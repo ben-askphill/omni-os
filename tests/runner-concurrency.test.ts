@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { startRunner } from './runner-harness.ts';
+import { startRunner } from './runner-boot.ts';
 import { sleep } from './support.ts';
 
 // One slot. Only turns in progress hold it; a warm idle process does not.

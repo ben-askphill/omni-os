@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { startRunner } from './runner-harness.ts';
+import { startRunner } from './runner-boot.ts';
 
 // Idle processes close after OMNI_KEEPALIVE_SECONDS; the next message resumes the session in a new one.
 const h = await startRunner({ OMNI_KEEPALIVE_SECONDS: '1' });

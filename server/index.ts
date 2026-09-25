@@ -8,7 +8,8 @@ import { z } from 'zod';
 import { config, paths, uploadsDir } from './config.ts';
 import { channels, threads, events, artifacts, search, type Channel, type Thread } from './db.ts';
 import { bus } from './bus.ts';
-import { createThread, sendMessage, interruptThread, getUsage, runningCount, queuedCount, pendingFor, isLive, shutdownAll } from './runner.ts';
+import { createThread, sendMessage, interruptThread, getUsage, runningCount, runningByHarness, queuedCount, pendingFor, isLive, shutdownAll } from './runner.ts';
+import { getCatalog, startCatalogRefresh } from './harness/catalog-service.ts';
 import { listCrew } from './crew.ts';
 import { listSecrets, setSecret, deleteSecret } from './secrets.ts';
 import { startArtifactWatcher, mimeFor } from './artifacts.ts';
@@ -103,6 +104,7 @@ const createSchema = z.object({
   prompt: z.string().min(1),
   role: z.string().nullish(),
   model: z.string().nullish(),
+  harness: z.string().nullish(),
   title: z.string().nullish(),
   parent_id: z.string().nullish(),
   task_id: z.string().nullish(),
@@ -285,6 +287,12 @@ api.post('/channels/:id/prs/:n/merge', async (c) => {
 
 api.get('/crew', (c) => c.json(listCrew()));
 
+// The harnesses with their availability, fix command, models, efforts, cap and running count.
+api.get('/harnesses', (c) => {
+  const running = runningByHarness();
+  return c.json(getCatalog().harnesses.map((h) => ({ ...h, running: running[h.id] ?? 0 })));
+});
+
 api.get('/secrets', (c) => c.json(listSecrets()));
 api.post('/secrets', async (c) => {
   const { scope, name, value } = z.object({ scope: z.string(), name: z.string(), value: z.string() }).parse(await c.req.json());
@@ -323,6 +331,7 @@ const interrupted = threads.failInterrupted();
 if (interrupted) console.log(`[omni] marked ${interrupted} interrupted thread(s) as failed`);
 startArtifactWatcher();
 startScheduler();
+startCatalogRefresh();
 
 const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
   console.log(`[omni] listening on http://${config.host}:${info.port}  brain=${config.brainDir}`);

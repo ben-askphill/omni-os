@@ -1,0 +1,58 @@
+// The harness adapter interface the runner drives. The runner keeps everything that
+// isn't harness-specific — queueing, send modes, keepalive, slots, crew reports, titles,
+// events and the feed — and each adapter owns its CLI's process and protocol, translating
+// to and from Omni's records. Claude Code's behaviour moves behind this unchanged.
+import type { ChildProcess } from 'node:child_process';
+import type { Channel, Thread } from '../db.ts';
+import type { CrewRole } from '../crew.ts';
+import type { Record as StreamRecord, Usage } from '../stream.ts';
+import type { HarnessCapabilities, HarnessId } from './types.ts';
+
+/** Everything an adapter needs to start a thread's process. */
+export interface AdapterContext {
+  thread: Thread;
+  channel: Channel;
+  role?: CrewRole;
+  /** Omni's context (channel facts, role charter, artifacts, secrets note). */
+  systemPrompt: string;
+  /** Per-thread MCP config file, when one was written. */
+  mcpFile: string | null;
+  /** Channel and global secret values. */
+  secretEnv: Record<string, string>;
+  /** Another thread already holds the channel's browser profile. */
+  browserBusy: boolean;
+  omniUrl: string;
+  /** Whether the CLI should resume its stored session rather than start fresh. */
+  resume: boolean;
+}
+
+/** The runner subscribes to these as the harness process runs. */
+export interface AdapterCallbacks {
+  /** One Omni record produced by the harness. */
+  record: (rec: StreamRecord) => void;
+  /** A usage snapshot for the meter. */
+  usage: (u: Usage) => void;
+  /** The harness's own session id, learned once the session starts (Codex thread id, Cursor chat id). */
+  session: (id: string) => void;
+}
+
+/** A running harness process, wired to the runner. */
+export interface HarnessSession {
+  /** The OS process, for signals (interrupt/kill) and stdin end. */
+  child: ChildProcess;
+  /**
+   * Translate a runner stdin object — a Claude-shaped `user` line or `control_request` —
+   * into the harness's protocol and write it. Returns false if the pipe is gone.
+   */
+  write(obj: unknown): boolean;
+  /** Flush any buffered stdout on close. */
+  flush?: () => void;
+}
+
+export interface HarnessAdapter {
+  readonly id: HarnessId;
+  readonly capabilities: HarnessCapabilities;
+  spawn(ctx: AdapterContext, cb: AdapterCallbacks): HarnessSession;
+  /** Whether a resume is warranted from on-disk session state, given the thread has not "run" in this process yet. */
+  resumeOnDisk?(thread: Thread): boolean;
+}

@@ -180,7 +180,13 @@ function DetailsTab({
   warm: boolean | undefined;
 }) {
   const cwd = init?.cwd || thread.cwd;
-  const resume = `cd ${shellQuote(cwd)} && claude --resume ${thread.session_id}`;
+  const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent' };
+  const resumeCmd: Record<string, string> = {
+    'claude-code': `claude --resume ${thread.session_id}`,
+    codex: `codex resume ${thread.session_id}`,
+    cursor: `cursor-agent --resume ${thread.session_id}`,
+  };
+  const resume = `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin h-full overflow-y-auto px-2.5 pb-3">
       <dl className="divide-y divide-line rounded-[18px] bg-bg py-1">
@@ -190,6 +196,7 @@ function DetailsTab({
           </a>
         </Row>
         <Row k="Role">{thread.role ?? <span className="text-fg-3">none</span>}</Row>
+        <Row k="Harness">{HARNESS_NAME[thread.harness] ?? thread.harness}</Row>
         <Row k="Model">
           {thread.model || init?.model || <span className="text-fg-3">default</span>}
           {thread.model && init?.model && init.model !== thread.model && <span className="ml-1 text-fg-3">({init.model})</span>}

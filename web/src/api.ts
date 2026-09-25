@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Thread, Channel, EventRow, Artifact } from '../../server/db.ts';
 import type { Attachment } from '../../server/uploads.ts';
+import type { HarnessInfo, ModelEntry, HarnessId } from '../../server/harness/types.ts';
 
-export type { Thread, Channel, EventRow, Artifact, Attachment };
+export type { Thread, Channel, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId };
+
+/** A harness in the catalog, plus how many of its threads are running now. */
+export type HarnessWithRunning = HarnessInfo & { running: number };
 
 // ---------- response shapes ----------
 
