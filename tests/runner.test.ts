@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { startRunner } from './runner-harness.ts';
+import { startRunner } from './runner-boot.ts';
 import { sleep } from './support.ts';
 
 // Integration: the real runner, a temp data dir and the fake claude CLI (tests/fixtures/fake-claude.mjs).

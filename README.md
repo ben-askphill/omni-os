@@ -9,7 +9,7 @@ One local workspace for all agent work. Replaces hopping between Claude Desktop,
 - **GitHub panel** per repo channel: PRs, checks, diff, merge (with confirm)
 - **Conductor**: one front agent that delegates to crew roles; reports come back to it automatically
 - **Automations**: cron YAML, every run is its own thread
-- Runs on your **Claude subscription** through the official `claude` CLI. No API key, no Cursor caps.
+- Runs each thread on the harness you pick — **Claude Code** (Claude plan) or **Codex** (ChatGPT plan) — through its official CLI. No API key.
 
 ## Run
 

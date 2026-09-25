@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from 'react';
-import { api, errorText, MODELS, type SendMode, type Thread } from '../api.ts';
+import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { bytes } from '../format.ts';
 import { navigate, takeComposerFocus } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { ErrorNote, Icon, IconButton, Kbd, Picker, Spinner, type IconName, type PickerOption } from './ui.tsx';
+import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
 
 // Unsent text survives navigation (not reloads). Keyed by where the composer lives.
 const drafts = new Map<string, string>();
@@ -240,7 +241,8 @@ export function NewThreadComposer({
   const [text, setText] = useState(() => drafts.get(key) ?? '');
   const [channel, setChannel] = useState(channelId ?? defaultChannel);
   const [role, setRole] = useState<string>(() => ((channelId ?? defaultChannel) === 'conductor' ? 'conductor' : ''));
-  const [model, setModel] = useState('');
+  const [choice, setChoice] = useState<ModelChoice>({ harness: 'claude-code', model: '' });
+  const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -251,6 +253,15 @@ export function NewThreadComposer({
   useEffect(() => {
     if (channelId) setChannel(channelId);
   }, [channelId]);
+
+  // A new composer starts on Claude Code's default model, not on the last pick.
+  useEffect(() => {
+    if (!harnesses || choice.model) return;
+    const claude = harnesses.find((h) => h.id === 'claude-code');
+    const def = claude?.models.find((m) => m.default) ?? claude?.models[0];
+    if (def) setChoice({ harness: 'claude-code', model: def.id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [harnesses]);
 
   // Default the role once crew loads, if the conductor channel is selected.
   useEffect(() => {
@@ -285,7 +296,7 @@ export function NewThreadComposer({
     try {
       const t = await api.send<Thread>(
         '/threads',
-        { channel, prompt, role: role || undefined, model: model || undefined },
+        { channel, prompt, role: role || undefined, harness: choice.harness, model: choice.model || undefined },
         att.files,
       );
       drafts.delete(key);
@@ -311,11 +322,6 @@ export function NewThreadComposer({
     { value: '', label: 'No role', sub: 'Plain Claude, no charter', avatar: false, icon: 'x' },
     ...crew.map((r) => ({ value: r.id, label: r.name, sub: r.description, avatar: r.name })),
   ];
-  const modelOptions: PickerOption<string>[] = [
-    { value: '', label: roleObj?.model ? `Default (${roleObj.model})` : 'Default model', sub: roleObj?.model ? `Set by ${roleObj.name}` : undefined, avatar: false, icon: 'sliders' },
-    ...MODELS.map((m) => ({ value: m, label: m, avatar: false as const, icon: 'zap' as const })),
-  ];
-
   return (
     <div className={shell(big ? 'rounded-[30px] bg-surface' : 'rounded-[26px] bg-surface', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
@@ -339,7 +345,7 @@ export function NewThreadComposer({
         <AttachButton onPick={att.add} disabled={busy} />
         {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
         <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />
-        <Picker label="Model" value={model} options={modelOptions} onChange={setModel} />
+        {harnesses && <ModelPicker harnesses={harnesses} value={choice} onChange={setChoice} />}
         <div className="ml-auto flex items-center gap-2.5">
           <Hint />
           <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>

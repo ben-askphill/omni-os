@@ -23,6 +23,11 @@ export const config = {
   defaultModel: env.OMNI_DEFAULT_MODEL ?? 'claude-opus-5-5',
   permissionMode: env.OMNI_PERMISSION_MODE ?? 'bypassPermissions',
   maxConcurrent: Number(env.OMNI_MAX_CONCURRENT ?? 4),
+  /** Per-harness concurrency caps. Claude Code uses OMNI_MAX_CONCURRENT. */
+  maxConcurrentCodex: Number(env.OMNI_MAX_CONCURRENT_CODEX ?? 4),
+  maxConcurrentCursor: Number(env.OMNI_MAX_CONCURRENT_CURSOR ?? 4),
+  codexBin: env.OMNI_CODEX_BIN,
+  cursorBin: env.OMNI_CURSOR_BIN,
   /** How long a thread's claude process stays warm after a turn. 0 closes it right away. */
   keepAliveSeconds: Number(env.OMNI_KEEPALIVE_SECONDS ?? 600),
   /** After an interrupt, how long the turn gets to wind down before the process is killed. */

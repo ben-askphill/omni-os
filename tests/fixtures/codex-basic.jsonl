@@ -1,0 +1,9 @@
+{"method":"turn/started","params":{"threadId":"th_abc","turnId":"turn_1"}}
+{"method":"item/started","params":{"threadId":"th_abc","item":{"id":"item_1","type":"commandExecution","command":"ls -la"}}}
+{"method":"item/completed","params":{"threadId":"th_abc","item":{"id":"item_1","type":"commandExecution","command":"ls -la","aggregatedOutput":"total 0\ndrwxr-xr-x  2 ben  staff   64 file.txt","exitCode":0}}}
+{"method":"item/agentMessage/delta","params":{"threadId":"th_abc","itemId":"item_2","delta":"Here"}}
+{"method":"item/completed","params":{"threadId":"th_abc","item":{"id":"item_2","type":"agentMessage","text":"Here is the listing you asked for."}}}
+{"method":"item/completed","params":{"threadId":"th_abc","item":{"id":"item_r","type":"reasoning","summary":"thinking about the task"}}}
+{"method":"thread/tokenUsage/updated","params":{"threadId":"th_abc","usage":{"inputTokens":1200,"outputTokens":80}}}
+{"method":"account/rateLimits/updated","params":{"id":"codex","primary":{"usedPercent":12,"resetsAt":1790328600,"windowMinutes":300},"secondary":{"usedPercent":3,"resetsAt":1790922600,"windowMinutes":10080}}}
+{"method":"turn/completed","params":{"threadId":"th_abc","turnId":"turn_1"}}

@@ -30,6 +30,8 @@ export interface Thread {
   status: ThreadStatus;
   role: string | null;
   model: string | null;
+  /** The harness this thread runs on. Existing rows migrate to 'claude-code'. */
+  harness: string;
   session_id: string;
   has_run: number;
   cwd: string;
@@ -90,6 +92,7 @@ CREATE TABLE IF NOT EXISTS threads (
   status TEXT NOT NULL,
   role TEXT,
   model TEXT,
+  harness TEXT NOT NULL DEFAULT 'claude-code',
   session_id TEXT NOT NULL,
   has_run INTEGER NOT NULL DEFAULT 0,
   cwd TEXT NOT NULL,
@@ -147,6 +150,20 @@ CREATE TABLE IF NOT EXISTS automation_runs (
 
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `);
+
+/**
+ * Startup migration: add columns the current schema needs to a database created by an older
+ * version. Safe to run again. Existing threads pick up the column default, so they open as
+ * Claude Code threads with their model unchanged.
+ */
+function ensureColumn(table: string, column: string, decl: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[];
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+}
+export function migrate() {
+  ensureColumn('threads', 'harness', `TEXT NOT NULL DEFAULT 'claude-code'`);
+}
+migrate();
 
 const now = () => new Date().toISOString();
 
@@ -223,19 +240,19 @@ export const threads = {
       .prepare(`SELECT * FROM threads ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY updated_at DESC LIMIT ?`)
       .all(...args) as unknown as Thread[];
   },
-  create(t: Omit<Thread, 'created_at' | 'updated_at' | 'has_run' | 'last_text'> & { has_run?: number; created_at?: string }) {
+  create(t: Omit<Thread, 'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'harness'> & { has_run?: number; created_at?: string; harness?: string }) {
     const ts = t.created_at ?? now();
     db.prepare(
-      `INSERT INTO threads (id, channel_id, title, status, role, model, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO threads (id, channel_id, title, status, role, model, harness, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
-      t.id, t.channel_id, t.title, t.status, t.role, t.model, t.session_id, t.has_run ?? 0, t.cwd,
+      t.id, t.channel_id, t.title, t.status, t.role, t.model, t.harness ?? 'claude-code', t.session_id, t.has_run ?? 0, t.cwd,
       t.branch, t.parent_id, t.task_id, t.source, t.automation, ts, ts,
     );
     return threads.get(t.id)!;
   },
   update(id: string, patch: Partial<Thread>) {
-    const allowed = ['title', 'status', 'model', 'has_run', 'cwd', 'branch', 'last_text', 'updated_at'] as const;
+    const allowed = ['title', 'status', 'model', 'harness', 'session_id', 'has_run', 'cwd', 'branch', 'last_text', 'updated_at'] as const;
     const keys = allowed.filter((k) => k in patch);
     const sets = keys.map((k) => `${k} = ?`);
     const vals = keys.map((k) => (patch[k] ?? null) as string | number | null);

@@ -1,27 +1,35 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { tmpdir, homedir } from 'node:os';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
 import { channels, events, threads, kv, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
 import { prepareWorkdir, writeMcpConfig } from './sandbox.ts';
 import { describeAttachments, inlinable, messageContent, saveUploads, type Attachment } from './uploads.ts';
 import { secretsEnv } from './secrets.ts';
-import { parseEvent, LineSplitter, type Usage, type Record as StreamRecord } from './stream.ts';
+import { type Usage, type Record as StreamRecord } from './stream.ts';
 import { publishFeed, publishThread } from './bus.ts';
+import { harnessEnv } from './harness/env-guard.ts';
+import { CAPABILITIES, isHarnessId, type HarnessId } from './harness/types.ts';
+import { getHarness, validateRun } from './harness/catalog.ts';
+import { getCatalog } from './harness/catalog-service.ts';
+import type { AdapterContext, HarnessAdapter } from './harness/adapter.ts';
+import { claudeAdapter } from './harness/claude/adapter.ts';
+import { codexAdapter } from './harness/codex/adapter.ts';
 
 const omniUrl = () => `http://127.0.0.1:${config.port}`;
 
-// Subscription only: with an API key in its env, `claude -p` bills that key instead of the logged-in plan
-// (and fails with 401 when the key is stale). A shell profile or a channel secret must never switch that.
-const API_AUTH_VARS = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'];
-function cliEnv(extra: Record<string, string>): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env, ...extra };
-  for (const name of API_AUTH_VARS) delete env[name];
-  return env;
-}
+const ADAPTERS: Record<string, HarnessAdapter> = {
+  'claude-code': claudeAdapter,
+  codex: codexAdapter,
+};
+const adapterFor = (harness: string): HarnessAdapter => ADAPTERS[harness] ?? claudeAdapter;
+const capsOf = (harness: string) => CAPABILITIES[harness as HarnessId] ?? CAPABILITIES['claude-code'];
+const harnessSteers = (threadId: string) => capsOf(threads.get(threadId)?.harness ?? 'claude-code').steer;
+/** The CLI name a harness shows in errors and the resume command. */
+const CLI_LABEL: Record<string, string> = { 'claude-code': 'claude', codex: 'codex', cursor: 'cursor-agent' };
+const cliLabel = (harness: string) => CLI_LABEL[harness] ?? harness;
 
 // ---------- state ----------
 
@@ -58,6 +66,10 @@ interface Live {
   channelId: string;
   /** null while secrets and the MCP config are prepared; inflight is written right after spawn. */
   child: ChildProcess | null;
+  /** The adapter's stdin encoder, set right after spawn. */
+  write: ((obj: unknown) => boolean) | null;
+  /** Flush buffered adapter stdout on close. */
+  flush: (() => void) | null;
   sessionId: string;
   /** A turn is in progress. Holds a concurrency slot. */
   turn: boolean;
@@ -112,6 +124,17 @@ const alive = (c: ChildProcess) => c.exitCode === null && c.signalCode === null;
 export const runningCount = () => [...lives.values()].filter((l) => l.turn).length;
 export const queuedCount = () => waiting.length;
 
+/** Running turns per harness, for the usage card footer and the harness endpoint. */
+export const runningByHarness = (): Record<string, number> => {
+  const out: Record<string, number> = {};
+  for (const l of lives.values()) {
+    if (!l.turn) continue;
+    const h = threads.get(l.threadId)?.harness ?? 'claude-code';
+    out[h] = (out[h] ?? 0) + 1;
+  }
+  return out;
+};
+
 /** A warm claude process exists for this thread. */
 export const isLive = (threadId: string) => {
   const l = lives.get(threadId);
@@ -151,8 +174,14 @@ function deliver(threadId: string, m: Msg) {
     live = lives.get(threadId);
   }
   if (live?.turn && !live.closing) {
-    if (m.mode === 'queue') live.held.push(m);
-    else {
+    const steerable = harnessSteers(threadId);
+    // A harness that can't steer queues a steer, and stops the process on interrupt so the next
+    // message resumes the session (there is no mid-turn control to send).
+    if (m.mode === 'queue' || (m.mode === 'steer' && !steerable)) live.held.push(m);
+    else if (m.mode === 'interrupt' && !steerable) {
+      live.held.push(m);
+      hardKill(live);
+    } else {
       m.midTurn = true;
       send(live, m);
       if (m.mode === 'interrupt') requestInterrupt(live);
@@ -201,14 +230,7 @@ function begin(threadId: string, [first, ...rest]: Msg[]) {
 // ---------- process ----------
 
 function writeLine(live: Live, obj: unknown) {
-  const stdin = live.child?.stdin;
-  if (!stdin || stdin.destroyed || stdin.writableEnded) return false;
-  try {
-    stdin.write(JSON.stringify(obj) + '\n');
-    return true;
-  } catch {
-    return false;
-  }
+  return live.write ? live.write(obj) : false;
 }
 
 /**
@@ -431,7 +453,7 @@ function onExit(live: Live, code: number | null, signal: NodeJS.Signals | null) 
     if (live.shutdown) addEvent(id, 'error', { text: 'Omni shut down while this turn was running.' });
     else if (!live.hardStop && !live.spawnFailed) {
       const how = code === null ? `signal ${signal}` : `code ${code}`;
-      addEvent(id, 'error', { text: `claude exited with ${how}.\n${live.stderr.trim().slice(-2000)}` });
+      addEvent(id, 'error', { text: `${cliLabel(thread.harness)} exited with ${how}.\n${live.stderr.trim().slice(-2000)}` });
     }
     drop(id, undelivered);
     threads.update(id, {
@@ -457,6 +479,8 @@ function launch(threadId: string, first: Msg): Live | undefined {
     threadId,
     channelId: thread.channel_id,
     child: null,
+    write: null,
+    flush: null,
     sessionId: thread.session_id,
     turn: true,
     cliTurn: false,
@@ -503,21 +527,6 @@ async function spawnLive(live: Live, thread: Thread) {
   }
   const mcpFile = writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, omniUrl: omniUrl() });
 
-  const args = [
-    '-p',
-    '--input-format', 'stream-json',
-    '--output-format', 'stream-json',
-    '--verbose',
-    '--replay-user-messages',
-    '--model', thread.model || role?.model || config.defaultModel,
-    '--permission-mode', config.permissionMode,
-    '--add-dir', threadDir(thread.id),
-    '--append-system-prompt', buildSystemPrompt(thread, channel, role),
-  ];
-  if (thread.cwd !== config.brainDir) args.push('--add-dir', config.brainDir);
-  if (mcpFile) args.push('--mcp-config', mcpFile);
-  args.push(thread.has_run || sessionOnDisk(thread) ? '--resume' : '--session-id', thread.session_id);
-
   let secretEnv: Record<string, string> = {};
   try {
     secretEnv = await secretsEnv(channel.id);
@@ -527,55 +536,42 @@ async function spawnLive(live: Live, thread: Thread) {
   // Interrupted or shut down while secrets were read.
   if (lives.get(thread.id) !== live) return;
 
-  const child = spawn(config.claudeBin, args, {
-    cwd: thread.cwd,
-    env: cliEnv({
-      ...secretEnv,
-      CLAUDE_CODE_ENTRYPOINT: 'omni-os',
-      CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
-      OMNI_URL: omniUrl(),
-      OMNI_THREAD_ID: thread.id,
-      OMNI_THREAD_DIR: threadDir(thread.id),
-      OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),
-      OMNI_CHANNEL: channel.id,
-    }),
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  live.child = child;
-
-  const splitter = new LineSplitter();
-  const handleLine = (line: string) => {
-    let evt: unknown;
-    try {
-      evt = JSON.parse(line);
-    } catch {
-      return;
-    }
-    try {
-      const parsed = parseEvent(evt);
-      if (parsed.usage) {
-        kv.set('usage', parsed.usage);
-        publishFeed({ type: 'usage', usage: parsed.usage });
-      }
-      for (const rec of parsed.records) onRecord(live, rec);
-    } catch (err) {
-      console.error(`[runner] ${thread.id} bad event:`, err);
-    }
+  const ctx: AdapterContext = {
+    thread,
+    channel,
+    role,
+    systemPrompt: buildSystemPrompt(thread, channel, role),
+    mcpFile,
+    secretEnv,
+    browserBusy,
+    omniUrl: omniUrl(),
+    resume: !!thread.has_run,
   };
+  const session = adapterFor(thread.harness).spawn(ctx, {
+    record: (rec) => onRecord(live, rec),
+    usage: (u) => {
+      kv.set('usage', u);
+      publishFeed({ type: 'usage', usage: u });
+    },
+    session: (sid) => {
+      live.sessionId = sid;
+      const t = threads.get(thread.id);
+      if (t && t.session_id !== sid) threads.update(thread.id, { session_id: sid, updated_at: t.updated_at });
+    },
+  });
+  const child = session.child;
+  live.child = child;
+  live.write = session.write;
+  live.flush = session.flush ?? null;
 
-  // setEncoding keeps multibyte characters intact when they straddle two chunks.
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', (d: string) => splitter.push(d).forEach(handleLine));
-  child.stderr.on('data', (d: string) => (live.stderr = (live.stderr + d).slice(-8000)));
-  // EPIPE when the CLI dies first. The close handler reports it.
-  child.stdin.on('error', () => {});
+  child.stderr?.setEncoding('utf8');
+  child.stderr?.on('data', (d: string) => (live.stderr = (live.stderr + d).slice(-8000)));
   child.on('error', (err) => {
     live.spawnFailed = true;
-    addEvent(thread.id, 'error', { text: `Could not start claude: ${err.message}` });
+    addEvent(thread.id, 'error', { text: `Could not start ${cliLabel(thread.harness)}: ${err.message}` });
   });
   child.on('close', (code, signal) => {
-    splitter.flush().forEach(handleLine);
+    live.flush?.();
     onExit(live, code, signal);
   });
 
@@ -587,12 +583,6 @@ async function spawnLive(live: Live, thread: Thread) {
     }
   }
   emitThread(thread.id);
-}
-
-// A run killed before its result event may still have written the session file.
-function sessionOnDisk(t: Thread) {
-  const dir = join(homedir(), '.claude', 'projects', t.cwd.replace(/[^a-zA-Z0-9]/g, '-'));
-  return existsSync(join(dir, `${t.session_id}.jsonl`));
 }
 
 function reportToParent(childId: string, status: string, text: string) {
@@ -667,6 +657,7 @@ export interface CreateThreadInput {
   prompt: string;
   role?: string | null;
   model?: string | null;
+  harness?: string | null;
   title?: string | null;
   parent_id?: string | null;
   task_id?: string | null;
@@ -681,6 +672,22 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const channelId = input.channel || role?.channel || 'inbox';
   const channel = channels.get(channelId);
   if (!channel) throw new Error(`unknown channel "${channelId}"`);
+
+  // Resolve and validate the harness against the catalog. Claude Code is the default, so callers
+  // that pass no harness (the menu bar app, the conductor) keep working. Role defaults are #16.
+  const harness: HarnessId = isHarnessId(input.harness) ? input.harness : 'claude-code';
+  if (input.harness && !isHarnessId(input.harness)) throw new Error(`Unknown harness "${input.harness}".`);
+  const cat = getCatalog();
+  const hInfo = getHarness(cat, harness);
+  if (!hInfo) throw new Error(`Unknown harness "${harness}".`);
+  if (!hInfo.available && hInfo.models.length === 0) {
+    throw new Error(`${hInfo.name} is not available. Run \`${hInfo.fix ?? ''}\`.`.trim());
+  }
+  if (input.model) {
+    const check = validateRun(cat, harness, input.model, '');
+    if (!check.ok) throw new Error(check.error);
+  }
+
   const id = randomUUID();
   const wd = await prepareWorkdir(channel, id);
   const thread = threads.create({
@@ -690,6 +697,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     status: 'queued',
     role: role?.id ?? null,
     model: input.model || null,
+    harness,
     session_id: id,
     cwd: wd.cwd,
     branch: wd.branch,
@@ -746,7 +754,12 @@ export function interruptThread(threadId: string): Thread | undefined {
   if (live?.turn && !live.closing) {
     // Still starting up (MCP servers can take 13s): no turn to wind down, and a queued message would run anyway.
     if (!live.child || !live.initSeen) stopStartup(live);
-    else {
+    else if (!harnessSteers(threadId)) {
+      // No graceful interrupt: end the process. The next message resumes the session.
+      drop(threadId, live.held);
+      live.held = [];
+      hardKill(live);
+    } else {
       drop(threadId, live.held);
       live.held = [];
       requestInterrupt(live);
@@ -807,7 +820,7 @@ function generateTitle(threadId: string, prompt: string) {
   const child = spawn(
     config.claudeBin,
     ['-p', '--model', 'haiku', '--output-format', 'text', '--strict-mcp-config', '--no-session-persistence', '--tools', ''],
-    { cwd: tmpdir(), env: cliEnv({ CLAUDE_CODE_ENTRYPOINT: 'omni-os-title' }), stdio: ['pipe', 'pipe', 'ignore'] },
+    { cwd: tmpdir(), env: harnessEnv('claude-code', { CLAUDE_CODE_ENTRYPOINT: 'omni-os-title' }), stdio: ['pipe', 'pipe', 'ignore'] },
   );
   child.stdin.on('error', () => {});
   child.stdin.end(
