@@ -23,17 +23,24 @@ export const config = {
   defaultModel: env.OMNI_DEFAULT_MODEL ?? 'opus',
   permissionMode: env.OMNI_PERMISSION_MODE ?? 'bypassPermissions',
   maxConcurrent: Number(env.OMNI_MAX_CONCURRENT ?? 4),
+  /** How long a thread's claude process stays warm after a turn. 0 closes it right away. */
+  keepAliveSeconds: Number(env.OMNI_KEEPALIVE_SECONDS ?? 600),
+  /** After an interrupt, how long the turn gets to wind down before the process is killed. */
+  interruptGraceMs: Number(env.OMNI_INTERRUPT_GRACE_MS ?? 8000),
   browser: (env.OMNI_BROWSER ?? '1') !== '0',
   maxUploadMb: Number(env.OMNI_MAX_UPLOAD_MB ?? 25),
   timezone: env.OMNI_TZ ?? 'Europe/Amsterdam',
 };
 
+// OMNI_DATA_DIR moves all runtime state, so tests can run against a temp dir.
+const DATA = env.OMNI_DATA_DIR ? resolve(ROOT, env.OMNI_DATA_DIR) : join(ROOT, 'data');
+
 export const paths = {
-  data: join(ROOT, 'data'),
-  db: join(ROOT, 'data', 'omni.db'),
-  threads: join(ROOT, 'data', 'threads'),
-  worktrees: join(ROOT, 'data', 'worktrees'),
-  browsers: join(ROOT, 'data', 'browsers'),
+  data: DATA,
+  db: join(DATA, 'omni.db'),
+  threads: join(DATA, 'threads'),
+  worktrees: join(DATA, 'worktrees'),
+  browsers: join(DATA, 'browsers'),
   crew: join(ROOT, 'crew'),
   automations: join(ROOT, 'automations'),
   webDist: join(ROOT, 'web', 'dist'),

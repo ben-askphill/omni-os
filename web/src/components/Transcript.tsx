@@ -1,5 +1,5 @@
 import { memo, useMemo, useState, type ReactNode } from 'react';
-import { parsePayload, uploadUrl, type Attachment, type EventRow } from '../api.ts';
+import { parsePayload, uploadUrl, type Attachment, type EventRow, type PendingMsg } from '../api.ts';
 import { bytes, clock, duration, plural, shortPath, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { Markdown } from './Markdown.tsx';
@@ -11,6 +11,10 @@ interface UserP {
   text: string;
   source?: string;
   attachments?: Attachment[];
+  /** Set when the message was sent while a turn was in progress. */
+  mode?: 'steer' | 'queue' | 'interrupt';
+  /** The run ended before the agent saw this message. */
+  dropped?: boolean;
 }
 interface TextP {
   text: string;
@@ -43,6 +47,7 @@ interface ReportP {
   role?: string | null;
   channel?: string;
   status?: string;
+  dropped?: boolean;
 }
 
 export interface ToolCall {
@@ -125,7 +130,8 @@ function buildItems(events: EventRow[]): { items: Item[]; plan: { todos: Todo[];
         break;
       case 'result': {
         const p = parsePayload<ResultP>(e);
-        // Zero-turn success: the CLI flushing a background task on resume, not a real turn.
+        // Zero-turn success is not a real turn: a local slash command (its output is stored as text
+        // just before) or, in older threads, the CLI flushing a background task on resume.
         if (p.ok && !p.turns) break;
         group = null;
         items.push({ type: 'result', key: e.id, p });
@@ -264,10 +270,22 @@ function ToolInput({ c }: { c: ToolCall }) {
   return <Pre>{json.length > 6000 ? json.slice(0, 6000) + '\n...' : json}</Pre>;
 }
 
+// The CLI answers a tool it cut short with one of these texts: an interrupt, or a turn abort
+// that skipped queued tools or dropped a running one. Not a failure.
+const STOPPED_TOOL = [
+  "The user doesn't want to proceed with this tool use",
+  "The user doesn't want to take this action right now",
+  '[Tool call skipped',
+  '[Tool call did not complete',
+  '[Request interrupted by user',
+];
+const interruptedTool = (c: ToolCall) => !!c.result?.is_error && STOPPED_TOOL.some((t) => c.result!.text.startsWith(t));
+
 function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | null; running: boolean; depth?: number }) {
   const [open, setOpen] = useState(false);
   const pending = !c.result;
-  const err = c.result?.is_error;
+  const stopped = interruptedTool(c);
+  const err = c.result?.is_error && !stopped;
   const summary = toolSummary(c, cwd);
   const mono = ['Bash', 'Read', 'Edit', 'Write', 'MultiEdit', 'Glob', 'Grep'].includes(c.name);
   const indent = depth > 0 || c.orphan;
@@ -284,7 +302,13 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
         <span className={`shrink-0 font-medium ${err ? 'text-bad' : 'text-fg-2'}`}>{toolLabel(c.name)}</span>
         <span className={`min-w-0 flex-1 truncate text-fg-3 ${mono ? 'font-mono text-[11.5px]' : ''}`}>{summary}</span>
         {c.children.length > 0 && <span className="shrink-0 font-num text-[11px] text-fg-4">{c.children.length} sub-calls</span>}
-        {pending && running ? <Spinner size={11} className="text-fg-3" /> : err ? <span className="shrink-0 font-num text-[11px] text-bad">error</span> : null}
+        {pending && running ? (
+          <Spinner size={11} className="text-fg-3" />
+        ) : err ? (
+          <span className="shrink-0 font-num text-[11px] text-bad">error</span>
+        ) : stopped ? (
+          <span className="shrink-0 font-num text-[11px] text-fg-4">stopped</span>
+        ) : null}
       </button>
       {open && (
         <div className="fade-in mt-1 mb-2.5 ml-7 space-y-1.5">
@@ -332,7 +356,7 @@ function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; 
     return <ToolRow c={calls[0]} cwd={cwd} running={running} />;
   }
   const all = flatten(calls);
-  const errors = all.filter((c) => c.result?.is_error).length;
+  const errors = all.filter((c) => c.result?.is_error && !interruptedTool(c)).length;
   const live = running && isLast && all.some((c) => !c.result);
   const latest = all[all.length - 1];
   const names = countNames(calls);
@@ -437,20 +461,36 @@ const SOURCE_LABEL: Record<string, string> = {
   import: 'Imported',
 };
 
-/** Follow-ups (and crew reports) waiting for the current turn; shown under the live output. */
-export function QueuedMessages({ items }: { items: { kind: string; text?: string; source?: string; task_id?: string | null; role?: string | null; attachments?: Attachment[] }[] }) {
+function pendingLabel(m: PendingMsg, lead: boolean) {
+  if (m.state === 'waiting') return 'Waiting for a free slot';
+  if (m.state === 'held') return 'Queued, runs after this turn';
+  if (lead) return 'Sent, starting now';
+  return m.mode === 'interrupt' ? 'Interrupting, runs next' : 'Steering, delivered at its next step';
+}
+
+/**
+ * Messages (and crew reports) the agent has not read yet; shown under the live output.
+ * `starting`: no turn is under way yet, so the first sent message starts one instead of steering it.
+ */
+export function QueuedMessages({ items, starting = false }: { items: PendingMsg[]; starting?: boolean }) {
   if (!items.length) return null;
+  const lead = starting ? items.find((m) => m.state === 'sent') : undefined;
   return (
     <div className="mt-5 flex flex-col gap-3">
       {items.map((m, i) =>
         m.kind === 'crew_report' ? (
-          <div key={i} className="flex items-center gap-1.5 text-[12px] text-fg-3">
-            <Icon name="clock" size={12} /> Crew report{m.task_id ? ` ${m.task_id}` : ''}{m.role ? ` from ${m.role}` : ''} queued
+          <div key={m.uuid ?? i} className="flex items-center gap-1.5 text-[12px] text-fg-3">
+            <Icon name={m.state === 'sent' ? 'send' : 'clock'} size={12} />
+            <span className="min-w-0">
+              Crew report{m.task_id ? ` ${m.task_id}` : ''}
+              {m.role ? ` from ${m.role}` : ''}
+              {m === lead ? ', starting now' : m.state === 'sent' ? ', delivered at its next step' : m.state === 'waiting' ? ', waiting for a free slot' : ' queued'}
+            </span>
           </div>
         ) : (
-          <div key={i} className="flex flex-col items-end opacity-70">
+          <div key={m.uuid ?? i} className="flex flex-col items-end opacity-70">
             <div className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-fg-3">
-              <Icon name="clock" size={12} /> Queued
+              <Icon name={m.state === 'sent' ? 'send' : 'clock'} size={12} /> {pendingLabel(m, m === lead)}
               {m.attachments?.length ? <span className="text-fg-4">· {plural(m.attachments.length, 'file')}</span> : null}
             </div>
             <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
@@ -468,16 +508,27 @@ function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: strin
   const text = p.text ?? '';
   const long = text.length > 1400;
   const label = p.source ? SOURCE_LABEL[p.source] : undefined;
+  const how = p.dropped ? null : p.mode === 'steer' ? 'Steered' : p.mode === 'interrupt' ? 'Interrupted and sent' : null;
   return (
-    <div className="flex flex-col items-end">
-      <div className="mb-1 flex items-center gap-2 text-[11.5px] text-fg-3">
+    <div className={`flex flex-col items-end ${p.dropped ? 'opacity-60' : ''}`}>
+      <div className="mb-1 flex flex-wrap items-center justify-end gap-x-2 text-[11.5px] text-fg-3">
         {label && <span className={`font-medium ${p.source === 'conductor' ? 'text-info' : ''}`}>{label}</span>}
+        {how && (
+          <span className={`inline-flex items-center gap-1 font-medium ${p.mode === 'interrupt' ? 'text-warn' : ''}`}>
+            <Icon name={p.mode === 'interrupt' ? 'stop' : 'send'} size={11} /> {how}
+          </span>
+        )}
+        {p.dropped && (
+          <span className="inline-flex items-center gap-1 font-medium" title="The run ended before the agent read this message">
+            <Icon name="x" size={11} /> Not sent
+          </span>
+        )}
         <span className="font-num text-[11px] text-fg-4">{clock(toDate(at))}</span>
       </div>
       {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} /> : null}
       <div
         className={`max-w-[92%] rounded-[22px] rounded-tr-lg px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%] ${
-          p.source === 'conductor' ? 'bg-info-bg text-fg' : 'bg-bubble'
+          p.dropped ? 'border border-dashed border-line-strong' : p.source === 'conductor' ? 'bg-info-bg text-fg' : 'bg-bubble'
         }`}
       >
         {long && !more ? text.slice(0, 1200) + '...' : text}
@@ -522,12 +573,17 @@ function ErrorCallout({ text }: { text: string }) {
 
 function ReportCard({ p }: { p: ReportP }) {
   return (
-    <div className="overflow-hidden rounded-[22px] bg-surface">
+    <div className={`overflow-hidden rounded-[22px] bg-surface ${p.dropped ? 'opacity-60' : ''}`}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-3 text-[12.5px]">
         <span className="grid h-7 w-7 place-items-center rounded-full bg-bg text-fg-3">
           <Icon name="inbox" size={14} />
         </span>
         <span className="font-medium">Report from {p.role ?? 'crew'}</span>
+        {p.dropped && (
+          <span className="text-[11.5px] font-medium text-fg-3" title="The run ended before the agent read this report">
+            Not delivered
+          </span>
+        )}
         {p.task_id && <span className="font-mono text-[11.5px] text-fg-3">{p.task_id}</span>}
         {p.channel && (
           <a href={href.channel(p.channel)} className="text-fg-3 hover:text-fg">

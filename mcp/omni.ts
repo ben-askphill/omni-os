@@ -65,11 +65,21 @@ server.registerTool(
 server.registerTool(
   'message_thread',
   {
-    description: 'Send a follow-up to an existing thread (yours or any other). It resumes with full context.',
-    inputSchema: { thread_id: z.string(), message: z.string() },
+    description:
+      'Send a message to an existing thread (yours or any other). It resumes with full context. ' +
+      'If the thread is busy, mode "steer" (default) hands it over at its next step so it adjusts while it keeps working; ' +
+      'mode "queue" waits until its current turn ends and then runs as a new turn.',
+    inputSchema: {
+      thread_id: z.string(),
+      message: z.string(),
+      mode: z.enum(['steer', 'queue']).optional().describe('steer (default): read at its next step if busy. queue: after its current turn.'),
+    },
   },
-  async ({ thread_id, message }) => {
-    const t = await call(`/threads/${thread_id}/messages`, { method: 'POST', body: JSON.stringify({ prompt: message, from: 'conductor' }) });
+  async ({ thread_id, message, mode }) => {
+    const t = await call(`/threads/${thread_id}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ prompt: message, from: 'conductor', mode: mode ?? 'steer' }),
+    });
     return text({ thread_id: t.id, status: t.status });
   },
 );

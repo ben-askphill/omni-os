@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type EventRow, type PendingMsg, type Thread, type ThreadDetail } from '../api.ts';
+import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type EventRow, type PendingMsg, type SendMode, type Thread, type ThreadDetail } from '../api.ts';
 import { ArtifactViewer, kindIcon } from '../components/ArtifactViewer.tsx';
 import { ReplyComposer } from '../components/Composer.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
-import { Avatar, Button, Chip, CopyButton, Empty, ErrorNote, Icon, IconButton, InlineConfirm, LinkButton, Loading, Modal, StatusDot, StatusPill, Tabs } from '../components/ui.tsx';
+import { Avatar, Button, Chip, CopyButton, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Modal, StatusDot, StatusPill, Tabs } from '../components/ui.tsx';
 import { duration, fullDate, plural, relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { readPref, useApp, useFeed, useIsMobile, writePref } from '../store.tsx';
@@ -169,6 +169,7 @@ function DetailsTab({
   children,
   init,
   lastResult,
+  warm,
 }: {
   thread: Thread;
   channel: Channel | undefined;
@@ -176,6 +177,7 @@ function DetailsTab({
   children: Thread[];
   init: InitP | null;
   lastResult: ResultP | null;
+  warm: boolean | undefined;
 }) {
   const cwd = init?.cwd || thread.cwd;
   const resume = `cd ${shellQuote(cwd)} && claude --resume ${thread.session_id}`;
@@ -206,6 +208,12 @@ function DetailsTab({
         </Row>
         <Row k="Session">
           <span className="font-mono text-[12px]">{thread.session_id}</span>
+          {warm !== undefined && (
+            <div className="mt-0.5 flex items-center gap-1.5 text-fg-3">
+              <StatusDot status={warm ? 'done' : 'imported'} size={6} />
+              {warm ? 'Live, the next message starts instantly' : 'Not running, the next message starts a new process'}
+            </div>
+          )}
         </Row>
         {thread.task_id && (
           <Row k="Task">
@@ -279,7 +287,9 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
   const [panelTab, setPanelTab] = useState<PanelTab>('artifacts');
   const [panelOpen, setPanelOpen] = useState<boolean>(() => readPref('threadPanel', true));
   const [mobilePanel, setMobilePanel] = useState(!!artifactParam);
+  const [stopping, setStopping] = useState(false);
   const [queued, setQueued] = useState<PendingMsg[]>([]);
+  const [warm, setWarm] = useState<boolean | undefined>(undefined);
   const [actionError, setActionError] = useState<string | null>(null);
   const [prBusy, setPrBusy] = useState(false);
 
@@ -338,6 +348,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
         const d = await api.get<ThreadDetail>(`/threads/${encodeURIComponent(id)}`);
         setThread(d.thread);
         setQueued(d.pending ?? []);
+        if (d.live !== undefined) setWarm(d.live);
         setChannel(d.channel);
         setParent(d.parent);
         setChildren(d.children);
@@ -396,6 +407,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
       else if (m.type === 'thread') {
         setThread(m.thread);
         if (m.pending) setQueued(m.pending);
+        if (m.live !== undefined) setWarm(m.live);
       }
     },
     () => void load(false),
@@ -408,15 +420,65 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     if (e.type === 'thread' && parent && e.thread.id === parent.id) setParent(e.thread);
   });
 
+  const running = thread?.status === 'running' || thread?.status === 'queued';
+  // The mobile sheet only exists on mobile; a desktop ?artifact= link sets mobilePanel too.
+  const sheetOpen = isMobile && mobilePanel;
+  // Also covers "Interrupt and send" while the server really interrupts: that message stays sent until the agent reads it.
+  const interrupting = stopping || queued.some((m) => m.state === 'sent' && m.mode === 'interrupt');
+
+  const interrupt = useCallback(async () => {
+    setStopping(true);
+    setActionError(null);
+    try {
+      await api.post(`/threads/${encodeURIComponent(id)}/stop`);
+    } catch (e) {
+      setActionError(errorText(e));
+      setStopping(false);
+    }
+  }, [id]);
+
+  // "Interrupting" lasts until the turn ends. Queued steers can keep the thread running past the
+  // interrupt, so a new result also clears it, and a timer covers a lost update.
+  const lastResultId = useMemo(() => {
+    for (let k = events.length - 1; k >= 0; k--) if (events[k].kind === 'result') return events[k].id;
+    return 0;
+  }, [events]);
+  useEffect(() => {
+    if (!running) setStopping(false);
+  }, [running]);
+  useEffect(() => setStopping(false), [lastResultId]);
+  useEffect(() => {
+    if (!stopping) return;
+    const t = setTimeout(() => setStopping(false), 15_000);
+    return () => clearTimeout(t);
+  }, [stopping]);
+
+  // Esc interrupts a busy thread. Capture phase, so it sees the page before any other Escape
+  // handler closes its layer: an open modal, lightbox, drawer, sheet or menu keeps Esc for itself.
+  useEffect(() => {
+    if (!running || interrupting || sheetOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.repeat || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (document.querySelector('[aria-modal="true"], [role="dialog"], [role="menu"]')) return;
+      // Esc in another field (sidebar search, a form) belongs to that field. The reply composer is the exception.
+      const el = e.target instanceof HTMLElement ? e.target : null;
+      if (el && (el.isContentEditable || el.matches('input, select') || (el.matches('textarea') && !el.hasAttribute('data-reply-composer')))) return;
+      void interrupt();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [running, interrupting, sheetOpen, interrupt]);
+
   // Escape closes the mobile sheet, unless a modal (lightbox, full-screen artifact) is on top.
   useEffect(() => {
-    if (!mobilePanel) return;
+    if (!sheetOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !document.querySelector('[aria-modal="true"]:not([data-sheet])')) setMobilePanel(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [mobilePanel]);
+  }, [sheetOpen]);
 
   // ----- auto scroll -----
   const onScroll = () => {
@@ -464,6 +526,17 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     for (let k = events.length - 1; k >= 0; k--) if (events[k].kind === 'result') return parsePayload<ResultP>(events[k]);
     return null;
   }, [events]);
+  // No activity since the last turn ended, so the first sent message starts the next turn instead of steering one.
+  const betweenTurns = useMemo(() => {
+    for (let k = events.length - 1; k >= 0; k--) {
+      const e = events[k];
+      if (e.kind === 'result' || e.kind === 'error') return true;
+      if (e.kind === 'user' || e.kind === 'crew_report') {
+        if (!parsePayload<{ dropped?: boolean }>(e).dropped) return false;
+      } else if (e.kind === 'tool_use' || e.kind === 'tool_result' || e.kind === 'assistant_text') return false;
+    }
+    return true;
+  }, [events]);
   const files = useMemo(() => artifacts.filter((a) => a.kind !== 'screenshot'), [artifacts]);
   const shots = useMemo(() => artifacts.filter((a) => a.kind === 'screenshot'), [artifacts]);
   const selectedArtifact = files.find((a) => a.id === selected) ?? files[files.length - 1];
@@ -500,24 +573,13 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     );
   }
 
-  const running = thread.status === 'running' || thread.status === 'queued';
-
-  // Thrown so the inline confirm springs back to its idle pill.
-  const stop = async () => {
-    setActionError(null);
-    try {
-      await api.post(`/threads/${encodeURIComponent(id)}/stop`);
-    } catch (e) {
-      setActionError(errorText(e));
-      throw e;
-    }
-  };
-
   const openPR = async () => {
     setPrBusy(true);
     setActionError(null);
     try {
-      const t = await api.post<Thread>(`/threads/${encodeURIComponent(id)}/messages`, { prompt: OPEN_PR_PROMPT });
+      // Mid-turn, wait for the work to finish instead of steering it to commit halfway.
+      const mode: SendMode | undefined = running ? 'queue' : undefined;
+      const t = await api.post<Thread>(`/threads/${encodeURIComponent(id)}/messages`, { prompt: OPEN_PR_PROMPT, mode });
       setThread(t);
       nearBottom.current = true;
     } catch (e) {
@@ -555,7 +617,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
       <div className="min-h-0 flex-1">
         {panelTab === 'artifacts' && <ArtifactsTab artifacts={files} selected={selectedArtifact} onSelect={setSelected} />}
         {panelTab === 'browser' && <BrowserTab shots={shots} />}
-        {panelTab === 'details' && <DetailsTab thread={thread} channel={channel} parent={parent} children={children} init={init} lastResult={lastResult} />}
+        {panelTab === 'details' && <DetailsTab thread={thread} channel={channel} parent={parent} children={children} init={init} lastResult={lastResult} warm={warm} />}
       </div>
     </div>
   );
@@ -596,7 +658,19 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
               </span>
             )}
             <StatusPill status={thread.status} />
-            {running && <InlineConfirm label="Stop" icon="stop" confirmLabel="Stop run" doneLabel="Stopping" busyLabel="Stopping" onConfirm={stop} />}
+            {running && (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon="stop"
+                onClick={() => void interrupt()}
+                busy={interrupting}
+                title="Interrupt the agent (Esc). Messages already sent still run."
+                aria-keyshortcuts="Escape"
+              >
+                {interrupting ? 'Interrupting' : 'Interrupt'}
+              </Button>
+            )}
             <span className="relative">
               <IconButton icon="panel" label="Artifacts, browser, details" active={isMobile ? mobilePanel : panelOpen} onClick={togglePanel} />
               {artifactCount > 0 && (
@@ -615,8 +689,9 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                   {error}
                 </ErrorNote>
               )}
-              <Transcript threadId={id} events={events} running={running} cwd={init?.cwd || thread.cwd} />
-              <QueuedMessages items={queued} />
+              {/* Queued means waiting for a slot: nothing is working yet. */}
+              <Transcript threadId={id} events={events} running={thread.status === 'running'} cwd={init?.cwd || thread.cwd} />
+              <QueuedMessages items={queued} starting={betweenTurns} />
             </div>
           </div>
           {showJump && (

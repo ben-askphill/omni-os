@@ -101,11 +101,10 @@ export function describeAttachments(attachments: Attachment[]) {
   return lines.join('\n');
 }
 
-/** One `--input-format stream-json` line: the images first, then the prompt text. */
-export function userMessageLine(text: string, images: { path: string; mime: string; data: string }[]) {
-  const content = [
+/** The content blocks of one stream-json user message: the images first, then the prompt text. */
+export function messageContent(text: string, images: { mime: string; data: string }[]) {
+  return [
     ...images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mime, data: i.data } })),
     { type: 'text', text },
   ];
-  return JSON.stringify({ type: 'user', message: { role: 'user', content } }) + '\n';
 }

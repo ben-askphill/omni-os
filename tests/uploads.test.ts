@@ -10,7 +10,7 @@ import {
   inlinable,
   safeName,
   uniqueName,
-  userMessageLine,
+  messageContent,
   type Attachment,
 } from '../server/uploads.ts';
 
@@ -132,14 +132,11 @@ describe('describeAttachments', () => {
   });
 });
 
-describe('userMessageLine', () => {
-  it('emits one JSON line with the images before the text', () => {
-    const line = userMessageLine('look at this', [{ path: '/u/a.png', mime: 'image/png', data: 'AAAA' }]);
-    expect(line.endsWith('\n')).toBe(true);
-    const msg = JSON.parse(line);
-    expect(msg.type).toBe('user');
-    expect(msg.message.role).toBe('user');
-    expect(msg.message.content[0]).toEqual({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } });
-    expect(msg.message.content[1]).toEqual({ type: 'text', text: 'look at this' });
+describe('messageContent', () => {
+  it('puts the images before the text', () => {
+    const content = messageContent('look at this', [{ mime: 'image/png', data: 'AAAA' }]);
+    expect(content).toHaveLength(2);
+    expect(content[0]).toEqual({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } });
+    expect(content[1]).toEqual({ type: 'text', text: 'look at this' });
   });
 });
