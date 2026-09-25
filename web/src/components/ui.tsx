@@ -86,7 +86,7 @@ export function Icon({ name, size = 16, className = '', strokeWidth = 1.75 }: { 
   );
 }
 
-/** The Omni wordmark: Google Sans with the red signal dot. */
+/** The Omni wordmark: SF Pro with the red signal dot. */
 export function Wordmark({ size = 18 }: { size?: number }) {
   return (
     <span className="inline-flex items-start font-display font-medium" style={{ fontSize: size, lineHeight: 1 }}>
@@ -261,7 +261,7 @@ export function Avatar({ name, size = 28, icon, className = '' }: { name: string
     color: `light-dark(oklch(0.38 0.07 ${h}), oklch(0.88 0.05 ${h}))`,
   };
   return (
-    <span aria-hidden="true" className={`inline-grid shrink-0 place-items-center rounded-full font-display font-medium uppercase ${className}`} style={style}>
+    <span aria-hidden="true" className={`inline-grid shrink-0 place-items-center rounded-full font-rounded font-medium uppercase ${className}`} style={style}>
       {icon ? <Icon name={icon} size={size * 0.5} /> : name.replace(/[^a-z0-9]/gi, '').slice(0, 1) || '?'}
     </span>
   );
