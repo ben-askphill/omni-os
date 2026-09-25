@@ -1,0 +1,96 @@
+import { execFile } from 'node:child_process';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+import { config, paths, threadDir, artifactsDir, browserOutDir } from './config.ts';
+import type { Channel } from './db.ts';
+import type { CrewRole } from './crew.ts';
+
+const run = promisify(execFile);
+
+export interface Workdir {
+  cwd: string;
+  branch: string | null;
+}
+
+async function isGitRepo(dir: string) {
+  try {
+    await run('git', ['-C', dir, 'rev-parse', '--is-inside-work-tree']);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where a thread's agent runs.
+ * - repo channel + worktrees on: a fresh git worktree on branch omni/<id>, so parallel threads never collide
+ * - repo channel, worktrees off: the repo itself
+ * - otherwise: the channel's base dir, falling back to the brain (phillbert) so skills and context load
+ */
+export async function prepareWorkdir(channel: Channel, threadId: string): Promise<Workdir> {
+  mkdirSync(artifactsDir(threadId), { recursive: true });
+  mkdirSync(browserOutDir(threadId), { recursive: true });
+
+  if (channel.repo_path && existsSync(channel.repo_path)) {
+    if (channel.use_worktree && (await isGitRepo(channel.repo_path))) {
+      const branch = `omni/${threadId.slice(0, 8)}`;
+      const dir = join(paths.worktrees, threadId);
+      try {
+        await run('git', ['-C', channel.repo_path, 'worktree', 'add', '-b', branch, dir, 'HEAD']);
+        return { cwd: dir, branch };
+      } catch (err) {
+        console.warn(`[sandbox] worktree failed for ${channel.id}, using repo directly:`, (err as Error).message);
+      }
+    }
+    return { cwd: channel.repo_path, branch: null };
+  }
+  if (channel.base_dir && existsSync(channel.base_dir)) return { cwd: channel.base_dir, branch: null };
+  if (existsSync(config.brainDir)) return { cwd: config.brainDir, branch: null };
+  return { cwd: threadDir(threadId), branch: null };
+}
+
+export interface McpInput {
+  threadId: string;
+  channel: Channel;
+  role?: CrewRole;
+  /** Another thread in this channel already holds the persistent browser profile. */
+  browserBusy: boolean;
+  omniUrl: string;
+}
+
+/** Per-thread MCP servers, layered on top of the user's normal Claude Code MCP config. */
+export function buildMcpConfig(input: McpInput) {
+  const servers: Record<string, { command: string; args: string[]; env?: Record<string, string> }> = {};
+
+  if (config.browser) {
+    const args = ['-y', '@playwright/mcp@latest', '--output-dir', browserOutDir(input.threadId)];
+    if (input.channel.browser_headless) args.push('--headless');
+    // Chrome locks a profile dir, so only one live thread per channel gets the persistent logins.
+    if (input.browserBusy) args.push('--isolated');
+    else args.push('--user-data-dir', join(paths.browsers, input.channel.id));
+    servers['omni-browser'] = { command: 'npx', args };
+  }
+
+  if (input.role?.mcp.includes('omni')) {
+    servers['omni'] = {
+      command: paths.tsx,
+      args: [paths.mcpOmni],
+      env: { OMNI_URL: input.omniUrl, OMNI_THREAD_ID: input.threadId },
+    };
+  }
+  return { mcpServers: servers };
+}
+
+export function writeMcpConfig(input: McpInput): string | null {
+  const cfg = buildMcpConfig(input);
+  if (!Object.keys(cfg.mcpServers).length) return null;
+  mkdirSync(threadDir(input.threadId), { recursive: true });
+  const file = join(threadDir(input.threadId), 'mcp.json');
+  writeFileSync(file, JSON.stringify(cfg, null, 2));
+  return file;
+}
+
+export async function removeWorktree(repoPath: string, dir: string) {
+  await run('git', ['-C', repoPath, 'worktree', 'remove', '--force', dir]).catch(() => {});
+}

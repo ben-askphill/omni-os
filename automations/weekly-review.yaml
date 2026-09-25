@@ -1,0 +1,11 @@
+name: Weekly review
+enabled: false
+cron: "0 16 * * 5"
+timezone: Europe/Amsterdam
+channel: inbox
+role: researcher
+prompt: |
+  Build my weekly review from Omni OS history. Use the Omni API at $OMNI_URL
+  (GET /api/recent?limit=200) to list this week's threads, then write an HTML
+  artifact: what I did per channel, what is still open or failed, and PRs
+  waiting on me (gh pr list --author @me across my repos). Reply with the top 5 open items.

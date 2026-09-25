@@ -1,0 +1,9 @@
+# Each run becomes a thread in the channel below, so every run stays searchable.
+name: Morning coffee
+enabled: false
+cron: "0 8 * * 1-5"
+timezone: Europe/Amsterdam
+channel: inbox
+role: inbox
+prompt: |
+  Run the morning-coffee skill for today. Summarize what matters in under 15 bullets.
