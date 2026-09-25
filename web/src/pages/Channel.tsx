@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { api, errorText, useApi, type ChannelWithRunning, type Thread } from '../api.ts';
 import { NewThreadComposer } from '../components/Composer.tsx';
 import { ThreadGroups, useLiveThreads } from '../components/ThreadList.tsx';
-import { Button, Chip, Empty, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
+import { Avatar, Button, Empty, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { href, type ChannelTab } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { ChannelSettingsForm } from './ChannelSettings.tsx';
@@ -12,9 +12,9 @@ function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
   const accept = useCallback((t: Thread) => t.channel_id === id, [id]);
   const list = useLiveThreads(`/channels/${encodeURIComponent(id)}/threads`, accept);
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-5 pb-16 md:px-8">
+    <div className="mx-auto max-w-3xl px-4 pt-6 pb-16 md:px-8">
       <NewThreadComposer channelId={id} placeholder={isConductor ? 'Ask the Conductor. It delegates to the crew.' : undefined} />
-      <div className="mt-6">
+      <div className="mt-8">
         <ThreadGroups
           threads={list.data}
           loading={list.loading}
@@ -98,42 +98,59 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
     { id: 'settings' as const, label: 'Settings', href: href.settings(id) },
   ];
 
+  const linkCls = 'hov inline-flex h-7 max-w-full items-center gap-1.5 rounded-full bg-surface px-2.5 text-[12px] text-fg-2 [--hov:var(--surface-2)]';
+
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      <div className="border-b border-line px-4 pt-5 md:px-8">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="flex min-w-0 items-center gap-1.5 text-[20px] font-semibold tracking-[-0.03em]">
-            {isConductor ? <Icon name="target" size={18} className="text-fg-3" /> : <span className="text-fg-4">#</span>}
-            <span className="truncate">{ch.name}</span>
-          </h1>
-          <Chip>{KIND_LABEL[ch.kind] ?? ch.kind}</Chip>
-          {ch.running > 0 && (
-            <span className="flex items-center gap-1 text-[12px] font-medium text-info">
-              <span className="pulse inline-block h-1.5 w-1.5 rounded-full bg-[var(--info-dot)]" /> {ch.running} running
-            </span>
-          )}
+      <div className={`mx-auto px-4 pt-6 md:px-8 md:pt-10 ${tab === 'settings' ? 'max-w-2xl' : tab === 'prs' ? (pr ? 'max-w-5xl' : 'max-w-4xl') : 'max-w-3xl'}`}>
+        <div className="flex items-center gap-3.5">
+          <Avatar name={ch.name} icon={isConductor ? 'target' : undefined} size={44} />
+          <div className="min-w-0 flex-1">
+            <div className="label-mono mb-1 flex items-center gap-2">
+              {KIND_LABEL[ch.kind] ?? ch.kind}
+              {ch.running > 0 && (
+                <span className="flex items-center gap-1.5 text-info">
+                  <span className="relative inline-block h-1.5 w-1.5">
+                    <span className="ping absolute inset-0 rounded-full bg-[var(--info-dot)]" />
+                    <span className="absolute inset-0 rounded-full bg-[var(--info-dot)]" />
+                  </span>
+                  {ch.running} running
+                </span>
+              )}
+            </div>
+            <h1 className="flex min-w-0 items-baseline gap-1 font-display text-[26px] leading-[1.1] md:text-[30px]">
+              {!isConductor && <span className="text-fg-4">#</span>}
+              <span className="truncate">{ch.name}</span>
+            </h1>
+          </div>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-fg-3">
-          {ch.store_domain && (
-            <a href={`https://${ch.store_domain}/admin`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-fg">
-              <Icon name="globe" size={13} /> {ch.store_domain}
-            </a>
-          )}
-          {ch.github_repo && (
-            <a href={`https://github.com/${ch.github_repo}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-fg">
-              <Icon name="branch" size={13} /> {ch.github_repo}
-            </a>
-          )}
-          {ch.repo_path && <span className="truncate font-mono text-[11.5px]" title={ch.repo_path}>{ch.repo_path}</span>}
-          {ch.notes && isConductor && <span className="truncate">{ch.notes}</span>}
-        </div>
-        <Tabs className="mt-3 -mb-px pb-2" tabs={tabs} value={tab} />
+        {(ch.store_domain || ch.github_repo || ch.repo_path || (ch.notes && isConductor)) && (
+          <div className="mt-4 flex flex-wrap items-center gap-1.5">
+            {ch.store_domain && (
+              <a href={`https://${ch.store_domain}/admin`} target="_blank" rel="noopener noreferrer" className={linkCls}>
+                <Icon name="globe" size={13} className="text-fg-3" /> <span className="truncate">{ch.store_domain}</span>
+              </a>
+            )}
+            {ch.github_repo && (
+              <a href={`https://github.com/${ch.github_repo}`} target="_blank" rel="noopener noreferrer" className={linkCls}>
+                <Icon name="branch" size={13} className="text-fg-3" /> <span className="truncate">{ch.github_repo}</span>
+              </a>
+            )}
+            {ch.repo_path && (
+              <span className="inline-flex h-7 max-w-full items-center rounded-full px-2.5 font-mono text-[11px] text-fg-4 shadow-[inset_0_0_0_1px_var(--line)]" title={ch.repo_path}>
+                <span className="truncate">{ch.repo_path}</span>
+              </span>
+            )}
+            {ch.notes && isConductor && <span className="truncate px-1 text-[12.5px] text-fg-3">{ch.notes}</span>}
+          </div>
+        )}
+        <Tabs className="mt-5" tabs={tabs} value={tab} />
       </div>
 
       {tab === 'threads' && <ThreadsTab id={id} isConductor={isConductor} />}
       {tab === 'prs' && (pr ? <PRDetail channel={ch} n={pr} /> : <PRList channel={ch} />)}
       {tab === 'settings' && (
-        <div className="mx-auto max-w-2xl px-4 pt-5 pb-16 md:px-8">
+        <div className="mx-auto max-w-2xl px-4 pt-6 pb-16 md:px-8">
           <ChannelSettingsForm existing={ch} />
         </div>
       )}

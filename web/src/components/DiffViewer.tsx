@@ -49,20 +49,20 @@ const FileBlock = memo(function FileBlock({ f, defaultOpen }: { f: FileDiff; def
   const [all, setAll] = useState(false);
   const shown = all ? f.lines : f.lines.slice(0, MAX_LINES);
   return (
-    <div className="overflow-hidden rounded-lg border border-line">
+    <div className="overflow-hidden rounded-[18px] shadow-[inset_0_0_0_1px_var(--line)]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="sticky top-0 z-[1] flex w-full min-w-0 items-center gap-2 border-b border-line bg-surface-2 px-3 py-1.5 text-left text-[12.5px] hover:bg-surface-3"
+        className="sticky top-0 z-[1] flex h-10 w-full min-w-0 items-center gap-2 bg-surface px-3.5 text-left text-[12.5px] transition-colors hover:bg-surface-2"
       >
-        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="text-fg-3" />
+        <Icon name="chevronRight" size={12} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
         <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{f.path}</span>
-        <span className="shrink-0 font-mono text-[11.5px] text-ok">+{f.add}</span>
-        <span className="shrink-0 font-mono text-[11.5px] text-bad">-{f.del}</span>
+        <span className="shrink-0 font-num text-[11px] text-ok">+{f.add}</span>
+        <span className="shrink-0 font-num text-[11px] text-bad">-{f.del}</span>
       </button>
       {open && (
-        <div className="scroll-thin overflow-x-auto bg-surface">
+        <div className="scroll-thin overflow-x-auto bg-bg">
           {f.binary && <div className="px-3 py-2 text-[12px] text-fg-3">Binary file</div>}
           <pre className="min-w-max font-mono text-[11.5px] leading-[1.6]">
             {shown.map((l, i) => {
@@ -83,7 +83,7 @@ const FileBlock = memo(function FileBlock({ f, defaultOpen }: { f: FileDiff; def
             })}
           </pre>
           {!all && f.lines.length > MAX_LINES && (
-            <button type="button" onClick={() => setAll(true)} className="w-full border-t border-line py-1.5 text-[12px] font-medium text-fg-3 hover:bg-surface-2">
+            <button type="button" onClick={() => setAll(true)} className="h-9 w-full border-t border-line text-[12px] font-medium text-fg-3 transition-colors hover:bg-surface hover:text-fg">
               Show {f.lines.length - MAX_LINES} more lines
             </button>
           )}

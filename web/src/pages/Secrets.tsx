@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { api, errorText, useApi, type SecretRow } from '../api.ts';
-import { Button, ConfirmDialog, Empty, ErrorNote, Icon, IconButton, Label, Loading, PageHeader } from '../components/ui.tsx';
+import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, PageHeader, Picker, type PickerOption } from '../components/ui.tsx';
 import { relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -24,9 +24,7 @@ export function SecretsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
-  const [pending, setPending] = useState<SecretRow | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<{ key: string; msg: string } | null>(null);
 
   const channelName = (id: string) => channel(id)?.name;
 
@@ -65,29 +63,32 @@ export function SecretsPage() {
     }
   };
 
-  const remove = async () => {
-    if (!pending) return;
-    setDeleting(true);
+  // Runs once the undo fuse burns out, so an accidental click costs nothing.
+  const remove = async (s: SecretRow) => {
+    const key = `${s.scope}/${s.name}`;
     setDeleteError(null);
     try {
-      await api.del('/secrets', { scope: pending.scope, name: pending.name });
-      setPending(null);
+      await api.del('/secrets', { scope: s.scope, name: s.name });
       res.reload();
     } catch (err) {
-      setDeleteError(errorText(err));
-    } finally {
-      setDeleting(false);
+      setDeleteError({ key, msg: errorText(err) });
+      throw err;
     }
   };
 
-  const scopeOptions = [{ value: 'global', label: 'Global (all channels)' }, ...channels.map((c) => ({ value: `channel:${c.id}`, label: `#${c.name}` }))];
+  const scopeOptions: PickerOption<string>[] = [
+    { value: 'global', label: 'Global', sub: 'All channels', icon: 'globe' },
+    ...channels.map((c) => ({ value: `channel:${c.id}`, label: `#${c.name}`, sub: c.kind, avatar: c.name, icon: c.id === 'conductor' ? ('target' as const) : undefined })),
+  ];
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      <PageHeader title="Secrets" subtitle="API keys and tokens for the crew. Stored in the macOS Keychain, never in the database." />
+      <PageHeader width="max-w-2xl" title="Secrets" subtitle="API keys and tokens for the crew. Stored in the macOS Keychain, never in the database." />
       <div className="mx-auto max-w-2xl space-y-5 px-4 pt-5 pb-16 md:px-8">
-        <div className="flex gap-2.5 rounded-xl border border-line bg-surface-2 p-3 text-[12.5px] leading-relaxed text-fg-2">
-          <Icon name="lock" size={15} className="mt-0.5 text-fg-3" />
+        <div className="flex gap-3 rounded-[20px] bg-surface p-4 text-[12.5px] leading-relaxed text-fg-2">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
+            <Icon name="lock" size={15} />
+          </span>
           <div>
             Values live in the Keychain under the service <span className="font-mono text-[12px]">omni-os</span> and are injected as environment variables when a thread
             runs. A channel secret overrides a global one with the same name. Omni never shows a value again after you save it; to change one, save it again with the same
@@ -95,18 +96,12 @@ export function SecretsPage() {
           </div>
         </div>
 
-        <form onSubmit={save} className="space-y-3 rounded-xl border border-line bg-surface p-4" autoComplete="off">
-          <h2 className="text-[13px] font-semibold text-fg-2">Add or replace</h2>
+        <form onSubmit={save} className="space-y-4 rounded-[24px] p-5 shadow-[inset_0_0_0_1px_var(--line)]" autoComplete="off">
+          <h2 className="font-display text-[16px]">Add or replace</h2>
           <div className="grid gap-3 sm:grid-cols-[1fr_1.2fr]">
             <div>
-              <Label htmlFor="sec-scope">Scope</Label>
-              <select id="sec-scope" className="field" value={scope} onChange={(e) => setScope(e.target.value)}>
-                {scopeOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+              <Label>Scope</Label>
+              <Picker label="Scope" value={scope} onChange={setScope} options={scopeOptions} searchable={scopeOptions.length > 7} className="w-full" />
             </div>
             <div>
               <Label htmlFor="sec-name">Name</Label>
@@ -144,11 +139,15 @@ export function SecretsPage() {
             />
           </div>
           {formError && <ErrorNote>{formError}</ErrorNote>}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" variant="primary" icon="key" busy={saving} disabled={!name || !value}>
               {exists ? 'Replace secret' : 'Save secret'}
             </Button>
-            {savedMsg && <span className="text-[12.5px] text-ok">{savedMsg}</span>}
+            {savedMsg && (
+              <span className="pop-in inline-flex items-center gap-1.5 text-[12.5px] text-ok">
+                <Icon name="check" size={13} strokeWidth={2.25} /> {savedMsg}
+              </span>
+            )}
           </div>
         </form>
 
@@ -164,7 +163,7 @@ export function SecretsPage() {
           <div className="space-y-4">
             {groups.map(([sc, rows]) => (
               <section key={sc}>
-                <h3 className="mb-1 flex items-center gap-2 px-1 text-[12px] font-semibold text-fg-3">
+                <h3 className="label-mono mb-2 flex items-center gap-2 px-2">
                   {sc === 'global' ? (
                     'Global'
                   ) : (
@@ -172,28 +171,27 @@ export function SecretsPage() {
                       {scopeLabel(sc, channelName)}
                     </a>
                   )}
-                  <span className="font-normal text-fg-4">{rows.length}</span>
+                  <span className="text-fg-4/70">{rows.length}</span>
                 </h3>
-                <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
-                  {rows.map((s) => (
-                    <li key={s.name} className="flex items-center gap-3 px-3 py-2">
-                      <Icon name="key" size={13} className="text-fg-4" />
-                      <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]">{s.name}</span>
-                      <span className="shrink-0 text-[11.5px] text-fg-4" title={s.updated_at}>
-                        {relTime(s.updated_at)}
-                      </span>
-                      <IconButton
-                        icon="trash"
-                        label={`Delete ${s.name}`}
-                        size={14}
-                        className="hover:!text-bad"
-                        onClick={() => {
-                          setDeleteError(null);
-                          setPending(s);
-                        }}
-                      />
-                    </li>
-                  ))}
+                <ul className="rounded-[20px] bg-surface p-1.5">
+                  {rows.map((s) => {
+                    const key = `${s.scope}/${s.name}`;
+                    return (
+                      <li key={s.name} className="rounded-2xl px-2.5 py-1.5">
+                        <div className="flex min-h-9 items-center gap-3">
+                          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg text-fg-4">
+                            <Icon name="key" size={13} />
+                          </span>
+                          <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]">{s.name}</span>
+                          <span className="hidden shrink-0 font-num text-[11px] text-fg-4 sm:inline" title={s.updated_at}>
+                            {relTime(s.updated_at)}
+                          </span>
+                          <InlineConfirm label="Delete" icon="trash" confirmLabel="Delete" doneLabel="Deleted" busyLabel="Deleting" undoMs={5000} onConfirm={() => remove(s)} />
+                        </div>
+                        {deleteError?.key === key && <div className="pt-1 pb-1 pl-10 text-[12px] text-bad">{deleteError.msg}</div>}
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             ))}
@@ -201,23 +199,6 @@ export function SecretsPage() {
         )}
       </div>
 
-      <ConfirmDialog
-        open={!!pending}
-        title={pending ? `Delete ${pending.name}?` : ''}
-        confirmLabel="Delete secret"
-        danger
-        busy={deleting}
-        error={deleteError}
-        onCancel={() => setPending(null)}
-        onConfirm={remove}
-      >
-        {pending && (
-          <p>
-            Removes it from the Keychain for <span className="font-medium">{scopeLabel(pending.scope, channelName)}</span>. Threads that rely on it will fail until you add it
-            again.
-          </p>
-        )}
-      </ConfirmDialog>
     </div>
   );
 }

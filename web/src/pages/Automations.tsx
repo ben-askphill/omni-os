@@ -1,9 +1,30 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { api, errorText, useApi, type Automation, type Thread } from '../api.ts';
 import { Button, Chip, Empty, ErrorNote, Icon, Loading, PageHeader, StatusDot, Toggle } from '../components/ui.tsx';
 import { describeCron, nextRunLabel, relTime, shortPath } from '../format.ts';
 import { href, navigate } from '../router.ts';
 import { useApp, useFeed } from '../store.tsx';
+
+const RUN_TONE: Record<string, string> = {
+  done: 'var(--ok-dot)',
+  failed: 'var(--bad-dot)',
+  stopped: 'var(--warn-dot)',
+  running: 'var(--info-dot)',
+  queued: 'var(--fg-4)',
+};
+
+/** Recent runs as a row of bars, oldest left: a glance at reliability. */
+function RunStrip({ runs }: { runs: Automation['runs'] }) {
+  if (!runs.length) return null;
+  const bars = [...runs].reverse();
+  return (
+    <span className="flex h-3.5 items-end gap-[3px]" role="img" aria-label={`${runs.filter((r) => r.status === 'done').length} of ${runs.length} recent runs finished`}>
+      {bars.map((r, i) => (
+        <i key={i} title={`${r.status ?? 'removed'} · ${relTime(r.created_at)}`} className={`block w-[5px] rounded-full ${r.status === 'running' ? 'pulse' : ''}`} style={{ height: r.status === 'done' ? '100%' : '70%', background: RUN_TONE[r.status ?? ''] ?? 'var(--line-strong)' }} />
+      ))}
+    </span>
+  );
+}
 
 function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void }) {
   const { channel } = useApp();
@@ -50,34 +71,37 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
   const ch = channel(a.channel);
 
   return (
-    <div className={`rounded-xl border bg-surface ${a.error ? 'border-bad/40' : 'border-line'}`}>
-      <div className="flex items-start gap-3 p-4">
+    <div className={`rounded-[24px] bg-surface transition-opacity ${a.error ? 'shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--bad)_35%,transparent)]' : ''}`}>
+      <div className="flex items-start gap-3 p-4 md:p-5">
+        <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-bg transition-colors ${enabled && !a.error ? 'text-fg' : 'text-fg-4'}`}>
+          <Icon name="zap" size={16} />
+        </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h2 className="text-[14.5px] font-semibold tracking-[-0.015em]">{a.name}</h2>
+            <h2 className="font-display text-[16px]">{a.name}</h2>
             {!enabled && !a.error && <Chip tone="outline">Paused</Chip>}
             {a.error && <Chip tone="bad">Invalid</Chip>}
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-fg-3">
-            <span className="inline-flex items-center gap-1 whitespace-nowrap" title={`${a.cron} (${a.timezone})`}>
-              <Icon name="clock" size={13} />
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-fg-2">
+            <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-bg px-2.5 whitespace-nowrap" title={`${a.cron} (${a.timezone})`}>
+              <Icon name="clock" size={12} className="text-fg-3" />
               {describeCron(a.cron)}
             </span>
-            <span className="font-mono text-[11.5px] whitespace-nowrap text-fg-4">{a.cron}</span>
-            <a href={href.channel(a.channel)} className="hover:text-fg">
+            <span className="inline-flex h-6 items-center rounded-full px-2 font-mono text-[11px] whitespace-nowrap text-fg-4 shadow-[inset_0_0_0_1px_var(--line)]">{a.cron}</span>
+            <a href={href.channel(a.channel)} className="hov inline-flex h-6 items-center rounded-full bg-bg px-2.5 [--hov:var(--surface-2)]">
               #{ch?.name ?? a.channel}
             </a>
-            {a.role && <span>role {a.role}</span>}
-            {a.model && <span>{a.model}</span>}
+            {a.role && <span className="inline-flex h-6 items-center rounded-full bg-bg px-2.5">{a.role}</span>}
+            {a.model && <span className="inline-flex h-6 items-center rounded-full bg-bg px-2.5 font-num text-[11px]">{a.model}</span>}
           </div>
           {enabled && a.next && !a.error && (
-            <div className="mt-1 text-[12.5px] text-fg-2">
-              Next run <span className="font-medium">{nextRunLabel(a.next, a.timezone)}</span>
-              {a.timezone !== Intl.DateTimeFormat().resolvedOptions().timeZone && <span className="text-fg-3"> ({a.timezone})</span>}
+            <div className="mt-2.5 text-[12.5px] text-fg-3">
+              Next run <span className="font-medium text-fg">{nextRunLabel(a.next, a.timezone)}</span>
+              {a.timezone !== Intl.DateTimeFormat().resolvedOptions().timeZone && <span> ({a.timezone})</span>}
             </div>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2.5">
           <Button size="sm" icon="play" onClick={runNow} busy={running} disabled={!!a.error}>
             Run now
           </Button>
@@ -86,48 +110,51 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
       </div>
 
       {a.error && (
-        <div className="mx-4 mb-3">
+        <div className="mx-4 mb-4 md:mx-5">
           <ErrorNote>
             {a.error}. Fix it in <span className="font-mono text-[12px]">{shortPath(a.file ?? `automations/${a.id}.yaml`)}</span>.
           </ErrorNote>
         </div>
       )}
       {error && (
-        <div className="mx-4 mb-3">
+        <div className="mx-4 mb-4 md:mx-5">
           <ErrorNote>{error}</ErrorNote>
         </div>
       )}
 
-      <div className="border-t border-line px-4 py-2">
-        <button type="button" onClick={() => setShowPrompt((v) => !v)} className="flex items-center gap-1 text-[12px] font-medium text-fg-3 hover:text-fg">
-          <Icon name={showPrompt ? 'chevronDown' : 'chevronRight'} size={12} /> Prompt
+      <div className="px-2.5 pb-1">
+        <button type="button" onClick={() => setShowPrompt((v) => !v)} aria-expanded={showPrompt} className="hov flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-fg-3 [--hov:var(--surface-2)] hover:text-fg">
+          <Icon name="chevronRight" size={12} className={`transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${showPrompt ? 'rotate-90' : ''}`} /> Prompt
         </button>
-        {showPrompt && <pre className="mt-1.5 mb-1 font-mono text-[12px] leading-relaxed whitespace-pre-wrap text-fg-2">{a.prompt || '(empty)'}</pre>}
+        {showPrompt && <pre className="fade-in mx-2.5 mt-1 mb-2 rounded-2xl bg-bg px-3.5 py-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap text-fg-2">{a.prompt || '(empty)'}</pre>}
       </div>
 
-      <div className="border-t border-line px-4 py-2.5">
-        <div className="mb-1 text-[12px] font-medium text-fg-3">Last runs</div>
+      <div className="px-4 pt-2 pb-4 md:px-5">
+        <div className="mb-2 flex items-center gap-3">
+          <span className="label-mono">Last runs</span>
+          <RunStrip runs={a.runs} />
+        </div>
         {a.runs.length === 0 ? (
           <div className="text-[12.5px] text-fg-4">Never run.</div>
         ) : (
-          <ul className="space-y-px">
+          <ul className="-mx-2">
             {a.runs.map((r, i) => {
               const inner = (
                 <>
                   <StatusDot status={r.status ?? 'failed'} size={7} />
                   <span className="min-w-0 flex-1 truncate">{r.title ?? 'Thread removed'}</span>
-                  {r.trigger === 'manual' && <span className="shrink-0 text-[11px] text-fg-4">manual</span>}
-                  <span className="w-24 shrink-0 text-right text-[11.5px] text-fg-3">{relTime(r.created_at)}</span>
+                  {r.trigger === 'manual' && <span className="shrink-0 font-num text-[10.5px] text-fg-4">manual</span>}
+                  <span className="w-24 shrink-0 text-right font-num text-[11px] text-fg-4">{relTime(r.created_at)}</span>
                 </>
               );
               return (
                 <li key={`${r.thread_id ?? 'x'}-${i}`}>
                   {r.thread_id ? (
-                    <a href={href.thread(r.thread_id)} className="-mx-1.5 flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-[12.5px] hover:bg-surface-2">
+                    <a href={href.thread(r.thread_id)} className="hov flex h-8 min-w-0 items-center gap-2.5 rounded-full px-2 text-[12.5px] [--hov:var(--surface-2)]">
                       {inner}
                     </a>
                   ) : (
-                    <div className="flex min-w-0 items-center gap-2 py-1 text-[12.5px] text-fg-3">{inner}</div>
+                    <div className="flex h-8 min-w-0 items-center gap-2.5 px-2 text-[12.5px] text-fg-3">{inner}</div>
                   )}
                 </li>
               );
@@ -156,7 +183,7 @@ export function AutomationsPage() {
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      <PageHeader
+      <PageHeader width="max-w-3xl"
         title="Automations"
         subtitle={
           <>
@@ -165,7 +192,7 @@ export function AutomationsPage() {
         }
         actions={<Button size="sm" variant="ghost" icon="refresh" onClick={reload} busy={res.loading && !!res.data} aria-label="Refresh" />}
       />
-      <div className="mx-auto max-w-3xl space-y-3 px-4 pt-5 pb-16 md:px-8">
+      <div className="rise mx-auto max-w-3xl space-y-3 px-4 pt-2 pb-16 md:px-8">
         {res.error ? (
           <ErrorNote onRetry={reload}>{res.error}</ErrorNote>
         ) : !res.data ? (
@@ -175,7 +202,11 @@ export function AutomationsPage() {
             Add a YAML file to <span className="font-mono text-[12px]">automations/</span> with name, cron, channel and prompt. It shows up here right away.
           </Empty>
         ) : (
-          res.data.map((a) => <AutomationCard key={a.id} a={a} onChanged={reload} />)
+          res.data.map((a, i) => (
+            <div key={a.id} style={{ '--i': i } as CSSProperties}>
+              <AutomationCard a={a} onChanged={reload} />
+            </div>
+          ))
         )}
       </div>
     </div>

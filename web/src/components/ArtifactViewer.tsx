@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { artifactUrl, type Artifact } from '../api.ts';
 import { bytes, relTime } from '../format.ts';
 import { Markdown } from './Markdown.tsx';
-import { ErrorNote, Icon, IconButton, Loading, Modal, type IconName } from './ui.tsx';
+import { ErrorNote, Icon, IconButton, IconLink, Loading, Modal, type IconName } from './ui.tsx';
 
 export const kindIcon = (kind: string): IconName =>
   kind === 'image' || kind === 'screenshot' ? 'image' : kind === 'html' || kind === 'svg' ? 'globe' : 'file';
@@ -70,10 +70,10 @@ function CsvTable({ text }: { text: string }) {
   return (
     <div className="scroll-thin h-full overflow-auto">
       <table className="min-w-full border-collapse text-[12px]">
-        <thead className="sticky top-0 bg-surface-2">
+        <thead className="sticky top-0 bg-surface">
           <tr>
             {head.map((h, i) => (
-              <th key={i} className="border-b border-line px-2.5 py-1.5 text-left font-semibold whitespace-nowrap">
+              <th key={i} className="border-b border-line px-3 py-2 text-left font-num text-[10.5px] font-medium tracking-[0.04em] whitespace-nowrap text-fg-3 uppercase">
                 {h}
               </th>
             ))}
@@ -81,9 +81,9 @@ function CsvTable({ text }: { text: string }) {
         </thead>
         <tbody>
           {body.map((r, i) => (
-            <tr key={i} className="odd:bg-surface even:bg-surface-2/40">
+            <tr key={i} className="hover:bg-surface">
               {r.map((c, j) => (
-                <td key={j} className="max-w-[28rem] truncate border-b border-line px-2.5 py-1 align-top" title={c}>
+                <td key={j} className="max-w-[28rem] truncate border-b border-line px-3 py-1.5 align-top" title={c}>
                   {c}
                 </td>
               ))}
@@ -131,7 +131,7 @@ export function ArtifactBody({ a }: { a: Artifact }) {
   if (a.kind === 'image' || a.kind === 'screenshot') {
     return (
       <div className="scroll-thin flex h-full items-start justify-center overflow-auto bg-surface-2 p-3">
-        <img src={src} alt={a.name} className="max-w-full rounded-md shadow-sm" />
+        <img src={src} alt={a.name} className="max-w-full rounded-xl shadow-[var(--shadow-card)]" />
       </div>
     );
   }
@@ -143,12 +143,8 @@ export function ArtifactActions({ a, onExpand }: { a: Artifact; onExpand?: () =>
   return (
     <div className="flex items-center">
       {onExpand && <IconButton icon="maximize" label="Full screen" onClick={onExpand} size={15} />}
-      <a href={artifactUrl(a)} target="_blank" rel="noopener noreferrer" aria-label="Open in new tab" title="Open in new tab" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-fg-3 hover:bg-surface-2 hover:text-fg">
-        <Icon name="external" size={15} />
-      </a>
-      <a href={artifactUrl(a, true)} aria-label="Download" title="Download" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-fg-3 hover:bg-surface-2 hover:text-fg">
-        <Icon name="download" size={15} />
-      </a>
+      <IconLink href={artifactUrl(a)} icon="external" label="Open in new tab" newTab />
+      <IconLink href={artifactUrl(a, true)} icon="download" label="Download" download />
     </div>
   );
 }
@@ -158,11 +154,13 @@ export function ArtifactViewer({ a }: { a: Artifact }) {
   const [full, setFull] = useState(false);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-2 border-b border-line py-1 pr-1 pl-3">
-        <Icon name={kindIcon(a.kind)} size={14} className="text-fg-3" />
+      <div className="flex items-center gap-2.5 py-1.5 pr-1.5 pl-3 shadow-[0_1px_0_var(--line)]">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface text-fg-3">
+          <Icon name={kindIcon(a.kind)} size={14} />
+        </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-medium">{a.name}</div>
-          <div className="text-[11px] text-fg-4">
+          <div className="font-num text-[10.5px] text-fg-4">
             {a.kind} · {bytes(a.size)} · updated {relTime(a.updated_at)}
           </div>
         </div>

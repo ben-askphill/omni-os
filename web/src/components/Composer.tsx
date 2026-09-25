@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { api, errorText, MODELS, type Thread } from '../api.ts';
 import { navigate, takeComposerFocus } from '../router.ts';
 import { useApp } from '../store.tsx';
-import { Button, ErrorNote, Icon, Kbd } from './ui.tsx';
+import { ErrorNote, Icon, Kbd, Picker, Spinner, type PickerOption } from './ui.tsx';
 
 // Unsent text survives navigation (not reloads). Keyed by where the composer lives.
 const drafts = new Map<string, string>();
@@ -10,12 +10,29 @@ const drafts = new Map<string, string>();
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 function useAutosize(ref: RefObject<HTMLTextAreaElement | null>, value: string, max: number) {
-  useLayoutEffect(() => {
+  const fit = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, max)}px`;
-  }, [ref, value, max]);
+  }, [ref, max]);
+  useLayoutEffect(fit, [fit, value]);
+  // The placeholder counts toward scrollHeight, so a measurement taken before layout or font load
+  // settles can come out far too tall. Refit when the width or the fonts change.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    void document.fonts?.ready.then(fit);
+    if (typeof ResizeObserver === 'undefined') return;
+    let w = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === w) return;
+      w = el.clientWidth;
+      fit();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, fit]);
 }
 
 function useFocusRequests(ref: RefObject<HTMLTextAreaElement | null>, enabled: boolean) {
@@ -31,25 +48,35 @@ function useFocusRequests(ref: RefObject<HTMLTextAreaElement | null>, enabled: b
   }, [ref, enabled]);
 }
 
-const selectCls =
-  'h-7 max-w-[11rem] appearance-none truncate rounded-md border border-line bg-surface-2 pr-6 pl-2 text-[12.5px] text-fg-2 outline-none hover:border-line-strong focus:border-fg-3';
-const selectStyle = {
-  backgroundImage:
-    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E\")",
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'right 7px center',
-};
+const KIND: Record<string, string> = { client: 'Client', internal: 'Internal', personal: 'Personal', system: 'System' };
 
-function Picker({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: ReactNode }) {
+/** Bencho "cmd" go button: quiet until there is something to send, then ink. */
+function SendButton({ armed, busy, onClick, children }: { armed: boolean; busy: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <label className="inline-flex items-center gap-1">
-      <span className="sr-only">{label}</span>
-      <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={selectCls} style={selectStyle}>
-        {children}
-      </select>
-    </label>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!armed || busy}
+      data-armed={armed || undefined}
+      className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-surface-3 pr-4 pl-3.5 text-[13px] font-medium text-fg-4 transition-[background-color,color,transform] duration-300 data-[armed]:bg-fg data-[armed]:text-on-ink"
+    >
+      {busy ? <Spinner size={14} /> : <Icon name="send" size={15} strokeWidth={2} />}
+      {children}
+    </button>
   );
 }
+
+function Hint() {
+  return (
+    <span className="hidden items-center gap-1 text-[11.5px] text-fg-4 sm:inline-flex">
+      <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
+      <Kbd>↵</Kbd>
+    </span>
+  );
+}
+
+const shell = (shape: string) =>
+  `${shape} p-1.5 transition-[background-color,box-shadow] duration-200 shadow-[inset_0_0_0_1px_var(--line)] focus-within:bg-bg focus-within:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_5px_var(--wash)]`;
 
 /** Starts a new thread. `channelId` fixes the channel (channel page); otherwise a picker is shown. */
 export function NewThreadComposer({
@@ -126,8 +153,25 @@ export function NewThreadComposer({
     }
   };
 
+  const channelOptions: PickerOption<string>[] = visibleChannels.map((c) => ({
+    value: c.id,
+    label: c.id === 'conductor' ? 'Conductor' : c.name,
+    sub: KIND[c.kind] ?? c.kind,
+    avatar: c.name,
+    icon: c.id === 'conductor' ? 'target' : undefined,
+  }));
+  if (!visibleChannels.some((c) => c.id === channel)) channelOptions.push({ value: channel, label: channel, avatar: channel });
+  const roleOptions: PickerOption<string>[] = [
+    { value: '', label: 'No role', sub: 'Plain Claude, no charter', avatar: false, icon: 'x' },
+    ...crew.map((r) => ({ value: r.id, label: r.name, sub: r.description, avatar: r.name })),
+  ];
+  const modelOptions: PickerOption<string>[] = [
+    { value: '', label: roleObj?.model ? `Default (${roleObj.model})` : 'Default model', sub: roleObj?.model ? `Set by ${roleObj.name}` : undefined, avatar: false, icon: 'sliders' },
+    ...MODELS.map((m) => ({ value: m, label: m, avatar: false as const, icon: 'zap' as const })),
+  ];
+
   return (
-    <div className="rounded-xl border border-line-strong bg-surface shadow-[var(--shadow-card)] transition-colors focus-within:border-fg-4">
+    <div className={shell(big ? 'rounded-[30px] bg-surface' : 'rounded-[26px] bg-surface')}>
       <textarea
         ref={ref}
         value={text}
@@ -140,46 +184,21 @@ export function NewThreadComposer({
         }}
         rows={big ? 3 : 2}
         placeholder={placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task')}
-        className={`block w-full resize-none bg-transparent px-3.5 pt-3 pb-1 outline-none placeholder:text-fg-4 ${big ? 'min-h-[84px] text-[15px]' : 'min-h-[56px] text-[14px]'}`}
+        className={`block w-full resize-none bg-transparent px-4 pt-3 pb-1 tracking-[-0.01em] outline-none placeholder:text-fg-4 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
       />
-      <div className="flex flex-wrap items-center gap-1.5 px-2.5 pt-1 pb-2.5">
-        {!channelId && (
-          <Picker label="Channel" value={channel} onChange={onChannel}>
-            {visibleChannels.map((c) => (
-              <option key={c.id} value={c.id}>
-                #{c.id}
-              </option>
-            ))}
-            {!visibleChannels.some((c) => c.id === channel) && <option value={channel}>#{channel}</option>}
-          </Picker>
-        )}
-        <Picker label="Role" value={role} onChange={onRole}>
-          <option value="">No role</option>
-          {crew.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </Picker>
-        <Picker label="Model" value={model} onChange={setModel}>
-          <option value="">{roleObj?.model ? `Default (${roleObj.model})` : 'Default model'}</option>
-          {MODELS.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </Picker>
-        <div className="ml-auto flex items-center gap-2">
-          <span className="hidden text-[11.5px] text-fg-4 sm:inline">
-            <Kbd>{isMac ? 'Cmd' : 'Ctrl'}</Kbd> <Kbd>Enter</Kbd>
-          </span>
-          <Button variant="primary" size="sm" onClick={submit} busy={busy} disabled={!text.trim()} icon="send">
+      <div className="flex flex-wrap items-center gap-1.5 px-1 pt-1">
+        {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
+        <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />
+        <Picker label="Model" value={model} options={modelOptions} onChange={setModel} />
+        <div className="ml-auto flex items-center gap-2.5">
+          <Hint />
+          <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>
             Start
-          </Button>
+          </SendButton>
         </div>
       </div>
-      {roleObj?.description && <div className="border-t border-line px-3.5 py-1.5 text-[12px] text-fg-3">{roleObj.description}</div>}
-      {error && <ErrorNote className="m-2 mt-0">{error}</ErrorNote>}
+      {roleObj?.description && <div className="px-4 pt-2.5 pb-1.5 text-[12px] text-fg-3">{roleObj.description}</div>}
+      {error && <ErrorNote className="m-1 mt-2">{error}</ErrorNote>}
     </div>
   );
 }
@@ -228,7 +247,7 @@ export function ReplyComposer({
   };
 
   return (
-    <div className="rounded-xl border border-line-strong bg-surface shadow-[var(--shadow-card)] focus-within:border-fg-4">
+    <div className={shell('rounded-[24px] bg-elev')}>
       <textarea
         ref={ref}
         value={text}
@@ -244,25 +263,23 @@ export function ReplyComposer({
         }}
         rows={1}
         placeholder={busyThread ? 'Queue a follow-up. It runs when the current turn ends.' : 'Reply'}
-        className="block min-h-[44px] w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-[14px] outline-none placeholder:text-fg-4"
+        className="block min-h-[44px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] tracking-[-0.01em] outline-none placeholder:text-fg-4"
       />
-      <div className="flex items-center gap-2 px-2.5 pb-2">
+      <div className="flex items-center gap-2 px-1">
         {extra}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2.5">
           {busyThread && (
             <span className="flex items-center gap-1 text-[11.5px] text-fg-3">
               <Icon name="clock" size={12} /> {status === 'queued' ? 'Queued' : 'Will queue'}
             </span>
           )}
-          <span className="hidden text-[11.5px] text-fg-4 sm:inline">
-            <Kbd>{isMac ? 'Cmd' : 'Ctrl'}</Kbd> <Kbd>Enter</Kbd>
-          </span>
-          <Button variant="primary" size="sm" onClick={submit} busy={busy} disabled={!text.trim()} icon="send">
+          <Hint />
+          <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>
             {busyThread ? 'Queue' : 'Send'}
-          </Button>
+          </SendButton>
         </div>
       </div>
-      {error && <ErrorNote className="m-2 mt-0">{error}</ErrorNote>}
+      {error && <ErrorNote className="m-1 mt-2">{error}</ErrorNote>}
     </div>
   );
 }

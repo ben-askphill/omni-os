@@ -1,4 +1,16 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import type { ThreadStatus } from '../../../server/db.ts';
 
 // ---------- icons (hand-drawn, 24px grid, 1.75 stroke) ----------
@@ -13,10 +25,12 @@ const PATHS = {
   chevronLeft: 'm15 18-6-6 6-6',
   stop: 'M7 7h10v10H7z',
   send: 'M12 19V5M5 12l7-7 7 7',
+  arrowRight: 'M5 12h14M13 6l6 6-6 6',
   external: 'M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6',
   download: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   check: 'M20 6 9 17l-5-5',
+  undo: 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
   panel: 'M3 5h18v14H3zM15 5v14',
   branch: 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9',
   pr: 'M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM13 6h3a2 2 0 0 1 2 2v7M6 9v12',
@@ -43,6 +57,11 @@ const PATHS = {
   lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
   home: 'M3 10.5 12 3l9 7.5M5 9v12h14V9',
   message: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  moon: 'M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z',
+  monitor: 'M3 4h18v12H3zM8 20h8M12 16v4',
+  bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+  grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
 } as const;
 
 export type IconName = keyof typeof PATHS;
@@ -66,17 +85,35 @@ export function Icon({ name, size = 16, className = '', strokeWidth = 1.75 }: { 
   );
 }
 
+/** The Omni wordmark: Google Sans with the red signal dot. */
+export function Wordmark({ size = 18 }: { size?: number }) {
+  return (
+    <span className="inline-flex items-start font-display font-medium" style={{ fontSize: size, lineHeight: 1 }}>
+      Omni
+      <span className="ml-[2px] inline-block rounded-full bg-accent" style={{ width: size * 0.3, height: size * 0.3 }} />
+    </span>
+  );
+}
+
 // ---------- buttons ----------
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-ghost';
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-fg text-bg hover:opacity-90 disabled:opacity-40',
-  secondary: 'bg-surface text-fg border border-line-strong hover:bg-surface-2 disabled:opacity-50',
-  ghost: 'text-fg-2 hover:bg-surface-2 hover:text-fg disabled:opacity-40',
-  danger: 'bg-bad text-white hover:opacity-90 disabled:opacity-40',
-  'danger-ghost': 'text-bad hover:bg-bad-bg disabled:opacity-40',
+  primary: 'bg-fg text-on-ink hover:bg-fg/88 disabled:opacity-35',
+  secondary: 'bg-surface-2 text-fg hover:bg-surface-3 disabled:opacity-45',
+  ghost: 'hov text-fg-2 hover:text-fg disabled:opacity-40',
+  danger: 'bg-bad-dot text-white hover:bg-bad-dot/90 disabled:opacity-40',
+  'danger-ghost': 'hov text-bad [--hov:var(--bad-bg)] disabled:opacity-40',
 };
+
+const SIZES = {
+  sm: 'h-7 px-3 text-[12.5px] gap-1.5',
+  md: 'h-[34px] px-4 text-[13px] gap-2',
+  lg: 'h-11 px-5 text-[14px] gap-2',
+};
+
+const btnBase = 'press inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap transition-[background-color,color,opacity,transform] duration-200 select-none';
 
 export function Button({
   variant = 'secondary',
@@ -86,15 +123,9 @@ export function Button({
   className = '',
   busy,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md'; icon?: IconName; busy?: boolean }) {
-  const sz = size === 'sm' ? 'h-7 px-2.5 text-[12.5px] gap-1.5 rounded-md' : 'h-8 px-3 text-[13px] gap-1.5 rounded-lg';
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md' | 'lg'; icon?: IconName; busy?: boolean }) {
   return (
-    <button
-      type="button"
-      {...rest}
-      disabled={rest.disabled || busy}
-      className={`inline-flex items-center justify-center font-medium whitespace-nowrap transition-colors select-none ${sz} ${VARIANTS[variant]} ${className}`}
-    >
+    <button type="button" {...rest} disabled={rest.disabled || busy} className={`${btnBase} ${SIZES[size]} ${VARIANTS[variant]} ${className}`}>
       {busy ? <Spinner size={size === 'sm' ? 12 : 14} /> : icon ? <Icon name={icon} size={size === 'sm' ? 14 : 15} /> : null}
       {children}
     </button>
@@ -106,30 +137,42 @@ export function IconButton({
   label,
   className = '',
   size = 16,
+  active,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { icon: IconName; label: string; size?: number }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { icon: IconName; label: string; size?: number; active?: boolean }) {
   return (
     <button
       type="button"
       aria-label={label}
       title={label}
+      data-on={active || undefined}
       {...rest}
-      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-40 ${className}`}
+      className={`hov press inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-fg-3 transition-colors hover:text-fg disabled:opacity-40 data-[on=true]:text-fg ${className}`}
     >
       <Icon name={icon} size={size} />
     </button>
   );
 }
 
-export function LinkButton({ href, icon, children, className = '', variant = 'secondary', size = 'md', target }: { href: string; icon?: IconName; children?: ReactNode; className?: string; variant?: Variant; size?: 'sm' | 'md'; target?: string }) {
-  const sz = size === 'sm' ? 'h-7 px-2.5 text-[12.5px] gap-1.5 rounded-md' : 'h-8 px-3 text-[13px] gap-1.5 rounded-lg';
+export function IconLink({ href, icon, label, size = 15, download, newTab, className = '' }: { href: string; icon: IconName; label: string; size?: number; download?: boolean; newTab?: boolean; className?: string }) {
   return (
     <a
       href={href}
-      target={target}
-      rel={target ? 'noopener noreferrer' : undefined}
-      className={`inline-flex items-center justify-center font-medium whitespace-nowrap transition-colors ${sz} ${VARIANTS[variant]} ${className}`}
+      aria-label={label}
+      title={label}
+      download={download || undefined}
+      target={newTab ? '_blank' : undefined}
+      rel={newTab ? 'noopener noreferrer' : undefined}
+      className={`hov press inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-fg-3 transition-colors hover:text-fg ${className}`}
     >
+      <Icon name={icon} size={size} />
+    </a>
+  );
+}
+
+export function LinkButton({ href, icon, children, className = '', variant = 'secondary', size = 'md', target }: { href: string; icon?: IconName; children?: ReactNode; className?: string; variant?: Variant; size?: 'sm' | 'md' | 'lg'; target?: string }) {
+  return (
+    <a href={href} target={target} rel={target ? 'noopener noreferrer' : undefined} className={`${btnBase} ${SIZES[size]} ${VARIANTS[variant]} ${className}`}>
       {icon && <Icon name={icon} size={size === 'sm' ? 14 : 15} />}
       {children}
     </a>
@@ -158,18 +201,16 @@ export const STATUS_LABEL: Record<string, string> = {
 
 export function StatusDot({ status, size = 8, className = '' }: { status: ThreadStatus | string | null | undefined; size?: number; className?: string }) {
   const s = status ?? 'imported';
-  const hollow = s === 'imported';
+  const hollow = s === 'imported' || s === 'queued';
+  const color = STATUS_COLOR[s] ?? 'var(--fg-4)';
   return (
-    <span
-      title={STATUS_LABEL[s] ?? s}
-      className={`inline-block shrink-0 rounded-full ${s === 'running' ? 'pulse' : ''} ${className}`}
-      style={{
-        width: size,
-        height: size,
-        background: hollow ? 'transparent' : STATUS_COLOR[s] ?? 'var(--fg-4)',
-        boxShadow: hollow ? `inset 0 0 0 1.5px var(--fg-4)` : undefined,
-      }}
-    />
+    <span title={STATUS_LABEL[s] ?? s} className={`relative inline-block shrink-0 ${className}`} style={{ width: size, height: size }}>
+      {s === 'running' && <span className="ping absolute inset-0 rounded-full" style={{ background: color }} />}
+      <span
+        className="absolute inset-0 rounded-full"
+        style={{ background: hollow ? 'transparent' : color, boxShadow: hollow ? `inset 0 0 0 1.5px ${color}` : undefined }}
+      />
+    </span>
   );
 }
 
@@ -183,25 +224,44 @@ export function StatusPill({ status }: { status: string }) {
     imported: 'text-fg-3 bg-surface-2',
   };
   return (
-    <span className={`inline-flex h-6 items-center gap-1.5 rounded-full px-2 text-[12px] font-medium ${tone[status] ?? 'bg-surface-2 text-fg-2'}`}>
+    <span className={`inline-flex h-6 items-center gap-1.5 rounded-full pr-2.5 pl-2 text-[12px] font-medium ${tone[status] ?? 'bg-surface-2 text-fg-2'}`}>
       <StatusDot status={status} size={6} />
       {STATUS_LABEL[status] ?? status}
     </span>
   );
 }
 
-export function Chip({ children, tone = 'default', className = '', title }: { children: ReactNode; tone?: 'default' | 'info' | 'ok' | 'bad' | 'warn' | 'outline'; className?: string; title?: string }) {
+export function Chip({ children, tone = 'default', className = '', title }: { children: ReactNode; tone?: 'default' | 'info' | 'ok' | 'bad' | 'warn' | 'outline' | 'ink'; className?: string; title?: string }) {
   const tones = {
     default: 'bg-surface-2 text-fg-2',
-    outline: 'border border-line-strong text-fg-3',
+    outline: 'shadow-[inset_0_0_0_1px_var(--line-strong)] text-fg-3',
+    ink: 'bg-fg text-on-ink',
     info: 'bg-info-bg text-info',
     ok: 'bg-ok-bg text-ok',
     bad: 'bg-bad-bg text-bad',
     warn: 'bg-warn-bg text-warn',
   };
   return (
-    <span title={title} className={`inline-flex h-[18px] shrink-0 items-center rounded px-1.5 text-[11px] font-medium leading-none tracking-normal ${tones[tone]} ${className}`}>
+    <span title={title} className={`inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[11px] font-medium leading-none tracking-normal ${tones[tone]} ${className}`}>
       {children}
+    </span>
+  );
+}
+
+/** Letter avatar for channels and roles. Hue is stable per name. */
+export function Avatar({ name, size = 28, icon, className = '' }: { name: string; size?: number; icon?: IconName; className?: string }) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  const style: CSSProperties = {
+    width: size,
+    height: size,
+    fontSize: size * 0.42,
+    background: `light-dark(oklch(0.93 0.035 ${h}), oklch(0.32 0.04 ${h}))`,
+    color: `light-dark(oklch(0.38 0.07 ${h}), oklch(0.88 0.05 ${h}))`,
+  };
+  return (
+    <span aria-hidden="true" className={`inline-grid shrink-0 place-items-center rounded-full font-display font-medium uppercase ${className}`} style={style}>
+      {icon ? <Icon name={icon} size={size * 0.5} /> : name.replace(/[^a-z0-9]/gi, '').slice(0, 1) || '?'}
     </span>
   );
 }
@@ -219,7 +279,7 @@ export function Spinner({ size = 14, className = '' }: { size?: number; classNam
 
 export function ErrorNote({ children, onRetry, className = '' }: { children: ReactNode; onRetry?: () => void; className?: string }) {
   return (
-    <div role="alert" className={`flex items-start gap-2 rounded-lg border border-bad/25 bg-bad-bg px-3 py-2 text-[13px] text-bad ${className}`}>
+    <div role="alert" className={`flex items-start gap-2.5 rounded-2xl bg-bad-bg px-4 py-2.5 text-[13px] text-bad ${className}`}>
       <Icon name="alert" size={15} className="mt-[2px]" />
       <div className="min-w-0 flex-1 break-words whitespace-pre-wrap">{children}</div>
       {onRetry && (
@@ -233,15 +293,15 @@ export function ErrorNote({ children, onRetry, className = '' }: { children: Rea
 
 export function Empty({ title, children, icon, action }: { title: string; children?: ReactNode; icon?: IconName; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+    <div className="fade-in flex flex-col items-center justify-center px-6 py-16 text-center">
       {icon && (
-        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-fg-3">
-          <Icon name={icon} size={18} />
+        <div className="mb-4 grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-fg-3">
+          <Icon name={icon} size={19} />
         </div>
       )}
-      <div className="text-[14px] font-semibold">{title}</div>
-      {children && <div className="mt-1 max-w-sm text-[13px] text-fg-3">{children}</div>}
-      {action && <div className="mt-4">{action}</div>}
+      <div className="font-display text-[17px]">{title}</div>
+      {children && <div className="mt-1.5 max-w-sm text-[13px] text-fg-3">{children}</div>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }
@@ -254,42 +314,162 @@ export function Loading({ label = 'Loading' }: { label?: string }) {
   );
 }
 
-// ---------- tabs ----------
+// ---------- sliding thumb (Bencho pill indicator: stretch toward the target, then settle) ----------
+
+type Phase = 'idle' | 'stretch' | 'settle';
+export interface ThumbBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  phase: Phase;
+}
+
+const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Tracks the `[data-active="true"]` child of `track` and returns where the thumb should sit. */
+export function useSlidingThumb(
+  track: RefObject<HTMLElement | null>,
+  activeKey: unknown,
+  vertical = false,
+  selector = ':scope > [data-active="true"], :scope > * > [data-active="true"]',
+): ThumbBox | null {
+  const [box, setBox] = useState<ThumbBox | null>(null);
+  const last = useRef<Omit<ThumbBox, 'phase'> | null>(null);
+
+  const measure = useCallback(() => {
+    const el = track.current?.querySelector<HTMLElement>(selector);
+    if (!el) return null;
+    return { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
+  }, [track, selector]);
+
+  useLayoutEffect(() => {
+    const next = measure();
+    const prev = last.current;
+    last.current = next;
+    if (!next) return setBox(null);
+    if (!prev || reducedMotion()) return setBox({ ...next, phase: 'idle' });
+    if (prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h) return;
+    // Stretch to cover old and new along the travel axis, then spring into place.
+    const x = vertical ? next.x : Math.min(prev.x, next.x);
+    const y = vertical ? Math.min(prev.y, next.y) : next.y;
+    const w = vertical ? next.w : Math.max(prev.x + prev.w, next.x + next.w) - x;
+    const h = vertical ? Math.max(prev.y + prev.h, next.y + next.h) - y : next.h;
+    setBox({ x, y, w, h, phase: 'stretch' });
+    const t = setTimeout(() => setBox({ ...next, phase: 'settle' }), 150);
+    return () => clearTimeout(t);
+  }, [activeKey, measure, vertical]);
+
+  // Fonts loading, lists growing and window resizes move items: follow without animating.
+  useEffect(() => {
+    const el = track.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      const n = measure();
+      last.current = n;
+      setBox(n ? { ...n, phase: 'idle' } : null);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [track, measure]);
+
+  return box;
+}
+
+export function Thumb({ box, tone, className = '' }: { box: ThumbBox | null; tone?: 'wash'; className?: string }) {
+  if (!box) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className={`seg-thumb ${className}`}
+      data-phase={box.phase}
+      data-tone={tone}
+      style={{ width: box.w, height: box.h, transform: `translate3d(${box.x}px, ${box.y}px, 0)` }}
+    />
+  );
+}
+
+export interface SegOption<T extends string> {
+  id: T;
+  label?: ReactNode;
+  href?: string;
+  icon?: IconName;
+  badge?: ReactNode;
+  title?: string;
+}
+
+/** Segmented pill with a sliding thumb. Links when options carry `href`, buttons otherwise. */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  size = 'md',
+  label,
+  radio,
+  className = '',
+}: {
+  options: SegOption<T>[];
+  value: T;
+  onChange?: (id: T) => void;
+  size?: 'sm' | 'md';
+  label?: string;
+  /** Radio semantics for settings; tab semantics otherwise. */
+  radio?: boolean;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const box = useSlidingThumb(ref, value);
+  return (
+    <div ref={ref} role={radio ? 'radiogroup' : 'tablist'} aria-label={label} data-size={size} className={`seg ${className}`}>
+      <Thumb box={box} />
+      {options.map((o) => {
+        const active = o.id === value;
+        const common = {
+          role: radio ? 'radio' : 'tab',
+          'aria-selected': radio ? undefined : active,
+          'aria-checked': radio ? active : undefined,
+          'aria-label': o.label ? undefined : o.title,
+          title: o.title,
+          'data-active': active,
+          className: 'seg-item',
+        } as const;
+        const inner = (
+          <>
+            {o.icon && <Icon name={o.icon} size={size === 'sm' ? 13 : 14} />}
+            {o.label}
+            {o.badge}
+          </>
+        );
+        return o.href ? (
+          <a key={o.id} href={o.href} {...common}>
+            {inner}
+          </a>
+        ) : (
+          <button key={o.id} type="button" onClick={() => onChange?.(o.id)} {...common}>
+            {inner}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function Tabs<T extends string>({
   tabs,
   value,
   onChange,
   className = '',
+  size,
 }: {
   tabs: { id: T; label: ReactNode; href?: string; badge?: ReactNode }[];
   value: T;
   onChange?: (id: T) => void;
   className?: string;
+  size?: 'sm' | 'md';
 }) {
   return (
-    <div role="tablist" className={`flex items-center gap-1 overflow-x-auto scroll-thin ${className}`}>
-      {tabs.map((t) => {
-        const active = t.id === value;
-        const cls = `relative inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium whitespace-nowrap transition-colors ${
-          active ? 'bg-surface-3 text-fg' : 'text-fg-3 hover:bg-surface-2 hover:text-fg'
-        }`;
-        const inner = (
-          <>
-            {t.label}
-            {t.badge}
-          </>
-        );
-        return t.href ? (
-          <a key={t.id} role="tab" aria-selected={active} href={t.href} className={cls}>
-            {inner}
-          </a>
-        ) : (
-          <button key={t.id} role="tab" aria-selected={active} type="button" onClick={() => onChange?.(t.id)} className={cls}>
-            {inner}
-          </button>
-        );
-      })}
+    <div className={`scroll-thin max-w-full overflow-x-auto ${className}`}>
+      <Segmented options={tabs} value={value} onChange={onChange} size={size} />
     </div>
   );
 }
@@ -311,16 +491,16 @@ export function Modal({ open, onClose, children, title, wide }: { open: boolean;
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-6" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="scrim fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={ref}
         role="dialog"
         aria-modal="true"
-        className={`fade-in max-h-[92vh] w-full overflow-auto rounded-t-2xl border border-line bg-surface shadow-[var(--shadow-menu)] sm:rounded-2xl ${wide ? 'sm:max-w-5xl' : 'sm:max-w-md'}`}
+        className={`modal-in max-h-[92vh] w-full overflow-auto rounded-t-[28px] bg-elev pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-menu)] sm:rounded-[28px] sm:pb-0 ${wide ? 'sm:max-w-5xl' : 'sm:max-w-md'}`}
       >
         {title && (
-          <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-            <div className="min-w-0 text-[14px] font-semibold">{title}</div>
+          <div className="flex items-center justify-between gap-3 py-3 pr-3 pl-6">
+            <div className="min-w-0 font-display text-[16px]">{title}</div>
             <IconButton icon="x" label="Close" onClick={onClose} />
           </div>
         )}
@@ -353,11 +533,11 @@ export function ConfirmDialog({
 }) {
   return (
     <Modal open={open} onClose={busy ? () => {} : onCancel} title={title}>
-      <div className="space-y-3 px-4 py-4 text-[13.5px] text-fg-2">{children}</div>
-      {error && <ErrorNote className="mx-4 mb-3">{error}</ErrorNote>}
-      <div className="flex justify-end gap-2 border-t border-line px-4 py-3">
+      <div className="space-y-3 px-6 pt-1 pb-4 text-[13.5px] text-fg-2">{children}</div>
+      {error && <ErrorNote className="mx-6 mb-3">{error}</ErrorNote>}
+      <div className="flex justify-end gap-2 px-5 pt-1 pb-5">
         {/* Focus starts on Cancel: every confirm here is destructive, so a stray Enter must not fire it. */}
-        <Button variant="ghost" onClick={onCancel} disabled={busy} data-autofocus>
+        <Button variant="secondary" onClick={onCancel} disabled={busy} data-autofocus>
           Cancel
         </Button>
         <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} busy={busy}>
@@ -365,6 +545,499 @@ export function ConfirmDialog({
         </Button>
       </div>
     </Modal>
+  );
+}
+
+// ---------- inline confirm with undo (Bencho "say") ----------
+
+type SayPhase = 'idle' | 'asking' | 'busy' | 'pending' | 'done';
+
+/**
+ * A pill that asks in place. With `undoMs`, confirming shows an Undo button with a burning fuse and
+ * `onConfirm` only runs once the fuse is out (or the component unmounts). Without it, `onConfirm`
+ * runs right away. Errors are the caller's to surface; the pill resets to idle.
+ */
+export function InlineConfirm({
+  label,
+  icon,
+  confirmLabel,
+  cancelLabel = 'Cancel',
+  doneLabel,
+  busyLabel,
+  undoMs,
+  danger = true,
+  disabled,
+  onConfirm,
+  className = '',
+}: {
+  label: ReactNode;
+  icon?: IconName;
+  confirmLabel: string;
+  cancelLabel?: string;
+  doneLabel?: string;
+  busyLabel?: string;
+  undoMs?: number;
+  danger?: boolean;
+  disabled?: boolean;
+  onConfirm: () => void | Promise<void>;
+  className?: string;
+}) {
+  const [phase, setPhase] = useState<SayPhase>('idle');
+  const [width, setWidth] = useState<number | undefined>(undefined);
+  const shell = useRef<HTMLDivElement>(null);
+  const row = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const run = useRef(onConfirm);
+  run.current = onConfirm;
+  const pending = useRef(false);
+
+  const fire = useCallback(async () => {
+    pending.current = false;
+    setPhase('busy');
+    try {
+      await run.current();
+      setPhase(doneLabel ? 'done' : 'idle');
+    } catch {
+      setPhase('idle');
+    }
+  }, [doneLabel]);
+
+  // Measure the visible row so the shell can spring between widths.
+  useLayoutEffect(() => {
+    const el = row.current;
+    if (!el) return;
+    const set = () => setWidth(el.scrollWidth);
+    set();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === 'asking') cancelRef.current?.focus();
+    if (phase !== 'asking') return;
+    const onDown = (e: MouseEvent) => !shell.current?.contains(e.target as Node) && setPhase('idle');
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setPhase('idle');
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== 'pending' || !undoMs) return;
+    pending.current = true;
+    const t = setTimeout(() => void fire(), undoMs);
+    return () => clearTimeout(t);
+  }, [phase, undoMs, fire]);
+
+  // Leaving the page mid-fuse still commits, the way mail clients handle "undo send".
+  useEffect(
+    () => () => {
+      if (pending.current) void run.current();
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (phase !== 'done') return;
+    const t = setTimeout(() => setPhase('idle'), 2400);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  const confirm = () => (undoMs ? setPhase('pending') : void fire());
+
+  let content: ReactNode;
+  if (phase === 'asking') {
+    content = (
+      <>
+        <button ref={cancelRef} type="button" className="say-btn" onClick={() => setPhase('idle')}>
+          {cancelLabel}
+        </button>
+        <span className="say-seam" />
+        <button type="button" className="say-btn" data-danger={danger || undefined} onClick={confirm}>
+          {confirmLabel}
+        </button>
+      </>
+    );
+  } else if (phase === 'busy') {
+    content = (
+      <span className="say-done">
+        <Spinner size={13} /> {busyLabel ?? `${confirmLabel}…`}
+      </span>
+    );
+  } else if (phase === 'pending' || phase === 'done') {
+    content = (
+      <>
+        <span className="say-done">
+          <Icon name="check" size={14} /> {doneLabel ?? 'Done'}
+        </span>
+        {phase === 'pending' && (
+          <button
+            type="button"
+            className="say-undo"
+            onClick={() => {
+              pending.current = false;
+              setPhase('idle');
+            }}
+          >
+            <Icon name="undo" size={13} /> Undo
+            <span className="say-fuse" style={{ animationDuration: `${undoMs}ms` }} />
+          </button>
+        )}
+      </>
+    );
+  } else {
+    content = (
+      <button type="button" className="say-btn" disabled={disabled} onClick={() => setPhase('asking')}>
+        {icon && <Icon name={icon} size={14} />}
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <div ref={shell} className={`say ${disabled ? 'opacity-45' : ''} ${className}`} style={{ width }} aria-live="polite">
+      <div ref={row} className="say-row">
+        {content}
+      </div>
+    </div>
+  );
+}
+
+// ---------- slide to confirm (Bencho "sld") ----------
+
+const GRIP = 48;
+
+export function SlideToConfirm({
+  label,
+  doneLabel = 'Done',
+  busyLabel,
+  disabled,
+  onConfirm,
+  className = '',
+}: {
+  label: string;
+  doneLabel?: string;
+  busyLabel?: string;
+  disabled?: boolean;
+  onConfirm: () => void | Promise<void>;
+  className?: string;
+}) {
+  const track = useRef<HTMLDivElement>(null);
+  const [x, setX] = useState(0);
+  const [held, setHeld] = useState(false);
+  const [spring, setSpring] = useState(false);
+  const [phase, setPhase] = useState<'idle' | 'busy' | 'done'>('idle');
+  const start = useRef(0);
+
+  const max = () => Math.max(0, (track.current?.clientWidth ?? 0) - GRIP - 8);
+
+  const complete = async () => {
+    setSpring(true);
+    setX(max());
+    setPhase('busy');
+    try {
+      await onConfirm();
+      setPhase('done');
+    } catch {
+      setPhase('idle');
+      setX(0);
+    }
+  };
+
+  const release = () => {
+    if (!held) return;
+    setHeld(false);
+    if (x >= max() * 0.9) void complete();
+    else {
+      setSpring(true);
+      setX(0);
+    }
+  };
+
+  const locked = disabled || phase !== 'idle';
+  const m = max() || 1;
+  const progress = Math.min(1, x / m);
+
+  return (
+    <div ref={track} className={`sld ${disabled ? 'opacity-45' : ''} ${className}`} data-held={held || undefined} data-done={phase === 'done' || undefined}>
+      {phase === 'done' ? (
+        <div className="sld-done">
+          <Icon name="check" size={16} /> {doneLabel}
+        </div>
+      ) : (
+        <>
+          <div className="sld-wash" data-spring={spring || undefined} style={{ width: x + GRIP }} />
+          <div className="sld-say" style={{ opacity: phase === 'busy' ? 1 : 1 - progress * 1.4 }}>
+            {phase === 'busy' ? (
+              <span className="inline-flex items-center gap-2 text-fg-2">
+                <Spinner size={14} /> {busyLabel ?? 'Working'}
+              </span>
+            ) : (
+              label
+            )}
+          </div>
+          <button
+            type="button"
+            className="sld-grip"
+            aria-label={label}
+            disabled={locked}
+            data-spring={spring || undefined}
+            style={{ transform: `translate3d(${x}px, 0, 0)` }}
+            onPointerDown={(e) => {
+              if (locked) return;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              start.current = e.clientX - x;
+              setSpring(false);
+              setHeld(true);
+            }}
+            onPointerMove={(e) => held && setX(Math.max(0, Math.min(max(), e.clientX - start.current)))}
+            onPointerUp={release}
+            onPointerCancel={release}
+            onKeyDown={(e) => {
+              if (locked) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                void complete();
+              } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                setSpring(true);
+                const nx = Math.min(max(), x + max() / 4);
+                setX(nx);
+                if (nx >= max()) void complete();
+              } else if (e.key === 'ArrowLeft' || e.key === 'Escape') {
+                setSpring(true);
+                setX(0);
+              }
+            }}
+          >
+            {phase === 'busy' ? <Spinner size={16} /> : <Icon name="arrowRight" size={18} strokeWidth={2} />}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------- picker (Bencho "pik") ----------
+
+export interface PickerOption<T extends string> {
+  value: T;
+  label: string;
+  sub?: string;
+  icon?: IconName;
+  /** Letter avatar seed; defaults to the label. Set `avatar: false` to hide it. */
+  avatar?: string | false;
+}
+
+export function Picker<T extends string>({
+  value,
+  options,
+  onChange,
+  label,
+  prefix,
+  searchable,
+  disabled,
+  className = '',
+  align = 'left',
+}: {
+  value: T;
+  options: PickerOption<T>[];
+  onChange: (v: T) => void;
+  label: string;
+  prefix?: ReactNode;
+  searchable?: boolean;
+  disabled?: boolean;
+  className?: string;
+  align?: 'left' | 'right';
+}) {
+  const [open, setOpen] = useState(false);
+  const [up, setUp] = useState(false);
+  const [cursor, setCursor] = useState(0);
+  const [q, setQ] = useState('');
+  const wrap = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const current = options.find((o) => o.value === value);
+  const shown = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return s ? options.filter((o) => `${o.label} ${o.sub ?? ''}`.toLowerCase().includes(s)) : options;
+  }, [options, q]);
+  const canSearch = searchable ?? options.length > 7;
+
+  const openMenu = () => {
+    if (disabled) return;
+    const r = btn.current?.getBoundingClientRect();
+    const need = Math.min(options.length * 44 + (canSearch ? 52 : 0) + 16, 340);
+    setUp(!!r && window.innerHeight - r.bottom < need && r.top > window.innerHeight - r.bottom);
+    setQ('');
+    setCursor(Math.max(0, options.findIndex((o) => o.value === value)));
+    setOpen(true);
+  };
+  const close = (refocus = true) => {
+    setOpen(false);
+    if (refocus) btn.current?.focus();
+  };
+  const pick = (o: PickerOption<T>) => {
+    onChange(o.value);
+    close();
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => !wrap.current?.contains(e.target as Node) && close(false);
+    document.addEventListener('mousedown', onDown);
+    if (!canSearch) list.current?.focus();
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open, canSearch]);
+
+  useEffect(() => {
+    list.current?.querySelector<HTMLElement>(`[data-i="${cursor}"]`)?.scrollIntoView({ block: 'nearest' });
+  }, [cursor]);
+
+  const onKey = (e: ReactKeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setCursor((c) => Math.min(shown.length - 1, c + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setCursor((c) => Math.max(0, c - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const o = shown[cursor];
+      if (o) pick(o);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    } else if (e.key === 'Tab') close(false);
+  };
+
+  return (
+    <div ref={wrap} className={`relative ${className}`}>
+      <button
+        ref={btn}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`${label}: ${current?.label ?? 'none'}`}
+        disabled={disabled}
+        onClick={() => (open ? close() : openMenu())}
+        onKeyDown={(e) => {
+          if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            e.preventDefault();
+            openMenu();
+          }
+        }}
+        className="press inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] font-medium text-fg transition-colors hover:bg-surface-3 disabled:opacity-45"
+      >
+        {current && current.avatar !== false ? (
+          <Avatar name={current.avatar || current.label} icon={current.icon} size={24} />
+        ) : current?.icon ? (
+          <span className="grid h-6 w-6 place-items-center text-fg-3">
+            <Icon name={current.icon} size={14} />
+          </span>
+        ) : (
+          <span className="w-1.5" />
+        )}
+        {prefix && <span className="-mr-1 text-fg-4">{prefix}</span>}
+        <span className="min-w-0 truncate">{current?.label ?? 'Choose'}</span>
+        <Icon name="chevronDown" size={13} className="pik-chev text-fg-4" />
+      </button>
+      {open && (
+        <div
+          className={`pik-card w-[min(300px,calc(100vw-32px))] ${up ? 'bottom-[calc(100%+8px)]' : 'top-[calc(100%+8px)]'} ${align === 'right' ? 'right-0' : 'left-0'}`}
+          data-up={up || undefined}
+          onKeyDown={onKey}
+        >
+          {canSearch && (
+            <label className="mb-1 flex h-10 items-center gap-2 rounded-2xl bg-surface px-3 text-fg-4">
+              <Icon name="search" size={14} />
+              <input
+                autoFocus
+                value={q}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setCursor(0);
+                }}
+                placeholder={`Find ${label.toLowerCase()}`}
+                aria-label={`Find ${label.toLowerCase()}`}
+                className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-4"
+              />
+            </label>
+          )}
+          <div ref={list} role="listbox" aria-label={label} tabIndex={-1} className="scroll-thin max-h-[280px] overflow-y-auto outline-none">
+            {shown.map((o, i) => (
+              <button
+                key={o.value}
+                type="button"
+                role="option"
+                data-i={i}
+                aria-selected={o.value === value}
+                data-cursor={i === cursor}
+                onMouseEnter={() => setCursor(i)}
+                onClick={() => pick(o)}
+                className="pik-row"
+              >
+                {o.avatar !== false ? (
+                  <Avatar name={o.avatar || o.label} icon={o.icon} size={28} />
+                ) : o.icon ? (
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-2 text-fg-3">
+                    <Icon name={o.icon} size={14} />
+                  </span>
+                ) : null}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[13px] text-fg">{o.label}</span>
+                  {o.sub && <span className="truncate text-[11.5px] text-fg-4">{o.sub}</span>}
+                </span>
+                <span className="pik-mark">
+                  {o.value === value && <Icon name="check" size={12} strokeWidth={2.6} />}
+                </span>
+              </button>
+            ))}
+            {!shown.length && <div className="px-3 py-3 text-[12.5px] text-fg-4">No match</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- ticks and checklist ----------
+
+/** Usage as a row of ticks (Bencho "tick"). `value` is 0..1. */
+export function Ticks({ value, count = 24, height = 14, tone, label, className = '' }: { value: number; count?: number; height?: number; tone?: 'warn' | 'bad'; label?: string; className?: string }) {
+  const v = Math.max(0, Math.min(1, value));
+  const on = v > 0 ? Math.max(1, Math.round(v * count)) : 0;
+  const style = { '--ticks-h': `${height}px`, '--tick-on': tone === 'bad' ? 'var(--bad-dot)' : tone === 'warn' ? 'var(--warn-dot)' : 'var(--fg)' } as CSSProperties;
+  return (
+    <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v * 100)} className={`ticks ${className}`} style={style}>
+      {Array.from({ length: count }, (_, i) => (
+        <i key={i} data-on={i < on || undefined} />
+      ))}
+    </div>
+  );
+}
+
+/** One animated to-do row (Bencho "chk"): box fills, tick draws, the label gets struck through. */
+export function CheckItem({ state, children }: { state: 'pending' | 'in_progress' | 'completed' | string; children: ReactNode }) {
+  return (
+    <div data-state={state} className="flex items-start gap-2.5 py-[3px]">
+      <span className="chk-box mt-[1px]">
+        <span className="chk-fill" />
+        <svg viewBox="0 0 24 24" className="chk-tick" aria-hidden="true">
+          <path d="M5 12.5l4.5 4.5L19 7.5" />
+        </svg>
+        {state === 'in_progress' && <span className="pulse absolute h-[7px] w-[7px] rounded-full bg-fg" />}
+      </span>
+      <span className={`min-w-0 text-[13.5px] leading-[1.4] ${state === 'in_progress' ? 'font-medium text-fg' : 'text-fg-2'}`}>
+        <span className="chk-say">{children}</span>
+      </span>
+    </div>
   );
 }
 
@@ -402,27 +1075,21 @@ export function CopyButton({ text, label = 'Copy', className = '' }: { text: str
 
 export function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${checked ? 'bg-fg' : 'bg-surface-3'}`}
-    >
-      <span className={`inline-block h-4 w-4 rounded-full bg-bg shadow transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+    <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={() => onChange(!checked)} className="tgl">
+      <span className="tgl-knob" />
     </button>
   );
 }
 
-export function PageHeader({ title, subtitle, actions, children }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
+/** `width` matches the page body's max width so the title lines up with the content under it. */
+export function PageHeader({ title, subtitle, actions, children, eyebrow, width = '' }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children?: ReactNode; eyebrow?: ReactNode; width?: string }) {
   return (
-    <div className="border-b border-line px-4 pt-5 pb-3 md:px-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className={`mx-auto px-4 pt-6 pb-4 md:px-8 md:pt-10 ${width}`}>
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-[20px] font-semibold tracking-[-0.03em]">{title}</h1>
-          {subtitle && <div className="mt-0.5 text-[13px] text-fg-3">{subtitle}</div>}
+          {eyebrow && <div className="label-mono mb-2.5">{eyebrow}</div>}
+          <h1 className="truncate font-display text-[26px] leading-[1.1] md:text-[30px]">{title}</h1>
+          {subtitle && <div className="mt-1.5 max-w-xl text-[13.5px] text-fg-3">{subtitle}</div>}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
@@ -433,13 +1100,13 @@ export function PageHeader({ title, subtitle, actions, children }: { title: Reac
 
 export function Label({ children, hint, htmlFor }: { children: ReactNode; hint?: ReactNode; htmlFor?: string }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1 block">
+    <label htmlFor={htmlFor} className="mb-1.5 block">
       <span className="text-[12.5px] font-medium text-fg-2">{children}</span>
       {hint && <span className="mt-0.5 block text-[12px] text-fg-3">{hint}</span>}
     </label>
   );
 }
 
-export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="rounded border border-line-strong bg-surface-2 px-1 font-mono text-[10.5px] text-fg-3">{children}</kbd>;
+export function Kbd({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <kbd className={`inline-grid h-[18px] min-w-[18px] place-items-center rounded-[6px] bg-surface-2 px-1 font-num text-[10.5px] text-fg-3 ${className}`}>{children}</kbd>;
 }

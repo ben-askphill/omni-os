@@ -1,52 +1,56 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import type { ChannelWithRunning, UsageWindow } from '../api.ts';
 import { untilLabel } from '../format.ts';
-import { href, navigate, requestComposerFocus, useRoute } from '../router.ts';
+import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
-import { Icon, type IconName } from './ui.tsx';
+import { ThemeSwitch } from './theme.tsx';
+import { Icon, Kbd, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
 
-function Bar({ label, w }: { label: string; w?: UsageWindow }) {
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+
+function UsageRow({ label, w }: { label: string; w?: UsageWindow }) {
   useNow(60_000);
   if (!w) {
     return (
-      <div className="flex items-center gap-2 text-[11.5px] text-fg-4">
-        <span className="w-5 font-medium">{label}</span>
-        <div className="h-1 flex-1 rounded-full bg-surface-3" />
-        <span className="w-8 text-right">n/a</span>
+      <div className="flex items-center gap-2.5">
+        <span className="label-mono w-5">{label}</span>
+        <Ticks value={0} count={22} height={12} className="flex-1 opacity-60" label={`${label} window: no data`} />
+        <span className="w-8 text-right font-num text-[11px] text-fg-4">n/a</span>
       </div>
     );
   }
   const raw = w.utilization > 1.5 ? w.utilization / 100 : w.utilization;
   const pct = Math.max(0, Math.min(1, raw));
-  const color = pct >= 0.9 ? 'var(--bad-dot)' : pct >= 0.7 ? 'var(--warn-dot)' : 'var(--fg-2)';
+  const tone = pct >= 0.9 ? 'bad' : pct >= 0.7 ? 'warn' : undefined;
   return (
-    <div className="text-[11.5px]" title={`${label} window: ${Math.round(pct * 100)}% used, resets ${new Date(w.resetsAt * 1000).toLocaleString('en-GB')}`}>
-      <div className="flex items-center gap-2">
-        <span className="w-5 font-medium text-fg-3">{label}</span>
-        <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-3">
-          <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.max(2, pct * 100)}%`, background: color }} />
-        </div>
-        <span className="w-8 text-right font-medium text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
+    <div title={`${label} window: ${Math.round(pct * 100)}% used, resets ${new Date(w.resetsAt * 1000).toLocaleString('en-GB')}`}>
+      <div className="flex items-center gap-2.5">
+        <span className="label-mono w-5">{label}</span>
+        <Ticks value={pct} count={22} height={12} tone={tone} className="flex-1" label={`${label} usage`} />
+        <span className="w-8 text-right font-num text-[11px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
       </div>
-      <div className="mt-0.5 pl-7 text-[11px] text-fg-4">resets {untilLabel(w.resetsAt)}</div>
+      <div className="mt-1 pl-[30px] text-[10.5px] text-fg-4">resets {untilLabel(w.resetsAt)}</div>
     </div>
   );
 }
 
-function UsageMeter() {
+function UsageCard() {
   const { usage, status, feedLive } = useApp();
   const st = usage?.status;
   const warn = st && st !== 'allowed' ? (st === 'rejected' ? 'Limit reached' : st.includes('warning') ? 'Near the limit' : st) : null;
   return (
-    <div className="space-y-1.5 rounded-lg border border-line bg-surface/60 px-2.5 py-2">
-      <Bar label="5h" w={usage?.five_hour} />
-      <Bar label="7d" w={usage?.seven_day} />
+    <div className="space-y-2.5 rounded-[20px] bg-bg/70 p-3 shadow-[var(--shadow-card)]">
+      <UsageRow label="5h" w={usage?.five_hour} />
+      <UsageRow label="7d" w={usage?.seven_day} />
       {warn && <div className="text-[11.5px] font-medium text-warn">{warn}</div>}
-      <div className="flex items-center gap-1.5 border-t border-line pt-1.5 text-[11.5px] text-fg-3">
-        <span className={`inline-block h-1.5 w-1.5 rounded-full ${feedLive ? 'bg-ok' : 'bg-fg-4'}`} title={feedLive ? 'Live' : 'Reconnecting'} />
+      <div className="flex items-center gap-2 border-t border-line pt-2.5 text-[11.5px] text-fg-3">
+        <span className="relative inline-block h-1.5 w-1.5" title={feedLive ? 'Live' : 'Reconnecting'}>
+          {feedLive && <span className="ping absolute inset-0 rounded-full bg-[var(--ok-dot)]" />}
+          <span className={`absolute inset-0 rounded-full ${feedLive ? 'bg-[var(--ok-dot)]' : 'bg-fg-4'}`} />
+        </span>
         {status ? (
-          <span className="tabular-nums">
-            {status.running} running{status.queued ? ` · ${status.queued} queued` : ''} <span className="text-fg-4">/ {status.maxConcurrent} slots</span>
+          <span className="font-num text-[11px] tabular-nums">
+            {status.running} running{status.queued ? ` · ${status.queued} queued` : ''} <span className="text-fg-4">/ {status.maxConcurrent}</span>
           </span>
         ) : (
           <span>{feedLive ? 'Connected' : 'Connecting'}</span>
@@ -56,17 +60,19 @@ function UsageMeter() {
   );
 }
 
-function NavLink({ to, icon, active, children, right, onNavigate }: { to: string; icon?: IconName; active?: boolean; children: ReactNode; right?: ReactNode; onNavigate?: () => void }) {
+function NavLink({ to, icon, lead, active, children, right, onNavigate }: { to: string; icon?: IconName; lead?: ReactNode; active?: boolean; children: ReactNode; right?: ReactNode; onNavigate?: () => void }) {
   return (
     <a
       href={to}
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
-      className={`flex h-8 items-center gap-2 rounded-md px-2 text-[13.5px] transition-colors md:h-7 md:text-[13px] ${
-        active ? 'bg-surface-3 font-medium text-fg' : 'text-fg-2 hover:bg-surface-2 hover:text-fg'
+      data-active={active || undefined}
+      className={`hov z-[1] flex h-9 items-center gap-2.5 rounded-full px-3 text-[13.5px] transition-colors md:h-8 md:text-[13px] ${
+        active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-2 hover:text-fg'
       }`}
     >
       {icon && <Icon name={icon} size={15} className={active ? 'text-fg' : 'text-fg-3'} />}
+      {lead}
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {right}
     </a>
@@ -76,8 +82,11 @@ function NavLink({ to, icon, active, children, right, onNavigate }: { to: string
 function RunningBadge({ n }: { n: number }) {
   if (!n) return null;
   return (
-    <span className="flex items-center gap-1 text-[11px] font-medium text-info tabular-nums" title={`${n} running or queued`}>
-      <span className="pulse inline-block h-1.5 w-1.5 rounded-full bg-[var(--info-dot)]" />
+    <span className="flex items-center gap-1.5 font-num text-[11px] text-info tabular-nums" title={`${n} running or queued`}>
+      <span className="relative inline-block h-1.5 w-1.5">
+        <span className="ping absolute inset-0 rounded-full bg-[var(--info-dot)]" />
+        <span className="absolute inset-0 rounded-full bg-[var(--info-dot)]" />
+      </span>
       {n}
     </span>
   );
@@ -89,58 +98,52 @@ const GROUPS: { kind: string; label: string }[] = [
   { kind: 'personal', label: 'Personal' },
 ];
 
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onSearch: () => void }) {
   const route = useRoute();
+  const hash = useHash();
   const { channels, channelsError, threadChannel } = useApp();
-  const [q, setQ] = useState(route.name === 'search' ? route.q : '');
-
-  useEffect(() => {
-    if (route.name === 'search') setQ(route.q);
-  }, [route]);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const activeChannel = route.name === 'channel' ? route.id : route.name === 'thread' ? threadChannel : null;
   const conductor = channels.find((c) => c.id === 'conductor');
   const rest = channels.filter((c) => c.id !== 'conductor');
   const other = rest.filter((c) => !GROUPS.some((g) => g.kind === c.kind));
+  const box = useSlidingThumb(listRef, `${hash}:${activeChannel}:${channels.length}`, true, '[data-active="true"]');
 
   const channelLink = (c: ChannelWithRunning) => (
-    <NavLink key={c.id} to={href.channel(c.id)} active={activeChannel === c.id} onNavigate={onNavigate} right={<RunningBadge n={c.running} />}>
-      <span className="text-fg-4">#</span> {c.name}
+    <NavLink
+      key={c.id}
+      to={href.channel(c.id)}
+      active={activeChannel === c.id}
+      onNavigate={onNavigate}
+      right={<RunningBadge n={c.running} />}
+      lead={<span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-4'}`}>#</span>}
+    >
+      {c.name}
     </NavLink>
   );
 
   return (
     <nav className="flex h-full flex-col bg-sidebar" aria-label="Main">
-      <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <a href={href.home()} onClick={onNavigate} className="flex items-center gap-1.5 text-[17px] font-bold tracking-[-0.045em]">
-          Omni
-          <span className="inline-block h-1.5 w-1.5 translate-y-[-5px] rounded-full bg-accent" />
+      <div className="flex h-14 items-center justify-between pr-3 pl-5">
+        <a href={href.home()} onClick={onNavigate} aria-label="Omni home">
+          <Wordmark size={19} />
         </a>
       </div>
 
       <div className="space-y-2 px-3">
-        <UsageMeter />
-        <form
-          role="search"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!q.trim()) return;
-            navigate(`/search?q=${encodeURIComponent(q.trim())}`);
+        <button
+          type="button"
+          onClick={() => {
             onNavigate?.();
+            onSearch();
           }}
+          className="press flex h-10 w-full items-center gap-2.5 rounded-full bg-bg/70 pr-2 pl-3.5 text-[13px] text-fg-4 shadow-[var(--shadow-card)] transition-colors hover:text-fg-3"
         >
-          <label className="flex h-8 items-center gap-2 rounded-md border border-line bg-surface px-2 text-fg-3 focus-within:border-fg-4">
-            <Icon name="search" size={14} />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search threads"
-              aria-label="Search threads"
-              enterKeyHint="search"
-              className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-4"
-            />
-          </label>
-        </form>
+          <Icon name="search" size={15} />
+          <span className="flex-1 text-left">Search or jump to</span>
+          <Kbd className="bg-surface-2">{isMac ? '⌘K' : 'Ctrl K'}</Kbd>
+        </button>
         <button
           type="button"
           onClick={() => {
@@ -150,52 +153,66 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             } else if (route.name !== 'home') navigate('/');
             requestComposerFocus();
           }}
-          className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-fg text-[13px] font-medium text-bg transition-opacity hover:opacity-90"
+          className="press flex h-10 w-full items-center justify-center gap-2 rounded-full bg-fg text-[13px] font-medium text-on-ink transition-colors hover:bg-fg/88"
         >
-          <Icon name="plus" size={15} /> New thread
+          <Icon name="plus" size={15} strokeWidth={2} /> New thread
         </button>
       </div>
 
-      <div className="scroll-thin mt-3 min-h-0 flex-1 space-y-4 overflow-y-auto px-3 pb-4">
-        <div className="space-y-px">
-          <NavLink to={href.home()} icon="home" active={route.name === 'home'} onNavigate={onNavigate}>
-            Home
-          </NavLink>
-          {conductor && (
-            <NavLink to={href.channel('conductor')} icon="target" active={activeChannel === 'conductor'} onNavigate={onNavigate} right={<RunningBadge n={conductor.running} />}>
-              Conductor
+      <div className="scroll-thin mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+        <div ref={listRef} className="relative space-y-4">
+          <Thumb box={box} />
+          <div className="space-y-px">
+            <NavLink to={href.home()} icon="home" active={route.name === 'home'} onNavigate={onNavigate}>
+              Home
             </NavLink>
-          )}
-        </div>
+            {conductor && (
+              <NavLink to={href.channel('conductor')} icon="target" active={activeChannel === 'conductor'} onNavigate={onNavigate} right={<RunningBadge n={conductor.running} />}>
+                Conductor
+              </NavLink>
+            )}
+          </div>
 
-        {channelsError && <div className="rounded-md bg-bad-bg px-2 py-1.5 text-[12px] text-bad">{channelsError}</div>}
+          {channelsError && <div className="rounded-2xl bg-bad-bg px-3 py-2 text-[12px] text-bad">{channelsError}</div>}
 
-        {GROUPS.map((g) => {
-          const list = rest.filter((c) => c.kind === g.kind);
-          if (!list.length) return null;
-          return (
-            <div key={g.kind}>
-              <div className="px-2 pb-1 text-[11px] font-semibold tracking-wide text-fg-4 uppercase">{g.label}</div>
-              <div className="space-y-px">{list.map(channelLink)}</div>
+          {GROUPS.map((g) => {
+            const list = rest.filter((c) => c.kind === g.kind);
+            if (!list.length) return null;
+            return (
+              <div key={g.kind}>
+                <div className="label-mono px-3 pt-1 pb-2">{g.label}</div>
+                <div className="space-y-px">{list.map(channelLink)}</div>
+              </div>
+            );
+          })}
+          {other.length > 0 && <div className="space-y-px">{other.map(channelLink)}</div>}
+
+          <NavLink to={href.newChannel()} icon="plus" active={route.name === 'new-channel'} onNavigate={onNavigate}>
+            Add channel
+          </NavLink>
+
+          <div>
+            <div className="label-mono px-3 pt-1 pb-2">Workspace</div>
+            <div className="space-y-px">
+              <NavLink to={href.artifacts()} icon="layers" active={route.name === 'artifacts'} onNavigate={onNavigate}>
+                Artifacts
+              </NavLink>
+              <NavLink to={href.automations()} icon="zap" active={route.name === 'automations'} onNavigate={onNavigate}>
+                Automations
+              </NavLink>
+              <NavLink to={href.secrets()} icon="key" active={route.name === 'secrets'} onNavigate={onNavigate}>
+                Secrets
+              </NavLink>
             </div>
-          );
-        })}
-        {other.length > 0 && <div className="space-y-px">{other.map(channelLink)}</div>}
+          </div>
+        </div>
+      </div>
 
-        <NavLink to={href.newChannel()} icon="plus" active={route.name === 'new-channel'} onNavigate={onNavigate}>
-          Add channel
-        </NavLink>
-
-        <div className="space-y-px border-t border-line pt-3">
-          <NavLink to={href.artifacts()} icon="layers" active={route.name === 'artifacts'} onNavigate={onNavigate}>
-            Artifacts
-          </NavLink>
-          <NavLink to={href.automations()} icon="zap" active={route.name === 'automations'} onNavigate={onNavigate}>
-            Automations
-          </NavLink>
-          <NavLink to={href.secrets()} icon="key" active={route.name === 'secrets'} onNavigate={onNavigate}>
-            Secrets
-          </NavLink>
+      <div className="space-y-2.5 px-3 pt-1 pb-3">
+        <UsageCard />
+        <div className="flex items-center justify-between pl-2">
+          <span className="label-mono">Theme</span>
+          <ThemeSwitch />
         </div>
       </div>
     </nav>
