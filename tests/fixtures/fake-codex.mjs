@@ -50,6 +50,14 @@ let threadId = null;
 let turnSeq = 0;
 let rateLimitSent = false;
 let dead = false;
+let activeTurn = null;
+
+function complete(turnId) {
+  if (activeTurn && activeTurn.turnId === turnId && !activeTurn.done) {
+    activeTurn.done = true;
+    notify('turn/completed', { threadId, turnId });
+  }
+}
 
 process.on('SIGINT', () => process.exit(0));
 process.on('SIGTERM', () => process.exit(0));
@@ -67,9 +75,11 @@ const textOf = (input) => (Array.isArray(input) ? input.filter((i) => i?.type ==
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function runTurn(turnId, text) {
+  const turn = (activeTurn = { turnId, done: false });
   notify('turn/started', { threadId, turnId });
   await delay(5);
   if (text.includes('SLOW')) await delay(400);
+  if (turn.done) return;
   if (text.includes('CRASH')) {
     process.stderr.write('fake-codex: crashing on purpose\n');
     process.exit(1);
@@ -89,15 +99,17 @@ async function runTurn(turnId, text) {
     });
   }
   if (text.includes('BADTURN')) {
+    turn.done = true;
     notify('error', { threadId, turnId, message: 'plan limit reached; resets at 5pm' });
     return;
   }
-  // Never completes: the turn hangs until the process is interrupted/killed.
+  // Never completes on its own: the turn hangs until interrupted.
   if (text.includes('HANG')) return;
   await delay(5);
+  if (turn.done) return;
   notify('item/completed', { threadId, item: { id: `item_msg_${turnSeq}`, type: 'agentMessage', text: `ack: ${text}` } });
   await delay(5);
-  notify('turn/completed', { threadId, turnId });
+  complete(turnId);
 }
 
 function onMessage(msg) {
@@ -128,8 +140,17 @@ function onMessage(msg) {
       void runTurn(turnId, textOf(params?.input));
       return;
     }
-    case 'turn/interrupt':
-      return respond(id, {});
+    case 'turn/steer': {
+      respond(id, {});
+      // The steer joins the running turn; the turn continues (no new turn/started).
+      notify('item/completed', { threadId, item: { id: `item_steer_${++turnSeq}`, type: 'agentMessage', text: `steered: ${textOf(params?.input)}` } });
+      return;
+    }
+    case 'turn/interrupt': {
+      respond(id, {});
+      complete(params?.turnId ?? activeTurn?.turnId);
+      return;
+    }
     default:
       if (typeof id === 'number') respond(id, {});
       return;

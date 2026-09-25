@@ -66,20 +66,21 @@ describe('codex tracer', () => {
     expect(H.thread(t.id).status).toBe('done');
   });
 
-  it('stops the process on interrupt, and the next message resumes the session', async () => {
+  it('interrupts the turn but keeps the process warm, and the next message continues', async () => {
     const t = await H.start('HANG long running', codex);
-    // The Codex thread id is stored once the session starts; the turn then hangs until we stop it.
-    const codexId = await H.until('codex session id', () => {
-      const s = H.thread(t.id).session_id;
-      return s.startsWith('th_') ? s : false;
-    });
+    await H.until('codex session id', () => H.thread(t.id).session_id.startsWith('th_'));
+    await H.until('turn started', () => H.byKind(t.id, 'init').length >= 1);
+    const pidsBefore = H.codexPids().length;
+
     H.runner.interruptThread(t.id);
     await H.untilStatus(t.id, 'stopped');
+    expect(H.runner.isLive(t.id)).toBe(true); // process kept warm
+    expect(H.codexRequests().some((r) => r.method === 'turn/interrupt')).toBe(true);
 
     H.runner.sendMessage(t.id, 'CMD carry on');
     await H.untilResults(t.id, 1, 12000);
-    const resumes = H.codexRequests().filter((r) => r.method === 'thread/resume');
-    expect(resumes.some((r) => r.params.threadId === codexId)).toBe(true);
     expect(H.thread(t.id).status).toBe('done');
+    // Same warm process continued the session: no new spawn, no resume.
+    expect(H.codexPids().length).toBe(pidsBefore);
   });
 });
