@@ -1,0 +1,7 @@
+{"method":"item/completed","params":{"item":{"id":"f1","type":"fileChange","path":"src/a.txt","kind":"add","content":"hello\nworld"}}}
+{"method":"item/completed","params":{"item":{"id":"f2","type":"fileChange","path":"src/b.ts","kind":"update","diff":"--- a/src/b.ts\n+++ b/src/b.ts\n@@ -1,2 +1,2 @@\n foo\n-bar\n+baz\n@@ -10,2 +10,2 @@\n qux\n-a\n+b"}}}
+{"method":"item/completed","params":{"item":{"id":"f3","type":"fileChange","path":"src/c.txt","kind":"delete"}}}
+{"method":"item/completed","params":{"item":{"id":"m1","type":"mcpToolCall","server":"omni","tool":"list_channels","arguments":{"archived":false},"result":"[{\"id\":\"inbox\"}]"}}}
+{"method":"item/completed","params":{"item":{"id":"m2","type":"mcpToolCall","server":"weather","tool":"forecast","arguments":{"city":"NYC"},"error":"upstream 500"}}}
+{"method":"item/completed","params":{"item":{"id":"w1","type":"webSearch","query":"omni os agent","results":"3 results"}}}
+{"method":"item/completed","params":{"item":{"id":"p1","type":"plan","steps":[{"step":"Scaffold","status":"completed"},{"step":"Wire adapter","status":"in_progress"},{"step":"Test","status":"pending"}]}}}
