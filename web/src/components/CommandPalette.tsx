@@ -165,7 +165,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             aria-expanded="true"
             aria-controls="omni-cmdk-list"
             aria-activedescendant={items[safeCursor] ? `cmdk-${items[safeCursor].id}` : undefined}
-            className="h-full min-w-0 flex-1 bg-transparent text-[16px] tracking-[-0.01em] outline-none placeholder:text-fg-4"
+            className="h-full min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-fg-4"
           />
           <Kbd>Esc</Kbd>
         </div>

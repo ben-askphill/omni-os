@@ -333,7 +333,7 @@ export function NewThreadComposer({
         }}
         rows={big ? 3 : 2}
         placeholder={placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task')}
-        className={`block w-full resize-none bg-transparent px-4 pt-3 pb-1 tracking-[-0.01em] outline-none placeholder:text-fg-4 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
+        className={`block w-full resize-none bg-transparent px-4 pt-3 pb-1 outline-none placeholder:text-fg-4 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
       />
       <div className="flex flex-wrap items-center gap-1.5 px-1 pt-1">
         <AttachButton onPick={att.add} disabled={busy} />
@@ -554,7 +554,7 @@ export function ReplyComposer({
         }}
         rows={1}
         placeholder={busyThread ? 'Steer the agent. It reads this at its next step.' : 'Reply'}
-        className="block min-h-[44px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] tracking-[-0.01em] outline-none placeholder:text-fg-4"
+        className="block min-h-[44px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] outline-none placeholder:text-fg-4"
       />
       <div className="flex items-center gap-2 px-1">
         <AttachButton onPick={att.add} disabled={busy} />

@@ -85,10 +85,16 @@
   --color-info-bg: var(--info-bg);
   --color-bubble: var(--bubble);
   --color-code: var(--code-bg);
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-head: "Google Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-num: "DM Mono", "IBM Plex Mono", ui-monospace, monospace;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  /* Apple's typefaces (developer.apple.com/fonts). Their license rules out serving them as web fonts,
+     so these name the local install; without it, Safari and iOS reach the same system copies through
+     system-ui and ui-*. SF Pro adjusts to each size by itself: its optical-size axis moves from Text to
+     Display, and its tracking table spaces letters the way macOS does, so body text adds no letter-spacing. */
+  --font-sans: "SF Pro", "SF Pro Text", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --font-head: "SF Pro", "SF Pro Display", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --font-rounded: "SF Pro Rounded", ui-rounded, system-ui, -apple-system, sans-serif;
+  --font-serif: "New York", ui-serif, Georgia, serif;
+  --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-num: var(--font-mono);
 }
 
 @layer base {
@@ -108,10 +114,8 @@
     font-family: var(--font-sans);
     font-size: 14px;
     line-height: 1.45;
-    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    font-feature-settings: "cv11", "ss01";
   }
   ::selection {
     background: var(--mark);
@@ -175,10 +179,10 @@
     scrollbar-color: var(--line-strong) transparent;
   }
 
-  /* Headline type: Google Sans, tight. */
+  /* Headline type: SF Pro, tight. */
   .font-display {
     font-family: var(--font-head);
-    letter-spacing: -0.03em;
+    letter-spacing: -0.01em;
     font-weight: 500;
   }
   /* Small mono caps used for section labels and counters. */
@@ -671,7 +675,7 @@
 .md h4 {
   font-family: var(--font-head);
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   line-height: 1.25;
   margin: 1.1em 0 0.45em;
 }
