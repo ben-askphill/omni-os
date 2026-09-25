@@ -1,10 +1,10 @@
-import { useRef, type ReactNode } from 'react';
-import type { ChannelWithRunning, UsageWindow } from '../api.ts';
+import { Fragment, useRef, type ReactNode } from 'react';
+import type { ChannelWithRunning, ThreadStub, UsageWindow } from '../api.ts';
 import { untilLabel } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { ThemeSwitch } from './theme.tsx';
-import { Icon, Kbd, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
+import { Icon, Kbd, Spinner, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -92,6 +92,33 @@ function RunningBadge({ n }: { n: number }) {
   );
 }
 
+/** A thread nested under its channel, like a Claude Code session under its project. */
+function ThreadLink({ t, active, onNavigate }: { t: ThreadStub; active: boolean; onNavigate?: () => void }) {
+  const title = t.title || 'Untitled';
+  return (
+    <a
+      href={href.thread(t.id)}
+      onClick={onNavigate}
+      title={`${title} · ${STATUS_LABEL[t.status] ?? t.status}`}
+      aria-current={active ? 'page' : undefined}
+      data-active={active || undefined}
+      className={`hov z-[1] ml-[25px] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${
+        active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-3 hover:text-fg'
+      }`}
+    >
+      <span className="grid w-3 shrink-0 place-items-center">
+        {t.status === 'running' ? <Spinner size={11} className="text-info" /> : <StatusDot status={t.status} size={7} />}
+      </span>
+      <span className="min-w-0 flex-1 truncate">{title}</span>
+    </a>
+  );
+}
+
+/** Past this many threads a channel shows "N more" and links to its full list. */
+const MAX_THREADS = 5;
+
+const newestFirst = (a: ThreadStub, b: ThreadStub) => b.created_at.localeCompare(a.created_at);
+
 const GROUPS: { kind: string; label: string }[] = [
   { kind: 'client', label: 'Clients' },
   { kind: 'internal', label: 'Internal' },
@@ -101,26 +128,56 @@ const GROUPS: { kind: string; label: string }[] = [
 export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onSearch: () => void }) {
   const route = useRoute();
   const hash = useHash();
-  const { channels, channelsError, threadChannel } = useApp();
+  const { channels, channelsError, openThread } = useApp();
   const listRef = useRef<HTMLDivElement>(null);
 
-  const activeChannel = route.name === 'channel' ? route.id : route.name === 'thread' ? threadChannel : null;
+  const activeChannel = route.name === 'channel' ? route.id : null;
+  const openId = route.name === 'thread' ? route.id : null;
   const conductor = channels.find((c) => c.id === 'conductor');
   const rest = channels.filter((c) => c.id !== 'conductor');
   const other = rest.filter((c) => !GROUPS.some((g) => g.kind === c.kind));
-  const box = useSlidingThumb(listRef, `${hash}:${activeChannel}:${channels.length}`, true, '[data-active="true"]');
+
+  // Running and queued threads, newest first. The open thread joins them with the page's fresher
+  // copy and stays after it stops, so the highlight never jumps out from under you.
+  const threadsOf = (c: ChannelWithRunning) => {
+    const open = openThread && openThread.id === openId && openThread.channel_id === c.id ? openThread : null;
+    const busy = (c.active ?? []).filter((t) => t.id !== open?.id);
+    return (open ? [open, ...busy] : busy).sort(newestFirst);
+  };
+  // Rows appearing or leaving above the highlighted one move it, so they re-measure the thumb too.
+  const rowsKey = channels.flatMap((c) => threadsOf(c).map((t) => t.id)).join();
+  const box = useSlidingThumb(listRef, `${hash}:${channels.length}:${rowsKey}`, true, '[data-active="true"]');
+
+  const threadLinks = (c: ChannelWithRunning) => {
+    const list = threadsOf(c);
+    const shown = list.filter((t, i) => i < MAX_THREADS || t.id === openId);
+    return (
+      <>
+        {shown.map((t) => (
+          <ThreadLink key={t.id} t={t} active={t.id === openId} onNavigate={onNavigate} />
+        ))}
+        {list.length > shown.length && (
+          <a href={href.channel(c.id)} onClick={onNavigate} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
+            {list.length - shown.length} more
+          </a>
+        )}
+      </>
+    );
+  };
 
   const channelLink = (c: ChannelWithRunning) => (
-    <NavLink
-      key={c.id}
-      to={href.channel(c.id)}
-      active={activeChannel === c.id}
-      onNavigate={onNavigate}
-      right={<RunningBadge n={c.running} />}
-      lead={<span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-4'}`}>#</span>}
-    >
-      {c.name}
-    </NavLink>
+    <Fragment key={c.id}>
+      <NavLink
+        to={href.channel(c.id)}
+        active={activeChannel === c.id}
+        onNavigate={onNavigate}
+        right={<RunningBadge n={c.running} />}
+        lead={<span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-4'}`}>#</span>}
+      >
+        {c.name}
+      </NavLink>
+      {threadLinks(c)}
+    </Fragment>
   );
 
   return (
@@ -167,9 +224,12 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
               Home
             </NavLink>
             {conductor && (
-              <NavLink to={href.channel('conductor')} icon="target" active={activeChannel === 'conductor'} onNavigate={onNavigate} right={<RunningBadge n={conductor.running} />}>
-                Conductor
-              </NavLink>
+              <>
+                <NavLink to={href.channel('conductor')} icon="target" active={activeChannel === 'conductor'} onNavigate={onNavigate} right={<RunningBadge n={conductor.running} />}>
+                  Conductor
+                </NavLink>
+                {threadLinks(conductor)}
+              </>
             )}
           </div>
 

@@ -6,7 +6,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { z } from 'zod';
 import { config, paths, uploadsDir } from './config.ts';
-import { channels, threads, events, artifacts, search, type Thread } from './db.ts';
+import { channels, threads, events, artifacts, search, type Channel, type Thread } from './db.ts';
 import { bus } from './bus.ts';
 import { createThread, sendMessage, interruptThread, getUsage, runningCount, queuedCount, pendingFor, isLive, shutdownAll } from './runner.ts';
 import { listCrew } from './crew.ts';
@@ -56,18 +56,25 @@ const channelSchema = z.object({
   notes: z.string().nullish(),
 });
 
-api.get('/channels', (c) => {
-  const list = channels.list(c.req.query('archived') === '1').map((ch) => ({
+/** A channel plus its running and queued threads, so the sidebar can list them under the name. */
+const withActive = (ch: Channel, busy: Thread[]) => {
+  const mine = busy.filter((t) => t.channel_id === ch.id);
+  return {
     ...ch,
-    running: threads.running().filter((t) => t.channel_id === ch.id).length,
-  }));
-  return c.json(list);
+    running: mine.length,
+    active: mine.map(({ id, channel_id, title, status, created_at }) => ({ id, channel_id, title, status, created_at })),
+  };
+};
+
+api.get('/channels', (c) => {
+  const busy = threads.running();
+  return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy)));
 });
 
 api.get('/channels/:id', (c) => {
   const ch = channels.get(c.req.param('id'));
   if (!ch) return c.json({ error: 'not found' }, 404);
-  return c.json({ ...ch, running: threads.running().filter((t) => t.channel_id === ch.id).length });
+  return c.json(withActive(ch, threads.running()));
 });
 
 api.post('/channels', async (c) => {
