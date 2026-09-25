@@ -33,14 +33,16 @@ beforeAll(async () => {
 });
 
 describe('threads harness migration', () => {
-  it('adds the harness column to an existing database', () => {
+  it('adds the harness and effort columns to an existing database', () => {
     const cols = db.db.prepare('PRAGMA table_info(threads)').all() as unknown as { name: string }[];
     expect(cols.some((c) => c.name === 'harness')).toBe(true);
+    expect(cols.some((c) => c.name === 'effort')).toBe(true);
   });
 
-  it('opens existing threads as Claude Code with their model unchanged', () => {
+  it('opens existing threads as Claude Code, default effort, model unchanged', () => {
     const t = db.threads.get('old-1')!;
     expect(t.harness).toBe('claude-code');
+    expect(t.effort).toBe('');
     expect(t.model).toBe('claude-sonnet-5');
   });
 

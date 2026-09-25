@@ -105,6 +105,7 @@ const createSchema = z.object({
   role: z.string().nullish(),
   model: z.string().nullish(),
   harness: z.string().nullish(),
+  effort: z.string().nullish(),
   title: z.string().nullish(),
   parent_id: z.string().nullish(),
   task_id: z.string().nullish(),

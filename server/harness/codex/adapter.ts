@@ -88,7 +88,7 @@ export const codexAdapter: HarnessAdapter = {
       emit({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
       const input: CodexInput[] = [{ type: 'text', text: m.text }];
       client
-        .request('turn/start', { threadId: codexThreadId, input, model: thread.model || undefined })
+        .request('turn/start', { threadId: codexThreadId, input, model: thread.model || undefined, effort: thread.effort || undefined })
         .catch(() => {
           // Turn never started: kill so the runner fails the turn and drops the message.
           client.kill('SIGKILL');

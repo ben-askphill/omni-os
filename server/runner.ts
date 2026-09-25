@@ -658,6 +658,7 @@ export interface CreateThreadInput {
   role?: string | null;
   model?: string | null;
   harness?: string | null;
+  effort?: string | null;
   title?: string | null;
   parent_id?: string | null;
   task_id?: string | null;
@@ -683,8 +684,11 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   if (!hInfo.available && hInfo.models.length === 0) {
     throw new Error(`${hInfo.name} is not available. Run \`${hInfo.fix ?? ''}\`.`.trim());
   }
-  if (input.model) {
-    const check = validateRun(cat, harness, input.model, '');
+  const effort = input.effort || '';
+  if (input.model || effort) {
+    // Validate the effort against the picked model, or the harness default when no model is named.
+    const modelForCheck = input.model || hInfo.models.find((m) => m.default)?.id || hInfo.models[0]?.id || '';
+    const check = validateRun(cat, harness, modelForCheck, effort);
     if (!check.ok) throw new Error(check.error);
   }
 
@@ -698,6 +702,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     role: role?.id ?? null,
     model: input.model || null,
     harness,
+    effort,
     session_id: id,
     cwd: wd.cwd,
     branch: wd.branch,

@@ -38,6 +38,7 @@ export const claudeAdapter: HarnessAdapter = {
       '--add-dir', threadDir(thread.id),
       '--append-system-prompt', systemPrompt,
     ];
+    if (thread.effort) args.push('--effort', thread.effort);
     if (thread.cwd !== config.brainDir) args.push('--add-dir', config.brainDir);
     if (mcpFile) args.push('--mcp-config', mcpFile);
     args.push(resume ? '--resume' : '--session-id', thread.session_id);
