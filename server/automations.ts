@@ -13,7 +13,9 @@ export interface Automation {
   timezone: string;
   channel: string;
   role?: string;
+  harness?: string;
   model?: string;
+  effort?: string;
   prompt: string;
   enabled: boolean;
   file: string;
@@ -36,7 +38,9 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
     timezone: y.timezone ?? config.timezone,
     channel: y.channel ?? 'inbox',
     role: y.role,
+    harness: y.harness,
     model: y.model,
+    effort: y.effort,
     prompt: String(y.prompt ?? '').trim(),
     enabled: y.enabled === true,
     file,
@@ -71,7 +75,9 @@ export async function runAutomation(a: Automation, trigger: 'cron' | 'manual') {
   const thread = await createThread({
     channel: a.channel,
     role: a.role,
+    harness: a.harness,
     model: a.model,
+    effort: a.effort,
     prompt: a.prompt,
     title: `${a.name} · ${date}`,
     source: 'automation',

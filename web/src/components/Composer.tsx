@@ -275,8 +275,17 @@ export function NewThreadComposer({
 
   const onRole = (r: string) => {
     setRole(r);
-    const rc = crew.find((x) => x.id === r)?.channel;
+    const roleObj = crew.find((x) => x.id === r);
+    const rc = roleObj?.channel;
     if (!channelId && rc && channels.some((c) => c.id === rc)) setChannel(rc);
+    // Preselect the role's harness, model and effort defaults.
+    if (roleObj && harnesses) {
+      const h = roleObj.harness && harnesses.some((x) => x.id === roleObj.harness) ? roleObj.harness : 'claude-code';
+      const info = harnesses.find((x) => x.id === h);
+      const model = roleObj.model || info?.models.find((m) => m.default)?.id || info?.models[0]?.id || '';
+      setChoice({ harness: h, model });
+      setEffort(roleObj.effort || '');
+    }
   };
   const onChannel = (c: string) => {
     setChannel(c);
@@ -320,7 +329,7 @@ export function NewThreadComposer({
   }));
   if (!visibleChannels.some((c) => c.id === channel)) channelOptions.push({ value: channel, label: channel, avatar: channel });
   const roleOptions: PickerOption<string>[] = [
-    { value: '', label: 'No role', sub: 'Plain Claude, no charter', avatar: false, icon: 'x' },
+    { value: '', label: 'No role', sub: 'No charter', avatar: false, icon: 'x' },
     ...crew.map((r) => ({ value: r.id, label: r.name, sub: r.description, avatar: r.name })),
   ];
   return (

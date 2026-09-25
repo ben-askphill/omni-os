@@ -12,8 +12,8 @@ import { type Record as StreamRecord } from './stream.ts';
 import { publishFeed, publishThread } from './bus.ts';
 import { recordUsage } from './usage.ts';
 import { harnessEnv } from './harness/env-guard.ts';
-import { CAPABILITIES, isHarnessId, type HarnessId } from './harness/types.ts';
-import { getHarness, validateRun } from './harness/catalog.ts';
+import { CAPABILITIES, type HarnessId } from './harness/types.ts';
+import { resolveRun } from './harness/resolve.ts';
 import { getCatalog } from './harness/catalog-service.ts';
 import type { AdapterContext, HarnessAdapter } from './harness/adapter.ts';
 import { claudeAdapter } from './harness/claude/adapter.ts';
@@ -702,23 +702,15 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const channel = channels.get(channelId);
   if (!channel) throw new Error(`unknown channel "${channelId}"`);
 
-  // Resolve and validate the harness against the catalog. Claude Code is the default, so callers
-  // that pass no harness (the menu bar app, the conductor) keep working. Role defaults are #16.
-  const harness: HarnessId = isHarnessId(input.harness) ? input.harness : 'claude-code';
-  if (input.harness && !isHarnessId(input.harness)) throw new Error(`Unknown harness "${input.harness}".`);
-  const cat = getCatalog();
-  const hInfo = getHarness(cat, harness);
-  if (!hInfo) throw new Error(`Unknown harness "${harness}".`);
-  if (!hInfo.available && hInfo.models.length === 0) {
-    throw new Error(`${hInfo.name} is not available. Run \`${hInfo.fix ?? ''}\`.`.trim());
-  }
-  const effort = input.effort || '';
-  if (input.model || effort) {
-    // Validate the effort against the picked model, or the harness default when no model is named.
-    const modelForCheck = input.model || hInfo.models.find((m) => m.default)?.id || hInfo.models[0]?.id || '';
-    const check = validateRun(cat, harness, modelForCheck, effort);
-    if (!check.ok) throw new Error(check.error);
-  }
+  // Resolve harness/model/effort: the thread's own choice, then the role's default, then Claude Code.
+  const run = resolveRun(
+    { harness: input.harness, model: input.model, effort: input.effort },
+    role ? { harness: role.harness, model: role.model, effort: role.effort } : undefined,
+    getCatalog(),
+  );
+  if (!run.ok) throw new Error(run.error);
+  const harness = run.harness;
+  const effort = run.effort;
 
   const id = randomUUID();
   const wd = await prepareWorkdir(channel, id);
@@ -728,7 +720,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     title: input.title?.trim() || fallbackTitle(input.prompt),
     status: 'queued',
     role: role?.id ?? null,
-    model: input.model || null,
+    model: run.model || null,
     harness,
     effort,
     session_id: id,

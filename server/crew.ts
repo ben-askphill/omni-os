@@ -7,7 +7,9 @@ export interface CrewRole {
   id: string;
   name: string;
   description: string;
+  harness?: string;
   model?: string;
+  effort?: string;
   channel?: string;
   /** Extra MCP servers this role gets. "omni" = the conductor tools. */
   mcp: string[];
@@ -29,7 +31,9 @@ export function parseCrewFile(id: string, src: string): CrewRole {
     id,
     name: meta.name ?? id,
     description: meta.description ?? '',
+    harness: meta.harness,
     model: meta.model,
+    effort: meta.effort,
     channel: meta.channel,
     mcp: Array.isArray(meta.mcp) ? meta.mcp : [],
     charter: (m ? m[2] : src).trim(),
