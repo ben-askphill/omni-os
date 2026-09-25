@@ -615,7 +615,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                   {error}
                 </ErrorNote>
               )}
-              <Transcript events={events} running={running} cwd={init?.cwd || thread.cwd} />
+              <Transcript threadId={id} events={events} running={running} cwd={init?.cwd || thread.cwd} />
               <QueuedMessages items={queued} />
             </div>
           </div>

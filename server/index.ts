@@ -1,17 +1,18 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { streamSSE } from 'hono/streaming';
 import { readFileSync, existsSync } from 'node:fs';
-import { relative } from 'node:path';
+import { join, relative } from 'node:path';
 import { z } from 'zod';
-import { config, paths } from './config.ts';
+import { config, paths, uploadsDir } from './config.ts';
 import { channels, threads, events, artifacts, search, type Thread } from './db.ts';
 import { bus } from './bus.ts';
 import { createThread, sendMessage, stopThread, getUsage, runningCount, queuedCount, pendingFor } from './runner.ts';
 import { listCrew } from './crew.ts';
 import { listSecrets, setSecret, deleteSecret } from './secrets.ts';
 import { startArtifactWatcher, mimeFor } from './artifacts.ts';
+import { imageMime, safeName } from './uploads.ts';
 import { detectRepo, listPRs, getPR, mergePR } from './github.ts';
 import { loadAutomations, runAutomation, setEnabled, lastRuns, startScheduler } from './automations.ts';
 
@@ -20,8 +21,24 @@ const api = new Hono();
 
 app.onError((err, c) => {
   console.error('[api]', err);
-  return c.json({ error: err.message }, err instanceof z.ZodError ? 400 : 500);
+  const status = err instanceof z.ZodError ? 400 : ((err as { status?: number }).status ?? 500);
+  return c.json({ error: err.message }, status as 400);
 });
+
+/**
+ * Message bodies arrive as JSON, or as multipart when the composer has attachments:
+ * a `payload` field with the same JSON plus one `files` entry per attachment.
+ */
+async function readBody(c: Context): Promise<{ data: unknown; files: File[] }> {
+  if (!(c.req.header('content-type') ?? '').includes('multipart/form-data')) return { data: await c.req.json(), files: [] };
+  const form = await c.req.parseBody({ all: true });
+  const raw = form.payload;
+  const entry = form.files;
+  return {
+    data: typeof raw === 'string' ? JSON.parse(raw) : {},
+    files: (Array.isArray(entry) ? entry : entry ? [entry] : []).filter((f): f is File => f instanceof File),
+  };
+}
 
 // ---------- channels ----------
 
@@ -96,8 +113,9 @@ api.get('/threads', (c) =>
 );
 
 api.post('/threads', async (c) => {
-  const body = createSchema.parse(await c.req.json());
-  return c.json(await createThread(body));
+  const { data, files } = await readBody(c);
+  const body = createSchema.parse(data);
+  return c.json(await createThread({ ...body, files }));
 });
 
 api.get('/threads/:id', (c) => {
@@ -126,10 +144,26 @@ api.get('/threads/:id/summary', (c) => {
 });
 
 api.post('/threads/:id/messages', async (c) => {
+  const { data, files } = await readBody(c);
   const { prompt, from } = z
     .object({ prompt: z.string().min(1), from: z.enum(['ben', 'conductor']).default('ben') })
-    .parse(await c.req.json());
-  return c.json(sendMessage(c.req.param('id'), prompt, from));
+    .parse(data);
+  return c.json(await sendMessage(c.req.param('id'), prompt, from, files));
+});
+
+/** Serves a file Ben attached, by its name inside the thread's uploads folder. */
+api.get('/threads/:id/uploads/:name', (c) => {
+  const id = c.req.param('id');
+  const name = safeName(c.req.param('name'));
+  if (!threads.get(id)) return c.text('not found', 404);
+  const file = join(uploadsDir(id), name);
+  if (!existsSync(file)) return c.text('not found', 404);
+  // Images render inline; anything else downloads rather than rendering in the tab.
+  const mime = imageMime(name);
+  c.header('Content-Type', mime ?? 'application/octet-stream');
+  c.header('Cache-Control', 'private, max-age=31536000, immutable');
+  if (!mime || c.req.query('download')) c.header('Content-Disposition', `attachment; filename="${name}"`);
+  return c.body(readFileSync(file));
 });
 
 api.post('/threads/:id/stop', (c) => {
@@ -189,7 +223,7 @@ api.get('/feed', (c) =>
 );
 
 api.get('/status', (c) =>
-  c.json({ usage: getUsage(), running: runningCount(), queued: queuedCount(), maxConcurrent: config.maxConcurrent }),
+  c.json({ usage: getUsage(), running: runningCount(), queued: queuedCount(), maxConcurrent: config.maxConcurrent, maxUploadMb: config.maxUploadMb }),
 );
 
 api.get('/recent', (c) => c.json(threads.recent(Number(c.req.query('limit') ?? 60))));

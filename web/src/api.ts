@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Thread, Channel, EventRow, Artifact } from '../../server/db.ts';
+import type { Attachment } from '../../server/uploads.ts';
 
-export type { Thread, Channel, EventRow, Artifact };
+export type { Thread, Channel, EventRow, Artifact, Attachment };
 
 // ---------- response shapes ----------
 
@@ -23,6 +24,7 @@ export interface Status {
   running: number;
   queued: number;
   maxConcurrent: number;
+  maxUploadMb: number;
 }
 
 export interface ThreadDetail {
@@ -42,6 +44,7 @@ export interface PendingMsg {
   source?: string;
   task_id?: string | null;
   role?: string | null;
+  attachments?: Attachment[];
 }
 
 export interface CrewRole {
@@ -139,12 +142,14 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  // FormData carries its own multipart content type, so never set one for it.
+  const form = body instanceof FormData;
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
       method,
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      headers: body !== undefined && !form ? { 'Content-Type': 'application/json' } : undefined,
+      body: body === undefined ? undefined : form ? body : JSON.stringify(body),
     });
   } catch {
     throw new ApiError('Cannot reach the Omni server. Is it running?', 0);
@@ -173,6 +178,14 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body: unknown = {}) => request<T>('POST', path, body),
+  /** Same body as `post`, plus attachments. Falls back to plain JSON when there are none. */
+  send: <T>(path: string, body: Record<string, unknown>, files: File[]) => {
+    if (!files.length) return request<T>('POST', path, body);
+    const fd = new FormData();
+    fd.append('payload', JSON.stringify(body));
+    for (const f of files) fd.append('files', f, f.name);
+    return request<T>('POST', path, fd);
+  },
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
   del: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
 };
@@ -181,6 +194,9 @@ export const errorText = (e: unknown) => (e instanceof Error ? e.message : Strin
 
 export const artifactUrl = (a: Pick<Artifact, 'id' | 'updated_at'>, download = false) =>
   `/api/artifacts/${a.id}/raw?v=${encodeURIComponent(a.updated_at)}${download ? '&download=1' : ''}`;
+
+export const uploadUrl = (threadId: string, a: Pick<Attachment, 'name'>, download = false) =>
+  `/api/threads/${encodeURIComponent(threadId)}/uploads/${encodeURIComponent(a.name)}${download ? '?download=1' : ''}`;
 
 // ---------- hooks ----------
 

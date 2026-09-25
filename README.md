@@ -45,6 +45,8 @@ Every stream event is stored in SQLite (`data/omni.db`) and pushed to the UI ove
 
 Messages sent while a thread is busy are queued: they show as "Queued" under the live output and enter the transcript when their turn starts. Stop cancels the current turn and drops anything queued.
 
+Files can ride along with a message (paperclip, drag-and-drop or paste). They land in `data/threads/<id>/uploads/`, keeping their original names, and the agent gets every one by absolute path; images small enough for the API also go in as real image blocks. `OMNI_MAX_UPLOAD_MB` caps a single file.
+
 To continue a thread in a terminal or Claude Desktop: `cd <cwd> && claude --resume <session id>` (the thread's Details panel has a copy button).
 
 ## Crew and conductor

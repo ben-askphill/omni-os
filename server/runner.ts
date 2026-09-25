@@ -1,12 +1,13 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { tmpdir, homedir } from 'node:os';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
 import { channels, events, threads, kv, type Channel, type Thread, type ThreadSource } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
 import { prepareWorkdir, writeMcpConfig } from './sandbox.ts';
+import { checkUploads, describeAttachments, inlinable, saveUploads, userMessageLine, type Attachment } from './uploads.ts';
 import { secretsEnv } from './secrets.ts';
 import { parseEvent, LineSplitter, type Usage } from './stream.ts';
 import { publishFeed, publishThread } from './bus.ts';
@@ -18,6 +19,8 @@ const omniUrl = () => `http://127.0.0.1:${config.port}`;
 interface Job {
   threadId: string;
   prompt: string;
+  /** Files Ben attached, already written into the thread's uploads folder. */
+  attachments?: Attachment[];
   /** Transcript event recorded when the turn starts, so a queued follow-up lands after the reply it waited for. */
   event: { kind: 'user' | 'crew_report'; payload: Record<string, unknown> };
 }
@@ -146,6 +149,10 @@ async function execute(job: Job) {
     '--add-dir', threadDir(thread.id),
     '--append-system-prompt', buildSystemPrompt(thread, channel, role),
   ];
+  const attachments = job.attachments ?? [];
+  const inlineImages = attachments.filter(inlinable);
+  // Images ride along as real image blocks, which only the streaming input format carries.
+  if (inlineImages.length) args.push('--input-format', 'stream-json');
   if (thread.cwd !== config.brainDir) args.push('--add-dir', config.brainDir);
   if (mcpFile) args.push('--mcp-config', mcpFile);
   args.push(thread.has_run || sessionOnDisk(thread) ? '--resume' : '--session-id', thread.session_id);
@@ -182,7 +189,15 @@ async function execute(job: Job) {
   });
   active.set(thread.id, child);
   // Prompt via stdin so leading dashes or huge pastes never get parsed as flags.
-  child.stdin.end(job.prompt);
+  const prompt = attachments.length ? `${job.prompt}\n\n${describeAttachments(attachments)}` : job.prompt;
+  child.stdin.end(
+    inlineImages.length
+      ? userMessageLine(
+          prompt,
+          inlineImages.map((a) => ({ path: a.path, mime: a.mime, data: readFileSync(a.path).toString('base64') })),
+        )
+      : prompt,
+  );
 
   const splitter = new LineSplitter();
   let stderr = '';
@@ -294,6 +309,7 @@ export interface CreateThreadInput {
   task_id?: string | null;
   source?: ThreadSource;
   automation?: string | null;
+  files?: File[];
 }
 
 export async function createThread(input: CreateThreadInput): Promise<Thread> {
@@ -301,6 +317,8 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const channelId = input.channel || role?.channel || 'inbox';
   const channel = channels.get(channelId);
   if (!channel) throw new Error(`unknown channel "${channelId}"`);
+  // Reject oversized uploads before anything is created or spawned.
+  checkUploads(input.files ?? []);
   const id = randomUUID();
   const wd = await prepareWorkdir(channel, id);
   const thread = threads.create({
@@ -318,15 +336,23 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     source: input.source ?? 'manual',
     automation: input.automation ?? null,
   });
-  enqueue({ threadId: thread.id, prompt: input.prompt, event: { kind: 'user', payload: { text: input.prompt, source: thread.source } } });
+  const attachments = await saveUploads(thread.id, input.files ?? []);
+  enqueue({
+    threadId: thread.id,
+    prompt: input.prompt,
+    attachments,
+    event: { kind: 'user', payload: { text: input.prompt, source: thread.source, attachments } },
+  });
   if (!input.title) void generateTitle(thread.id, input.prompt);
   return threads.get(thread.id)!;
 }
 
-export function sendMessage(threadId: string, prompt: string, from: 'ben' | 'conductor' = 'ben') {
+export async function sendMessage(threadId: string, prompt: string, from: 'ben' | 'conductor' = 'ben', files: File[] = []) {
   const thread = threads.get(threadId);
   if (!thread) throw new Error('thread not found');
-  enqueue({ threadId, prompt, event: { kind: 'user', payload: { text: prompt, source: from } } });
+  checkUploads(files);
+  const attachments = await saveUploads(threadId, files);
+  enqueue({ threadId, prompt, attachments, event: { kind: 'user', payload: { text: prompt, source: from, attachments } } });
   return threads.get(threadId)!;
 }
 

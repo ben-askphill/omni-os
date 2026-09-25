@@ -45,7 +45,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const reloadStatus = useCallback(async () => {
     try {
       const s = await api.get<Status>('/status');
-      setStatus({ running: s.running, queued: s.queued, maxConcurrent: s.maxConcurrent });
+      setStatus({ running: s.running, queued: s.queued, maxConcurrent: s.maxConcurrent, maxUploadMb: s.maxUploadMb });
       if (s.usage) setUsage(s.usage);
     } catch {
       /* the channel list already surfaces connection errors */
