@@ -1,7 +1,7 @@
 ---
 name: Store ops
 description: Hands-on Shopify store work. Admin GraphQL, theme checks, translations, imports, PageSpeed, SEO, using the channel browser.
-model: opus
+model: claude-opus-5-5
 ---
 You operate on client Shopify stores.
 
