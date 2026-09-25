@@ -8,8 +8,9 @@ import { z } from 'zod';
 import { config, paths, uploadsDir } from './config.ts';
 import { channels, threads, events, artifacts, search, type Channel, type Thread } from './db.ts';
 import { bus } from './bus.ts';
-import { createThread, sendMessage, interruptThread, getUsage, runningCount, runningByHarness, queuedCount, pendingFor, isLive, shutdownAll } from './runner.ts';
+import { createThread, sendMessage, interruptThread, runningCount, runningByHarness, slotsByHarness, queuedCount, pendingFor, isLive, shutdownAll } from './runner.ts';
 import { getCatalog, startCatalogRefresh } from './harness/catalog-service.ts';
+import { usageByHarness } from './usage.ts';
 import { listCrew } from './crew.ts';
 import { listSecrets, setSecret, deleteSecret } from './secrets.ts';
 import { startArtifactWatcher, mimeFor } from './artifacts.ts';
@@ -238,7 +239,9 @@ api.get('/feed', (c) =>
     stream.onAbort(() => {
       bus.off('feed', onFeed);
     });
-    await stream.writeSSE({ data: JSON.stringify({ type: 'usage', usage: getUsage() }) });
+    for (const [harness, usage] of Object.entries(usageByHarness())) {
+      if (usage) await stream.writeSSE({ data: JSON.stringify({ type: 'usage', harness, usage }) });
+    }
     while (!stream.aborted) {
       await stream.sleep(20_000);
       await stream.writeSSE({ event: 'ping', data: '' });
@@ -247,7 +250,14 @@ api.get('/feed', (c) =>
 );
 
 api.get('/status', (c) =>
-  c.json({ usage: getUsage(), running: runningCount(), queued: queuedCount(), maxConcurrent: config.maxConcurrent, maxUploadMb: config.maxUploadMb }),
+  c.json({
+    usage: usageByHarness(),
+    slots: slotsByHarness(),
+    running: runningCount(),
+    queued: queuedCount(),
+    maxConcurrent: config.maxConcurrent,
+    maxUploadMb: config.maxUploadMb,
+  }),
 );
 
 api.get('/recent', (c) => c.json(threads.recent(Number(c.req.query('limit') ?? 60))));

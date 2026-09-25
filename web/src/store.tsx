@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, openSSE, errorText, type ChannelWithRunning, type CrewRole, type FeedEvent, type Status, type ThreadStub, type Usage } from './api.ts';
+import { api, openSSE, errorText, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type Status, type ThreadStub } from './api.ts';
 
 interface AppState {
   channels: ChannelWithRunning[];
@@ -7,7 +7,7 @@ interface AppState {
   channelsError: string | null;
   reloadChannels: () => Promise<void>;
   crew: CrewRole[];
-  usage: Usage | null;
+  usage: HarnessUsage;
   status: Omit<Status, 'usage'> | null;
   feedLive: boolean;
   subscribe: (fn: (e: FeedEvent) => void) => () => void;
@@ -24,7 +24,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [channelsLoaded, setChannelsLoaded] = useState(false);
   const [channelsError, setChannelsError] = useState<string | null>(null);
   const [crew, setCrew] = useState<CrewRole[]>([]);
-  const [usage, setUsage] = useState<Usage | null>(null);
+  const [usage, setUsage] = useState<HarnessUsage>({});
   const [status, setStatus] = useState<Omit<Status, 'usage'> | null>(null);
   const [feedLive, setFeedLive] = useState(false);
   const [openThread, setOpenThread] = useState<ThreadStub | null>(null);
@@ -45,8 +45,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const reloadStatus = useCallback(async () => {
     try {
       const s = await api.get<Status>('/status');
-      setStatus({ running: s.running, queued: s.queued, maxConcurrent: s.maxConcurrent, maxUploadMb: s.maxUploadMb });
-      if (s.usage) setUsage(s.usage);
+      setStatus({ running: s.running, queued: s.queued, maxConcurrent: s.maxConcurrent, maxUploadMb: s.maxUploadMb, slots: s.slots ?? {} });
+      if (s.usage) setUsage((prev) => ({ ...prev, ...s.usage }));
     } catch {
       /* the channel list already surfaces connection errors */
     }
@@ -83,7 +83,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       (d) => {
         const e = d as FeedEvent;
         if (e.type === 'usage') {
-          if (e.usage) setUsage(e.usage);
+          setUsage((prev) => ({ ...prev, [e.harness ?? 'claude-code']: e.usage }));
         } else if (e.type === 'thread') {
           scheduleRefresh();
         }

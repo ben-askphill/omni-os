@@ -6,7 +6,7 @@ bus.setMaxListeners(0);
 
 export type FeedEvent =
   | { type: 'thread'; thread: unknown }
-  | { type: 'usage'; usage: unknown }
+  | { type: 'usage'; harness?: string; usage: unknown }
   | { type: 'artifact'; artifact: unknown };
 
 export const publishFeed = (e: FeedEvent) => bus.emit('feed', e);

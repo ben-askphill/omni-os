@@ -124,6 +124,12 @@ function onMessage(msg) {
       return; // notification
     case 'account/read':
       return respond(id, { type: 'chatgpt', planType: 'plus' });
+    case 'account/rateLimits/read':
+      return respond(id, {
+        id: 'codex',
+        primary: { usedPercent: 8, resetsAt: 1790328600, windowMinutes: 300 },
+        secondary: { usedPercent: 2, resetsAt: 1790922600, windowMinutes: 10080 },
+      });
     case 'config/read':
       return respond(id, { model: 'gpt-5.6-sol', effort: 'high' });
     case 'model/list':

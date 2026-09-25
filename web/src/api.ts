@@ -26,8 +26,14 @@ export interface Usage {
   status?: string;
   updated_at?: string;
 }
+export type HarnessUsage = Partial<Record<HarnessId, Usage | null>>;
+export interface HarnessSlot {
+  running: number;
+  cap: number;
+}
 export interface Status {
-  usage: Usage | null;
+  usage: HarnessUsage;
+  slots: Partial<Record<HarnessId, HarnessSlot>>;
   running: number;
   queued: number;
   maxConcurrent: number;
@@ -145,7 +151,7 @@ export interface SecretRow {
 
 export type FeedEvent =
   | { type: 'thread'; thread: Thread }
-  | { type: 'usage'; usage: Usage | null }
+  | { type: 'usage'; harness?: HarnessId; usage: Usage | null }
   | { type: 'artifact'; artifact: Artifact }
   | { type: 'reconnect' };
 

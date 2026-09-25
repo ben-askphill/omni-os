@@ -4,9 +4,14 @@
 import { config } from '../config.ts';
 import { CodexClient } from './codex/client.ts';
 import { codexBin } from './codex/bin.ts';
+import { normalizeRateLimits } from './codex/normalize.ts';
+import type { RateLimits } from './codex/protocol.ts';
 import { harnessEnv } from './env-guard.ts';
+import { recordUsage } from '../usage.ts';
 import { HARNESS_META, CAPABILITIES, type HarnessId, type HarnessInfo } from './types.ts';
 import { claudeHarness, codexHarness, type Catalog, type CodexProbe } from './catalog.ts';
+
+type Probe = CodexProbe & { rateLimits?: RateLimits };
 
 let current: Catalog | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -30,18 +35,18 @@ function cursorPlaceholder(cap: number): HarnessInfo {
   };
 }
 
-/** Probe `codex app-server` for account, config defaults and the model list. */
-export async function probeCodex(bin = codexBin()): Promise<CodexProbe> {
-  const unavailable: CodexProbe = { available: false, models: [] };
+/** Probe `codex app-server` for account, config defaults, the model list and rate limits. */
+export async function probeCodex(bin = codexBin()): Promise<Probe> {
+  const unavailable: Probe = { available: false, models: [] };
   if (!bin) return unavailable;
-  return await new Promise<CodexProbe>((resolve) => {
+  return await new Promise<Probe>((resolve) => {
     let settled = false;
     const client = new CodexClient({
       bin,
       env: harnessEnv('codex', {}),
       onExit: () => finish(unavailable),
     });
-    const finish = (r: CodexProbe) => {
+    const finish = (r: Probe) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
@@ -57,13 +62,14 @@ export async function probeCodex(bin = codexBin()): Promise<CodexProbe> {
         if (!account || (account.type && account.type !== 'chatgpt')) return finish(unavailable);
         const cfg = await client.request<{ model?: string; effort?: string }>('config/read').catch(() => ({} as { model?: string; effort?: string }));
         const list = await client.request<{ models?: any[] }>('model/list');
+        const rateLimits = await client.request<RateLimits>('account/rateLimits/read').catch(() => undefined);
         const models = (list?.models ?? []).map((m) => ({
           id: m.id,
           label: m.displayName ?? m.id,
           efforts: m.supportedReasoningEfforts ?? [],
           defaultEffort: m.defaultReasoningEffort,
         }));
-        finish({ available: true, planType: account?.planType, defaultModel: cfg?.model, defaultEffort: cfg?.effort, models });
+        finish({ available: true, planType: account?.planType, defaultModel: cfg?.model, defaultEffort: cfg?.effort, models, rateLimits });
       } catch {
         finish(unavailable);
       }
@@ -75,7 +81,10 @@ export async function loadCatalog(): Promise<Catalog> {
   const c = caps();
   const harnesses: HarnessInfo[] = [claudeHarness(c['claude-code'], config.defaultModel)];
   try {
-    harnesses.push(codexHarness(await probeCodex(), c.codex));
+    const probe = await probeCodex();
+    harnesses.push(codexHarness(probe, c.codex));
+    // Read Codex plan usage at startup and on every refresh; live turns keep it current.
+    if (probe.available && probe.rateLimits) recordUsage('codex', normalizeRateLimits(probe.rateLimits));
   } catch {
     harnesses.push(codexHarness({ available: false, models: [] }, c.codex));
   }

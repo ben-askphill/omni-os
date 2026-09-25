@@ -1,5 +1,5 @@
 import { Fragment, useRef, type ReactNode } from 'react';
-import type { ChannelWithRunning, ThreadStub, UsageWindow } from '../api.ts';
+import type { ChannelWithRunning, HarnessId, ThreadStub, Usage, UsageWindow } from '../api.ts';
 import { untilLabel } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
@@ -8,50 +8,74 @@ import { Icon, Kbd, Spinner, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingTh
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
-function UsageRow({ label, w }: { label: string; w?: UsageWindow }) {
-  useNow(60_000);
-  if (!w) {
-    return (
-      <div className="flex items-center gap-2.5">
-        <span className="label-mono w-5">{label}</span>
-        <Ticks value={0} count={22} height={12} className="flex-1 opacity-60" label={`${label} window: no data`} />
-        <span className="w-8 text-right font-num text-[11px] text-fg-4">n/a</span>
-      </div>
-    );
-  }
+const HARNESS_ROWS: { id: HarnessId; name: string }[] = [
+  { id: 'claude-code', name: 'Claude' },
+  { id: 'codex', name: 'Codex' },
+  { id: 'cursor', name: 'Cursor' },
+];
+
+const windowPct = (w?: UsageWindow) => {
+  if (!w) return null;
   const raw = w.utilization > 1.5 ? w.utilization / 100 : w.utilization;
-  const pct = Math.max(0, Math.min(1, raw));
+  return Math.max(0, Math.min(1, raw));
+};
+
+/** One window's tick bar and percentage, with the reset time on hover. */
+function WindowCell({ w, label }: { w?: UsageWindow; label: string }) {
+  const pct = windowPct(w);
+  if (pct === null) return <span className="flex-1 text-center font-num text-[10px] text-fg-4">—</span>;
   const tone = pct >= 0.9 ? 'bad' : pct >= 0.7 ? 'warn' : undefined;
   return (
-    <div title={`${label} window: ${Math.round(pct * 100)}% used, resets ${new Date(w.resetsAt * 1000).toLocaleString('en-GB')}`}>
-      <div className="flex items-center gap-2.5">
-        <span className="label-mono w-5">{label}</span>
-        <Ticks value={pct} count={22} height={12} tone={tone} className="flex-1" label={`${label} usage`} />
-        <span className="w-8 text-right font-num text-[11px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
-      </div>
-      <div className="mt-1 pl-[30px] text-[10.5px] text-fg-4">resets {untilLabel(w.resetsAt)}</div>
+    <div
+      className="flex flex-1 items-center gap-1.5"
+      title={`${label}: ${Math.round(pct * 100)}% used, resets ${new Date(w!.resetsAt * 1000).toLocaleString('en-GB')} (${untilLabel(w!.resetsAt)})`}
+    >
+      <Ticks value={pct} count={10} height={10} tone={tone} className="flex-1" label={`${label} usage`} />
+      <span className="w-7 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
+    </div>
+  );
+}
+
+/** One plan's row: the 5-hour and weekly windows, or "no data" for a harness that reports none. */
+function HarnessUsageRow({ name, usage }: { name: string; usage?: Usage | null }) {
+  useNow(60_000);
+  const noData = !usage || (!usage.five_hour && !usage.seven_day);
+  return (
+    <div className="flex items-center gap-2">
+      <span className="label-mono w-12 shrink-0">{name}</span>
+      {noData ? (
+        <span className="flex-1 text-[10.5px] text-fg-4">no data</span>
+      ) : (
+        <>
+          <WindowCell w={usage!.five_hour} label={`${name} 5h`} />
+          <WindowCell w={usage!.seven_day} label={`${name} week`} />
+        </>
+      )}
     </div>
   );
 }
 
 function UsageCard() {
   const { usage, status, feedLive } = useApp();
-  const st = usage?.status;
-  const warn = st && st !== 'allowed' ? (st === 'rejected' ? 'Limit reached' : st.includes('warning') ? 'Near the limit' : st) : null;
+  const slots = status?.slots ?? {};
+  const footer = HARNESS_ROWS.filter((r) => slots[r.id]).map((r) => `${r.name} ${slots[r.id]!.running}/${slots[r.id]!.cap}`).join(' · ');
   return (
-    <div className="space-y-2.5 rounded-[20px] bg-bg/70 p-3 shadow-[var(--shadow-card)]">
-      <UsageRow label="5h" w={usage?.five_hour} />
-      <UsageRow label="7d" w={usage?.seven_day} />
-      {warn && <div className="text-[11.5px] font-medium text-warn">{warn}</div>}
-      <div className="flex items-center gap-2 border-t border-line pt-2.5 text-[11.5px] text-fg-3">
-        <span className="relative inline-block h-1.5 w-1.5" title={feedLive ? 'Live' : 'Reconnecting'}>
+    <div className="space-y-2 rounded-[20px] bg-bg/70 p-3 shadow-[var(--shadow-card)]">
+      <div className="flex items-center gap-2 pb-0.5 text-[9px] font-medium tracking-wide text-fg-4 uppercase">
+        <span className="w-12 shrink-0" />
+        <span className="flex-1">5h</span>
+        <span className="flex-1">Week</span>
+      </div>
+      {HARNESS_ROWS.map((r) => (
+        <HarnessUsageRow key={r.id} name={r.name} usage={usage[r.id]} />
+      ))}
+      <div className="flex items-center gap-2 border-t border-line pt-2.5 text-[11px] text-fg-3">
+        <span className="relative inline-block h-1.5 w-1.5 shrink-0" title={feedLive ? 'Live' : 'Reconnecting'}>
           {feedLive && <span className="ping absolute inset-0 rounded-full bg-[var(--ok-dot)]" />}
           <span className={`absolute inset-0 rounded-full ${feedLive ? 'bg-[var(--ok-dot)]' : 'bg-fg-4'}`} />
         </span>
-        {status ? (
-          <span className="font-num text-[11px] tabular-nums">
-            {status.running} running{status.queued ? ` · ${status.queued} queued` : ''} <span className="text-fg-4">/ {status.maxConcurrent}</span>
-          </span>
+        {footer ? (
+          <span className="font-num tabular-nums">{footer}</span>
         ) : (
           <span>{feedLive ? 'Connected' : 'Connecting'}</span>
         )}
