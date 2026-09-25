@@ -253,6 +253,9 @@ const userLine = (live: Live, m: Msg) => ({
   parent_tool_use_id: null,
   session_id: live.sessionId,
   uuid: m.uuid,
+  // Side channel for adapters that need the raw text and attachment paths (Codex sends images as
+  // localImage paths). The Claude adapter strips this before writing to its stdin.
+  _omni: { text: m.text, attachments: m.attachments ?? [] },
 });
 
 /** stdin is gone: kill it so the close handler fails the turn and records what was not delivered. */

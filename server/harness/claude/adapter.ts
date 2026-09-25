@@ -83,8 +83,11 @@ export const claudeAdapter: HarnessAdapter = {
       write(obj: unknown) {
         const stdin = child.stdin;
         if (!stdin || stdin.destroyed || stdin.writableEnded) return false;
+        // Drop the Omni side channel; Claude only sees the standard stream-json user line.
+        const { _omni, ...clean } = (obj ?? {}) as Record<string, unknown>;
+        void _omni;
         try {
-          stdin.write(JSON.stringify(obj) + '\n');
+          stdin.write(JSON.stringify(clean) + '\n');
           return true;
         } catch {
           return false;

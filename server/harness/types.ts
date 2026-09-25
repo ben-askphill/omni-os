@@ -28,6 +28,7 @@ export interface HarnessCapabilities {
 export const CAPABILITIES: Record<HarnessId, HarnessCapabilities> = {
   'claude-code': { warmProcess: true, steer: true, inlineImages: true, usage: 'five-hour-week' },
   codex: { warmProcess: true, steer: true, inlineImages: true, usage: 'five-hour-week' },
+  // (Codex steer/interrupt/images are wired in #11; capabilities above reflect the shipped behavior.)
   cursor: { warmProcess: false, steer: false, inlineImages: false, usage: 'none' },
 };
 
