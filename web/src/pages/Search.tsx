@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { useApi, type SearchHit } from '../api.ts';
 import { Empty, ErrorNote, Icon, Loading, PageHeader, StatusDot } from '../components/ui.tsx';
 import { plural, relTime, safeSnippet } from '../format.ts';
@@ -26,14 +26,14 @@ export function SearchPage({ q }: { q: string }) {
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      <PageHeader title="Search" subtitle="Titles, prompts, replies and tool output across every channel." />
-      <div className="mx-auto max-w-3xl px-4 pt-4 pb-16 md:px-8">
+      <PageHeader width="max-w-3xl" title="Search" subtitle="Titles, prompts, replies and tool output across every channel." />
+      <div className="mx-auto max-w-3xl px-4 pt-2 pb-16 md:px-8">
         <form onSubmit={submit} className="relative">
-          <Icon name="search" size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
+          <Icon name="search" size={17} className="pointer-events-none absolute top-1/2 left-4.5 -translate-y-1/2 text-fg-3" />
           <input
             ref={input}
             type="search"
-            className="field !h-10 !pl-9 !text-[14px]"
+            className="h-12 w-full rounded-full bg-surface pr-5 pl-11 text-[15px] shadow-[inset_0_0_0_1px_var(--line)] transition-[box-shadow,background-color] outline-none placeholder:text-fg-4 focus:bg-bg focus:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_5px_var(--wash)] focus-visible:outline-none"
             placeholder="Search threads"
             value={value}
             onChange={(e) => setValue(e.target.value)}
@@ -41,7 +41,7 @@ export function SearchPage({ q }: { q: string }) {
           />
         </form>
 
-        <div className="mt-4">
+        <div className="mt-5">
           {!query ? (
             <Empty icon="search" title="Search everything">
               Prefix matches work, so <span className="font-mono text-[12px]">checko</span> finds checkout.
@@ -56,18 +56,18 @@ export function SearchPage({ q }: { q: string }) {
             </Empty>
           ) : (
             <>
-              <div className="mb-2 px-3 text-[12px] text-fg-3">
+              <div className="label-mono mb-2 px-3.5">
                 {hits.length >= 40 ? 'Top 40 results' : plural(hits.length, 'result')}
               </div>
-              <ul className="space-y-px">
-                {hits.map((h) => (
-                  <li key={h.thread_id}>
-                    <a href={href.thread(h.thread_id)} className="block rounded-lg px-3 py-2.5 hover:bg-surface-2">
+              <ul className="rise">
+                {hits.map((h, i) => (
+                  <li key={h.thread_id} style={{ '--i': i } as CSSProperties}>
+                    <a href={href.thread(h.thread_id)} className="hov block rounded-[18px] px-3.5 py-3 [--hov:var(--surface)]">
                       <div className="flex min-w-0 items-center gap-2">
                         <StatusDot status={h.status} />
                         <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{h.title}</span>
-                        <span className="shrink-0 text-[12px] text-fg-3">#{channel(h.channel_id)?.name ?? h.channel_id}</span>
-                        <span className="w-16 shrink-0 text-right text-[12px] text-fg-4">{relTime(h.updated_at)}</span>
+                        <span className="shrink-0 rounded-full bg-surface-2 px-2 text-[11.5px] leading-5 text-fg-2">#{channel(h.channel_id)?.name ?? h.channel_id}</span>
+                        <span className="w-16 shrink-0 text-right font-num text-[11px] text-fg-4">{relTime(h.updated_at)}</span>
                       </div>
                       {h.snippet && (
                         <p

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { artifactUrl, useApi, type ArtifactWithThread } from '../api.ts';
 import { kindIcon } from '../components/ArtifactViewer.tsx';
-import { Empty, ErrorNote, Icon, Loading, PageHeader } from '../components/ui.tsx';
-import { relTime } from '../format.ts';
+import { Empty, ErrorNote, Icon, Loading, PageHeader, Segmented } from '../components/ui.tsx';
+import { relTime, toDate } from '../format.ts';
 import { href } from '../router.ts';
-import { useApp, useFeed } from '../store.tsx';
+import { readPref, useApp, useFeed, writePref } from '../store.tsx';
 
 const FILTERS = [
   { id: 'all', label: 'All' },
@@ -67,24 +67,29 @@ export function ArtifactsPage() {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const list = useMemo(() => (res.data ?? []).filter((a) => matches(filter, a.kind)), [res.data, filter]);
+  const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.id, (res.data ?? []).filter((a) => matches(f.id, a.kind)).length])) as Record<Filter, number>, [res.data]);
+
+  // "New" means changed since the previous visit to this page. The first visit marks nothing.
+  const [seenAt] = useState(() => readPref<number | null>('artifacts.seen', null));
+  useEffect(() => writePref('artifacts.seen', Date.now()), []);
+  const isNew = (a: ArtifactWithThread) => seenAt != null && toDate(a.updated_at).getTime() > seenAt;
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
       <PageHeader title="Artifacts" subtitle="Pages, reports and files the crew produced, newest first." />
-      <div className="px-4 pt-4 pb-16 md:px-8">
-        <div className="mb-4 flex flex-wrap gap-1">
-          {FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setFilter(f.id)}
-              className={`h-7 rounded-md px-2.5 text-[12.5px] font-medium transition-colors ${
-                filter === f.id ? 'bg-surface-3 text-fg' : 'text-fg-3 hover:bg-surface-2 hover:text-fg'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+      <div className="px-4 pt-2 pb-16 md:px-8">
+        <div className="scroll-thin mb-5 max-w-full overflow-x-auto">
+          <Segmented
+            label="Filter artifacts"
+            value={filter}
+            onChange={setFilter}
+            size="sm"
+            options={FILTERS.map((f) => ({
+              id: f.id,
+              label: f.label,
+              badge: counts[f.id] ? <span className="font-num text-[10.5px] text-fg-4 tabular-nums">{counts[f.id]}</span> : undefined,
+            }))}
+          />
         </div>
 
         {res.error ? (
@@ -96,27 +101,33 @@ export function ArtifactsPage() {
             Ask for a report, audit or mockup and it lands here and in the thread's side panel.
           </Empty>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
-            {list.map((a) => (
+          <div key={filter} className="rise grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3 md:gap-4">
+            {list.map((a, i) => (
               <a
                 key={a.id}
                 href={href.thread(a.thread_id, a.id)}
-                className="group flex flex-col overflow-hidden rounded-xl border border-line bg-surface transition-shadow hover:shadow-[var(--shadow-card)]"
+                style={{ '--i': i } as CSSProperties}
+                className="group flex flex-col rounded-[22px] bg-surface p-1.5 transition-[transform,box-shadow,background-color] duration-300 [transition-timing-function:var(--ease-spring)] hover:-translate-y-0.5 hover:bg-elev hover:shadow-[var(--shadow-card)]"
               >
-                <div className="aspect-[16/10] overflow-hidden border-b border-line bg-surface-2">
+                <div className="relative aspect-[16/10] overflow-hidden rounded-[16px] bg-surface-2 shadow-[inset_0_0_0_1px_var(--line)]">
                   <Thumb a={a} />
+                  {isNew(a) && (
+                    <span className="pop-in absolute top-2 left-2 inline-flex h-5 items-center gap-1 rounded-full bg-fg px-2 font-num text-[10px] tracking-[0.06em] text-on-ink uppercase">
+                      <span className="h-1 w-1 rounded-full bg-accent" /> New
+                    </span>
+                  )}
                 </div>
-                <div className="min-w-0 p-2.5">
+                <div className="min-w-0 px-2 pt-2.5 pb-1.5">
                   <div className="flex min-w-0 items-center gap-1.5">
                     <Icon name={kindIcon(a.kind)} size={13} className="text-fg-3" />
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium group-hover:underline">{a.name}</span>
+                    <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{a.name}</span>
                   </div>
                   <div className="mt-0.5 truncate text-[12px] text-fg-3" title={a.thread_title}>
                     {a.thread_title}
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-[11.5px] text-fg-4">
+                  <div className="mt-1.5 flex items-center gap-2 text-[11.5px] text-fg-4">
                     <span className="truncate">#{channel(a.channel_id)?.name ?? a.channel_id}</span>
-                    <span className="ml-auto shrink-0">{relTime(a.updated_at)}</span>
+                    <span className="ml-auto shrink-0 font-num text-[10.5px]">{relTime(a.updated_at)}</span>
                   </div>
                 </div>
               </a>

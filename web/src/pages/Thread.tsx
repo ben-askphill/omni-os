@@ -3,7 +3,7 @@ import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifa
 import { ArtifactViewer, kindIcon } from '../components/ArtifactViewer.tsx';
 import { ReplyComposer } from '../components/Composer.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
-import { Button, Chip, CopyButton, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Modal, StatusDot, StatusPill, Tabs } from '../components/ui.tsx';
+import { Avatar, Button, Chip, CopyButton, Empty, ErrorNote, Icon, IconButton, InlineConfirm, LinkButton, Loading, Modal, StatusDot, StatusPill, Tabs } from '../components/ui.tsx';
 import { duration, fullDate, plural, relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { readPref, useApp, useFeed, useIsMobile, writePref } from '../store.tsx';
@@ -39,24 +39,24 @@ function ArtifactsTab({ artifacts, selected, onSelect }: { artifacts: Artifact[]
   return (
     <div className="flex h-full min-h-0 flex-col">
       {list.length > 1 && (
-        <div className="scroll-thin max-h-[30%] shrink-0 overflow-y-auto border-b border-line p-1.5">
+        <div className="scroll-thin max-h-[30%] shrink-0 overflow-y-auto px-2 pb-2">
           {list.map((a) => (
             <button
               key={a.id}
               type="button"
               onClick={() => onSelect(a.id)}
-              className={`flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] ${
-                selected?.id === a.id ? 'bg-surface-3 text-fg' : 'text-fg-2 hover:bg-surface-2'
-              }`}
+              data-on={selected?.id === a.id || undefined}
+              aria-pressed={selected?.id === a.id}
+              className={`hov flex h-8 w-full min-w-0 items-center gap-2 rounded-full px-3 text-left text-[12.5px] [--hov:var(--surface-3)] ${selected?.id === a.id ? 'text-fg' : 'text-fg-2'}`}
             >
               <Icon name={kindIcon(a.kind)} size={13} className="text-fg-3" />
               <span className="min-w-0 flex-1 truncate font-medium">{a.name}</span>
-              <span className="shrink-0 text-[11px] text-fg-4">{relTime(a.updated_at)}</span>
+              <span className="shrink-0 font-num text-[10.5px] text-fg-4">{relTime(a.updated_at)}</span>
             </button>
           ))}
         </div>
       )}
-      <div className="min-h-0 flex-1">{selected ? <ArtifactViewer key={selected.id} a={selected} /> : <div className="p-4 text-[13px] text-fg-3">Pick a file.</div>}</div>
+      <div className="min-h-0 flex-1 bg-bg">{selected ? <ArtifactViewer key={selected.id} a={selected} /> : <div className="p-4 text-[13px] text-fg-3">Pick a file.</div>}</div>
     </div>
   );
 }
@@ -73,12 +73,12 @@ function BrowserTab({ shots }: { shots: Artifact[] }) {
   const list = [...shots].reverse();
   const idx = open ? list.findIndex((s) => s.id === open.id) : -1;
   return (
-    <div className="scroll-thin h-full overflow-y-auto p-2">
+    <div className="scroll-thin h-full overflow-y-auto px-2.5 pb-2.5">
       <div className="grid grid-cols-2 gap-2">
         {list.map((s) => (
-          <button key={s.id} type="button" onClick={() => setOpen(s)} className="group overflow-hidden rounded-lg border border-line bg-surface-2 text-left">
-            <img src={artifactUrl(s)} alt={s.name} loading="lazy" className="aspect-[4/3] w-full object-cover object-top transition-opacity group-hover:opacity-90" />
-            <div className="truncate px-2 py-1 text-[11px] text-fg-3">{relTime(s.updated_at)}</div>
+          <button key={s.id} type="button" onClick={() => setOpen(s)} className="press group overflow-hidden rounded-2xl bg-bg p-1 text-left">
+            <img src={artifactUrl(s)} alt={s.name} loading="lazy" className="aspect-[4/3] w-full rounded-xl object-cover object-top shadow-[inset_0_0_0_1px_var(--line)] transition-opacity group-hover:opacity-90" />
+            <div className="truncate px-1.5 pt-1 pb-0.5 font-num text-[10.5px] text-fg-4">{relTime(s.updated_at)}</div>
           </button>
         ))}
       </div>
@@ -90,7 +90,7 @@ function BrowserTab({ shots }: { shots: Artifact[] }) {
           open && (
             <span className="flex items-center gap-2">
               <span className="truncate">{open.name}</span>
-              <span className="text-[12px] font-normal text-fg-3">{fullDate(open.updated_at)}</span>
+              <span className="font-num text-[11px] text-fg-3">{fullDate(open.updated_at)}</span>
             </span>
           )
         }
@@ -99,10 +99,10 @@ function BrowserTab({ shots }: { shots: Artifact[] }) {
           <div className="relative bg-surface-2">
             <img src={artifactUrl(open)} alt={open.name} className="mx-auto max-h-[78vh] w-auto" />
             {idx > 0 && (
-              <IconButton icon="chevronLeft" label="Newer" className="absolute top-1/2 left-2 -translate-y-1/2 bg-surface" onClick={() => setOpen(list[idx - 1])} />
+              <IconButton icon="chevronLeft" label="Newer" className="glass absolute top-1/2 left-3 -translate-y-1/2" onClick={() => setOpen(list[idx - 1])} />
             )}
             {idx >= 0 && idx < list.length - 1 && (
-              <IconButton icon="chevronRight" label="Older" className="absolute top-1/2 right-2 -translate-y-1/2 bg-surface" onClick={() => setOpen(list[idx + 1])} />
+              <IconButton icon="chevronRight" label="Older" className="glass absolute top-1/2 right-3 -translate-y-1/2" onClick={() => setOpen(list[idx + 1])} />
             )}
           </div>
         )}
@@ -155,8 +155,8 @@ function McpList({ servers }: { servers: string[] }) {
 
 function Row({ k, children }: { k: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[6.5rem_1fr] gap-2 py-1.5 text-[12.5px]">
-      <dt className="text-fg-3">{k}</dt>
+    <div className="grid grid-cols-[6.5rem_1fr] gap-2 px-3.5 py-2 text-[12.5px]">
+      <dt className="label-mono pt-px">{k}</dt>
       <dd className="min-w-0 break-words text-fg">{children}</dd>
     </div>
   );
@@ -180,8 +180,8 @@ function DetailsTab({
   const cwd = init?.cwd || thread.cwd;
   const resume = `cd ${shellQuote(cwd)} && claude --resume ${thread.session_id}`;
   return (
-    <div className="scroll-thin h-full overflow-y-auto px-3.5 py-2">
-      <dl className="divide-y divide-line">
+    <div className="scroll-thin h-full overflow-y-auto px-2.5 pb-3">
+      <dl className="divide-y divide-line rounded-[18px] bg-bg py-1">
         <Row k="Channel">
           <a href={href.channel(thread.channel_id)} className="font-medium hover:underline">
             #{channel?.name ?? thread.channel_id}
@@ -235,11 +235,11 @@ function DetailsTab({
       </dl>
 
       {children.length > 0 && (
-        <div className="mt-3">
-          <div className="mb-1 text-[12px] font-semibold text-fg-2">Delegated threads</div>
-          <div className="space-y-px">
+        <div className="mt-4">
+          <div className="label-mono mb-1.5 px-2">Delegated threads</div>
+          <div className="rounded-[18px] bg-bg p-1">
             {children.map((c) => (
-              <a key={c.id} href={href.thread(c.id)} className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-[12.5px] hover:bg-surface-2">
+              <a key={c.id} href={href.thread(c.id)} className="hov flex h-9 min-w-0 items-center gap-2.5 rounded-full px-3 text-[12.5px] [--hov:var(--surface)]">
                 <StatusDot status={c.status} size={7} />
                 <span className="min-w-0 flex-1 truncate">{c.title}</span>
                 {c.task_id && <span className="shrink-0 font-mono text-[11px] text-fg-4">{c.task_id}</span>}
@@ -250,12 +250,12 @@ function DetailsTab({
         </div>
       )}
 
-      <div className="mt-4 rounded-lg border border-line bg-surface-2 p-2.5">
-        <div className="mb-1.5 flex items-center justify-between gap-2">
-          <span className="text-[12px] font-semibold text-fg-2">Resume in terminal</span>
+      <div className="mt-4 rounded-[18px] bg-bg p-3.5">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="label-mono">Resume in terminal</span>
           <CopyButton text={resume} />
         </div>
-        <code className="block font-mono text-[11.5px] break-all text-fg-2">{resume}</code>
+        <code className="block rounded-xl bg-surface px-3 py-2.5 font-mono text-[11.5px] break-all text-fg-2">{resume}</code>
       </div>
     </div>
   );
@@ -279,7 +279,6 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
   const [panelTab, setPanelTab] = useState<PanelTab>('artifacts');
   const [panelOpen, setPanelOpen] = useState<boolean>(() => readPref('threadPanel', true));
   const [mobilePanel, setMobilePanel] = useState(!!artifactParam);
-  const [stopping, setStopping] = useState(false);
   const [queued, setQueued] = useState<PendingMsg[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [prBusy, setPrBusy] = useState(false);
@@ -409,15 +408,11 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     if (e.type === 'thread' && parent && e.thread.id === parent.id) setParent(e.thread);
   });
 
-  useEffect(() => {
-    if (thread && thread.status !== 'running' && thread.status !== 'queued') setStopping(false);
-  }, [thread?.status]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Escape closes the mobile sheet, unless a modal (lightbox, full-screen artifact) is on top.
   useEffect(() => {
     if (!mobilePanel) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !document.querySelector('[aria-modal="true"]')) setMobilePanel(false);
+      if (e.key === 'Escape' && !document.querySelector('[aria-modal="true"]:not([data-sheet])')) setMobilePanel(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -507,14 +502,14 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
 
   const running = thread.status === 'running' || thread.status === 'queued';
 
+  // Thrown so the inline confirm springs back to its idle pill.
   const stop = async () => {
-    setStopping(true);
     setActionError(null);
     try {
       await api.post(`/threads/${encodeURIComponent(id)}/stop`);
     } catch (e) {
       setActionError(errorText(e));
-      setStopping(false);
+      throw e;
     }
   };
 
@@ -542,15 +537,16 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
   };
 
   const panel = (
-    <div className="flex h-full min-h-0 flex-col bg-surface">
-      <div className="flex items-center gap-1 border-b border-line px-2 py-1.5">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex items-center gap-1 px-2.5 py-2.5">
         <Tabs
           className="min-w-0 flex-1"
+          size="sm"
           value={panelTab}
           onChange={setPanelTab}
           tabs={[
-            { id: 'artifacts', label: 'Artifacts', badge: files.length ? <span className="text-[11px] text-fg-4">{files.length}</span> : undefined },
-            { id: 'browser', label: 'Browser', badge: shots.length ? <span className="text-[11px] text-fg-4">{shots.length}</span> : undefined },
+            { id: 'artifacts', label: 'Artifacts', badge: files.length ? <span className="font-num text-[10.5px] text-fg-4">{files.length}</span> : undefined },
+            { id: 'browser', label: 'Browser', badge: shots.length ? <span className="font-num text-[10.5px] text-fg-4">{shots.length}</span> : undefined },
             { id: 'details', label: 'Details' },
           ]}
         />
@@ -570,10 +566,13 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
         {/* header */}
-        <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2 md:px-5">
+        <div className="flex shrink-0 items-center gap-3 px-3 pt-3 pb-2 md:px-6 md:pt-4">
+          <span className="hidden sm:block">
+            <Avatar name={channel?.name ?? thread.channel_id} icon={thread.channel_id === 'conductor' ? 'target' : undefined} size={34} />
+          </span>
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1 text-[12.5px] text-fg-3">
-              <a href={href.channel(thread.channel_id)} className="shrink-0 font-medium hover:text-fg">
+            <div className="flex min-w-0 items-center gap-1 text-[12px] text-fg-3">
+              <a href={href.channel(thread.channel_id)} className="shrink-0 hover:text-fg">
                 #{channel?.name ?? thread.channel_id}
               </a>
               {parent && (
@@ -584,47 +583,33 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                   </a>
                 </>
               )}
-              {thread.task_id && <span className="ml-1 shrink-0 font-mono text-[11px] text-fg-4">{thread.task_id}</span>}
+              {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-4">{thread.task_id}</span>}
             </div>
-            <h1 className="truncate text-[15px] font-semibold tracking-[-0.02em]" title={thread.title}>
+            <h1 className="truncate font-display text-[16px] leading-snug md:text-[18px]" title={thread.title}>
               {thread.title}
             </h1>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {!live && ready && (
-              <span className="hidden text-[11.5px] text-warn sm:inline" title="Reconnecting to the live stream">
-                Reconnecting
+              <span className="hidden items-center gap-1.5 font-num text-[11px] text-warn sm:inline-flex" title="Reconnecting to the live stream">
+                <span className="pulse h-1.5 w-1.5 rounded-full bg-[var(--warn-dot)]" /> Reconnecting
               </span>
             )}
             <StatusPill status={thread.status} />
-            {running && (
-              <Button size="sm" variant="secondary" icon="stop" onClick={stop} busy={stopping}>
-                Stop
-              </Button>
-            )}
-            <button
-              type="button"
-              onClick={togglePanel}
-              aria-label="Toggle side panel"
-              title="Artifacts, browser, details"
-              className={`relative inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-surface-2 ${
-                (isMobile ? mobilePanel : panelOpen) ? 'text-fg' : 'text-fg-3'
-              }`}
-            >
-              <Icon name="panel" size={16} />
+            {running && <InlineConfirm label="Stop" icon="stop" confirmLabel="Stop run" doneLabel="Stopping" busyLabel="Stopping" onConfirm={stop} />}
+            <span className="relative">
+              <IconButton icon="panel" label="Artifacts, browser, details" active={isMobile ? mobilePanel : panelOpen} onClick={togglePanel} />
               {artifactCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-fg px-1 text-[10px] font-semibold text-bg">
-                  {artifactCount}
-                </span>
+                <span className="pointer-events-none absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-fg px-1 font-num text-[9.5px] text-on-ink">{artifactCount}</span>
               )}
-            </button>
+            </span>
           </div>
         </div>
 
         {/* transcript */}
         <div className="relative min-h-0 flex-1">
           <div ref={scrollRef} onScroll={onScroll} className="scroll-thin h-full overflow-y-auto">
-            <div ref={contentRef} className="mx-auto max-w-3xl px-4 pt-5 pb-8 md:px-6">
+            <div ref={contentRef} className="mx-auto max-w-3xl px-4 pt-4 pb-10 md:px-6">
               {error && (
                 <ErrorNote className="mb-3" onRetry={() => void load(false)}>
                   {error}
@@ -638,7 +623,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
             <button
               type="button"
               onClick={jump}
-              className="fade-in absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line-strong bg-surface px-3 py-1 text-[12px] font-medium shadow-[var(--shadow-menu)]"
+              className="glass pop-in press absolute bottom-4 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-medium"
             >
               <Icon name="chevronDown" size={13} /> New activity
             </button>
@@ -646,7 +631,8 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
         </div>
 
         {/* composer */}
-        <div className="shrink-0 border-t border-line bg-bg px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-5">
+        <div className="relative shrink-0 bg-bg px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4">
+          <div className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-bg to-transparent" />
           <div className="mx-auto max-w-3xl">
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             <ReplyComposer
@@ -669,12 +655,20 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
       </div>
 
       {/* desktop panel */}
-      {!isMobile && panelOpen && <aside className="w-[clamp(340px,40vw,760px)] shrink-0 border-l border-line">{panel}</aside>}
+      {!isMobile && panelOpen && (
+        <aside className="w-[clamp(340px,40vw,760px)] shrink-0 py-2 pr-2">
+          <div className="panel-in h-full overflow-hidden rounded-[18px] bg-surface">{panel}</div>
+        </aside>
+      )}
 
       {/* mobile sheet */}
       {isMobile && mobilePanel && (
-        <div className="fade-in fixed inset-0 z-30 flex flex-col bg-surface pt-[env(safe-area-inset-top)]" role="dialog" aria-label="Thread panel">
-          {panel}
+        <div className="fixed inset-0 z-30" role="dialog" aria-modal="true" aria-label="Thread panel" data-sheet>
+          <div className="scrim absolute inset-0" onClick={() => setMobilePanel(false)} />
+          <div className="sheet-in absolute inset-x-0 top-[calc(env(safe-area-inset-top)+12px)] bottom-0 flex flex-col overflow-hidden rounded-t-[28px] bg-surface pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-menu)]">
+            <div className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-line-strong" />
+            {panel}
+          </div>
         </div>
       )}
     </div>

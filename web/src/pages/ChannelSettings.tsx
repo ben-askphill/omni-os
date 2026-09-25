@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, type Channel } from '../api.ts';
-import { Button, ConfirmDialog, ErrorNote, Label, PageHeader, Toggle } from '../components/ui.tsx';
+import { Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, Toggle } from '../components/ui.tsx';
 import { slugify } from '../format.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -50,8 +50,8 @@ function Field({ label, hint, children, htmlFor }: { label: string; hint?: React
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="space-y-4 rounded-xl border border-line bg-surface p-4">
-      <h2 className="text-[13px] font-semibold text-fg-2">{title}</h2>
+    <section className="space-y-4 rounded-[24px] p-5 shadow-[inset_0_0_0_1px_var(--line)]">
+      <h2 className="font-display text-[16px]">{title}</h2>
       {children}
     </section>
   );
@@ -64,8 +64,6 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [archiveOpen, setArchiveOpen] = useState(false);
-  const [archiveBusy, setArchiveBusy] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const isNew = !existing;
   const isSystem = existing?.kind === 'system';
@@ -117,19 +115,17 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
     }
   };
 
+  // Reversible from the channel URL (it offers Unarchive), so an inline ask is enough.
   const archive = async () => {
     if (!existing) return;
-    setArchiveBusy(true);
     setArchiveError(null);
     try {
       await api.patch(`/channels/${encodeURIComponent(existing.id)}`, { archived: 1 });
       await reloadChannels();
-      setArchiveOpen(false);
       navigate('/');
     } catch (err) {
       setArchiveError(errorText(err));
-    } finally {
-      setArchiveBusy(false);
+      throw err;
     }
   };
 
@@ -161,20 +157,17 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         </div>
         {!isSystem && (
           <Field label="Kind">
-            <div className="flex gap-1">
-              {(['client', 'internal', 'personal'] as const).map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => set('kind', k)}
-                  className={`h-8 rounded-md border px-3 text-[13px] capitalize transition-colors ${
-                    f.kind === k ? 'border-fg bg-fg text-bg' : 'border-line-strong text-fg-2 hover:bg-surface-2'
-                  }`}
-                >
-                  {k}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              radio
+              label="Kind"
+              value={f.kind}
+              onChange={(k) => set('kind', k)}
+              options={[
+                { id: 'client', label: 'Client' },
+                { id: 'internal', label: 'Internal' },
+                { id: 'personal', label: 'Personal' },
+              ]}
+            />
           </Field>
         )}
         <Field label="Notes" htmlFor="ch-notes" hint="Added to every thread's system prompt in this channel. Keep it short: who the client is, conventions, what not to touch.">
@@ -189,9 +182,9 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         <Field label="GitHub repo" htmlFor="ch-gh" hint="owner/name. Auto-detected from the repo path when left empty.">
           <input id="ch-gh" className="field font-mono !text-[13px]" value={f.github_repo} onChange={(e) => set('github_repo', e.target.value)} placeholder="askphill/apa-volero" spellCheck={false} />
         </Field>
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
           <div>
-            <div className="text-[13px] font-medium text-fg-2">Worktree per thread</div>
+            <div className="text-[13px] font-medium text-fg">Worktree per thread</div>
             <div className="text-[12px] text-fg-3">Each thread gets its own branch (omni/...) so parallel work never collides. Off runs in the repo itself.</div>
           </div>
           <Toggle checked={f.use_worktree} onChange={(v) => set('use_worktree', v)} label="Worktree per thread" disabled={!f.repo_path.trim()} />
@@ -210,9 +203,9 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             <input id="ch-portal" className="field font-mono !text-[13px]" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="volero" spellCheck={false} />
           </Field>
         </div>
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
           <div>
-            <div className="text-[13px] font-medium text-fg-2">Show the browser window</div>
+            <div className="text-[13px] font-medium text-fg">Show the browser window</div>
             <div className="text-[12px] text-fg-3">Off runs the channel browser headless. Turn on to watch it or to log in by hand. Logins persist per channel.</div>
           </div>
           <Toggle checked={f.showBrowser} onChange={(v) => set('showBrowser', v)} label="Show the browser window" />
@@ -225,28 +218,17 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         <Button type="submit" variant="primary" busy={busy}>
           {isNew ? 'Create channel' : 'Save changes'}
         </Button>
-        {saved && <span className="text-[12.5px] text-ok">Saved</span>}
+        {saved && (
+          <span className="pop-in inline-flex items-center gap-1.5 text-[12.5px] text-ok">
+            <Icon name="check" size={13} strokeWidth={2.25} /> Saved
+          </span>
+        )}
         {existing && !isSystem && existing.id !== 'inbox' && (
-          <Button variant="danger-ghost" icon="archive" className="ml-auto" onClick={() => setArchiveOpen(true)}>
-            Archive channel
-          </Button>
+          <InlineConfirm className="ml-auto" label="Archive channel" icon="archive" confirmLabel="Archive" busyLabel="Archiving" onConfirm={archive} />
         )}
       </div>
+      {archiveError && <ErrorNote>{archiveError}</ErrorNote>}
 
-      {existing && (
-        <ConfirmDialog
-          open={archiveOpen}
-          title={`Archive #${existing.id}?`}
-          confirmLabel="Archive"
-          danger
-          busy={archiveBusy}
-          error={archiveError}
-          onCancel={() => setArchiveOpen(false)}
-          onConfirm={archive}
-        >
-          <p>The channel leaves the sidebar. Its threads, artifacts and search history stay in the database.</p>
-        </ConfirmDialog>
-      )}
     </form>
   );
 }
@@ -254,8 +236,8 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 export function NewChannelPage() {
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      <PageHeader title="New channel" subtitle="One channel per client or project. Threads, PRs, secrets and the browser profile are scoped to it." />
-      <div className="mx-auto max-w-2xl px-4 pt-5 pb-16 md:px-8">
+      <PageHeader width="max-w-2xl" title="New channel" subtitle="One channel per client or project. Threads, PRs, secrets and the browser profile are scoped to it." />
+      <div className="mx-auto max-w-2xl px-4 pt-2 pb-16 md:px-8">
         <ChannelSettingsForm />
       </div>
     </div>

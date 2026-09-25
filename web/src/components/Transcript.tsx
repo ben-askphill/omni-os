@@ -3,7 +3,7 @@ import { parsePayload, type EventRow } from '../api.ts';
 import { clock, duration, plural, shortPath, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { Markdown } from './Markdown.tsx';
-import { Icon, Spinner, StatusPill } from './ui.tsx';
+import { CheckItem, Icon, Spinner, StatusPill, Ticks } from './ui.tsx';
 
 // ---------- payloads ----------
 
@@ -63,7 +63,13 @@ type Item =
   | { type: 'error'; key: number; p: TextP }
   | { type: 'report'; key: number; at: string; p: ReportP };
 
-function buildItems(events: EventRow[]): Item[] {
+interface Todo {
+  content?: string;
+  activeForm?: string;
+  status?: string;
+}
+
+function buildItems(events: EventRow[]): { items: Item[]; plan: { todos: Todo[]; after: number } | null } {
   const results = new Map<string, ToolResultP>();
   for (const e of events) {
     if (e.kind === 'tool_result') {
@@ -73,6 +79,7 @@ function buildItems(events: EventRow[]): Item[] {
   }
   const items: Item[] = [];
   let group: { item: Extract<Item, { type: 'tools' }>; byId: Map<string, ToolCall> } | null = null;
+  let plan: { todos: Todo[]; after: number } | null = null;
 
   for (const e of events) {
     switch (e.kind) {
@@ -94,6 +101,7 @@ function buildItems(events: EventRow[]): Item[] {
         }
         group.byId.set(call.id, call);
         group.item.total++;
+        if (call.name === 'TodoWrite' && Array.isArray(call.input.todos)) plan = { todos: call.input.todos as Todo[], after: group.item.key };
         const parent = call.parent ? group.byId.get(call.parent) : undefined;
         if (parent) parent.children.push(call);
         else {
@@ -134,7 +142,7 @@ function buildItems(events: EventRow[]): Item[] {
         break;
     }
   }
-  return items;
+  return { items, plan };
 }
 
 // ---------- tool summaries ----------
@@ -193,7 +201,7 @@ function Pre({ children, tone, className = '' }: { children: ReactNode; tone?: '
   const bg = tone === 'add' ? 'bg-[var(--diff-add)]' : tone === 'del' ? 'bg-[var(--diff-del)]' : 'bg-code';
   return (
     <pre
-      className={`scroll-thin max-h-80 overflow-auto rounded-md border border-line px-2.5 py-2 font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap break-words ${bg} ${tone === 'bad' ? 'text-bad' : 'text-fg-2'} ${className}`}
+      className={`scroll-thin max-h-80 overflow-auto rounded-xl px-3 py-2.5 font-mono text-[11.5px] leading-[1.6] whitespace-pre-wrap break-words shadow-[inset_0_0_0_1px_var(--line)] ${bg} ${tone === 'bad' ? 'text-bad' : 'text-fg-2'} ${className}`}
     >
       {children}
     </pre>
@@ -241,17 +249,13 @@ function ToolInput({ c }: { c: ToolCall }) {
   }
   if (c.name === 'TodoWrite' && Array.isArray(i.todos)) {
     return (
-      <ul className="space-y-0.5 text-[12.5px]">
-        {(i.todos as { content?: string; status?: string }[]).map((t, k) => (
-          <li key={k} className={`flex items-start gap-2 ${t.status === 'completed' ? 'text-fg-3 line-through' : t.status === 'in_progress' ? 'text-fg' : 'text-fg-2'}`}>
-            <span className="mt-[3px] inline-flex h-3 w-3 shrink-0 items-center justify-center rounded-sm border border-line-strong">
-              {t.status === 'completed' && <Icon name="check" size={10} strokeWidth={3} />}
-              {t.status === 'in_progress' && <span className="h-1.5 w-1.5 rounded-full bg-[var(--info-dot)]" />}
-            </span>
+      <div>
+        {(i.todos as Todo[]).map((t, k) => (
+          <CheckItem key={k} state={t.status ?? 'pending'}>
             {t.content}
-          </li>
+          </CheckItem>
         ))}
-      </ul>
+      </div>
     );
   }
   const json = JSON.stringify(i, null, 2);
@@ -267,22 +271,22 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
   const mono = ['Bash', 'Read', 'Edit', 'Write', 'MultiEdit', 'Glob', 'Grep'].includes(c.name);
   const indent = depth > 0 || c.orphan;
   return (
-    <div className={indent ? 'ml-3 border-l border-line pl-2.5' : ''}>
+    <div className={indent ? 'ml-3.5 border-l border-line pl-2.5' : ''}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="group flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left text-[12.5px] hover:bg-surface-2"
+        className="hov group flex h-8 w-full min-w-0 items-center gap-2 rounded-full px-2.5 text-left text-[12.5px]"
       >
-        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="text-fg-4" />
+        <Icon name="chevronRight" size={12} className={`text-fg-4 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
         <Icon name={toolIcon(c.name)} size={13} className={err ? 'text-bad' : 'text-fg-3'} />
         <span className={`shrink-0 font-medium ${err ? 'text-bad' : 'text-fg-2'}`}>{toolLabel(c.name)}</span>
         <span className={`min-w-0 flex-1 truncate text-fg-3 ${mono ? 'font-mono text-[11.5px]' : ''}`}>{summary}</span>
-        {c.children.length > 0 && <span className="shrink-0 text-[11px] text-fg-4">{c.children.length} sub-calls</span>}
-        {pending && running ? <Spinner size={11} className="text-fg-3" /> : err ? <span className="shrink-0 text-[11px] font-medium text-bad">error</span> : null}
+        {c.children.length > 0 && <span className="shrink-0 font-num text-[11px] text-fg-4">{c.children.length} sub-calls</span>}
+        {pending && running ? <Spinner size={11} className="text-fg-3" /> : err ? <span className="shrink-0 font-num text-[11px] text-bad">error</span> : null}
       </button>
       {open && (
-        <div className="mt-1 mb-2 ml-6 space-y-1.5">
+        <div className="fade-in mt-1 mb-2.5 ml-7 space-y-1.5">
           <ToolInput c={c} />
           {c.result ? (
             <>
@@ -332,16 +336,18 @@ function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; 
   const latest = all[all.length - 1];
   const names = countNames(calls);
   return (
-    <div className="rounded-lg border border-line bg-surface/50">
+    <div className="rounded-[20px] bg-surface">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] hover:bg-surface-2"
+        className="hov flex h-10 w-full min-w-0 items-center gap-2 rounded-[20px] px-3.5 text-left text-[12.5px]"
       >
-        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="text-fg-4" />
+        <Icon name="chevronRight" size={12} className={`text-fg-4 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
         <Icon name="tool" size={13} className="text-fg-3" />
-        <span className="shrink-0 font-medium text-fg-2">{total} tool calls</span>
+        <span className="shrink-0 font-medium text-fg-2">
+          <span className="font-num">{total}</span> tool calls
+        </span>
         <span className="min-w-0 flex-1 truncate text-fg-3">
           {live && latest ? (
             <span className="font-mono text-[11.5px]">
@@ -354,11 +360,11 @@ function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; 
               .join(', ')
           )}
         </span>
-        {errors > 0 && <span className="shrink-0 text-[11px] font-medium text-bad">{errors} failed</span>}
+        {errors > 0 && <span className="shrink-0 font-num text-[11px] text-bad">{errors} failed</span>}
         {live && <Spinner size={11} className="text-fg-3" />}
       </button>
       {open && (
-        <div className="border-t border-line px-1.5 py-1">
+        <div className="fade-in px-1.5 pb-1.5">
           {calls.map((c) => (
             <ToolRow key={c.id} c={c} cwd={cwd} running={running} />
           ))}
@@ -392,7 +398,7 @@ export function QueuedMessages({ items }: { items: { kind: string; text?: string
             <div className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-fg-3">
               <Icon name="clock" size={12} /> Queued
             </div>
-            <div className="max-w-[92%] rounded-2xl rounded-tr-md border border-dashed border-line-strong px-3.5 py-2 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
+            <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
               {m.text}
             </div>
           </div>
@@ -411,11 +417,11 @@ function UserBubble({ p, at }: { p: UserP; at: string }) {
     <div className="flex flex-col items-end">
       <div className="mb-1 flex items-center gap-2 text-[11.5px] text-fg-3">
         {label && <span className={`font-medium ${p.source === 'conductor' ? 'text-info' : ''}`}>{label}</span>}
-        <span className="text-fg-4">{clock(toDate(at))}</span>
+        <span className="font-num text-[11px] text-fg-4">{clock(toDate(at))}</span>
       </div>
       <div
-        className={`max-w-[92%] rounded-2xl rounded-tr-md px-3.5 py-2 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%] ${
-          p.source === 'conductor' ? 'border border-info/20 bg-info-bg' : 'bg-bubble'
+        className={`max-w-[92%] rounded-[22px] rounded-tr-lg px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%] ${
+          p.source === 'conductor' ? 'bg-info-bg text-fg' : 'bg-bubble'
         }`}
       >
         {long && !more ? text.slice(0, 1200) + '...' : text}
@@ -435,9 +441,10 @@ function ResultLine({ p }: { p: ResultP }) {
   if (p.turns) bits.push(plural(p.turns, 'turn'));
   const bad = !p.ok && !p.stopped;
   return (
-    <div className="flex items-center gap-3 py-1 text-[11.5px] text-fg-4">
+    <div className="flex items-center gap-3 py-1 font-num text-[10.5px] tracking-[0.06em] text-fg-4 uppercase">
       <div className="h-px flex-1 bg-line" />
-      <span className={bad ? 'text-bad' : ''}>
+      <span className={`flex items-center gap-2 ${bad ? 'text-bad' : ''}`}>
+        <span className={`inline-block h-1 w-1 rounded-full ${bad ? 'bg-bad' : p.ok ? 'bg-[var(--ok-dot)]' : 'bg-[var(--warn-dot)]'}`} />
         {bits.join(' · ')}
         {bad && p.subtype && p.subtype !== 'success' ? ` · ${p.subtype.replace(/_/g, ' ')}` : ''}
       </span>
@@ -448,8 +455,8 @@ function ResultLine({ p }: { p: ResultP }) {
 
 function ErrorCallout({ text }: { text: string }) {
   return (
-    <div className="rounded-lg border border-bad/25 bg-bad-bg px-3 py-2">
-      <div className="mb-1 flex items-center gap-1.5 text-[12.5px] font-semibold text-bad">
+    <div className="rounded-[20px] bg-bad-bg px-4 py-3">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-bad">
         <Icon name="alert" size={14} /> Error
       </div>
       <pre className="scroll-thin max-h-72 overflow-auto font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap break-words text-bad">{text}</pre>
@@ -459,10 +466,12 @@ function ErrorCallout({ text }: { text: string }) {
 
 function ReportCard({ p }: { p: ReportP }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-line-strong bg-surface">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line bg-surface-2 px-3.5 py-2 text-[12.5px]">
-        <Icon name="inbox" size={14} className="text-fg-3" />
-        <span className="font-semibold">Report from {p.role ?? 'crew'}</span>
+    <div className="overflow-hidden rounded-[22px] bg-surface">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-3 text-[12.5px]">
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-bg text-fg-3">
+          <Icon name="inbox" size={14} />
+        </span>
+        <span className="font-medium">Report from {p.role ?? 'crew'}</span>
         {p.task_id && <span className="font-mono text-[11.5px] text-fg-3">{p.task_id}</span>}
         {p.channel && (
           <a href={href.channel(p.channel)} className="text-fg-3 hover:text-fg">
@@ -471,16 +480,39 @@ function ReportCard({ p }: { p: ReportP }) {
         )}
         <span className="ml-auto flex items-center gap-2">
           {p.status && <StatusPill status={p.status} />}
-          <a href={href.thread(p.thread_id)} className="inline-flex items-center gap-1 font-medium text-info hover:underline">
-            Open thread <Icon name="chevronRight" size={12} />
+          <a href={href.thread(p.thread_id)} className="press inline-flex h-7 items-center gap-1 rounded-full bg-bg px-3 font-medium text-fg shadow-[var(--shadow-card)]">
+            Open thread <Icon name="arrowRight" size={12} />
           </a>
         </span>
       </div>
-      {p.title && <div className="px-3.5 pt-2.5 text-[13px] font-medium text-fg-2">{p.title}</div>}
-      <div className="px-3.5 py-2.5">
+      {p.title && <div className="px-4 pt-3 font-display text-[15px] text-fg">{p.title}</div>}
+      <div className="px-4 pt-2 pb-4">
         <Markdown text={p.text || '(no reply)'} />
       </div>
     </div>
+  );
+}
+
+/** The latest TodoWrite as a live checklist (Bencho "chk"). */
+function PlanCard({ todos }: { todos: Todo[] }) {
+  const done = todos.filter((t) => t.status === 'completed').length;
+  const active = todos.find((t) => t.status === 'in_progress');
+  return (
+    <section aria-label="Plan" className="rounded-[22px] bg-surface px-4 pt-3.5 pb-3">
+      <div className="mb-2.5 flex items-center gap-3">
+        <span className="label-mono">Plan</span>
+        <Ticks value={todos.length ? done / todos.length : 0} count={Math.max(1, todos.length)} height={6} className="max-w-40 flex-1" label="Plan progress" />
+        <span className="ml-auto font-num text-[11px] text-fg-3 tabular-nums">
+          {done}/{todos.length}
+        </span>
+      </div>
+      {todos.map((t, k) => (
+        <CheckItem key={k} state={t.status ?? 'pending'}>
+          {t.status === 'in_progress' && t.activeForm ? t.activeForm : t.content}
+        </CheckItem>
+      ))}
+      {!active && done === todos.length && todos.length > 0 && <div className="mt-1.5 text-[12px] text-fg-4">All done</div>}
+    </section>
   );
 }
 
@@ -495,7 +527,7 @@ export const Transcript = memo(function Transcript({
   running: boolean;
   cwd?: string | null;
 }) {
-  const items = useMemo(() => buildItems(events), [events]);
+  const { items, plan } = useMemo(() => buildItems(events), [events]);
   const latestStatus = useMemo(() => {
     if (!running) return null;
     for (let k = events.length - 1; k >= 0; k--) {
@@ -517,8 +549,11 @@ export const Transcript = memo(function Transcript({
             return <UserBubble key={it.key} p={it.p} at={it.at} />;
           case 'text':
             return <Markdown key={it.key} text={it.p.text ?? ''} />;
-          case 'tools':
-            return <ToolGroup key={it.key} calls={it.calls} total={it.total} cwd={cwd} running={running} isLast={idx === items.length - 1} />;
+          case 'tools': {
+            const group = <ToolGroup key={it.key} calls={it.calls} total={it.total} cwd={cwd} running={running} isLast={idx === items.length - 1} />;
+            // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
+            return plan?.after === it.key ? [group, <PlanCard key="plan" todos={plan.todos} />] : group;
+          }
           case 'result':
             return <ResultLine key={it.key} p={it.p} />;
           case 'error':
@@ -530,9 +565,9 @@ export const Transcript = memo(function Transcript({
         }
       })}
       {(showWorking || latestStatus) && (
-        <div className="flex items-center gap-2 text-[12px] text-fg-3">
+        <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
           {running && <Spinner size={12} />}
-          <span className="truncate">{latestStatus ?? 'Working'}</span>
+          <span className={`truncate ${running ? 'shimmer' : ''}`}>{latestStatus ?? 'Working'}</span>
         </div>
       )}
     </div>
