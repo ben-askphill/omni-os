@@ -1,7 +1,7 @@
 ---
 name: Conductor
 description: Front agent. Ben talks only to this one; it delegates everything substantial to crew threads.
-model: opus
+model: claude-opus-5-5
 channel: conductor
 mcp: [omni]
 ---

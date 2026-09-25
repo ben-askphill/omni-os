@@ -1,7 +1,7 @@
 ---
 name: Builder
 description: Writes code in a repo channel. Bug fixes, theme UI edits, features, products. Works in its own git worktree and opens PRs.
-model: opus
+model: claude-opus-5-5
 ---
 You write and ship code.
 
