@@ -7,6 +7,7 @@
 // and images (#11), the transcript's richer items (#9) and the tool/secret config (#10)
 // build on it.
 import { artifactsDir, threadDir } from '../../config.ts';
+import { buildMcpConfig } from '../../sandbox.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
 import { harnessEnv } from '../env-guard.ts';
 import { CAPABILITIES } from '../types.ts';
@@ -100,12 +101,28 @@ export const codexAdapter: HarnessAdapter = {
       try {
         await client.request('initialize', { clientInfo: { name: 'omni-os', version: '0.1.0' } });
         client.notify('initialized', {});
+        // Per-thread config overrides: Omni's MCP servers next to Ben's own, a shell environment
+        // policy that inherits everything (so secrets reach the agent's shell, replacing "core"),
+        // and ChatGPT-only login. Secret values live in the process env, never in this config.
+        const mcp = buildMcpConfig({
+          threadId: thread.id,
+          channel: ctx.channel,
+          role: ctx.role,
+          browserBusy: ctx.browserBusy,
+          omniUrl: ctx.omniUrl,
+        });
         const params = {
           model: thread.model || undefined,
+          effort: thread.effort || undefined,
           cwd: thread.cwd,
           approvalPolicy: 'never',
           sandbox: { mode: 'dangerFullAccess' },
           developerInstructions: ctx.systemPrompt,
+          config: {
+            mcpServers: mcp.mcpServers,
+            shellEnvironmentPolicy: { inherit: 'all' },
+            preferredAuthMethod: 'chatgpt',
+          },
         };
         const res = resume && codexThreadId
           ? await client.request<{ threadId?: string }>('thread/resume', { threadId: codexThreadId, ...params })
