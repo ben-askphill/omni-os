@@ -75,10 +75,13 @@ export interface CrewRole {
   id: string;
   name: string;
   description: string;
+  harness?: string;
   model?: string;
+  effort?: string;
   channel?: string;
   mcp: string[];
   charter: string;
+  error?: string;
 }
 
 export interface SearchHit {

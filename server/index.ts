@@ -10,6 +10,7 @@ import { channels, threads, events, artifacts, search, type Channel, type Thread
 import { bus } from './bus.ts';
 import { createThread, sendMessage, interruptThread, runningCount, runningByHarness, slotsByHarness, queuedCount, pendingFor, isLive, shutdownAll } from './runner.ts';
 import { getCatalog, startCatalogRefresh } from './harness/catalog-service.ts';
+import { validateDefaults } from './harness/resolve.ts';
 import { usageByHarness } from './usage.ts';
 import { listCrew } from './crew.ts';
 import { listSecrets, setSecret, deleteSecret } from './secrets.ts';
@@ -296,7 +297,15 @@ api.post('/channels/:id/prs/:n/merge', async (c) => {
 
 // ---------- crew, secrets, automations ----------
 
-api.get('/crew', (c) => c.json(listCrew()));
+api.get('/crew', (c) => {
+  const cat = getCatalog();
+  return c.json(
+    listCrew().map((r) => ({
+      ...r,
+      error: r.error ?? validateDefaults({ harness: r.harness, model: r.model, effort: r.effort }, cat),
+    })),
+  );
+});
 
 // The harnesses with their availability, fix command, models, efforts, cap and running count.
 api.get('/harnesses', (c) => {
@@ -316,7 +325,16 @@ api.delete('/secrets', async (c) => {
   return c.json({ ok: true });
 });
 
-api.get('/automations', (c) => c.json(loadAutomations().map((a) => ({ ...a, runs: lastRuns(a.id, 5) }))));
+api.get('/automations', (c) => {
+  const cat = getCatalog();
+  return c.json(
+    loadAutomations().map((a) => ({
+      ...a,
+      error: a.error ?? validateDefaults({ harness: a.harness, model: a.model, effort: a.effort }, cat),
+      runs: lastRuns(a.id, 5),
+    })),
+  );
+});
 api.post('/automations/:id/run', async (c) => {
   const a = loadAutomations().find((x) => x.id === c.req.param('id'));
   if (!a) return c.json({ error: 'not found' }, 404);
