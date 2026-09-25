@@ -43,22 +43,45 @@ server.registerTool(
   {
     description:
       'Hand a task to a crew role in a channel. Creates a new thread that runs in the background. ' +
-      'Its final reply is reported back to you automatically as a [crew report] message; do not poll for it.',
+      'Its final reply is reported back to you automatically as a [crew report] message; do not poll for it. ' +
+      'Without a harness/model/effort it uses the role\'s defaults. Use list_harnesses for valid ids.',
     inputSchema: {
       channel: z.string().describe('Channel id, e.g. "volero". Use list_channels.'),
       role: z.string().describe('Crew role id, e.g. "researcher". Use list_crew.'),
       prompt: z.string().describe('Self-contained task brief. Include everything the crewmate needs; it cannot see your chat.'),
       task_id: z.string().optional().describe('Short id like T-12 to match the report. Generated if omitted.'),
       title: z.string().optional(),
-      model: z.enum(['opus', 'sonnet', 'haiku', 'fable']).optional().describe('Override the role default. sonnet or haiku for quick lookups.'),
+      harness: z.string().optional().describe('Override the role default harness: claude-code, codex or cursor. Use list_harnesses.'),
+      model: z.string().optional().describe('Any catalog model id, or a Claude alias (opus, sonnet, haiku, fable). Use list_harnesses.'),
+      effort: z.string().optional().describe('Reasoning effort supported by the model, e.g. high. Use list_harnesses.'),
     },
   },
-  async ({ channel, role, prompt, task_id, title, model }) => {
+  async ({ channel, role, prompt, task_id, title, harness, model, effort }) => {
     const t = await call('/threads', {
       method: 'POST',
-      body: JSON.stringify({ channel, role, prompt, task_id, title, model, parent_id: SELF, source: 'conductor' }),
+      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, parent_id: SELF, source: 'conductor' }),
     });
-    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, role: t.role, status: t.status, branch: t.branch });
+    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, status: t.status, branch: t.branch });
+  },
+);
+
+server.registerTool(
+  'list_harnesses',
+  { description: 'List the agent harnesses (Claude Code, Codex, Cursor) with their availability, fix command, models and effort levels, so you can pass valid ids to delegate.' },
+  async () => {
+    const list = await call('/harnesses');
+    return text(
+      list.map((h: any) => ({
+        id: h.id,
+        name: h.name,
+        plan: h.plan,
+        available: h.available,
+        fix: h.available ? undefined : h.fix,
+        cap: h.cap,
+        running: h.running,
+        models: (h.models ?? []).map((m: any) => ({ id: m.id, label: m.label, efforts: m.efforts, default_effort: m.defaultEffort, default: m.default })),
+      })),
+    );
   },
 );
 
@@ -68,7 +91,8 @@ server.registerTool(
     description:
       'Send a message to an existing thread (yours or any other). It resumes with full context. ' +
       'If the thread is busy, mode "steer" (default) hands it over at its next step so it adjusts while it keeps working; ' +
-      'mode "queue" waits until its current turn ends and then runs as a new turn.',
+      'mode "queue" waits until its current turn ends and then runs as a new turn. ' +
+      'A steer to a thread whose harness cannot steer (Cursor) is queued automatically.',
     inputSchema: {
       thread_id: z.string(),
       message: z.string(),
