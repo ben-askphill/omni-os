@@ -28,6 +28,7 @@ export const config = {
   /** After an interrupt, how long the turn gets to wind down before the process is killed. */
   interruptGraceMs: Number(env.OMNI_INTERRUPT_GRACE_MS ?? 8000),
   browser: (env.OMNI_BROWSER ?? '1') !== '0',
+  maxUploadMb: Number(env.OMNI_MAX_UPLOAD_MB ?? 25),
   timezone: env.OMNI_TZ ?? 'Europe/Amsterdam',
 };
 
@@ -52,3 +53,4 @@ for (const p of [paths.data, paths.threads, paths.worktrees, paths.browsers]) mk
 export const threadDir = (threadId: string) => join(paths.threads, threadId);
 export const artifactsDir = (threadId: string) => join(paths.threads, threadId, 'artifacts');
 export const browserOutDir = (threadId: string) => join(paths.threads, threadId, 'browser');
+export const uploadsDir = (threadId: string) => join(paths.threads, threadId, 'uploads');

@@ -1,12 +1,13 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { tmpdir, homedir } from 'node:os';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
 import { channels, events, threads, kv, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
 import { prepareWorkdir, writeMcpConfig } from './sandbox.ts';
+import { describeAttachments, inlinable, messageContent, saveUploads, type Attachment } from './uploads.ts';
 import { secretsEnv } from './secrets.ts';
 import { parseEvent, LineSplitter, type Usage, type Record as StreamRecord } from './stream.ts';
 import { publishFeed, publishThread } from './bus.ts';
@@ -31,6 +32,8 @@ interface Msg {
   uuid: string;
   text: string;
   mode: SendMode;
+  /** Files Ben attached, already written into the thread's uploads folder. */
+  attachments?: Attachment[];
   /** Written while a turn was already running, so the transcript marks where it steered. */
   midTurn?: boolean;
   /** Recorded when the CLI replays this uuid, so it lands exactly where the agent saw it. */
@@ -208,9 +211,23 @@ function writeLine(live: Live, obj: unknown) {
   }
 }
 
+/**
+ * Attachments add a note naming every file and where it is on disk, and images small enough for the
+ * API ride along as real image blocks, so the agent sees them without a Read.
+ */
+function messageBody(m: Msg): string | ReturnType<typeof messageContent> {
+  const attachments = m.attachments ?? [];
+  if (!attachments.length) return m.text;
+  const text = `${m.text}\n\n${describeAttachments(attachments)}`;
+  return messageContent(
+    text,
+    attachments.filter(inlinable).map((a) => ({ mime: a.mime, data: readFileSync(a.path).toString('base64') })),
+  );
+}
+
 const userLine = (live: Live, m: Msg) => ({
   type: 'user',
-  message: { role: 'user', content: m.text },
+  message: { role: 'user', content: messageBody(m) },
   parent_tool_use_id: null,
   session_id: live.sessionId,
   uuid: m.uuid,
@@ -655,6 +672,8 @@ export interface CreateThreadInput {
   task_id?: string | null;
   source?: ThreadSource;
   automation?: string | null;
+  /** Files Ben attached to the first message. Validate them with `checkUploads` before calling. */
+  files?: File[];
 }
 
 export async function createThread(input: CreateThreadInput): Promise<Thread> {
@@ -679,23 +698,32 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     source: input.source ?? 'manual',
     automation: input.automation ?? null,
   });
+  const saved = await saveUploads(thread.id, input.files ?? []);
+  const attachments = saved.length ? saved : undefined;
   deliver(thread.id, {
     uuid: randomUUID(),
     text: input.prompt,
     mode: 'steer',
-    event: { kind: 'user', payload: { text: input.prompt, source: thread.source } },
+    attachments,
+    event: { kind: 'user', payload: { text: input.prompt, source: thread.source, ...(attachments && { attachments }) } },
   });
   if (!input.title) void generateTitle(thread.id, input.prompt);
   return threads.get(thread.id)!;
 }
 
-export function sendMessage(threadId: string, prompt: string, opts: { from?: 'ben' | 'conductor'; mode?: SendMode } = {}): Thread {
+export function sendMessage(
+  threadId: string,
+  prompt: string,
+  opts: { from?: 'ben' | 'conductor'; mode?: SendMode; attachments?: Attachment[] } = {},
+): Thread {
   if (!threads.get(threadId)) throw new Error('thread not found');
+  const attachments = opts.attachments?.length ? opts.attachments : undefined;
   deliver(threadId, {
     uuid: randomUUID(),
     text: prompt,
     mode: opts.mode ?? 'steer',
-    event: { kind: 'user', payload: { text: prompt, source: opts.from ?? 'ben' } },
+    attachments,
+    event: { kind: 'user', payload: { text: prompt, source: opts.from ?? 'ben', ...(attachments && { attachments }) } },
   });
   return threads.get(threadId)!;
 }
