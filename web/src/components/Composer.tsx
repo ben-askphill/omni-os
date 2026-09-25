@@ -242,6 +242,7 @@ export function NewThreadComposer({
   const [channel, setChannel] = useState(channelId ?? defaultChannel);
   const [role, setRole] = useState<string>(() => ((channelId ?? defaultChannel) === 'conductor' ? 'conductor' : ''));
   const [choice, setChoice] = useState<ModelChoice>({ harness: 'claude-code', model: '' });
+  const [effort, setEffort] = useState('');
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -296,7 +297,7 @@ export function NewThreadComposer({
     try {
       const t = await api.send<Thread>(
         '/threads',
-        { channel, prompt, role: role || undefined, harness: choice.harness, model: choice.model || undefined },
+        { channel, prompt, role: role || undefined, harness: choice.harness, model: choice.model || undefined, effort: effort || undefined },
         att.files,
       );
       drafts.delete(key);
@@ -345,7 +346,28 @@ export function NewThreadComposer({
         <AttachButton onPick={att.add} disabled={busy} />
         {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
         <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />
-        {harnesses && <ModelPicker harnesses={harnesses} value={choice} onChange={setChoice} />}
+        {harnesses && (
+          <ModelPicker
+            harnesses={harnesses}
+            value={choice}
+            onChange={(c) => {
+              setChoice(c);
+              setEffort(''); // changing the model resets effort to the default
+            }}
+          />
+        )}
+        {harnesses && (() => {
+          const m = harnesses.find((h) => h.id === choice.harness)?.models.find((x) => x.id === choice.model);
+          const efforts = m?.efforts ?? [];
+          if (!efforts.length) {
+            return <Picker label="Effort" value="" options={[{ value: '', label: 'Auto effort', avatar: false, icon: 'sliders' }]} onChange={() => {}} disabled />;
+          }
+          const effortOptions: PickerOption<string>[] = [
+            { value: '', label: m?.defaultEffort ? `Default (${m.defaultEffort})` : 'Default', avatar: false, icon: 'sliders' },
+            ...efforts.map((e) => ({ value: e, label: e, avatar: false as const, icon: 'sliders' as const })),
+          ];
+          return <Picker label="Effort" value={effort} options={effortOptions} onChange={setEffort} />;
+        })()}
         <div className="ml-auto flex items-center gap-2.5">
           <Hint />
           <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>

@@ -42,7 +42,7 @@ const REJECTED =
 const VALUE = new Set([
   '--output-format', '--input-format', '--json-schema', '--max-budget-usd', '--system-prompt', '--system-prompt-file',
   '--append-system-prompt', '--append-system-prompt-file', '--permission-mode', '--model', '--agent', '--fallback-model',
-  '--settings', '--session-id', '--agents', '--setting-sources', '--max-turns', '--permission-prompt-tool',
+  '--settings', '--session-id', '--agents', '--setting-sources', '--max-turns', '--permission-prompt-tool', '--effort',
 ]);
 const VARIADIC = new Set([
   '--allowedTools', '--allowed-tools', '--tools', '--disallowedTools', '--disallowed-tools', '--mcp-config', '--add-dir',
@@ -388,7 +388,7 @@ async function main() {
       process.env.FAKE_CLAUDE_LOG,
       JSON.stringify({
         pid: process.pid, time: Date.now(), cwd: process.cwd(), args: process.argv.slice(2), mode,
-        session_id: sessionId, resume: resumed, model, unknown, thread_id: process.env.OMNI_THREAD_ID ?? null,
+        session_id: sessionId, resume: resumed, model, effort: opts['--effort'] ?? null, unknown, thread_id: process.env.OMNI_THREAD_ID ?? null,
         api_auth: ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'].filter((k) => k in process.env),
       }) + '\n',
     );
