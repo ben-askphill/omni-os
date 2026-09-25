@@ -1,4 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { paths } from './config.ts';
 
 export type ChannelKind = 'client' | 'internal' | 'personal' | 'system';
@@ -60,6 +62,7 @@ export interface Artifact {
   updated_at: string;
 }
 
+mkdirSync(dirname(paths.db), { recursive: true });
 export const db = new DatabaseSync(paths.db);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 
@@ -277,14 +280,15 @@ export const events = {
       .get(threadId) as { payload: string } | undefined;
     return row ? (JSON.parse(row.payload).text as string) : null;
   },
-  /** All assistant text produced by the most recent run (after the last user message). */
-  lastRunText(threadId: string): string {
+  /** All assistant text produced by the most recent run (after the last message the agent actually saw, and after `after`). */
+  lastRunText(threadId: string, after = 0): string {
     const rows = db
       .prepare(
         `SELECT payload FROM events WHERE thread_id = ? AND kind = 'assistant_text'
-         AND id > COALESCE((SELECT MAX(id) FROM events WHERE thread_id = ? AND kind IN ('user', 'crew_report')), 0) ORDER BY id`,
+         AND id > MAX(COALESCE((SELECT MAX(id) FROM events WHERE thread_id = ? AND kind IN ('user', 'crew_report')
+           AND json_extract(payload, '$.dropped') IS NOT 1), 0), ?) ORDER BY id`,
       )
-      .all(threadId, threadId) as { payload: string }[];
+      .all(threadId, threadId, after) as { payload: string }[];
     return rows.map((r) => JSON.parse(r.payload).text as string).join('\n\n');
   },
 };
