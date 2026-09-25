@@ -1,15 +1,18 @@
 // The live catalog: it probes the CLIs at server start and every 15 minutes, keeping the
 // last good list when a refresh fails, so the picker never goes empty. The pure assembly
 // lives in catalog.ts; this file does the I/O.
+import { execFile } from 'node:child_process';
 import { config } from '../config.ts';
 import { CodexClient } from './codex/client.ts';
 import { codexBin } from './codex/bin.ts';
 import { normalizeRateLimits } from './codex/normalize.ts';
 import type { RateLimits } from './codex/protocol.ts';
+import { cursorBin } from './cursor/bin.ts';
+import { parseCursorModels } from './cursor/models.ts';
 import { harnessEnv } from './env-guard.ts';
 import { recordUsage } from '../usage.ts';
-import { HARNESS_META, CAPABILITIES, type HarnessId, type HarnessInfo } from './types.ts';
-import { claudeHarness, codexHarness, type Catalog, type CodexProbe } from './catalog.ts';
+import { type HarnessId, type HarnessInfo } from './types.ts';
+import { claudeHarness, codexHarness, cursorHarness, type Catalog, type CodexProbe, type CursorProbe } from './catalog.ts';
 
 type Probe = CodexProbe & { rateLimits?: RateLimits };
 
@@ -22,17 +25,17 @@ const caps = (): Record<HarnessId, number> => ({
   cursor: config.maxConcurrentCursor,
 });
 
-/** Cursor is wired in its own slice (#14); until then it shows as unavailable. */
-function cursorPlaceholder(cap: number): HarnessInfo {
-  return {
-    id: 'cursor',
-    ...HARNESS_META.cursor,
-    capabilities: CAPABILITIES.cursor,
-    available: false,
-    fix: 'cursor-agent login',
-    models: [],
-    cap,
-  };
+/** Probe `cursor-agent --list-models` for the model list. Success means installed and logged in. */
+export async function probeCursor(bin = cursorBin()): Promise<CursorProbe> {
+  const unavailable: CursorProbe = { available: false, models: [] };
+  if (!bin) return unavailable;
+  return await new Promise<CursorProbe>((resolve) => {
+    execFile(bin, ['--list-models'], { env: harnessEnv('cursor', {}), timeout: 5000 }, (err, stdout) => {
+      if (err || !stdout?.trim()) return resolve(unavailable);
+      const models = parseCursorModels(stdout);
+      resolve(models.length ? { available: true, models } : unavailable);
+    });
+  });
 }
 
 /** Probe `codex app-server` for account, config defaults, the model list and rate limits. */
@@ -88,7 +91,11 @@ export async function loadCatalog(): Promise<Catalog> {
   } catch {
     harnesses.push(codexHarness({ available: false, models: [] }, c.codex));
   }
-  harnesses.push(cursorPlaceholder(c.cursor));
+  try {
+    harnesses.push(cursorHarness(await probeCursor(), c.cursor));
+  } catch {
+    harnesses.push(cursorHarness({ available: false, models: [] }, c.cursor));
+  }
   current = { harnesses };
   return current;
 }
@@ -101,7 +108,7 @@ export function getCatalog(): Catalog {
     harnesses: [
       claudeHarness(c['claude-code'], config.defaultModel),
       codexHarness({ available: false, models: [] }, c.codex),
-      cursorPlaceholder(c.cursor),
+      cursorHarness({ available: false, models: [] }, c.cursor),
     ],
   };
 }

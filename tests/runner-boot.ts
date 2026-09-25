@@ -14,6 +14,7 @@ export async function startRunner(env: Record<string, string> = {}) {
   const tmp = mkdtempSync(join(tmpdir(), 'omni-runner-'));
   const log = join(tmp, 'fake-claude.jsonl');
   const codexLog = join(tmp, 'fake-codex.jsonl');
+  const cursorLog = join(tmp, 'fake-cursor.jsonl');
   const scratch = join(tmp, 'scratch');
   const brain = join(tmp, 'brain');
   mkdirSync(scratch);
@@ -30,6 +31,7 @@ export async function startRunner(env: Record<string, string> = {}) {
     FAKE_CLAUDE_LOG: log,
     FAKE_CLAUDE_LATENCY_MS: '10',
     FAKE_CODEX_LOG: codexLog,
+    FAKE_CURSOR_LOG: cursorLog,
     ...env,
   });
 
@@ -55,12 +57,15 @@ export async function startRunner(env: Record<string, string> = {}) {
     existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
   const codexRequests = (): any[] =>
     existsSync(codexLog) ? readFileSync(codexLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  const cursorRequests = (): any[] =>
+    existsSync(cursorLog) ? readFileSync(cursorLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
 
   afterAll(async () => {
     await runner.shutdownAll?.();
     // Safety net: never leave a fake CLI behind, whatever the runner did.
     for (const { pid } of invocations()) if (fakeAlive(pid)) process.kill(pid, 'SIGKILL');
     for (const { pid } of codexRequests()) if (fakeAlive(pid, 'fake-codex.mjs')) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
+    for (const { pid } of cursorRequests()) if (fakeAlive(pid, 'fake-cursor.mjs')) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
     db.db.close();
     rmSync(tmp, { recursive: true, force: true });
   }, 15_000);
@@ -85,6 +90,7 @@ export async function startRunner(env: Record<string, string> = {}) {
     codexRequests,
     /** Codex app-server processes spawned, oldest first (one per thread). */
     codexPids: () => [...new Set(codexRequests().map((r) => r.pid))],
+    cursorRequests,
     /** Long-lived stream-json processes spawned for a thread, oldest first. */
     spawns: (id: string) => invocations().filter((i) => i.mode === 'stream' && i.thread_id === id),
     fakeAlive,

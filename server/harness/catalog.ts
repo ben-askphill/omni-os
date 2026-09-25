@@ -87,6 +87,27 @@ export function codexHarness(probe: CodexProbe, cap: number): HarnessInfo {
   return { ...base, available: true, models };
 }
 
+// ---------- Cursor ----------
+
+export interface CursorProbe {
+  available: boolean;
+  /** Families already parsed from the CLI model list. */
+  models: ModelEntry[];
+}
+
+export function cursorHarness(probe: CursorProbe, cap: number): HarnessInfo {
+  const base: Omit<HarnessInfo, 'models' | 'available' | 'fix'> = {
+    id: 'cursor',
+    ...HARNESS_META.cursor,
+    capabilities: CAPABILITIES.cursor,
+    cap,
+  };
+  if (!probe.available) return { ...base, available: false, fix: 'cursor-agent login', models: [] };
+  const models = probe.models;
+  if (models.length && !models.some((m) => m.default)) models[0].default = true;
+  return { ...base, available: true, models };
+}
+
 // ---------- resolution & validation ----------
 
 export interface Catalog {
