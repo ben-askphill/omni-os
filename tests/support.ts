@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 export const FAKE_CLAUDE = join(import.meta.dirname, 'fixtures', 'fake-claude.mjs');
 export const FAKE_CODEX = join(import.meta.dirname, 'fixtures', 'fake-codex.mjs');
+export const FAKE_CURSOR = join(import.meta.dirname, 'fixtures', 'fake-cursor.mjs');
 
 /** Poll until fn returns something truthy. Beats fixed sleeps for process-driven tests. */
 export async function waitFor<T>(fn: () => T | undefined | null | false, label: string | (() => string), timeout = 8000): Promise<T> {

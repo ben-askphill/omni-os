@@ -389,8 +389,8 @@ const SEND_OPTIONS: { mode: SendMode; label: string; hint: string; icon: IconNam
 
 const halfCls = 'press inline-flex h-9 items-center bg-fg text-on-ink transition-opacity select-none hover:opacity-90 disabled:opacity-40';
 
-/** Split button for a busy thread: Steer, plus a menu to queue or interrupt instead. */
-function SteerButton({ disabled, busy, onSend }: { disabled: boolean; busy: boolean; onSend: (mode: SendMode) => void }) {
+/** Split button for a busy thread: Steer (or Queue when the harness can't steer), plus a menu. */
+function SteerButton({ disabled, busy, canSteer = true, onSend }: { disabled: boolean; busy: boolean; canSteer?: boolean; onSend: (mode: SendMode) => void }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -435,11 +435,13 @@ function SteerButton({ disabled, busy, onSend }: { disabled: boolean; busy: bool
     else if (e.key === 'Tab') setOpen(false);
   };
 
+  const options = canSteer ? SEND_OPTIONS : SEND_OPTIONS.filter((o) => o.mode !== 'steer');
+  const primary: SendMode = canSteer ? 'steer' : 'queue';
   return (
     <div ref={wrap} className="relative flex">
-      <button type="button" onClick={() => onSend('steer')} disabled={disabled || busy} className={`${halfCls} gap-1.5 rounded-l-full pr-2.5 pl-3.5 text-[13px] font-medium whitespace-nowrap`}>
-        {busy ? <Spinner size={14} /> : <Icon name="send" size={15} strokeWidth={2} />}
-        Steer
+      <button type="button" onClick={() => onSend(primary)} disabled={disabled || busy} className={`${halfCls} gap-1.5 rounded-l-full pr-2.5 pl-3.5 text-[13px] font-medium whitespace-nowrap`}>
+        {busy ? <Spinner size={14} /> : <Icon name={canSteer ? 'send' : 'clock'} size={15} strokeWidth={2} />}
+        {canSteer ? 'Steer' : 'Queue'}
       </button>
       <button
         ref={trigger}
@@ -467,7 +469,7 @@ function SteerButton({ disabled, busy, onSend }: { disabled: boolean; busy: bool
           onKeyDown={onMenuKey}
           className="fade-in absolute right-0 bottom-full z-20 mb-1.5 w-72 max-w-[calc(100vw-1.5rem)] sm:w-80 rounded-lg border border-line bg-surface p-1 shadow-[var(--shadow-menu)]"
         >
-          {SEND_OPTIONS.map((o, k) => (
+          {options.map((o, k) => (
             <button
               key={o.mode}
               ref={(el) => {
@@ -509,11 +511,14 @@ const finePointer = () => typeof matchMedia !== 'undefined' && matchMedia('(poin
 export function ReplyComposer({
   threadId,
   status,
+  canSteer = true,
   onSent,
   extra,
 }: {
   threadId: string;
   status: string;
+  /** When false (e.g. Cursor), a busy thread offers only Queue and Interrupt; Cmd+Enter queues. */
+  canSteer?: boolean;
   onSent?: (t: Thread, mode?: SendMode) => void;
   extra?: ReactNode;
 }) {
@@ -578,7 +583,8 @@ export function ReplyComposer({
         onKeyDown={(e) => {
           if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.nativeEvent.isComposing) return;
           e.preventDefault();
-          void submit(busyThread ? (e.shiftKey ? 'interrupt' : 'steer') : undefined);
+          const busyMode: SendMode = e.shiftKey ? 'interrupt' : canSteer ? 'steer' : 'queue';
+          void submit(busyThread ? busyMode : undefined);
         }}
         rows={1}
         placeholder={busyThread ? 'Steer the agent. It reads this at its next step.' : 'Reply'}
@@ -590,7 +596,7 @@ export function ReplyComposer({
         <div className="ml-auto flex items-center gap-2.5">
           <Hint />
           {busyThread ? (
-            <SteerButton disabled={!text.trim()} busy={busy} onSend={sendVia} />
+            <SteerButton disabled={!text.trim()} busy={busy} canSteer={canSteer} onSend={sendVia} />
           ) : (
             <SendButton armed={!!text.trim()} busy={busy} onClick={() => void submit()}>
               Send

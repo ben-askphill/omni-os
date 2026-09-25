@@ -18,12 +18,14 @@ import { getCatalog } from './harness/catalog-service.ts';
 import type { AdapterContext, HarnessAdapter } from './harness/adapter.ts';
 import { claudeAdapter } from './harness/claude/adapter.ts';
 import { codexAdapter } from './harness/codex/adapter.ts';
+import { cursorAdapter } from './harness/cursor/adapter.ts';
 
 const omniUrl = () => `http://127.0.0.1:${config.port}`;
 
 const ADAPTERS: Record<string, HarnessAdapter> = {
   'claude-code': claudeAdapter,
   codex: codexAdapter,
+  cursor: cursorAdapter,
 };
 const adapterFor = (harness: string): HarnessAdapter => ADAPTERS[harness] ?? claudeAdapter;
 const capsOf = (harness: string) => CAPABILITIES[harness as HarnessId] ?? CAPABILITIES['claude-code'];

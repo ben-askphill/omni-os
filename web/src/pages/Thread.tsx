@@ -722,6 +722,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
             <ReplyComposer
               threadId={id}
               status={thread.status}
+              canSteer={thread.harness !== 'cursor'}
               onSent={(t) => {
                 setThread(t);
                 nearBottom.current = true;
