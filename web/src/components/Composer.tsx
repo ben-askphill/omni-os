@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { api, errorText, MODELS, type Thread } from '../api.ts';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { api, errorText, MODELS, type SendMode, type Thread } from '../api.ts';
 import { navigate, takeComposerFocus } from '../router.ts';
 import { useApp } from '../store.tsx';
-import { ErrorNote, Icon, Kbd, Picker, Spinner, type PickerOption } from './ui.tsx';
+import { ErrorNote, Icon, Kbd, Picker, Spinner, type IconName, type PickerOption } from './ui.tsx';
 
 // Unsent text survives navigation (not reloads). Keyed by where the composer lives.
 const drafts = new Map<string, string>();
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const MOD = isMac ? 'Cmd' : 'Ctrl';
 
 function useAutosize(ref: RefObject<HTMLTextAreaElement | null>, value: string, max: number) {
   const fit = useCallback(() => {
@@ -203,7 +204,131 @@ export function NewThreadComposer({
   );
 }
 
-/** Follow-up composer pinned under a thread. */
+const SEND_OPTIONS: { mode: SendMode; label: string; hint: string; icon: IconName; keys?: string[] }[] = [
+  { mode: 'steer', label: 'Steer now', hint: 'The agent reads it at its next step', icon: 'send', keys: [MOD, 'Enter'] },
+  { mode: 'queue', label: 'Queue for after this turn', hint: 'Runs when the current turn ends', icon: 'clock' },
+  { mode: 'interrupt', label: 'Interrupt and send', hint: 'Stops the current step, then runs this', icon: 'stop', keys: [MOD, 'Shift', 'Enter'] },
+];
+
+const halfCls = 'press inline-flex h-9 items-center bg-fg text-on-ink transition-opacity select-none hover:opacity-90 disabled:opacity-40';
+
+/** Split button for a busy thread: Steer, plus a menu to queue or interrupt instead. */
+function SteerButton({ disabled, busy, onSend }: { disabled: boolean; busy: boolean; onSend: (mode: SendMode) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const items = useRef<(HTMLButtonElement | null)[]>([]);
+
+  useEffect(() => {
+    if (disabled || busy) setOpen(false);
+  }, [disabled, busy]);
+
+  useEffect(() => {
+    if (!open) return;
+    items.current[0]?.focus();
+    const onDown = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    // The thread page skips its Esc-to-interrupt while a [role=menu] is open, so this only closes the menu.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      setOpen(false);
+      trigger.current?.focus();
+    };
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const onMenuKey = (e: ReactKeyboardEvent) => {
+    const list = items.current.filter((b): b is HTMLButtonElement => !!b);
+    const at = list.indexOf(document.activeElement as HTMLButtonElement);
+    const go = (k: number) => {
+      e.preventDefault();
+      list[(k + list.length) % list.length]?.focus();
+    };
+    if (e.key === 'ArrowDown') go(at + 1);
+    else if (e.key === 'ArrowUp') go(at - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(list.length - 1);
+    else if (e.key === 'Tab') setOpen(false);
+  };
+
+  return (
+    <div ref={wrap} className="relative flex">
+      <button type="button" onClick={() => onSend('steer')} disabled={disabled || busy} className={`${halfCls} gap-1.5 rounded-l-full pr-2.5 pl-3.5 text-[13px] font-medium whitespace-nowrap`}>
+        {busy ? <Spinner size={14} /> : <Icon name="send" size={15} strokeWidth={2} />}
+        Steer
+      </button>
+      <button
+        ref={trigger}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="More ways to send"
+        title="More ways to send"
+        disabled={disabled || busy}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+        className={`${halfCls} w-8 justify-center rounded-r-full border-l border-on-ink/25 pr-0.5`}
+      >
+        <Icon name="chevronDown" size={13} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label="Send options"
+          onKeyDown={onMenuKey}
+          className="fade-in absolute right-0 bottom-full z-20 mb-1.5 w-72 max-w-[calc(100vw-1.5rem)] sm:w-80 rounded-lg border border-line bg-surface p-1 shadow-[var(--shadow-menu)]"
+        >
+          {SEND_OPTIONS.map((o, k) => (
+            <button
+              key={o.mode}
+              ref={(el) => {
+                items.current[k] = el;
+              }}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onSend(o.mode);
+              }}
+              className="flex w-full min-w-0 items-start gap-2.5 rounded-md px-2.5 py-2 text-left outline-none hover:bg-surface-2 focus:bg-surface-2"
+            >
+              <Icon name={o.icon} size={14} className="mt-[3px] text-fg-3" />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 text-[13px] font-medium text-fg">{o.label}</span>
+                  {o.keys && (
+                    <span className="hidden shrink-0 items-center gap-0.5 sm:flex">
+                      {o.keys.map((key) => (
+                        <Kbd key={key}>{key}</Kbd>
+                      ))}
+                    </span>
+                  )}
+                </span>
+                <span className="block text-[12px] text-fg-3">{o.hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const finePointer = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: fine)').matches;
+
+/** Follow-up composer pinned under a thread. On a busy thread it steers by default. */
 export function ReplyComposer({
   threadId,
   status,
@@ -212,7 +337,7 @@ export function ReplyComposer({
 }: {
   threadId: string;
   status: string;
-  onSent?: (t: Thread) => void;
+  onSent?: (t: Thread, mode?: SendMode) => void;
   extra?: ReactNode;
 }) {
   const key = `reply:${threadId}`;
@@ -228,17 +353,22 @@ export function ReplyComposer({
   }, [key]);
 
   const busyThread = status === 'running' || status === 'queued';
+  const latest = useRef(text);
+  latest.current = text;
 
-  const submit = async () => {
-    const prompt = text.trim();
+  // `mode` only matters while a turn is in progress; an idle thread just starts the next turn.
+  const submit = async (mode?: SendMode) => {
+    const raw = text;
+    const prompt = raw.trim();
     if (!prompt || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const t = await api.post<Thread>(`/threads/${encodeURIComponent(threadId)}/messages`, { prompt });
-      drafts.delete(key);
-      setText('');
-      onSent?.(t);
+      const t = await api.post<Thread>(`/threads/${encodeURIComponent(threadId)}/messages`, mode ? { prompt, mode } : { prompt });
+      // Keep anything typed while the send was in flight.
+      if (drafts.get(key) === raw) drafts.delete(key);
+      if (latest.current === raw) setText('');
+      onSent?.(t, mode);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -246,37 +376,41 @@ export function ReplyComposer({
     }
   };
 
+  const sendVia = (mode: SendMode) => {
+    if (finePointer()) ref.current?.focus();
+    void submit(mode);
+  };
+
   return (
     <div className={shell('rounded-[24px] bg-elev')}>
       <textarea
         ref={ref}
+        data-reply-composer
         value={text}
         onChange={(e) => {
           setText(e.target.value);
           drafts.set(key, e.target.value);
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            void submit();
-          }
+          if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          void submit(busyThread ? (e.shiftKey ? 'interrupt' : 'steer') : undefined);
         }}
         rows={1}
-        placeholder={busyThread ? 'Queue a follow-up. It runs when the current turn ends.' : 'Reply'}
+        placeholder={busyThread ? 'Steer the agent. It reads this at its next step.' : 'Reply'}
         className="block min-h-[44px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] tracking-[-0.01em] outline-none placeholder:text-fg-4"
       />
       <div className="flex items-center gap-2 px-1">
         {extra}
         <div className="ml-auto flex items-center gap-2.5">
-          {busyThread && (
-            <span className="flex items-center gap-1 text-[11.5px] text-fg-3">
-              <Icon name="clock" size={12} /> {status === 'queued' ? 'Queued' : 'Will queue'}
-            </span>
-          )}
           <Hint />
-          <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>
-            {busyThread ? 'Queue' : 'Send'}
-          </SendButton>
+          {busyThread ? (
+            <SteerButton disabled={!text.trim()} busy={busy} onSend={sendVia} />
+          ) : (
+            <SendButton armed={!!text.trim()} busy={busy} onClick={() => void submit()}>
+              Send
+            </SendButton>
+          )}
         </div>
       </div>
       {error && <ErrorNote className="m-1 mt-2">{error}</ErrorNote>}

@@ -7,6 +7,9 @@ export type Record =
   | { kind: 'tool_use'; payload: { id: string; name: string; input: unknown; parent?: string | null } }
   | { kind: 'tool_result'; payload: { tool_use_id: string; text: string; is_error: boolean; truncated: boolean } }
   | { kind: 'status'; payload: { text: string } }
+  /** One of our own stdin messages, echoed when the CLI adds it to the conversation (--replay-user-messages). */
+  | { kind: 'replay'; payload: { uuid: string; text: string } }
+  | { kind: 'control'; payload: { request_id: string; subtype: string; still_queued: string[] } }
   | {
       kind: 'result';
       payload: { ok: boolean; subtype: string; duration_ms?: number; turns?: number; cost_usd?: number; text?: string };
@@ -76,6 +79,14 @@ export function parseEvent(evt: any): Parsed {
     }
     case 'user': {
       const content = evt.message?.content;
+      if (evt.isReplay) {
+        const text = typeof content === 'string' ? content : Array.isArray(content)
+          ? content.filter((b: Block) => b.type === 'text').map((b: Block) => b.text ?? '').join('\n')
+          : '';
+        out.records.push({ kind: 'replay', payload: { uuid: String(evt.uuid ?? ''), text } });
+        break;
+      }
+      // Tool results only. Interrupt markers ("[Request interrupted by user...]") are plain text blocks and drop out here.
       if (!Array.isArray(content)) break;
       for (const b of content as Block[]) {
         if (b.type !== 'tool_result') continue;
@@ -101,6 +112,19 @@ export function parseEvent(evt: any): Parsed {
         status: info.status,
         updated_at: new Date().toISOString(),
       };
+      break;
+    }
+    case 'control_response': {
+      const r = evt.response ?? {};
+      const queued = r.response?.still_queued;
+      out.records.push({
+        kind: 'control',
+        payload: {
+          request_id: String(r.request_id ?? ''),
+          subtype: String(r.subtype ?? 'unknown'),
+          still_queued: Array.isArray(queued) ? queued.map(String) : [],
+        },
+      });
       break;
     }
     case 'result': {

@@ -33,13 +33,24 @@ export interface ThreadDetail {
   children: Thread[];
   parent: Thread | null;
   pending?: PendingMsg[];
+  /** A warm CLI process is attached (idle or mid-turn), so the next message starts instantly. */
+  live?: boolean;
 }
 
-/** A message waiting for the current turn to end; it enters the transcript when its turn starts. */
+/** How a message reaches a busy thread: read at its next step, run after the turn, or interrupt then run. */
+export type SendMode = 'steer' | 'queue' | 'interrupt';
+
+/**
+ * A message the agent has not seen yet; it enters the transcript when the CLI replays it.
+ * `waiting`: no free slot yet. `sent`: written to the CLI, read at its next step. `held`: runs after this turn.
+ */
 export interface PendingMsg {
+  uuid: string;
   kind: 'user' | 'crew_report';
-  text?: string;
+  text: string;
   source?: string;
+  mode: SendMode;
+  state: 'waiting' | 'sent' | 'held';
   task_id?: string | null;
   role?: string | null;
 }
@@ -323,13 +334,14 @@ export function openSSE(
 export type StreamMessage =
   | { type: 'event'; event: EventRow }
   | { type: 'artifact'; artifact: Artifact }
-  | { type: 'thread'; thread: Thread; pending?: PendingMsg[] };
+  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean };
 
 function classifyStream(d: unknown): StreamMessage | null {
   if (!d || typeof d !== 'object') return null;
   const o = d as Record<string, unknown>;
   if (o.kind === 'artifact' && o.artifact) return { type: 'artifact', artifact: o.artifact as Artifact };
-  if (o.kind === 'thread' && o.thread) return { type: 'thread', thread: o.thread as Thread, pending: o.pending as PendingMsg[] | undefined };
+  if (o.kind === 'thread' && o.thread)
+    return { type: 'thread', thread: o.thread as Thread, pending: o.pending as PendingMsg[] | undefined, live: typeof o.live === 'boolean' ? o.live : undefined };
   if (typeof o.id === 'number' && typeof o.payload === 'string') return { type: 'event', event: o as unknown as EventRow };
   return null;
 }

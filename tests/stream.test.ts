@@ -257,6 +257,106 @@ describe('parseEvent: captured stream sample', () => {
   });
 });
 
+describe('parseEvent: streaming input (replay, control, interrupt)', () => {
+  const replay = (content: unknown, uuid = 'u-1') => ({
+    type: 'user', isReplay: true, uuid, session_id: 's', parent_tool_use_id: null, message: { role: 'user', content },
+  });
+
+  it('maps a replayed message to a replay record carrying our uuid', () => {
+    expect(parseEvent(replay('Change of plan: include PINEAPPLE', 'uuid-42')).records).toEqual([
+      { kind: 'replay', payload: { uuid: 'uuid-42', text: 'Change of plan: include PINEAPPLE' } },
+    ]);
+  });
+
+  it('reads text blocks of a replayed message and skips other blocks', () => {
+    expect(parseEvent(replay([{ type: 'text', text: 'steer' }])).records).toEqual([{ kind: 'replay', payload: { uuid: 'u-1', text: 'steer' } }]);
+    const two = parseEvent(replay([{ type: 'text', text: 'one' }, { type: 'image', source: {} }, { type: 'text', text: 'two' }])).records;
+    expect(two).toHaveLength(1);
+    expect(two[0].kind).toBe('replay');
+    const text = (two[0].payload as { text: string }).text;
+    expect(text).toContain('one');
+    expect(text).toContain('two');
+    expect(text).not.toContain('image');
+  });
+
+  it('maps control_response to a control record with still_queued', () => {
+    const out = parseEvent({
+      type: 'control_response',
+      response: { subtype: 'success', request_id: 'req_int_2', response: { still_queued: ['1111', '2222'] } },
+    });
+    expect(out.records).toEqual([{ kind: 'control', payload: { request_id: 'req_int_2', subtype: 'success', still_queued: ['1111', '2222'] } }]);
+  });
+
+  it('gives an empty still_queued when the CLI lists none, and keeps error subtypes', () => {
+    const empty = parseEvent({ type: 'control_response', response: { subtype: 'success', request_id: 'r1', response: {} } });
+    expect(empty.records).toEqual([{ kind: 'control', payload: { request_id: 'r1', subtype: 'success', still_queued: [] } }]);
+    const err = parseEvent({ type: 'control_response', response: { subtype: 'error', request_id: 'r2', error: 'nope' } });
+    expect(err.records).toMatchObject([{ kind: 'control', payload: { request_id: 'r2', subtype: 'error' } }]);
+  });
+
+  it.each(['[Request interrupted by user for tool use]', '[Request interrupted by user]'])('drops the interrupt marker %s', (text) => {
+    const marker = { type: 'user', session_id: 's', message: { role: 'user', content: [{ type: 'text', text }] } };
+    expect(parseEvent(marker).records).toEqual([]);
+  });
+
+  it('still parses the rejected tool_result of an interrupted tool', () => {
+    const out = parseEvent({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'toolu_9', is_error: true, content: "The user doesn't want to proceed with this tool use." }],
+      },
+    });
+    expect(out.records).toMatchObject([{ kind: 'tool_result', payload: { tool_use_id: 'toolu_9', is_error: true } }]);
+  });
+
+  it.each([
+    { type: 'command_lifecycle', phase: 'turn_end' },
+    { type: 'system', subtype: 'thinking_tokens', tokens: 12 },
+    { type: 'system', subtype: 'task_started', task_id: 't' },
+    { type: 'system', subtype: 'task_notification', task_id: 't', status: 'completed' },
+    { type: 'system', subtype: 'post_turn_summary', status_detail: 'x' },
+    { type: 'system', subtype: 'hook_started', hook_id: 'h' },
+    { type: 'system', subtype: 'hook_response', hook_id: 'h', exit_code: 0 },
+  ])('ignores stream noise %j', (evt) => {
+    expect(parseEvent(evt).records).toEqual([]);
+  });
+
+  // Event sequences from the live probes against claude 2.1.278 (steer contract, section 1).
+  const kinds = (evts: unknown[]) => evts.flatMap((e) => parseEvent(e).records.map((r) => r.kind));
+  const toolUse = { type: 'assistant', parent_tool_use_id: null, message: { content: [{ type: 'tool_use', id: 'toolu_1', name: 'Bash', input: { command: 'sleep 8' } }] } };
+  const toolResult = (text: string, is_error = false) => ({
+    type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: text, is_error }] },
+  });
+
+  it('turns the steer-mid-tool probe into the records the runner consumes', () => {
+    expect(
+      kinds([
+        { type: 'system', subtype: 'init', session_id: 's' },
+        replay('Run the loop', 'u1'),
+        toolUse,
+        toolResult('tick 1..8'),
+        replay('Change of plan', 'u2'),
+        { type: 'assistant', parent_tool_use_id: null, message: { content: [{ type: 'text', text: 'Done, PINEAPPLE.' }] } },
+        { type: 'result', subtype: 'success', is_error: false, num_turns: 2, result: 'Done, PINEAPPLE.' },
+        { type: 'command_lifecycle' },
+      ]),
+    ).toEqual(['init', 'replay', 'tool_use', 'tool_result', 'replay', 'assistant_text', 'result']);
+  });
+
+  it('turns the interrupt probe into the records the runner consumes', () => {
+    expect(
+      kinds([
+        toolUse,
+        { type: 'control_response', response: { subtype: 'success', request_id: 'req_int_1', response: { still_queued: [] } } },
+        toolResult("The user doesn't want to proceed with this tool use.", true),
+        { type: 'user', message: { role: 'user', content: [{ type: 'text', text: '[Request interrupted by user for tool use]' }] } },
+        { type: 'result', subtype: 'error_during_execution', is_error: true, num_turns: 3 },
+      ]),
+    ).toEqual(['tool_use', 'control', 'tool_result', 'result']);
+  });
+});
+
 describe('LineSplitter', () => {
   it('reassembles lines split across chunks', () => {
     const s = new LineSplitter();

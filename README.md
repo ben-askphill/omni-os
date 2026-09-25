@@ -30,7 +30,7 @@ Config is optional, see `.env.example` (brain dir, default model, concurrency, p
 
 ## How a thread runs
 
-Each message spawns `claude -p --output-format stream-json` with:
+Each thread gets one long-lived `claude -p --input-format stream-json --output-format stream-json` process. Messages go in on stdin, the process runs many turns and stays warm for `OMNI_KEEPALIVE_SECONDS` (default 10 minutes) after the last one, so a follow-up starts instantly. It is launched with:
 
 | Piece | What |
 | --- | --- |
@@ -43,9 +43,17 @@ Each message spawns `claude -p --output-format stream-json` with:
 
 Every stream event is stored in SQLite (`data/omni.db`) and pushed to the UI over SSE. The CLI's rate-limit events drive the 5h / 7d usage meter.
 
-Messages sent while a thread is busy are queued: they show as "Queued" under the live output and enter the transcript when their turn starts. Stop cancels the current turn and drops anything queued.
+Messages sent while a thread is busy:
 
-To continue a thread in a terminal or Claude Desktop: `cd <cwd> && claude --resume <session id>` (the thread's Details panel has a copy button).
+| Mode | What happens |
+| --- | --- |
+| Steer (default, Cmd/Ctrl+Enter) | Written to the CLI now. The agent reads it at its next step (after the running tool) and keeps going |
+| Queue for after this turn | Held by Omni, runs as a new turn once the current one ends |
+| Interrupt and send (Cmd/Ctrl+Shift+Enter) | Stops the current step, then runs the message |
+
+Pending messages show under the live output and enter the transcript at the point the agent actually read them. Interrupt (header button or Esc) stops the turn but keeps the process and its context. Steers already sent still run; queued ones are recorded as "Not sent". A CLI that does not stop within `OMNI_INTERRUPT_GRACE_MS` is killed. Only turns in progress count toward `OMNI_MAX_CONCURRENT`; warm idle processes do not.
+
+To continue a thread in a terminal or Claude Desktop: `cd <cwd> && claude --resume <session id>` (the thread's Details panel has a copy button). Check there that the session is no longer warm first, so two processes do not write the same session.
 
 ## Crew and conductor
 

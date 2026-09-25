@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { streamSSE } from 'hono/streaming';
@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { config, paths } from './config.ts';
 import { channels, threads, events, artifacts, search, type Thread } from './db.ts';
 import { bus } from './bus.ts';
-import { createThread, sendMessage, stopThread, getUsage, runningCount, queuedCount, pendingFor } from './runner.ts';
+import { createThread, sendMessage, interruptThread, getUsage, runningCount, queuedCount, pendingFor, isLive, shutdownAll } from './runner.ts';
 import { listCrew } from './crew.ts';
 import { listSecrets, setSecret, deleteSecret } from './secrets.ts';
 import { startArtifactWatcher, mimeFor } from './artifacts.ts';
@@ -111,6 +111,7 @@ api.get('/threads/:id', (c) => {
     children: threads.children(t.id),
     parent: t.parent_id ? threads.get(t.parent_id) : null,
     pending: pendingFor(t.id),
+    live: isLive(t.id),
   });
 });
 
@@ -126,16 +127,23 @@ api.get('/threads/:id/summary', (c) => {
 });
 
 api.post('/threads/:id/messages', async (c) => {
-  const { prompt, from } = z
-    .object({ prompt: z.string().min(1), from: z.enum(['ben', 'conductor']).default('ben') })
+  const { prompt, from, mode } = z
+    .object({
+      prompt: z.string().min(1),
+      from: z.enum(['ben', 'conductor']).default('ben'),
+      // steer: read at the agent's next step. queue: after this turn. interrupt: stop the turn, then run it.
+      mode: z.enum(['steer', 'queue', 'interrupt']).default('steer'),
+    })
     .parse(await c.req.json());
-  return c.json(sendMessage(c.req.param('id'), prompt, from));
+  return c.json(sendMessage(c.req.param('id'), prompt, { from, mode }));
 });
 
-api.post('/threads/:id/stop', (c) => {
-  stopThread(c.req.param('id'));
-  return c.json({ ok: true });
-});
+const interrupt = (c: Context) => {
+  const t = interruptThread(c.req.param('id')!);
+  return t ? c.json(t) : c.json({ error: 'not found' }, 404);
+};
+api.post('/threads/:id/stop', interrupt);
+api.post('/threads/:id/interrupt', interrupt);
 
 api.get('/threads/:id/stream', (c) => {
   const id = c.req.param('id');
@@ -148,7 +156,8 @@ api.get('/threads/:id/stream', (c) => {
       wake?.();
     };
     bus.on(`thread:${id}`, onEvent);
-    const onFeed = (e: any) => e.type === 'thread' && (e.thread as Thread).id === id && onEvent({ kind: 'thread', thread: e.thread, pending: pendingFor(id) });
+    const onFeed = (e: any) =>
+      e.type === 'thread' && (e.thread as Thread).id === id && onEvent({ kind: 'thread', thread: e.thread, pending: pendingFor(id), live: isLive(id) });
     bus.on('feed', onFeed);
     stream.onAbort(() => {
       bus.off(`thread:${id}`, onEvent);
@@ -269,6 +278,19 @@ if (interrupted) console.log(`[omni] marked ${interrupted} interrupted thread(s)
 startArtifactWatcher();
 startScheduler();
 
-serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
+const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
   console.log(`[omni] listening on http://${config.host}:${info.port}  brain=${config.brainDir}`);
 });
+
+// Close warm claude processes so none outlive the server. A second signal exits at once.
+let exiting = false;
+const shutdown = (sig: string) => {
+  if (exiting) process.exit(1);
+  exiting = true;
+  console.log(`[omni] ${sig}, closing live sessions`);
+  server.close();
+  setTimeout(() => process.exit(0), 6000).unref();
+  void shutdownAll().finally(() => process.exit(0));
+};
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
