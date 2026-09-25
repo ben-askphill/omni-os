@@ -6,6 +6,7 @@
 // a steer and stops the thread by killing the holder (the next message resumes the chat).
 import { spawn, type ChildProcess } from 'node:child_process';
 import { artifactsDir, threadDir } from '../../config.ts';
+import { writeCursorPlugin } from '../../sandbox.ts';
 import { describeAttachments, type Attachment } from '../../uploads.ts';
 import { LineSplitter } from '../../stream.ts';
 import { harnessEnv } from '../env-guard.ts';
@@ -62,6 +63,8 @@ export const cursorAdapter: HarnessAdapter = {
     const resume = ctx.resume || thread.session_id !== thread.id;
     let chatId: string | null = resume ? thread.session_id : null;
     const modelId = thread.model ? cursorModelId(thread.model, thread.effort || '') : 'auto';
+    // Omni's MCP servers load from a per-thread plugin folder; nothing touches the repo or ~/.cursor.
+    const pluginDir = writeCursorPlugin({ threadId: thread.id, channel: ctx.channel, role: ctx.role, browserBusy: ctx.browserBusy, omniUrl: ctx.omniUrl });
 
     // A persistent holder keeps the runner's warm-process logic happy between per-turn runs.
     const holder = spawn('sh', ['-c', 'exec cat >/dev/null'], { stdio: ['pipe', 'pipe', 'pipe'] });
@@ -86,7 +89,7 @@ export const cursorAdapter: HarnessAdapter = {
       if (m.attachments.length) prompt += `\n\n${describeAttachments(m.attachments)}`;
       if (addContext) prompt = `${ctx.systemPrompt}\n\n---\n\n${prompt}`;
 
-      const args = ['-p', '--output-format', 'stream-json', '--model', modelId, '--trust', '--force', '--sandbox', 'disabled', '--approve-mcps'];
+      const args = ['-p', '--output-format', 'stream-json', '--model', modelId, '--trust', '--force', '--sandbox', 'disabled', '--approve-mcps', '--plugin-dir', pluginDir];
       if (chatId) args.push('--resume', chatId);
       args.push(prompt);
 

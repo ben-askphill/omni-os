@@ -91,6 +91,20 @@ export function writeMcpConfig(input: McpInput): string | null {
   return file;
 }
 
+/**
+ * Cursor loads Omni's MCP servers from a per-thread plugin folder in the thread's data dir:
+ * `.cursor-plugin/plugin.json` with a name, plus `.mcp.json` in Claude's MCP config shape.
+ * Nothing is written to the repo or `~/.cursor`, and no secret value goes into the folder.
+ */
+export function writeCursorPlugin(input: McpInput): string {
+  const cfg = buildMcpConfig(input);
+  const dir = join(threadDir(input.threadId), 'cursor-plugin');
+  mkdirSync(join(dir, '.cursor-plugin'), { recursive: true });
+  writeFileSync(join(dir, '.cursor-plugin', 'plugin.json'), JSON.stringify({ name: 'omni-os', version: '0.1.0' }, null, 2));
+  writeFileSync(join(dir, '.mcp.json'), JSON.stringify(cfg, null, 2));
+  return dir;
+}
+
 export async function removeWorktree(repoPath: string, dir: string) {
   await run('git', ['-C', repoPath, 'worktree', 'remove', '--force', dir]).catch(() => {});
 }
