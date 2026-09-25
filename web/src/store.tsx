@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, openSSE, errorText, type ChannelWithRunning, type CrewRole, type FeedEvent, type Status, type Usage } from './api.ts';
+import { api, openSSE, errorText, type ChannelWithRunning, type CrewRole, type FeedEvent, type Status, type ThreadStub, type Usage } from './api.ts';
 
 interface AppState {
   channels: ChannelWithRunning[];
@@ -12,9 +12,9 @@ interface AppState {
   feedLive: boolean;
   subscribe: (fn: (e: FeedEvent) => void) => () => void;
   channel: (id: string) => ChannelWithRunning | undefined;
-  /** Channel of the thread currently open, so the sidebar can highlight it. */
-  threadChannel: string | null;
-  setThreadChannel: (id: string | null) => void;
+  /** The thread currently open, so the sidebar can list and highlight it under its channel. */
+  openThread: ThreadStub | null;
+  setOpenThread: (t: ThreadStub | null) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -27,7 +27,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [status, setStatus] = useState<Omit<Status, 'usage'> | null>(null);
   const [feedLive, setFeedLive] = useState(false);
-  const [threadChannel, setThreadChannel] = useState<string | null>(null);
+  const [openThread, setOpenThread] = useState<ThreadStub | null>(null);
   const listeners = useRef(new Set<(e: FeedEvent) => void>());
 
   const reloadChannels = useCallback(async () => {
@@ -124,10 +124,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       feedLive,
       subscribe,
       channel: (id: string) => channels.find((c) => c.id === id),
-      threadChannel,
-      setThreadChannel,
+      openThread,
+      setOpenThread,
     }),
-    [channels, channelsLoaded, channelsError, reloadChannels, crew, usage, status, feedLive, subscribe, threadChannel],
+    [channels, channelsLoaded, channelsError, reloadChannels, crew, usage, status, feedLive, subscribe, openThread],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

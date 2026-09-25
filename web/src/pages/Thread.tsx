@@ -272,7 +272,7 @@ function DetailsTab({
 // ---------- page ----------
 
 export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifact?: number }) {
-  const { setThreadChannel } = useApp();
+  const { setOpenThread } = useApp();
   const isMobile = useIsMobile();
   const [thread, setThread] = useState<Thread | null>(null);
   const [channel, setChannel] = useState<Channel | undefined>(undefined);
@@ -392,10 +392,11 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     }
   }, [artifactParam]);
 
+  // The sidebar keeps this thread listed under its channel, with live title and status, even once it stops.
   useEffect(() => {
-    if (thread) setThreadChannel(thread.channel_id);
-  }, [thread?.channel_id]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => setThreadChannel(null), [setThreadChannel]);
+    if (thread) setOpenThread({ id: thread.id, channel_id: thread.channel_id, title: thread.title, status: thread.status, created_at: thread.created_at });
+  }, [thread?.id, thread?.channel_id, thread?.title, thread?.status, thread?.created_at]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => setOpenThread(null), [setOpenThread]);
 
   const live = useThreadStream(
     id,
