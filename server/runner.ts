@@ -3,13 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { readFileSync } from 'node:fs';
 import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
-import { channels, events, threads, kv, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
+import { channels, events, threads, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
 import { prepareWorkdir, writeMcpConfig } from './sandbox.ts';
 import { describeAttachments, inlinable, messageContent, saveUploads, type Attachment } from './uploads.ts';
 import { secretsEnv } from './secrets.ts';
-import { type Usage, type Record as StreamRecord } from './stream.ts';
+import { type Record as StreamRecord } from './stream.ts';
 import { publishFeed, publishThread } from './bus.ts';
+import { recordUsage } from './usage.ts';
 import { harnessEnv } from './harness/env-guard.ts';
 import { CAPABILITIES, isHarnessId, type HarnessId } from './harness/types.ts';
 import { getHarness, validateRun } from './harness/catalog.ts';
@@ -27,6 +28,22 @@ const ADAPTERS: Record<string, HarnessAdapter> = {
 const adapterFor = (harness: string): HarnessAdapter => ADAPTERS[harness] ?? claudeAdapter;
 const capsOf = (harness: string) => CAPABILITIES[harness as HarnessId] ?? CAPABILITIES['claude-code'];
 const harnessSteers = (threadId: string) => capsOf(threads.get(threadId)?.harness ?? 'claude-code').steer;
+
+/** The concurrency cap for a harness. Claude Code uses OMNI_MAX_CONCURRENT. */
+const CAPS: Record<string, number> = {
+  'claude-code': config.maxConcurrent,
+  codex: config.maxConcurrentCodex,
+  cursor: config.maxConcurrentCursor,
+};
+const capFor = (harness: string) => CAPS[harness] ?? config.maxConcurrent;
+
+/** Running turns and cap per harness, for the usage card footer and the status endpoint. */
+export function slotsByHarness(): Record<string, { running: number; cap: number }> {
+  const running = runningByHarness();
+  const out: Record<string, { running: number; cap: number }> = {};
+  for (const h of Object.keys(CAPS)) out[h] = { running: running[h] ?? 0, cap: capFor(h) };
+  return out;
+}
 /** The CLI name a harness shows in errors and the resume command. */
 const CLI_LABEL: Record<string, string> = { 'claude-code': 'claude', codex: 'codex', cursor: 'cursor-agent' };
 const cliLabel = (harness: string) => CLI_LABEL[harness] ?? harness;
@@ -198,16 +215,25 @@ function deliver(threadId: string, m: Msg) {
   emitThread(threadId);
 }
 
+/** Concurrency is counted per harness; a full harness never blocks another. */
 function pump() {
   if (shuttingDown) return;
-  for (let i = 0; i < waiting.length && runningCount() < config.maxConcurrent; ) {
+  const running = runningByHarness();
+  for (let i = 0; i < waiting.length; ) {
     const id = waiting[i];
     // Its old process is still exiting; start fresh once it is gone.
     if (lives.get(id)?.closing) {
       i++;
       continue;
     }
+    const harness = threads.get(id)?.harness ?? 'claude-code';
+    // Harness at its cap: leave this thread queued and try others (arrival order within a harness).
+    if ((running[harness] ?? 0) >= capFor(harness)) {
+      i++;
+      continue;
+    }
     waiting.splice(i, 1);
+    running[harness] = (running[harness] ?? 0) + 1;
     const msgs = waitingMsgs.get(id) ?? [];
     waitingMsgs.delete(id);
     if (msgs.length) begin(id, msgs);
@@ -552,10 +578,7 @@ async function spawnLive(live: Live, thread: Thread) {
   };
   const session = adapterFor(thread.harness).spawn(ctx, {
     record: (rec) => onRecord(live, rec),
-    usage: (u) => {
-      kv.set('usage', u);
-      publishFeed({ type: 'usage', usage: u });
-    },
+    usage: (u) => recordUsage(thread.harness as HarnessId, u),
     session: (sid) => {
       live.sessionId = sid;
       const t = threads.get(thread.id);
@@ -817,7 +840,6 @@ export async function shutdownAll() {
   }
 }
 
-export const getUsage = () => kv.get<Usage>('usage') ?? null;
 
 function fallbackTitle(prompt: string) {
   const first = prompt.trim().split('\n')[0].replace(/\s+/g, ' ');

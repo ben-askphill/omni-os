@@ -117,4 +117,4 @@ data/        gitignored: db, thread dirs, worktrees, browser profiles, logs
 - Only one live thread per channel gets the persistent browser profile; parallel ones get an isolated browser.
 - Worktrees are not cleaned up automatically yet (`git worktree prune` in the repo).
 - The run queue lives in memory. Restarting the server marks running threads failed and drops queued follow-ups; resend them.
-- Subscription limits still apply. Concurrency is capped at 4 by default (`OMNI_MAX_CONCURRENT`).
+- Subscription limits still apply. Each harness has its own concurrency cap (4 by default): `OMNI_MAX_CONCURRENT` (Claude Code), `OMNI_MAX_CONCURRENT_CODEX`, `OMNI_MAX_CONCURRENT_CURSOR`. A full harness never holds up threads on another.
