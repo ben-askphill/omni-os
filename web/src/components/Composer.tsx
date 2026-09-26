@@ -243,7 +243,7 @@ export function NewThreadComposer({
   const [role, setRole] = useState<string>(() => ((channelId ?? defaultChannel) === 'conductor' ? 'conductor' : ''));
   const [choice, setChoice] = useState<ModelChoice>({ harness: 'claude-code', model: '' });
   const [effort, setEffort] = useState('');
-  const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
+  const { data: harnesses, reload: reloadHarnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -358,6 +358,7 @@ export function NewThreadComposer({
         {harnesses && (
           <ModelPicker
             harnesses={harnesses}
+            onOpen={reloadHarnesses}
             value={choice}
             onChange={(c) => {
               setChoice(c);

@@ -1,6 +1,7 @@
-// The live catalog: it probes the CLIs at server start and every 15 minutes, keeping the
-// last good list when a refresh fails, so the picker never goes empty. The pure assembly
-// lives in catalog.ts; this file does the I/O.
+// The live catalog: it probes the CLIs at server start and every 15 minutes. A harness that
+// is down is probed again on demand (freshCatalog, at most every 10 seconds), so a
+// `codex login` shows up the next time the picker opens instead of at the next refresh.
+// The pure assembly lives in catalog.ts; this file does the I/O.
 import { execFile } from 'node:child_process';
 import { config } from '../config.ts';
 import { CodexClient } from './codex/client.ts';
@@ -18,12 +19,17 @@ import { cursorBin } from './cursor/bin.ts';
 import { parseCursorModels } from './cursor/models.ts';
 import { harnessEnv } from './env-guard.ts';
 import { recordUsage } from '../usage.ts';
-import { type HarnessId, type HarnessInfo } from './types.ts';
-import { claudeHarness, codexHarness, cursorHarness, type Catalog, type CodexProbe, type CursorProbe } from './catalog.ts';
+import { HARNESS_IDS, type HarnessId, type HarnessInfo } from './types.ts';
+import { claudeHarness, codexHarness, cursorHarness, getHarness, type Catalog, type CodexProbe, type CursorProbe } from './catalog.ts';
 
 type Probe = CodexProbe & { rateLimits?: RateLimits };
 
+/** How long a harness that is down stays down before a request probes it again. */
+const RECHECK_MS = 10_000;
+
 let current: Catalog | null = null;
+let loading: Promise<Catalog> | null = null;
+let checkedAt = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 const caps = (): Record<HarnessId, number> => ({
@@ -107,24 +113,36 @@ export async function probeCodex(bin = codexBin()): Promise<Probe> {
   });
 }
 
-export async function loadCatalog(): Promise<Catalog> {
-  const c = caps();
-  const harnesses: HarnessInfo[] = [claudeHarness(c['claude-code'], config.defaultModel)];
-  try {
-    const probe = await probeCodex();
-    harnesses.push(codexHarness(probe, c.codex));
-    // Read Codex plan usage at startup and on every refresh; live turns keep it current.
-    if (probe.available && probe.rateLimits) recordUsage('codex', normalizeRateLimits(probe.rateLimits));
-  } catch {
-    harnesses.push(codexHarness({ available: false, models: [] }, c.codex));
-  }
-  try {
-    harnesses.push(cursorHarness(await probeCursor(), c.cursor));
-  } catch {
-    harnesses.push(cursorHarness({ available: false, models: [] }, c.cursor));
-  }
-  current = { harnesses };
-  return current;
+async function probeCodexHarness(cap: number): Promise<HarnessInfo> {
+  const probe = await probeCodex().catch((): Probe => ({ available: false, models: [] }));
+  // Read Codex plan usage at startup and on every refresh; live turns keep it current.
+  if (probe.available && probe.rateLimits) recordUsage('codex', normalizeRateLimits(probe.rateLimits));
+  return codexHarness(probe, cap);
+}
+
+async function probeCursorHarness(cap: number): Promise<HarnessInfo> {
+  return cursorHarness(await probeCursor().catch((): CursorProbe => ({ available: false, models: [] })), cap);
+}
+
+/**
+ * Probe the harnesses in `only` (all by default) and keep the others as they are. A call while
+ * a load is running joins that load.
+ */
+export function loadCatalog(only: HarnessId[] = HARNESS_IDS): Promise<Catalog> {
+  loading ??= (async () => {
+    const c = caps();
+    const keep = (id: HarnessId) => getHarness(getCatalog(), id)!;
+    const [codex, cursor] = await Promise.all([
+      only.includes('codex') ? probeCodexHarness(c.codex) : keep('codex'),
+      only.includes('cursor') ? probeCursorHarness(c.cursor) : keep('cursor'),
+    ]);
+    current = { harnesses: [claudeHarness(c['claude-code'], config.defaultModel), codex, cursor] };
+    checkedAt = Date.now();
+    return current;
+  })().finally(() => {
+    loading = null;
+  });
+  return loading;
 }
 
 /** The current catalog, or a best-effort default (Claude only) before the first load. */
@@ -138,6 +156,17 @@ export function getCatalog(): Catalog {
       cursorHarness({ available: false, models: [] }, c.cursor),
     ],
   };
+}
+
+/**
+ * The catalog after probing again any harness that is down, if it was last probed over
+ * RECHECK_MS ago. Waits for a load that is already running. For the picker and thread start.
+ */
+export async function freshCatalog(): Promise<Catalog> {
+  if (loading) return loading;
+  const down = getCatalog().harnesses.filter((h) => !h.available).map((h) => h.id);
+  if (!down.length || Date.now() - checkedAt < RECHECK_MS) return getCatalog();
+  return loadCatalog(down);
 }
 
 export function startCatalogRefresh() {
