@@ -18,6 +18,7 @@ const codexProbe: CodexProbe = {
   models: [
     { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'medium' },
     { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', efforts: ['low', 'medium', 'high'], defaultEffort: 'medium' },
+    { id: 'gpt-6-astra', label: 'GPT-6 Astra', efforts: ['low', 'medium'], defaultEffort: 'low', isDefault: true },
   ],
 };
 
@@ -51,8 +52,15 @@ describe('codex catalog', () => {
     expect(def?.defaultEffort).toBe('high'); // config effort wins over the model's own default
   });
 
-  it('falls back to the model default effort for non-config models', () => {
+  it('applies the config effort to every model that supports it, as Codex does', () => {
     const h = codexHarness(codexProbe, 4);
+    expect(h.models.find((m) => m.id === 'gpt-5.6-terra')?.defaultEffort).toBe('high');
+    expect(h.models.find((m) => m.id === 'gpt-6-astra')?.defaultEffort).toBe('low'); // has no "high"
+  });
+
+  it("falls back to Codex's own default model when config.toml names none", () => {
+    const h = codexHarness({ ...codexProbe, defaultModel: undefined, defaultEffort: undefined }, 4);
+    expect(h.models.filter((m) => m.default).map((m) => m.id)).toEqual(['gpt-6-astra']);
     expect(h.models.find((m) => m.id === 'gpt-5.6-terra')?.defaultEffort).toBe('medium');
   });
 

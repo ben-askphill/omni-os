@@ -30,7 +30,15 @@ describe('codex failures', () => {
     const t = await H.start('BADTURN please', codex);
     await H.untilResults(t.id, 1, 12000);
     expect(H.thread(t.id).status).toBe('failed');
-    const statuses = H.byKind(t.id, 'status');
-    expect(statuses.some((s) => /resets at/i.test(String(s.p.text)))).toBe(true);
+    // The API's JSON error body, unwrapped to its message, in the transcript.
+    expect(H.texts(t.id, 'error')).toEqual(["You've hit your usage limit. It resets at 5:00 PM."]);
+  });
+
+  it('shows an error Codex retries by itself as progress, and the turn carries on', async () => {
+    const t = await H.start('RETRY then answer', codex);
+    await H.untilResults(t.id, 1);
+    expect(H.thread(t.id).status).toBe('done');
+    expect(H.texts(t.id, 'status')).toContain('Reconnecting... 1/5');
+    expect(H.byKind(t.id, 'error')).toEqual([]);
   });
 });

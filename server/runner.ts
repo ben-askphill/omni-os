@@ -14,7 +14,8 @@ import { recordUsage } from './usage.ts';
 import { harnessEnv } from './harness/env-guard.ts';
 import { CAPABILITIES, type HarnessId } from './harness/types.ts';
 import { resolveRun } from './harness/resolve.ts';
-import { getCatalog } from './harness/catalog-service.ts';
+import type { Catalog } from './harness/catalog.ts';
+import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import type { AdapterContext, HarnessAdapter } from './harness/adapter.ts';
 import { claudeAdapter } from './harness/claude/adapter.ts';
 import { codexAdapter } from './harness/codex/adapter.ts';
@@ -703,11 +704,15 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   if (!channel) throw new Error(`unknown channel "${channelId}"`);
 
   // Resolve harness/model/effort: the thread's own choice, then the role's default, then Claude Code.
-  const run = resolveRun(
-    { harness: input.harness, model: input.model, effort: input.effort },
-    role ? { harness: role.harness, model: role.model, effort: role.effort } : undefined,
-    getCatalog(),
-  );
+  // On a miss, probe the harnesses that are down and try again: Ben may have just logged in.
+  const resolve = (cat: Catalog) =>
+    resolveRun(
+      { harness: input.harness, model: input.model, effort: input.effort },
+      role ? { harness: role.harness, model: role.model, effort: role.effort } : undefined,
+      cat,
+    );
+  let run = resolve(getCatalog());
+  if (!run.ok) run = resolve(await freshCatalog());
   if (!run.ok) throw new Error(run.error);
   const harness = run.harness;
   const effort = run.effort;

@@ -51,7 +51,7 @@ describe('codex steer, interrupt and images', () => {
     await H.untilResults(t.id, 1);
     const start = H.codexRequests().find((r) => r.method === 'turn/start' && r.thread_id === t.id);
     const textItem = start.params.input.find((i: any) => i.type === 'text');
-    expect(textItem.text).toContain('notes.txt');
+    expect(textItem).toMatchObject({ text: expect.stringContaining('notes.txt'), text_elements: [] });
     expect(start.params.input.some((i: any) => i.type === 'localImage')).toBe(false);
   });
 });

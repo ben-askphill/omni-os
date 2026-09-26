@@ -7,6 +7,8 @@ export type Record =
   | { kind: 'tool_use'; payload: { id: string; name: string; input: unknown; parent?: string | null } }
   | { kind: 'tool_result'; payload: { tool_use_id: string; text: string; is_error: boolean; truncated: boolean } }
   | { kind: 'status'; payload: { text: string } }
+  /** Why a turn failed, shown in the transcript. A harness adapter's own; Claude's errors arrive as text. */
+  | { kind: 'error'; payload: { text: string } }
   /** One of our own stdin messages, echoed when the CLI adds it to the conversation (--replay-user-messages). */
   | { kind: 'replay'; payload: { uuid: string; text: string } }
   | { kind: 'control'; payload: { request_id: string; subtype: string; still_queued: string[] } }

@@ -1,3 +1,5 @@
+Available models
+
 auto - Auto
 composer-2.5 - Composer 2.5
 composer-2.5-fast - Composer 2.5 (Fast)
@@ -12,3 +14,4 @@ gemini-3.8-flash-high - Gemini 3.8 Flash (high)
 claude-opus-5-5-high - Claude Opus 5.5 (high)
 claude-opus-5-5-max - Claude Opus 5.5 (max)
 claude-sonnet-5-thinking-high - Claude Sonnet 5 Thinking (high)
+Tip: use --model <id> (or /model <id> in interactive mode) to switch. Parameterized models also accept quoted overrides.

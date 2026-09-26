@@ -36,14 +36,17 @@ export function cursorModelId(family: string, effort: string): string {
   return `${family}-${effort}`;
 }
 
-/** Parse the `--list-models` output ("id - Label" or "id" per line) into catalog families. */
+/**
+ * Parse the `--list-models` output ("id - Label" or "id" per line) into catalog families. The
+ * "Available models" header and the closing "Tip: ..." line have spaces, which no id has.
+ */
 export function parseCursorModels(listOutput: string): ModelEntry[] {
   const ids = listOutput
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)
     .map((l) => l.split(/\s+-\s+/)[0].trim())
-    .filter(Boolean);
+    .filter((id) => /^\S+$/.test(id));
 
   const efforts = new Map<string, Set<string>>();
   let hasAuto = false;

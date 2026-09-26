@@ -61,7 +61,8 @@ export interface CodexProbe {
   /** From config/read: Ben's default model and effort, when set. */
   defaultModel?: string;
   defaultEffort?: string;
-  models: { id: string; label?: string; efforts: string[]; defaultEffort?: string }[];
+  /** `isDefault` is Codex's own default model, used when config.toml names none. */
+  models: { id: string; label?: string; efforts: string[]; defaultEffort?: string; isDefault?: boolean }[];
 }
 
 export function codexHarness(probe: CodexProbe, cap: number): HarnessInfo {
@@ -78,11 +79,15 @@ export function codexHarness(probe: CodexProbe, cap: number): HarnessInfo {
     id: m.id,
     label: m.label ?? m.id,
     efforts: m.efforts,
-    // Ben's configured effort wins for his configured model; otherwise the model's own default.
+    // Ben's configured effort applies to every model that supports it, as it does in Codex.
     defaultEffort:
-      (probe.defaultModel === m.id && probe.defaultEffort) || m.defaultEffort || m.efforts[0] || '',
+      (probe.defaultEffort && m.efforts.includes(probe.defaultEffort) ? probe.defaultEffort : '') ||
+      m.defaultEffort ||
+      m.efforts[0] ||
+      '',
   }));
-  const def = models.find((m) => m.id === probe.defaultModel) ?? models[0];
+  const def =
+    models.find((m) => m.id === probe.defaultModel) ?? models.find((_, i) => probe.models[i].isDefault) ?? models[0];
   if (def) def.default = true;
   return { ...base, available: true, models };
 }

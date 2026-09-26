@@ -1,22 +1,35 @@
-// The live catalog: it probes the CLIs at server start and every 15 minutes, keeping the
-// last good list when a refresh fails, so the picker never goes empty. The pure assembly
-// lives in catalog.ts; this file does the I/O.
+// The live catalog: it probes the CLIs at server start and every 15 minutes. A harness that
+// is down is probed again on demand (freshCatalog, at most every 10 seconds), so a
+// `codex login` shows up the next time the picker opens instead of at the next refresh.
+// The pure assembly lives in catalog.ts; this file does the I/O.
 import { execFile } from 'node:child_process';
 import { config } from '../config.ts';
 import { CodexClient } from './codex/client.ts';
 import { codexBin } from './codex/bin.ts';
-import { normalizeRateLimits } from './codex/normalize.ts';
-import type { RateLimits } from './codex/protocol.ts';
+import { PLAN_LIMIT_ID, normalizeRateLimits } from './codex/normalize.ts';
+import type {
+  CodexModel,
+  ConfigReadResponse,
+  GetAccountRateLimitsResponse,
+  GetAccountResponse,
+  ModelListResponse,
+  RateLimits,
+} from './codex/protocol.ts';
 import { cursorBin } from './cursor/bin.ts';
 import { parseCursorModels } from './cursor/models.ts';
 import { harnessEnv } from './env-guard.ts';
 import { recordUsage } from '../usage.ts';
-import { type HarnessId, type HarnessInfo } from './types.ts';
-import { claudeHarness, codexHarness, cursorHarness, type Catalog, type CodexProbe, type CursorProbe } from './catalog.ts';
+import { HARNESS_IDS, type HarnessId, type HarnessInfo } from './types.ts';
+import { claudeHarness, codexHarness, cursorHarness, getHarness, type Catalog, type CodexProbe, type CursorProbe } from './catalog.ts';
 
 type Probe = CodexProbe & { rateLimits?: RateLimits };
 
+/** How long a harness that is down stays down before a request probes it again. */
+const RECHECK_MS = 10_000;
+
 let current: Catalog | null = null;
+let loading: Promise<Catalog> | null = null;
+let checkedAt = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 const caps = (): Record<HarnessId, number> => ({
@@ -38,7 +51,7 @@ export async function probeCursor(bin = cursorBin()): Promise<CursorProbe> {
   });
 }
 
-/** Probe `codex app-server` for account, config defaults, the model list and rate limits. */
+/** Probe `codex app-server` for the account, config defaults, the model list and rate limits. */
 export async function probeCodex(bin = codexBin()): Promise<Probe> {
   const unavailable: Probe = { available: false, models: [] };
   if (!bin) return unavailable;
@@ -49,6 +62,8 @@ export async function probeCodex(bin = codexBin()): Promise<Probe> {
       env: harnessEnv('codex', {}),
       onExit: () => finish(unavailable),
     });
+    // A binary that can't be run (a stale OMNI_CODEX_BIN) is an error event, not an exit.
+    client.child.on('error', () => finish(unavailable));
     const finish = (r: Probe) => {
       if (settled) return;
       settled = true;
@@ -61,18 +76,36 @@ export async function probeCodex(bin = codexBin()): Promise<Probe> {
       try {
         await client.request('initialize', { clientInfo: { name: 'omni-os', version: '0.1.0' } });
         client.notify('initialized', {});
-        const account = await client.request<{ type?: string; planType?: string }>('account/read').catch(() => null);
-        if (!account || (account.type && account.type !== 'chatgpt')) return finish(unavailable);
-        const cfg = await client.request<{ model?: string; effort?: string }>('config/read').catch(() => ({} as { model?: string; effort?: string }));
-        const list = await client.request<{ models?: any[] }>('model/list');
-        const rateLimits = await client.request<RateLimits>('account/rateLimits/read').catch(() => undefined);
-        const models = (list?.models ?? []).map((m) => ({
-          id: m.id,
-          label: m.displayName ?? m.id,
-          efforts: m.supportedReasoningEfforts ?? [],
-          defaultEffort: m.defaultReasoningEffort,
-        }));
-        finish({ available: true, planType: account?.planType, defaultModel: cfg?.model, defaultEffort: cfg?.effort, models, rateLimits });
+        // Omni runs Codex on the ChatGPT plan only, so an API key login counts as logged out.
+        const { account } = await client.request<GetAccountResponse>('account/read', {});
+        if (account?.type !== 'chatgpt') return finish(unavailable);
+        const cfg = (await client.request<ConfigReadResponse>('config/read', {}).catch(() => null))?.config;
+        const listed: CodexModel[] = [];
+        let cursor: string | null = null;
+        do {
+          const page: ModelListResponse = await client.request<ModelListResponse>('model/list', { cursor, includeHidden: true });
+          listed.push(...page.data);
+          cursor = page.nextCursor;
+        } while (cursor);
+        const rl = await client.request<GetAccountRateLimitsResponse>('account/rateLimits/read', {}).catch(() => null);
+        // Codex's own picker hides some models; so does Omni's, unless config.toml picks one.
+        const models = listed
+          .filter((m) => !m.hidden || m.id === cfg?.model)
+          .map((m) => ({
+            id: m.id,
+            label: m.displayName || m.id,
+            efforts: m.supportedReasoningEfforts.map((e) => e.reasoningEffort),
+            defaultEffort: m.defaultReasoningEffort,
+            isDefault: m.isDefault,
+          }));
+        finish({
+          available: true,
+          planType: account.planType,
+          defaultModel: cfg?.model ?? undefined,
+          defaultEffort: cfg?.model_reasoning_effort ?? undefined,
+          models,
+          rateLimits: rl?.rateLimitsByLimitId?.[PLAN_LIMIT_ID] ?? rl?.rateLimits,
+        });
       } catch {
         finish(unavailable);
       }
@@ -80,24 +113,36 @@ export async function probeCodex(bin = codexBin()): Promise<Probe> {
   });
 }
 
-export async function loadCatalog(): Promise<Catalog> {
-  const c = caps();
-  const harnesses: HarnessInfo[] = [claudeHarness(c['claude-code'], config.defaultModel)];
-  try {
-    const probe = await probeCodex();
-    harnesses.push(codexHarness(probe, c.codex));
-    // Read Codex plan usage at startup and on every refresh; live turns keep it current.
-    if (probe.available && probe.rateLimits) recordUsage('codex', normalizeRateLimits(probe.rateLimits));
-  } catch {
-    harnesses.push(codexHarness({ available: false, models: [] }, c.codex));
-  }
-  try {
-    harnesses.push(cursorHarness(await probeCursor(), c.cursor));
-  } catch {
-    harnesses.push(cursorHarness({ available: false, models: [] }, c.cursor));
-  }
-  current = { harnesses };
-  return current;
+async function probeCodexHarness(cap: number): Promise<HarnessInfo> {
+  const probe = await probeCodex().catch((): Probe => ({ available: false, models: [] }));
+  // Read Codex plan usage at startup and on every refresh; live turns keep it current.
+  if (probe.available && probe.rateLimits) recordUsage('codex', normalizeRateLimits(probe.rateLimits));
+  return codexHarness(probe, cap);
+}
+
+async function probeCursorHarness(cap: number): Promise<HarnessInfo> {
+  return cursorHarness(await probeCursor().catch((): CursorProbe => ({ available: false, models: [] })), cap);
+}
+
+/**
+ * Probe the harnesses in `only` (all by default) and keep the others as they are. A call while
+ * a load is running joins that load.
+ */
+export function loadCatalog(only: HarnessId[] = HARNESS_IDS): Promise<Catalog> {
+  loading ??= (async () => {
+    const c = caps();
+    const keep = (id: HarnessId) => getHarness(getCatalog(), id)!;
+    const [codex, cursor] = await Promise.all([
+      only.includes('codex') ? probeCodexHarness(c.codex) : keep('codex'),
+      only.includes('cursor') ? probeCursorHarness(c.cursor) : keep('cursor'),
+    ]);
+    current = { harnesses: [claudeHarness(c['claude-code'], config.defaultModel), codex, cursor] };
+    checkedAt = Date.now();
+    return current;
+  })().finally(() => {
+    loading = null;
+  });
+  return loading;
 }
 
 /** The current catalog, or a best-effort default (Claude only) before the first load. */
@@ -111,6 +156,17 @@ export function getCatalog(): Catalog {
       cursorHarness({ available: false, models: [] }, c.cursor),
     ],
   };
+}
+
+/**
+ * The catalog after probing again any harness that is down, if it was last probed over
+ * RECHECK_MS ago. Waits for a load that is already running. For the picker and thread start.
+ */
+export async function freshCatalog(): Promise<Catalog> {
+  if (loading) return loading;
+  const down = getCatalog().harnesses.filter((h) => !h.available).map((h) => h.id);
+  if (!down.length || Date.now() - checkedAt < RECHECK_MS) return getCatalog();
+  return loadCatalog(down);
 }
 
 export function startCatalogRefresh() {

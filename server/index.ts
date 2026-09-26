@@ -9,7 +9,7 @@ import { config, paths, uploadsDir } from './config.ts';
 import { channels, threads, events, artifacts, search, type Channel, type Thread } from './db.ts';
 import { bus } from './bus.ts';
 import { createThread, sendMessage, interruptThread, runningCount, runningByHarness, slotsByHarness, queuedCount, pendingFor, isLive, shutdownAll } from './runner.ts';
-import { getCatalog, startCatalogRefresh } from './harness/catalog-service.ts';
+import { freshCatalog, getCatalog, startCatalogRefresh } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { usageByHarness } from './usage.ts';
 import { listCrew } from './crew.ts';
@@ -308,9 +308,11 @@ api.get('/crew', (c) => {
 });
 
 // The harnesses with their availability, fix command, models, efforts, cap and running count.
-api.get('/harnesses', (c) => {
+// A harness that is down is probed again first, so a login shows up when the picker opens.
+api.get('/harnesses', async (c) => {
+  const cat = await freshCatalog();
   const running = runningByHarness();
-  return c.json(getCatalog().harnesses.map((h) => ({ ...h, running: running[h.id] ?? 0 })));
+  return c.json(cat.harnesses.map((h) => ({ ...h, running: running[h.id] ?? 0 })));
 });
 
 api.get('/secrets', (c) => c.json(listSecrets()));

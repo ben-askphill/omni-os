@@ -10,16 +10,19 @@ export interface ModelChoice {
 /**
  * One model pill whose list groups models under each harness, with a sticky header naming the
  * plan, one search across all groups, and the harness default marked "(default)". A harness that
- * isn't installed or logged in shows disabled with the command that fixes it.
+ * isn't installed or logged in shows disabled with the command that fixes it. `onOpen` fires as
+ * the list opens, so the caller can refetch and a fresh login shows up without a reload.
  */
 export function ModelPicker({
   harnesses,
   value,
   onChange,
+  onOpen,
 }: {
   harnesses: HarnessWithRunning[];
   value: ModelChoice;
   onChange: (v: ModelChoice) => void;
+  onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -67,7 +70,10 @@ export function ModelPicker({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Model: ${current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}`}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) onOpen?.();
+          setOpen(!open);
+        }}
         className="press inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-3 text-[12.5px] font-medium text-fg transition-colors hover:bg-surface-3"
       >
         <Icon name="zap" size={14} className="text-fg-3" />
