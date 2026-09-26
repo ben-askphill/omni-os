@@ -2,17 +2,18 @@
 // so a Codex turn renders in the same transcript as a Claude turn. Tool names follow
 // Claude Code's, so the existing transcript renderer shows them unchanged.
 import type { Record as StreamRecord } from '../../stream.ts';
-import type { CodexItem, RateLimits } from './protocol.ts';
+import type { CodexItem, PlanUpdate, RateLimitWindow, RateLimits } from './protocol.ts';
 import type { Usage } from '../../stream.ts';
 
 /** Codex plan statuses mapped to the TodoWrite ones the checklist renders. */
 const PLAN_STATUS: Record<string, string> = {
   pending: 'pending',
-  in_progress: 'in_progress',
-  running: 'in_progress',
+  inProgress: 'in_progress',
   completed: 'completed',
-  done: 'completed',
 };
+
+/** The rate-limit bucket that is the ChatGPT plan. Codex also reports others, e.g. a reserve model's. */
+export const PLAN_LIMIT_ID = 'codex';
 
 /** Split a unified diff into one edit per hunk: the removed side and the added side. */
 export function diffToEdits(diff: string): { old_string: string; new_string: string }[] {
@@ -23,7 +24,8 @@ export function diffToEdits(diff: string): { old_string: string; new_string: str
     if (oldLines || newLines) edits.push({ old_string: (oldLines ?? []).join('\n'), new_string: (newLines ?? []).join('\n') });
     oldLines = newLines = null;
   };
-  for (const line of diff.split('\n')) {
+  // Codex ends each diff with a newline; the empty line after it is not a context line.
+  for (const line of diff.replace(/\n$/, '').split('\n')) {
     if (line.startsWith('@@')) {
       flush();
       oldLines = [];
@@ -31,6 +33,7 @@ export function diffToEdits(diff: string): { old_string: string; new_string: str
       continue;
     }
     if (oldLines === null || newLines === null) continue; // preamble (---/+++) before the first hunk
+    if (line.startsWith('\\')) continue; // "\ No newline at end of file"
     if (line.startsWith('-')) oldLines.push(line.slice(1));
     else if (line.startsWith('+')) newLines.push(line.slice(1));
     else {
@@ -49,6 +52,11 @@ const truncated = (s: string) => s.length > MAX_RESULT;
 
 const asCommand = (c: string | string[]) => (Array.isArray(c) ? c.join(' ') : c);
 
+const result = (id: string, text: string, isError: boolean): StreamRecord => ({
+  kind: 'tool_result',
+  payload: { tool_use_id: id, text: clip(text), is_error: isError, truncated: truncated(text) },
+});
+
 /**
  * One completed Codex item to zero or more Omni records. Reasoning items drop out, the same
  * as for Claude. Unknown item kinds pass through as a tool row under their own name.
@@ -62,7 +70,10 @@ export function normalizeItem(item: CodexItem): StreamRecord[] {
       // stores Ben's own text without the added context.
       return [];
 
-    case 'agentMessage': {
+    case 'agentMessage':
+    case 'plan': {
+      // A plan item is the plan Codex proposes in plan mode, as markdown. The checklist comes
+      // from turn/plan/updated instead (normalizePlan).
       const text = String((item as { text?: unknown }).text ?? '');
       return text.trim() ? [{ kind: 'assistant_text', payload: { text } }] : [];
     }
@@ -70,47 +81,37 @@ export function normalizeItem(item: CodexItem): StreamRecord[] {
     case 'commandExecution': {
       const command = asCommand((item as { command?: string | string[] }).command ?? '');
       const out = String((item as { aggregatedOutput?: unknown; output?: unknown }).aggregatedOutput ?? (item as { output?: unknown }).output ?? '');
-      const exitCode = (item as { exitCode?: number }).exitCode ?? 0;
+      const { exitCode, status } = item as { exitCode?: number | null; status?: string };
       return [
         { kind: 'tool_use', payload: { id: item.id, name: 'Bash', input: { command }, parent: null } },
-        { kind: 'tool_result', payload: { tool_use_id: item.id, text: clip(out), is_error: exitCode !== 0, truncated: truncated(out) } },
+        result(item.id, out, (exitCode ?? 0) !== 0 || status === 'failed' || status === 'declined'),
       ];
     }
 
     case 'fileChange':
       return fileChange(item);
 
+    // The item is complete, so its row ends with a result even when Codex sends no body.
     case 'mcpToolCall': {
       const server = String((item as { server?: unknown }).server ?? '');
       const tool = String((item as { tool?: unknown }).tool ?? '');
       const args = (item as { arguments?: unknown }).arguments ?? {};
-      const error = (item as { error?: unknown }).error;
-      const result = (item as { result?: unknown }).result;
-      const recs: StreamRecord[] = [
+      const { error, result: res, status } = item as { error?: { message?: string } | null; result?: McpResult | null; status?: string };
+      return [
         { kind: 'tool_use', payload: { id: item.id, name: `mcp__${server}__${tool}`, input: args, parent: null } },
+        error
+          ? result(item.id, String(error.message ?? JSON.stringify(error)), true)
+          : result(item.id, res ? mcpText(res) : '', status === 'failed'),
       ];
-      if (error != null || result != null) {
-        const text = typeof (error ?? result) === 'string' ? String(error ?? result) : JSON.stringify(error ?? result);
-        recs.push({ kind: 'tool_result', payload: { tool_use_id: item.id, text: clip(text), is_error: error != null, truncated: truncated(text) } });
-      }
-      return recs;
     }
 
     case 'webSearch': {
-      const query = String((item as { query?: unknown }).query ?? '');
-      const results = (item as { results?: unknown }).results;
-      const recs: StreamRecord[] = [{ kind: 'tool_use', payload: { id: item.id, name: 'WebSearch', input: { query }, parent: null } }];
-      if (results != null) {
-        const text = typeof results === 'string' ? results : JSON.stringify(results);
-        recs.push({ kind: 'tool_result', payload: { tool_use_id: item.id, text: clip(text), is_error: false, truncated: truncated(text) } });
-      }
-      return recs;
-    }
-
-    case 'plan': {
-      const steps = (item as { steps?: { step?: string; text?: string; status?: string }[] }).steps ?? [];
-      const todos = steps.map((s) => ({ content: String(s.step ?? s.text ?? ''), status: PLAN_STATUS[String(s.status ?? 'pending')] ?? 'pending' }));
-      return [{ kind: 'tool_use', payload: { id: item.id, name: 'TodoWrite', input: { todos }, parent: null } }];
+      // Built-in search sends its results to the model only, so `results` is usually null.
+      const { query, action, results } = item as { query?: string; action?: { url?: string | null } | null; results?: unknown };
+      return [
+        { kind: 'tool_use', payload: { id: item.id, name: 'WebSearch', input: { query: query || action?.url || '' }, parent: null } },
+        result(item.id, results == null ? '' : typeof results === 'string' ? results : JSON.stringify(results), false),
+      ];
     }
 
     default:
@@ -121,35 +122,91 @@ export function normalizeItem(item: CodexItem): StreamRecord[] {
   }
 }
 
+/** An MCP tool result: its text blocks, or its JSON when it has none. */
+interface McpResult {
+  content?: { type?: string; text?: string }[];
+  structuredContent?: unknown;
+}
+function mcpText(r: McpResult): string {
+  const texts = (r.content ?? []).filter((c) => c?.type === 'text' && typeof c.text === 'string').map((c) => c.text!);
+  if (texts.length) return texts.join('\n');
+  return JSON.stringify(r.structuredContent ?? r.content ?? r);
+}
+
 function rawInput(item: CodexItem): Record<string, unknown> {
   const { id: _id, type: _type, ...rest } = item;
   return rest;
 }
 
-/** A Codex file change to Claude's Write/Edit/MultiEdit rows, or a visible Delete entry. */
-function fileChange(item: CodexItem): StreamRecord[] {
-  const path = String((item as { path?: unknown }).path ?? '');
-  const kind = String((item as { kind?: unknown }).kind ?? 'update');
-  if (kind === 'add' || kind === 'create' || kind === 'added') {
-    const content = String((item as { content?: unknown }).content ?? '');
-    return [{ kind: 'tool_use', payload: { id: item.id, name: 'Write', input: { file_path: path, content }, parent: null } }];
-  }
-  if (kind === 'delete' || kind === 'deleted' || kind === 'remove') {
-    return [{ kind: 'tool_use', payload: { id: item.id, name: 'Delete', input: { file_path: path }, parent: null } }];
-  }
-  const diff = String((item as { diff?: unknown }).diff ?? '');
-  const edits = diffToEdits(diff);
-  if (edits.length <= 1) {
-    const e = edits[0] ?? { old_string: '', new_string: '' };
-    return [{ kind: 'tool_use', payload: { id: item.id, name: 'Edit', input: { file_path: path, old_string: e.old_string, new_string: e.new_string }, parent: null } }];
-  }
-  return [{ kind: 'tool_use', payload: { id: item.id, name: 'MultiEdit', input: { file_path: path, edits }, parent: null } }];
+interface FileUpdateChange {
+  path: string;
+  kind: { type: 'add' | 'delete' | 'update'; move_path?: string | null };
+  diff: string;
 }
 
-/** A rate-limit snapshot to an Omni usage record: 300-minute window as 5h, 10,080-minute as the week. */
-export function normalizeRateLimits(rl: RateLimits): Usage {
+/**
+ * A Codex file change to Claude's Write/Edit/MultiEdit rows, or a visible Delete entry, one per
+ * file. For an added file `diff` is its content; for an update it is a unified diff.
+ */
+function fileChange(item: CodexItem): StreamRecord[] {
+  const changes = ((item as { changes?: FileUpdateChange[] }).changes ?? []).filter((c) => c?.path);
+  const status = String((item as { status?: unknown }).status ?? 'completed');
+  const failed = status === 'failed' || status === 'declined';
+  return changes.flatMap((c, i): StreamRecord[] => {
+    const id = changes.length === 1 ? item.id : `${item.id}:${i}`;
+    const diff = String(c.diff ?? '');
+    let use: StreamRecord;
+    if (c.kind?.type === 'add') {
+      use = { kind: 'tool_use', payload: { id, name: 'Write', input: { file_path: c.path, content: diff }, parent: null } };
+    } else if (c.kind?.type === 'delete') {
+      use = { kind: 'tool_use', payload: { id, name: 'Delete', input: { file_path: c.path }, parent: null } };
+    } else {
+      // A rename shows under the new name.
+      const path = c.kind?.move_path || c.path;
+      const edits = diffToEdits(diff);
+      use =
+        edits.length > 1
+          ? { kind: 'tool_use', payload: { id, name: 'MultiEdit', input: { file_path: path, edits }, parent: null } }
+          : { kind: 'tool_use', payload: { id, name: 'Edit', input: { file_path: path, ...(edits[0] ?? { old_string: '', new_string: '' }) }, parent: null } };
+    }
+    return [use, result(id, failed ? `Patch ${status}.` : '', failed)];
+  });
+}
+
+/** The message in a Codex turn error, which is often the API's JSON error body as a string. */
+export function turnErrorText(message: string): string {
+  try {
+    const body = JSON.parse(message);
+    const inner = body?.error?.message ?? body?.message;
+    if (typeof inner === 'string' && inner.trim()) return inner;
+  } catch {
+    /* plain text */
+  }
+  return message;
+}
+
+/** A turn/plan/updated checklist to a TodoWrite row, which drives the transcript's live checklist. */
+export function normalizePlan(update: PlanUpdate, id: string): StreamRecord[] {
+  const todos = (update.plan ?? []).map((s) => ({ content: String(s.step ?? ''), status: PLAN_STATUS[String(s.status)] ?? 'pending' }));
+  return [
+    { kind: 'tool_use', payload: { id, name: 'TodoWrite', input: { todos }, parent: null } },
+    result(id, '', false),
+  ];
+}
+
+const usageWindow = (w: RateLimitWindow | null | undefined) =>
+  w && w.resetsAt != null ? { utilization: w.usedPercent / 100, resetsAt: w.resetsAt } : undefined;
+
+/**
+ * The plan's rate-limit bucket to an Omni usage record: the 300-minute primary window as 5h, the
+ * 10,080-minute secondary as the week. account/rateLimits/updated is sparse, so a window it
+ * leaves out keeps its value from `prev`, the usage recorded last.
+ */
+export function normalizeRateLimits(rl: RateLimits, prev?: Usage | null): Usage {
   const usage: Usage = { updated_at: new Date().toISOString() };
-  if (rl.primary) usage.five_hour = { utilization: rl.primary.usedPercent / 100, resetsAt: rl.primary.resetsAt };
-  if (rl.secondary) usage.seven_day = { utilization: rl.secondary.usedPercent / 100, resetsAt: rl.secondary.resetsAt };
+  const fiveHour = usageWindow(rl.primary) ?? prev?.five_hour;
+  const week = usageWindow(rl.secondary) ?? prev?.seven_day;
+  if (fiveHour) usage.five_hour = fiveHour;
+  if (week) usage.seven_day = week;
   return usage;
 }

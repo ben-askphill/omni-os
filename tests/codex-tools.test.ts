@@ -12,15 +12,17 @@ beforeAll(async () => {
 });
 
 describe('codex tools, secrets and crew reports', () => {
-  it('loads Omni MCP servers, an inherit-all shell policy and ChatGPT login in the config overrides', async () => {
+  it('loads Omni MCP servers, an inherit-all shell policy and ChatGPT login as config.toml overrides', async () => {
     const t = await H.start('CMD hello', { ...codex, role: 'conductor' });
     await H.untilResults(t.id, 1);
     const start = H.codexRequests().find((r) => r.method === 'thread/start');
     const cfg = start.params.config;
-    expect(Object.keys(cfg.mcpServers)).toContain('omni'); // the conductor tools
-    expect(Object.keys(cfg.mcpServers)).toContain('omni-browser');
-    expect(cfg.shellEnvironmentPolicy.inherit).toBe('all');
-    expect(cfg.preferredAuthMethod).toBe('chatgpt');
+    // Dotted keys merge into Ben's config.toml; a whole mcp_servers table would replace his servers.
+    expect(cfg['mcp_servers.omni']).toMatchObject({ command: expect.any(String), args: expect.any(Array) }); // the conductor tools
+    expect(cfg['mcp_servers.omni-browser']).toMatchObject({ command: 'npx' });
+    expect(cfg.mcp_servers).toBeUndefined();
+    expect(cfg['shell_environment_policy.inherit']).toBe('all');
+    expect(cfg.forced_login_method).toBe('chatgpt');
   });
 
   it('carries secrets in the environment but writes no secret value into any config', () => {

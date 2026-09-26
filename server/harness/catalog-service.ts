@@ -5,8 +5,15 @@ import { execFile } from 'node:child_process';
 import { config } from '../config.ts';
 import { CodexClient } from './codex/client.ts';
 import { codexBin } from './codex/bin.ts';
-import { normalizeRateLimits } from './codex/normalize.ts';
-import type { RateLimits } from './codex/protocol.ts';
+import { PLAN_LIMIT_ID, normalizeRateLimits } from './codex/normalize.ts';
+import type {
+  CodexModel,
+  ConfigReadResponse,
+  GetAccountRateLimitsResponse,
+  GetAccountResponse,
+  ModelListResponse,
+  RateLimits,
+} from './codex/protocol.ts';
 import { cursorBin } from './cursor/bin.ts';
 import { parseCursorModels } from './cursor/models.ts';
 import { harnessEnv } from './env-guard.ts';
@@ -38,7 +45,7 @@ export async function probeCursor(bin = cursorBin()): Promise<CursorProbe> {
   });
 }
 
-/** Probe `codex app-server` for account, config defaults, the model list and rate limits. */
+/** Probe `codex app-server` for the account, config defaults, the model list and rate limits. */
 export async function probeCodex(bin = codexBin()): Promise<Probe> {
   const unavailable: Probe = { available: false, models: [] };
   if (!bin) return unavailable;
@@ -49,6 +56,8 @@ export async function probeCodex(bin = codexBin()): Promise<Probe> {
       env: harnessEnv('codex', {}),
       onExit: () => finish(unavailable),
     });
+    // A binary that can't be run (a stale OMNI_CODEX_BIN) is an error event, not an exit.
+    client.child.on('error', () => finish(unavailable));
     const finish = (r: Probe) => {
       if (settled) return;
       settled = true;
@@ -61,18 +70,36 @@ export async function probeCodex(bin = codexBin()): Promise<Probe> {
       try {
         await client.request('initialize', { clientInfo: { name: 'omni-os', version: '0.1.0' } });
         client.notify('initialized', {});
-        const account = await client.request<{ type?: string; planType?: string }>('account/read').catch(() => null);
-        if (!account || (account.type && account.type !== 'chatgpt')) return finish(unavailable);
-        const cfg = await client.request<{ model?: string; effort?: string }>('config/read').catch(() => ({} as { model?: string; effort?: string }));
-        const list = await client.request<{ models?: any[] }>('model/list');
-        const rateLimits = await client.request<RateLimits>('account/rateLimits/read').catch(() => undefined);
-        const models = (list?.models ?? []).map((m) => ({
-          id: m.id,
-          label: m.displayName ?? m.id,
-          efforts: m.supportedReasoningEfforts ?? [],
-          defaultEffort: m.defaultReasoningEffort,
-        }));
-        finish({ available: true, planType: account?.planType, defaultModel: cfg?.model, defaultEffort: cfg?.effort, models, rateLimits });
+        // Omni runs Codex on the ChatGPT plan only, so an API key login counts as logged out.
+        const { account } = await client.request<GetAccountResponse>('account/read', {});
+        if (account?.type !== 'chatgpt') return finish(unavailable);
+        const cfg = (await client.request<ConfigReadResponse>('config/read', {}).catch(() => null))?.config;
+        const listed: CodexModel[] = [];
+        let cursor: string | null = null;
+        do {
+          const page: ModelListResponse = await client.request<ModelListResponse>('model/list', { cursor, includeHidden: true });
+          listed.push(...page.data);
+          cursor = page.nextCursor;
+        } while (cursor);
+        const rl = await client.request<GetAccountRateLimitsResponse>('account/rateLimits/read', {}).catch(() => null);
+        // Codex's own picker hides some models; so does Omni's, unless config.toml picks one.
+        const models = listed
+          .filter((m) => !m.hidden || m.id === cfg?.model)
+          .map((m) => ({
+            id: m.id,
+            label: m.displayName || m.id,
+            efforts: m.supportedReasoningEfforts.map((e) => e.reasoningEffort),
+            defaultEffort: m.defaultReasoningEffort,
+            isDefault: m.isDefault,
+          }));
+        finish({
+          available: true,
+          planType: account.planType,
+          defaultModel: cfg?.model ?? undefined,
+          defaultEffort: cfg?.model_reasoning_effort ?? undefined,
+          models,
+          rateLimits: rl?.rateLimitsByLimitId?.[PLAN_LIMIT_ID] ?? rl?.rateLimits,
+        });
       } catch {
         finish(unavailable);
       }

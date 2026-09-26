@@ -14,11 +14,20 @@ beforeAll(async () => {
 });
 
 describe('codex tracer', () => {
-  it('makes the catalog list Codex as available with its config default', async () => {
+  it('lists the Codex models with their efforts and config.toml defaults, and reads the plan usage', async () => {
     const { getCatalog } = await import('../server/harness/catalog-service.ts');
     const h = getCatalog().harnesses.find((x) => x.id === 'codex')!;
     expect(h.available).toBe(true);
+    // Both model/list pages, without the model Codex's own picker hides.
+    expect(h.models.map((m) => m.id)).toEqual(['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra']);
     expect(h.models.find((m) => m.default)?.id).toBe('gpt-5.6-sol');
+    expect(h.models.find((m) => m.id === 'gpt-5.6-sol')).toMatchObject({
+      label: 'GPT-5.6 Sol',
+      efforts: ['low', 'medium', 'high', 'xhigh'],
+      defaultEffort: 'high',
+    });
+    const { usageFor } = await import('../server/usage.ts');
+    expect(usageFor('codex')).toMatchObject({ five_hour: { utilization: 0.08 }, seven_day: { utilization: 0.02 } });
   });
 
   it('runs a turn: reply in the transcript, shell command as a Bash row, thread ends done', async () => {
@@ -42,8 +51,31 @@ describe('codex tracer', () => {
     const start = H.codexRequests().find((r) => r.method === 'thread/start');
     expect(start).toBeTruthy();
     expect(start.params.approvalPolicy).toBe('never');
-    expect(start.params.sandbox.mode).toBe('dangerFullAccess');
+    expect(start.params.sandbox).toBe('danger-full-access');
     expect(String(start.params.developerInstructions)).toContain('Omni OS');
+  });
+
+  it("keeps the usage card on the plan's rate limits, not a reserve model's", async () => {
+    const t = await H.start('hello', codex);
+    await H.untilResults(t.id, 1);
+    // The reserve model's weekly bucket arrives after the plan's, at 90%.
+    const { usageFor } = await import('../server/usage.ts');
+    expect(usageFor('codex')).toMatchObject({
+      five_hour: { utilization: 0.12, resetsAt: 1790328600 },
+      seven_day: { utilization: 0.03, resetsAt: 1790922600 },
+    });
+  });
+
+  it("shows Codex's plan as the live checklist", async () => {
+    const t = await H.start('PLAN then answer', codex);
+    await H.untilResults(t.id, 1);
+    const todo = H.byKind(t.id, 'tool_use').find((e: Ev) => e.p.name === 'TodoWrite');
+    expect(todo?.p.input.todos).toEqual([
+      { content: 'Scaffold', status: 'completed' },
+      { content: 'Wire adapter', status: 'in_progress' },
+      { content: 'Test', status: 'pending' },
+    ]);
+    expect(H.thread(t.id).status).toBe('done');
   });
 
   it('continues the same warm session on a follow-up', async () => {
