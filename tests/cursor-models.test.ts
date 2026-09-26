@@ -8,6 +8,10 @@ const models = parseCursorModels(list);
 const byId = (id: string) => models.find((m) => m.id === id);
 
 describe('cursor model list parser', () => {
+  it('skips the header and tip lines around the list', () => {
+    expect(models.some((m) => /\s/.test(m.id) || /^(available|tip)/i.test(m.id))).toBe(false);
+  });
+
   it('folds effort variants into one family and drops fast variants', () => {
     const sol = byId('gpt-5.6-sol')!;
     expect(sol.efforts).toEqual(['low', 'medium', 'high']);
