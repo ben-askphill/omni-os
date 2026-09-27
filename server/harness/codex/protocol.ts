@@ -36,6 +36,8 @@ export interface CodexItem {
     | 'dynamicToolCall'
     | 'collabAgentToolCall'
     | 'contextCompaction'
+    | 'enteredReviewMode'
+    | 'exitedReviewMode'
     | string;
   [k: string]: unknown;
 }
@@ -133,6 +135,22 @@ export interface ErrorNotification {
 export interface PlanUpdate {
   explanation: string | null;
   plan: { step: string; status: 'pending' | 'inProgress' | 'completed' }[];
+}
+
+/** What review/start reviews. `title` labels a commit in Codex's own UI, e.g. its subject. */
+export type ReviewTarget =
+  | { type: 'uncommittedChanges' }
+  | { type: 'baseBranch'; branch: string }
+  | { type: 'commit'; sha: string; title: string | null }
+  | { type: 'custom'; instructions: string };
+
+/**
+ * review/start `{ threadId, target, delivery }`. Inline delivery runs the review as a turn of the
+ * thread itself: the answer carries that turn, and its items arrive under its id.
+ */
+export interface ReviewStartResponse {
+  turn: CodexTurn;
+  reviewThreadId: string;
 }
 
 /** Turn input items sent on turn/start and turn/steer. A skill item loads that skill for the turn. */

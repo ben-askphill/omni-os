@@ -1,6 +1,7 @@
-// Pure translation of one completed `codex app-server` item into Omni's records,
-// so a Codex turn renders in the same transcript as a Claude turn. Tool names follow
-// Claude Code's, so the existing transcript renderer shows them unchanged.
+// Pure translation of one `codex app-server` item into Omni's records, so a Codex turn
+// renders in the same transcript as a Claude turn. Tool names follow Claude Code's, so the
+// existing transcript renderer shows them unchanged. Most items count once complete; a few
+// that take a while show a status as they start.
 import type { Record as StreamRecord } from '../../stream.ts';
 import type { CodexItem, PlanUpdate, RateLimitWindow, RateLimits } from './protocol.ts';
 import type { Usage } from '../../stream.ts';
@@ -65,10 +66,19 @@ export function normalizeItem(item: CodexItem): StreamRecord[] {
   switch (item.type) {
     case 'reasoning':
     case 'userMessage':
-    case 'contextCompaction':
       // Reasoning/thinking is dropped as for Claude; the user echo is dropped because Omni already
-      // stores Ben's own text without the added context.
+      // stores Ben's own text without the added context. A review's prompt comes as one too.
       return [];
+
+    case 'enteredReviewMode':
+    case 'exitedReviewMode':
+      // The review's text comes again as the agentMessage right after, which is the reply. On a
+      // stop, that one says the review was interrupted, where this one says the reviewer failed.
+      return [];
+
+    case 'contextCompaction':
+      // An empty status clears the one it showed on starting, for a compaction mid-turn.
+      return [{ kind: 'status', payload: { text: '' } }];
 
     case 'agentMessage':
     case 'plan': {
@@ -119,6 +129,24 @@ export function normalizeItem(item: CodexItem): StreamRecord[] {
       return [
         { kind: 'tool_use', payload: { id: item.id, name: String(item.type), input: rawInput(item), parent: null } },
       ];
+  }
+}
+
+/** Codex's own names for what a review looks at; anything else is Ben's instructions. */
+const REVIEW_HINT = /^(current changes$|changes against '|commit [0-9a-f]{7})/;
+
+/** One started Codex item to records: a status for the ones that take a while, nothing for the rest. */
+export function normalizeStarted(item: CodexItem): StreamRecord[] {
+  switch (item.type) {
+    case 'enteredReviewMode': {
+      const hint = String((item as { review?: unknown }).review ?? '').trim();
+      const text = REVIEW_HINT.test(hint) ? `Reviewing ${hint}` : hint ? `Reviewing: ${hint}` : 'Reviewing';
+      return [{ kind: 'status', payload: { text } }];
+    }
+    case 'contextCompaction':
+      return [{ kind: 'status', payload: { text: 'Compacting the conversation' } }];
+    default:
+      return [];
   }
 }
 

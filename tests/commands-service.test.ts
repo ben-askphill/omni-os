@@ -153,6 +153,17 @@ describe('listCommands on Codex', () => {
     expect(names(list)).not.toContain('legacy-deploy');
   });
 
+  it("lists Codex's /review and /compact as built-ins, over a skill of the same name", async () => {
+    const dir = repo();
+    addSkill(join(dir, '.agents', 'skills'), 'review', 'Ask which review to run');
+    const list = await listCommands('codex', dir, { wait: true });
+
+    expect(list.commands.filter((c) => c.name === 'review')).toEqual([
+      { name: 'review', description: 'Review my current changes and find issues', argumentHint: '[branch, commit or instructions]', source: 'builtin', mentionable: false },
+    ]);
+    expect(list.commands).toContainEqual({ name: 'compact', description: 'Summarize conversation to prevent hitting the context limit', source: 'builtin', mentionable: false });
+  });
+
   it('asks for that folder only, and strips a stale API key', async () => {
     const dir = repo();
     await listCommands('codex', dir, { wait: true });

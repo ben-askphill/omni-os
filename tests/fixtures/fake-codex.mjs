@@ -6,9 +6,16 @@
 //
 // Requests answered: initialize, account/read, account/rateLimits/read, config/read,
 // model/list (two models a page), skills/list, thread/start, thread/resume, turn/start,
-// turn/steer, turn/interrupt. A turn sends turn/started, item/started and item/completed (userMessage,
-// commandExecution, agentMessage), account/rateLimits/updated (on the first turn, for the
-// plan's bucket and then a reserve model's) and turn/completed.
+// turn/steer, turn/interrupt, review/start, thread/compact/start. A turn sends turn/started,
+// item/started and item/completed (userMessage, commandExecution, agentMessage),
+// account/rateLimits/updated (on the first turn, for the plan's bucket and then a reserve
+// model's) and turn/completed.
+//
+// An inline review goes as codex-cli 0.157's did (tests/fixtures/codex-review.jsonl): the answer
+// carries the review's turn, enteredReviewMode, a turn/started under a second turn id, the
+// review prompt as a userMessage, exitedReviewMode with the review, the same text again as an
+// agentMessage, then turn/completed for the review's turn. A compaction answers `{}`, then runs
+// as a turn of its own with a contextCompaction item. Neither can be steered, as in Codex.
 //
 // Directives in a turn's input text:
 //   CMD       run a shell command (a commandExecution item) before the reply
@@ -19,6 +26,8 @@
 //   BADTURN   fail the turn on the plan limit, with the API's JSON error body as the message
 //   CRASH     exit(1) mid-turn, like the process dying
 //   SKILLS_EDITED  send skills/changed, as Codex does when a personal skill file changes
+// and in a review's custom instructions:
+//   HANG      never finish on its own; only turn/interrupt ends the review
 // Env:
 //   FAKE_CODEX_LOG=<file>     append one JSON line per request (method, params, cwd, api vars seen)
 //   FAKE_CODEX_ACCOUNT=none   logged out; =apiKey logged in with an API key instead of ChatGPT
@@ -294,11 +303,83 @@ function steer(id, params) {
   const turn = activeTurn;
   if (!turn || params.threadId !== threadId) return fail(id, 'no active turn to steer');
   if (params.expectedTurnId !== turn.id) return fail(id, `expected turn ${params.expectedTurnId}, but turn ${turn.id} is running`);
+  if (turn.kind) return fail(id, `ActiveTurnNotSteerable: a ${turn.kind} turn cannot be steered`);
   if (!Array.isArray(params.input)) return fail(id, 'Invalid request: missing field `input`');
   respond(id, { turnId: turn.id });
   // The steer joins the running turn (no new turn/started), and the model answers it.
   item(turn, { type: 'userMessage', id: nextItemId(), clientId: null, content: params.input }, 'completed');
   item(turn, message(`steered: ${textOf(params.input)}`), 'completed');
+}
+
+/** What a review looks at, in Codex's words: its status hint and the review turn's user message. */
+function reviewHint(target) {
+  switch (target?.type) {
+    case 'uncommittedChanges':
+      return 'current changes';
+    case 'baseBranch':
+      return target.branch ? `changes against '${target.branch}'` : null;
+    case 'commit':
+      return target.sha ? `commit ${String(target.sha).slice(0, 7)}${target.title ? `: ${target.title}` : ''}` : null;
+    case 'custom':
+      return String(target.instructions ?? '').trim() || null;
+    default:
+      return null;
+  }
+}
+
+function startReview(id, params) {
+  if (!threadId || params.threadId !== threadId) return fail(id, `thread not found: ${params.threadId}`);
+  const hint = reviewHint(params.target);
+  if (!hint) return fail(id, `Invalid request: bad review target ${JSON.stringify(params.target)}`);
+  if (params.delivery != null && !['inline', 'detached'].includes(params.delivery)) return fail(id, `Invalid request: unknown delivery ${params.delivery}`);
+  if (activeTurn) return fail(id, `turn ${activeTurn.id} is still running`);
+  const turn = (activeTurn = { id: `turn_${++turnSeq}`, status: 'inProgress', error: null, kind: 'review' });
+  const asked = { type: 'userMessage', id: turn.id, clientId: null, content: [{ type: 'text', text: hint, text_elements: [] }] };
+  respond(id, { turn: { ...turnOf(turn), items: [asked] }, reviewThreadId: threadId });
+  void runReview(turn, hint);
+}
+
+async function runReview(turn, hint) {
+  const entered = { type: 'enteredReviewMode', id: nextItemId(), review: hint };
+  item(turn, entered, 'started');
+  item(turn, entered, 'completed');
+  // Announced under an id of its own; everything after carries the review turn's id.
+  notify('turn/started', { threadId, turn: turnOf({ id: `turn_${++turnSeq}`, status: 'inProgress', error: null }) });
+  const prompt = { type: 'userMessage', id: nextItemId(), clientId: null, content: [{ type: 'text', text: `Review the ${hint} and provide prioritized findings.`, text_elements: [] }] };
+  item(turn, prompt, 'started');
+  item(turn, prompt, 'completed');
+  await delay(5);
+  if (hint.includes('HANG') || turn.status !== 'inProgress') return;
+  // The reviewer's own answer starts and never completes.
+  item(turn, message(''), 'started');
+  const review = `Review of ${hint}: no issues found.`;
+  const exited = { type: 'exitedReviewMode', id: nextItemId(), review };
+  item(turn, exited, 'started');
+  item(turn, exited, 'completed');
+  const reply = { ...message(review), phase: null };
+  item(turn, reply, 'started');
+  item(turn, reply, 'completed');
+  await delay(5);
+  end(turn, 'completed');
+}
+
+function compact(id, params) {
+  if (!threadId || params.threadId !== threadId) return fail(id, `thread not found: ${params.threadId}`);
+  if (activeTurn) return fail(id, `turn ${activeTurn.id} is still running`);
+  const turn = (activeTurn = { id: `turn_${++turnSeq}`, status: 'inProgress', error: null, kind: 'compact' });
+  respond(id, {});
+  void runCompaction(turn);
+}
+
+async function runCompaction(turn) {
+  await delay(5);
+  notify('turn/started', { threadId, turn: turnOf(turn) });
+  const it = { type: 'contextCompaction', id: nextItemId() };
+  item(turn, it, 'started');
+  await delay(20);
+  if (turn.status !== 'inProgress') return;
+  item(turn, it, 'completed');
+  end(turn, 'completed');
 }
 
 function interrupt(id, params) {
@@ -354,6 +435,10 @@ function onMessage(msg) {
       return steer(id, params);
     case 'turn/interrupt':
       return interrupt(id, params);
+    case 'review/start':
+      return startReview(id, params ?? {});
+    case 'thread/compact/start':
+      return compact(id, params);
     default:
       if (typeof id === 'number') respond(id, {});
       return;

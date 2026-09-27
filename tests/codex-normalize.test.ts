@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { normalizeItem, normalizeRateLimits, turnErrorText } from '../server/harness/codex/normalize.ts';
+import { normalizeItem, normalizeRateLimits, normalizeStarted, turnErrorText } from '../server/harness/codex/normalize.ts';
 import type { CodexItem, RateLimits } from '../server/harness/codex/protocol.ts';
 
 // codex-basic.jsonl is one real codex-cli 0.157 turn, with ids and paths shortened.
@@ -48,6 +48,51 @@ describe('codex normalizer', () => {
     const recs = normalizeItem({ id: 'z', type: 'somethingNew', foo: 'bar' } as CodexItem);
     expect(recs).toHaveLength(1);
     expect(recs[0]).toMatchObject({ kind: 'tool_use', payload: { name: 'somethingNew', input: { foo: 'bar' } } });
+  });
+});
+
+// codex-review.jsonl is a real codex-cli 0.157 inline review of an uncommitted change, then a
+// compaction, with ids and paths shortened. Its first line is review/start's answer.
+const reviewLines = readFileSync(join(import.meta.dirname, 'fixtures', 'codex-review.jsonl'), 'utf8')
+  .split('\n')
+  .filter(Boolean)
+  .map((l) => JSON.parse(l) as { method?: string; params?: any });
+
+/** The records one turn of the fixture comes to, in order: started items, then completed ones, as they arrive. */
+const recordsOf = (turnId: string) =>
+  reviewLines
+    .filter((l) => l.params?.turnId === turnId)
+    .flatMap((l) => (l.method === 'item/started' ? normalizeStarted(l.params.item) : l.method === 'item/completed' ? normalizeItem(l.params.item) : []));
+
+describe('codex review and compaction', () => {
+  it('shows a status on entering review, and the review text once, as the reply', () => {
+    const recs = recordsOf('turn_review');
+    expect(recs.filter((r) => r.kind === 'status').map((r) => r.payload)).toEqual([{ text: 'Reviewing current changes' }]);
+    const replies = recs.filter((r) => r.kind === 'assistant_text');
+    expect(replies).toHaveLength(1);
+    expect((replies[0].payload as { text: string }).text).toContain('[P1] Use the defined name parameter');
+    // The commands the reviewer ran are the only tool rows; entering and leaving review are not.
+    expect(recs.filter((r) => r.kind === 'tool_use').map((r) => (r.payload as { name: string }).name)).toEqual(['Bash']);
+  });
+
+  it('shows a status while compacting, and clears it once the compaction is done', () => {
+    expect(recordsOf('turn_compact')).toEqual([
+      { kind: 'status', payload: { text: 'Compacting the conversation' } },
+      { kind: 'status', payload: { text: '' } },
+    ]);
+  });
+
+  it('names what the review looks at in its status', () => {
+    const entering = (review: string) => normalizeStarted({ id: 'r', type: 'enteredReviewMode', review });
+    expect(entering("changes against 'main'")).toEqual([{ kind: 'status', payload: { text: "Reviewing changes against 'main'" } }]);
+    expect(entering('commit 1a2b3c4: Make greet loud')).toEqual([{ kind: 'status', payload: { text: 'Reviewing commit 1a2b3c4: Make greet loud' } }]);
+    // Custom instructions are the hint itself.
+    expect(entering('focus on the parser')).toEqual([{ kind: 'status', payload: { text: 'Reviewing: focus on the parser' } }]);
+  });
+
+  it('adds nothing when any other item starts', () => {
+    expect(normalizeStarted({ id: 'a', type: 'agentMessage', text: '' })).toEqual([]);
+    expect(normalizeStarted({ id: 'c', type: 'commandExecution', command: 'ls' })).toEqual([]);
   });
 });
 

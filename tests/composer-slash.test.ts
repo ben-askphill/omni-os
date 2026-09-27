@@ -118,6 +118,13 @@ describe('replySlash: hints for commands that stay text', () => {
     expect(replySlash('use /tdd and /pdf here', READY, 'cursor')).toEqual(SEND);
   });
 
+  it('says Codex leaves out the text after /compact, since its compaction takes no instructions', () => {
+    expect(replySlash('/compact keep the API notes', READY, 'codex')).toEqual(sendWith('Codex compacts without instructions, so it leaves out the text after /compact.'));
+    expect(replySlash('/compact', READY, 'codex')).toEqual(SEND);
+    // Claude Code's /compact takes them.
+    expect(replySlash('/compact keep the API notes', READY, 'claude-code')).toEqual(SEND);
+  });
+
   it('leaves paths and URLs alone', () => {
     for (const text of ['/Users/ben/notes.md read this', 'see https://example.com/clear', 'look in /tmp/x']) {
       expect(replySlash(text, READY, 'claude-code')).toEqual(SEND);
