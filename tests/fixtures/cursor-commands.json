@@ -1,0 +1,88 @@
+{
+ "jsonrpc": "2.0",
+ "method": "session/update",
+ "params": {
+  "sessionId": "9a47eef5-0ef6-4856-9c96-8a08f7972a07",
+  "update": {
+   "sessionUpdate": "available_commands_update",
+   "availableCommands": [
+    {
+     "name": "copy-request-id",
+     "description": "Copy the last request ID to clipboard"
+    },
+    {
+     "name": "multi-model-review",
+     "description": "Pick models (structured question or inline), then parallel Task reviewers (global)"
+    },
+    {
+     "name": "simplify",
+     "description": "Find low-info comments, one-off helpers, perf issues, and reuse opportunities. (global)"
+    },
+    {
+     "name": "omni-claude-cmd",
+     "description": "--- (project)"
+    },
+    {
+     "name": "omni-probe-cmd",
+     "description": "--- (project)"
+    },
+    {
+     "name": "ke-dev",
+     "description": "List products from the Shopify admin (production) store using the mcp__shopify-admin__products-list tool. (user)"
+    },
+    {
+     "name": "n8n",
+     "description": "n8n (user)"
+    },
+    {
+     "name": "autopilot",
+     "description": "Keep a PR merge-ready by triaging comments, resolving clear conflicts, and fixing CI in a loop. (user skill)"
+    },
+    {
+     "name": "goal",
+     "description": "Set a goal that Cursor will pursue to completion. (builtin skill)"
+    },
+    {
+     "name": "rename-chat",
+     "description": "Rename the current chat to match its focus. Use only when the user invokes /rename-chat. Optional text after the command steers the title. (user skill)"
+    },
+    {
+     "name": "statusline",
+     "description": "Configure a custom status line in the CLI. Use when the user mentions status line, statusline, statusLine, CLI status bar, prompt footer customization, or wants to add session context above the prompt. (user skill)"
+    },
+    {
+     "name": "omni-probe-skill",
+     "description": "Omni probe skill (project skill)"
+    },
+    {
+     "name": "bro",
+     "description": "Restate the last message in plain human language, with no jargon. (user skill)"
+    },
+    {
+     "name": "preview-volero",
+     "description": "Push the current branch to an unpublished Shopify preview theme on the live volero-eu store, then attach the preview and editor URLs to the branch's PR (creating the PR if none exists). Use when asked to preview, push a preview, or see a branch's changes rendered on Volero. Triggers on \"push a preview\", \"preview this branch\", \"/preview-volero\".\n (user skill)"
+    },
+    {
+     "name": "tdd",
+     "description": "Test-driven development with red-green-refactor loop. Use when user wants to build features or fix bugs using TDD, mentions \"red-green-refactor\", wants integration tests, or asks for test-first development. (user skill)"
+    },
+    {
+     "name": "n8n",
+     "description": "Describe when Agent should use this skill. (user skill)"
+    },
+    {
+     "name": "release-notes",
+     "description": "Draft release notes from merged PRs (team)"
+    },
+    {
+     "name": "lint-fix",
+     "description": "Fix lint errors in changed files (skill)"
+    },
+    {
+     "name": "two words",
+     "description": "Not a command name (user skill)"
+    }
+   ]
+  }
+ }
+}

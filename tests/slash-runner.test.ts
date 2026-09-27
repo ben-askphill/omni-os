@@ -2,13 +2,13 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
-import { FAKE_CODEX } from './support.ts';
+import { FAKE_CODEX, FAKE_CURSOR } from './support.ts';
 
 // Every message that enters a thread, whoever sent it, is resolved against the thread's
 // command list, and the user event stores what it resolved to. The text itself goes to
-// Claude Code unchanged; Codex gets its skill to load with it.
+// Claude Code and Cursor Agent unchanged; Codex gets its skill to load with it.
 
-const r = await startRunner({ OMNI_CODEX_BIN: FAKE_CODEX });
+const r = await startRunner({ OMNI_CODEX_BIN: FAKE_CODEX, OMNI_CURSOR_BIN: FAKE_CURSOR });
 const { runAutomation } = await import('../server/automations.ts');
 await (await import('../server/harness/catalog-service.ts')).loadCatalog();
 
@@ -125,5 +125,27 @@ describe('a Codex skill command', () => {
       await r.untilResults(t.id, 1);
       expect(inputs(t.id)).toEqual([[text(typed)]]);
     }
+  });
+});
+
+describe('a Cursor Agent command', () => {
+  const cursor = { harness: 'cursor', model: 'gpt-5.6-sol' };
+  const prompts = (id: string) => r.cursorRequests().filter((q) => q.method === 'turn' && q.thread_id === id).map((q) => q.prompt);
+
+  it('reaches Cursor Agent as typed, and the transcript shows the command', async () => {
+    const t = await r.start('/tdd fix the parser', cursor);
+    await r.untilResults(t.id, 1);
+    expect(r.byKind(t.id, 'user')[0].p).toMatchObject({ text: '/tdd fix the parser', slash: { command: { name: 'tdd', source: 'personal', start: 0, end: 4 } } });
+    // A session's first message has Omni's context in front, and Cursor Agent finds a command anywhere after a space.
+    expect(prompts(t.id)[0]).toMatch(/\n\/tdd fix the parser$/);
+  });
+
+  it('is stored for a follow-up, which goes as typed', async () => {
+    const t = await r.start('hello', cursor);
+    await r.untilResults(t.id, 1);
+    await r.runner.postMessage(t.id, '/goal ship the release');
+    await r.untilResults(t.id, 2);
+    expect(r.byKind(t.id, 'user')[1].p).toMatchObject({ slash: { command: { name: 'goal', source: 'builtin' } } });
+    expect(prompts(t.id)[1]).toBe('/goal ship the release');
   });
 });

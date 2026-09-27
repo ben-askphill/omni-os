@@ -1,19 +1,26 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
-import { FAKE_CODEX } from './support.ts';
+import { FAKE_CODEX, FAKE_CURSOR, fakeAlive } from './support.ts';
 
-// The command list service, against the fake Claude Code and the fake Codex. Probes are counted
-// through the fakes' logs: a Claude Code probe is an invocation with the commands entrypoint, a
-// Codex probe is a skills/list request.
+// The command list service, against the fake Claude Code, Codex and Cursor Agent. Probes are
+// counted through the fakes' logs: a Claude Code probe is an invocation with the commands
+// entrypoint, a Codex probe is a skills/list request, a Cursor Agent probe is an ACP session/new.
 
-const r = await startRunner({ ANTHROPIC_API_KEY: 'sk-stale-from-zshrc', OMNI_CODEX_BIN: FAKE_CODEX, OPENAI_API_KEY: 'sk-stale-openai' });
+const r = await startRunner({
+  ANTHROPIC_API_KEY: 'sk-stale-from-zshrc',
+  OMNI_CODEX_BIN: FAKE_CODEX,
+  OPENAI_API_KEY: 'sk-stale-openai',
+  OMNI_CURSOR_BIN: FAKE_CURSOR,
+  CURSOR_API_KEY: 'stale-cursor-key',
+});
 const { listCommands } = await import('../server/commands.ts');
 await (await import('../server/harness/catalog-service.ts')).loadCatalog();
 
 const probes = (cwd?: string) => r.invocations().filter((i) => i.entrypoint === 'omni-os-commands' && (!cwd || i.cwd === cwd));
 const codexProbes = (cwd?: string) => r.codexRequests().filter((q) => q.method === 'skills/list' && (!cwd || q.cwd === cwd));
+const cursorProbes = (cwd?: string) => r.cursorRequests().filter((q) => q.method === 'session/new' && (!cwd || q.params.cwd === cwd));
 const names = (l: { commands: { name: string }[] }) => l.commands.map((c) => c.name);
 
 /** A folder with project commands, like a channel's repo. */
@@ -35,6 +42,12 @@ function addSkill(skills: string, name: string, description: string) {
   const file = join(skills, name, 'SKILL.md');
   writeFileSync(file, `---\nname: ${name}\ndescription: ${description}\n---\nDo it.\n`);
   return file;
+}
+
+/** A Cursor command: `.cursor/commands/<name>.md`, which Cursor describes by its first line. */
+function addCursorCommand(dir: string, name: string, description: string) {
+  mkdirSync(join(dir, '.cursor', 'commands'), { recursive: true });
+  writeFileSync(join(dir, '.cursor', 'commands', `${name}.md`), `${description}\n\nDo it.\n`);
 }
 
 beforeAll(() => {
@@ -175,6 +188,49 @@ describe('listCommands on Codex', () => {
       expect(list).toEqual({ status: 'unavailable', fix: 'codex doctor', commands: [], fetchedAt: null });
     } finally {
       delete process.env.FAKE_CODEX_SKILLS_FAIL;
+    }
+  });
+});
+
+describe('listCommands on Cursor Agent', () => {
+  let config: string;
+  beforeAll(() => {
+    // Where Cursor Agent keeps its sessions; the fake keeps them there too.
+    config = process.env.CURSOR_CONFIG_DIR = join(r.tmp, 'cursor-config');
+  });
+  afterAll(() => {
+    delete process.env.CURSOR_CONFIG_DIR;
+  });
+
+  it("reads the folder's commands and skills from Cursor Agent", async () => {
+    const dir = repo();
+    addCursorCommand(dir, 'ship-check', 'Run the pre-ship checklist');
+    const list = await listCommands('cursor', dir, { wait: true });
+
+    expect(list.status).toBe('ready');
+    expect(list.commands).toContainEqual({ name: 'ship-check', description: 'Run the pre-ship checklist', source: 'project', mentionable: true });
+    expect(list.commands).toContainEqual({ name: 'tdd', description: 'Test-driven development with red-green-refactor loop.', source: 'personal', mentionable: true });
+    expect(list.commands).toContainEqual(expect.objectContaining({ name: 'goal', source: 'builtin' }));
+    for (const hidden of ['copy-request-id', 'statusline']) expect(names(list)).not.toContain(hidden);
+  });
+
+  it('opens a session for that folder with no MCP servers, strips the API keys and leaves nothing behind', async () => {
+    const dir = repo();
+    await listCommands('cursor', dir, { wait: true });
+    const [probe] = cursorProbes(dir);
+    expect(probe.params).toEqual({ cwd: dir, mcpServers: [] });
+    expect(probe.cursor_auth).toEqual([]);
+    expect(fakeAlive(probe.pid, 'fake-cursor.mjs')).toBe(false);
+    expect(readdirSync(join(config, 'acp-sessions'))).toEqual([]);
+  });
+
+  it('reports the fix when Cursor Agent cannot list its commands', async () => {
+    process.env.FAKE_CURSOR_ACP_FAIL = '1';
+    try {
+      const list = await listCommands('cursor', repo(), { wait: true });
+      expect(list).toEqual({ status: 'unavailable', fix: 'cursor-agent status', commands: [], fetchedAt: null });
+    } finally {
+      delete process.env.FAKE_CURSOR_ACP_FAIL;
     }
   });
 });
