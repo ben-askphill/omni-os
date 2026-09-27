@@ -17,6 +17,8 @@ export interface SlashCommand {
   plugin?: string;
   /** Can be named after the start of a message as a Mention. */
   mentionable: boolean;
+  /** The file a Codex skill loads from, which Omni sends with the message. */
+  path?: string;
 }
 
 /** A `/name` token in a message. `end` is exclusive. */

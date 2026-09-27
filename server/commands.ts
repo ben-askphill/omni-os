@@ -4,6 +4,7 @@
 // a failed probe keeps the last good list.
 import { visibleCommands, type SlashCommand } from '../shared/slash.ts';
 import { probeClaudeCommands } from './harness/claude/commands.ts';
+import { probeCodexSkills } from './harness/codex/commands.ts';
 import type { HarnessId } from './harness/types.ts';
 
 export interface CommandList {
@@ -23,6 +24,7 @@ interface Source {
 
 const SOURCES: Partial<Record<HarnessId, Source>> = {
   'claude-code': { probe: probeClaudeCommands, fix: 'claude doctor' },
+  codex: { probe: probeCodexSkills, fix: 'codex doctor' },
 };
 
 /** A list older than this is served, then refreshed. */
@@ -79,6 +81,14 @@ const NONE: CommandList = { status: 'ready', commands: [], fetchedAt: null };
 export function peekCommands(harness: HarnessId, cwd: string): CommandList {
   const src = SOURCES[harness];
   return src ? snapshot(entry(harness, cwd, src), src) : NONE;
+}
+
+/**
+ * Mark every cached list of a harness out of date, so the next call asks it again. A change to
+ * personal commands shows in every folder.
+ */
+export function invalidateCommands(harness: HarnessId) {
+  for (const [key, e] of entries) if (key.startsWith(`${harness}\0`)) e.checkedAt = undefined;
 }
 
 /**

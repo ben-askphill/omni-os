@@ -5,8 +5,8 @@
 // thread, kept warm.
 //
 // Requests answered: initialize, account/read, account/rateLimits/read, config/read,
-// model/list (two models a page), thread/start, thread/resume, turn/start, turn/steer,
-// turn/interrupt. A turn sends turn/started, item/started and item/completed (userMessage,
+// model/list (two models a page), skills/list, thread/start, thread/resume, turn/start,
+// turn/steer, turn/interrupt. A turn sends turn/started, item/started and item/completed (userMessage,
 // commandExecution, agentMessage), account/rateLimits/updated (on the first turn, for the
 // plan's bucket and then a reserve model's) and turn/completed.
 //
@@ -18,11 +18,15 @@
 //   RETRY     report an error Codex retries by itself, then carry on
 //   BADTURN   fail the turn on the plan limit, with the API's JSON error body as the message
 //   CRASH     exit(1) mid-turn, like the process dying
+//   SKILLS_EDITED  send skills/changed, as Codex does when a personal skill file changes
 // Env:
 //   FAKE_CODEX_LOG=<file>     append one JSON line per request (method, params, cwd, api vars seen)
 //   FAKE_CODEX_ACCOUNT=none   logged out; =apiKey logged in with an API key instead of ChatGPT
+//   FAKE_CODEX_SKILLS_FAIL=1  skills/list answers with an error
+//   CODEX_HOME=<dir>          personal skills are read from <dir>/skills, as Codex does
 import { randomUUID } from 'node:crypto';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const argv = process.argv.slice(2);
 if (argv[0] !== 'app-server') {
@@ -106,6 +110,41 @@ const bucket = (limitId, primary, secondary) => ({
 const planLimits = (fiveHour, week) => bucket('codex', win(fiveHour, 300, 1790328600), win(week, 10080, 1790922600));
 const RESERVE_LIMITS = bucket('base_model_inference', null, win(90, 10080, 1790922600));
 
+// ---------- skills ----------
+
+// Skills from folders, then the ones every folder gets. The repeat of `tdd` is a second copy
+// Codex also lists; the first one wins.
+const skill = (name, description, scope, path, extra = {}) => ({ name, description, path, scope, enabled: true, pluginId: null, ...extra });
+const FIXED_SKILLS = [
+  skill('tdd', 'Test-driven development with red-green-refactor loop.', 'user', '/Users/dev/.agents/skills/tdd/SKILL.md'),
+  skill('bro', 'Restate the last message in plain human language.', 'user', '/Users/dev/.agents/skills/bro/SKILL.md'),
+  skill('tdd', 'An older copy.', 'user', '/Users/dev/.agents/skills/synced/tdd/SKILL.md'),
+  skill('vercel:vercel-cli', 'Vercel CLI expert guidance.', 'user', '/Users/dev/.codex/plugins/cache/vercel/skills/vercel-cli/SKILL.md', { pluginId: 'vercel@claude-plugins-official' }),
+  skill('legacy-deploy', 'Deploy with the old pipeline.', 'user', '/Users/dev/.agents/skills/legacy-deploy/SKILL.md', { enabled: false }),
+  skill('imagegen', 'Generate or edit raster images when the task benefits from AI-created bitmap visuals.', 'system', '/Users/dev/.codex/skills/.system/imagegen/SKILL.md', {
+    interface: { displayName: 'Image Gen', shortDescription: 'Generate or edit images for websites, games, and more' },
+  }),
+];
+
+/** The skills in `<dir>/<name>/SKILL.md`, named and described by their frontmatter. */
+function skillsIn(dir, scope) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((d) => existsSync(join(dir, d, 'SKILL.md')))
+    .map((d) => {
+      const file = join(dir, d, 'SKILL.md');
+      const front = /^---\n([\s\S]*?)\n---/.exec(readFileSync(file, 'utf8'))?.[1] ?? '';
+      const field = (k) => new RegExp(`^${k}:\\s*(.*)$`, 'm').exec(front)?.[1]?.trim() ?? '';
+      return skill(field('name') || d, field('description'), scope, file);
+    });
+}
+
+const skillsFor = (cwd) => [
+  ...skillsIn(join(cwd, '.agents', 'skills'), 'repo'),
+  ...(process.env.CODEX_HOME ? skillsIn(join(process.env.CODEX_HOME, 'skills'), 'user') : []),
+  ...FIXED_SKILLS,
+];
+
 const PLAN = [
   { step: 'Scaffold', status: 'completed' },
   { step: 'Wire adapter', status: 'inProgress' },
@@ -168,6 +207,7 @@ async function runTurn(turn, input) {
     notify('error', { error: turnError('Reconnecting... 1/5'), willRetry: true, threadId, turnId: turn.id });
   }
   if (said.includes('PLAN')) notify('turn/plan/updated', { threadId, turnId: turn.id, explanation: null, plan: PLAN });
+  if (said.includes('SKILLS_EDITED')) notify('skills/changed', {});
   if (said.includes('CMD')) {
     const cmd = {
       type: 'commandExecution',
@@ -302,6 +342,9 @@ function onMessage(msg) {
       const to = from + (params.limit ?? 2);
       return respond(id, { data: all.slice(from, to), nextCursor: to < all.length ? String(to) : null });
     }
+    case 'skills/list':
+      if (process.env.FAKE_CODEX_SKILLS_FAIL) return fail(id, 'skills are unavailable');
+      return respond(id, { data: (params?.cwds ?? []).map((cwd) => ({ cwd, skills: skillsFor(cwd), errors: [] })) });
     case 'thread/start':
     case 'thread/resume':
       return openThread(id, method, params);

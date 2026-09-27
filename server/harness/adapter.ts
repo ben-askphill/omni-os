@@ -26,6 +26,16 @@ export interface AdapterContext {
   resume: boolean;
 }
 
+/** A harness command a message names, resolved when it was sent. `end` is exclusive. */
+export interface CommandUse {
+  name: string;
+  /** Where `/name` sits in the text, as typed (it may be an alias). */
+  start: number;
+  end: number;
+  /** A Codex skill's file. */
+  path?: string;
+}
+
 /** The runner subscribes to these as the harness process runs. */
 export interface AdapterCallbacks {
   /** One Omni record produced by the harness. */
@@ -34,6 +44,8 @@ export interface AdapterCallbacks {
   usage: (u: Usage) => void;
   /** The harness's own session id, learned once the session starts (Codex thread id, Cursor chat id). */
   session: (id: string) => void;
+  /** The harness says its commands changed, so a cached command list is out of date. */
+  commandsChanged?: () => void;
 }
 
 /** A running harness process, wired to the runner. */
