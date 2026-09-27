@@ -31,6 +31,7 @@ const GROUPS: [CommandSource, string][] = [
   ['project', 'Project'],
   ['personal', 'Personal'],
   ['plugin', 'Plugins'],
+  ['mcp', 'MCP'],
   ['builtin', 'Built-in'],
   ['omni', 'Omni'],
 ];
@@ -40,6 +41,7 @@ export const SOURCE_TAG: Record<CommandSource, string> = {
   project: 'project',
   personal: 'personal',
   plugin: 'plugin',
+  mcp: 'mcp',
   builtin: 'built-in',
   omni: 'omni',
 };

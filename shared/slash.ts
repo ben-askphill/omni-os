@@ -1,8 +1,8 @@
 // The slash grammar, shared by the server and the web app so both agree on what a message runs.
 // See CONTEXT.md: a Slash command is a Harness command or an Omni command.
 
-/** Where a command comes from, as the menu groups it. */
-export type CommandSource = 'omni' | 'project' | 'personal' | 'plugin' | 'builtin';
+/** Where a command comes from, as the menu groups it. `mcp`: an MCP server's prompt, which only a thread's running process lists. */
+export type CommandSource = 'omni' | 'project' | 'personal' | 'plugin' | 'mcp' | 'builtin';
 
 /** One command a thread's `/` menu offers, in the same shape for every harness. */
 export interface SlashCommand {
@@ -124,7 +124,7 @@ export function resolveSlash(text: string, commands: SlashCommand[]): SlashResol
 
 /** A command that only works at the start of a message, typed later in one. */
 export interface LateCommand extends SlashToken {
-  /** An Omni command, or a harness command that can't be a Mention (a built-in). */
+  /** An Omni command, or a harness command that can't be a Mention (a built-in or an MCP prompt). */
   kind: 'omni' | 'builtin';
 }
 

@@ -5,6 +5,7 @@ import { normalizeClaudeCommands } from '../server/harness/claude/commands.ts';
 
 // Trimmed from real `initialize` responses captured on 2026-09-27: a strict-MCP probe in a folder
 // with a project command and a project skill, plus one MCP prompt from a probe without strict MCP.
+// The MCP server names below were checked against claude 2.1.282's `system/init` slash_commands.
 const RAW = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'claude-commands.json'), 'utf8'));
 const list = normalizeClaudeCommands(RAW);
 const byName = (name: string) => list.find((c) => c.name === name);
@@ -52,8 +53,26 @@ describe('normalizeClaudeCommands', () => {
     expect(byName('claude-api')!.description).not.toContain('\n');
   });
 
-  it('drops entries whose names cannot be typed as a command, such as MCP prompts', () => {
+  it('lists an MCP prompt under the name that runs it, mcp__<server>__<prompt>, which cannot be a Mention', () => {
+    expect(byName('mcp__plugin_vercel_vercel__quick_status')).toEqual({
+      name: 'mcp__plugin_vercel_vercel__quick_status',
+      description: expect.stringMatching(/^Get a quick overview of the current project status/),
+      source: 'mcp',
+      mentionable: false,
+    });
+  });
+
+  it('writes an MCP server name the way Claude Code does, with _ for anything but letters, digits, _ and -', () => {
+    const names = normalizeClaudeCommands([
+      { name: 'claude.ai Figma:create_design_system_rules (MCP)', description: 'Rules', argumentHint: '' },
+      { name: 'claude.ai Foo - Bar:greet (MCP)', description: 'Hi', argumentHint: '' },
+      { name: 'Acme-Tools_2:two_args (MCP)', description: 'Two', argumentHint: '' },
+    ]).map((c) => c.name);
+    expect(names).toEqual(['mcp__claude_ai_Figma__create_design_system_rules', 'mcp__claude_ai_Foo_-_Bar__greet', 'mcp__Acme-Tools_2__two_args']);
+  });
+
+  it('drops entries whose names cannot be typed as a command', () => {
     expect(list.some((c) => c.name.includes(' '))).toBe(false);
-    expect(list).toHaveLength(RAW.length - 2); // the MCP prompt and `__remote-workflow`
+    expect(list).toHaveLength(RAW.length - 1); // `__remote-workflow`
   });
 });

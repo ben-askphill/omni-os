@@ -9,8 +9,26 @@ import { config, artifactsDir, threadDir } from '../../config.ts';
 import type { Thread } from '../../db.ts';
 import { parseEvent, LineSplitter } from '../../stream.ts';
 import { harnessEnv } from '../env-guard.ts';
+import { normalizeClaudeCommands } from './commands.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
+
+/** Omni's own `initialize` request, whose answer lists the process's commands. */
+const COMMANDS_REQUEST = 'omni-commands';
+
+/**
+ * A command list the process sent: its answer to Omni's `initialize`, or the whole list again once it
+ * changed. MCP prompts only arrive the second way, when the servers connect after the answer went out.
+ */
+function listedCommands(evt: any): unknown[] | null {
+  const list =
+    evt?.type === 'control_response' && evt.response?.request_id === COMMANDS_REQUEST && evt.response.subtype === 'success'
+      ? evt.response.response?.commands
+      : evt?.type === 'system' && evt.subtype === 'commands_changed'
+        ? evt.commands
+        : null;
+  return Array.isArray(list) ? list : null;
+}
 
 // A run killed before its result event may still have written the session file.
 function sessionOnDisk(t: Thread) {
@@ -65,6 +83,8 @@ export const claudeAdapter: HarnessAdapter = {
       } catch {
         return;
       }
+      const listed = listedCommands(evt);
+      if (listed) cb.commands?.(normalizeClaudeCommands(listed));
       try {
         const parsed = parseEvent(evt);
         if (parsed.usage) cb.usage(parsed.usage);
@@ -77,6 +97,8 @@ export const claudeAdapter: HarnessAdapter = {
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (d: string) => splitter.push(d).forEach(handleLine));
     child.stdin.on('error', () => {});
+    // Ahead of the first message: the commands this process can run, for the thread's `/` menu.
+    child.stdin.write(JSON.stringify({ type: 'control_request', request_id: COMMANDS_REQUEST, request: { subtype: 'initialize' } }) + '\n');
 
     return {
       child,

@@ -63,6 +63,13 @@ describe('menuSections', () => {
     ]);
   });
 
+  it("lists a thread's MCP prompts in their own group after plugins, found by the prompt's name", () => {
+    const list = [...LIST, cmd('mcp__plugin_github_github__AssignCodingAgent', 'mcp', 'Assign the GitHub coding agent to a task', { mentionable: false })];
+    expect(menuSections(list, '').map((s) => [s.label, s.commands.map((c) => c.name)])).toContainEqual(['MCP', ['mcp__plugin_github_github__AssignCodingAgent']]);
+    expect(menuSections(list, '').map((s) => s.label)).toEqual(['Project', 'Personal', 'Plugins', 'MCP', 'Built-in']);
+    expect(names(menuSections(list, 'assign'))).toEqual(['mcp__plugin_github_github__AssignCodingAgent']);
+  });
+
   it('searches every group in one ranked list, name and alias matches above description matches', () => {
     expect(menuSections(LIST, 'pdf')).toHaveLength(1);
     expect(menuSections(LIST, 'pdf')[0].label).toBeNull();

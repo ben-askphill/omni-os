@@ -29,9 +29,14 @@
 //   FAKE_CLAUDE_SIGINT_EXIT_MS=<ms>  on SIGINT, go quiet and exit only after that long, like the real CLI running its
 //                                 shutdown hooks and closing its MCP servers
 //   FAKE_CLAUDE_INIT_FAIL=1       exit 1 on an initialize control request instead of answering it
+//   FAKE_CLAUDE_STDIN_LOG=<file>  stream mode: append one JSON line per stdin line read (pid, thread, type, control subtype)
+//   FAKE_CLAUDE_MCP_MS=<ms>       how long after startup the user's MCP servers connect (default 30)
 //
 // The initialize control request answers with the commands a real CLI lists: a fixed set of personal,
 // plugin and built-in commands, plus one "(project)" command per .claude/commands/*.md in the cwd.
+// Without --strict-mcp-config the user's MCP servers connect a moment after startup, as in claude 2.1.282:
+// an initialize answered before that has no MCP prompts, and once they connect the CLI pushes the whole
+// list again, their prompts included, as system/commands_changed.
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -349,6 +354,13 @@ const COMMANDS = [
   { name: 'config', description: 'Open config panel', argumentHint: '', builtin: true, aliases: ['settings'] },
 ];
 
+// The prompts of the user's own MCP servers, like Ben's GitHub plugin and Figma connector.
+const MCP_PROMPTS = [
+  { name: 'plugin:github:github:AssignCodingAgent (MCP)', description: 'Assign the GitHub coding agent to a task in a repository', argumentHint: '' },
+  { name: 'claude.ai Figma:create_design_system_rules (MCP)', description: 'Write design system rules for this repository', argumentHint: '' },
+];
+let mcpConnected = false;
+
 function projectCommands() {
   const dir = join(process.cwd(), '.claude', 'commands');
   if (!existsSync(dir)) return [];
@@ -360,6 +372,8 @@ function projectCommands() {
       return { name: f.slice(0, -3), description: `${field('description')} (project)`, argumentHint: field('argument-hint') };
     });
 }
+
+const commandList = () => [...COMMANDS, ...projectCommands(), ...(mcpConnected ? MCP_PROMPTS : [])];
 
 function onControl(msg) {
   const id = msg.request_id;
@@ -376,7 +390,7 @@ function onControl(msg) {
       process.stderr.write('fake-claude: initialize failed\n');
       return finish(1);
     }
-    writeRaw({ type: 'control_response', response: { subtype: 'success', request_id: id, response: { commands: [...COMMANDS, ...projectCommands()] } } });
+    writeRaw({ type: 'control_response', response: { subtype: 'success', request_id: id, response: { commands: commandList() } } });
   } else if (sub === 'set_model' || sub === 'set_permission_mode') {
     writeRaw({ type: 'control_response', response: { subtype: 'success', request_id: id, response: {} } });
   } else {
@@ -392,6 +406,10 @@ function onLine(line) {
   } catch {
     process.stderr.write(`fake-claude: ignoring bad stream-json input line: ${line.slice(0, 80)}\n`);
     return;
+  }
+  if (process.env.FAKE_CLAUDE_STDIN_LOG) {
+    const line = { pid: process.pid, thread_id: process.env.OMNI_THREAD_ID ?? null, type: msg.type, subtype: msg.request?.subtype };
+    appendFileSync(process.env.FAKE_CLAUDE_STDIN_LOG, JSON.stringify(line) + '\n');
   }
   if (msg.type === 'user') {
     const content = msg.message?.content ?? '';
@@ -477,6 +495,12 @@ async function main() {
 
   // Until startup is over, input lines wait unread.
   const startup = Number(process.env.FAKE_CLAUDE_STARTUP_MS ?? 0);
+  if (!opts['--strict-mcp-config']) {
+    setTimeout(() => {
+      mcpConnected = true;
+      emit({ type: 'system', subtype: 'commands_changed', commands: commandList() });
+    }, startup + Number(process.env.FAKE_CLAUDE_MCP_MS ?? 30));
+  }
   let early = startup > 0 ? [] : null;
   const take = (line) => (early ? early.push(line) : onLine(line));
   const idleExit = () => !early && stdinDone && !turn && !queue.length && !background && finish(0);

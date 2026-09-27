@@ -13,6 +13,7 @@ export type Ev = { id: number; kind: string; p: any };
 export async function startRunner(env: Record<string, string> = {}) {
   const tmp = mkdtempSync(join(tmpdir(), 'omni-runner-'));
   const log = join(tmp, 'fake-claude.jsonl');
+  const stdinLog = join(tmp, 'fake-claude-stdin.jsonl');
   const codexLog = join(tmp, 'fake-codex.jsonl');
   const cursorLog = join(tmp, 'fake-cursor.jsonl');
   const scratch = join(tmp, 'scratch');
@@ -29,6 +30,7 @@ export async function startRunner(env: Record<string, string> = {}) {
     OMNI_KEEPALIVE_SECONDS: '60',
     OMNI_INTERRUPT_GRACE_MS: '1000',
     FAKE_CLAUDE_LOG: log,
+    FAKE_CLAUDE_STDIN_LOG: stdinLog,
     FAKE_CLAUDE_LATENCY_MS: '10',
     FAKE_CODEX_LOG: codexLog,
     FAKE_CURSOR_LOG: cursorLog,
@@ -55,6 +57,8 @@ export async function startRunner(env: Record<string, string> = {}) {
 
   const invocations = (): any[] =>
     existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  const claudeStdin = (): any[] =>
+    existsSync(stdinLog) ? readFileSync(stdinLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
   const codexRequests = (): any[] =>
     existsSync(codexLog) ? readFileSync(codexLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
   const cursorRequests = (): any[] =>
@@ -87,6 +91,9 @@ export async function startRunner(env: Record<string, string> = {}) {
     thread,
     statuses: (id: string) => statusLog.get(id) ?? [],
     invocations,
+    /** What a thread's claude processes read on stdin, in order: `user`, or `control_request:<subtype>`. */
+    claudeStdin: (id: string) =>
+      claudeStdin().filter((l) => l.thread_id === id).map((l) => (l.subtype ? `${l.type}:${l.subtype}` : l.type) as string),
     codexRequests,
     /** Codex app-server processes spawned, oldest first (one per thread). */
     codexPids: () => [...new Set(codexRequests().map((r) => r.pid))],

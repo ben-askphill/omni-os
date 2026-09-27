@@ -64,6 +64,30 @@ describe('the resolved command on the user event', () => {
   });
 });
 
+describe("a Claude Code thread's own command list", () => {
+  it('is asked for before the first message, and the first turn runs as before', async () => {
+    const t = await r.start('hello');
+    await r.untilResults(t.id, 1);
+    expect(r.claudeStdin(t.id)).toEqual(['control_request:initialize', 'user']);
+    expect(r.flow(t.id)).toEqual(['user', 'assistant_text', 'result']);
+    expect(r.texts(t.id, 'assistant_text')).toEqual(['ack: hello']);
+    expect(r.spawns(t.id).map((s) => s.session_id)).toEqual([t.session_id]);
+  });
+
+  it('has the MCP prompts only the running process lists, so a follow-up can start with one', async () => {
+    const t = await r.start('hello');
+    await r.untilResults(t.id, 1);
+    await r.until('its MCP servers to connect', () => r.runner.threadCommands(t.id)?.commands.some((c) => c.source === 'mcp'));
+    await r.runner.postMessage(t.id, '/mcp__plugin_github_github__AssignCodingAgent octo/omni#39');
+    await r.untilResults(t.id, 2);
+    expect(r.byKind(t.id, 'user')[1].p).toMatchObject({
+      text: '/mcp__plugin_github_github__AssignCodingAgent octo/omni#39',
+      slash: { command: { name: 'mcp__plugin_github_github__AssignCodingAgent', source: 'mcp', start: 0, end: 45 } },
+    });
+    expect(r.texts(t.id, 'assistant_text')[1]).toBe('Output of /mcp__plugin_github_github__AssignCodingAgent');
+  });
+});
+
 describe('an Omni command that arrives from outside the composer', () => {
   it('is stored and sent as plain text, and Omni neither renames nor starts a thread', async () => {
     const t = await r.start('hello', { title: 'Old title' });
