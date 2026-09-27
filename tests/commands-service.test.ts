@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, mkdtempSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 import { FAKE_CODEX, FAKE_CURSOR, fakeAlive } from './support.ts';
@@ -243,6 +243,22 @@ describe('listCommands on Cursor Agent', () => {
       expect(list).toEqual({ status: 'unavailable', fix: 'cursor-agent status', commands: [], fetchedAt: null });
     } finally {
       delete process.env.FAKE_CURSOR_ACP_FAIL;
+    }
+  });
+
+  it('answers once Cursor Agent is gone, even while a helper it started holds its output open', async () => {
+    const helper = join(r.tmp, 'cursor-helper.pid');
+    const bin = join(r.tmp, 'cursor-with-helper.sh');
+    writeFileSync(bin, `#!/bin/sh\nsleep 30 &\necho $! > '${helper}'\nexec '${FAKE_CURSOR}' "$@"\n`, { mode: 0o755 });
+    process.env.OMNI_CURSOR_BIN = bin;
+    try {
+      const dir = repo();
+      const list = await Promise.race([listCommands('cursor', dir, { wait: true }), new Promise((ok) => setTimeout(ok, 3_000, 'still waiting'))]);
+      expect(list).toMatchObject({ status: 'ready' });
+      expect(readdirSync(join(config, 'acp-sessions'))).toEqual([]);
+    } finally {
+      process.env.OMNI_CURSOR_BIN = FAKE_CURSOR;
+      process.kill(Number(readFileSync(helper, 'utf8')), 'SIGKILL');
     }
   });
 });

@@ -27,12 +27,14 @@ export function probeCursorCommands(cwd: string): Promise<SlashCommand[] | null>
     let sessionId: string | null = null;
     let done = false;
     let settled = false;
+    const exited = () => child.exitCode !== null || child.signalCode !== null;
     const finish = (found: SlashCommand[] | null) => {
       if (done) return;
       done = true;
       list = found;
       clearTimeout(timer);
-      child.kill('SIGKILL');
+      if (exited()) settle();
+      else child.kill('SIGKILL');
     };
     // Answer once Cursor Agent is gone, so removing its session can't race it.
     const settle = () => {
@@ -45,6 +47,9 @@ export function probeCursorCommands(cwd: string): Promise<SlashCommand[] | null>
     const timer = setTimeout(() => finish(null), PROBE_TIMEOUT_MS);
     child.on('error', settle);
     child.on('close', settle);
+    // 'close' also waits for any helper Cursor Agent started that still holds its output open.
+    // Once there's an answer, or none is coming, its own exit is enough.
+    child.on('exit', () => done && settle());
     child.stdin.on('error', () => {});
     const send = (msg: object) => child.stdin.write(JSON.stringify({ jsonrpc: '2.0', ...msg }) + '\n');
 
