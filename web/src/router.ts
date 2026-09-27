@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import type { NewThreadPreset } from './composer-slash.ts';
 
 export type ChannelTab = 'threads' | 'prs' | 'settings';
 
@@ -97,4 +98,22 @@ export function takeComposerFocus() {
   const v = focusPending;
   focusPending = false;
   return v;
+}
+
+// ---------- a new thread from a thread (`/clear`, "New thread on another model") ----------
+
+let preset: NewThreadPreset | null = null;
+
+/** Open the channel's new-thread composer, set up from `p`. */
+export function openNewThread(p: NewThreadPreset) {
+  preset = p;
+  // The model picker takes the focus itself.
+  if (!p.pickModel) focusPending = true;
+  navigate(`/c/${encodeURIComponent(p.channel)}`);
+}
+
+/** The preset waiting for this channel's composer. Read while rendering, so it stays until `dropNewThreadPreset`. */
+export const peekNewThreadPreset = (channel: string) => (preset?.channel === channel ? preset : null);
+export function dropNewThreadPreset(p: NewThreadPreset) {
+  if (preset === p) preset = null;
 }

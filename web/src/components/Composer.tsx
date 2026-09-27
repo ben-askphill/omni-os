@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { bytes } from '../format.ts';
-import { navigate, takeComposerFocus } from '../router.ts';
+import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset, takeComposerFocus } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { ErrorNote, Icon, IconButton, Kbd, Picker, Spinner, type IconName, type PickerOption } from './ui.tsx';
 import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
 import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
 import { menuSections, pickCommand, slashQuery } from '../slash-menu.ts';
+import { menuCommands, newThreadBody, otherModel, replySlash, sameSettings } from '../composer-slash.ts';
 import type { SlashCommand } from '../../../shared/slash.ts';
 
 // Unsent text survives navigation (not reloads). Keyed by where the composer lives.
@@ -241,11 +242,16 @@ export function NewThreadComposer({
 }) {
   const { channels, crew } = useApp();
   const key = `new:${channelId ?? '*'}`;
+  // Set up from the thread Ben came from, when `/clear` or "New thread on another model" opened this.
+  const [preset] = useState(() => (channelId ? peekNewThreadPreset(channelId) : null));
+  useEffect(() => {
+    if (preset) dropNewThreadPreset(preset);
+  }, [preset]);
   const [text, setText] = useState(() => drafts.get(key) ?? '');
   const [channel, setChannel] = useState(channelId ?? defaultChannel);
-  const [role, setRole] = useState<string>(() => ((channelId ?? defaultChannel) === 'conductor' ? 'conductor' : ''));
-  const [choice, setChoice] = useState<ModelChoice>({ harness: 'claude-code', model: '' });
-  const [effort, setEffort] = useState('');
+  const [role, setRole] = useState<string>(() => preset?.role ?? ((channelId ?? defaultChannel) === 'conductor' ? 'conductor' : ''));
+  const [choice, setChoice] = useState<ModelChoice>(() => preset?.choice ?? { harness: 'claude-code', model: '' });
+  const [effort, setEffort] = useState(preset?.effort ?? '');
   const { data: harnesses, reload: reloadHarnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -258,18 +264,18 @@ export function NewThreadComposer({
     if (channelId) setChannel(channelId);
   }, [channelId]);
 
-  // A new composer starts on Claude Code's default model, not on the last pick.
+  // A new composer starts on its harness's default model (Claude Code's, unless a preset says), not on the last pick.
   useEffect(() => {
     if (!harnesses || choice.model) return;
-    const claude = harnesses.find((h) => h.id === 'claude-code');
-    const def = claude?.models.find((m) => m.default) ?? claude?.models[0];
-    if (def) setChoice({ harness: 'claude-code', model: def.id });
+    const h = harnesses.find((x) => x.id === choice.harness);
+    const def = h?.models.find((m) => m.default) ?? h?.models[0];
+    if (def) setChoice({ harness: choice.harness, model: def.id });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [harnesses]);
 
-  // Default the role once crew loads, if the conductor channel is selected.
+  // Default the role once crew loads, if the conductor channel is selected. A preset keeps its own.
   useEffect(() => {
-    if (!role && channel === 'conductor' && crew.some((r) => r.id === 'conductor')) setRole('conductor');
+    if (!preset && !role && channel === 'conductor' && crew.some((r) => r.id === 'conductor')) setRole('conductor');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crew]);
 
@@ -362,6 +368,7 @@ export function NewThreadComposer({
           <ModelPicker
             harnesses={harnesses}
             onOpen={reloadHarnesses}
+            defaultOpen={preset?.pickModel}
             value={choice}
             onChange={(c) => {
               setChoice(c);
@@ -522,19 +529,21 @@ const finePointer = () => typeof matchMedia !== 'undefined' && matchMedia('(poin
 
 /** Follow-up composer pinned under a thread. On a busy thread it steers by default. */
 export function ReplyComposer({
-  threadId,
-  status,
+  thread,
   canSteer = true,
   onSent,
+  onRenamed,
   extra,
 }: {
-  threadId: string;
-  status: string;
+  thread: Thread;
   /** When false (e.g. Cursor), a busy thread offers only Queue and Interrupt; Cmd+Enter queues. */
   canSteer?: boolean;
   onSent?: (t: Thread, mode?: SendMode) => void;
+  /** The thread after `/rename`. */
+  onRenamed?: (t: Thread) => void;
   extra?: ReactNode;
 }) {
+  const { id: threadId, status } = thread;
   const key = `reply:${threadId}`;
   const [text, setText] = useState(() => drafts.get(key) ?? '');
   const [busy, setBusy] = useState(false);
@@ -562,7 +571,7 @@ export function ReplyComposer({
   // Esc closes the menu until what is typed before the caret changes, or the command is deleted.
   const [dismissed, setDismissed] = useState<string | null>(null);
   const at = focused ? slashQuery(text, caret) : null;
-  const sections = useMemo(() => (at ? menuSections(list?.commands ?? [], at.query) : []), [at?.query, list]);
+  const sections = useMemo(() => (at ? menuSections(menuCommands(list?.commands), at.query) : []), [at?.query, list]);
   const items = sections.flatMap((s) => s.commands);
   const typed = text.slice(0, caret);
   // A ready list with nothing matching shows no menu: the text is sent as it is.
@@ -636,6 +645,51 @@ export function ReplyComposer({
     void submit(mode);
   };
 
+  // ----- Omni commands, and hints for commands that stay text -----
+  const slash = useMemo(() => replySlash(text, list, thread.harness), [text, list, thread.harness]);
+  const omni = slash.action.kind !== 'send';
+
+  /** Clear what was sent, unless Ben typed more while it was in flight. */
+  const sent = (raw: string) => {
+    if (drafts.get(key) === raw) drafts.delete(key);
+    if (latest.current === raw) setText('');
+  };
+
+  /** Run the Omni command the message starts with. The thread itself sees none of it. */
+  const runOmni = async () => {
+    const { action } = slash;
+    if (!slash.armed || busy) return;
+    const raw = text;
+    if (action.kind === 'new-thread' && !action.prompt) {
+      sent(raw);
+      openNewThread(sameSettings(thread));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      if (action.kind === 'new-thread') {
+        const t = await api.send<Thread>('/threads', newThreadBody(thread, action.prompt), att.files);
+        sent(raw);
+        att.clear();
+        navigate(`/t/${t.id}`);
+      } else if (action.kind === 'rename') {
+        const t = await api.patch<Thread>(`/threads/${encodeURIComponent(threadId)}`, { title: action.title });
+        sent(raw);
+        onRenamed?.(t);
+      }
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const otherModelThread = () => {
+    sent(text);
+    openNewThread(otherModel(thread));
+  };
+
   return (
     <div className={shell('rounded-[24px] bg-elev', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
@@ -667,6 +721,7 @@ export function ReplyComposer({
           if (menuKey(e)) return;
           if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.nativeEvent.isComposing) return;
           e.preventDefault();
+          if (omni) return void runOmni();
           const busyMode: SendMode = e.shiftKey ? 'interrupt' : canSteer ? 'steer' : 'queue';
           void submit(busyThread ? busyMode : undefined);
         }}
@@ -679,7 +734,11 @@ export function ReplyComposer({
         {extra}
         <div className="ml-auto flex items-center gap-2.5">
           <Hint />
-          {busyThread ? (
+          {omni ? (
+            <SendButton armed={slash.armed} busy={busy} onClick={() => void runOmni()}>
+              {slash.label ?? 'Send'}
+            </SendButton>
+          ) : busyThread ? (
             <SteerButton disabled={!text.trim()} busy={busy} canSteer={canSteer} onSend={sendVia} />
           ) : (
             <SendButton armed={!!text.trim()} busy={busy} onClick={() => void submit()}>
@@ -688,6 +747,16 @@ export function ReplyComposer({
           )}
         </div>
       </div>
+      {slash.hint && !menuOpen && (
+        <div aria-live="polite" className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2 pb-1.5 text-[12px] text-fg-3">
+          <span>{slash.hint}</span>
+          {slash.action.kind === 'fixed' && (
+            <button type="button" onClick={otherModelThread} className="font-medium text-fg-2 underline-offset-2 hover:text-fg hover:underline">
+              New thread on another model
+            </button>
+          )}
+        </div>
+      )}
       {(att.error || error) && <ErrorNote className="m-1 mt-2">{att.error ?? error}</ErrorNote>}
     </div>
   );

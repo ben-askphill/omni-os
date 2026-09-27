@@ -18,13 +18,16 @@ export function ModelPicker({
   value,
   onChange,
   onOpen,
+  defaultOpen,
 }: {
   harnesses: HarnessWithRunning[];
   value: ModelChoice;
   onChange: (v: ModelChoice) => void;
   onOpen?: () => void;
+  /** Start with the list open, as "New thread on another model" does. */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!defaultOpen);
   const [q, setQ] = useState('');
   const wrap = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
@@ -44,6 +47,11 @@ export function ModelPicker({
         : h.models,
     }));
   }, [harnesses, q]);
+
+  useEffect(() => {
+    if (defaultOpen) onOpen?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!open) return;

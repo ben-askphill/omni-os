@@ -71,7 +71,8 @@ export function SlashMenu({
       onMouseDown={(e) => e.preventDefault()}
       className="fade-in scroll-thin absolute inset-x-0 bottom-full z-20 mb-2 max-h-[min(22rem,45vh)] overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-[var(--shadow-menu)]"
     >
-      {!sections.length && list?.status === 'unavailable' && (
+      {/* Omni's own commands are listed either way, so say why the harness's are missing. */}
+      {list?.status === 'unavailable' && (
         <div className="px-2.5 py-2 text-[12.5px] text-fg-3">
           Couldn't read this thread's commands.
           {list.fix && (
@@ -82,7 +83,7 @@ export function SlashMenu({
           )}
         </div>
       )}
-      {!sections.length && (!list || list.status === 'loading') && (
+      {(!list || list.status === 'loading') && (
         <div className="flex items-center gap-2 px-2.5 py-2 text-[12.5px] text-fg-3">
           <Spinner size={13} /> Loading commands
         </div>
