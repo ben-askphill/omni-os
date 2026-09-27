@@ -1,14 +1,32 @@
-import { afterAll } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { FAKE_CLAUDE, fakeAlive, waitFor } from './support.ts';
 
 // Boots the real runner against a throwaway data dir and the fake claude CLI.
-// Env must be set before the first import of server modules, so each test file calls this once at the top.
-// No Keychain (fresh db has no secrets), no browser MCP, no network, no real claude.
+// Env must be set before the first import of server modules, so each test file calls this once, at the
+// top or in beforeAll. tests/setup.ts stops it once the file's tests are done.
+// No Keychain (fresh db has no secrets), no browser MCP, no network, no real claude, codex or cursor-agent.
 
 export type Ev = { id: number; kind: string; p: any };
+
+/** Teardowns of the runners this test file booted. */
+const running: (() => Promise<void>)[] = [];
+
+/** Stop the runners this test file booted. tests/setup.ts calls it after the file's tests. */
+export async function stopRunners() {
+  for (const stop of running.splice(0)) await stop();
+}
+
+/** shutdownAll sends SIGKILL at 5s, so a shutdown still running after this is stuck. */
+const SHUTDOWN_MS = 7_000;
+
+/** True once p resolves, false if it has not settled within ms. Rejects if p does. */
+function settles(p: Promise<unknown>, ms: number) {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<boolean>((done) => (timer = setTimeout(done, ms, false)));
+  return Promise.race([p.then(() => true), late]).finally(() => clearTimeout(timer));
+}
 
 export async function startRunner(env: Record<string, string> = {}) {
   const tmp = mkdtempSync(join(tmpdir(), 'omni-runner-'));
@@ -23,6 +41,9 @@ export async function startRunner(env: Record<string, string> = {}) {
   Object.assign(process.env, {
     OMNI_DATA_DIR: join(tmp, 'data'),
     OMNI_CLAUDE_BIN: FAKE_CLAUDE,
+    // Not installed, unless the file passes the fake.
+    OMNI_CODEX_BIN: join(tmp, 'no-codex'),
+    OMNI_CURSOR_BIN: join(tmp, 'no-cursor-agent'),
     OMNI_BROWSER: '0',
     OMNI_BRAIN_DIR: brain,
     OMNI_DEFAULT_MODEL: 'sonnet',
@@ -64,15 +85,22 @@ export async function startRunner(env: Record<string, string> = {}) {
   const cursorRequests = (): any[] =>
     existsSync(cursorLog) ? readFileSync(cursorLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
 
-  afterAll(async () => {
-    await runner.shutdownAll?.();
-    // Safety net: never leave a fake CLI behind, whatever the runner did.
-    for (const { pid } of invocations()) if (fakeAlive(pid)) process.kill(pid, 'SIGKILL');
-    for (const { pid } of codexRequests()) if (fakeAlive(pid, 'fake-codex.mjs')) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
-    for (const { pid } of cursorRequests()) if (fakeAlive(pid, 'fake-cursor.mjs')) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
-    db.db.close();
-    rmSync(tmp, { recursive: true, force: true });
-  }, 15_000);
+  running.push(async () => {
+    const shutdown = runner.shutdownAll();
+    try {
+      if (!(await settles(shutdown, SHUTDOWN_MS))) throw new Error(`shutdownAll did not finish within ${SHUTDOWN_MS}ms`);
+    } finally {
+      // Safety net: never leave a fake CLI behind, whatever the runner did.
+      const fakes: [any[], string][] = [[invocations(), 'fake-claude.mjs'], [codexRequests(), 'fake-codex.mjs'], [cursorRequests(), 'fake-cursor.mjs']];
+      for (const [lines, fixture] of fakes) {
+        for (const pid of new Set(lines.map((l) => l.pid))) if (fakeAlive(pid, fixture)) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
+      }
+      // The kills close the pipes a stuck shutdown waits on: let it finish before closing the db under it.
+      await settles(shutdown, 1000).catch(() => {});
+      db.db.close();
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 
   const TRANSCRIPT = new Set(['user', 'crew_report', 'tool_use', 'tool_result', 'assistant_text', 'result', 'error']);
   const events = (id: string): Ev[] => db.events.since(id).map((r) => ({ id: r.id, kind: r.kind, p: JSON.parse(r.payload) }));
