@@ -246,3 +246,59 @@ describe('listCommands on Cursor Agent', () => {
     }
   });
 });
+
+describe('a message that names a command', () => {
+  /** A channel on its own folder, whose list is cached and then 31 seconds old. */
+  async function staleChannel(id: string) {
+    const dir = repo({ 'ship-check': 'Run the pre-ship checklist' });
+    r.db.channels.create({ id, name: id, kind: 'internal', use_worktree: 0, base_dir: dir });
+    await listCommands('claude-code', dir, { wait: true });
+    later(31_000);
+    return dir;
+  }
+  /** The next probes answer after three seconds, like a CLI connecting slow MCP servers. */
+  async function withSlowProbes<T>(fn: () => Promise<T>): Promise<T> {
+    process.env.FAKE_CLAUDE_STARTUP_MS = '3000';
+    try {
+      return await fn();
+    } finally {
+      delete process.env.FAKE_CLAUDE_STARTUP_MS;
+    }
+  }
+  const timed = async (fn: () => Promise<unknown>) => {
+    const t0 = performance.now();
+    await fn();
+    return performance.now() - t0;
+  };
+
+  it('starts a thread at once on a stale list, which refreshes in the background', async () => {
+    const dir = await staleChannel('stale-start');
+    const ms = await withSlowProbes(() => timed(() => r.runner.createThread({ channel: 'stale-start', prompt: '/ship-check main' })));
+    expect(ms).toBeLessThan(1500);
+    await r.until('the background refresh', () => probes(dir).length === 2);
+  });
+
+  it('keeps the order messages were posted in, while the first waits for a list', async () => {
+    const dir = repo({ 'ship-check': 'Run the pre-ship checklist' });
+    r.db.channels.create({ id: 'in-order', name: 'In order', kind: 'internal', use_worktree: 0, base_dir: dir });
+    await withSlowProbes(async () => {
+      // Nothing is cached, and the thread's own process lists nothing until it is up.
+      const t = await r.runner.createThread({ channel: 'in-order', prompt: 'hello' });
+      await Promise.all([r.runner.postMessage(t.id, '/ship-check main'), r.runner.postMessage(t.id, 'and the changelog')]);
+      await r.until('all three messages in', () => r.byKind(t.id, 'user').length === 3);
+      expect(r.byKind(t.id, 'user').map((u) => u.p.text)).toEqual(['hello', '/ship-check main', 'and the changelog']);
+    });
+  });
+
+  it("goes at once to a warm thread, which has its own list", async () => {
+    await staleChannel('stale-warm');
+    const t = await r.runner.createThread({ channel: 'stale-warm', prompt: 'hello' });
+    await r.untilResults(t.id, 1);
+    await r.until('its own list', () => r.runner.threadCommands(t.id));
+    later(31_000);
+    const ms = await withSlowProbes(() => timed(() => r.runner.postMessage(t.id, '/ship-check main')));
+    expect(ms).toBeLessThan(1500);
+    await r.untilResults(t.id, 2);
+    expect(r.byKind(t.id, 'user')[1].p).toMatchObject({ slash: { command: { name: 'ship-check', source: 'project' } } });
+  });
+});

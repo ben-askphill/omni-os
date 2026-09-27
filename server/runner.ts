@@ -700,9 +700,13 @@ const namesCommand = (prompt: string) => {
   return !!lead || mentions.length > 0;
 };
 
-/** Wait, within a bound, for a folder's command list when a message names a command. */
-async function warmCommands(harness: string, cwd: string, prompt: string) {
+/**
+ * Wait, within a bound, for a folder's first command list when a message names a command. A warm
+ * thread's own list, or a cached one (a stale one refreshes in the background), is used at once.
+ */
+async function warmCommands(harness: string, cwd: string, prompt: string, threadId?: string) {
   if (!namesCommand(prompt)) return;
+  if ((threadId && threadCommands(threadId)) || peekCommands(harness as HarnessId, cwd).status !== 'loading') return;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([listCommands(harness as HarnessId, cwd, { wait: true }), new Promise((r) => (timer = setTimeout(r, SLASH_WAIT_MS)))]);
@@ -838,12 +842,28 @@ export function sendMessage(
   return threads.get(threadId)!;
 }
 
-/** `sendMessage` for the API: a message that starts with a slash first waits, within a bound, for the thread's command list. */
+/** Each thread's last posted message, until it is sent. */
+const posting = new Map<string, Promise<unknown>>();
+
+/**
+ * `sendMessage` for the API: a message that names a command first waits, within a bound, for the
+ * thread's command list. Messages to a thread still go in the order they were posted.
+ */
 export async function postMessage(threadId: string, prompt: string, opts: Parameters<typeof sendMessage>[2] = {}): Promise<Thread> {
   const thread = threads.get(threadId);
   if (!thread) throw new Error('thread not found');
-  await warmCommands(thread.harness, thread.cwd, prompt);
-  return sendMessage(threadId, prompt, opts);
+  const next = (posting.get(threadId) ?? Promise.resolve())
+    .catch(() => {})
+    .then(async () => {
+      await warmCommands(thread.harness, thread.cwd, prompt, threadId);
+      return sendMessage(threadId, prompt, opts);
+    });
+  posting.set(threadId, next);
+  try {
+    return await next;
+  } finally {
+    if (posting.get(threadId) === next) posting.delete(threadId);
+  }
 }
 
 /**
