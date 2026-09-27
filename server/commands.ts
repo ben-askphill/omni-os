@@ -5,6 +5,7 @@
 import { visibleCommands, type SlashCommand } from '../shared/slash.ts';
 import { probeClaudeCommands } from './harness/claude/commands.ts';
 import { probeCodexSkills } from './harness/codex/commands.ts';
+import { probeCursorCommands } from './harness/cursor/commands.ts';
 import type { HarnessId } from './harness/types.ts';
 
 export interface CommandList {
@@ -25,6 +26,8 @@ interface Source {
 const SOURCES: Partial<Record<HarnessId, Source>> = {
   'claude-code': { probe: probeClaudeCommands, fix: 'claude doctor' },
   codex: { probe: probeCodexSkills, fix: 'codex doctor' },
+  // Cursor Agent has no doctor; `status` says whether it is logged in.
+  cursor: { probe: probeCursorCommands, fix: 'cursor-agent status' },
 };
 
 /** A list older than this is served, then refreshed. */
