@@ -18,8 +18,8 @@
 //   /<command>        a message starting with a slash is a local command: no model call, a zero-turn success result
 //                     whose text is the command output
 //   TITLE:<ms>        text mode (Omni's title call): take that long to write the title
-//   ORPHAN            leave a child behind that holds our stdout until it is killed, like a daemon started without
-//                     redirecting its output: once we exit, the runner never sees our pipes close
+//   ORPHAN            leave a child behind that holds our stdout until it is killed (two minutes at most), like a
+//                     daemon started without redirecting its output: once we exit, the runner never sees our pipes close
 // Env:
 //   FAKE_CLAUDE_CRASH_ON=<text>   exit 1 with a stderr message when a message containing <text> starts
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen)
@@ -344,7 +344,7 @@ function startBackground(ms) {
   }, ms);
 }
 
-/** ORPHAN: this script again, as a child that inherits our stdout and idles until killed. */
+/** ORPHAN: this script again, as a child that inherits our stdout and idles until killed (two minutes at most). */
 function leaveOrphan() {
   spawn(process.execPath, [process.argv[1]], { env: { ...process.env, FAKE_CLAUDE_ORPHAN: '1' }, stdio: ['ignore', 'inherit', 'ignore'] }).unref();
 }
@@ -357,7 +357,9 @@ function orphan() {
       JSON.stringify({ pid: process.pid, time: Date.now(), mode: 'orphan', thread_id: process.env.OMNI_THREAD_ID ?? null }) + '\n',
     );
   }
-  setInterval(() => {}, 1 << 30);
+  // Idle until killed, but two minutes at most: far past the teardown that must kill it, and short
+  // enough that a test run killed outright, hooks and all, can't leave it behind for good.
+  setTimeout(() => {}, 120_000);
 }
 
 // ---------- commands ----------
