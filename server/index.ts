@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { config, paths, uploadsDir } from './config.ts';
 import { channels, threads, events, artifacts, search, type Channel, type Thread } from './db.ts';
 import { bus } from './bus.ts';
-import { createThread, sendMessage, interruptThread, runningCount, runningByHarness, slotsByHarness, queuedCount, pendingFor, isLive, shutdownAll } from './runner.ts';
+import { createThread, postMessage, interruptThread, runningCount, runningByHarness, slotsByHarness, queuedCount, pendingFor, isLive, shutdownAll } from './runner.ts';
 import { freshCatalog, getCatalog, startCatalogRefresh } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { usageByHarness } from './usage.ts';
@@ -18,6 +18,7 @@ import { startArtifactWatcher, mimeFor } from './artifacts.ts';
 import { checkUploads, imageMime, safeName, saveUploads } from './uploads.ts';
 import { detectRepo, listPRs, getPR, mergePR } from './github.ts';
 import { loadAutomations, runAutomation, setEnabled, lastRuns, startScheduler } from './automations.ts';
+import { commandsApi } from './commands-api.ts';
 
 const app = new Hono();
 const api = new Hono();
@@ -171,7 +172,7 @@ api.post('/threads/:id/messages', async (c) => {
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
   checkUploads(files);
   const attachments = await saveUploads(id, files);
-  return c.json(sendMessage(id, prompt, { from, mode, attachments }));
+  return c.json(await postMessage(id, prompt, { from, mode, attachments }));
 });
 
 /** Serves a file Ben attached, by its name inside the thread's uploads folder. */
@@ -348,6 +349,8 @@ api.post('/automations/:id/enabled', async (c) => {
   setEnabled(c.req.param('id'), enabled);
   return c.json({ ok: true });
 });
+
+api.route('/commands', commandsApi);
 
 app.route('/api', api);
 

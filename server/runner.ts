@@ -5,7 +5,9 @@ import { readFileSync } from 'node:fs';
 import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
 import { channels, events, threads, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
-import { prepareWorkdir, writeMcpConfig } from './sandbox.ts';
+import { commandsFolder, prepareWorkdir, writeMcpConfig } from './sandbox.ts';
+import { parseSlash, slashRecord } from '../shared/slash.ts';
+import { listCommands, peekCommands } from './commands.ts';
 import { describeAttachments, inlinable, messageContent, saveUploads, type Attachment } from './uploads.ts';
 import { secretsEnv } from './secrets.ts';
 import { type Record as StreamRecord } from './stream.ts';
@@ -679,6 +681,29 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
   return lines.filter((l) => l !== '').join('\n').replace(/\n## /g, '\n\n## ');
 }
 
+// ---------- slash commands ----------
+
+/** How long a message that starts with a slash waits for a command list that isn't cached. It goes as plain text after. */
+const SLASH_WAIT_MS = 5000;
+
+/** Wait, within a bound, for a folder's command list when a message starts with a slash. */
+async function warmCommands(harness: string, cwd: string, prompt: string) {
+  if (!parseSlash(prompt).lead) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([listCommands(harness as HarnessId, cwd, { wait: true }), new Promise((r) => (timer = setTimeout(r, SLASH_WAIT_MS)))]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The user event's `slash` field: the harness command a message starts with, from the cached list. */
+function slashFor(harness: string, cwd: string, prompt: string) {
+  if (!parseSlash(prompt).lead) return {};
+  const slash = slashRecord(prompt, peekCommands(harness as HarnessId, cwd).commands);
+  return slash ? { slash } : {};
+}
+
 // ---------- public API ----------
 
 export interface CreateThreadInput {
@@ -738,12 +763,17 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   });
   const saved = await saveUploads(thread.id, input.files ?? []);
   const attachments = saved.length ? saved : undefined;
+  const folder = commandsFolder(channel) ?? wd.cwd;
+  await warmCommands(harness, folder, input.prompt);
   deliver(thread.id, {
     uuid: randomUUID(),
     text: input.prompt,
     mode: 'steer',
     attachments,
-    event: { kind: 'user', payload: { text: input.prompt, source: thread.source, ...(attachments && { attachments }) } },
+    event: {
+      kind: 'user',
+      payload: { text: input.prompt, source: thread.source, ...slashFor(harness, folder, input.prompt), ...(attachments && { attachments }) },
+    },
   });
   if (!input.title) void generateTitle(thread.id, input.prompt);
   return threads.get(thread.id)!;
@@ -754,16 +784,28 @@ export function sendMessage(
   prompt: string,
   opts: { from?: 'ben' | 'conductor'; mode?: SendMode; attachments?: Attachment[] } = {},
 ): Thread {
-  if (!threads.get(threadId)) throw new Error('thread not found');
+  const thread = threads.get(threadId);
+  if (!thread) throw new Error('thread not found');
   const attachments = opts.attachments?.length ? opts.attachments : undefined;
   deliver(threadId, {
     uuid: randomUUID(),
     text: prompt,
     mode: opts.mode ?? 'steer',
     attachments,
-    event: { kind: 'user', payload: { text: prompt, source: opts.from ?? 'ben', ...(attachments && { attachments }) } },
+    event: {
+      kind: 'user',
+      payload: { text: prompt, source: opts.from ?? 'ben', ...slashFor(thread.harness, thread.cwd, prompt), ...(attachments && { attachments }) },
+    },
   });
   return threads.get(threadId)!;
+}
+
+/** `sendMessage` for the API: a message that starts with a slash first waits, within a bound, for the thread's command list. */
+export async function postMessage(threadId: string, prompt: string, opts: Parameters<typeof sendMessage>[2] = {}): Promise<Thread> {
+  const thread = threads.get(threadId);
+  if (!thread) throw new Error('thread not found');
+  await warmCommands(thread.harness, thread.cwd, prompt);
+  return sendMessage(threadId, prompt, opts);
 }
 
 /**

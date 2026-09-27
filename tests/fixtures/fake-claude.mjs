@@ -27,8 +27,13 @@
 //                                 an interrupt in that gap is answered but stops nothing
 //   FAKE_CLAUDE_SIGINT_EXIT_MS=<ms>  on SIGINT, go quiet and exit only after that long, like the real CLI running its
 //                                 shutdown hooks and closing its MCP servers
+//   FAKE_CLAUDE_INIT_FAIL=1       exit 1 on an initialize control request instead of answering it
+//
+// The initialize control request answers with the commands a real CLI lists: a fixed set of personal,
+// plugin and built-in commands, plus one "(project)" command per .claude/commands/*.md in the cwd.
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const VERSION = '2.1.278';
 const TOOLS = ['Task', 'Bash', 'Glob', 'Grep', 'Read', 'Edit', 'Write', 'WebFetch', 'WebSearch', 'TodoWrite'];
@@ -329,6 +334,32 @@ function startBackground(ms) {
   }, ms);
 }
 
+// ---------- commands ----------
+
+// Shapes as the real CLI sends them (2026-09-27): scope tags at the end, plugin names as a prefix.
+const COMMANDS = [
+  { name: 'tdd', description: 'Test-driven development with a red-green-refactor loop. (user)', argumentHint: '' },
+  { name: 'bro', description: 'Restate the last message in plain human language, with no jargon. (user)', argumentHint: '' },
+  { name: 'document-skills:pdf', description: '(document-skills) Read, create and edit PDF files', argumentHint: '', aliases: ['pdf'] },
+  { name: 'compact', description: 'Clear conversation history but keep a summary in context', argumentHint: '<optional custom summarization instructions>', builtin: true },
+  { name: 'context', description: 'Visualize current context usage as a colored grid', argumentHint: '', builtin: true },
+  { name: 'clear', description: 'Clear conversation history and free up context', argumentHint: '', builtin: true, aliases: ['reset', 'new'] },
+  { name: 'model', description: 'Set the AI model for Claude Code', argumentHint: '[model]', builtin: true },
+  { name: 'config', description: 'Open config panel', argumentHint: '', builtin: true, aliases: ['settings'] },
+];
+
+function projectCommands() {
+  const dir = join(process.cwd(), '.claude', 'commands');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.md'))
+    .map((f) => {
+      const src = readFileSync(join(dir, f), 'utf8');
+      const field = (k) => src.match(new RegExp(`^${k}:\\s*(.*)$`, 'm'))?.[1].trim() ?? '';
+      return { name: f.slice(0, -3), description: `${field('description')} (project)`, argumentHint: field('argument-hint') };
+    });
+}
+
 function onControl(msg) {
   const id = msg.request_id;
   const sub = msg.request?.subtype;
@@ -339,7 +370,13 @@ function onControl(msg) {
       turn.interrupted = true;
       turn.abort?.();
     }
-  } else if (sub === 'initialize' || sub === 'set_model' || sub === 'set_permission_mode') {
+  } else if (sub === 'initialize') {
+    if (process.env.FAKE_CLAUDE_INIT_FAIL === '1') {
+      process.stderr.write('fake-claude: initialize failed\n');
+      return finish(1);
+    }
+    writeRaw({ type: 'control_response', response: { subtype: 'success', request_id: id, response: { commands: [...COMMANDS, ...projectCommands()] } } });
+  } else if (sub === 'set_model' || sub === 'set_permission_mode') {
     writeRaw({ type: 'control_response', response: { subtype: 'success', request_id: id, response: {} } });
   } else {
     writeRaw({ type: 'control_response', response: { subtype: 'error', request_id: id, error: `Unsupported control request subtype: ${sub}` } });
@@ -363,6 +400,14 @@ function onLine(line) {
 }
 
 // ---------- main ----------
+
+function hooksOff() {
+  try {
+    return JSON.parse(opts['--settings'] ?? '{}').disableAllHooks === true;
+  } catch {
+    return false;
+  }
+}
 
 async function readAll() {
   let s = '';
@@ -390,6 +435,7 @@ async function main() {
         pid: process.pid, time: Date.now(), cwd: process.cwd(), args: process.argv.slice(2), mode,
         session_id: sessionId, resume: resumed, model, effort: opts['--effort'] ?? null, unknown, thread_id: process.env.OMNI_THREAD_ID ?? null,
         api_auth: ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'].filter((k) => k in process.env),
+        entrypoint: process.env.CLAUDE_CODE_ENTRYPOINT ?? null,
       }) + '\n',
     );
   }
@@ -415,8 +461,10 @@ async function main() {
     return startTurn();
   }
 
-  emit({ type: 'system', subtype: 'hook_started', hook_id: randomUUID(), hook_name: 'SessionStart:startup', hook_event: 'SessionStart' });
-  emit({ type: 'system', subtype: 'hook_response', hook_id: randomUUID(), hook_name: 'SessionStart:startup', hook_event: 'SessionStart', exit_code: 0 });
+  if (!hooksOff()) {
+    emit({ type: 'system', subtype: 'hook_started', hook_id: randomUUID(), hook_name: 'SessionStart:startup', hook_event: 'SessionStart' });
+    emit({ type: 'system', subtype: 'hook_response', hook_id: randomUUID(), hook_name: 'SessionStart:startup', hook_event: 'SessionStart', exit_code: 0 });
+  }
   if (resumed && process.env.FAKE_CLAUDE_RESUME_FLUSH === '1') {
     // A leftover background task flushed as an empty result before any turn.
     emit({ type: 'result', subtype: 'success', is_error: false, duration_ms: 0, duration_api_ms: 0, num_turns: 0, result: '', total_cost_usd: 0 });

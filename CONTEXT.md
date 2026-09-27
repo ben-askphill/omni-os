@@ -45,6 +45,20 @@ _Avoid_: Thinking, reasoning level
 The harness's own record of a thread's conversation, which Omni resumes on every follow-up.
 _Avoid_: Codex "thread", Cursor "chat" (their names for the same thing)
 
+**Slash command**:
+Anything Ben runs by typing `/` in the composer: a **Harness command** or an **Omni command**.
+_Avoid_: Prompt, macro, shortcut
+
+**Harness command**:
+A skill, custom command, plugin command or built-in that a thread's **Harness** offers and runs itself.
+
+**Omni command**:
+A **Slash command** Omni runs itself in place of a harness built-in that would change what Omni tracks (`/clear`, `/rename`, `/model`).
+
+**Mention**:
+A skill or custom command named with `/` after the start of a message, which the harness loads alongside the text rather than running as the command.
+_Avoid_: Tag, reference
+
 ## Relationships
 
 - A **Channel** has many **Threads**
@@ -54,6 +68,11 @@ _Avoid_: Codex "thread", Cursor "chat" (their names for the same thing)
 - A thread's **Harness**, **Model** and **Effort** are fixed once it starts; carrying work to another harness means starting a new thread
 - A **Crew role** or **Automation** can set a default **Harness**, **Model** and **Effort**; a choice made on the thread wins, and Claude Code is the fallback
 - The **Conductor** delegates on the crew role's default **Harness** unless Ben names another one
+- A **Harness** offers many **Harness commands**; a thread's `/` menu lists its own **Harness**'s **Harness commands** plus the **Omni commands**
+- An **Omni command** behaves the same on every **Harness**; `/clear` starts a new **Thread** rather than wiping the **Session**
+- A message starts with at most one **Slash command** and can carry many **Mentions**; built-ins and **Omni commands** only work at the start
+- In Claude Code a **Mention** is best effort (the model decides whether to load it); Codex and Cursor load every one
+- **Harness commands** work in any message a **Thread** gets, whether Ben, an **Automation** or the **Conductor** sent it; **Omni commands** only work from the composer
 
 ## Example dialogue
 
@@ -64,3 +83,4 @@ _Avoid_: Codex "thread", Cursor "chat" (their names for the same thing)
 
 - "provider" was used for both the CLI a thread runs in and the company behind the model. Resolved: the CLI plus its subscription is the **Harness**; the model vendor is only part of the **Model** name.
 - Codex calls its conversations "threads" and Cursor calls them "chats". Resolved: in Omni those are **Sessions**; **Thread** always means an Omni thread.
+- "Syncing slash commands" could mean copying command files between the tools. Resolved: Omni reads each **Harness**'s own **Harness commands** live and copies nothing; a command defined in one tool only shows in threads on that tool.
