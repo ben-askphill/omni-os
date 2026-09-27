@@ -6,7 +6,7 @@ import { FAKE_CLAUDE, fakeAlive, waitFor } from './support.ts';
 // Boots the real runner against a throwaway data dir and the fake claude CLI.
 // Env must be set before the first import of server modules, so each test file calls this once, at the
 // top or in beforeAll. tests/setup.ts stops it once the file's tests are done.
-// No Keychain (fresh db has no secrets), no browser MCP, no network, no real claude.
+// No Keychain (fresh db has no secrets), no browser MCP, no network, no real claude, codex or cursor-agent.
 
 export type Ev = { id: number; kind: string; p: any };
 
@@ -41,6 +41,9 @@ export async function startRunner(env: Record<string, string> = {}) {
   Object.assign(process.env, {
     OMNI_DATA_DIR: join(tmp, 'data'),
     OMNI_CLAUDE_BIN: FAKE_CLAUDE,
+    // Not installed, unless the file passes the fake.
+    OMNI_CODEX_BIN: join(tmp, 'no-codex'),
+    OMNI_CURSOR_BIN: join(tmp, 'no-cursor-agent'),
     OMNI_BROWSER: '0',
     OMNI_BRAIN_DIR: brain,
     OMNI_DEFAULT_MODEL: 'sonnet',
