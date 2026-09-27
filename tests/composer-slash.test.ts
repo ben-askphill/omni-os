@@ -103,7 +103,19 @@ describe('replySlash: hints for commands that stay text', () => {
   it('says a built-in or Omni command after the start of a message stays text', () => {
     expect(replySlash('fix it, then /clear', READY, 'codex')).toEqual(sendWith('/clear only works at the start of a message, so here it stays text.'));
     expect(replySlash('/tdd 31 then /compact', READY, 'claude-code')).toEqual(sendWith('/compact only works at the start of a message, so here it stays text.'));
-    expect(replySlash('use /tdd and /pdf here', READY, 'claude-code')).toEqual(SEND);
+  });
+
+  it('says Claude Code loads a Mention only if the model decides to, each named as typed', () => {
+    expect(replySlash('use /tdd here', READY, 'claude-code')).toEqual(sendWith('Claude Code loads /tdd only if the model decides to.'));
+    expect(replySlash('use /tdd and /pdf then /TDD again', READY, 'claude-code')).toEqual(sendWith('Claude Code loads /tdd and /pdf only if the model decides to.'));
+    expect(replySlash('/tdd 31 with /pdf', READY, 'claude-code')).toEqual(sendWith('Claude Code loads /pdf only if the model decides to.'));
+    const more = { ...READY, commands: [...LIST, cmd('bro', 'personal')] };
+    expect(replySlash('use /tdd /pdf and /bro', more, 'claude-code')).toEqual(sendWith('Claude Code loads /tdd, /pdf and /bro only if the model decides to.'));
+  });
+
+  it('says nothing about a Mention on Codex or Cursor Agent, which load every one', () => {
+    expect(replySlash('use /tdd and /pdf here', READY, 'codex')).toEqual(SEND);
+    expect(replySlash('use /tdd and /pdf here', READY, 'cursor')).toEqual(SEND);
   });
 
   it('leaves paths and URLs alone', () => {

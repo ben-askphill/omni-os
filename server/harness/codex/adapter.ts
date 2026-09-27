@@ -36,18 +36,19 @@ interface Outgoing {
 /**
  * Ben's message to Codex input items: text (plus a path note for non-image files), a skill item
  * for each skill it names, then local images. Codex's own composer writes a skill as `$name`, so
- * `/name` becomes `$name` in the text.
+ * each `/name` becomes `$name` in the text. A skill named twice loads once.
  */
 function buildInput(text: string, attachments: Attachment[], commands: CommandUse[]): CodexInput[] {
   const skills = commands.filter((c): c is CommandUse & { path: string } => !!c.path);
   // From the end, so the earlier offsets still hold.
   const said = [...skills].sort((a, b) => b.start - a.start).reduce((t, c) => `${t.slice(0, c.start)}$${c.name}${t.slice(c.end)}`, text);
+  const loads = [...new Map(skills.map((c) => [c.path, c])).values()];
   const images = attachments.filter((a) => a.image);
   const others = attachments.filter((a) => !a.image);
   const full = others.length ? `${said}\n\n${describeAttachments(others)}` : said;
   return [
     { type: 'text', text: full, text_elements: [] },
-    ...skills.map((c) => ({ type: 'skill' as const, name: c.name, path: c.path })),
+    ...loads.map((c) => ({ type: 'skill' as const, name: c.name, path: c.path })),
     ...images.map((a) => ({ type: 'localImage' as const, path: a.path })),
   ];
 }

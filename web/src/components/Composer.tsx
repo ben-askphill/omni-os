@@ -6,7 +6,7 @@ import { useApp } from '../store.tsx';
 import { ErrorNote, Icon, IconButton, Kbd, Picker, Spinner, type IconName, type PickerOption } from './ui.tsx';
 import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
 import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
-import { menuSections, pickCommand, slashQuery } from '../slash-menu.ts';
+import { mentionSections, menuSections, pickCommand, slashQuery } from '../slash-menu.ts';
 import { menuCommands, newThreadBody, otherModel, replySlash, sameSettings } from '../composer-slash.ts';
 import type { SlashCommand } from '../../../shared/slash.ts';
 
@@ -571,12 +571,17 @@ export function ReplyComposer({
   // Esc closes the menu until what is typed before the caret changes, or the command is deleted.
   const [dismissed, setDismissed] = useState<string | null>(null);
   const at = focused ? slashQuery(text, caret) : null;
-  const sections = useMemo(() => (at ? menuSections(menuCommands(list?.commands), at.query, list?.recent) : []), [at?.query, list]);
+  // After the start of the message, only a Mention: a skill or custom command, never an Omni command.
+  const sections = useMemo(() => {
+    if (!at) return [];
+    if (at.mention) return mentionSections(list?.commands ?? [], at.query, list?.recent);
+    return menuSections(menuCommands(list?.commands), at.query, list?.recent);
+  }, [at?.query, at?.mention, list]);
   const items = sections.flatMap((s) => s.commands);
   const typed = text.slice(0, caret);
   // A ready list with nothing matching shows no menu: the text is sent as it is.
   const menuOpen = !!at && dismissed !== typed && (items.length > 0 || !list || list.status !== 'ready');
-  const navKey = `${at?.query}\0${list?.fetchedAt}`;
+  const navKey = `${at?.start}\0${at?.query}\0${list?.fetchedAt}`;
   const [nav, setNav] = useState({ key: '', i: 0 });
   const active = nav.key === navKey ? Math.min(nav.i, items.length - 1) : 0;
   const [picked, setPicked] = useState<{ caret: number } | null>(null);

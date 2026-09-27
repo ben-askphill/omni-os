@@ -64,6 +64,28 @@ describe('the resolved command on the user event', () => {
   });
 });
 
+describe('the Mentions on the user event', () => {
+  const at = (hit: typeof TDD, start: number) => ({ ...hit, start, end: start + hit.end - hit.start });
+
+  it('are stored for the first message of a thread whose folder nobody listed yet, which reaches Claude Code unchanged', async () => {
+    const dir = join(r.tmp, 'mentions');
+    mkdirSync(dir);
+    r.db.channels.create({ id: 'mentions', name: 'Mentions', kind: 'internal', use_worktree: 0, base_dir: dir });
+    const t = await r.start('fix the parser with /tdd and /pdf the notes', { channel: 'mentions' });
+    await r.untilResults(t.id, 1);
+    expect(r.byKind(t.id, 'user')[0].p.slash).toEqual({ mentions: [at(TDD, 20), at(PDF, 29)] });
+    expect(r.texts(t.id, 'assistant_text')).toEqual(['ack: fix the parser with /tdd and /pdf the notes']);
+  });
+
+  it('are stored with the leading command of a follow-up', async () => {
+    const t = await r.start('hello');
+    await r.untilResults(t.id, 1);
+    await r.runner.postMessage(t.id, '/tdd 31 using /pdf');
+    await r.untilResults(t.id, 2);
+    expect(r.byKind(t.id, 'user')[1].p.slash).toEqual({ command: TDD, mentions: [at(PDF, 14)] });
+  });
+});
+
 describe("a Claude Code thread's own command list", () => {
   it('is asked for before the first message, and the first turn runs as before', async () => {
     const t = await r.start('hello');
@@ -178,6 +200,22 @@ describe('a Codex skill command', () => {
     expect(inputs(t.id, 'turn/steer')).toEqual([[text('$tdd and add a test'), TDD]]);
   });
 
+  it('turns each Mention into $name with its skill to load, one skill item per skill', async () => {
+    const typed = 'fix the parser with /tdd then /ship-check and /TDD again';
+    const t = await r.start(typed, codex);
+    await r.untilResults(t.id, 1);
+    expect(inputs(t.id)).toEqual([[text('fix the parser with $tdd then $ship-check and $tdd again'), TDD, { type: 'skill', name: 'ship-check', path: shipCheck }]]);
+    expect(r.byKind(t.id, 'user')[0].p).toMatchObject({ text: typed, slash: { mentions: [{ name: 'tdd' }, { name: 'ship-check' }, { name: 'tdd' }] } });
+  });
+
+  it('loads the leading skill and the Mentions after it', async () => {
+    const t = await r.start('hello', codex);
+    await r.untilResults(t.id, 1);
+    await r.runner.postMessage(t.id, '/tdd 31 with /ship-check');
+    await r.untilResults(t.id, 2);
+    expect(inputs(t.id)[1]).toEqual([text('$tdd 31 with $ship-check'), TDD, { type: 'skill', name: 'ship-check', path: shipCheck }]);
+  });
+
   it('sends plain text and commands Codex does not have as typed, with no skill', async () => {
     for (const typed of ['hello there', '/nope do it']) {
       const t = await r.start(typed, codex);
@@ -206,5 +244,14 @@ describe('a Cursor Agent command', () => {
     await r.untilResults(t.id, 2);
     expect(r.byKind(t.id, 'user')[1].p).toMatchObject({ slash: { command: { name: 'goal', source: 'builtin' } } });
     expect(prompts(t.id)[1]).toBe('/goal ship the release');
+  });
+
+  it('keeps its Mentions as typed, since Cursor Agent loads each one itself', async () => {
+    const t = await r.start('hello', cursor);
+    await r.untilResults(t.id, 1);
+    await r.runner.postMessage(t.id, 'fix the parser with /tdd then /goal');
+    await r.untilResults(t.id, 2);
+    expect(r.byKind(t.id, 'user')[1].p.slash).toMatchObject({ mentions: [{ name: 'tdd', start: 20, end: 24 }, { name: 'goal', start: 30, end: 35 }] });
+    expect(prompts(t.id)[1]).toBe('fix the parser with /tdd then /goal');
   });
 });
