@@ -141,6 +141,31 @@ describe('slashRecord: what the user event stores', () => {
   });
 });
 
+describe('slashRecord: the Mentions a message carries', () => {
+  const TDD = { name: 'tdd', source: 'personal', description: 'tdd description', argumentHint: '<issue>' };
+  const PDF = { name: 'document-skills:pdf', source: 'plugin', description: 'document-skills:pdf description' };
+
+  it('stores each skill or custom command named after whitespace, in order, each resolved on its own', () => {
+    expect(slashRecord('fix it with /tdd and\n/pdf then /TDD again', COMMANDS)).toEqual({
+      mentions: [
+        { ...TDD, start: 12, end: 16 },
+        { ...PDF, start: 21, end: 25 },
+        { ...TDD, start: 31, end: 35 },
+      ],
+    });
+  });
+
+  it('stores the leading command and the Mentions after it', () => {
+    expect(slashRecord('/tdd 31 using /pdf', COMMANDS)).toEqual({ command: { ...TDD, start: 0, end: 4 }, mentions: [{ ...PDF, start: 14, end: 18 }] });
+  });
+
+  it('leaves out built-ins, Omni commands, unknown names, and a name glued to punctuation or inside a path', () => {
+    for (const text of ['then /compact', 'then /clear', 'then /nope', 'use /tdd, then', 'use /tdd.', '(/tdd)', 'see /Users/ben/tdd', 'and/tdd']) {
+      expect(slashRecord(text, COMMANDS)).toBeUndefined();
+    }
+  });
+});
+
 describe('visibleCommands: what the menu offers', () => {
   it('leaves out terminal-only commands and the built-ins Omni commands replace', () => {
     const builtin = (name: string, aliases?: string[]) => cmd(name, { source: 'builtin', mentionable: false, ...(aliases && { aliases }) });

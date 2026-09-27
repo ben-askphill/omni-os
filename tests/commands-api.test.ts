@@ -101,6 +101,10 @@ describe('recent commands in GET /api/commands', () => {
     await r.untilResults(b.id, 1);
     await r.runner.postMessage(a.id, '/tdd and add a test');
     await r.untilResults(a.id, 3);
+    // A Mention names a command without running it.
+    await r.runner.postMessage(a.id, 'now try /pdf on it');
+    await r.untilResults(a.id, 4);
+    expect(r.byKind(a.id, 'user')[3].p.slash).toMatchObject({ mentions: [{ name: 'document-skills:pdf' }] });
     // Not Ben's: the Conductor's and an Automation's.
     await r.runner.postMessage(b.id, '/compact', { from: 'conductor' });
     await r.untilResults(b.id, 2);

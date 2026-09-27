@@ -691,12 +691,18 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
 
 // ---------- slash commands ----------
 
-/** How long a message that starts with a slash waits for a command list that isn't cached. It goes as plain text after. */
+/** How long a message that names a command waits for a command list that isn't cached. It goes as plain text after. */
 const SLASH_WAIT_MS = 5000;
 
-/** Wait, within a bound, for a folder's command list when a message starts with a slash. */
+/** Whether a message names a command anywhere: at its start or as a Mention. */
+const namesCommand = (prompt: string) => {
+  const { lead, mentions } = parseSlash(prompt);
+  return !!lead || mentions.length > 0;
+};
+
+/** Wait, within a bound, for a folder's command list when a message names a command. */
 async function warmCommands(harness: string, cwd: string, prompt: string) {
-  if (!parseSlash(prompt).lead) return;
+  if (!namesCommand(prompt)) return;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([listCommands(harness as HarnessId, cwd, { wait: true }), new Promise((r) => (timer = setTimeout(r, SLASH_WAIT_MS)))]);
@@ -711,17 +717,20 @@ export function threadCommands(threadId: string): CommandList | null {
 }
 
 /**
- * The harness command a message starts with, from the thread's list or the folder's cached one: the
- * user event's `slash` field, and the command as the adapter runs it (a Codex skill goes with its file).
+ * The harness command a message starts with and its Mentions, from the thread's list or the folder's
+ * cached one: the user event's `slash` field, and the commands as the adapter runs them (a Codex
+ * skill goes with its file).
  */
 function slashFor(prompt: string, commands: () => SlashCommand[]): { slash?: SlashRecord; commands?: CommandUse[] } {
-  if (!parseSlash(prompt).lead) return {};
+  if (!namesCommand(prompt)) return {};
   const list = commands();
   const slash = slashRecord(prompt, list);
   if (!slash) return {};
-  const { name, start, end } = slash.command;
-  const path = list.find((c) => c.name === name)?.path;
-  return { slash, commands: [{ name, start, end, ...(path && { path }) }] };
+  const uses = [...(slash.command ? [slash.command] : []), ...(slash.mentions ?? [])].map(({ name, start, end }) => {
+    const path = list.find((c) => c.name === name)?.path;
+    return { name, start, end, ...(path && { path }) };
+  });
+  return { slash, commands: uses };
 }
 
 // ---------- public API ----------

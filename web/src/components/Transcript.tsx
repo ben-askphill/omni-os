@@ -1,10 +1,11 @@
-import { memo, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, memo, useMemo, useState, type ReactNode } from 'react';
 import { parsePayload, uploadUrl, type Attachment, type EventRow, type PendingMsg } from '../api.ts';
 import { bytes, clock, duration, plural, shortPath, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { Markdown } from './Markdown.tsx';
 import { CheckItem, Icon, Modal, Spinner, StatusPill, Ticks } from './ui.tsx';
 import { SOURCE_TAG } from '../slash-menu.ts';
+import { slashPieces } from '../slash-pills.ts';
 import type { SlashHit, SlashRecord } from '../../../shared/slash.ts';
 
 // ---------- payloads ----------
@@ -17,7 +18,7 @@ interface UserP {
   mode?: 'steer' | 'queue' | 'interrupt';
   /** The run ended before the agent saw this message. */
   dropped?: boolean;
-  /** The harness command the message starts with, as it resolved when sent. */
+  /** The harness command the message starts with and its Mentions, as they resolved when sent. */
   slash?: SlashRecord;
 }
 interface TextP {
@@ -524,13 +525,13 @@ function CommandPill({ label, cmd, open, onToggle }: { label: string; cmd: Slash
 
 function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: string }) {
   const [more, setMore] = useState(false);
-  const [about, setAbout] = useState(false);
+  // Where the pill whose description is open starts.
+  const [about, setAbout] = useState<number | null>(null);
   const text = p.text ?? '';
   const long = text.length > 1400;
-  const shown = long && !more ? text.slice(0, 1200) + '...' : text;
-  // Only a span that still points at a `/name` in the text becomes a pill.
-  const cmd = p.slash?.command;
-  const pill = cmd && text[cmd.start] === '/' && cmd.end <= shown.length ? cmd : undefined;
+  const cut = long && !more;
+  const pieces = slashPieces(text, p.slash, cut ? 1200 : text.length);
+  const open = pieces.find((x) => x.hit?.start === about)?.hit;
   const label = p.source ? SOURCE_LABEL[p.source] : undefined;
   const how = p.dropped ? null : p.mode === 'steer' ? 'Steered' : p.mode === 'interrupt' ? 'Interrupted and sent' : null;
   return (
@@ -555,18 +556,17 @@ function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: strin
           p.dropped ? 'border border-dashed border-line-strong' : p.source === 'conductor' ? 'bg-info-bg text-fg' : 'bg-bubble'
         }`}
       >
-        {pill ? (
-          <>
-            {shown.slice(0, pill.start)}
-            <CommandPill label={text.slice(pill.start, pill.end)} cmd={pill} open={about} onToggle={() => setAbout((a) => !a)} />
-            {shown.slice(pill.end)}
-          </>
-        ) : (
-          shown
+        {pieces.map(({ text: t, hit }, i) =>
+          hit ? (
+            <CommandPill key={i} label={t} cmd={hit} open={hit === open} onToggle={() => setAbout((a) => (a === hit.start ? null : hit.start))} />
+          ) : (
+            <Fragment key={i}>{t}</Fragment>
+          ),
         )}
-        {pill && about && (
+        {cut && '...'}
+        {open && (
           <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
-            {pill.description || 'No description'} <span className="text-fg-4">· {SOURCE_TAG[pill.source]}</span>
+            {open.description || 'No description'} <span className="text-fg-4">· {SOURCE_TAG[open.source]}</span>
           </span>
         )}
         {long && (

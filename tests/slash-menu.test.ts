@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SlashCommand } from '../shared/slash.ts';
-import { menuSections, pickCommand, slashQuery } from '../web/src/slash-menu.ts';
+import { mentionSections, menuSections, pickCommand, slashQuery } from '../web/src/slash-menu.ts';
 
 // The composer's `/` menu: which command is being typed at the caret, what the menu lists for
 // it, and what picking a row does to the text.
@@ -40,7 +40,6 @@ describe('slashQuery: the command being typed at the caret', () => {
 
   it.each([
     ['', 0],
-    ['hello /td', 9],
     ['/tdd ', 5],
     ['/tdd fix', 8],
     ['/Users/ben', 10],
@@ -49,6 +48,26 @@ describe('slashQuery: the command being typed at the caret', () => {
     ['/td,', 4],
     ['/td,', 3],
   ])('nothing for %j with the caret at %i', (text, caret) => {
+    expect(slashQuery(text, caret)).toBeNull();
+  });
+
+  it.each([
+    ['hello /', 7, { query: '', start: 6, end: 7, mention: true }],
+    ['hello /td', 9, { query: 'td', start: 6, end: 9, mention: true }],
+    ['/tdd 31 with /p', 15, { query: 'p', start: 13, end: 15, mention: true }],
+    ['fix it\n/pd', 10, { query: 'pd', start: 7, end: 10, mention: true }],
+    ['use /tdd now', 6, { query: 't', start: 4, end: 8, mention: true }],
+  ])('a Mention for %j with the caret at %i', (text, caret, want) => {
+    expect(slashQuery(text, caret)).toEqual(want);
+  });
+
+  it.each([
+    ['and/td', 6],
+    ['see /Users/ben', 14],
+    ['use /td, then', 7],
+    // The caret before the slash.
+    ['hello /td', 5],
+  ])('no Mention for %j with the caret at %i', (text, caret) => {
     expect(slashQuery(text, caret)).toBeNull();
   });
 });
@@ -113,6 +132,22 @@ describe('menuSections with the commands Ben used recently', () => {
   });
 });
 
+describe('mentionSections: the menu for a Mention', () => {
+  const omni = cmd('rename', 'omni', 'Rename this thread', { mentionable: false });
+
+  it('lists only the skills and custom commands a message can name after its start', () => {
+    const sections = mentionSections([...LIST, omni], '', ['compact', 'tdd']);
+    expect(sections.map((s) => s.label)).toEqual(['Recent', 'Project', 'Personal', 'Plugins']);
+    expect(names(sections)).toEqual(['tdd', 'deploy-preview', 'export-pdf', 'bro', 'document-skills:pdf', 'vercel:deploy']);
+  });
+
+  it('finds a command by its name or an alias, never by its description alone', () => {
+    expect(names(mentionSections(LIST, 'pdf'))).toEqual(['document-skills:pdf', 'export-pdf']);
+    expect(names(mentionSections(LIST, 'page'))).toEqual([]);
+    expect(names(mentionSections(LIST, 'comp'))).toEqual([]);
+  });
+});
+
 describe('pickCommand', () => {
   it('inserts /name and a space, with the caret after it', () => {
     expect(pickCommand('/td', slashQuery('/td', 3)!, 'tdd')).toEqual({ text: '/tdd ', caret: 5 });
@@ -120,6 +155,11 @@ describe('pickCommand', () => {
 
   it('keeps what follows the name without doubling the space', () => {
     expect(pickCommand('/t fix it', slashQuery('/t fix it', 2)!, 'tdd')).toEqual({ text: '/tdd fix it', caret: 5 });
+  });
+
+  it('puts a Mention in place of what was typed after the start', () => {
+    const text = 'fix it with /t please';
+    expect(pickCommand(text, slashQuery(text, 14)!, 'tdd')).toEqual({ text: 'fix it with /tdd please', caret: 17 });
   });
 
   it('keeps leading whitespace', () => {

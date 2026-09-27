@@ -148,13 +148,34 @@ export interface SlashHit {
 }
 
 export interface SlashRecord {
-  command: SlashHit;
+  /** The harness command the message starts with. */
+  command?: SlashHit;
+  /** The Mentions after it, in order. */
+  mentions?: SlashHit[];
 }
 
-/** The slash field for a user event: set only when the message starts with a harness command. */
+const hit = ({ name, source, description, argumentHint }: SlashCommand, { start, end }: SlashToken): SlashHit => ({
+  name,
+  source,
+  description,
+  ...(argumentHint && { argumentHint }),
+  start,
+  end,
+});
+
+/** The skills and custom commands a message names after its start, each resolved on its own. */
+export function mentionHits(text: string, commands: SlashCommand[]): SlashHit[] {
+  return parseSlash(text).mentions.flatMap((t) => {
+    const c = isOmniCommand(t.name) ? undefined : findCommand(t.name, commands);
+    return c?.mentionable ? [hit(c, t)] : [];
+  });
+}
+
+/** The slash field for a user event: set only when the message starts with a harness command or carries a Mention. */
 export function slashRecord(text: string, commands: SlashCommand[]): SlashRecord | undefined {
   const r = resolveSlash(text, commands);
-  if (r?.kind !== 'harness') return undefined;
-  const { name, source, description, argumentHint } = r.command;
-  return { command: { name, source, description, ...(argumentHint && { argumentHint }), start: r.token.start, end: r.token.end } };
+  const command = r?.kind === 'harness' ? hit(r.command, r.token) : undefined;
+  const mentions = mentionHits(text, commands);
+  if (!command && !mentions.length) return undefined;
+  return { ...(command && { command }), ...(mentions.length && { mentions }) };
 }

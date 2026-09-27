@@ -1,7 +1,7 @@
 // What the reply composer does with a `/`, as pure functions: the Omni commands every thread's menu
 // offers, what Send does with a message that starts with one, and the quiet hints for commands that
 // stay plain text. The grammar itself is in shared/slash.ts.
-import { OMNI_COMMANDS, midMessageCommands, resolveSlash, type SlashCommand } from '../../shared/slash.ts';
+import { OMNI_COMMANDS, mentionHits, midMessageCommands, resolveSlash, type SlashCommand } from '../../shared/slash.ts';
 import type { CommandList, Thread } from './api.ts';
 
 const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent' };
@@ -54,14 +54,25 @@ export function replySlash(text: string, list: CommandList | null, harness: stri
   return { action: { kind: 'send' }, armed: !!text.trim(), label: null, hint: textHint(text, r, list, harness) };
 }
 
-/** Why a `/name` in a message that sends as typed won't run. None of these stops the send. */
+/**
+ * Why a `/name` in a message that sends as typed won't run, or might not: Claude Code leaves a
+ * Mention to the model. None of these stops the send.
+ */
 function textHint(text: string, r: ReturnType<typeof resolveSlash>, list: CommandList | null, harness: string): string | null {
   if (r?.kind === 'terminal') return `/${r.name} only works in a ${harnessName(harness)} terminal, so it sends as text.`;
   // Until the list is in, any name could be one of the thread's commands.
   if (r?.kind === 'unknown' && list?.status === 'ready') return `No /${r.name} command in this thread, so it sends as text.`;
   const [late] = midMessageCommands(text, list?.commands ?? []);
-  return late ? `/${late.name} only works at the start of a message, so here it stays text.` : null;
+  if (late) return `/${late.name} only works at the start of a message, so here it stays text.`;
+  if (harness !== 'claude-code') return null;
+  const hits = mentionHits(text, list?.commands ?? []);
+  // Each command once, as Ben first typed it.
+  const typed = hits.filter((h, i) => hits.findIndex((o) => o.name === h.name) === i).map((h) => text.slice(h.start, h.end));
+  return typed.length ? `Claude Code loads ${and(typed)} only if the model decides to.` : null;
 }
+
+/** "a", "a and b", "a, b and c". */
+const and = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
 
 /** The body that starts a thread with this one's channel, harness, model, effort and role. */
 export const newThreadBody = (t: Thread, prompt: string) => ({
