@@ -554,6 +554,9 @@ function launch(threadId: string, first: Msg): Live | undefined {
   return live;
 }
 
+/** How long an exited CLI's output may take to arrive before the runner closes its pipes. */
+const EXIT_DRAIN_MS = 500;
+
 async function spawnLive(live: Live, thread: Thread) {
   const channel = channels.get(thread.channel_id)!;
   const role = getCrew(thread.role);
@@ -609,7 +612,13 @@ async function spawnLive(live: Live, thread: Thread) {
     live.spawnFailed = true;
     addEvent(thread.id, 'error', { text: `Could not start ${cliLabel(thread.harness)}: ${err.message}` });
   });
+  // 'close' waits for every pipe, and a process the CLI started can hold them open after it exits. Give
+  // the rest of the output a moment to arrive, and one more poll to be read, then close them ourselves.
+  let drain: ReturnType<typeof setTimeout> | undefined;
+  const closePipes = () => setImmediate(() => child.stdio.forEach((s) => s?.destroy()));
+  child.on('exit', () => (drain = setTimeout(closePipes, EXIT_DRAIN_MS)));
   child.on('close', (code, signal) => {
+    clearTimeout(drain);
     live.flush?.();
     onExit(live, code, signal);
   });
