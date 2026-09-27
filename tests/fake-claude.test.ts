@@ -234,6 +234,22 @@ describe('fake claude: streaming input', () => {
     expect(f.events.find((e) => e.subtype === 'init')).toMatchObject({ session_id: f.sid, fake_resumed: true });
   });
 
+  it('answers initialize with its commands, then lists them again with MCP prompts once its MCP servers connect', T, async () => {
+    const f = fake();
+    f.raw(JSON.stringify({ type: 'control_request', request_id: 'c1', request: { subtype: 'initialize' } }));
+    await f.until('commands_changed', (e) => e.type === 'system' && e.subtype === 'commands_changed');
+    f.end();
+    await f.exited;
+    const answer = f.events.find((e) => e.type === 'control_response')!.response;
+    const later: Evt[] = f.events.find((e) => e.subtype === 'commands_changed')!.commands;
+    const mcp = (list: Evt[]) => list.filter((c) => c.name.endsWith(' (MCP)')).map((c) => c.name);
+    expect(answer).toMatchObject({ subtype: 'success', request_id: 'c1' });
+    expect(mcp(answer.response.commands)).toEqual([]);
+    // The whole list again, not just what changed.
+    expect(later.slice(0, answer.response.commands.length)).toEqual(answer.response.commands);
+    expect(mcp(later)).toEqual(['plugin:github:github:AssignCodingAgent (MCP)', 'claude.ai Figma:create_design_system_rules (MCP)']);
+  });
+
   it('skips bad input lines and answers unsupported control requests with an error', T, async () => {
     const f = fake();
     f.raw('{not json');

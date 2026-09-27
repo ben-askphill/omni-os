@@ -50,7 +50,7 @@ Anything Ben runs by typing `/` in the composer: a **Harness command** or an **O
 _Avoid_: Prompt, macro, shortcut
 
 **Harness command**:
-A skill, custom command, plugin command or built-in that a thread's **Harness** offers and runs itself.
+A skill, custom command, plugin command, MCP prompt or built-in that a thread's **Harness** offers and runs itself.
 
 **Omni command**:
 A **Slash command** Omni runs itself in place of a harness built-in that would change what Omni tracks (`/clear`, `/rename`, `/model`).
@@ -70,7 +70,8 @@ _Avoid_: Tag, reference
 - The **Conductor** delegates on the crew role's default **Harness** unless Ben names another one
 - A **Harness** offers many **Harness commands**; a thread's `/` menu lists its own **Harness**'s **Harness commands** plus the **Omni commands**
 - An **Omni command** behaves the same on every **Harness**; `/clear` starts a new **Thread** rather than wiping the **Session**
-- A message starts with at most one **Slash command** and can carry many **Mentions**; built-ins and **Omni commands** only work at the start
+- A message starts with at most one **Slash command** and can carry many **Mentions**; built-ins, MCP prompts and **Omni commands** only work at the start
+- A Claude Code **Thread** lists its MCP prompts only while it is warm, once its MCP servers have connected; while warm, its `/` menu lists exactly what that session can run
 - In Claude Code a **Mention** is best effort (the model decides whether to load it); Codex and Cursor load every one
 - **Harness commands** work in any message a **Thread** gets, whether Ben, an **Automation** or the **Conductor** sent it; **Omni commands** only work from the composer
 

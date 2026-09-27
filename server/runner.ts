@@ -6,8 +6,8 @@ import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
 import { channels, events, threads, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
 import { commandsFolder, prepareWorkdir, writeMcpConfig } from './sandbox.ts';
-import { parseSlash, slashRecord, type SlashRecord } from '../shared/slash.ts';
-import { invalidateCommands, listCommands, peekCommands } from './commands.ts';
+import { parseSlash, slashRecord, visibleCommands, type SlashCommand, type SlashRecord } from '../shared/slash.ts';
+import { invalidateCommands, listCommands, peekCommands, type CommandList } from './commands.ts';
 import { describeAttachments, inlinable, messageContent, saveUploads, type Attachment } from './uploads.ts';
 import { secretsEnv } from './secrets.ts';
 import { type Record as StreamRecord } from './stream.ts';
@@ -116,6 +116,8 @@ interface Live {
   /** Holds the channel's persistent browser profile. */
   browser: boolean;
   initSeen: boolean;
+  /** The commands the process listed itself, once it has. */
+  commands: CommandList | null;
   resultSeen: boolean;
   spawnFailed: boolean;
   exitedFlag: boolean;
@@ -531,6 +533,7 @@ function launch(threadId: string, first: Msg): Live | undefined {
     shutdown: false,
     browser: false,
     initSeen: false,
+    commands: null,
     resultSeen: false,
     spawnFailed: false,
     exitedFlag: false,
@@ -593,6 +596,7 @@ async function spawnLive(live: Live, thread: Thread) {
       if (t && t.session_id !== sid) threads.update(thread.id, { session_id: sid, updated_at: t.updated_at });
     },
     commandsChanged: () => invalidateCommands(thread.harness as HarnessId),
+    commands: (list) => (live.commands = { status: 'ready', commands: visibleCommands(list), fetchedAt: Date.now() }),
   });
   const child = session.child;
   live.child = child;
@@ -701,13 +705,18 @@ async function warmCommands(harness: string, cwd: string, prompt: string) {
   }
 }
 
+/** The commands a thread's running process listed itself, MCP prompts included. Null while none has. */
+export function threadCommands(threadId: string): CommandList | null {
+  return lives.get(threadId)?.commands ?? null;
+}
+
 /**
- * The harness command a message starts with, from the cached list: the user event's `slash`
- * field, and the command as the adapter runs it (a Codex skill goes with its file).
+ * The harness command a message starts with, from the thread's list or the folder's cached one: the
+ * user event's `slash` field, and the command as the adapter runs it (a Codex skill goes with its file).
  */
-function slashFor(harness: string, cwd: string, prompt: string): { slash?: SlashRecord; commands?: CommandUse[] } {
+function slashFor(prompt: string, commands: () => SlashCommand[]): { slash?: SlashRecord; commands?: CommandUse[] } {
   if (!parseSlash(prompt).lead) return {};
-  const list = peekCommands(harness as HarnessId, cwd).commands;
+  const list = commands();
   const slash = slashRecord(prompt, list);
   if (!slash) return {};
   const { name, start, end } = slash.command;
@@ -776,7 +785,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const attachments = saved.length ? saved : undefined;
   const folder = commandsFolder(channel) ?? wd.cwd;
   await warmCommands(harness, folder, input.prompt);
-  const { slash, commands } = slashFor(harness, folder, input.prompt);
+  const { slash, commands } = slashFor(input.prompt, () => peekCommands(harness as HarnessId, folder).commands);
   deliver(thread.id, {
     uuid: randomUUID(),
     text: input.prompt,
@@ -800,7 +809,7 @@ export function sendMessage(
   const thread = threads.get(threadId);
   if (!thread) throw new Error('thread not found');
   const attachments = opts.attachments?.length ? opts.attachments : undefined;
-  const { slash, commands } = slashFor(thread.harness, thread.cwd, prompt);
+  const { slash, commands } = slashFor(prompt, () => (threadCommands(threadId) ?? peekCommands(thread.harness as HarnessId, thread.cwd)).commands);
   deliver(threadId, {
     uuid: randomUUID(),
     text: prompt,

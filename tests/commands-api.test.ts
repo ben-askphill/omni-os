@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
@@ -16,10 +17,29 @@ const get = async (query: string) => {
   return { status: res.status, body: await res.json() };
 };
 
+/** A Claude Code thread in `dir` with no process running it, as once its keepalive ran out. */
+const idle = (dir: string) => {
+  mkdirSync(dir, { recursive: true });
+  return r.db.threads.create({
+    id: randomUUID(),
+    channel_id: 'scratch',
+    title: 'Idle',
+    status: 'done',
+    role: null,
+    model: null,
+    session_id: randomUUID(),
+    cwd: dir,
+    branch: null,
+    parent_id: null,
+    task_id: null,
+    source: 'manual',
+    automation: null,
+  });
+};
+
 describe('GET /api/commands', () => {
   it("lists a thread's commands, with the project commands of the folder it runs in", async () => {
-    const t = await r.start('hello');
-    await r.untilResults(t.id, 1);
+    const t = idle(join(r.tmp, 'shop'));
     mkdirSync(join(t.cwd, '.claude', 'commands'), { recursive: true });
     writeFileSync(join(t.cwd, '.claude', 'commands', 'ship-check.md'), '---\ndescription: Run the pre-ship checklist\n---\nDo it.\n');
 
@@ -31,15 +51,28 @@ describe('GET /api/commands', () => {
   });
 
   it('answers at once without wait, and serves the cache after', async () => {
-    const dir = join(r.tmp, 'other');
-    mkdirSync(dir);
-    r.db.channels.create({ id: 'other', name: 'Other', kind: 'internal', use_worktree: 0, base_dir: dir });
-    const t = await r.start('hello', { channel: 'other' });
-    await r.untilResults(t.id, 1);
+    const t = idle(join(r.tmp, 'other'));
     expect((await get(`thread=${t.id}`)).body).toEqual({ status: 'loading', commands: [], fetchedAt: null, recent: [] });
     const fresh = (await get(`thread=${t.id}&wait=1`)).body;
     expect(fresh.status).toBe('ready');
     expect((await get(`thread=${t.id}`)).body).toEqual(fresh);
+  });
+
+  it("lists what a running Claude Code thread's own process can run, MCP prompts included", async () => {
+    const t = await r.start('hello');
+    await r.untilResults(t.id, 1);
+    // Its MCP servers connect after it started.
+    await vi.waitFor(async () =>
+      expect((await get(`thread=${t.id}`)).body.commands).toContainEqual({
+        name: 'mcp__plugin_github_github__AssignCodingAgent',
+        description: 'Assign the GitHub coding agent to a task in a repository',
+        source: 'mcp',
+        mentionable: false,
+      }),
+    );
+    const { body } = await get(`thread=${t.id}`);
+    expect(body).toMatchObject({ status: 'ready', fetchedAt: expect.any(Number) });
+    expect(body.commands).toContainEqual(expect.objectContaining({ name: 'tdd', source: 'personal' }));
   });
 
   it("lists a Codex thread's skills, not Claude Code's commands", async () => {

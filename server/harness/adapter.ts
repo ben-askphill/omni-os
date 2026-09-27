@@ -3,6 +3,7 @@
 // events and the feed — and each adapter owns its CLI's process and protocol, translating
 // to and from Omni's records. Claude Code's behaviour moves behind this unchanged.
 import type { ChildProcess } from 'node:child_process';
+import type { SlashCommand } from '../../shared/slash.ts';
 import type { Channel, Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
 import type { Record as StreamRecord, Usage } from '../stream.ts';
@@ -46,6 +47,11 @@ export interface AdapterCallbacks {
   session: (id: string) => void;
   /** The harness says its commands changed, so a cached command list is out of date. */
   commandsChanged?: () => void;
+  /**
+   * The commands this process can run, MCP prompts included: its first list, then each new one when it
+   * changes. The thread's `/` menu uses it while the process runs.
+   */
+  commands?: (list: SlashCommand[]) => void;
 }
 
 /** A running harness process, wired to the runner. */

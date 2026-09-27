@@ -72,15 +72,27 @@ interface RawCommand {
 // Claude Code ends a description with the command's scope: `(user)`, `(claude.ai sync)` or `(project)`.
 const SCOPE = /\s*\((user|claude\.ai sync|project)\)\s*$/;
 
+// Claude Code lists an MCP prompt as "server:prompt (MCP)" and runs it as /mcp__server__prompt, with _ for
+// anything in the server name but letters, digits, _ and - (claude 2.1.282). The server name can hold colons.
+const MCP_PROMPT = /^(.+):([^:]+) \(MCP\)$/;
+const mcpName = (server: string, prompt: string) => `mcp__${server.replace(/[^A-Za-z0-9_-]/g, '_')}__${prompt}`;
+
 /** Turn Claude Code's raw command list into the menu's shape. */
 export function normalizeClaudeCommands(raw: unknown): SlashCommand[] {
   if (!Array.isArray(raw)) return [];
   const out: SlashCommand[] = [];
   for (const r of raw as RawCommand[]) {
     const name = typeof r?.name === 'string' ? r.name : '';
-    // MCP prompts ("server:prompt (MCP)") and internal commands can't be typed after a `/`.
+    let description = typeof r?.description === 'string' ? r.description.replace(/\s+/g, ' ').trim() : '';
+    const mcp = MCP_PROMPT.exec(name);
+    if (mcp) {
+      // Its arguments follow the name, split at spaces, but it can't be a Mention.
+      const runs = mcpName(mcp[1], mcp[2]);
+      if (isCommandName(runs)) out.push({ name: runs, description, source: 'mcp', mentionable: false });
+      continue;
+    }
+    // Internal commands can't be typed after a `/`.
     if (!isCommandName(name)) continue;
-    let description = typeof r.description === 'string' ? r.description.replace(/\s+/g, ' ').trim() : '';
     const argumentHint = typeof r.argumentHint === 'string' && r.argumentHint.trim() ? r.argumentHint.trim() : undefined;
     const aliases = Array.isArray(r.aliases) ? r.aliases.filter((a): a is string => typeof a === 'string' && isCommandName(a)) : [];
 
