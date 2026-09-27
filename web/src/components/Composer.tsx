@@ -571,7 +571,7 @@ export function ReplyComposer({
   // Esc closes the menu until what is typed before the caret changes, or the command is deleted.
   const [dismissed, setDismissed] = useState<string | null>(null);
   const at = focused ? slashQuery(text, caret) : null;
-  const sections = useMemo(() => (at ? menuSections(menuCommands(list?.commands), at.query) : []), [at?.query, list]);
+  const sections = useMemo(() => (at ? menuSections(menuCommands(list?.commands), at.query, list?.recent) : []), [at?.query, list]);
   const items = sections.flatMap((s) => s.commands);
   const typed = text.slice(0, caret);
   // A ready list with nothing matching shows no menu: the text is sent as it is.

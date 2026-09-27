@@ -8,6 +8,7 @@ import { FAKE_CODEX } from './support.ts';
 
 const r = await startRunner({ OMNI_CODEX_BIN: FAKE_CODEX });
 const { commandsApi } = await import('../server/commands-api.ts');
+const { runAutomation } = await import('../server/automations.ts');
 await (await import('../server/harness/catalog-service.ts')).loadCatalog();
 
 const get = async (query: string) => {
@@ -35,7 +36,7 @@ describe('GET /api/commands', () => {
     r.db.channels.create({ id: 'other', name: 'Other', kind: 'internal', use_worktree: 0, base_dir: dir });
     const t = await r.start('hello', { channel: 'other' });
     await r.untilResults(t.id, 1);
-    expect((await get(`thread=${t.id}`)).body).toEqual({ status: 'loading', commands: [], fetchedAt: null });
+    expect((await get(`thread=${t.id}`)).body).toEqual({ status: 'loading', commands: [], fetchedAt: null, recent: [] });
     const fresh = (await get(`thread=${t.id}&wait=1`)).body;
     expect(fresh.status).toBe('ready');
     expect((await get(`thread=${t.id}`)).body).toEqual(fresh);
@@ -53,5 +54,33 @@ describe('GET /api/commands', () => {
   it('is 404 for a thread that does not exist', async () => {
     expect((await get('thread=nope')).status).toBe(404);
     expect((await get('')).status).toBe(404);
+  });
+});
+
+describe('recent commands in GET /api/commands', () => {
+  it("names the commands Ben used most recently on the thread's harness, in any thread, newest first", async () => {
+    const a = await r.start('/tdd fix the parser');
+    await r.untilResults(a.id, 1);
+    await r.runner.postMessage(a.id, '/pdf summarise the brief');
+    await r.untilResults(a.id, 2);
+    // Typed in claude-bar's hotkey prompt.
+    const b = await r.start('/bro', { source: 'capture' });
+    await r.untilResults(b.id, 1);
+    await r.runner.postMessage(a.id, '/tdd and add a test');
+    await r.untilResults(a.id, 3);
+    // Not Ben's: the Conductor's and an Automation's.
+    await r.runner.postMessage(b.id, '/compact', { from: 'conductor' });
+    await r.untilResults(b.id, 2);
+    const nightly = await runAutomation(
+      { id: 'nightly', name: 'Nightly', cron: '0 3 * * *', timezone: 'Europe/Amsterdam', channel: 'scratch', prompt: '/context', enabled: true, file: '' },
+      'manual',
+    );
+    await r.untilResults(nightly.id, 1);
+    // On another harness.
+    const codex = await r.start('/imagegen a logo', { harness: 'codex', model: 'gpt-5.6-sol' });
+    await r.untilResults(codex.id, 1);
+
+    expect((await get(`thread=${b.id}`)).body.recent).toEqual(['tdd', 'bro', 'document-skills:pdf']);
+    expect((await get(`thread=${codex.id}`)).body.recent).toEqual(['imagegen']);
   });
 });

@@ -82,6 +82,30 @@ describe('menuSections', () => {
   });
 });
 
+describe('menuSections with the commands Ben used recently', () => {
+  it('lists up to five of them first, newest first, and the groups without them', () => {
+    // `gone` was used in a folder whose list this is not.
+    const recent = ['tdd', 'gone', 'compact', 'vercel:deploy', 'bro', 'export-pdf', 'context'];
+    expect(menuSections(LIST, '', recent).map((s) => [s.label, s.commands.map((c) => c.name)])).toEqual([
+      ['Recent', ['tdd', 'compact', 'vercel:deploy', 'bro', 'export-pdf']],
+      ['Project', ['deploy-preview']],
+      ['Plugins', ['document-skills:pdf']],
+      ['Built-in', ['context']],
+    ]);
+  });
+
+  it('searches them with the rest, a recent one first among matches as good as it', () => {
+    expect(names(menuSections(LIST, 'd'))).toEqual(['deploy-preview', 'document-skills:pdf', 'vercel:deploy', 'export-pdf', 'tdd']);
+    expect(names(menuSections(LIST, 'd', ['tdd', 'document-skills:pdf']))).toEqual([
+      'document-skills:pdf',
+      'deploy-preview',
+      'vercel:deploy',
+      'tdd',
+      'export-pdf',
+    ]);
+  });
+});
+
 describe('pickCommand', () => {
   it('inserts /name and a space, with the caret after it', () => {
     expect(pickCommand('/td', slashQuery('/td', 3)!, 'tdd')).toEqual({ text: '/tdd ', caret: 5 });

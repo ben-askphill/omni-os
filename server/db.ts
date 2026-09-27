@@ -119,6 +119,8 @@ CREATE TABLE IF NOT EXISTS events (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS events_thread ON events(thread_id, id);
+-- Messages only, for the recent commands every slash menu asks for.
+CREATE INDEX IF NOT EXISTS events_user ON events(id) WHERE kind = 'user';
 
 CREATE VIRTUAL TABLE IF NOT EXISTS search_fts USING fts5(
   body, thread_id UNINDEXED, event_id UNINDEXED, tokenize = 'porter unicode61'
@@ -311,6 +313,21 @@ export const events = {
       )
       .all(threadId, threadId, after) as { payload: string }[];
     return rows.map((r) => JSON.parse(r.payload).text as string).join('\n\n');
+  },
+  /**
+   * The commands Ben used most recently on a harness, in any thread, newest first and each once.
+   * Only messages he typed count: in Omni or in claude-bar's hotkey prompt, not the Conductor's or an Automation's.
+   */
+  recentCommands(harness: string, limit = 20): string[] {
+    const rows = db
+      .prepare(
+        `SELECT json_extract(e.payload, '$.slash.command.name') AS name FROM events e JOIN threads t ON t.id = e.thread_id
+         WHERE e.kind = 'user' AND t.harness = ? AND json_extract(e.payload, '$.source') IN ('manual', 'ben', 'capture')
+           AND json_extract(e.payload, '$.slash.command.name') IS NOT NULL
+         GROUP BY name ORDER BY MAX(e.id) DESC LIMIT ?`,
+      )
+      .all(harness, limit) as { name: string }[];
+    return rows.map((r) => r.name);
   },
 };
 
