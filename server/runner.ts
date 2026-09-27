@@ -6,8 +6,8 @@ import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
 import { channels, events, threads, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
 import { commandsFolder, prepareWorkdir, writeMcpConfig } from './sandbox.ts';
-import { parseSlash, slashRecord } from '../shared/slash.ts';
-import { listCommands, peekCommands } from './commands.ts';
+import { parseSlash, slashRecord, type SlashRecord } from '../shared/slash.ts';
+import { invalidateCommands, listCommands, peekCommands } from './commands.ts';
 import { describeAttachments, inlinable, messageContent, saveUploads, type Attachment } from './uploads.ts';
 import { secretsEnv } from './secrets.ts';
 import { type Record as StreamRecord } from './stream.ts';
@@ -18,7 +18,7 @@ import { CAPABILITIES, type HarnessId } from './harness/types.ts';
 import { resolveRun } from './harness/resolve.ts';
 import type { Catalog } from './harness/catalog.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
-import type { AdapterContext, HarnessAdapter } from './harness/adapter.ts';
+import type { AdapterContext, CommandUse, HarnessAdapter } from './harness/adapter.ts';
 import { claudeAdapter } from './harness/claude/adapter.ts';
 import { codexAdapter } from './harness/codex/adapter.ts';
 import { cursorAdapter } from './harness/cursor/adapter.ts';
@@ -66,6 +66,8 @@ interface Msg {
   attachments?: Attachment[];
   /** Written while a turn was already running, so the transcript marks where it steered. */
   midTurn?: boolean;
+  /** Harness commands the text names, for the adapter. */
+  commands?: CommandUse[];
   /** Recorded when the CLI replays this uuid, so it lands exactly where the agent saw it. */
   event: { kind: 'user' | 'crew_report'; payload: Record<string, unknown> };
 }
@@ -284,9 +286,10 @@ const userLine = (live: Live, m: Msg) => ({
   parent_tool_use_id: null,
   session_id: live.sessionId,
   uuid: m.uuid,
-  // Side channel for adapters that need the raw text and attachment paths (Codex sends images as
-  // localImage paths). The Claude adapter strips this before writing to its stdin.
-  _omni: { text: m.text, attachments: m.attachments ?? [] },
+  // Side channel for adapters that need the raw text, attachment paths and commands (Codex sends
+  // images as localImage paths and skills as skill items). The Claude adapter strips this before
+  // writing to its stdin.
+  _omni: { text: m.text, attachments: m.attachments ?? [], commands: m.commands ?? [] },
 });
 
 /** stdin is gone: kill it so the close handler fails the turn and records what was not delivered. */
@@ -589,6 +592,7 @@ async function spawnLive(live: Live, thread: Thread) {
       const t = threads.get(thread.id);
       if (t && t.session_id !== sid) threads.update(thread.id, { session_id: sid, updated_at: t.updated_at });
     },
+    commandsChanged: () => invalidateCommands(thread.harness as HarnessId),
   });
   const child = session.child;
   live.child = child;
@@ -697,11 +701,18 @@ async function warmCommands(harness: string, cwd: string, prompt: string) {
   }
 }
 
-/** The user event's `slash` field: the harness command a message starts with, from the cached list. */
-function slashFor(harness: string, cwd: string, prompt: string) {
+/**
+ * The harness command a message starts with, from the cached list: the user event's `slash`
+ * field, and the command as the adapter runs it (a Codex skill goes with its file).
+ */
+function slashFor(harness: string, cwd: string, prompt: string): { slash?: SlashRecord; commands?: CommandUse[] } {
   if (!parseSlash(prompt).lead) return {};
-  const slash = slashRecord(prompt, peekCommands(harness as HarnessId, cwd).commands);
-  return slash ? { slash } : {};
+  const list = peekCommands(harness as HarnessId, cwd).commands;
+  const slash = slashRecord(prompt, list);
+  if (!slash) return {};
+  const { name, start, end } = slash.command;
+  const path = list.find((c) => c.name === name)?.path;
+  return { slash, commands: [{ name, start, end, ...(path && { path }) }] };
 }
 
 // ---------- public API ----------
@@ -765,14 +776,16 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const attachments = saved.length ? saved : undefined;
   const folder = commandsFolder(channel) ?? wd.cwd;
   await warmCommands(harness, folder, input.prompt);
+  const { slash, commands } = slashFor(harness, folder, input.prompt);
   deliver(thread.id, {
     uuid: randomUUID(),
     text: input.prompt,
     mode: 'steer',
     attachments,
+    commands,
     event: {
       kind: 'user',
-      payload: { text: input.prompt, source: thread.source, ...slashFor(harness, folder, input.prompt), ...(attachments && { attachments }) },
+      payload: { text: input.prompt, source: thread.source, ...(slash && { slash }), ...(attachments && { attachments }) },
     },
   });
   if (!input.title) void generateTitle(thread.id, input.prompt);
@@ -787,14 +800,16 @@ export function sendMessage(
   const thread = threads.get(threadId);
   if (!thread) throw new Error('thread not found');
   const attachments = opts.attachments?.length ? opts.attachments : undefined;
+  const { slash, commands } = slashFor(thread.harness, thread.cwd, prompt);
   deliver(threadId, {
     uuid: randomUUID(),
     text: prompt,
     mode: opts.mode ?? 'steer',
     attachments,
+    commands,
     event: {
       kind: 'user',
-      payload: { text: prompt, source: opts.from ?? 'ben', ...slashFor(thread.harness, thread.cwd, prompt), ...(attachments && { attachments }) },
+      payload: { text: prompt, source: opts.from ?? 'ben', ...(slash && { slash }), ...(attachments && { attachments }) },
     },
   });
   return threads.get(threadId)!;

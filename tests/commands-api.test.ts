@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
+import { FAKE_CODEX } from './support.ts';
 
 // GET /api/commands?thread=<id>: the thread's `/` menu, from the folder the thread runs in.
 
-const r = await startRunner();
+const r = await startRunner({ OMNI_CODEX_BIN: FAKE_CODEX });
 const { commandsApi } = await import('../server/commands-api.ts');
+await (await import('../server/harness/catalog-service.ts')).loadCatalog();
 
 const get = async (query: string) => {
   const res = await commandsApi.request(`/?${query}`);
@@ -37,6 +39,15 @@ describe('GET /api/commands', () => {
     const fresh = (await get(`thread=${t.id}&wait=1`)).body;
     expect(fresh.status).toBe('ready');
     expect((await get(`thread=${t.id}`)).body).toEqual(fresh);
+  });
+
+  it("lists a Codex thread's skills, not Claude Code's commands", async () => {
+    const t = await r.start('hello', { harness: 'codex', model: 'gpt-5.6-sol' });
+    await r.untilResults(t.id, 1);
+    const { body } = await get(`thread=${t.id}&wait=1`);
+    expect(body.status).toBe('ready');
+    expect(body.commands).toContainEqual(expect.objectContaining({ name: 'tdd', source: 'personal', path: '/Users/dev/.agents/skills/tdd/SKILL.md' }));
+    expect(body.commands.map((c: { name: string }) => c.name)).not.toContain('document-skills:pdf');
   });
 
   it('is 404 for a thread that does not exist', async () => {

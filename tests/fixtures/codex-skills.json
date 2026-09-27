@@ -1,0 +1,166 @@
+{
+ "_note": "Trimmed from a real codex-cli 0.157 skills/list answer (2026-09-27), paths anonymised. The last three skills are made up in the same shape: a disabled one, an admin one and a name with a space.",
+ "id": 2,
+ "result": {
+  "data": [
+   {
+    "cwd": "/Users/ben/code/shop",
+    "skills": [
+     {
+      "name": "ship-check",
+      "description": "Run the pre-ship checklist for this repo.",
+      "path": "/Users/ben/code/shop/.agents/skills/ship-check/SKILL.md",
+      "scope": "repo",
+      "enabled": true,
+      "pluginId": null
+     },
+     {
+      "name": "bro",
+      "description": "Restate the last message in plain human language, with no jargon.",
+      "path": "/Users/ben/.agents/skills/bro/SKILL.md",
+      "scope": "user",
+      "enabled": true,
+      "pluginId": null
+     },
+     {
+      "name": "chrome-devtools-mcp:a11y-debugging",
+      "description": "Uses Chrome DevTools MCP for accessibility (a11y) debugging and auditing based on web.dev guidelines. Use when testing semantic HTML, ARIA labels, focus states, keyboard navigation, tap targets, and color contrast.",
+      "path": "/Users/ben/.codex/plugins/cache/claude-plugins-official/chrome-devtools-mcp/1.8.0/skills/a11y-debugging/SKILL.md",
+      "scope": "user",
+      "enabled": true,
+      "pluginId": "chrome-devtools-mcp@claude-plugins-official"
+     },
+     {
+      "name": "productive-time",
+      "description": "Quick time entry logging to Productive. Use when user wants to log time, track hours, add time entries, or says \"log X hours/minutes to Y\". Supports aliases (e.g., \"ke\" for Kamera Express), natural language time (\"1 hour 30 minutes\", \"90 min\"), and repeat last entry.",
+      "path": "/Users/ben/.agents/skills/productive-time/SKILL.md",
+      "scope": "user",
+      "enabled": true,
+      "pluginId": null
+     },
+     {
+      "name": "productive-time",
+      "description": "Quick time entry logging to Productive. Use when user wants to log time, track hours, add time entries, or says \"log X hours/minutes to Y\". Supports aliases (e.g., \"ke\" for Kamera Express), natural language time (\"1 hour 30 minutes\", \"90 min\"), and repeat last entry.",
+      "path": "/Users/ben/.agents/skills/synced/9137d64c-fc24-4fd2-94f9-1ef07851fc9c_abffd56c-b0cb-4c71-84a5-41ee54fa6ba4/productive-time/SKILL.md",
+      "scope": "user",
+      "enabled": true,
+      "pluginId": null
+     },
+     {
+      "name": "skill-creator",
+      "description": "Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy.",
+      "path": "/Users/ben/.agents/skills/synced/9137d64c-fc24-4fd2-94f9-1ef07851fc9c_abffd56c-b0cb-4c71-84a5-41ee54fa6ba4/skill-creator/SKILL.md",
+      "scope": "user",
+      "enabled": true,
+      "pluginId": null
+     },
+     {
+      "name": "tdd",
+      "description": "Test-driven development with red-green-refactor loop. Use when user wants to build features or fix bugs using TDD, mentions \"red-green-refactor\", wants integration tests, or asks for test-first development.",
+      "path": "/Users/ben/.agents/skills/tdd/SKILL.md",
+      "scope": "user",
+      "enabled": true,
+      "pluginId": null
+     },
+     {
+      "name": "vercel:vercel-cli",
+      "description": "Vercel CLI expert guidance. Use when deploying, managing environment variables, linking projects, viewing logs, querying metrics, managing domains, managing feature flags with vercel flags, or interacting with the Vercel platform from the command line.",
+      "path": "/Users/ben/.codex/plugins/cache/claude-plugins-official/vercel/0.50.0/skills/vercel-cli/SKILL.md",
+      "scope": "user",
+      "enabled": true,
+      "pluginId": "vercel@claude-plugins-official"
+     },
+     {
+      "name": "vercel:vercel-cli",
+      "description": "Deploy, manage, inspect, and troubleshoot Vercel projects from the command line. Use for Vercel deployments, Vercel Toolbar comments, build failures, projects and teams, environment variables, domains and DNS, logs, metrics, Speed Insights, Core Web Vitals, request traces, usage, activity, alerts, firewall rules, cache, cron jobs, deploy hooks, Edge Config, feature flags (`vercel flags`), integrations, connectors, Blob storage, Container Registry (VCR), microfrontends, rolling releases, custom environments, Sandbox, agent/MCP setup, preview access, local development, or `vercel api` fallback.",
+      "path": "/Users/ben/.codex/plugins/cache/claude-plugins-official/vercel/0.50.0/skills/vercel-cli/upstream/SKILL.md",
+      "scope": "user",
+      "enabled": true,
+      "pluginId": "vercel@claude-plugins-official"
+     },
+     {
+      "name": "imagegen",
+      "description": "Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector. Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas.",
+      "interface": {
+       "displayName": "Image Gen",
+       "shortDescription": "Generate or edit images for websites, games, and more",
+       "iconSmall": "/Users/ben/.codex/skills/.system/imagegen/assets/imagegen-small.svg",
+       "iconLarge": "/Users/ben/.codex/skills/.system/imagegen/assets/imagegen.png",
+       "iconSmallUrl": null,
+       "iconLargeUrl": null,
+       "brandColor": null,
+       "defaultPrompt": "Use $imagegen to make or edit an image for this project."
+      },
+      "path": "/Users/ben/.codex/skills/.system/imagegen/SKILL.md",
+      "scope": "system",
+      "enabled": true,
+      "pluginId": null
+     },
+     {
+      "name": "openai-docs",
+      "description": "Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge—including 'you,' 'your,' 'this app,' or 'this coding agent' when they refer to Codex—and for OpenAI APIs/products and ChatGPT Work. Also use for model choice/migration, prompting, SDKs, Responses, Realtime, agents, evals, and Chat/Work/Codex comparisons. Do not use for generic app/software tasks that merely mention Codex.",
+      "shortDescription": "Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, and self-knowledge; OpenAI APIs and ChatGPT Work. 'You'/'this app' means Codex only.",
+      "interface": {
+       "displayName": "OpenAI Docs",
+       "shortDescription": "OpenAI and Codex docs for models, skills, tasks, and setup",
+       "iconSmall": "/Users/ben/.codex/skills/.system/openai-docs/assets/openai-small.svg",
+       "iconLarge": "/Users/ben/.codex/skills/.system/openai-docs/assets/openai.png",
+       "iconSmallUrl": null,
+       "iconLargeUrl": null,
+       "brandColor": null,
+       "defaultPrompt": "Use OpenAI Docs for official docs lookup, questions about Codex itself or Codex surfaces, model selection, model migration, and prompt-upgrade work."
+      },
+      "path": "/Users/ben/.codex/skills/.system/openai-docs/SKILL.md",
+      "scope": "system",
+      "enabled": true,
+      "pluginId": null
+     },
+     {
+      "name": "skill-creator",
+      "description": "Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources.",
+      "shortDescription": "Create or update a skill",
+      "interface": {
+       "displayName": "Skill Creator",
+       "shortDescription": "Create or update a skill",
+       "iconSmall": "/Users/ben/.codex/skills/.system/skill-creator/assets/skill-creator-small.svg",
+       "iconLarge": "/Users/ben/.codex/skills/.system/skill-creator/assets/skill-creator.png",
+       "iconSmallUrl": null,
+       "iconLargeUrl": null,
+       "brandColor": null,
+       "defaultPrompt": null
+      },
+      "path": "/Users/ben/.codex/skills/.system/skill-creator/SKILL.md",
+      "scope": "system",
+      "enabled": true,
+      "pluginId": null
+     },
+     {
+      "name": "legacy-deploy",
+      "description": "Deploy with the old pipeline.",
+      "path": "/Users/ben/.agents/skills/legacy-deploy/SKILL.md",
+      "scope": "user",
+      "enabled": false,
+      "pluginId": null
+     },
+     {
+      "name": "company-policy",
+      "description": "Ask Phill's rules for client work.",
+      "path": "/etc/codex/skills/company-policy/SKILL.md",
+      "scope": "admin",
+      "enabled": true,
+      "pluginId": null
+     },
+     {
+      "name": "Release Notes",
+      "description": "Draft the release notes.",
+      "path": "/Users/ben/.agents/skills/release-notes/SKILL.md",
+      "scope": "user",
+      "enabled": true,
+      "pluginId": null
+     }
+    ],
+    "errors": []
+   }
+  ]
+ }
+}

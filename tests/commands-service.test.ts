@@ -2,14 +2,18 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
+import { FAKE_CODEX } from './support.ts';
 
-// The command list service, against the fake Claude Code. Probes are counted through the
-// fake's invocation log: a probe is an invocation with the commands entrypoint.
+// The command list service, against the fake Claude Code and the fake Codex. Probes are counted
+// through the fakes' logs: a Claude Code probe is an invocation with the commands entrypoint, a
+// Codex probe is a skills/list request.
 
-const r = await startRunner({ ANTHROPIC_API_KEY: 'sk-stale-from-zshrc' });
+const r = await startRunner({ ANTHROPIC_API_KEY: 'sk-stale-from-zshrc', OMNI_CODEX_BIN: FAKE_CODEX, OPENAI_API_KEY: 'sk-stale-openai' });
 const { listCommands } = await import('../server/commands.ts');
+await (await import('../server/harness/catalog-service.ts')).loadCatalog();
 
 const probes = (cwd?: string) => r.invocations().filter((i) => i.entrypoint === 'omni-os-commands' && (!cwd || i.cwd === cwd));
+const codexProbes = (cwd?: string) => r.codexRequests().filter((q) => q.method === 'skills/list' && (!cwd || q.cwd === cwd));
 const names = (l: { commands: { name: string }[] }) => l.commands.map((c) => c.name);
 
 /** A folder with project commands, like a channel's repo. */
@@ -24,6 +28,13 @@ function addCommands(dir: string, commands: Record<string, string>) {
   for (const [name, description] of Object.entries(commands)) {
     writeFileSync(join(dir, '.claude', 'commands', `${name}.md`), `---\ndescription: ${description}\n---\nDo it.\n`);
   }
+}
+/** A Codex skill: `<skills>/<name>/SKILL.md`, as in a repo's `.agents/skills` or `$CODEX_HOME/skills`. */
+function addSkill(skills: string, name: string, description: string) {
+  mkdirSync(join(skills, name), { recursive: true });
+  const file = join(skills, name, 'SKILL.md');
+  writeFileSync(file, `---\nname: ${name}\ndescription: ${description}\n---\nDo it.\n`);
+  return file;
 }
 
 beforeAll(() => {
@@ -112,6 +123,58 @@ describe('listCommands on Claude Code', () => {
       expect(list).toEqual({ status: 'unavailable', fix: 'claude doctor', commands: [], fetchedAt: null });
     } finally {
       delete process.env.FAKE_CLAUDE_INIT_FAIL;
+    }
+  });
+});
+
+describe('listCommands on Codex', () => {
+  it("reads the folder's skills from Codex, with the file each one loads from", async () => {
+    const dir = repo();
+    const file = addSkill(join(dir, '.agents', 'skills'), 'ship-check', 'Run the pre-ship checklist');
+    const list = await listCommands('codex', dir, { wait: true });
+
+    expect(list.status).toBe('ready');
+    expect(list.commands).toContainEqual({ name: 'ship-check', description: 'Run the pre-ship checklist', source: 'project', mentionable: true, path: file });
+    expect(list.commands).toContainEqual(expect.objectContaining({ name: 'tdd', source: 'personal' }));
+    expect(list.commands).toContainEqual(expect.objectContaining({ name: 'imagegen', source: 'builtin' }));
+    expect(names(list)).not.toContain('legacy-deploy');
+  });
+
+  it('asks for that folder only, and strips a stale API key', async () => {
+    const dir = repo();
+    await listCommands('codex', dir, { wait: true });
+    const [probe] = codexProbes(dir);
+    expect(probe.params).toEqual({ cwds: [dir] });
+    expect(probe.api_auth).toEqual([]);
+  });
+
+  it('asks Codex again as soon as a Codex thread says its skills changed', async () => {
+    const home = (process.env.CODEX_HOME = mkdtempSync(join(r.tmp, 'codex-home-')));
+    try {
+      const dir = repo();
+      await listCommands('codex', dir, { wait: true });
+      addSkill(join(home, 'skills'), 'release-notes', 'Draft the release notes');
+      // Within 30 seconds the cached list is served.
+      expect(names(await listCommands('codex', dir, { wait: true }))).not.toContain('release-notes');
+
+      const t = await r.start('SKILLS_EDITED', { harness: 'codex', model: 'gpt-5.6-sol' });
+      await r.untilResults(t.id, 1);
+
+      const after = await listCommands('codex', dir, { wait: true });
+      expect(after.commands).toContainEqual(expect.objectContaining({ name: 'release-notes', source: 'personal' }));
+      expect(codexProbes(dir)).toHaveLength(2);
+    } finally {
+      delete process.env.CODEX_HOME;
+    }
+  });
+
+  it('reports the fix when Codex cannot list its skills', async () => {
+    process.env.FAKE_CODEX_SKILLS_FAIL = '1';
+    try {
+      const list = await listCommands('codex', repo(), { wait: true });
+      expect(list).toEqual({ status: 'unavailable', fix: 'codex doctor', commands: [], fetchedAt: null });
+    } finally {
+      delete process.env.FAKE_CODEX_SKILLS_FAIL;
     }
   });
 });

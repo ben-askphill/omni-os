@@ -1,12 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
+import { FAKE_CODEX } from './support.ts';
 
 // Every message that enters a thread, whoever sent it, is resolved against the thread's
 // command list, and the user event stores what it resolved to. The text itself goes to
-// Claude Code unchanged.
+// Claude Code unchanged; Codex gets its skill to load with it.
 
-const r = await startRunner();
+const r = await startRunner({ OMNI_CODEX_BIN: FAKE_CODEX });
 const { runAutomation } = await import('../server/automations.ts');
+await (await import('../server/harness/catalog-service.ts')).loadCatalog();
 
 const TDD = { name: 'tdd', source: 'personal', description: 'Test-driven development with a red-green-refactor loop.', start: 0, end: 4 };
 const PDF = { name: 'document-skills:pdf', source: 'plugin', description: 'Read, create and edit PDF files', start: 0, end: 4 };
@@ -56,6 +60,70 @@ describe('the resolved command on the user event', () => {
       const t = await r.start(text);
       await r.untilResults(t.id, 1);
       expect(r.byKind(t.id, 'user')[0].p.slash).toBeUndefined();
+    }
+  });
+});
+
+describe('a Codex skill command', () => {
+  const codex = { harness: 'codex', model: 'gpt-5.6-sol' };
+  const TDD = { type: 'skill', name: 'tdd', path: '/Users/dev/.agents/skills/tdd/SKILL.md' };
+  const text = (t: string) => ({ type: 'text', text: t, text_elements: [] });
+  /** The input of each turn/start (or turn/steer) Codex got for a thread. */
+  const inputs = (id: string, method = 'turn/start') =>
+    r.codexRequests().filter((q) => q.method === method && q.thread_id === id).map((q) => q.params.input);
+
+  // A repo skill in the scratch channel's folder, written before Codex first lists it.
+  const shipCheck = join(r.tmp, 'scratch', '.agents', 'skills', 'ship-check', 'SKILL.md');
+  beforeAll(() => {
+    mkdirSync(join(shipCheck, '..'), { recursive: true });
+    writeFileSync(shipCheck, '---\nname: ship-check\ndescription: Run the pre-ship checklist\n---\nDo it.\n');
+  });
+
+  it('reaches Codex as $name with the skill to load, and the transcript keeps what Ben typed', async () => {
+    const t = await r.start('/tdd fix the parser', codex);
+    await r.untilResults(t.id, 1);
+    expect(inputs(t.id)).toEqual([[text('$tdd fix the parser'), TDD]]);
+    const [u] = r.byKind(t.id, 'user');
+    expect(u.p).toMatchObject({ text: '/tdd fix the parser', source: 'manual', slash: { command: { name: 'tdd', source: 'personal', start: 0, end: 4 } } });
+    expect(u.p.slash.command).not.toHaveProperty('path');
+  });
+
+  it("loads a repo skill from the thread's own folder", async () => {
+    const t = await r.start('/ship-check', codex);
+    await r.untilResults(t.id, 1);
+    expect(inputs(t.id)).toEqual([[text('$ship-check'), { type: 'skill', name: 'ship-check', path: shipCheck }]]);
+  });
+
+  it('loads the skill for a message from the Conductor', async () => {
+    const t = await r.start('hello', codex);
+    await r.untilResults(t.id, 1);
+    await r.runner.postMessage(t.id, '/tdd 31', { from: 'conductor' });
+    await r.untilResults(t.id, 2);
+    expect(inputs(t.id)[1]).toEqual([text('$tdd 31'), TDD]);
+  });
+
+  it('loads the skill for a thread an Automation starts', async () => {
+    const t = await runAutomation(
+      { id: 'nightly-codex', name: 'Nightly', cron: '0 3 * * *', timezone: 'Europe/Amsterdam', channel: 'scratch', prompt: '/tdd run the suite', enabled: true, file: '', ...codex },
+      'manual',
+    );
+    await r.untilResults(t.id, 1);
+    expect(inputs(t.id)).toEqual([[text('$tdd run the suite'), TDD]]);
+  });
+
+  it('loads the skill when the message steers a running turn', async () => {
+    const t = await r.start('SLOW original task', codex);
+    await r.until('the turn to start', () => r.byKind(t.id, 'init').length >= 1);
+    await r.runner.postMessage(t.id, '/tdd and add a test', { mode: 'steer' });
+    await r.untilResults(t.id, 1);
+    expect(inputs(t.id, 'turn/steer')).toEqual([[text('$tdd and add a test'), TDD]]);
+  });
+
+  it('sends plain text and commands Codex does not have as typed, with no skill', async () => {
+    for (const typed of ['hello there', '/nope do it']) {
+      const t = await r.start(typed, codex);
+      await r.untilResults(t.id, 1);
+      expect(inputs(t.id)).toEqual([[text(typed)]]);
     }
   });
 });

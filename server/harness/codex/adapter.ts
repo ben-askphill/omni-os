@@ -12,7 +12,7 @@ import { usageFor } from '../../usage.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
 import { harnessEnv } from '../env-guard.ts';
 import { CAPABILITIES } from '../types.ts';
-import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
+import type { AdapterCallbacks, AdapterContext, CommandUse, HarnessAdapter, HarnessSession } from '../adapter.ts';
 import { CodexClient } from './client.ts';
 import { codexBin } from './bin.ts';
 import { PLAN_LIMIT_ID, normalizeItem, normalizePlan, normalizeRateLimits, turnErrorText } from './normalize.ts';
@@ -30,20 +30,33 @@ interface Outgoing {
   text: string;
   uuid: string;
   attachments: Attachment[];
+  commands: CommandUse[];
 }
 
-/** Ben's message to Codex input items: text (plus a path note for non-image files), then local images. */
-function buildInput(text: string, attachments: Attachment[]): CodexInput[] {
+/**
+ * Ben's message to Codex input items: text (plus a path note for non-image files), a skill item
+ * for each skill it names, then local images. Codex's own composer writes a skill as `$name`, so
+ * `/name` becomes `$name` in the text.
+ */
+function buildInput(text: string, attachments: Attachment[], commands: CommandUse[]): CodexInput[] {
+  const skills = commands.filter((c): c is CommandUse & { path: string } => !!c.path);
+  // From the end, so the earlier offsets still hold.
+  const said = [...skills].sort((a, b) => b.start - a.start).reduce((t, c) => `${t.slice(0, c.start)}$${c.name}${t.slice(c.end)}`, text);
   const images = attachments.filter((a) => a.image);
   const others = attachments.filter((a) => !a.image);
-  const full = others.length ? `${text}\n\n${describeAttachments(others)}` : text;
-  return [{ type: 'text', text: full, text_elements: [] }, ...images.map((a) => ({ type: 'localImage' as const, path: a.path }))];
+  const full = others.length ? `${said}\n\n${describeAttachments(others)}` : said;
+  return [
+    { type: 'text', text: full, text_elements: [] },
+    ...skills.map((c) => ({ type: 'skill' as const, name: c.name, path: c.path })),
+    ...images.map((a) => ({ type: 'localImage' as const, path: a.path })),
+  ];
 }
 
 const omniOf = (obj: any): Outgoing => ({
   text: String(obj?._omni?.text ?? ''),
   uuid: String(obj?.uuid ?? ''),
   attachments: (obj?._omni?.attachments ?? []) as Attachment[],
+  commands: (obj?._omni?.commands ?? []) as CommandUse[],
 });
 
 /**
@@ -147,6 +160,10 @@ export const codexAdapter: HarnessAdapter = {
           if (rl && (rl.limitId ?? PLAN_LIMIT_ID) === PLAN_LIMIT_ID) cb.usage(normalizeRateLimits(rl, usageFor('codex')));
           break;
         }
+        case 'skills/changed':
+          // A personal skill was added, edited or removed.
+          cb.commandsChanged?.();
+          break;
         default:
           break;
       }
@@ -172,7 +189,7 @@ export const codexAdapter: HarnessAdapter = {
       const started = client
         .request<{ turn: CodexTurn }>('turn/start', {
           threadId: codexThreadId,
-          input: buildInput(m.text, m.attachments),
+          input: buildInput(m.text, m.attachments, m.commands),
           model: thread.model || undefined,
           effort: thread.effort || undefined,
         })
@@ -191,7 +208,7 @@ export const codexAdapter: HarnessAdapter = {
       emit({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
       try {
         const turnId = currentTurnId ?? (await starting);
-        await client.request('turn/steer', { threadId: codexThreadId, input: buildInput(m.text, m.attachments), expectedTurnId: turnId });
+        await client.request('turn/steer', { threadId: codexThreadId, input: buildInput(m.text, m.attachments, m.commands), expectedTurnId: turnId });
       } catch {
         // Lost the race with the end of the turn: run it as the next turn instead.
         outbox.push(m);

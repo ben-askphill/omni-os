@@ -135,8 +135,32 @@ export interface PlanUpdate {
   plan: { step: string; status: 'pending' | 'inProgress' | 'completed' }[];
 }
 
-/** Turn input items sent on turn/start and turn/steer. */
+/** Turn input items sent on turn/start and turn/steer. A skill item loads that skill for the turn. */
 export type CodexInput =
   | { type: 'text'; text: string; text_elements: [] }
   | { type: 'localImage'; path: string }
-  | { type: 'image'; url: string };
+  | { type: 'image'; url: string }
+  | { type: 'skill'; name: string; path: string };
+
+// ---------- skills ----------
+
+/** One skill in skills/list. Plugin skills are named `plugin:skill`. */
+export interface SkillMetadata {
+  name: string;
+  description: string;
+  shortDescription?: string;
+  interface?: { displayName?: string; shortDescription?: string };
+  path: string;
+  scope: 'user' | 'repo' | 'system' | 'admin';
+  enabled: boolean;
+  /** `plugin@marketplace` for a plugin's skill. */
+  pluginId?: string | null;
+}
+
+/**
+ * skills/list `{ cwds }`: one entry per folder, repo skills first, then user, then system.
+ * A name can repeat, and the first one wins.
+ */
+export interface SkillsListResponse {
+  data: { cwd: string; skills: SkillMetadata[]; errors: unknown[] }[];
+}
