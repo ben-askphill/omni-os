@@ -18,6 +18,8 @@
 //   /<command>        a message starting with a slash is a local command: no model call, a zero-turn success result
 //                     whose text is the command output
 //   TITLE:<ms>        text mode (Omni's title call): take that long to write the title
+//   ORPHAN            leave a child behind that holds our stdout until it is killed, like a daemon started without
+//                     redirecting its output: once we exit, the runner never sees our pipes close
 // Env:
 //   FAKE_CLAUDE_CRASH_ON=<text>   exit 1 with a stderr message when a message containing <text> starts
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen)
@@ -37,6 +39,7 @@
 // Without --strict-mcp-config the user's MCP servers connect a moment after startup, as in claude 2.1.282:
 // an initialize answered before that has no MCP prompts, and once they connect the CLI pushes the whole
 // list again, their prompts included, as system/commands_changed.
+import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -234,6 +237,7 @@ async function runTurn() {
       for (const x of m.text.matchAll(/THINK:(\d+)/g)) think += Number(x[1]);
       for (const x of m.text.matchAll(/BG:(\d+)/g)) startBackground(Number(x[1]));
       if (m.text.includes('IGNORE_INTERRUPT')) t.ignoreInterrupt = true;
+      if (m.text.includes('ORPHAN')) leaveOrphan();
     }
     return true;
   };
@@ -338,6 +342,22 @@ function startBackground(ms) {
     queue.push({ uuid: randomUUID(), content: '<task-notification>background task done</task-notification>', text: 'BGDONE', system: true });
     startTurn();
   }, ms);
+}
+
+/** ORPHAN: this script again, as a child that inherits our stdout and idles until killed. */
+function leaveOrphan() {
+  spawn(process.execPath, [process.argv[1]], { env: { ...process.env, FAKE_CLAUDE_ORPHAN: '1' }, stdio: ['ignore', 'inherit', 'ignore'] }).unref();
+}
+
+/** The child ORPHAN leaves behind. Logged like an invocation, so a test can find and kill it. */
+function orphan() {
+  if (process.env.FAKE_CLAUDE_LOG) {
+    appendFileSync(
+      process.env.FAKE_CLAUDE_LOG,
+      JSON.stringify({ pid: process.pid, time: Date.now(), mode: 'orphan', thread_id: process.env.OMNI_THREAD_ID ?? null }) + '\n',
+    );
+  }
+  setInterval(() => {}, 1 << 30);
 }
 
 // ---------- commands ----------
@@ -533,4 +553,5 @@ async function main() {
   });
 }
 
-main();
+if (process.env.FAKE_CLAUDE_ORPHAN) orphan();
+else main();

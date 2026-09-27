@@ -8,6 +8,7 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
+    setupFiles: ['tests/setup.ts'],
     // Never let a test touch the real data/omni.db. Tests that need db.ts mock it.
     env: { OMNI_BROWSER: '1', OMNI_TZ: 'Europe/Amsterdam' },
   },
