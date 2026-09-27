@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 import { FAKE_CODEX, FAKE_CURSOR } from './support.ts';
@@ -222,6 +223,111 @@ describe('a Codex skill command', () => {
       await r.untilResults(t.id, 1);
       expect(inputs(t.id)).toEqual([[text(typed)]]);
     }
+  });
+});
+
+describe("Codex's /review and /compact", () => {
+  const codex = { harness: 'codex', model: 'gpt-5.6-sol' };
+  /** The params of each request of a kind Codex got for a thread. */
+  const requests = (id: string, method: string) => r.codexRequests().filter((q) => q.method === method && q.thread_id === id).map((q) => q.params);
+  const REVIEWED = 'Review of current changes: no issues found.';
+
+  // A channel whose folder is a git repo: main with one commit, a feature branch one commit ahead.
+  let loud = '';
+  beforeAll(() => {
+    const repo = join(realpathSync(r.tmp), 'review-repo');
+    mkdirSync(repo);
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', repo, '-c', 'user.name=Omni', '-c', 'user.email=omni@example.com', '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' }).trim();
+    git('init', '-q', '-b', 'main');
+    writeFileSync(join(repo, 'greet.js'), 'export const greet = (name) => `hi ${name}`;\n');
+    git('add', '.');
+    git('commit', '-q', '-m', 'Add greet');
+    git('checkout', '-q', '-b', 'feature');
+    writeFileSync(join(repo, 'greet.js'), 'export const greet = (name) => `HI ${name.toUpperCase()}`;\n');
+    git('commit', '-q', '-am', 'Make greet loud');
+    loud = git('rev-parse', 'HEAD');
+    r.db.channels.create({ id: 'review-repo', name: 'Review repo', kind: 'internal', use_worktree: 0, base_dir: repo });
+  });
+
+  it('reviews the uncommitted changes inline: a status on entering review, and the review as the reply', async () => {
+    const t = await r.start('/review', codex);
+    await r.untilResults(t.id, 1);
+    expect(requests(t.id, 'review/start')).toEqual([{ threadId: r.thread(t.id).session_id, target: { type: 'uncommittedChanges' }, delivery: 'inline' }]);
+    expect(requests(t.id, 'turn/start')).toEqual([]);
+    expect(r.texts(t.id, 'status')).toEqual(['Reviewing current changes']);
+    expect(r.texts(t.id, 'assistant_text')).toEqual([REVIEWED]);
+    expect(r.byKind(t.id, 'tool_use')).toEqual([]);
+    expect(r.byKind(t.id, 'result')[0].p).toMatchObject({ ok: true });
+    expect(r.byKind(t.id, 'user')[0].p).toMatchObject({ text: '/review', slash: { command: { name: 'review', source: 'builtin', start: 0, end: 7 } } });
+    expect(r.thread(t.id).status).toBe('done');
+  });
+
+  it("works out what to review with git in the thread's folder", async () => {
+    const t = await r.runner.createThread({ channel: 'review-repo', prompt: 'hello', ...codex });
+    await r.untilResults(t.id, 1);
+    for (const [n, typed] of ['/review main', `/review ${loud.slice(0, 7)}`, '/review focus on the parser'].entries()) {
+      await r.runner.postMessage(t.id, typed);
+      await r.untilResults(t.id, n + 2);
+    }
+    expect(requests(t.id, 'review/start').map((q) => q.target)).toEqual([
+      { type: 'baseBranch', branch: 'main' },
+      { type: 'commit', sha: loud, title: 'Make greet loud' },
+      { type: 'custom', instructions: 'focus on the parser' },
+    ]);
+    expect(r.texts(t.id, 'status')).toEqual(["Reviewing changes against 'main'", `Reviewing commit ${loud.slice(0, 7)}: Make greet loud`, 'Reviewing: focus on the parser']);
+  });
+
+  it('waits for a running turn to end rather than steering it', async () => {
+    const t = await r.start('SLOW original task', codex);
+    await r.until('the turn to start', () => r.byKind(t.id, 'init').length >= 1);
+    await r.runner.postMessage(t.id, '/review', { mode: 'steer' });
+    await r.untilResults(t.id, 2);
+    expect(requests(t.id, 'turn/steer')).toEqual([]);
+    expect(requests(t.id, 'review/start')).toHaveLength(1);
+    expect(r.texts(t.id, 'assistant_text').at(-1)).toBe(REVIEWED);
+  });
+
+  it('runs a message sent during a review after it, since Codex steers no review', async () => {
+    const t = await r.start('hello', codex);
+    await r.untilResults(t.id, 1);
+    await r.runner.postMessage(t.id, '/review HANG');
+    await r.until('the review to start', () => r.texts(t.id, 'status').includes('Reviewing: HANG'));
+    await r.runner.postMessage(t.id, 'and the tests', { mode: 'steer' });
+    r.runner.interruptThread(t.id);
+    await r.untilResults(t.id, 3);
+    expect(requests(t.id, 'turn/steer')).toEqual([]);
+    expect(requests(t.id, 'turn/start').map((q) => q.input[0].text)).toEqual(['hello', 'and the tests']);
+  });
+
+  it('stops a review in progress and keeps the session warm for the next message', async () => {
+    const t = await r.start('hello', codex);
+    await r.untilResults(t.id, 1);
+    await r.runner.postMessage(t.id, '/review HANG');
+    await r.until('the review to start', () => r.texts(t.id, 'status').includes('Reviewing: HANG'));
+    r.runner.interruptThread(t.id);
+    await r.untilResults(t.id, 2);
+    expect(r.byKind(t.id, 'result')[1].p).toMatchObject({ ok: false, subtype: 'interrupted' });
+    expect(r.runner.isLive(t.id)).toBe(true);
+
+    await r.runner.postMessage(t.id, 'carry on');
+    await r.untilResults(t.id, 3);
+    expect(r.byKind(t.id, 'result')[2].p).toMatchObject({ ok: true });
+    expect(requests(t.id, 'turn/start')).toHaveLength(2);
+  });
+
+  it('compacts through the app-server instead of starting a turn, and the thread ends idle', async () => {
+    const t = await r.start('hello', codex);
+    await r.untilResults(t.id, 1);
+    await r.runner.postMessage(t.id, '/compact');
+    await r.untilResults(t.id, 2);
+    expect(requests(t.id, 'thread/compact/start')).toEqual([{ threadId: r.thread(t.id).session_id }]);
+    expect(requests(t.id, 'turn/start')).toHaveLength(1);
+    // The status shows while Codex compacts, then clears.
+    expect(r.texts(t.id, 'status')).toEqual(['Compacting the conversation', '']);
+    expect(r.byKind(t.id, 'result')[1].p).toMatchObject({ ok: true });
+    expect(r.byKind(t.id, 'user')[1].p).toMatchObject({ text: '/compact', slash: { command: { name: 'compact', source: 'builtin', start: 0, end: 8 } } });
+    expect(r.thread(t.id).status).toBe('done');
   });
 });
 

@@ -6,6 +6,7 @@ import { Markdown } from './Markdown.tsx';
 import { CheckItem, Icon, Modal, Spinner, StatusPill, Ticks } from './ui.tsx';
 import { SOURCE_TAG } from '../slash-menu.ts';
 import { slashPieces } from '../slash-pills.ts';
+import { statusLabel } from '../status-line.ts';
 import type { SlashHit, SlashRecord } from '../../../shared/slash.ts';
 
 // ---------- payloads ----------
@@ -679,15 +680,7 @@ export const Transcript = memo(function Transcript({
   cwd?: string | null;
 }) {
   const { items, plan } = useMemo(() => buildItems(events), [events]);
-  const latestStatus = useMemo(() => {
-    if (!running) return null;
-    for (let k = events.length - 1; k >= 0; k--) {
-      const e = events[k];
-      if (e.kind === 'status') return parsePayload<TextP>(e).text;
-      if (e.kind === 'user') return null;
-    }
-    return null;
-  }, [events, running]);
+  const latestStatus = useMemo(() => (running ? statusLabel(events) : null), [events, running]);
 
   const last = items[items.length - 1];
   const showWorking = running && (!last || last.type === 'user' || last.type === 'report' || last.type === 'text');

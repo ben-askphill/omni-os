@@ -1,5 +1,6 @@
-// Codex's skills, as its app-server's skills/list lists them for a folder. They are Codex's
-// commands: a message that starts with `/name` loads that skill.
+// Codex's commands: its skills, as its app-server's skills/list lists them for a folder, and the
+// two built-ins Omni runs through the app-server. A message that starts with a skill's `/name`
+// loads that skill.
 import { isCommandName, type CommandSource, type SlashCommand } from '../../../shared/slash.ts';
 import { harnessEnv } from '../env-guard.ts';
 import { codexBin } from './bin.ts';
@@ -32,12 +33,28 @@ export function probeCodexSkills(cwd: string): Promise<SlashCommand[] | null> {
         client.notify('initialized', {});
         const res = await client.request<SkillsListResponse>('skills/list', { cwds: [cwd] });
         const skills = res?.data?.[0]?.skills;
-        finish(Array.isArray(skills) ? normalizeCodexSkills(skills) : null);
+        finish(Array.isArray(skills) ? withBuiltins(normalizeCodexSkills(skills)) : null);
       } catch {
         finish(null);
       }
     })();
   });
+}
+
+/**
+ * Codex's own `/review` and `/compact`, which Omni runs as review/start and thread/compact/start
+ * rather than as a turn. In Codex's composer these names are always the built-ins (a skill goes
+ * by `$name` there), so a skill of the same name gives way.
+ */
+export const CODEX_BUILTINS: readonly SlashCommand[] = [
+  { name: 'review', description: 'Review my current changes and find issues', argumentHint: '[branch, commit or instructions]', source: 'builtin', mentionable: false },
+  { name: 'compact', description: 'Summarize conversation to prevent hitting the context limit', source: 'builtin', mentionable: false },
+];
+
+/** The built-ins, then the skills whose names they leave free. */
+function withBuiltins(skills: SlashCommand[]): SlashCommand[] {
+  const taken = new Set(CODEX_BUILTINS.map((c) => c.name));
+  return [...CODEX_BUILTINS.map((c) => ({ ...c })), ...skills.filter((s) => !taken.has(s.name))];
 }
 
 const SCOPE_SOURCE: Record<string, CommandSource> = { repo: 'project', user: 'personal', system: 'builtin', admin: 'builtin' };

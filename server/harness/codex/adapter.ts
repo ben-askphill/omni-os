@@ -5,6 +5,9 @@
 // A turn: turn/start answers at once with the turn's id, items arrive as item/completed,
 // and turn/completed ends it as completed, interrupted or failed. Codex sends an `error`
 // notification before a failed turn/completed, and for errors it retries by itself.
+//
+// `/review` and `/compact` are Codex's own and run as turns too, started by review/start and
+// thread/compact/start instead of turn/start. Codex steers neither of them.
 import { artifactsDir, threadDir } from '../../config.ts';
 import { buildMcpConfig } from '../../sandbox.ts';
 import { describeAttachments, type Attachment } from '../../uploads.ts';
@@ -15,13 +18,16 @@ import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, CommandUse, HarnessAdapter, HarnessSession } from '../adapter.ts';
 import { CodexClient } from './client.ts';
 import { codexBin } from './bin.ts';
-import { PLAN_LIMIT_ID, normalizeItem, normalizePlan, normalizeRateLimits, turnErrorText } from './normalize.ts';
+import { CODEX_BUILTINS } from './commands.ts';
+import { PLAN_LIMIT_ID, normalizeItem, normalizePlan, normalizeRateLimits, normalizeStarted, turnErrorText } from './normalize.ts';
+import { reviewTarget } from './review.ts';
 import type {
   CodexInput,
   CodexTurn,
   ErrorNotification,
   PlanUpdate,
   RateLimits,
+  ReviewStartResponse,
   RpcNotification,
   ThreadStartResponse,
 } from './protocol.ts';
@@ -52,6 +58,11 @@ function buildInput(text: string, attachments: Attachment[], commands: CommandUs
     ...images.map((a) => ({ type: 'localImage' as const, path: a.path })),
   ];
 }
+
+const BUILTINS = new Set(CODEX_BUILTINS.map((c) => c.name));
+
+/** The Codex built-in a message starts with. A built-in is never a Mention, and has no skill file. */
+const builtinOf = (m: Outgoing) => m.commands.find((c) => !c.path && BUILTINS.has(c.name));
 
 const omniOf = (obj: any): Outgoing => ({
   text: String(obj?._omni?.text ?? ''),
@@ -89,10 +100,13 @@ export const codexAdapter: HarnessAdapter = {
 
     let ready = false;
     let turnActive = false;
+    // The id turn/completed will carry, which turn/interrupt takes.
     let currentTurnId: string | null = null;
-    // turn/start in flight or answered, resolving to the turn id. A steer or interrupt that
-    // arrives before the id is known waits on it.
-    let starting: Promise<string> | null = null;
+    // The request that starts the turn, in flight or answered, resolving to the turn id when the
+    // answer has one. A steer or interrupt that arrives before the id is known waits on it.
+    let starting: Promise<string | null> | null = null;
+    // The built-in the running turn is, if it is one.
+    let builtin: string | null = null;
     let initSent = false;
     // A final error from this turn, in case its turn/completed carries none.
     let lastError = '';
@@ -109,9 +123,8 @@ export const codexAdapter: HarnessAdapter = {
       OMNI_CHANNEL: thread.channel_id,
     }, ctx.secretEnv), onNotification: onNote });
 
-    /** The runner opens a turn on its init: one per turn, from turn/start's answer or turn/started, whichever is first. */
-    function turnBegan(turnId: string | undefined) {
-      currentTurnId ??= turnId ?? null;
+    /** The runner opens a turn on its init: one per turn, from Codex's answer or turn/started, whichever is first. */
+    function turnBegan() {
       if (initSent) return;
       initSent = true;
       emit({ kind: 'init', payload: { model, cwd: thread.cwd, tools: 0, mcp: [] } });
@@ -121,9 +134,14 @@ export const codexAdapter: HarnessAdapter = {
       const p = (n.params ?? {}) as Record<string, any>;
       switch (n.method) {
         case 'turn/started':
-          // Also covers a turn Codex starts by itself.
+          // Also covers a turn Codex starts by itself. A review announces itself under an id its
+          // turn/completed doesn't carry; review/start's answer has the right one.
           turnActive = true;
-          turnBegan((p.turn as CodexTurn | undefined)?.id);
+          if (builtin !== 'review') currentTurnId ??= (p.turn as CodexTurn | undefined)?.id ?? null;
+          turnBegan();
+          break;
+        case 'item/started':
+          for (const rec of normalizeStarted(p.item)) emit(rec);
           break;
         case 'item/completed':
           for (const rec of normalizeItem(p.item)) emit(rec);
@@ -147,6 +165,7 @@ export const codexAdapter: HarnessAdapter = {
           turnActive = false;
           currentTurnId = null;
           starting = null;
+          builtin = null;
           initSent = false;
           lastError = '';
           if (error) emit({ kind: 'error', payload: { text: error } });
@@ -180,28 +199,49 @@ export const codexAdapter: HarnessAdapter = {
       client.kill('SIGKILL');
     }
 
+    /** Ask Codex to run the message, as a turn or as the built-in it starts with. Resolves to the turn's id, if the answer has it. */
+    async function begin(m: Outgoing, use: CommandUse | undefined): Promise<string | null> {
+      if (use?.name === 'compact') {
+        // Codex compacts without instructions, so the text after the command goes nowhere. The
+        // answer is empty; the compaction's own turn/started has its id.
+        await client.request('thread/compact/start', { threadId: codexThreadId });
+        return null;
+      }
+      if (use?.name === 'review') {
+        const target = await reviewTarget(m.text.slice(use.end), thread.cwd);
+        const r = await client.request<ReviewStartResponse>('review/start', { threadId: codexThreadId, target, delivery: 'inline' });
+        return r.turn.id;
+      }
+      const r = await client.request<{ turn: CodexTurn }>('turn/start', {
+        threadId: codexThreadId,
+        input: buildInput(m.text, m.attachments, m.commands),
+        model: thread.model || undefined,
+        effort: thread.effort || undefined,
+      });
+      return r.turn.id;
+    }
+
     function pump() {
       if (!ready || turnActive || !outbox.length) return;
       const m = outbox.shift()!;
+      const use = builtinOf(m);
       turnActive = true;
+      builtin = use?.name ?? null;
       lastError = '';
       // The runner moves the message from "pending" to the transcript when it sees the replay.
       emit({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
-      const started = client
-        .request<{ turn: CodexTurn }>('turn/start', {
-          threadId: codexThreadId,
-          input: buildInput(m.text, m.attachments, m.commands),
-          model: thread.model || undefined,
-          effort: thread.effort || undefined,
-        })
-        .then((r) => {
-          // Unless the turn already completed.
-          if (starting === started) turnBegan(r.turn.id);
-          return r.turn.id;
-        });
+      const what = builtin === 'review' ? 'start the review' : builtin === 'compact' ? 'compact the conversation' : 'start the turn';
+      const started = begin(m, use).then((turnId) => {
+        // Unless the turn already completed.
+        if (starting === started) {
+          if (turnId) currentTurnId = turnId;
+          turnBegan();
+        }
+        return turnId;
+      });
       starting = started;
       // Turn never started: the runner fails the turn and drops the message.
-      started.catch((e) => fatal('start the turn', e));
+      started.catch((e) => fatal(what, e));
     }
 
     /** A steer passes the message into the running turn; if the turn already ended, it runs next. */
@@ -270,8 +310,9 @@ export const codexAdapter: HarnessAdapter = {
         const o = obj as { type?: string; request?: { subtype?: string }; request_id?: string };
         if (o?.type === 'user') {
           const m = omniOf(o);
-          // Mid-turn goes in as a steer; otherwise it starts (or is queued for) the next turn.
-          if (turnActive) void steer(m);
+          // Mid-turn goes in as a steer; otherwise it starts (or is queued for) the next turn. A
+          // built-in runs as a turn of its own, and nothing steers into one.
+          if (turnActive && !builtin && !builtinOf(m)) void steer(m);
           else {
             outbox.push(m);
             pump();

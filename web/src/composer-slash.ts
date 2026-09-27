@@ -56,12 +56,15 @@ export function replySlash(text: string, list: CommandList | null, harness: stri
 
 /**
  * Why a `/name` in a message that sends as typed won't run, or might not: Claude Code leaves a
- * Mention to the model. None of these stops the send.
+ * Mention to the model. Or what a command leaves out. None of these stops the send.
  */
 function textHint(text: string, r: ReturnType<typeof resolveSlash>, list: CommandList | null, harness: string): string | null {
   if (r?.kind === 'terminal') return `/${r.name} only works in a ${harnessName(harness)} terminal, so it sends as text.`;
   // Until the list is in, any name could be one of the thread's commands.
   if (r?.kind === 'unknown' && list?.status === 'ready') return `No /${r.name} command in this thread, so it sends as text.`;
+  if (harness === 'codex' && r?.kind === 'harness' && r.command.name === 'compact' && r.token.args.trim()) {
+    return 'Codex compacts without instructions, so it leaves out the text after /compact.';
+  }
   const [late] = midMessageCommands(text, list?.commands ?? []);
   if (late) return `/${late.name} only works at the start of a message, so here it stays text.`;
   if (harness !== 'claude-code') return null;
