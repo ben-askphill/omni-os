@@ -279,6 +279,15 @@ function DetailsTab({
 
 // ---------- page ----------
 
+/**
+ * The later of two snapshots of the thread. A send's reply can land after the stream has already
+ * moved the thread on (a local command answers in milliseconds), so a reply never wins a tie.
+ */
+function newer(prev: Thread | null, next: Thread, reply = false): Thread {
+  if (!prev || prev.id !== next.id) return next;
+  return prev.updated_at > next.updated_at || (reply && prev.updated_at === next.updated_at) ? prev : next;
+}
+
 export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifact?: number }) {
   const { setOpenThread } = useApp();
   const isMobile = useIsMobile();
@@ -354,7 +363,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     async (initial: boolean) => {
       try {
         const d = await api.get<ThreadDetail>(`/threads/${encodeURIComponent(id)}`);
-        setThread(d.thread);
+        setThread((prev) => newer(prev, d.thread));
         setQueued(d.pending ?? []);
         if (d.live !== undefined) setWarm(d.live);
         setChannel(d.channel);
@@ -414,7 +423,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
       if (m.type === 'event') addEvents([m.event]);
       else if (m.type === 'artifact') upsertArtifact(m.artifact);
       else if (m.type === 'thread') {
-        setThread(m.thread);
+        setThread((prev) => newer(prev, m.thread));
         if (m.pending) setQueued(m.pending);
         if (m.live !== undefined) setWarm(m.live);
       }
@@ -463,13 +472,13 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
   }, [stopping]);
 
   // Esc interrupts a busy thread. Capture phase, so it sees the page before any other Escape
-  // handler closes its layer: an open modal, lightbox, drawer, sheet or menu keeps Esc for itself.
+  // handler closes its layer: an open modal, lightbox, drawer, sheet, menu or list keeps Esc for itself.
   useEffect(() => {
     if (!running || interrupting || sheetOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.repeat || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-      if (document.querySelector('[aria-modal="true"], [role="dialog"], [role="menu"]')) return;
+      if (document.querySelector('[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return;
       // Esc in another field (sidebar search, a form) belongs to that field. The reply composer is the exception.
       const el = e.target instanceof HTMLElement ? e.target : null;
       if (el && (el.isContentEditable || el.matches('input, select') || (el.matches('textarea') && !el.hasAttribute('data-reply-composer')))) return;
@@ -589,7 +598,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
       // Mid-turn, wait for the work to finish instead of steering it to commit halfway.
       const mode: SendMode | undefined = running ? 'queue' : undefined;
       const t = await api.post<Thread>(`/threads/${encodeURIComponent(id)}/messages`, { prompt: OPEN_PR_PROMPT, mode });
-      setThread(t);
+      setThread((prev) => newer(prev, t, true));
       nearBottom.current = true;
     } catch (e) {
       setActionError(errorText(e));
@@ -724,7 +733,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
               status={thread.status}
               canSteer={thread.harness !== 'cursor'}
               onSent={(t) => {
-                setThread(t);
+                setThread((prev) => newer(prev, t, true));
                 nearBottom.current = true;
               }}
               extra={

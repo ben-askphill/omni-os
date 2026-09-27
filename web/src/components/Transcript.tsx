@@ -4,6 +4,8 @@ import { bytes, clock, duration, plural, shortPath, toDate } from '../format.ts'
 import { href } from '../router.ts';
 import { Markdown } from './Markdown.tsx';
 import { CheckItem, Icon, Modal, Spinner, StatusPill, Ticks } from './ui.tsx';
+import { SOURCE_TAG } from '../slash-menu.ts';
+import type { SlashHit, SlashRecord } from '../../../shared/slash.ts';
 
 // ---------- payloads ----------
 
@@ -15,6 +17,8 @@ interface UserP {
   mode?: 'steer' | 'queue' | 'interrupt';
   /** The run ended before the agent saw this message. */
   dropped?: boolean;
+  /** The harness command the message starts with, as it resolved when sent. */
+  slash?: SlashRecord;
 }
 interface TextP {
   text: string;
@@ -503,10 +507,30 @@ export function QueuedMessages({ items, starting = false }: { items: PendingMsg[
   );
 }
 
+/** A message's leading command as a pill. Hover shows its description; a tap spells it out under the text. */
+function CommandPill({ label, cmd, open, onToggle }: { label: string; cmd: SlashHit; open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={cmd.description || undefined}
+      aria-expanded={open}
+      className="rounded-md bg-surface-3 px-1.5 py-px font-mono text-[13px] font-medium whitespace-nowrap text-fg"
+    >
+      {label}
+    </button>
+  );
+}
+
 function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: string }) {
   const [more, setMore] = useState(false);
+  const [about, setAbout] = useState(false);
   const text = p.text ?? '';
   const long = text.length > 1400;
+  const shown = long && !more ? text.slice(0, 1200) + '...' : text;
+  // Only a span that still points at a `/name` in the text becomes a pill.
+  const cmd = p.slash?.command;
+  const pill = cmd && text[cmd.start] === '/' && cmd.end <= shown.length ? cmd : undefined;
   const label = p.source ? SOURCE_LABEL[p.source] : undefined;
   const how = p.dropped ? null : p.mode === 'steer' ? 'Steered' : p.mode === 'interrupt' ? 'Interrupted and sent' : null;
   return (
@@ -531,7 +555,20 @@ function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: strin
           p.dropped ? 'border border-dashed border-line-strong' : p.source === 'conductor' ? 'bg-info-bg text-fg' : 'bg-bubble'
         }`}
       >
-        {long && !more ? text.slice(0, 1200) + '...' : text}
+        {pill ? (
+          <>
+            {shown.slice(0, pill.start)}
+            <CommandPill label={text.slice(pill.start, pill.end)} cmd={pill} open={about} onToggle={() => setAbout((a) => !a)} />
+            {shown.slice(pill.end)}
+          </>
+        ) : (
+          shown
+        )}
+        {pill && about && (
+          <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
+            {pill.description || 'No description'} <span className="text-fg-4">· {SOURCE_TAG[pill.source]}</span>
+          </span>
+        )}
         {long && (
           <button type="button" onClick={() => setMore((m) => !m)} className="mt-1 block text-[12px] font-medium text-fg-3 underline underline-offset-2">
             {more ? 'Show less' : 'Show all'}

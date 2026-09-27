@@ -50,6 +50,15 @@ export async function prepareWorkdir(channel: Channel, threadId: string): Promis
   return { cwd: threadDir(threadId), branch: null };
 }
 
+/**
+ * The folder a channel's new threads read their command list from: the repo (a worktree is cut
+ * from it, so it has the same commands), then the base dir, then the brain.
+ */
+export function commandsFolder(channel: Channel): string | null {
+  for (const dir of [channel.repo_path, channel.base_dir, config.brainDir]) if (dir && existsSync(dir)) return dir;
+  return null;
+}
+
 export interface McpInput {
   threadId: string;
   channel: Channel;

@@ -1,0 +1,133 @@
+[
+  {
+    "name": "bro",
+    "description": "Restate the last message in plain human language, with no jargon. (user)",
+    "argumentHint": ""
+  },
+  {
+    "name": "diagnose",
+    "description": "Disciplined diagnosis loop for hard bugs and performance regressions. Reproduce → minimise → hypothesise → instrument → fix → regression-test. Use when user says \"diagnose this\" / \"debug this\", reports a bug, says something is broken/throwing/failing, or describes a performance regression. (user)",
+    "argumentHint": ""
+  },
+  {
+    "name": "ask-phill-marketing-blog-writer",
+    "description": "Writes blog articles for askphill.com from a topic or briefing, with strict fact-checking against Ahrefs (keywords, GSC integration, SERP), Shopify GraphQL (existing content check), and web sources. Auto-adapts structure per article type (pillar, comparison, how-to, listicle, news reaction, thought leadership). Two-stop human-in-the-loop: after research/data check, and after draft. Outputs draft to Notion and local .md; final published only after approval. Use when the user wants to draft a blog post, write a pillar article, produce a Shopify vs X comparison, react to industry news, or turn a brief into a publish-ready draft. (claude.ai sync)",
+    "argumentHint": "",
+    "aliases": [
+      "anthropic-skills:ask-phill-marketing-blog-writer"
+    ]
+  },
+  {
+    "name": "ship-check",
+    "description": "Run the pre-ship checklist for this repo. (project)",
+    "argumentHint": ""
+  },
+  {
+    "name": "deploy-preview",
+    "description": "Push this branch to a preview theme (project)",
+    "argumentHint": "<store>"
+  },
+  {
+    "name": "document-skills:pdf",
+    "description": "(document-skills) Use this skill whenever the user wants to do anything with PDF files. This includes reading or extracting text/tables from PDFs, combining or merging multiple PDFs into one, splitting PDFs apart, rotating pages, adding watermarks, creating new PDFs, filling PDF forms, encrypting/decrypting PDFs, extracting images, and OCR on scanned PDFs to make them searchable. If the user mentions a .pdf file or asks to produce one, use this skill.",
+    "argumentHint": "",
+    "aliases": [
+      "pdf"
+    ]
+  },
+  {
+    "name": "slack:create-slack-app",
+    "description": "(slack) Use when a developer wants to create, scaffold, or bootstrap a new Slack app or agent from scratch with the Slack CLI. Covers prerequisites, sandbox setup, authentication, and creating + running a project from a Bolt (JS or Python) template locally. Trigger on \"create a Slack app\", \"new Bolt app\", \"start a Slack agent\".",
+    "argumentHint": "[bolt-js | bolt-python]",
+    "aliases": [
+      "create-slack-app"
+    ]
+  },
+  {
+    "name": "vercel:deploy",
+    "description": "(vercel) Deploy the current project to Vercel. Pass \"prod\" or \"production\" as argument to deploy to production. Default is preview deployment.",
+    "argumentHint": ""
+  },
+  {
+    "name": "compact",
+    "description": "Free up context by summarizing the conversation so far",
+    "argumentHint": "<optional custom summarization instructions>",
+    "builtin": true
+  },
+  {
+    "name": "clear",
+    "description": "Start a new session with empty context; previous session stays on disk (resumable with /resume)",
+    "argumentHint": "[name]",
+    "aliases": [
+      "reset",
+      "new"
+    ],
+    "builtin": true
+  },
+  {
+    "name": "config",
+    "description": "Set a setting by key",
+    "argumentHint": "key=value",
+    "aliases": [
+      "settings"
+    ],
+    "builtin": true
+  },
+  {
+    "name": "code-review",
+    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's review recipe covers them) at the given effort level (low/medium: fewer, high-confidence findings; high→max: broader coverage, may include uncertain findings); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review.",
+    "argumentHint": "[low|medium|high|xhigh|max] [--fix] [--comment] [<pr#>|<branch>|<path>]",
+    "aliases": [
+      "review"
+    ],
+    "builtin": true
+  },
+  {
+    "name": "claude-api",
+    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).",
+    "argumentHint": "",
+    "builtin": true
+  },
+  {
+    "name": "heapdump",
+    "description": "Dump the JS heap to the Desktop; on Linux with no Desktop folder, the home directory",
+    "argumentHint": "",
+    "builtin": true
+  },
+  {
+    "name": "__remote-workflow",
+    "description": "Run the workflow script delivered in this session environment (server-launched sessions only)",
+    "argumentHint": "",
+    "builtin": true
+  },
+  {
+    "name": "usage",
+    "description": "Show session cost, plan usage, and what's contributing to your limits",
+    "argumentHint": "",
+    "aliases": [
+      "cost",
+      "stats"
+    ],
+    "builtin": true
+  },
+  {
+    "name": "rename",
+    "description": "Rename the current conversation",
+    "argumentHint": "[name]",
+    "aliases": [
+      "name"
+    ],
+    "builtin": true
+  },
+  {
+    "name": "model",
+    "description": "Set the AI model for Claude Code",
+    "argumentHint": "<model>",
+    "builtin": true
+  },
+  {
+    "name": "plugin:vercel:vercel:quick_status (MCP)",
+    "description": "Get a quick overview of the current project status, latest deployment, and any immediate issues. Use this for daily check-ins, quick status updates, or when you need a fast overview without deep analysis. Perfect for busy developers who need instant project insights.",
+    "argumentHint": ""
+  }
+]
