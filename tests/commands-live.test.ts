@@ -26,7 +26,9 @@ describe.skipIf(!LIVE)('the real Claude Code CLI', () => {
     expect(list.commands).toContainEqual({ name: 'omni-live-check', description: 'Omni live check', source: 'project', mentionable: true });
     expect(list.commands).toContainEqual(expect.objectContaining({ name: 'compact', source: 'builtin', mentionable: false }));
     const names = list.commands.map((c) => c.name);
-    for (const hidden of ['login', 'config', 'mcp', 'clear', 'model']) expect(names).not.toContain(hidden);
+    for (const hidden of ['login', 'config', 'mcp']) expect(names).not.toContain(hidden);
+    // Omni runs these in their place, and keeps them so their other names (/reset, /name) resolve.
+    expect(names).toEqual(expect.arrayContaining(['clear', 'rename', 'model']));
     for (const c of list.commands) expect(c.description).not.toMatch(/\n|\((user|project)\)$/);
 
     // Claude Code keeps a folder's sessions under ~/.claude/projects/<folder with - for / and .>.

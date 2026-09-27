@@ -28,8 +28,9 @@ export async function reviewTarget(args: string, cwd: string): Promise<ReviewTar
   if (!arg) return { type: 'uncommittedChanges' };
   // A leading dash would reach git as an option.
   if (/^[^\s-]\S*$/.test(arg)) {
+    // show-ref takes only a whole ref name, so `main~1` is a commit, not the branch.
     for (const ref of [`refs/heads/${arg}`, `refs/remotes/${arg}`]) {
-      if ((await git(cwd, 'rev-parse', '--verify', '--quiet', ref)) !== null) return { type: 'baseBranch', branch: arg };
+      if ((await git(cwd, 'show-ref', '--verify', '--quiet', ref)) !== null) return { type: 'baseBranch', branch: arg };
     }
     const sha = await git(cwd, 'rev-parse', '--verify', '--quiet', `${arg}^{commit}`);
     if (sha) return { type: 'commit', sha, title: (await git(cwd, 'log', '-1', '--format=%s', sha)) || null };

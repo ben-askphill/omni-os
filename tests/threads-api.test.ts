@@ -35,8 +35,15 @@ describe('PATCH /api/threads/:id', () => {
 
   it('needs a title', async () => {
     const t = await idle();
-    for (const body of [{ title: ' \n ' }, {}, { title: 42 }]) expect((await patch(t.id, body)).status).toBe(400);
+    for (const body of [{ title: ' \n ' }, {}, { title: 42 }]) expect(await patch(t.id, body)).toEqual({ status: 400, body: { error: 'a title is required' } });
     expect(r.thread(t.id).title).toBe('Old title');
+  });
+
+  it('takes a title of up to 200 characters, and says so for a longer one', async () => {
+    const t = await idle();
+    expect(await patch(t.id, { title: 'a'.repeat(201) })).toEqual({ status: 400, body: { error: 'a title can be up to 200 characters' } });
+    expect(r.thread(t.id).title).toBe('Old title');
+    expect((await patch(t.id, { title: ` ${'a'.repeat(200)} ` })).status).toBe(200);
   });
 
   it("keeps Ben's title when the generated one comes back after the rename", async () => {

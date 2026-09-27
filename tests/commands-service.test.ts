@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, mkdtempSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 import { FAKE_CODEX, FAKE_CURSOR, fakeAlive } from './support.ts';
@@ -15,7 +15,7 @@ const r = await startRunner({
   OMNI_CURSOR_BIN: FAKE_CURSOR,
   CURSOR_API_KEY: 'stale-cursor-key',
 });
-const { listCommands } = await import('../server/commands.ts');
+const { invalidateCommands, listCommands, peekCommands } = await import('../server/commands.ts');
 await (await import('../server/harness/catalog-service.ts')).loadCatalog();
 
 const probes = (cwd?: string) => r.invocations().filter((i) => i.entrypoint === 'omni-os-commands' && (!cwd || i.cwd === cwd));
@@ -78,10 +78,11 @@ describe('listCommands on Claude Code', () => {
     expect(probe.api_auth).toEqual([]);
   });
 
-  it('leaves out terminal-only commands and the built-ins Omni commands replace', async () => {
+  it('leaves out terminal-only commands, and keeps the built-ins Omni runs in their place so their other names resolve', async () => {
     const list = await listCommands('claude-code', repo(), { wait: true });
-    expect(names(list)).toContain('compact');
-    for (const hidden of ['clear', 'model', 'config']) expect(names(list)).not.toContain(hidden);
+    expect(names(list)).toEqual(expect.arrayContaining(['compact', 'clear', 'rename', 'model']));
+    expect(list.commands.find((c) => c.name === 'clear')?.aliases).toEqual(['reset', 'new']);
+    expect(names(list)).not.toContain('config');
   });
 
   it('shares one probe between concurrent calls and serves the cache for 30 seconds', async () => {
@@ -112,6 +113,18 @@ describe('listCommands on Claude Code', () => {
 
     const fresh = await listCommands('claude-code', dir, { wait: true });
     expect(names(fresh)).toContain('release-notes');
+    expect(probes(dir)).toHaveLength(2);
+  });
+
+  it('asks again when the commands change while it is asking', async () => {
+    const dir = repo({ 'ship-check': 'Run the pre-ship checklist' });
+    expect(peekCommands('claude-code', dir).status).toBe('loading');
+    // A thread says its commands changed before that probe answers, which may have missed the change.
+    invalidateCommands('claude-code');
+    await listCommands('claude-code', dir, { wait: true });
+    expect(probes(dir)).toHaveLength(1);
+
+    await listCommands('claude-code', dir, { wait: true });
     expect(probes(dir)).toHaveLength(2);
   });
 
@@ -243,5 +256,77 @@ describe('listCommands on Cursor Agent', () => {
     } finally {
       delete process.env.FAKE_CURSOR_ACP_FAIL;
     }
+  });
+
+  it('answers once Cursor Agent is gone, even while a helper it started holds its output open', async () => {
+    const helper = join(r.tmp, 'cursor-helper.pid');
+    const bin = join(r.tmp, 'cursor-with-helper.sh');
+    writeFileSync(bin, `#!/bin/sh\nsleep 30 &\necho $! > '${helper}'\nexec '${FAKE_CURSOR}' "$@"\n`, { mode: 0o755 });
+    process.env.OMNI_CURSOR_BIN = bin;
+    try {
+      const dir = repo();
+      const list = await Promise.race([listCommands('cursor', dir, { wait: true }), new Promise((ok) => setTimeout(ok, 3_000, 'still waiting'))]);
+      expect(list).toMatchObject({ status: 'ready' });
+      expect(readdirSync(join(config, 'acp-sessions'))).toEqual([]);
+    } finally {
+      process.env.OMNI_CURSOR_BIN = FAKE_CURSOR;
+      process.kill(Number(readFileSync(helper, 'utf8')), 'SIGKILL');
+    }
+  });
+});
+
+describe('a message that names a command', () => {
+  /** A channel on its own folder, whose list is cached and then 31 seconds old. */
+  async function staleChannel(id: string) {
+    const dir = repo({ 'ship-check': 'Run the pre-ship checklist' });
+    r.db.channels.create({ id, name: id, kind: 'internal', use_worktree: 0, base_dir: dir });
+    await listCommands('claude-code', dir, { wait: true });
+    later(31_000);
+    return dir;
+  }
+  /** The next probes answer after three seconds, like a CLI connecting slow MCP servers. */
+  async function withSlowProbes<T>(fn: () => Promise<T>): Promise<T> {
+    process.env.FAKE_CLAUDE_STARTUP_MS = '3000';
+    try {
+      return await fn();
+    } finally {
+      delete process.env.FAKE_CLAUDE_STARTUP_MS;
+    }
+  }
+  const timed = async (fn: () => Promise<unknown>) => {
+    const t0 = performance.now();
+    await fn();
+    return performance.now() - t0;
+  };
+
+  it('starts a thread at once on a stale list, which refreshes in the background', async () => {
+    const dir = await staleChannel('stale-start');
+    const ms = await withSlowProbes(() => timed(() => r.runner.createThread({ channel: 'stale-start', prompt: '/ship-check main' })));
+    expect(ms).toBeLessThan(1500);
+    await r.until('the background refresh', () => probes(dir).length === 2);
+  });
+
+  it('keeps the order messages were posted in, while the first waits for a list', async () => {
+    const dir = repo({ 'ship-check': 'Run the pre-ship checklist' });
+    r.db.channels.create({ id: 'in-order', name: 'In order', kind: 'internal', use_worktree: 0, base_dir: dir });
+    await withSlowProbes(async () => {
+      // Nothing is cached, and the thread's own process lists nothing until it is up.
+      const t = await r.runner.createThread({ channel: 'in-order', prompt: 'hello' });
+      await Promise.all([r.runner.postMessage(t.id, '/ship-check main'), r.runner.postMessage(t.id, 'and the changelog')]);
+      await r.until('all three messages in', () => r.byKind(t.id, 'user').length === 3);
+      expect(r.byKind(t.id, 'user').map((u) => u.p.text)).toEqual(['hello', '/ship-check main', 'and the changelog']);
+    });
+  });
+
+  it("goes at once to a warm thread, which has its own list", async () => {
+    await staleChannel('stale-warm');
+    const t = await r.runner.createThread({ channel: 'stale-warm', prompt: 'hello' });
+    await r.untilResults(t.id, 1);
+    await r.until('its own list', () => r.runner.threadCommands(t.id));
+    later(31_000);
+    const ms = await withSlowProbes(() => timed(() => r.runner.postMessage(t.id, '/ship-check main')));
+    expect(ms).toBeLessThan(1500);
+    await r.untilResults(t.id, 2);
+    expect(r.byKind(t.id, 'user')[1].p).toMatchObject({ slash: { command: { name: 'ship-check', source: 'project' } } });
   });
 });

@@ -40,12 +40,16 @@ export const OMNI_COMMANDS: SlashCommand[] = [
   { name: 'clear', description: 'Start a new thread with the same settings', source: 'omni', mentionable: false },
   { name: 'new', description: 'Start a new thread with the same settings', source: 'omni', mentionable: false },
   { name: 'rename', argumentHint: '<title>', description: 'Rename this thread', source: 'omni', mentionable: false },
-  { name: 'model', description: 'Start a new thread on another model', source: 'omni', mentionable: false },
-  { name: 'effort', description: 'Start a new thread with another effort', source: 'omni', mentionable: false },
-  { name: 'fast', description: 'Start a new thread in fast mode', source: 'omni', mentionable: false },
+  // A thread's model and effort are fixed, so these offer a new thread instead.
+  { name: 'model', description: 'Fixed per thread, so it offers a new thread on another model', source: 'omni', mentionable: false },
+  { name: 'effort', description: 'Fixed per thread, so it offers a new thread with another effort', source: 'omni', mentionable: false },
+  { name: 'fast', description: 'Fixed per thread, so it offers a new thread on a faster model', source: 'omni', mentionable: false },
 ];
 
 const OMNI_NAMES = new Set(OMNI_COMMANDS.map((c) => c.name));
+
+/** The longest title `/rename` sets. */
+export const TITLE_MAX = 200;
 
 /** Built-ins that only work in the harness's own terminal. The menu leaves them out. */
 const TERMINAL_ONLY = new Set([
@@ -69,10 +73,16 @@ export const isOmniCommand = (name: string) => OMNI_NAMES.has(name.toLowerCase()
 export const isTerminalOnly = (name: string) => name.startsWith('__') || TERMINAL_ONLY.has(name.toLowerCase());
 
 /**
+ * A harness's list as Omni keeps it: no terminal-only commands. The built-ins Omni runs in their
+ * place stay, so their other names (Claude Code's /reset for /clear) resolve to the Omni command.
+ */
+export const runnableCommands = (commands: SlashCommand[]) => commands.filter((c) => !isTerminalOnly(c.name));
+
+/**
  * A harness's list as the menu offers it: no terminal-only commands, and nothing under an Omni
  * command's name, since the Omni command runs in its place.
  */
-export const visibleCommands = (commands: SlashCommand[]) => commands.filter((c) => !isTerminalOnly(c.name) && !isOmniCommand(c.name));
+export const visibleCommands = (commands: SlashCommand[]) => runnableCommands(commands).filter((c) => !isOmniCommand(c.name));
 
 // A name is letters, digits, `.`, `_`, `:` and `-`, starts with a letter or digit, and ends at
 // whitespace or the end of the text. Anything else glued on (a second `/`, a comma) means it is
@@ -100,8 +110,9 @@ export function parseSlash(text: string): ParsedSlash {
 }
 
 export type SlashResolution =
-  | { kind: 'harness'; name: string; command: SlashCommand; token: SlashToken & { args: string } }
-  | { kind: 'omni' | 'terminal' | 'unknown'; name: string; token: SlashToken & { args: string } };
+  /** `command` is the one that runs: the harness's own, or Omni's. `name` is as typed. */
+  | { kind: 'harness' | 'omni'; name: string; command: SlashCommand; token: SlashToken & { args: string } }
+  | { kind: 'terminal' | 'unknown'; name: string; token: SlashToken & { args: string } };
 
 const names = (c: SlashCommand) => [c.name, ...(c.aliases ?? [])];
 
@@ -111,12 +122,21 @@ export function findCommand(name: string, commands: SlashCommand[]): SlashComman
   return commands.find((c) => names(c).includes(name)) ?? commands.find((c) => names(c).some((n) => n.toLowerCase() === lower));
 }
 
+const omniNamed = (name: string) => OMNI_COMMANDS.find((c) => c.name === name.toLowerCase());
+
+/** The Omni command a name runs: its own, or the one that runs in place of the harness built-in it names. */
+function omniCommand(name: string, commands: SlashCommand[]): SlashCommand | undefined {
+  const harness = findCommand(name, commands);
+  return omniNamed(name) ?? (harness && omniNamed(harness.name));
+}
+
 /** What a message's leading command is, against a thread's command list. Null when it has none. */
 export function resolveSlash(text: string, commands: SlashCommand[]): SlashResolution | null {
   const { lead } = parseSlash(text);
   if (!lead) return null;
   const { name } = lead;
-  if (isOmniCommand(name)) return { kind: 'omni', name, token: lead };
+  const omni = omniCommand(name, commands);
+  if (omni) return { kind: 'omni', name, command: omni, token: lead };
   const command = findCommand(name, commands);
   if (command) return { kind: 'harness', name, command, token: lead };
   return { kind: isTerminalOnly(name) ? 'terminal' : 'unknown', name, token: lead };
@@ -131,7 +151,7 @@ export interface LateCommand extends SlashToken {
 /** The start-only commands named after the start of a message, so the composer can say they stay text. */
 export function midMessageCommands(text: string, commands: SlashCommand[]): LateCommand[] {
   return parseSlash(text).mentions.flatMap((t): LateCommand[] => {
-    if (isOmniCommand(t.name)) return [{ ...t, kind: 'omni' }];
+    if (omniCommand(t.name, commands)) return [{ ...t, kind: 'omni' }];
     const c = findCommand(t.name, commands);
     return c && !c.mentionable ? [{ ...t, kind: 'builtin' }] : [];
   });
@@ -166,7 +186,7 @@ const hit = ({ name, source, description, argumentHint }: SlashCommand, { start,
 /** The skills and custom commands a message names after its start, each resolved on its own. */
 export function mentionHits(text: string, commands: SlashCommand[]): SlashHit[] {
   return parseSlash(text).mentions.flatMap((t) => {
-    const c = isOmniCommand(t.name) ? undefined : findCommand(t.name, commands);
+    const c = omniCommand(t.name, commands) ? undefined : findCommand(t.name, commands);
     return c?.mentionable ? [hit(c, t)] : [];
   });
 }

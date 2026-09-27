@@ -52,6 +52,9 @@ describe('reviewTarget', () => {
     expect(await reviewTarget(loud, repo)).toEqual({ type: 'commit', sha: loud, title: 'Make greet loud' });
     expect(await reviewTarget(loud.slice(0, 7), repo)).toEqual({ type: 'commit', sha: loud, title: 'Make greet loud' });
     expect(await reviewTarget('HEAD~1', repo)).toEqual({ type: 'commit', sha: first, title: 'Add greet' });
+    // A branch with a revision after it names a commit, not the branch.
+    expect(await reviewTarget('feature~1', repo)).toEqual({ type: 'commit', sha: first, title: 'Add greet' });
+    expect(await reviewTarget('origin/main^0', repo)).toEqual({ type: 'commit', sha: first, title: 'Add greet' });
   });
 
   it('reviews with anything else as instructions, the whole argument text', async () => {

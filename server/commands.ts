@@ -2,7 +2,7 @@
 // Omni copies nothing. A list is cached per harness and folder, served at once, and refreshed in
 // the background once it is 30 seconds old. One probe runs at a time per harness and folder, and
 // a failed probe keeps the last good list.
-import { visibleCommands, type SlashCommand } from '../shared/slash.ts';
+import { runnableCommands, type SlashCommand } from '../shared/slash.ts';
 import { probeClaudeCommands } from './harness/claude/commands.ts';
 import { probeCodexSkills } from './harness/codex/commands.ts';
 import { probeCursorCommands } from './harness/cursor/commands.ts';
@@ -42,20 +42,25 @@ interface Entry {
   checkedAt?: number;
   ok?: boolean;
   inflight?: Promise<void>;
+  /** Bumped by each invalidation, so a probe that was running then doesn't count as fresh. */
+  gen: number;
 }
 
 const entries = new Map<string, Entry>();
 
 function refresh(e: Entry, src: Source, cwd: string) {
+  const gen = e.gen;
   e.inflight = src
     .probe(cwd)
     .catch(() => null)
     .then((list) => {
-      e.checkedAt = Date.now();
+      const now = Date.now();
+      // The harness may have read its commands before the change, so the next call asks again.
+      if (e.gen === gen) e.checkedAt = now;
       e.ok = !!list;
       if (list) {
-        e.list = visibleCommands(list);
-        e.fetchedAt = e.checkedAt;
+        e.list = runnableCommands(list);
+        e.fetchedAt = now;
       }
     })
     .finally(() => {
@@ -72,7 +77,7 @@ function snapshot(e: Entry, src: Source): CommandList {
 function entry(harness: HarnessId, cwd: string, src: Source): Entry {
   const key = `${harness}\0${cwd}`;
   let e = entries.get(key);
-  if (!e) entries.set(key, (e = {}));
+  if (!e) entries.set(key, (e = { gen: 0 }));
   const due = e.checkedAt === undefined || Date.now() - e.checkedAt >= (e.ok ? STALE_MS : RECHECK_MS);
   if (due && !e.inflight) refresh(e, src, cwd);
   return e;
@@ -91,7 +96,11 @@ export function peekCommands(harness: HarnessId, cwd: string): CommandList {
  * personal commands shows in every folder.
  */
 export function invalidateCommands(harness: HarnessId) {
-  for (const [key, e] of entries) if (key.startsWith(`${harness}\0`)) e.checkedAt = undefined;
+  for (const [key, e] of entries) {
+    if (!key.startsWith(`${harness}\0`)) continue;
+    e.checkedAt = undefined;
+    e.gen++;
+  }
 }
 
 /**

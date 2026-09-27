@@ -6,7 +6,7 @@ import { useApp } from '../store.tsx';
 import { ErrorNote, Icon, IconButton, Kbd, Picker, Spinner, type IconName, type PickerOption } from './ui.tsx';
 import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
 import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
-import { mentionSections, menuSections, pickCommand, slashQuery } from '../slash-menu.ts';
+import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '../slash-menu.ts';
 import { menuCommands, newThreadBody, newThreadHint, otherModel, replySlash, sameSettings } from '../composer-slash.ts';
 import { parseSlash, type SlashCommand } from '../../../shared/slash.ts';
 
@@ -232,41 +232,43 @@ function DropHint({ over }: { over: boolean }) {
 
 /**
  * The `/` menu over a composer's textarea: whether it is open, what it lists, and the keys and
- * textarea props that drive it. `omni` adds Omni's own commands at the start of a message.
+ * textarea props that drive it. A thread's reply box adds Omni's own commands at the start of a message.
  */
 function useSlashMenu({
   ref,
   text,
   onText,
   commands: { list, load },
-  omni,
+  where,
 }: {
   ref: RefObject<HTMLTextAreaElement | null>;
   text: string;
   /** The composer's own setter, which keeps its draft too. */
   onText: (text: string) => void;
   commands: ReturnType<typeof useCommands>;
-  omni: boolean;
+  where: 'reply' | 'new-thread';
 }) {
   const menuId = useId();
   const [caret, setCaret] = useState(0);
   const [focused, setFocused] = useState(false);
-  // Esc closes the menu until what is typed before the caret changes, or the command is deleted.
+  // Esc closes the menu for this command until the text changes. Moving the caret keeps it closed.
   const [dismissed, setDismissed] = useState<string | null>(null);
   const at = focused ? slashQuery(text, caret) : null;
+  const here = at && `${at.start}\0${text}`;
   // After the start of the message, only a Mention: a skill or custom command, never an Omni command.
   const sections = useMemo(() => {
     if (!at) return [];
-    if (at.mention) return mentionSections(list?.commands ?? [], at.query, list?.recent);
-    return menuSections(omni ? menuCommands(list?.commands) : (list?.commands ?? []), at.query, list?.recent);
-  }, [at?.query, at?.mention, list, omni]);
+    const rows = menuCommands(list?.commands, where);
+    return (at.mention ? mentionSections : menuSections)(rows, at.query, list?.recent);
+  }, [at?.query, at?.mention, list, where]);
   const items = sections.flatMap((s) => s.commands);
-  const typed = text.slice(0, caret);
   // A ready list with nothing matching shows no menu: the text is sent as it is.
-  const open = !!at && dismissed !== typed && (items.length > 0 || !list || list.status !== 'ready');
-  const navKey = `${at?.start}\0${at?.query}\0${list?.fetchedAt}`;
-  const [nav, setNav] = useState({ key: '', i: 0 });
-  const active = nav.key === navKey ? Math.min(nav.i, items.length - 1) : 0;
+  const open = !!here && dismissed !== here && (items.length > 0 || !list || list.status !== 'ready');
+  // The highlight follows a command, not a row number, so a list that refreshes while open keeps it.
+  const navKey = `${at?.start}\0${at?.query}`;
+  const [nav, setNav] = useState<{ key: string; row: string | null }>({ key: '', row: null });
+  const active = Math.max(nav.key === navKey ? items.findIndex((c) => rowKey(c) === nav.row) : 0, 0);
+  const moveTo = (i: number) => setNav({ key: navKey, row: rowKey(items[i]) });
   const [picked, setPicked] = useState<{ caret: number } | null>(null);
 
   // Swap in a fresh list whenever the menu opens, or gets another list while open (a new harness or
@@ -292,14 +294,15 @@ function useSlashMenu({
 
   /** Arrow keys, Enter, Tab and Esc drive the menu while it is open. True when the key was used. */
   const onKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    if (!open || e.nativeEvent.isComposing) return false;
+    // 229: Safari's Enter that ends an IME composition, which it doesn't flag as composing.
+    if (!open || e.nativeEvent.isComposing || e.keyCode === 229) return false;
     const n = items.length;
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && n) {
-      setNav({ key: navKey, i: (active + (e.key === 'ArrowDown' ? 1 : -1) + n) % n });
+      moveTo((active + (e.key === 'ArrowDown' ? 1 : -1) + n) % n);
     } else if (((e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) || (e.key === 'Tab' && !e.shiftKey)) && n) {
       pick(items[active]);
     } else if (e.key === 'Escape') {
-      setDismissed(typed);
+      setDismissed(here);
     } else {
       return false;
     }
@@ -326,7 +329,7 @@ function useSlashMenu({
     'aria-activedescendant': open && items.length ? optionId(menuId, active) : undefined,
   };
 
-  const menu = open ? { id: menuId, list, sections, active, onActive: (i: number) => setNav({ key: navKey, i }), onPick: pick } : null;
+  const menu = open ? { id: menuId, list, sections, active, onActive: moveTo, onPick: pick } : null;
   return { open, menu, onKey, textarea };
 }
 
@@ -411,7 +414,7 @@ export function NewThreadComposer({
 
   // ----- the `/` menu: the harness in the picker, for the folder a thread in this channel reads its commands from -----
   const commands = useCommands(`harness=${encodeURIComponent(choice.harness)}&channel=${encodeURIComponent(channel)}`);
-  const slashMenu = useSlashMenu({ ref, text, onText: update, commands, omni: false });
+  const slashMenu = useSlashMenu({ ref, text, onText: update, commands, where: 'new-thread' });
   const hint = useMemo(() => newThreadHint(text, commands.list, choice.harness), [text, commands.list, choice.harness]);
   // Another harness or channel has its own list: fetch it for what is typed, so the hint re-checks it.
   const latest = useRef(text);
@@ -513,11 +516,8 @@ export function NewThreadComposer({
           </SendButton>
         </div>
       </div>
-      {hint && !slashMenu.open && (
-        <div aria-live="polite" className="px-4 pt-2.5 pb-1.5 text-[12px] text-fg-3">
-          {hint}
-        </div>
-      )}
+      {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
+      <div aria-live="polite">{hint && !slashMenu.open && <div className="px-4 pt-2.5 pb-1.5 text-[12px] text-fg-3">{hint}</div>}</div>
       {roleObj?.description && <div className="px-4 pt-2.5 pb-1.5 text-[12px] text-fg-3">{roleObj.description}</div>}
       {(att.error || error) && <ErrorNote className="m-1 mt-2">{att.error ?? error}</ErrorNote>}
     </div>
@@ -693,7 +693,7 @@ export function ReplyComposer({
   };
   const commands = useCommands(`thread=${encodeURIComponent(threadId)}`);
   const { list } = commands;
-  const slashMenu = useSlashMenu({ ref, text, onText: update, commands, omni: true });
+  const slashMenu = useSlashMenu({ ref, text, onText: update, commands, where: 'reply' });
 
   // `mode` only matters while a turn is in progress; an idle thread just starts the next turn.
   const submit = async (mode?: SendMode) => {
@@ -807,16 +807,19 @@ export function ReplyComposer({
           )}
         </div>
       </div>
-      {slash.hint && !slashMenu.open && (
-        <div aria-live="polite" className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2 pb-1.5 text-[12px] text-fg-3">
-          <span>{slash.hint}</span>
-          {slash.action.kind === 'fixed' && (
-            <button type="button" onClick={otherModelThread} className="font-medium text-fg-2 underline-offset-2 hover:text-fg hover:underline">
-              New thread on another model
-            </button>
-          )}
-        </div>
-      )}
+      {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
+      <div aria-live="polite">
+        {slash.hint && !slashMenu.open && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2 pb-1.5 text-[12px] text-fg-3">
+            <span>{slash.hint}</span>
+            {slash.action.kind === 'fixed' && (
+              <button type="button" onClick={otherModelThread} className="font-medium text-fg-2 underline-offset-2 hover:text-fg hover:underline">
+                New thread on another model
+              </button>
+            )}
+          </div>
+        )}
+      </div>
       {(att.error || error) && <ErrorNote className="m-1 mt-2">{att.error ?? error}</ErrorNote>}
     </div>
   );

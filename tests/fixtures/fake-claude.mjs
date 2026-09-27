@@ -350,6 +350,7 @@ const COMMANDS = [
   { name: 'compact', description: 'Clear conversation history but keep a summary in context', argumentHint: '<optional custom summarization instructions>', builtin: true },
   { name: 'context', description: 'Visualize current context usage as a colored grid', argumentHint: '', builtin: true },
   { name: 'clear', description: 'Clear conversation history and free up context', argumentHint: '', builtin: true, aliases: ['reset', 'new'] },
+  { name: 'rename', description: 'Rename the current conversation', argumentHint: '[name]', builtin: true, aliases: ['name'] },
   { name: 'model', description: 'Set the AI model for Claude Code', argumentHint: '[model]', builtin: true },
   { name: 'config', description: 'Open config panel', argumentHint: '', builtin: true, aliases: ['settings'] },
 ];

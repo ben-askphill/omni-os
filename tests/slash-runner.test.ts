@@ -112,22 +112,29 @@ describe("a Claude Code thread's own command list", () => {
 });
 
 describe('an Omni command that arrives from outside the composer', () => {
-  it('is stored and sent as plain text, and Omni neither renames nor starts a thread', async () => {
+  // The fake runs a message that starts with a slash as its own command, as Claude Code does, and
+  // answers anything else as the model would, echoing the text it got.
+  it("reaches Claude Code as plain text, so neither Claude Code nor Omni runs it", async () => {
     const t = await r.start('hello', { title: 'Old title' });
     await r.untilResults(t.id, 1);
     const threadsBefore = r.db.threads.byChannel('scratch').length;
-    await r.runner.postMessage(t.id, '/rename Better title');
-    await r.untilResults(t.id, 2);
-    await r.runner.postMessage(t.id, '/clear start over', { from: 'conductor' });
-    await r.untilResults(t.id, 3);
+    // Claude Code's /reset clears the session as /clear does, and /name renames it as /rename does.
+    const sent = [
+      ['/rename Better title', 'ben'],
+      ['/clear start over', 'conductor'],
+      ['/reset', 'ben'],
+      ['/name Other title', 'conductor'],
+      ['/model sonnet', 'ben'],
+    ] as const;
+    for (const [n, [text, from]] of sent.entries()) {
+      await r.runner.postMessage(t.id, text, { from });
+      await r.untilResults(t.id, n + 2);
+    }
 
-    const [, rename, clear] = r.byKind(t.id, 'user');
-    expect(rename.p).toMatchObject({ text: '/rename Better title', source: 'ben' });
-    expect(clear.p).toMatchObject({ text: '/clear start over', source: 'conductor' });
-    expect(rename.p.slash).toBeUndefined();
-    expect(clear.p.slash).toBeUndefined();
-    // The fake answers any text that starts with a slash as a local command, so this is the text as sent.
-    expect(r.texts(t.id, 'assistant_text').slice(-2)).toEqual(['Output of /rename', 'Output of /clear']);
+    const users = r.byKind(t.id, 'user').slice(1);
+    expect(users.map((u) => [u.p.text, u.p.source])).toEqual(sent);
+    for (const u of users) expect(u.p.slash).toBeUndefined();
+    expect(r.texts(t.id, 'assistant_text').slice(1)).toEqual(sent.map(([text]) => `ack:  ${text}`));
     expect(r.thread(t.id).title).toBe('Old title');
     expect(r.db.threads.byChannel('scratch')).toHaveLength(threadsBefore);
   });
@@ -142,7 +149,26 @@ describe('an Omni command that arrives from outside the composer', () => {
     const [u] = r.byKind(t.id, 'user');
     expect(u.p).toMatchObject({ text: '/new daily digest', source: 'automation' });
     expect(u.p.slash).toBeUndefined();
+    expect(r.texts(t.id, 'assistant_text')).toEqual(['ack:  /new daily digest']);
     expect(r.db.threads.byChannel('scratch')).toHaveLength(threadsBefore + 1);
+  });
+
+  it("is plain text in the first message of a thread, under the harness's own name for it too", async () => {
+    const t = await r.start('/reset and plan the release');
+    await r.untilResults(t.id, 1);
+    expect(r.byKind(t.id, 'user')[0].p).toMatchObject({ text: '/reset and plan the release' });
+    expect(r.texts(t.id, 'assistant_text')).toEqual(['ack:  /reset and plan the release']);
+  });
+});
+
+describe('a command after leading whitespace', () => {
+  it('reaches Claude Code at the very start of the text, where Claude Code runs it', async () => {
+    const t = await r.start('hello');
+    await r.untilResults(t.id, 1);
+    await r.runner.postMessage(t.id, '\n  /tdd 31', { from: 'conductor' });
+    await r.untilResults(t.id, 2);
+    expect(r.byKind(t.id, 'user')[1].p).toMatchObject({ text: '\n  /tdd 31', slash: { command: { ...TDD, start: 3, end: 7 } } });
+    expect(r.texts(t.id, 'assistant_text')[1]).toBe('Output of /tdd');
   });
 });
 

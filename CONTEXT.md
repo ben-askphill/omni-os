@@ -53,7 +53,7 @@ _Avoid_: Prompt, macro, shortcut
 A skill, custom command, plugin command, MCP prompt or built-in that a thread's **Harness** offers and runs itself.
 
 **Omni command**:
-A **Slash command** Omni runs itself in place of a harness built-in that would change what Omni tracks (`/clear`, `/rename`, `/model`).
+A **Slash command** Omni runs itself in place of a harness built-in that would change what Omni tracks (`/clear`, `/rename`, `/model`). The harness's other names for that built-in run it too (Claude Code's `/reset` is `/clear`, `/name` is `/rename`).
 
 **Mention**:
 A skill or custom command named with `/` after the start of a message, which the harness loads alongside the text rather than running as the command.
@@ -73,7 +73,7 @@ _Avoid_: Tag, reference
 - A message starts with at most one **Slash command** and can carry many **Mentions**; built-ins, MCP prompts and **Omni commands** only work at the start
 - A Claude Code **Thread** lists its MCP prompts only while it is warm, once its MCP servers have connected; while warm, its `/` menu lists exactly what that session can run
 - In Claude Code a **Mention** is best effort (the model decides whether to load it); Codex and Cursor load every one
-- **Harness commands** work in any message a **Thread** gets, whether Ben, an **Automation** or the **Conductor** sent it; **Omni commands** only work from the composer
+- **Harness commands** work in any message a **Thread** gets, whether Ben, an **Automation** or the **Conductor** sent it; **Omni commands** only work from a thread's reply box, and anywhere else reach the harness as plain text
 
 ## Example dialogue
 

@@ -1,14 +1,20 @@
 // What the composers do with a `/`, as pure functions: the Omni commands every thread's menu offers,
 // what Send does with a message that starts with one, and the quiet hints for commands that stay
 // plain text. The new-thread composer offers no Omni commands. The grammar itself is in shared/slash.ts.
-import { OMNI_COMMANDS, mentionHits, midMessageCommands, resolveSlash, type SlashCommand } from '../../shared/slash.ts';
+import { OMNI_COMMANDS, TITLE_MAX, mentionHits, midMessageCommands, resolveSlash, visibleCommands, type SlashCommand } from '../../shared/slash.ts';
 import type { CommandList, Thread } from './api.ts';
 
 const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent' };
 export const harnessName = (id: string) => HARNESS_NAME[id] ?? id;
 
-/** A thread's menu: its harness's list, then Omni's own commands, which work on every harness. */
-export const menuCommands = (list: SlashCommand[] | undefined): SlashCommand[] => [...(list ?? []), ...OMNI_COMMANDS];
+/**
+ * A composer's menu: its harness's list, less the built-ins Omni runs in their place. A thread's
+ * reply box adds Omni's own commands, which work on every harness.
+ */
+export const menuCommands = (list: SlashCommand[] | undefined, where: 'reply' | 'new-thread'): SlashCommand[] => [
+  ...visibleCommands(list ?? []),
+  ...(where === 'reply' ? OMNI_COMMANDS : []),
+];
 
 export type ReplyAction =
   /** To the harness, as typed. */
@@ -34,7 +40,7 @@ export function replySlash(text: string, list: CommandList | null, harness: stri
   const r = resolveSlash(text, list?.commands ?? []);
   if (r?.kind === 'omni') {
     const args = r.token.args.trim();
-    switch (r.name.toLowerCase()) {
+    switch (r.command.name) {
       case 'clear':
       case 'new':
         return {
@@ -45,7 +51,12 @@ export function replySlash(text: string, list: CommandList | null, harness: stri
         };
       case 'rename': {
         const title = args.replace(/\s+/g, ' ');
-        return { action: { kind: 'rename', title }, armed: !!title, label: 'Rename', hint: title ? null : 'Type the new title after /rename.' };
+        const hint = !title
+          ? 'Type the new title after /rename.'
+          : title.length > TITLE_MAX
+            ? `A title can be up to ${TITLE_MAX} characters. This one is ${title.length}.`
+            : null;
+        return { action: { kind: 'rename', title }, armed: !!title && !hint, label: 'Rename', hint };
       }
       default:
         return { action: { kind: 'fixed' }, armed: false, label: null, hint: 'The model, effort and fast mode are fixed per thread.' };
