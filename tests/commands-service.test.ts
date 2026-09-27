@@ -15,7 +15,7 @@ const r = await startRunner({
   OMNI_CURSOR_BIN: FAKE_CURSOR,
   CURSOR_API_KEY: 'stale-cursor-key',
 });
-const { listCommands } = await import('../server/commands.ts');
+const { invalidateCommands, listCommands, peekCommands } = await import('../server/commands.ts');
 await (await import('../server/harness/catalog-service.ts')).loadCatalog();
 
 const probes = (cwd?: string) => r.invocations().filter((i) => i.entrypoint === 'omni-os-commands' && (!cwd || i.cwd === cwd));
@@ -113,6 +113,18 @@ describe('listCommands on Claude Code', () => {
 
     const fresh = await listCommands('claude-code', dir, { wait: true });
     expect(names(fresh)).toContain('release-notes');
+    expect(probes(dir)).toHaveLength(2);
+  });
+
+  it('asks again when the commands change while it is asking', async () => {
+    const dir = repo({ 'ship-check': 'Run the pre-ship checklist' });
+    expect(peekCommands('claude-code', dir).status).toBe('loading');
+    // A thread says its commands changed before that probe answers, which may have missed the change.
+    invalidateCommands('claude-code');
+    await listCommands('claude-code', dir, { wait: true });
+    expect(probes(dir)).toHaveLength(1);
+
+    await listCommands('claude-code', dir, { wait: true });
     expect(probes(dir)).toHaveLength(2);
   });
 
