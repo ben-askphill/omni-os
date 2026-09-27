@@ -58,19 +58,34 @@ function rank(c: SlashCommand, q: string): number | null {
   return null;
 }
 
-/** With no search text, the list grouped by source. With search text, every group in one ranked list. */
-export function menuSections(commands: SlashCommand[], query: string): MenuSection[] {
+/** How many of the commands Ben used recently the menu lists first. */
+const RECENT_ROWS = 5;
+
+/**
+ * With no search text, the commands Ben used most recently (`recent`, names newest first), then the
+ * rest grouped by source. With search text, every command in one ranked list.
+ */
+export function menuSections(commands: SlashCommand[], query: string, recent: string[] = []): MenuSection[] {
   const q = query.toLowerCase();
   if (!q) {
-    return GROUPS.map(([source, label]) => ({ label, commands: commands.filter((c) => c.source === source).sort(byName) })).filter(
-      (s) => s.commands.length,
-    );
+    // A name the list doesn't have was used in another folder, or its command is gone.
+    const top = [...new Set(recent)].flatMap((n) => commands.find((c) => c.name === n) ?? []).slice(0, RECENT_ROWS);
+    const rest = commands.filter((c) => !top.includes(c));
+    return [
+      { label: 'Recent', commands: top },
+      ...GROUPS.map(([source, label]) => ({ label, commands: rest.filter((c) => c.source === source).sort(byName) })),
+    ].filter((s) => s.commands.length);
   }
+  // Among matches as good as each other, the one Ben used last comes first.
+  const used = (c: SlashCommand) => {
+    const i = recent.indexOf(c.name);
+    return i < 0 ? recent.length : i;
+  };
   const hits = commands.flatMap((c) => {
     const r = rank(c, q);
     return r === null ? [] : [{ c, r }];
   });
-  hits.sort((a, b) => a.r - b.r || byName(a.c, b.c));
+  hits.sort((a, b) => a.r - b.r || used(a.c) - used(b.c) || byName(a.c, b.c));
   return hits.length ? [{ label: null, commands: hits.map((h) => h.c) }] : [];
 }
 

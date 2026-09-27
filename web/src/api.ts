@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import type { Thread, Channel, EventRow, Artifact } from '../../server/db.ts';
 import type { Attachment } from '../../server/uploads.ts';
 import type { HarnessInfo, ModelEntry, HarnessId } from '../../server/harness/types.ts';
-import type { CommandList } from '../../server/commands.ts';
+import type { CommandList as HarnessCommands } from '../../server/commands.ts';
 
-export type { Thread, Channel, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, CommandList };
+export type { Thread, Channel, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number };
+
+/** A thread's `/` menu: its harness's commands, and the names Ben used last on that harness, newest first. */
+export type CommandList = HarnessCommands & { recent?: string[] };
 
 // ---------- response shapes ----------
 
