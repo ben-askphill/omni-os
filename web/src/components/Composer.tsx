@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type SyntheticEvent } from 'react';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { bytes } from '../format.ts';
 import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset, takeComposerFocus } from '../router.ts';
@@ -7,8 +7,8 @@ import { ErrorNote, Icon, IconButton, Kbd, Picker, Spinner, type IconName, type 
 import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
 import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
 import { mentionSections, menuSections, pickCommand, slashQuery } from '../slash-menu.ts';
-import { menuCommands, newThreadBody, otherModel, replySlash, sameSettings } from '../composer-slash.ts';
-import type { SlashCommand } from '../../../shared/slash.ts';
+import { menuCommands, newThreadBody, newThreadHint, otherModel, replySlash, sameSettings } from '../composer-slash.ts';
+import { parseSlash, type SlashCommand } from '../../../shared/slash.ts';
 
 // Unsent text survives navigation (not reloads). Keyed by where the composer lives.
 const drafts = new Map<string, string>();
@@ -228,6 +228,108 @@ function DropHint({ over }: { over: boolean }) {
   );
 }
 
+// ---------- the `/` menu ----------
+
+/**
+ * The `/` menu over a composer's textarea: whether it is open, what it lists, and the keys and
+ * textarea props that drive it. `omni` adds Omni's own commands at the start of a message.
+ */
+function useSlashMenu({
+  ref,
+  text,
+  onText,
+  commands: { list, load },
+  omni,
+}: {
+  ref: RefObject<HTMLTextAreaElement | null>;
+  text: string;
+  /** The composer's own setter, which keeps its draft too. */
+  onText: (text: string) => void;
+  commands: ReturnType<typeof useCommands>;
+  omni: boolean;
+}) {
+  const menuId = useId();
+  const [caret, setCaret] = useState(0);
+  const [focused, setFocused] = useState(false);
+  // Esc closes the menu until what is typed before the caret changes, or the command is deleted.
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const at = focused ? slashQuery(text, caret) : null;
+  // After the start of the message, only a Mention: a skill or custom command, never an Omni command.
+  const sections = useMemo(() => {
+    if (!at) return [];
+    if (at.mention) return mentionSections(list?.commands ?? [], at.query, list?.recent);
+    return menuSections(omni ? menuCommands(list?.commands) : (list?.commands ?? []), at.query, list?.recent);
+  }, [at?.query, at?.mention, list, omni]);
+  const items = sections.flatMap((s) => s.commands);
+  const typed = text.slice(0, caret);
+  // A ready list with nothing matching shows no menu: the text is sent as it is.
+  const open = !!at && dismissed !== typed && (items.length > 0 || !list || list.status !== 'ready');
+  const navKey = `${at?.start}\0${at?.query}\0${list?.fetchedAt}`;
+  const [nav, setNav] = useState({ key: '', i: 0 });
+  const active = nav.key === navKey ? Math.min(nav.i, items.length - 1) : 0;
+  const [picked, setPicked] = useState<{ caret: number } | null>(null);
+
+  // Swap in a fresh list whenever the menu opens, or gets another list while open (a new harness or
+  // channel); the server only probes a list older than 30 seconds.
+  const loaded = useRef<typeof load | null>(null);
+  useEffect(() => {
+    if (open && loaded.current !== load) void load();
+    loaded.current = open ? load : null;
+  }, [open, load]);
+
+  // Put the caret after `/name ` once the picked text is in the textarea.
+  useLayoutEffect(() => {
+    if (picked) ref.current?.setSelectionRange(picked.caret, picked.caret);
+  }, [picked, ref]);
+
+  const pick = (c: SlashCommand) => {
+    if (!at) return;
+    const next = pickCommand(text, at, c.name);
+    onText(next.text);
+    setCaret(next.caret);
+    setPicked({ caret: next.caret });
+  };
+
+  /** Arrow keys, Enter, Tab and Esc drive the menu while it is open. True when the key was used. */
+  const onKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (!open || e.nativeEvent.isComposing) return false;
+    const n = items.length;
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && n) {
+      setNav({ key: navKey, i: (active + (e.key === 'ArrowDown' ? 1 : -1) + n) % n });
+    } else if (((e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) || (e.key === 'Tab' && !e.shiftKey)) && n) {
+      pick(items[active]);
+    } else if (e.key === 'Escape') {
+      setDismissed(typed);
+    } else {
+      return false;
+    }
+    e.preventDefault();
+    return true;
+  };
+
+  const textarea = {
+    onChange: (e: ChangeEvent<HTMLTextAreaElement>) => {
+      onText(e.target.value);
+      setCaret(e.target.selectionStart);
+      // Deleting the command ends an Esc, so typing `/` again reopens the menu.
+      if (!slashQuery(e.target.value, e.target.selectionStart)) setDismissed(null);
+    },
+    onSelect: (e: SyntheticEvent<HTMLTextAreaElement>) => setCaret(e.currentTarget.selectionStart),
+    onFocus: (e: ReactFocusEvent<HTMLTextAreaElement>) => {
+      setFocused(true);
+      setCaret(e.currentTarget.selectionStart);
+      void load();
+    },
+    onBlur: () => setFocused(false),
+    'aria-autocomplete': 'list' as const,
+    'aria-controls': open ? menuId : undefined,
+    'aria-activedescendant': open && items.length ? optionId(menuId, active) : undefined,
+  };
+
+  const menu = open ? { id: menuId, list, sections, active, onActive: (i: number) => setNav({ key: navKey, i }), onPick: pick } : null;
+  return { open, menu, onKey, textarea };
+}
+
 /** Starts a new thread. `channelId` fixes the channel (channel page); otherwise a picker is shown. */
 export function NewThreadComposer({
   channelId,
@@ -307,6 +409,19 @@ export function NewThreadComposer({
     drafts.set(key, v);
   };
 
+  // ----- the `/` menu: the harness in the picker, for the folder a thread in this channel reads its commands from -----
+  const commands = useCommands(`harness=${encodeURIComponent(choice.harness)}&channel=${encodeURIComponent(channel)}`);
+  const slashMenu = useSlashMenu({ ref, text, onText: update, commands, omni: false });
+  const hint = useMemo(() => newThreadHint(text, commands.list, choice.harness), [text, commands.list, choice.harness]);
+  // Another harness or channel has its own list: fetch it for what is typed, so the hint re-checks it.
+  const latest = useRef(text);
+  latest.current = text;
+  const { load } = commands;
+  useEffect(() => {
+    const { lead, mentions } = parseSlash(latest.current);
+    if (lead || mentions.length) void load();
+  }, [load]);
+
   const submit = async () => {
     const prompt = text.trim();
     if (!prompt || busy) return;
@@ -344,13 +459,16 @@ export function NewThreadComposer({
   return (
     <div className={shell(big ? 'rounded-[30px] bg-surface' : 'rounded-[26px] bg-surface', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
+      {/* Near the top of the page, so it opens downward. */}
+      {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
       <AttachmentStrip files={att.files} onRemove={att.remove} />
       <textarea
         ref={ref}
         value={text}
-        onChange={(e) => update(e.target.value)}
+        {...slashMenu.textarea}
         onPaste={att.onPaste}
         onKeyDown={(e) => {
+          if (slashMenu.onKey(e)) return;
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             void submit();
@@ -395,6 +513,11 @@ export function NewThreadComposer({
           </SendButton>
         </div>
       </div>
+      {hint && !slashMenu.open && (
+        <div aria-live="polite" className="px-4 pt-2.5 pb-1.5 text-[12px] text-fg-3">
+          {hint}
+        </div>
+      )}
       {roleObj?.description && <div className="px-4 pt-2.5 pb-1.5 text-[12px] text-fg-3">{roleObj.description}</div>}
       {(att.error || error) && <ErrorNote className="m-1 mt-2">{att.error ?? error}</ErrorNote>}
     </div>
@@ -564,65 +687,13 @@ export function ReplyComposer({
   latest.current = text;
 
   // ----- the `/` menu -----
-  const menuId = useId();
-  const { list, load } = useCommands(threadId);
-  const [caret, setCaret] = useState(0);
-  const [focused, setFocused] = useState(false);
-  // Esc closes the menu until what is typed before the caret changes, or the command is deleted.
-  const [dismissed, setDismissed] = useState<string | null>(null);
-  const at = focused ? slashQuery(text, caret) : null;
-  // After the start of the message, only a Mention: a skill or custom command, never an Omni command.
-  const sections = useMemo(() => {
-    if (!at) return [];
-    if (at.mention) return mentionSections(list?.commands ?? [], at.query, list?.recent);
-    return menuSections(menuCommands(list?.commands), at.query, list?.recent);
-  }, [at?.query, at?.mention, list]);
-  const items = sections.flatMap((s) => s.commands);
-  const typed = text.slice(0, caret);
-  // A ready list with nothing matching shows no menu: the text is sent as it is.
-  const menuOpen = !!at && dismissed !== typed && (items.length > 0 || !list || list.status !== 'ready');
-  const navKey = `${at?.start}\0${at?.query}\0${list?.fetchedAt}`;
-  const [nav, setNav] = useState({ key: '', i: 0 });
-  const active = nav.key === navKey ? Math.min(nav.i, items.length - 1) : 0;
-  const [picked, setPicked] = useState<{ caret: number } | null>(null);
-
-  // Swap in a fresh list whenever the menu opens; the server only probes a list older than 30 seconds.
-  const wasOpen = useRef(false);
-  useEffect(() => {
-    if (menuOpen && !wasOpen.current) void load();
-    wasOpen.current = menuOpen;
-  }, [menuOpen, load]);
-
-  // Put the caret after `/name ` once the picked text is in the textarea.
-  useLayoutEffect(() => {
-    if (picked) ref.current?.setSelectionRange(picked.caret, picked.caret);
-  }, [picked]);
-
-  const pick = (c: SlashCommand) => {
-    if (!at) return;
-    const next = pickCommand(text, at, c.name);
-    setText(next.text);
-    drafts.set(key, next.text);
-    setCaret(next.caret);
-    setPicked({ caret: next.caret });
+  const update = (v: string) => {
+    setText(v);
+    drafts.set(key, v);
   };
-
-  /** Arrow keys, Enter, Tab and Esc drive the menu while it is open. True when the key was used. */
-  const menuKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    if (!menuOpen || e.nativeEvent.isComposing) return false;
-    const n = items.length;
-    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && n) {
-      setNav({ key: navKey, i: (active + (e.key === 'ArrowDown' ? 1 : -1) + n) % n });
-    } else if (((e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) || (e.key === 'Tab' && !e.shiftKey)) && n) {
-      pick(items[active]);
-    } else if (e.key === 'Escape') {
-      setDismissed(typed);
-    } else {
-      return false;
-    }
-    e.preventDefault();
-    return true;
-  };
+  const commands = useCommands(`thread=${encodeURIComponent(threadId)}`);
+  const { list } = commands;
+  const slashMenu = useSlashMenu({ ref, text, onText: update, commands, omni: true });
 
   // `mode` only matters while a turn is in progress; an idle thread just starts the next turn.
   const submit = async (mode?: SendMode) => {
@@ -698,32 +769,16 @@ export function ReplyComposer({
   return (
     <div className={shell('rounded-[24px] bg-elev', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
-      {menuOpen && <SlashMenu id={menuId} list={list} sections={sections} active={active} onActive={(i) => setNav({ key: navKey, i })} onPick={pick} />}
+      {slashMenu.menu && <SlashMenu {...slashMenu.menu} />}
       <AttachmentStrip files={att.files} onRemove={att.remove} />
       <textarea
         ref={ref}
         data-reply-composer
         value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          drafts.set(key, e.target.value);
-          setCaret(e.target.selectionStart);
-          // Deleting the command ends an Esc, so typing `/` again reopens the menu.
-          if (!slashQuery(e.target.value, e.target.selectionStart)) setDismissed(null);
-        }}
-        onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
-        onFocus={(e) => {
-          setFocused(true);
-          setCaret(e.currentTarget.selectionStart);
-          void load();
-        }}
-        onBlur={() => setFocused(false)}
-        aria-autocomplete="list"
-        aria-controls={menuOpen ? menuId : undefined}
-        aria-activedescendant={menuOpen && items.length ? optionId(menuId, active) : undefined}
+        {...slashMenu.textarea}
         onPaste={att.onPaste}
         onKeyDown={(e) => {
-          if (menuKey(e)) return;
+          if (slashMenu.onKey(e)) return;
           if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.nativeEvent.isComposing) return;
           e.preventDefault();
           if (omni) return void runOmni();
@@ -752,7 +807,7 @@ export function ReplyComposer({
           )}
         </div>
       </div>
-      {slash.hint && !menuOpen && (
+      {slash.hint && !slashMenu.open && (
         <div aria-live="polite" className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2 pb-1.5 text-[12px] text-fg-3">
           <span>{slash.hint}</span>
           {slash.action.kind === 'fixed' && (

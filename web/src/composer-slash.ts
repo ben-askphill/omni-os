@@ -1,6 +1,6 @@
-// What the reply composer does with a `/`, as pure functions: the Omni commands every thread's menu
-// offers, what Send does with a message that starts with one, and the quiet hints for commands that
-// stay plain text. The grammar itself is in shared/slash.ts.
+// What the composers do with a `/`, as pure functions: the Omni commands every thread's menu offers,
+// what Send does with a message that starts with one, and the quiet hints for commands that stay
+// plain text. The new-thread composer offers no Omni commands. The grammar itself is in shared/slash.ts.
 import { OMNI_COMMANDS, mentionHits, midMessageCommands, resolveSlash, type SlashCommand } from '../../shared/slash.ts';
 import type { CommandList, Thread } from './api.ts';
 
@@ -51,21 +51,34 @@ export function replySlash(text: string, list: CommandList | null, harness: stri
         return { action: { kind: 'fixed' }, armed: false, label: null, hint: 'The model, effort and fast mode are fixed per thread.' };
     }
   }
-  return { action: { kind: 'send' }, armed: !!text.trim(), label: null, hint: textHint(text, r, list, harness) };
+  return { action: { kind: 'send' }, armed: !!text.trim(), label: null, hint: textHint(text, r, list, harness, 'reply') };
+}
+
+/**
+ * The quiet line under the new-thread composer, against the list of the harness in its picker. Start
+ * sends the message as typed, an Omni command's name included.
+ */
+export function newThreadHint(text: string, list: CommandList | null, harness: string): string | null {
+  const r = resolveSlash(text, list?.commands ?? []);
+  if (r?.kind === 'omni') return `/${r.name} works in a thread's reply box, so here it sends as text.`;
+  return textHint(text, r, list, harness, 'new-thread');
 }
 
 /**
  * Why a `/name` in a message that sends as typed won't run, or might not: Claude Code leaves a
  * Mention to the model. Or what a command leaves out. None of these stops the send.
  */
-function textHint(text: string, r: ReturnType<typeof resolveSlash>, list: CommandList | null, harness: string): string | null {
+function textHint(text: string, r: ReturnType<typeof resolveSlash>, list: CommandList | null, harness: string, where: 'reply' | 'new-thread'): string | null {
   if (r?.kind === 'terminal') return `/${r.name} only works in a ${harnessName(harness)} terminal, so it sends as text.`;
   // Until the list is in, any name could be one of the thread's commands.
-  if (r?.kind === 'unknown' && list?.status === 'ready') return `No /${r.name} command in this thread, so it sends as text.`;
+  if (r?.kind === 'unknown' && list?.status === 'ready') {
+    return `No /${r.name} command ${where === 'reply' ? 'in this thread' : `for ${harnessName(harness)} in this channel`}, so it sends as text.`;
+  }
   if (harness === 'codex' && r?.kind === 'harness' && r.command.name === 'compact' && r.token.args.trim()) {
     return 'Codex compacts without instructions, so it leaves out the text after /compact.';
   }
-  const [late] = midMessageCommands(text, list?.commands ?? []);
+  // Where no Omni command runs, one named later is just a word.
+  const [late] = midMessageCommands(text, list?.commands ?? []).filter((c) => where === 'reply' || c.kind !== 'omni');
   if (late) return `/${late.name} only works at the start of a message, so here it stays text.`;
   if (harness !== 'claude-code') return null;
   const hits = mentionHits(text, list?.commands ?? []);

@@ -90,6 +90,59 @@ describe('GET /api/commands', () => {
   });
 });
 
+// ?harness=<id>&channel=<id>: the new-thread composer's menu, before the thread exists, from the
+// folder a thread started there would run in.
+describe('GET /api/commands for a new thread', () => {
+  const command = (dir: string, name: string, description: string) => {
+    mkdirSync(join(dir, '.claude', 'commands'), { recursive: true });
+    writeFileSync(join(dir, '.claude', 'commands', `${name}.md`), `---\ndescription: ${description}\n---\nDo it.\n`);
+  };
+  const names = (body: { commands: { name: string }[] }) => body.commands.map((c) => c.name);
+  const repo = join(r.tmp, 'client-repo');
+  const base = join(r.tmp, 'client-base');
+  command(repo, 'repo-check', 'Check the repo');
+  command(base, 'base-check', 'Check the base folder');
+  command(r.config.brainDir, 'brain-check', 'Check the brain');
+
+  it("lists the harness's commands for the channel's repo, which a worktree thread is cut from", async () => {
+    r.db.channels.create({ id: 'client', name: 'Client', repo_path: repo, use_worktree: 1, base_dir: base });
+    const { status, body } = await get('harness=claude-code&channel=client&wait=1');
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ status: 'ready', fetchedAt: expect.any(Number), recent: [] });
+    expect(body.commands).toContainEqual({ name: 'repo-check', description: 'Check the repo', source: 'project', mentionable: true });
+    expect(body.commands).toContainEqual(expect.objectContaining({ name: 'tdd', source: 'personal' }));
+    expect(names(body)).not.toContain('base-check');
+  });
+
+  it("lists the base folder's commands for a channel with no repo", async () => {
+    r.db.channels.create({ id: 'research', name: 'Research', base_dir: base });
+    const { body } = await get('harness=claude-code&channel=research&wait=1');
+    expect(body.commands).toContainEqual({ name: 'base-check', description: 'Check the base folder', source: 'project', mentionable: true });
+    expect(names(body)).not.toContain('repo-check');
+  });
+
+  it("lists the brain's commands for a channel with neither", async () => {
+    r.db.channels.create({ id: 'ops', name: 'Ops', kind: 'internal' });
+    const { body } = await get('harness=claude-code&channel=ops&wait=1');
+    expect(body.commands).toContainEqual({ name: 'brain-check', description: 'Check the brain', source: 'project', mentionable: true });
+    expect(names(body)).not.toContain('base-check');
+  });
+
+  it('lists the commands of the harness picked, for the same folder', async () => {
+    const { body } = await get('harness=codex&channel=research&wait=1');
+    expect(body.status).toBe('ready');
+    expect(body.commands).toContainEqual(expect.objectContaining({ name: 'review', source: 'builtin' }));
+    expect(body.commands).toContainEqual(expect.objectContaining({ name: 'tdd', source: 'personal', path: '/Users/dev/.agents/skills/tdd/SKILL.md' }));
+    expect(names(body)).not.toContain('base-check');
+  });
+
+  it('is 404 for a channel that does not exist, and 400 for a harness Omni does not run', async () => {
+    expect((await get('harness=claude-code&channel=nope')).status).toBe(404);
+    expect((await get('harness=emacs&channel=scratch')).status).toBe(400);
+    expect((await get('channel=scratch')).status).toBe(400);
+  });
+});
+
 describe('recent commands in GET /api/commands', () => {
   it("names the commands Ben used most recently on the thread's harness, in any thread, newest first", async () => {
     const a = await r.start('/tdd fix the parser');
