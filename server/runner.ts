@@ -903,6 +903,7 @@ function fallbackTitle(prompt: string) {
 }
 
 function generateTitle(threadId: string, prompt: string) {
+  const placeholder = threads.get(threadId)?.title;
   const child = spawn(
     config.claudeBin,
     ['-p', '--model', 'haiku', '--output-format', 'text', '--strict-mcp-config', '--no-session-persistence', '--tools', ''],
@@ -919,8 +920,10 @@ function generateTitle(threadId: string, prompt: string) {
   child.on('close', (code) => {
     clearTimeout(timer);
     const title = out.trim().split('\n').filter(Boolean).pop()?.replace(/^["']|["']$/g, '').slice(0, 90);
-    if (code === 0 && title) {
-      threads.update(threadId, { title, updated_at: threads.get(threadId)?.updated_at });
+    const t = threads.get(threadId);
+    // Only in place of the placeholder: Ben may have renamed it while this ran.
+    if (code === 0 && title && t && t.title === placeholder) {
+      threads.update(threadId, { title, updated_at: t.updated_at });
       emitThread(threadId);
     }
   });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type EventRow, type PendingMsg, type SendMode, type Thread, type ThreadDetail } from '../api.ts';
 import { ArtifactViewer, kindIcon } from '../components/ArtifactViewer.tsx';
 import { ReplyComposer } from '../components/Composer.tsx';
+import { harnessName } from '../composer-slash.ts';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
 import { Avatar, Button, Chip, CopyButton, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Modal, StatusDot, StatusPill, Tabs } from '../components/ui.tsx';
 import { duration, fullDate, plural, relTime } from '../format.ts';
@@ -180,7 +181,6 @@ function DetailsTab({
   warm: boolean | undefined;
 }) {
   const cwd = init?.cwd || thread.cwd;
-  const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent' };
   const resumeCmd: Record<string, string> = {
     'claude-code': `claude --resume ${thread.session_id}`,
     codex: `codex resume ${thread.session_id}`,
@@ -196,7 +196,7 @@ function DetailsTab({
           </a>
         </Row>
         <Row k="Role">{thread.role ?? <span className="text-fg-3">none</span>}</Row>
-        <Row k="Harness">{HARNESS_NAME[thread.harness] ?? thread.harness}</Row>
+        <Row k="Harness">{harnessName(thread.harness)}</Row>
         <Row k="Model">
           {thread.model || init?.model || <span className="text-fg-3">default</span>}
           {thread.model && init?.model && init.model !== thread.model && <span className="ml-1 text-fg-3">({init.model})</span>}
@@ -729,13 +729,14 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
           <div className="mx-auto max-w-3xl">
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             <ReplyComposer
-              threadId={id}
-              status={thread.status}
+              thread={thread}
               canSteer={thread.harness !== 'cursor'}
               onSent={(t) => {
                 setThread((prev) => newer(prev, t, true));
                 nearBottom.current = true;
               }}
+              // A rename keeps updated_at, so it has to win a tie.
+              onRenamed={(t) => setThread((prev) => newer(prev, t))}
               extra={
                 thread.branch ? (
                   <Button size="sm" variant="ghost" icon="pr" onClick={openPR} busy={prBusy} title={OPEN_PR_PROMPT}>

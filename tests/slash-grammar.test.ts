@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSlash, resolveSlash, slashRecord, visibleCommands, type SlashCommand } from '../shared/slash.ts';
+import { midMessageCommands, parseSlash, resolveSlash, slashRecord, visibleCommands, type SlashCommand } from '../shared/slash.ts';
 
 // The slash grammar is shared by the server (what a message runs) and the web app (menu, pills),
 // so both agree on what counts as a command.
@@ -49,6 +49,38 @@ describe('parseSlash: the leading command', () => {
     ['/', 'a bare slash'],
   ])('%j is not a command (%s)', (text) => {
     expect(parseSlash(text).lead).toBeNull();
+  });
+});
+
+describe('parseSlash: commands named later in the message', () => {
+  it('finds every `/name` after whitespace, but not the leading command', () => {
+    expect(parseSlash('fix it with /tdd and\n/pdf').mentions).toEqual([
+      { name: 'tdd', start: 12, end: 16 },
+      { name: 'pdf', start: 21, end: 25 },
+    ]);
+    expect(parseSlash('/tdd /bro 31').mentions).toEqual([{ name: 'bro', start: 5, end: 9 }]);
+  });
+
+  it.each([
+    ['see /Users/ben/notes.md', 'a path'],
+    ['and/or /tdd, then', 'no whitespace before, and punctuation glued on'],
+    ['(/tdd)', 'a bracket before'],
+    ['https://example.com/tdd', 'a URL'],
+  ])('%j names nothing (%s)', (text) => {
+    expect(parseSlash(text).mentions).toEqual([]);
+  });
+});
+
+describe('midMessageCommands: start-only commands typed later in a message', () => {
+  it('reports Omni commands and built-ins after the start', () => {
+    expect(midMessageCommands('fix it, then /clear', COMMANDS)).toEqual([{ name: 'clear', start: 13, end: 19, kind: 'omni' }]);
+    expect(midMessageCommands('/tdd 31 and /COMPACT after', COMMANDS)).toEqual([{ name: 'COMPACT', start: 12, end: 20, kind: 'builtin' }]);
+  });
+
+  it('leaves the leading command, Mentions, unknown words and paths alone', () => {
+    for (const text of ['/clear', '/compact now', 'use /tdd here', 'and /pdf', 'look in /tmp', 'see /Users/ben/a.md']) {
+      expect(midMessageCommands(text, COMMANDS)).toEqual([]);
+    }
   });
 });
 

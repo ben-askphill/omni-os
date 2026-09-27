@@ -19,6 +19,7 @@ import { checkUploads, imageMime, safeName, saveUploads } from './uploads.ts';
 import { detectRepo, listPRs, getPR, mergePR } from './github.ts';
 import { loadAutomations, runAutomation, setEnabled, lastRuns, startScheduler } from './automations.ts';
 import { commandsApi } from './commands-api.ts';
+import { threadsApi } from './threads-api.ts';
 
 const app = new Hono();
 const api = new Hono();
@@ -157,6 +158,8 @@ api.get('/threads/:id/summary', (c) => {
     artifacts: artifacts.byThread(t.id).map((a) => a.name),
   });
 });
+
+api.route('/threads', threadsApi);
 
 api.post('/threads/:id/messages', async (c) => {
   const id = c.req.param('id');

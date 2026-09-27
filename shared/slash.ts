@@ -31,6 +31,8 @@ export interface SlashToken {
 export interface ParsedSlash {
   /** The command a message starts with, and the text after it. */
   lead: (SlashToken & { args: string }) | null;
+  /** Every other `/name` in the message: one after whitespace. */
+  mentions: SlashToken[];
 }
 
 /** Commands Omni runs itself, in place of the harness built-ins that would change what Omni tracks. */
@@ -77,16 +79,24 @@ export const visibleCommands = (commands: SlashCommand[]) => commands.filter((c)
 // a path, a URL or prose, never a command.
 const NAME = '[A-Za-z0-9][A-Za-z0-9._:-]*';
 const LEAD = new RegExp(`^(\\s*)\\/(${NAME})(?=\\s|$)`);
+const LATER = new RegExp(`(?<=\\s)\\/(${NAME})(?=\\s|$)`, 'g');
 
 /** Whether a harness command's name can be typed after a `/` at all. */
 export const isCommandName = (name: string) => new RegExp(`^${NAME}$`).test(name);
 
 export function parseSlash(text: string): ParsedSlash {
   const m = LEAD.exec(text);
-  if (!m) return { lead: null };
-  const start = m[1].length;
-  const end = start + 1 + m[2].length;
-  return { lead: { name: m[2], start, end, args: text.slice(end).replace(/^\s+/, '') } };
+  let lead: ParsedSlash['lead'] = null;
+  if (m) {
+    const start = m[1].length;
+    const end = start + 1 + m[2].length;
+    lead = { name: m[2], start, end, args: text.slice(end).replace(/^\s+/, '') };
+  }
+  const mentions = [...text.matchAll(LATER)]
+    .map((x) => ({ name: x[1], start: x.index, end: x.index + x[0].length }))
+    // Leading spaces put the leading command after whitespace too.
+    .filter((t) => t.start !== lead?.start);
+  return { lead, mentions };
 }
 
 export type SlashResolution =
@@ -110,6 +120,21 @@ export function resolveSlash(text: string, commands: SlashCommand[]): SlashResol
   const command = findCommand(name, commands);
   if (command) return { kind: 'harness', name, command, token: lead };
   return { kind: isTerminalOnly(name) ? 'terminal' : 'unknown', name, token: lead };
+}
+
+/** A command that only works at the start of a message, typed later in one. */
+export interface LateCommand extends SlashToken {
+  /** An Omni command, or a harness command that can't be a Mention (a built-in). */
+  kind: 'omni' | 'builtin';
+}
+
+/** The start-only commands named after the start of a message, so the composer can say they stay text. */
+export function midMessageCommands(text: string, commands: SlashCommand[]): LateCommand[] {
+  return parseSlash(text).mentions.flatMap((t): LateCommand[] => {
+    if (isOmniCommand(t.name)) return [{ ...t, kind: 'omni' }];
+    const c = findCommand(t.name, commands);
+    return c && !c.mentionable ? [{ ...t, kind: 'builtin' }] : [];
+  });
 }
 
 /** A resolved command as a user event stores it, so its pill keeps the description it had when sent. */

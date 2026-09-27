@@ -17,6 +17,7 @@
 //                     on its own (no message of ours, no replay)
 //   /<command>        a message starting with a slash is a local command: no model call, a zero-turn success result
 //                     whose text is the command output
+//   TITLE:<ms>        text mode (Omni's title call): take that long to write the title
 // Env:
 //   FAKE_CLAUDE_CRASH_ON=<text>   exit 1 with a stderr message when a message containing <text> starts
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen)
@@ -445,7 +446,11 @@ async function main() {
     // One-shot print mode: prompt from the arguments or stdin.
     const prompt = positional.length ? positional.join(' ') : (await readAll()).trim();
     if (!prompt) return fail('Error: Input must be provided either through stdin or as a prompt argument when using --print');
-    if (outFmt === 'text') return process.stdout.write('Fake title\n');
+    if (outFmt === 'text') {
+      const wait = Number(/TITLE:(\d+)/.exec(prompt)?.[1] ?? 0);
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      return process.stdout.write('Fake title\n');
+    }
     if (outFmt === 'json') {
       return process.stdout.write(
         JSON.stringify({

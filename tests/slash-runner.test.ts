@@ -64,6 +64,41 @@ describe('the resolved command on the user event', () => {
   });
 });
 
+describe('an Omni command that arrives from outside the composer', () => {
+  it('is stored and sent as plain text, and Omni neither renames nor starts a thread', async () => {
+    const t = await r.start('hello', { title: 'Old title' });
+    await r.untilResults(t.id, 1);
+    const threadsBefore = r.db.threads.byChannel('scratch').length;
+    await r.runner.postMessage(t.id, '/rename Better title');
+    await r.untilResults(t.id, 2);
+    await r.runner.postMessage(t.id, '/clear start over', { from: 'conductor' });
+    await r.untilResults(t.id, 3);
+
+    const [, rename, clear] = r.byKind(t.id, 'user');
+    expect(rename.p).toMatchObject({ text: '/rename Better title', source: 'ben' });
+    expect(clear.p).toMatchObject({ text: '/clear start over', source: 'conductor' });
+    expect(rename.p.slash).toBeUndefined();
+    expect(clear.p.slash).toBeUndefined();
+    // The fake answers any text that starts with a slash as a local command, so this is the text as sent.
+    expect(r.texts(t.id, 'assistant_text').slice(-2)).toEqual(['Output of /rename', 'Output of /clear']);
+    expect(r.thread(t.id).title).toBe('Old title');
+    expect(r.db.threads.byChannel('scratch')).toHaveLength(threadsBefore);
+  });
+
+  it('is plain text in the prompt of a thread an Automation starts', async () => {
+    const threadsBefore = r.db.threads.byChannel('scratch').length;
+    const t = await runAutomation(
+      { id: 'digest', name: 'Digest', cron: '0 7 * * *', timezone: 'Europe/Amsterdam', channel: 'scratch', prompt: '/new daily digest', enabled: true, file: '' },
+      'manual',
+    );
+    await r.untilResults(t.id, 1);
+    const [u] = r.byKind(t.id, 'user');
+    expect(u.p).toMatchObject({ text: '/new daily digest', source: 'automation' });
+    expect(u.p.slash).toBeUndefined();
+    expect(r.db.threads.byChannel('scratch')).toHaveLength(threadsBefore + 1);
+  });
+});
+
 describe('a Codex skill command', () => {
   const codex = { harness: 'codex', model: 'gpt-5.6-sol' };
   const TDD = { type: 'skill', name: 'tdd', path: '/Users/dev/.agents/skills/tdd/SKILL.md' };
