@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SlashCommand } from '../shared/slash.ts';
 import type { CommandList, Thread } from '../web/src/api.ts';
-import { menuCommands, newThreadBody, otherModel, replySlash, sameSettings } from '../web/src/composer-slash.ts';
+import { menuCommands, newThreadBody, newThreadHint, otherModel, replySlash, sameSettings } from '../web/src/composer-slash.ts';
 import { menuSections } from '../web/src/slash-menu.ts';
 
 // What the reply composer does with a `/`: the Omni commands it adds to every thread's menu, what
@@ -129,6 +129,35 @@ describe('replySlash: hints for commands that stay text', () => {
     for (const text of ['/Users/ben/notes.md read this', 'see https://example.com/clear', 'look in /tmp/x']) {
       expect(replySlash(text, READY, 'claude-code')).toEqual(SEND);
     }
+  });
+});
+
+describe('newThreadHint: the new-thread composer, where Start sends every message as typed', () => {
+  const CODEX: CommandList = { status: 'ready', commands: [cmd('review', 'builtin'), cmd('imagegen', 'builtin')], fetchedAt: 2 };
+
+  it("says an Omni command is for a thread's reply box, since this composer offers none", () => {
+    expect(newThreadHint('/clear', READY, 'claude-code')).toBe("/clear works in a thread's reply box, so here it sends as text.");
+    expect(newThreadHint('/rename Launch prep', null, 'codex')).toBe("/rename works in a thread's reply box, so here it sends as text.");
+    // After the start it is plain text, like any other word.
+    expect(newThreadHint('fix it, then /clear', READY, 'claude-code')).toBeNull();
+  });
+
+  it('says the picked harness has no such command in this channel, once its list is in', () => {
+    expect(newThreadHint('/nope do it', READY, 'claude-code')).toBe('No /nope command for Claude Code in this channel, so it sends as text.');
+    expect(newThreadHint('/nope do it', null, 'claude-code')).toBeNull();
+  });
+
+  it('checks what is typed against the list of the harness in the picker', () => {
+    expect(newThreadHint('/tdd fix the parser', READY, 'claude-code')).toBeNull();
+    expect(newThreadHint('/tdd fix the parser', CODEX, 'codex')).toBe('No /tdd command for Codex in this channel, so it sends as text.');
+    expect(newThreadHint('fix the parser with /tdd', READY, 'claude-code')).toBe('Claude Code loads /tdd only if the model decides to.');
+    expect(newThreadHint('fix the parser with /tdd', CODEX, 'codex')).toBeNull();
+  });
+
+  it('says the rest as a reply would', () => {
+    expect(newThreadHint('fix the login bug', READY, 'claude-code')).toBeNull();
+    expect(newThreadHint('/login', READY, 'claude-code')).toBe('/login only works in a Claude Code terminal, so it sends as text.');
+    expect(newThreadHint('/tdd 31 then /compact', READY, 'claude-code')).toBe('/compact only works at the start of a message, so here it stays text.');
   });
 });
 
