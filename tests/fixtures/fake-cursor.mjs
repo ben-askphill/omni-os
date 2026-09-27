@@ -14,11 +14,16 @@
 //   CMD     emit a shell tool_call before the reply
 //   CRASH   exit(1) after init, like the process dying
 //   HANG    emit init + assistant but no result, and stay alive until killed
+//   ORPHAN  first leave a child behind that holds our stdout until it is killed (two minutes at most), like a
+//           daemon started without redirecting its output: once we exit, our stdout never closes. The child
+//           is logged as an "orphan" request, with the pid of the process that left it
 // Env:
 //   FAKE_CURSOR_LOG=<file>   append one JSON line per invocation, and per ACP request
 //   FAKE_CURSOR_ACP_FAIL=1   session/new fails, as it does when Cursor Agent is logged out
+//   FAKE_CURSOR_CREATE_CHAT_ORPHAN=1  create-chat leaves a child behind, as ORPHAN does in a turn
 //   CURSOR_CONFIG_DIR=<dir>  where session/new keeps its session, as the real CLI does. Unset,
 //                            the fake keeps nothing, so a test never writes to ~/.cursor.
+import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -71,6 +76,7 @@ async function runTurn() {
   const prompt = argv[argv.length - 1] ?? '';
   const sessionId = resume || `chat_${randomUUID().slice(0, 8)}`;
   log('turn', { model, resume: resume ?? null, prompt, plugin_dir: flagVal('--plugin-dir') ?? null });
+  if (prompt.includes('ORPHAN')) leaveOrphan();
 
   write({ type: 'system', subtype: 'init', session_id: sessionId, model, cwd: process.cwd(), apiKeySource: 'login' });
   await delay(3);
@@ -96,6 +102,18 @@ async function runTurn() {
   await delay(3);
   write({ type: 'result', subtype: 'success', is_error: false, result: `ack: ${prompt}`, session_id: sessionId, usage: { input_tokens: 24000, output_tokens: 120 } });
   process.exit(0);
+}
+
+/** ORPHAN: this script again, as a child that inherits our stdout and idles until killed (two minutes at most). */
+function leaveOrphan() {
+  spawn(process.execPath, [process.argv[1]], { env: { ...process.env, FAKE_CURSOR_ORPHAN: String(process.pid) }, stdio: ['ignore', 'inherit', 'ignore'] }).unref();
+}
+
+/** The child ORPHAN leaves behind. Logged, so a test can find it and teardown can kill it. */
+function orphan() {
+  log('orphan', { parent: Number(process.env.FAKE_CURSOR_ORPHAN) });
+  // Idle until killed, but two minutes at most, as in fake-claude.mjs.
+  setTimeout(() => {}, 120_000);
 }
 
 // Cursor's own entries and Ben's, as a real ACP listing has them: the description ends with the
@@ -179,6 +197,7 @@ async function main() {
   }
   if (argv[0] === 'create-chat') {
     log('create-chat', {});
+    if (process.env.FAKE_CURSOR_CREATE_CHAT_ORPHAN === '1') leaveOrphan();
     process.stdout.write(`chat_${randomUUID().slice(0, 8)}\n`);
     return;
   }
@@ -188,4 +207,5 @@ async function main() {
   process.exit(1);
 }
 
-main();
+if (process.env.FAKE_CURSOR_ORPHAN) orphan();
+else main();
