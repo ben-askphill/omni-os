@@ -6,7 +6,7 @@ import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
 import { channels, events, threads, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
 import { commandsFolder, prepareWorkdir, writeMcpConfig } from './sandbox.ts';
-import { parseSlash, slashRecord, visibleCommands, type SlashCommand, type SlashRecord } from '../shared/slash.ts';
+import { parseSlash, resolveSlash, runnableCommands, slashRecord, type SlashCommand, type SlashRecord } from '../shared/slash.ts';
 import { invalidateCommands, listCommands, peekCommands, type CommandList } from './commands.ts';
 import { describeAttachments, inlinable, messageContent, saveUploads, type Attachment } from './uploads.ts';
 import { secretsEnv } from './secrets.ts';
@@ -596,7 +596,7 @@ async function spawnLive(live: Live, thread: Thread) {
       if (t && t.session_id !== sid) threads.update(thread.id, { session_id: sid, updated_at: t.updated_at });
     },
     commandsChanged: () => invalidateCommands(thread.harness as HarnessId),
-    commands: (list) => (live.commands = { status: 'ready', commands: visibleCommands(list), fetchedAt: Date.now() }),
+    commands: (list) => (live.commands = { status: 'ready', commands: runnableCommands(list), fetchedAt: Date.now() }),
   });
   const child = session.child;
   live.child = child;
@@ -717,20 +717,25 @@ export function threadCommands(threadId: string): CommandList | null {
 }
 
 /**
- * The harness command a message starts with and its Mentions, from the thread's list or the folder's
- * cached one: the user event's `slash` field, and the commands as the adapter runs them (a Codex
- * skill goes with its file).
+ * A message against the thread's command list, or the folder's cached one: the text the harness
+ * gets, the user event's `slash` field (the harness command it starts with and its Mentions), and
+ * the commands as the adapter runs them (a Codex skill goes with its file).
  */
-function slashFor(prompt: string, commands: () => SlashCommand[]): { slash?: SlashRecord; commands?: CommandUse[] } {
-  if (!namesCommand(prompt)) return {};
+function slashFor(prompt: string, commands: () => SlashCommand[]): { text: string; slash?: SlashRecord; commands?: CommandUse[] } {
+  if (!namesCommand(prompt)) return { text: prompt };
   const list = commands();
+  // A harness runs a command only at the very start of its text. So a harness command goes there,
+  // and an Omni command, which runs only from a thread's reply box, goes after a space as text.
+  const r = resolveSlash(prompt, list);
+  const shift = r?.kind === 'omni' ? 1 : r?.kind === 'harness' ? -r.token.start : 0;
+  const text = shift > 0 ? ` ${prompt}` : prompt.slice(-shift);
   const slash = slashRecord(prompt, list);
-  if (!slash) return {};
+  if (!slash) return { text };
   const uses = [...(slash.command ? [slash.command] : []), ...(slash.mentions ?? [])].map(({ name, start, end }) => {
     const path = list.find((c) => c.name === name)?.path;
-    return { name, start, end, ...(path && { path }) };
+    return { name, start: start + shift, end: end + shift, ...(path && { path }) };
   });
-  return { slash, commands: uses };
+  return { text, slash, commands: uses };
 }
 
 // ---------- public API ----------
@@ -794,10 +799,10 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const attachments = saved.length ? saved : undefined;
   const folder = commandsFolder(channel) ?? wd.cwd;
   await warmCommands(harness, folder, input.prompt);
-  const { slash, commands } = slashFor(input.prompt, () => peekCommands(harness as HarnessId, folder).commands);
+  const { text, slash, commands } = slashFor(input.prompt, () => peekCommands(harness as HarnessId, folder).commands);
   deliver(thread.id, {
     uuid: randomUUID(),
-    text: input.prompt,
+    text,
     mode: 'steer',
     attachments,
     commands,
@@ -818,10 +823,10 @@ export function sendMessage(
   const thread = threads.get(threadId);
   if (!thread) throw new Error('thread not found');
   const attachments = opts.attachments?.length ? opts.attachments : undefined;
-  const { slash, commands } = slashFor(prompt, () => (threadCommands(threadId) ?? peekCommands(thread.harness as HarnessId, thread.cwd)).commands);
+  const { text, slash, commands } = slashFor(prompt, () => (threadCommands(threadId) ?? peekCommands(thread.harness as HarnessId, thread.cwd)).commands);
   deliver(threadId, {
     uuid: randomUUID(),
-    text: prompt,
+    text,
     mode: opts.mode ?? 'steer',
     attachments,
     commands,

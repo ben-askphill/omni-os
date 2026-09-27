@@ -232,21 +232,21 @@ function DropHint({ over }: { over: boolean }) {
 
 /**
  * The `/` menu over a composer's textarea: whether it is open, what it lists, and the keys and
- * textarea props that drive it. `omni` adds Omni's own commands at the start of a message.
+ * textarea props that drive it. A thread's reply box adds Omni's own commands at the start of a message.
  */
 function useSlashMenu({
   ref,
   text,
   onText,
   commands: { list, load },
-  omni,
+  where,
 }: {
   ref: RefObject<HTMLTextAreaElement | null>;
   text: string;
   /** The composer's own setter, which keeps its draft too. */
   onText: (text: string) => void;
   commands: ReturnType<typeof useCommands>;
-  omni: boolean;
+  where: 'reply' | 'new-thread';
 }) {
   const menuId = useId();
   const [caret, setCaret] = useState(0);
@@ -257,9 +257,9 @@ function useSlashMenu({
   // After the start of the message, only a Mention: a skill or custom command, never an Omni command.
   const sections = useMemo(() => {
     if (!at) return [];
-    if (at.mention) return mentionSections(list?.commands ?? [], at.query, list?.recent);
-    return menuSections(omni ? menuCommands(list?.commands) : (list?.commands ?? []), at.query, list?.recent);
-  }, [at?.query, at?.mention, list, omni]);
+    const rows = menuCommands(list?.commands, where);
+    return (at.mention ? mentionSections : menuSections)(rows, at.query, list?.recent);
+  }, [at?.query, at?.mention, list, where]);
   const items = sections.flatMap((s) => s.commands);
   const typed = text.slice(0, caret);
   // A ready list with nothing matching shows no menu: the text is sent as it is.
@@ -411,7 +411,7 @@ export function NewThreadComposer({
 
   // ----- the `/` menu: the harness in the picker, for the folder a thread in this channel reads its commands from -----
   const commands = useCommands(`harness=${encodeURIComponent(choice.harness)}&channel=${encodeURIComponent(channel)}`);
-  const slashMenu = useSlashMenu({ ref, text, onText: update, commands, omni: false });
+  const slashMenu = useSlashMenu({ ref, text, onText: update, commands, where: 'new-thread' });
   const hint = useMemo(() => newThreadHint(text, commands.list, choice.harness), [text, commands.list, choice.harness]);
   // Another harness or channel has its own list: fetch it for what is typed, so the hint re-checks it.
   const latest = useRef(text);
@@ -693,7 +693,7 @@ export function ReplyComposer({
   };
   const commands = useCommands(`thread=${encodeURIComponent(threadId)}`);
   const { list } = commands;
-  const slashMenu = useSlashMenu({ ref, text, onText: update, commands, omni: true });
+  const slashMenu = useSlashMenu({ ref, text, onText: update, commands, where: 'reply' });
 
   // `mode` only matters while a turn is in progress; an idle thread just starts the next turn.
   const submit = async (mode?: SendMode) => {

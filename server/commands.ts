@@ -2,7 +2,7 @@
 // Omni copies nothing. A list is cached per harness and folder, served at once, and refreshed in
 // the background once it is 30 seconds old. One probe runs at a time per harness and folder, and
 // a failed probe keeps the last good list.
-import { visibleCommands, type SlashCommand } from '../shared/slash.ts';
+import { runnableCommands, type SlashCommand } from '../shared/slash.ts';
 import { probeClaudeCommands } from './harness/claude/commands.ts';
 import { probeCodexSkills } from './harness/codex/commands.ts';
 import { probeCursorCommands } from './harness/cursor/commands.ts';
@@ -54,7 +54,7 @@ function refresh(e: Entry, src: Source, cwd: string) {
       e.checkedAt = Date.now();
       e.ok = !!list;
       if (list) {
-        e.list = visibleCommands(list);
+        e.list = runnableCommands(list);
         e.fetchedAt = e.checkedAt;
       }
     })

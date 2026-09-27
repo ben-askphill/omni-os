@@ -17,11 +17,14 @@ const cmd = (name: string, source: SlashCommand['source'], extra: Partial<SlashC
 
 const LIST: SlashCommand[] = [cmd('tdd', 'personal'), cmd('compact', 'builtin'), cmd('document-skills:pdf', 'plugin', { aliases: ['pdf'] })];
 
+/** Claude Code's list, with the built-ins Omni runs in their place under their own names. */
+const CLAUDE: SlashCommand[] = [...LIST, cmd('clear', 'builtin', { aliases: ['reset', 'new'] }), cmd('rename', 'builtin', { aliases: ['name'] }), cmd('model', 'builtin')];
+
 const names = (sections: ReturnType<typeof menuSections>) => sections.map((s) => [s.label, s.commands.map((c) => c.name)]);
 
-describe('menuCommands: the rows a thread offers', () => {
-  it("puts Omni's commands last, on every harness, whatever the harness lists", () => {
-    expect(names(menuSections(menuCommands(LIST), ''))).toEqual([
+describe('menuCommands: the rows a composer offers', () => {
+  it("puts Omni's commands last in a thread, on every harness, whatever the harness lists", () => {
+    expect(names(menuSections(menuCommands(LIST, 'reply'), ''))).toEqual([
       ['Personal', ['tdd']],
       ['Plugins', ['document-skills:pdf']],
       ['Built-in', ['compact']],
@@ -30,7 +33,21 @@ describe('menuCommands: the rows a thread offers', () => {
   });
 
   it('offers them while the harness list is still loading or unavailable', () => {
-    expect(names(menuSections(menuCommands(undefined), 'ren'))).toEqual([[null, ['rename']]]);
+    expect(names(menuSections(menuCommands(undefined, 'reply'), 'ren'))).toEqual([[null, ['rename']]]);
+  });
+
+  it('offers only the harness list in the new-thread composer', () => {
+    expect(names(menuSections(menuCommands(LIST, 'new-thread'), ''))).toEqual([
+      ['Personal', ['tdd']],
+      ['Plugins', ['document-skills:pdf']],
+      ['Built-in', ['compact']],
+    ]);
+  });
+
+  it("leaves out the harness's built-ins that Omni runs in their place, in both composers", () => {
+    expect(names(menuSections(menuCommands(CLAUDE, 'reply'), ''))).toEqual(names(menuSections(menuCommands(LIST, 'reply'), '')));
+    expect(names(menuSections(menuCommands(CLAUDE, 'new-thread'), ''))).toEqual(names(menuSections(menuCommands(LIST, 'new-thread'), '')));
+    expect(names(menuSections(menuCommands(CLAUDE, 'new-thread'), 'model'))).toEqual([]);
   });
 });
 
@@ -72,6 +89,13 @@ describe('replySlash: what Send does', () => {
       label: 'Rename',
       hint: 'Type the new title after /rename.',
     });
+  });
+
+  it("runs the harness's other names for /clear and /rename as Omni's", () => {
+    const claude: CommandList = { status: 'ready', commands: CLAUDE, fetchedAt: 3 };
+    expect(replySlash('/reset', claude, 'claude-code')).toMatchObject({ action: { kind: 'new-thread', prompt: '' }, armed: true, label: 'New thread' });
+    expect(replySlash('/Name Launch prep', claude, 'claude-code')).toMatchObject({ action: { kind: 'rename', title: 'Launch prep' }, armed: true, label: 'Rename' });
+    expect(replySlash('/model', claude, 'claude-code')).toMatchObject({ action: { kind: 'fixed' }, armed: false });
   });
 
   it('says the model, effort and fast mode are fixed per thread, and sends nothing', () => {
@@ -140,6 +164,10 @@ describe('newThreadHint: the new-thread composer, where Start sends every messag
     expect(newThreadHint('/rename Launch prep', null, 'codex')).toBe("/rename works in a thread's reply box, so here it sends as text.");
     // After the start it is plain text, like any other word.
     expect(newThreadHint('fix it, then /clear', READY, 'claude-code')).toBeNull();
+    // So is the harness's own name for one, named as typed.
+    const claude: CommandList = { status: 'ready', commands: CLAUDE, fetchedAt: 3 };
+    expect(newThreadHint('/reset start over', claude, 'claude-code')).toBe("/reset works in a thread's reply box, so here it sends as text.");
+    expect(newThreadHint('fix it, then /reset', claude, 'claude-code')).toBeNull();
   });
 
   it('says the picked harness has no such command in this channel, once its list is in', () => {

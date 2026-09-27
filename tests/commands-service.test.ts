@@ -78,10 +78,11 @@ describe('listCommands on Claude Code', () => {
     expect(probe.api_auth).toEqual([]);
   });
 
-  it('leaves out terminal-only commands and the built-ins Omni commands replace', async () => {
+  it('leaves out terminal-only commands, and keeps the built-ins Omni runs in their place so their other names resolve', async () => {
     const list = await listCommands('claude-code', repo(), { wait: true });
-    expect(names(list)).toContain('compact');
-    for (const hidden of ['clear', 'model', 'config']) expect(names(list)).not.toContain(hidden);
+    expect(names(list)).toEqual(expect.arrayContaining(['compact', 'clear', 'rename', 'model']));
+    expect(list.commands.find((c) => c.name === 'clear')?.aliases).toEqual(['reset', 'new']);
+    expect(names(list)).not.toContain('config');
   });
 
   it('shares one probe between concurrent calls and serves the cache for 30 seconds', async () => {

@@ -21,6 +21,11 @@ const COMMANDS: SlashCommand[] = [
   cmd('v1.2', { source: 'project' }),
 ];
 
+const builtin = (name: string, aliases?: string[]) => cmd(name, { source: 'builtin', mentionable: false, ...(aliases && { aliases }) });
+
+/** A Claude Code list, with the built-ins Omni runs in their place. */
+const CLAUDE: SlashCommand[] = [...COMMANDS, builtin('clear', ['reset', 'new']), builtin('rename', ['name']), builtin('model')];
+
 describe('parseSlash: the leading command', () => {
   it.each([
     ['/tdd fix it', { name: 'tdd', start: 0, end: 4, args: 'fix it' }],
@@ -74,6 +79,7 @@ describe('parseSlash: commands named later in the message', () => {
 describe('midMessageCommands: start-only commands typed later in a message', () => {
   it('reports Omni commands and built-ins after the start', () => {
     expect(midMessageCommands('fix it, then /clear', COMMANDS)).toEqual([{ name: 'clear', start: 13, end: 19, kind: 'omni' }]);
+    expect(midMessageCommands('fix it, then /reset', CLAUDE)).toEqual([{ name: 'reset', start: 13, end: 19, kind: 'omni' }]);
     expect(midMessageCommands('/tdd 31 and /COMPACT after', COMMANDS)).toEqual([{ name: 'COMPACT', start: 12, end: 20, kind: 'builtin' }]);
   });
 
@@ -103,8 +109,17 @@ describe('resolveSlash', () => {
 
   it('classifies Omni commands, whatever the harness lists', () => {
     for (const name of ['clear', 'new', 'rename', 'model', 'effort', 'fast']) {
-      expect(resolveSlash(`/${name}`, COMMANDS)).toMatchObject({ kind: 'omni', name });
+      expect(resolveSlash(`/${name}`, COMMANDS)).toMatchObject({ kind: 'omni', name, command: { name, source: 'omni' } });
     }
+    expect(resolveSlash('/Rename Launch prep', COMMANDS)).toMatchObject({ kind: 'omni', name: 'Rename', command: { name: 'rename' }, token: { args: 'Launch prep' } });
+  });
+
+  it("classifies the harness's other names for a built-in Omni runs in its place as that Omni command", () => {
+    // Claude Code's /reset clears the session and /name renames it, as /clear and /rename do.
+    expect(resolveSlash('/reset', CLAUDE)).toMatchObject({ kind: 'omni', name: 'reset', command: { name: 'clear', source: 'omni' } });
+    expect(resolveSlash('/NAME Launch prep', CLAUDE)).toMatchObject({ kind: 'omni', name: 'NAME', command: { name: 'rename', source: 'omni' }, token: { args: 'Launch prep' } });
+    // A harness that has no such name leaves it unknown.
+    expect(resolveSlash('/reset', COMMANDS)).toMatchObject({ kind: 'unknown', name: 'reset' });
   });
 
   it('classifies terminal-only commands', () => {
@@ -168,7 +183,6 @@ describe('slashRecord: the Mentions a message carries', () => {
 
 describe('visibleCommands: what the menu offers', () => {
   it('leaves out terminal-only commands and the built-ins Omni commands replace', () => {
-    const builtin = (name: string, aliases?: string[]) => cmd(name, { source: 'builtin', mentionable: false, ...(aliases && { aliases }) });
     const list = [
       cmd('tdd'),
       builtin('clear', ['reset', 'new']),
