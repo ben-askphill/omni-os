@@ -91,6 +91,22 @@ describe('replySlash: what Send does', () => {
     });
   });
 
+  it('says how long a title can be, and holds a longer one back', () => {
+    expect(replySlash(`/rename ${'a'.repeat(200)}`, READY, 'claude-code')).toMatchObject({ armed: true, hint: null });
+    // The server trims the title, so the space after it doesn't count.
+    expect(replySlash(`/rename ${'a'.repeat(200)} \n`, READY, 'claude-code')).toMatchObject({
+      action: { kind: 'rename', title: 'a'.repeat(200) },
+      armed: true,
+      hint: null,
+    });
+    expect(replySlash(`/rename ${'a'.repeat(150)}\n${'b'.repeat(51)}`, READY, 'claude-code')).toEqual({
+      action: { kind: 'rename', title: `${'a'.repeat(150)} ${'b'.repeat(51)}` },
+      armed: false,
+      label: 'Rename',
+      hint: 'A title can be up to 200 characters. This one is 202.',
+    });
+  });
+
   it("runs the harness's other names for /clear and /rename as Omni's", () => {
     const claude: CommandList = { status: 'ready', commands: CLAUDE, fetchedAt: 3 };
     expect(replySlash('/reset', claude, 'claude-code')).toMatchObject({ action: { kind: 'new-thread', prompt: '' }, armed: true, label: 'New thread' });

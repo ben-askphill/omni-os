@@ -40,12 +40,16 @@ export const OMNI_COMMANDS: SlashCommand[] = [
   { name: 'clear', description: 'Start a new thread with the same settings', source: 'omni', mentionable: false },
   { name: 'new', description: 'Start a new thread with the same settings', source: 'omni', mentionable: false },
   { name: 'rename', argumentHint: '<title>', description: 'Rename this thread', source: 'omni', mentionable: false },
-  { name: 'model', description: 'Start a new thread on another model', source: 'omni', mentionable: false },
-  { name: 'effort', description: 'Start a new thread with another effort', source: 'omni', mentionable: false },
-  { name: 'fast', description: 'Start a new thread in fast mode', source: 'omni', mentionable: false },
+  // A thread's model and effort are fixed, so these offer a new thread instead.
+  { name: 'model', description: 'Fixed per thread, so it offers a new thread on another model', source: 'omni', mentionable: false },
+  { name: 'effort', description: 'Fixed per thread, so it offers a new thread with another effort', source: 'omni', mentionable: false },
+  { name: 'fast', description: 'Fixed per thread, so it offers a new thread on a faster model', source: 'omni', mentionable: false },
 ];
 
 const OMNI_NAMES = new Set(OMNI_COMMANDS.map((c) => c.name));
+
+/** The longest title `/rename` sets. */
+export const TITLE_MAX = 200;
 
 /** Built-ins that only work in the harness's own terminal. The menu leaves them out. */
 const TERMINAL_ONLY = new Set([

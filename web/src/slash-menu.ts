@@ -57,6 +57,9 @@ export const SOURCE_TAG: Record<CommandSource, string> = {
 
 const byName = (a: SlashCommand, b: SlashCommand) => a.name.localeCompare(b.name);
 
+/** A row's command, the same across list refreshes. */
+export const rowKey = (c: SlashCommand) => `${c.source}\0${c.name}`;
+
 /** The rank of a match on the description alone. */
 const DESCRIPTION = 4;
 
