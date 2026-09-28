@@ -46,7 +46,7 @@ const PATHS = {
   clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
   play: 'M7 4v16l13-8z',
   archive: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
-  key: 'M14 10a4 4 0 1 0-3.5 3.97M10.5 14 4 20.5M7 17.5l2 2M14 10h7M18 10v3',
+  key: 'M3 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M11 12h10M17 12v3M20 12v2',
   zap: 'M13 2 3 14h9l-1 8 10-12h-9z',
   layers: 'm12 2 10 5-10 5L2 7zM2 17l10 5 10-5M2 12l10 5 10-5',
   hash: 'M4 9h16M4 15h16M10 3 8 21M16 3l-2 18',
@@ -100,9 +100,9 @@ export function Icon({ name, size = 16, className = '', strokeWidth = 1.75 }: { 
   );
 }
 
-/** The Omni OS lockup: serif "omni" plus "OS". */
-export function Wordmark({ size = 20 }: { size?: number }) {
-  return <OmniLogo variant="lockup" height={size} />;
+/** The continuous-line "omni" wordmark. */
+export function Wordmark({ size = 18 }: { size?: number }) {
+  return <OmniLogo height={size} />;
 }
 
 // ---------- buttons ----------
