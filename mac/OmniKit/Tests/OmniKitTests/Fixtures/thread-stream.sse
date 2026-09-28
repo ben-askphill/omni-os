@@ -1,0 +1,67 @@
+event: ping
+data: 
+
+data: {"id":1,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"init","payload":"{\"model\":\"sonnet\",\"cwd\":\"/tmp/omni-fixtures/acme\",\"tools\":10,\"mcp\":[]}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 1
+
+data: {"id":2,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"user","payload":"{\"text\":\"TOOL:20 fix the cart\",\"source\":\"manual\"}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 2
+
+data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":0,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":null,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[],"live":true}
+
+data: {"id":3,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"tool_use","payload":"{\"id\":\"toolu_fake_1\",\"name\":\"Bash\",\"input\":{\"command\":\"sleep 0.02\",\"description\":\"Fake tool\"},\"parent\":null}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 3
+
+data: {"id":4,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"tool_result","payload":"{\"tool_use_id\":\"toolu_fake_1\",\"text\":\"slept 20ms\",\"is_error\":false,\"truncated\":false}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 4
+
+data: {"id":5,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"assistant_text","payload":"{\"text\":\"ack: TOOL:20 fix the cart\"}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 5
+
+data: {"id":6,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"result","payload":"{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":1000,\"turns\":2,\"cost_usd\":0.002}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 6
+
+data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart","status":"done","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[],"live":true}
+
+data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[{"uuid":"00000000-0000-4000-8000-000000000003","kind":"user","text":"TOOL:4000 and the tests","source":"ben","mode":"steer","state":"sent"}],"live":true}
+
+data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[{"uuid":"00000000-0000-4000-8000-000000000003","kind":"user","text":"TOOL:4000 and the tests","source":"ben","mode":"steer","state":"sent"}],"live":true}
+
+data: {"id":7,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"user","payload":"{\"text\":\"TOOL:4000 and the tests\",\"source\":\"ben\"}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 7
+
+data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[],"live":true}
+
+data: {"id":8,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"tool_use","payload":"{\"id\":\"toolu_fake_3\",\"name\":\"Bash\",\"input\":{\"command\":\"sleep 4\",\"description\":\"Fake tool\"},\"parent\":null}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 8
+
+data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[{"uuid":"00000000-0000-4000-8000-000000000002","kind":"user","text":"then tidy up","source":"ben","mode":"queue","state":"held"}],"live":true}
+
+data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart and the tests","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[{"uuid":"00000000-0000-4000-8000-000000000002","kind":"user","text":"then tidy up","source":"ben","mode":"queue","state":"held"}],"live":true}
+
+data: {"kind":"artifact","artifact":{"id":1,"thread_id":"00000000-0000-4000-8000-000000000001","path":"/tmp/omni-fixtures/data/threads/00000000-0000-4000-8000-000000000001/artifacts/report.md","name":"report.md","kind":"markdown","size":9,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"}}
+
+data: {"id":9,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"tool_result","payload":"{\"tool_use_id\":\"toolu_fake_3\",\"text\":\"slept 4000ms\",\"is_error\":false,\"truncated\":false}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 9
+
+data: {"id":10,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"assistant_text","payload":"{\"text\":\"ack: TOOL:4000 and the tests\"}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 10
+
+data: {"id":11,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"result","payload":"{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":1000,\"turns\":2,\"cost_usd\":0.002}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 11
+
+data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart and the tests","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[{"uuid":"00000000-0000-4000-8000-000000000002","kind":"user","text":"then tidy up","source":"ben","mode":"queue","state":"sent"}],"live":true}
+
+data: {"id":12,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"user","payload":"{\"text\":\"then tidy up\",\"source\":\"ben\"}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 12
+
+data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart and the tests","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[],"live":true}
+
+data: {"id":13,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"assistant_text","payload":"{\"text\":\"ack: then tidy up\"}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 13
+
+data: {"id":14,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"result","payload":"{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":1000,\"turns\":1,\"cost_usd\":0.001}","created_at":"2026-01-05T09:00:00.000Z"}
+id: 14
+
+data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart and the tests","status":"done","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: then tidy up","created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[],"live":true}
+

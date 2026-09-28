@@ -1,0 +1,242 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		4F4D4E490000000000000010 /* OmniKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4F4D4E490000000000000011 /* OmniKit */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		4F4D4E490000000000000002 /* Omni.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Omni.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F4D4E490000000000000013 /* Omni-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Omni-Info.plist"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		4F4D4E490000000000000003 /* Omni */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Omni; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4F4D4E490000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4F4D4E490000000000000010 /* OmniKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4F4D4E490000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				4F4D4E490000000000000003 /* Omni */,
+				4F4D4E490000000000000013 /* Omni-Info.plist */,
+				4F4D4E490000000000000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4F4D4E490000000000000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4F4D4E490000000000000002 /* Omni.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4F4D4E490000000000000006 /* Omni */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4F4D4E490000000000000020 /* Build configuration list for PBXNativeTarget "Omni" */;
+			buildPhases = (
+				4F4D4E490000000000000007 /* Sources */,
+				4F4D4E490000000000000004 /* Frameworks */,
+				4F4D4E490000000000000008 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4F4D4E490000000000000003 /* Omni */,
+			);
+			name = Omni;
+			packageProductDependencies = (
+				4F4D4E490000000000000011 /* OmniKit */,
+			);
+			productName = Omni;
+			productReference = 4F4D4E490000000000000002 /* Omni.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		4F4D4E490000000000000009 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+			};
+			buildConfigurationList = 4F4D4E490000000000000023 /* Build configuration list for PBXProject "Omni" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 4F4D4E490000000000000001;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4F4D4E490000000000000012 /* XCLocalSwiftPackageReference "OmniKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 4F4D4E490000000000000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4F4D4E490000000000000006 /* Omni */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4F4D4E490000000000000008 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4F4D4E490000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		4F4D4E490000000000000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Omni-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Omni;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.omni-os.mac";
+				PRODUCT_NAME = Omni;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		4F4D4E490000000000000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Omni-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Omni;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.omni-os.mac";
+				PRODUCT_NAME = Omni;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		4F4D4E490000000000000024 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		4F4D4E490000000000000025 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4F4D4E490000000000000020 /* Build configuration list for PBXNativeTarget "Omni" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F4D4E490000000000000021 /* Debug */,
+				4F4D4E490000000000000022 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4F4D4E490000000000000023 /* Build configuration list for PBXProject "Omni" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F4D4E490000000000000024 /* Debug */,
+				4F4D4E490000000000000025 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4F4D4E490000000000000012 /* XCLocalSwiftPackageReference "OmniKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = OmniKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4F4D4E490000000000000011 /* OmniKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = OmniKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 4F4D4E490000000000000009 /* Project object */;
+}

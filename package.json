@@ -11,6 +11,8 @@
     "build": "vite build",
     "start": "NODE_ENV=production NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx server/index.ts",
     "test": "vitest run --config tests/vitest.config.ts",
+    "test:mac": "swift test --package-path mac/OmniKit",
+    "test:all": "npm test && npm run test:mac",
     "typecheck": "tsc --noEmit",
     "import-history": "tsx scripts/import-history.ts"
   },

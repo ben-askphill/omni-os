@@ -59,8 +59,19 @@ A **Slash command** Omni runs itself in place of a harness built-in that would c
 A skill or custom command named with `/` after the start of a message, which the harness loads alongside the text rather than running as the command.
 _Avoid_: Tag, reference
 
+### Clients
+
+**Mac app**:
+The native macOS client Ben uses at his desk.
+_Avoid_: Desktop app, native UI, "the app"
+
+**Web UI**:
+The browser client, used from the phone over tailscale and as a fallback on the Mac.
+_Avoid_: Frontend, dashboard
+
 ## Relationships
 
+- The **Mac app** and the **Web UI** are two clients of the same Omni server; neither holds thread state of its own
 - A **Channel** has many **Threads**
 - A **Thread** runs on one **Harness** and one **Model**, and has one **Session** in that harness
 - A **Harness** offers many **Models**; the same model family can appear in several harnesses (Claude Opus runs in Claude Code and in Cursor Agent)

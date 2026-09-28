@@ -43,12 +43,14 @@ const DATA = env.OMNI_DATA_DIR ? resolve(ROOT, env.OMNI_DATA_DIR) : join(ROOT, '
 export const paths = {
   data: DATA,
   db: join(DATA, 'omni.db'),
+  /** Holds the pid of the server running on this data dir. */
+  lock: join(DATA, 'server.pid'),
   threads: join(DATA, 'threads'),
   worktrees: join(DATA, 'worktrees'),
   browsers: join(DATA, 'browsers'),
   crew: join(ROOT, 'crew'),
   automations: join(ROOT, 'automations'),
-  webDist: join(ROOT, 'web', 'dist'),
+  webDist: env.OMNI_WEB_DIST ? resolve(ROOT, env.OMNI_WEB_DIST) : join(ROOT, 'web', 'dist'),
   mcpOmni: join(ROOT, 'mcp', 'omni.ts'),
   tsx: join(ROOT, 'node_modules', '.bin', 'tsx'),
 };

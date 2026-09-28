@@ -1,0 +1,41 @@
+{
+  "usage": {
+    "claude-code": {
+      "five_hour": {
+        "utilization": 0.01,
+        "resetsAt": 1790328600
+      },
+      "status": "allowed",
+      "updated_at": "2026-01-05T09:00:00.000Z"
+    },
+    "codex": null,
+    "cursor": null
+  },
+  "slots": {
+    "claude-code": {
+      "running": 1,
+      "cap": 4
+    },
+    "codex": {
+      "running": 0,
+      "cap": 4
+    },
+    "cursor": {
+      "running": 0,
+      "cap": 4
+    }
+  },
+  "running": 1,
+  "queued": 0,
+  "maxConcurrent": 4,
+  "maxUploadMb": 25,
+  "server": {
+    "version": "0.1.0",
+    "pid": 4242,
+    "root": "/Users/omni/omni-os",
+    "dataDir": "/tmp/omni-fixtures/data",
+    "gitHead": "0000000000000000000000000000000000000000",
+    "startedAt": "2026-01-05T09:00:00.000Z",
+    "port": 4799
+  }
+}
