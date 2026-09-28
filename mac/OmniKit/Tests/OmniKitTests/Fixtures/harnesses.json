@@ -1,0 +1,99 @@
+[
+  {
+    "id": "claude-code",
+    "name": "Claude Code",
+    "plan": "Claude plan",
+    "capabilities": {
+      "warmProcess": true,
+      "steer": true,
+      "inlineImages": true,
+      "usage": "five-hour-week"
+    },
+    "available": true,
+    "models": [
+      {
+        "id": "claude-opus-5-5",
+        "label": "Opus 5.5",
+        "efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "defaultEffort": "high"
+      },
+      {
+        "id": "claude-sonnet-5",
+        "label": "Sonnet 5",
+        "efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "defaultEffort": "high",
+        "default": true
+      },
+      {
+        "id": "claude-fable-5-1",
+        "label": "Fable 5.1",
+        "efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "defaultEffort": "high"
+      },
+      {
+        "id": "claude-haiku-4-5",
+        "label": "Haiku 4.5",
+        "efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "defaultEffort": "high"
+      }
+    ],
+    "cap": 4,
+    "running": 0
+  },
+  {
+    "id": "codex",
+    "name": "Codex",
+    "plan": "ChatGPT plan",
+    "capabilities": {
+      "warmProcess": true,
+      "steer": true,
+      "inlineImages": true,
+      "usage": "five-hour-week"
+    },
+    "cap": 4,
+    "available": false,
+    "fix": "codex login",
+    "models": [],
+    "running": 0
+  },
+  {
+    "id": "cursor",
+    "name": "Cursor Agent",
+    "plan": "Cursor plan",
+    "capabilities": {
+      "warmProcess": false,
+      "steer": false,
+      "inlineImages": false,
+      "usage": "none"
+    },
+    "cap": 4,
+    "available": false,
+    "fix": "cursor-agent login",
+    "models": [],
+    "running": 0
+  }
+]

@@ -1,0 +1,61 @@
+[
+  {
+    "id": "conductor",
+    "name": "Conductor",
+    "kind": "system",
+    "repo_path": null,
+    "github_repo": null,
+    "use_worktree": 0,
+    "base_dir": null,
+    "store_domain": null,
+    "portal_slug": null,
+    "browser_headless": 1,
+    "notes": "Front agent. Delegates to crew threads in other channels.",
+    "archived": 0,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "running": 0,
+    "active": []
+  },
+  {
+    "id": "acme",
+    "name": "Acme",
+    "kind": "client",
+    "repo_path": null,
+    "github_repo": null,
+    "use_worktree": 0,
+    "base_dir": "/tmp/omni-fixtures/acme",
+    "store_domain": null,
+    "portal_slug": null,
+    "browser_headless": 1,
+    "notes": "Fixture",
+    "archived": 0,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "running": 1,
+    "active": [
+      {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "channel_id": "acme",
+        "title": "Fix the cart",
+        "status": "running",
+        "created_at": "2026-01-05T09:00:00.000Z"
+      }
+    ]
+  },
+  {
+    "id": "inbox",
+    "name": "Inbox",
+    "kind": "internal",
+    "repo_path": null,
+    "github_repo": null,
+    "use_worktree": 0,
+    "base_dir": null,
+    "store_domain": null,
+    "portal_slug": null,
+    "browser_headless": 1,
+    "notes": "Default channel for quick asks, research and ops.",
+    "archived": 0,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "running": 0,
+    "active": []
+  }
+]
