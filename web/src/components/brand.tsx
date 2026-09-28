@@ -3,9 +3,11 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode 
 // ---------- the Omni mark ----------
 
 /* A ring that behaves like a liquid body: SVG plus a goo filter (blur, then an alpha threshold).
-   Units: ring centerline R=39, stroke W=22, so the outer diameter is 100 in a -64..64 viewBox. */
-const R = 39;
-const W = 22;
+   Units: ring centerline R=40, stroke W=20, the o of the wordmark. The mark leans 10° with the wordmark;
+   physics run unskewed and MARK_TRANSFORM fits the lean into the -64..64 viewBox. */
+const R = 40;
+const W = 20;
+export const MARK_TRANSFORM = 'translate(-4 3) scale(.92) skewX(-10)';
 const N = 104;
 const TAU = Math.PI * 2;
 const SAT_A = -Math.PI / 4;
@@ -112,8 +114,10 @@ export function useReducedMotion() {
 export function StaticMark({ size = 32, title = 'Omni', ring = false, className = '', style }: { size?: number; title?: string; ring?: boolean; className?: string; style?: CSSProperties }) {
   return (
     <svg className={`mark ${className}`} width={size} height={size} viewBox="-64 -64 128 128" role={title ? 'img' : undefined} aria-label={title || undefined} aria-hidden={title ? undefined : true} style={style}>
-      <circle cx="0" cy="0" r={R} fill="none" stroke="currentColor" strokeWidth={W} />
-      {!ring && <circle cx="49.5" cy="-49.5" r="12" fill="currentColor" />}
+      <g transform={MARK_TRANSFORM}>
+        <circle cx="0" cy="0" r={R} fill="none" stroke="currentColor" strokeWidth={W} />
+        {!ring && <circle cx="49.5" cy="-49.5" r="12" fill="currentColor" />}
+      </g>
     </svg>
   );
 }
@@ -217,6 +221,7 @@ export function OmniMark({
         </filter>
       </defs>
       <g filter={`url(#${id})`}>
+        <g transform={MARK_TRANSFORM}>
         <path ref={pathRef} d={`M${R} 0A${R} ${R} 0 1 1 ${-R} 0A${R} ${R} 0 1 1 ${R} 0Z`} fill="none" stroke="currentColor" strokeWidth={W} strokeLinejoin="round" />
         {Array.from({ length: maxDrops }, (_, i) => (
           <circle
@@ -230,6 +235,7 @@ export function OmniMark({
             fill="currentColor"
           />
         ))}
+        </g>
       </g>
     </svg>
   );
@@ -237,35 +243,25 @@ export function OmniMark({
 
 // ---------- wordmark ----------
 
-/* "omni" in Anthropic Serif Display Medium, outlined to paths. The serif carries the voice; the mark
-   stays geometric and sits beside it, never inside it. */
-const VB = { x: 0, y: -77, w: 247, h: 80 };
-const LETTERS =
-  'M28.90 1C44.10 1 56.35-11.35 56.35-26.75C56.35-41.65 45.25-52.45 29.70-52.45C14.50-52.45 2.25-40.10 2.25-24.70C2.25-9.75 13.40 1 28.90 1ZM30.05-4.20C21.10-4.20 14.60-13.75 14.60-27.20C14.60-39.85 19.85-47.20 28.55-47.20C37.55-47.20 44-37.70 44-24.20C44-11.60 38.70-4.20 30.05-4.20ZM73.40-52.45L57.70-46.90L57.70-43.55L65.50-40.80L65.50-9.40C65.50-6.20 63.65-5 57.70-4.35L57.70 0L85.15 0L85.15-4.35C79.20-5 77.35-6.20 77.35-9.40L77.35-38.75C81.20-41.75 86.05-43.75 90.05-43.75C96.35-43.75 99.30-40.90 99.30-34.95L99.30-9.40C99.30-6.20 97.50-5 91.55-4.35L91.55 0L119 0L119-4.35C113.05-5 111.20-6.20 111.20-9.40L111.20-37.05C111.20-37.60 111.20-38.15 111.15-38.70C115-41.70 119.90-43.75 123.95-43.75C130.20-43.75 133.20-40.90 133.20-34.95L133.20-9.40C133.20-6.20 131.35-5 125.40-4.35L125.40 0L152.90 0L152.90-4.35C146.90-5 145.10-6.20 145.10-9.40L145.10-37.05C145.10-47.10 139.60-52.45 129.50-52.45C123.10-52.45 115.75-48.60 110.45-42.80C108.65-49.15 103.60-52.45 95.60-52.45C89.55-52.45 82.55-48.95 77.35-43.60L77.35-52.45ZM169.30-52.45L153.60-46.90L153.60-43.55L161.40-40.80L161.40-9.40C161.40-6.20 159.55-5 153.60-4.35L153.60 0L181.05 0L181.05-4.35C175.10-5 173.25-6.20 173.25-9.40L173.25-38.25C177.40-41.55 182.70-43.75 187-43.75C193.65-43.75 196.85-40.70 196.85-34.40L196.85-9.40C196.85-6.20 195-5 189.05-4.35L189.05 0L216.50 0L216.50-4.35C210.55-5 208.75-6.20 208.75-9.40L208.75-36.40C208.75-46.80 203.05-52.45 192.40-52.45C186-52.45 178.70-48.70 173.25-43.05L173.25-52.45ZM222.95-67.50C222.95-63.35 226.30-60 230.45-60C234.60-60 237.95-63.35 237.95-67.50C237.95-71.65 234.60-75 230.45-75C226.30-75 222.95-71.65 222.95-67.50ZM236.85-52.45L232.90-52.45L217.20-46.90L217.20-43.55L225-40.80L225-9.40C225-6.20 223.15-5 217.20-4.35L217.20 0L244.65 0L244.65-4.35C238.70-5 236.85-6.20 236.85-9.40Z';
+/* "omni" as one continuous 20u line, leaning 10°. Centerline on an integer grid: o r40, m arches r24,
+   n arch r28, baseline turns r16, o to m join r26. The o is the mark's ring. The name is just "omni". */
+const VB = { x: -15, y: -1, w: 391, h: 102 };
+const LINE =
+  'M46 90A40 40 0 0 0 86 50A40 40 0 0 0 46 10A40 40 0 0 0 6 50A40 40 0 0 0 46 90L92 90A26 26 0 0 0 118 64L118 34A24 24 0 0 1 166 34L166 74A16 16 0 0 0 198 74L198 34A24 24 0 0 1 246 34L246 74A16 16 0 0 0 278 74L278 38A28 28 0 0 1 334 38L334 74A16 16 0 0 0 366 74L366 10';
 
-/** `wordmark` is "omni"; `lockup` adds "OS"; `live` puts the moving mark in front. */
-export function OmniLogo({ variant = 'wordmark', height = 32, live = false, markState = 'idle', title = 'Omni OS' }: { variant?: 'wordmark' | 'lockup'; height?: number; live?: boolean; markState?: MarkState; title?: string }) {
+/** `wordmark` is the line "omni"; `mark` is the fluid mark alone; `live` puts the moving mark beside the word. */
+export function OmniLogo({ variant = 'wordmark', height = 32, live = false, markState = 'idle', title = 'omni' }: { variant?: 'wordmark' | 'mark'; height?: number; live?: boolean; markState?: MarkState; title?: string }) {
+  if (variant === 'mark') return <OmniMark size={height} state={markState} title={title} />;
   const word = (
-    <svg width={VB.w * (height / VB.h)} height={height} viewBox={`${VB.x} ${VB.y} ${VB.w} ${VB.h}`} aria-hidden="true" className="block shrink-0">
-      <path d={LETTERS} fill="currentColor" />
+    <svg width={VB.w * (height / VB.h)} height={height} viewBox={`${VB.x} ${VB.y} ${VB.w} ${VB.h}`} role="img" aria-label={title} className="block shrink-0 text-fg">
+      <path transform="skewX(-10)" d={LINE} fill="none" stroke="currentColor" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
-  const withMark = live ? (
-    <span className="inline-flex items-center" style={{ gap: height * 0.28 }}>
-      <OmniMark size={height * 0.92} state={markState} title="" />
-      {word}
-    </span>
-  ) : (
-    word
-  );
+  if (!live) return word;
   return (
-    <span role="img" aria-label={title} className="inline-flex items-baseline text-fg" style={{ gap: height * 0.2 }}>
-      {withMark}
-      {variant === 'lockup' && (
-        <span aria-hidden="true" style={{ font: `500 ${Math.round(height * 0.36)}px/1 var(--font-head)`, letterSpacing: '0.02em', paddingBottom: height * 0.03 }}>
-          OS
-        </span>
-      )}
+    <span className="inline-flex items-center text-fg" style={{ gap: height * 0.28 }}>
+      <OmniMark size={height * 1.2} state={markState} title="" />
+      {word}
     </span>
   );
 }
@@ -285,7 +281,7 @@ export function Loader({ size = 14, label, className = '' }: { size?: number; la
         </filter>
       </defs>
       <g filter={`url(#${id})`}>
-        <circle r="39" fill="none" stroke="currentColor" strokeWidth="22" />
+        <circle r="40" fill="none" stroke="currentColor" strokeWidth="20" />
         <g>
           <circle cx="0" cy="-54" r="13" fill="currentColor" />
           {!reduced && <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="1.6s" repeatCount="indefinite" />}

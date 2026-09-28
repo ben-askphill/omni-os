@@ -142,7 +142,7 @@ function Shell() {
       <header className="relative bg-bg z-20 flex h-[calc(52px+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-line px-2 pt-[env(safe-area-inset-top)] shadow-none md:hidden">
         <IconButton icon="menu" label="Open menu" onClick={() => setDrawer(true)} size={18} />
         <a href={href.home()} className="px-1" aria-label="Omni home">
-          <Wordmark size={17} />
+          <Wordmark size={16} />
         </a>
         <span className="ml-1 min-w-0 flex-1 truncate text-[13px] text-fg-3">{mobileTitle(route, (id) => channel(id)?.name)}</span>
         <IconButton icon="search" label="Search or jump to" onClick={openPalette} size={17} />

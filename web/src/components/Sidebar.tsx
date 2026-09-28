@@ -210,7 +210,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
     <nav className="flex h-full flex-col bg-sidebar" aria-label="Main">
       <div className="flex h-14 items-center justify-between pr-3 pl-5">
         <a href={href.home()} onClick={onNavigate} aria-label="Omni home">
-          <Wordmark size={20} />
+          <Wordmark size={18} />
         </a>
       </div>
 
