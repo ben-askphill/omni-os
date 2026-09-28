@@ -73,7 +73,7 @@ function CsvTable({ text }: { text: string }) {
         <thead className="sticky top-0 bg-surface">
           <tr>
             {head.map((h, i) => (
-              <th key={i} className="border-b border-line px-3 py-2 text-left font-num text-[10.5px] font-medium tracking-[0.04em] whitespace-nowrap text-fg-3 uppercase">
+              <th key={i} className="border-b border-line px-3 py-2 text-left font-num text-[11px] font-medium whitespace-nowrap text-fg-3">
                 {h}
               </th>
             ))}
@@ -159,8 +159,8 @@ export function ArtifactViewer({ a }: { a: Artifact }) {
           <Icon name={kindIcon(a.kind)} size={14} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium">{a.name}</div>
-          <div className="font-num text-[10.5px] text-fg-4">
+          <div className="truncate font-mono text-[11.5px] font-medium">{a.name}</div>
+          <div className="font-num text-[11px] text-fg-4">
             {a.kind} · {bytes(a.size)} · updated {relTime(a.updated_at)}
           </div>
         </div>

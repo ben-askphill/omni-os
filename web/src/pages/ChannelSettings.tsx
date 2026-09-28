@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, type Channel } from '../api.ts';
-import { Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, Toggle } from '../components/ui.tsx';
+import { Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { slugify } from '../format.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -219,8 +219,8 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
           {isNew ? 'Create channel' : 'Save changes'}
         </Button>
         {saved && (
-          <span className="pop-in inline-flex items-center gap-1.5 text-[12.5px] text-ok">
-            <Icon name="check" size={13} strokeWidth={2.25} /> Saved
+          <span className="pop-in inline-flex items-center gap-1.5 text-[12.5px] text-fg-2">
+            <StatusDot status="done" /> Saved
           </span>
         )}
         {existing && !isSystem && existing.id !== 'inbox' && (

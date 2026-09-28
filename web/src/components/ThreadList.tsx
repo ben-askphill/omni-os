@@ -1,3 +1,4 @@
+import { Loader } from './brand.tsx';
 import { useCallback, type CSSProperties, type ReactNode } from 'react';
 import { useApi, type Thread } from '../api.ts';
 import { groupByDay, relTime } from '../format.ts';
@@ -38,7 +39,7 @@ export function ThreadRow({ t, showChannel }: { t: Thread; showChannel?: boolean
     <a href={href.thread(t.id)} className="hov group flex items-start gap-3 rounded-[18px] px-3 py-3 [--hov:var(--surface)] md:px-3.5">
       {showChannel ? (
         <span className="relative mt-0.5 shrink-0">
-          <Avatar name={t.channel_id} icon={t.channel_id === 'conductor' ? 'target' : undefined} size={32} />
+          <Avatar name={t.channel_id} size={32} />
           <span className="absolute -right-0.5 -bottom-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
             <StatusDot status={t.status} size={8} />
           </span>
@@ -50,7 +51,7 @@ export function ThreadRow({ t, showChannel }: { t: Thread; showChannel?: boolean
       )}
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 truncate text-[14px] font-medium text-fg">{t.title || 'Untitled'}</span>
+          <span className="min-w-0 truncate text-[14px] text-fg-2 group-hover:text-fg">{t.title || 'Untitled'}</span>
           {t.role && <Chip>{t.role}</Chip>}
           {source && <Chip tone="outline">{source}</Chip>}
           <span className="ml-auto shrink-0 pl-2 font-num text-[11px] text-fg-4 tabular-nums">{relTime(t.updated_at)}</span>
@@ -58,7 +59,8 @@ export function ThreadRow({ t, showChannel }: { t: Thread; showChannel?: boolean
         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
           {showChannel && <span className="shrink-0 text-fg-2">#{t.channel_id}</span>}
           {t.branch && <span className="hidden shrink-0 rounded-full bg-surface-2 px-1.5 font-mono text-[10.5px] leading-[18px] text-fg-3 sm:inline">{t.branch}</span>}
-          <span className={`min-w-0 truncate ${!t.last_text && t.status === 'running' ? 'shimmer' : ''}`}>{preview}</span>
+          {!t.last_text && t.status === 'running' && <Loader size={11} className="shrink-0" />}
+          <span className="min-w-0 truncate">{preview}</span>
         </div>
       </div>
     </a>
@@ -87,7 +89,7 @@ export function ThreadGroups({
     <div className="space-y-4">
       {groupByDay(threads, (t) => t.updated_at).map((g) => (
         <section key={g.label}>
-          <h3 className="label-mono sticky top-0 z-[2] flex items-center gap-2 bg-bg/90 px-3.5 py-2 backdrop-blur-md">
+          <h3 className="caption sticky top-0 z-[2] flex items-center gap-2 bg-bg px-3.5 py-2">
             {g.label}
             <span className="text-fg-4/70">{g.items.length}</span>
           </h3>

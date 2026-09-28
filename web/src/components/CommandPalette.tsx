@@ -68,7 +68,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         label: c.id === 'conductor' ? 'Conductor' : `#${c.name}`,
         sub: c.store_domain ?? c.github_repo ?? undefined,
         lead: <Avatar name={c.name} icon={c.id === 'conductor' ? 'target' : undefined} size={28} />,
-        right: c.running ? <span className="font-num text-[11px] text-info">{c.running} running</span> : undefined,
+        right: c.running ? <span className="font-num text-[11px] text-live-text">{c.running} running</span> : undefined,
         run: () => go(href.channel(c.id)),
       })),
       ...(recent.data ?? []).map<Item>((t) => ({
@@ -173,7 +173,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           <Thumb box={box} tone="wash" className="!rounded-2xl" />
           {groups.map((g) => (
             <div key={g.name} role="group" aria-label={g.name}>
-              <div className="label-mono px-4 pt-3 pb-2">{g.name}</div>
+              <div className="caption px-4 pt-3 pb-2">{g.name}</div>
               {g.items.map(({ item, index }) => (
                 <button
                   key={item.id}

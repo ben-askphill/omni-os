@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { api, errorText, useApi, type SecretRow } from '../api.ts';
-import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, PageHeader, Picker, type PickerOption } from '../components/ui.tsx';
+import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, PageHeader, Picker, StatusDot, type PickerOption } from '../components/ui.tsx';
 import { relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -102,7 +102,7 @@ export function SecretsPage() {
         </div>
 
         <div className="space-y-2">
-          <div className="label-mono px-1">Known global secrets</div>
+          <div className="caption px-1">Known global secrets</div>
           <ul className="space-y-2">
             {KNOWN_GLOBALS.map((k) => {
               const saved = (res.data ?? []).some((s) => s.scope === 'global' && s.name === k.name);
@@ -119,7 +119,7 @@ export function SecretsPage() {
                     className="press flex w-full items-center gap-3 rounded-[18px] bg-surface px-3 py-2.5 text-left"
                   >
                     <span className="font-mono text-[12.5px]">{k.name}</span>
-                    {saved && <span className="text-[11px] font-medium text-ok">saved</span>}
+                    {saved && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-fg-2"><StatusDot status="done" size={7} /> saved</span>}
                     <span className="min-w-0 flex-1 text-[12px] leading-snug text-fg-3">{k.blurb}</span>
                   </button>
                 </li>
@@ -176,8 +176,8 @@ export function SecretsPage() {
               {exists ? 'Replace secret' : 'Save secret'}
             </Button>
             {savedMsg && (
-              <span className="pop-in inline-flex items-center gap-1.5 text-[12.5px] text-ok">
-                <Icon name="check" size={13} strokeWidth={2.25} /> {savedMsg}
+              <span className="pop-in inline-flex items-center gap-1.5 text-[12.5px] text-fg-2">
+                <StatusDot status="done" /> {savedMsg}
               </span>
             )}
           </div>
@@ -195,7 +195,7 @@ export function SecretsPage() {
           <div className="space-y-4">
             {groups.map(([sc, rows]) => (
               <section key={sc}>
-                <h3 className="label-mono mb-2 flex items-center gap-2 px-2">
+                <h3 className="caption mb-2 flex items-center gap-2 px-2">
                   {sc === 'global' ? (
                     'Global'
                   ) : (
@@ -220,7 +220,7 @@ export function SecretsPage() {
                           </span>
                           <InlineConfirm label="Delete" icon="trash" confirmLabel="Delete" doneLabel="Deleted" busyLabel="Deleting" undoMs={5000} onConfirm={() => remove(s)} />
                         </div>
-                        {deleteError?.key === key && <div className="pt-1 pb-1 pl-10 text-[12px] text-bad">{deleteError.msg}</div>}
+                        {deleteError?.key === key && <div className="pt-1 pb-1 pl-10 text-[12px] text-fg-2"><StatusDot status="needs" size={7} className="mr-1.5" />{deleteError.msg}</div>}
                       </li>
                     );
                   })}

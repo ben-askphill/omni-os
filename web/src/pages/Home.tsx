@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { Thread } from '../api.ts';
 import { NewThreadComposer } from '../components/Composer.tsx';
 import { ThreadGroups, useLiveThreads } from '../components/ThreadList.tsx';
-import { Empty, Segmented } from '../components/ui.tsx';
+import { OmniMark } from '../components/brand.tsx';
+import { Empty, Segmented, StatusDot, glyphFor } from '../components/ui.tsx';
 import { useApp } from '../store.tsx';
 
 const acceptAll = () => true;
@@ -25,10 +26,7 @@ function Pulse() {
   const busy = status.running > 0;
   return (
     <span className="inline-flex h-7 items-center gap-2 rounded-full bg-surface px-3 font-num text-[11.5px] text-fg-2 tabular-nums">
-      <span className="relative inline-block h-1.5 w-1.5">
-        {busy && <span className="ping absolute inset-0 rounded-full bg-[var(--info-dot)]" />}
-        <span className={`absolute inset-0 rounded-full ${busy ? 'bg-[var(--info-dot)]' : 'bg-[var(--ok-dot)]'}`} />
-      </span>
+      <StatusDot status={busy ? 'running' : 'idle'} size={7} />
       {busy ? `${status.running} running` : 'All quiet'}
       {status.queued > 0 && <span className="text-fg-4">· {status.queued} queued</span>}
     </span>
@@ -41,6 +39,8 @@ export function HomePage() {
   const all = recent.data;
   const shown = all?.filter(FILTERS[filter]);
   const count = (f: Filter) => all?.filter(FILTERS[f]).length ?? 0;
+  const { status } = useApp();
+  const markState = all?.some((t) => glyphFor(t.status) === 'needs') ? 'attention' : status && status.running > 0 ? 'thinking' : 'idle';
   const badge = (n: number) => (n ? <span className="font-num text-[10.5px] text-fg-4 tabular-nums">{n}</span> : null);
 
   return (
@@ -48,7 +48,8 @@ export function HomePage() {
       <div className="mx-auto max-w-3xl px-4 pt-8 pb-16 md:px-8 md:pt-16">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3 px-1">
           <div>
-            <div className="label-mono mb-2.5">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+            <OmniMark size={40} state={markState} />
+            <div className="caption mt-4 mb-2.5">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
             <h1 className="font-display text-[30px] leading-[1.05] md:text-[38px]">{greeting()}</h1>
           </div>
           <Pulse />

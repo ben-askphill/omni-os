@@ -112,8 +112,8 @@ export function ArtifactsPage() {
                 <div className="relative aspect-[16/10] overflow-hidden rounded-[16px] bg-surface-2 shadow-[inset_0_0_0_1px_var(--line)]">
                   <Thumb a={a} />
                   {isNew(a) && (
-                    <span className="pop-in absolute top-2 left-2 inline-flex h-5 items-center gap-1 rounded-full bg-fg px-2 font-num text-[10px] tracking-[0.06em] text-on-ink uppercase">
-                      <span className="h-1 w-1 rounded-full bg-accent" /> New
+                    <span className="pop-in absolute top-2 left-2 inline-flex h-5 items-center gap-1 rounded-full bg-fg px-2 text-[10.5px] font-medium text-on-ink">
+                      <span className="h-1 w-1 rounded-full bg-done" /> New
                     </span>
                   )}
                 </div>

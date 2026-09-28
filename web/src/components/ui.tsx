@@ -12,8 +12,11 @@ import {
   type RefObject,
 } from 'react';
 import type { ThreadStatus } from '../../../server/db.ts';
+import { Loader, OmniLogo } from './brand.tsx';
 
-// ---------- icons (hand-drawn, 24px grid, 1.75 stroke) ----------
+export { Loader } from './brand.tsx';
+
+// ---------- icons (hand-drawn, 24px grid, 1.75 stroke, round caps and joins) ----------
 
 const PATHS = {
   menu: 'M4 6h16M4 12h16M4 18h16',
@@ -63,11 +66,22 @@ const PATHS = {
   monitor: 'M3 4h18v12H3zM8 20h8M12 16v4',
   bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
   grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
+  // Omni additions, same grid and stroke.
+  delegate: 'M3 12h4M7 12c3 0 3-6 7-6h7M7 12c3 0 3 6 7 6h7M7 12h14',
+  switchboard: 'M3 6h18M3 12h18M3 18h18M8 4v4M15 10v4M6 16v4',
+  split: 'M3 5h18v14H3zM12 5v14',
+  sidebar: 'M3 5h18v14H3zM9 5v14',
+  browser: 'M3 5h18v14H3zM3 9h18',
+  gauge: 'M4 18a8 8 0 0 1 16 0M12 18l4-5',
+  pause: 'M9 5v14M15 5v14',
+  diff: 'M12 3v8M8 7h8M8 17h8M5 21h14',
+  more: 'M5 12h.01M12 12h.01M19 12h.01',
 } as const;
 
 export type IconName = keyof typeof PATHS;
 
 export function Icon({ name, size = 16, className = '', strokeWidth = 1.75 }: { name: IconName; size?: number; className?: string; strokeWidth?: number }) {
+  if (name === 'more') strokeWidth = 3;
   return (
     <svg
       width={size}
@@ -86,26 +100,21 @@ export function Icon({ name, size = 16, className = '', strokeWidth = 1.75 }: { 
   );
 }
 
-/** The Omni wordmark: SF Pro with the red signal dot. */
-export function Wordmark({ size = 18 }: { size?: number }) {
-  return (
-    <span className="inline-flex items-start font-display font-medium" style={{ fontSize: size, lineHeight: 1 }}>
-      Omni
-      <span className="ml-[2px] inline-block rounded-full bg-accent" style={{ width: size * 0.3, height: size * 0.3 }} />
-    </span>
-  );
+/** The Omni OS lockup: serif "omni" plus "OS". */
+export function Wordmark({ size = 20 }: { size?: number }) {
+  return <OmniLogo variant="lockup" height={size} />;
 }
 
 // ---------- buttons ----------
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-ghost';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'needs';
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-fg text-on-ink hover:bg-fg/88 disabled:opacity-35',
   secondary: 'bg-surface-2 text-fg hover:bg-surface-3 disabled:opacity-45',
   ghost: 'hov text-fg-2 hover:text-fg disabled:opacity-40',
-  danger: 'bg-bad-dot text-white hover:bg-bad-dot/90 disabled:opacity-40',
-  'danger-ghost': 'hov text-bad [--hov:var(--bad-bg)] disabled:opacity-40',
+  // Destructive or blocking actions: vermilion fill with ink text, never vermilion text.
+  needs: 'bg-needs text-on-needs hover:bg-[color-mix(in_srgb,var(--needs)_90%,var(--fg))] disabled:opacity-40',
 };
 
 const SIZES = {
@@ -127,7 +136,7 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md' | 'lg'; icon?: IconName; busy?: boolean }) {
   return (
     <button type="button" {...rest} disabled={rest.disabled || busy} className={`${btnBase} ${SIZES[size]} ${VARIANTS[variant]} ${className}`}>
-      {busy ? <Spinner size={size === 'sm' ? 12 : 14} /> : icon ? <Icon name={icon} size={size === 'sm' ? 14 : 15} /> : null}
+      {busy ? <Loader size={size === 'sm' ? 12 : 14} /> : icon ? <Icon name={icon} size={size === 'sm' ? 14 : 15} /> : null}
       {children}
     </button>
   );
@@ -182,15 +191,6 @@ export function LinkButton({ href, icon, children, className = '', variant = 'se
 
 // ---------- status ----------
 
-const STATUS_COLOR: Record<string, string> = {
-  queued: 'var(--fg-4)',
-  running: 'var(--info-dot)',
-  done: 'var(--ok-dot)',
-  failed: 'var(--bad-dot)',
-  stopped: 'var(--warn-dot)',
-  imported: 'var(--fg-4)',
-};
-
 export const STATUS_LABEL: Record<string, string> = {
   queued: 'Queued',
   running: 'Running',
@@ -198,49 +198,61 @@ export const STATUS_LABEL: Record<string, string> = {
   failed: 'Failed',
   stopped: 'Stopped',
   imported: 'Imported',
+  needs: 'Needs you',
+  settled: 'Done',
+  idle: 'Idle',
 };
 
-export function StatusDot({ status, size = 8, className = '' }: { status: ThreadStatus | string | null | undefined; size?: number; className?: string }) {
-  const s = status ?? 'imported';
-  const hollow = s === 'imported' || s === 'queued';
-  const color = STATUS_COLOR[s] ?? 'var(--fg-4)';
+export type Glyph = 'running' | 'needs' | 'done' | 'settled' | 'idle' | 'queued';
+
+/** Thread status to the glyph it draws: a failure needs you, a stop just settles. */
+export function glyphFor(status: ThreadStatus | string | null | undefined): Glyph {
+  switch (status) {
+    case 'running':
+    case 'needs':
+    case 'done':
+    case 'settled':
+    case 'queued':
+    case 'idle':
+      return status;
+    case 'failed':
+      return 'needs';
+    case 'imported':
+      return 'idle';
+    default:
+      return 'settled';
+  }
+}
+
+export function StatusDot({ status, size = 8, className = '' }: { status: ThreadStatus | Glyph | string | null | undefined; size?: number; className?: string }) {
+  const s = glyphFor(status);
   return (
-    <span title={STATUS_LABEL[s] ?? s} className={`relative inline-block shrink-0 ${className}`} style={{ width: size, height: size }}>
-      {s === 'running' && <span className="ping absolute inset-0 rounded-full" style={{ background: color }} />}
-      <span
-        className="absolute inset-0 rounded-full"
-        style={{ background: hollow ? 'transparent' : color, boxShadow: hollow ? `inset 0 0 0 1.5px ${color}` : undefined }}
-      />
+    <span title={STATUS_LABEL[status ?? 'imported'] ?? status ?? undefined} data-s={s} className={`glyph ${className}`} style={{ width: size, height: size }}>
+      {s === 'running' && <i className="ping" />}
+      <i />
     </span>
   );
 }
 
-export function StatusPill({ status }: { status: string }) {
-  const tone: Record<string, string> = {
-    running: 'text-info bg-info-bg',
-    done: 'text-ok bg-ok-bg',
-    failed: 'text-bad bg-bad-bg',
-    stopped: 'text-warn bg-warn-bg',
-    queued: 'text-fg-2 bg-surface-2',
-    imported: 'text-fg-3 bg-surface-2',
-  };
+export function StatusPill({ status, label }: { status: string; label?: ReactNode }) {
   return (
-    <span className={`inline-flex h-6 items-center gap-1.5 rounded-full pr-2.5 pl-2 text-[12px] font-medium ${tone[status] ?? 'bg-surface-2 text-fg-2'}`}>
+    <span role="status" data-s={glyphFor(status)} className="spill">
       <StatusDot status={status} size={6} />
-      {STATUS_LABEL[status] ?? status}
+      {label ?? STATUS_LABEL[status] ?? status}
     </span>
   );
 }
 
-export function Chip({ children, tone = 'default', className = '', title }: { children: ReactNode; tone?: 'default' | 'info' | 'ok' | 'bad' | 'warn' | 'outline' | 'ink'; className?: string; title?: string }) {
-  const tones = {
+export type ChipTone = 'default' | 'outline' | 'ink' | 'live' | 'needs' | 'done';
+
+export function Chip({ children, tone = 'default', className = '', title }: { children: ReactNode; tone?: ChipTone; className?: string; title?: string }) {
+  const tones: Record<ChipTone, string> = {
     default: 'bg-surface-2 text-fg-2',
     outline: 'shadow-[inset_0_0_0_1px_var(--line-strong)] text-fg-3',
     ink: 'bg-fg text-on-ink',
-    info: 'bg-info-bg text-info',
-    ok: 'bg-ok-bg text-ok',
-    bad: 'bg-bad-bg text-bad',
-    warn: 'bg-warn-bg text-warn',
+    live: 'bg-live text-on-live',
+    needs: 'bg-needs text-on-needs',
+    done: 'bg-done text-on-done',
   };
   return (
     <span title={title} className={`inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[11px] font-medium leading-none tracking-normal ${tones[tone]} ${className}`}>
@@ -249,30 +261,16 @@ export function Chip({ children, tone = 'default', className = '', title }: { ch
   );
 }
 
-/** Letter avatar for channels and roles. Hue is stable per name. */
-export function Avatar({ name, size = 28, icon, className = '' }: { name: string; size?: number; icon?: IconName; className?: string }) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
-  const style: CSSProperties = {
-    width: size,
-    height: size,
-    fontSize: size * 0.42,
-    background: `light-dark(oklch(0.93 0.035 ${h}), oklch(0.32 0.04 ${h}))`,
-    color: `light-dark(oklch(0.38 0.07 ${h}), oklch(0.88 0.05 ${h}))`,
-  };
+/** Letter avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. */
+export function Avatar({ name, size = 28, icon, ink, className = '' }: { name: string; size?: number; icon?: IconName; ink?: boolean; className?: string }) {
   return (
-    <span aria-hidden="true" className={`inline-grid shrink-0 place-items-center rounded-full font-rounded font-medium uppercase ${className}`} style={style}>
+    <span
+      aria-hidden="true"
+      className={`inline-grid shrink-0 place-items-center rounded-full font-rounded font-medium uppercase leading-none ${ink ? 'bg-fg text-on-ink' : 'bg-surface-2 text-fg-2'} ${className}`}
+      style={{ width: size, height: size, fontSize: size * 0.42 }}
+    >
       {icon ? <Icon name={icon} size={size * 0.5} /> : name.replace(/[^a-z0-9]/gi, '').slice(0, 1) || '?'}
     </span>
-  );
-}
-
-export function Spinner({ size = 14, className = '' }: { size?: number; className?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" className={`spin shrink-0 ${className}`} aria-hidden="true">
-      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="3" />
-      <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
   );
 }
 
@@ -280,8 +278,8 @@ export function Spinner({ size = 14, className = '' }: { size?: number; classNam
 
 export function ErrorNote({ children, onRetry, className = '' }: { children: ReactNode; onRetry?: () => void; className?: string }) {
   return (
-    <div role="alert" className={`flex items-start gap-2.5 rounded-2xl bg-bad-bg px-4 py-2.5 text-[13px] text-bad ${className}`}>
-      <Icon name="alert" size={15} className="mt-[2px]" />
+    <div role="alert" className={`flex items-start gap-2.5 rounded-2xl bg-surface px-4 py-2.5 text-[13px] text-fg ${className}`}>
+      <StatusDot status="needs" size={8} className="mt-[5px]" />
       <div className="min-w-0 flex-1 break-words whitespace-pre-wrap">{children}</div>
       {onRetry && (
         <button type="button" onClick={onRetry} className="shrink-0 font-medium underline underline-offset-2">
@@ -310,7 +308,7 @@ export function Empty({ title, children, icon, action }: { title: string; childr
 export function Loading({ label = 'Loading' }: { label?: string }) {
   return (
     <div className="flex items-center gap-2 px-1 py-6 text-[13px] text-fg-3">
-      <Spinner /> {label}
+      <Loader /> {label}
     </div>
   );
 }
@@ -541,7 +539,7 @@ export function ConfirmDialog({
         <Button variant="secondary" onClick={onCancel} disabled={busy} data-autofocus>
           Cancel
         </Button>
-        <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} busy={busy}>
+        <Button variant={danger ? 'needs' : 'primary'} onClick={onConfirm} busy={busy}>
           {confirmLabel}
         </Button>
       </div>
@@ -566,7 +564,7 @@ export function InlineConfirm({
   doneLabel,
   busyLabel,
   undoMs,
-  danger = true,
+  needs = true,
   disabled,
   onConfirm,
   className = '',
@@ -578,7 +576,7 @@ export function InlineConfirm({
   doneLabel?: string;
   busyLabel?: string;
   undoMs?: number;
-  danger?: boolean;
+  needs?: boolean;
   disabled?: boolean;
   onConfirm: () => void | Promise<void>;
   className?: string;
@@ -659,7 +657,7 @@ export function InlineConfirm({
           {cancelLabel}
         </button>
         <span className="say-seam" />
-        <button type="button" className="say-btn" data-danger={danger || undefined} onClick={confirm}>
+        <button type="button" className="say-btn" data-needs={needs || undefined} onClick={confirm}>
           {confirmLabel}
         </button>
       </>
@@ -667,7 +665,7 @@ export function InlineConfirm({
   } else if (phase === 'busy') {
     content = (
       <span className="say-done">
-        <Spinner size={13} /> {busyLabel ?? `${confirmLabel}…`}
+        <Loader size={13} /> {busyLabel ?? `${confirmLabel}…`}
       </span>
     );
   } else if (phase === 'pending' || phase === 'done') {
@@ -776,7 +774,7 @@ export function SlideToConfirm({
           <div className="sld-say" style={{ opacity: phase === 'busy' ? 1 : 1 - progress * 1.4 }}>
             {phase === 'busy' ? (
               <span className="inline-flex items-center gap-2 text-fg-2">
-                <Spinner size={14} /> {busyLabel ?? 'Working'}
+                <Loader size={14} /> {busyLabel ?? 'Working'}
               </span>
             ) : (
               label
@@ -816,7 +814,7 @@ export function SlideToConfirm({
               }
             }}
           >
-            {phase === 'busy' ? <Spinner size={16} /> : <Icon name="arrowRight" size={18} strokeWidth={2} />}
+            {phase === 'busy' ? <Loader size={16} /> : <Icon name="arrowRight" size={18} strokeWidth={2} />}
           </button>
         </>
       )}
@@ -833,6 +831,8 @@ export interface PickerOption<T extends string> {
   icon?: IconName;
   /** Letter avatar seed; defaults to the label. Set `avatar: false` to hide it. */
   avatar?: string | false;
+  /** A mark to lead with instead of the avatar (a HarnessLogo or CrewMark). */
+  lead?: ReactNode;
 }
 
 export function Picker<T extends string>({
@@ -936,7 +936,9 @@ export function Picker<T extends string>({
         }}
         className="press inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] font-medium text-fg transition-colors hover:bg-surface-3 disabled:opacity-45"
       >
-        {current && current.avatar !== false ? (
+        {current?.lead ? (
+          <span className="grid h-6 w-6 place-items-center rounded-full bg-bg text-fg">{current.lead}</span>
+        ) : current && current.avatar !== false ? (
           <Avatar name={current.avatar || current.label} icon={current.icon} size={24} />
         ) : current?.icon ? (
           <span className="grid h-6 w-6 place-items-center text-fg-3">
@@ -984,7 +986,9 @@ export function Picker<T extends string>({
                 onClick={() => pick(o)}
                 className="pik-row"
               >
-                {o.avatar !== false ? (
+                {o.lead ? (
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">{o.lead}</span>
+                ) : o.avatar !== false ? (
                   <Avatar name={o.avatar || o.label} icon={o.icon} size={28} />
                 ) : o.icon ? (
                   <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-2 text-fg-3">
@@ -1011,10 +1015,10 @@ export function Picker<T extends string>({
 // ---------- ticks and checklist ----------
 
 /** Usage as a row of ticks (Bencho "tick"). `value` is 0..1. */
-export function Ticks({ value, count = 24, height = 14, tone, label, className = '' }: { value: number; count?: number; height?: number; tone?: 'warn' | 'bad'; label?: string; className?: string }) {
+export function Ticks({ value, count = 24, height = 14, tone, label, className = '' }: { value: number; count?: number; height?: number; tone?: 'needs'; label?: string; className?: string }) {
   const v = Math.max(0, Math.min(1, value));
   const on = v > 0 ? Math.max(1, Math.round(v * count)) : 0;
-  const style = { '--ticks-h': `${height}px`, '--tick-on': tone === 'bad' ? 'var(--bad-dot)' : tone === 'warn' ? 'var(--warn-dot)' : 'var(--fg)' } as CSSProperties;
+  const style = { '--ticks-h': `${height}px`, '--tick-on': tone === 'needs' ? 'var(--needs)' : 'var(--fg)' } as CSSProperties;
   return (
     <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v * 100)} className={`ticks ${className}`} style={style}>
       {Array.from({ length: count }, (_, i) => (
@@ -1033,7 +1037,7 @@ export function CheckItem({ state, children }: { state: 'pending' | 'in_progress
         <svg viewBox="0 0 24 24" className="chk-tick" aria-hidden="true">
           <path d="M5 12.5l4.5 4.5L19 7.5" />
         </svg>
-        {state === 'in_progress' && <span className="pulse absolute h-[7px] w-[7px] rounded-full bg-fg" />}
+        {state === 'in_progress' && <span className="pulse absolute h-[7px] w-[7px] rounded-full bg-live" />}
       </span>
       <span className={`min-w-0 text-[13.5px] leading-[1.4] ${state === 'in_progress' ? 'font-medium text-fg' : 'text-fg-2'}`}>
         <span className="chk-say">{children}</span>
@@ -1088,7 +1092,7 @@ export function PageHeader({ title, subtitle, actions, children, eyebrow, width 
     <div className={`mx-auto px-4 pt-6 pb-4 md:px-8 md:pt-10 ${width}`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          {eyebrow && <div className="label-mono mb-2.5">{eyebrow}</div>}
+          {eyebrow && <div className="caption mb-2.5">{eyebrow}</div>}
           <h1 className="truncate font-display text-[26px] leading-[1.1] md:text-[30px]">{title}</h1>
           {subtitle && <div className="mt-1.5 max-w-xl text-[13.5px] text-fg-3">{subtitle}</div>}
         </div>
@@ -1109,5 +1113,5 @@ export function Label({ children, hint, htmlFor }: { children: ReactNode; hint?:
 }
 
 export function Kbd({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <kbd className={`inline-grid h-[18px] min-w-[18px] place-items-center rounded-[6px] bg-surface-2 px-1 font-num text-[10.5px] text-fg-3 ${className}`}>{children}</kbd>;
+  return <kbd className={`inline-grid h-[18px] min-w-[18px] place-items-center rounded-[6px] bg-surface-2 px-1 font-sans text-[10.5px] text-fg-3 ${className}`}>{children}</kbd>;
 }

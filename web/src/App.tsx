@@ -73,7 +73,7 @@ const startThread = (route: Route) => {
   requestComposerFocus();
 };
 
-/** Phone navigation: a floating glass icon bar with a sliding thumb (Bencho "gnav"). */
+/** Phone navigation: a floating icon bar with a sliding thumb (Bencho "gnav"). */
 function MobileNav({ route, onMenu, onSearch }: { route: Route; onMenu: () => void; onSearch: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const active = route.name === 'home' ? 'home' : route.name === 'artifacts' ? 'artifacts' : route.name === 'search' ? 'search' : route.name === 'channel' ? 'channels' : null;
@@ -85,7 +85,7 @@ function MobileNav({ route, onMenu, onSearch }: { route: Route; onMenu: () => vo
   );
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center pb-[calc(10px+env(safe-area-inset-bottom))] md:hidden">
-      <div ref={ref} className="glass pointer-events-auto relative flex items-center gap-1 rounded-full p-1.5">
+      <div ref={ref} className="float pointer-events-auto relative flex items-center gap-1 rounded-full p-1.5">
         <Thumb box={box} />
         {item('home', 'home', 'Home', () => navigate('/'))}
         {item('channels', 'hash', 'Channels', onMenu)}
@@ -139,7 +139,7 @@ function Shell() {
   return (
     <div className="flex h-full min-h-0 flex-col md:flex-row md:py-2 md:pr-2">
       {/* Mobile top bar */}
-      <header className="glass relative z-20 flex h-[calc(52px+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-line px-2 pt-[env(safe-area-inset-top)] shadow-none md:hidden">
+      <header className="relative bg-bg z-20 flex h-[calc(52px+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-line px-2 pt-[env(safe-area-inset-top)] shadow-none md:hidden">
         <IconButton icon="menu" label="Open menu" onClick={() => setDrawer(true)} size={18} />
         <a href={href.home()} className="px-1" aria-label="Omni home">
           <Wordmark size={17} />

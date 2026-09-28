@@ -56,7 +56,7 @@ export function SearchPage({ q }: { q: string }) {
             </Empty>
           ) : (
             <>
-              <div className="label-mono mb-2 px-3.5">
+              <div className="caption mb-2 px-3.5">
                 {hits.length >= 40 ? 'Top 40 results' : plural(hits.length, 'result')}
               </div>
               <ul className="rise">

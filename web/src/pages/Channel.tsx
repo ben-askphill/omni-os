@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { api, errorText, useApi, type ChannelWithRunning, type Thread } from '../api.ts';
 import { NewThreadComposer } from '../components/Composer.tsx';
 import { ThreadGroups, useLiveThreads } from '../components/ThreadList.tsx';
-import { Avatar, Button, Empty, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
+import { Avatar, Button, Empty, StatusDot, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { href, type ChannelTab } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { ChannelSettingsForm } from './ChannelSettings.tsx';
@@ -74,7 +74,7 @@ function MissingChannel({ id }: { id: string }) {
         }
       >
         Its threads are kept. Unarchive to see them in the sidebar and start new ones.
-        {error && <div className="mt-2 text-bad">{error}</div>}
+        {error && <div className="mt-2 flex items-center justify-center gap-1.5 text-fg-2"><StatusDot status="needs" />{error}</div>}
       </Empty>
     </div>
   );
@@ -106,14 +106,11 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
         <div className="flex items-center gap-3.5">
           <Avatar name={ch.name} icon={isConductor ? 'target' : undefined} size={44} />
           <div className="min-w-0 flex-1">
-            <div className="label-mono mb-1 flex items-center gap-2">
+            <div className="caption mb-1 flex items-center gap-2">
               {KIND_LABEL[ch.kind] ?? ch.kind}
               {ch.running > 0 && (
-                <span className="flex items-center gap-1.5 text-info">
-                  <span className="relative inline-block h-1.5 w-1.5">
-                    <span className="ping absolute inset-0 rounded-full bg-[var(--info-dot)]" />
-                    <span className="absolute inset-0 rounded-full bg-[var(--info-dot)]" />
-                  </span>
+                <span className="flex items-center gap-1.5 text-live-text">
+                  <StatusDot status="running" size={7} />
                   {ch.running} running
                 </span>
               )}
