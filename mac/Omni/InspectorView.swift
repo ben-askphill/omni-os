@@ -17,6 +17,9 @@ private struct ThreadInspector: ViewModifier {
   let store: ThreadStore
   @AppStorage(inspectorOpenKey) private var open = true
   @State private var selection: InspectorSelection
+  /// Presenting the inspector in the same pass that puts the thread on screen loops the window's layout and
+  /// traps, so it comes one beat after.
+  @State private var settled = false
 
   init(model: AppModel, store: ThreadStore) {
     self.model = model
@@ -31,7 +34,7 @@ private struct ThreadInspector: ViewModifier {
   func body(content: Content) -> some View {
     let count = store.artifacts.count
     content
-      .inspector(isPresented: $open) {
+      .inspector(isPresented: Binding(get: { open && settled }, set: { open = $0 })) {
         InspectorPanel(model: model, store: store, selection: $selection)
           .inspectorColumnWidth(min: 340, ideal: 420, max: 760)
       }
@@ -57,6 +60,10 @@ private struct ThreadInspector: ViewModifier {
         guard let artifact else { return }
         selection.open(artifact: artifact)
         open = true
+      }
+      .task {
+        try? await Task.sleep(for: .milliseconds(300))
+        settled = true
       }
       .onAppear {
         if Self.param(model.route) != nil { open = true }
