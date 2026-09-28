@@ -162,6 +162,14 @@ final class QARunner {
           case .stop: await model.stopServer()
           case .check: await model.checkAgain()
           }
+        case .expand:
+          result.note = "not handled by this build"
+        case .inspector(let command):
+          guard let inspect = InspectorProbe.command else { throw QAScriptError("no thread is open") }
+          inspect(command)
+          try? await Task.sleep(for: .milliseconds(400))
+        case .webTitle(let title):
+          try await InspectorProbe.waitForTitle(title)
         case .quit:
           finish(result, started)
           await end()
@@ -215,6 +223,9 @@ final class QARunner {
     case .server(let action): "server \(action.rawValue)"
     case .appearance(let appearance): "appearance \(appearance.rawValue)"
     case .scroll(let scroll): "scroll \(scroll.rawValue)"
+    case .expand: "expand"
+    case .inspector(let command): "inspector \(command.rawValue)"
+    case .webTitle(let title): "webTitle \(title)"
     case .quit: "quit"
     }
   }

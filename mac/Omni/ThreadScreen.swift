@@ -68,6 +68,7 @@ private struct ThreadView: View {
           ThreadHeader(model: model, store: store, thread: thread)
           TranscriptView(model: model, store: store, ui: ui, markdown: markdown)
         }
+        .threadInspector(model: model, store: store)
       }
     }
   }

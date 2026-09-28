@@ -19,6 +19,10 @@ public enum QAAppearance: String, Hashable, Sendable {
 
 /// Where a scroll step takes the open thread's transcript. `through` scrolls from the bottom to the top half
 /// a screen per frame and reports how long the frames took.
+public enum QAInspector: String, Hashable, Sendable {
+  case open, close, artifacts, browser, details
+}
+
 public enum QAScroll: String, Hashable, Sendable {
   case top, bottom, through
 }
@@ -32,7 +36,8 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`,
 /// `{"server": "start"}` (or `stop`, `check`), `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or
-/// `bottom`, `through`), `{"expand": true}`, `{"quit": true}`.
+/// `bottom`, `through`), `{"expand": true}`, `{"inspector": "artifacts"}` (or `browser`, `details`, `open`,
+/// `close`), `{"webTitle": "BLOCKED"}`, `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -48,6 +53,10 @@ public enum QAStep: Hashable, Sendable {
   case scroll(QAScroll)
   /// Opens the open thread's tool groups, and the calls in them that failed or have sub-calls.
   case expand
+  /// Opens or closes the thread inspector, or picks its tab.
+  case inspector(QAInspector)
+  /// Waits until the inspector's web view has this document title, so a page can report what it could reach.
+  case webTitle(String)
   case quit
 
   static let defaultTimeout = Duration.seconds(10)
@@ -135,7 +144,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "server", "appearance", "scroll", "expand", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "server", "appearance", "scroll", "expand", "inspector", "webTitle", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -183,6 +192,14 @@ public struct QAScript: Hashable, Sendable {
       return .scroll(to)
     case "expand":
       return .expand
+    case "inspector":
+      guard let name = value as? String, let to = QAInspector(rawValue: name) else {
+        throw QAScriptError("inspector takes open, close, artifacts, browser or details")
+      }
+      return .inspector(to)
+    case "webTitle":
+      guard let title = value as? String, !title.isEmpty else { throw QAScriptError("webTitle takes the title to wait for") }
+      return .webTitle(title)
     default:
       return .quit
     }

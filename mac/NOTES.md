@@ -301,6 +301,24 @@ Server screen (`ServerScreen`):
 
 Settings, Connection pane: Port, Repo (a field and a folder picker), Node (a field and a file picker; empty finds Node itself). The port and paths apply on Return, when the field loses focus or when Settings closes (closing a window does not end editing), and the paths on a pick too. Never per key: typing 4759 does not try 4, 47 and 475. A number that is not a port puts the current one back. A blank Repo is `~/omni-os` (`effectiveRepoPath`), in `config` and on the server screen. Everything applies at once, no relaunch. With launch arguments set, a note says changes last until the app quits. Status shows the server state, the feed, Open Log, and Build (the `OmniGitCommit` stamp) in an installed build.
 
+## Thread inspector (#67)
+
+`.inspector` on the thread screen (`ThreadScreen` adds `.threadInspector(model:store:)`), 340 to 760pt, toggled in the toolbar and View > Show Inspector (Opt-Cmd-I, with the artifact count). Open state is `@AppStorage("threadInspector.open")`, shared by all threads.
+
+- OmniKit, all pure: `InspectorSelection` (initial pick: `?artifact`, else newest HTML, else newest file, else Details; `arrived` selects a new HTML even the first), `RequestPolicy` (blocks loopback, 100.64.0.0/10, `.ts.net` and the Omni port; `ruleListJSON` is the same policy as a WebKit content rule list, a test keeps them equal), `CSV`, `ThreadDetails` (resume command, MCP list, dates), `ArtifactRef` (Codable, the value of the artifact window) and `OmniClient.artifactData`.
+- `mac/Omni`: `InspectorView` (modifier, panel, Artifacts tab), `InspectorTabs` (Browser, Details), `ArtifactViews` (viewer, native PDF/image/CSV/JSON/markdown/text, save panel, `ArtifactWindowView`), `ArtifactWebView` (HTML and SVG).
+- The web view: non-persistent data store, page served by the `omni-artifact` scheme (only its own artifact), rule list on, no script message handlers, links and window.open go to the default browser (http, https, mailto, never a blocked host). The window scene is `WindowGroup(id: "artifact", for: ArtifactRef.self)` in `OmniApp`.
+- QA steps: `{"inspector": "open|close|artifacts|browser|details"}` and `{"webTitle": "BLOCKED"}` (waits for the inspector web view's document.title). The check used an HTML artifact that no-cors fetches the local API and reports `BLOCKED` only when every local fetch failed and a control fetch to the internet worked.
+- To seed a QA thread: write files into `<data>/threads/<id>/artifacts/` (and `browser/*.png` for screenshots); the server's watcher picks them up.
+
+## Artifacts page (#69)
+
+`#/artifacts` shows `ArtifactsScreen` (`DetailView` routes to it): a filter picker (All, Pages, Images, Docs, Data, with counts), a grid of cards (thumbnail, type icon and name, thread title, `#channel`, age) and a "New" badge for anything changed since the previous visit (`UserDefaults` `artifacts.seen`). A card sets `model.route = .thread(id:, artifact:)`, which opens the thread with the inspector on that file.
+
+- OmniKit: `GalleryArtifact` (a row of `GET /api/artifacts`, fixture `artifacts.json`), `ArtifactFilter`, `ArtifactGallery` (pure; the upsert rules are in its doc comment) and `ArtifactsStore`. The store has a feed connection of its own, started and stopped with the page. A feed artifact of a known thread joins at once; an unknown thread, or a reconnect, refetches after 1.5s like the Web UI.
+- `mac/Omni`: `ArtifactsScreen`, `ArtifactThumbnails`. Images are decoded small with ImageIO, SVG through `NSImage`, pages are loaded one at a time in the viewer's sandbox (`ArtifactWebHost`, `SandboxRules`) in an off-screen window and snapshotted. All are cached per artifact version.
+- To recheck live updates in QA, write a file into `<data>/threads/<id>/artifacts/` during a `sleep` step.
+
 ## Build and install
 
 `scripts/build-mac.sh [--no-open] [-- app arguments]`:
