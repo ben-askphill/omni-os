@@ -28,6 +28,67 @@ interface ResultP {
   output_tokens?: number;
 }
 
+// Desktop panel width in px. null means the default, clamp(340px, 40vw, 760px).
+const PANEL_MIN = 320;
+const THREAD_MIN = 420; // keep the transcript usable next to a wide panel
+const defaultPanelWidth = () => Math.min(760, Math.max(340, window.innerWidth * 0.4));
+
+function PanelResizeHandle({ width, max, onChange, onReset }: { width: number; max: number; onChange: (w: number, done: boolean) => void; onReset: () => void }) {
+  const drag = useRef<{ x: number; w: number } | null>(null);
+  const [active, setActive] = useState(false);
+  const clampW = (w: number) => Math.round(Math.min(Math.max(w, PANEL_MIN), Math.max(PANEL_MIN, max)));
+  const end = () => {
+    drag.current = null;
+    setActive(false);
+    document.body.classList.remove('col-resizing');
+  };
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+      aria-valuemin={PANEL_MIN}
+      aria-valuemax={Math.round(max)}
+      aria-valuenow={Math.round(width)}
+      tabIndex={0}
+      title="Drag to resize, double-click to reset"
+      className="group absolute inset-y-0 -left-1.5 z-10 flex w-3 cursor-col-resize touch-none justify-center outline-none"
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { x: e.clientX, w: width };
+        setActive(true);
+        document.body.classList.add('col-resizing');
+      }}
+      onPointerMove={(e) => {
+        // The panel sits on the right, so dragging left grows it.
+        if (drag.current) onChange(clampW(drag.current.w + drag.current.x - e.clientX), false);
+      }}
+      onPointerUp={(e) => {
+        if (drag.current) onChange(clampW(drag.current.w + drag.current.x - e.clientX), true);
+        end();
+      }}
+      onLostPointerCapture={() => {
+        if (drag.current) onChange(width, true);
+        end();
+      }}
+      onDoubleClick={onReset}
+      onKeyDown={(e) => {
+        const step = e.shiftKey ? 64 : 16;
+        if (e.key === 'ArrowLeft') onChange(clampW(width + step), true);
+        else if (e.key === 'ArrowRight') onChange(clampW(width - step), true);
+        else if (e.key === 'Home') onChange(clampW(PANEL_MIN), true);
+        else if (e.key === 'End') onChange(clampW(max), true);
+        else return;
+        e.preventDefault();
+      }}
+    >
+      <span className={`my-auto h-10 w-[3px] rounded-full transition-colors ${active ? 'bg-fg-3' : 'bg-transparent group-hover:bg-line-strong group-focus-visible:bg-fg-3'}`} />
+    </div>
+  );
+}
+
 const shellQuote = (s: string) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
 
 // ---------- right panel ----------
@@ -334,6 +395,12 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
   const [panelTab, setPanelTab] = useState<PanelTab>('artifacts');
   const [panelOpen, setPanelOpen] = useState<boolean>(() => readPref('threadPanel', true));
   const [mobilePanel, setMobilePanel] = useState(!!artifactParam);
+  const [panelWidth, setPanelWidth] = useState<number | null>(() => {
+    const v = readPref<unknown>('threadPanelWidth', null);
+    return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  });
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [rootWidth, setRootWidth] = useState(0);
   const [stopping, setStopping] = useState(false);
   const [queued, setQueued] = useState<PendingMsg[]>([]);
   const [warm, setWarm] = useState<boolean | undefined>(undefined);
@@ -598,6 +665,17 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     prevFiles.current = files.length;
   }, [files, ready, isMobile]);
 
+  // Track the thread view width so a wide panel never squeezes the transcript below THREAD_MIN.
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    setRootWidth(el.clientWidth);
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setRootWidth(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [thread !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (notFound) {
     return (
       <div className="h-full overflow-y-auto">
@@ -672,8 +750,11 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
 
   const artifactCount = files.length + shots.length;
 
+  const panelMax = Math.max(PANEL_MIN, (rootWidth || window.innerWidth) - THREAD_MIN);
+  const shownPanelWidth = Math.min(Math.max(panelWidth ?? defaultPanelWidth(), PANEL_MIN), panelMax);
+
   return (
-    <div className="flex h-full min-h-0">
+    <div ref={rootRef} className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
         {/* header */}
         <div className="flex shrink-0 items-center gap-3 px-3 pt-3 pb-2 md:px-6 md:pt-4">
@@ -780,7 +861,19 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
 
       {/* desktop panel */}
       {!isMobile && panelOpen && (
-        <aside className="w-[clamp(340px,40vw,760px)] shrink-0 py-2 pr-2">
+        <aside className="relative shrink-0 py-2 pr-2" style={{ width: shownPanelWidth }}>
+          <PanelResizeHandle
+            width={shownPanelWidth}
+            max={panelMax}
+            onChange={(w, done) => {
+              setPanelWidth(w);
+              if (done) writePref('threadPanelWidth', w);
+            }}
+            onReset={() => {
+              setPanelWidth(null);
+              writePref('threadPanelWidth', null);
+            }}
+          />
           <div className="panel-in h-full overflow-hidden rounded-[18px] bg-surface">{panel}</div>
         </aside>
       )}

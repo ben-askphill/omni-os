@@ -1028,3 +1028,38 @@
     animation: none !important;
   }
 }
+
+@keyframes omni-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+/* Live status text: a soft light sweep across the words. */
+.shimmer {
+  background: linear-gradient(90deg, var(--fg-4) 0%, var(--fg-4) 35%, var(--fg) 50%, var(--fg-4) 65%, var(--fg-4) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: omni-shimmer 2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none !important;
+    color: var(--fg-3);
+    background: none;
+  }
+}
+
+/* While the thread panel is being resized: keep the col-resize cursor everywhere and stop
+   artifact iframes and text selection from stealing the drag. */
+body.col-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+body.col-resizing iframe {
+  pointer-events: none;
+}
