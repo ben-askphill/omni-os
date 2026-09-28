@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type EventRow, type PendingMsg, type SendMode, type Thread, type ThreadDetail } from '../api.ts';
 import { ArtifactViewer, kindIcon } from '../components/ArtifactViewer.tsx';
 import { ReplyComposer } from '../components/Composer.tsx';
+import { CAPABILITIES, isHarnessId } from '../../../server/harness/types.ts';
 import { harnessName } from '../composer-slash.ts';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
 import { Avatar, Button, Chip, CopyButton, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Modal, StatusDot, StatusPill, Tabs } from '../components/ui.tsx';
@@ -22,6 +23,9 @@ interface InitP {
 interface ResultP {
   duration_ms?: number;
   turns?: number;
+  model?: string;
+  input_tokens?: number;
+  output_tokens?: number;
 }
 
 const shellQuote = (s: string) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
@@ -181,12 +185,13 @@ function DetailsTab({
   warm: boolean | undefined;
 }) {
   const cwd = init?.cwd || thread.cwd;
+  const remote = thread.harness === 'hermes';
   const resumeCmd: Record<string, string> = {
     'claude-code': `claude --resume ${thread.session_id}`,
     codex: `codex resume ${thread.session_id}`,
     cursor: `cursor-agent --resume ${thread.session_id}`,
   };
-  const resume = `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
+  const resume = remote ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin h-full overflow-y-auto px-2.5 pb-3">
       <dl className="divide-y divide-line rounded-[18px] bg-bg py-1">
@@ -212,7 +217,11 @@ function DetailsTab({
           </Row>
         )}
         <Row k="Working dir">
-          <span className="font-mono text-[12px]">{cwd}</span>
+          {remote ? (
+            <span className="text-fg-3">Hermes server — not an Omni worktree</span>
+          ) : (
+            <span className="font-mono text-[12px]">{cwd}</span>
+          )}
         </Row>
         <Row k="Session">
           <span className="font-mono text-[12px]">{thread.session_id}</span>
@@ -246,6 +255,13 @@ function DetailsTab({
           <Row k="Last run">
             {duration(lastResult.duration_ms)}
             {lastResult.turns ? <span className="text-fg-3"> · {plural(lastResult.turns, 'turn')}</span> : null}
+            {lastResult.model ? <span className="text-fg-3"> · {lastResult.model}</span> : null}
+            {lastResult.input_tokens != null ? (
+              <span className="text-fg-3">
+                {' '}
+                · {lastResult.input_tokens} in / {lastResult.output_tokens ?? 0} out
+              </span>
+            ) : null}
           </Row>
         )}
       </dl>
@@ -266,13 +282,22 @@ function DetailsTab({
         </div>
       )}
 
-      <div className="mt-4 rounded-[18px] bg-bg p-3.5">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="label-mono">Resume in terminal</span>
-          <CopyButton text={resume} />
+      {remote ? (
+        <div className="mt-4 rounded-[18px] bg-bg p-3.5">
+          <div className="label-mono mb-2">Remote session</div>
+          <p className="text-[12.5px] leading-relaxed text-fg-2">
+            This thread runs on the Hermes server. Another message here resumes <span className="font-mono">{thread.session_id}</span>.
+          </p>
         </div>
-        <code className="block rounded-xl bg-surface px-3 py-2.5 font-mono text-[11.5px] break-all text-fg-2">{resume}</code>
-      </div>
+      ) : (
+        <div className="mt-4 rounded-[18px] bg-bg p-3.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="label-mono">Resume in terminal</span>
+            <CopyButton text={resume} />
+          </div>
+          <code className="block rounded-xl bg-surface px-3 py-2.5 font-mono text-[11.5px] break-all text-fg-2">{resume}</code>
+        </div>
+      )}
     </div>
   );
 }
@@ -730,7 +755,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             <ReplyComposer
               thread={thread}
-              canSteer={thread.harness !== 'cursor'}
+              canSteer={isHarnessId(thread.harness) ? CAPABILITIES[thread.harness].steer : thread.harness !== 'cursor'}
               onSent={(t) => {
                 setThread((prev) => newer(prev, t, true));
                 nearBottom.current = true;

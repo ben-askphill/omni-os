@@ -44,6 +44,9 @@ interface ResultP {
   turns?: number;
   cost_usd?: number;
   stopped?: boolean;
+  model?: string;
+  input_tokens?: number;
+  output_tokens?: number;
 }
 interface ReportP {
   text: string;
@@ -585,12 +588,15 @@ function ResultLine({ p }: { p: ResultP }) {
   const bits = [p.duration_ms != null ? `${word} in ${duration(p.duration_ms)}` : word];
   if (p.turns) bits.push(plural(p.turns, 'turn'));
   const bad = !p.ok && !p.stopped;
+  const tokens = p.input_tokens != null ? `${p.input_tokens} in / ${p.output_tokens ?? 0} out` : null;
   return (
     <div className="flex items-center gap-3 py-1 font-num text-[10.5px] tracking-[0.06em] text-fg-4 uppercase">
       <div className="h-px flex-1 bg-line" />
       <span className={`flex items-center gap-2 ${bad ? 'text-bad' : ''}`}>
         <span className={`inline-block h-1 w-1 rounded-full ${bad ? 'bg-bad' : p.ok ? 'bg-[var(--ok-dot)]' : 'bg-[var(--warn-dot)]'}`} />
         {bits.join(' · ')}
+        {p.model ? <span className="normal-case tracking-normal"> · {p.model}</span> : null}
+        {tokens ? <span className="normal-case tracking-normal"> · {tokens}</span> : null}
         {bad && p.subtype && p.subtype !== 'success' ? ` · ${p.subtype.replace(/_/g, ' ')}` : ''}
       </span>
       <div className="h-px flex-1 bg-line" />
