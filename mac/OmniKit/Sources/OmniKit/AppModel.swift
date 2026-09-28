@@ -90,6 +90,8 @@ public final class AppModel {
   public var route = Route.home
   /// The last start that failed, until the server runs, Start is pressed again or the settings change.
   public private(set) var startFailure: StartFailure?
+  /// Banners for threads that finish, fail or stop. The window shows them.
+  public let banners = BannerCenter()
 
   @ObservationIgnored private let connect: @MainActor (_ port: Int) -> Connection
   @ObservationIgnored private var config: ServerConfig
@@ -227,7 +229,10 @@ public final class AppModel {
   // MARK: Following changes
 
   private func follow(_ c: Connection) {
-    c.store.onFeed = { [threads = c.threads] in threads.apply(feed: $0) }
+    c.store.onFeed = { [threads = c.threads, weak self] in
+      threads.apply(feed: $0)
+      self?.feedArrived($0)
+    }
   }
 
   private func checkServer() {
@@ -257,9 +262,24 @@ public final class AppModel {
     checkServer()
   }
 
+  private func feedArrived(_ event: FeedEvent) {
+    var viewing: String?
+    if case .thread(let id, _) = route { viewing = id }
+    banners.handle(event, viewing: viewing)
+  }
+
+  /// Threads in flight when the feed opens, so their end gets a banner too.
+  private func seedBanners() async {
+    let client = client
+    for status in [ThreadStatus.running, .queued] {
+      if let list = try? await client.threads(status: status, limit: 100) { banners.seed(list) }
+    }
+  }
+
   private func connectionChanged(_ state: ConnectionState) {
     let previous = lastConnection
     lastConnection = state
+    if state == .open { Task { await seedBanners() } }
     switch state {
     case .open where !supervisor.isRunning:
       checkServer()

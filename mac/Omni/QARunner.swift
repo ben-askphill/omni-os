@@ -162,6 +162,9 @@ final class QARunner {
           case .stop: await model.stopServer()
           case .check: await model.checkAgain()
           }
+        case .expand:
+          // Not wired at this commit: the thread screen slice handles it.
+          throw QAScriptError("expand is not implemented")
         case .quit:
           finish(result, started)
           await end()
@@ -215,6 +218,7 @@ final class QARunner {
     case .server(let action): "server \(action.rawValue)"
     case .appearance(let appearance): "appearance \(appearance.rawValue)"
     case .scroll(let scroll): "scroll \(scroll.rawValue)"
+    case .expand: "expand"
     case .quit: "quit"
     }
   }

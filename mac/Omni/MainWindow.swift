@@ -4,6 +4,7 @@ import SwiftUI
 /// The sidebar and the screen for the route, or the server screen while there is no server to talk to.
 struct MainWindow: View {
   let model: AppModel
+  let updater: Updater
   #if DEBUG
   @Environment(\.openSettings) private var openSettings
   #endif
@@ -13,7 +14,12 @@ struct MainWindow: View {
       SidebarView(model: model)
         .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 340)
     } detail: {
-      DetailView(model: model)
+      VStack(spacing: 0) {
+        UpdateBar(updater: updater)
+        DetailView(model: model)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+      .overlay(alignment: .bottomTrailing) { BannerStack(model: model) }
     }
     .navigationTitle(model.title)
     .toolbar { toolbar }
