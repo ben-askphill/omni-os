@@ -140,6 +140,13 @@ final class QARunner {
         case .appearance(let appearance):
           NSApp.appearance = NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
           try? await Task.sleep(for: .milliseconds(500))
+        case .expand:
+          break
+        case .palette(let query):
+          if let query { model.shell.openPalette(query: query) } else { model.shell.paletteOpen = false }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .channel(let action):
+          try await channelStep(action)
         case .scroll(let scroll):
           result.note = try await self.scroll(scroll)
         case .expand:
@@ -226,6 +233,32 @@ final class QARunner {
     return try Data(contentsOf: URL(filePath: (trimmed as NSString).expandingTildeInPath))
   }
 
+  /// The settings form's calls, on the channel `qa-channel`, then the sidebar's reload.
+  private func channelStep(_ action: QAChannelAction) async throws(QAScriptError) {
+    let id = "qa-channel"
+    do {
+      switch action {
+      case .create:
+        var form = ChannelForm()
+        form.setName("QA Channel")
+        form.notes = "Made by the QA run."
+        _ = try await model.client.createChannel(form)
+      case .edit:
+        var form = ChannelForm(channel: try await model.client.channel(id).channel)
+        form.setName("QA Channel Renamed")
+        form.kind = .internal
+        form.storeDomain = "https://qa-shop.myshopify.com/admin"
+        form.notes = ""
+        _ = try await model.client.updateChannel(id, form, system: false)
+      case .archive, .unarchive:
+        _ = try await model.client.setChannelArchived(id, action == .archive)
+      }
+    } catch {
+      throw QAScriptError("channel \(action.rawValue): \(error.message)")
+    }
+    await model.store.reloadChannels()
+  }
+
   private func describe(_ step: QAStep) -> String {
     switch step {
     case .route(let route): "route \(route.hash)"
@@ -243,6 +276,8 @@ final class QARunner {
     case .send(let mode): "send \(mode?.rawValue ?? "reply")"
     case .inspector(let command): "inspector \(command.rawValue)"
     case .webTitle(let title): "webTitle \(title)"
+    case .channel(let action): "channel \(action.rawValue)"
+    case .palette(let query): "palette \(query ?? "close")"
     case .quit: "quit"
     }
   }

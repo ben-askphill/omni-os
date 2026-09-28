@@ -447,6 +447,21 @@ Wiring it into the composer (mac/Omni/SlashMenuDemo.swift is a working example, 
 5. Send: `if let r = menu.reply, r.action != .send` then the button reads `r.label ?? "Send"`, is enabled by `r.armed`, and runs `OmniCommands.run(r.action, in: thread, client:)`; clear the draft after. For a plain send the button is enabled by non-empty text as before.
 
 The overlay sits above the composer, like the Web UI's, not at the caret: `TextEditor` gives no caret rectangle. If the keys do not reach `.onKeyPress` because the text view takes them first, move the modifier's key closure to the text view's own handler and call `menu.handle(_:)`.
+## Home, Channel, Search and Go to (#68)
+
+- Screens: `HomeScreen`, `ChannelScreen`, `SearchScreen`, `PaletteView` (⌘K overlay in `MainWindow`), `UsageCard` (sidebar footer). Shared rows and day groups in `ThreadListViews.swift`.
+- Pure logic in OmniKit: `NavigationHistory` and `ShellState` (history, palette open, composer focus; `AppModel.shell`, `goBack`, `goForward`, `startNewThread`), `ThreadFilter` and `ThreadListing` (filter rules, day groups, channel list merge), `Palette` (items and ranking), `SearchHit` and `Snippet` (`<mark>` runs), `UsageMeter` (thresholds 70% warn, 90% bad).
+- `AppModel.route` has a `didSet` that records history; Back and Forward set the route, which the history ignores as already current.
+- `QuickComposer` is a stand-in: prompt, channel picker, send with ⌘↩. Swap it for the #65 new-thread composer in `HomeScreen` and `ChannelScreen`.
+- Search opens the thread, not the match: `/api/search` returns no event id.
+- Channel Settings and PRs tabs are placeholders. Go menu: Back ⌘[, Forward ⌘], Go to ⌘K.
+- QA step `{"palette": "query"}` opens the palette (`false` closes). Close it before opening with a new query.
+
+## Channel settings (#71)
+
+- `ChannelForm` (OmniKit) holds the form, `slugify`, the validation messages and the PATCH and POST bodies. Empty text goes as `null`, so clearing a field clears it; the store domain is cut to the host; a system channel sends no `kind`. `OmniClient.createChannel`, `updateChannel`, `setChannelArchived`.
+- `ChannelSettingsView.swift`: `ChannelSettingsForm` (create and edit, folder pickers for repo path and base dir, inline Archive confirm), `NewChannelScreen` (`#/new-channel`, a page as in the Web UI, not a sheet) and `MissingChannelView` (archived channel: Unarchive). The channel's Settings tab shows the form. After a save the store reloads channels.
+- QA step `{"channel": "create"}` (or `edit`, `archive`, `unarchive`) runs the same client calls on channel `qa-channel`.
 
 ## Next
 

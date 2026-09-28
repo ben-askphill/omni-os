@@ -143,6 +143,11 @@ public struct OmniClient: Sendable {
     try await send("GET", "/api/recent", query: limit.map { [("limit", String($0))] } ?? [])
   }
 
+  /// Full-text search over every thread: prefix matches, at most 40, best first.
+  public func search(_ query: String) async throws(OmniAPIError) -> [SearchHit] {
+    try await send("GET", "/api/search", query: [("q", query)])
+  }
+
   /// A thread with its transcript, artifacts, children, parent and pending messages.
   public func thread(_ id: String) async throws(OmniAPIError) -> ThreadDetail {
     try await send("GET", "/api/threads/\(uriComponent(id))")
