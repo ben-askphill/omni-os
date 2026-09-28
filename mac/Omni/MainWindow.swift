@@ -78,6 +78,10 @@ struct DetailView: View {
       ServerView(model: model, screen: screen)
     } else if case .thread(let id, _) = model.route {
       ThreadScreen(model: model, id: id)
+    } else if case .home = model.route {
+      NewThreadScreen(model: model, channelID: nil)
+    } else if case .channel(let id, .threads, _) = model.route {
+      NewThreadScreen(model: model, channelID: id)
     } else {
       RoutePlaceholder(route: model.route, title: model.route.title { model.store.channel($0)?.name }) {
         model.route = .home

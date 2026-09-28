@@ -166,6 +166,13 @@ final class QARunner {
           case .stop: await model.stopServer()
           case .check: await model.checkAgain()
           }
+        case .type(let text):
+          guard let composer = QAComposerProbe.current else { throw QAScriptError("no reply box is showing") }
+          composer.setText(text)
+          try? await Task.sleep(for: .milliseconds(300))
+        case .send(let mode):
+          guard let composer = QAComposerProbe.current else { throw QAScriptError("no reply box is showing") }
+          try await composer.send(mode)
         case .quit:
           finish(result, started)
           await end()
@@ -220,6 +227,8 @@ final class QARunner {
     case .appearance(let appearance): "appearance \(appearance.rawValue)"
     case .scroll(let scroll): "scroll \(scroll.rawValue)"
     case .expand: "expand"
+    case .type(let text): "type \(text.prefix(40))"
+    case .send(let mode): "send \(mode?.rawValue ?? "reply")"
     case .quit: "quit"
     }
   }

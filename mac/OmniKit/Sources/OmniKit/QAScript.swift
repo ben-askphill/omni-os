@@ -32,7 +32,8 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`,
 /// `{"server": "start"}` (or `stop`, `check`), `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or
-/// `bottom`, `through`), `{"expand": true}`, `{"quit": true}`.
+/// `bottom`, `through`), `{"expand": true}`, `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`,
+/// `interrupt`), `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -48,6 +49,10 @@ public enum QAStep: Hashable, Sendable {
   case scroll(QAScroll)
   /// Opens the open thread's tool groups, and the calls in them that failed or have sub-calls.
   case expand
+  /// Puts text in the reply box, as if typed.
+  case type(String)
+  /// Sends the reply box: nil is a plain reply, else the mode of the split button.
+  case send(SendMode?)
   case quit
 
   static let defaultTimeout = Duration.seconds(10)
@@ -135,7 +140,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "server", "appearance", "scroll", "expand", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "server", "appearance", "scroll", "expand", "type", "send", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -183,6 +188,14 @@ public struct QAScript: Hashable, Sendable {
       return .scroll(to)
     case "expand":
       return .expand
+    case "type":
+      guard let text = value as? String else { throw QAScriptError("type takes the text for the reply box") }
+      return .type(text)
+    case "send":
+      guard let name = value as? String, ["reply", "steer", "queue", "interrupt"].contains(name) else {
+        throw QAScriptError("send takes reply, steer, queue or interrupt")
+      }
+      return .send(name == "reply" ? nil : SendMode(rawValue: name))
     default:
       return .quit
     }

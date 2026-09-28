@@ -379,3 +379,18 @@ What the tracer's QA run covered (each checked by eye in the PNGs): the sidebar 
 - The quit dialog (#74) can call `stopServer()` when `state` is `.running(startedByApp: true, _)`. Threads in their own windows are #75.
 - `Route(hash:)` and `route.hash` mirror `parseHash` and `href` in the Web UI. Use them for deep links, open in browser and window restoration. PR and artifact numbers parse as `Int` only.
 - New endpoints: add a method to `OmniClient`, a stub test in `ClientTests.swift` and, if the app depends on its shape, a fixture.
+
+## Reply composer (#64)
+
+- OmniKit: `SendRules` (steer/queue/interrupt per harness, `EscapeGate` for Esc), `Attachments.swift` (`StagedFile`, `AttachmentRules.add`: 10 files, `maxUploadMb`, empty files dropped, Web UI wording), `DraftStore` (one file per key in `~/Library/Application Support/Omni/Drafts`), `ReplyComposerModel` (text as draft, staged files, send, Open PR), `OmniClient.reply(to:prompt:mode:files:)` (JSON, or multipart with a `payload` field and `files` parts when there are files; an idle thread sends no `mode`).
+- App: `ComposerTextView.swift` (AppKit text view: IME, spellcheck, undo, grows to 240pt, Cmd-Return and Shift-Cmd-Return in `performKeyEquivalent`, Esc in `cancelOperation`, file drop and paste, screenshot paste to a temp `image.png`), `ComposerView.swift` (`ReplyComposerHost` is the one line in the thread screen; split Steer button; paperclip; Open PR; toolbar Interrupt), `ThreadCommands.swift` (Thread > Interrupt, Cmd-period). If another slice adds a "Thread" menu, merge the two.
+- QA steps: `{"type": "text"}` fills the reply box, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`) sends it. `QARunner` also got a stub for `.expand`, which the tree did not handle (Debug build failed on it); replace it with the real one.
+- Not built: the slash menu (Esc gating has a slot for it), scroll-to-bottom on send.
+
+## New thread (#65)
+
+- OmniKit: `NewThreadRules.swift` (`NewThreadChoice`, role/channel/model preset rules and the request body, `EffortRules`, `ModelSearch`, all mirroring `NewThreadComposer` and `ModelPicker` in the Web UI), `NewThreadComposerModel` (draft per channel in `DraftStore` under `new:<channel>` or `new:*`, staged files, send), `Client+NewThread.swift` (`createThread(_:files:)`, JSON or multipart with a `payload` field).
+- App: `NewThreadView.swift`. `NewThreadComposerView(model:channelID:big:)` is the embeddable composer (`big` is Home's 96 to 360pt, else 60 to 260pt); `NewThreadScreen` wraps it. `DetailView` shows the screen for Home and a channel's Threads tab until those screens are built; when they are, embed `NewThreadComposerView` in them and drop the two branches.
+- Sending opens the thread (`model.route = .thread`). Model changes reset effort to default; an effort the model does not take is never sent.
+- QA: `{"type": "..."}` and `{"send": "reply"}` drive the new-thread box too (`QAComposerProbe`, which now has an `owner` so a box that leaves after its successor appeared does not clear the hooks).
+- `ComposerTextView` got `heightRange` and `label`; `SendButton` a `title`; `AttachmentStrip` and `SendButton` are no longer private.

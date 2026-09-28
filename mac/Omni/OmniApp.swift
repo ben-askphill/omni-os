@@ -76,6 +76,7 @@ struct OmniCommands: Commands {
       .keyboardShortcut("c", modifiers: [.command, .shift])
       .disabled(model.openThread == nil)
     }
+    ThreadCommands(model: model)
     CommandMenu("Server") {
       ServerMenuItems(model: model, shortcuts: true)
     }
