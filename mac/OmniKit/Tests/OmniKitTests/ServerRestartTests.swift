@@ -10,6 +10,7 @@ private final class FakeHost: RestartHost {
   var stopError: String?
   var startError: String?
   var onBuild: (() -> Void)?
+  var onTurns: ((Int) -> Void)?
 
   init(turns: [Int]) { self.turns = turns }
 
@@ -17,6 +18,7 @@ private final class FakeHost: RestartHost {
   func runningTurns() async -> Int {
     let n = turns.count > 1 ? turns.removeFirst() : (turns.first ?? 0)
     calls.append("turns \(n)")
+    onTurns?(n)
     return n
   }
   func buildWeb() async -> String? { calls.append("build"); onBuild?(); return buildError }
@@ -91,5 +93,19 @@ private final class FakeHost: RestartHost {
     await done.value
     #expect(restart.step == .idle)
     #expect(!host.calls.contains("build"))
+  }
+
+  @Test func aCancelWhileTheCountIsBeingReadStillCancels() async throws {
+    let host = FakeHost(turns: [1, 0])
+    let clock = TestClock()
+    let restart = ServerRestart(host: host, clock: clock)
+    host.onTurns = { n in if n == 0 { restart.cancel() } }
+    let done = Task { await restart.run() }
+    try await waitFor("waiting") { restart.step == .waitingForIdle(running: 1) }
+    clock.advance(by: .seconds(2))
+    await done.value
+    #expect(restart.step == .idle)
+    #expect(!host.calls.contains("build"))
+    #expect(!host.calls.contains("stop"))
   }
 }

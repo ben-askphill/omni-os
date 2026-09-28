@@ -88,7 +88,8 @@ public final class AppModel {
   /// The open threads' stores, fed from `store`'s feed. Swapped with it on a port change.
   public private(set) var threads: ThreadStoreRegistry
   public var route = Route.home {
-    didSet { shell.history.visit(route) }
+    // A route that lives in Settings is put back at once, so it is no stop in the history.
+    didSet { if route.settingsTab == nil { shell.history.visit(route) } }
   }
   /// History, the Go to palette and composer focus.
   public let shell = ShellState()
@@ -207,35 +208,41 @@ public final class AppModel {
     await supervisor.start()
     switch supervisor.state {
     case .failed(let message, let tail): startFailure = StartFailure(message: message, logTail: tail)
-    case .running: store.reconnectNow()
+    case .running: reconnectStreams()
     default: break
     }
   }
 
-  public func stopServer() async {
-    await supervisor.stop()
+  /// - Parameter ownOnly: see `ServerSupervisor.stop(ownOnly:)`.
+  public func stopServer(ownOnly: Bool = false) async {
+    await supervisor.stop(ownOnly: ownOnly)
   }
 
   /// Checks the port again and retries the feed now.
   public func checkAgain() async {
-    store.reconnectNow()
+    reconnectStreams()
     await refreshServer()
   }
 
   /// The app came to the front: a feed quiet for longer than the server's ping interval is likely dead.
   public func didBecomeActive() {
-    store.reconnectNow(ifQuietFor: .seconds(25))
+    reconnectStreams(ifQuietFor: .seconds(25))
     checkServer()
   }
 
   /// The Mac woke from sleep. Connections from before rarely survive it.
   public func didWake() {
-    store.reconnectNow()
+    reconnectStreams()
     checkServer()
   }
 
   public func networkChanged() {
-    store.reconnectNow()
+    reconnectStreams()
+  }
+
+  private func reconnectStreams(ifQuietFor quiet: Duration? = nil) {
+    store.reconnectNow(ifQuietFor: quiet)
+    threads.reconnectNow(ifQuietFor: quiet)
   }
 
   // MARK: Following changes
@@ -263,6 +270,7 @@ public final class AppModel {
     startFailure = nil
     if portChanged {
       store.stop()
+      threads.stopAll()
       let c = connect(new.port)
       client = c.client
       store = c.store

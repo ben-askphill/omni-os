@@ -49,6 +49,9 @@ public final class ShellState {
   public var paletteQuery = ""
   /// Bumped to ask the composer on screen to take focus.
   public private(set) var composerFocus = 0
+  /// The settings a new-thread composer takes when it opens (`/clear`, `/new`, "New thread on another model"). The
+  /// composer of that channel clears it.
+  public var newThreadPreset: NewThreadPreset?
 
   public init() {}
 
@@ -73,5 +76,12 @@ extension AppModel {
   public func startNewThread() {
     route = route.newThreadRoute
     shell.requestComposerFocus()
+  }
+
+  /// Opens the channel's new-thread composer set up from `preset`, as `openNewThread` in web/src/router.ts.
+  public func openNewThread(_ preset: NewThreadPreset) {
+    shell.newThreadPreset = preset
+    route = .channel(id: preset.channel)
+    if !preset.pickModel { shell.requestComposerFocus() }
   }
 }

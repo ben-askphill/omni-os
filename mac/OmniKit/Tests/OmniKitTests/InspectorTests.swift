@@ -42,11 +42,15 @@ private func list(_ items: [(Int, String)]) throws -> [Artifact] { try items.map
     "http://127.1.2.3/", "http://0.0.0.0:80/", "http://[::1]/", "http://[::ffff:7f00:1]/", "http://100.64.0.1/", "http://100.100.5.5:8080/",
     "http://100.127.255.255/", "https://bens-mac.tail1234.ts.net/", "http://192.168.1.20:4747/api", "http://bens-mac.local:4747/",
     "ws://localhost:4747/api/feed", "http://user@127.0.0.1/", "http://2130706433/", "http://0x7f.1/",
+    "http://localhost.:3000/", "https://x.localhost./", "https://bens-mac.tail1234.ts.net./", "http://u@localhost.:80/",
+    "http://[fd7a:115c:a1e0:ab12:4843:cd96:6265:1234]/", "http://[fd7a:115c:a1e0::1]:3000/",
+    "http://bens-mac/", "http://bens-mac:8080/x", "http://bens-mac.local/", "http://u@bens-mac.local:9000/",
   ]
   static let allowed = [
     "https://example.com/", "https://cdn.jsdelivr.net/npm/x.js", "http://100.63.255.255/", "http://100.128.0.1/", "http://101.64.0.1/",
     "https://example.com:47470/", "http://notlocalhost.com/", "https://ts.net.example.com/", "data:text/html,hi", "omni-artifact://5/a.html",
-    "http://192.168.1.20:8080/",
+    "http://192.168.1.20:8080/", "https://example.com./", "http://[fd7b:115c:a1e0::1]/",
+    "https://[2001:db8::1]/", "https://example.local.example.com/", "https://locale.example.com/", "https://a.b/",
   ]
 
   @Test(arguments: blocked) func blocksThePrivateWay(_ text: String) throws {

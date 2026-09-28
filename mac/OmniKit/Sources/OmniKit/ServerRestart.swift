@@ -101,6 +101,8 @@ public final class ServerRestart {
   private func waitForIdle() async throws {
     while true {
       let running = await host.runningTurns()
+      // A Cancel that came while the count was read still counts: nothing is built or stopped after it.
+      try Task.checkCancellation()
       if running == 0 { return }
       step = .waitingForIdle(running: running)
       try await ticker.sleep(ticker.now() + pollEvery)

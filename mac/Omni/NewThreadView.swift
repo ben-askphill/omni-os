@@ -54,19 +54,34 @@ struct NewThreadComposerView: View {
   /// Made on first use: reading the draft is a file read.
   @MainActor private final class ComposerBox {
     var composer: NewThreadComposerModel?
+    var menu: SlashMenuModel?
   }
 
   var body: some View {
     let composer = box.composer ?? NewThreadComposerModel(fixedChannel: channelID, api: model.client)
     box.composer = composer
-    return NewThreadBox(model: model, composer: composer, big: big)
+    let menu = box.menu ?? SlashMenuModel(
+      commands: SlashCommandsStore(api: model.client, source: Self.source(composer.choice)), placement: .newThread,
+      harness: composer.choice.harness.rawValue)
+    box.menu = menu
+    // The menu's box overflows below the composer, over what follows it.
+    return NewThreadBox(model: model, composer: composer, menu: menu, big: big).zIndex(1)
+  }
+
+  /// The list a thread started with these pickers would read its commands from.
+  static func source(_ c: NewThreadChoice) -> CommandsSource {
+    .newThread(harness: c.harness.rawValue, channel: c.channel)
   }
 }
 
 private struct NewThreadBox: View {
   let model: AppModel
   @Bindable var composer: NewThreadComposerModel
+  let menu: SlashMenuModel
   let big: Bool
+  @State private var caret: CaretRequest?
+  @State private var pickerRequest = 0
+  @State private var focusTick = 0
   @State private var focused = false
   @State private var over = false
   @State private var picking = false
@@ -103,7 +118,10 @@ private struct NewThreadBox: View {
     .onAppear {
       QAComposerProbe.owner = ObjectIdentifier(composer)
       QAComposerProbe.current = QAComposerProbe.Hooks(
-        setText: { composer.text = $0 },
+        setText: {
+          composer.text = $0
+          focusTick += 1
+        },
         send: { _ throws(QAScriptError) in
           guard composer.canSend else { throw QAScriptError("the new thread box has nothing to send") }
           guard let t = await composer.send() else { throw QAScriptError(composer.sendError ?? "the send failed") }
@@ -116,6 +134,24 @@ private struct NewThreadBox: View {
     #endif
     .onChange(of: lists, initial: true) { _, l in
       composer.update(crew: l.crew, channels: l.channels, harnesses: l.harnesses)
+    }
+    .onAppear {
+      menu.onEdit = { text, at in
+        composer.text = text
+        caret = CaretRequest(id: (caret?.id ?? 0) + 1, offset: at)
+      }
+      takePreset()
+    }
+    .onChange(of: model.shell.newThreadPreset) { takePreset() }
+    // Another harness or channel has its own list.
+    .onChange(of: NewThreadComposerView.source(composer.choice), initial: true) { _, source in
+      menu.commands.source = source
+      menu.harness = composer.choice.harness.rawValue
+      if menu.isOpen || menu.hint != nil { Task { await menu.commands.load() } }
+    }
+    // Text set from outside the box (a sent or cleared draft) reaches the menu with the caret at the end.
+    .onChange(of: composer.text) { _, text in
+      if menu.text != text { menu.update(text: text, caret: text.utf16.count) }
     }
     .onChange(of: model.store.status?.maxUploadMb, initial: true) { _, mb in
       composer.maxUploadMB = mb ?? AttachmentRules.defaultMaxMB
@@ -130,12 +166,16 @@ private struct NewThreadBox: View {
     return VStack(alignment: .leading, spacing: 0) {
       if !composer.files.isEmpty { AttachmentStrip(files: composer.files, remove: composer.removeFile) }
       ComposerTextView(
-        text: $composer.text, placeholder: placeholder, running: false, interrupting: false, focusTick: 0,
-        callbacks: callbacks, heightRange: range, label: "New thread")
+        text: $composer.text, placeholder: placeholder, running: false, interrupting: false, focusTick: focusTick,
+        callbacks: callbacks, heightRange: range, label: "New thread", caretRequest: caret)
       if let e = composer.attachError {
         Text(e).font(.system(size: 12)).foregroundStyle(ThreadStyle.bad).padding(.horizontal, 16).padding(.bottom, 4)
       }
       footer
+      SlashHintView(model: menu) {}
+        .padding(.horizontal, 16)
+        .padding(.bottom, menu.hint == nil ? 0 : 10)
+        .padding(.top, menu.hint == nil ? 0 : 2)
     }
     .background(Color(nsColor: .textBackgroundColor).opacity(0.6), in: RoundedRectangle(cornerRadius: radius))
     .overlay {
@@ -156,6 +196,7 @@ private struct NewThreadBox: View {
     } isTargeted: {
       over = $0
     }
+    .slashMenu(menu, below: true)
   }
 
   private var footer: some View {
@@ -174,7 +215,7 @@ private struct NewThreadBox: View {
       roleMenu
       ModelPickerButton(
         harnesses: composer.harnesses, choice: composer.choice,
-        pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses)
+        pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest)
       effortMenu
       Spacer(minLength: 8)
       Text("⌘↩").font(.system(size: 11.5)).foregroundStyle(.tertiary).accessibilityHidden(true)
@@ -265,7 +306,20 @@ private struct NewThreadBox: View {
       files: { stage($0) },
       image: { stagePasted($0) },
       dragTargeted: { over = $0 },
-      focusChanged: { focused = $0 })
+      focusChanged: {
+        focused = $0
+        menu.setFocused($0)
+      },
+      slash: { menu.handle($0) },
+      edited: { menu.update(text: $0, caret: $1) })
+  }
+
+  /// A preset waiting for this channel's composer (`/clear`, `/new`, "New thread on another model"): take it once.
+  private func takePreset() {
+    guard let preset = model.shell.newThreadPreset, preset.channel == composer.fixedChannel else { return }
+    model.shell.newThreadPreset = nil
+    composer.apply(preset)
+    if preset.pickModel { pickerRequest += 1 }
   }
 
   private func start() {
@@ -326,6 +380,8 @@ private struct ModelPickerButton: View {
   let choice: NewThreadChoice
   let pick: (HarnessID, String) -> Void
   let refresh: () -> Void
+  /// Bumped to open the list, for "New thread on another model".
+  var openRequest = 0
   @State private var open = false
   @State private var query = ""
 
@@ -350,6 +406,11 @@ private struct ModelPickerButton: View {
     .help("Model")
     .accessibilityLabel("Model: \(c.model?.label ?? "none")\(c.harness.map { " on \($0.name)" } ?? "")")
     .popover(isPresented: $open, arrowEdge: .bottom) { list }
+    .onChange(of: openRequest) {
+      query = ""
+      open = true
+      refresh()
+    }
   }
 
   private func pill(_ c: (harness: HarnessInfo?, model: ModelEntry?), harness: Bool) -> some View {

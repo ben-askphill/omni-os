@@ -455,6 +455,13 @@ Wiring it into the composer (mac/Omni/SlashMenuDemo.swift is a working example, 
 5. Send: `if let r = menu.reply, r.action != .send` then the button reads `r.label ?? "Send"`, is enabled by `r.armed`, and runs `OmniCommands.run(r.action, in: thread, client:)`; clear the draft after. For a plain send the button is enabled by non-empty text as before.
 
 The overlay sits above the composer, like the Web UI's, not at the caret: `TextEditor` gives no caret rectangle. If the keys do not reach `.onKeyPress` because the text view takes them first, move the modifier's key closure to the text view's own handler and call `menu.handle(_:)`.
+Wired (both composers):
+
+- `ComposerCallbacks` got `slash` (arrows, Return, Tab from the text view's `doCommandBy`, Esc from `cancelOperation`; not while an input method composes) and `edited` (text and caret on every change, selection move and focus). `CaretRequest` sets the caret after a pick. `.slashMenu(menu)` is on the composer's shell for its overlay; its key handler never sees the keys because the AppKit text view takes them first.
+- Reply box: `menu.reply` decides the Send button (`Rename`, `New thread`, ...) and Cmd-Return; `runOmni()` calls `OmniKit.OmniCommands.run` (qualified: the app has its own `OmniCommands: Commands`). `/model`, `/effort`, `/fast` show the hint with "New thread on another model".
+- New thread: `.slashMenu(menu, below: true)`; `menu.commands.source` and `menu.harness` follow the pickers. `AppModel.openNewThread(preset)` puts the preset in `shell.newThreadPreset` and opens the channel; that channel's composer takes it (`NewThreadComposerModel.apply`) and opens the model list for `pickModel`.
+- QA: `{"type": ...}` also focuses the box. In this environment, opening a thread with `{"route": "#/t/<id>"}` crashes the app (window constraint loop) on main too; use `{"openThread": "<id>"}` and read `-window1.png`.
+
 ## Home, Channel, Search and Go to (#68)
 
 - Screens: `HomeScreen`, `ChannelScreen`, `SearchScreen`, `PaletteView` (⌘K overlay in `MainWindow`), `UsageCard` (sidebar footer). Shared rows and day groups in `ThreadListViews.swift`.

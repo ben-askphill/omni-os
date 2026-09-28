@@ -15,7 +15,9 @@ public enum RequestPolicy {
   }
 
   static func isPrivate(host raw: String) -> Bool {
-    let host = raw.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+    var host = raw.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+    // "localhost." is the same name to the resolver, and WebKit keeps the dot.
+    while host.hasSuffix(".") { host.removeLast() }
     if host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".ts.net") { return true }
     if host.contains(":") {
       var addr = in6_addr()
@@ -23,12 +25,17 @@ public enum RequestPolicy {
       let bytes = withUnsafeBytes(of: addr) { Array($0) }
       let loopback = bytes.dropLast().allSatisfy { $0 == 0 } && bytes.last == 1
       let unspecified = bytes.allSatisfy { $0 == 0 }
+      // The tailnet's own IPv6 range, fd7a:115c:a1e0::/48.
+      let tailnet = bytes.prefix(6).elementsEqual([0xfd, 0x7a, 0x11, 0x5c, 0xa1, 0xe0])
       let mapped = bytes.prefix(10).allSatisfy { $0 == 0 } && bytes[10] == 0xff && bytes[11] == 0xff
-      return loopback || unspecified || (mapped && isPrivateV4(bytes[12], bytes[13]))
+      return loopback || unspecified || tailnet || (mapped && isPrivateV4(bytes[12], bytes[13]))
     }
     // inet_aton also reads 2130706433, 0x7f.1 and the other spellings a browser turns into 127.0.0.1.
     var v4 = in_addr()
-    guard inet_aton(host, &v4) == 1 else { return false }
+    guard inet_aton(host, &v4) == 1 else {
+      // A name with no dot (a tailnet or LAN machine by its short name) or under .local (this Mac by its Bonjour name).
+      return !host.contains(".") || host.hasSuffix(".local")
+    }
     let n = UInt32(bigEndian: v4.s_addr)
     return isPrivateV4(UInt8(n >> 24), UInt8((n >> 16) & 0xff))
   }
@@ -41,13 +48,14 @@ public enum RequestPolicy {
   /// per spelling. WebKit hands it URLs already in canonical form.
   public static func ruleListJSON(omniPort: Int) -> String {
     let hosts = [
-      #"localhost"#, #"[^/:@]*\.localhost"#, #"[^/:@]*\.ts\.net"#, #"127\.[0-9.]+"#, #"0\.0\.0\.0"#,
+      #"localhost"#, #"[^/:@]*\.localhost"#, #"[^/:@]*\.ts\.net"#, #"[^/:@]*\.local"#, #"[^/.:@\[]+"#, #"127\.[0-9.]+"#, #"0\.0\.0\.0"#,
       #"\[::1\]"#, #"\[::\]"#, #"\[::ffff:7f[0-9a-f]*:[0-9a-f]+\]"#, #"\[::ffff:[0-9a-f]+:[0-9a-f]+\]"#,
+      #"\[fd7a:115c:a1e0:[0-9a-f:]*\]"#,
       #"100\.6[4-9]\.[0-9.]+"#, #"100\.[7-9][0-9]\.[0-9.]+"#, #"100\.1[01][0-9]\.[0-9.]+"#, #"100\.12[0-7]\.[0-9.]+"#,
     ]
     var filters: [String] = []
     for prefix in [#"^[a-z]+://"#, #"^[a-z]+://[^/]*@"#] {
-      for host in hosts { filters.append(prefix + host + #"[:/]"#) }
+      for host in hosts { filters.append(prefix + host + #"\.?[:/]"#) }
     }
     filters.append(#"^[a-z]+://[^/]*:\#(omniPort)/"#)
     let rules = filters.map { #"{"trigger":{"url-filter":"\#(jsonEscape($0))"},"action":{"type":"block"}}"# }

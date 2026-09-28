@@ -55,11 +55,12 @@ private struct SandboxedWebView: NSViewRepresentable {
   let rules: WKContentRuleList
   let port: Int
 
-  func makeCoordinator() -> ArtifactWebHost { ArtifactWebHost(client: client, ref: ref, port: port) }
+  func makeCoordinator() -> ArtifactWebHost { ArtifactWebHost(client: client, ref: ref, port: port, opensLinks: true) }
 
   func makeNSView(context: Context) -> WKWebView {
     let config = WKWebViewConfiguration()
     config.websiteDataStore = .nonPersistent()
+    config.preferences.javaScriptCanOpenWindowsAutomatically = false
     config.userContentController.add(rules)
     config.setURLSchemeHandler(context.coordinator, forURLScheme: RequestPolicy.scheme)
     let web = WKWebView(frame: .zero, configuration: config)
@@ -76,18 +77,22 @@ private struct SandboxedWebView: NSViewRepresentable {
   func updateNSView(_ web: WKWebView, context: Context) {}
 }
 
-/// Serves the artifact to its page and decides where links go.
+/// Serves the artifact to its page and decides where links go. Links open in the default browser only from a
+/// view Ben looks at (`opensLinks`) and only when a link is followed: a page that redirects itself, or one
+/// drawn for a thumbnail, never starts the browser.
 @MainActor
 final class ArtifactWebHost: NSObject, WKURLSchemeHandler, WKNavigationDelegate, WKUIDelegate {
   private let client: OmniClient
   private let ref: ArtifactRef
   private let port: Int
+  private let opensLinks: Bool
   private var active: Set<ObjectIdentifier> = []
 
-  init(client: OmniClient, ref: ArtifactRef, port: Int) {
+  init(client: OmniClient, ref: ArtifactRef, port: Int, opensLinks: Bool = false) {
     self.client = client
     self.ref = ref
     self.port = port
+    self.opensLinks = opensLinks
   }
 
   var pageURL: URL {
@@ -145,8 +150,13 @@ final class ArtifactWebHost: NSObject, WKURLSchemeHandler, WKNavigationDelegate,
       // Its own page, or a jump inside it.
       return !mainFrame || url.path() == pageURL.path() ? .allow : .cancel
     }
-    if !mainFrame, action.targetFrame != nil, action.navigationType == .other { return .allow }
-    openOutside(url)
+    // A frame inside the page loads what the rule list lets through. Not file: and the like.
+    if !mainFrame, action.targetFrame != nil, action.navigationType == .other,
+      ["http", "https", "about", "data", "blob"].contains(url.scheme?.lowercased() ?? "")
+    {
+      return .allow
+    }
+    if action.navigationType == .linkActivated { openOutside(url) }
     return .cancel
   }
 
@@ -159,7 +169,7 @@ final class ArtifactWebHost: NSObject, WKURLSchemeHandler, WKNavigationDelegate,
   }
 
   private func openOutside(_ url: URL) {
-    guard ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? ""), !RequestPolicy.isBlocked(url, omniPort: port) else { return }
+    guard opensLinks, ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? ""), !RequestPolicy.isBlocked(url, omniPort: port) else { return }
     NSWorkspace.shared.open(url)
   }
 }

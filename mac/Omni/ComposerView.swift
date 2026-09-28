@@ -14,12 +14,16 @@ struct ReplyComposerHost: View {
   /// Made on first use, once per thread screen: reading the draft is a file read.
   @MainActor private final class ReplyBox {
     var model: ReplyComposerModel?
+    var menu: SlashMenuModel?
   }
 
   var body: some View {
     let reply = box.model ?? ReplyComposerModel(threadID: store.id, api: model.client)
     box.model = reply
-    return ReplyComposerView(model: model, store: store, thread: thread, reply: reply)
+    let menu = box.menu ?? SlashMenuModel(
+      commands: SlashCommandsStore(api: model.client, source: .thread(store.id)), placement: .reply, harness: thread.harness.rawValue)
+    box.menu = menu
+    return ReplyComposerView(model: model, store: store, thread: thread, reply: reply, menu: menu)
     .frame(maxWidth: ThreadStyle.column)
     .padding(.horizontal, 24)
     .padding(.top, 4)
@@ -61,6 +65,10 @@ private struct ReplyComposerView: View {
   let store: ThreadStore
   let thread: OmniThread
   @Bindable var reply: ReplyComposerModel
+  let menu: SlashMenuModel
+  @State private var caret: CaretRequest?
+  @State private var omniBusy = false
+  @State private var omniError: String?
   @State private var focused = false
   @State private var over = false
   @State private var focusTick = 0
@@ -75,13 +83,16 @@ private struct ReplyComposerView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       if let e = store.actionError { ErrorNote(text: e.message) }
-      if let e = reply.sendError { ErrorNote(text: e) }
+      if let e = reply.sendError ?? omniError { ErrorNote(text: e) }
       shell
     }
     #if DEBUG
     .onAppear {
       QAComposerProbe.current = QAComposerProbe.Hooks(
-        setText: { reply.text = $0 },
+        setText: {
+          reply.text = $0
+          focusTick += 1
+        },
         send: { mode throws(QAScriptError) in
           guard reply.canSend else { throw QAScriptError("the reply box has nothing to send") }
           guard let t = await reply.send(mode: mode) else { throw QAScriptError(reply.sendError ?? "the send failed") }
@@ -92,6 +103,16 @@ private struct ReplyComposerView: View {
     #endif
     .onChange(of: model.store.status?.maxUploadMb, initial: true) { _, mb in
       reply.maxUploadMB = mb ?? AttachmentRules.defaultMaxMB
+    }
+    .onAppear {
+      menu.onEdit = { text, at in
+        reply.text = text
+        caret = CaretRequest(id: (caret?.id ?? 0) + 1, offset: at)
+      }
+    }
+    // Text set from outside the box (a sent or cleared draft) reaches the menu with the caret at the end.
+    .onChange(of: reply.text) { _, text in
+      if menu.text != text { menu.update(text: text, caret: text.utf16.count) }
     }
     .fileImporter(isPresented: $picking, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
       if case .success(let urls) = result { stage(urls) }
@@ -105,7 +126,7 @@ private struct ReplyComposerView: View {
       }
       ComposerTextView(
         text: $reply.text, placeholder: SendRules.placeholder(busy: busyThread), running: busyThread,
-        interrupting: store.interrupting, focusTick: focusTick, callbacks: callbacks
+        interrupting: store.interrupting, focusTick: focusTick, callbacks: callbacks, caretRequest: caret
       )
       .fixedSize(horizontal: false, vertical: false)
       if let e = reply.attachError {
@@ -116,6 +137,10 @@ private struct ReplyComposerView: View {
           .padding(.bottom, 4)
       }
       footer
+      SlashHintView(model: menu) { newThreadOnAnotherModel() }
+        .padding(.horizontal, 16)
+        .padding(.bottom, menu.hint == nil ? 0 : 10)
+        .padding(.top, menu.hint == nil ? 0 : 2)
     }
     .background(Color(nsColor: .textBackgroundColor).opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
     .overlay {
@@ -136,6 +161,7 @@ private struct ReplyComposerView: View {
     } isTargeted: {
       over = $0
     }
+    .slashMenu(menu)
   }
 
   private var footer: some View {
@@ -173,7 +199,9 @@ private struct ReplyComposerView: View {
         .font(.system(size: 11.5))
         .foregroundStyle(.tertiary)
         .accessibilityHidden(true)
-      if busyThread {
+      if let omni = menu.reply, omni.action != .send {
+        SendButton(title: omni.label ?? "Send", armed: omni.armed, sending: omniBusy) { runOmni() }
+      } else if busyThread {
         SteerButton(canSteer: canSteer, enabled: reply.canSend, sending: reply.sending) { send($0) }
       } else {
         SendButton(armed: reply.canSend, sending: reply.sending) { send(nil) }
@@ -187,9 +215,12 @@ private struct ReplyComposerView: View {
   private var callbacks: ComposerCallbacks {
     ComposerCallbacks(
       send: { interrupt in
+        if let omni = menu.reply, omni.action != .send { return runOmni() }
         send(SendRules.mode(busy: busyThread, canSteer: canSteer, shift: interrupt))
       },
       escape: { context in
+        var context = context
+        context.slashMenuOpen = menu.isOpen
         guard EscapeGate.interrupts(context) else { return false }
         Task { await store.interrupt() }
         return true
@@ -197,7 +228,42 @@ private struct ReplyComposerView: View {
       files: { stage($0) },
       image: { stagePasted($0) },
       dragTargeted: { over = $0 },
-      focusChanged: { focused = $0 })
+      focusChanged: {
+        focused = $0
+        menu.setFocused($0)
+      },
+      slash: { menu.handle($0) },
+      edited: { menu.update(text: $0, caret: $1) })
+  }
+
+  /// Send when the message starts with an Omni command: `/clear` and `/new` start a thread, `/rename` renames this one.
+  private func runOmni() {
+    guard let omni = menu.reply, omni.action != .send, omni.armed, !omniBusy else { return }
+    let raw = reply.text
+    omniBusy = true
+    omniError = nil
+    Task {
+      defer { omniBusy = false }
+      do {
+        guard let result = try await OmniKit.OmniCommands.run(omni.action, in: thread, client: model.client) else { return }
+        if reply.text == raw { reply.text = "" }
+        switch result {
+        case .openNewThread(let preset): model.openNewThread(preset)
+        case .threadCreated(let t): model.route = .thread(id: t.id)
+        case .renamed(let t): store.merge(t)
+        }
+      } catch let error as OmniAPIError {
+        omniError = error.message
+      } catch {
+        omniError = error.localizedDescription
+      }
+    }
+  }
+
+  /// `/model`, `/effort` and `/fast` can't change a running thread: offer a new one that picks its model.
+  private func newThreadOnAnotherModel() {
+    reply.text = ""
+    model.openNewThread(.otherModel(thread))
   }
 
   private func send(_ mode: SendMode?) {

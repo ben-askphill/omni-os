@@ -447,4 +447,16 @@ public final class ThreadStoreRegistry {
   public func apply(feed: FeedEvent) {
     for (store, _) in stores.values { store.apply(feed: feed) }
   }
+
+  /// Retries every open thread's stream now (wake, foreground, network change).
+  public func reconnectNow(ifQuietFor quiet: Duration? = nil) {
+    for (store, _) in stores.values { store.reconnectNow(ifQuietFor: quiet) }
+  }
+
+  /// Stops every store and forgets them, for a registry that is being replaced.
+  public func stopAll() {
+    let all = stores.values.map(\.store)
+    stores = [:]
+    for store in all { store.stop() }
+  }
 }

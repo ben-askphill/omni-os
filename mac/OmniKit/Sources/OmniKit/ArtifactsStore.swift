@@ -33,6 +33,8 @@ public final class ArtifactsStore {
   @ObservationIgnored private var feedTask: Task<Void, Never>?
   @ObservationIgnored private var reloadTimer: Task<Void, Never>?
   @ObservationIgnored private var loads = 0
+  /// Feed artifacts that arrived while a reload was out; nil when none is.
+  @ObservationIgnored private var sinceLoad: [Int: Artifact]?
   @ObservationIgnored private var opened = false
 
   /// - Parameter thread: the title and channel of a thread the caller knows, for an artifact of a thread
@@ -82,13 +84,18 @@ public final class ArtifactsStore {
     reloadTimer = nil
     loads += 1
     let mine = loads
+    sinceLoad = [:]
     do {
       let list = try await api.artifacts()
       guard mine == loads else { return }
       gallery = ArtifactGallery(list)
+      // Feed events that came while the list was out may be newer than it.
+      for a in (sinceLoad ?? [:]).values { _ = gallery.upsert(a, thread: thread) }
+      sinceLoad = nil
       loadState = .loaded
     } catch {
       guard mine == loads, error != .cancelled else { return }
+      sinceLoad = nil
       loadState = .failed(error)
     }
   }
@@ -101,6 +108,7 @@ public final class ArtifactsStore {
       opened = true
       if again { scheduleReload() }
     case .message(.artifact(let a)):
+      if sinceLoad != nil { sinceLoad?[a.id] = a }
       if gallery.upsert(a, thread: thread) == .needsReload { scheduleReload() }
     case .message:
       break

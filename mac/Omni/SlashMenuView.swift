@@ -86,7 +86,9 @@ private struct SlashRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
           Text("/\(command.name)")
             .font(.system(size: 13, weight: .medium, design: .monospaced))
-            .fixedSize()
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .layoutPriority(1)
           if let hint = command.argumentHint {
             Text(hint)
               .font(.system(size: 12, design: .monospaced))

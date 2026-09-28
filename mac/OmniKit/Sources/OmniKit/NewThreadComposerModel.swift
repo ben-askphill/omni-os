@@ -51,6 +51,18 @@ public final class NewThreadComposerModel {
     if settled != choice { choice = settled }
   }
 
+  /// Starts from a preset (`/clear` and `/new` in a thread): its role, harness, model and effort. A preset without a
+  /// model takes the harness's default.
+  public func apply(_ preset: NewThreadPreset) {
+    var c = choice
+    if fixedChannel == nil { c.channel = preset.channel }
+    c.role = preset.role
+    c.harness = preset.harness ?? .claudeCode
+    c.model = preset.model ?? ""
+    c.effort = preset.effort ?? ""
+    choice = NewThreadRules.settled(c, crew: crew, harnesses: harnesses)
+  }
+
   public func selectRole(_ id: String) {
     choice = NewThreadRules.selectingRole(
       id, from: choice, crew: crew, channels: channels, harnesses: harnesses, channelFixed: fixedChannel != nil)

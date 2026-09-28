@@ -55,6 +55,16 @@ public struct Usage: Decodable, Hashable, Sendable {
     case sevenDay = "seven_day"
     case updatedAt = "updated_at"
   }
+
+  /// Each field is optional: one the server sends in a shape this app does not know leaves it nil
+  /// instead of failing the whole status.
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    status = try? c.decodeIfPresent(String.self, forKey: .status)
+    fiveHour = try? c.decodeIfPresent(UsageWindow.self, forKey: .fiveHour)
+    sevenDay = try? c.decodeIfPresent(UsageWindow.self, forKey: .sevenDay)
+    updatedAt = try? c.decodeIfPresent(Date.self, forKey: .updatedAt)
+  }
 }
 
 public struct HarnessSlot: Decodable, Hashable, Sendable {

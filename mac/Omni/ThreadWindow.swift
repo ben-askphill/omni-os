@@ -51,6 +51,9 @@ struct ThreadWindowView: View {
     .onChange(of: model.route) {
       if activeState == .key { openWindow(id: "main") }
     }
+    .onChange(of: model.shell.paletteOpen) { _, open in
+      if open, activeState == .key { openWindow(id: "main") }
+    }
   }
 
   private var title: String {

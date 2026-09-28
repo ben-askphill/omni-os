@@ -12,6 +12,8 @@ struct ChannelSettingsForm: View {
   @State private var busy = false
   @State private var error: String?
   @State private var saved = false
+  /// The form as the server returned it, so setting it does not clear the Saved mark.
+  @State private var savedForm: ChannelForm?
   @State private var archiveError: String?
   @State private var confirmArchive = false
   @State private var archiving = false
@@ -34,7 +36,7 @@ struct ChannelSettingsForm: View {
       actions
       if let archiveError { ErrorNote(text: archiveError) }
     }
-    .onChange(of: form) { saved = false }
+    .onChange(of: form) { if form != savedForm { saved = false } }
   }
 
   private var basics: some View {
@@ -187,6 +189,7 @@ struct ChannelSettingsForm: View {
         let ch = try await model.client.updateChannel(existing.id, form, system: isSystem)
         await model.store.reloadChannels()
         form = ChannelForm(channel: ch)
+        savedForm = form
         saved = true
       } else {
         let ch = try await model.client.createChannel(form)

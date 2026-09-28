@@ -253,6 +253,21 @@ struct ServerSupervisorTests {
     #expect(rig.dir.read("logs/server.log").contains("SIGTERM, closing live sessions"))
   }
 
+  @Test func aStopForOwnServersOnlyLeavesAServerItDidNotStart() async throws {
+    let rig = Rig()
+    defer { rig.cleanUp() }
+    await rig.supervisor().start()
+    let other = rig.supervisor(record: rig.dir.path("other/server.json"))
+    await other.refresh()
+    let pid = try #require(other.state.running?.server?.pid, "\(other.state)")
+    #expect(other.state.running?.startedByApp == false)
+
+    await other.stop(ownOnly: true)
+    #expect(processAlive(Int32(pid)))
+    #expect(other.state.running?.startedByApp == false)
+    #expect(!portIsFree(rig.port))
+  }
+
   @Test func aPortHeldByAHungProgramFailsClearly() async throws {
     let listener = SilentListener()
     let rig = Rig(port: listener.port)

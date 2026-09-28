@@ -26,7 +26,6 @@ private struct ChannelView: View {
   let pr: Int?
 
   private var conductor: Bool { channel.id == SidebarSections.conductorID }
-  private var hasRepo: Bool { !conductor && (channel.githubRepo?.isEmpty == false || channel.repoPath?.isEmpty == false) }
 
   var body: some View {
     ScreenColumn {
@@ -39,14 +38,13 @@ private struct ChannelView: View {
           switch tab {
           case .threads:
             ChannelThreads(model: model, channel: channel)
-          case .prs where hasRepo:
-            EmptyNote(symbol: "arrow.triangle.pull", title: "Pull requests", message: "This tab is not built yet.")
           case .settings:
             ChannelSettingsForm(model: model, existing: channel.channel)
               .frame(maxWidth: 672, alignment: .leading)
               .id(channel.id)
-          default:
-            EmptyNote(symbol: "arrow.triangle.pull", title: "No repo", message: "Set a repo path in Settings to see pull requests.")
+          case .prs:
+            // The main window shows the PRs tab through PullRequestsScreen, under ChannelTabsBar.
+            EmptyView()
           }
         }
         .padding(.top, 24)
@@ -130,14 +128,46 @@ private struct ChannelView: View {
   }
 
   private var tabs: some View {
-    Picker("Channel tabs", selection: Binding(get: { tab }, set: { model.route = .channel(id: channel.id, tab: $0) })) {
+    ChannelTabsPicker(model: model, channelID: channel.id, tab: tab, conductor: conductor)
+  }
+}
+
+/// Threads, PRs and Settings, as Channel.tsx: PRs for every channel but the Conductor.
+private struct ChannelTabsPicker: View {
+  let model: AppModel
+  let channelID: String
+  let tab: ChannelTab
+  let conductor: Bool
+
+  var body: some View {
+    Picker("Channel tabs", selection: Binding(get: { tab }, set: { model.route = .channel(id: channelID, tab: $0) })) {
       Text("Threads").tag(ChannelTab.threads)
-      if hasRepo { Text("PRs").tag(ChannelTab.prs) }
+      if !conductor { Text("PRs").tag(ChannelTab.prs) }
       Text("Settings").tag(ChannelTab.settings)
     }
     .pickerStyle(.segmented)
     .labelsHidden()
     .fixedSize()
+  }
+}
+
+/// The channel's name and tabs above the PRs screens, so the other tabs stay one click away.
+struct ChannelTabsBar: View {
+  let model: AppModel
+  let channelID: String
+
+  var body: some View {
+    if let channel = model.store.channel(channelID) {
+      let conductor = channel.id == SidebarSections.conductorID
+      HStack(spacing: 10) {
+        ChannelAvatar(name: channel.name, conductor: conductor, size: 24)
+        Text(conductor ? channel.name : "#\(channel.name)").font(.headline).lineLimit(1)
+        Spacer()
+        ChannelTabsPicker(model: model, channelID: channel.id, tab: .prs, conductor: conductor)
+      }
+      .padding(.horizontal, 24)
+      .padding(.top, 12)
+    }
   }
 }
 
@@ -172,6 +202,7 @@ private struct ChannelThreads: View {
     let threads = ThreadListing.merging(loaded: loaded ?? [], live: model.store.recent, channel: channel.id)
     VStack(alignment: .leading, spacing: 32) {
       NewThreadComposerView(model: model, channelID: channel.id)
+        .id(channel.id)
       if let error, loaded == nil {
         ErrorNote(text: error) { Task { await load() } }
       } else if loaded == nil {

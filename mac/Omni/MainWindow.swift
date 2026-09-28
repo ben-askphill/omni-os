@@ -119,7 +119,10 @@ struct DetailView: View {
     } else if case .home = model.route {
       HomeScreen(model: model)
     } else if case .channel(let id, .prs, let pr) = model.route {
-      PullRequestsScreen(model: model, channelID: id, number: pr)
+      VStack(spacing: 0) {
+        ChannelTabsBar(model: model, channelID: id)
+        PullRequestsScreen(model: model, channelID: id, number: pr)
+      }
     } else if case .channel(let id, let tab, let pr) = model.route {
       ChannelScreen(model: model, id: id, tab: tab, pr: pr)
     } else if case .newChannel = model.route {

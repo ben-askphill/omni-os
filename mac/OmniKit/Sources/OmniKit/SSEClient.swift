@@ -49,6 +49,8 @@ public struct URLSessionSSETransport: SSETransport {
       c.requestCachePolicy = .reloadIgnoringLocalCacheData
       c.timeoutIntervalForRequest = 90
       c.httpMaximumConnectionsPerHost = 32
+      // The server is local: never through a system proxy.
+      c.connectionProxyDictionary = [:]
       return URLSession(configuration: c)
     }()
   }
@@ -101,6 +103,8 @@ public final class SSEClient<Message: Sendable>: Sendable {
     var lastActivity = Duration.zero
     var cursor: String?
     var seen: Set<String> = []
+    /// `seen` in arrival order, so it can be trimmed: a replay only ever overlaps the recent past.
+    var seenOrder: [String] = []
   }
 
   private let continuation: AsyncStream<SSEEvent<Message>>.Continuation
@@ -313,6 +317,11 @@ public final class SSEClient<Message: Sendable>: Sendable {
       guard s.phase != .closed else { return }
       if let id = m.id, !id.isEmpty {
         guard s.seen.insert(id).inserted else { return }
+        s.seenOrder.append(id)
+        if s.seenOrder.count > 4096 {
+          for old in s.seenOrder.prefix(2048) { s.seen.remove(old) }
+          s.seenOrder.removeFirst(2048)
+        }
         s.cursor = id
       }
       if let message { continuation.yield(.message(message)) }

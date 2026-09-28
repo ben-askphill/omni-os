@@ -41,4 +41,16 @@ import OmniKit
     #expect(model.route == .artifacts)
     #expect(model.settingsTab == .connection)
   }
+
+  @Test func aSettingsRouteIsNoStopInTheHistory() {
+    let (model, dir) = model()
+    defer { dir.remove() }
+    model.route = .channel(id: "acme")
+    // What the main window does when a script sets #/secrets: put the old route back.
+    model.route = .secrets
+    model.route = .channel(id: "acme")
+    #expect(model.shell.history.canGoBack)
+    #expect(model.shell.history.current == .channel(id: "acme"))
+    #expect(model.shell.history.entries == [.home, .channel(id: "acme")])
+  }
 }

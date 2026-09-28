@@ -12,6 +12,16 @@ struct ComposerCallbacks {
   var image: (Data) -> Void
   var dragTargeted: (Bool) -> Void
   var focusChanged: (Bool) -> Void
+  /// The `/` menu's key. True when the menu was open and used it, so the text view leaves it alone.
+  var slash: (SlashKey) -> Bool = { _ in false }
+  /// The text and caret (a UTF-16 offset) after Ben typed or moved the caret, and when the box takes focus.
+  var edited: (_ text: String, _ caret: Int) -> Void = { _, _ in }
+}
+
+/// A caret position the view sets once, after it changed the text itself (a picked command).
+struct CaretRequest: Equatable {
+  var id: Int
+  var offset: Int
 }
 
 /// The reply box's text: an AppKit text view for input methods, spellcheck, undo, and the send keys. It grows
@@ -26,6 +36,7 @@ struct ComposerTextView: NSViewRepresentable {
   /// The box's height range: 44 to 240pt for a reply, 60 to 260 for a new thread (96 to 360 on Home).
   var heightRange: ClosedRange<CGFloat> = ComposerTextView.minHeight...ComposerTextView.maxHeight
   var label = "Reply"
+  var caretRequest: CaretRequest?
   static let maxHeight: CGFloat = 240
   static let minHeight: CGFloat = 44
   static let font = NSFont.systemFont(ofSize: 14.5)
@@ -76,9 +87,15 @@ struct ComposerTextView: NSViewRepresentable {
     tv.placeholder = placeholder
     tv.running = running
     tv.interrupting = interrupting
+    c.updating = true
+    defer { c.updating = false }
     if tv.string != text, !tv.hasMarkedText() {
       tv.string = text
       tv.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+    }
+    if let request = caretRequest, request.id != c.caretID {
+      c.caretID = request.id
+      tv.setSelectedRange(NSRange(location: max(0, min(request.offset, (tv.string as NSString).length)), length: 0))
     }
     if c.focusTick != focusTick {
       c.focusTick = focusTick
@@ -106,10 +123,36 @@ struct ComposerTextView: NSViewRepresentable {
     var parent: ComposerTextView?
     weak var textView: ComposerNSTextView?
     var focusTick = 0
+    var caretID = 0
+    /// True while the view sets the text or caret itself: the model already knows.
+    var updating = false
 
     func textDidChange(_ notification: Notification) {
-      guard let tv = notification.object as? NSTextView, let parent, parent.text != tv.string else { return }
-      parent.text = tv.string
+      guard let tv = notification.object as? NSTextView, let parent else { return }
+      if parent.text != tv.string { parent.text = tv.string }
+      parent.callbacks.edited(tv.string, tv.selectedRange().location)
+    }
+
+    func textViewDidChangeSelection(_ notification: Notification) {
+      guard !updating, let tv = notification.object as? NSTextView, let parent else { return }
+      parent.callbacks.edited(tv.string, tv.selectedRange().location)
+    }
+
+    // The arrows, Return and Tab go to the `/` menu while it is open. An input method composing keeps them.
+    func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+      guard let parent, !textView.hasMarkedText() else { return false }
+      let key: SlashKey
+      switch selector {
+      case #selector(NSResponder.moveUp(_:)): key = .up
+      case #selector(NSResponder.moveDown(_:)): key = .down
+      case #selector(NSResponder.insertTab(_:)): key = .tab
+      case #selector(NSResponder.insertNewline(_:)):
+        let flags = NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
+        guard flags.isDisjoint(with: [.shift, .option, .command, .control]) else { return false }
+        key = .return
+      default: return false
+      }
+      return parent.callbacks.slash(key)
     }
   }
 }
@@ -133,7 +176,10 @@ final class ComposerNSTextView: NSTextView {
 
   override func becomeFirstResponder() -> Bool {
     let ok = super.becomeFirstResponder()
-    if ok { callbacks?.focusChanged(true) }
+    if ok {
+      callbacks?.edited(string, selectedRange().location)
+      callbacks?.focusChanged(true)
+    }
     return ok
   }
 
@@ -166,6 +212,7 @@ final class ComposerNSTextView: NSTextView {
 
   // Esc: the input method gets it first while composing, and a sheet or menu never reaches here.
   override func cancelOperation(_ sender: Any?) {
+    if !hasMarkedText(), callbacks?.slash(.escape) == true { return }
     var context = EscapeContext(running: running)
     context.interrupting = interrupting
     context.composing = hasMarkedText()

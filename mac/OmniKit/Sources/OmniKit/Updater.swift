@@ -54,13 +54,15 @@ public final class Updater {
   public static var appRebuildLog: URL { URL.libraryDirectory.appending(path: "Logs/Omni/app-rebuild.log") }
 
   @ObservationIgnored private let model: AppModel
+  @ObservationIgnored private let host: Host
   @ObservationIgnored private let appCommit: String?
   @ObservationIgnored private var watcher: Task<Void, Never>?
 
   public init(model: AppModel, appCommit: String? = AppBuild.commit) {
     self.model = model
     self.appCommit = appCommit
-    restart = ServerRestart(host: Host(model: model))
+    host = Host(model: model)
+    restart = ServerRestart(host: host)
   }
 
   isolated deinit {
@@ -93,6 +95,9 @@ public final class Updater {
   }
 
   public func restartServer() async {
+    // What the click stood for: the window asked first only when the server was not the app's. A restart
+    // that waits for turns must not stop a different server than the one that was agreed to.
+    if !restart.step.isActive { host.mayStopOutsideServer = restartStopsOutsideServer }
     await restart.run()
     await check()
   }
@@ -128,6 +133,7 @@ public final class Updater {
   @MainActor
   private final class Host: RestartHost {
     weak var model: AppModel?
+    var mayStopOutsideServer = false
 
     init(model: AppModel) { self.model = model }
 
@@ -169,8 +175,11 @@ public final class Updater {
 
     func stopServer() async -> String? {
       guard let model else { return "The app is closing." }
-      await model.stopServer()
+      await model.stopServer(ownOnly: !mayStopOutsideServer)
       if case .notRunning = model.supervisor.state { return nil }
+      if case .running(false, _) = model.supervisor.state, !mayStopOutsideServer {
+        return "The server on the port was not started by the app, so it was left alone. Try Restart again."
+      }
       return "The server did not stop."
     }
 
@@ -223,6 +232,7 @@ extension AppModel {
         for id in ids { group.addTask { _ = try? await client.stopThread(id) } }
       }
     }
-    if stopServer { await self.stopServer() }
+    // The state the decision came from may be old: only a server the app started goes, whatever runs now.
+    if stopServer { await self.stopServer(ownOnly: true) }
   }
 }
