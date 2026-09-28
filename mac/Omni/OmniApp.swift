@@ -76,6 +76,21 @@ struct OmniCommands: Commands {
       .keyboardShortcut("c", modifiers: [.command, .shift])
       .disabled(model.openThread == nil)
     }
+    CommandMenu("Go") {
+      Button("Back") { model.goBack() }
+        .keyboardShortcut("[")
+        .disabled(!model.shell.history.canGoBack)
+      Button("Forward") { model.goForward() }
+        .keyboardShortcut("]")
+        .disabled(!model.shell.history.canGoForward)
+      Divider()
+      Button("Home") { model.route = .home }
+        .keyboardShortcut("h", modifiers: [.command, .shift])
+      Button("Go to…") { model.shell.openPalette() }
+        .keyboardShortcut("k")
+      Button("Search") { model.route = .search(query: "") }
+        .keyboardShortcut("f", modifiers: [.command, .shift])
+    }
     CommandMenu("Server") {
       ServerMenuItems(model: model, shortcuts: true)
     }

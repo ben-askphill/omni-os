@@ -87,7 +87,11 @@ public final class AppModel {
   public private(set) var store: WorkspaceStore
   /// The open threads' stores, fed from `store`'s feed. Swapped with it on a port change.
   public private(set) var threads: ThreadStoreRegistry
-  public var route = Route.home
+  public var route = Route.home {
+    didSet { shell.history.visit(route) }
+  }
+  /// History, the Go to palette and composer focus.
+  public let shell = ShellState()
   /// The last start that failed, until the server runs, Start is pressed again or the settings change.
   public private(set) var startFailure: StartFailure?
 

@@ -60,7 +60,10 @@ struct SidebarView: View {
     }
     .listStyle(.sidebar)
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      StatusFooter(model: model)
+      VStack(spacing: 0) {
+        UsageCard(model: model)
+        StatusFooter(model: model)
+      }
     }
   }
 

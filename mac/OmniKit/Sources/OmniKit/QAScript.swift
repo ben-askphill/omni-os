@@ -23,6 +23,11 @@ public enum QAScroll: String, Hashable, Sendable {
   case top, bottom, through
 }
 
+/// What a channel step does to the channel `qa-channel`, through the same client calls as the settings form.
+public enum QAChannelAction: String, Hashable, Sendable {
+  case create, edit, archive, unarchive
+}
+
 /// What the Server menu does, without the confirmation Stop asks for.
 public enum QAServerAction: String, Hashable, Sendable {
   case start, stop, check
@@ -32,7 +37,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`,
 /// `{"server": "start"}` (or `stop`, `check`), `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or
-/// `bottom`, `through`), `{"expand": true}`, `{"quit": true}`.
+/// `bottom`, `through`), `{"expand": true}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`), `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -48,6 +53,10 @@ public enum QAStep: Hashable, Sendable {
   case scroll(QAScroll)
   /// Opens the open thread's tool groups, and the calls in them that failed or have sub-calls.
   case expand
+  /// Opens the Go to palette with this query, or closes it with nil.
+  case palette(String?)
+  /// Creates, edits, archives or unarchives the channel `qa-channel`.
+  case channel(QAChannelAction)
   case quit
 
   static let defaultTimeout = Duration.seconds(10)
@@ -135,7 +144,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "server", "appearance", "scroll", "expand", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "server", "appearance", "scroll", "expand", "palette", "channel", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -183,6 +192,15 @@ public struct QAScript: Hashable, Sendable {
       return .scroll(to)
     case "expand":
       return .expand
+    case "palette":
+      if let query = value as? String { return .palette(query) }
+      if let open = value as? Bool, !open { return .palette(nil) }
+      throw QAScriptError("palette takes a query, or false to close it")
+    case "channel":
+      guard let name = value as? String, let action = QAChannelAction(rawValue: name) else {
+        throw QAScriptError("channel takes create, edit, archive or unarchive")
+      }
+      return .channel(action)
     default:
       return .quit
     }
