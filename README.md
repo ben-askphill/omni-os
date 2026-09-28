@@ -9,7 +9,7 @@ One local workspace for all agent work. Replaces hopping between Claude Desktop,
 - **GitHub panel** per repo channel: PRs, checks, diff, merge (with confirm)
 - **Conductor**: one front agent that delegates to crew roles; reports come back to it automatically
 - **Automations**: cron YAML, every run is its own thread
-- Runs each thread on the harness you pick — **Claude Code** (Claude plan), **Codex** (ChatGPT plan) or **Cursor Agent** (Cursor plan) — through its official CLI. No API key.
+- Runs each thread on the harness you pick — **Claude Code** (Claude plan), **Codex** (ChatGPT plan), **Cursor Agent** (Cursor plan) or **Hermes** (Anthropic API, on a remote server) — through its official CLI, or over HTTP for Hermes.
 
 ## Run
 
@@ -56,6 +56,26 @@ Pending messages show under the live output and enter the transcript at the poin
 Files can ride along with a message (paperclip, drag-and-drop or paste). They land in `data/threads/<id>/uploads/`, keeping their original names, and the agent gets every one by absolute path; images small enough for the API also go in as real image blocks. `OMNI_MAX_UPLOAD_MB` caps a single file.
 
 To continue a thread in a terminal or Claude Desktop: `cd <cwd> && claude --resume <session id>` (the thread's Details panel has a copy button). Check there that the session is no longer warm first, so two processes do not write the same session.
+
+## Hermes (remote)
+
+Hermes is Ben's always-on agent on a Linux server. Omni does not spawn it. A thread on the Hermes harness talks to the Hermes API server over HTTP (`OMNI_HERMES_URL`, default `http://127.0.0.1:8642`). From the Mac that is usually an SSH tunnel:
+
+```bash
+ssh -N -L 8642:127.0.0.1:8642 <server>
+```
+
+The bearer token is the Keychain secret `HERMES_API_KEY` (global). It is not an env var, not a database column and not written to logs.
+
+| Piece | What |
+| --- | --- |
+| Where it runs | On the Hermes server, in whatever clone Hermes already has. Omni does not create a worktree, browser profile or artifacts dir for the thread |
+| Session | `omni-<thread id>`. The same id continues the conversation, with Hermes' own context |
+| Prompt | Channel facts (repo, store, notes) go in `instructions` on the first run. The transcript shows only what Ben typed |
+| Steer / interrupt | `POST /v1/runs/{id}/steer` and `/stop`. A steer that arrives after the run finished is queued as the next run |
+| Attachments | Described in the message. The files stay on the Mac; Hermes cannot read those paths |
+| Usage | Token counts on the run, not the plan meter. It bills the Anthropic API, not the Claude, ChatGPT or Cursor plan |
+| Availability | `GET /v1/capabilities` with the bearer token. Missing key or an unreachable URL shows the fix in the model picker |
 
 ## Crew and conductor
 
@@ -117,4 +137,4 @@ data/        gitignored: db, thread dirs, worktrees, browser profiles, logs
 - Only one live thread per channel gets the persistent browser profile; parallel ones get an isolated browser.
 - Worktrees are not cleaned up automatically yet (`git worktree prune` in the repo).
 - The run queue lives in memory. Restarting the server marks running threads failed and drops queued follow-ups; resend them.
-- Subscription limits still apply. Each harness has its own concurrency cap (4 by default): `OMNI_MAX_CONCURRENT` (Claude Code), `OMNI_MAX_CONCURRENT_CODEX`, `OMNI_MAX_CONCURRENT_CURSOR`. A full harness never holds up threads on another.
+- Subscription limits still apply. Each harness has its own concurrency cap (4 by default): `OMNI_MAX_CONCURRENT` (Claude Code), `OMNI_MAX_CONCURRENT_CODEX`, `OMNI_MAX_CONCURRENT_CURSOR`, `OMNI_MAX_CONCURRENT_HERMES`. A full harness never holds up threads on another. Hermes also enforces its own concurrent-run cap; Omni backs off and retries on HTTP 429.
