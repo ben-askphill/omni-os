@@ -5,6 +5,7 @@
 // only; the transcript shows only what Ben typed. Cursor can't steer, so the runner queues
 // a steer and stops the thread by killing the holder (the next message resumes the chat).
 import { spawn, type ChildProcess } from 'node:child_process';
+import { closePipesAfterExit } from '../../child.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
 import { writeCursorPlugin } from '../../sandbox.ts';
 import { describeAttachments, type Attachment } from '../../uploads.ts';
@@ -31,6 +32,7 @@ const omniOf = (obj: any): Outgoing => ({
 function createChat(bin: string, cwd: string, env: NodeJS.ProcessEnv): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn(bin, ['create-chat'], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    closePipesAfterExit(proc);
     let out = '';
     let err = '';
     proc.stdout.setEncoding('utf8');
@@ -94,6 +96,8 @@ export const cursorAdapter: HarnessAdapter = {
       args.push(prompt);
 
       const proc = spawn(bin, args, { cwd: thread.cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      // The runner watches the holder, not this process, so the adapter must see its exit itself.
+      closePipesAfterExit(proc);
       currentProc = proc;
       let resultSeen = false;
       let stderr = '';

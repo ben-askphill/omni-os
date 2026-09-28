@@ -33,6 +33,8 @@
 //   FAKE_CLAUDE_INIT_FAIL=1       exit 1 on an initialize control request instead of answering it
 //   FAKE_CLAUDE_STDIN_LOG=<file>  stream mode: append one JSON line per stdin line read (pid, thread, type, control subtype)
 //   FAKE_CLAUDE_MCP_MS=<ms>       how long after startup the user's MCP servers connect (default 30)
+//   FAKE_CLAUDE_TITLE_ORPHAN=1    text mode (Omni's title call): leave a child behind, as ORPHAN does. Not a directive:
+//                                 the title call's prompt is the thread's first message, and the thread's CLI gets it too
 //
 // The initialize control request answers with the commands a real CLI lists: a fixed set of personal,
 // plugin and built-in commands, plus one "(project)" command per .claude/commands/*.md in the cwd.
@@ -346,15 +348,15 @@ function startBackground(ms) {
 
 /** ORPHAN: this script again, as a child that inherits our stdout and idles until killed (two minutes at most). */
 function leaveOrphan() {
-  spawn(process.execPath, [process.argv[1]], { env: { ...process.env, FAKE_CLAUDE_ORPHAN: '1' }, stdio: ['ignore', 'inherit', 'ignore'] }).unref();
+  spawn(process.execPath, [process.argv[1]], { env: { ...process.env, FAKE_CLAUDE_ORPHAN: String(process.pid) }, stdio: ['ignore', 'inherit', 'ignore'] }).unref();
 }
 
-/** The child ORPHAN leaves behind. Logged like an invocation, so a test can find and kill it. */
+/** The child ORPHAN leaves behind. Logged like an invocation, with its parent's pid, so a test can find and kill it. */
 function orphan() {
   if (process.env.FAKE_CLAUDE_LOG) {
     appendFileSync(
       process.env.FAKE_CLAUDE_LOG,
-      JSON.stringify({ pid: process.pid, time: Date.now(), mode: 'orphan', thread_id: process.env.OMNI_THREAD_ID ?? null }) + '\n',
+      JSON.stringify({ pid: process.pid, time: Date.now(), mode: 'orphan', parent: Number(process.env.FAKE_CLAUDE_ORPHAN), thread_id: process.env.OMNI_THREAD_ID ?? null }) + '\n',
     );
   }
   // Idle until killed, but two minutes at most: far past the teardown that must kill it, and short
@@ -488,6 +490,7 @@ async function main() {
     const prompt = positional.length ? positional.join(' ') : (await readAll()).trim();
     if (!prompt) return fail('Error: Input must be provided either through stdin or as a prompt argument when using --print');
     if (outFmt === 'text') {
+      if (process.env.FAKE_CLAUDE_TITLE_ORPHAN === '1') leaveOrphan();
       const wait = Number(/TITLE:(\d+)/.exec(prompt)?.[1] ?? 0);
       if (wait) await new Promise((r) => setTimeout(r, wait));
       return process.stdout.write('Fake title\n');

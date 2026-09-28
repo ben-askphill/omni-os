@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { readFileSync } from 'node:fs';
+import { closePipesAfterExit } from './child.ts';
 import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
 import { channels, events, threads, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
@@ -554,9 +555,6 @@ function launch(threadId: string, first: Msg): Live | undefined {
   return live;
 }
 
-/** How long an exited CLI's output may take to arrive before the runner closes its pipes. */
-const EXIT_DRAIN_MS = 500;
-
 async function spawnLive(live: Live, thread: Thread) {
   const channel = channels.get(thread.channel_id)!;
   const role = getCrew(thread.role);
@@ -612,13 +610,9 @@ async function spawnLive(live: Live, thread: Thread) {
     live.spawnFailed = true;
     addEvent(thread.id, 'error', { text: `Could not start ${cliLabel(thread.harness)}: ${err.message}` });
   });
-  // 'close' waits for every pipe, and a process the CLI started can hold them open after it exits. Give
-  // the rest of the output a moment to arrive, and one more poll to be read, then close them ourselves.
-  let drain: ReturnType<typeof setTimeout> | undefined;
-  const closePipes = () => setImmediate(() => child.stdio.forEach((s) => s?.destroy()));
-  child.on('exit', () => (drain = setTimeout(closePipes, EXIT_DRAIN_MS)));
+  // 'close' waits for every pipe, and a process the CLI started can hold them open after it exits.
+  closePipesAfterExit(child);
   child.on('close', (code, signal) => {
-    clearTimeout(drain);
     live.flush?.();
     onExit(live, code, signal);
   });
@@ -961,6 +955,7 @@ function generateTitle(threadId: string, prompt: string) {
     ['-p', '--model', 'haiku', '--output-format', 'text', '--strict-mcp-config', '--no-session-persistence', '--tools', ''],
     { cwd: tmpdir(), env: harnessEnv('claude-code', { CLAUDE_CODE_ENTRYPOINT: 'omni-os-title' }), stdio: ['pipe', 'pipe', 'ignore'] },
   );
+  closePipesAfterExit(child);
   child.stdin.on('error', () => {});
   child.stdin.end(
     'Write a title of at most 7 words for this task. Plain text, no quotes, no trailing period, no em dashes. ' +
