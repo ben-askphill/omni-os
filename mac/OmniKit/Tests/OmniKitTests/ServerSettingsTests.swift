@@ -69,6 +69,17 @@ struct ServerSettingsTests {
     #expect(settings().port == 4747)
   }
 
+  @Test func aBlankRepoPathMeansTheHomeCheckout() {
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let s = settings()
+    for blank in ["", "  "] {
+      s.repoPath = blank
+      // Not the app's working folder, which is / when Finder opens it.
+      #expect(s.config.repo == URL(filePath: "/Users/test/omni-os"))
+      #expect(settings().config.repo == URL(filePath: "/Users/test/omni-os"))
+    }
+  }
+
   @Test func aBlankNodePathMeansDetect() {
     defer { defaults.removePersistentDomain(forName: suite) }
     let s = settings()

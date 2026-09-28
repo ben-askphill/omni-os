@@ -28,7 +28,7 @@ public final class ServerSettings {
     public static let nodePath = "nodePath"
   }
 
-  public static let defaultPort = 4747
+  nonisolated public static let defaultPort = 4747
   public static let defaultRepoPath = "~/omni-os"
 
   /// 1 to 65535. Anything else is ignored.
@@ -39,10 +39,13 @@ public final class ServerSettings {
     }
   }
 
-  /// As typed. `~` stands for the home folder.
+  /// As typed. `~` stands for the home folder. Blank means `defaultRepoPath`: read `effectiveRepoPath`.
   public var repoPath: String {
     didSet { save(repoPath, Key.repoPath) }
   }
+
+  /// The repo path the server starts from.
+  public var effectiveRepoPath: String { Self.effective(repoPath: repoPath) }
 
   /// Empty to detect Node.
   public var nodePath: String {
@@ -57,7 +60,7 @@ public final class ServerSettings {
 
   public var config: ServerConfig {
     let node = nodePath.trimmingCharacters(in: .whitespaces)
-    return ServerConfig(port: port, repo: URL(filePath: expand(repoPath)), node: node.isEmpty ? nil : URL(filePath: expand(node)))
+    return ServerConfig(port: port, repo: URL(filePath: expand(effectiveRepoPath)), node: node.isEmpty ? nil : URL(filePath: expand(node)))
   }
 
   /// - Parameter arguments: the launch arguments' values, NSArgumentDomain by default.
@@ -70,7 +73,7 @@ public final class ServerSettings {
     func value(_ key: String) -> Any? { arguments[key] ?? defaults.object(forKey: key) }
     let ports = [arguments[Key.port], defaults.object(forKey: Key.port)].compactMap { Self.int($0) }
     port = ports.first(where: Self.validPort) ?? Self.defaultPort
-    repoPath = (value(Key.repoPath) as? String).flatMap { $0.isEmpty ? nil : $0 } ?? Self.defaultRepoPath
+    repoPath = Self.effective(repoPath: value(Key.repoPath) as? String)
     nodePath = value(Key.nodePath) as? String ?? ""
   }
 
@@ -86,6 +89,12 @@ public final class ServerSettings {
   }
 
   private static func validPort(_ port: Int) -> Bool { (1...65535).contains(port) }
+
+  /// Blank, which would be the app's working folder, is the default checkout.
+  private static func effective(repoPath: String?) -> String {
+    let p = repoPath?.trimmingCharacters(in: .whitespaces) ?? ""
+    return p.isEmpty ? defaultRepoPath : p
+  }
 
   private static func int(_ value: Any?) -> Int? {
     switch value {

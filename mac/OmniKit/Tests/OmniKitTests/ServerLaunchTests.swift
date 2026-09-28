@@ -55,6 +55,18 @@ struct LoginShellTests {
     }
   }
 
+  @Test func runsTheShellWithoutATerminal() async {
+    let dir = TempDir("login-shell")
+    defer { dir.remove() }
+    // zsh -i claims the app's terminal from a background group, and SIGTTOU stops it before any rc file runs.
+    let exe = dir.script("tty-zsh", """
+      if (exec 3</dev/tty) 2>/dev/null; then echo 'has a terminal'; exit 1; fi
+      export PATH='/login/bin:/bin'
+      eval "$2"
+      """)
+    #expect(await LoginShell(executable: exe).path() == "/login/bin:/bin")
+  }
+
   @Test func startsTheShellWithTheMinimalEnvironment() async {
     let dir = TempDir("login-shell")
     defer { dir.remove() }
@@ -262,6 +274,17 @@ struct ServerLauncherTests {
     await #expect(throws: ServerStartError.dependenciesMissing(path: dir.path("bare").path)) {
       try await launcher.prepare(ServerConfig(port: 4757, repo: dir.path("bare"), node: node))
     }
+  }
+
+  @Test func runsTheServerInASessionOfItsOwn() async throws {
+    defer { dir.remove() }
+    let node = fakeNode(in: dir, "node/bin/node", body: "sleep 30")
+    let launch = ServerLaunch(executable: node, arguments: [], directory: dir.url, environment: ["PATH": "/usr/bin:/bin"])
+    let server = try ServerProcess.spawn(launch, log: dir.path("server.log"))
+    defer { killGroup(server.pgid) }
+    // No terminal to be stopped by, and still a group of its own to signal.
+    #expect(getsid(server.pid) == server.pid)
+    #expect(getpgid(server.pid) == server.pid)
   }
 
   @Test func appendsToTheLog() async throws {

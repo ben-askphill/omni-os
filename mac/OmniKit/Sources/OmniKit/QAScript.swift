@@ -20,8 +20,8 @@ public enum QAServerAction: String, Hashable, Sendable {
 
 /// One step of a Debug QA run, from the JSON the app gets with `-OmniQAScript`:
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
-/// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}`, `{"open": "settings"}`, `{"server": "start"}`
-/// (or `stop`, `check`), `{"quit": true}`.
+/// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`,
+/// `{"server": "start"}` (or `stop`, `check`), `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -141,6 +141,7 @@ public struct QAScript: Hashable, Sendable {
       return .snapshot(name)
     case "port":
       guard let n = value as? Int, (1...65535).contains(n) else { throw QAScriptError("port takes a number from 1 to 65535") }
+      guard n != ServerSettings.defaultPort else { throw QAScriptError("port \(n) is the live server") }
       return .port(n)
     case "open":
       guard let name = value as? String, let window = QAWindow(rawValue: name) else {
@@ -167,6 +168,24 @@ public struct QAScript: Hashable, Sendable {
   private static func validName(_ name: String) -> Bool {
     let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
     return !name.isEmpty && !name.hasPrefix(".") && name.unicodeScalars.allSatisfy(allowed.contains)
+  }
+}
+
+/// The QA run's launch check, made on the raw arguments before the app model exists.
+public enum QALaunch {
+  /// The port `-serverPort` sets. Every `-serverPort` must be a port other than 4747, since a value the
+  /// settings can't use falls back to the saved port.
+  public static func serverPort(in arguments: [String]) throws(QAScriptError) -> Int {
+    let refused = QAScriptError("QA runs need -serverPort set to a port other than \(ServerSettings.defaultPort).")
+    let flag = "-\(ServerSettings.Key.port)"
+    let values = arguments.indices.filter { arguments[$0] == flag }.map { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : "" }
+    var port: Int?
+    for v in values {
+      guard let n = Int(v.trimmingCharacters(in: .whitespaces)), (1...65535).contains(n), n != ServerSettings.defaultPort else { throw refused }
+      port = n
+    }
+    guard let port else { throw refused }
+    return port
   }
 }
 

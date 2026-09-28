@@ -16,7 +16,8 @@ extension OmniClient: WorkspaceAPI {}
 /// rules (web/src/store.tsx):
 /// - `start()` loads everything.
 /// - A thread event updates `recent` in place, and refetches channels and status 500ms after the first
-///   event of a burst, so running counts follow.
+///   event of a burst, so running counts follow. One that comes in while `recent` loads is laid over the
+///   answer, unless the answer has a newer copy of the thread.
 /// - Every feed open after the first refetches everything, since events were missed. So does the first
 ///   one when the start load failed: the server came up.
 /// - After the app changes a channel itself, call `reloadChannels()`. The server sends no event for it.
@@ -79,6 +80,8 @@ public final class WorkspaceStore {
   @ObservationIgnored private var opened = false
   /// The latest load of each part. An answer to an older one is dropped.
   @ObservationIgnored private var tokens: [Part: Int] = [:]
+  /// Feed threads that came in while `recent` loaded, by id. nil while no load is out.
+  @ObservationIgnored private var recentSinceLoad: [String: OmniThread]?
 
   /// - Parameter feed: the feed's events, as `SSEClient.events` sends them.
   public init(api: any WorkspaceAPI, feed: AsyncStream<SSEEvent<FeedEvent>>, clock: any Clock<Duration> = ContinuousClock()) {
@@ -155,9 +158,14 @@ public final class WorkspaceStore {
   }
 
   private func upsertRecent(_ t: OmniThread) {
-    var list = recent.filter { $0.id != t.id }
+    recentSinceLoad?[t.id] = t
+    recent = Self.upserting(t, into: recent)
+  }
+
+  private static func upserting(_ t: OmniThread, into list: [OmniThread]) -> [OmniThread] {
+    var list = list.filter { $0.id != t.id }
     list.insert(t, at: list.firstIndex { $0.updatedAt < t.updatedAt } ?? list.endIndex)
-    recent = Array(list.prefix(Self.recentLimit))
+    return Array(list.prefix(recentLimit))
   }
 
   private func scheduleRefresh() {
@@ -207,8 +215,17 @@ public final class WorkspaceStore {
       guard let list = try? await api.crew(), current(), crew != list else { return }
       crew = list
     case .recent:
-      guard let list = try? await api.recent(limit: Self.recentLimit), current(), recent != list else { return }
-      recent = list
+      recentSinceLoad = [:]
+      let answer = try? await api.recent(limit: Self.recentLimit)
+      guard current() else { return }
+      let since = recentSinceLoad ?? [:]
+      recentSinceLoad = nil
+      guard var list = answer else { return }
+      // The answer can predate an event read while it was out. A newer copy in the answer wins.
+      for t in since.values where list.first(where: { $0.id == t.id }).map({ $0.updatedAt <= t.updatedAt }) ?? true {
+        list = Self.upserting(t, into: list)
+      }
+      if recent != list { recent = list }
     case .harnesses:
       guard let list = try? await api.harnesses(), current(), harnesses != list else { return }
       harnesses = list

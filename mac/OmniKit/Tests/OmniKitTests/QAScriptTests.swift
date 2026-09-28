@@ -50,6 +50,7 @@ import OmniKit
     #"[{"open": "garage"}]"#,
     #"[{"server": "reboot"}]"#,
     #"[{"port": 0}]"#,
+    #"[{"port": 4747}]"#,
     #"[{"sleep": -1}]"#,
     #"{"nope": []}"#,
   ])
@@ -63,6 +64,15 @@ import OmniKit
     }
     #expect(error.message.contains("step 2"))
     #expect(error.message.contains("lunch"))
+  }
+
+  @Test func aRunNeedsAServerPortOtherThanTheLiveOne() throws {
+    let qa = ["Omni", "-OmniQAScript", "[]", "-OmniQAOut", "/tmp/qa"]
+    #expect(try QALaunch.serverPort(in: qa + ["-serverPort", "4757"]) == 4757)
+    for bad in [[], ["-serverPort"], ["-serverPort", "4747"], ["-serverPort", "abc"], ["-serverPort", "70000"],
+                ["-serverPort", "4757", "-serverPort", "4747"]] {
+      #expect(throws: QAScriptError.self, "\(bad)") { try QALaunch.serverPort(in: qa + bad) }
+    }
   }
 
   @Test func conditionsReadTheFacts() throws {

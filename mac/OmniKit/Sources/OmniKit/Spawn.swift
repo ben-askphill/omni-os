@@ -1,8 +1,10 @@
 import Darwin
 import Foundation
 
-/// posix_spawn with the child in a process group of its own (its pgid is its pid), stdin from /dev/null,
-/// default signal handling, and none of this process's descriptors but the ones set here.
+/// posix_spawn with the child in a session of its own, so it has no controlling terminal and its pgid is its
+/// pid. Also stdin from /dev/null, default signal handling, and none of this process's descriptors but the
+/// ones set here. With only a group of its own, a child that claims the app's terminal (zsh -i does) would be
+/// stopped by SIGTTOU when the app runs from one.
 enum Spawn {
   enum Output {
     case null
@@ -25,8 +27,7 @@ enum Spawn {
     var attr: posix_spawnattr_t?
     posix_spawnattr_init(&attr)
     defer { posix_spawnattr_destroy(&attr) }
-    posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))
-    posix_spawnattr_setpgroup(&attr, 0)
+    posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETSID | POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))
     var all = sigset_t()
     sigfillset(&all)
     sigdelset(&all, SIGKILL)
@@ -126,13 +127,16 @@ enum Spawn {
     return Captured(output: output, status: exited ? status : nil)
   }
 
-  /// True once `pid`, a child of ours, has exited. It is not reaped.
+  /// True once `pid`, a child of ours, has exited. It is not reaped. Darwin's waitid also reports a child that
+  /// is only stopped, so the code is checked: a stopped one has not exited, and reaping it would block.
   static func hasExited(_ pid: pid_t) -> Bool {
     var info = siginfo_t()
     return waitid(P_PID, id_t(pid), &info, WEXITED | WNOHANG | WNOWAIT) == 0 && info.si_pid == pid
+      && [CLD_EXITED, CLD_KILLED, CLD_DUMPED].contains(info.si_code)
   }
 
-  /// Waits for a child of ours and returns its exit code, nil when a signal ended it.
+  /// Waits for a child of ours and returns its exit code, nil when a signal ended it. It blocks, so call it only
+  /// once `hasExited` says so or after a SIGKILL.
   @discardableResult
   static func reap(_ pid: pid_t) -> Int32? {
     var status: Int32 = 0

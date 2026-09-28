@@ -58,9 +58,14 @@ private struct Rig {
 
   func starts() -> Int { dir.read("logs/server.log").components(separatedBy: "[omni-app]").count - 1 }
 
-  /// Kills what the app recorded if it still runs, then removes the folder.
+  /// The pid a fake server wrote to `fake.pid`, which is its pgid too.
+  var fakePid: Int32? { Int32(dir.read("fake.pid").trimmingCharacters(in: .whitespacesAndNewlines)) }
+
+  /// Kills what the app recorded and the fake in `fake.pid` if they still run, then removes the folder. The
+  /// code under test clears the record, so a fake a broken stop left running is only found by its pid file.
   func cleanUp() {
     if let r = ServerRecord.load(from: record), processAlive(r.pid), getpgid(r.pid) == r.pgid { killGroup(r.pgid) }
+    if let pid = fakePid, processAlive(pid), getpgid(pid) == pid { killGroup(pid) }
     dir.remove()
   }
 }
@@ -240,6 +245,32 @@ struct ServerSupervisorTests {
     #expect(rig.starts() == 0)
   }
 
+  @Test func onlyTheFirstCheckShowsChecking() async throws {
+    let listener = SilentListener()
+    let rig = Rig(port: listener.port)
+    defer {
+      listener.close()
+      rig.cleanUp()
+    }
+    let supervisor = rig.supervisor()
+    let first = Task { await supervisor.refresh() }
+    try await waitFor("checking") { supervisor.state == .checking }
+    await first.value
+    let failed = ServerSupervisor.State.failed(message: ServerStartError.portInUse(port: listener.port).message, logTail: [])
+    #expect(supervisor.state == failed)
+
+    // Coming back to the app checks again. What it shows stays while the probe waits out its timeout.
+    let again = Task { await supervisor.refresh() }
+    var seen: [ServerSupervisor.State] = []
+    for _ in 0..<5 {
+      try await Task.sleep(for: .milliseconds(50))
+      seen.append(supervisor.state)
+    }
+    await again.value
+    #expect(seen.allSatisfy { $0 == failed })
+    #expect(supervisor.state == failed)
+  }
+
   @Test func anotherProgramAnsweringOnThePortFailsClearly() async throws {
     let web = HTTPResponder(contentType: "text/html", body: "<html>hello</html>")
     let rig = Rig(port: web.port)
@@ -286,7 +317,33 @@ struct ServerSupervisorTests {
     let supervisor = rig.supervisor()
     await supervisor.start()
     #expect(supervisor.state == .failed(message: ServerStartError.noAnswer(seconds: 2).message, logTail: ["warming up"]))
-    let pid = try #require(Int32(rig.dir.read("fake.pid").trimmingCharacters(in: .whitespacesAndNewlines)))
+    let pid = try #require(rig.fakePid)
+    #expect(!processAlive(pid))
+    #expect(ServerRecord.load(from: rig.record) == nil)
+  }
+
+  @Test func aServerThatIsStoppedWhileStartingIsStoppedAtTheTimeout() async throws {
+    var rig = Rig()
+    defer { rig.cleanUp() }
+    let pidFile = rig.dir.path("fake.pid").path
+    rig.node = fakeNode(in: rig.dir, "bin/node", body: """
+      echo $$ > '\(pidFile)'
+      echo "booting"
+      kill -STOP $$
+      """)
+    rig.startTimeout = .seconds(2)
+    // A stopped server must not read as exited: its reap would wait on the main actor until it runs again.
+    // Should that happen, this ends the wait so the test fails instead of hanging.
+    let watchdog = DispatchWorkItem { @Sendable [dir = rig.dir] in
+      if let pid = Int32(dir.read("fake.pid").trimmingCharacters(in: .whitespacesAndNewlines)) { kill(pid, SIGKILL) }
+    }
+    DispatchQueue.global().asyncAfter(deadline: .now() + 10, execute: watchdog)
+    defer { watchdog.cancel() }
+
+    let supervisor = rig.supervisor()
+    await supervisor.start()
+    #expect(supervisor.state == .failed(message: ServerStartError.noAnswer(seconds: 2).message, logTail: ["booting"]))
+    let pid = try #require(rig.fakePid)
     #expect(!processAlive(pid))
     #expect(ServerRecord.load(from: rig.record) == nil)
   }
@@ -334,6 +391,23 @@ struct ServerSupervisorTests {
     #expect(!supervisor.canStop)
     await supervisor.stop()
     #expect(supervisor.state == .running(startedByApp: false, server: nil))
+    #expect(rig.starts() == 0)
+  }
+
+  @Test func aPidThatCannotBeAProcessIsNotStopped() async throws {
+    let server = #"{"version":"0.1.0","pid":4294967296,"root":"/x","dataDir":"/x/data","startedAt":"2026-09-28T10:00:00.000Z","port":1}"#
+    let status = #"{"usage":{},"slots":{},"running":0,"queued":0,"maxConcurrent":4,"maxUploadMb":25,"server":\#(server)}"#
+    let odd = HTTPResponder(contentType: "application/json", body: status)
+    let rig = Rig(port: odd.port)
+    defer {
+      odd.close()
+      rig.cleanUp()
+    }
+    let supervisor = rig.supervisor()
+    await supervisor.start()
+    #expect(supervisor.state.running?.startedByApp == false)
+    #expect(supervisor.state.running?.server?.pid == 4_294_967_296)
+    #expect(!supervisor.canStop)
     #expect(rig.starts() == 0)
   }
 

@@ -148,7 +148,7 @@ public final class AppModel {
   public var serverScreen: ServerScreen? {
     ServerScreen(
       state: supervisor.state, connection: store.connection, startFailure: startFailure, port: settings.port,
-      repo: settings.repoPath
+      repo: settings.effectiveRepoPath
     )
   }
 

@@ -52,7 +52,8 @@ final class FakeWorkspaceAPI: WorkspaceAPI {
     var harnesses: [HarnessInfo] = []
     var calls: [String: Int] = [:]
     var recentLimits: [Int?] = []
-    var hold: Gate?
+    var channelsHold: Gate?
+    var recentHold: Gate?
   }
   private let state = Mutex(State())
 
@@ -98,15 +99,22 @@ final class FakeWorkspaceAPI: WorkspaceAPI {
   /// The next channels call answers with the list set now, but only once the gate opens.
   func holdNextChannels() -> Gate {
     let gate = Gate()
-    state.withLock { $0.hold = gate }
+    state.withLock { $0.channelsHold = gate }
+    return gate
+  }
+
+  /// The next recent call answers with the list set now, but only once the gate opens.
+  func holdNextRecent() -> Gate {
+    let gate = Gate()
+    state.withLock { $0.recentHold = gate }
     return gate
   }
 
   func channels(archived: Bool) async throws(OmniAPIError) -> [ChannelWithRunning] {
     let (reply, gate) = state.withLock { s in
       s.calls["channels", default: 0] += 1
-      defer { s.hold = nil }
-      return (s.channels, s.hold)
+      defer { s.channelsHold = nil }
+      return (s.channels, s.channelsHold)
     }
     await gate?.wait()
     return try reply.get()
@@ -129,11 +137,14 @@ final class FakeWorkspaceAPI: WorkspaceAPI {
   }
 
   func recent(limit: Int?) async throws(OmniAPIError) -> [OmniThread] {
-    state.withLock { s in
+    let (reply, gate) = state.withLock { s in
       s.calls["recent", default: 0] += 1
       s.recentLimits.append(limit)
-      return s.recent
+      defer { s.recentHold = nil }
+      return (s.recent, s.recentHold)
     }
+    await gate?.wait()
+    return reply
   }
 
   func harnesses() async throws(OmniAPIError) -> [HarnessInfo] {
@@ -346,6 +357,50 @@ private func loaded(_ store: WorkspaceStore) async throws {
     gate.open()
     await slow.value
     #expect(store.snapshot.channel("acme")?.running == 2, "the older answer is dropped")
+  }
+
+  @Test func keepsFeedThreadsThatComeInWhileRecentLoads() async throws {
+    let api = try FakeWorkspaceAPI.standard()
+    api.recent = [try thread("x", updated: 1)]
+    let (store, feed, _) = makeStore(api)
+    defer { store.stop(); feed.finish() }
+    try await loaded(store)
+
+    // The refetch on a feed reopen: the server answers with x still running, then x ends and the feed
+    // says so before the answer lands.
+    let gate = api.holdNextRecent()
+    let slow = Task { await store.refresh() }
+    try await waitFor("the slow call") { api.calls("recent") == 2 }
+    feed.yield(.message(.thread(try thread("x", status: "done", updated: 9))))
+    feed.yield(.message(.thread(try thread("y", updated: 8))))
+    try await waitFor("the events read") { store.snapshot.recent.map(\.id) == ["x", "y"] }
+
+    gate.open()
+    await slow.value
+    #expect(store.snapshot.recent.map(\.id) == ["x", "y"])
+    #expect(store.snapshot.recent.first?.status == .done, "the older answer does not undo the feed")
+  }
+
+  @Test func aRecentAnswerNewerThanTheFeedWins() async throws {
+    let api = try FakeWorkspaceAPI.standard()
+    api.recent = [try thread("x", updated: 1)]
+    let (store, feed, _) = makeStore(api)
+    defer { store.stop(); feed.finish() }
+    try await loaded(store)
+
+    // The query ran after the event, so its row is the newer one.
+    let gate = api.holdNextRecent()
+    let fetched = try thread("x", status: "done", updated: 12)
+    api.recent = [fetched]
+    let slow = Task { await store.refresh() }
+    try await waitFor("the slow call") { api.calls("recent") == 2 }
+    let event = try thread("x", updated: 9)
+    feed.yield(.message(.thread(event)))
+    try await waitFor("the event read") { store.snapshot.recent == [event] }
+
+    gate.open()
+    await slow.value
+    #expect(store.snapshot.recent == [fetched])
   }
 
   @Test func readsTheServerFeed() async throws {

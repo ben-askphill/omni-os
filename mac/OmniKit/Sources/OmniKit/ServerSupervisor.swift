@@ -141,10 +141,11 @@ public struct ServerRecord: Codable, Hashable, Sendable {
     session.invalidateAndCancel()
   }
 
-  /// Checks what answers on the port.
+  /// Checks what answers on the port. Only the first check shows `.checking`: after that what shows stays
+  /// until the answer, so coming back to the app does not blank the screen.
   public func refresh() async {
     await serially {
-      if !self.isRunning { self.state = .checking }
+      if case .unknown = self.state { self.state = .checking }
       await self.detect()
     }
   }
@@ -189,7 +190,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
         target = .group(own)
       } else {
         state = .running(startedByApp: false, server: server)
-        target = server.map { Int32($0.pid) }.flatMap { ServerProcess.name($0)?.hasPrefix("node") == true ? .process($0) : nil }
+        target = server.flatMap { Int32(exactly: $0.pid) }.flatMap { ServerProcess.name($0)?.hasPrefix("node") == true ? .process($0) : nil }
       }
     case .nothing:
       if let own {

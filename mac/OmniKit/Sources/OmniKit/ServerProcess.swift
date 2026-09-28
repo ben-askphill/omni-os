@@ -15,8 +15,8 @@ public enum ServerProcess {
   /// Past this the log is moved to `server.log.1` before a start.
   static let logLimit: UInt64 = 10 << 20
 
-  /// Starts the server in a process group of its own, stdin from /dev/null, stdout and stderr appended
-  /// to `log`. Nothing ties it to the app: it keeps running when the app quits.
+  /// Starts the server in a session and process group of its own, stdin from /dev/null, stdout and stderr
+  /// appended to `log`. Nothing ties it to the app: it keeps running when the app quits.
   public static func spawn(_ launch: ServerLaunch, log: URL) throws(ServerStartError) -> SpawnedServer {
     let fm = FileManager.default
     do {

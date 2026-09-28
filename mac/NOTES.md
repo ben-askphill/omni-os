@@ -25,7 +25,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `Ticker.swift` | Internal. A `Clock` with its instant type erased, so tests can inject one |
 | `WorkspaceStore.swift` | `WorkspaceStore`, `WorkspaceAPI`, `SidebarSections` |
 | `ServerSettings.swift` | `ServerSettings` (port, repo path, Node override in UserDefaults), `ServerConfig` |
-| `Spawn.swift` | Internal. posix_spawn in a new process group, and `capture` for short commands with a timeout |
+| `Spawn.swift` | Internal. posix_spawn in a new session (no controlling terminal, pgid is the pid), and `capture` for short commands with a timeout |
 | `ServerLaunch.swift` | `ServerStartError`, `LoginShell`, `NodeResolver`, `NodeVersion`, `ServerEnvironment`, `ServerLauncher`, `ServerLaunch` |
 | `ServerProcess.swift` | `ServerProcess` (spawn into the log, log tail, liveness, group stop), `SpawnedServer` |
 | `ServerSupervisor.swift` | `ServerSupervisor` (the state machine), `ServerRecord` |
@@ -98,7 +98,7 @@ What the server sends (see the `.sse` fixtures and `server/app.ts`):
 `WorkspaceStore` (`@MainActor @Observable`) holds what the sidebar and Home need: `channels` (with running counts and `active` threads), `status`, `usage`, `crew`, `recent` (60, newest update first) and `harnesses`. Each is its own observed property; `snapshot` puts them together. `loadState` is `.loading` until the first channel list comes back, and `.failed(error)` when the last channel load failed, with the old list kept, like the Web UI's `channelsError`. Other parts fail quietly and keep their last value. `connection` mirrors the feed.
 
 - `WorkspaceStore(client:)` owns the feed's `SSEClient`. `start()` opens it and loads everything; `stop()` closes it. `reconnectNow(ifQuietFor:)` passes through.
-- A feed thread event updates `recent` in place, and refetches channels and status 500ms after the first event of a burst.
+- A feed thread event updates `recent` in place, and refetches channels and status 500ms after the first event of a burst. One that comes in while `recent` loads is laid over the answer, unless the answer has a newer copy of that thread (by `updatedAt`).
 - A feed usage event replaces that harness's usage. A status load merges its usage in.
 - Every feed open after the first refetches everything at once. So does the first open when the start load failed, which is the case when the server comes up after the app.
 - The server sends no feed event when a channel is created, edited or archived. After the app does one, `await store.reloadChannels()`. Secrets and automations are not in this store; their screens reload themselves after their own changes.
@@ -112,9 +112,9 @@ What the server sends (see the `.sse` fixtures and `server/app.ts`):
 
 - `state`: `.unknown`, `.checking`, `.notRunning`, `.starting`, `.running(startedByApp:server:)`, `.failed(message:logTail:)`, `.stopping`. `server` is the status's `ServerInfo`, nil for a server older than #76. `message` is plain text for the window; `logTail` is this run's last 40 log lines, when there are any.
 - `canStop`: there is a process to stop. `port`: the port of the last check. `isRunning`.
-- `refresh()` does GET /api/status on 127.0.0.1 with a 1.5s timeout. JSON that decodes as `Status` is a server, with or without the `server` object. No answer and the port free: `.notRunning`. No answer but the port taken: `.failed`, port in use. Anything else answering (HTML, a 404): `.failed`, not an Omni server. It never leaves `.running` for `.checking`, so a periodic refresh does not flicker.
-- `start()` never starts a server when something answers on the port: it attaches. Otherwise it resolves the launch, spawns, writes the record and polls status every 200ms. It is running once status answers with `server.pid` equal to the child's pid, or with no `server` object. The child exiting first gives `.failed` with its exit code and the log tail. No answer within 20s: the group is stopped (2s grace), then `.failed` with the tail.
-- `stop()`: for a server the app started, SIGTERM to its process group, SIGKILL to the group after 8s (and always after, for leftovers), then the record is removed. For a server started some other way that reports its pid and whose process is named `node`: SIGTERM to that pid only, SIGKILL after 8s. A server that does not say its pid (older than #76, not the app's) can't be stopped: `canStop` is false and `stop()` only checks again.
+- `refresh()` does GET /api/status on 127.0.0.1 with a 1.5s timeout. JSON that decodes as `Status` is a server, with or without the `server` object. No answer and the port free: `.notRunning`. No answer but the port taken: `.failed`, port in use. Anything else answering (HTML, a 404): `.failed`, not an Omni server. Only the first check, from `.unknown`, shows `.checking`. Later ones keep what shows (running, not running, failed) until the answer, so coming back to the app or waking does not blank the screen.
+- `start()` never starts a server when something answers on the port: it attaches. Otherwise it resolves the launch, spawns, writes the record and polls status every 200ms. It is running once status answers with `server.pid` equal to the child's pid, or with no `server` object. The child exiting first gives `.failed` with its exit code and the log tail. No answer within 20s: the group is stopped (2s grace), then `.failed` with the tail. A child that is only stopped (SIGSTOP) has not exited: Darwin's `waitid` reports it too, so `Spawn.hasExited` checks the code, and reaping it would block the main actor.
+- `stop()`: for a server the app started, SIGTERM to its process group, SIGKILL to the group after 8s (and always after, for leftovers), then the record is removed. For a server started some other way that reports its pid and whose process is named `node`: SIGTERM to that pid only, SIGKILL after 8s. A pid past Int32 counts as none. A server that does not say its pid (older than #76, not the app's) can't be stopped: `canStop` is false and `stop()` only checks again.
 - An exit watch (a dispatch process source) on the server's pid refreshes the state when the server dies, whoever killed it.
 - One server per app: `start()` refuses (`.failed`, "still runs on port N") while the app's recorded server runs on another port, as after a port change. Set the port back and stop it first.
 
@@ -124,7 +124,7 @@ How the server is started:
 - Node: the Settings override if set (it must run and report 24 or later, or it is an error; there is no fallback). Otherwise the highest nvm Node 24 or later in `~/.nvm/versions/node`, then `node` on the login PATH, each checked with `node -v`.
 - Environment: HOME, USER, LOGNAME, SHELL, TMPDIR and LANG from the app, PATH, `NODE_ENV=production`, `NODE_OPTIONS=--disable-warning=ExperimentalWarning`, `OMNI_PORT`. Nothing else. Keys that bill an API (`ANTHROPIC_*`, `*_API_KEY`, `*_AUTH_TOKEN`, `OPENAI_BASE_URL`) are dropped last, even from `extraEnvironment`.
 - PATH: `/bin/zsh -ilc` runs a printf of `$PATH` between split markers with a random id (a shell that echoes the command can't fake them), 5s timeout, killed with its group at the timeout. The shell itself gets only the minimal environment. Nothing but PATH is read from it; Ben's zshrc exports a stale `ANTHROPIC_API_KEY`. No PATH: `~/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`. Node's own bin folder goes first.
-- posix_spawn with its own process group (`POSIX_SPAWN_SETPGROUP`), default signal handlers and mask, no inherited descriptors (`CLOEXEC_DEFAULT`), stdin `/dev/null`, stdout and stderr appended to `~/Library/Logs/Omni/server.log`. Each start writes an `[omni-app] <date> starting <command> in <dir>` line first; the tail is read from after it. Over 10MB the log moves to `server.log.1` at the next start.
+- posix_spawn in a session of its own (`POSIX_SPAWN_SETSID`): no controlling terminal, and its pgid is its pid. With only its own group, `zsh -ilc` from an app started in a terminal took the terminal from a background group and SIGTTOU stopped it before any rc file ran, so the PATH fell back. Default signal handlers and mask, no inherited descriptors (`CLOEXEC_DEFAULT`), stdin `/dev/null`, stdout and stderr appended to `~/Library/Logs/Omni/server.log`. Each start writes an `[omni-app] <date> starting <command> in <dir>` line first; the tail is read from after it. Over 10MB the log moves to `server.log.1` at the next start.
 - Nothing ties the server to the app: it keeps running when the app quits. It is never a LaunchAgent or login item.
 - The record, `~/Library/Application Support/Omni/server.json`: `{pid, pgid, port, startedAt, repo}`. A later launch counts a server as started by the app when the record is for this port, its pid still runs in that group and started within 5s of `startedAt` (so a reused pid does not pass), and the answering server's pid is that pid (or it gives none). A record whose process is gone is removed at the next check.
 - Before the start: `ServerStartError` for no `server/index.ts` in the repo, no `node_modules/tsx`, no usable Node.
@@ -134,8 +134,9 @@ Launch arguments override the settings for the run and turn saving off (`isVolat
 ### Supervisor tests
 
 - `ServerSettingsTests`, `ServerLaunchTests` (login shell, Node, environment, launcher): fakes only. The fake login shell prints junk and exports `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`; the tests show neither reaches the child.
-- `ServerSupervisorTests`: real processes, run by default. They boot this checkout's server on a free port with a throwaway data folder, the fake claude CLI and `OMNI_BROWSER=0`, and fake servers (a script, a hung listener, an HTML responder, a Node one-liner with the old status shape). About 8s. `OMNI_SKIP_SUPERVISOR_TESTS=1` leaves them out. Each test kills what it recorded and removes its folder. A run cut short (killed by a timeout, a crash) skips that, and its server keeps running: look for a `supervisor-*` folder in `$TMPDIR` and stop the server whose `OMNI_DATA_DIR` is in it. Don't wrap `swift test` in a kill timer.
+- `ServerSupervisorTests`: real processes, run by default. They boot this checkout's server on a free port with a throwaway data folder, the fake claude CLI and `OMNI_BROWSER=0`, and fake servers (a script, a hung listener, an HTML responder, a Node one-liner with the old status shape). About 8s. `OMNI_SKIP_SUPERVISOR_TESTS=1` leaves them out. Each test kills what it recorded and the fake whose pid is in `fake.pid`, then removes its folder. The code under test clears the record, so a fake that a broken stop leaves running is only found by its pid file. A run cut short (killed by a timeout, a crash) skips that, and its server keeps running: look for a `supervisor-*` folder in `$TMPDIR` and stop the server whose `OMNI_DATA_DIR` is in it. Don't wrap `swift test` in a kill timer.
 - `LiveLoginShellTests`: this Mac's real zsh and Node, only with `OMNI_LIVE_LOGIN_SHELL=1`. Prints nothing.
+- A terminal: `runsTheServerInASessionOfItsOwn` checks the session anywhere. `runsTheShellWithoutATerminal` and `LiveLoginShellTests` only catch a shell that gets the terminal when `swift test` has one; from a script, run them under `script -q /dev/null`.
 
 ## Test support
 
@@ -147,7 +148,7 @@ In `TestSupport.swift`:
 - `ScriptedSSETransport`: each connection waits for `accept(status:contentType:)` or `refuse()`, then takes `send(_:)` and `end()`. `isDropped` says the client let it go. `next()` waits for the next connection.
 - `Recorder`: collects an `SSEClient`'s events; `next()` waits for the next one.
 - `eventually` and `waitFor` (for main actor state) poll for up to 2s by default; `settle()` lets other tasks run before a check that something did not happen. `Gate` holds a fake call until opened.
-- `FakeWorkspaceAPI` in `WorkspaceStoreTests.swift` answers with what the test set and counts calls.
+- `FakeWorkspaceAPI` in `WorkspaceStoreTests.swift` answers with what the test set and counts calls. `holdNextChannels()` and `holdNextRecent()` hold the next call with a `Gate`.
 
 `LiveServerTests` runs the SSE client, `URLSessionSSETransport` and the store against a real server, only when `OMNI_LIVE_PORT` is set (never 4747). Boot one from the repo root with the fake CLIs and a throwaway data dir, passing only PATH and HOME from your shell (the login shell exports a stale `ANTHROPIC_API_KEY`):
 
@@ -196,7 +197,7 @@ Server screen (`ServerScreen`):
 - Stop always asks first: running threads stop with the server.
 - "Reconnecting" shows next to Not running: the feed keeps trying, which is how a server started in a terminal is found. That is on purpose (see `AppModelTests`).
 
-Settings, Connection pane: Port, Repo (a field and a folder picker), Node (a field and a file picker; empty finds Node itself). The port applies on Return or when the field loses focus; the paths on Return, focus loss or a pick. Everything applies at once, no relaunch. With launch arguments set, a note says changes last until the app quits. Status shows the server state, the feed, Open Log, and Build (the `OmniGitCommit` stamp) in an installed build.
+Settings, Connection pane: Port, Repo (a field and a folder picker), Node (a field and a file picker; empty finds Node itself). The port and paths apply on Return, when the field loses focus or when Settings closes (closing a window does not end editing), and the paths on a pick too. Never per key: typing 4759 does not try 4, 47 and 475. A number that is not a port puts the current one back. A blank Repo is `~/omni-os` (`effectiveRepoPath`), in `config` and on the server screen. Everything applies at once, no relaunch. With launch arguments set, a note says changes last until the app quits. Status shows the server state, the feed, Open Log, and Build (the `OmniGitCommit` stamp) in an installed build.
 
 ## Build and install
 
@@ -223,7 +224,7 @@ mac/.xcode/Build/Products/Debug/Omni.app/Contents/MacOS/Omni -ApplePersistenceIg
 
 - `-OmniQAScript` takes the JSON itself or a path to it; `-OmniQAOut` the folder for PNGs and `qa.json`. They are read from the raw arguments: UserDefaults would parse a JSON value as a property list.
 - Give every flag a value. A flag without one ahead of the others left the app with no window.
-- It refuses to run (exit 2, reason in `qa.json` and stderr) unless launch arguments set `-serverPort` to something other than 4747. So a QA run never talks to the live server and never saves settings.
+- It refuses to run (exit 2, reason in `qa.json` and stderr) unless launch arguments set `-serverPort` (every one given) to a port other than 4747. `QALaunch.serverPort` checks the raw arguments before the app model exists, so nothing has talked to a server yet. A `{"port": 4747}` step is rejected, and server steps refuse while the port is 4747. So a QA run never talks to the live server and never saves settings.
 - A server a QA run starts keeps its data, brain folder, log and record in the out folder and runs the fake CLIs (`QAServer.environment`: `OMNI_DATA_DIR`, `OMNI_BRAIN_DIR`, `OMNI_CLAUDE_BIN`, `OMNI_CODEX_BIN`, `OMNI_CURSOR_BIN`, `OMNI_BROWSER=0`). The run stops it before quitting.
 - The app exits at `quit` or when the steps run out: 0 when every step passed, 1 otherwise.
 
@@ -235,7 +236,7 @@ Steps (a list, or an object with the list under `steps`):
 | `{"wait": "sidebarLoaded"}`, `{"wait": {"for": "serverState:running", "timeout": 30}}` | Polls every 100ms, 10s by default. Conditions: `sidebarLoaded`, `serverState:<unknown, checking, notRunning, starting, running, failed, stopping>`, `connection:<connecting, open, reconnecting, closed>`, `channel:<id>` |
 | `{"sleep": 1.5}` | Seconds |
 | `{"snapshot": "home"}` | `home.png` for the main window, `home-settings.png` for Settings, `home-window<n>.png` for others. Fails on a blank image |
-| `{"port": 4759}` | Sets the port, as Settings would |
+| `{"port": 4759}` | Sets the port, as Settings would. Never 4747 |
 | `{"open": "settings"}` | Opens Settings |
 | `{"server": "start"}`, `"stop"`, `"check"` | Start Server, Stop Server (no confirmation), Check Again. Waits for it to finish |
 | `{"quit": true}` | Writes the report and exits |

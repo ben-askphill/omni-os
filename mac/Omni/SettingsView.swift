@@ -24,7 +24,7 @@ struct ConnectionSettings: View {
   var body: some View {
     Form {
       Section {
-        TextField("Port", value: $settings.port, format: .number.grouping(.never))
+        PortField(port: $settings.port)
         PathField(title: "Repo", path: $settings.repoPath, prompt: ServerSettings.defaultRepoPath) {
           chooseRepo(from: settings.config.repo)
         }
@@ -71,7 +71,35 @@ struct ConnectionSettings: View {
   }
 }
 
-/// A path typed or picked. Typing applies on Return or when the field loses focus, not per key.
+/// The port as typed. Like a path it applies on Return, focus loss or when Settings closes, so typing 4759
+/// does not try ports 4, 47 and 475 on the way. A number that is not a port puts the current one back.
+struct PortField: View {
+  @Binding var port: Int
+  @State private var draft = ""
+  @FocusState private var focused: Bool
+
+  var body: some View {
+    TextField("Port", text: $draft)
+      .focused($focused)
+      .onSubmit(commit)
+      .onAppear { draft = String(port) }
+      .onChange(of: port) { _, new in
+        if !focused { draft = String(new) }
+      }
+      .onChange(of: focused) { _, now in
+        if !now { commit() }
+      }
+      .onDisappear(perform: commit)
+  }
+
+  private func commit() {
+    if let n = Int(draft.trimmingCharacters(in: .whitespaces)), n != port { port = n }
+    draft = String(port)
+  }
+}
+
+/// A path typed or picked. Typing applies on Return, when the field loses focus or when Settings closes
+/// (closing a window does not end editing), not per key.
 struct PathField: View {
   let title: String
   @Binding var path: String
@@ -103,6 +131,7 @@ struct PathField: View {
     .onChange(of: focused) { _, now in
       if !now { commit() }
     }
+    .onDisappear(perform: commit)
   }
 
   private func commit() {

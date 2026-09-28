@@ -94,6 +94,17 @@ struct AppModelTests {
     }
   }
 
+  @Test func aBlankRepoShowsTheCheckoutItStandsFor() async throws {
+    let port = freePort()
+    let rig = Rig(port: port)
+    let model = rig.model
+    rig.settings.repoPath = ""
+    model.launch()
+    try await rig.sse.next().refuse()
+    try await waitFor("not running", within: .seconds(3)) { model.supervisor.state == .notRunning }
+    #expect(model.serverScreen == .notRunning(port: port, repo: ServerSettings.defaultRepoPath))
+  }
+
   @Test func startAttachesToAServerThatAnswersAndReconnectsTheFeedAtOnce() async throws {
     let port = freePort()
     let rig = Rig(port: port)

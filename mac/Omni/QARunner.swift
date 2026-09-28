@@ -7,9 +7,10 @@ import SwiftUI
 /// against the app. Snapshots render the app's own windows to PNG, with no screen recording permission.
 /// Each step's result goes to `qa.json` in the out folder as it finishes.
 ///
-/// It refuses to run unless launch arguments set the port to something other than 4747, so a QA run never
-/// talks to the live server or saves settings. A server it starts keeps its data in the out folder and runs
-/// the fake CLIs (see `QAServer`).
+/// It refuses to run unless launch arguments set the port to something other than 4747, checked before the
+/// app model exists, so a QA run never talks to the live server or saves settings. A port step can't pick
+/// 4747 either, and server steps refuse while the port is 4747. A server it starts keeps its data in the out
+/// folder and runs the fake CLIs (see `QAServer`).
 @MainActor
 final class QARunner {
   struct Launch {
@@ -38,7 +39,27 @@ final class QARunner {
       FileHandle.standardError.write(Data("QA: -OmniQAScript needs -OmniQAOut <dir>\n".utf8))
       exit(2)
     }
-    return Launch(script: script, out: URL(filePath: out, directoryHint: .isDirectory))
+    let launch = Launch(script: script, out: URL(filePath: out, directoryHint: .isDirectory))
+    do throws(QAScriptError) {
+      _ = try QALaunch.serverPort(in: arguments)
+    } catch {
+      refuse(error.message, out: launch.out)
+    }
+    return launch
+  }
+
+  /// Ends the run before the app model exists, so nothing has talked to a server yet.
+  private static func refuse(_ message: String, out: URL) -> Never {
+    try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+    try? encoder.encode(Report(ok: false, error: message)).write(to: out.appending(path: "qa.json"))
+    FileHandle.standardError.write(Data("QA: \(message)\n".utf8))
+    exit(2)
+  }
+
+  private static var encoder: JSONEncoder {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+    return encoder
   }
 
   static func start(_ launch: Launch, model: AppModel) {
@@ -114,17 +135,21 @@ final class QARunner {
         case .snapshot(let name):
           result.files = try await snapshot(name)
         case .port(let port):
+          guard port != ServerSettings.defaultPort else { throw QAScriptError("port \(port) is the live server") }
           model.settings.port = port
         case .open(.settings):
           guard let openSettings = Self.openSettings else { throw QAScriptError("the main window has not appeared") }
           openSettings()
           try? await Task.sleep(for: .milliseconds(600))
-        case .server(.start):
-          await model.startServer()
-        case .server(.stop):
-          await model.stopServer()
-        case .server(.check):
-          await model.checkAgain()
+        case .server(let action):
+          guard model.settings.port != ServerSettings.defaultPort, model.supervisor.port != ServerSettings.defaultPort else {
+            throw QAScriptError("port \(ServerSettings.defaultPort) is the live server")
+          }
+          switch action {
+          case .start: await model.startServer()
+          case .stop: await model.stopServer()
+          case .check: await model.checkAgain()
+          }
         case .quit:
           finish(result, started)
           await end()
@@ -202,9 +227,7 @@ final class QARunner {
       serverState: f.serverState, connection: f.connection, sidebarLoaded: f.sidebarLoaded, channels: f.channels.sorted(),
       route: model.route.hash, windows: Self.windows.map { $0.identifier?.rawValue ?? $0.title }
     )
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-    try? encoder.encode(report).write(to: out.appending(path: "qa.json"))
+    try? Self.encoder.encode(report).write(to: out.appending(path: "qa.json"))
   }
 
   // MARK: Snapshots
