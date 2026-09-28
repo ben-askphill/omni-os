@@ -94,7 +94,7 @@ public struct Attachment: Decodable, Hashable, Sendable {
 }
 
 /// A command or Mention the message names, with its place in the text.
-public struct SlashHit: Decodable, Hashable, Sendable {
+public struct SlashHit: Codable, Hashable, Sendable {
   public let name: String
   /// omni, project, personal, plugin, mcp or builtin.
   public let source: String
@@ -102,13 +102,27 @@ public struct SlashHit: Decodable, Hashable, Sendable {
   public let argumentHint: String?
   public let start: Int
   public let end: Int
+
+  public init(name: String, source: String, description: String, argumentHint: String?, start: Int, end: Int) {
+    self.name = name
+    self.source = source
+    self.description = description
+    self.argumentHint = argumentHint
+    self.start = start
+    self.end = end
+  }
 }
 
-public struct SlashRecord: Decodable, Hashable, Sendable {
+public struct SlashRecord: Codable, Hashable, Sendable {
   /// The harness command the message starts with.
   public let command: SlashHit?
   /// The Mentions after it, in order.
   public let mentions: [SlashHit]?
+
+  public init(command: SlashHit?, mentions: [SlashHit]?) {
+    self.command = command
+    self.mentions = mentions
+  }
 }
 
 /// kind `user`: a message from Ben or the conductor.
