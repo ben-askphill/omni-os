@@ -979,3 +979,13 @@
     background: none;
   }
 }
+
+/* While the thread panel is being resized: keep the col-resize cursor everywhere and stop
+   artifact iframes and text selection from stealing the drag. */
+body.col-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+body.col-resizing iframe {
+  pointer-events: none;
+}
