@@ -68,6 +68,14 @@ struct OmniCommands: Commands {
       NewThreadButton(model: model)
         .keyboardShortcut("n")
     }
+    CommandGroup(after: .pasteboard) {
+      Divider()
+      Button("Copy Thread as Markdown") {
+        if let text = model.openThreadMarkdown { Pasteboard.copy(text) }
+      }
+      .keyboardShortcut("c", modifiers: [.command, .shift])
+      .disabled(model.openThread == nil)
+    }
     CommandMenu("Server") {
       ServerMenuItems(model: model, shortcuts: true)
     }

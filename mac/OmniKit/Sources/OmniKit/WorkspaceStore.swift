@@ -58,6 +58,8 @@ public final class WorkspaceStore {
   public private(set) var harnesses: [HarnessInfo] = []
   public private(set) var loadState = LoadState.loading
   public private(set) var connection = ConnectionState.connecting
+  /// Each feed message as it comes, for the thread stores that follow it.
+  @ObservationIgnored public var onFeed: ((FeedEvent) -> Void)?
 
   public var snapshot: Snapshot {
     Snapshot(channels: channels, status: status, usage: usage, crew: crew, recent: recent, harnesses: harnesses)
@@ -138,6 +140,7 @@ public final class WorkspaceStore {
   }
 
   private func handle(_ e: SSEEvent<FeedEvent>) {
+    if case .message(let m) = e { onFeed?(m) }
     switch e {
     case .state(let s):
       connection = s

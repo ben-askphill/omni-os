@@ -59,6 +59,29 @@ struct LiveServerTests {
     #expect(ids() == ids().sorted())
   }
 
+  @MainActor @Test func followsAThreadInItsStore() async throws {
+    let t = try await client.createThread(NewThread(channel: "inbox", prompt: "RICH hello from the thread store test"))
+    let store = ThreadStore(id: t.id, client: client)
+    store.start()
+    defer { store.stop() }
+    try await waitFor("loaded", within: .seconds(10)) { store.loadState == .loaded && store.connection == .open }
+    try await waitFor("the turn to end", within: .seconds(20)) { !store.running && store.lastResultID > 0 }
+    let items = store.transcript.items
+    #expect(items.contains { if case .plan(let p) = $0 { p.allDone } else { false } })
+    #expect(items.contains { if case .tools(let g) = $0 { g.flat.contains { !$0.children.isEmpty } } else { false } })
+    #expect(store.betweenTurns)
+
+    store.reconnectNow()
+    _ = try await client.sendMessage(to: t.id, prompt: "and again", mode: .queue)
+    try await finished(t.id)
+    let d = try await client.thread(t.id)
+    try await waitFor("the second turn", within: .seconds(10)) {
+      store.events.map(\.id) == d.events.map(\.id) && store.thread?.status == d.thread.status
+    }
+    #expect(store.transcript.items == Transcript.build(d.events))
+    #expect(store.refreshError == nil)
+  }
+
   @MainActor @Test func fillsTheWorkspaceStore() async throws {
     let store = WorkspaceStore(client: client)
     store.start()

@@ -30,6 +30,7 @@ func sseData(_ text: String) -> [String] {
     "channels.json": { _ = try decodeFixture([ChannelWithRunning].self, "channels.json") },
     "channel.json": { _ = try decodeFixture(ChannelWithRunning.self, "channel.json") },
     "thread.json": { _ = try decodeFixture(ThreadDetail.self, "thread.json") },
+    "thread-rich.json": { _ = try decodeFixture(ThreadDetail.self, "thread-rich.json") },
     "channel-threads.json": { _ = try decodeFixture([OmniThread].self, "channel-threads.json") },
     "threads.json": { _ = try decodeFixture([OmniThread].self, "threads.json") },
     "recent.json": { _ = try decodeFixture([OmniThread].self, "recent.json") },

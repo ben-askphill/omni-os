@@ -35,6 +35,38 @@ import OmniKit
     ])
   }
 
+  @Test func readsTheThreadSteps() throws {
+    let script = try QAScript(json: Data("""
+      [
+        {"appearance": "dark"},
+        {"appearance": "light"},
+        {"wait": "thread:t1"},
+        {"scroll": "top"},
+        {"scroll": "bottom"},
+        {"scroll": "through"},
+        {"expand": true}
+      ]
+      """.utf8))
+    #expect(script.steps == [
+      .appearance(.dark),
+      .appearance(.light),
+      .wait(.thread("t1"), timeout: .seconds(10)),
+      .scroll(.top),
+      .scroll(.bottom),
+      .scroll(.through),
+      .expand,
+    ])
+  }
+
+  @Test func sumsUpFrames() {
+    let stats = QAFrameStats(gaps: [16, 17, 16, 50, 16, 34])
+    #expect(stats.frames == 6)
+    #expect(stats.worst == 50)
+    #expect(stats.slow == 2)
+    #expect(stats.summary == "6 frames, mean 24.8 ms, worst 50.0 ms, 2 over 33 ms")
+    #expect(QAFrameStats(gaps: []).summary == "0 frames")
+  }
+
   @Test func takesTheStepsUnderAKeyToo() throws {
     let script = try QAScript(json: Data(##"{"steps": [{"route": "#/"}, {"quit": true}]}"##.utf8))
     #expect(script.steps == [.route(.home), .quit])
@@ -52,6 +84,9 @@ import OmniKit
     #"[{"port": 0}]"#,
     #"[{"port": 4747}]"#,
     #"[{"sleep": -1}]"#,
+    #"[{"appearance": "sepia"}]"#,
+    #"[{"scroll": "left"}]"#,
+    #"[{"wait": "thread:"}]"#,
     #"{"nope": []}"#,
   ])
   func rejectsWhatItDoesNotKnow(json: String) {
@@ -83,6 +118,9 @@ import OmniKit
     #expect(try QACondition("connection:open").holds(in: facts))
     #expect(try QACondition("channel:acme").holds(in: facts))
     #expect(try !QACondition("channel:globex").holds(in: facts))
+    #expect(try !QACondition("thread:t1").holds(in: facts))
+    facts.shownThread = "t1"
+    #expect(try QACondition("thread:t1").holds(in: facts))
     facts.sidebarLoaded = false
     #expect(try !QACondition("sidebarLoaded").holds(in: facts))
   }

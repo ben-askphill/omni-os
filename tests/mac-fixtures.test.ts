@@ -7,7 +7,8 @@ import { FAKE_CLAUDE, fakeAlive } from './support.ts';
 
 // Golden fixtures for the Mac app's Swift types (mac/OmniKit). Boots the real server with the fake claude CLI,
 // makes a channel and runs a thread through three turns, and keeps what the app reads: the JSON of each GET
-// and the raw SSE of the thread stream and the feed. A normal run only checks that the server still sends the
+// and the raw SSE of the thread stream and the feed. A second thread gets the richer transcript the app's
+// transcript builder reads: a plan, a sub-agent, failing and MCP tools, a crew report, a local command, a crash. A normal run only checks that the server still sends the
 // recorded shape: the same keys and value types, per event kind and per stream message. It writes nothing.
 // When the shape changes on purpose, record again, then run the Swift tests:
 //   OMNI_RECORD_MAC_FIXTURES=1 npx vitest run --config tests/vitest.config.ts tests/mac-fixtures.test.ts
@@ -36,6 +37,8 @@ const NAMES = [
   'error-not-found.json',
   'thread-stream.sse',
   'feed.sse',
+  // Last, so its ids number after the others'.
+  'thread-rich.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -91,6 +94,7 @@ async function boot(): Promise<number> {
       OMNI_WEB_DIST: join(tmp, 'no-web'),
       FAKE_CLAUDE_LOG: fakeLog,
       FAKE_CLAUDE_LATENCY_MS: '10',
+      FAKE_CLAUDE_CRASH_ON: 'CRASH_NOW',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -211,6 +215,25 @@ async function scenario() {
   keep('error-not-found.json', await call('GET', '/threads/nope', undefined, false));
   got.set('thread-stream.sse', await stream.stop());
   got.set('feed.sse', await feed.stop());
+
+  // After everything above is kept, so the lists and streams stay as they were.
+  const rich = (await call('POST', '/threads', { channel: 'acme', prompt: 'RICH fix the cart total', title: 'Fix the cart total' })) as Thread;
+  const settled = (turns: number, extra: (d: Detail) => boolean = () => true) =>
+    eventually(async () => {
+      const d = await detail(rich.id);
+      return d.thread.status === 'done' && count(d, 'result') === turns && extra(d);
+    }, `turn ${turns} of the rich thread to finish`);
+  await settled(1);
+  await call('POST', '/threads', { channel: 'acme', prompt: 'check the checkout', title: 'Check the checkout', parent_id: rich.id, task_id: 'T-1' });
+  await settled(2, (d) => count(d, 'crew_report') === 1);
+  await call('POST', `/threads/${rich.id}/messages`, { prompt: '/context', mode: 'steer' });
+  await settled(3);
+  await call('POST', `/threads/${rich.id}/messages`, { prompt: 'CRASH_NOW', mode: 'steer' });
+  await eventually(async () => {
+    const d = await detail(rich.id);
+    return d.thread.status === 'failed' && count(d, 'error') === 1;
+  }, 'the rich thread to crash');
+  keep('thread-rich.json', await detail(rich.id));
 }
 
 // ---------- shapes ----------

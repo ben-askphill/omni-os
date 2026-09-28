@@ -75,6 +75,8 @@ final class QARunner {
     var ms = 0
     var error: String?
     var files: [String] = []
+    /// What a step measured: a thread's open time, frame times for a scroll.
+    var note: String?
   }
 
   private struct Report: Encodable {
@@ -96,6 +98,7 @@ final class QARunner {
   private let model: AppModel
   private let out: URL
   private var report = Report()
+  private var routedAt: ContinuousClock.Instant?
 
   private init(model: AppModel, out: URL) {
     self.model = model
@@ -128,8 +131,17 @@ final class QARunner {
         switch step {
         case .route(let route):
           model.route = route
+          routedAt = .now
         case .wait(let condition, let timeout):
           try await wait(for: condition, timeout: timeout)
+          if case .thread = condition, let routedAt, let shownAt = QAProbe.shownAt, shownAt > routedAt {
+            result.note = "open \(Self.ms(shownAt - routedAt)) ms"
+          }
+        case .appearance(let appearance):
+          NSApp.appearance = NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
+          try? await Task.sleep(for: .milliseconds(500))
+        case .scroll(let scroll):
+          result.note = try await self.scroll(scroll)
         case .sleep(let duration):
           try? await Task.sleep(for: duration)
         case .snapshot(let name):
@@ -177,10 +189,13 @@ final class QARunner {
 
   private func finish(_ result: StepResult, _ started: ContinuousClock.Instant) {
     var result = result
-    let elapsed = ContinuousClock.now - started
-    result.ms = Int(elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000)
+    result.ms = Self.ms(ContinuousClock.now - started)
     if !result.ok { report.ok = false }
     report.steps.append(result)
+  }
+
+  private static func ms(_ d: Duration) -> Int {
+    Int(d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000)
   }
 
   private func scriptData(_ text: String) throws -> Data {
@@ -198,19 +213,48 @@ final class QARunner {
     case .port(let port): "port \(port)"
     case .open(let window): "open \(window.rawValue)"
     case .server(let action): "server \(action.rawValue)"
+    case .appearance(let appearance): "appearance \(appearance.rawValue)"
+    case .scroll(let scroll): "scroll \(scroll.rawValue)"
     case .quit: "quit"
     }
   }
 
   private func wait(for condition: QACondition, timeout: Duration) async throws(QAScriptError) {
     let deadline = ContinuousClock.now + timeout
-    while !condition.holds(in: model.qaFacts) {
+    while !condition.holds(in: facts) {
       guard ContinuousClock.now < deadline else {
-        let f = model.qaFacts
+        let f = facts
         throw QAScriptError("timed out; server \(f.serverState), feed \(f.connection), sidebar loaded \(f.sidebarLoaded)")
       }
       try? await Task.sleep(for: .milliseconds(100))
     }
+  }
+
+  /// The model's facts and which transcript the thread screen has laid out.
+  private var facts: QAFacts {
+    var f = model.qaFacts
+    f.shownThread = QAProbe.shownThread
+    return f
+  }
+
+  // MARK: Scrolling
+
+  private func scroll(_ scroll: QAScroll) async throws(QAScriptError) -> String? {
+    guard let scroller = QAProbe.scroller else { throw QAScriptError("no thread on screen") }
+    switch scroll {
+    case .top:
+      scroller.toTop()
+    case .bottom:
+      scroller.toBottom()
+    case .through:
+      guard let view = Self.windows.first(where: Self.isMain)?.contentView else { throw QAScriptError("no main window") }
+      scroller.toBottom()
+      try? await Task.sleep(for: .seconds(1))
+      let gaps = await FrameClock().run(in: view, frames: 5000, scroller.pageUp)
+      return QAFrameStats(gaps: gaps).summary
+    }
+    try? await Task.sleep(for: .milliseconds(600))
+    return nil
   }
 
   private func abort(_ message: String) {
@@ -379,6 +423,34 @@ final class QARunner {
       context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
     }
     return buffer
+  }
+}
+/// Calls `tick` once a frame from the display link until it returns false, and times the frames.
+@MainActor
+private final class FrameClock: NSObject {
+  private var tick: () -> Bool = { false }
+  private var left = 0
+  private var last: CFTimeInterval?
+  private var gaps: [Double] = []
+  private var done: CheckedContinuation<[Double], Never>?
+
+  func run(in view: NSView, frames: Int, _ tick: @escaping () -> Bool) async -> [Double] {
+    self.tick = tick
+    left = frames
+    return await withCheckedContinuation { continuation in
+      done = continuation
+      view.displayLink(target: self, selector: #selector(frame(_:))).add(to: .main, forMode: .common)
+    }
+  }
+
+  @objc private func frame(_ link: CADisplayLink) {
+    if let last { gaps.append((link.timestamp - last) * 1000) }
+    last = link.timestamp
+    left -= 1
+    guard left <= 0 || !tick() else { return }
+    link.invalidate()
+    done?.resume(returning: gaps)
+    done = nil
   }
 }
 #endif

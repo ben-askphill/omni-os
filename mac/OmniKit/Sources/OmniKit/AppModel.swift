@@ -71,10 +71,13 @@ public final class AppModel {
   public struct Connection {
     public let client: OmniClient
     public let store: WorkspaceStore
+    public let threads: ThreadStoreRegistry
 
-    public init(client: OmniClient, store: WorkspaceStore) {
+    /// - Parameter threads: the stores for open threads, on `client` by default.
+    @MainActor public init(client: OmniClient, store: WorkspaceStore, threads: ThreadStoreRegistry? = nil) {
       self.client = client
       self.store = store
+      self.threads = threads ?? ThreadStoreRegistry(client: client)
     }
   }
 
@@ -82,6 +85,8 @@ public final class AppModel {
   public let supervisor: ServerSupervisor
   public private(set) var client: OmniClient
   public private(set) var store: WorkspaceStore
+  /// The open threads' stores, fed from `store`'s feed. Swapped with it on a port change.
+  public private(set) var threads: ThreadStoreRegistry
   public var route = Route.home
   /// The last start that failed, until the server runs, Start is pressed again or the settings change.
   public private(set) var startFailure: StartFailure?
@@ -104,6 +109,8 @@ public final class AppModel {
     let c = connect(settings.port)
     client = c.client
     store = c.store
+    threads = c.threads
+    follow(c)
   }
 
   isolated deinit {
@@ -159,6 +166,25 @@ public final class AppModel {
 
   public var logURL: URL { supervisor.logURL }
 
+  /// The thread the route shows, once its store has it, for the sidebar to keep in view.
+  public var openThread: ThreadStub? {
+    guard case .thread(let id, _) = route, let t = threads.store(id)?.thread else { return nil }
+    return ThreadStub(t)
+  }
+
+  /// The window title: the thread's own on a thread, else the route's.
+  public var title: String {
+    guard serverScreen == nil else { return "Omni" }
+    if case .thread(let id, _) = route, let t = threads.store(id)?.thread { return t.title }
+    return route.title { store.channel($0)?.name }
+  }
+
+  /// The thread on screen as Markdown, for Copy Thread as Markdown. nil until it loads.
+  public var openThreadMarkdown: String? {
+    guard case .thread(let id, _) = route, let s = threads.store(id), let t = s.thread, s.loadState == .loaded else { return nil }
+    return TranscriptMarkdown.thread(title: t.title, items: s.transcript.items, cwd: s.cwd)
+  }
+
   // MARK: Actions
 
   /// Starts the server, or attaches to one that answers, then reconnects the feed without waiting out its backoff.
@@ -200,6 +226,10 @@ public final class AppModel {
 
   // MARK: Following changes
 
+  private func follow(_ c: Connection) {
+    c.store.onFeed = { [threads = c.threads] in threads.apply(feed: $0) }
+  }
+
   private func checkServer() {
     Task { await refreshServer() }
   }
@@ -219,6 +249,8 @@ public final class AppModel {
       let c = connect(new.port)
       client = c.client
       store = c.store
+      threads = c.threads
+      follow(c)
       lastConnection = .connecting
       store.start()
     }

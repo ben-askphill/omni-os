@@ -75,7 +75,7 @@ struct SidebarView: View {
     Label(title ?? channel.name, systemImage: symbol)
       .badge(channel.running)
       .tag(SidebarItem.channel(channel.id))
-    let links = SidebarSections.threads(of: channel)
+    let links = SidebarSections.threads(of: channel, open: model.openThread)
     ForEach(links.shown) { thread in
       ThreadRow(thread: thread)
         .tag(SidebarItem.thread(thread.id))

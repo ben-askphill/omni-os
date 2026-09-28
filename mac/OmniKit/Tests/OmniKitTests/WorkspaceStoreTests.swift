@@ -255,6 +255,19 @@ private func loaded(_ store: WorkspaceStore) async throws {
     try await waitFor("the next refetch") { api.calls("channels") == 3 }
   }
 
+  @Test func passesEachFeedMessageOn() async throws {
+    let (store, feed, _) = makeStore(try FakeWorkspaceAPI.standard())
+    defer { store.stop(); feed.finish() }
+    var got: [FeedEvent] = []
+    store.onFeed = { got.append($0) }
+    let t = try thread("t1", updated: 1)
+    feed.yield(.state(.open))
+    feed.yield(.message(.thread(t)))
+    feed.yield(.message(.unknown(.string("x"))))
+    try await waitFor("both messages") { got.count == 2 }
+    #expect(got == [.thread(t), .unknown(.string("x"))])
+  }
+
   @Test func keepsRecentThreadsInStepWithTheFeed() async throws {
     let api = try FakeWorkspaceAPI.standard()
     api.recent = [try thread("t1", updated: 10), try thread("t2", updated: 9)]

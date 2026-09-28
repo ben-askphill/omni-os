@@ -15,17 +15,12 @@ struct MainWindow: View {
     } detail: {
       DetailView(model: model)
     }
-    .navigationTitle(title)
+    .navigationTitle(model.title)
     .toolbar { toolbar }
     .frame(minWidth: 720, minHeight: 460)
     #if DEBUG
     .onAppear { QARunner.openSettings = openSettings }
     #endif
-  }
-
-  private var title: String {
-    guard model.serverScreen == nil else { return "Omni" }
-    return model.route.title { model.store.channel($0)?.name }
   }
 
   @ToolbarContentBuilder private var toolbar: some ToolbarContent {
@@ -81,6 +76,8 @@ struct DetailView: View {
   var body: some View {
     if let screen = model.serverScreen {
       ServerView(model: model, screen: screen)
+    } else if case .thread(let id, _) = model.route {
+      ThreadScreen(model: model, id: id)
     } else {
       RoutePlaceholder(route: model.route, title: model.route.title { model.store.channel($0)?.name }) {
         model.route = .home

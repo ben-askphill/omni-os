@@ -72,6 +72,24 @@ func eventJSON(kind: String, payload: String, id: Int = 1) -> String {
     #expect(try decode(OmniThread.self, threadJSON(status: "queued")).status.isActive)
   }
 
+  @Test(arguments: [
+    ("queued", "Queued"), ("running", "Running"), ("done", "Done"), ("failed", "Failed"), ("stopped", "Stopped"),
+    ("imported", "Imported"), ("paused", "paused"),
+  ])
+  func labelsStatusesAsTheWebUIDoes(_ raw: String, _ want: String) {
+    #expect(ThreadStatus(rawValue: raw).label == want)
+  }
+
+  @Test func makesASidebarStubFromAThread() throws {
+    let t = try decode(OmniThread.self, threadJSON(status: "running"))
+    let stub = ThreadStub(t)
+    #expect(stub.id == "t1")
+    #expect(stub.channelID == "acme")
+    #expect(stub.title == "Fix cart")
+    #expect(stub.status == .running)
+    #expect(stub.createdAt == t.createdAt)
+  }
+
   @Test func readsAChannelWithItsRunningThreads() throws {
     let json = channelJSON.dropLast() + #","running":1,"active":[{"id":"t1","channel_id":"acme","title":"Fix cart","status":"running","created_at":"2026-09-28T07:57:15.045Z"}]}"#
     let c = try decode(ChannelWithRunning.self, String(json))

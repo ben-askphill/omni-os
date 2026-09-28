@@ -13,6 +13,16 @@ public enum QAWindow: String, Hashable, Sendable {
   case settings
 }
 
+public enum QAAppearance: String, Hashable, Sendable {
+  case light, dark
+}
+
+/// Where a scroll step takes the open thread's transcript. `through` scrolls from the bottom to the top half
+/// a screen per frame and reports how long the frames took.
+public enum QAScroll: String, Hashable, Sendable {
+  case top, bottom, through
+}
+
 /// What the Server menu does, without the confirmation Stop asks for.
 public enum QAServerAction: String, Hashable, Sendable {
   case start, stop, check
@@ -21,7 +31,8 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// One step of a Debug QA run, from the JSON the app gets with `-OmniQAScript`:
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`,
-/// `{"server": "start"}` (or `stop`, `check`), `{"quit": true}`.
+/// `{"server": "start"}` (or `stop`, `check`), `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or
+/// `bottom`, `through`), `{"expand": true}`, `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -33,6 +44,10 @@ public enum QAStep: Hashable, Sendable {
   case open(QAWindow)
   /// Start Server, Stop Server or Check Again. The step waits for it to finish.
   case server(QAServerAction)
+  case appearance(QAAppearance)
+  case scroll(QAScroll)
+  /// Opens the open thread's tool groups, and the calls in them that failed or have sub-calls.
+  case expand
   case quit
 
   static let defaultTimeout = Duration.seconds(10)
@@ -48,6 +63,8 @@ public enum QACondition: Hashable, Sendable {
   case connection(String)
   /// `channel:<id>`: the sidebar lists that channel.
   case channel(String)
+  /// `thread:<id>`: the thread's transcript is on screen, laid out.
+  case thread(String)
 
   static let serverStates: Set = ["unknown", "checking", "notRunning", "starting", "running", "failed", "stopping"]
   static let connectionStates: Set = ["connecting", "open", "reconnecting", "closed"]
@@ -59,6 +76,7 @@ public enum QACondition: Hashable, Sendable {
     case ("serverState", let s?) where Self.serverStates.contains(s): self = .serverState(s)
     case ("connection", let s?) where Self.connectionStates.contains(s): self = .connection(s)
     case ("channel", let id?) where !id.isEmpty: self = .channel(id)
+    case ("thread", let id?) where !id.isEmpty: self = .thread(id)
     default: throw QAScriptError("unknown condition \(text)")
     }
   }
@@ -69,6 +87,7 @@ public enum QACondition: Hashable, Sendable {
     case .serverState(let s): facts.serverState == s
     case .connection(let s): facts.connection == s
     case .channel(let id): facts.channels.contains(id)
+    case .thread(let id): facts.shownThread == id
     }
   }
 }
@@ -79,12 +98,15 @@ public struct QAFacts: Hashable, Sendable {
   public var connection: String
   public var sidebarLoaded: Bool
   public var channels: Set<String>
+  /// The thread whose transcript is on screen, once it is laid out.
+  public var shownThread: String?
 
-  public init(serverState: String, connection: String, sidebarLoaded: Bool, channels: Set<String>) {
+  public init(serverState: String, connection: String, sidebarLoaded: Bool, channels: Set<String>, shownThread: String? = nil) {
     self.serverState = serverState
     self.connection = connection
     self.sidebarLoaded = sidebarLoaded
     self.channels = channels
+    self.shownThread = shownThread
   }
 }
 
@@ -113,7 +135,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "server", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "server", "appearance", "scroll", "expand", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -153,6 +175,14 @@ public struct QAScript: Hashable, Sendable {
         throw QAScriptError("server takes start, stop or check")
       }
       return .server(action)
+    case "appearance":
+      guard let name = value as? String, let a = QAAppearance(rawValue: name) else { throw QAScriptError("appearance takes light or dark") }
+      return .appearance(a)
+    case "scroll":
+      guard let name = value as? String, let to = QAScroll(rawValue: name) else { throw QAScriptError("scroll takes top, bottom or through") }
+      return .scroll(to)
+    case "expand":
+      return .expand
     default:
       return .quit
     }
@@ -202,6 +232,30 @@ public enum QAServer {
       "OMNI_CURSOR_BIN": fixtures.appending(path: "fake-cursor.mjs").path,
       "OMNI_BROWSER": "0",
     ]
+  }
+}
+
+/// How long the frames of a scroll step took, from one display refresh to the next.
+public struct QAFrameStats: Hashable, Sendable {
+  /// Longer than two 60 Hz frames: one was missed.
+  public static let slowMs = 33.0
+
+  public let frames: Int
+  public let mean: Double
+  public let worst: Double
+  public let slow: Int
+
+  public init(gaps: [Double]) {
+    frames = gaps.count
+    mean = gaps.isEmpty ? 0 : gaps.reduce(0, +) / Double(gaps.count)
+    worst = gaps.max() ?? 0
+    slow = gaps.count { $0 > Self.slowMs }
+  }
+
+  public var summary: String {
+    guard frames > 0 else { return "0 frames" }
+    let ms = { (v: Double) in String(format: "%.1f ms", v) }
+    return "\(frames) frames, mean \(ms(mean)), worst \(ms(worst)), \(slow) over \(Int(Self.slowMs)) ms"
   }
 }
 

@@ -24,6 +24,15 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `SSEClient.swift` | `SSEClient`, `SSEEvent`, `ConnectionState`, `SSETransport`, `URLSessionSSETransport`, and `feedEvents` and `threadEvents` on `OmniClient` |
 | `Ticker.swift` | Internal. A `Clock` with its instant type erased, so tests can inject one |
 | `WorkspaceStore.swift` | `WorkspaceStore`, `WorkspaceAPI`, `SidebarSections` |
+| `Client+Thread.swift` | `ThreadAPI` (the calls `ThreadStore` makes), `artifactURL` and `uploadURL` on `OmniClient` |
+| `ThreadStore.swift` | `ThreadStore` (one thread, live), `ThreadStoreRegistry` |
+| `Transcript.swift` | `Transcript` (the Web UI's `buildItems`, incremental), `TranscriptItem`, `ToolGroup`, `ToolCall`, `Plan`, `Todo`, `TurnResult.line` |
+| `ToolText.swift` | `ToolText`: a tool's label, one-line summary, SF Symbol and font, from `web/src/tool-summary.ts` and `Transcript.tsx`. Internal `JSONKeyOrder` |
+| `StatusLine.swift` | `StatusLine.label` (`web/src/status-line.ts`) and `betweenTurns` |
+| `Format.swift` | `Format`: `relTime`, `clock`, `shortDate`, `duration(ms:)`, `bytes`, `plural`, `shortPath`, from `web/src/format.ts` |
+| `Markdown.swift` | `MarkdownDocument` and its blocks, `MarkdownText`, `MarkdownRun`, `MarkdownImage`, `MarkdownLink`. The only file that imports swift-markdown |
+| `Autolink.swift` | Internal. `Autolink.pieces`: the Web UI's bare URL, email and thread id links in a run of text |
+| `MarkdownCache.swift` | `MarkdownCache`: parsed markdown per event id and text |
 | `ServerSettings.swift` | `ServerSettings` (port, repo path, Node override in UserDefaults), `ServerConfig` |
 | `Spawn.swift` | Internal. posix_spawn in a new session (no controlling terminal, pgid is the pid), and `capture` for short commands with a timeout |
 | `ServerLaunch.swift` | `ServerStartError`, `LoginShell`, `NodeResolver`, `NodeVersion`, `ServerEnvironment`, `ServerLauncher`, `ServerLaunch` |
@@ -40,6 +49,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 - The app: `xcodebuild -project mac/Omni.xcodeproj -scheme Omni -configuration Debug -derivedDataPath mac/.xcode build`. It lands in `mac/.xcode/Build/Products/Debug/Omni.app`. `-configuration Release` builds `Release/Omni.app`, which has no QA code.
 - In Xcode, open `mac/Omni.xcodeproj` to run the app. Its scheme has no tests: Xcode does not offer a local package's test target to the project's schemes. For Cmd-U on OmniKit, open `mac/OmniKit/Package.swift`.
 - `mac/.xcode`, `mac/OmniKit/.build`, `mac/OmniKit/.swiftpm` and `xcuserdata` are gitignored.
+- OmniKit's one dependency is swift-markdown (from 0.6.0), which brings swift-cmark. Two `Package.resolved` files pin them and are committed: `mac/OmniKit/Package.resolved` for `swift test`, and `mac/Omni.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` for xcodebuild and Xcode. Keep their pins the same: after `swift package update` in `mac/OmniKit`, copy its file over the Xcode one (or resolve in Xcode and copy back). The first build of a checkout fetches both from GitHub; later ones use the cache.
 
 ### Golden fixtures
 
@@ -49,6 +59,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 - To record again after a deliberate change: `OMNI_RECORD_MAC_FIXTURES=1 npx vitest run --config tests/vitest.config.ts tests/mac-fixtures.test.ts`, then `npm run test:mac` and fix the Swift types it breaks.
 - Recording is stable: paths, UUIDs, times, pids, ports, the git head and durations are normalized, so recording twice gives the same files.
 - `FixtureTests.swift` decodes every file, and fails if a file in the folder has no decoder in its table. Add a fixture in both places.
+- `thread-rich.json` is a second thread, for the transcript. Its prompt has the fake CLI's `RICH` marker, which plays the calls a real turn is made of: a plan updated three times, a sub-agent (`Task`) with a nested `Grep` and `Read`, a status, a failing `Bash`, an MCP tool. Then a child's crew report, `/context` (a zero-turn result), and a turn that crashes (`FAKE_CLAUDE_CRASH_ON`), with an error and a dropped message. It is recorded last, so the other fixtures kept their UUIDs.
 
 ## Conventions
 
@@ -106,6 +117,97 @@ What the server sends (see the `.sse` fixtures and `server/app.ts`):
 - `SidebarSections(channels)` lays out the sidebar like `Sidebar.tsx`: Conductor, then Clients, Internal and Personal (empty groups left out), then any other kind. `SidebarSections.threads(of:open:)` gives the thread links: newest first, 5 at most, the open thread kept even after it stops, and the count for "N more".
 - Differences from the Web UI: the reconnect refetch is immediate and includes recent and harnesses; the Web UI debounces channels and status and lets each list reload itself. Harnesses load at start and on reconnect only, since the call is slow; the Web UI loads them in the composer.
 
+## Thread store (#63 part A)
+
+`ThreadStore` (`@MainActor @Observable`, one per thread id) holds what the thread screen shows, kept current like `web/src/pages/Thread.tsx`:
+
+- `start()` loads `GET /api/threads/:id`, then opens the stream with `after=` the last event id. A 404 is `.notFound` and opens no stream. A first load that fails is `.failed(error)`; `reload()` tries again and opens the stream once it works.
+- `events` are kept once each, in id order, whatever order the stream sends them in. `transcript` follows them.
+- Stream messages gather for `frame` (16ms) and are applied together. A connection change applies what came before it first.
+- A thread row, from the stream or a load, replaces the one shown unless it is older (`updatedAt`). `merge(_:isReply:)` does the same for the answer to Ben's own request, which also loses a tie. `pending` and `warm` (the server's `live`) change only with a row that is applied.
+- Every stream open after the first loads the thread again and merges it in: missing events are added, the row goes through the rule above, channel, parent and children are replaced. Artifacts the stream sent while the load was out are laid over the answer unless it has a newer copy. A refetch that fails sets `refreshError` and keeps everything.
+- `isReconnecting` is the Web UI's Reconnecting label: loaded, and the stream is `.reconnecting`. It stays false during the first connection.
+- `interrupt()` posts stop. `stopping` holds until the thread stops running, a new result comes or 15s pass; a failed stop sets `actionError`. `interrupting` also counts an "Interrupt and send" message the agent has not read.
+- `workingLine` is the line under the transcript: the latest status, else "Working" when nothing came back since the last message. Only while the thread is `.running`; queued is not working yet.
+- `arrivedHTML` is the newest HTML artifact that first came on the stream, which the Web UI selects when it lands. `defaultArtifact(_:)` is the one to show when the thread opens: the newest HTML page, else the newest file.
+- `apply(feed:)` updates children and the parent from feed thread events. The thread's own row is left to its stream, which carries `pending` with it.
+- Decoding happens off the main actor: stream messages in `SSEClient`'s reader, the snapshot in `OmniClient`, and the first transcript layout in a nonisolated function.
+- `ThreadStoreRegistry` shares one store per thread id: `acquire` makes and starts it, the last `release` stops and drops it, `apply(feed:)` passes the event to every store. A store that is let go without `stop()` closes its stream in its deinit.
+
+`Transcript` is `buildItems` from `web/src/components/Transcript.tsx`:
+
+- Items: `.user`, `.text`, `.tools(ToolGroup)`, `.plan`, `.result`, `.error`, `.report`. A group gathers the calls between two breaking rows (user, text, result, error, crew report), with sub-agent calls nested under their parent by `parent_tool_use_id`. A result can come before its call.
+- Ids are stable across updates: a group is `.event(first call's event id)`, the plan is `.plan`. The live plan is one item, updated in place, placed after the group of its latest `TodoWrite`.
+- `update(_:)` works from the last item that can still change, so a streamed event costs the tail, not the thread. If the list does not extend the one it saw (an earlier event turned up), it lays everything out again. `TranscriptTests` checks piece by piece equals all at once, over random splits of the recorded threads and random turns.
+- A zero-turn success result (a slash command) shows nothing and does not break the group, like the Web UI.
+- Differences: a call that names itself as its parent is shown at the top, not dropped. A `tool_use` whose payload does not decode shows nothing.
+
+`ToolText.summary` needs the input's keys in the order JavaScript gives them, for the "first string field" fallback: `ToolUse.inputKeys` keeps the top level's order (integer keys first, then as sent). Nested objects are not ordered, so part C's pretty JSON of an input will not match the Web UI's key order until that is solved (`JSONKeyOrder` can be extended).
+
+`Format` spells month names out (en-GB, "Sept") instead of taking them from the system, so they match the Web UI.
+
+## Thread screen handoff (#63 part C)
+
+For the thread screen (part C). What parts A and B leave ready and what they do not:
+
+- Wire-up: the app has no `ThreadStoreRegistry` yet. Make one next to the `WorkspaceStore` in `AppModel`, and pass feed thread events to `registry.apply(feed:)` (the `WorkspaceStore` reads the feed; give it a hook, or read `client.feedEvents()` once and fan out). The screen calls `acquire(id)` on appear and `release(id)` on disappear; S14 (#75) reuses it across windows.
+- Pass the open thread to `SidebarSections.threads(of:open:)` so it stays in the sidebar after it stops.
+- Rows, from `Transcript.tsx`: `UserBubble` (the `SOURCE_LABEL` table, "Steered", "Interrupted and sent", "Not sent" for a dropped message, attachments via `uploadURL`), `ToolGroup` (a lone call is just its row, `isSingle`; else "N tool calls" with `names`, or the `latest` call's label and summary while `isLive(_:running:)`, and "N failed" from `failures`), a call row ("N sub-calls", `ToolText.label`, `summary(cwd:)`, `icon`, `isMonospaced`, `isFailed`, `isStopped`), `ToolInput` (the full input as pretty JSON, see the key order caveat above), `PlanCard` (`Plan.done`, `active`, `allDone`, `Todo.label`), `ResultLine` (`TurnResult.line`, `isBad`), `ReportCard` (its text is markdown, "(no reply)" when empty), the error row. Assistant text and reports go through `MarkdownCache` (see "Markdown" below).
+- Under the transcript: `workingLine`, then `QueuedMessages` (`pendingLabel` in `Transcript.tsx`) from `store.pending`, with `starting: store.betweenTurns`.
+- Header: `isReconnecting` shows "Reconnecting", the status pill, `interrupting` turns the button into "Interrupting". Esc interrupts a running thread when nothing else wants Esc.
+- Artifacts are chosen per window, not in the store: start from `ThreadStore.defaultArtifact(store.artifacts)`, switch to `arrivedHTML` when it changes, list `files` and `screenshots`, load with `client.artifactURL(_:)`.
+- `cwd` for summaries is the last `init` event's cwd, else `thread.cwd`, as the Web UI does.
+- Errors: `.failed` and `.notFound` for the whole screen, `refreshError` and `actionError` as notes with a retry (`reload()`).
+- The transcript should be a lazy list keyed by `TranscriptItem.id`; items are `Hashable` so rows can skip redraws.
+
+## Markdown (#63 part B)
+
+`MarkdownDocument(parsing:)` reads text the way `web/src/components/Markdown.tsx` shows it: react-markdown with remark-gfm, then its thread id links. swift-markdown (cmark-gfm) parses, smart punctuation off, and `Markdown.swift` turns its tree into plain `Sendable` values, so no swift-markdown type leaves OmniKit.
+
+- Blocks: `.paragraph`, `.heading(level:)`, `.code(language:code:)` (the first word of the fence info; no trailing newline), `.quote`, `.list`, `.table`, `.thematicBreak`, `.html` (a raw HTML block, shown as the text it is).
+- `MarkdownList`: `isOrdered`, `start`, `isLoose`, and items of blocks, so lists nest. `checked` is nil for an item that is not a task. `isLoose` is CommonMark's loose list (a blank line between items, or between two blocks of one item); the Web UI wraps each item in a `<p>` then, which spaces the list out.
+- `MarkdownTable`: `alignments`, `head`, `rows`, each row padded or cut to the head's width. The alignment is in the model, but the Web UI's CSS left-aligns every cell; part C picks.
+- `MarkdownText` is a list of `runs`: text with a `style` (emphasis, strong, strikethrough, code), maybe a `link`, maybe an `image` (its text is the alt text). Runs that look the same are joined. `attributed` is one `AttributedString` with `inlinePresentationIntent` and `link` set, for a SwiftUI `Text`, images as their alt text. `segments` splits it around images, for a view that loads them. `plain` is the text alone.
+- A soft break is a space, a hard break a newline. Inline HTML is text. Link titles are dropped. No footnotes (remark-gfm has them).
+
+Links, `MarkdownLink`:
+
+- `#/...` is `.route(Route)`. A hash that is `Route.notFound` (`#top`) is not a link.
+- http and https with a host, and mailto, are `.external(URL)`. Any other scheme (javascript, file, data, irc, xmpp) and relative paths are not links: the text shows plain. Images load from http and https only.
+- The href is encoded like micromark's normalizeUri: what a URL cannot hold is percent encoded, escapes already there are kept. Where the web leaves a URL that cannot open, a second `#` and a `%` that starts no escape are encoded too, and an IPv6 host is kept.
+- In `attributed`, a route rides as `omni:#/t/<id>`. In the view's `OpenURLAction`, `MarkdownLink(url:)` turns the URL back: `.route` sets `model.route`, `.external` goes to `NSWorkspace`.
+
+Bare links, `Autolink.swift`, found in the web's order:
+
+1. micromark's literal autolinks, found while it parses: `http(s)://`, `www.` and emails, with its trailing punctuation and parentheses rules. None while a `[` is open in the block (its `previousUnbalanced`); escaped brackets are read back from the source for that.
+2. mdast-util-gfm-autolink-literal's URL and email passes over the text left. These also link after punctuation or a symbol.
+3. Markdown.tsx's bare thread ids (lowercase UUIDs between word boundaries) link to `#/t/<id>` and show the first 8 characters. Inline code that is exactly an id does the same, in code style.
+
+Code, link text and raw HTML are never linked. Every scan is linear in the text: `MarkdownSpeedTests` parses a 24 KB reply under 250ms, and long words that would make a naive scan quadratic.
+
+To see what the web makes of a snippet, from the repo root:
+
+```sh
+node --import tsx --input-type=module -e '
+const { createElement } = await import("react");
+const { renderToStaticMarkup } = await import("react-dom/server");
+const { Markdown } = await import("./web/src/components/Markdown.tsx");
+console.log(renderToStaticMarkup(createElement(Markdown, { text: process.argv[1] })));
+' 'see www.example.com, and **bold**'
+```
+
+Differences from the web, found by comparing 10,000 random and realistic snippets with that render. All rare in agent text:
+
+- Emphasis around a URL: micromark finds a literal URL before it pairs `*`, `_` and `~`, cmark after. A delimiter in a URL that pairs with one outside splits the URL here; the web keeps it whole (`**https://x.com/a**/`, `_https://en.wikipedia.org/wiki/Foo_(bar)_`, `https://x.com/a-b_c~d~`). Fixing it takes a second parse with those delimiters escaped.
+- `&amp;` right after a URL: cmark decodes it first, so the link takes the `&`. The web stops before it.
+- A URL Foundation can't parse (a port that is not a number, as `https://x.com:443'}` or `www.x.co:y`, or no host, as `www.@`) stays plain. The web links it, to a page that can't open.
+- A thread id inside a URL stays in the URL; the web links the id and breaks the URL. An id in `<...>` or `_..._` is linked here and not on the web (its regex runs on the source).
+- A relative link (`[x](www.x.com)`, `[x](docs/a.md)`) is plain text here and a dead link on the web.
+
+`MarkdownCache<Key>`: `document(for:text:)` parses once per key and text, and again when a key's text changes (a streaming reply). Past `limit` (2000) it drops the least recently used down to three quarters. It is thread safe and parses outside its lock, so a parse can run off the main actor. `cached(for:text:)` never parses. Use one `MarkdownCache<Int>` for the app keyed by event id (ids are unique across threads), shared by every thread window.
+
+Tests: `MarkdownTests` (blocks, inline, `attributed`), `MarkdownLinkTests` (link rules, encoding, thread ids, bare links; the expected results were checked against the web render), `MarkdownCacheTests` (cache, speed).
+
 ## Server supervisor (part C)
 
 `ServerSupervisor` (`@MainActor @Observable`) finds, starts and stops the server on the port from `ServerSettings`. Make it with `ServerSupervisor(settings:)`; it reads `settings.config` at each call, so a settings change applies at the next `refresh()`, `start()` or `stop()`. Calls run one at a time, in order.
@@ -150,7 +252,7 @@ In `TestSupport.swift`:
 - `eventually` and `waitFor` (for main actor state) poll for up to 2s by default; `settle()` lets other tasks run before a check that something did not happen. `Gate` holds a fake call until opened.
 - `FakeWorkspaceAPI` in `WorkspaceStoreTests.swift` answers with what the test set and counts calls. `holdNextChannels()` and `holdNextRecent()` hold the next call with a `Gate`.
 
-`LiveServerTests` runs the SSE client, `URLSessionSSETransport` and the store against a real server, only when `OMNI_LIVE_PORT` is set (never 4747). Boot one from the repo root with the fake CLIs and a throwaway data dir, passing only PATH and HOME from your shell (the login shell exports a stale `ANTHROPIC_API_KEY`):
+`LiveServerTests` runs the SSE client, `URLSessionSSETransport`, the workspace store and a thread store (a `RICH` turn, then a reconnect and a second turn) against a real server, only when `OMNI_LIVE_PORT` is set (never 4747). Boot one from the repo root with the fake CLIs and a throwaway data dir, passing only PATH and HOME from your shell (the login shell exports a stale `ANTHROPIC_API_KEY`):
 
 ```sh
 T=$(mktemp -d)
@@ -264,7 +366,7 @@ What the tracer's QA run covered (each checked by eye in the PNGs): the sidebar 
 
 ## Next
 
-- No screen is built past the placeholders. The thread store can stand on `threadEvents(_:after:)`: load the snapshot, stream after its last event id, and refetch the snapshot on each `.open` after the first. Once a thread screen exists, pass the open thread to `SidebarSections.threads(of:open:)` so it stays in the sidebar after it stops; the sidebar passes none today.
+- No screen is built past the placeholders. `ThreadStore` and the markdown model are ready for the thread screen; see the handoff above.
 - While the server is down the sidebar keeps the last channel list it had.
 - The quit dialog (#74) can call `stopServer()` when `state` is `.running(startedByApp: true, _)`. Threads in their own windows are #75.
 - `Route(hash:)` and `route.hash` mirror `parseHash` and `href` in the Web UI. Use them for deep links, open in browser and window restoration. PR and artifact numbers parse as `Int` only.

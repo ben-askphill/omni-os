@@ -13,6 +13,19 @@ public struct ThreadStatus: OpenEnum {
 
   /// Queued or running: the sidebar lists it under its channel.
   public var isActive: Bool { self == .queued || self == .running }
+
+  /// What the status pill says, as STATUS_LABEL in web/src/components/ui.tsx.
+  public var label: String {
+    switch self {
+    case .queued: "Queued"
+    case .running: "Running"
+    case .done: "Done"
+    case .failed: "Failed"
+    case .stopped: "Stopped"
+    case .imported: "Imported"
+    default: rawValue
+    }
+  }
 }
 
 public struct ThreadSource: OpenEnum {
