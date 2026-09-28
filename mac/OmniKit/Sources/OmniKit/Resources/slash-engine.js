@@ -88,7 +88,7 @@
     });
   }
 
-  // web/src/composer-slash.ts
+  // shared/composer-slash.ts
   var HARNESS_NAME = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor Agent", hermes: "Hermes" };
   var harnessName = (id) => HARNESS_NAME[id] ?? id;
   var menuCommands = (list, where) => [
@@ -141,7 +141,7 @@
   }
   var and = (xs) => xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`;
 
-  // web/src/slash-menu.ts
+  // shared/slash-menu.ts
   var TYPING = /^(\s*)\/([A-Za-z0-9._:-]*)$/;
   var TYPING_MENTION = /(?<=\s)\/([A-Za-z0-9._:-]*)$/;
   var NAME_REST = /^[A-Za-z0-9._:-]*/;
@@ -208,7 +208,7 @@
     return { text: text.slice(0, at.start) + insert + after, caret: at.start + name.length + 2 };
   }
 
-  // web/src/slash-pills.ts
+  // shared/slash-pills.ts
   function slashPieces(text, slash, visible = text.length) {
     const end = Math.min(visible, text.length);
     const hits = [...slash?.command ? [slash.command] : [], ...slash?.mentions ?? []].filter((h) => text[h.start] === "/" && h.start < h.end && h.end <= end).sort((a, b) => a.start - b.start);

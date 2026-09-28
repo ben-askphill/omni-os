@@ -1,11 +1,11 @@
-// The entry of the Mac app's slash engine: the same modules the Web UI runs, behind one global.
+// The entry of the Mac app's slash engine: the same shared/ modules the Web UI runs, behind one global.
+// It imports from shared/ only, never from web/, so a Web UI change cannot reach the Mac bundle.
 // Every call takes and returns JSON text, and every offset is a UTF-16 unit, like JavaScript's own.
 // Build with `npm run build:slash`; the bundle is checked in (see docs/adr/0002-mac-app-is-a-client.md).
-import { OMNI_COMMANDS, type SlashCommand, type SlashRecord } from '../../shared/slash.ts';
-import { menuCommands, newThreadHint, replySlash } from '../../web/src/composer-slash.ts';
-import { mentionSections, menuSections, pickCommand, slashQuery, type SlashQuery } from '../../web/src/slash-menu.ts';
-import { slashPieces } from '../../web/src/slash-pills.ts';
-import type { CommandList } from '../../web/src/api.ts';
+import { OMNI_COMMANDS, type CommandList, type SlashCommand, type SlashRecord } from '../../shared/slash.ts';
+import { menuCommands, newThreadHint, replySlash } from '../../shared/composer-slash.ts';
+import { mentionSections, menuSections, pickCommand, slashQuery, type SlashQuery } from '../../shared/slash-menu.ts';
+import { slashPieces } from '../../shared/slash-pills.ts';
 
 const call =
   <A, R>(f: (a: A) => R) =>

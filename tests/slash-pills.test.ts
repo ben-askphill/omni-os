@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SlashHit } from '../shared/slash.ts';
-import { slashPieces } from '../web/src/slash-pills.ts';
+import { slashPieces } from '../shared/slash-pills.ts';
 
 // A user message in the transcript: plain text, with a pill for each command it names.
 

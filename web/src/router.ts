@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import type { NewThreadPreset } from './composer-slash.ts';
+import type { NewThreadPreset } from './new-thread-preset.ts';
 
 export type ChannelTab = 'threads' | 'prs' | 'settings';
 

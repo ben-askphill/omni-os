@@ -1,8 +1,8 @@
 // What the composers do with a `/`, as pure functions: the Omni commands every thread's menu offers,
 // what Send does with a message that starts with one, and the quiet hints for commands that stay
-// plain text. The new-thread composer offers no Omni commands. The grammar itself is in shared/slash.ts.
-import { OMNI_COMMANDS, TITLE_MAX, mentionHits, midMessageCommands, resolveSlash, visibleCommands, type SlashCommand } from '../../shared/slash.ts';
-import type { CommandList, Thread } from './api.ts';
+// plain text. The new-thread composer offers no Omni commands. The grammar itself is in slash.ts.
+// Shared by the Web UI and the Mac app's slash engine, so it imports nothing from web/ or mac/.
+import { OMNI_COMMANDS, TITLE_MAX, mentionHits, midMessageCommands, resolveSlash, visibleCommands, type CommandList, type SlashCommand } from './slash.ts';
 
 const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent', hermes: 'Hermes' };
 export const harnessName = (id: string) => HARNESS_NAME[id] ?? id;
@@ -100,35 +100,3 @@ function textHint(text: string, r: ReturnType<typeof resolveSlash>, list: Comman
 
 /** "a", "a and b", "a, b and c". */
 const and = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
-
-/** The body that starts a thread with this one's channel, harness, model, effort and role. */
-export const newThreadBody = (t: Thread, prompt: string) => ({
-  channel: t.channel_id,
-  prompt,
-  role: t.role || undefined,
-  harness: t.harness,
-  model: t.model || undefined,
-  effort: t.effort || undefined,
-});
-
-/** What the new-thread composer starts with when it opens from a thread. */
-export interface NewThreadPreset {
-  channel: string;
-  /** A crew role's id, or '' for none. */
-  role: string;
-  choice?: { harness: string; model: string };
-  effort?: string;
-  /** Open the model picker. */
-  pickModel?: boolean;
-}
-
-/** `/clear` or `/new` on its own: this thread's settings, for a first prompt Ben types next. */
-export const sameSettings = (t: Thread): NewThreadPreset => ({
-  channel: t.channel_id,
-  role: t.role ?? '',
-  choice: { harness: t.harness, model: t.model ?? '' },
-  effort: t.effort,
-});
-
-/** "New thread on another model": the channel and role, and nothing that picks a model. */
-export const otherModel = (t: Thread): NewThreadPreset => ({ channel: t.channel_id, role: t.role ?? '', pickModel: true });

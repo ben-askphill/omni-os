@@ -2,6 +2,15 @@
 
 One local workspace for all agent work. Replaces hopping between Claude Desktop, Cursor cloud agents and the Grok conductor bot.
 
+One Node server runs everything (threads, harnesses, database, secrets, automations). Two clients sit on top of its `/api`:
+
+| Client | What | Where |
+| --- | --- | --- |
+| Web UI | React app, in any browser and on the phone over Tailscale | `web/` |
+| Mac app | Native SwiftUI app for the desk. Can start and stop the server itself | `mac/` |
+
+Both show the same channels and threads. They never share code directly: see [Web UI and Mac app](#web-ui-and-mac-app).
+
 - **Channels** per client or project (Volero, Pink Gellac, Acne, internal, personal)
 - **Threads** per task, dated and full-text searchable, resumable any time
 - **Sandbox per thread**: own git worktree in repo channels, a persistent browser per channel (logins survive), secrets from the Keychain injected as env
@@ -25,6 +34,15 @@ npm run build && npm start
 ./scripts/install-launchd.sh      # autostart at login, keeps the Mac awake while running
 tailscale serve --bg 4747         # reach it from your phone over the tailnet
 ```
+
+Mac app (needs Xcode, Node and this checkout on the Mac):
+
+```bash
+scripts/build-mac.sh              # Release build, installs to ~/Applications/Omni.app and opens it
+npm run test:mac                  # OmniKit tests, headless
+```
+
+Or open `mac/Omni.xcodeproj` in Xcode and run the `Omni` scheme. The app finds the server on :4747, or starts one from the repo. See `mac/NOTES.md`.
 
 Config is optional, see `.env.example` (brain dir, default model, concurrency, permission mode).
 
@@ -115,15 +133,29 @@ Stored in the macOS Keychain under service `omni-os` (account `<scope>/<NAME>`).
 - claude-bar hotkey prompt: set `"target": "omni"` in its config to send captures here
 - `npm run import-history -- --days 30`: pull existing Claude Code sessions into Omni as resumable threads
 
+## Web UI and Mac app
+
+The two clients are kept apart so a change to one cannot break the other:
+
+- `web/` imports only `web/`, `shared/` and server types. It never imports `mac/`.
+- `mac/` imports only `mac/` and `shared/`. Its Swift code talks to the server over HTTP and SSE, never to `web/`.
+- `shared/` holds the pure TypeScript both need (slash grammar, `/` menu ranking, command pills) and imports only itself. The Mac app runs it through JavaScriptCore from a checked-in bundle: run `npm run build:slash` after changing a slash module.
+- `tests/app-boundaries.test.ts` fails on any import that crosses these lines.
+- `tests/mac-fixtures.test.ts` pins the JSON the Mac app reads from the server, so a server change that would break the app fails `npm test`.
+- Some screens copy a Web UI rule (transcript grouping, status line, format helpers). Those are ported to Swift with their own tests, not imported. A Web UI change to one of them should say whether the Mac app needs it too (ADR 0002).
+
 ## Layout
 
 ```
 server/      Hono API, runner (claude CLI), sandbox, secrets, artifacts watcher, GitHub, scheduler
 mcp/omni.ts  conductor tools
-web/         React UI
+web/         Web UI (React)
+mac/         Mac app: SwiftUI app (Omni/), OmniKit package, slash engine entry
+shared/      pure TypeScript both clients use (slash grammar, menu, pills)
 crew/        role charters
 automations/ cron YAML
-scripts/     launchd install, shell shim, history import
+scripts/     launchd install, shell shim, history import, Mac build, slash bundle
+tests/       vitest suite, including the Mac fixtures and the app boundary check
 data/        gitignored: db, thread dirs, worktrees, browser profiles, logs
 ```
 

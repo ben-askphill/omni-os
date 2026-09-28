@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SlashCommand } from '../../../shared/slash.ts';
 import { api, type CommandList } from '../api.ts';
-import { SOURCE_TAG, type MenuSection } from '../slash-menu.ts';
+import { SOURCE_TAG, type MenuSection } from '../../../shared/slash-menu.ts';
 import { Loader } from './ui.tsx';
 
 /**

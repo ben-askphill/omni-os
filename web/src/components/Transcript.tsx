@@ -4,8 +4,8 @@ import { bytes, clock, duration, plural, shortPath, toDate } from '../format.ts'
 import { href } from '../router.ts';
 import { Markdown } from './Markdown.tsx';
 import { CheckItem, Icon, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
-import { SOURCE_TAG } from '../slash-menu.ts';
-import { slashPieces } from '../slash-pills.ts';
+import { SOURCE_TAG } from '../../../shared/slash-menu.ts';
+import { slashPieces } from '../../../shared/slash-pills.ts';
 import { statusLabel } from '../status-line.ts';
 import type { SlashHit, SlashRecord } from '../../../shared/slash.ts';
 

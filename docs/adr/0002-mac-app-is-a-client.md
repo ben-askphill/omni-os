@@ -5,5 +5,5 @@ The Mac app is a native SwiftUI app that talks to the same Omni server and `/api
 ## Consequences
 
 - Two clients render the same threads. A change to thread behavior in the Web UI (transcript, composer, slash menu) has to say whether the Mac app needs the same change.
-- The slash grammar and menu ranking are not ported. The Mac app runs the same TypeScript modules through JavaScriptCore from a checked-in bundle, and a test fails when the bundle is stale. Stable presentation rules (transcript grouping, tool labels, status line, format helpers) are ported to Swift and pinned by tests that mirror the TypeScript ones.
+- The slash grammar and menu ranking are not ported. The Mac app runs the same TypeScript modules through JavaScriptCore from a checked-in bundle, and a test fails when the bundle is stale. Those modules live in `shared/`, not `web/`: the two clients never import each other's code, and `tests/app-boundaries.test.ts` fails if either does. Stable presentation rules (transcript grouping, tool labels, status line, format helpers) are ported to Swift and pinned by tests that mirror the TypeScript ones.
 - The Mac app needs Node and the repo checkout on the Mac. It can start the server from the repo, but it does not bundle either, so it is not distributable as is.
