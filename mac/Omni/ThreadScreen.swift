@@ -73,6 +73,7 @@ private struct ThreadView: View {
         .onAppear { QAProbe.expand = { ui.expandAll(store.transcript.items) } }
         .onDisappear { QAProbe.expand = nil }
         #endif
+        .threadInspector(model: model, store: store)
       }
     }
   }

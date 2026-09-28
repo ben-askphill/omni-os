@@ -37,6 +37,7 @@ const NAMES = [
   'channel-threads.json',
   'threads.json',
   'recent.json',
+  'artifacts.json',
   'error-not-found.json',
   'thread-stream.sse',
   'feed.sse',
@@ -253,6 +254,7 @@ async function scenario() {
   keep('channel-threads.json', await get('/channels/acme/threads'));
   keep('threads.json', await get('/threads?channel=acme'));
   keep('recent.json', await get('/recent'));
+  keep('artifacts.json', await get('/artifacts'));
   keep('error-not-found.json', await call('GET', '/threads/nope', undefined, false));
   got.set('thread-stream.sse', await stream.stop());
   got.set('feed.sse', await feed.stop());

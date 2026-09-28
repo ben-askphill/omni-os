@@ -101,6 +101,8 @@ struct DetailView: View {
       NewThreadScreen(model: model, channelID: id)
     } else if model.route == .automations {
       AutomationsView(model: model)
+    } else if case .artifacts = model.route {
+      ArtifactsScreen(model: model)
     } else {
       RoutePlaceholder(route: model.route, title: model.route.title { model.store.channel($0)?.name }) {
         model.route = .home

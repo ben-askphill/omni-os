@@ -178,6 +178,12 @@ final class QARunner {
         case .send(let mode):
           guard let composer = QAComposerProbe.current else { throw QAScriptError("no reply box is showing") }
           try await composer.send(mode)
+        case .inspector(let command):
+          guard let inspect = InspectorProbe.command else { throw QAScriptError("no thread is open") }
+          inspect(command)
+          try? await Task.sleep(for: .milliseconds(400))
+        case .webTitle(let title):
+          try await InspectorProbe.waitForTitle(title)
         case .quit:
           finish(result, started)
           await end()
@@ -235,6 +241,8 @@ final class QARunner {
     case .expand: "expand"
     case .type(let text): "type \(text.prefix(40))"
     case .send(let mode): "send \(mode?.rawValue ?? "reply")"
+    case .inspector(let command): "inspector \(command.rawValue)"
+    case .webTitle(let title): "webTitle \(title)"
     case .quit: "quit"
     }
   }

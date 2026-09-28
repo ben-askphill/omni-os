@@ -34,6 +34,7 @@ func sseData(_ text: String) -> [String] {
     "channel-threads.json": { _ = try decodeFixture([OmniThread].self, "channel-threads.json") },
     "threads.json": { _ = try decodeFixture([OmniThread].self, "threads.json") },
     "recent.json": { _ = try decodeFixture([OmniThread].self, "recent.json") },
+    "artifacts.json": { _ = try decodeFixture([GalleryArtifact].self, "artifacts.json") },
     "error-not-found.json": { _ = try decodeFixture([String: String].self, "error-not-found.json") },
     "thread-stream.sse": { _ = try threadStream() },
     "feed.sse": { _ = try feed() },

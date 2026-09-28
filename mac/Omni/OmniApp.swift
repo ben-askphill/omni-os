@@ -16,6 +16,11 @@ struct OmniApp: App {
       OmniCommands(model: delegate.model)
     }
 
+    WindowGroup("Artifact", id: "artifact", for: ArtifactRef.self) { $ref in
+      if let ref { ArtifactWindowView(model: delegate.model, ref: ref) }
+    }
+    .defaultSize(width: 720, height: 640)
+
     Settings {
       SettingsView(model: delegate.model, appearance: delegate.appearance)
     }
@@ -83,6 +88,9 @@ struct OmniCommands: Commands {
       .disabled(model.openThread == nil)
     }
     ThreadCommands(model: model)
+    CommandGroup(after: .toolbar) {
+      InspectorCommand(model: model)
+    }
     CommandMenu("Server") {
       ServerMenuItems(model: model, shortcuts: true)
     }
