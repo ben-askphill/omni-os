@@ -191,14 +191,18 @@ public struct OmniClient: Sendable {
     return url
   }
 
-  private func send<T: Decodable>(
-    _ method: String, _ path: String, query: [(String, String)] = [], body: (any Encodable & Sendable)? = nil
+  func send<T: Decodable>(
+    _ method: String, _ path: String, query: [(String, String)] = [], body: (any Encodable & Sendable)? = nil,
+    raw: (data: Data, contentType: String)? = nil
   ) async throws(OmniAPIError) -> T {
     var req = URLRequest(url: url(path, query: query))
     req.httpMethod = method
     req.cachePolicy = .reloadIgnoringLocalCacheData
     req.setValue("application/json", forHTTPHeaderField: "Accept")
-    if let body {
+    if let raw {
+      req.setValue(raw.contentType, forHTTPHeaderField: "Content-Type")
+      req.httpBody = raw.data
+    } else if let body {
       req.setValue("application/json", forHTTPHeaderField: "Content-Type")
       do {
         req.httpBody = try OmniJSON.encoder().encode(body)

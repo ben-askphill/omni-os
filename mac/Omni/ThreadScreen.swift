@@ -67,6 +67,7 @@ private struct ThreadView: View {
         VStack(spacing: 0) {
           ThreadHeader(model: model, store: store, thread: thread)
           TranscriptView(model: model, store: store, ui: ui, markdown: markdown)
+          ReplyComposerHost(model: model, store: store, thread: thread)
         }
       }
     }
