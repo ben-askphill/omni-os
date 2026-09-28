@@ -141,6 +141,11 @@ final class QARunner {
           guard let openSettings = Self.openSettings else { throw QAScriptError("the main window has not appeared") }
           openSettings()
           try? await Task.sleep(for: .milliseconds(600))
+        case .settings(let tab):
+          guard let openSettings = Self.openSettings else { throw QAScriptError("the main window has not appeared") }
+          model.settingsTab = tab
+          openSettings()
+          try? await Task.sleep(for: .milliseconds(600))
         case .server(let action):
           guard model.settings.port != ServerSettings.defaultPort, model.supervisor.port != ServerSettings.defaultPort else {
             throw QAScriptError("port \(ServerSettings.defaultPort) is the live server")
@@ -197,6 +202,7 @@ final class QARunner {
     case .snapshot(let name): "snapshot \(name)"
     case .port(let port): "port \(port)"
     case .open(let window): "open \(window.rawValue)"
+    case .settings(let tab): "settings \(tab.rawValue)"
     case .server(let action): "server \(action.rawValue)"
     case .quit: "quit"
     }

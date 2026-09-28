@@ -83,6 +83,8 @@ public final class AppModel {
   public private(set) var client: OmniClient
   public private(set) var store: WorkspaceStore
   public var route = Route.home
+  /// The tab the Settings window shows.
+  public var settingsTab = SettingsTab.connection
   /// The last start that failed, until the server runs, Start is pressed again or the settings change.
   public private(set) var startFailure: StartFailure?
 

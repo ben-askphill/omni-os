@@ -5,12 +5,14 @@ import SwiftUI
 /// threads, Add channel, and the workspace pages. A status line for the server sits at the bottom.
 struct SidebarView: View {
   let model: AppModel
+  @Environment(\.openSettings) private var openSettings
 
+  /// Secrets opens Settings on its tab and leaves the window where it was.
   private var selection: Binding<SidebarItem?> {
     Binding {
       SidebarItem(route: model.route)
     } set: { item in
-      if let item { model.route = item.route }
+      if let item, model.show(item.route) != nil { openSettings() }
     }
   }
 

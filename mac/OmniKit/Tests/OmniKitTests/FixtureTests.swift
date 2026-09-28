@@ -36,6 +36,17 @@ func sseData(_ text: String) -> [String] {
     "error-not-found.json": { _ = try decodeFixture([String: String].self, "error-not-found.json") },
     "thread-stream.sse": { _ = try threadStream() },
     "feed.sse": { _ = try feed() },
+    "secrets.json": { _ = try decodeFixture([SecretRow].self, "secrets.json") },
+    "secret-saved.json": { _ = try decodeFixture([String: Bool].self, "secret-saved.json") },
+    "secret-deleted.json": { _ = try decodeFixture([String: Bool].self, "secret-deleted.json") },
+    "error-secret-name.json": { _ = try decodeFixture([String: String].self, "error-secret-name.json") },
+    "automations.json": { _ = try decodeFixture([Automation].self, "automations.json") },
+    "automation-run.json": { _ = try decodeFixture(OmniThread.self, "automation-run.json") },
+    "automation-enabled.json": { _ = try decodeFixture([String: Bool].self, "automation-enabled.json") },
+    // Request bodies the app sends. SecretsTests compares them with what the client encodes.
+    "secret-set-request.json": { _ = try decodeFixture([String: String].self, "secret-set-request.json") },
+    "secret-delete-request.json": { _ = try decodeFixture([String: String].self, "secret-delete-request.json") },
+    "automation-enabled-request.json": { _ = try decodeFixture([String: Bool].self, "automation-enabled-request.json") },
   ]
 
   static func threadStream() throws -> [ThreadStreamMessage] {

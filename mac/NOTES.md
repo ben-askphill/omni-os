@@ -18,7 +18,15 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `Event.swift` | `EventRow`, `EventPayload` and its payload structs, `Artifact` |
 | `Status.swift` | `Status`, `Usage`, `HarnessSlot`, `ServerInfo`, `HarnessInfo`, `ModelEntry`, `CrewRole` |
 | `StreamMessage.swift` | `ThreadStreamMessage` and `FeedEvent`: one SSE `data:` message each |
-| `Client.swift` | `OmniClient`, `HTTPTransport`, `OmniAPIError`, `NewThread` |
+| `Client.swift` | `OmniClient`, `HTTPTransport`, `OmniAPIError`, `NewThread`. `send` is internal so extensions in other files can use it |
+| `Client+Secrets.swift` | `secrets()`, `setSecret(scope:name:value:)`, `deleteSecret(scope:name:)` on `OmniClient` |
+| `Secrets.swift` | `SecretScope`, `SecretRow`, `SecretName` (the Web UI's name rules), `SecretGroup`, `SecretScopeOption`, `SecretsModel` (the Secrets tab) |
+| `RelTime.swift` | `RelTime.label`: `relTime` in `web/src/format.ts` |
+| `Appearance.swift` | `Appearance`, `AppearanceSettings` (in UserDefaults, `-appearance` for a run) |
+| `SettingsTab.swift` | `SettingsTab`, `Route.settingsTab`, `AppModel.show(_:)` |
+| `Client+Automations.swift` | `automations()`, `runAutomation(_:)`, `setAutomationEnabled(_:_:)` on `OmniClient` |
+| `Automation.swift` | `Automation`, `AutomationRun`, `AutomationTrigger`, `AutomationBadge`, `NextRunText`, `AutomationSchedule` (`describeCron` and `nextRunLabel` in `web/src/format.ts`) |
+| `AutomationsModel.swift` | `AutomationsModel` (the Automations page) |
 | `Route.swift` | `Route`, parsed from and printed to the Web UI hash routes |
 | `SSEParser.swift` | `SSEParser`, `SSEMessage`: the EventSource parsing rules, bytes in, messages out |
 | `SSEClient.swift` | `SSEClient`, `SSEEvent`, `ConnectionState`, `SSETransport`, `URLSessionSSETransport`, and `feedEvents` and `threadEvents` on `OmniClient` |
@@ -49,6 +57,9 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 - To record again after a deliberate change: `OMNI_RECORD_MAC_FIXTURES=1 npx vitest run --config tests/vitest.config.ts tests/mac-fixtures.test.ts`, then `npm run test:mac` and fix the Swift types it breaks.
 - Recording is stable: paths, UUIDs, times, pids, ports, the git head and durations are normalized, so recording twice gives the same files.
 - `FixtureTests.swift` decodes every file, and fails if a file in the folder has no decoder in its table. Add a fixture in both places.
+- Request fixtures (`secret-set-request.json`, `secret-delete-request.json`, `automation-enabled-request.json`) go the other way: the check run sends the recorded body to the server, so it must still take it, and `SecretsTests` checks the client encodes exactly that JSON.
+- The secrets part runs with a `security` on PATH that stores nothing, so `npm test` never touches the Keychain.
+- The automations part reads a folder of the test's own (`OMNI_AUTOMATIONS_DIR`, see `.env.example`): `daily-digest` (enabled, run once) and `broken` (a cron the server can't schedule). Toggling one writes its YAML file, so never point a test server at the repo's `automations/`.
 
 ## Conventions
 
@@ -161,6 +172,8 @@ env -i PATH="$PATH" HOME="$HOME" TMPDIR="$T" OMNI_DATA_DIR="$T/data" OMNI_PORT=4
 OMNI_LIVE_PORT=4791 swift test --package-path mac/OmniKit --filter LiveServerTests
 ```
 
+`LiveSecretsTests` saves and deletes a secret through `SecretsModel`, so it also needs `OMNI_LIVE_SECRETS=1`, and the server a `security` that stores nothing first on PATH, so it never writes to the Keychain: `mkdir "$T/bin"; printf '#!/bin/sh\n[ "$1" = "-i" ] && cat > /dev/null\nexit 0\n' > "$T/bin/security"; chmod +x "$T/bin/security"`, then boot with `PATH="$T/bin:$PATH"`.
+
 
 ## The app (part D)
 
@@ -172,7 +185,10 @@ OMNI_LIVE_PORT=4791 swift test --package-path mac/OmniKit --filter LiveServerTes
 | `MainWindow.swift` | `NavigationSplitView` of the sidebar and the detail, the toolbar, `RoutePlaceholder`, `Route.symbol` |
 | `SidebarView.swift` | The sidebar, `ThreadRow`, `ThreadStatusIcon`, `StatusFooter` |
 | `ServerView.swift` | The server screen, `ServerDetails`, `LogTail`, `ServerMenuItems`, `confirmStop` |
-| `SettingsView.swift` | The Connection pane, `PathField`, the folder and file pickers |
+| `SettingsView.swift` | The Settings tabs (`model.settingsTab`), the Connection pane, `PathField`, the folder and file pickers |
+| `SecretsSettingsView.swift` | The Secrets tab: `SecretsSettings` (a `SecretsModel` per client and visit), `SecretsForm`, `SecretRowView` |
+| `AppearanceSettingsView.swift` | The Appearance tab, `Appearance.nsAppearance` |
+| `AutomationsView.swift` | The Automations page: `AutomationsView` (an `AutomationsModel` per client and visit), `AutomationSection`, `RunStrip`, `RunRow`, `FlowRow` |
 | `SystemEvents.swift` | Wake (`NSWorkspace.didWakeNotification`) to `didWake()`, `NWPathMonitor` changes (not the first update) to `networkChanged()` |
 | `QARunner.swift` | Debug only. The QA harness, below |
 
@@ -181,10 +197,10 @@ OMNI_LIVE_PORT=4791 swift test --package-path mac/OmniKit --filter LiveServerTes
 Main window:
 
 - The sidebar matches `Sidebar.tsx`: Home, Conductor, the channels by kind (Clients, Internal, Personal, then others), Add channel, and Workspace (Artifacts, Automations, Secrets). A channel's badge is its running count, hidden at 0. Under each channel, its active threads from `SidebarSections.threads(of:)`, with a spinner (running), a clock (queued) or a red mark (failed), and "N more", which opens the channel. It all comes from the store, so counts and threads move with the feed.
-- The selection is `SidebarItem(route: model.route)`; picking a row sets `model.route`. Routes without a row (search) select nothing.
+- The selection is `SidebarItem(route: model.route)`; picking a row sets `model.route`. Routes without a row (search) select nothing. Secrets is the exception: it opens Settings on the Secrets tab (`model.show`) and the window stays where it was. Any other write of `#/secrets` to the route does the same (`MainWindow`'s `onChange`), going back to the route last drawn.
 - A red row under Home when the channel list fails to load while the server runs. With no server, the server screen says so instead.
 - The footer: a dot (green running, orange running but the feed is retrying, red not running or failed), `State.label` ("Started by the app", "Started outside the app", "Not running"), the port, and an orange "Reconnecting".
-- The detail is the server screen while `model.serverScreen` is set, else the screen for the route. No route has a screen yet: each shows a `ContentUnavailableView` with its title and hash. Unknown routes show "Nothing here" and Go Home.
+- The detail is the server screen while `model.serverScreen` is set, else the screen for the route. Automations has its screen (below). The other routes show a `ContentUnavailableView` with their title and hash. Unknown routes show "Nothing here" and Go Home.
 - The title follows the route (`#acme` on a channel), "Omni" while the server screen shows.
 - Toolbar: "Reconnecting" with a spinner while the feed retries, a Server menu, New Thread. Menus: File > New Thread (Cmd-N, in place of New Window), a Server menu (Check Again is Cmd-R), and the sidebar commands in View.
 - The standard macOS 27 look: `.listStyle(.sidebar)`, system materials, no custom glass or colors.
@@ -198,6 +214,24 @@ Server screen (`ServerScreen`):
 - "Reconnecting" shows next to Not running: the feed keeps trying, which is how a server started in a terminal is found. That is on purpose (see `AppModelTests`).
 
 Settings, Connection pane: Port, Repo (a field and a folder picker), Node (a field and a file picker; empty finds Node itself). The port and paths apply on Return, when the field loses focus or when Settings closes (closing a window does not end editing), and the paths on a pick too. Never per key: typing 4759 does not try 4, 47 and 475. A number that is not a port puts the current one back. A blank Repo is `~/omni-os` (`effectiveRepoPath`), in `config` and on the server screen. Everything applies at once, no relaunch. With launch arguments set, a note says changes last until the app quits. Status shows the server state, the feed, Open Log, and Build (the `OmniGitCommit` stamp) in an installed build.
+
+Settings, Secrets tab (#72), like `Secrets.tsx`:
+
+- The Keychain note, then Add or replace: Scope (Global, then `#name` per channel), Name (upper-cased and `_` for anything else as it is typed, per UTF-16 unit like the Web UI), Value (a `SecureField`). "Save secret", or "Replace secret" with the hint when the name exists in that scope. The Web UI's messages for a bad name, no value and a value with a line break, checked before sending; the server's own error shows the same way. After a save: "Saved NAME (#Acme)" or "Updated ...", name and value cleared, the list loads again.
+- The list: Global first, then the channel scopes, each with its count; a row is the name, `RelTime` (the ISO time as a tooltip) and a trash button. Delete asks first (a confirmation dialog, not the Web UI's 5 second undo); a failure shows on the row. Loading, "No secrets yet", and the load error with Retry.
+- The value: only in `SecretsModel.value` while typed and sent, in the POST body, and nowhere else. No UserDefaults, file or log. It is cleared after a save that succeeds and when the tab or Settings closes (`clearValue()`); a refused save keeps it so it can be sent again. A Swift `String` can't be wiped in memory, so "cleared" means the model drops it. `SecretsModelTests.holdsNoValueAfterSave` walks the model's stored properties and UserDefaults for it.
+- The list loads when the tab shows, for a new port, and when the feed opens again.
+
+Settings, Appearance tab: Match system, Light, Dark (radio buttons), saved as `appearance` in UserDefaults. `AppDelegate` applies it in `applicationWillFinishLaunching`, before any window, and on every change in the same call (`AppearanceSettings.follow` sets `NSApp.appearance`), so every window follows at once. `-appearance dark` sets it for one run and saves nothing, with a note in the tab.
+
+Automations page (#73), like `Automations.tsx`. The Web UI has no create or edit: an automation is a YAML file in `automations/` that the server reads again on save. So the app has neither; the empty state says where the files go.
+
+- One grouped section per automation, in the server's order. The head: a bolt, the name, a Paused or Invalid badge, then chips for the schedule in words (`AutomationSchedule.describe`, the cron and time zone as a tooltip), the cron, the channel (opens it), the role and the model. "Next run Tomorrow 08:00" only while enabled, valid and scheduled, in the automation's time zone, with the zone named when it is not the Mac's. Then Run now and the switch.
+- `describe` and `nextRunLabel` are ports, down to the quirks: `61 8 * * *` reads "Every day at 08:61", Tomorrow is the day 24 hours from now, and months are Node's en-GB short names ("Sept"). The test cases were run through `web/src/format.ts` in Node.
+- An invalid automation shows the server's error and "Fix it in <file>" (`shortPath`), and its Run now and switch are off, as in the Web UI.
+- Run now opens the new thread. The switch shows its new value at once, turns back with the server's error if it refuses, and loads the list again when it takes it. Errors show on the automation until its next action.
+- Prompt is a disclosure group. Last runs: the strip (oldest left, finished runs full height, colors of `RUN_TONE`, the running one pulses, "done · 5m ago" tooltips), then a row per run: the status dot (a ring for queued), the title or "Thread removed", "manual", `RelTime`. A row with a thread opens it.
+- It loads when it shows and for a new port. The Web UI reloads a second after a feed event for an automation's thread; the app has no raw feed events, so `recentChanged` watches `store.recent` for automation threads that are new or changed, and reloads once, a second later. It also reloads a second after the feed opens again. Refresh in the toolbar, a spinner there while a reload runs.
 
 ## Build and install
 
@@ -227,6 +261,7 @@ mac/.xcode/Build/Products/Debug/Omni.app/Contents/MacOS/Omni -ApplePersistenceIg
 - It refuses to run (exit 2, reason in `qa.json` and stderr) unless launch arguments set `-serverPort` (every one given) to a port other than 4747. `QALaunch.serverPort` checks the raw arguments before the app model exists, so nothing has talked to a server yet. A `{"port": 4747}` step is rejected, and server steps refuse while the port is 4747. So a QA run never talks to the live server and never saves settings.
 - A server a QA run starts keeps its data, brain folder, log and record in the out folder and runs the fake CLIs (`QAServer.environment`: `OMNI_DATA_DIR`, `OMNI_BRAIN_DIR`, `OMNI_CLAUDE_BIN`, `OMNI_CODEX_BIN`, `OMNI_CURSOR_BIN`, `OMNI_BROWSER=0`). The run stops it before quitting.
 - The app exits at `quit` or when the steps run out: 0 when every step passed, 1 otherwise.
+- `-appearance light` or `dark` sets the appearance for the run, to snapshot both.
 
 Steps (a list, or an object with the list under `steps`):
 
@@ -238,6 +273,7 @@ Steps (a list, or an object with the list under `steps`):
 | `{"snapshot": "home"}` | `home.png` for the main window, `home-settings.png` for Settings, `home-window<n>.png` for others. Fails on a blank image |
 | `{"port": 4759}` | Sets the port, as Settings would. Never 4747 |
 | `{"open": "settings"}` | Opens Settings |
+| `{"settings": "secrets"}`, `"appearance"`, `"connection"` | Opens Settings on that tab |
 | `{"server": "start"}`, `"stop"`, `"check"` | Start Server, Stop Server (no confirmation), Check Again. Waits for it to finish |
 | `{"quit": true}` | Writes the report and exits |
 
@@ -257,6 +293,8 @@ env -i PATH="$PATH" HOME="$HOME" TMPDIR="$S/tmp" OMNI_DATA_DIR="$S/tmp/qa-data" 
   OMNI_CLAUDE_BIN="$PWD/tests/fixtures/fake-claude.mjs" OMNI_BROWSER=0 OMNI_BRAIN_DIR="$S/tmp/qa-brain" \
   node --disable-warning=ExperimentalWarning --import tsx server/index.ts > "$S/tmp/qa-server.log" 2>&1 &
 ```
+
+For the Automations page, add `OMNI_AUTOMATIONS_DIR="$S/tmp/qa-automations"` with a YAML file or two in it (name, cron, channel, prompt, `enabled: true`). Without it the server reads and writes the repo's `automations/`, and the enabled ones run on their schedule.
 
 A thread whose prompt is `TOOL:300000` keeps running for five minutes with the fake CLI, for spinners and running counts. The server runs four per harness at once; the rest queue.
 

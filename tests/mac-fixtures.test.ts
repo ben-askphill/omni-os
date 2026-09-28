@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { FAKE_CLAUDE, fakeAlive } from './support.ts';
@@ -9,6 +9,9 @@ import { FAKE_CLAUDE, fakeAlive } from './support.ts';
 // makes a channel and runs a thread through three turns, and keeps what the app reads: the JSON of each GET
 // and the raw SSE of the thread stream and the feed. A normal run only checks that the server still sends the
 // recorded shape: the same keys and value types, per event kind and per stream message. It writes nothing.
+// The request bodies the app sends (the *-request.json files) go the other way: a normal run sends the recorded
+// ones and the server must take them. A fake `security` stands in for the Keychain, so no value is stored, and
+// the automations come from a folder of the test's own, so toggling one never writes the repo's automations/.
 // When the shape changes on purpose, record again, then run the Swift tests:
 //   OMNI_RECORD_MAC_FIXTURES=1 npx vitest run --config tests/vitest.config.ts tests/mac-fixtures.test.ts
 //   npm run test:mac
@@ -36,6 +39,16 @@ const NAMES = [
   'error-not-found.json',
   'thread-stream.sse',
   'feed.sse',
+  'secret-set-request.json',
+  'secret-saved.json',
+  'secrets.json',
+  'error-secret-name.json',
+  'secret-delete-request.json',
+  'secret-deleted.json',
+  'automation-enabled-request.json',
+  'automation-enabled.json',
+  'automation-run.json',
+  'automations.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -69,13 +82,40 @@ afterAll(async () => {
 
 // ---------- the server ----------
 
+/**
+ * A `security` that stores nothing, so the secrets routes never reach the Keychain. `security -i` reads its
+ * command from stdin; the other calls leave stdin open, so only that one reads it.
+ */
+function fakeSecurity() {
+  const bin = join(tmp, 'bin');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'security'), '#!/bin/sh\n[ "$1" = "-i" ] && cat > /dev/null\nexit 0\n');
+  chmodSync(join(bin, 'security'), 0o755);
+  return bin;
+}
+
+/** One automation to toggle and run, and one the server can't schedule. */
+function automations() {
+  const dir = join(tmp, 'automations');
+  mkdirSync(dir);
+  writeFileSync(
+    join(dir, 'daily-digest.yaml'),
+    'name: Daily digest\nenabled: false\ncron: "0 8 * * 1-5"\ntimezone: Europe/Amsterdam\nchannel: acme\nrole: researcher\n' +
+      'model: claude-opus-5-5\nprompt: |\n  Summarize what changed in the cart since yesterday.\n',
+  );
+  writeFileSync(join(dir, 'broken.yaml'), 'name: Broken\nenabled: true\ncron: "61 8 * * *"\nchannel: acme\nprompt: Never runs.\n');
+  return dir;
+}
+
 async function boot(): Promise<number> {
   mkdirSync(join(tmp, 'brain'));
+  const bin = fakeSecurity();
+  const automationsDir = automations();
   child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', 'tsx', 'server/index.ts'], {
     cwd: ROOT,
     // Only what the server needs: none of this shell's other variables, so no API key.
     env: {
-      PATH: process.env.PATH,
+      PATH: `${bin}:${process.env.PATH}`,
       HOME: process.env.HOME,
       TMPDIR: tmpdir(),
       OMNI_DATA_DIR: data,
@@ -89,6 +129,7 @@ async function boot(): Promise<number> {
       OMNI_DEFAULT_MODEL: 'sonnet',
       OMNI_KEEPALIVE_SECONDS: '60',
       OMNI_WEB_DIST: join(tmp, 'no-web'),
+      OMNI_AUTOMATIONS_DIR: automationsDir,
       FAKE_CLAUDE_LOG: fakeLog,
       FAKE_CLAUDE_LATENCY_MS: '10',
     },
@@ -211,6 +252,47 @@ async function scenario() {
   keep('error-not-found.json', await call('GET', '/threads/nope', undefined, false));
   got.set('thread-stream.sse', await stream.stop());
   got.set('feed.sse', await feed.stop());
+
+  // Secrets, after the threads, so no run reads them. The request bodies are the recorded ones, except when recording.
+  const setBody = request('secret-set-request.json', { scope: 'channel:acme', name: 'SHOPIFY_ADMIN_TOKEN', value: 'fixture-value' });
+  keep('secret-saved.json', await call('POST', '/secrets', setBody));
+  await call('POST', '/secrets', { scope: 'global', name: 'GITHUB_TOKEN', value: 'fixture-value' });
+  const listed = keep('secrets.json', await get('/secrets')) as { scope: string; name: string }[];
+  expect(listed.map((s) => `${s.scope}/${s.name}`)).toEqual(['channel:acme/SHOPIFY_ADMIN_TOKEN', 'global/GITHUB_TOKEN']);
+  expect(JSON.stringify(listed), 'no value in the list').not.toContain('fixture-value');
+  keep('error-secret-name.json', await call('POST', '/secrets', { scope: 'global', name: 'lower_case', value: 'x' }, false));
+  const deleteBody = request('secret-delete-request.json', { scope: 'channel:acme', name: 'SHOPIFY_ADMIN_TOKEN' });
+  keep('secret-deleted.json', await call('DELETE', '/secrets', deleteBody));
+  expect(((await get('/secrets')) as { name: string }[]).map((s) => s.name)).toEqual(['GITHUB_TOKEN']);
+
+  // Automations, last, so their run is not in the thread lists above.
+  type Automation = { id: string; enabled: boolean; error?: string; next?: string; runs: { thread_id: string; trigger: string; status: string }[] };
+  const before = (await get('/automations')) as Automation[];
+  expect(before.map((a) => a.id).sort(), 'the test folder, not the repo').toEqual(['broken', 'daily-digest']);
+  const enableBody = request('automation-enabled-request.json', { enabled: true });
+  keep('automation-enabled.json', await call('POST', '/automations/daily-digest/enabled', enableBody));
+  const run = keep('automation-run.json', await call('POST', '/automations/daily-digest/run', {})) as Thread;
+  await eventually(async () => (await detail(run.id)).thread.status === 'done', 'the automation run to finish');
+  const listed2 = keep('automations.json', await get('/automations')) as Automation[];
+  const digest = listed2.find((a) => a.id === 'daily-digest')!;
+  expect(digest.enabled).toBe(true);
+  expect(digest.next).toBeTruthy();
+  expect(digest.runs.find((r) => r.trigger === 'manual')).toMatchObject({ thread_id: run.id, status: 'done' });
+  const broken = listed2.find((a) => a.id === 'broken')!;
+  expect(broken.error).toMatch(/^invalid schedule/);
+  expect(broken.next).toBeUndefined();
+}
+
+/** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */
+function request(name: Name, fresh: Record<string, unknown>): unknown {
+  const file = join(FIXTURES, name);
+  let body: unknown = fresh;
+  if (!RECORD) {
+    expect(existsSync(file), `${file} is missing. Record it with ${RECORDING}`).toBe(true);
+    body = JSON.parse(readFileSync(file, 'utf8'));
+  }
+  got.set(name, `${JSON.stringify(body, null, 2)}\n`);
+  return body;
 }
 
 // ---------- shapes ----------
@@ -340,7 +422,9 @@ function normalize(files: Map<Name, string>): Map<Name, string> {
       .replace(/("pid": )\d+/g, '$14242')
       .replace(/("port": )\d+/g, '$14799')
       .replace(/("gitHead": )"[0-9a-f]{40}"/g, `$1"${'0'.repeat(40)}"`)
-      .replace(/(\\*"duration_ms\\*":\s*)\d+/g, '$11000');
+      .replace(/(\\*"duration_ms\\*":\s*)\d+/g, '$11000')
+      // An automation run's title ends with the day it ran.
+      .replace(/( · )\d{1,2} [A-Z][a-z]+/g, '$15 Jan');
     out.set(name, t);
   }
   return out;
