@@ -2,7 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type EventRow, type PendingMsg, type SendMode, type Thread, type ThreadDetail } from '../api.ts';
 import { ArtifactViewer, kindIcon } from '../components/ArtifactViewer.tsx';
 import { ReplyComposer } from '../components/Composer.tsx';
-import { harnessName } from '../composer-slash.ts';
+import { CAPABILITIES, isHarnessId } from '../../../server/harness/types.ts';
+import { HarnessMark } from '../components/brand.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
 import { Avatar, Button, Chip, CopyButton, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Modal, StatusDot, StatusPill, Tabs } from '../components/ui.tsx';
 import { duration, fullDate, plural, relTime } from '../format.ts';
@@ -22,6 +23,70 @@ interface InitP {
 interface ResultP {
   duration_ms?: number;
   turns?: number;
+  model?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+}
+
+// Desktop panel width in px. null means the default, clamp(340px, 40vw, 760px).
+const PANEL_MIN = 320;
+const THREAD_MIN = 420; // keep the transcript usable next to a wide panel
+const defaultPanelWidth = () => Math.min(760, Math.max(340, window.innerWidth * 0.4));
+
+function PanelResizeHandle({ width, max, onChange, onReset }: { width: number; max: number; onChange: (w: number, done: boolean) => void; onReset: () => void }) {
+  const drag = useRef<{ x: number; w: number } | null>(null);
+  const [active, setActive] = useState(false);
+  const clampW = (w: number) => Math.round(Math.min(Math.max(w, PANEL_MIN), Math.max(PANEL_MIN, max)));
+  const end = () => {
+    drag.current = null;
+    setActive(false);
+    document.body.classList.remove('col-resizing');
+  };
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize panel"
+      aria-valuemin={PANEL_MIN}
+      aria-valuemax={Math.round(max)}
+      aria-valuenow={Math.round(width)}
+      tabIndex={0}
+      title="Drag to resize, double-click to reset"
+      className="group absolute inset-y-0 -left-1.5 z-10 flex w-3 cursor-col-resize touch-none justify-center outline-none"
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { x: e.clientX, w: width };
+        setActive(true);
+        document.body.classList.add('col-resizing');
+      }}
+      onPointerMove={(e) => {
+        // The panel sits on the right, so dragging left grows it.
+        if (drag.current) onChange(clampW(drag.current.w + drag.current.x - e.clientX), false);
+      }}
+      onPointerUp={(e) => {
+        if (drag.current) onChange(clampW(drag.current.w + drag.current.x - e.clientX), true);
+        end();
+      }}
+      onLostPointerCapture={() => {
+        if (drag.current) onChange(width, true);
+        end();
+      }}
+      onDoubleClick={onReset}
+      onKeyDown={(e) => {
+        const step = e.shiftKey ? 64 : 16;
+        if (e.key === 'ArrowLeft') onChange(clampW(width + step), true);
+        else if (e.key === 'ArrowRight') onChange(clampW(width - step), true);
+        else if (e.key === 'Home') onChange(clampW(PANEL_MIN), true);
+        else if (e.key === 'End') onChange(clampW(max), true);
+        else return;
+        e.preventDefault();
+      }}
+    >
+      <span className={`my-auto h-10 w-[3px] rounded-full transition-colors ${active ? 'bg-fg-3' : 'bg-transparent group-hover:bg-line-strong group-focus-visible:bg-fg-3'}`} />
+    </div>
+  );
 }
 
 const shellQuote = (s: string) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
@@ -100,10 +165,10 @@ function BrowserTab({ shots }: { shots: Artifact[] }) {
           <div className="relative bg-surface-2">
             <img src={artifactUrl(open)} alt={open.name} className="mx-auto max-h-[78vh] w-auto" />
             {idx > 0 && (
-              <IconButton icon="chevronLeft" label="Newer" className="glass absolute top-1/2 left-3 -translate-y-1/2" onClick={() => setOpen(list[idx - 1])} />
+              <IconButton icon="chevronLeft" label="Newer" className="float absolute top-1/2 left-3 -translate-y-1/2" onClick={() => setOpen(list[idx - 1])} />
             )}
             {idx >= 0 && idx < list.length - 1 && (
-              <IconButton icon="chevronRight" label="Older" className="glass absolute top-1/2 right-3 -translate-y-1/2" onClick={() => setOpen(list[idx + 1])} />
+              <IconButton icon="chevronRight" label="Older" className="float absolute top-1/2 right-3 -translate-y-1/2" onClick={() => setOpen(list[idx + 1])} />
             )}
           </div>
         )}
@@ -127,7 +192,7 @@ function McpList({ servers }: { servers: string[] }) {
     <div>
       <div className="text-fg-2">
         {good.length} connected
-        {bad.length > 0 && <span className="text-warn"> · {bad.length} not connected</span>}
+        {bad.length > 0 && <span className="text-fg-2"> · {bad.length} not connected</span>}
         <button type="button" onClick={() => setOpen((v) => !v)} className="ml-2 text-[12px] text-fg-3 underline-offset-2 hover:text-fg hover:underline">
           {open ? 'Hide' : 'Show'}
         </button>
@@ -135,7 +200,7 @@ function McpList({ servers }: { servers: string[] }) {
       {bad.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1">
           {bad.map((p) => (
-            <Chip key={p.key} tone="warn" title={`${p.name} (${p.status})`}>
+            <Chip key={p.key} tone="needs" title={`${p.name} (${p.status})`}>
               {p.label}
             </Chip>
           ))}
@@ -157,7 +222,7 @@ function McpList({ servers }: { servers: string[] }) {
 function Row({ k, children }: { k: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[6.5rem_1fr] gap-2 px-3.5 py-2 text-[12.5px]">
-      <dt className="label-mono pt-px">{k}</dt>
+      <dt className="pt-px text-fg-3">{k}</dt>
       <dd className="min-w-0 break-words text-fg">{children}</dd>
     </div>
   );
@@ -181,22 +246,25 @@ function DetailsTab({
   warm: boolean | undefined;
 }) {
   const cwd = init?.cwd || thread.cwd;
+  const remote = thread.harness === 'hermes';
   const resumeCmd: Record<string, string> = {
     'claude-code': `claude --resume ${thread.session_id}`,
     codex: `codex resume ${thread.session_id}`,
     cursor: `cursor-agent --resume ${thread.session_id}`,
   };
-  const resume = `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
+  const resume = remote ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin h-full overflow-y-auto px-2.5 pb-3">
-      <dl className="divide-y divide-line rounded-[18px] bg-bg py-1">
+      <dl className="divide-y divide-line rounded-[20px] bg-bg py-1">
         <Row k="Channel">
           <a href={href.channel(thread.channel_id)} className="font-medium hover:underline">
             #{channel?.name ?? thread.channel_id}
           </a>
         </Row>
         <Row k="Role">{thread.role ?? <span className="text-fg-3">none</span>}</Row>
-        <Row k="Harness">{harnessName(thread.harness)}</Row>
+        <Row k="Harness">
+          <HarnessMark harness={thread.harness} withLabel />
+        </Row>
         <Row k="Model">
           {thread.model || init?.model || <span className="text-fg-3">default</span>}
           {thread.model && init?.model && init.model !== thread.model && <span className="ml-1 text-fg-3">({init.model})</span>}
@@ -212,7 +280,11 @@ function DetailsTab({
           </Row>
         )}
         <Row k="Working dir">
-          <span className="font-mono text-[12px]">{cwd}</span>
+          {remote ? (
+            <span className="text-fg-3">Hermes server, not an Omni worktree</span>
+          ) : (
+            <span className="font-mono text-[12px]">{cwd}</span>
+          )}
         </Row>
         <Row k="Session">
           <span className="font-mono text-[12px]">{thread.session_id}</span>
@@ -246,14 +318,24 @@ function DetailsTab({
           <Row k="Last run">
             {duration(lastResult.duration_ms)}
             {lastResult.turns ? <span className="text-fg-3"> · {plural(lastResult.turns, 'turn')}</span> : null}
+            {lastResult.model ? <span className="text-fg-3"> · {lastResult.model}</span> : null}
+            {lastResult.input_tokens != null ? (
+              <span className="text-fg-3">
+                {' '}
+                · {lastResult.input_tokens} in / {lastResult.output_tokens ?? 0} out
+              </span>
+            ) : null}
           </Row>
         )}
       </dl>
 
       {children.length > 0 && (
         <div className="mt-4">
-          <div className="label-mono mb-1.5 px-2">Delegated threads</div>
-          <div className="rounded-[18px] bg-bg p-1">
+          <div className="mb-1.5 flex items-center px-2">
+            <span className="caption">Delegated threads</span>
+            <span className="ml-auto font-num text-[11px] text-fg-3">{children.length}</span>
+          </div>
+          <div className="rounded-[20px] bg-bg p-1">
             {children.map((c) => (
               <a key={c.id} href={href.thread(c.id)} className="hov flex h-9 min-w-0 items-center gap-2.5 rounded-full px-3 text-[12.5px] [--hov:var(--surface)]">
                 <StatusDot status={c.status} size={7} />
@@ -266,13 +348,22 @@ function DetailsTab({
         </div>
       )}
 
-      <div className="mt-4 rounded-[18px] bg-bg p-3.5">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="label-mono">Resume in terminal</span>
-          <CopyButton text={resume} />
+      {remote ? (
+        <div className="mt-4 rounded-[20px] bg-bg p-3.5">
+          <div className="caption mb-2">Remote session</div>
+          <p className="text-[12.5px] leading-relaxed text-fg-2">
+            This thread runs on the Hermes server. Another message here resumes <span className="font-mono">{thread.session_id}</span>.
+          </p>
         </div>
-        <code className="block rounded-xl bg-surface px-3 py-2.5 font-mono text-[11.5px] break-all text-fg-2">{resume}</code>
-      </div>
+      ) : (
+        <div className="mt-4 rounded-[20px] bg-bg p-3.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="caption">Resume in terminal</span>
+            <CopyButton text={resume} />
+          </div>
+          <code className="block rounded-xl bg-surface px-3 py-2.5 font-mono text-[11.5px] break-all text-fg-2">{resume}</code>
+        </div>
+      )}
     </div>
   );
 }
@@ -304,6 +395,12 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
   const [panelTab, setPanelTab] = useState<PanelTab>('artifacts');
   const [panelOpen, setPanelOpen] = useState<boolean>(() => readPref('threadPanel', true));
   const [mobilePanel, setMobilePanel] = useState(!!artifactParam);
+  const [panelWidth, setPanelWidth] = useState<number | null>(() => {
+    const v = readPref<unknown>('threadPanelWidth', null);
+    return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  });
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [rootWidth, setRootWidth] = useState(0);
   const [stopping, setStopping] = useState(false);
   const [queued, setQueued] = useState<PendingMsg[]>([]);
   const [warm, setWarm] = useState<boolean | undefined>(undefined);
@@ -568,6 +665,17 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     prevFiles.current = files.length;
   }, [files, ready, isMobile]);
 
+  // Track the thread view width so a wide panel never squeezes the transcript below THREAD_MIN.
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    setRootWidth(el.clientWidth);
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setRootWidth(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [thread !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (notFound) {
     return (
       <div className="h-full overflow-y-auto">
@@ -642,8 +750,11 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
 
   const artifactCount = files.length + shots.length;
 
+  const panelMax = Math.max(PANEL_MIN, (rootWidth || window.innerWidth) - THREAD_MIN);
+  const shownPanelWidth = Math.min(Math.max(panelWidth ?? defaultPanelWidth(), PANEL_MIN), panelMax);
+
   return (
-    <div className="flex h-full min-h-0">
+    <div ref={rootRef} className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
         {/* header */}
         <div className="flex shrink-0 items-center gap-3 px-3 pt-3 pb-2 md:px-6 md:pt-4">
@@ -671,8 +782,8 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {!live && ready && (
-              <span className="hidden items-center gap-1.5 font-num text-[11px] text-warn sm:inline-flex" title="Reconnecting to the live stream">
-                <span className="pulse h-1.5 w-1.5 rounded-full bg-[var(--warn-dot)]" /> Reconnecting
+              <span className="hidden items-center gap-1.5 font-num text-[11px] text-fg-3 sm:inline-flex" title="Reconnecting to the live stream">
+                <span className="pulse h-1.5 w-1.5 rounded-full bg-fg-4" /> Reconnecting
               </span>
             )}
             <StatusPill status={thread.status} />
@@ -716,7 +827,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
             <button
               type="button"
               onClick={jump}
-              className="glass pop-in press absolute bottom-4 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-medium"
+              className="float pop-in press absolute bottom-4 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-medium"
             >
               <Icon name="chevronDown" size={13} /> New activity
             </button>
@@ -725,12 +836,11 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
 
         {/* composer */}
         <div className="relative shrink-0 bg-bg px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4">
-          <div className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-bg to-transparent" />
           <div className="mx-auto max-w-3xl">
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             <ReplyComposer
               thread={thread}
-              canSteer={thread.harness !== 'cursor'}
+              canSteer={isHarnessId(thread.harness) ? CAPABILITIES[thread.harness].steer : thread.harness !== 'cursor'}
               onSent={(t) => {
                 setThread((prev) => newer(prev, t, true));
                 nearBottom.current = true;
@@ -751,7 +861,19 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
 
       {/* desktop panel */}
       {!isMobile && panelOpen && (
-        <aside className="w-[clamp(340px,40vw,760px)] shrink-0 py-2 pr-2">
+        <aside className="relative shrink-0 py-2 pr-2" style={{ width: shownPanelWidth }}>
+          <PanelResizeHandle
+            width={shownPanelWidth}
+            max={panelMax}
+            onChange={(w, done) => {
+              setPanelWidth(w);
+              if (done) writePref('threadPanelWidth', w);
+            }}
+            onReset={() => {
+              setPanelWidth(null);
+              writePref('threadPanelWidth', null);
+            }}
+          />
           <div className="panel-in h-full overflow-hidden rounded-[18px] bg-surface">{panel}</div>
         </aside>
       )}

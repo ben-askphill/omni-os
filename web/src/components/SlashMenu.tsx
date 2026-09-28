@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SlashCommand } from '../../../shared/slash.ts';
 import { api, type CommandList } from '../api.ts';
 import { SOURCE_TAG, type MenuSection } from '../slash-menu.ts';
-import { Spinner } from './ui.tsx';
+import { Loader } from './ui.tsx';
 
 /**
  * The command list for a `/` menu: a thread's (`thread=<id>`), or the one a new thread would get
@@ -77,11 +77,11 @@ export function SlashMenu({
       aria-label="Commands"
       // Keep focus (and the phone keyboard) in the composer.
       onMouseDown={(e) => e.preventDefault()}
-      className={`fade-in scroll-thin absolute inset-x-0 z-20 max-h-[min(22rem,45vh)] overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-[var(--shadow-menu)] ${below ? 'top-full mt-2' : 'bottom-full mb-2'}`}
+      className={`fade-in scroll-thin absolute inset-x-0 z-20 max-h-[min(22rem,45vh)] overflow-y-auto rounded-[22px] bg-elev p-1.5 shadow-[var(--shadow-menu)] ${below ? 'top-full mt-2' : 'bottom-full mb-2'}`}
     >
       {/* A thread's menu lists Omni's own commands either way, so say why the harness's are missing. */}
       {list?.status === 'unavailable' && (
-        <div className="px-2.5 py-2 text-[12.5px] text-fg-3">
+        <div className="px-3 py-2.5 text-[12.5px] text-fg-3">
           Couldn't read the commands.
           {list.fix && (
             <>
@@ -92,13 +92,13 @@ export function SlashMenu({
         </div>
       )}
       {(!list || list.status === 'loading') && (
-        <div className="flex items-center gap-2 px-2.5 py-2 text-[12.5px] text-fg-3">
-          <Spinner size={13} /> Loading commands
+        <div className="flex items-center gap-2 px-3 py-2.5 text-[12.5px] text-fg-3">
+          <Loader size={13} /> Loading commands
         </div>
       )}
       {sections.map((s) => (
         <div key={s.label ?? 'matches'} role="group" aria-label={s.label ?? 'Matches'}>
-          {s.label && <div className="label-mono px-2.5 pt-2 pb-1">{s.label}</div>}
+          {s.label && <div className="caption px-3 pt-2 pb-1">{s.label}</div>}
           {s.commands.map((c) => {
             const k = ++i;
             return (
@@ -110,16 +110,16 @@ export function SlashMenu({
                 data-active={k === active || undefined}
                 onMouseMove={() => k !== active && onActive(k)}
                 onClick={() => onPick(c)}
-                className="flex cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-1.5 data-[active]:bg-surface-2"
+                className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-2xl px-3 py-1.5 data-[active]:bg-[var(--wash)]"
               >
                 <span className="min-w-0 flex-1">
                   <span className="flex min-w-0 items-baseline gap-2">
                     <span className="shrink-0 font-mono text-[13px] font-medium text-fg">/{c.name}</span>
                     {c.argumentHint && <span className="truncate font-mono text-[12px] text-fg-4">{c.argumentHint}</span>}
                   </span>
-                  {c.description && <span className="block truncate text-[12px] text-fg-3">{c.description}</span>}
+                  {c.description && <span className="block truncate text-[11.5px] text-fg-4">{c.description}</span>}
                 </span>
-                <span className="mt-0.5 shrink-0 rounded bg-surface-3 px-1.5 py-px text-[10.5px] text-fg-3">{SOURCE_TAG[c.source]}</span>
+                <span className="shrink-0 rounded-full bg-surface-2 px-2 py-px text-[11px] text-fg-3">{SOURCE_TAG[c.source]}</span>
               </div>
             );
           })}

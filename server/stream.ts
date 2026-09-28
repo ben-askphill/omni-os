@@ -14,7 +14,20 @@ export type Record =
   | { kind: 'control'; payload: { request_id: string; subtype: string; still_queued: string[] } }
   | {
       kind: 'result';
-      payload: { ok: boolean; subtype: string; duration_ms?: number; turns?: number; cost_usd?: number; text?: string };
+      payload: {
+        ok: boolean;
+        subtype: string;
+        duration_ms?: number;
+        turns?: number;
+        cost_usd?: number;
+        text?: string;
+        /** Hermes reports the serving model and token counts on the run. Plan harnesses leave these off. */
+        model?: string;
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_read_tokens?: number;
+        cache_write_tokens?: number;
+      };
     };
 
 export interface Usage {

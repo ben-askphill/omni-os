@@ -3,7 +3,7 @@ import { parsePayload, uploadUrl, type Attachment, type EventRow, type PendingMs
 import { bytes, clock, duration, plural, shortPath, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { Markdown } from './Markdown.tsx';
-import { CheckItem, Icon, Modal, Spinner, StatusPill, Ticks } from './ui.tsx';
+import { CheckItem, Icon, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
 import { SOURCE_TAG } from '../slash-menu.ts';
 import { slashPieces } from '../slash-pills.ts';
 import { statusLabel } from '../status-line.ts';
@@ -44,6 +44,9 @@ interface ResultP {
   turns?: number;
   cost_usd?: number;
   stopped?: boolean;
+  model?: string;
+  input_tokens?: number;
+  output_tokens?: number;
 }
 interface ReportP {
   text: string;
@@ -214,7 +217,7 @@ function Pre({ children, tone, className = '' }: { children: ReactNode; tone?: '
   const bg = tone === 'add' ? 'bg-[var(--diff-add)]' : tone === 'del' ? 'bg-[var(--diff-del)]' : 'bg-code';
   return (
     <pre
-      className={`scroll-thin max-h-80 overflow-auto rounded-xl px-3 py-2.5 font-mono text-[11.5px] leading-[1.6] whitespace-pre-wrap break-words shadow-[inset_0_0_0_1px_var(--line)] ${bg} ${tone === 'bad' ? 'text-bad' : 'text-fg-2'} ${className}`}
+      className={`scroll-thin max-h-80 overflow-auto rounded-xl px-3 py-2.5 font-mono text-[11.5px] leading-[1.6] whitespace-pre-wrap break-words shadow-[inset_0_0_0_1px_var(--line)] ${bg} ${tone === 'bad' ? 'text-fg' : 'text-fg-2'} ${className}`}
     >
       {children}
     </pre>
@@ -304,14 +307,16 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
         className="hov group flex h-8 w-full min-w-0 items-center gap-2 rounded-full px-2.5 text-left text-[12.5px]"
       >
         <Icon name="chevronRight" size={12} className={`text-fg-4 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
-        <Icon name={toolIcon(c.name)} size={13} className={err ? 'text-bad' : 'text-fg-3'} />
-        <span className={`shrink-0 font-medium ${err ? 'text-bad' : 'text-fg-2'}`}>{toolLabel(c.name)}</span>
+        <Icon name={toolIcon(c.name)} size={13} className="text-fg-3" />
+        <span className={`shrink-0 font-medium text-fg-2`}>{toolLabel(c.name)}</span>
         <span className={`min-w-0 flex-1 truncate text-fg-3 ${mono ? 'font-mono text-[11.5px]' : ''}`}>{summary}</span>
         {c.children.length > 0 && <span className="shrink-0 font-num text-[11px] text-fg-4">{c.children.length} sub-calls</span>}
         {pending && running ? (
-          <Spinner size={11} className="text-fg-3" />
+          <Loader size={11} className="text-fg-3" />
         ) : err ? (
-          <span className="shrink-0 font-num text-[11px] text-bad">error</span>
+          <span className="inline-flex shrink-0 items-center gap-1 font-num text-[11px] text-fg">
+            <StatusDot status="needs" size={7} /> error
+          </span>
         ) : stopped ? (
           <span className="shrink-0 font-num text-[11px] text-fg-4">stopped</span>
         ) : null}
@@ -391,8 +396,12 @@ function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; 
               .join(', ')
           )}
         </span>
-        {errors > 0 && <span className="shrink-0 font-num text-[11px] text-bad">{errors} failed</span>}
-        {live && <Spinner size={11} className="text-fg-3" />}
+        {errors > 0 && (
+          <span className="inline-flex shrink-0 items-center gap-1 font-num text-[11px] text-fg">
+            <StatusDot status="needs" size={7} /> {errors} failed
+          </span>
+        )}
+        {live && <Loader size={11} className="text-fg-3" />}
       </button>
       {open && (
         <div className="fade-in px-1.5 pb-1.5">
@@ -538,9 +547,9 @@ function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: strin
   return (
     <div className={`flex flex-col items-end ${p.dropped ? 'opacity-60' : ''}`}>
       <div className="mb-1 flex flex-wrap items-center justify-end gap-x-2 text-[11.5px] text-fg-3">
-        {label && <span className={`font-medium ${p.source === 'conductor' ? 'text-info' : ''}`}>{label}</span>}
+        {label && <span className={`font-medium ${p.source === 'conductor' ? 'text-live-text' : ''}`}>{label}</span>}
         {how && (
-          <span className={`inline-flex items-center gap-1 font-medium ${p.mode === 'interrupt' ? 'text-warn' : ''}`}>
+          <span className={`inline-flex items-center gap-1 font-medium ${p.mode === 'interrupt' ? 'text-fg-2' : ''}`}>
             <Icon name={p.mode === 'interrupt' ? 'stop' : 'send'} size={11} /> {how}
           </span>
         )}
@@ -554,7 +563,7 @@ function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: strin
       {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} /> : null}
       <div
         className={`max-w-[92%] rounded-[22px] rounded-tr-lg px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%] ${
-          p.dropped ? 'border border-dashed border-line-strong' : p.source === 'conductor' ? 'bg-info-bg text-fg' : 'bg-bubble'
+          p.dropped ? 'border border-dashed border-line-strong' : 'bg-bubble'
         }`}
       >
         {pieces.map(({ text: t, hit }, i) =>
@@ -585,12 +594,19 @@ function ResultLine({ p }: { p: ResultP }) {
   const bits = [p.duration_ms != null ? `${word} in ${duration(p.duration_ms)}` : word];
   if (p.turns) bits.push(plural(p.turns, 'turn'));
   const bad = !p.ok && !p.stopped;
+  const tokens = p.input_tokens != null ? `${p.input_tokens} in / ${p.output_tokens ?? 0} out` : null;
   return (
-    <div className="flex items-center gap-3 py-1 font-num text-[10.5px] tracking-[0.06em] text-fg-4 uppercase">
+    <div className="flex items-center gap-3 py-1 font-num text-[12px] font-medium text-fg-4">
       <div className="h-px flex-1 bg-line" />
-      <span className={`flex items-center gap-2 ${bad ? 'text-bad' : ''}`}>
-        <span className={`inline-block h-1 w-1 rounded-full ${bad ? 'bg-bad' : p.ok ? 'bg-[var(--ok-dot)]' : 'bg-[var(--warn-dot)]'}`} />
+      <span className={`flex items-center gap-2 ${bad ? 'text-fg-2' : ''}`}>
+        {bad ? (
+          <StatusDot status="needs" size={8} />
+        ) : (
+          <span className={`inline-block h-1 w-1 rounded-full ${p.ok ? 'bg-done shadow-[inset_0_0_0_0.5px_var(--done-edge)]' : 'bg-fg-4'}`} />
+        )}
         {bits.join(' · ')}
+        {p.model ? <span> · {p.model}</span> : null}
+        {tokens ? <span> · {tokens}</span> : null}
         {bad && p.subtype && p.subtype !== 'success' ? ` · ${p.subtype.replace(/_/g, ' ')}` : ''}
       </span>
       <div className="h-px flex-1 bg-line" />
@@ -600,11 +616,11 @@ function ResultLine({ p }: { p: ResultP }) {
 
 function ErrorCallout({ text }: { text: string }) {
   return (
-    <div className="rounded-[20px] bg-bad-bg px-4 py-3">
-      <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-bad">
-        <Icon name="alert" size={14} /> Error
+    <div className="rounded-[20px] bg-surface px-4 py-3">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-fg">
+        <StatusDot status="needs" size={9} /> Error
       </div>
-      <pre className="scroll-thin max-h-72 overflow-auto font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap break-words text-bad">{text}</pre>
+      <pre className="scroll-thin max-h-72 overflow-auto font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap break-words text-fg-2">{text}</pre>
     </div>
   );
 }
@@ -650,7 +666,7 @@ function PlanCard({ todos }: { todos: Todo[] }) {
   return (
     <section aria-label="Plan" className="rounded-[22px] bg-surface px-4 pt-3.5 pb-3">
       <div className="mb-2.5 flex items-center gap-3">
-        <span className="label-mono">Plan</span>
+        <span className="caption">Plan</span>
         <Ticks value={todos.length ? done / todos.length : 0} count={Math.max(1, todos.length)} height={6} className="max-w-40 flex-1" label="Plan progress" />
         <span className="ml-auto font-num text-[11px] text-fg-3 tabular-nums">
           {done}/{todos.length}
@@ -710,8 +726,8 @@ export const Transcript = memo(function Transcript({
       })}
       {(showWorking || latestStatus) && (
         <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
-          {running && <Spinner size={12} />}
-          <span className={`truncate ${running ? 'shimmer' : ''}`}>{latestStatus ?? 'Working'}</span>
+          {running && <Loader size={13} />}
+          <span className="truncate">{latestStatus ?? 'Working'}</span>
         </div>
       )}
     </div>

@@ -1,11 +1,16 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { api, errorText, useApi, type SecretRow } from '../api.ts';
-import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, PageHeader, Picker, type PickerOption } from '../components/ui.tsx';
+import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, PageHeader, Picker, StatusDot, type PickerOption } from '../components/ui.tsx';
 import { relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 
 const NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
+
+/** Names Omni looks up itself. Values still go to the Keychain; this only fills the form. */
+const KNOWN_GLOBALS: { name: string; blurb: string }[] = [
+  { name: 'HERMES_API_KEY', blurb: 'Hermes API bearer token. Global. Sent on HTTP requests, not in a shell environment.' },
+];
 
 function scopeLabel(scope: string, name: (id: string) => string | undefined) {
   if (scope === 'global') return 'Global';
@@ -96,6 +101,33 @@ export function SecretsPage() {
           </div>
         </div>
 
+        <div className="space-y-2">
+          <div className="caption px-1">Known global secrets</div>
+          <ul className="space-y-2">
+            {KNOWN_GLOBALS.map((k) => {
+              const saved = (res.data ?? []).some((s) => s.scope === 'global' && s.name === k.name);
+              return (
+                <li key={k.name}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScope('global');
+                      setName(k.name);
+                      setSavedMsg(null);
+                      setFormError(null);
+                    }}
+                    className="press flex w-full items-center gap-3 rounded-[18px] bg-surface px-3 py-2.5 text-left"
+                  >
+                    <span className="font-mono text-[12.5px]">{k.name}</span>
+                    {saved && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-fg-2"><StatusDot status="done" size={7} /> saved</span>}
+                    <span className="min-w-0 flex-1 text-[12px] leading-snug text-fg-3">{k.blurb}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
         <form onSubmit={save} className="space-y-4 rounded-[24px] p-5 shadow-[inset_0_0_0_1px_var(--line)]" autoComplete="off">
           <h2 className="font-display text-[16px]">Add or replace</h2>
           <div className="grid gap-3 sm:grid-cols-[1fr_1.2fr]">
@@ -144,8 +176,8 @@ export function SecretsPage() {
               {exists ? 'Replace secret' : 'Save secret'}
             </Button>
             {savedMsg && (
-              <span className="pop-in inline-flex items-center gap-1.5 text-[12.5px] text-ok">
-                <Icon name="check" size={13} strokeWidth={2.25} /> {savedMsg}
+              <span className="pop-in inline-flex items-center gap-1.5 text-[12.5px] text-fg-2">
+                <StatusDot status="done" /> {savedMsg}
               </span>
             )}
           </div>
@@ -163,7 +195,7 @@ export function SecretsPage() {
           <div className="space-y-4">
             {groups.map(([sc, rows]) => (
               <section key={sc}>
-                <h3 className="label-mono mb-2 flex items-center gap-2 px-2">
+                <h3 className="caption mb-2 flex items-center gap-2 px-2">
                   {sc === 'global' ? (
                     'Global'
                   ) : (
@@ -188,7 +220,7 @@ export function SecretsPage() {
                           </span>
                           <InlineConfirm label="Delete" icon="trash" confirmLabel="Delete" doneLabel="Deleted" busyLabel="Deleting" undoMs={5000} onConfirm={() => remove(s)} />
                         </div>
-                        {deleteError?.key === key && <div className="pt-1 pb-1 pl-10 text-[12px] text-bad">{deleteError.msg}</div>}
+                        {deleteError?.key === key && <div className="pt-1 pb-1 pl-10 text-[12px] text-fg-2"><StatusDot status="needs" size={7} className="mr-1.5" />{deleteError.msg}</div>}
                       </li>
                     );
                   })}

@@ -6,10 +6,10 @@ import { href, navigate } from '../router.ts';
 import { useApp, useFeed } from '../store.tsx';
 
 const RUN_TONE: Record<string, string> = {
-  done: 'var(--ok-dot)',
-  failed: 'var(--bad-dot)',
-  stopped: 'var(--warn-dot)',
-  running: 'var(--info-dot)',
+  done: 'var(--done)',
+  failed: 'var(--needs)',
+  stopped: 'var(--fg-4)',
+  running: 'var(--live)',
   queued: 'var(--fg-4)',
 };
 
@@ -80,7 +80,7 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h2 className="font-display text-[16px]">{a.name}</h2>
             {!enabled && !a.error && <Chip tone="outline">Paused</Chip>}
-            {a.error && <Chip tone="bad">Invalid</Chip>}
+            {a.error && <Chip tone="needs">Invalid</Chip>}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-fg-2">
             <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-bg px-2.5 whitespace-nowrap" title={`${a.cron} (${a.timezone})`}>
@@ -131,7 +131,7 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
 
       <div className="px-4 pt-2 pb-4 md:px-5">
         <div className="mb-2 flex items-center gap-3">
-          <span className="label-mono">Last runs</span>
+          <span className="caption">Last runs</span>
           <RunStrip runs={a.runs} />
         </div>
         {a.runs.length === 0 ? (

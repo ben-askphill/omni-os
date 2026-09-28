@@ -4,7 +4,7 @@ import { Segmented } from './ui.tsx';
 
 export type ThemePref = 'system' | 'light' | 'dark';
 
-const CHROME = { light: '#f7f7f6', dark: '#0c0d0f' };
+const CHROME = { light: '#ffffff', dark: '#0c0d0f' };
 
 function apply(t: ThemePref) {
   const root = document.documentElement;

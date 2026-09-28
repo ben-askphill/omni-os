@@ -113,6 +113,40 @@ export function cursorHarness(probe: CursorProbe, cap: number): HarnessInfo {
   return { ...base, available: true, models };
 }
 
+// ---------- Hermes ----------
+
+/** Shown when the capabilities probe cannot reach Hermes or the key is missing. */
+export const HERMES_FIX =
+  'Set HERMES_API_KEY in Secrets and connect this Mac to Tailscale (OMNI_HERMES_URL, default http://100.110.128.38:8642)';
+
+const HERMES_NOTE = 'Runs on the Hermes server. Bills the Anthropic API, not your Claude, ChatGPT or Cursor plan.';
+
+/** The one model Hermes offers. The server picks the underlying LLM. */
+export function hermesModels(): ModelEntry[] {
+  return [{ id: 'hermes', label: 'Hermes default', note: HERMES_NOTE, efforts: [], defaultEffort: '', default: true }];
+}
+
+export interface HermesProbe {
+  available: boolean;
+}
+
+export function hermesHarness(probe: HermesProbe, cap: number): HarnessInfo {
+  const base: Omit<HarnessInfo, 'models' | 'available' | 'fix'> = {
+    id: 'hermes',
+    ...HARNESS_META.hermes,
+    capabilities: CAPABILITIES.hermes,
+    cap,
+  };
+  if (!probe.available) return { ...base, available: false, fix: HERMES_FIX, models: [] };
+  return { ...base, available: true, models: hermesModels() };
+}
+
+const UNAVAILABLE_FIX: Partial<Record<HarnessId, string>> = {
+  codex: 'codex login',
+  cursor: 'cursor-agent login',
+  hermes: HERMES_FIX,
+};
+
 // ---------- resolution & validation ----------
 
 export interface Catalog {
@@ -153,9 +187,7 @@ export function validateRun(
 ): Resolved | ResolveError {
   const h = getHarness(cat, harness);
   if (!h) return { ok: false, error: `Unknown harness "${harness}".` };
-  if (!h.available && h.models.length === 0) {
-    return { ok: false, error: `${h.name} is not available. Run \`${h.fix ?? ''}\`.`.trim() };
-  }
+  if (!h.available && h.models.length === 0) return { ok: false, error: unavailableError(h.name, h.fix) };
   // Catalog unavailable for this harness: pass through.
   if (h.models.length === 0) return { ok: true, harness, model, effort };
 
@@ -171,6 +203,17 @@ export function validateRun(
   return { ok: true, harness, model: m.id, effort };
 }
 
+/**
+ * A short fix is a shell command (`codex login`). A sentence is the instruction itself,
+ * which is what Hermes needs (a Keychain secret and a reachable URL, not one command).
+ */
+export function unavailableError(name: string, fix?: string): string {
+  const text = (fix ?? '').trim();
+  if (!text) return `${name} is not available.`;
+  if (text.split(/\s+/).length <= 3) return `${name} is not available. Run \`${text}\`.`;
+  return `${name} is not available. ${text}`;
+}
+
 export function emptyCatalog(caps: Record<HarnessId, number>): Catalog {
   return {
     harnesses: HARNESS_IDS.map((id) => ({
@@ -178,7 +221,7 @@ export function emptyCatalog(caps: Record<HarnessId, number>): Catalog {
       ...HARNESS_META[id],
       capabilities: CAPABILITIES[id],
       available: id === 'claude-code',
-      ...(id === 'claude-code' ? {} : { fix: id === 'codex' ? 'codex login' : 'cursor-agent login' }),
+      ...(UNAVAILABLE_FIX[id] ? { fix: UNAVAILABLE_FIX[id] } : {}),
       models: id === 'claude-code' ? claudeModels() : [],
       cap: caps[id],
     })),

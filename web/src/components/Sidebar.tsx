@@ -4,7 +4,8 @@ import { untilLabel } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { ThemeSwitch } from './theme.tsx';
-import { Icon, Kbd, Spinner, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
+import { HarnessLogo, Loader, OmniMark } from './brand.tsx';
+import { ErrorNote, Icon, Kbd, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -12,6 +13,7 @@ const HARNESS_ROWS: { id: HarnessId; name: string }[] = [
   { id: 'claude-code', name: 'Claude' },
   { id: 'codex', name: 'Codex' },
   { id: 'cursor', name: 'Cursor' },
+  { id: 'hermes', name: 'Hermes' },
 ];
 
 const windowPct = (w?: UsageWindow) => {
@@ -24,7 +26,7 @@ const windowPct = (w?: UsageWindow) => {
 function WindowCell({ w, label }: { w?: UsageWindow; label: string }) {
   const pct = windowPct(w);
   if (pct === null) return <span className="flex-1 text-center font-num text-[10px] text-fg-4">—</span>;
-  const tone = pct >= 0.9 ? 'bad' : pct >= 0.7 ? 'warn' : undefined;
+  const tone = pct >= 0.9 ? 'needs' : undefined;
   return (
     <div
       className="flex flex-1 items-center gap-1.5"
@@ -37,12 +39,15 @@ function WindowCell({ w, label }: { w?: UsageWindow; label: string }) {
 }
 
 /** One plan's row: the 5-hour and weekly windows, or "no data" for a harness that reports none. */
-function HarnessUsageRow({ name, usage }: { name: string; usage?: Usage | null }) {
+function HarnessUsageRow({ id, name, usage }: { id: HarnessId; name: string; usage?: Usage | null }) {
   useNow(60_000);
   const noData = !usage || (!usage.five_hour && !usage.seven_day);
   return (
     <div className="flex items-center gap-2">
-      <span className="label-mono w-12 shrink-0">{name}</span>
+      <span className="caption inline-flex w-[66px] shrink-0 items-center gap-1.5 text-fg-2">
+        <span className="text-fg"><HarnessLogo harness={id} size={12} /></span>
+        {name}
+      </span>
       {noData ? (
         <span className="flex-1 text-[10.5px] text-fg-4">no data</span>
       ) : (
@@ -61,18 +66,18 @@ function UsageCard() {
   const footer = HARNESS_ROWS.filter((r) => slots[r.id]).map((r) => `${r.name} ${slots[r.id]!.running}/${slots[r.id]!.cap}`).join(' · ');
   return (
     <div className="space-y-2 rounded-[20px] bg-bg/70 p-3 shadow-[var(--shadow-card)]">
-      <div className="flex items-center gap-2 pb-0.5 text-[9px] font-medium tracking-wide text-fg-4 uppercase">
-        <span className="w-12 shrink-0" />
+      <div className="flex items-center gap-2 pb-0.5 text-[11px] font-medium text-fg-4">
+        <span className="w-[66px] shrink-0" />
         <span className="flex-1">5h</span>
         <span className="flex-1">Week</span>
       </div>
       {HARNESS_ROWS.map((r) => (
-        <HarnessUsageRow key={r.id} name={r.name} usage={usage[r.id]} />
+        <HarnessUsageRow key={r.id} id={r.id} name={r.name} usage={usage[r.id]} />
       ))}
       <div className="flex items-center gap-2 border-t border-line pt-2.5 text-[11px] text-fg-3">
         <span className="relative inline-block h-1.5 w-1.5 shrink-0" title={feedLive ? 'Live' : 'Reconnecting'}>
-          {feedLive && <span className="ping absolute inset-0 rounded-full bg-[var(--ok-dot)]" />}
-          <span className={`absolute inset-0 rounded-full ${feedLive ? 'bg-[var(--ok-dot)]' : 'bg-fg-4'}`} />
+          {feedLive && <span className="ping absolute inset-0 rounded-full bg-done" />}
+          <span className={`absolute inset-0 rounded-full ${feedLive ? 'bg-done' : 'bg-fg-4'}`} />
         </span>
         {footer ? (
           <span className="font-num tabular-nums">{footer}</span>
@@ -106,11 +111,8 @@ function NavLink({ to, icon, lead, active, children, right, onNavigate }: { to: 
 function RunningBadge({ n }: { n: number }) {
   if (!n) return null;
   return (
-    <span className="flex items-center gap-1.5 font-num text-[11px] text-info tabular-nums" title={`${n} running or queued`}>
-      <span className="relative inline-block h-1.5 w-1.5">
-        <span className="ping absolute inset-0 rounded-full bg-[var(--info-dot)]" />
-        <span className="absolute inset-0 rounded-full bg-[var(--info-dot)]" />
-      </span>
+    <span className="flex items-center gap-1.5 font-num text-[11px] text-live-text tabular-nums" title={`${n} running or queued`}>
+      <StatusDot status="running" size={6} />
       {n}
     </span>
   );
@@ -131,7 +133,7 @@ function ThreadLink({ t, active, onNavigate }: { t: ThreadStub; active: boolean;
       }`}
     >
       <span className="grid w-3 shrink-0 place-items-center">
-        {t.status === 'running' ? <Spinner size={11} className="text-info" /> : <StatusDot status={t.status} size={7} />}
+        {t.status === 'running' ? <Loader size={11} className="text-live-text" /> : <StatusDot status={t.status} size={7} />}
       </span>
       <span className="min-w-0 flex-1 truncate">{title}</span>
     </a>
@@ -208,7 +210,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
     <nav className="flex h-full flex-col bg-sidebar" aria-label="Main">
       <div className="flex h-14 items-center justify-between pr-3 pl-5">
         <a href={href.home()} onClick={onNavigate} aria-label="Omni home">
-          <Wordmark size={19} />
+          <Wordmark size={20} />
         </a>
       </div>
 
@@ -249,7 +251,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
             </NavLink>
             {conductor && (
               <>
-                <NavLink to={href.channel('conductor')} icon="target" active={activeChannel === 'conductor'} onNavigate={onNavigate} right={<RunningBadge n={conductor.running} />}>
+                <NavLink to={href.channel('conductor')} lead={<span className="grid w-[15px] place-items-center"><OmniMark size={17} /></span>} active={activeChannel === 'conductor'} onNavigate={onNavigate} right={<RunningBadge n={conductor.running} />}>
                   Conductor
                 </NavLink>
                 {threadLinks(conductor)}
@@ -257,14 +259,14 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
             )}
           </div>
 
-          {channelsError && <div className="rounded-2xl bg-bad-bg px-3 py-2 text-[12px] text-bad">{channelsError}</div>}
+          {channelsError && <ErrorNote>{channelsError}</ErrorNote>}
 
           {GROUPS.map((g) => {
             const list = rest.filter((c) => c.kind === g.kind);
             if (!list.length) return null;
             return (
               <div key={g.kind}>
-                <div className="label-mono px-3 pt-1 pb-2">{g.label}</div>
+                <div className="caption px-3 pt-1 pb-2">{g.label}</div>
                 <div className="space-y-px">{list.map(channelLink)}</div>
               </div>
             );
@@ -276,7 +278,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
           </NavLink>
 
           <div>
-            <div className="label-mono px-3 pt-1 pb-2">Workspace</div>
+            <div className="caption px-3 pt-1 pb-2">Workspace</div>
             <div className="space-y-px">
               <NavLink to={href.artifacts()} icon="layers" active={route.name === 'artifacts'} onNavigate={onNavigate}>
                 Artifacts
@@ -295,7 +297,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
       <div className="space-y-2.5 px-3 pt-1 pb-3">
         <UsageCard />
         <div className="flex items-center justify-between pl-2">
-          <span className="label-mono">Theme</span>
+          <span className="caption">Theme</span>
           <ThemeSwitch />
         </div>
       </div>
