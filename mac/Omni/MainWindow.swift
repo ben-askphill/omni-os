@@ -22,6 +22,7 @@ struct MainWindow: View {
     .navigationTitle(model.title)
     .toolbar { toolbar }
     .overlay { PaletteOverlay(model: model) }
+    .modifier(ThreadWindowSupport(model: model))
     .frame(minWidth: 720, minHeight: 460)
     .onChange(of: model.route) { old, new in
       // A route that lives in Settings, such as #/secrets from a script, opens it there instead.
@@ -65,6 +66,7 @@ struct MainWindow: View {
       NewThreadButton(model: model)
         .help("New thread")
     }
+    OpenInNewWindowToolbar(model: model)
   }
 }
 

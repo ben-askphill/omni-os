@@ -26,6 +26,7 @@ final class QARunner {
 
   /// Captured by the main window, since only a view can read it.
   static var openSettings: OpenSettingsAction?
+  static var openThreadWindow: ((String) -> Void)?
   private static var current: QARunner?
 
   /// Read from the raw arguments: UserDefaults would parse a JSON value as an old-style property list.
@@ -169,6 +170,10 @@ final class QARunner {
           model.settingsTab = tab
           openSettings()
           try? await Task.sleep(for: .milliseconds(600))
+        case .openThread(let id):
+          guard let open = Self.openThreadWindow else { throw QAScriptError("the main window has not appeared") }
+          open(id)
+          try? await Task.sleep(for: .milliseconds(800))
         case .server(let action):
           guard model.settings.port != ServerSettings.defaultPort, model.supervisor.port != ServerSettings.defaultPort else {
             throw QAScriptError("port \(ServerSettings.defaultPort) is the live server")
@@ -268,6 +273,7 @@ final class QARunner {
     case .port(let port): "port \(port)"
     case .open(let window): "open \(window.rawValue)"
     case .settings(let tab): "settings \(tab.rawValue)"
+    case .openThread(let id): "openThread \(id)"
     case .server(let action): "server \(action.rawValue)"
     case .appearance(let appearance): "appearance \(appearance.rawValue)"
     case .scroll(let scroll): "scroll \(scroll.rawValue)"

@@ -39,7 +39,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 
 /// One step of a Debug QA run, from the JSON the app gets with `-OmniQAScript`:
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
-/// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`,
+/// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
 /// `{"settings": "secrets"}` (or `connection`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
 /// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`), `{"expand": true}`,
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
@@ -55,6 +55,8 @@ public enum QAStep: Hashable, Sendable {
   case open(QAWindow)
   /// Opens the Settings window on a tab.
   case settings(SettingsTab)
+  /// Opens the thread in its own window, as Open in New Window does.
+  case openThread(String)
   /// Start Server, Stop Server or Check Again. The step waits for it to finish.
   case server(QAServerAction)
   case appearance(QAAppearance)
@@ -160,7 +162,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "settings", "server", "appearance", "scroll", "expand", "type", "send", "inspector", "webTitle", "palette", "channel", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "type", "send", "inspector", "webTitle", "palette", "channel", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -200,6 +202,9 @@ public struct QAScript: Hashable, Sendable {
         throw QAScriptError("settings takes connection, secrets or appearance")
       }
       return .settings(tab)
+    case "openThread":
+      guard let id = value as? String, !id.isEmpty else { throw QAScriptError("openThread takes a thread id") }
+      return .openThread(id)
     case "server":
       guard let name = value as? String, let action = QAServerAction(rawValue: name) else {
         throw QAScriptError("server takes start, stop or check")

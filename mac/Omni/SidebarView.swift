@@ -84,6 +84,7 @@ struct SidebarView: View {
     ForEach(links.shown) { thread in
       ThreadRow(thread: thread)
         .tag(SidebarItem.thread(thread.id))
+        .openInNewWindow(thread.id)
     }
     if links.more > 0 {
       Label {

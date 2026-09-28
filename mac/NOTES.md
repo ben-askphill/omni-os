@@ -501,3 +501,13 @@ The overlay sits above the composer, like the Web UI's, not at the caret: `TextE
 - QA without GitHub: `tests/fixtures/fake-gh.mjs` answers the `gh` calls of `server/github.ts`. Link it as `gh` in a folder first on the test server's PATH. `Fixtures/prs.json` and `pr.json` were recorded from that server.
 - Debug launch args `-OmniPRTab Diff` and `-OmniPRMergeSheet YES` open a tab or the sheet, since QA scripts only pick routes.
 - `QARunner` ignores the `expand` step for now (it was missing, so the Debug build did not compile).
+
+## Thread in its own window (#75)
+
+- `mac/Omni/ThreadWindow.swift`. `WindowGroup("Thread", id: "thread", for: String.self)` in `OmniApp`, value is the thread id. SwiftUI keeps one window per id (`openWindow(id:value:)` fronts the existing one) and restores them on relaunch.
+- A thread window shows `ThreadScreen`, so it takes its store from `AppModel.threads` like the main window. The main window on a thread plus a thread window on it share one store and one stream; the last one to close stops it (`ThreadStoreRegistry`, already tested).
+- Open in New Window: File menu (Option-Cmd-N, for the thread the focused window shows, off in a thread window), a toolbar button in the main window on a thread, and `.openInNewWindow(threadID)` on any view (context menu, Option-click). It is on sidebar thread rows; add it to thread rows in lists and channel pages as they land.
+- `FocusedValues.shownThread` says which thread the focused window shows. Copy Thread as Markdown uses it too (`AppModel.threadMarkdown(_:)`).
+- Buttons and links inside a thread window still set `model.route`, so they navigate the main window; the thread window brings it forward when it changes the route while key.
+- QA: `{"openThread": "<id>"}` opens the window; snapshots write it as `<name>-window<n>.png`.
+- The composer and inspector show in the thread window once #64 puts them in `ThreadScreen`.
