@@ -437,9 +437,9 @@ What the tracer's QA run covered (each checked by eye in the PNGs): the sidebar 
 
 ## Slash menu (#66)
 
-The slash grammar, ranking, hints and pills are the Web UI's own TypeScript, run through JavaScriptCore (ADR 0002).
+The slash grammar, ranking, hints and pills are the TypeScript in `shared/` that the Web UI also runs, through JavaScriptCore (ADR 0002). The engine imports from `shared/` only, never from `web/`; `tests/app-boundaries.test.ts` enforces it.
 
-- `mac/slash-engine/entry.ts` is the entry; `npm run build:slash` bundles it (esbuild, `scripts/build-slash-engine.ts`) to `OmniKit/Sources/OmniKit/Resources/slash-engine.js`, which is checked in. `tests/slash-engine-bundle.test.ts` fails when it is stale. After changing `shared/slash.ts` or `web/src/slash-menu.ts`, `composer-slash.ts` or `slash-pills.ts`, run `npm run build:slash`.
+- `mac/slash-engine/entry.ts` is the entry; `npm run build:slash` bundles it (esbuild, `scripts/build-slash-engine.ts`) to `OmniKit/Sources/OmniKit/Resources/slash-engine.js`, which is checked in. `tests/slash-engine-bundle.test.ts` fails when it is stale. After changing `shared/slash.ts`, `slash-menu.ts`, `composer-slash.ts` or `slash-pills.ts`, run `npm run build:slash`.
 - `SlashEngine.shared` (OmniKit): `query`, `sections`, `pick`, `reply`, `newThreadHint`, `pieces`, `omniCommands`. All offsets are UTF-16 units. `String.index(utf16Offset:)` and `utf16Offset(of:)` (in `SlashTypes.swift`) are the only place they become Swift indices; `AttributedString` has the same pair in `SlashMenuView.swift`.
 - `SlashCommandsStore` (`@MainActor @Observable`): the list for a `CommandsSource` (`.thread(id)` or `.newThread(harness:channel:)`), fetched as `useCommands` does: cached, then `wait=1`; an older `fetchedAt` never replaces a newer list; a failure with no list is `.unavailable`. Set `source` when the new-thread picker changes.
 - `SlashMenuModel`: open/closed, sections, highlight, Esc dismissal, keys, pick, `reply` (what Send does) and `hint`. It loads the list on focus and when the menu opens.

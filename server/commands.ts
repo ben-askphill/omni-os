@@ -2,21 +2,13 @@
 // Omni copies nothing. A list is cached per harness and folder, served at once, and refreshed in
 // the background once it is 30 seconds old. One probe runs at a time per harness and folder, and
 // a failed probe keeps the last good list.
-import { runnableCommands, type SlashCommand } from '../shared/slash.ts';
+import { runnableCommands, type CommandList, type SlashCommand } from '../shared/slash.ts';
 import { probeClaudeCommands } from './harness/claude/commands.ts';
 import { probeCodexSkills } from './harness/codex/commands.ts';
 import { probeCursorCommands } from './harness/cursor/commands.ts';
 import type { HarnessId } from './harness/types.ts';
 
-export interface CommandList {
-  /** `loading`: nothing cached yet and a probe is running. `unavailable`: the harness didn't answer. */
-  status: 'ready' | 'loading' | 'unavailable';
-  /** When unavailable, the command that fixes it. */
-  fix?: string;
-  commands: SlashCommand[];
-  /** When the list was read from the harness (epoch ms). */
-  fetchedAt: number | null;
-}
+export type { CommandList };
 
 interface Source {
   probe: (cwd: string) => Promise<SlashCommand[] | null>;

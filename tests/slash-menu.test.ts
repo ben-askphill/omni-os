@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SlashCommand } from '../shared/slash.ts';
-import { mentionSections, menuSections, pickCommand, slashQuery } from '../web/src/slash-menu.ts';
+import { mentionSections, menuSections, pickCommand, slashQuery } from '../shared/slash-menu.ts';
 
 // The composer's `/` menu: which command is being typed at the caret, what the menu lists for
 // it, and what picking a row does to the text.

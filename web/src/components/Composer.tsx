@@ -7,8 +7,9 @@ import { ErrorNote, Icon, IconButton, Kbd, Loader, Picker, type IconName, type P
 import { CrewMark, isCrewRole } from './brand.tsx';
 import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
 import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
-import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '../slash-menu.ts';
-import { menuCommands, newThreadBody, newThreadHint, otherModel, replySlash, sameSettings } from '../composer-slash.ts';
+import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '../../../shared/slash-menu.ts';
+import { menuCommands, newThreadHint, replySlash } from '../../../shared/composer-slash.ts';
+import { newThreadBody, otherModel, sameSettings } from '../new-thread-preset.ts';
 import { parseSlash, type SlashCommand } from '../../../shared/slash.ts';
 
 // Unsent text survives navigation (not reloads). Keyed by where the composer lives.

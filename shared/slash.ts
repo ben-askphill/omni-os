@@ -199,3 +199,14 @@ export function slashRecord(text: string, commands: SlashCommand[]): SlashRecord
   if (!command && !mentions.length) return undefined;
   return { ...(command && { command }), ...(mentions.length && { mentions }) };
 }
+
+/** A harness's command list for a folder, as GET /api/commands sends it. */
+export interface CommandList {
+  /** `loading`: nothing cached yet and a probe is running. `unavailable`: the harness didn't answer. */
+  status: 'ready' | 'loading' | 'unavailable';
+  /** When unavailable, the command that fixes it. */
+  fix?: string;
+  commands: SlashCommand[];
+  /** When the list was read from the harness (epoch ms). */
+  fetchedAt: number | null;
+}

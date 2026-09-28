@@ -1,6 +1,6 @@
 // The composer's `/` menu as pure functions: the command being typed at the caret, what the menu
 // lists for it, and what picking a row does to the text. The grammar itself is in shared/slash.ts.
-import type { CommandSource, SlashCommand } from '../../shared/slash.ts';
+import type { CommandSource, SlashCommand } from './slash.ts';
 
 /**
  * The command being typed, with the caret in its name: the slash that starts the message, or a

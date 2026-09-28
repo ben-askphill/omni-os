@@ -1,5 +1,5 @@
 // A user message as the transcript shows it: plain runs of text, and a pill for each command it names.
-import type { SlashHit, SlashRecord } from '../../shared/slash.ts';
+import type { SlashHit, SlashRecord } from './slash.ts';
 
 export interface Piece {
   text: string;
