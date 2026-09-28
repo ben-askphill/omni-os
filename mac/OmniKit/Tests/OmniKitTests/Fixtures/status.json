@@ -9,7 +9,8 @@
       "updated_at": "2026-01-05T09:00:00.000Z"
     },
     "codex": null,
-    "cursor": null
+    "cursor": null,
+    "hermes": null
   },
   "slots": {
     "claude-code": {
@@ -21,6 +22,10 @@
       "cap": 4
     },
     "cursor": {
+      "running": 0,
+      "cap": 4
+    },
+    "hermes": {
       "running": 0,
       "cap": 4
     }

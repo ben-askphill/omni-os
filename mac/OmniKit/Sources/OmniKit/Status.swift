@@ -1,6 +1,6 @@
 import Foundation
 
-/// The agent CLI a thread runs in: claude-code, codex or cursor.
+/// The agent CLI a thread runs in: claude-code, codex, cursor or hermes.
 public struct HarnessID: OpenEnum, CodingKeyRepresentable {
   public let rawValue: String
   public init(rawValue: String) { self.rawValue = rawValue }
@@ -8,6 +8,7 @@ public struct HarnessID: OpenEnum, CodingKeyRepresentable {
   public static let claudeCode: Self = "claude-code"
   public static let codex: Self = "codex"
   public static let cursor: Self = "cursor"
+  public static let hermes: Self = "hermes"
 
   public var codingKey: any CodingKey { Key(stringValue: rawValue) }
   public init?<T: CodingKey>(codingKey: T) { self.init(rawValue: codingKey.stringValue) }

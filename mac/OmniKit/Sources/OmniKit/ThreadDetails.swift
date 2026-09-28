@@ -35,7 +35,8 @@ public enum ThreadDetails {
 
   /// The command that resumes the session in a terminal. nil while the thread has no session.
   public static func resumeCommand(harness: HarnessID, sessionID: String?, cwd: String?) -> String? {
-    guard let sessionID, !sessionID.isEmpty else { return nil }
+    // Hermes runs on its own server, so there is nothing to resume in a terminal.
+    guard let sessionID, !sessionID.isEmpty, harness != .hermes else { return nil }
     let command =
       switch harness {
       case .codex: "codex resume \(sessionID)"
@@ -50,6 +51,7 @@ public enum ThreadDetails {
     case .claudeCode: "Claude Code"
     case .codex: "Codex"
     case .cursor: "Cursor Agent"
+    case .hermes: "Hermes"
     default: id.rawValue
     }
   }

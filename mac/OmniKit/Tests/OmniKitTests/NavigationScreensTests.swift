@@ -217,8 +217,8 @@ private func listThread(_ id: String, title: String? = nil, channel: String = "a
   @Test func rowsListEveryHarnessAndFlagNoData() throws {
     let usage = try decode([HarnessID: Usage].self, #"{"claude-code":{"five_hour":{"utilization":0.5,"resetsAt":1790600000}}}"#)
     let rows = HarnessUsageRow.rows(usage: usage, slots: [.claudeCode: HarnessSlot(running: 1, cap: 4)])
-    #expect(rows.map(\.name) == ["Claude", "Codex", "Cursor"])
-    #expect(rows.map(\.hasData) == [true, false, false])
+    #expect(rows.map(\.name) == ["Claude", "Codex", "Cursor", "Hermes"])
+    #expect(rows.map(\.hasData) == [true, false, false, false])
     #expect(rows[0].slot?.cap == 4 && rows[0].week == nil)
   }
 }

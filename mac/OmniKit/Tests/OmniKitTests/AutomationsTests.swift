@@ -131,7 +131,7 @@ private final class AutomationsServer: HTTPTransport {
     #expect(digest.error == nil)
     #expect(digest.next == date("2026-01-05T09:00:00.000Z"))
     let run = try #require(digest.runs.first)
-    #expect(run.threadID == "00000000-0000-4000-8000-000000000004")
+    #expect(run.threadID == "00000000-0000-4000-8000-000000000006")
     #expect(run.trigger == .manual)
     #expect(run.status == .done)
     #expect(run.title == "Daily digest · 5 Jan")
@@ -165,7 +165,7 @@ private final class AutomationsServer: HTTPTransport {
   @Test func runsWithAnEmptyBody() async throws {
     let t = StubTransport(body: try fixture("automation-run.json"))
     let thread = try await OmniClient(port: 4799, transport: t).runAutomation("daily-digest")
-    #expect(thread.id == "00000000-0000-4000-8000-000000000004")
+    #expect(thread.id == "00000000-0000-4000-8000-000000000006")
     #expect(thread.source == .automation)
     #expect(thread.automation == "daily-digest")
     let req = try #require(t.requests.first)
@@ -457,7 +457,7 @@ private final class AutomationsServer: HTTPTransport {
     try await waitFor("the run to be sent") { m.starting.contains(a.id) }
     #expect(!m.canRun(a))
     gate.open()
-    #expect(await run.value == "00000000-0000-4000-8000-000000000004")
+    #expect(await run.value == "00000000-0000-4000-8000-000000000006")
     #expect(m.starting.isEmpty)
     let write = try #require(server.writes.first)
     #expect(write.url?.path() == "/api/automations/daily-digest/run")

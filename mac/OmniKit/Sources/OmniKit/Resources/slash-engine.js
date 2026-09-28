@@ -89,7 +89,7 @@
   }
 
   // web/src/composer-slash.ts
-  var HARNESS_NAME = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor Agent" };
+  var HARNESS_NAME = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor Agent", hermes: "Hermes" };
   var harnessName = (id) => HARNESS_NAME[id] ?? id;
   var menuCommands = (list, where) => [
     ...visibleCommands(list ?? []),

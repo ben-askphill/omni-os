@@ -87,7 +87,7 @@ func sseData(_ text: String) -> [String] {
     #expect(acme.active.first?.status == .running)
 
     let harnesses = try decodeFixture([HarnessInfo].self, "harnesses.json")
-    #expect(harnesses.map(\.id) == [.claudeCode, .codex, .cursor])
+    #expect(harnesses.map(\.id) == [.claudeCode, .codex, .cursor, .hermes])
     #expect(harnesses.first?.models.contains { $0.isDefault } == true)
   }
 

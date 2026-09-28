@@ -46,7 +46,7 @@ public struct HarnessUsageRow: Hashable, Sendable, Identifiable {
 
   public var hasData: Bool { fiveHour != nil || week != nil }
 
-  static let harnesses: [(id: HarnessID, name: String)] = [(.claudeCode, "Claude"), (.codex, "Codex"), (.cursor, "Cursor")]
+  static let harnesses: [(id: HarnessID, name: String)] = [(.claudeCode, "Claude"), (.codex, "Codex"), (.cursor, "Cursor"), (.hermes, "Hermes")]
 
   public static func rows(usage: [HarnessID: Usage], slots: [HarnessID: HarnessSlot]) -> [HarnessUsageRow] {
     harnesses.map { h in

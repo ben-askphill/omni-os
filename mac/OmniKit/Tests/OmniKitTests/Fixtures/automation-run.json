@@ -1,5 +1,5 @@
 {
-  "id": "00000000-0000-4000-8000-000000000004",
+  "id": "00000000-0000-4000-8000-000000000006",
   "channel_id": "acme",
   "title": "Daily digest · 5 Jan",
   "status": "running",
@@ -7,7 +7,7 @@
   "model": "claude-opus-5-5",
   "harness": "claude-code",
   "effort": "",
-  "session_id": "00000000-0000-4000-8000-000000000004",
+  "session_id": "00000000-0000-4000-8000-000000000006",
   "has_run": 0,
   "cwd": "/tmp/omni-fixtures/acme",
   "branch": null,

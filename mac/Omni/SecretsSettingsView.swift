@@ -55,6 +55,14 @@ struct SecretsForm: View {
             .autocorrectionDisabled()
             .onSubmit { valueFocused = true }
         }
+        if secrets.name.isEmpty {
+          Button("Use HERMES_API_KEY", systemImage: "wand.and.stars") {
+            secrets.scope = .global
+            secrets.name = "HERMES_API_KEY"
+            valueFocused = true
+          }
+          .help("The Hermes API bearer token. Global. Sent on HTTP requests, not in a shell environment.")
+        }
         LabeledContent("Value") {
           SecureField("Value", text: $secrets.value, prompt: Text("Paste the value"))
             .labelsHidden()

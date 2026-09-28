@@ -95,5 +95,21 @@
     "fix": "cursor-agent login",
     "models": [],
     "running": 0
+  },
+  {
+    "id": "hermes",
+    "name": "Hermes",
+    "plan": "Anthropic API via Hermes",
+    "capabilities": {
+      "warmProcess": false,
+      "steer": true,
+      "inlineImages": false,
+      "usage": "none"
+    },
+    "cap": 4,
+    "available": false,
+    "fix": "Set HERMES_API_KEY in Secrets and connect this Mac to Tailscale (OMNI_HERMES_URL, default http://100.110.128.38:8642)",
+    "models": [],
+    "running": 0
   }
 ]

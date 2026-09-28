@@ -192,7 +192,7 @@ private func loaded(_ store: WorkspaceStore) async throws {
     #expect(s.usage[.claudeCode]?.fiveHour != nil)
     #expect(s.crew.map(\.id).contains("conductor"))
     #expect(s.recent.map(\.id) == ["t0"])
-    #expect(s.harnesses.map(\.id) == [.claudeCode, .codex, .cursor])
+    #expect(s.harnesses.map(\.id) == [.claudeCode, .codex, .cursor, .hermes])
     #expect(api.recentLimits == [60])
     for e in endpoints { #expect(api.calls(e) == 1, "\(e)") }
   }
