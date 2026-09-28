@@ -4,7 +4,7 @@
 import { OMNI_COMMANDS, TITLE_MAX, mentionHits, midMessageCommands, resolveSlash, visibleCommands, type SlashCommand } from '../../shared/slash.ts';
 import type { CommandList, Thread } from './api.ts';
 
-const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent' };
+const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent', hermes: 'Hermes' };
 export const harnessName = (id: string) => HARNESS_NAME[id] ?? id;
 
 /**

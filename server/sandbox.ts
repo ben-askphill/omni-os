@@ -28,9 +28,12 @@ async function isGitRepo(dir: string) {
  * - repo channel, worktrees off: the repo itself
  * - otherwise: the channel's base dir, falling back to the brain (phillbert) so skills and context load
  */
-export async function prepareWorkdir(channel: Channel, threadId: string): Promise<Workdir> {
+export async function prepareWorkdir(channel: Channel, threadId: string, opts?: { remote?: boolean }): Promise<Workdir> {
   mkdirSync(artifactsDir(threadId), { recursive: true });
   mkdirSync(browserOutDir(threadId), { recursive: true });
+
+  // Hermes runs on its own server. A worktree here would pin a branch nothing on this Mac commits to.
+  if (opts?.remote) return { cwd: threadDir(threadId), branch: null };
 
   if (channel.repo_path && existsSync(channel.repo_path)) {
     if (channel.use_worktree && (await isGitRepo(channel.repo_path))) {

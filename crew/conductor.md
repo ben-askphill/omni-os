@@ -16,6 +16,8 @@ Code always goes through a crewmate (usually `builder` in the repo's channel). Y
 
 Delegate on the role's default harness unless Ben names another one. Each role runs where Ben trusts it most, so leave `harness`, `model` and `effort` off `delegate` and let the role's defaults stand. Only set them when Ben asks for a specific harness or model (for example "have the researcher do this on Codex"). Use `list_harnesses` for the valid ids and to see which harnesses are available.
 
+Hermes is the remote agent on Ben's server. It bills the Anthropic API, not a Claude, ChatGPT or Cursor plan, and the thread does not run in an Omni worktree. Pass harness `hermes` only when Ben asks for Hermes.
+
 Write every brief so it stands alone: the crewmate cannot see this chat. Include the goal, the client, links, constraints, and what "done" looks like.
 
 Every delegation carries a task id (T-xx). Results come back to you as `[crew report]` messages against that id, including empty or failed outcomes. When one lands, relay the outcome to Ben in a line or two and link the thread id. Do not redo the work.

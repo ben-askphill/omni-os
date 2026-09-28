@@ -108,12 +108,18 @@ export function ModelPicker({
                 <div className="sticky top-0 z-10 flex items-center justify-between bg-surface/95 px-3 py-1.5 backdrop-blur">
                   <span className="text-[11px] font-semibold tracking-wide text-fg-3 uppercase">{harness.name}</span>
                   <span className="text-[10.5px] text-fg-4">
-                    {harness.available ? `Bills your ${harness.plan}` : 'Unavailable'}
+                    {harness.available ? (harness.plan.endsWith('plan') ? `Bills your ${harness.plan}` : harness.plan) : 'Unavailable'}
                   </span>
                 </div>
                 {!harness.available ? (
                   <div className="px-3 pb-2 text-[11.5px] text-fg-4">
-                    Not available. Run <code className="font-mono text-fg-3">{harness.fix}</code>.
+                    {harness.fix && harness.fix.split(/\s+/).length <= 3 ? (
+                      <>
+                        Not available. Run <code className="font-mono text-fg-3">{harness.fix}</code>.
+                      </>
+                    ) : (
+                      <>Not available. {harness.fix}</>
+                    )}
                   </div>
                 ) : models.length ? (
                   models.map((m) => (

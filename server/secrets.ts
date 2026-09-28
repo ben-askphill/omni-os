@@ -50,6 +50,12 @@ async function readSecret(scope: string, name: string): Promise<string | null> {
   }
 }
 
+/** One global secret from the Keychain, or null when it is missing. The value is never logged. */
+export async function globalSecret(name: string): Promise<string | null> {
+  if (!NAME_RE.test(name)) return null;
+  return readSecret('global', name);
+}
+
 /** Global secrets, overridden by channel-scoped ones with the same name. */
 export async function secretsEnv(channelId: string): Promise<Record<string, string>> {
   const rows = db

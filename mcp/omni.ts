@@ -51,7 +51,7 @@ server.registerTool(
       prompt: z.string().describe('Self-contained task brief. Include everything the crewmate needs; it cannot see your chat.'),
       task_id: z.string().optional().describe('Short id like T-12 to match the report. Generated if omitted.'),
       title: z.string().optional(),
-      harness: z.string().optional().describe('Override the role default harness: claude-code, codex or cursor. Use list_harnesses.'),
+      harness: z.string().optional().describe('Override the role default harness: claude-code, codex, cursor or hermes. Use list_harnesses.'),
       model: z.string().optional().describe('Any catalog model id, or a Claude alias (opus, sonnet, haiku, fable). Use list_harnesses.'),
       effort: z.string().optional().describe('Reasoning effort supported by the model, e.g. high. Use list_harnesses.'),
     },
@@ -67,7 +67,7 @@ server.registerTool(
 
 server.registerTool(
   'list_harnesses',
-  { description: 'List the agent harnesses (Claude Code, Codex, Cursor) with their availability, fix command, models and effort levels, so you can pass valid ids to delegate.' },
+  { description: 'List the agent harnesses (Claude Code, Codex, Cursor, Hermes) with their availability, fix command, models and effort levels, so you can pass valid ids to delegate.' },
   async () => {
     const list = await call('/harnesses');
     return text(

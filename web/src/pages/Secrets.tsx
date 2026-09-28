@@ -7,6 +7,11 @@ import { useApp } from '../store.tsx';
 
 const NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
 
+/** Names Omni looks up itself. Values still go to the Keychain; this only fills the form. */
+const KNOWN_GLOBALS: { name: string; blurb: string }[] = [
+  { name: 'HERMES_API_KEY', blurb: 'Hermes API bearer token. Global. Sent on HTTP requests, not in a shell environment.' },
+];
+
 function scopeLabel(scope: string, name: (id: string) => string | undefined) {
   if (scope === 'global') return 'Global';
   const id = scope.replace(/^channel:/, '');
@@ -94,6 +99,33 @@ export function SecretsPage() {
             runs. A channel secret overrides a global one with the same name. Omni never shows a value again after you save it; to change one, save it again with the same
             name.
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="label-mono px-1">Known global secrets</div>
+          <ul className="space-y-2">
+            {KNOWN_GLOBALS.map((k) => {
+              const saved = (res.data ?? []).some((s) => s.scope === 'global' && s.name === k.name);
+              return (
+                <li key={k.name}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScope('global');
+                      setName(k.name);
+                      setSavedMsg(null);
+                      setFormError(null);
+                    }}
+                    className="press flex w-full items-center gap-3 rounded-[18px] bg-surface px-3 py-2.5 text-left"
+                  >
+                    <span className="font-mono text-[12.5px]">{k.name}</span>
+                    {saved && <span className="text-[11px] font-medium text-ok">saved</span>}
+                    <span className="min-w-0 flex-1 text-[12px] leading-snug text-fg-3">{k.blurb}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </div>
 
         <form onSubmit={save} className="space-y-4 rounded-[24px] p-5 shadow-[inset_0_0_0_1px_var(--line)]" autoComplete="off">

@@ -30,7 +30,7 @@ A cron schedule that starts a new thread on every run.
 ### Harnesses
 
 **Harness**:
-The agent CLI a thread runs in, together with the subscription it bills: Claude Code (Claude plan), Codex (ChatGPT plan) or Cursor Agent (Cursor plan).
+The agent a thread runs in, together with what it bills: Claude Code (Claude plan), Codex (ChatGPT plan), Cursor Agent (Cursor plan) or Hermes (Anthropic API on Ben's server, not his Claude, ChatGPT or Cursor plan).
 _Avoid_: Provider, engine, backend, runtime
 
 **Model**:
@@ -75,6 +75,7 @@ _Avoid_: Frontend, dashboard
 - A **Channel** has many **Threads**
 - A **Thread** runs on one **Harness** and one **Model**, and has one **Session** in that harness
 - A **Harness** offers many **Models**; the same model family can appear in several harnesses (Claude Opus runs in Claude Code and in Cursor Agent)
+- A Hermes **Thread** runs on the Hermes server, reached over Tailscale. The API listens on the server's tailnet address and is not public. The thread has no Omni worktree, browser profile or artifacts directory. Its **Session** id is `omni-<thread id>`. Artifacts come back as links or text
 - Ben picks the **Harness** per thread; Omni never switches it on its own
 - A thread's **Harness**, **Model** and **Effort** are fixed once it starts; carrying work to another harness means starting a new thread
 - A **Crew role** or **Automation** can set a default **Harness**, **Model** and **Effort**; a choice made on the thread wins, and Claude Code is the fallback
