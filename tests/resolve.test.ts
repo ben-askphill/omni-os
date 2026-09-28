@@ -91,8 +91,8 @@ describe('run resolver precedence', () => {
     const r = resolveRun({ harness: 'hermes' }, undefined, down);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.error.startsWith('Hermes is not available. Set ')).toBe(true);
-      expect(r.error).toContain(HERMES_FIX);
+      expect(r.error).toBe(`Hermes is not available. ${HERMES_FIX}`);
+      expect(r.error).toContain('Tailscale');
     }
   });
 

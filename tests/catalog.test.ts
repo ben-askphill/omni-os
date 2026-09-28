@@ -128,10 +128,12 @@ describe('hermes catalog', () => {
     expect(h.capabilities).toMatchObject({ warmProcess: false, steer: true, inlineImages: false, usage: 'none' });
   });
 
-  it('is unavailable with the key-and-tunnel fix when the probe fails', () => {
+  it('is unavailable with the key-and-Tailscale fix when the probe fails', () => {
     const h = hermesHarness({ available: false }, 4);
     expect(h.available).toBe(false);
     expect(h.fix).toBe(HERMES_FIX);
+    expect(h.fix).toContain('HERMES_API_KEY');
+    expect(h.fix).toContain('Tailscale');
     expect(h.models).toEqual([]);
   });
 });

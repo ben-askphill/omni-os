@@ -116,8 +116,7 @@ export function cursorHarness(probe: CursorProbe, cap: number): HarnessInfo {
 // ---------- Hermes ----------
 
 /** Shown when the capabilities probe cannot reach Hermes or the key is missing. */
-export const HERMES_FIX =
-  'Set HERMES_API_KEY in Secrets and make OMNI_HERMES_URL reachable (ssh -N -L 8642:127.0.0.1:8642 <server>)';
+export const HERMES_FIX = 'Set HERMES_API_KEY in Secrets and connect the Mac to Tailscale';
 
 const HERMES_NOTE = 'Runs on the Hermes server. Bills the Anthropic API, not your Claude, ChatGPT or Cursor plan.';
 
