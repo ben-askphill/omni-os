@@ -160,6 +160,14 @@ For the thread screen (part C). What parts A and B leave ready and what they do 
 - Errors: `.failed` and `.notFound` for the whole screen, `refreshError` and `actionError` as notes with a retry (`reload()`).
 - The transcript should be a lazy list keyed by `TranscriptItem.id`; items are `Hashable` so rows can skip redraws.
 
+## Thread screen (#63 part C)
+
+`ThreadScreen.swift` (screen, header, scroll pin, pill), `MessageViews.swift` (user bubble, result, error, report, working and queued lines), `ToolViews.swift` (groups, calls, plan, `TranscriptUI` open state), `MarkdownView.swift`, `ThreadStyle.swift`. `#/t/<id>` opens it from the sidebar, links and QA.
+
+- QA: `{"wait": "thread:<id>"}` waits for the laid-out transcript and notes the open time; `{"scroll": "top"|"bottom"|"through"}` and `{"expand": true}` (opens tool groups and failed or nested calls) work on the open thread.
+- Measured on this Mac: a 2,000-event thread opens in about 65 ms; a scroll through it ran 87 frames, mean 19 ms, worst 33 ms.
+- Copy: right-click a row for Copy; Edit > Copy Thread as Markdown (Shift-Cmd-C).
+
 ## Markdown (#63 part B)
 
 `MarkdownDocument(parsing:)` reads text the way `web/src/components/Markdown.tsx` shows it: react-markdown with remark-gfm, then its thread id links. swift-markdown (cmark-gfm) parses, smart punctuation off, and `Markdown.swift` turns its tree into plain `Sendable` values, so no swift-markdown type leaves OmniKit.

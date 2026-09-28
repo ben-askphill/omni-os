@@ -142,6 +142,10 @@ final class QARunner {
           try? await Task.sleep(for: .milliseconds(500))
         case .scroll(let scroll):
           result.note = try await self.scroll(scroll)
+        case .expand:
+          guard let expand = QAProbe.expand else { throw QAScriptError("no thread on screen") }
+          expand()
+          try? await Task.sleep(for: .milliseconds(600))
         case .sleep(let duration):
           try? await Task.sleep(for: duration)
         case .snapshot(let name):
@@ -215,6 +219,7 @@ final class QARunner {
     case .server(let action): "server \(action.rawValue)"
     case .appearance(let appearance): "appearance \(appearance.rawValue)"
     case .scroll(let scroll): "scroll \(scroll.rawValue)"
+    case .expand: "expand"
     case .quit: "quit"
     }
   }

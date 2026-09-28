@@ -12,6 +12,18 @@ final class TranscriptUI {
   func toggle(_ key: String) {
     if open.remove(key) == nil { open.insert(key) }
   }
+
+  /// Opens every group, and the calls that failed or have sub-calls (QA).
+  func expandAll(_ items: [TranscriptItem]) {
+    func visit(_ call: ToolCall) {
+      if call.isFailed || !call.children.isEmpty { open.insert("c\(call.id)") }
+      call.children.forEach(visit)
+    }
+    for case .tools(let group) in items {
+      open.insert("g\(group.eventID)")
+      group.calls.forEach(visit)
+    }
+  }
 }
 
 /// Tool calls in a row, as ToolGroup in Transcript.tsx: one call shows as its row, more as a card that says how

@@ -68,6 +68,10 @@ private struct ThreadView: View {
           ThreadHeader(model: model, store: store, thread: thread)
           TranscriptView(model: model, store: store, ui: ui, markdown: markdown)
         }
+        #if DEBUG
+        .onAppear { QAProbe.expand = { ui.expandAll(store.transcript.items) } }
+        .onDisappear { QAProbe.expand = nil }
+        #endif
       }
     }
   }
@@ -386,6 +390,7 @@ enum QAProbe {
   static var shownThread: String?
   static var shownAt: ContinuousClock.Instant?
   static var scroller: Scroller?
+  static var expand: (() -> Void)?
 
   static func laidOut(_ store: ThreadStore, _ g: ScrollPin.Geometry) {
     guard shownThread != store.id, store.loadState == .loaded, g.contentHeight > 0 else { return }
