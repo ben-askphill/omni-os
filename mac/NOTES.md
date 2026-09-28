@@ -371,3 +371,12 @@ What the tracer's QA run covered (each checked by eye in the PNGs): the sidebar 
 - The quit dialog (#74) can call `stopServer()` when `state` is `.running(startedByApp: true, _)`. Threads in their own windows are #75.
 - `Route(hash:)` and `route.hash` mirror `parseHash` and `href` in the Web UI. Use them for deep links, open in browser and window restoration. PR and artifact numbers parse as `Int` only.
 - New endpoints: add a method to `OmniClient`, a stub test in `ClientTests.swift` and, if the app depends on its shape, a fixture.
+
+## PRs, diffs and merge (#70)
+
+- `#/c/<id>/prs` and `#/c/<id>/prs/<n>` render `PullRequestsScreen` (list, detail), wired in `DetailView`. It has no tab bar of its own; the channel screen's tabs belong to the channel slice.
+- OmniKit: `PullRequest.swift` (types, `OmniClient.pullRequests/pullRequest/merge`), `DiffParser.swift` (`parseDiff` and the open rule from `DiffViewer.tsx`: a file starts closed only when the diff has more than 12 files and the file has 200 or more changes; 1500 line cap per file). `OmniClient.send` is now internal so extensions can use it.
+- Merge is a sheet with method and delete-branch. Neither button is the default one, so Return does not confirm. The body always carries `confirm: true`.
+- QA without GitHub: `tests/fixtures/fake-gh.mjs` answers the `gh` calls of `server/github.ts`. Link it as `gh` in a folder first on the test server's PATH. `Fixtures/prs.json` and `pr.json` were recorded from that server.
+- Debug launch args `-OmniPRTab Diff` and `-OmniPRMergeSheet YES` open a tab or the sheet, since QA scripts only pick routes.
+- `QARunner` ignores the `expand` step for now (it was missing, so the Debug build did not compile).

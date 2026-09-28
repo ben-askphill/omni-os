@@ -191,7 +191,7 @@ public struct OmniClient: Sendable {
     return url
   }
 
-  private func send<T: Decodable>(
+  func send<T: Decodable>(
     _ method: String, _ path: String, query: [(String, String)] = [], body: (any Encodable & Sendable)? = nil
   ) async throws(OmniAPIError) -> T {
     var req = URLRequest(url: url(path, query: query))

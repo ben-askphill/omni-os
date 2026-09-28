@@ -78,6 +78,8 @@ struct DetailView: View {
       ServerView(model: model, screen: screen)
     } else if case .thread(let id, _) = model.route {
       ThreadScreen(model: model, id: id)
+    } else if case .channel(let id, .prs, let pr) = model.route {
+      PullRequestsScreen(model: model, channelID: id, number: pr)
     } else {
       RoutePlaceholder(route: model.route, title: model.route.title { model.store.channel($0)?.name }) {
         model.route = .home
