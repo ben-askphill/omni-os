@@ -410,6 +410,27 @@ A thread whose prompt is `TOOL:300000` keeps running for five minutes with the f
 
 What the tracer's QA run covered (each checked by eye in the PNGs): the sidebar with channels, badges, running and queued threads and "N more"; a count and a thread row showing up while the app ran; channel, thread and unknown routes; Settings; not running (4759); a foreign server (a plain HTTP server on 4758: "not an Omni server"); a start that failed, with short and long log tails; a start and stop by the app on 4758 with the QA environment; the server killed under a connected app (Reconnecting, then Not running).
 
+## Slash menu (#66)
+
+The slash grammar, ranking, hints and pills are the Web UI's own TypeScript, run through JavaScriptCore (ADR 0002).
+
+- `mac/slash-engine/entry.ts` is the entry; `npm run build:slash` bundles it (esbuild, `scripts/build-slash-engine.ts`) to `OmniKit/Sources/OmniKit/Resources/slash-engine.js`, which is checked in. `tests/slash-engine-bundle.test.ts` fails when it is stale. After changing `shared/slash.ts` or `web/src/slash-menu.ts`, `composer-slash.ts` or `slash-pills.ts`, run `npm run build:slash`.
+- `SlashEngine.shared` (OmniKit): `query`, `sections`, `pick`, `reply`, `newThreadHint`, `pieces`, `omniCommands`. All offsets are UTF-16 units. `String.index(utf16Offset:)` and `utf16Offset(of:)` (in `SlashTypes.swift`) are the only place they become Swift indices; `AttributedString` has the same pair in `SlashMenuView.swift`.
+- `SlashCommandsStore` (`@MainActor @Observable`): the list for a `CommandsSource` (`.thread(id)` or `.newThread(harness:channel:)`), fetched as `useCommands` does: cached, then `wait=1`; an older `fetchedAt` never replaces a newer list; a failure with no list is `.unavailable`. Set `source` when the new-thread picker changes.
+- `SlashMenuModel`: open/closed, sections, highlight, Esc dismissal, keys, pick, `reply` (what Send does) and `hint`. It loads the list on focus and when the menu opens.
+- `OmniCommands.run(action, in: thread, client:)` does `/clear`, `/new` (new thread, or `.openNewThread(preset)` when there is no prompt) and `/rename`. `/model`, `/effort` and `/fast` do nothing; offer `NewThreadPreset.otherModel(thread)`. Attachments on `/clear <prompt>` are not sent.
+- Pills in user bubbles already use `SlashPiece.split` (native); a test pins it to the engine's `pieces`.
+
+Wiring it into the composer (mac/Omni/SlashMenuDemo.swift is a working example, Debug only, `-OmniQASlashDemo YES`):
+
+1. `let menu = SlashMenuModel(commands: SlashCommandsStore(api: client, source: .thread(id)), placement: .reply, harness: thread.harness.rawValue)`. For the new-thread composer use `placement: .newThread` and `.newThread(harness:channel:)`; update `menu.harness` and `commands.source` when the picker changes.
+2. On the composer's container (the view around the text view): `.slashMenu(menu)` (`below: true` near the top of the page). It draws the menu and takes the arrows, Return, Tab and Esc while open.
+3. Feed it: `menu.setFocused(focused)` and `menu.update(text:, caret:)` on every text or selection change (caret is a UTF-16 offset). Set `menu.onEdit = { text, caret in ... }` to write the picked text back and move the caret.
+4. Under the text: `SlashHintView(model: menu) { open new thread on another model }`.
+5. Send: `if let r = menu.reply, r.action != .send` then the button reads `r.label ?? "Send"`, is enabled by `r.armed`, and runs `OmniCommands.run(r.action, in: thread, client:)`; clear the draft after. For a plain send the button is enabled by non-empty text as before.
+
+The overlay sits above the composer, like the Web UI's, not at the caret: `TextEditor` gives no caret rectangle. If the keys do not reach `.onKeyPress` because the text view takes them first, move the modifier's key closure to the text view's own handler and call `menu.handle(_:)`.
+
 ## Next
 
 - No screen is built past the placeholders. `ThreadStore` and the markdown model are ready for the thread screen; see the handoff above.

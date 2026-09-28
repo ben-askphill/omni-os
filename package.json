@@ -14,7 +14,8 @@
     "test:mac": "swift test --package-path mac/OmniKit",
     "test:all": "npm test && npm run test:mac",
     "typecheck": "tsc --noEmit",
-    "import-history": "tsx scripts/import-history.ts"
+    "import-history": "tsx scripts/import-history.ts",
+    "build:slash": "tsx scripts/build-slash-engine.ts"
   },
   "engines": {
     "node": ">=24"
@@ -38,6 +39,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

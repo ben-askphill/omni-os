@@ -79,6 +79,18 @@ struct DetailView: View {
   let model: AppModel
 
   var body: some View {
+    #if DEBUG
+    if ProcessInfo.processInfo.arguments.contains("-OmniQASlashDemo") {
+      SlashMenuDemo()
+    } else {
+      screen
+    }
+    #else
+    screen
+    #endif
+  }
+
+  @ViewBuilder private var screen: some View {
     if let screen = model.serverScreen {
       ServerView(model: model, screen: screen)
     } else if case .thread(let id, _) = model.route {

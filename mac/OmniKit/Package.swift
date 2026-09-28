@@ -9,7 +9,9 @@ let package = Package(
     .package(url: "https://github.com/swiftlang/swift-markdown", from: "0.6.0"),
   ],
   targets: [
-    .target(name: "OmniKit", dependencies: [.product(name: "Markdown", package: "swift-markdown")]),
+    .target(
+      name: "OmniKit", dependencies: [.product(name: "Markdown", package: "swift-markdown")],
+      resources: [.copy("Resources/slash-engine.js")]),
     .testTarget(name: "OmniKitTests", dependencies: ["OmniKit"], resources: [.copy("Fixtures")]),
   ]
 )
