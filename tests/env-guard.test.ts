@@ -21,6 +21,7 @@ describe('harness env guard', () => {
       OPENAI_BASE_URL: 'u',
       CURSOR_API_KEY: 'cu',
       CURSOR_AUTH_TOKEN: 'ct',
+      HERMES_API_KEY: 'h',
     } as NodeJS.ProcessEnv;
 
     const claude = harnessEnv('claude-code', {}, {}, dirty);
@@ -34,6 +35,10 @@ describe('harness env guard', () => {
 
     const cursor = harnessEnv('cursor', {}, {}, dirty);
     for (const v of STRIPPED_VARS.cursor) expect(cursor[v]).toBeUndefined();
+
+    const hermes = harnessEnv('hermes', {}, { HERMES_API_KEY: 'from-secret' }, dirty);
+    expect(hermes.HERMES_API_KEY).toBeUndefined();
+    expect(hermes.PATH).toBe('/usr/bin');
   });
 
   it('lets the guard win over a secret with a stripped name', () => {

@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // sandbox.ts only type-imports db.ts; make sure that stays true.
@@ -6,8 +9,8 @@ vi.mock('../server/db.ts', () => {
   throw new Error('db.ts must not be imported by sandbox tests');
 });
 
-import { buildMcpConfig } from '../server/sandbox.ts';
-import { config, paths, browserOutDir } from '../server/config.ts';
+import { buildMcpConfig, prepareWorkdir } from '../server/sandbox.ts';
+import { config, paths, browserOutDir, threadDir } from '../server/config.ts';
 import type { Channel } from '../server/db.ts';
 import type { CrewRole } from '../server/crew.ts';
 
@@ -95,6 +98,28 @@ describe('buildMcpConfig: omni conductor server', () => {
     expect(
       buildMcpConfig({ threadId: THREAD, channel: channel(), role: role([]), browserBusy: false, omniUrl: OMNI_URL }).mcpServers['omni'],
     ).toBeUndefined();
+  });
+
+  it('does not create a git worktree for a remote harness', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'omni-hermes-repo-'));
+    const id = 'hermes-remote-wd';
+    try {
+      execFileSync('git', ['init', repo]);
+      execFileSync('git', ['-C', repo, 'config', 'user.email', 'test@example.com']);
+      execFileSync('git', ['-C', repo, 'config', 'user.name', 'Test']);
+      writeFileSync(join(repo, 'README'), 'hi\n');
+      execFileSync('git', ['-C', repo, 'add', 'README']);
+      execFileSync('git', ['-C', repo, 'commit', '-m', 'init'], {
+        env: { ...process.env, GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' },
+      });
+      const wd = await prepareWorkdir(channel({ repo_path: repo, use_worktree: 1, github_repo: 'acme/widgets' }), id, { remote: true });
+      expect(wd.branch).toBeNull();
+      expect(wd.cwd).toBe(threadDir(id));
+      expect(existsSync(join(paths.worktrees, id))).toBe(false);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(threadDir(id), { recursive: true, force: true });
+    }
   });
 
   it('still works with the browser off', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveRun, validateDefaults } from '../server/harness/resolve.ts';
-import { claudeHarness, codexHarness, cursorHarness, type Catalog } from '../server/harness/catalog.ts';
+import { claudeHarness, codexHarness, cursorHarness, hermesHarness, HERMES_FIX, type Catalog } from '../server/harness/catalog.ts';
 
 const cat: Catalog = {
   harnesses: [
@@ -18,6 +18,7 @@ const cat: Catalog = {
       4,
     ),
     cursorHarness({ available: true, models: [{ id: 'auto', label: 'Auto', efforts: [], defaultEffort: '', default: true }] }, 4),
+    hermesHarness({ available: true }, 4),
   ],
 };
 
@@ -77,6 +78,22 @@ describe('run resolver precedence', () => {
     expect(badModel.ok).toBe(false);
     if (!badModel.ok) expect(badModel.error).toContain('gpt-5.6-sol');
     expect(resolveRun({ harness: 'codex', model: 'gpt-5.6-terra', effort: 'xhigh' }, undefined, cat).ok).toBe(false);
+  });
+
+  it('accepts hermes, including as a role default, and rejects an effort', () => {
+    expect(ok(resolveRun({ harness: 'hermes', model: 'hermes' }, undefined, cat))).toMatchObject({ harness: 'hermes', model: 'hermes', effort: '' });
+    expect(ok(resolveRun({}, { harness: 'hermes', model: 'hermes' }, cat))).toMatchObject({ harness: 'hermes', model: 'hermes' });
+    expect(resolveRun({ harness: 'hermes', model: 'hermes', effort: 'high' }, undefined, cat).ok).toBe(false);
+  });
+
+  it('states the Hermes fix as a sentence when the probe failed', () => {
+    const down: Catalog = { harnesses: [hermesHarness({ available: false }, 4)] };
+    const r = resolveRun({ harness: 'hermes' }, undefined, down);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.startsWith('Hermes is not available. Set ')).toBe(true);
+      expect(r.error).toContain(HERMES_FIX);
+    }
   });
 
   it('passes values through when the catalog for the harness has no models', () => {

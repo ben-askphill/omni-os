@@ -6,6 +6,8 @@ import {
   resolveModel,
   validateRun,
   emptyCatalog,
+  hermesHarness,
+  HERMES_FIX,
   type Catalog,
   type CodexProbe,
 } from '../server/harness/catalog.ts';
@@ -102,12 +104,34 @@ describe('validateRun', () => {
   });
 
   it('passes values through when the catalog could not be probed', () => {
-    const c = emptyCatalog({ 'claude-code': 4, codex: 4, cursor: 4 });
+    const c = emptyCatalog({ 'claude-code': 4, codex: 4, cursor: 4, hermes: 4 });
     // codex has no models in an empty catalog but is marked unavailable, so it errors;
     // simulate a probed-but-empty catalog by making it "available" with no models.
     const probed: Catalog = { harnesses: [{ ...codexHarness({ available: true, models: [] }, 4), available: true }] };
     const r = validateRun(probed, 'codex', 'whatever-id', 'weird');
     expect(r).toEqual({ ok: true, harness: 'codex', model: 'whatever-id', effort: 'weird' });
     expect(c.harnesses.find((h) => h.id === 'claude-code')?.models.length).toBeGreaterThan(0);
+    const hermes = c.harnesses.find((h) => h.id === 'hermes');
+    expect(hermes?.available).toBe(false);
+    expect(hermes?.fix).toBe(HERMES_FIX);
+    expect(hermes?.models).toEqual([]);
+  });
+});
+
+describe('hermes catalog', () => {
+  it('offers one model and no effort levels when the probe succeeds', () => {
+    const h = hermesHarness({ available: true }, 4);
+    expect(h.available).toBe(true);
+    expect(h.models).toHaveLength(1);
+    expect(h.models[0]).toMatchObject({ id: 'hermes', label: 'Hermes default', efforts: [], defaultEffort: '', default: true });
+    expect(h.models[0].note).toContain('Anthropic API');
+    expect(h.capabilities).toMatchObject({ warmProcess: false, steer: true, inlineImages: false, usage: 'none' });
+  });
+
+  it('is unavailable with the key-and-tunnel fix when the probe fails', () => {
+    const h = hermesHarness({ available: false }, 4);
+    expect(h.available).toBe(false);
+    expect(h.fix).toBe(HERMES_FIX);
+    expect(h.models).toEqual([]);
   });
 });

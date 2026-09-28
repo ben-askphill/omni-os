@@ -1,6 +1,6 @@
-// The live catalog: it probes the CLIs at server start and every 15 minutes. A harness that
-// is down is probed again on demand (freshCatalog, at most every 10 seconds), so a
-// `codex login` shows up the next time the picker opens instead of at the next refresh.
+// The live catalog: it probes the CLIs (and the Hermes API) at server start and every 15 minutes.
+// A harness that is down is probed again on demand (freshCatalog, at most every 10 seconds), so a
+// `codex login` or a tunnel coming up shows in the picker without a restart.
 // The pure assembly lives in catalog.ts; this file does the I/O.
 import { execFile } from 'node:child_process';
 import { config } from '../config.ts';
@@ -17,10 +17,22 @@ import type {
 } from './codex/protocol.ts';
 import { cursorBin } from './cursor/bin.ts';
 import { parseCursorModels } from './cursor/models.ts';
+import { probeHermes } from './hermes/client.ts';
 import { harnessEnv } from './env-guard.ts';
+import { globalSecret } from '../secrets.ts';
 import { recordUsage } from '../usage.ts';
 import { HARNESS_IDS, type HarnessId, type HarnessInfo } from './types.ts';
-import { claudeHarness, codexHarness, cursorHarness, getHarness, type Catalog, type CodexProbe, type CursorProbe } from './catalog.ts';
+import {
+  claudeHarness,
+  codexHarness,
+  cursorHarness,
+  hermesHarness,
+  getHarness,
+  type Catalog,
+  type CodexProbe,
+  type CursorProbe,
+  type HermesProbe,
+} from './catalog.ts';
 
 type Probe = CodexProbe & { rateLimits?: RateLimits };
 
@@ -36,6 +48,7 @@ const caps = (): Record<HarnessId, number> => ({
   'claude-code': config.maxConcurrent,
   codex: config.maxConcurrentCodex,
   cursor: config.maxConcurrentCursor,
+  hermes: config.maxConcurrentHermes,
 });
 
 /** Probe `cursor-agent --list-models` for the model list. Success means installed and logged in. */
@@ -124,6 +137,19 @@ async function probeCursorHarness(cap: number): Promise<HarnessInfo> {
   return cursorHarness(await probeCursor().catch((): CursorProbe => ({ available: false, models: [] })), cap);
 }
 
+/** GET /v1/capabilities with the Keychain bearer token. Missing key or any failure is unavailable. */
+export async function probeHermesHarness(cap: number): Promise<HarnessInfo> {
+  const unavailable: HermesProbe = { available: false };
+  try {
+    const key = await globalSecret('HERMES_API_KEY');
+    if (!key) return hermesHarness(unavailable, cap);
+    const ok = await probeHermes(config.hermesUrl, key);
+    return hermesHarness({ available: ok }, cap);
+  } catch {
+    return hermesHarness(unavailable, cap);
+  }
+}
+
 /**
  * Probe the harnesses in `only` (all by default) and keep the others as they are. A call while
  * a load is running joins that load.
@@ -132,11 +158,12 @@ export function loadCatalog(only: HarnessId[] = HARNESS_IDS): Promise<Catalog> {
   loading ??= (async () => {
     const c = caps();
     const keep = (id: HarnessId) => getHarness(getCatalog(), id)!;
-    const [codex, cursor] = await Promise.all([
+    const [codex, cursor, hermes] = await Promise.all([
       only.includes('codex') ? probeCodexHarness(c.codex) : keep('codex'),
       only.includes('cursor') ? probeCursorHarness(c.cursor) : keep('cursor'),
+      only.includes('hermes') ? probeHermesHarness(c.hermes) : keep('hermes'),
     ]);
-    current = { harnesses: [claudeHarness(c['claude-code'], config.defaultModel), codex, cursor] };
+    current = { harnesses: [claudeHarness(c['claude-code'], config.defaultModel), codex, cursor, hermes] };
     checkedAt = Date.now();
     return current;
   })().finally(() => {
@@ -154,6 +181,7 @@ export function getCatalog(): Catalog {
       claudeHarness(c['claude-code'], config.defaultModel),
       codexHarness({ available: false, models: [] }, c.codex),
       cursorHarness({ available: false, models: [] }, c.cursor),
+      hermesHarness({ available: false }, c.hermes),
     ],
   };
 }

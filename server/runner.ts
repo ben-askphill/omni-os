@@ -10,7 +10,7 @@ import { commandsFolder, prepareWorkdir, writeMcpConfig } from './sandbox.ts';
 import { parseSlash, resolveSlash, runnableCommands, slashRecord, type SlashCommand, type SlashRecord } from '../shared/slash.ts';
 import { invalidateCommands, listCommands, peekCommands, type CommandList } from './commands.ts';
 import { describeAttachments, inlinable, messageContent, saveUploads, type Attachment } from './uploads.ts';
-import { secretsEnv } from './secrets.ts';
+import { globalSecret, secretsEnv } from './secrets.ts';
 import { type Record as StreamRecord } from './stream.ts';
 import { publishFeed, publishThread } from './bus.ts';
 import { recordUsage } from './usage.ts';
@@ -23,6 +23,7 @@ import type { AdapterContext, CommandUse, HarnessAdapter } from './harness/adapt
 import { claudeAdapter } from './harness/claude/adapter.ts';
 import { codexAdapter } from './harness/codex/adapter.ts';
 import { cursorAdapter } from './harness/cursor/adapter.ts';
+import { hermesAdapter } from './harness/hermes/adapter.ts';
 
 const omniUrl = () => `http://127.0.0.1:${config.port}`;
 
@@ -30,6 +31,7 @@ const ADAPTERS: Record<string, HarnessAdapter> = {
   'claude-code': claudeAdapter,
   codex: codexAdapter,
   cursor: cursorAdapter,
+  hermes: hermesAdapter,
 };
 const adapterFor = (harness: string): HarnessAdapter => ADAPTERS[harness] ?? claudeAdapter;
 const capsOf = (harness: string) => CAPABILITIES[harness as HarnessId] ?? CAPABILITIES['claude-code'];
@@ -40,6 +42,7 @@ const CAPS: Record<string, number> = {
   'claude-code': config.maxConcurrent,
   codex: config.maxConcurrentCodex,
   cursor: config.maxConcurrentCursor,
+  hermes: config.maxConcurrentHermes,
 };
 const capFor = (harness: string) => CAPS[harness] ?? config.maxConcurrent;
 
@@ -51,7 +54,7 @@ export function slotsByHarness(): Record<string, { running: number; cap: number 
   return out;
 }
 /** The CLI name a harness shows in errors and the resume command. */
-const CLI_LABEL: Record<string, string> = { 'claude-code': 'claude', codex: 'codex', cursor: 'cursor-agent' };
+const CLI_LABEL: Record<string, string> = { 'claude-code': 'claude', codex: 'codex', cursor: 'cursor-agent', hermes: 'Hermes' };
 const cliLabel = (harness: string) => CLI_LABEL[harness] ?? harness;
 
 // ---------- state ----------
@@ -559,18 +562,25 @@ async function spawnLive(live: Live, thread: Thread) {
   const channel = channels.get(thread.channel_id)!;
   const role = getCrew(thread.role);
 
+  // Hermes is not on this Mac: it must not take the channel's browser profile or see local MCP config.
+  const remote = thread.harness === 'hermes';
   // Chrome locks a profile dir: the first live process in a channel keeps it until it exits.
   const holder = browserHolder.get(channel.id);
   const browserBusy = !!holder && holder !== thread.id;
-  if (config.browser && !browserBusy) {
+  if (config.browser && !browserBusy && !remote) {
     browserHolder.set(channel.id, thread.id);
     live.browser = true;
   }
-  const mcpFile = writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, omniUrl: omniUrl() });
+  const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, omniUrl: omniUrl() });
 
   let secretEnv: Record<string, string> = {};
   try {
     secretEnv = await secretsEnv(channel.id);
+    // The catalog probe reads the same global key. A channel secret of the same name already won above.
+    if (remote && !secretEnv.HERMES_API_KEY) {
+      const key = await globalSecret('HERMES_API_KEY');
+      if (key) secretEnv = { ...secretEnv, HERMES_API_KEY: key };
+    }
   } catch (err) {
     addEvent(thread.id, 'error', { text: `Could not read secrets: ${(err as Error).message}` });
   }
@@ -655,28 +665,42 @@ function reportToParent(childId: string, status: string, text: string) {
 // ---------- prompts ----------
 
 export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole) {
+  const remote = thread.harness === 'hermes';
   const lines = [
     '# Omni OS context',
-    `You are running headless inside Omni OS, Ben's local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`,
+    remote
+      ? 'You are Hermes, running on your own server and reached by Omni OS over HTTP. Ben is on his Mac; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.'
+      : "You are running headless inside Omni OS, Ben's local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.",
     `- Thread: ${thread.id}${thread.task_id ? ` (task ${thread.task_id})` : ''}`,
     `- Channel: #${channel.id} (${channel.name}, ${channel.kind})`,
     channel.store_domain ? `- Shopify store: ${channel.store_domain}` : '',
     channel.portal_slug ? `- Ask Phill Portal company slug: ${channel.portal_slug}` : '',
     channel.github_repo ? `- GitHub repo: ${channel.github_repo}` : '',
-    thread.branch ? `- You are in a dedicated git worktree on branch ${thread.branch}. Commit here; open a PR when asked.` : '',
+    remote
+      ? '- This thread does not run in an Omni worktree or browser. Work on your own clone of the repo and open pull requests there.'
+      : thread.branch
+        ? `- You are in a dedicated git worktree on branch ${thread.branch}. Commit here; open a PR when asked.`
+        : '',
     channel.notes ? `- Channel notes: ${channel.notes}` : '',
     '',
     '## Artifacts',
-    `Write any HTML page, report, diagram, CSV or document meant for Ben into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).`,
-    'Omni renders files there inline in the thread. Prefer a self-contained .html file for anything visual. Mention the filename in your reply.',
-    '',
-    '## Browser',
-    config.browser
-      ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads. Screenshots land in ${browserOutDir(thread.id)} and show up in the thread.`
-      : '',
+    remote
+      ? 'OMNI_ARTIFACTS_DIR does not exist on this machine. Return artifacts as links or as text in your reply.'
+      : `Write any HTML page, report, diagram, CSV or document meant for Ben into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).\nOmni renders files there inline in the thread. Prefer a self-contained .html file for anything visual. Mention the filename in your reply.`,
+    ...(remote
+      ? []
+      : [
+          '',
+          '## Browser',
+          config.browser
+            ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads. Screenshots land in ${browserOutDir(thread.id)} and show up in the thread.`
+            : '',
+        ]),
     '',
     '## Secrets',
-    'Channel and global secrets are already in your environment as variables. Never print, echo or write their values anywhere.',
+    remote
+      ? 'Omni does not copy Keychain secrets onto this server. Never print, echo or write secret values anywhere.'
+      : 'Channel and global secrets are already in your environment as variables. Never print, echo or write their values anywhere.',
     '',
     '## Reply',
     'Your final message is what gets shown and reported. Lead with the outcome, keep it short, bullets over prose.',
@@ -784,7 +808,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const effort = run.effort;
 
   const id = randomUUID();
-  const wd = await prepareWorkdir(channel, id);
+  const wd = await prepareWorkdir(channel, id, { remote: harness === 'hermes' });
   const thread = threads.create({
     id,
     channel_id: channel.id,

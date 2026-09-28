@@ -5,7 +5,7 @@
 // A role's model and effort only apply when the thread runs on the role's harness, and the
 // role's effort only when the role's model is the one picked. Pure, so it is testable.
 import { isHarnessId, DEFAULT_HARNESS, HARNESS_META, type HarnessId } from './types.ts';
-import { getHarness, validateRun, type Catalog, type Resolved, type ResolveError } from './catalog.ts';
+import { getHarness, unavailableError, validateRun, type Catalog, type Resolved, type ResolveError } from './catalog.ts';
 
 export interface RunChoice {
   harness?: string | null;
@@ -35,7 +35,7 @@ export function resolveRun(choice: RunChoice, role: RoleDefaults | undefined, ca
   const h = getHarness(cat, harness);
   if (!h) return { ok: false, error: `Unknown harness "${harness}".` };
   if (!h.available && h.models.length === 0) {
-    return { ok: false, error: `${h.name} is not available. Run \`${h.fix ?? ''}\`.`.trim() };
+    return { ok: false, error: unavailableError(h.name, h.fix) };
   }
   if (model || effort) {
     const modelForCheck = model || h.models.find((m) => m.default)?.id || h.models[0]?.id || '';

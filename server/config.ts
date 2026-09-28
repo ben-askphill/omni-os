@@ -26,8 +26,11 @@ export const config = {
   /** Per-harness concurrency caps. Claude Code uses OMNI_MAX_CONCURRENT. */
   maxConcurrentCodex: Number(env.OMNI_MAX_CONCURRENT_CODEX ?? 4),
   maxConcurrentCursor: Number(env.OMNI_MAX_CONCURRENT_CURSOR ?? 4),
+  maxConcurrentHermes: Number(env.OMNI_MAX_CONCURRENT_HERMES ?? 4),
   codexBin: env.OMNI_CODEX_BIN,
   cursorBin: env.OMNI_CURSOR_BIN,
+  /** Hermes API server. The bearer token is the Keychain secret HERMES_API_KEY, not an env var. */
+  hermesUrl: (env.OMNI_HERMES_URL ?? 'http://127.0.0.1:8642').replace(/\/$/, ''),
   /** How long a thread's claude process stays warm after a turn. 0 closes it right away. */
   keepAliveSeconds: Number(env.OMNI_KEEPALIVE_SECONDS ?? 600),
   /** After an interrupt, how long the turn gets to wind down before the process is killed. */

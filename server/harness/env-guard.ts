@@ -13,6 +13,8 @@ export const STRIPPED_VARS: Record<HarnessId, string[]> = {
   'claude-code': ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'],
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY', 'OPENAI_BASE_URL'],
   cursor: ['CURSOR_API_KEY', 'CURSOR_AUTH_TOKEN'],
+  // The bearer token is sent on the HTTP client, never inherited by the holder process.
+  hermes: ['HERMES_API_KEY'],
 };
 
 /**
