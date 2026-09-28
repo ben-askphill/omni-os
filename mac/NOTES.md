@@ -485,3 +485,11 @@ The overlay sits above the composer, like the Web UI's, not at the caret: `TextE
 - Sending opens the thread (`model.route = .thread`). Model changes reset effort to default; an effort the model does not take is never sent.
 - QA: `{"type": "..."}` and `{"send": "reply"}` drive the new-thread box too (`QAComposerProbe`, which now has an `owner` so a box that leaves after its successor appeared does not clear the hooks).
 - `ComposerTextView` got `heightRange` and `label`; `SendButton` a `title`; `AttachmentStrip` and `SendButton` are no longer private.
+## PRs, diffs and merge (#70)
+
+- `#/c/<id>/prs` and `#/c/<id>/prs/<n>` render `PullRequestsScreen` (list, detail), wired in `DetailView`. It has no tab bar of its own; the channel screen's tabs belong to the channel slice.
+- OmniKit: `PullRequest.swift` (types, `OmniClient.pullRequests/pullRequest/merge`), `DiffParser.swift` (`parseDiff` and the open rule from `DiffViewer.tsx`: a file starts closed only when the diff has more than 12 files and the file has 200 or more changes; 1500 line cap per file). `OmniClient.send` is now internal so extensions can use it.
+- Merge is a sheet with method and delete-branch. Neither button is the default one, so Return does not confirm. The body always carries `confirm: true`.
+- QA without GitHub: `tests/fixtures/fake-gh.mjs` answers the `gh` calls of `server/github.ts`. Link it as `gh` in a folder first on the test server's PATH. `Fixtures/prs.json` and `pr.json` were recorded from that server.
+- Debug launch args `-OmniPRTab Diff` and `-OmniPRMergeSheet YES` open a tab or the sheet, since QA scripts only pick routes.
+- `QARunner` ignores the `expand` step for now (it was missing, so the Debug build did not compile).
