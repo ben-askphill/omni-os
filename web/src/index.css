@@ -4,7 +4,8 @@
    pill radii, spring easing. light-dark() keeps one token table; <html data-theme> forces a scheme. */
 :root {
   color-scheme: light dark;
-  --canvas: light-dark(#f7f7f6, #0c0d0f);
+  /* Base is pure white in light (canvas and main); greys only for surfaces inside it. */
+  --canvas: light-dark(#ffffff, #0c0d0f);
   --bg: light-dark(#ffffff, #121316);
   --bg-sidebar: var(--canvas);
   --surface: light-dark(#f7f7f6, #191b1e);
@@ -19,26 +20,25 @@
   --line: light-dark(rgb(23 24 26 / 0.08), rgb(236 235 231 / 0.08));
   --line-strong: light-dark(rgb(23 24 26 / 0.16), rgb(236 235 231 / 0.16));
   --thumb: light-dark(#ffffff, rgb(255 255 255 / 0.14));
-  --accent: light-dark(#de0015, #ff3345);
-  --info: light-dark(#2231dd, #8e97ff);
-  --info-dot: light-dark(#2231dd, #7482ff);
-  --ok: light-dark(#15803d, #34d17a);
-  --ok-dot: light-dark(#16a34a, #34d17a);
-  --bad: light-dark(#c03535, #ff7b7b);
-  --bad-dot: light-dark(#d64545, #ff5f5f);
-  --warn: light-dark(#9a5a06, #f5b544);
-  --warn-dot: light-dark(#f59e0b, #f5b544);
-  --bad-bg: color-mix(in srgb, var(--bad-dot) 9%, transparent);
-  --warn-bg: color-mix(in srgb, var(--warn-dot) 13%, transparent);
-  --ok-bg: color-mix(in srgb, var(--ok-dot) 10%, transparent);
-  --info-bg: color-mix(in srgb, var(--info-dot) 8%, transparent);
+  /* Status is the only color: ultramarine = running, vermilion = needs you, volt = done.
+     Full saturation, never tinted. Needs and done carry ink text; vermilion is never text on white. */
+  --ink: #17181a;
+  --live: light-dark(#2b3bff, #7280ff);
+  --live-text: var(--live);
+  --on-live: light-dark(#ffffff, #101114);
+  --needs: #ff4420;
+  --on-needs: var(--ink);
+  --done: #c6f52b;
+  --on-done: var(--ink);
+  --done-edge: light-dark(var(--ink), transparent);
+  --scrim: light-dark(rgb(23 24 26 / 0.22), rgb(0 0 0 / 0.5));
   --bubble: var(--surface-2);
   --code-bg: var(--surface);
   --mark: light-dark(rgb(245 158 11 / 0.28), rgb(245 181 68 / 0.28));
-  --diff-add: color-mix(in srgb, var(--ok-dot) 12%, transparent);
-  --diff-del: color-mix(in srgb, var(--bad-dot) 10%, transparent);
+  /* Diffs are the one place a line gets a wash, drawn from the done and needs pops. */
+  --diff-add: color-mix(in srgb, var(--done) 22%, transparent);
+  --diff-del: color-mix(in srgb, var(--needs) 12%, transparent);
   --wash: color-mix(in srgb, var(--fg) 6%, transparent);
-  --pane: light-dark(rgb(255 255 255 / 0.72), rgb(33 36 41 / 0.72));
   --pane-edge: light-dark(rgb(23 24 26 / 0.07), rgb(255 255 255 / 0.09));
   --shadow-menu:
     0 0 0 0.5px light-dark(rgb(23 24 26 / 0.08), rgb(255 255 255 / 0.08)),
@@ -46,11 +46,15 @@
     0 18px 44px -10px light-dark(rgb(23 24 26 / 0.2), rgb(0 0 0 / 0.65));
   --shadow-card: 0 0 0 0.5px var(--pane-edge), 0 1px 2px light-dark(rgb(23 24 26 / 0.05), rgb(0 0 0 / 0.4));
   --shadow-thumb: 0 1px 2px light-dark(rgb(23 24 26 / 0.09), rgb(0 0 0 / 0.3)), 0 0 0 0.5px light-dark(rgb(23 24 26 / 0.05), rgb(255 255 255 / 0.06));
-  /* Bencho motion: spring overshoot, settle, stretch, and a soft ease-out. */
+  /* Bencho motion: spring overshoot, settle, stretch, a soft ease-out; fluid drives the mark. */
   --ease-spring: cubic-bezier(0.24, 1.34, 0.38, 1);
   --ease-settle: cubic-bezier(0.28, 1.28, 0.36, 1);
   --ease-stretch: cubic-bezier(0.32, 0.72, 0.24, 1);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-fluid: cubic-bezier(0.37, 0, 0.63, 1);
+  --dur-pulse: 1400ms;
+  --dur-ping: 1600ms;
+  --type-caption: 500 12px/1.2 var(--font-sans);
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -74,15 +78,13 @@
   --color-on-ink: var(--on-ink);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
-  --color-accent: var(--accent);
-  --color-info: var(--info);
-  --color-ok: var(--ok);
-  --color-bad: var(--bad);
-  --color-warn: var(--warn);
-  --color-bad-bg: var(--bad-bg);
-  --color-warn-bg: var(--warn-bg);
-  --color-ok-bg: var(--ok-bg);
-  --color-info-bg: var(--info-bg);
+  --color-live: var(--live);
+  --color-live-text: var(--live-text);
+  --color-on-live: var(--on-live);
+  --color-needs: var(--needs);
+  --color-on-needs: var(--on-needs);
+  --color-done: var(--done);
+  --color-on-done: var(--on-done);
   --color-bubble: var(--bubble);
   --color-code: var(--code-bg);
   /* Apple's typefaces (developer.apple.com/fonts). Their license rules out serving them as web fonts,
@@ -94,7 +96,8 @@
   --font-rounded: "SF Pro Rounded", ui-rounded, system-ui, -apple-system, sans-serif;
   --font-serif: "New York", ui-serif, Georgia, serif;
   --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-num: var(--font-mono);
+  /* Numbers are sans with tabular figures; mono is only for code (ids, branches, commits, paths). */
+  --font-num: var(--font-sans);
 }
 
 @layer base {
@@ -116,6 +119,7 @@
     line-height: 1.45;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    font-variant-numeric: tabular-nums;
   }
   ::selection {
     background: var(--mark);
@@ -185,24 +189,19 @@
     letter-spacing: -0.01em;
     font-weight: 500;
   }
-  /* Small mono caps used for section labels and counters. */
-  .label-mono {
-    font-family: var(--font-num);
-    font-size: 10.5px;
-    line-height: 1;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--fg-4);
+  /* Section labels: sentence case sans caption. No mono caps. */
+  .caption {
+    font: var(--type-caption);
+    color: var(--fg-3);
   }
   .card {
     background: var(--surface);
     border-radius: 20px;
   }
-  .glass {
-    background: var(--pane);
-    backdrop-filter: blur(22px) saturate(1.7);
-    -webkit-backdrop-filter: blur(22px) saturate(1.7);
-    box-shadow: inset 0 0 0 0.5px var(--pane-edge), var(--shadow-menu);
+  /* Floating chrome (mobile bars, menus): solid elevated surface, no blur. */
+  .float {
+    background: var(--elev);
+    box-shadow: var(--shadow-menu);
   }
 
   /* Hover wash that scales in from the center, like Bencho's icon buttons. */
@@ -236,6 +235,82 @@
   }
   .press:active:not(:disabled) {
     transform: scale(0.96);
+  }
+
+  /* ---- status glyphs: running pings ultramarine, needs is a still vermilion diamond,
+     done is a volt disc with an ink edge on white, settled is grey, idle and queued are hollow ---- */
+  .glyph {
+    position: relative;
+    display: inline-block;
+    flex: none;
+  }
+  .glyph > i {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+  }
+  .glyph[data-s="running"] > i {
+    background: var(--live);
+  }
+  .glyph[data-s="running"] > i.ping {
+    animation: omni-ping var(--dur-ping) var(--ease-out) infinite;
+  }
+  .glyph[data-s="needs"] > i {
+    border-radius: 1.5px;
+    background: var(--needs);
+    transform: rotate(45deg) scale(0.86);
+  }
+  .glyph[data-s="done"] > i {
+    background: var(--done);
+    box-shadow: inset 0 0 0 1px var(--done-edge);
+  }
+  .glyph[data-s="settled"] > i {
+    background: var(--fg-4);
+  }
+  .glyph[data-s="idle"] > i,
+  .glyph[data-s="queued"] > i {
+    box-shadow: inset 0 0 0 1.5px var(--fg-4);
+  }
+  /* Status pill: neutral, except needs and done which fill with their pop and carry ink text. */
+  .spill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px 0 8px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    font: 500 12px/1 var(--font-sans);
+    color: var(--fg-2);
+    white-space: nowrap;
+  }
+  .spill[data-s="running"] {
+    color: var(--live-text);
+  }
+  .spill[data-s="needs"] {
+    background: var(--needs);
+    color: var(--on-needs);
+  }
+  .spill[data-s="needs"] .glyph > i {
+    background: var(--on-needs);
+  }
+  .spill[data-s="done"] {
+    background: var(--done);
+    color: var(--on-done);
+  }
+  .spill[data-s="done"] .glyph > i {
+    background: var(--on-done);
+    box-shadow: none;
+  }
+  /* The mark takes the text color; attention turns it vermilion. */
+  .mark {
+    display: inline-block;
+    flex: none;
+    overflow: visible;
+    transition: color 0.42s var(--ease-out);
+  }
+  .mark-needs {
+    color: var(--needs);
   }
 
   /* ---- segmented pill with a sliding thumb (Bencho "pill") ---- */
@@ -385,11 +460,12 @@
   .say-btn:hover {
     background: var(--wash);
   }
-  .say-btn[data-danger] {
-    color: var(--bad-dot);
+  .say-btn[data-needs] {
+    background: var(--needs);
+    color: var(--on-needs);
   }
-  .say-btn[data-danger]:hover {
-    background: var(--bad-bg);
+  .say-btn[data-needs]:hover {
+    background: color-mix(in srgb, var(--needs) 90%, var(--fg));
   }
   .say-seam {
     width: 1px;
@@ -866,9 +942,7 @@
   }
 }
 .scrim {
-  background: light-dark(rgb(23 24 26 / 0.22), rgb(0 0 0 / 0.5));
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: var(--scrim);
   animation: omni-scrim 0.24s var(--ease-out);
 }
 @keyframes omni-drawer {

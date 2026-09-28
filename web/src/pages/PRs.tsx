@@ -2,7 +2,7 @@ import { useState, type CSSProperties } from 'react';
 import { api, errorText, useApi, type Channel, type Checks, type PRDetail as PRDetailT, type PRSummary, type Thread } from '../api.ts';
 import { DiffViewer } from '../components/DiffViewer.tsx';
 import { Markdown } from '../components/Markdown.tsx';
-import { Avatar, Button, Chip, Empty, ErrorNote, Icon, IconLink, LinkButton, Loading, Picker, SlideToConfirm, Tabs, Toggle, type PickerOption } from '../components/ui.tsx';
+import { Avatar, Button, Chip, StatusDot, Empty, ErrorNote, Icon, IconLink, LinkButton, Loading, Picker, SlideToConfirm, Tabs, Toggle, type PickerOption } from '../components/ui.tsx';
 import { fullDate, relTime } from '../format.ts';
 import { href, navigate } from '../router.ts';
 
@@ -21,17 +21,17 @@ export function ChecksSummary({ c }: { c: Checks }) {
   if (!c.passed && !c.failed && !c.pending) return <span className="text-[12px] text-fg-4">no checks</span>;
   return (
     <span className="inline-flex items-center gap-2 font-num text-[11.5px] tabular-nums" title={`${c.passed} passed, ${c.failed} failed, ${c.pending} pending`}>
-      {c.passed > 0 && <span className="text-ok">✓ {c.passed}</span>}
-      {c.failed > 0 && <span className="text-bad">✗ {c.failed}</span>}
-      {c.pending > 0 && <span className="text-warn">• {c.pending}</span>}
+      {c.passed > 0 && <span className="inline-flex items-center gap-1 text-fg-2"><StatusDot status="done" size={7} /> {c.passed}</span>}
+      {c.failed > 0 && <span className="inline-flex items-center gap-1 text-fg-2"><StatusDot status="needs" size={7} /> {c.failed}</span>}
+      {c.pending > 0 && <span className="inline-flex items-center gap-1 text-live-text"><StatusDot status="running" size={7} /> {c.pending}</span>}
     </span>
   );
 }
 
 function ReviewChip({ d }: { d: string | null }) {
   if (!d) return null;
-  if (d === 'APPROVED') return <Chip tone="ok">Approved</Chip>;
-  if (d === 'CHANGES_REQUESTED') return <Chip tone="bad">Changes requested</Chip>;
+  if (d === 'APPROVED') return <Chip tone="done">Approved</Chip>;
+  if (d === 'CHANGES_REQUESTED') return <Chip tone="needs">Changes requested</Chip>;
   if (d === 'REVIEW_REQUIRED') return <Chip>Review required</Chip>;
   return <Chip>{d.toLowerCase().replace(/_/g, ' ')}</Chip>;
 }
@@ -74,7 +74,7 @@ export function PRList({ channel }: { channel: Channel }) {
           {q.data.map((p, i) => (
             <a key={p.number} href={href.pr(channel.id, p.number)} style={{ '--i': i } as CSSProperties} className="hov block rounded-[18px] px-3.5 py-3 [--hov:var(--surface)]">
               <div className="flex min-w-0 items-center gap-2">
-                <Icon name="pr" size={14} className={p.isDraft ? 'text-fg-4' : p.state === 'MERGED' ? 'text-info' : p.state === 'CLOSED' ? 'text-bad' : 'text-ok'} />
+                <Icon name="pr" size={14} className={p.isDraft || p.state === 'CLOSED' ? 'text-fg-4' : p.state === 'MERGED' ? 'text-fg-2' : 'text-live-text'} />
                 <span className="min-w-0 truncate text-[14px] font-medium">{p.title}</span>
                 <span className="shrink-0 font-num text-[11.5px] text-fg-4">#{p.number}</span>
                 {p.isDraft && <Chip tone="outline">Draft</Chip>}
@@ -89,7 +89,7 @@ export function PRList({ channel }: { channel: Channel }) {
                   {p.headRefName} <span className="text-fg-4">into</span> {p.baseRefName}
                 </span>
                 <span className="font-num text-[11px]">
-                  <span className="text-ok">+{p.additions}</span> <span className="text-bad">-{p.deletions}</span>
+                  <span className="text-fg-2">+{p.additions}</span> <span className="text-fg-3">-{p.deletions}</span>
                 </span>
                 <span className="ml-auto font-num text-[11px] text-fg-4">{relTime(p.updatedAt)}</span>
               </div>
@@ -102,13 +102,13 @@ export function PRList({ channel }: { channel: Channel }) {
 }
 
 function checkTone(state: string) {
-  if (['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(state)) return 'text-ok';
-  if (['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(state)) return 'text-bad';
-  return 'text-warn';
+  if (['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(state)) return 'done';
+  if (['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(state)) return 'needs';
+  return 'running';
 }
 function checkGlyph(state: string) {
   const t = checkTone(state);
-  return t === 'text-ok' ? '✓' : t === 'text-bad' ? '✗' : '•';
+  return t === 'done' ? '✓' : t === 'needs' ? '✗' : '•';
 }
 
 type DetailTab = 'conversation' | 'checks' | 'files' | 'diff';
@@ -188,7 +188,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
     }
   };
 
-  const failed = p.checkRuns.filter((c) => checkTone(c.state) === 'text-bad').length;
+  const failed = p.checkRuns.filter((c) => checkTone(c.state) === 'needs').length;
   const warnings = [failed > 0 && `${failed} checks failing`, p.isDraft && 'Still a draft', p.reviewDecision === 'CHANGES_REQUESTED' && 'Changes requested'].filter(Boolean) as string[];
   const conflicting = p.mergeable === 'CONFLICTING';
 
@@ -201,7 +201,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
             {p.title} <span className="font-num text-[15px] text-fg-4">#{p.number}</span>
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12.5px] text-fg-3">
-            {p.state && <Chip tone={p.state === 'OPEN' ? 'ok' : p.state === 'MERGED' ? 'info' : 'default'}>{p.state.toLowerCase()}</Chip>}
+            {p.state && <Chip tone={p.state === 'OPEN' ? 'live' : p.state === 'MERGED' ? 'done' : 'outline'}>{p.state.toLowerCase()}</Chip>}
             {p.isDraft && <Chip tone="outline">Draft</Chip>}
             <ReviewChip d={p.reviewDecision} />
             <span>{p.author?.login}</span>
@@ -210,7 +210,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
             </span>
             <ChecksSummary c={p.checks} />
             <span className="font-num text-[11.5px]">
-              <span className="text-ok">+{p.additions}</span> <span className="text-bad">-{p.deletions}</span>
+              <span className="text-fg-2">+{p.additions}</span> <span className="text-fg-3">-{p.deletions}</span>
             </span>
           </div>
         </div>
@@ -240,9 +240,9 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
           </div>
           {(warnings.length > 0 || conflicting) && (
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {conflicting && <Chip tone="bad">Has conflicts</Chip>}
+              {conflicting && <Chip tone="needs">Has conflicts</Chip>}
               {warnings.map((w) => (
-                <Chip key={w} tone="warn">
+                <Chip key={w} tone="needs">
                   {w}
                 </Chip>
               ))}
@@ -260,8 +260,8 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
         </section>
       )}
       {merged && (
-        <div className="pop-in mt-5 flex items-start gap-2.5 rounded-[20px] bg-ok-bg px-4 py-3 text-[13px] text-ok">
-          <Icon name="check" size={15} strokeWidth={2.25} className="mt-0.5 shrink-0" />
+        <div className="pop-in mt-5 flex items-start gap-2.5 rounded-[20px] bg-surface px-4 py-3 text-[13px] text-fg">
+          <StatusDot status="done" size={9} className="mt-1 shrink-0" />
           <span className="whitespace-pre-wrap">{merged}</span>
         </div>
       )}
@@ -292,7 +292,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
                   <div className="flex items-center gap-2 px-4 pt-3 text-[12.5px] text-fg-3">
                     <Avatar name={c.who ?? '?'} size={22} />
                     <span className="font-medium text-fg-2">{c.who ?? 'unknown'}</span>
-                    {c.kind === 'review' && <Chip tone={c.state === 'APPROVED' ? 'ok' : c.state === 'CHANGES_REQUESTED' ? 'bad' : 'default'}>{c.state.toLowerCase().replace(/_/g, ' ')}</Chip>}
+                    {c.kind === 'review' && <Chip tone={c.state === 'APPROVED' ? 'done' : c.state === 'CHANGES_REQUESTED' ? 'needs' : 'default'}>{c.state.toLowerCase().replace(/_/g, ' ')}</Chip>}
                     {c.at && <span className="ml-auto font-num text-[11px] text-fg-4">{fullDate(c.at)}</span>}
                   </div>
                   {ghBody(c.body) && (
@@ -332,8 +332,8 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
               >
                 <Icon name="file" size={13} className="text-fg-4" />
                 <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{f.path}</span>
-                <span className="font-num text-[11px] text-ok">+{f.additions}</span>
-                <span className="font-num text-[11px] text-bad">-{f.deletions}</span>
+                <span className="font-num text-[11px] text-fg-2">+{f.additions}</span>
+                <span className="font-num text-[11px] text-fg-3">-{f.deletions}</span>
               </button>
             ))}
             {!p.files?.length && <div className="px-3.5 py-2 text-[13px] text-fg-3">No files.</div>}

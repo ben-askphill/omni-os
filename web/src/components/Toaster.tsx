@@ -29,7 +29,7 @@ function ToastView({ t, dismiss }: { t: ToastItem; dismiss: (id: number) => void
     return () => clearTimeout(tm);
   }, [hover, t.leaving, t.id, dismiss]);
   return (
-    <div role="status" className="toast glass" data-leaving={t.leaving || undefined} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+    <div role="status" className="toast float" data-leaving={t.leaving || undefined} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       {t.status ? <StatusDot status={t.status} /> : t.icon ? <Icon name={t.icon} size={15} className="text-fg-3" /> : null}
       <div className="min-w-0 flex-1 py-1">
         <div className="truncate font-medium text-fg">{t.title}</div>

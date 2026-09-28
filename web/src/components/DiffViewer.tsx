@@ -58,8 +58,8 @@ const FileBlock = memo(function FileBlock({ f, defaultOpen }: { f: FileDiff; def
       >
         <Icon name="chevronRight" size={12} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
         <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{f.path}</span>
-        <span className="shrink-0 font-num text-[11px] text-ok">+{f.add}</span>
-        <span className="shrink-0 font-num text-[11px] text-bad">-{f.del}</span>
+        <span className="shrink-0 font-num text-[11px] text-fg-2">+{f.add}</span>
+        <span className="shrink-0 font-num text-[11px] text-fg-3">-{f.del}</span>
       </button>
       {open && (
         <div className="scroll-thin overflow-x-auto bg-bg">
@@ -67,7 +67,7 @@ const FileBlock = memo(function FileBlock({ f, defaultOpen }: { f: FileDiff; def
           <pre className="min-w-max font-mono text-[11.5px] leading-[1.6]">
             {shown.map((l, i) => {
               const cls = l.startsWith('@@')
-                ? 'bg-info-bg text-info'
+                ? 'bg-surface text-fg-3'
                 : l.startsWith('+')
                   ? 'bg-[var(--diff-add)]'
                   : l.startsWith('-')

@@ -3,7 +3,7 @@ import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifa
 import { ArtifactViewer, kindIcon } from '../components/ArtifactViewer.tsx';
 import { ReplyComposer } from '../components/Composer.tsx';
 import { CAPABILITIES, isHarnessId } from '../../../server/harness/types.ts';
-import { harnessName } from '../composer-slash.ts';
+import { HarnessMark } from '../components/brand.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
 import { Avatar, Button, Chip, CopyButton, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Modal, StatusDot, StatusPill, Tabs } from '../components/ui.tsx';
 import { duration, fullDate, plural, relTime } from '../format.ts';
@@ -165,10 +165,10 @@ function BrowserTab({ shots }: { shots: Artifact[] }) {
           <div className="relative bg-surface-2">
             <img src={artifactUrl(open)} alt={open.name} className="mx-auto max-h-[78vh] w-auto" />
             {idx > 0 && (
-              <IconButton icon="chevronLeft" label="Newer" className="glass absolute top-1/2 left-3 -translate-y-1/2" onClick={() => setOpen(list[idx - 1])} />
+              <IconButton icon="chevronLeft" label="Newer" className="float absolute top-1/2 left-3 -translate-y-1/2" onClick={() => setOpen(list[idx - 1])} />
             )}
             {idx >= 0 && idx < list.length - 1 && (
-              <IconButton icon="chevronRight" label="Older" className="glass absolute top-1/2 right-3 -translate-y-1/2" onClick={() => setOpen(list[idx + 1])} />
+              <IconButton icon="chevronRight" label="Older" className="float absolute top-1/2 right-3 -translate-y-1/2" onClick={() => setOpen(list[idx + 1])} />
             )}
           </div>
         )}
@@ -192,7 +192,7 @@ function McpList({ servers }: { servers: string[] }) {
     <div>
       <div className="text-fg-2">
         {good.length} connected
-        {bad.length > 0 && <span className="text-warn"> · {bad.length} not connected</span>}
+        {bad.length > 0 && <span className="text-fg-2"> · {bad.length} not connected</span>}
         <button type="button" onClick={() => setOpen((v) => !v)} className="ml-2 text-[12px] text-fg-3 underline-offset-2 hover:text-fg hover:underline">
           {open ? 'Hide' : 'Show'}
         </button>
@@ -200,7 +200,7 @@ function McpList({ servers }: { servers: string[] }) {
       {bad.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1">
           {bad.map((p) => (
-            <Chip key={p.key} tone="warn" title={`${p.name} (${p.status})`}>
+            <Chip key={p.key} tone="needs" title={`${p.name} (${p.status})`}>
               {p.label}
             </Chip>
           ))}
@@ -222,7 +222,7 @@ function McpList({ servers }: { servers: string[] }) {
 function Row({ k, children }: { k: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[6.5rem_1fr] gap-2 px-3.5 py-2 text-[12.5px]">
-      <dt className="label-mono pt-px">{k}</dt>
+      <dt className="pt-px text-fg-3">{k}</dt>
       <dd className="min-w-0 break-words text-fg">{children}</dd>
     </div>
   );
@@ -255,14 +255,16 @@ function DetailsTab({
   const resume = remote ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin h-full overflow-y-auto px-2.5 pb-3">
-      <dl className="divide-y divide-line rounded-[18px] bg-bg py-1">
+      <dl className="divide-y divide-line rounded-[20px] bg-bg py-1">
         <Row k="Channel">
           <a href={href.channel(thread.channel_id)} className="font-medium hover:underline">
             #{channel?.name ?? thread.channel_id}
           </a>
         </Row>
         <Row k="Role">{thread.role ?? <span className="text-fg-3">none</span>}</Row>
-        <Row k="Harness">{harnessName(thread.harness)}</Row>
+        <Row k="Harness">
+          <HarnessMark harness={thread.harness} withLabel />
+        </Row>
         <Row k="Model">
           {thread.model || init?.model || <span className="text-fg-3">default</span>}
           {thread.model && init?.model && init.model !== thread.model && <span className="ml-1 text-fg-3">({init.model})</span>}
@@ -279,7 +281,7 @@ function DetailsTab({
         )}
         <Row k="Working dir">
           {remote ? (
-            <span className="text-fg-3">Hermes server — not an Omni worktree</span>
+            <span className="text-fg-3">Hermes server, not an Omni worktree</span>
           ) : (
             <span className="font-mono text-[12px]">{cwd}</span>
           )}
@@ -329,8 +331,11 @@ function DetailsTab({
 
       {children.length > 0 && (
         <div className="mt-4">
-          <div className="label-mono mb-1.5 px-2">Delegated threads</div>
-          <div className="rounded-[18px] bg-bg p-1">
+          <div className="mb-1.5 flex items-center px-2">
+            <span className="caption">Delegated threads</span>
+            <span className="ml-auto font-num text-[11px] text-fg-3">{children.length}</span>
+          </div>
+          <div className="rounded-[20px] bg-bg p-1">
             {children.map((c) => (
               <a key={c.id} href={href.thread(c.id)} className="hov flex h-9 min-w-0 items-center gap-2.5 rounded-full px-3 text-[12.5px] [--hov:var(--surface)]">
                 <StatusDot status={c.status} size={7} />
@@ -344,16 +349,16 @@ function DetailsTab({
       )}
 
       {remote ? (
-        <div className="mt-4 rounded-[18px] bg-bg p-3.5">
-          <div className="label-mono mb-2">Remote session</div>
+        <div className="mt-4 rounded-[20px] bg-bg p-3.5">
+          <div className="caption mb-2">Remote session</div>
           <p className="text-[12.5px] leading-relaxed text-fg-2">
             This thread runs on the Hermes server. Another message here resumes <span className="font-mono">{thread.session_id}</span>.
           </p>
         </div>
       ) : (
-        <div className="mt-4 rounded-[18px] bg-bg p-3.5">
+        <div className="mt-4 rounded-[20px] bg-bg p-3.5">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="label-mono">Resume in terminal</span>
+            <span className="caption">Resume in terminal</span>
             <CopyButton text={resume} />
           </div>
           <code className="block rounded-xl bg-surface px-3 py-2.5 font-mono text-[11.5px] break-all text-fg-2">{resume}</code>
@@ -777,8 +782,8 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {!live && ready && (
-              <span className="hidden items-center gap-1.5 font-num text-[11px] text-warn sm:inline-flex" title="Reconnecting to the live stream">
-                <span className="pulse h-1.5 w-1.5 rounded-full bg-[var(--warn-dot)]" /> Reconnecting
+              <span className="hidden items-center gap-1.5 font-num text-[11px] text-fg-3 sm:inline-flex" title="Reconnecting to the live stream">
+                <span className="pulse h-1.5 w-1.5 rounded-full bg-fg-4" /> Reconnecting
               </span>
             )}
             <StatusPill status={thread.status} />
@@ -822,7 +827,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
             <button
               type="button"
               onClick={jump}
-              className="glass pop-in press absolute bottom-4 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-medium"
+              className="float pop-in press absolute bottom-4 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-medium"
             >
               <Icon name="chevronDown" size={13} /> New activity
             </button>
@@ -831,7 +836,6 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
 
         {/* composer */}
         <div className="relative shrink-0 bg-bg px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4">
-          <div className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-bg to-transparent" />
           <div className="mx-auto max-w-3xl">
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             <ReplyComposer

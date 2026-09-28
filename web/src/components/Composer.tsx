@@ -3,7 +3,8 @@ import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Th
 import { bytes } from '../format.ts';
 import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset, takeComposerFocus } from '../router.ts';
 import { useApp } from '../store.tsx';
-import { ErrorNote, Icon, IconButton, Kbd, Picker, Spinner, type IconName, type PickerOption } from './ui.tsx';
+import { ErrorNote, Icon, IconButton, Kbd, Loader, Picker, type IconName, type PickerOption } from './ui.tsx';
+import { CrewMark, isCrewRole } from './brand.tsx';
 import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
 import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
 import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '../slash-menu.ts';
@@ -143,7 +144,7 @@ function Thumb({ file }: { file: File }) {
 function AttachmentStrip({ files, onRemove }: { files: File[]; onRemove: (f: File) => void }) {
   if (!files.length) return null;
   return (
-    <div className="flex flex-wrap gap-1.5 px-1.5 pt-1.5 pb-0.5">
+    <div className="flex flex-wrap gap-1.5 px-3 pt-3 pb-0.5">
       {files.map((f, i) => (
         <span key={`${f.name}:${f.size}:${i}`} className="flex h-11 max-w-[15rem] items-center gap-2 rounded-2xl bg-surface-2 pr-1 pl-1 text-[12.5px]">
           {isImage(f) ? (
@@ -193,28 +194,31 @@ function SendButton({ armed, busy, onClick, children }: { armed: boolean; busy: 
       onClick={onClick}
       disabled={!armed || busy}
       data-armed={armed || undefined}
-      className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-surface-3 pr-4 pl-3.5 text-[13px] font-medium text-fg-4 transition-[background-color,color,transform] duration-300 data-[armed]:bg-fg data-[armed]:text-on-ink"
+      aria-label={typeof children === 'string' ? children : undefined}
+      title={typeof children === 'string' ? children : undefined}
+      className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out active:scale-[.92] disabled:opacity-25"
     >
-      {busy ? <Spinner size={14} /> : <Icon name="send" size={15} strokeWidth={2} />}
-      {children}
+      {busy ? <Loader size={16} /> : <Icon name="send" size={16} strokeWidth={2} />}
+      <span className="sr-only">{children}</span>
     </button>
   );
 }
 
 function Hint() {
   return (
-    <span className="hidden items-center gap-1 text-[11.5px] text-fg-4 sm:inline-flex">
-      <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
-      <Kbd>↵</Kbd>
+    <span className="hidden items-center gap-3.5 pr-1 text-[11.5px] text-fg-4 sm:inline-flex">
+      <span>{isMac ? '⌘↵' : 'Ctrl ↵'} send</span>
+      <span>↵ newline</span>
+      <span>/ commands</span>
     </span>
   );
 }
 
 const shell = (shape: string, over = false) =>
-  `${shape} relative p-1.5 transition-[background-color,box-shadow] duration-200 focus-within:bg-bg ${
+  `${shape} relative transition-[background-color,box-shadow] duration-[160ms] ease-out focus-within:bg-bg ${
     over
-      ? 'shadow-[inset_0_0_0_1.5px_var(--line-strong),0_0_0_5px_var(--wash)]'
-      : 'shadow-[inset_0_0_0_1px_var(--line)] focus-within:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_5px_var(--wash)]'
+      ? 'bg-bg shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_4px_var(--wash)]'
+      : 'focus-within:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_4px_var(--wash)]'
   }`;
 
 function DropHint({ over }: { over: boolean }) {
@@ -457,7 +461,7 @@ export function NewThreadComposer({
   if (!visibleChannels.some((c) => c.id === channel)) channelOptions.push({ value: channel, label: channel, avatar: channel });
   const roleOptions: PickerOption<string>[] = [
     { value: '', label: 'No role', sub: 'No charter', avatar: false, icon: 'x' },
-    ...crew.map((r) => ({ value: r.id, label: r.name, sub: r.description, avatar: r.name })),
+    ...crew.map((r) => ({ value: r.id, label: r.name, sub: r.description, avatar: r.name, lead: isCrewRole(r.id) ? <CrewMark role={r.id} size={13} /> : undefined })),
   ];
   return (
     <div className={shell(big ? 'rounded-[30px] bg-surface' : 'rounded-[26px] bg-surface', att.over)} {...att.dropZone}>
@@ -479,10 +483,9 @@ export function NewThreadComposer({
         }}
         rows={big ? 3 : 2}
         placeholder={placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task')}
-        className={`block w-full resize-none bg-transparent px-4 pt-3 pb-1 outline-none placeholder:text-fg-4 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
+        className={`block max-h-[220px] w-full resize-none bg-transparent px-4 pt-3 pb-1 leading-[1.5] outline-none placeholder:text-fg-4 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
       />
-      <div className="flex flex-wrap items-center gap-1.5 px-1 pt-1">
-        <AttachButton onPick={att.add} disabled={busy} />
+      <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
         {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
         <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />
         {harnesses && (
@@ -509,6 +512,7 @@ export function NewThreadComposer({
           ];
           return <Picker label="Effort" value={effort} options={effortOptions} onChange={setEffort} />;
         })()}
+        <AttachButton onPick={att.add} disabled={busy} />
         <div className="ml-auto flex items-center gap-2.5">
           <Hint />
           <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>
@@ -517,9 +521,9 @@ export function NewThreadComposer({
         </div>
       </div>
       {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
-      <div aria-live="polite">{hint && !slashMenu.open && <div className="px-4 pt-2.5 pb-1.5 text-[12px] text-fg-3">{hint}</div>}</div>
-      {roleObj?.description && <div className="px-4 pt-2.5 pb-1.5 text-[12px] text-fg-3">{roleObj.description}</div>}
-      {(att.error || error) && <ErrorNote className="m-1 mt-2">{att.error ?? error}</ErrorNote>}
+      <div aria-live="polite">{hint && !slashMenu.open && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
+      {roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
+      {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
     </div>
   );
 }
@@ -530,7 +534,7 @@ const SEND_OPTIONS: { mode: SendMode; label: string; hint: string; icon: IconNam
   { mode: 'interrupt', label: 'Interrupt and send', hint: 'Stops the current step, then runs this', icon: 'stop', keys: [MOD, 'Shift', 'Enter'] },
 ];
 
-const halfCls = 'press inline-flex h-9 items-center bg-fg text-on-ink transition-opacity select-none hover:opacity-90 disabled:opacity-40';
+const halfCls = 'inline-flex h-[34px] items-center bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out select-none active:scale-[.92] disabled:opacity-25';
 
 /** Split button for a busy thread: Steer (or Queue when the harness can't steer), plus a menu. */
 function SteerButton({ disabled, busy, canSteer = true, onSend }: { disabled: boolean; busy: boolean; canSteer?: boolean; onSend: (mode: SendMode) => void }) {
@@ -583,7 +587,7 @@ function SteerButton({ disabled, busy, canSteer = true, onSend }: { disabled: bo
   return (
     <div ref={wrap} className="relative flex">
       <button type="button" onClick={() => onSend(primary)} disabled={disabled || busy} className={`${halfCls} gap-1.5 rounded-l-full pr-2.5 pl-3.5 text-[13px] font-medium whitespace-nowrap`}>
-        {busy ? <Spinner size={14} /> : <Icon name={canSteer ? 'send' : 'clock'} size={15} strokeWidth={2} />}
+        {busy ? <Loader size={16} /> : <Icon name={canSteer ? 'send' : 'clock'} size={16} strokeWidth={2} />}
         {canSteer ? 'Steer' : 'Queue'}
       </button>
       <button
@@ -610,7 +614,7 @@ function SteerButton({ disabled, busy, canSteer = true, onSend }: { disabled: bo
           role="menu"
           aria-label="Send options"
           onKeyDown={onMenuKey}
-          className="fade-in absolute right-0 bottom-full z-20 mb-1.5 w-72 max-w-[calc(100vw-1.5rem)] sm:w-80 rounded-lg border border-line bg-surface p-1 shadow-[var(--shadow-menu)]"
+          className="fade-in absolute right-0 bottom-full z-20 mb-1.5 w-72 max-w-[calc(100vw-1.5rem)] sm:w-80 rounded-[22px] bg-elev p-1.5 shadow-[var(--shadow-menu)]"
         >
           {options.map((o, k) => (
             <button
@@ -624,12 +628,12 @@ function SteerButton({ disabled, busy, canSteer = true, onSend }: { disabled: bo
                 setOpen(false);
                 onSend(o.mode);
               }}
-              className="flex w-full min-w-0 items-start gap-2.5 rounded-md px-2.5 py-2 text-left outline-none hover:bg-surface-2 focus:bg-surface-2"
+              className="flex min-h-10 w-full min-w-0 items-start gap-2.5 rounded-2xl px-3 py-2 text-left outline-none hover:bg-[var(--wash)] focus:bg-[var(--wash)]"
             >
               <Icon name={o.icon} size={14} className="mt-[3px] text-fg-3" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 text-[13px] font-medium text-fg">{o.label}</span>
+                  <span className="min-w-0 flex-1 text-[13px] text-fg">{o.label}</span>
                   {o.keys && (
                     <span className="hidden shrink-0 items-center gap-0.5 sm:flex">
                       {o.keys.map((key) => (
@@ -638,7 +642,7 @@ function SteerButton({ disabled, busy, canSteer = true, onSend }: { disabled: bo
                     </span>
                   )}
                 </span>
-                <span className="block text-[12px] text-fg-3">{o.hint}</span>
+                <span className="block text-[11.5px] text-fg-4">{o.hint}</span>
               </span>
             </button>
           ))}
@@ -767,7 +771,7 @@ export function ReplyComposer({
   };
 
   return (
-    <div className={shell('rounded-[24px] bg-elev', att.over)} {...att.dropZone}>
+    <div className={shell('rounded-[26px] bg-surface', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
       {slashMenu.menu && <SlashMenu {...slashMenu.menu} />}
       <AttachmentStrip files={att.files} onRemove={att.remove} />
@@ -787,11 +791,11 @@ export function ReplyComposer({
         }}
         rows={1}
         placeholder={busyThread ? 'Steer the agent. It reads this at its next step.' : 'Reply'}
-        className="block min-h-[44px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] outline-none placeholder:text-fg-4"
+        className="block max-h-[220px] min-h-[60px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.5] outline-none placeholder:text-fg-4"
       />
-      <div className="flex items-center gap-2 px-1">
-        <AttachButton onPick={att.add} disabled={busy} />
+      <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
         {extra}
+        <AttachButton onPick={att.add} disabled={busy} />
         <div className="ml-auto flex items-center gap-2.5">
           <Hint />
           {omni ? (
@@ -810,7 +814,7 @@ export function ReplyComposer({
       {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
       <div aria-live="polite">
         {slash.hint && !slashMenu.open && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2 pb-1.5 text-[12px] text-fg-3">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pb-2.5 text-[12px] text-fg-3">
             <span>{slash.hint}</span>
             {slash.action.kind === 'fixed' && (
               <button type="button" onClick={otherModelThread} className="font-medium text-fg-2 underline-offset-2 hover:text-fg hover:underline">
@@ -820,7 +824,7 @@ export function ReplyComposer({
           </div>
         )}
       </div>
-      {(att.error || error) && <ErrorNote className="m-1 mt-2">{att.error ?? error}</ErrorNote>}
+      {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
     </div>
   );
 }
