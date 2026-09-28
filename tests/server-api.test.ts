@@ -79,7 +79,12 @@ describe('an unknown /api request', () => {
     expect(JSON.parse(channels.text).map((c: { id: string }) => c.id)).toContain('scratch');
     expect(await call('/api/threads/nope')).toMatchObject({ status: 404, text: JSON.stringify({ error: 'not found' }) });
     const rename = { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'New' }) };
-    expect(await call('/api/threads/nope', rename)).toMatchObject({ status: 404 });
+    expect(await call('/api/threads/nope', rename)).toMatchObject({ status: 404, text: JSON.stringify({ error: 'not found' }) });
+    const t = await r.start('hello', { title: 'Old title' });
+    await r.untilResults(t.id, 1);
+    const renamed = await call(`/api/threads/${t.id}`, rename);
+    expect(renamed.status).toBe(200);
+    expect(JSON.parse(renamed.text)).toMatchObject({ id: t.id, title: 'New' });
   });
 });
 

@@ -1,9 +1,14 @@
-import { execFileSync } from 'node:child_process';
-import { linkSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { basename } from 'node:path';
+import { closeSync, constants, fstatSync, ftruncateSync, openSync, readFileSync, rmSync, statSync, writeSync } from 'node:fs';
 
-// One server per data dir: a pid file the server holds while it runs. It is written whole before it
-// appears (a hard link to a file that already holds the pid), so a reader never sees it empty.
+// One server per data dir. The server keeps the lock file open with an exclusive flock(2), which the
+// kernel drops when the process ends, however it ends. So a lock is never stale and no pid is guessed at:
+// the pid in the file only names the holder for the message a second server prints.
+
+/** macOS open(2) flag: take an exclusive flock as the file opens. Node has no constant for it. */
+const O_EXLOCK = 0x20;
+
+/** The locks this process holds, by file: the descriptor holding each. */
+const held = new Map<string, number>();
 
 const readPid = (file: string) => {
   try {
@@ -13,41 +18,54 @@ const readPid = (file: string) => {
   }
 };
 
-/** True while pid is a live node process. A pid a crash or reboot handed to another program doesn't count. */
 function alive(pid: number) {
   try {
     process.kill(pid, 0);
-    return basename(execFileSync('/bin/ps', ['-p', String(pid), '-o', 'comm='], { encoding: 'utf8' }).trim()).startsWith('node');
+    return true;
   } catch {
     return false;
   }
 }
 
+const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
 /**
  * Takes the lock for this process. Returns the pid of the live server that holds it instead, or null
- * once this process does. A lock whose server is gone is taken over.
+ * once this process does.
  */
 export function takeLock(file: string): number | null {
-  const mine = `${file}.${process.pid}`;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    writeFileSync(mine, `${process.pid}\n`);
+  if (held.has(file)) return null;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    let fd: number;
     try {
-      linkSync(mine, file);
-      return null;
+      fd = openSync(file, constants.O_RDWR | constants.O_CREAT | constants.O_NONBLOCK | O_EXLOCK, 0o644);
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-    } finally {
-      rmSync(mine, { force: true });
+      if ((err as NodeJS.ErrnoException).code !== 'EAGAIN') throw err;
+      // Held. Its server writes its pid right after it takes the lock: until then the file names the one before.
+      const holder = readPid(file);
+      if (holder && alive(holder)) return holder;
+      pause(20);
+      continue;
     }
-    const holder = readPid(file);
-    if (holder && holder !== process.pid && alive(holder)) return holder;
-    // Stale. Remove it unless another server took it over since.
-    if (readPid(file) === holder) rmSync(file, { force: true });
+    // A server that stops removes the file while it holds the lock: a lock on the file it removed is no lock.
+    if (fstatSync(fd).ino !== statSync(file, { throwIfNoEntry: false })?.ino) {
+      closeSync(fd);
+      continue;
+    }
+    const pid = `${process.pid}\n`;
+    writeSync(fd, pid, 0);
+    ftruncateSync(fd, pid.length);
+    held.set(file, fd);
+    return null;
   }
   throw new Error(`could not take the lock at ${file}`);
 }
 
-/** Removes the lock if this process holds it. */
+/** Removes the lock if this process holds it. The file goes first, so no other server locks it on its way out. */
 export function releaseLock(file: string) {
-  if (readPid(file) === process.pid) rmSync(file, { force: true });
+  const fd = held.get(file);
+  if (fd === undefined) return;
+  held.delete(file);
+  rmSync(file, { force: true });
+  closeSync(fd);
 }
