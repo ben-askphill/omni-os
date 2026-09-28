@@ -8,7 +8,7 @@ struct OmniApp: App {
 
   var body: some Scene {
     Window("Omni", id: "main") {
-      MainWindow(model: delegate.model)
+      MainWindow(model: delegate.model, updater: delegate.updater)
     }
     .defaultSize(width: 1100, height: 720)
     .commands {
@@ -16,8 +16,17 @@ struct OmniApp: App {
       OmniCommands(model: delegate.model)
     }
 
+    WindowGroup("Artifact", id: "artifact", for: ArtifactRef.self) { $ref in
+      if let ref { ArtifactWindowView(model: delegate.model, ref: ref) }
+    }
+    .defaultSize(width: 720, height: 640)
+    WindowGroup("Thread", id: ThreadWindow.id, for: String.self) { $id in
+      ThreadWindowView(model: delegate.model, id: id)
+    }
+    .defaultSize(width: 780, height: 720)
+
     Settings {
-      SettingsView(model: delegate.model)
+      SettingsView(model: delegate.model, appearance: delegate.appearance)
     }
   }
 }
@@ -26,6 +35,9 @@ struct OmniApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private(set) lazy var model: AppModel = makeModel()
+  let appearance = AppearanceSettings()
+  private(set) lazy var updater = Updater(model: model)
+  private var quitting = false
   private var events: SystemEvents?
 
   #if DEBUG
@@ -44,8 +56,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     return AppModel(settings: settings)
   }
 
+  /// Before any window shows, so none draws in the wrong appearance first.
+  func applicationWillFinishLaunching(_ notification: Notification) {
+    appearance.follow { NSApp.appearance = $0.nsAppearance }
+  }
+
   func applicationDidFinishLaunching(_ notification: Notification) {
     model.launch()
+    updater.start()
     events = SystemEvents(model: model)
     #if DEBUG
     if let qa { QARunner.start(qa, model: model) }
@@ -53,7 +71,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationDidBecomeActive(_ notification: Notification) {
+    model.banners.windowActive = true
     model.didBecomeActive()
+    Task { await updater.check() }
+  }
+
+  func applicationDidResignActive(_ notification: Notification) {
+    model.banners.windowActive = false
+  }
+
+  /// Quit asks while turns run. With none, an app-started server stops and a hand-started one is left alone.
+  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    guard !quitting else { return .terminateLater }
+    quitting = true
+    Task {
+      let proceed = await confirmQuit()
+      quitting = false
+      sender.reply(toApplicationShouldTerminate: proceed)
+    }
+    return .terminateLater
+  }
+
+  private func confirmQuit() async -> Bool {
+    let byApp = model.serverStartedByApp
+    let action: QuitRules.Action
+    switch await model.quitDecision() {
+    case .quit(let stopServer):
+      action = .quit(interruptTurns: false, stopServer: stopServer)
+    case .ask(let running):
+      action = QuitRules.action(for: QuitDialog.ask(runningTurns: running), serverStartedByApp: byApp)
+    }
+    guard case .quit(let interrupt, let stop) = action else { return false }
+    await model.prepareToQuit(interruptTurns: interrupt, stopServer: stop)
+    return true
   }
 
   /// The server keeps running after the app quits. It is not tied to the app.
@@ -67,6 +117,30 @@ struct OmniCommands: Commands {
     CommandGroup(replacing: .newItem) {
       NewThreadButton(model: model)
         .keyboardShortcut("n")
+      OpenInNewWindowCommand()
+    }
+    CommandGroup(after: .pasteboard) {
+      Divider()
+      CopyThreadMarkdownCommand(model: model)
+    }
+    ThreadCommands(model: model)
+    CommandGroup(after: .toolbar) {
+      InspectorCommand(model: model)
+    }
+    CommandMenu("Go") {
+      Button("Back") { model.goBack() }
+        .keyboardShortcut("[")
+        .disabled(!model.shell.history.canGoBack)
+      Button("Forward") { model.goForward() }
+        .keyboardShortcut("]")
+        .disabled(!model.shell.history.canGoForward)
+      Divider()
+      Button("Home") { model.route = .home }
+        .keyboardShortcut("h", modifiers: [.command, .shift])
+      Button("Go to…") { model.shell.openPalette() }
+        .keyboardShortcut("k")
+      Button("Search") { model.route = .search(query: "") }
+        .keyboardShortcut("f", modifiers: [.command, .shift])
     }
     CommandMenu("Server") {
       ServerMenuItems(model: model, shortcuts: true)

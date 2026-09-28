@@ -95,4 +95,13 @@ public struct ThreadStub: Decodable, Hashable, Sendable, Identifiable {
     case channelID = "channel_id"
     case createdAt = "created_at"
   }
+
+  /// The sidebar's row for a thread it has the whole of.
+  public init(_ t: OmniThread) {
+    id = t.id
+    channelID = t.channelID
+    title = t.title
+    status = t.status
+    createdAt = t.createdAt
+  }
 }

@@ -192,7 +192,7 @@ private func loaded(_ store: WorkspaceStore) async throws {
     #expect(s.usage[.claudeCode]?.fiveHour != nil)
     #expect(s.crew.map(\.id).contains("conductor"))
     #expect(s.recent.map(\.id) == ["t0"])
-    #expect(s.harnesses.map(\.id) == [.claudeCode, .codex, .cursor])
+    #expect(s.harnesses.map(\.id) == [.claudeCode, .codex, .cursor, .hermes])
     #expect(api.recentLimits == [60])
     for e in endpoints { #expect(api.calls(e) == 1, "\(e)") }
   }
@@ -253,6 +253,19 @@ private func loaded(_ store: WorkspaceStore) async throws {
     try await waitFor("the next event read") { store.snapshot.recent.first?.id == "t4" }
     clock.advance(by: .milliseconds(500))
     try await waitFor("the next refetch") { api.calls("channels") == 3 }
+  }
+
+  @Test func passesEachFeedMessageOn() async throws {
+    let (store, feed, _) = makeStore(try FakeWorkspaceAPI.standard())
+    defer { store.stop(); feed.finish() }
+    var got: [FeedEvent] = []
+    store.onFeed = { got.append($0) }
+    let t = try thread("t1", updated: 1)
+    feed.yield(.state(.open))
+    feed.yield(.message(.thread(t)))
+    feed.yield(.message(.unknown(.string("x"))))
+    try await waitFor("both messages") { got.count == 2 }
+    #expect(got == [.thread(t), .unknown(.string("x"))])
   }
 
   @Test func keepsRecentThreadsInStepWithTheFeed() async throws {

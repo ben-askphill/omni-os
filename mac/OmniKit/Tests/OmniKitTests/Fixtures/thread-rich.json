@@ -1,0 +1,284 @@
+{
+  "thread": {
+    "id": "00000000-0000-4000-8000-000000000004",
+    "channel_id": "acme",
+    "title": "Fix the cart total",
+    "status": "failed",
+    "role": null,
+    "model": null,
+    "harness": "claude-code",
+    "effort": "",
+    "session_id": "00000000-0000-4000-8000-000000000004",
+    "has_run": 1,
+    "cwd": "/tmp/omni-fixtures/acme",
+    "branch": null,
+    "parent_id": null,
+    "task_id": null,
+    "source": "manual",
+    "automation": null,
+    "last_text": "Output of /context",
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "updated_at": "2026-01-05T09:00:00.000Z"
+  },
+  "channel": {
+    "id": "acme",
+    "name": "Acme",
+    "kind": "client",
+    "repo_path": null,
+    "github_repo": null,
+    "use_worktree": 0,
+    "base_dir": "/tmp/omni-fixtures/acme",
+    "store_domain": null,
+    "portal_slug": null,
+    "browser_headless": 1,
+    "notes": "Fixture",
+    "archived": 0,
+    "created_at": "2026-01-05T09:00:00.000Z"
+  },
+  "events": [
+    {
+      "id": 15,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "init",
+      "payload": "{\"model\":\"sonnet\",\"cwd\":\"/tmp/omni-fixtures/acme\",\"tools\":10,\"mcp\":[]}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 16,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "user",
+      "payload": "{\"text\":\"RICH fix the cart total\",\"source\":\"manual\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 17,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_1\",\"name\":\"TodoWrite\",\"input\":{\"todos\":[{\"content\":\"Find the cart code\",\"activeForm\":\"Finding the cart code\",\"status\":\"in_progress\"},{\"content\":\"Fix the total\",\"activeForm\":\"Fixing the total\",\"status\":\"pending\"},{\"content\":\"Run the tests\",\"activeForm\":\"Running the tests\",\"status\":\"pending\"}]},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 18,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"toolu_fake_1\",\"text\":\"Todos have been modified successfully.\",\"is_error\":false,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 19,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "status",
+      "payload": "{\"text\":\"Looking for the cart code\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 20,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_2\",\"name\":\"Task\",\"input\":{\"description\":\"Find the cart code\",\"prompt\":\"Find where the cart total is computed.\",\"subagent_type\":\"Explore\"},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 21,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_3\",\"name\":\"Grep\",\"input\":{\"pattern\":\"cartTotal\",\"path\":\"/tmp/omni-fixtures/acme/src\"},\"parent\":\"toolu_fake_2\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 22,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"toolu_fake_3\",\"text\":\"src/cart.ts\",\"is_error\":false,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 23,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_4\",\"name\":\"Read\",\"input\":{\"file_path\":\"/tmp/omni-fixtures/acme/src/cart.ts\"},\"parent\":\"toolu_fake_2\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 24,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"toolu_fake_4\",\"text\":\"1\\texport function cartTotal() {}\",\"is_error\":false,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 25,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"toolu_fake_2\",\"text\":\"The total is computed in src/cart.ts.\",\"is_error\":false,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 26,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_6\",\"name\":\"TodoWrite\",\"input\":{\"todos\":[{\"content\":\"Find the cart code\",\"activeForm\":\"Finding the cart code\",\"status\":\"completed\"},{\"content\":\"Fix the total\",\"activeForm\":\"Fixing the total\",\"status\":\"in_progress\"},{\"content\":\"Run the tests\",\"activeForm\":\"Running the tests\",\"status\":\"pending\"}]},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 27,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"toolu_fake_6\",\"text\":\"Todos have been modified successfully.\",\"is_error\":false,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 28,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_7\",\"name\":\"Edit\",\"input\":{\"file_path\":\"/tmp/omni-fixtures/acme/src/cart.ts\",\"old_string\":\"cartTotal() {}\",\"new_string\":\"cartTotal() { return 0; }\"},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 29,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"toolu_fake_7\",\"text\":\"Edited.\",\"is_error\":false,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 30,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_8\",\"name\":\"Bash\",\"input\":{\"command\":\"npm test\",\"description\":\"Run the tests\"},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 31,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"toolu_fake_8\",\"text\":\"1 test failed\",\"is_error\":true,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 32,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_9\",\"name\":\"mcp__plugin_github_github__search_issues\",\"input\":{\"query\":\"cart total\",\"perPage\":5},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 33,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"toolu_fake_9\",\"text\":\"[]\",\"is_error\":false,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 34,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_10\",\"name\":\"TodoWrite\",\"input\":{\"todos\":[{\"content\":\"Find the cart code\",\"activeForm\":\"Finding the cart code\",\"status\":\"completed\"},{\"content\":\"Fix the total\",\"activeForm\":\"Fixing the total\",\"status\":\"completed\"},{\"content\":\"Run the tests\",\"activeForm\":\"Running the tests\",\"status\":\"completed\"}]},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 35,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"toolu_fake_10\",\"text\":\"Todos have been modified successfully.\",\"is_error\":false,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 36,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "assistant_text",
+      "payload": "{\"text\":\"ack: RICH fix the cart total\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 37,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "result",
+      "payload": "{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":1000,\"turns\":8,\"cost_usd\":0.008}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 42,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "crew_report",
+      "payload": "{\"text\":\"ack: check the checkout\",\"task_id\":\"T-1\",\"thread_id\":\"00000000-0000-4000-8000-000000000005\",\"title\":\"Check the checkout\",\"role\":null,\"channel\":\"acme\",\"status\":\"done\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 43,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "assistant_text",
+      "payload": "{\"text\":\"ack: [crew report] task T-1 from crew in #acme (thread 00000000-0000-4000-8000-000000000005), status: done\\n\\nack: check the checkout\\n\\nRelay what matters to Ben in one short update. Delegate follow-ups if needed. Do not redo the work.\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 44,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "result",
+      "payload": "{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":1000,\"turns\":1,\"cost_usd\":0.001}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 45,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "user",
+      "payload": "{\"text\":\"/context\",\"source\":\"ben\",\"slash\":{\"command\":{\"name\":\"context\",\"source\":\"builtin\",\"description\":\"Visualize current context usage as a colored grid\",\"start\":0,\"end\":8}}}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 46,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "assistant_text",
+      "payload": "{\"text\":\"Output of /context\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 47,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "result",
+      "payload": "{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":1000,\"turns\":0,\"cost_usd\":0}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 48,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "error",
+      "payload": "{\"text\":\"claude exited with code 1.\\nfake-claude: crashed on purpose (FAKE_CLAUDE_CRASH_ON=CRASH_NOW)\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 49,
+      "thread_id": "00000000-0000-4000-8000-000000000004",
+      "kind": "user",
+      "payload": "{\"text\":\"CRASH_NOW\",\"source\":\"ben\",\"dropped\":true}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    }
+  ],
+  "artifacts": [],
+  "children": [
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "channel_id": "acme",
+      "title": "Check the checkout",
+      "status": "done",
+      "role": null,
+      "model": null,
+      "harness": "claude-code",
+      "effort": "",
+      "session_id": "00000000-0000-4000-8000-000000000005",
+      "has_run": 1,
+      "cwd": "/tmp/omni-fixtures/acme",
+      "branch": null,
+      "parent_id": "00000000-0000-4000-8000-000000000004",
+      "task_id": "T-1",
+      "source": "manual",
+      "automation": null,
+      "last_text": "ack: check the checkout",
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "updated_at": "2026-01-05T09:00:00.000Z"
+    }
+  ],
+  "parent": null,
+  "pending": [],
+  "live": false
+}

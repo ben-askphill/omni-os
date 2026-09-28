@@ -162,3 +162,34 @@ func bodyJSON(_ request: URLRequest) throws -> JSONValue {
     #expect(client.feedURL.absoluteString == "http://127.0.0.1:4799/api/feed")
   }
 }
+
+@Suite struct ThreadURLTests {
+  @Test func buildsArtifactAndUploadURLs() throws {
+    let client = OmniClient(port: 4799)
+    let a = try decode(Artifact.self, """
+      {"id":7,"thread_id":"t1","path":"/x/a.html","name":"a.html","kind":"html","size":10,
+       "created_at":"2026-09-28T07:57:15Z","updated_at":"2026-09-28T07:57:15.045Z"}
+      """)
+    #expect(client.artifactURL(a).absoluteString == "http://127.0.0.1:4799/api/artifacts/7/raw?v=2026-09-28T07%3A57%3A15.045Z")
+    #expect(client.artifactURL(a, download: true).absoluteString == "http://127.0.0.1:4799/api/artifacts/7/raw?v=2026-09-28T07%3A57%3A15.045Z&download=1")
+    #expect(client.uploadURL(threadID: "t 1", name: "a b.png").absoluteString == "http://127.0.0.1:4799/api/threads/t%201/uploads/a%20b.png")
+    #expect(client.uploadURL(threadID: "t1", name: "x.pdf", download: true).absoluteString == "http://127.0.0.1:4799/api/threads/t1/uploads/x.pdf?download=1")
+  }
+}
+
+@Suite struct FileFetchTests {
+  @Test func fetchesAFileAsItIs() async throws {
+    let t = StubTransport(contentType: "image/png", body: "PNG")
+    let client = OmniClient(port: 4799, transport: t)
+    let data = try await client.file(client.uploadURL(threadID: "t1", name: "a.png"))
+    #expect(data == Data("PNG".utf8))
+    #expect(t.requests.first?.url?.path() == "/api/threads/t1/uploads/a.png")
+  }
+
+  @Test func saysWhyAFileIsMissing() async {
+    let client = OmniClient(port: 4799, transport: StubTransport(status: 404, body: #"{"error":"not found"}"#))
+    await #expect(throws: OmniAPIError.http(status: 404, message: "not found")) {
+      _ = try await client.file(client.uploadURL(threadID: "t1", name: "gone.png"))
+    }
+  }
+}

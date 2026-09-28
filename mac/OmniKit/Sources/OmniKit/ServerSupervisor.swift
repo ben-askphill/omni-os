@@ -156,8 +156,11 @@ public struct ServerRecord: Codable, Hashable, Sendable {
   }
 
   /// SIGTERM, then SIGKILL after `stopTimeout`. A server the app started goes with its whole process group.
-  public func stop() async {
-    await serially { await self.stopNow() }
+  /// - Parameter ownOnly: stop nothing but a server the app started, judged by a fresh check. For a stop the
+  ///   user did not ask for on that server, like quitting: what ran when the window last looked may be gone,
+  ///   and a server started by hand on the port since is not the app's to stop.
+  public func stop(ownOnly: Bool = false) async {
+    await serially { await self.stopNow(ownOnly: ownOnly) }
   }
 
   /// One operation at a time, in order.
@@ -265,9 +268,10 @@ public struct ServerRecord: Codable, Hashable, Sendable {
     }
   }
 
-  private func stopNow() async {
+  private func stopNow(ownOnly: Bool) async {
     await detect()
     guard let target else { return }
+    if ownOnly, case .process = target { return }
     state = .stopping
     watch(nil)
     switch target {

@@ -13,6 +13,25 @@ public enum QAWindow: String, Hashable, Sendable {
   case settings
 }
 
+public enum QAAppearance: String, Hashable, Sendable {
+  case light, dark
+}
+
+/// Where a scroll step takes the open thread's transcript. `through` scrolls from the bottom to the top half
+/// a screen per frame and reports how long the frames took.
+public enum QAInspector: String, Hashable, Sendable {
+  case open, close, artifacts, browser, details
+}
+
+public enum QAScroll: String, Hashable, Sendable {
+  case top, bottom, through
+}
+
+/// What a channel step does to the channel `qa-channel`, through the same client calls as the settings form.
+public enum QAChannelAction: String, Hashable, Sendable {
+  case create, edit, archive, unarchive
+}
+
 /// What the Server menu does, without the confirmation Stop asks for.
 public enum QAServerAction: String, Hashable, Sendable {
   case start, stop, check
@@ -20,8 +39,11 @@ public enum QAServerAction: String, Hashable, Sendable {
 
 /// One step of a Debug QA run, from the JSON the app gets with `-OmniQAScript`:
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
-/// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`,
-/// `{"server": "start"}` (or `stop`, `check`), `{"quit": true}`.
+/// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
+/// `{"settings": "secrets"}` (or `connection`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
+/// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`), `{"expand": true}`,
+/// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
+/// `browser`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`), `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -31,8 +53,28 @@ public enum QAStep: Hashable, Sendable {
   /// Sets the server port, as the Settings window would.
   case port(Int)
   case open(QAWindow)
+  /// Opens the Settings window on a tab.
+  case settings(SettingsTab)
+  /// Opens the thread in its own window, as Open in New Window does.
+  case openThread(String)
   /// Start Server, Stop Server or Check Again. The step waits for it to finish.
   case server(QAServerAction)
+  case appearance(QAAppearance)
+  case scroll(QAScroll)
+  /// Opens the open thread's tool groups, and the calls in them that failed or have sub-calls.
+  case expand
+  /// Puts text in the reply box, as if typed.
+  case type(String)
+  /// Sends the reply box: nil is a plain reply, else the mode of the split button.
+  case send(SendMode?)
+  /// Opens or closes the thread inspector, or picks its tab.
+  case inspector(QAInspector)
+  /// Waits until the inspector's web view has this document title, so a page can report what it could reach.
+  case webTitle(String)
+  /// Opens the Go to palette with this query, or closes it with nil.
+  case palette(String?)
+  /// Creates, edits, archives or unarchives the channel `qa-channel`.
+  case channel(QAChannelAction)
   case quit
 
   static let defaultTimeout = Duration.seconds(10)
@@ -48,6 +90,8 @@ public enum QACondition: Hashable, Sendable {
   case connection(String)
   /// `channel:<id>`: the sidebar lists that channel.
   case channel(String)
+  /// `thread:<id>`: the thread's transcript is on screen, laid out.
+  case thread(String)
 
   static let serverStates: Set = ["unknown", "checking", "notRunning", "starting", "running", "failed", "stopping"]
   static let connectionStates: Set = ["connecting", "open", "reconnecting", "closed"]
@@ -59,6 +103,7 @@ public enum QACondition: Hashable, Sendable {
     case ("serverState", let s?) where Self.serverStates.contains(s): self = .serverState(s)
     case ("connection", let s?) where Self.connectionStates.contains(s): self = .connection(s)
     case ("channel", let id?) where !id.isEmpty: self = .channel(id)
+    case ("thread", let id?) where !id.isEmpty: self = .thread(id)
     default: throw QAScriptError("unknown condition \(text)")
     }
   }
@@ -69,6 +114,7 @@ public enum QACondition: Hashable, Sendable {
     case .serverState(let s): facts.serverState == s
     case .connection(let s): facts.connection == s
     case .channel(let id): facts.channels.contains(id)
+    case .thread(let id): facts.shownThread == id
     }
   }
 }
@@ -79,12 +125,15 @@ public struct QAFacts: Hashable, Sendable {
   public var connection: String
   public var sidebarLoaded: Bool
   public var channels: Set<String>
+  /// The thread whose transcript is on screen, once it is laid out.
+  public var shownThread: String?
 
-  public init(serverState: String, connection: String, sidebarLoaded: Bool, channels: Set<String>) {
+  public init(serverState: String, connection: String, sidebarLoaded: Bool, channels: Set<String>, shownThread: String? = nil) {
     self.serverState = serverState
     self.connection = connection
     self.sidebarLoaded = sidebarLoaded
     self.channels = channels
+    self.shownThread = shownThread
   }
 }
 
@@ -113,7 +162,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "server", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "type", "send", "inspector", "webTitle", "palette", "channel", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -148,11 +197,52 @@ public struct QAScript: Hashable, Sendable {
         throw QAScriptError("open takes settings")
       }
       return .open(window)
+    case "settings":
+      guard let name = value as? String, let tab = SettingsTab(rawValue: name) else {
+        throw QAScriptError("settings takes connection, secrets or appearance")
+      }
+      return .settings(tab)
+    case "openThread":
+      guard let id = value as? String, !id.isEmpty else { throw QAScriptError("openThread takes a thread id") }
+      return .openThread(id)
     case "server":
       guard let name = value as? String, let action = QAServerAction(rawValue: name) else {
         throw QAScriptError("server takes start, stop or check")
       }
       return .server(action)
+    case "appearance":
+      guard let name = value as? String, let a = QAAppearance(rawValue: name) else { throw QAScriptError("appearance takes light or dark") }
+      return .appearance(a)
+    case "scroll":
+      guard let name = value as? String, let to = QAScroll(rawValue: name) else { throw QAScriptError("scroll takes top, bottom or through") }
+      return .scroll(to)
+    case "expand":
+      return .expand
+    case "type":
+      guard let text = value as? String else { throw QAScriptError("type takes the text for the reply box") }
+      return .type(text)
+    case "send":
+      guard let name = value as? String, ["reply", "steer", "queue", "interrupt"].contains(name) else {
+        throw QAScriptError("send takes reply, steer, queue or interrupt")
+      }
+      return .send(name == "reply" ? nil : SendMode(rawValue: name))
+    case "inspector":
+      guard let name = value as? String, let to = QAInspector(rawValue: name) else {
+        throw QAScriptError("inspector takes open, close, artifacts, browser or details")
+      }
+      return .inspector(to)
+    case "webTitle":
+      guard let title = value as? String, !title.isEmpty else { throw QAScriptError("webTitle takes the title to wait for") }
+      return .webTitle(title)
+    case "palette":
+      if let query = value as? String { return .palette(query) }
+      if let open = value as? Bool, !open { return .palette(nil) }
+      throw QAScriptError("palette takes a query, or false to close it")
+    case "channel":
+      guard let name = value as? String, let action = QAChannelAction(rawValue: name) else {
+        throw QAScriptError("channel takes create, edit, archive or unarchive")
+      }
+      return .channel(action)
     default:
       return .quit
     }
@@ -202,6 +292,30 @@ public enum QAServer {
       "OMNI_CURSOR_BIN": fixtures.appending(path: "fake-cursor.mjs").path,
       "OMNI_BROWSER": "0",
     ]
+  }
+}
+
+/// How long the frames of a scroll step took, from one display refresh to the next.
+public struct QAFrameStats: Hashable, Sendable {
+  /// Longer than two 60 Hz frames: one was missed.
+  public static let slowMs = 33.0
+
+  public let frames: Int
+  public let mean: Double
+  public let worst: Double
+  public let slow: Int
+
+  public init(gaps: [Double]) {
+    frames = gaps.count
+    mean = gaps.isEmpty ? 0 : gaps.reduce(0, +) / Double(gaps.count)
+    worst = gaps.max() ?? 0
+    slow = gaps.count { $0 > Self.slowMs }
+  }
+
+  public var summary: String {
+    guard frames > 0 else { return "0 frames" }
+    let ms = { (v: Double) in String(format: "%.1f ms", v) }
+    return "\(frames) frames, mean \(ms(mean)), worst \(ms(worst)), \(slow) over \(Int(Self.slowMs)) ms"
   }
 }
 

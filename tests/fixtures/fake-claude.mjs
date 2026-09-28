@@ -18,6 +18,8 @@
 //   /<command>        a message starting with a slash is a local command: no model call, a zero-turn success result
 //                     whose text is the command output
 //   TITLE:<ms>        text mode (Omni's title call): take that long to write the title
+//   RICH              before the answer, the calls a real turn is made of: a plan updated as it goes, a sub-agent
+//                     with calls of its own, a status, a failing command and an MCP tool
 //   ORPHAN            leave a child behind that holds our stdout until it is killed (two minutes at most), like a
 //                     daemon started without redirecting its output: once we exit, the runner never sees our pipes close
 // Env:
@@ -195,6 +197,60 @@ const toolResult = (id, text, isError) =>
     tool_use_result: isError ? `Error: ${text}` : { stdout: text, stderr: '', interrupted: false, isImage: false },
   });
 
+/** RICH: one scripted step after another, each after a model call, until interrupted. Resolves to the steps taken. */
+async function richCalls(t) {
+  const cwd = process.cwd();
+  const say = (parent, content) =>
+    emit({
+      type: 'assistant',
+      message: { model, id: `msg_fake_${++seq}`, type: 'message', role: 'assistant', content, stop_reason: null, stop_sequence: null, usage: { input_tokens: 12, output_tokens: 6 } },
+      parent_tool_use_id: parent,
+      timestamp: now(),
+    });
+  const use = (name, input, parent = null) => {
+    const id = `toolu_fake_${seq + 1}`;
+    say(parent, [{ type: 'tool_use', id, name, input }]);
+    return id;
+  };
+  const answer = (id, text, isError = false, parent = null) =>
+    emit({
+      type: 'user',
+      message: { role: 'user', content: [{ tool_use_id: id, type: 'tool_result', content: text, is_error: isError }] },
+      parent_tool_use_id: parent,
+      timestamp: now(),
+      tool_use_result: isError ? `Error: ${text}` : { stdout: text, stderr: '', interrupted: false, isImage: false },
+    });
+  const todos = (...states) =>
+    [
+      ['Find the cart code', 'Finding the cart code'],
+      ['Fix the total', 'Fixing the total'],
+      ['Run the tests', 'Running the tests'],
+    ].map(([content, activeForm], i) => ({ content, activeForm, status: states[i] }));
+  const steps = [
+    () => answer(use('TodoWrite', { todos: todos('in_progress', 'pending', 'pending') }), 'Todos have been modified successfully.'),
+    () => {
+      emit({ type: 'system', subtype: 'task_summary', detail: 'Looking for the cart code' });
+      const task = use('Task', { description: 'Find the cart code', prompt: 'Find where the cart total is computed.', subagent_type: 'Explore' });
+      answer(use('Grep', { pattern: 'cartTotal', path: join(cwd, 'src') }, task), 'src/cart.ts', false, task);
+      answer(use('Read', { file_path: join(cwd, 'src', 'cart.ts') }, task), '1\texport function cartTotal() {}', false, task);
+      say(task, [{ type: 'text', text: 'It is in src/cart.ts.' }]);
+      answer(task, 'The total is computed in src/cart.ts.');
+    },
+    () => answer(use('TodoWrite', { todos: todos('completed', 'in_progress', 'pending') }), 'Todos have been modified successfully.'),
+    () => answer(use('Edit', { file_path: join(cwd, 'src', 'cart.ts'), old_string: 'cartTotal() {}', new_string: 'cartTotal() { return 0; }' }), 'Edited.'),
+    () => answer(use('Bash', { command: 'npm test', description: 'Run the tests' }), '1 test failed', true),
+    () => answer(use('mcp__plugin_github_github__search_issues', { query: 'cart total', perPage: 5 }), '[]'),
+    () => answer(use('TodoWrite', { todos: todos('completed', 'completed', 'completed') }), 'Todos have been modified successfully.'),
+  ];
+  let done = 0;
+  for (const step of steps) {
+    if (!(await pause(t, LATENCY))) break;
+    step();
+    done++;
+  }
+  return done;
+}
+
 const marker = (text) =>
   emit({ type: 'user', message: { role: 'user', content: [{ type: 'text', text }] }, parent_tool_use_id: null, timestamp: now() });
 
@@ -213,6 +269,7 @@ async function runTurn() {
   const seen = [];
   const tools = [];
   let think = 0;
+  let rich = false;
   let steps = 0;
 
   emit({
@@ -240,6 +297,7 @@ async function runTurn() {
       for (const x of m.text.matchAll(/BG:(\d+)/g)) startBackground(Number(x[1]));
       if (m.text.includes('IGNORE_INTERRUPT')) t.ignoreInterrupt = true;
       if (m.text.includes('ORPHAN')) leaveOrphan();
+      if (m.text.includes('RICH')) rich = true;
     }
     return true;
   };
@@ -259,6 +317,10 @@ async function runTurn() {
 
   let finalText = null;
   let toolRejected = false;
+  if (rich) {
+    steps += await richCalls(t);
+    if (dead) return;
+  }
   for (;;) {
     // One model call: either a tool call or the final answer.
     if (!(await pause(t, LATENCY))) break;

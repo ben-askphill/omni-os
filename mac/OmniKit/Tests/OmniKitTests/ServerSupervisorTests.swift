@@ -182,6 +182,28 @@ struct ServerSupervisorTests {
     #expect(ServerRecord.load(from: rig.dir.path("other/server.json")) == nil)
   }
 
+  @Test func aServerLeftInTheBackgroundIsTheAppsOwnOnTheNextLaunch() async throws {
+    let rig = Rig()
+    defer { rig.cleanUp() }
+    var first: ServerSupervisor? = rig.supervisor()
+    await first?.start()
+    let pid = try #require(first?.state.running?.server?.pid, "\(String(describing: first?.state))")
+    // Quit with Keep server running: the app lets go and does nothing to the server.
+    first = nil
+
+    let next = rig.supervisor()
+    await next.refresh()
+    #expect(next.state.running?.startedByApp == true, "\(next.state)")
+    #expect(next.state.running?.server?.pid == pid)
+    #expect(next.canStop)
+    #expect(rig.starts() == 1)
+
+    // Quitting again with nothing running stops it, and the port is free.
+    await next.stop()
+    #expect(next.state == .notRunning)
+    #expect(!processAlive(Int32(pid)))
+  }
+
   @Test func twoStartsAtOnceStartOneServer() async throws {
     let rig = Rig()
     defer { rig.cleanUp() }
@@ -229,6 +251,21 @@ struct ServerSupervisorTests {
     #expect(!processAlive(Int32(pid)))
     #expect(portIsFree(rig.port))
     #expect(rig.dir.read("logs/server.log").contains("SIGTERM, closing live sessions"))
+  }
+
+  @Test func aStopForOwnServersOnlyLeavesAServerItDidNotStart() async throws {
+    let rig = Rig()
+    defer { rig.cleanUp() }
+    await rig.supervisor().start()
+    let other = rig.supervisor(record: rig.dir.path("other/server.json"))
+    await other.refresh()
+    let pid = try #require(other.state.running?.server?.pid, "\(other.state)")
+    #expect(other.state.running?.startedByApp == false)
+
+    await other.stop(ownOnly: true)
+    #expect(processAlive(Int32(pid)))
+    #expect(other.state.running?.startedByApp == false)
+    #expect(!portIsFree(rig.port))
   }
 
   @Test func aPortHeldByAHungProgramFailsClearly() async throws {

@@ -1,6 +1,6 @@
 import Foundation
 
-/// The agent CLI a thread runs in: claude-code, codex or cursor.
+/// The agent CLI a thread runs in: claude-code, codex, cursor or hermes.
 public struct HarnessID: OpenEnum, CodingKeyRepresentable {
   public let rawValue: String
   public init(rawValue: String) { self.rawValue = rawValue }
@@ -8,6 +8,7 @@ public struct HarnessID: OpenEnum, CodingKeyRepresentable {
   public static let claudeCode: Self = "claude-code"
   public static let codex: Self = "codex"
   public static let cursor: Self = "cursor"
+  public static let hermes: Self = "hermes"
 
   public var codingKey: any CodingKey { Key(stringValue: rawValue) }
   public init?<T: CodingKey>(codingKey: T) { self.init(rawValue: codingKey.stringValue) }
@@ -54,6 +55,16 @@ public struct Usage: Decodable, Hashable, Sendable {
     case fiveHour = "five_hour"
     case sevenDay = "seven_day"
     case updatedAt = "updated_at"
+  }
+
+  /// Each field is optional: one the server sends in a shape this app does not know leaves it nil
+  /// instead of failing the whole status.
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    status = try? c.decodeIfPresent(String.self, forKey: .status)
+    fiveHour = try? c.decodeIfPresent(UsageWindow.self, forKey: .fiveHour)
+    sevenDay = try? c.decodeIfPresent(UsageWindow.self, forKey: .sevenDay)
+    updatedAt = try? c.decodeIfPresent(Date.self, forKey: .updatedAt)
   }
 }
 

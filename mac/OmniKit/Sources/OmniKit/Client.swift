@@ -143,6 +143,11 @@ public struct OmniClient: Sendable {
     try await send("GET", "/api/recent", query: limit.map { [("limit", String($0))] } ?? [])
   }
 
+  /// Full-text search over every thread: prefix matches, at most 40, best first.
+  public func search(_ query: String) async throws(OmniAPIError) -> [SearchHit] {
+    try await send("GET", "/api/search", query: [("q", query)])
+  }
+
   /// A thread with its transcript, artifacts, children, parent and pending messages.
   public func thread(_ id: String) async throws(OmniAPIError) -> ThreadDetail {
     try await send("GET", "/api/threads/\(uriComponent(id))")
@@ -184,21 +189,25 @@ public struct OmniClient: Sendable {
 
   // MARK: Plumbing
 
-  private func url(_ path: String, query: [(String, String)] = []) -> URL {
+  func url(_ path: String, query: [(String, String)] = []) -> URL {
     let q = query.map { "\(uriComponent($0.0))=\(uriComponent($0.1))" }.joined(separator: "&")
     let text = baseURL.absoluteString + path + (q.isEmpty ? "" : "?\(q)")
     guard let url = URL(string: text) else { preconditionFailure("Not a URL: \(text)") }
     return url
   }
 
-  private func send<T: Decodable>(
-    _ method: String, _ path: String, query: [(String, String)] = [], body: (any Encodable & Sendable)? = nil
+  func send<T: Decodable>(
+    _ method: String, _ path: String, query: [(String, String)] = [], body: (any Encodable & Sendable)? = nil,
+    raw: (data: Data, contentType: String)? = nil
   ) async throws(OmniAPIError) -> T {
     var req = URLRequest(url: url(path, query: query))
     req.httpMethod = method
     req.cachePolicy = .reloadIgnoringLocalCacheData
     req.setValue("application/json", forHTTPHeaderField: "Accept")
-    if let body {
+    if let raw {
+      req.setValue(raw.contentType, forHTTPHeaderField: "Content-Type")
+      req.httpBody = raw.data
+    } else if let body {
       req.setValue("application/json", forHTTPHeaderField: "Content-Type")
       do {
         req.httpBody = try OmniJSON.encoder().encode(body)
@@ -207,6 +216,25 @@ public struct OmniClient: Sendable {
       }
     }
 
+    let (data, response) = try await exchange(req)
+    let type = response.value(forHTTPHeaderField: "Content-Type")
+    guard Self.isJSON(type) else { throw .notJSON(status: response.statusCode, contentType: type) }
+    do {
+      return try OmniJSON.decoder().decode(T.self, from: data)
+    } catch {
+      throw .decoding(Self.describe(error))
+    }
+  }
+
+  /// A file the server serves, such as an upload, as it is.
+  public func file(_ url: URL) async throws(OmniAPIError) -> Data {
+    var req = URLRequest(url: url)
+    req.cachePolicy = .reloadIgnoringLocalCacheData
+    return try await exchange(req).0
+  }
+
+  /// Sends the request. A status outside 2xx throws with the server's message.
+  private func exchange(_ req: URLRequest) async throws(OmniAPIError) -> (Data, HTTPURLResponse) {
     let data: Data
     let response: HTTPURLResponse
     do {
@@ -218,17 +246,11 @@ public struct OmniClient: Sendable {
     } catch {
       throw .unreachable(error.localizedDescription)
     }
-
-    let type = response.value(forHTTPHeaderField: "Content-Type")
     guard (200..<300).contains(response.statusCode) else {
+      let type = response.value(forHTTPHeaderField: "Content-Type")
       throw .http(status: response.statusCode, message: Self.errorMessage(data, contentType: type, status: response.statusCode))
     }
-    guard Self.isJSON(type) else { throw .notJSON(status: response.statusCode, contentType: type) }
-    do {
-      return try OmniJSON.decoder().decode(T.self, from: data)
-    } catch {
-      throw .decoding(Self.describe(error))
-    }
+    return (data, response)
   }
 
   static func isJSON(_ contentType: String?) -> Bool {

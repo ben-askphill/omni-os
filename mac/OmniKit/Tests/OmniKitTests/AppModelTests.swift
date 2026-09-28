@@ -5,6 +5,16 @@ import OmniKit
 /// /api/status the way servers before #76 answer it: no `server` object, so nothing to stop or watch.
 private let oldStatus = #"{"usage":{},"slots":{},"running":0,"queued":0,"maxConcurrent":4,"maxUploadMb":25}"#
 
+private func threadRow(_ id: String, parent: String? = nil, title: String) -> String {
+  """
+  {"id":"\(id)","channel_id":"acme","title":"\(title)","status":"running","role":null,"model":null,"harness":"claude-code",
+   "effort":"","session_id":null,"has_run":1,"cwd":null,"branch":null,"parent_id":\(parent.map { "\"\($0)\"" } ?? "null"),
+   "task_id":null,"source":"manual","automation":null,"last_text":null,"created_at":"2026-09-28T07:57:15Z","updated_at":"2026-09-28T07:58:00Z"}
+  """.replacingOccurrences(of: "\n", with: "")
+}
+
+private let parentThread = threadRow("p1", title: "Fix the cart")
+
 /// One app model with its own settings, record and log, a scripted feed and a REST side that answers empty lists.
 /// The supervisor probes the real port.
 @MainActor
@@ -14,7 +24,11 @@ private final class Rig {
   let sse = ScriptedSSETransport()
   let clock = TestClock()
   let http = StubTransport { req in
-    StubTransport.Reply(body: req.url?.path == "/api/status" ? oldStatus : "[]")
+    switch req.url?.path {
+    case "/api/status": StubTransport.Reply(body: oldStatus)
+    case "/api/threads/p1": StubTransport.Reply(body: #"{"thread":\#(parentThread),"events":[]}"#)
+    default: StubTransport.Reply(body: "[]")
+    }
   }
   private(set) lazy var model: AppModel = {
     let supervisor = ServerSupervisor(
@@ -24,7 +38,9 @@ private final class Rig {
     let http = self.http, sse = self.sse, clock = self.clock
     return AppModel(settings: settings, supervisor: supervisor) { port in
       let client = OmniClient(port: port, transport: http)
-      return AppModel.Connection(client: client, store: WorkspaceStore(client: client, transport: sse, clock: clock))
+      return AppModel.Connection(
+        client: client, store: WorkspaceStore(client: client, transport: sse, clock: clock),
+        threads: ThreadStoreRegistry(client: client, transport: sse))
     }
   }()
 
@@ -131,6 +147,7 @@ struct AppModelTests {
     model.launch()
     let old = try await rig.sse.next()
     let oldStore = model.store
+    let oldThreads = model.threads
     try await waitFor("not running", within: .seconds(3)) { model.supervisor.state == .notRunning }
 
     let server = HTTPResponder(contentType: "application/json", body: oldStatus)
@@ -140,6 +157,7 @@ struct AppModelTests {
     #expect(feed.request.url == rig.feedURL(server.port))
     #expect(model.client.baseURL.port == server.port)
     #expect(oldStore.connection == .closed)
+    #expect(model.threads !== oldThreads, "thread stores follow the port too")
     #expect(old.isAnswered)
     try await waitFor("running on the new port", within: .seconds(3)) { model.supervisor.isRunning }
     #expect(model.supervisor.port == server.port)
@@ -204,6 +222,47 @@ struct AppModelTests {
     try await waitFor("not running", within: .seconds(3)) { model.supervisor.state == .notRunning }
     #expect(model.serverScreen == .notRunning(port: server.port, repo: rig.repo))
     #expect(model.connectionNotice == "Reconnecting")
+  }
+
+  @Test func feedsTheThreadOnScreenAndNamesItForTheSidebar() async throws {
+    let rig = Rig(port: freePort())
+    let model = rig.model
+    model.launch()
+    let feed = try await rig.sse.next()
+    feed.accept()
+    try await waitFor("open") { model.store.connection == .open }
+
+    model.route = .thread(id: "p1")
+    #expect(model.openThread == nil, "not loaded yet")
+    #expect(model.title == "Thread")
+    let store = model.threads.acquire("p1")
+    defer { model.threads.release("p1") }
+    try await waitFor("the thread") { store.loadState == .loaded }
+    #expect(model.openThread?.id == "p1")
+    #expect(model.openThread?.channelID == "acme")
+    #expect(model.title == "Fix the cart")
+
+    feed.send("data: {\"type\":\"thread\",\"thread\":\(threadRow("c1", parent: "p1", title: "Check it"))}\n\n")
+    try await waitFor("the child") { store.children.map(\.id) == ["c1"] }
+
+    model.route = .home
+    #expect(model.openThread == nil)
+    #expect(model.title == "Home")
+  }
+
+  @Test func copiesTheThreadOnScreenAsMarkdownOnceItLoads() async throws {
+    let rig = Rig(port: freePort())
+    let model = rig.model
+    model.route = .thread(id: "p1")
+    #expect(model.openThreadMarkdown == nil, "no store yet")
+    let store = model.threads.acquire("p1")
+    defer { model.threads.release("p1") }
+    #expect(model.openThreadMarkdown == nil, "not loaded yet")
+    try await waitFor("the thread") { store.loadState == .loaded }
+    #expect(model.openThreadMarkdown == "# Fix the cart\n")
+
+    model.route = .home
+    #expect(model.openThreadMarkdown == nil)
   }
 
   @Test func anOpenFeedChecksTheServerAgain() async throws {

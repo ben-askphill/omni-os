@@ -4,31 +4,51 @@ import SwiftUI
 /// The sidebar and the screen for the route, or the server screen while there is no server to talk to.
 struct MainWindow: View {
   let model: AppModel
-  #if DEBUG
+  let updater: Updater
   @Environment(\.openSettings) private var openSettings
-  #endif
 
   var body: some View {
     NavigationSplitView {
       SidebarView(model: model)
         .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 340)
     } detail: {
-      DetailView(model: model)
+      VStack(spacing: 0) {
+        UpdateBar(updater: updater)
+        DetailView(model: model)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+      .overlay(alignment: .bottomTrailing) { BannerStack(model: model) }
     }
-    .navigationTitle(title)
+    .navigationTitle(model.title)
     .toolbar { toolbar }
+    .overlay { PaletteOverlay(model: model) }
+    .modifier(ThreadWindowSupport(model: model))
     .frame(minWidth: 720, minHeight: 460)
+    .onChange(of: model.route) { old, new in
+      // A route that lives in Settings, such as #/secrets from a script, opens it there instead.
+      guard let tab = new.settingsTab else { return }
+      model.route = old
+      model.settingsTab = tab
+      openSettings()
+    }
     #if DEBUG
     .onAppear { QARunner.openSettings = openSettings }
     #endif
   }
 
-  private var title: String {
-    guard model.serverScreen == nil else { return "Omni" }
-    return model.route.title { model.store.channel($0)?.name }
-  }
-
   @ToolbarContentBuilder private var toolbar: some ToolbarContent {
+    ToolbarItemGroup(placement: .navigation) {
+      Button(action: model.goBack) {
+        Label("Back", systemImage: "chevron.left")
+      }
+      .disabled(!model.shell.history.canGoBack)
+      .help("Back (⌘[)")
+      Button(action: model.goForward) {
+        Label("Forward", systemImage: "chevron.right")
+      }
+      .disabled(!model.shell.history.canGoForward)
+      .help("Forward (⌘])")
+    }
     if let notice = model.connectionNotice {
       ToolbarItem(placement: .status) {
         ReconnectingLabel(text: notice)
@@ -46,6 +66,7 @@ struct MainWindow: View {
       NewThreadButton(model: model)
         .help("New thread")
     }
+    OpenInNewWindowToolbar(model: model)
   }
 }
 
@@ -68,7 +89,7 @@ struct NewThreadButton: View {
 
   var body: some View {
     Button {
-      model.route = model.route.newThreadRoute
+      model.startNewThread()
     } label: {
       Label("New Thread", systemImage: "square.and.pencil")
     }
@@ -79,8 +100,39 @@ struct DetailView: View {
   let model: AppModel
 
   var body: some View {
+    #if DEBUG
+    if ProcessInfo.processInfo.arguments.contains("-OmniQASlashDemo") {
+      SlashMenuDemo()
+    } else {
+      screen
+    }
+    #else
+    screen
+    #endif
+  }
+
+  @ViewBuilder private var screen: some View {
     if let screen = model.serverScreen {
       ServerView(model: model, screen: screen)
+    } else if case .thread(let id, _) = model.route {
+      ThreadScreen(model: model, id: id)
+    } else if case .home = model.route {
+      HomeScreen(model: model)
+    } else if case .channel(let id, .prs, let pr) = model.route {
+      VStack(spacing: 0) {
+        ChannelTabsBar(model: model, channelID: id)
+        PullRequestsScreen(model: model, channelID: id, number: pr)
+      }
+    } else if case .channel(let id, let tab, let pr) = model.route {
+      ChannelScreen(model: model, id: id, tab: tab, pr: pr)
+    } else if case .newChannel = model.route {
+      NewChannelScreen(model: model)
+    } else if case .search(let query) = model.route {
+      SearchScreen(model: model, query: query)
+    } else if model.route == .automations {
+      AutomationsView(model: model)
+    } else if case .artifacts = model.route {
+      ArtifactsScreen(model: model)
     } else {
       RoutePlaceholder(route: model.route, title: model.route.title { model.store.channel($0)?.name }) {
         model.route = .home

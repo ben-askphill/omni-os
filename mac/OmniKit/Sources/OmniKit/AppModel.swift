@@ -71,10 +71,13 @@ public final class AppModel {
   public struct Connection {
     public let client: OmniClient
     public let store: WorkspaceStore
+    public let threads: ThreadStoreRegistry
 
-    public init(client: OmniClient, store: WorkspaceStore) {
+    /// - Parameter threads: the stores for open threads, on `client` by default.
+    @MainActor public init(client: OmniClient, store: WorkspaceStore, threads: ThreadStoreRegistry? = nil) {
       self.client = client
       self.store = store
+      self.threads = threads ?? ThreadStoreRegistry(client: client)
     }
   }
 
@@ -82,9 +85,20 @@ public final class AppModel {
   public let supervisor: ServerSupervisor
   public private(set) var client: OmniClient
   public private(set) var store: WorkspaceStore
-  public var route = Route.home
+  /// The open threads' stores, fed from `store`'s feed. Swapped with it on a port change.
+  public private(set) var threads: ThreadStoreRegistry
+  public var route = Route.home {
+    // A route that lives in Settings is put back at once, so it is no stop in the history.
+    didSet { if route.settingsTab == nil { shell.history.visit(route) } }
+  }
+  /// History, the Go to palette and composer focus.
+  public let shell = ShellState()
+  /// The tab the Settings window shows.
+  public var settingsTab = SettingsTab.connection
   /// The last start that failed, until the server runs, Start is pressed again or the settings change.
   public private(set) var startFailure: StartFailure?
+  /// Banners for threads that finish, fail or stop. The window shows them.
+  public let banners = BannerCenter()
 
   @ObservationIgnored private let connect: @MainActor (_ port: Int) -> Connection
   @ObservationIgnored private var config: ServerConfig
@@ -104,6 +118,8 @@ public final class AppModel {
     let c = connect(settings.port)
     client = c.client
     store = c.store
+    threads = c.threads
+    follow(c)
   }
 
   isolated deinit {
@@ -159,6 +175,31 @@ public final class AppModel {
 
   public var logURL: URL { supervisor.logURL }
 
+  /// The thread the route shows, once its store has it, for the sidebar to keep in view.
+  public var openThread: ThreadStub? {
+    guard case .thread(let id, _) = route, let t = threads.store(id)?.thread else { return nil }
+    return ThreadStub(t)
+  }
+
+  /// The window title: the thread's own on a thread, else the route's.
+  public var title: String {
+    guard serverScreen == nil else { return "Omni" }
+    if case .thread(let id, _) = route, let t = threads.store(id)?.thread { return t.title }
+    return route.title { store.channel($0)?.name }
+  }
+
+  /// The thread on screen as Markdown, for Copy Thread as Markdown. nil until it loads.
+  public var openThreadMarkdown: String? {
+    guard case .thread(let id, _) = route else { return nil }
+    return threadMarkdown(id)
+  }
+
+  /// A thread as Markdown, once its store has it. For the window that has focus, whichever it is.
+  public func threadMarkdown(_ id: String) -> String? {
+    guard let s = threads.store(id), let t = s.thread, s.loadState == .loaded else { return nil }
+    return TranscriptMarkdown.thread(title: t.title, items: s.transcript.items, cwd: s.cwd)
+  }
+
   // MARK: Actions
 
   /// Starts the server, or attaches to one that answers, then reconnects the feed without waiting out its backoff.
@@ -167,38 +208,51 @@ public final class AppModel {
     await supervisor.start()
     switch supervisor.state {
     case .failed(let message, let tail): startFailure = StartFailure(message: message, logTail: tail)
-    case .running: store.reconnectNow()
+    case .running: reconnectStreams()
     default: break
     }
   }
 
-  public func stopServer() async {
-    await supervisor.stop()
+  /// - Parameter ownOnly: see `ServerSupervisor.stop(ownOnly:)`.
+  public func stopServer(ownOnly: Bool = false) async {
+    await supervisor.stop(ownOnly: ownOnly)
   }
 
   /// Checks the port again and retries the feed now.
   public func checkAgain() async {
-    store.reconnectNow()
+    reconnectStreams()
     await refreshServer()
   }
 
   /// The app came to the front: a feed quiet for longer than the server's ping interval is likely dead.
   public func didBecomeActive() {
-    store.reconnectNow(ifQuietFor: .seconds(25))
+    reconnectStreams(ifQuietFor: .seconds(25))
     checkServer()
   }
 
   /// The Mac woke from sleep. Connections from before rarely survive it.
   public func didWake() {
-    store.reconnectNow()
+    reconnectStreams()
     checkServer()
   }
 
   public func networkChanged() {
-    store.reconnectNow()
+    reconnectStreams()
+  }
+
+  private func reconnectStreams(ifQuietFor quiet: Duration? = nil) {
+    store.reconnectNow(ifQuietFor: quiet)
+    threads.reconnectNow(ifQuietFor: quiet)
   }
 
   // MARK: Following changes
+
+  private func follow(_ c: Connection) {
+    c.store.onFeed = { [threads = c.threads, weak self] in
+      threads.apply(feed: $0)
+      self?.feedArrived($0)
+    }
+  }
 
   private func checkServer() {
     Task { await refreshServer() }
@@ -216,18 +270,36 @@ public final class AppModel {
     startFailure = nil
     if portChanged {
       store.stop()
+      threads.stopAll()
       let c = connect(new.port)
       client = c.client
       store = c.store
+      threads = c.threads
+      follow(c)
       lastConnection = .connecting
       store.start()
     }
     checkServer()
   }
 
+  private func feedArrived(_ event: FeedEvent) {
+    var viewing: String?
+    if case .thread(let id, _) = route { viewing = id }
+    banners.handle(event, viewing: viewing)
+  }
+
+  /// Threads in flight when the feed opens, so their end gets a banner too.
+  private func seedBanners() async {
+    let client = client
+    for status in [ThreadStatus.running, .queued] {
+      if let list = try? await client.threads(status: status, limit: 100) { banners.seed(list) }
+    }
+  }
+
   private func connectionChanged(_ state: ConnectionState) {
     let previous = lastConnection
     lastConnection = state
+    if state == .open { Task { await seedBanners() } }
     switch state {
     case .open where !supervisor.isRunning:
       checkServer()

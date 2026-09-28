@@ -30,12 +30,27 @@ func sseData(_ text: String) -> [String] {
     "channels.json": { _ = try decodeFixture([ChannelWithRunning].self, "channels.json") },
     "channel.json": { _ = try decodeFixture(ChannelWithRunning.self, "channel.json") },
     "thread.json": { _ = try decodeFixture(ThreadDetail.self, "thread.json") },
+    "thread-rich.json": { _ = try decodeFixture(ThreadDetail.self, "thread-rich.json") },
+    "prs.json": { _ = try decodeFixture([PullRequestSummary].self, "prs.json") },
+    "pr.json": { _ = try decodeFixture(PullRequestDetail.self, "pr.json") },
     "channel-threads.json": { _ = try decodeFixture([OmniThread].self, "channel-threads.json") },
     "threads.json": { _ = try decodeFixture([OmniThread].self, "threads.json") },
     "recent.json": { _ = try decodeFixture([OmniThread].self, "recent.json") },
+    "artifacts.json": { _ = try decodeFixture([GalleryArtifact].self, "artifacts.json") },
     "error-not-found.json": { _ = try decodeFixture([String: String].self, "error-not-found.json") },
     "thread-stream.sse": { _ = try threadStream() },
     "feed.sse": { _ = try feed() },
+    "secrets.json": { _ = try decodeFixture([SecretRow].self, "secrets.json") },
+    "secret-saved.json": { _ = try decodeFixture([String: Bool].self, "secret-saved.json") },
+    "secret-deleted.json": { _ = try decodeFixture([String: Bool].self, "secret-deleted.json") },
+    "error-secret-name.json": { _ = try decodeFixture([String: String].self, "error-secret-name.json") },
+    "automations.json": { _ = try decodeFixture([Automation].self, "automations.json") },
+    "automation-run.json": { _ = try decodeFixture(OmniThread.self, "automation-run.json") },
+    "automation-enabled.json": { _ = try decodeFixture([String: Bool].self, "automation-enabled.json") },
+    // Request bodies the app sends. SecretsTests compares them with what the client encodes.
+    "secret-set-request.json": { _ = try decodeFixture([String: String].self, "secret-set-request.json") },
+    "secret-delete-request.json": { _ = try decodeFixture([String: String].self, "secret-delete-request.json") },
+    "automation-enabled-request.json": { _ = try decodeFixture([String: Bool].self, "automation-enabled-request.json") },
   ]
 
   static func threadStream() throws -> [ThreadStreamMessage] {
@@ -72,7 +87,7 @@ func sseData(_ text: String) -> [String] {
     #expect(acme.active.first?.status == .running)
 
     let harnesses = try decodeFixture([HarnessInfo].self, "harnesses.json")
-    #expect(harnesses.map(\.id) == [.claudeCode, .codex, .cursor])
+    #expect(harnesses.map(\.id) == [.claudeCode, .codex, .cursor, .hermes])
     #expect(harnesses.first?.models.contains { $0.isDefault } == true)
   }
 

@@ -5,12 +5,14 @@ import SwiftUI
 /// threads, Add channel, and the workspace pages. A status line for the server sits at the bottom.
 struct SidebarView: View {
   let model: AppModel
+  @Environment(\.openSettings) private var openSettings
 
+  /// Secrets opens Settings on its tab and leaves the window where it was.
   private var selection: Binding<SidebarItem?> {
     Binding {
       SidebarItem(route: model.route)
     } set: { item in
-      if let item { model.route = item.route }
+      if let item, model.show(item.route) != nil { openSettings() }
     }
   }
 
@@ -60,7 +62,10 @@ struct SidebarView: View {
     }
     .listStyle(.sidebar)
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      StatusFooter(model: model)
+      VStack(spacing: 0) {
+        UsageCard(model: model)
+        StatusFooter(model: model)
+      }
     }
   }
 
@@ -75,10 +80,11 @@ struct SidebarView: View {
     Label(title ?? channel.name, systemImage: symbol)
       .badge(channel.running)
       .tag(SidebarItem.channel(channel.id))
-    let links = SidebarSections.threads(of: channel)
+    let links = SidebarSections.threads(of: channel, open: model.openThread)
     ForEach(links.shown) { thread in
       ThreadRow(thread: thread)
         .tag(SidebarItem.thread(thread.id))
+        .openInNewWindow(thread.id)
     }
     if links.more > 0 {
       Label {

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// One transcript entry. The server stores `payload` as JSON text inside the JSON row; `content` is
@@ -51,7 +52,11 @@ public enum EventPayload: Hashable, Sendable {
       case "crew_report": self = .crewReport(try d.decode(CrewReport.self, from: data))
       case "init": self = .sessionInit(try d.decode(SessionInit.self, from: data))
       case "assistant_text": self = .assistantText(text: try d.decode(TextPayload.self, from: data).text)
-      case "tool_use": self = .toolUse(try d.decode(ToolUse.self, from: data))
+      case "tool_use":
+        var use = try d.decode(ToolUse.self, from: data)
+        if case .object = use.input { use.inputKeys = JSONKeyOrder.keys(ofObjectAt: "input", in: json) }
+        use.inputJSON = JSONKeyOrder.valueText(ofKey: "input", in: json)
+        self = .toolUse(use)
       case "tool_result": self = .toolResult(try d.decode(ToolResult.self, from: data))
       case "status": self = .status(text: try d.decode(TextPayload.self, from: data).text)
       case "error": self = .error(text: try d.decode(TextPayload.self, from: data).text)
@@ -76,10 +81,20 @@ public struct Attachment: Decodable, Hashable, Sendable {
   public let mime: String
   /// Renders as an image in the transcript.
   public let image: Bool
+
+  /// The largest a thumbnail shows, as `max-h-44 max-w-[14rem]` in Transcript.tsx.
+  public static let thumbnailBox = CGSize(width: 224, height: 176)
+
+  /// An image's size shrunk to fit `thumbnailBox` with its shape kept. Small images stay as they are.
+  public static func thumbnailSize(_ natural: CGSize) -> CGSize {
+    guard natural.width > 0, natural.height > 0 else { return .zero }
+    let scale = min(1, thumbnailBox.width / natural.width, thumbnailBox.height / natural.height)
+    return CGSize(width: (natural.width * scale).rounded(), height: (natural.height * scale).rounded())
+  }
 }
 
 /// A command or Mention the message names, with its place in the text.
-public struct SlashHit: Decodable, Hashable, Sendable {
+public struct SlashHit: Codable, Hashable, Sendable {
   public let name: String
   /// omni, project, personal, plugin, mcp or builtin.
   public let source: String
@@ -87,13 +102,27 @@ public struct SlashHit: Decodable, Hashable, Sendable {
   public let argumentHint: String?
   public let start: Int
   public let end: Int
+
+  public init(name: String, source: String, description: String, argumentHint: String?, start: Int, end: Int) {
+    self.name = name
+    self.source = source
+    self.description = description
+    self.argumentHint = argumentHint
+    self.start = start
+    self.end = end
+  }
 }
 
-public struct SlashRecord: Decodable, Hashable, Sendable {
+public struct SlashRecord: Codable, Hashable, Sendable {
   /// The harness command the message starts with.
   public let command: SlashHit?
   /// The Mentions after it, in order.
   public let mentions: [SlashHit]?
+
+  public init(command: SlashHit?, mentions: [SlashHit]?) {
+    self.command = command
+    self.mentions = mentions
+  }
 }
 
 /// kind `user`: a message from Ben or the conductor.
@@ -141,6 +170,11 @@ public struct ToolUse: Decodable, Hashable, Sendable {
   public let input: JSONValue
   /// The tool use this one runs inside, for subagents.
   public let parent: String?
+  /// The input's keys in the order JavaScript lists them (integer keys first, then as sent), which `input`
+  /// does not keep.
+  public internal(set) var inputKeys: [String] = []
+  /// The input as the server stored it, which is how JSON.stringify wrote it. nil when the call has none.
+  public internal(set) var inputJSON: String?
 
   enum CodingKeys: String, CodingKey {
     case id, name, input, parent
