@@ -59,7 +59,7 @@ To continue a thread in a terminal or Claude Desktop: `cd <cwd> && claude --resu
 
 ## Hermes (remote)
 
-Hermes is Ben's always-on agent on a Linux server. Omni does not spawn it. A thread on the Hermes harness talks to the Hermes API server over Tailscale (`OMNI_HERMES_URL`, default `http://100.110.128.38:8642`). Off the tailnet, an SSH tunnel is the fallback: `ssh -N -L 8642:127.0.0.1:8642 <server>` with `OMNI_HERMES_URL=http://127.0.0.1:8642`.
+Hermes is Ben's always-on agent on a Linux server. Omni does not spawn it. The Hermes API server listens on the server's Tailscale address and is not public. A thread talks to it at `OMNI_HERMES_URL` (default `http://100.110.128.38:8642`). The Mac must be on the tailnet.
 
 The bearer token is the Keychain secret `HERMES_API_KEY` (global). It is not an env var, not a database column and not written to logs.
 

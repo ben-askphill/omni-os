@@ -91,8 +91,10 @@ describe('run resolver precedence', () => {
     const r = resolveRun({ harness: 'hermes' }, undefined, down);
     expect(r.ok).toBe(false);
     if (!r.ok) {
+      expect(r.error).toBe(
+        'Hermes is not available. Set HERMES_API_KEY in Secrets and connect this Mac to Tailscale (OMNI_HERMES_URL, default http://100.110.128.38:8642)',
+      );
       expect(r.error).toBe(`Hermes is not available. ${HERMES_FIX}`);
-      expect(r.error).toContain('Tailscale');
     }
   });
 

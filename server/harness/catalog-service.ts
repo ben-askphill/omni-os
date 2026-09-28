@@ -1,6 +1,6 @@
 // The live catalog: it probes the CLIs (and the Hermes API) at server start and every 15 minutes.
 // A harness that is down is probed again on demand (freshCatalog, at most every 10 seconds), so a
-// `codex login` or Tailscale coming up shows in the picker without a restart.
+// `codex login` or the Mac joining the tailnet shows in the picker without a restart.
 // The pure assembly lives in catalog.ts; this file does the I/O.
 import { execFile } from 'node:child_process';
 import { config } from '../config.ts';

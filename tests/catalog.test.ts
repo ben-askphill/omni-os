@@ -128,12 +128,13 @@ describe('hermes catalog', () => {
     expect(h.capabilities).toMatchObject({ warmProcess: false, steer: true, inlineImages: false, usage: 'none' });
   });
 
-  it('is unavailable with the key-and-Tailscale fix when the probe fails', () => {
+  it('is unavailable until the key is set and this Mac is on Tailscale', () => {
     const h = hermesHarness({ available: false }, 4);
     expect(h.available).toBe(false);
+    expect(h.fix).toBe(
+      'Set HERMES_API_KEY in Secrets and connect this Mac to Tailscale (OMNI_HERMES_URL, default http://100.110.128.38:8642)',
+    );
     expect(h.fix).toBe(HERMES_FIX);
-    expect(h.fix).toContain('HERMES_API_KEY');
-    expect(h.fix).toContain('Tailscale');
     expect(h.models).toEqual([]);
   });
 });

@@ -64,7 +64,7 @@ _Avoid_: Tag, reference
 - A **Channel** has many **Threads**
 - A **Thread** runs on one **Harness** and one **Model**, and has one **Session** in that harness
 - A **Harness** offers many **Models**; the same model family can appear in several harnesses (Claude Opus runs in Claude Code and in Cursor Agent)
-- A Hermes **Thread** runs on the Hermes server, reached over Tailscale, not in an Omni worktree, browser profile or artifacts directory. Its **Session** id is `omni-<thread id>`. Artifacts come back as links or text. Off the tailnet, an SSH tunnel to port 8642 is the fallback
+- A Hermes **Thread** runs on the Hermes server, reached over Tailscale. The API listens on the server's tailnet address and is not public. The thread has no Omni worktree, browser profile or artifacts directory. Its **Session** id is `omni-<thread id>`. Artifacts come back as links or text
 - Ben picks the **Harness** per thread; Omni never switches it on its own
 - A thread's **Harness**, **Model** and **Effort** are fixed once it starts; carrying work to another harness means starting a new thread
 - A **Crew role** or **Automation** can set a default **Harness**, **Model** and **Effort**; a choice made on the thread wins, and Claude Code is the fallback
