@@ -16,6 +16,11 @@ struct OmniApp: App {
       OmniCommands(model: delegate.model)
     }
 
+    WindowGroup("Thread", id: ThreadWindow.id, for: String.self) { $id in
+      ThreadWindowView(model: delegate.model, id: id)
+    }
+    .defaultSize(width: 780, height: 720)
+
     Settings {
       SettingsView(model: delegate.model)
     }
@@ -67,14 +72,11 @@ struct OmniCommands: Commands {
     CommandGroup(replacing: .newItem) {
       NewThreadButton(model: model)
         .keyboardShortcut("n")
+      OpenInNewWindowCommand()
     }
     CommandGroup(after: .pasteboard) {
       Divider()
-      Button("Copy Thread as Markdown") {
-        if let text = model.openThreadMarkdown { Pasteboard.copy(text) }
-      }
-      .keyboardShortcut("c", modifiers: [.command, .shift])
-      .disabled(model.openThread == nil)
+      CopyThreadMarkdownCommand(model: model)
     }
     CommandMenu("Server") {
       ServerMenuItems(model: model, shortcuts: true)

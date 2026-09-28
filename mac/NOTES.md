@@ -371,3 +371,13 @@ What the tracer's QA run covered (each checked by eye in the PNGs): the sidebar 
 - The quit dialog (#74) can call `stopServer()` when `state` is `.running(startedByApp: true, _)`. Threads in their own windows are #75.
 - `Route(hash:)` and `route.hash` mirror `parseHash` and `href` in the Web UI. Use them for deep links, open in browser and window restoration. PR and artifact numbers parse as `Int` only.
 - New endpoints: add a method to `OmniClient`, a stub test in `ClientTests.swift` and, if the app depends on its shape, a fixture.
+
+## Thread in its own window (#75)
+
+- `mac/Omni/ThreadWindow.swift`. `WindowGroup("Thread", id: "thread", for: String.self)` in `OmniApp`, value is the thread id. SwiftUI keeps one window per id (`openWindow(id:value:)` fronts the existing one) and restores them on relaunch.
+- A thread window shows `ThreadScreen`, so it takes its store from `AppModel.threads` like the main window. The main window on a thread plus a thread window on it share one store and one stream; the last one to close stops it (`ThreadStoreRegistry`, already tested).
+- Open in New Window: File menu (Option-Cmd-N, for the thread the focused window shows, off in a thread window), a toolbar button in the main window on a thread, and `.openInNewWindow(threadID)` on any view (context menu, Option-click). It is on sidebar thread rows; add it to thread rows in lists and channel pages as they land.
+- `FocusedValues.shownThread` says which thread the focused window shows. Copy Thread as Markdown uses it too (`AppModel.threadMarkdown(_:)`).
+- Buttons and links inside a thread window still set `model.route`, so they navigate the main window; the thread window brings it forward when it changes the route while key.
+- QA: `{"openThread": "<id>"}` opens the window; snapshots write it as `<name>-window<n>.png`.
+- The composer and inspector show in the thread window once #64 puts them in `ThreadScreen`.

@@ -17,6 +17,7 @@ struct MainWindow: View {
     }
     .navigationTitle(model.title)
     .toolbar { toolbar }
+    .modifier(ThreadWindowSupport(model: model))
     .frame(minWidth: 720, minHeight: 460)
     #if DEBUG
     .onAppear { QARunner.openSettings = openSettings }
@@ -41,6 +42,7 @@ struct MainWindow: View {
       NewThreadButton(model: model)
         .help("New thread")
     }
+    OpenInNewWindowToolbar(model: model)
   }
 }
 
