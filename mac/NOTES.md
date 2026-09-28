@@ -360,6 +360,14 @@ Automations page (#73), like `Automations.tsx`. The Web UI has no create or edit
 - `mac/Omni`: `ArtifactsScreen`, `ArtifactThumbnails`. Images are decoded small with ImageIO, SVG through `NSImage`, pages are loaded one at a time in the viewer's sandbox (`ArtifactWebHost`, `SandboxRules`) in an off-screen window and snapshotted. All are cached per artifact version.
 - To recheck live updates in QA, write a file into `<data>/threads/<id>/artifacts/` during a `sleep` step.
 
+## Quit, updates and banners (#74)
+
+- Quit: `AppDelegate.applicationShouldTerminate` returns `.terminateLater`, asks `AppModel.quitDecision()` (`QuitRules` in `Quit.swift`, a pure function of the running turns from a fresh GET /api/status and whether the app started the server) and either quits or shows the `NSAlert` in `UpdateViews.swift`: Keep Server Running, Stop Them and Quit, Cancel. `prepareToQuit` stops queued then running threads, then the server if the app started it. A hand-started server is never stopped. A kept server is found by the record on the next launch (`ServerSupervisorTests`).
+- `Updater` (`Updater.swift`, made by `AppDelegate`): `UpdateCheck.notices` compares `server.gitHead` and the app's `OmniGitCommit` with `git rev-parse main` in the repo (`RepoHead`). It checks when the server state changes and when the app becomes active. A commit it cannot know never shows a notice.
+- Restart Server (`ServerRestart`, sequenced against `RestartHost`, tested with a fake host and `TestClock`): wait for no running turns (poll 2s), `node node_modules/vite/bin/vite.js build` (log `~/Library/Logs/Omni/web-build.log`), check idle again, stop, start. A server started outside the app asks first. Rebuild and Relaunch runs `scripts/build-mac.sh` in its own session (log `app-rebuild.log`); the script quits the installed copy itself.
+- `UpdateBar` sits above the detail and shows the notice, progress and errors. Nothing runs without a click.
+- Banners: `FinishTracker` mirrors `ThreadNotifier` in the Web UI (a thread seen queued or running that becomes done, failed or stopped, unless it is open in the front window). `AppModel.banners` is fed from the feed; `BannerStack` shows them bottom right, auto-dismiss 6.5s, paused on hover.
+
 ## Build and install
 
 `scripts/build-mac.sh [--no-open] [-- app arguments]`:
