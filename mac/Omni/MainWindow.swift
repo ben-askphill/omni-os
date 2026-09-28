@@ -4,9 +4,7 @@ import SwiftUI
 /// The sidebar and the screen for the route, or the server screen while there is no server to talk to.
 struct MainWindow: View {
   let model: AppModel
-  #if DEBUG
   @Environment(\.openSettings) private var openSettings
-  #endif
 
   var body: some View {
     NavigationSplitView {
@@ -18,6 +16,13 @@ struct MainWindow: View {
     .navigationTitle(model.title)
     .toolbar { toolbar }
     .frame(minWidth: 720, minHeight: 460)
+    .onChange(of: model.route) { old, new in
+      // A route that lives in Settings, such as #/secrets from a script, opens it there instead.
+      guard let tab = new.settingsTab else { return }
+      model.route = old
+      model.settingsTab = tab
+      openSettings()
+    }
     #if DEBUG
     .onAppear { QARunner.openSettings = openSettings }
     #endif
@@ -82,6 +87,8 @@ struct DetailView: View {
       NewThreadScreen(model: model, channelID: nil)
     } else if case .channel(let id, .threads, _) = model.route {
       NewThreadScreen(model: model, channelID: id)
+    } else if model.route == .automations {
+      AutomationsView(model: model)
     } else {
       RoutePlaceholder(route: model.route, title: model.route.title { model.store.channel($0)?.name }) {
         model.route = .home

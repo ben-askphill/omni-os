@@ -3,15 +3,24 @@ import OmniKit
 import SwiftUI
 
 struct SettingsView: View {
-  let model: AppModel
+  @Bindable var model: AppModel
+  let appearance: AppearanceSettings
 
   var body: some View {
-    TabView {
-      Tab("Connection", systemImage: "network") {
+    TabView(selection: $model.settingsTab) {
+      Tab("Connection", systemImage: "network", value: .connection) {
         ConnectionSettings(settings: model.settings, model: model)
+          .frame(width: 560, height: 520)
+      }
+      Tab("Secrets", systemImage: "key", value: .secrets) {
+        SecretsSettings(model: model)
+          .frame(width: 560, height: 680)
+      }
+      Tab("Appearance", systemImage: "circle.lefthalf.filled", value: .appearance) {
+        AppearanceSettingsView(appearance: appearance)
+          .frame(width: 560, height: 220)
       }
     }
-    .frame(width: 560, height: 520)
   }
 }
 

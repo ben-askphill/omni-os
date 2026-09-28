@@ -67,6 +67,12 @@ import OmniKit
     #expect(QAFrameStats(gaps: []).summary == "0 frames")
   }
 
+  @Test func opensATabOfSettings() throws {
+    let script = try QAScript(json: Data(#"[{"settings": "secrets"}, {"settings": "appearance"}, {"settings": "connection"}]"#.utf8))
+    #expect(script.steps == [.settings(.secrets), .settings(.appearance), .settings(.connection)])
+    #expect(throws: QAScriptError.self) { try QAScript(json: Data(#"[{"settings": "garage"}]"#.utf8)) }
+  }
+
   @Test func takesTheStepsUnderAKeyToo() throws {
     let script = try QAScript(json: Data(##"{"steps": [{"route": "#/"}, {"quit": true}]}"##.utf8))
     #expect(script.steps == [.route(.home), .quit])

@@ -49,7 +49,8 @@ export const paths = {
   worktrees: join(DATA, 'worktrees'),
   browsers: join(DATA, 'browsers'),
   crew: join(ROOT, 'crew'),
-  automations: join(ROOT, 'automations'),
+  /** OMNI_AUTOMATIONS_DIR lets tests toggle automations without rewriting the repo's own. */
+  automations: env.OMNI_AUTOMATIONS_DIR ? resolve(ROOT, env.OMNI_AUTOMATIONS_DIR) : join(ROOT, 'automations'),
   webDist: env.OMNI_WEB_DIST ? resolve(ROOT, env.OMNI_WEB_DIST) : join(ROOT, 'web', 'dist'),
   mcpOmni: join(ROOT, 'mcp', 'omni.ts'),
   tsx: join(ROOT, 'node_modules', '.bin', 'tsx'),

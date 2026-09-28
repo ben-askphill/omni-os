@@ -17,7 +17,7 @@ struct OmniApp: App {
     }
 
     Settings {
-      SettingsView(model: delegate.model)
+      SettingsView(model: delegate.model, appearance: delegate.appearance)
     }
   }
 }
@@ -26,6 +26,7 @@ struct OmniApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private(set) lazy var model: AppModel = makeModel()
+  let appearance = AppearanceSettings()
   private var events: SystemEvents?
 
   #if DEBUG
@@ -42,6 +43,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     #endif
     return AppModel(settings: settings)
+  }
+
+  /// Before any window shows, so none draws in the wrong appearance first.
+  func applicationWillFinishLaunching(_ notification: Notification) {
+    appearance.follow { NSApp.appearance = $0.nsAppearance }
   }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
