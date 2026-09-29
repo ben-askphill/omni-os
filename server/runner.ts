@@ -1004,7 +1004,13 @@ function generateTitle(threadId: string, prompt: string) {
   child.on('close', (code) => {
     clearTimeout(timer);
     const title = out.trim().split('\n').filter(Boolean).pop()?.replace(/^["']|["']$/g, '').slice(0, 90);
-    const t = threads.get(threadId);
+    // Nobody waits on this call: a shutdown may have closed the db by the time it ends.
+    let t: Thread | undefined;
+    try {
+      t = threads.get(threadId);
+    } catch {
+      return;
+    }
     // Only in place of the placeholder: Ben may have renamed it while this ran.
     if (code === 0 && title && t && t.title === placeholder) {
       threads.update(threadId, { title, updated_at: t.updated_at });

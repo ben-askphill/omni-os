@@ -239,7 +239,7 @@ describe('Hermes adapter', () => {
     expect(s.records.find((r) => r.kind === 'status')?.payload).toMatchObject({ text: 'Approval requested: terminal — rm -rf /' });
   });
 
-  it('fails the turn when the key is missing, and the holder never sees a key', async () => {
+  it('fails the turn when the key is missing', async () => {
     const before = fake.calls.length;
     const s = boot({ key: '' });
     s.user('hello', 'm1');
@@ -248,7 +248,10 @@ describe('Hermes adapter', () => {
     expect(resultOf(s.records)[0].payload).toMatchObject({ ok: false });
     expect(fake.calls.length).toBe(before);
     await waitFor(() => s.child.exitCode != null || s.child.signalCode != null, 'holder exit');
+  });
 
+  // Reads the holder's environment from /proc. macOS has no /proc and does not show another process's environment.
+  it.skipIf(process.platform !== 'linux')('never lets the holder see a key', () => {
     process.env.HERMES_API_KEY = 'from-shell';
     const live = boot({ key: 'from-keychain' });
     const env = readFileSync(`/proc/${live.child.pid}/environ`).toString();
