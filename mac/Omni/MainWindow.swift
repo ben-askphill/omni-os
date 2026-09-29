@@ -7,6 +7,7 @@ struct MainWindow: View {
   let updater: Updater
   @Environment(\.openSettings) private var openSettings
   @AppStorage(sidebarShownKey) private var sidebarShown = true
+  @State private var paneTop: CGFloat?
 
   var body: some View {
     HStack(spacing: 0) {
@@ -20,6 +21,8 @@ struct MainWindow: View {
         DetailView(model: model)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
+      .environment(\.paneTop, paneTop)
+      .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { paneTop = $0 }
       .overlay(alignment: .bottomTrailing) { BannerStack(model: model) }
       .background(Tok.bg)
       .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -82,6 +85,11 @@ struct MainWindow: View {
 }
 
 let sidebarShownKey = "sidebar.shown"
+
+extension EnvironmentValues {
+  /// Where the main window's pane starts, in window space. nil outside the main window.
+  @Entry var paneTop: CGFloat?
+}
 
 /// View > Show Sidebar, since the sidebar is ours rather than a split view's.
 struct SidebarToggleCommand: View {
