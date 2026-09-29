@@ -14,7 +14,8 @@
     "archived": 0,
     "created_at": "2026-01-05T09:00:00.000Z",
     "running": 0,
-    "active": []
+    "active": [],
+    "recent": []
   },
   {
     "id": "acme",
@@ -39,6 +40,15 @@
         "status": "running",
         "created_at": "2026-01-05T09:00:00.000Z"
       }
+    ],
+    "recent": [
+      {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "channel_id": "acme",
+        "title": "Fix the cart",
+        "status": "running",
+        "created_at": "2026-01-05T09:00:00.000Z"
+      }
     ]
   },
   {
@@ -56,6 +66,7 @@
     "archived": 0,
     "created_at": "2026-01-05T09:00:00.000Z",
     "running": 0,
-    "active": []
+    "active": [],
+    "recent": []
   }
 ]

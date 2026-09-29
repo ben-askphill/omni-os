@@ -65,25 +65,32 @@ const channelSchema = z.object({
   notes: z.string().nullish(),
 });
 
-/** A channel plus its running and queued threads, so the sidebar can list them under the name. */
-const withActive = (ch: Channel, busy: Thread[]) => {
+/** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */
+const RECENT_PER_CHANNEL = 5;
+
+const stub = ({ id, channel_id, title, status, created_at }: Thread) => ({ id, channel_id, title, status, created_at });
+
+/** A channel plus its running and queued threads, and its latest ones, so the sidebar can list them under the name. */
+const withActive = (ch: Channel, busy: Thread[], recent: Thread[]) => {
   const mine = busy.filter((t) => t.channel_id === ch.id);
   return {
     ...ch,
     running: mine.length,
-    active: mine.map(({ id, channel_id, title, status, created_at }) => ({ id, channel_id, title, status, created_at })),
+    active: mine.map(stub),
+    recent: recent.filter((t) => t.channel_id === ch.id).map(stub),
   };
 };
 
 api.get('/channels', (c) => {
   const busy = threads.running();
-  return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy)));
+  const recent = threads.recentPerChannel(RECENT_PER_CHANNEL);
+  return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy, recent)));
 });
 
 api.get('/channels/:id', (c) => {
   const ch = channels.get(c.req.param('id'));
   if (!ch) return c.json({ error: 'not found' }, 404);
-  return c.json(withActive(ch, threads.running()));
+  return c.json(withActive(ch, threads.running(), threads.byChannel(ch.id, RECENT_PER_CHANNEL)));
 });
 
 api.post('/channels', async (c) => {
