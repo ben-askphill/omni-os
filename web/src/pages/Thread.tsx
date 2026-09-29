@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type EventRow, type PendingMsg, type SendMode, type Thread, type ThreadDetail } from '../api.ts';
+import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type EventRow, type PendingMsg, type PRSummary, type SendMode, type Thread, type ThreadDetail } from '../api.ts';
 import { ArtifactViewer, kindIcon } from '../components/ArtifactViewer.tsx';
 import { ReplyComposer } from '../components/Composer.tsx';
 import { CAPABILITIES, isHarnessId } from '../../../server/harness/types.ts';
@@ -13,6 +13,48 @@ import { readPref, useApp, useFeed, useIsMobile, writePref } from '../store.tsx'
 type PanelTab = 'artifacts' | 'browser' | 'details';
 
 const OPEN_PR_PROMPT = 'Commit your work, push the branch and open a PR with gh. Reply with the PR URL.';
+
+/** The composer's PR slot: Open PR until the branch has a PR, then that PR and whether it merged. */
+function ThreadPR({ thread, running, busy, onOpen }: { thread: Thread; running: boolean; busy: boolean; onOpen: () => void }) {
+  // undefined until the first answer, so the button does not flash before the PR shows.
+  const [pr, setPr] = useState<PRSummary | null | undefined>(undefined);
+  const load = useCallback(async () => {
+    try {
+      setPr((await api.get<{ pr: PRSummary | null }>(`/threads/${encodeURIComponent(thread.id)}/pr`)).pr);
+    } catch {
+      setPr((prev) => prev ?? null);
+    }
+  }, [thread.id]);
+  // Again when a turn ends (it may have opened the PR), and every minute to catch a merge.
+  useEffect(() => {
+    if (!running) void load();
+  }, [load, running, thread.branch]);
+  useEffect(() => {
+    const tick = setInterval(() => {
+      if (document.visibilityState === 'visible') void load();
+    }, 60_000);
+    return () => clearInterval(tick);
+  }, [load]);
+
+  if (pr === undefined) return null;
+  const openButton = (
+    <Button size="sm" variant="ghost" icon="pr" onClick={onOpen} busy={busy} title={OPEN_PR_PROMPT}>
+      Open PR
+    </Button>
+  );
+  if (!pr) return openButton;
+  const state = pr.state ?? 'OPEN';
+  const label = state === 'MERGED' ? 'merged' : state === 'CLOSED' ? 'closed' : pr.isDraft ? 'draft' : 'open';
+  return (
+    <>
+      <LinkButton size="sm" variant="ghost" icon="pr" href={href.pr(thread.channel_id, pr.number)} className="gap-1.5">
+        <span title={pr.title}>#{pr.number}</span>
+        <Chip tone={label === 'open' ? 'live' : label === 'merged' ? 'done' : 'outline'}>{label}</Chip>
+      </LinkButton>
+      {state === 'CLOSED' && openButton}
+    </>
+  );
+}
 
 interface InitP {
   model?: string;
@@ -852,11 +894,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
               // A rename keeps updated_at, so it has to win a tie.
               onRenamed={(t) => setThread((prev) => newer(prev, t))}
               extra={
-                thread.branch ? (
-                  <Button size="sm" variant="ghost" icon="pr" onClick={openPR} busy={prBusy} title={OPEN_PR_PROMPT}>
-                    Open PR
-                  </Button>
-                ) : undefined
+                thread.branch ? <ThreadPR thread={thread} running={running} busy={prBusy} onOpen={openPR} /> : undefined
               }
             />
           </div>

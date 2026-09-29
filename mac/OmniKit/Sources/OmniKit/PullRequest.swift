@@ -20,6 +20,14 @@ public struct PullRequestSummary: Decodable, Hashable, Sendable, Identifiable {
 
   public var id: Int { number }
   public var isOpen: Bool { PullRequestState.isOpen(state) }
+  /// The composer's word for it, as `ThreadPR` in Thread.tsx: open, draft, merged or closed.
+  public var badge: String {
+    switch state {
+    case "MERGED": "merged"
+    case "CLOSED": "closed"
+    default: isDraft ? "draft" : "open"
+    }
+  }
 }
 
 public struct PRPerson: Decodable, Hashable, Sendable {
@@ -180,7 +188,17 @@ private struct MergeReply: Decodable {
   let output: String?
 }
 
+private struct ThreadPRReply: Decodable {
+  let pr: PullRequestSummary?
+}
+
 extension OmniClient {
+  /// The PR opened from a thread's branch, open or not. nil when there is none.
+  public func pullRequest(forThread id: String) async throws(OmniAPIError) -> PullRequestSummary? {
+    let reply: ThreadPRReply = try await send("GET", "/api/threads/\(uriComponent(id))/pr")
+    return reply.pr
+  }
+
   public func pullRequests(in channel: String, state: PullRequestListState = .open) async throws(OmniAPIError) -> [PullRequestSummary] {
     try await send("GET", "/api/channels/\(uriComponent(channel))/prs", query: [("state", state.rawValue)])
   }

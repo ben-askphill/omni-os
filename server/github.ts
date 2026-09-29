@@ -34,6 +34,17 @@ export async function listPRs(repo: string, state = 'open') {
   return prs.map((p: any) => ({ ...p, checks: summarizeChecks(p.statusCheckRollup), statusCheckRollup: undefined }));
 }
 
+/** The PR a branch was opened as: its open one, else the newest (gh lists newest first). */
+export function pickBranchPR<T extends { state?: string }>(prs: T[]): T | null {
+  return prs.find((p) => p.state === 'OPEN') ?? prs[0] ?? null;
+}
+
+export async function branchPR(repo: string, branch: string) {
+  const prs = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--head', branch, '--state', 'all', '--limit', '10', '--json', PR_FIELDS]));
+  const p = pickBranchPR(prs as any[]);
+  return p ? { ...p, checks: summarizeChecks(p.statusCheckRollup), statusCheckRollup: undefined } : null;
+}
+
 export async function getPR(repo: string, n: number) {
   const [view, diff] = await Promise.all([
     gh(['pr', 'view', String(n), '--repo', repo, '--json', `${PR_FIELDS},body,files,reviews,comments`]),
