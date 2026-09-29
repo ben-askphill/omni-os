@@ -3,10 +3,10 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync
 import { homedir } from 'node:os';
 import { basename, dirname, join, sep } from 'node:path';
 import { threadDir } from '../config.ts';
-import { kv, threads, type Thread } from '../db.ts';
+import { db, kv, threads, type Thread } from '../db.ts';
 import { safeSegment } from './paths.ts';
 import type { SyncTransport } from './transport.ts';
-import { activeWorker } from './worker.ts';
+import { activeWorker, onSynced, type SyncWorker } from './worker.ts';
 
 // Files that go with a thread, next to the rows the worker syncs:
 // - what is in data/threads/<id>/{uploads,artifacts,browser}, content-addressed in Storage as blobs/<sha256>, listed
@@ -466,3 +466,49 @@ export async function beforeResume(t: Thread): Promise<void> {
     console.error(`[sync] session download for ${t.id} is slow; starting without waiting`),
   );
 }
+
+let backfilling: Promise<void> | null = null;
+
+/**
+ * The files and session files of threads from before sync was set up: the turn hook only moves them after a new
+ * turn, so this uploads them for every thread this Mac wrote last (the other Mac sends its own). It runs once per
+ * sync id, after that id's first sync; a thread that fails is tried again after the next one. Recorded in kv
+ * sync.files_backfill as the machine id it ran for.
+ */
+export function backfillFiles(worker: SyncWorker): Promise<void> {
+  if (backfilling || kv.get<string>('sync.files_backfill') === worker.machineId) return backfilling ?? Promise.resolve();
+  const opts: FileSyncOptions = { transport: worker.transport, home: hookDefaults.home, env: hookDefaults.env };
+  const ids = (
+    db
+      .prepare(
+        `SELECT t.id FROM threads t LEFT JOIN sync_meta m ON m.entity = 'thread' AND m.entity_id = t.id
+         WHERE m.machine_id IS NULL OR m.machine_id = ? ORDER BY t.updated_at DESC`,
+      )
+      .all(worker.machineId) as { id: string }[]
+  ).map((r) => r.id);
+  const job = async () => {
+    let failed = 0;
+    let done = 0;
+    for (const id of ids) {
+      // Signed out, or moved to another relay: that relay's own first sync starts again.
+      if (activeWorker() !== worker) return;
+      const t = threads.get(id);
+      if (!t) continue;
+      try {
+        await serial(id, async () => {
+          await pushThreadFiles(id, opts);
+          await pushSession(t, opts);
+        });
+      } catch (err) {
+        failed++;
+        logFailure('file backfill', id)(err);
+      }
+      if (++done % 50 === 0) console.log(`[sync] uploaded files for ${done} of ${ids.length} threads`);
+    }
+    if (failed) console.error(`[sync] file backfill: ${failed} of ${ids.length} threads failed, trying again after the next sync`);
+    else kv.set('sync.files_backfill', worker.machineId);
+  };
+  return (backfilling = job().finally(() => (backfilling = null)));
+}
+
+onSynced((worker) => void backfillFiles(worker));

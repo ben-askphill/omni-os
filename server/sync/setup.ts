@@ -120,6 +120,7 @@ export async function setupSync(input: SetupRequest, deps: SetupDeps): Promise<S
     // The old relay's sync must be over first, or it could write its cursor over the reset below.
     await setActiveWorker(null);
     kv.set('sync.cursor', 0);
+    kv.set('sync.files_backfill', null);
     db.exec('DELETE FROM sync_deferred');
     if (outbox.machineId()) backfill();
   }

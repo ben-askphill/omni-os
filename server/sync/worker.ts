@@ -103,6 +103,13 @@ function toChanges(rows: OutboxRow[], machineId: string): Change[] {
   return out;
 }
 
+const syncedListeners = new Set<(worker: SyncWorker) => void>();
+/** Called after each sync that went through, with the worker that ran it. Returns a function that removes it. */
+export function onSynced(fn: (worker: SyncWorker) => void): () => void {
+  syncedListeners.add(fn);
+  return () => syncedListeners.delete(fn);
+}
+
 export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   const { transport } = opts;
   const copiedFrom = outbox.machineId();
@@ -175,6 +182,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       lastError = null;
       signedOut = false;
       lastSyncAt = new Date().toISOString();
+      if (!stopped) for (const fn of syncedListeners) fn(worker);
     } catch (err) {
       failures++;
       lastError = (err as Error)?.message ?? String(err);
