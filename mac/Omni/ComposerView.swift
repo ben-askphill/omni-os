@@ -61,6 +61,7 @@ struct InterruptButton: View {
 }
 
 /// Open PR until the branch has a PR, then that PR and whether it merged: `ThreadPR` in Thread.tsx.
+/// It opens a menu of every PR from the branch, with Open PR there while none is open.
 private struct ThreadPRSlot: View {
   let model: AppModel
   let thread: OmniThread
@@ -68,31 +69,43 @@ private struct ThreadPRSlot: View {
   let opening: Bool
   let open: () -> Void
   /// nil until the first answer, so the button does not flash before the PR shows.
-  @State private var pr: PullRequestSummary??
+  @State private var prs: ThreadPullRequests?
+  @State private var failed = false
 
   var body: some View {
-    HStack(spacing: 4) {
-      switch pr {
-      case .none: EmptyView()
-      case .some(.none): openButton
-      case .some(.some(let pr)):
-        Button {
-          model.route = .channel(id: thread.channelID, tab: .prs, pr: pr.number)
+    Group {
+      if let pr = prs?.pr, let prs {
+        Menu {
+          Section("\(prs.prs.count) PR\(prs.prs.count == 1 ? "" : "s") from \(thread.branch ?? "this branch")") {
+            ForEach(prs.prs) { p in
+              Button("#\(p.number)  \(p.title)  (\(p.badge))") {
+                model.route = .channel(id: thread.channelID, tab: .prs, pr: p.number)
+              }
+            }
+          }
+          if prs.canOpenAnother {
+            Divider()
+            Button("Open a new PR", action: open).disabled(opening)
+          }
         } label: {
           HStack(spacing: 5) {
-            Image(systemName: "arrow.triangle.pull")
+            if opening { ProgressView().controlSize(.mini) } else { Image(systemName: "arrow.triangle.pull") }
             Text("#\(pr.number)")
             PRChip(text: pr.badge, tone: pr.badge == "open" ? .ok : pr.badge == "merged" ? .info : .outline)
+            if prs.prs.count > 1 { Text("+\(prs.prs.count - 1)").foregroundStyle(.tertiary) }
           }
           .font(.system(size: 12.5))
-          .padding(.horizontal, 8)
-          .frame(height: 26)
-          .contentShape(Rectangle())
         }
+        .menuStyle(.button)
         .buttonStyle(.plain)
+        .menuIndicator(.visible)
+        .fixedSize()
+        .padding(.horizontal, 8)
+        .frame(height: 26)
         .foregroundStyle(.secondary)
         .help(pr.title)
-        if pr.state == "CLOSED" { openButton }
+      } else if prs != nil || failed {
+        openButton
       }
     }
     // Again when a turn ends (it may have opened the PR), and every minute to catch a merge.
@@ -124,9 +137,9 @@ private struct ThreadPRSlot: View {
 
   private func load() async {
     do {
-      pr = .some(try await model.client.pullRequest(forThread: thread.id))
+      prs = try await model.client.pullRequests(forThread: thread.id)
     } catch {
-      if pr == nil { pr = .some(nil) }
+      failed = true
     }
   }
 }

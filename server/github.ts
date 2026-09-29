@@ -39,10 +39,11 @@ export function pickBranchPR<T extends { state?: string }>(prs: T[]): T | null {
   return prs.find((p) => p.state === 'OPEN') ?? prs[0] ?? null;
 }
 
-export async function branchPR(repo: string, branch: string) {
-  const prs = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--head', branch, '--state', 'all', '--limit', '10', '--json', PR_FIELDS]));
-  const p = pickBranchPR(prs as any[]);
-  return p ? { ...p, checks: summarizeChecks(p.statusCheckRollup), statusCheckRollup: undefined } : null;
+/** Every PR opened from a branch, newest first, and the one to show for it. */
+export async function branchPRs(repo: string, branch: string) {
+  const raw = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--head', branch, '--state', 'all', '--limit', '30', '--json', PR_FIELDS]));
+  const prs = (raw as any[]).map((p) => ({ ...p, checks: summarizeChecks(p.statusCheckRollup), statusCheckRollup: undefined }));
+  return { pr: pickBranchPR(prs), prs };
 }
 
 export async function getPR(repo: string, n: number) {
