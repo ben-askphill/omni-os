@@ -63,6 +63,8 @@ public struct ChannelWithRunning: Decodable, Hashable, Sendable, Identifiable {
   public let channel: Channel
   public let running: Int
   public let active: [ThreadStub]
+  /// Its latest threads of any status, for the highlighted channel to keep finished ones findable.
+  public let recent: [ThreadStub]
 
   public var id: String { channel.id }
 
@@ -71,7 +73,7 @@ public struct ChannelWithRunning: Decodable, Hashable, Sendable, Identifiable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case running, active
+    case running, active, recent
   }
 
   public init(from decoder: any Decoder) throws {
@@ -79,6 +81,7 @@ public struct ChannelWithRunning: Decodable, Hashable, Sendable, Identifiable {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     running = try c.decodeIfPresent(Int.self, forKey: .running) ?? 0
     active = try c.decodeIfPresent([ThreadStub].self, forKey: .active) ?? []
+    recent = try c.decodeIfPresent([ThreadStub].self, forKey: .recent) ?? []
   }
 }
 

@@ -450,6 +450,13 @@ export const threads = {
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
   children: (parentId: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? ORDER BY created_at`).all(parentId) as unknown as Thread[],
+  /** Each channel's `perChannel` most recently updated threads, whatever their status. */
+  recentPerChannel: (perChannel = 5) =>
+    db
+      .prepare(
+        `SELECT ${THREAD_COLUMNS} FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY updated_at DESC) AS n FROM threads) WHERE n <= ?`,
+      )
+      .all(perChannel) as unknown as Thread[],
   running: () => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],
   /** The machine id of the Mac that runs the thread (sync), or null when none does. */
   runMachine: (id: string) =>

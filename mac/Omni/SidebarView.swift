@@ -80,15 +80,15 @@ struct SidebarView: View {
     Label(title ?? channel.name, systemImage: symbol)
       .badge(channel.running)
       .tag(SidebarItem.channel(channel.id))
-    let links = SidebarSections.threads(of: channel, open: model.openThread)
+    let links = SidebarSections.threads(of: channel, open: model.openThread, focused: model.focusedChannel == channel.id)
     ForEach(links.shown) { thread in
       ThreadRow(thread: thread)
         .tag(SidebarItem.thread(thread.id))
         .openInNewWindow(thread.id)
     }
-    if links.more > 0 {
+    if links.seeAll || links.more > 0 {
       Label {
-        Text("\(links.more) more")
+        Text(links.seeAll ? "See all threads" : "\(links.more) more")
           .foregroundStyle(.secondary)
       } icon: {
         // Keeps the text in line with the thread titles above it.

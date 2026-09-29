@@ -6,7 +6,7 @@ public enum SidebarItem: Hashable, Sendable {
   case home
   case channel(String)
   case thread(String)
-  /// "N more" under a channel. It opens the channel, so it never shows as selected itself.
+  /// "N more" or "See all threads" under a channel. It opens the channel, so it never shows as selected itself.
   case more(String)
   case newChannel
   case artifacts
