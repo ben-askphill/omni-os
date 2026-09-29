@@ -10,6 +10,7 @@ export type Route =
   | { name: 'search'; q: string }
   | { name: 'automations' }
   | { name: 'secrets' }
+  | { name: 'sync' }
   | { name: 'artifacts' }
   | { name: 'new-channel' }
   | { name: 'notfound'; path: string };
@@ -43,6 +44,7 @@ export function parseHash(hash: string): Route {
   if (a === 'search') return { name: 'search', q: q.get('q') ?? '' };
   if (a === 'automations' && !b) return { name: 'automations' };
   if (a === 'secrets' && !b) return { name: 'secrets' };
+  if (a === 'sync' && !b) return { name: 'sync' };
   if (a === 'artifacts' && !b) return { name: 'artifacts' };
   if (a === 'new-channel' && !b) return { name: 'new-channel' };
   return { name: 'notfound', path: pathPart };
@@ -83,6 +85,7 @@ export const href = {
   search: (q: string) => `#/search?q=${encodeURIComponent(q)}`,
   automations: () => '#/automations',
   secrets: () => '#/secrets',
+  sync: () => '#/sync',
   artifacts: () => '#/artifacts',
   newChannel: () => '#/new-channel',
 };

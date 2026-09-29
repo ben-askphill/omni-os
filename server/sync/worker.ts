@@ -1,7 +1,7 @@
 import { kv, outbox, type OutboxRow } from '../db.ts';
 import { globalSecret, listSecrets, setSecret, SYNC_SECRETS } from '../secrets.ts';
 import { applyBatch, deferredCount, getHandler, registeredEntities, retryDeferred, type ApplyContext } from './apply.ts';
-import { createSupabaseTransport, isoTs, type Change, type SyncTransport } from './transport.ts';
+import { createSupabaseTransport, isoTs, isSignedOut, type Change, type SyncTransport } from './transport.ts';
 import './handlers/index.ts';
 
 // The sync loop: push the outbox in batches, then pull what other machines pushed since the cursor and apply it.
@@ -40,6 +40,8 @@ export interface SyncStatus {
   machineId: string | null;
   lastSyncAt: string | null;
   lastError: string | null;
+  /** The relay refused this machine's refresh token: it takes a new sign-in, not a retry. */
+  signedOut: boolean;
   /** Failed syncs in a row. */
   failures: number;
   nextSyncAt: string | null;
@@ -98,6 +100,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   let started = false;
   let failures = 0;
   let lastError: string | null = null;
+  let signedOut = false;
   let lastSyncAt: string | null = null;
   let nextAt: number | null = null;
   let timer: NodeJS.Timeout | undefined;
@@ -145,10 +148,12 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       await pull(result);
       failures = 0;
       lastError = null;
+      signedOut = false;
       lastSyncAt = new Date().toISOString();
     } catch (err) {
       failures++;
       lastError = (err as Error)?.message ?? String(err);
+      signedOut = isSignedOut(err);
       result.error = lastError;
       console.error(`[sync] ${lastError} (try ${failures}, next in ${Math.round(backoffMs(failures) / 1000)}s)`);
     }
@@ -209,6 +214,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
         machineId,
         lastSyncAt,
         lastError,
+        signedOut,
         failures,
         nextSyncAt: nextAt ? new Date(nextAt).toISOString() : null,
       };
@@ -248,6 +254,7 @@ function baseStatus(): SyncStatus {
     machineId: outbox.machineId(),
     lastSyncAt: null,
     lastError: null,
+    signedOut: false,
     failures: 0,
     nextSyncAt: null,
     pending: counts.pending,

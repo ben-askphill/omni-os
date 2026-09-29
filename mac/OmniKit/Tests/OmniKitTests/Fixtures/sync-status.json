@@ -1,0 +1,15 @@
+{
+  "configured": true,
+  "enabled": true,
+  "running": false,
+  "machineId": "3f9c2a1e7b4d",
+  "lastSyncAt": "2026-09-28T09:15:02.123Z",
+  "lastError": null,
+  "signedOut": false,
+  "failures": 0,
+  "nextSyncAt": "2026-09-28T09:16:02.123Z",
+  "pending": 2,
+  "held": 0,
+  "deferred": 1,
+  "cursor": 418
+}
