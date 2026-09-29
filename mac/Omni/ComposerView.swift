@@ -24,7 +24,7 @@ struct ReplyComposerHost: View {
       commands: SlashCommandsStore(api: model.client, source: .thread(store.id)), placement: .reply, harness: thread.harness.rawValue)
     box.menu = menu
     return ReplyComposerView(model: model, store: store, thread: thread, reply: reply, menu: menu)
-    .frame(maxWidth: ThreadStyle.column)
+    .frame(maxWidth: ThreadStyle.thread)
     .padding(.horizontal, 24)
     .padding(.top, 4)
     .padding(.bottom, 16)
