@@ -1,7 +1,8 @@
-import { Fragment, memo, useMemo, useState, type ReactNode } from 'react';
+import { createContext, Fragment, memo, useContext, useMemo, useState, type ReactNode } from 'react';
 import { parsePayload, uploadUrl, type Attachment, type EventRow, type PendingMsg } from '../api.ts';
 import { bytes, clock, duration, plural, shortPath, toDate } from '../format.ts';
 import { href } from '../router.ts';
+import { useApp, useNow } from '../store.tsx';
 import { Markdown } from './Markdown.tsx';
 import { CheckItem, Icon, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
 import { SOURCE_TAG } from '../../../shared/slash-menu.ts';
@@ -59,6 +60,28 @@ interface ReportP {
   dropped?: boolean;
 }
 
+interface TaskP {
+  task_id: string;
+  event: 'started' | 'progress' | 'ended';
+  tool_use_id?: string;
+  background?: boolean;
+  status?: string;
+  tool_uses?: number;
+}
+
+/** What a sub-agent's Agent row shows: live while the CLI still runs it, else how it ended. */
+interface TaskView {
+  running: boolean;
+  background: boolean;
+  status?: string;
+  tool_uses?: number;
+  started: string;
+  ended?: string;
+}
+
+/** Task state by the Agent call's tool_use id. */
+const TaskCtx = createContext<Map<string, TaskView>>(new Map());
+
 export interface ToolCall {
   id: string;
   name: string;
@@ -84,6 +107,29 @@ interface Todo {
   status?: string;
 }
 
+/** Stored task rows folded per Agent call. One with no end row reads as running; the live list decides. */
+function buildTasks(events: EventRow[]) {
+  const byTask = new Map<string, string>();
+  const out = new Map<string, TaskView>();
+  for (const e of events) {
+    if (e.kind !== 'task') continue;
+    const p = parsePayload<TaskP>(e);
+    const tool = p.tool_use_id ?? byTask.get(p.task_id);
+    if (!tool) continue;
+    byTask.set(p.task_id, tool);
+    const prev = out.get(tool);
+    if (p.event === 'started' || !prev) {
+      const ended = p.event === 'ended' ? e.created_at : undefined;
+      out.set(tool, { running: !ended, background: !!p.background, status: p.status, tool_uses: p.tool_uses, started: e.created_at, ended });
+    } else if (p.event === 'progress') {
+      out.set(tool, { ...prev, background: p.background ?? prev.background, tool_uses: p.tool_uses ?? prev.tool_uses });
+    } else {
+      out.set(tool, { ...prev, running: false, status: p.status ?? 'completed', tool_uses: p.tool_uses ?? prev.tool_uses, ended: e.created_at });
+    }
+  }
+  return out;
+}
+
 function buildItems(events: EventRow[]): { items: Item[]; plan: { todos: Todo[]; after: number } | null } {
   const results = new Map<string, ToolResultP>();
   for (const e of events) {
@@ -93,7 +139,10 @@ function buildItems(events: EventRow[]): { items: Item[]; plan: { todos: Todo[];
     }
   }
   const items: Item[] = [];
-  let group: { item: Extract<Item, { type: 'tools' }>; byId: Map<string, ToolCall> } | null = null;
+  // Every call so far, not just this group's: a background agent's calls land after later text and turns.
+  const byId = new Map<string, ToolCall>();
+  const groupOf = new Map<string, Extract<Item, { type: 'tools' }>>();
+  let group: Extract<Item, { type: 'tools' }> | null = null;
   let plan: { todos: Todo[]; after: number } | null = null;
 
   for (const e of events) {
@@ -110,18 +159,23 @@ function buildItems(events: EventRow[]): { items: Item[]; plan: { todos: Todo[];
           children: [],
           orphan: false,
         };
-        if (!group) {
-          group = { item: { type: 'tools', key: e.id, calls: [], total: 0 }, byId: new Map() };
-          items.push(group.item);
+        const parent = call.parent ? byId.get(call.parent) : undefined;
+        let home = parent && groupOf.get(parent.id);
+        if (!home) {
+          if (!group) {
+            group = { type: 'tools', key: e.id, calls: [], total: 0 };
+            items.push(group);
+          }
+          home = group;
         }
-        group.byId.set(call.id, call);
-        group.item.total++;
-        if (call.name === 'TodoWrite' && Array.isArray(call.input.todos)) plan = { todos: call.input.todos as Todo[], after: group.item.key };
-        const parent = call.parent ? group.byId.get(call.parent) : undefined;
+        byId.set(call.id, call);
+        groupOf.set(call.id, home);
+        home.total++;
+        if (call.name === 'TodoWrite' && Array.isArray(call.input.todos)) plan = { todos: call.input.todos as Todo[], after: home.key };
         if (parent) parent.children.push(call);
         else {
           call.orphan = !!call.parent;
-          group.item.calls.push(call);
+          home.calls.push(call);
         }
         break;
       }
@@ -290,9 +344,42 @@ const STOPPED_TOOL = [
 ];
 const interruptedTool = (c: ToolCall) => !!c.result?.is_error && STOPPED_TOOL.some((t) => c.result!.text.startsWith(t));
 
+/** Time since a sub-agent started, ticking each second. */
+function Elapsed({ since }: { since: string }) {
+  const now = useNow(1000);
+  return <>{duration(Math.max(0, now - toDate(since).getTime()))}</>;
+}
+
+const TASK_END: Record<string, string> = { completed: 'done', failed: 'failed', killed: 'stopped', stopped: 'stopped' };
+
+/** A sub-agent's line on its Agent row: background or not, calls so far and time running, or how it ended. */
+function TaskBadge({ t }: { t: TaskView }) {
+  if (t.running) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1.5 font-num text-[11px] text-live-text tabular-nums">
+        {t.background && <span>background ·</span>}
+        {t.tool_uses ? <span>{plural(t.tool_uses, 'tool')} ·</span> : null}
+        <Elapsed since={t.started} />
+        <Loader size={11} />
+      </span>
+    );
+  }
+  const end = TASK_END[t.status ?? ''] ?? t.status ?? 'done';
+  const took = t.ended ? duration(toDate(t.ended).getTime() - toDate(t.started).getTime()) : '';
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 font-num text-[11px] text-fg-4 tabular-nums">
+      {end === 'failed' && <StatusDot status="needs" size={7} />}
+      <span className={end === 'failed' ? 'text-fg' : ''}>{end}</span>
+      {took && <span>· {took}</span>}
+    </span>
+  );
+}
+
 function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | null; running: boolean; depth?: number }) {
   const [open, setOpen] = useState(false);
-  const pending = !c.result;
+  const task = useContext(TaskCtx).get(c.id);
+  // A background agent's result comes back at launch, so its task says whether it still runs.
+  const pending = task ? task.running : !c.result;
   const stopped = interruptedTool(c);
   const err = c.result?.is_error && !stopped;
   const summary = toolSummary(c, cwd);
@@ -310,8 +397,10 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
         <Icon name={toolIcon(c.name)} size={13} className="text-fg-3" />
         <span className={`shrink-0 font-medium text-fg-2`}>{toolLabel(c.name)}</span>
         <span className={`min-w-0 flex-1 truncate text-fg-3 ${mono ? 'font-mono text-[11.5px]' : ''}`}>{summary}</span>
-        {c.children.length > 0 && <span className="shrink-0 font-num text-[11px] text-fg-4">{c.children.length} sub-calls</span>}
-        {pending && running ? (
+        {c.children.length > 0 && !task?.running && <span className="shrink-0 font-num text-[11px] text-fg-4">{c.children.length} sub-calls</span>}
+        {task ? (
+          <TaskBadge t={task} />
+        ) : pending && running ? (
           <Loader size={11} className="text-fg-3" />
         ) : err ? (
           <span className="inline-flex shrink-0 items-center gap-1 font-num text-[11px] text-fg">
@@ -334,7 +423,7 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
           )}
         </div>
       )}
-      {c.children.length > 0 && (open || (pending && running)) && (
+      {c.children.length > 0 && (open || (pending && (running || !!task))) && (
         <div className="mb-1 ml-3">
           {(open ? c.children : c.children.slice(-3)).map((ch) => (
             <ToolRow key={ch.id} c={ch} cwd={cwd} running={running} depth={depth + 1} />
@@ -363,6 +452,7 @@ function flatten(calls: ToolCall[]): ToolCall[] {
 
 function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; total: number; cwd?: string | null; running: boolean; isLast: boolean }) {
   const [open, setOpen] = useState(false);
+  const tasks = useContext(TaskCtx);
   if (total === 1 && calls.length === 1) {
     return <ToolRow c={calls[0]} cwd={cwd} running={running} />;
   }
@@ -370,6 +460,8 @@ function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; 
   const errors = all.filter((c) => c.result?.is_error && !interruptedTool(c)).length;
   const live = running && isLast && all.some((c) => !c.result);
   const latest = all[all.length - 1];
+  // Sub-agents still at work stay in view while the group is folded.
+  const agents = calls.filter((c) => tasks.get(c.id)?.running);
   const names = countNames(calls);
   return (
     <div className="rounded-[20px] bg-surface">
@@ -401,11 +493,12 @@ function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; 
             <StatusDot status="needs" size={7} /> {errors} failed
           </span>
         )}
-        {live && <Loader size={11} className="text-fg-3" />}
+        {agents.length > 0 && !open && <span className="shrink-0 font-num text-[11px] text-live-text">{plural(agents.length, 'agent')} running</span>}
+        {(live || agents.length > 0) && <Loader size={11} className={agents.length ? 'text-live-text' : 'text-fg-3'} />}
       </button>
-      {open && (
+      {(open || agents.length > 0) && (
         <div className="fade-in px-1.5 pb-1.5">
-          {calls.map((c) => (
+          {(open ? calls : agents).map((c) => (
             <ToolRow key={c.id} c={c} cwd={cwd} running={running} />
           ))}
         </div>
@@ -696,40 +789,57 @@ export const Transcript = memo(function Transcript({
   cwd?: string | null;
 }) {
   const { items, plan } = useMemo(() => buildItems(events), [events]);
+  const { tasks: live, feedLive } = useApp();
+  const stored = useMemo(() => buildTasks(events), [events]);
+  // The server's live list wins: a task it no longer runs has ended, even if no end row was stored.
+  const tasks = useMemo(() => {
+    const mine = live.filter((t) => t.thread_id === threadId && t.tool_use_id);
+    const out = new Map(stored);
+    for (const [id, t] of out) {
+      if (t.running && feedLive && !mine.some((m) => m.tool_use_id === id)) out.set(id, { ...t, running: false, status: t.status ?? 'stopped' });
+    }
+    for (const m of mine) {
+      const prev = out.get(m.tool_use_id!);
+      out.set(m.tool_use_id!, { running: true, background: m.background, tool_uses: m.tool_uses ?? prev?.tool_uses, started: prev?.started ?? m.started_at });
+    }
+    return out;
+  }, [stored, live, feedLive, threadId]);
   const latestStatus = useMemo(() => (running ? statusLabel(events) : null), [events, running]);
 
   const last = items[items.length - 1];
   const showWorking = running && (!last || last.type === 'user' || last.type === 'report' || last.type === 'text');
 
   return (
-    <div className="space-y-4">
-      {items.map((it, idx) => {
-        switch (it.type) {
-          case 'user':
-            return <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} />;
-          case 'text':
-            return <Markdown key={it.key} text={it.p.text ?? ''} />;
-          case 'tools': {
-            const group = <ToolGroup key={it.key} calls={it.calls} total={it.total} cwd={cwd} running={running} isLast={idx === items.length - 1} />;
-            // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
-            return plan?.after === it.key ? [group, <PlanCard key="plan" todos={plan.todos} />] : group;
+    <TaskCtx.Provider value={tasks}>
+      <div className="space-y-4">
+        {items.map((it, idx) => {
+          switch (it.type) {
+            case 'user':
+              return <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} />;
+            case 'text':
+              return <Markdown key={it.key} text={it.p.text ?? ''} />;
+            case 'tools': {
+              const group = <ToolGroup key={it.key} calls={it.calls} total={it.total} cwd={cwd} running={running} isLast={idx === items.length - 1} />;
+              // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
+              return plan?.after === it.key ? [group, <PlanCard key="plan" todos={plan.todos} />] : group;
+            }
+            case 'result':
+              return <ResultLine key={it.key} p={it.p} />;
+            case 'error':
+              return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
+            case 'report':
+              return <ReportCard key={it.key} p={it.p} />;
+            default:
+              return null;
           }
-          case 'result':
-            return <ResultLine key={it.key} p={it.p} />;
-          case 'error':
-            return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
-          case 'report':
-            return <ReportCard key={it.key} p={it.p} />;
-          default:
-            return null;
-        }
-      })}
-      {(showWorking || latestStatus) && (
-        <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
-          {running && <Loader size={13} />}
-          <span className="truncate">{latestStatus ?? 'Working'}</span>
-        </div>
-      )}
-    </div>
+        })}
+        {(showWorking || latestStatus) && (
+          <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
+            {running && <Loader size={13} />}
+            <span className="truncate">{latestStatus ?? 'Working'}</span>
+          </div>
+        )}
+      </div>
+    </TaskCtx.Provider>
   );
 });

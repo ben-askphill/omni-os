@@ -50,6 +50,22 @@ describe('parseEvent: system', () => {
     expect(parseEvent({ type: 'system', subtype: 'task_summary', detail: null }).records).toEqual([]);
   });
 
+  it('maps the task lifecycle to task records', () => {
+    const started = parseEvent({ type: 'system', subtype: 'task_started', task_id: 't1', tool_use_id: 'toolu_1', description: 'Restyle home', subagent_type: 'general-purpose', task_type: 'local_agent', is_backgrounded: true, prompt: 'long' });
+    expect(started.records).toEqual([{ kind: 'task', payload: { task_id: 't1', tool_use_id: 'toolu_1', event: 'started', description: 'Restyle home', subagent_type: 'general-purpose', task_type: 'local_agent', background: true } }]);
+    const progress = parseEvent({ type: 'system', subtype: 'task_progress', task_id: 't1', tool_use_id: 'toolu_1', description: 'Restyle home', usage: { total_tokens: 900, tool_uses: 4, duration_ms: 5000 }, last_tool_name: 'Edit' });
+    expect(progress.records[0].payload).toEqual({ task_id: 't1', tool_use_id: 'toolu_1', event: 'progress', description: 'Restyle home', last_tool: 'Edit', tool_uses: 4, tokens: 900, duration_ms: 5000 });
+    const done = parseEvent({ type: 'system', subtype: 'task_notification', task_id: 't1', tool_use_id: 'toolu_1', status: 'completed', output_file: '', summary: 'Restyled' });
+    expect(done.records[0].payload).toEqual({ task_id: 't1', tool_use_id: 'toolu_1', event: 'ended', status: 'completed', summary: 'Restyled' });
+  });
+
+  it('keeps only the task_updated patches a view shows', () => {
+    expect(parseEvent({ type: 'system', subtype: 'task_updated', task_id: 't1', patch: { status: 'failed', error: 'x' } }).records[0].payload).toEqual({ task_id: 't1', event: 'ended', status: 'failed' });
+    expect(parseEvent({ type: 'system', subtype: 'task_updated', task_id: 't1', patch: { is_backgrounded: true } }).records[0].payload).toEqual({ task_id: 't1', event: 'progress', background: true });
+    expect(parseEvent({ type: 'system', subtype: 'task_updated', task_id: 't1', patch: { total_paused_ms: 5 } }).records).toEqual([]);
+    expect(parseEvent({ type: 'system', subtype: 'task_started' }).records).toEqual([]);
+  });
+
   it('ignores hook and other system subtypes', () => {
     expect(parseEvent({ type: 'system', subtype: 'hook_started', hook_id: 'x' }).records).toEqual([]);
     expect(parseEvent({ type: 'system', subtype: 'post_turn_summary', status_detail: 'x' }).records).toEqual([]);
@@ -313,8 +329,6 @@ describe('parseEvent: streaming input (replay, control, interrupt)', () => {
   it.each([
     { type: 'command_lifecycle', phase: 'turn_end' },
     { type: 'system', subtype: 'thinking_tokens', tokens: 12 },
-    { type: 'system', subtype: 'task_started', task_id: 't' },
-    { type: 'system', subtype: 'task_notification', task_id: 't', status: 'completed' },
     { type: 'system', subtype: 'post_turn_summary', status_detail: 'x' },
     { type: 'system', subtype: 'hook_started', hook_id: 'h' },
     { type: 'system', subtype: 'hook_response', hook_id: 'h', exit_code: 0 },

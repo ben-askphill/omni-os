@@ -12,7 +12,7 @@ import { parseSlash, resolveSlash, runnableCommands, slashRecord, type SlashComm
 import { invalidateCommands, listCommands, peekCommands, type CommandList } from './commands.ts';
 import { describeAttachments, inlinable, messageContent, saveUploads, type Attachment } from './uploads.ts';
 import { globalSecret, secretsEnv } from './secrets.ts';
-import { type Record as StreamRecord } from './stream.ts';
+import { type Record as StreamRecord, type TaskUpdate } from './stream.ts';
 import { publishFeed, publishThread } from './bus.ts';
 import { recordUsage } from './usage.ts';
 import { harnessEnv } from './harness/env-guard.ts';
@@ -122,6 +122,10 @@ interface Live {
   /** Holds the channel's persistent browser profile. */
   browser: boolean;
   initSeen: boolean;
+  /** Tasks the CLI runs beside the turn, by task id, until they end. Background ones keep the process alive. */
+  tasks: Map<string, ActiveTask>;
+  /** Progress persisted per task, at most every TASK_PROGRESS_MS. */
+  taskSaved: Map<string, number>;
   /** The commands the process listed itself, once it has. */
   commands: CommandList | null;
   resultSeen: boolean;
@@ -133,6 +137,25 @@ interface Live {
 }
 
 type ResultPayload = Extract<StreamRecord, { kind: 'result' }>['payload'];
+
+/** A sub-agent, background shell or workflow still running in some thread's process. */
+export interface ActiveTask {
+  thread_id: string;
+  channel_id: string;
+  task_id: string;
+  tool_use_id?: string;
+  description: string;
+  subagent_type?: string;
+  task_type?: string;
+  background: boolean;
+  started_at: string;
+  last_tool?: string;
+  tool_uses?: number;
+  tokens?: number;
+  summary?: string;
+}
+
+const TASK_PROGRESS_MS = 20_000;
 
 const lives = new Map<string, Live>();
 const waiting: string[] = []; // thread ids waiting for a slot, FIFO
@@ -152,6 +175,82 @@ function addEvent(threadId: string, kind: string, payload: unknown) {
 }
 
 const alive = (c: ChildProcess) => c.exitCode === null && c.signalCode === null;
+
+/** Every task still running, oldest first, for the sidebar and /api/tasks. */
+export const activeTasks = (): ActiveTask[] =>
+  [...lives.values()].flatMap((l) => [...l.tasks.values()]).sort((a, b) => a.started_at.localeCompare(b.started_at));
+
+// Progress comes in bursts from every agent at once; one feed update per second is plenty.
+let tasksTimer: ReturnType<typeof setTimeout> | undefined;
+function publishTasks(now = false) {
+  if (now) {
+    clearTimeout(tasksTimer);
+    tasksTimer = undefined;
+    return publishFeed({ type: 'tasks', tasks: activeTasks() });
+  }
+  tasksTimer ??= setTimeout(() => {
+    tasksTimer = undefined;
+    publishFeed({ type: 'tasks', tasks: activeTasks() });
+  }, 1000);
+}
+
+const hasBackground = (live: Live) => [...live.tasks.values()].some((t) => t.background);
+
+function onTask(live: Live, u: TaskUpdate) {
+  const id = live.threadId;
+  const known = live.tasks.get(u.task_id);
+  if (u.event === 'started') {
+    live.tasks.set(u.task_id, {
+      thread_id: id,
+      channel_id: live.channelId,
+      task_id: u.task_id,
+      tool_use_id: u.tool_use_id,
+      description: u.description || 'Task',
+      subagent_type: u.subagent_type,
+      task_type: u.task_type,
+      // Agents started with run_in_background say so here; a foreground one can be backgrounded later.
+      background: !!u.background,
+      started_at: new Date().toISOString(),
+    });
+    live.taskSaved.set(u.task_id, Date.now());
+    addEvent(id, 'task', u);
+    return publishTasks(true);
+  }
+  if (u.event === 'progress') {
+    if (!known) return;
+    Object.assign(known, {
+      description: u.description ?? known.description,
+      background: u.background ?? known.background,
+      last_tool: u.last_tool ?? known.last_tool,
+      tool_uses: u.tool_uses ?? known.tool_uses,
+      tokens: u.tokens ?? known.tokens,
+      summary: u.summary ?? known.summary,
+    });
+    // A task backgrounded mid-turn now keeps the process alive; a stored row keeps the transcript honest.
+    const last = live.taskSaved.get(u.task_id) ?? 0;
+    if (u.background !== undefined || Date.now() - last >= TASK_PROGRESS_MS) {
+      live.taskSaved.set(u.task_id, Date.now());
+      addEvent(id, 'task', u);
+    }
+    return publishTasks();
+  }
+  // Ended. The CLI can report the end twice (a status patch, then the notification); keep the first.
+  if (!known) return;
+  live.tasks.delete(u.task_id);
+  live.taskSaved.delete(u.task_id);
+  addEvent(id, 'task', u);
+  publishTasks(true);
+  if (!live.turn && !hasBackground(live)) armIdle(live);
+}
+
+/** The process is gone: whatever it still ran ended with it. */
+function endTasks(live: Live) {
+  if (!live.tasks.size) return;
+  for (const t of live.tasks.values()) addEvent(live.threadId, 'task', { task_id: t.task_id, tool_use_id: t.tool_use_id, event: 'ended', status: 'stopped' });
+  live.tasks.clear();
+  live.taskSaved.clear();
+  publishTasks(true);
+}
 
 export const runningCount = () => [...lives.values()].filter((l) => l.turn).length;
 export const queuedCount = () => waiting.length;
@@ -369,6 +468,11 @@ function closeLive(live: Live) {
 function armIdle(live: Live) {
   if (shuttingDown) return;
   clearTimeout(live.idleTimer);
+  // Closing stdin now would end the background agents with the process. Wait for them, within a bound.
+  if (hasBackground(live)) {
+    live.idleTimer = setTimeout(() => closeLive(live), config.taskKeepAliveSeconds * 1000);
+    return;
+  }
   if (config.keepAliveSeconds <= 0) return closeLive(live);
   live.idleTimer = setTimeout(() => closeLive(live), config.keepAliveSeconds * 1000);
 }
@@ -376,6 +480,7 @@ function armIdle(live: Live) {
 /** Forget the process: timers, browser profile, live state. */
 function teardown(live: Live) {
   clearTimeout(live.idleTimer);
+  endTasks(live);
   clearInterrupt(live);
   if (live.browser && browserHolder.get(live.channelId) === live.threadId) browserHolder.delete(live.channelId);
   if (lives.get(live.threadId) === live) lives.delete(live.threadId);
@@ -469,6 +574,8 @@ function onRecord(live: Live, rec: StreamRecord) {
       return;
     case 'result':
       return onResult(live, rec.payload);
+    case 'task':
+      return onTask(live, rec.payload);
     default: {
       // The model is working with no turn of ours open: a background task finished and the CLI runs a turn
       // about it by itself. Track it like any other so status, last_text and the parent report follow.
@@ -544,6 +651,8 @@ function launch(threadId: string, first: Msg): Live | undefined {
     shutdown: false,
     browser: false,
     initSeen: false,
+    tasks: new Map(),
+    taskSaved: new Map(),
     commands: null,
     resultSeen: false,
     spawnFailed: false,

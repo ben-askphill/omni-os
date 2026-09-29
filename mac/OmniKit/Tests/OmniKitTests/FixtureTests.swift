@@ -129,6 +129,7 @@ func sseData(_ text: String) -> [String] {
     #expect(events.contains { if case .usage(.claudeCode, _?) = $0 { true } else { false } })
     #expect(events.contains { if case .artifact = $0 { true } else { false } })
     #expect(events.contains { if case .thread = $0 { true } else { false } })
+    #expect(events.contains { if case .tasks(let t) = $0 { !t.isEmpty } else { false } })
     for e in events {
       if case .unknown(let json) = e { Issue.record("unknown feed event: \(json)") }
     }

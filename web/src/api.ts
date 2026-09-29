@@ -163,8 +163,27 @@ export type { SyncStatus } from '../../server/sync/worker.ts';
 /** POST /api/sync/setup: a code went out by email, or the sign-in worked. */
 export type SyncSetupResult = { state: 'code_sent'; email: string } | { state: 'signed_in'; email: string; relayChanged: boolean };
 
+/** A sub-agent or background task the CLI is running, as GET /api/tasks and the feed's 'tasks' event carry it. */
+export interface BackgroundTask {
+  thread_id: string;
+  channel_id: string;
+  task_id: string;
+  tool_use_id?: string;
+  description: string;
+  subagent_type?: string;
+  task_type?: string;
+  background: boolean;
+  /** ISO time. */
+  started_at: string;
+  last_tool?: string;
+  tool_uses?: number;
+  tokens?: number;
+  summary?: string;
+}
+
 export type FeedEvent =
   | { type: 'thread'; thread: Thread }
+  | { type: 'tasks'; tasks: BackgroundTask[] }
   | { type: 'usage'; harness?: HarnessId; usage: Usage | null }
   | { type: 'artifact'; artifact: Artifact }
   | { type: 'reconnect' };

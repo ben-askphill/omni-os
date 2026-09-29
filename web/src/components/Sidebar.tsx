@@ -1,6 +1,6 @@
 import { Fragment, useRef, type ReactNode } from 'react';
-import type { ChannelWithRunning, HarnessId, ThreadStub, Usage, UsageWindow } from '../api.ts';
-import { untilLabel } from '../format.ts';
+import type { BackgroundTask, ChannelWithRunning, HarnessId, ThreadStub, Usage, UsageWindow } from '../api.ts';
+import { duration, plural, toDate, untilLabel } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { ThemeSwitch } from './theme.tsx';
@@ -119,13 +119,15 @@ function RunningBadge({ n }: { n: number }) {
 }
 
 /** A thread nested under its channel, like a Claude Code session under its project. */
-function ThreadLink({ t, active, onNavigate }: { t: ThreadStub; active: boolean; onNavigate?: () => void }) {
+function ThreadLink({ t, active, agents, onNavigate }: { t: ThreadStub; active: boolean; agents: number; onNavigate?: () => void }) {
   const title = t.title || 'Untitled';
+  // A thread whose turn ended still works while its sub-agents run.
+  const busy = t.status === 'running' || agents > 0;
   return (
     <a
       href={href.thread(t.id)}
       onClick={onNavigate}
-      title={`${title} · ${STATUS_LABEL[t.status] ?? t.status}`}
+      title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : (STATUS_LABEL[t.status] ?? t.status)}`}
       aria-current={active ? 'page' : undefined}
       data-active={active || undefined}
       className={`hov z-[1] ml-[25px] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${
@@ -133,9 +135,24 @@ function ThreadLink({ t, active, onNavigate }: { t: ThreadStub; active: boolean;
       }`}
     >
       <span className="grid w-3 shrink-0 place-items-center">
-        {t.status === 'running' ? <Loader size={11} className="text-live-text" /> : <StatusDot status={t.status} size={7} />}
+        {busy ? <Loader size={11} className="text-live-text" /> : <StatusDot status={t.status} size={7} />}
       </span>
       <span className="min-w-0 flex-1 truncate">{title}</span>
+    </a>
+  );
+}
+
+/** A sub-agent running anywhere, linking to the thread that started it. */
+function AgentLink({ t, channel, onNavigate }: { t: BackgroundTask; channel?: string; onNavigate?: () => void }) {
+  const now = useNow(1000);
+  const tip = [t.description, channel && `#${channel}`, t.tool_uses ? plural(t.tool_uses, 'tool') : null, t.last_tool && `last ${t.last_tool}`].filter(Boolean).join(' · ');
+  return (
+    <a href={href.thread(t.thread_id)} onClick={onNavigate} title={tip} className="hov z-[1] flex h-9 items-center gap-2.5 rounded-full px-3 text-[13px] text-fg-2 transition-colors hover:text-fg md:h-8 md:text-[12.5px]">
+      <span className="grid w-[15px] shrink-0 place-items-center">
+        <Loader size={11} className="text-live-text" />
+      </span>
+      <span className="min-w-0 flex-1 truncate">{t.description}</span>
+      <span className="shrink-0 font-num text-[11px] text-fg-4 tabular-nums">{duration(Math.max(0, now - toDate(t.started_at).getTime()))}</span>
     </a>
   );
 }
@@ -154,7 +171,7 @@ const GROUPS: { kind: string; label: string }[] = [
 export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onSearch: () => void }) {
   const route = useRoute();
   const hash = useHash();
-  const { channels, channelsError, openThread } = useApp();
+  const { channels, channelsError, openThread, tasks } = useApp();
   const listRef = useRef<HTMLDivElement>(null);
 
   const activeChannel = route.name === 'channel' ? route.id : null;
@@ -180,7 +197,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
     return (
       <>
         {shown.map((t) => (
-          <ThreadLink key={t.id} t={t} active={t.id === openId} onNavigate={onNavigate} />
+          <ThreadLink key={t.id} t={t} active={t.id === openId} agents={tasks.filter((k) => k.thread_id === t.id).length} onNavigate={onNavigate} />
         ))}
         {list.length > shown.length && (
           <a href={href.channel(c.id)} onClick={onNavigate} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
@@ -258,6 +275,20 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
               </>
             )}
           </div>
+
+          {tasks.length > 0 && (
+            <div>
+              <div className="caption flex items-center justify-between px-3 pt-1 pb-2">
+                <span>Agents</span>
+                <span className="font-num text-live-text tabular-nums">{tasks.length}</span>
+              </div>
+              <div className="space-y-px">
+                {tasks.map((t) => (
+                  <AgentLink key={t.task_id} t={t} channel={channels.find((c) => c.id === t.channel_id)?.name} onNavigate={onNavigate} />
+                ))}
+              </div>
+            </div>
+          )}
 
           {channelsError && <ErrorNote>{channelsError}</ErrorNote>}
 

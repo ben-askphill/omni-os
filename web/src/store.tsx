@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, openSSE, errorText, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type Status, type ThreadStub } from './api.ts';
+import { api, openSSE, errorText, type BackgroundTask, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type Status, type ThreadStub } from './api.ts';
 
 interface AppState {
   channels: ChannelWithRunning[];
@@ -10,6 +10,8 @@ interface AppState {
   usage: HarnessUsage;
   status: Omit<Status, 'usage'> | null;
   feedLive: boolean;
+  /** Every sub-agent running right now, across all threads. */
+  tasks: BackgroundTask[];
   subscribe: (fn: (e: FeedEvent) => void) => () => void;
   channel: (id: string) => ChannelWithRunning | undefined;
   /** The thread currently open, so the sidebar can list and highlight it under its channel. */
@@ -27,6 +29,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [usage, setUsage] = useState<HarnessUsage>({});
   const [status, setStatus] = useState<Omit<Status, 'usage'> | null>(null);
   const [feedLive, setFeedLive] = useState(false);
+  const [tasks, setTasks] = useState<BackgroundTask[]>([]);
   const [openThread, setOpenThread] = useState<ThreadStub | null>(null);
   const listeners = useRef(new Set<(e: FeedEvent) => void>());
 
@@ -59,11 +62,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, []);
 
+  const reloadTasks = useCallback(() => {
+    api
+      .get<BackgroundTask[]>('/tasks')
+      .then(setTasks)
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     void reloadChannels();
     void reloadStatus();
     reloadCrew();
-  }, [reloadChannels, reloadStatus, reloadCrew]);
+    reloadTasks();
+  }, [reloadChannels, reloadStatus, reloadCrew, reloadTasks]);
 
   // Thread events arrive in bursts; refresh running counts at most every ~0.5s.
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -86,6 +97,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setUsage((prev) => ({ ...prev, [e.harness ?? 'claude-code']: e.usage }));
         } else if (e.type === 'thread') {
           scheduleRefresh();
+        } else if (e.type === 'tasks') {
+          setTasks(e.tasks);
         }
         emit(e);
       },
@@ -96,6 +109,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             // Missed events while disconnected: let every view refetch.
             scheduleRefresh();
             reloadCrew();
+            reloadTasks();
             emit({ type: 'reconnect' });
           }
         },
@@ -103,7 +117,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
     );
     return () => h.close();
-  }, [scheduleRefresh, reloadCrew]);
+  }, [scheduleRefresh, reloadCrew, reloadTasks]);
 
   const subscribe = useCallback((fn: (e: FeedEvent) => void) => {
     listeners.current.add(fn);
@@ -122,12 +136,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       usage,
       status,
       feedLive,
+      tasks,
       subscribe,
       channel: (id: string) => channels.find((c) => c.id === id),
       openThread,
       setOpenThread,
     }),
-    [channels, channelsLoaded, channelsError, reloadChannels, crew, usage, status, feedLive, subscribe, openThread],
+    [channels, channelsLoaded, channelsError, reloadChannels, crew, usage, status, feedLive, tasks, subscribe, openThread],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

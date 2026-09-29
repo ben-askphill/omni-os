@@ -60,36 +60,57 @@
     {
       "id": 4,
       "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "task",
+      "payload": "{\"task_id\":\"toolu_fake_1\",\"event\":\"started\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 5,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
       "kind": "tool_result",
       "payload": "{\"tool_use_id\":\"toolu_fake_1\",\"text\":\"slept 20ms\",\"is_error\":false,\"truncated\":false}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {
-      "id": 5,
+      "id": 6,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "task",
+      "payload": "{\"task_id\":\"toolu_fake_1\",\"event\":\"ended\",\"status\":\"completed\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 7,
       "thread_id": "00000000-0000-4000-8000-000000000001",
       "kind": "assistant_text",
       "payload": "{\"text\":\"ack: TOOL:20 fix the cart\"}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {
-      "id": 6,
+      "id": 8,
       "thread_id": "00000000-0000-4000-8000-000000000001",
       "kind": "result",
       "payload": "{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":1000,\"turns\":2,\"cost_usd\":0.002}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {
-      "id": 7,
+      "id": 9,
       "thread_id": "00000000-0000-4000-8000-000000000001",
       "kind": "user",
       "payload": "{\"text\":\"TOOL:4000 and the tests\",\"source\":\"ben\"}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {
-      "id": 8,
+      "id": 10,
       "thread_id": "00000000-0000-4000-8000-000000000001",
       "kind": "tool_use",
       "payload": "{\"id\":\"toolu_fake_3\",\"name\":\"Bash\",\"input\":{\"command\":\"sleep 4\",\"description\":\"Fake tool\"},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 11,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "task",
+      "payload": "{\"task_id\":\"toolu_fake_3\",\"event\":\"started\"}",
       "created_at": "2026-01-05T09:00:00.000Z"
     }
   ],

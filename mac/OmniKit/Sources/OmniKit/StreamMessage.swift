@@ -42,10 +42,12 @@ public enum FeedEvent: Decodable, Hashable, Sendable {
   /// A harness's plan usage changed. The server sends every harness's usage when the feed connects.
   case usage(harness: HarnessID, usage: Usage?)
   case artifact(Artifact)
+  /// Every sub-agent running now, across all threads, whenever one starts, progresses or ends.
+  case tasks([BackgroundTask])
   case unknown(JSONValue)
 
   private enum CodingKeys: String, CodingKey {
-    case type, thread, harness, usage, artifact
+    case type, thread, harness, usage, artifact, tasks
   }
 
   public init(from decoder: any Decoder) throws {
@@ -63,8 +65,35 @@ public enum FeedEvent: Decodable, Hashable, Sendable {
       )
     case "artifact":
       self = .artifact(try c.decode(Artifact.self, forKey: .artifact))
+    case "tasks":
+      self = .tasks(try c.decode([BackgroundTask].self, forKey: .tasks))
     default:
       self = .unknown(try JSONValue(from: decoder))
     }
+  }
+}
+
+/// A sub-agent the CLI is running, as GET /api/tasks and the feed's `tasks` event carry it.
+public struct BackgroundTask: Decodable, Hashable, Sendable, Identifiable {
+  public var id: String { taskID }
+  public let threadID: String
+  public let channelID: String
+  public let taskID: String
+  public let toolUseID: String?
+  public let description: String
+  public let background: Bool
+  public let startedAt: Date
+  public let lastTool: String?
+  public let toolUses: Int?
+
+  enum CodingKeys: String, CodingKey {
+    case description, background
+    case threadID = "thread_id"
+    case channelID = "channel_id"
+    case taskID = "task_id"
+    case toolUseID = "tool_use_id"
+    case startedAt = "started_at"
+    case lastTool = "last_tool"
+    case toolUses = "tool_uses"
   }
 }
