@@ -195,7 +195,7 @@ private struct ReplyComposerView: View {
         .help(ReplyComposerModel.openPRPrompt)
       }
       Spacer(minLength: 8)
-      Text("⌘↩")
+      Text("↩")
         .font(.system(size: 11.5))
         .foregroundStyle(.tertiary)
         .accessibilityHidden(true)

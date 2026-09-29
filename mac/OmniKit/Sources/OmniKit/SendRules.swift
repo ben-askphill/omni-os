@@ -13,7 +13,7 @@ public enum SendRules {
     canSteer ? [.steer, .queue, .interrupt] : [.queue, .interrupt]
   }
 
-  /// What the button's main half and Cmd-Return do on a busy thread.
+  /// What the button's main half and Return do on a busy thread.
   public static func primary(canSteer: Bool) -> SendMode {
     canSteer ? .steer : .queue
   }
