@@ -1,7 +1,7 @@
 import { db, threads, type Thread } from '../../db.ts';
 import { publishFeed } from '../../bus.ts';
 import { claim, registerHandler } from '../apply.ts';
-import { fromPortable, toRemote } from '../paths.ts';
+import { fromPortable, safeSegment, toRemote } from '../paths.ts';
 
 // Threads: last writer wins on the whole row. cwd travels with the home dir as "~", through each Mac's path map.
 
@@ -21,9 +21,11 @@ registerHandler('thread', {
     return t ? { ...t, cwd: toRemote(t.cwd) } : null;
   },
   apply(change) {
-    if (!claim(change)) return false;
+    // The id names the thread's folder here: one that would leave data/threads is dropped, not retried.
+    if (!safeSegment(change.entity_id) || !claim(change)) return false;
     if (change.op === 'delete') return db.prepare('DELETE FROM threads WHERE id = ?').run(change.entity_id).changes > 0;
-    const t = { harness: 'claude-code', effort: '', has_run: 0, ...(change.data as Partial<Thread>) } as Thread;
+    // The row is the one the change names, which is also the one claim just stamped.
+    const t = { harness: 'claude-code', effort: '', has_run: 0, ...(change.data as Partial<Thread>), id: change.entity_id } as Thread;
     upsert.run(
       ...COLUMNS.map((c) => (c === 'cwd' ? fromPortable(t.cwd) : ((t[c] ?? null) as string | number | null))),
     );

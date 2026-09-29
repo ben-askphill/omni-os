@@ -267,11 +267,20 @@ function record(entity: SyncEntity, entityId: string, op: SyncOp = 'upsert') {
 }
 let onRecord: (() => void) | null = null;
 
+/**
+ * The time a last-writer-wins row is queued with by the first arm: before any real write. A Mac joining later
+ * seeds its built-in channels and kv too, and those are defaults, not edits newer than the other Mac's. A seeded
+ * copy therefore loses to any write, and never replaces a row the receiving Mac already has (apply.ts claim).
+ */
+export const SEED_TS = '1970-01-01T00:00:00.000Z';
+
 /** Queue every row there is, parents first, the first time sync is set up on this machine. */
 function seed(machineId: string) {
   const ts = now();
   const q = (entity: SyncEntity, select: string) =>
-    db.prepare(`INSERT INTO sync_outbox (entity, entity_id, op, ts) SELECT '${entity}', k, 'upsert', ? FROM (${select})`).run(ts);
+    db
+      .prepare(`INSERT INTO sync_outbox (entity, entity_id, op, ts) SELECT '${entity}', k, 'upsert', ? FROM (${select})`)
+      .run(LWW.has(entity) ? SEED_TS : ts);
   q('channel', 'SELECT id AS k FROM channels ORDER BY created_at, rowid');
   q('thread', 'SELECT id AS k FROM threads ORDER BY created_at, rowid');
   q('event', 'SELECT uid AS k FROM events ORDER BY id');
@@ -444,6 +453,12 @@ export const threads = {
       if (db.prepare(`UPDATE threads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id).changes) record('thread', id);
     });
     return threads.get(id);
+  },
+  /** Move a thread to another channel, keeping its place in the lists. import-history's --move-imported uses it. */
+  setChannel(id: string, channelId: string) {
+    tx(() => {
+      if (db.prepare('UPDATE threads SET channel_id = ? WHERE id = ?').run(channelId, id).changes) record('thread', id);
+    });
   },
   /**
    * Threads that were mid-run when the server died can never finish. Not one another machine's sync says is

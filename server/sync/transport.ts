@@ -182,13 +182,15 @@ export function createSupabaseTransport(opts: SupabaseTransportOptions): SyncTra
   let userId: string | null = null;
   let refreshToken = opts.refreshToken;
   let signingIn: Promise<void> | null = null;
+  /** Stores one at a time, in rotation order: a slow store finishing last would leave a used token in the Keychain. */
+  let storing: Promise<void> = Promise.resolve();
 
   function keep(token: string | undefined) {
     if (!token || token === refreshToken) return;
     refreshToken = token;
-    Promise.resolve(opts.onRefreshToken(token)).catch((err) =>
-      console.error('[sync] could not store the new refresh token:', (err as Error).message),
-    );
+    storing = storing
+      .then(() => opts.onRefreshToken(token))
+      .catch((err) => console.error('[sync] could not store the new refresh token:', (err as Error).message));
   }
 
   const quiet = (c: SupabaseClient) => void Promise.resolve(c.auth.stopAutoRefresh?.()).catch(() => {});

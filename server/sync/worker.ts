@@ -67,7 +67,10 @@ export interface SyncWorker {
   /** Sync within ms, coalescing calls. */
   syncSoon(ms?: number): void;
   start(): void;
+  /** Stop syncing. A sync in flight finishes its request but applies nothing more and leaves the cursor alone. */
   stop(): void;
+  /** Resolves once no sync is in flight: after stop, before another worker takes over the cursor and the outbox. */
+  settled(): Promise<void>;
   status(): SyncStatus;
 }
 
@@ -104,6 +107,8 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   const interval = opts.intervalMs ?? 60_000;
 
   let started = false;
+  /** Set by stop, cleared by start. A sync in flight checks it after each request it waits on. */
+  let stopped = false;
   let failures = 0;
   let lastError: string | null = null;
   let signedOut = false;
@@ -119,6 +124,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   async function push(): Promise<number> {
     let pushed = 0;
     for (;;) {
+      if (stopped) return pushed;
       const rows = outbox.pending(batch, registeredEntities());
       if (!rows.length) return pushed;
       const changes = toChanges(rows, machineId);
@@ -133,6 +139,9 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
     for (;;) {
       const after = kv.get<number>('sync.cursor') ?? 0;
       const changes = await transport.pull({ after, excludeMachine: machineId, limit: batch });
+      // Stopped while this pull was out (a sign-out, or a move to another relay that reset the cursor): these
+      // changes and this cursor belong to the sync that is over.
+      if (stopped) return;
       if (!changes.length) break;
       const stats = applyBatch(changes.map((c) => ({ ...c, ts: isoTs(c.ts) })), ctx);
       result.pulled += changes.length;
@@ -200,6 +209,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
     start() {
       if (started) return;
       started = true;
+      stopped = false;
       unsubscribe = transport.subscribe?.(machineId, () => worker.syncSoon(300));
       // A second or so, so the Wi-Fi's DNS and routes settle first. A failure still backs off as usual.
       offNetwork = opts.network?.(() => worker.syncSoon(1_000));
@@ -208,6 +218,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
     },
     stop() {
       started = false;
+      stopped = true;
       clearTimeout(timer);
       clearTimeout(soon);
       soon = undefined;
@@ -217,6 +228,9 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       offNetwork?.();
       offNetwork = undefined;
       outbox.onRecord(null);
+    },
+    async settled() {
+      while (inflight || queued) await (queued ?? inflight)!.catch(() => {});
     },
     status() {
       return {
@@ -241,9 +255,16 @@ let active: SyncWorker | null = null;
 
 /** The worker the server runs, or null while sync is off. startSync sets it; tests can too. */
 export const activeWorker = () => active;
-export function setActiveWorker(w: SyncWorker | null) {
-  if (active && active !== w) active.stop();
+/**
+ * Make w the server's worker, stopping the one before. Resolves once that one's sync in flight is over, so two
+ * workers never push the same outbox rows or write the cursor at once: start w only after it resolves.
+ */
+export function setActiveWorker(w: SyncWorker | null): Promise<void> {
+  const prev = active;
   active = w;
+  if (!prev || prev === w) return Promise.resolve();
+  prev.stop();
+  return prev.settled();
 }
 
 /** Sync now, for anything that wants its change on the other Mac sooner. Null when sync is off. */
@@ -297,7 +318,9 @@ export async function startSync(): Promise<SyncWorker | null> {
     onRefreshToken: (token) => setSecret('global', SYNC_SECRETS.refreshToken, token),
   });
   const w = createSyncWorker({ transport, autoPushMs: 2_000, network: watchNetwork });
-  setActiveWorker(w);
+  await setActiveWorker(w);
+  // Replaced again while the last one finished (a second sign-in): that one starts instead.
+  if (activeWorker() !== w) return null;
   w.start();
   console.log(`[sync] on, machine ${w.machineId}`);
   return w;

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { MemoryTransport } from '../server/sync/transport.ts';
@@ -218,5 +218,53 @@ describe('Cursor Agent chats', () => {
     expect(await b.files.pushSession(onB, b.opts)).toBe(0);
     expect(put).not.toHaveBeenCalled();
     put.mockRestore();
+  });
+});
+
+describe('paths from the relay', () => {
+  it('never writes a Cursor chat outside its chats folder, whatever the session id says', async () => {
+    const cwd = join(b.home, 'shop');
+    const sid = '../../../../escape';
+    const key = `cursor:${sid}`;
+    const body = Buffer.from('owned');
+    relay.objects.set('manifests/t9.json', Buffer.from(JSON.stringify({
+      v: 1, files: {}, sessions: { [key]: { harness: 'cursor', id: sid, files: { 'evil.txt': { sha: sha(body), size: 5, mtime: 1 } } } },
+    })));
+    relay.objects.set(`sessions/cursor/${sid}/evil.txt`, body);
+    expect(await b.files.pullSession(thread('t9', cwd, { harness: 'cursor', session_id: sid }), b.opts)).toBe(0);
+    expect(existsSync(join(b.home, 'escape', 'evil.txt'))).toBe(false);
+    expect(existsSync(join(b.home, '..', 'escape'))).toBe(false);
+  });
+
+  it('never builds a thread folder from an id that is not one folder name', async () => {
+    const body = Buffer.from('owned');
+    relay.objects.set('manifests/../../escape.json', Buffer.from(JSON.stringify({ v: 1, files: { 'uploads/x.txt': { sha: sha(body), size: 5, mtime: 1 } }, sessions: {} })));
+    relay.objects.set(`blobs/${sha(body)}`, body);
+    expect(await b.files.pullThreadFiles('../../escape', b.opts)).toEqual({ count: 0, skipped: 0 });
+    expect(existsSync(join(b.config.paths.threads, '..', '..', 'escape'))).toBe(false);
+  });
+});
+
+describe('a malformed manifest from the relay', () => {
+  it('skips a broken entry and still downloads the rest, leaving no temp file behind', async () => {
+    const good = Buffer.from('fine');
+    const odd = Buffer.from('odd mtime');
+    relay.objects.set(`blobs/${sha(good)}`, good);
+    relay.objects.set(`blobs/${sha(odd)}`, odd);
+    relay.objects.set('manifests/t10.json', Buffer.from(JSON.stringify({
+      v: 1,
+      files: {
+        'uploads/a-null.txt': null,
+        'uploads/b-odd.txt': { sha: sha(odd), size: odd.length, mtime: 'not a time' },
+        'uploads/c-good.txt': { sha: sha(good), size: good.length, mtime: 1_700_000_000_000 },
+      },
+      sessions: {},
+    })));
+    const r = await b.files.pullThreadFiles('t10', b.opts);
+    expect(r).toEqual({ count: 2, skipped: 1 });
+    const dir = join(b.config.threadDir('t10'), 'uploads');
+    expect(readFileSync(join(dir, 'c-good.txt'), 'utf8')).toBe('fine');
+    expect(readFileSync(join(dir, 'b-odd.txt'), 'utf8')).toBe('odd mtime');
+    expect(readdirSync(dir).filter((n) => n.startsWith('.'))).toEqual([]);
   });
 });

@@ -42,5 +42,13 @@ export function fromPortable<T extends string | null>(p: T, opts: { home?: strin
   return (mapped.startsWith('~/') ? home + mapped.slice(1) : mapped) as T;
 }
 
+/**
+ * True when an id from another machine is one plain folder name: no separators, no "." or "..", no NUL.
+ * Thread ids and session ids become folder names here (data/threads/<id>, a Cursor chat's folder), and the
+ * relay's data is not trusted to stay inside them.
+ */
+export const safeSegment = (id: unknown): id is string =>
+  typeof id === 'string' && id.length > 0 && id.length <= 200 && id !== '.' && id !== '..' && !/[/\\\0]/.test(id);
+
 /** This machine's path map, from kv `sync.path_map`. */
 export const pathMap = (): PathMap => kv.get<PathMap>('sync.path_map') ?? {};

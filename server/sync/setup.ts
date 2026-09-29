@@ -117,7 +117,8 @@ export async function setupSync(input: SetupRequest, deps: SetupDeps): Promise<S
   const before = kv.get<string>('sync.relay');
   const relayChanged = !!before && before !== relay;
   if (relayChanged) {
-    setActiveWorker(null);
+    // The old relay's sync must be over first, or it could write its cursor over the reset below.
+    await setActiveWorker(null);
     kv.set('sync.cursor', 0);
     db.exec('DELETE FROM sync_deferred');
     if (outbox.machineId()) backfill();
@@ -136,7 +137,7 @@ function authFailed(err: unknown): never {
 
 /** Stop syncing. With forget, also remove the credentials from the Keychain, so it takes a new sign-in. */
 export async function disableSync(opts: { forget?: boolean }, deps: SetupDeps) {
-  setActiveWorker(null);
+  await setActiveWorker(null);
   kv.set('sync.enabled', false);
   if (opts.forget) for (const name of Object.values(SYNC_SECRETS)) await deps.deleteSecret(name);
 }

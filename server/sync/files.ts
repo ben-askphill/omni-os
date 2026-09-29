@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, sep } from 'node:path';
 import { threadDir } from '../config.ts';
 import { kv, threads, type Thread } from '../db.ts';
+import { safeSegment } from './paths.ts';
 import type { SyncTransport } from './transport.ts';
 import { activeWorker } from './worker.ts';
 
@@ -100,11 +101,12 @@ function unchanged(state: LocalState, key: string, path: string) {
 }
 
 /** Write a file whole: a reader never sees half of it. The temp file is a dotfile, so no watcher or push picks it up. */
-function writeAtomic(path: string, body: Uint8Array, mtime?: number) {
+function writeAtomic(path: string, body: Uint8Array, mtime?: unknown) {
   mkdirSync(dirname(path), { recursive: true });
   const tmp = join(dirname(path), `.${basename(path)}.omni-sync-${process.pid}`);
   writeFileSync(tmp, body);
-  if (mtime) utimesSync(tmp, new Date(mtime), new Date(mtime));
+  // The mtime comes from the relay's manifest: one that is not a time is left out, not a failed download.
+  if (typeof mtime === 'number' && Number.isFinite(mtime) && mtime > 0) utimesSync(tmp, new Date(mtime), new Date(mtime));
   renameSync(tmp, path);
 }
 
@@ -174,11 +176,14 @@ export async function pushThreadFiles(threadId: string, opts: FileSyncOptions): 
 /** Download the files in the thread's manifest that this machine does not have. A file already here is left alone. */
 export async function pullThreadFiles(threadId: string, opts: FileSyncOptions): Promise<FilesResult> {
   const { transport } = opts;
-  const manifest = await readManifest(transport, threadId);
   const result: FilesResult = { count: 0, skipped: 0 };
+  // Thread ids come from the relay too, and the folder is built from one.
+  if (!safeSegment(threadId)) return result;
+  const manifest = await readManifest(transport, threadId);
   const state = readState(threadId);
   for (const [rel, entry] of Object.entries(manifest.files)) {
-    if (!safeRel(rel) || !(FILE_AREAS as readonly string[]).includes(rel.split('/')[0]) || rel.split('/').length < 2) {
+    const listed = !!entry && typeof entry === 'object' && typeof entry.sha === 'string';
+    if (!listed || !safeRel(rel) || !(FILE_AREAS as readonly string[]).includes(rel.split('/')[0]) || rel.split('/').length < 2) {
       result.skipped++;
       continue;
     }
@@ -207,9 +212,13 @@ const codexHome = (home: string, env: NodeJS.ProcessEnv) => env.CODEX_HOME?.trim
 const cursorDir = (home: string, env: NodeJS.ProcessEnv) =>
   env.CURSOR_CONFIG_DIR?.trim() || (env.XDG_CONFIG_HOME?.trim() ? join(env.XDG_CONFIG_HOME, 'cursor') : join(home, '.cursor'));
 
-/** Whether the thread has a session file to sync. Codex and Cursor threads keep their Omni id until the first turn. */
+/**
+ * Whether the thread has a session file to sync. Codex and Cursor threads keep their Omni id until the first turn.
+ * The session id names a file or folder below, and a thread row may come from the relay: it must be a plain name.
+ */
 const hasSession = (t: Thread) =>
-  t.harness === 'claude-code' || ((t.harness === 'codex' || t.harness === 'cursor') && t.session_id !== t.id);
+  safeSegment(t.session_id) &&
+  (t.harness === 'claude-code' || ((t.harness === 'codex' || t.harness === 'cursor') && t.session_id !== t.id));
 
 /**
  * The folder a harness keeps this thread's session in, on this machine:
@@ -302,8 +311,8 @@ export async function pullSession(t: Thread, opts: FileSyncOptions): Promise<num
   const state = readState(t.id);
   let written = 0;
   let learned = false;
-  for (const [rel, remote] of Object.entries(entry.files)) {
-    if (!sessionRel(t, rel)) continue;
+  for (const [rel, remote] of Object.entries(entry.files ?? {})) {
+    if (!remote || typeof remote !== 'object' || typeof remote.sha !== 'string' || !sessionRel(t, rel)) continue;
     const path = join(root, rel);
     const skey = `s:${key}:${rel}`;
     if (existsSync(path)) {

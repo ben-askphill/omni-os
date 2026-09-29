@@ -1,4 +1,4 @@
-import { db, syncMeta, tx, type SyncEntity } from '../db.ts';
+import { db, SEED_TS, syncMeta, tx, type SyncEntity } from '../db.ts';
 import type { RemoteChange } from './transport.ts';
 
 // Remote changes into the local db. Each entity has a handler; server/sync/handlers/ registers them.
@@ -49,10 +49,11 @@ export const later = (ts: string, machine: string, ts2: string, machine2: string
 /**
  * Last-writer-wins gate for a handler: true when the change is newer than the last write this row took,
  * local or remote, and records it as the last write. Call it inside apply, before writing.
+ * A seeded copy (SEED_TS, another Mac's first arm) only fills a gap: it never replaces a row this Mac has.
  */
 export function claim(change: RemoteChange): boolean {
   const last = syncMeta.get(change.entity, change.entity_id);
-  if (last && !later(change.ts, change.machine_id, last.ts, last.machine_id)) return false;
+  if (last && (change.ts === SEED_TS || !later(change.ts, change.machine_id, last.ts, last.machine_id))) return false;
   syncMeta.set(change.entity, change.entity_id, change.ts, change.machine_id);
   return true;
 }

@@ -67,6 +67,8 @@ describe('supabase transport tokens', () => {
     expect(stored).toEqual(['rt-1']);
     fake.emit('TOKEN_REFRESHED', 'rt-9');
     fake.emit('TOKEN_REFRESHED', 'rt-9');
+    // Stores run one after another, so the new one lands a tick later.
+    await new Promise((r) => setTimeout(r, 0));
     expect(stored).toEqual(['rt-1', 'rt-9']);
   });
 
@@ -131,5 +133,26 @@ describe('supabase transport tokens', () => {
     expect(printed).not.toMatch(/rt-\d/);
     log.mockRestore();
     error.mockRestore();
+  });
+});
+
+describe('supabase transport token storage', () => {
+  it('stores rotated refresh tokens in the order they came, however long each store takes', async () => {
+    const fake = fakeSupabase();
+    const stored: string[] = [];
+    const t = createSupabaseTransport({
+      url: 'https://example.supabase.co',
+      anonKey: 'anon',
+      refreshToken: 'rt-0',
+      // The first store is slow (a Keychain prompt, a busy `security`), the next one quick.
+      onRefreshToken: (tok) => new Promise<void>((r) => setTimeout(() => (stored.push(tok), r()), tok === 'rt-a' ? 40 : 1)),
+      createClient: fake.create,
+    });
+    await t.push([]);
+    fake.emit('TOKEN_REFRESHED', 'rt-a');
+    fake.emit('TOKEN_REFRESHED', 'rt-b');
+    await new Promise((r) => setTimeout(r, 80));
+    expect(stored.at(-1)).toBe('rt-b');
+    expect(stored).toEqual(['rt-1', 'rt-a', 'rt-b']);
   });
 });

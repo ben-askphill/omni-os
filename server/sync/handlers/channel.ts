@@ -1,6 +1,6 @@
 import { channels, db, type Channel } from '../../db.ts';
 import { claim, registerHandler } from '../apply.ts';
-import { fromPortable, toRemote } from '../paths.ts';
+import { fromPortable, safeSegment, toRemote } from '../paths.ts';
 
 // Channels: last writer wins on the whole row. repo_path and base_dir travel with the home dir as "~", through
 // each Mac's path map. A folder that is not on this Mac is fine: new threads fall back as prepareWorkdir does.
@@ -22,7 +22,8 @@ registerHandler('channel', {
     return ch ? { ...ch, repo_path: toRemote(ch.repo_path), base_dir: toRemote(ch.base_dir) } : null;
   },
   apply(change) {
-    if (!claim(change)) return false;
+    // Channel ids end up in secret scopes and folder names: one that is not a plain name is dropped.
+    if (!safeSegment(change.entity_id) || !claim(change)) return false;
     // Nothing deletes a channel today. One that still has threads here fails on them and waits in sync_deferred.
     if (change.op === 'delete') return db.prepare('DELETE FROM channels WHERE id = ?').run(change.entity_id).changes > 0;
     const ch = {

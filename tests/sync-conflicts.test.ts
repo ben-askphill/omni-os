@@ -168,3 +168,42 @@ describe('insert only: events and automation runs', () => {
     expect(uids(a)).toEqual(uids(b));
   });
 });
+
+describe('a second Mac joining', () => {
+  // Both installs start with the same built-in channels. A fresh Mac's copy is a default, not a newer edit.
+  const shared = new MemoryTransport();
+  async function fresh(name: string, before?: (db: typeof import('../server/db.ts')) => void) {
+    vi.resetModules();
+    process.env.OMNI_DATA_DIR = mkdtempSync(join(tmpdir(), `omni-join-${name}-`));
+    const db = await import('../server/db.ts');
+    before?.(db);
+    const sync = await import('../server/sync/worker.ts');
+    return { db, worker: sync.createSyncWorker({ transport: shared, machineId: name }) };
+  }
+  const run = async (...ms: { worker: { syncNow(): Promise<{ error?: string }> } }[]) => {
+    for (const m of ms) expect((await m.worker.syncNow()).error).toBeUndefined();
+  };
+
+  it("does not overwrite the first Mac's edits with its own defaults", async () => {
+    const first = await fresh('mac-a');
+    first.db.channels.update('inbox', { notes: 'edited on A' });
+    await run(first);
+    // mac-z sorts after mac-a, so a tie at the same ts would go its way too.
+    const joiner = await fresh('mac-z');
+    await run(joiner, first, joiner);
+    expect(first.db.channels.get('inbox')!.notes).toBe('edited on A');
+    expect(joiner.db.channels.get('inbox')!.notes).toBe('edited on A');
+  });
+
+  it('keeps edits made before sync was set up, whichever Mac signs in first', async () => {
+    const empty = await fresh('mac-y');
+    await run(empty);
+    const edited = await fresh('mac-b', (db) => db.channels.update('conductor', { notes: 'my conductor' }));
+    await run(edited, empty, edited);
+    expect(edited.db.channels.get('conductor')!.notes).toBe('my conductor');
+    // A real edit after that goes everywhere, as always.
+    edited.db.channels.update('conductor', { notes: 'edited again' });
+    await run(edited, empty);
+    expect(empty.db.channels.get('conductor')!.notes).toBe('edited again');
+  });
+});

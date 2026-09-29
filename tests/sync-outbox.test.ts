@@ -116,4 +116,13 @@ describe('sync outbox', () => {
     expect(db.syncMeta.get('thread', 't2')).toEqual({ ts: expect.any(String), machine_id: 'mac-a' });
     clear();
   });
+
+  it("records a thread moved to another channel, as import-history's --move-imported does", () => {
+    db.channels.create({ id: 'moved-to', name: 'Moved to' });
+    clear();
+    db.threads.setChannel('t2', 'moved-to');
+    expect(db.threads.get('t2')!.channel_id).toBe('moved-to');
+    expect(rows()).toEqual([{ entity: 'thread', entity_id: 't2', op: 'upsert' }]);
+    clear();
+  });
 });

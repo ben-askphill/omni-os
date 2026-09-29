@@ -177,3 +177,80 @@ describe('sync worker', () => {
     expect(spy).toHaveBeenCalledOnce();
   });
 });
+
+describe('remote data is untrusted', () => {
+  const ctx = { machineId: 'mac-a' };
+
+  it('skips a thread whose id is not one folder name, so no path is built from it', () => {
+    for (const [i, id] of ['../../escape', 'a/b', '..', '', 'x\\y'].entries()) {
+      expect(apply.applyChange({ ...remoteThread(id, '2020-01-01T14:00:00.000Z'), seq: 2000 + i }, ctx)).toBe('skipped');
+      expect(db.threads.get(id)).toBeUndefined();
+    }
+    expect(apply.deferredCount()).toBe(0);
+  });
+
+  it('writes a thread under the id the change names, whatever its data says', () => {
+    const change = { ...remoteThread('named', '2020-01-01T14:00:00.000Z', { id: 'other' }), seq: 2010 };
+    expect(apply.applyChange(change, ctx)).toBe('applied');
+    expect(db.threads.get('named')?.title).toBe('remote named');
+    expect(db.threads.get('other')).toBeUndefined();
+  });
+});
+
+describe('stopping a worker mid-sync', () => {
+  it('lets a sync in flight finish without applying what it pulled or moving the cursor', async () => {
+    const inner = new MemoryTransport();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow: typeof inner = Object.assign(Object.create(inner), {
+      pull: async (o: Parameters<typeof inner.pull>[0]) => {
+        const out = await inner.pull(o);
+        await gate;
+        return out;
+      },
+    });
+    await inner.push([remoteThread('late', '2020-01-01T15:00:00.000Z')]);
+    const w = sync.createSyncWorker({ transport: slow, machineId: 'mac-a' });
+    db.kv.set('sync.cursor', 0);
+    const run = w.syncNow();
+    await new Promise((r) => setTimeout(r, 20));
+    w.stop();
+    // What setup does when Ben moves to another relay: start over from 0.
+    db.kv.set('sync.cursor', 0);
+    release();
+    await run;
+    await w.settled();
+    expect(db.kv.get<number>('sync.cursor')).toBe(0);
+    expect(db.threads.get('late')).toBeUndefined();
+  });
+
+  it('settled resolves at once when nothing is in flight', async () => {
+    const w = sync.createSyncWorker({ transport: new MemoryTransport(), machineId: 'mac-a' });
+    await expect(w.settled()).resolves.toBeUndefined();
+  });
+});
+
+describe('replacing the active worker', () => {
+  it('resolves only once the old worker has finished its sync, so two never run at once', async () => {
+    const inner = new MemoryTransport();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow: typeof inner = Object.assign(Object.create(inner), {
+      pull: async (o: Parameters<typeof inner.pull>[0]) => (await gate, inner.pull(o)),
+    });
+    const old = sync.createSyncWorker({ transport: slow, machineId: 'mac-a' });
+    await sync.setActiveWorker(old);
+    const run = old.syncNow();
+    const next = sync.createSyncWorker({ transport: inner, machineId: 'mac-a' });
+    let replaced = false;
+    const swap = sync.setActiveWorker(next).then(() => (replaced = true));
+    expect(sync.activeWorker()).toBe(next);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(replaced).toBe(false);
+    release();
+    await run;
+    await swap;
+    expect(replaced).toBe(true);
+    await sync.setActiveWorker(null);
+  });
+});
