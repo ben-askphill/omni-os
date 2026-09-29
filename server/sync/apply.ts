@@ -36,6 +36,9 @@ export function registerHandler(entity: SyncEntity, handler: SyncHandler) {
   handlers.set(entity, handler);
 }
 
+/** Drop an entity's handler, so its outbox rows are held again. For tests. */
+export const unregisterHandler = (entity: SyncEntity) => void handlers.delete(entity);
+
 export const getHandler = (entity: SyncEntity) => handlers.get(entity);
 export const registeredEntities = (): SyncEntity[] => [...handlers.keys()];
 

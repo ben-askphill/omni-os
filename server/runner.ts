@@ -7,6 +7,7 @@ import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
 import { channels, events, threads, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
 import { commandsFolder, prepareWorkdir, writeMcpConfig } from './sandbox.ts';
+import { prepareTurn, turnBlocked } from './sync/guard.ts';
 import { parseSlash, resolveSlash, runnableCommands, slashRecord, type SlashCommand, type SlashRecord } from '../shared/slash.ts';
 import { invalidateCommands, listCommands, peekCommands, type CommandList } from './commands.ts';
 import { describeAttachments, inlinable, messageContent, saveUploads, type Attachment } from './uploads.ts';
@@ -164,6 +165,9 @@ export const runningByHarness = (): Record<string, number> => {
   }
   return out;
 };
+
+/** This Mac runs the thread: a process is attached, or it waits for a slot. */
+export const runsHere = (threadId: string) => lives.has(threadId) || waiting.includes(threadId);
 
 /** A warm claude process exists for this thread. */
 export const isLive = (threadId: string) => {
@@ -853,6 +857,9 @@ export function sendMessage(
 ): Thread {
   const thread = threads.get(threadId);
   if (!thread) throw new Error('thread not found');
+  // Synced threads: not while the other Mac runs it, nor with its folder missing here (postMessage makes it first).
+  const blocked = turnBlocked(thread, runsHere(threadId));
+  if (blocked) throw Object.assign(new Error(blocked), { status: 409 });
   const attachments = opts.attachments?.length ? opts.attachments : undefined;
   const { text, slash, commands } = slashFor(prompt, () => (threadCommands(threadId) ?? peekCommands(thread.harness as HarnessId, thread.cwd)).commands);
   deliver(threadId, {
@@ -882,7 +889,8 @@ export async function postMessage(threadId: string, prompt: string, opts: Parame
   const next = (posting.get(threadId) ?? Promise.resolve())
     .catch(() => {})
     .then(async () => {
-      await warmCommands(thread.harness, thread.cwd, prompt, threadId);
+      const ready = await prepareTurn(threads.get(threadId) ?? thread, runsHere(threadId));
+      await warmCommands(ready.harness, ready.cwd, prompt, threadId);
       return sendMessage(threadId, prompt, opts);
     });
   posting.set(threadId, next);

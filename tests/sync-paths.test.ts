@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../server/db.ts', () => ({ kv: { get: () => undefined } }));
 
-import { fromPortable, toPortable } from '../server/sync/paths.ts';
+import { fromPortable, toPortable, toRemote } from '../server/sync/paths.ts';
 
 const home = '/Users/ben';
 
@@ -28,5 +28,15 @@ describe('portable paths', () => {
     expect(fromPortable('~/work/client/a', { home, map })).toBe('/Volumes/ssd/client/a');
     expect(fromPortable('~/workshop', { home, map })).toBe('/Users/ben/workshop');
     expect(fromPortable('/opt/x', { home, map })).toBe('/usr/local/opt/x');
+  });
+
+  it('undoes the path map on the way out, so a mapped path goes back the way it came', () => {
+    const map = { '~/work': '~/code', '~/work/client': '/Volumes/ssd/client' };
+    expect(toRemote('/Users/ben/code/volero', { home, map })).toBe('~/work/volero');
+    expect(toRemote('/Volumes/ssd/client/a', { home, map })).toBe('~/work/client/a');
+    expect(toRemote('/Users/ben/codex/x', { home, map })).toBe('~/codex/x');
+    expect(toRemote('/Users/ben/other', { home, map })).toBe('~/other');
+    expect(toRemote(null, { home, map })).toBeNull();
+    for (const p of ['~/work/volero', '~/work/client/a', '~/elsewhere']) expect(toRemote(fromPortable(p, { home, map }), { home, map })).toBe(p);
   });
 });
