@@ -181,6 +181,12 @@ public final class AppModel {
     return ThreadStub(t)
   }
 
+  /// The highlighted channel in the sidebar: the one open, or the open thread's.
+  public var focusedChannel: String? {
+    if case .channel(let id, _, _) = route { return id }
+    return openThread?.channelID
+  }
+
   /// The window title: the thread's own on a thread, else the route's.
   public var title: String {
     guard serverScreen == nil else { return "Omni" }

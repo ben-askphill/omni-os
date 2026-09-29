@@ -157,7 +157,7 @@ function AgentLink({ t, channel, onNavigate }: { t: BackgroundTask; channel?: st
   );
 }
 
-/** Past this many threads a channel shows "N more" and links to its full list. */
+/** Past this many threads a channel shows "N more" (or "See all threads" when highlighted) and links to its full list. */
 const MAX_THREADS = 5;
 
 const newestFirst = (a: ThreadStub, b: ThreadStub) => b.created_at.localeCompare(a.created_at);
@@ -180,12 +180,18 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
   const rest = channels.filter((c) => c.id !== 'conductor');
   const other = rest.filter((c) => !GROUPS.some((g) => g.kind === c.kind));
 
+  // The highlighted channel: the one open, or the one the open thread belongs to.
+  const focused = activeChannel ?? (openThread && openThread.id === openId ? openThread.channel_id : null);
+
   // Running and queued threads, newest first. The open thread joins them with the page's fresher
-  // copy and stays after it stops, so the highlight never jumps out from under you.
+  // copy and stays after it stops, so the highlight never jumps out from under you. The highlighted
+  // channel also lists its latest threads of any status, so finished ones stay a click away.
   const threadsOf = (c: ChannelWithRunning) => {
     const open = openThread && openThread.id === openId && openThread.channel_id === c.id ? openThread : null;
-    const busy = (c.active ?? []).filter((t) => t.id !== open?.id);
-    return (open ? [open, ...busy] : busy).sort(newestFirst);
+    const extra = c.id === focused ? (c.recent ?? []) : [];
+    const seen = new Set(open ? [open.id] : []);
+    const rest = [...(c.active ?? []), ...extra].filter((t) => !seen.has(t.id) && seen.add(t.id));
+    return (open ? [open, ...rest] : rest).sort(newestFirst);
   };
   // Rows appearing or leaving above the highlighted one move it, so they re-measure the thumb too.
   const rowsKey = channels.flatMap((c) => threadsOf(c).map((t) => t.id)).join();
@@ -199,10 +205,16 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
         {shown.map((t) => (
           <ThreadLink key={t.id} t={t} active={t.id === openId} agents={tasks.filter((k) => k.thread_id === t.id).length} onNavigate={onNavigate} />
         ))}
-        {list.length > shown.length && (
+        {c.id === focused ? (
           <a href={href.channel(c.id)} onClick={onNavigate} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
-            {list.length - shown.length} more
+            See all threads
           </a>
+        ) : (
+          list.length > shown.length && (
+            <a href={href.channel(c.id)} onClick={onNavigate} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
+              {list.length - shown.length} more
+            </a>
+          )
         )}
       </>
     );

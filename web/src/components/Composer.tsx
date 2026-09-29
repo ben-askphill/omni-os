@@ -4,8 +4,9 @@ import { bytes } from '../format.ts';
 import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset, takeComposerFocus } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { ErrorNote, Icon, IconButton, Kbd, Loader, Picker, type IconName, type PickerOption } from './ui.tsx';
-import { CrewMark, isCrewRole } from './brand.tsx';
+import { CrewMark, HarnessLogo, harnessLabel, isCrewRole } from './brand.tsx';
 import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
+import { threadRunLabels } from '../thread-run.ts';
 import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
 import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '../../../shared/slash-menu.ts';
 import { menuCommands, newThreadHint, replySlash } from '../../../shared/composer-slash.ts';
@@ -205,16 +206,33 @@ function SendButton({ armed, busy, onClick, children }: { armed: boolean; busy: 
   );
 }
 
-/** `enterSends`: the new-thread box, where Enter sends and the modifier adds a newline. */
-function Hint({ enterSends = false }: { enterSends?: boolean }) {
-  const mod = isMac ? '⌘↵' : 'Ctrl ↵';
+function Hint() {
   return (
     <span className="hidden items-center gap-3.5 pr-1 text-[11.5px] text-fg-4 sm:inline-flex">
-      <span>{enterSends ? '↵' : mod} send</span>
-      <span>{enterSends ? mod : '↵'} newline</span>
+      <span>↵ send</span>
+      <span>{isMac ? '⌘↵' : 'Ctrl ↵'} newline</span>
       <span>/ commands</span>
     </span>
   );
+}
+
+/**
+ * Enter sends, Shift+Cmd/Ctrl+Enter interrupts, Cmd/Ctrl+Enter inserts a newline (Shift+Enter keeps the
+ * textarea's own). Null for every other key, and for the Enter that ends an IME composition (229: Safari's,
+ * which it doesn't flag as composing). Prevents the default for the keys it acts on.
+ */
+function enterKey(e: ReactKeyboardEvent<HTMLTextAreaElement>, text: string, onText: (text: string) => void): 'send' | 'interrupt' | null {
+  if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229 || e.altKey) return null;
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod && e.shiftKey) return null;
+  e.preventDefault();
+  if (mod && e.shiftKey) return 'interrupt';
+  if (!mod) return 'send';
+  const el = e.currentTarget;
+  const at = el.selectionStart + 1;
+  onText(text.slice(0, el.selectionStart) + '\n' + text.slice(el.selectionEnd));
+  requestAnimationFrame(() => el.setSelectionRange(at, at));
+  return null;
 }
 
 const shell = (shape: string, over = false) =>
@@ -479,18 +497,7 @@ export function NewThreadComposer({
         onPaste={att.onPaste}
         onKeyDown={(e) => {
           if (slashMenu.onKey(e)) return;
-          // 229: Safari's Enter that ends an IME composition, which it doesn't flag as composing.
-          if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return;
-          if (e.metaKey || e.ctrlKey) {
-            e.preventDefault();
-            const el = e.currentTarget;
-            const at = el.selectionStart + 1;
-            update(text.slice(0, el.selectionStart) + '\n' + text.slice(el.selectionEnd));
-            requestAnimationFrame(() => el.setSelectionRange(at, at));
-          } else if (!e.shiftKey && !e.altKey) {
-            e.preventDefault();
-            void submit();
-          }
+          if (enterKey(e, text, update)) void submit();
         }}
         rows={big ? 3 : 2}
         placeholder={placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task')}
@@ -525,7 +532,7 @@ export function NewThreadComposer({
         })()}
         <AttachButton onPick={att.add} disabled={busy} />
         <div className="ml-auto flex items-center gap-2.5">
-          <Hint enterSends />
+          <Hint />
           <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>
             Start
           </SendButton>
@@ -540,7 +547,7 @@ export function NewThreadComposer({
 }
 
 const SEND_OPTIONS: { mode: SendMode; label: string; hint: string; icon: IconName; keys?: string[] }[] = [
-  { mode: 'steer', label: 'Steer now', hint: 'The agent reads it at its next step', icon: 'send', keys: [MOD, 'Enter'] },
+  { mode: 'steer', label: 'Steer now', hint: 'The agent reads it at its next step', icon: 'send', keys: ['Enter'] },
   { mode: 'queue', label: 'Queue for after this turn', hint: 'Runs when the current turn ends', icon: 'clock' },
   { mode: 'interrupt', label: 'Interrupt and send', hint: 'Stops the current step, then runs this', icon: 'stop', keys: [MOD, 'Shift', 'Enter'] },
 ];
@@ -664,6 +671,32 @@ function SteerButton({ disabled, busy, canSteer = true, onSend }: { disabled: bo
 }
 
 const finePointer = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: fine)').matches;
+
+const pillCls = 'inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] font-medium text-fg';
+
+/** The model and effort this thread is running on. Fixed, so they stay visible and are not pickers. */
+function ThreadRunPills({ thread }: { thread: Thread }) {
+  const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
+  const labels = threadRunLabels(thread, harnesses);
+  const harnessName = labels.harnessName || harnessLabel(thread.harness);
+  return (
+    <>
+      <span title="Fixed for this thread" aria-label={`Model: ${labels.model} on ${harnessName}`} className={pillCls}>
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg text-fg">
+          <HarnessLogo harness={thread.harness} size={13} />
+        </span>
+        <span className="min-w-0 truncate">{labels.model}</span>
+        <span className="hidden shrink-0 text-fg-4 sm:inline">· {harnessName}</span>
+      </span>
+      <span title="Fixed for this thread" aria-label={`Effort: ${labels.effort}`} className={pillCls}>
+        <span className="grid h-6 w-6 shrink-0 place-items-center text-fg-3">
+          <Icon name="sliders" size={14} />
+        </span>
+        <span className="min-w-0 truncate">{labels.effort}</span>
+      </span>
+    </>
+  );
+}
 
 /** Follow-up composer pinned under a thread. On a busy thread it steers by default. */
 export function ReplyComposer({
@@ -794,10 +827,10 @@ export function ReplyComposer({
         onPaste={att.onPaste}
         onKeyDown={(e) => {
           if (slashMenu.onKey(e)) return;
-          if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.nativeEvent.isComposing) return;
-          e.preventDefault();
+          const key = enterKey(e, text, update);
+          if (!key) return;
           if (omni) return void runOmni();
-          const busyMode: SendMode = e.shiftKey ? 'interrupt' : canSteer ? 'steer' : 'queue';
+          const busyMode: SendMode = key === 'interrupt' ? 'interrupt' : canSteer ? 'steer' : 'queue';
           void submit(busyThread ? busyMode : undefined);
         }}
         rows={1}
@@ -807,6 +840,7 @@ export function ReplyComposer({
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
         {extra}
         <AttachButton onPick={att.add} disabled={busy} />
+        <ThreadRunPills thread={thread} />
         <div className="ml-auto flex items-center gap-2.5">
           <Hint />
           {omni ? (
