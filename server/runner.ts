@@ -301,6 +301,7 @@ function drop(threadId: string, msgs: Msg[]) {
 
 function deliver(threadId: string, m: Msg) {
   if (shuttingDown) throw new Error('Omni is shutting down');
+  clearSuggestion(threadId);
   let live = lives.get(threadId);
   // Interrupt and send while the process is still starting: stop it like Interrupt does and start fresh with this message.
   if (live?.turn && !live.closing && m.mode === 'interrupt' && (!live.child || !live.initSeen)) {
@@ -512,6 +513,7 @@ function endTurn(live: Live, status: ThreadStatus) {
   });
   emitThread(id);
   if (t?.parent_id && status !== 'stopped' && !shuttingDown) reportToParent(id, status, runText);
+  if (status === 'done' && !t?.parent_id && runText && !shuttingDown) suggestReply(id, runText);
   void turnFinished(id);
   armIdle(live);
   pump();
@@ -1088,6 +1090,54 @@ export async function shutdownAll() {
   }
 }
 
+
+/** Each thread's latest suggestion call. A message sent while one runs makes its answer stale. */
+const suggestCalls = new Map<string, number>();
+let suggestSeq = 0;
+
+function clearSuggestion(threadId: string) {
+  suggestCalls.delete(threadId);
+  if (threads.setSuggestion(threadId, null)) emitThread(threadId);
+}
+
+/** Guess Ben's next reply from his last message and the agent's answer, for the reply box to offer. */
+function suggestReply(threadId: string, runText: string) {
+  if (!config.suggestions) return;
+  const call = ++suggestSeq;
+  suggestCalls.set(threadId, call);
+  const child = spawn(
+    config.claudeBin,
+    ['-p', '--model', 'haiku', '--output-format', 'text', '--strict-mcp-config', '--no-session-persistence', '--tools', ''],
+    { cwd: tmpdir(), env: harnessEnv('claude-code', { CLAUDE_CODE_ENTRYPOINT: 'omni-os-suggest' }), stdio: ['pipe', 'pipe', 'ignore'] },
+  );
+  closePipesAfterExit(child);
+  child.stdin.on('error', () => {});
+  child.stdin.end(
+    'Ben is working with a coding agent. Predict the short reply Ben is most likely to send next, in his voice: ' +
+      'a direct instruction or answer of at most 12 words, e.g. "Yes, open a PR" or "Run the tests first". ' +
+      'Plain text, no quotes, no em dashes. If there is no obvious next step, output NONE. Output the reply only.\n\n' +
+      "Ben's last message:\n" + events.lastUserText(threadId).slice(0, 1500) +
+      "\n\nThe agent's answer:\n" + runText.slice(-3000),
+  );
+  let out = '';
+  const timer = setTimeout(() => child.kill('SIGKILL'), 45_000);
+  child.stdout.on('data', (d) => (out += d));
+  child.on('close', (code) => {
+    clearTimeout(timer);
+    if (suggestCalls.get(threadId) !== call) return;
+    suggestCalls.delete(threadId);
+    const text = out.trim().split('\n').filter(Boolean).pop()?.replace(/^["']|["']$/g, '').trim().slice(0, 200);
+    if (code !== 0 || !text || /^none\.?$/i.test(text)) return;
+    // Nobody waits on this call: a shutdown may have closed the db by the time it ends.
+    try {
+      if (threads.get(threadId)?.status !== 'done') return;
+      if (threads.setSuggestion(threadId, text)) emitThread(threadId);
+    } catch {
+      return;
+    }
+  });
+  child.on('error', () => clearTimeout(timer));
+}
 
 function fallbackTitle(prompt: string) {
   const first = prompt.trim().split('\n')[0].replace(/\s+/g, ' ');

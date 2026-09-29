@@ -44,6 +44,8 @@ export interface Thread {
   source: ThreadSource;
   automation: string | null;
   last_text: string | null;
+  /** A guess at Ben's next reply once a turn is done, the reply box's placeholder. Local only, not synced. */
+  suggestion: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -118,6 +120,7 @@ CREATE TABLE IF NOT EXISTS threads (
   source TEXT NOT NULL DEFAULT 'manual',
   automation TEXT,
   last_text TEXT,
+  suggestion TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -211,6 +214,7 @@ export function migrate() {
   ensureColumn('threads', 'effort', `TEXT NOT NULL DEFAULT ''`);
   // Sync: the machine id of the Mac running or queueing the thread, null otherwise. Synced, kept out of the API.
   ensureColumn('threads', 'run_machine', 'TEXT');
+  ensureColumn('threads', 'suggestion', 'TEXT');
   // Sync matches these rows on uid, never on the local integer id. Old rows get one once; the index then makes the check free.
   for (const table of ['events', 'artifacts', 'automation_runs']) {
     ensureColumn(table, 'uid', 'TEXT');
@@ -435,7 +439,7 @@ export const channels = {
 
 /** The columns clients read, without sync's run_machine. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, created_at, updated_at';
 
 /** Who runs a thread with this status: this machine while it is running or queued here and sync is set up, else nobody. */
 const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? armedId : null);
@@ -471,7 +475,7 @@ export const threads = {
       .prepare(`SELECT ${THREAD_COLUMNS} FROM threads ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY updated_at DESC LIMIT ?`)
       .all(...args) as unknown as Thread[];
   },
-  create(t: Omit<Thread, 'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'harness' | 'effort'> & { has_run?: number; created_at?: string; harness?: string; effort?: string }) {
+  create(t: Omit<Thread, 'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'harness' | 'effort'> & { has_run?: number; created_at?: string; harness?: string; effort?: string }) {
     const ts = t.created_at ?? now();
     return tx(() => {
       db.prepare(
@@ -497,6 +501,13 @@ export const threads = {
       if (db.prepare(`UPDATE threads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id).changes) record('thread', id);
     });
     return threads.get(id);
+  },
+  /**
+   * The reply box's suggestion. Not a change to the thread: updated_at stays, so lists keep their order,
+   * and sync never hears of it. True when it changed.
+   */
+  setSuggestion(id: string, text: string | null) {
+    return db.prepare('UPDATE threads SET suggestion = ? WHERE id = ? AND suggestion IS NOT ?').run(text, id, text).changes > 0;
   },
   /** Move a thread to another channel, keeping its place in the lists. import-history's --move-imported uses it. */
   setChannel(id: string, channelId: string) {
@@ -572,6 +583,15 @@ export const events = {
       )
       .all(threadId, threadId, after) as { payload: string }[];
     return rows.map((r) => JSON.parse(r.payload).text as string).join('\n\n');
+  },
+  /** The text of the thread's last message that was not dropped. */
+  lastUserText(threadId: string): string {
+    const row = db
+      .prepare(
+        `SELECT payload FROM events WHERE thread_id = ? AND kind = 'user' AND json_extract(payload, '$.dropped') IS NOT 1 ORDER BY id DESC LIMIT 1`,
+      )
+      .get(threadId) as { payload: string } | undefined;
+    return row ? (JSON.parse(row.payload).text as string) ?? '' : '';
   },
   /**
    * The commands Ben used most recently on a harness, in any thread, newest first and each once.

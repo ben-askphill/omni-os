@@ -38,6 +38,8 @@ export const config = {
   /** After an interrupt, how long the turn gets to wind down before the process is killed. */
   interruptGraceMs: Number(env.OMNI_INTERRUPT_GRACE_MS ?? 8000),
   browser: (env.OMNI_BROWSER ?? '1') !== '0',
+  /** After a finished turn, ask Haiku for Ben's likely next reply: the reply box's placeholder, Tab fills it in. */
+  suggestions: (env.OMNI_SUGGESTIONS ?? '1') !== '0',
   maxUploadMb: Number(env.OMNI_MAX_UPLOAD_MB ?? 25),
   timezone: env.OMNI_TZ ?? 'Europe/Amsterdam',
 };

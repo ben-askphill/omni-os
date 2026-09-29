@@ -158,6 +158,11 @@ private struct ReplyComposerView: View {
   @State private var picking = false
 
   private var busyThread: Bool { thread.status.isActive }
+  /// The server's guess at the next reply, shown in the empty box. Tab takes it.
+  private var suggestion: String? {
+    guard !busyThread, reply.text.isEmpty, let s = thread.suggestion, !s.isEmpty else { return nil }
+    return s
+  }
   private var canSteer: Bool {
     let caps = model.store.harnesses.first { $0.id == thread.harness }?.capabilities
     return SendRules.canSteer(harness: thread.harness, capabilities: caps)
@@ -208,7 +213,7 @@ private struct ReplyComposerView: View {
         AttachmentStrip(files: reply.files, remove: reply.removeFile)
       }
       ComposerTextView(
-        text: $reply.text, placeholder: SendRules.placeholder(busy: busyThread), running: busyThread,
+        text: $reply.text, placeholder: suggestion ?? SendRules.placeholder(busy: busyThread), running: busyThread,
         interrupting: store.interrupting, focusTick: focusTick, callbacks: callbacks, caretRequest: caret
       )
       .fixedSize(horizontal: false, vertical: false)
@@ -243,7 +248,7 @@ private struct ReplyComposerView: View {
         ThreadPRSlot(model: model, thread: thread, busy: busyThread, opening: reply.openingPR) { Task { await openPR() } }
       }
       HStack(spacing: 10) {
-        ComposerHints()
+        ComposerHints(tab: suggestion != nil)
         if let omni = menu.reply, omni.action != .send {
           SendButton(title: omni.label ?? "Send", armed: omni.armed, sending: omniBusy) { runOmni() }
         } else if busyThread {
@@ -279,7 +284,12 @@ private struct ReplyComposerView: View {
         menu.setFocused($0)
       },
       slash: { menu.handle($0) },
-      edited: { menu.update(text: $0, caret: $1) })
+      edited: { menu.update(text: $0, caret: $1) },
+      tab: {
+        guard let s = suggestion else { return false }
+        reply.text = s
+        return true
+      })
   }
 
   /// Send when the message starts with an Omni command: `/clear` and `/new` start a thread, `/rename` renames this one.
