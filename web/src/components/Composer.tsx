@@ -205,11 +205,13 @@ function SendButton({ armed, busy, onClick, children }: { armed: boolean; busy: 
   );
 }
 
-function Hint() {
+/** `enterSends`: the new-thread box, where Enter sends and the modifier adds a newline. */
+function Hint({ enterSends = false }: { enterSends?: boolean }) {
+  const mod = isMac ? '⌘↵' : 'Ctrl ↵';
   return (
     <span className="hidden items-center gap-3.5 pr-1 text-[11.5px] text-fg-4 sm:inline-flex">
-      <span>{isMac ? '⌘↵' : 'Ctrl ↵'} send</span>
-      <span>↵ newline</span>
+      <span>{enterSends ? '↵' : mod} send</span>
+      <span>{enterSends ? mod : '↵'} newline</span>
       <span>/ commands</span>
     </span>
   );
@@ -477,7 +479,15 @@ export function NewThreadComposer({
         onPaste={att.onPaste}
         onKeyDown={(e) => {
           if (slashMenu.onKey(e)) return;
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+          // 229: Safari's Enter that ends an IME composition, which it doesn't flag as composing.
+          if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return;
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            const el = e.currentTarget;
+            const at = el.selectionStart + 1;
+            update(text.slice(0, el.selectionStart) + '\n' + text.slice(el.selectionEnd));
+            requestAnimationFrame(() => el.setSelectionRange(at, at));
+          } else if (!e.shiftKey && !e.altKey) {
             e.preventDefault();
             void submit();
           }
@@ -515,7 +525,7 @@ export function NewThreadComposer({
         })()}
         <AttachButton onPick={att.add} disabled={busy} />
         <div className="ml-auto flex items-center gap-2.5">
-          <Hint />
+          <Hint enterSends />
           <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>
             Start
           </SendButton>
