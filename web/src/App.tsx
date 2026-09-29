@@ -10,6 +10,7 @@ import { HomePage } from './pages/Home.tsx';
 import { NewChannelPage } from './pages/ChannelSettings.tsx';
 import { SearchPage } from './pages/Search.tsx';
 import { SecretsPage } from './pages/Secrets.tsx';
+import { SyncPage } from './pages/Sync.tsx';
 import { ThreadPage } from './pages/Thread.tsx';
 import { href, navigate, requestComposerFocus, useHash, useRoute, type Route } from './router.ts';
 import { AppProvider, useApp } from './store.tsx';
@@ -30,6 +31,8 @@ function Page({ route }: { route: Route }) {
       return <AutomationsPage />;
     case 'secrets':
       return <SecretsPage />;
+    case 'sync':
+      return <SyncPage />;
     case 'artifacts':
       return <ArtifactsPage />;
     case 'new-channel':
@@ -59,6 +62,8 @@ function mobileTitle(route: Route, channelName: (id: string) => string | undefin
       return 'Automations';
     case 'secrets':
       return 'Secrets';
+    case 'sync':
+      return 'Sync';
     case 'artifacts':
       return 'Artifacts';
     case 'new-channel':

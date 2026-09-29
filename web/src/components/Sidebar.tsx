@@ -289,6 +289,9 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
               <NavLink to={href.secrets()} icon="key" active={route.name === 'secrets'} onNavigate={onNavigate}>
                 Secrets
               </NavLink>
+              <NavLink to={href.sync()} icon="refresh" active={route.name === 'sync'} onNavigate={onNavigate}>
+                Sync
+              </NavLink>
             </div>
           </div>
         </div>

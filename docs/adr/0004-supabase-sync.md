@@ -1,0 +1,19 @@
+# Two Macs sync through a change-log relay; each keeps its own SQLite
+
+Ben runs Omni on two Macs and wants the same channels, threads and history on both. Each Mac keeps its own SQLite database as the source of truth, and the server keeps working the same way as before. When a row changes, the write that changes it also records it in a local outbox, in the same transaction. A worker pushes the outbox to an append-only `changes` table in a Supabase project Ben owns, and pulls the other Mac's changes by sequence number. It applies them locally, with last-writer-wins by timestamp for rows both Macs edit (a thread's title, a setting) and plain inserts for append-only rows (events). Thread files and harness session files go to a private storage bucket, addressed by content hash. Realtime on `changes` tells the other Mac to pull at once. It signs in with the anon key and Ben's own user, and row level security scopes every row and object to that user. No service-role key exists on either Mac.
+
+Sync is off until Ben signs in from Settings. Until the first sign-in nothing is recorded for pushing and nothing reaches the network, so a Mac that never signs in behaves exactly as it did before.
+
+## Considered
+
+- **One shared Postgres for both Macs.** Omni would then need the network for every read and write. Today it runs offline, on a plane, with the relay down, and runs threads in the tens of milliseconds between events. Moving to Postgres would also mean rewriting every query and the `node:sqlite` layer, and the local tools (`sqlite3 data/omni.db`, the import script, the tests) would stop working. A relay only adds a sync step; if the relay is down, sync waits and nothing else stops.
+- **Git (a repo of exported JSON, pushed and pulled).** It has a history and needs no new service, but it has no push notification, needs merge handling for a file both Macs rewrote, and makes every event a commit. Thread files and session logs would bloat the repo. It suits documents, not an event stream.
+- **iCloud Drive (share the database file, or a folder of change files).** Syncing the SQLite file itself corrupts it: iCloud moves whole files, not WAL frames, and two Macs writing at once lose writes silently. A folder of change files avoids that but gives no ordering, no reliable notification to the Node server, and no way to tell "not synced yet" from "gone". iCloud also offers no control over when a file arrives or which version wins.
+
+## Consequences
+
+- Every synced table needs a stable id that means the same row on both Macs (the uid migration), and every new synced table needs a handler in `server/sync/handlers/` and an entry in the `changes.entity` check. A table without a handler keeps its changes held in the outbox until one ships.
+- Conflicts resolve per row, not per field: the later write wins the whole row. For one person on two Macs this is rarely wrong; the rule is simple enough to explain in one line.
+- The relay only grows. Nothing prunes `changes` yet; at Ben's volume the free tier lasts years, and a new relay starts from the beginning and re-queues the history.
+- Paths travel with the home folder as `~`, and a per-Mac path map covers folders that live elsewhere. A thread whose repo is not on this Mac shows its history but cannot run there until the repo exists.
+- The Supabase URL, anon key and refresh token are Keychain secrets under the global scope, and are never passed to a thread's environment. The password or emailed code is used once to sign in and never stored. A refresh token the relay refuses shows as "signed out" in Settings and takes a new sign-in, not a retry.

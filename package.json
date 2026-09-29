@@ -15,7 +15,8 @@
     "test:all": "npm test && npm run test:mac",
     "typecheck": "tsc --noEmit",
     "import-history": "tsx scripts/import-history.ts",
-    "build:slash": "tsx scripts/build-slash-engine.ts"
+    "build:slash": "tsx scripts/build-slash-engine.ts",
+    "sync:backfill": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/sync-backfill.ts"
   },
   "engines": {
     "node": ">=24"

@@ -158,6 +158,11 @@ export interface SecretRow {
   updated_at: string;
 }
 
+/** GET /api/sync/status. */
+export type { SyncStatus } from '../../server/sync/worker.ts';
+/** POST /api/sync/setup: a code went out by email, or the sign-in worked. */
+export type SyncSetupResult = { state: 'code_sent'; email: string } | { state: 'signed_in'; email: string; relayChanged: boolean };
+
 export type FeedEvent =
   | { type: 'thread'; thread: Thread }
   | { type: 'usage'; harness?: HarnessId; usage: Usage | null }
@@ -220,6 +225,7 @@ export const api = {
     return request<T>('POST', path, fd);
   },
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
+  put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   del: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
 };
 
