@@ -19,6 +19,7 @@ import { detectRepo, listPRs, getPR, mergePR } from './github.ts';
 import { loadAutomations, runAutomation, setEnabled, lastRuns } from './automations.ts';
 import { commandsApi } from './commands-api.ts';
 import { threadsApi } from './threads-api.ts';
+import { syncApi } from './sync-api.ts';
 import { about } from './about.ts';
 
 // Every /api route, and the Web UI. server/index.ts boots it.
@@ -356,6 +357,7 @@ api.post('/automations/:id/enabled', async (c) => {
 });
 
 api.route('/commands', commandsApi);
+api.route('/sync', syncApi);
 
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
 api.all('*', (c) => c.json({ error: 'Not found' }, 404));

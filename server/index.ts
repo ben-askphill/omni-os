@@ -20,6 +20,7 @@ const { shutdownAll } = await import('./runner.ts');
 const { startArtifactWatcher } = await import('./artifacts.ts');
 const { startScheduler } = await import('./automations.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
+const { startSync } = await import('./sync/worker.ts');
 
 const onBindError = (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') console.error(`[omni] port ${config.port} on ${config.host} is in use. Stopped before touching any thread.`);
@@ -37,6 +38,8 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startArtifactWatcher();
   startScheduler();
   startCatalogRefresh();
+  // Off unless the sync credentials are in the Keychain; then it runs alongside, and a failure only logs.
+  startSync().catch((err) => console.error('[sync] could not start:', (err as Error).message));
   console.log(`[omni] listening on http://${config.host}:${info.port}  brain=${config.brainDir}`);
 });
 server.once('error', onBindError);

@@ -7,6 +7,10 @@ import { db } from './db.ts';
 const SERVICE = 'omni-os';
 const run = promisify(execFile);
 
+/** Omni's own sync credentials (server/sync/worker.ts). Global, and never handed to an agent's environment. */
+export const SYNC_SECRETS = { url: 'SUPABASE_URL', anonKey: 'SUPABASE_ANON_KEY', refreshToken: 'SUPABASE_REFRESH_TOKEN' } as const;
+const PRIVATE = new Set<string>(Object.values(SYNC_SECRETS));
+
 export const NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
 export const SCOPE_RE = /^(global|channel:[a-z0-9-]+)$/;
 
@@ -56,13 +60,14 @@ export async function globalSecret(name: string): Promise<string | null> {
   return readSecret('global', name);
 }
 
-/** Global secrets, overridden by channel-scoped ones with the same name. */
+/** Global secrets, overridden by channel-scoped ones with the same name. Omni's sync credentials stay out. */
 export async function secretsEnv(channelId: string): Promise<Record<string, string>> {
   const rows = db
     .prepare(`SELECT scope, name FROM secrets WHERE scope = 'global' OR scope = ? ORDER BY scope = 'global' DESC`)
     .all(`channel:${channelId}`) as { scope: string; name: string }[];
   const env: Record<string, string> = {};
   for (const r of rows) {
+    if (r.scope === 'global' && PRIVATE.has(r.name)) continue;
     const v = await readSecret(r.scope, r.name);
     if (v != null) env[r.name] = v;
   }

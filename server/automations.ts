@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { Cron } from 'croner';
 import YAML from 'yaml';
 import { config, paths } from './config.ts';
-import { db } from './db.ts';
+import { automationRuns, db } from './db.ts';
 import { createThread } from './runner.ts';
 
 export interface Automation {
@@ -83,14 +83,14 @@ export async function runAutomation(a: Automation, trigger: 'cron' | 'manual') {
     source: 'automation',
     automation: a.id,
   });
-  db.prepare('INSERT INTO automation_runs (automation, thread_id, trigger) VALUES (?, ?, ?)').run(a.id, thread.id, trigger);
+  automationRuns.add(a.id, thread.id, trigger);
   return thread;
 }
 
 export function lastRuns(id: string, limit = 10) {
   return db
     .prepare(
-      `SELECT r.*, t.status, t.title FROM automation_runs r LEFT JOIN threads t ON t.id = r.thread_id
+      `SELECT r.id, r.automation, r.thread_id, r.trigger, r.created_at, t.status, t.title FROM automation_runs r LEFT JOIN threads t ON t.id = r.thread_id
        WHERE r.automation = ? ORDER BY r.id DESC LIMIT ?`,
     )
     .all(id, limit);
