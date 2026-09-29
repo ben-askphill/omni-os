@@ -4,6 +4,7 @@ import { applyBatch, deferredCount, getHandler, registeredEntities, retryDeferre
 import { createSupabaseTransport, isoTs, isSignedOut, type Change, type SyncTransport } from './transport.ts';
 import { watchNetwork, type NetworkWatch } from './network.ts';
 import { automationsOwner, claimIfUnowned, type AutomationsOwner } from './owner.ts';
+import { hardwareId } from './hardware.ts';
 import './handlers/index.ts';
 
 // The sync loop: push the outbox in batches, then pull what other machines pushed since the cursor and apply it.
@@ -104,7 +105,10 @@ function toChanges(rows: OutboxRow[], machineId: string): Change[] {
 
 export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   const { transport } = opts;
-  const machineId = outbox.arm(opts.machineId);
+  const copiedFrom = outbox.machineId();
+  const machineId = outbox.arm(opts.machineId, hardwareId());
+  if (copiedFrom && copiedFrom !== machineId)
+    console.warn(`[sync] this data folder was copied from another Mac (sync id ${copiedFrom}): this Mac is now ${machineId} and pulls the history again`);
   const ctx: ApplyContext = { machineId };
   const batch = opts.batchSize ?? 200;
   const interval = opts.intervalMs ?? 60_000;

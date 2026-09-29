@@ -301,12 +301,26 @@ export const outbox = {
   /**
    * Turn recording on for good and return this machine's id: the stored one, else `machineId`, else a new uuid.
    * The first arm also queues the existing history. server/sync/worker.ts calls it; nothing else should.
+   * `hardware` (server/sync/hardware.ts) is stored with it. A stored one that differs means this data folder was
+   * copied from another Mac, which still has that id: this one takes a new id, and pulls and seeds again from the
+   * start, as a first arm does, so neither Mac skips the other's changes as its own.
    */
-  arm(machineId?: string): string {
+  arm(machineId?: string, hardware?: string | null): string {
     return tx(() => {
-      if (armedId) return armedId;
-      const id = machineId ?? randomUUID();
-      db.prepare(`INSERT INTO kv (key, value) VALUES ('sync.machine_id', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(id));
+      const setLocal = (key: string, value: unknown) =>
+        db.prepare(`INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, JSON.stringify(value));
+      const stored = kv.get<string>('sync.hardware_id');
+      if (hardware && stored !== hardware) setLocal('sync.hardware_id', hardware);
+      if (armedId && !(hardware && stored && stored !== hardware)) return armedId;
+      const moved = !!armedId;
+      const id = moved ? randomUUID() : (machineId ?? randomUUID());
+      setLocal('sync.machine_id', id);
+      if (moved) {
+        // The copy's queue and parked changes were the other Mac's to send and apply. Seeded rows (SEED_TS) only
+        // fill gaps over there, so nothing here overwrites what that Mac has; everything it has comes back here.
+        setLocal('sync.cursor', 0);
+        db.exec('DELETE FROM sync_outbox; DELETE FROM sync_deferred');
+      }
       // A thread mid-run as sync is set up is this machine's run, and its row should say so.
       db.prepare(`UPDATE threads SET run_machine = ? WHERE status IN ('running','queued') AND run_machine IS NULL`).run(id);
       seed(id);
