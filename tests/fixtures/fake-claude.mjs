@@ -13,7 +13,8 @@
 //   TOOL:<ms>         run a Bash tool for that long (repeatable, interruptible)
 //   THINK:<ms>        take that long to write the final text (no tool boundary, so new messages wait for the next turn)
 //   IGNORE_INTERRUPT  never answer interrupt requests during that turn, like a wedged CLI
-//   BG:<ms>           a background task that finishes that long after the turn; the CLI then runs a turn about it
+//   BG:<ms>           a background agent that finishes that long after the turn: an Agent call answered at once,
+//                     task_started, a sub-agent Bash call with each task_progress, then task_notification; the CLI then runs a turn about it
 //                     on its own (no message of ours, no replay)
 //   /<command>        a message starting with a slash is a local command: no model call, a zero-turn success result
 //                     whose text is the command output
@@ -400,9 +401,30 @@ function startTurn() {
 /** When it finishes, the CLI queues a report about it that no stdin message asked for and runs a turn. */
 function startBackground(ms) {
   background++;
+  // Like a sub-agent run with run_in_background: started, progress while it works, a notification at the end.
+  const task_id = `bg${background}${randomUUID().slice(0, 6)}`;
+  const tool_use_id = `toolu_bg_${task_id}`;
+  const begun = Date.now();
+  const description = `Background task ${ms}ms`;
+  // The Agent call that launches it, answered at once, as run_in_background is.
+  assistant(`msg_bg_${task_id}`, [{ type: 'tool_use', id: tool_use_id, name: 'Agent', input: { description, prompt: 'Work in the background', subagent_type: 'general-purpose', run_in_background: true } }]);
+  toolResult(tool_use_id, `Async agent launched successfully. agentId: ${task_id}`, false);
+  emit({ type: 'system', subtype: 'task_started', task_id, tool_use_id, description, subagent_type: 'general-purpose', task_type: 'local_agent', is_backgrounded: true });
+  let uses = 0;
+  const tick = setInterval(() => {
+    if (dead) return clearInterval(tick);
+    uses++;
+    // One of the sub-agent's own calls, tagged with the Agent call it runs under.
+    const child = `${tool_use_id}_${uses}`;
+    emit({ type: 'assistant', message: { model, id: `msg_${child}`, type: 'message', role: 'assistant', content: [{ type: 'tool_use', id: child, name: 'Bash', input: { command: `echo step ${uses}`, description: 'Fake step' } }], stop_reason: null, stop_sequence: null, usage: { input_tokens: 12, output_tokens: 6 } }, parent_tool_use_id: tool_use_id, timestamp: now() });
+    emit({ type: 'user', message: { role: 'user', content: [{ tool_use_id: child, type: 'tool_result', content: `step ${uses}`, is_error: false }] }, parent_tool_use_id: tool_use_id, timestamp: now() });
+    emit({ type: 'system', subtype: 'task_progress', task_id, tool_use_id, description, usage: { total_tokens: uses * 100, tool_uses: uses, duration_ms: Date.now() - begun }, last_tool_name: 'Bash' });
+  }, Math.max(50, Math.floor(ms / 4)));
   setTimeout(() => {
+    clearInterval(tick);
     background--;
     if (dead || stopping) return;
+    emit({ type: 'system', subtype: 'task_notification', task_id, tool_use_id, status: 'completed', output_file: '', summary: 'background task done', usage: { total_tokens: uses * 100, tool_uses: uses, duration_ms: Date.now() - begun } });
     queue.push({ uuid: randomUUID(), content: '<task-notification>background task done</task-notification>', text: 'BGDONE', system: true });
     startTurn();
   }, ms);

@@ -7,6 +7,8 @@ export type Record =
   | { kind: 'tool_use'; payload: { id: string; name: string; input: unknown; parent?: string | null } }
   | { kind: 'tool_result'; payload: { tool_use_id: string; text: string; is_error: boolean; truncated: boolean } }
   | { kind: 'status'; payload: { text: string } }
+  /** A task the CLI runs beside the turn (a sub-agent, a background shell, a workflow): started, progress, ended. */
+  | { kind: 'task'; payload: TaskUpdate }
   /** Why a turn failed, shown in the transcript. A harness adapter's own; Claude's errors arrive as text. */
   | { kind: 'error'; payload: { text: string } }
   /** One of our own stdin messages, echoed when the CLI adds it to the conversation (--replay-user-messages). */
@@ -29,6 +31,76 @@ export type Record =
         cache_write_tokens?: number;
       };
     };
+
+export interface TaskUpdate {
+  task_id: string;
+  event: 'started' | 'progress' | 'ended';
+  /** The Agent or Bash call that started it, so the transcript can show it on that row. */
+  tool_use_id?: string;
+  description?: string;
+  subagent_type?: string;
+  /** The CLI's task type: local_agent, local_bash, workflow and so on. */
+  task_type?: string;
+  /** Runs on after the turn that started it ends. */
+  background?: boolean;
+  /** Ended: completed, failed, killed or stopped. */
+  status?: string;
+  summary?: string;
+  last_tool?: string;
+  tool_uses?: number;
+  tokens?: number;
+  duration_ms?: number;
+}
+
+const opt = <T>(v: T | null | undefined) => (v === null || v === undefined || v === '' ? undefined : v);
+
+/** The CLI's task_* system events as one record shape. Undefined fields are left out. */
+function taskUpdate(evt: any): TaskUpdate | null {
+  if (!evt.task_id) return null;
+  const base = { task_id: String(evt.task_id), tool_use_id: opt(evt.tool_use_id) } as TaskUpdate;
+  const usage = evt.usage ?? {};
+  const counts = {
+    tool_uses: opt(usage.tool_uses),
+    tokens: opt(usage.total_tokens),
+    duration_ms: opt(usage.duration_ms),
+  };
+  let u: TaskUpdate;
+  switch (evt.subtype) {
+    case 'task_started':
+      u = {
+        ...base,
+        event: 'started',
+        description: opt(evt.description),
+        subagent_type: opt(evt.subagent_type),
+        task_type: opt(evt.task_type),
+        background: evt.is_backgrounded === undefined ? undefined : !!evt.is_backgrounded,
+      };
+      break;
+    case 'task_progress':
+      u = { ...base, event: 'progress', description: opt(evt.description), last_tool: opt(evt.last_tool_name), summary: opt(evt.summary), ...counts };
+      break;
+    case 'task_updated': {
+      // Only the fields a view shows: a status change (ended when terminal) and backgrounding.
+      const patch = evt.patch ?? {};
+      const terminal = typeof patch.status === 'string' && patch.status !== 'running' && patch.status !== 'pending';
+      if (!terminal && patch.is_backgrounded === undefined && patch.description === undefined) return null;
+      u = {
+        ...base,
+        event: terminal ? 'ended' : 'progress',
+        status: terminal ? patch.status : undefined,
+        description: opt(patch.description),
+        background: patch.is_backgrounded === undefined ? undefined : !!patch.is_backgrounded,
+      };
+      break;
+    }
+    case 'task_notification':
+      u = { ...base, event: 'ended', status: opt(evt.status) ?? 'completed', summary: opt(evt.summary), ...counts };
+      break;
+    default:
+      return null;
+  }
+  return Object.fromEntries(Object.entries(u).filter(([, v]) => v !== undefined)) as TaskUpdate;
+}
 
 export interface Usage {
   five_hour?: { utilization: number; resetsAt: number };
@@ -77,6 +149,9 @@ export function parseEvent(evt: any): Parsed {
         });
       } else if (evt.subtype === 'task_summary' && evt.detail) {
         out.records.push({ kind: 'status', payload: { text: String(evt.detail) } });
+      } else if (typeof evt.subtype === 'string' && evt.subtype.startsWith('task_')) {
+        const u = taskUpdate(evt);
+        if (u) out.records.push({ kind: 'task', payload: u });
       }
       break;
     }

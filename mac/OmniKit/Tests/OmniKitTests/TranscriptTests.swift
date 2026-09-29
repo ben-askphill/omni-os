@@ -150,7 +150,7 @@ private func recorded(_ name: String) throws -> [EventRow] {
     let e = try recorded("thread-rich.json")
     for row in e { if case .unknown = row.content { Issue.record("event \(row.id) did not decode") } }
     let t = Transcript(e)
-    #expect(t.items.map(\.id) == [16, 17, nil, 36, 37, 42, 43, 44, 45, 46, 48, 49].map { $0.map(TranscriptItemID.event) ?? .plan })
+    #expect(t.items.map(\.id) == [20, 21, nil, 40, 41, 46, 47, 48, 49, 50, 52, 53].map { $0.map(TranscriptItemID.event) ?? .plan })
     let g = try #require(groups(t.items).first)
     #expect(g.calls.map(\.name) == ["TodoWrite", "Task", "TodoWrite", "Edit", "Bash", "mcp__plugin_github_github__search_issues", "TodoWrite"])
     #expect(g.calls[1].children.map(\.name) == ["Grep", "Read"])
@@ -161,14 +161,14 @@ private func recorded(_ name: String) throws -> [EventRow] {
     #expect(g.calls[1].summary(cwd: "/tmp/omni-fixtures/acme") == "Find the cart code (Explore)")
     #expect(g.calls[1].children[0].summary(cwd: "/tmp/omni-fixtures/acme") == "cartTotal  in src")
     guard case .plan(let plan) = t.items[2] else { Issue.record("no plan"); return }
-    #expect(plan.after == 17)
+    #expect(plan.after == 21)
     #expect(plan.todos.count == 3)
     #expect(plan.allDone)
-    guard case .report(42, _, let report) = t.items[5] else { Issue.record("no report"); return }
+    guard case .report(46, _, let report) = t.items[5] else { Issue.record("no report"); return }
     #expect(report.taskID == "T-1")
-    guard case .error(48, let error) = t.items[10] else { Issue.record("no error"); return }
+    guard case .error(52, let error) = t.items[10] else { Issue.record("no error"); return }
     #expect(error.hasPrefix("claude exited with code 1."))
-    guard case .user(49, _, let dropped) = t.items[11] else { Issue.record("no message"); return }
+    guard case .user(53, _, let dropped) = t.items[11] else { Issue.record("no message"); return }
     #expect(dropped.dropped == true)
     #expect(t.items == Transcript.build(e))
   }

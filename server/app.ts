@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { config, paths, uploadsDir } from './config.ts';
 import { channels, threads, events, artifacts, search, type Channel, type Thread } from './db.ts';
 import { bus } from './bus.ts';
-import { createThread, postMessage, interruptThread, runningCount, runningByHarness, slotsByHarness, queuedCount, pendingFor, isLive, runsHere } from './runner.ts';
+import { createThread, postMessage, interruptThread, runningCount, activeTasks, runningByHarness, slotsByHarness, queuedCount, pendingFor, isLive, runsHere } from './runner.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { usageByHarness } from './usage.ts';
@@ -286,6 +286,9 @@ api.get('/status', (c) =>
     server: about,
   }),
 );
+
+/** Sub-agents, background shells and workflows still running, across every thread. */
+api.get('/tasks', (c) => c.json(activeTasks()));
 
 api.get('/recent', (c) => c.json(threads.recent(Number(c.req.query('limit') ?? 60))));
 api.get('/search', (c) => c.json(search(c.req.query('q') ?? '')));

@@ -33,6 +33,8 @@ export const config = {
   hermesUrl: (env.OMNI_HERMES_URL ?? 'http://100.110.128.38:8642').replace(/\/$/, ''),
   /** How long a thread's claude process stays warm after a turn. 0 closes it right away. */
   keepAliveSeconds: Number(env.OMNI_KEEPALIVE_SECONDS ?? 600),
+  /** How long an idle process stays up for background agents that have not ended yet. */
+  taskKeepAliveSeconds: Number(env.OMNI_TASK_KEEPALIVE_SECONDS ?? 4 * 3600),
   /** After an interrupt, how long the turn gets to wind down before the process is killed. */
   interruptGraceMs: Number(env.OMNI_INTERRUPT_GRACE_MS ?? 8000),
   browser: (env.OMNI_BROWSER ?? '1') !== '0',

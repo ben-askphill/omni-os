@@ -41,6 +41,7 @@ public enum EventPayload: Hashable, Sendable {
   case status(text: String)
   case error(text: String)
   case result(TurnResult)
+  case task(TaskEvent)
   case unknown(kind: String, payload: JSONValue)
 
   public init(kind: String, json: String) {
@@ -61,11 +62,33 @@ public enum EventPayload: Hashable, Sendable {
       case "status": self = .status(text: try d.decode(TextPayload.self, from: data).text)
       case "error": self = .error(text: try d.decode(TextPayload.self, from: data).text)
       case "result": self = .result(try d.decode(TurnResult.self, from: data))
+      case "task": self = .task(try d.decode(TaskEvent.self, from: data))
       default: self = .unknown(kind: kind, payload: JSONValue.parse(json))
       }
     } catch {
       self = .unknown(kind: kind, payload: JSONValue.parse(json))
     }
+  }
+}
+
+/// A sub-agent or background task started, reported progress or ended, as the server stores it.
+public struct TaskEvent: Decodable, Hashable, Sendable {
+  public enum Phase: String, Decodable, Sendable { case started, progress, ended }
+  public let taskID: String
+  public let event: Phase
+  /// The Agent call that started it.
+  public let toolUseID: String?
+  public let description: String?
+  public let background: Bool?
+  /// How it ended: completed, failed, killed or stopped.
+  public let status: String?
+  public let toolUses: Int?
+
+  enum CodingKeys: String, CodingKey {
+    case event, description, background, status
+    case taskID = "task_id"
+    case toolUseID = "tool_use_id"
+    case toolUses = "tool_uses"
   }
 }
 

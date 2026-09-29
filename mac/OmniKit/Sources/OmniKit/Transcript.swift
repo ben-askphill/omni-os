@@ -199,7 +199,7 @@ public struct Transcript: Sendable {
       close(.result(eventID: e.id, r))
     case .error(let t): close(.error(eventID: e.id, t))
     case .crewReport(let r): close(.report(eventID: e.id, at: e.createdAt, r))
-    case .status, .sessionInit: break
+    case .status, .sessionInit, .task: break
     case .unknown(let kind, _):
       if Self.breaking.contains(kind) { close(nil) }
     }
@@ -303,7 +303,7 @@ extension Transcript {
         let node = Node(e.id, use, results[use.id], e.createdAt, parent == nil && use.parent != nil)
         if let parent { parent.children.append(node) } else { g.calls.append(node) }
         g.byID[use.id] = node
-      case .toolResult, .status, .sessionInit: break
+      case .toolResult, .status, .sessionInit, .task: break
       case .user(let m):
         group = nil
         rows.append(.item(.user(eventID: e.id, at: e.createdAt, m)))
