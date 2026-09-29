@@ -11,3 +11,4 @@ Local agent workspace. See README.md for what it does.
 - `npm run dev` (server :4747 + vite :4748), `npm test`, `npm run typecheck`.
 - Never store secret values outside the Keychain. The `secrets` table holds names only.
 - `data/` is runtime state (db, thread dirs, worktrees, browser profiles). Never commit it.
+- A feature or fix with a visible change to the Web UI or Mac app ships with screenshots in the PR description (before/after, both clients if both change). Take them against a throwaway server, never :4747, and upload with `scripts/pr-screenshots.sh`. See `docs/pr-screenshots.md`.
