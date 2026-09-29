@@ -6,6 +6,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 
 - `mac/Omni.xcodeproj`: hand-written, objectVersion 77, one app target `Omni`. Shared scheme `Omni`.
 - `mac/Omni/`: the app's sources. A synchronized folder: a file dropped in here is in the target, no project edit needed. See "The app (part D)" below.
+- `mac/Omni/Assets.xcassets/AppIcon.appiconset`: the app icon, all ten macOS sizes. `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon` in the target's build settings.
 - `mac/Omni-Info.plist`: partial Info.plist, merged with the generated keys. Only ATS `NSAllowsLocalNetworking`. It sits outside `mac/Omni/` so the synced folder does not copy it as a resource. `scripts/build-mac.sh` adds `OmniGitCommit` to the built app's copy, not to this file.
 - `scripts/build-mac.sh`: Release build, sign, install to `~/Applications/Omni.app`, open. See "Build and install".
 - `mac/OmniKit/`: Swift package, linked to the app as a local package. Everything that can be tested without UI goes here.
