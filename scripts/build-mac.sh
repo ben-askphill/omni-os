@@ -65,15 +65,16 @@ codesign --force --sign "$identity" --timestamp=none "$BUILT"
 codesign --verify --strict "$BUILT"
 
 # 4. Quit the installed copy if it runs. Only that copy: a Debug build or the server keeps running.
+# -a: pgrep skips its own ancestors by default, and the app is one when its Rebuild button runs this.
 exe="$DEST/Contents/MacOS/Omni"
-if pids="$(pgrep -f "^$exe( |$)")"; then
+if pids="$(pgrep -af "^$exe( |$)")"; then
   say "Quitting the running Omni"
   kill -TERM $pids 2>/dev/null || true
   for _ in $(seq 1 50); do
-    pgrep -f "^$exe( |$)" >/dev/null || break
+    pgrep -af "^$exe( |$)" >/dev/null || break
     sleep 0.1
   done
-  if pids="$(pgrep -f "^$exe( |$)")"; then
+  if pids="$(pgrep -af "^$exe( |$)")"; then
     kill -KILL $pids 2>/dev/null || true
     sleep 0.2
   fi
