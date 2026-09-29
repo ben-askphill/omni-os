@@ -71,8 +71,7 @@ describe('with sync on', () => {
 
   it('a thread running on the other Mac takes no turn here', async () => {
     thread('elsewhere', { cwd: r.tmp });
-    r.db.db.prepare(`UPDATE threads SET status = 'running' WHERE id = 'elsewhere'`).run();
-    r.db.syncMeta.set('thread', 'elsewhere', new Date().toISOString(), 'mac-b');
+    r.db.db.prepare(`UPDATE threads SET status = 'running', run_machine = 'mac-b' WHERE id = 'elsewhere'`).run();
     const d = await detail('elsewhere');
     expect(d.blocked).toMatch(/running on your other Mac/);
     const res = await post('elsewhere');
@@ -92,15 +91,16 @@ describe('with sync on', () => {
     ctl.abort();
     expect(JSON.parse(text.split('data: ').at(-1)!.split('\n')[0])).toMatchObject({ kind: 'thread', blocked: d.blocked });
     // Once it finishes there, it is free here.
-    r.db.db.prepare(`UPDATE threads SET status = 'done' WHERE id = 'elsewhere'`).run();
+    r.db.db.prepare(`UPDATE threads SET status = 'done', run_machine = NULL WHERE id = 'elsewhere'`).run();
     expect(await detail('elsewhere')).not.toHaveProperty('blocked');
   });
 
   it('a thread running here is not running elsewhere, even when the other Mac wrote to it last', async () => {
     const t = await r.start('THINK:1500 a long answer');
     await r.untilStatus(t.id, 'running');
-    // The other Mac renamed it mid-run: its row came with status running, from mac-b.
+    // The other Mac renamed it mid-run: its row came with status running, from mac-b, and says mac-a runs it.
     r.db.syncMeta.set('thread', t.id, new Date(Date.now() + 60_000).toISOString(), 'mac-b');
+    expect(r.db.threads.runMachine(t.id)).toBe('mac-a');
     expect(await detail(t.id)).not.toHaveProperty('blocked');
     expect(() => r.runner.sendMessage(t.id, 'and one more thing', { mode: 'queue' })).not.toThrow();
     await r.untilResults(t.id, 2);

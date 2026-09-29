@@ -209,6 +209,8 @@ const UUID_SQL = `lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) 
 export function migrate() {
   ensureColumn('threads', 'harness', `TEXT NOT NULL DEFAULT 'claude-code'`);
   ensureColumn('threads', 'effort', `TEXT NOT NULL DEFAULT ''`);
+  // Sync: the machine id of the Mac running or queueing the thread, null otherwise. Synced, kept out of the API.
+  ensureColumn('threads', 'run_machine', 'TEXT');
   // Sync matches these rows on uid, never on the local integer id. Old rows get one once; the index then makes the check free.
   for (const table of ['events', 'artifacts', 'automation_runs']) {
     ensureColumn(table, 'uid', 'TEXT');
@@ -305,6 +307,8 @@ export const outbox = {
       if (armedId) return armedId;
       const id = machineId ?? randomUUID();
       db.prepare(`INSERT INTO kv (key, value) VALUES ('sync.machine_id', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify(id));
+      // A thread mid-run as sync is set up is this machine's run, and its row should say so.
+      db.prepare(`UPDATE threads SET run_machine = ? WHERE status IN ('running','queued') AND run_machine IS NULL`).run(id);
       seed(id);
       armedId = id;
       return id;
@@ -319,6 +323,13 @@ export const outbox = {
   /** Called after each recorded write, so the worker can push soon. Only schedule work in it: it runs inside the write's tx. */
   onRecord(fn: (() => void) | null) {
     onRecord = fn;
+  },
+  /**
+   * Queue a row again after a remote change was applied to it, for a handler that kept part of the row as this
+   * machine has it: the other machines then get the row as it is here, with a newer ts. Call it inside apply.
+   */
+  requeue(entity: SyncEntity, entityId: string) {
+    record(entity, entityId);
   },
   /** Drop rows the relay took. */
   ack(ids: readonly number[]) {
@@ -408,17 +419,27 @@ export const channels = {
 
 // ---------- threads ----------
 
+/** The columns clients read, without sync's run_machine. */
+export const THREAD_COLUMNS =
+  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, created_at, updated_at';
+
+/** Who runs a thread with this status: this machine while it is running or queued here and sync is set up, else nobody. */
+const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? armedId : null);
+
 export const threads = {
-  get: (id: string) => db.prepare('SELECT * FROM threads WHERE id = ?').get(id) as unknown as Thread | undefined,
+  get: (id: string) => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE id = ?`).get(id) as unknown as Thread | undefined,
   byChannel: (channelId: string, limit = 200) =>
     db
-      .prepare('SELECT * FROM threads WHERE channel_id = ? ORDER BY updated_at DESC LIMIT ?')
+      .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? ORDER BY updated_at DESC LIMIT ?`)
       .all(channelId, limit) as unknown as Thread[],
   recent: (limit = 50) =>
-    db.prepare('SELECT * FROM threads ORDER BY updated_at DESC LIMIT ?').all(limit) as unknown as Thread[],
+    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
   children: (parentId: string) =>
-    db.prepare('SELECT * FROM threads WHERE parent_id = ? ORDER BY created_at').all(parentId) as unknown as Thread[],
-  running: () => db.prepare(`SELECT * FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],
+    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? ORDER BY created_at`).all(parentId) as unknown as Thread[],
+  running: () => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],
+  /** The machine id of the Mac that runs the thread (sync), or null when none does. */
+  runMachine: (id: string) =>
+    (db.prepare('SELECT run_machine FROM threads WHERE id = ?').get(id) as { run_machine: string | null } | undefined)?.run_machine ?? null,
   list(filter: { channel?: string; status?: string; limit?: number }) {
     const where: string[] = [];
     const args: (string | number)[] = [];
@@ -426,18 +447,18 @@ export const threads = {
     if (filter.status) (where.push('status = ?'), args.push(filter.status));
     args.push(filter.limit ?? 30);
     return db
-      .prepare(`SELECT * FROM threads ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY updated_at DESC LIMIT ?`)
+      .prepare(`SELECT ${THREAD_COLUMNS} FROM threads ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY updated_at DESC LIMIT ?`)
       .all(...args) as unknown as Thread[];
   },
   create(t: Omit<Thread, 'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'harness' | 'effort'> & { has_run?: number; created_at?: string; harness?: string; effort?: string }) {
     const ts = t.created_at ?? now();
     return tx(() => {
       db.prepare(
-        `INSERT INTO threads (id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO threads (id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, run_machine, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         t.id, t.channel_id, t.title, t.status, t.role, t.model, t.harness ?? 'claude-code', t.effort ?? '', t.session_id, t.has_run ?? 0, t.cwd,
-        t.branch, t.parent_id, t.task_id, t.source, t.automation, ts, ts,
+        t.branch, t.parent_id, t.task_id, t.source, t.automation, runMachine(t.status), ts, ts,
       );
       record('thread', t.id);
       return threads.get(t.id)!;
@@ -449,6 +470,8 @@ export const threads = {
     const sets = keys.map((k) => `${k} = ?`);
     const vals = keys.map((k) => (patch[k] ?? null) as string | number | null);
     if (!('updated_at' in patch)) (sets.push('updated_at = ?'), vals.push(now()));
+    // Every status write says who runs the thread, so the row itself tells the other Mac (server/sync/guard.ts).
+    if (patch.status) (sets.push('run_machine = ?'), vals.push(runMachine(patch.status)));
     tx(() => {
       if (db.prepare(`UPDATE threads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id).changes) record('thread', id);
     });
@@ -461,18 +484,15 @@ export const threads = {
     });
   },
   /**
-   * Threads that were mid-run when the server died can never finish. Not one another machine's sync says is
-   * running there: that machine fails it itself when it restarts.
+   * Threads that were mid-run when the server died can never finish. Only the ones this machine ran, or no
+   * machine claims: one another Mac runs is that Mac's to fail when it restarts.
    */
   failInterrupted() {
     return tx(() => {
       const ids = db
-        .prepare(
-          `SELECT id FROM threads WHERE status IN ('running','queued') AND id NOT IN
-             (SELECT entity_id FROM sync_meta WHERE entity = 'thread' AND machine_id != ?)`,
-        )
+        .prepare(`SELECT id FROM threads WHERE status IN ('running','queued') AND (run_machine IS NULL OR run_machine = ?)`)
         .all(armedId ?? '') as { id: string }[];
-      const fail = db.prepare(`UPDATE threads SET status = 'failed' WHERE id = ?`);
+      const fail = db.prepare(`UPDATE threads SET status = 'failed', run_machine = NULL WHERE id = ?`);
       for (const { id } of ids) (fail.run(id), record('thread', id));
       return ids.length;
     });

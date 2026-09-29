@@ -147,6 +147,7 @@ On each Mac: Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the UR
 - Path map: paths travel with the home folder as `~`. When the other Mac keeps a folder somewhere else, map it on the Sync page, like `~/work` to `~/code`.
 - `npm run sync:backfill`: queue every existing row again, for instance after restoring a database. It is idempotent and skips rows the other Mac wrote last.
 - Signing in to a different project or user starts that relay from the beginning and queues the history again.
+- A thread runs on one Mac at a time. Its row names the Mac running it (`run_machine`), so the other Mac shows it read-only until the run ends there, and an edit from the other Mac mid-run (a rename) never changes its status. After a crash, only the Mac that ran it marks it failed.
 
 ## Other entry points
 

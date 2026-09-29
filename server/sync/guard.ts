@@ -1,20 +1,20 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { paths, threadDir } from '../config.ts';
-import { channels, outbox, syncMeta, threads, type Thread } from '../db.ts';
+import { channels, outbox, threads, type Thread } from '../db.ts';
 import { restoreWorktree } from '../sandbox.ts';
 
 // Whether this machine may start a turn in a synced thread.
 
 /**
- * True when the thread is running or queued on another machine: the last write to it came from there.
- * A new turn here would fork the session, so the runner must refuse one.
+ * True when the thread is running or queued on another machine: its row names that machine as the one running
+ * it (run_machine), not merely the last to write it. A new turn here would fork the session, so the runner must refuse one.
  */
 export function runningElsewhere(t: Pick<Thread, 'id' | 'status'>): boolean {
   if (t.status !== 'running' && t.status !== 'queued') return false;
   const self = outbox.machineId();
-  const last = syncMeta.get('thread', t.id);
-  return !!self && !!last && last.machine_id !== self;
+  const runs = threads.runMachine(t.id);
+  return !!self && !!runs && runs !== self;
 }
 
 /** A refused turn. app.ts answers it as a 409 with the message. */
