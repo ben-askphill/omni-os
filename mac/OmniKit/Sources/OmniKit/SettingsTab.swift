@@ -2,7 +2,7 @@ import Foundation
 
 /// A tab of the Settings window.
 public enum SettingsTab: String, CaseIterable, Hashable, Sendable {
-  case connection, secrets, appearance
+  case connection, secrets, sync, appearance
 }
 
 extension Route {

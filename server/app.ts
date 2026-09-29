@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { config, paths, uploadsDir } from './config.ts';
 import { channels, threads, events, artifacts, search, type Channel, type Thread } from './db.ts';
 import { bus } from './bus.ts';
-import { createThread, postMessage, interruptThread, runningCount, runningByHarness, slotsByHarness, queuedCount, pendingFor, isLive } from './runner.ts';
+import { createThread, postMessage, interruptThread, runningCount, runningByHarness, slotsByHarness, queuedCount, pendingFor, isLive, runsHere } from './runner.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { usageByHarness } from './usage.ts';
@@ -19,6 +19,9 @@ import { detectRepo, listPRs, getPR, mergePR } from './github.ts';
 import { loadAutomations, runAutomation, setEnabled, lastRuns } from './automations.ts';
 import { commandsApi } from './commands-api.ts';
 import { threadsApi } from './threads-api.ts';
+import { syncApi } from './sync-api.ts';
+import { turnBlocked } from './sync/guard.ts';
+import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { about } from './about.ts';
 
 // Every /api route, and the Web UI. server/index.ts boots it.
@@ -137,7 +140,9 @@ api.post('/threads', async (c) => {
 api.get('/threads/:id', (c) => {
   const t = threads.get(c.req.param('id'));
   if (!t) return c.json({ error: 'not found' }, 404);
-  return c.json({
+  // With sync on, the files it has on the other Mac download in the background.
+  void threadOpened(t.id);
+  const detail = {
     thread: t,
     channel: channels.get(t.channel_id),
     events: events.since(t.id),
@@ -146,7 +151,10 @@ api.get('/threads/:id', (c) => {
     parent: t.parent_id ? threads.get(t.parent_id) : null,
     pending: pendingFor(t.id),
     live: isLive(t.id),
-  });
+  };
+  // Only when a turn cannot start here (a synced thread): why, for the composer to show.
+  const blocked = turnBlocked(t, runsHere(t.id));
+  return c.json(blocked ? { ...detail, blocked } : detail);
 });
 
 /** Compact view for the conductor MCP. */
@@ -180,11 +188,13 @@ api.post('/threads/:id/messages', async (c) => {
 });
 
 /** Serves a file Ben attached, by its name inside the thread's uploads folder. */
-api.get('/threads/:id/uploads/:name', (c) => {
+api.get('/threads/:id/uploads/:name', async (c) => {
   const id = c.req.param('id');
   const name = safeName(c.req.param('name'));
   if (!threads.get(id)) return c.text('not found', 404);
   const file = join(uploadsDir(id), name);
+  // Attached on the other Mac: it may still be downloading.
+  if (!existsSync(file)) await threadFilesReady(id);
   if (!existsSync(file)) return c.text('not found', 404);
   // Images render inline; anything else downloads rather than rendering in the tab.
   const mime = imageMime(name);
@@ -212,8 +222,11 @@ api.get('/threads/:id/stream', (c) => {
       wake?.();
     };
     bus.on(`thread:${id}`, onEvent);
-    const onFeed = (e: any) =>
-      e.type === 'thread' && (e.thread as Thread).id === id && onEvent({ kind: 'thread', thread: e.thread, pending: pendingFor(id), live: isLive(id) });
+    const onFeed = (e: any) => {
+      if (e.type !== 'thread' || (e.thread as Thread).id !== id) return;
+      const blocked = turnBlocked(e.thread as Thread, runsHere(id));
+      onEvent({ kind: 'thread', thread: e.thread, pending: pendingFor(id), live: isLive(id), ...(blocked && { blocked }) });
+    };
     bus.on('feed', onFeed);
     stream.onAbort(() => {
       bus.off(`thread:${id}`, onEvent);
@@ -273,8 +286,9 @@ api.get('/search', (c) => c.json(search(c.req.query('q') ?? '')));
 // ---------- artifacts ----------
 
 api.get('/artifacts', (c) => c.json(artifacts.recent()));
-api.get('/artifacts/:id/raw', (c) => {
+api.get('/artifacts/:id/raw', async (c) => {
   const a = artifacts.get(Number(c.req.param('id')));
+  if (a && !existsSync(a.path)) await threadFilesReady(a.thread_id);
   if (!a || !existsSync(a.path) || relative(paths.threads, a.path).startsWith('..')) return c.text('not found', 404);
   c.header('Content-Type', mimeFor(a.path, a.kind));
   c.header('Cache-Control', 'no-store');
@@ -356,6 +370,7 @@ api.post('/automations/:id/enabled', async (c) => {
 });
 
 api.route('/commands', commandsApi);
+api.route('/sync', syncApi);
 
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
 api.all('*', (c) => c.json({ error: 'Not found' }, 404));

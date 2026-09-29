@@ -405,6 +405,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
   const [queued, setQueued] = useState<PendingMsg[]>([]);
   const [warm, setWarm] = useState<boolean | undefined>(undefined);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<string | null>(null);
   const [prBusy, setPrBusy] = useState(false);
 
   const lastId = useRef(0);
@@ -463,6 +464,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
         setThread((prev) => newer(prev, d.thread));
         setQueued(d.pending ?? []);
         if (d.live !== undefined) setWarm(d.live);
+        setBlocked(d.blocked ?? null);
         setChannel(d.channel);
         setParent(d.parent);
         setChildren(d.children);
@@ -523,6 +525,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
         setThread((prev) => newer(prev, m.thread));
         if (m.pending) setQueued(m.pending);
         if (m.live !== undefined) setWarm(m.live);
+        setBlocked(m.blocked ?? null);
       }
     },
     () => void load(false),
@@ -838,6 +841,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
         <div className="relative shrink-0 bg-bg px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4">
           <div className="mx-auto max-w-3xl">
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
+            {blocked && <ErrorNote className="mb-2">{blocked}</ErrorNote>}
             <ReplyComposer
               thread={thread}
               canSteer={isHarnessId(thread.harness) ? CAPABILITIES[thread.harness].steer : thread.harness !== 'cursor'}

@@ -117,6 +117,23 @@ export function writeCursorPlugin(input: McpInput): string {
   return dir;
 }
 
+/**
+ * Check a thread's branch out again at dir, for a worktree thread whose worktree is not on this Mac (it ran on the
+ * other one). The branch comes from the repo, else from its origin. Throws, saying why, when neither has it.
+ */
+export async function restoreWorktree(repoPath: string, dir: string, branch: string) {
+  // Never wait on a credential prompt: the turn is waiting.
+  const git = (...args: string[]) =>
+    run('git', ['-C', repoPath, ...args], { timeout: 30_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+  const ref = `refs/heads/${branch}`;
+  const has = () => git('rev-parse', '--verify', '--quiet', ref).then(() => true, () => false);
+  if (!(await has())) await git('fetch', '--quiet', 'origin', `${ref}:${ref}`).catch(() => {});
+  if (!(await has())) throw new Error(`branch ${branch} is not in ${repoPath} or on its origin`);
+  // A worktree removed by hand is still registered until pruned, and add refuses its path.
+  await git('worktree', 'prune').catch(() => {});
+  await git('worktree', 'add', dir, branch);
+}
+
 export async function removeWorktree(repoPath: string, dir: string) {
   await run('git', ['-C', repoPath, 'worktree', 'remove', '--force', dir]).catch(() => {});
 }

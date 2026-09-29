@@ -16,6 +16,10 @@ struct SettingsView: View {
         SecretsSettings(model: model)
           .frame(width: 560, height: 680)
       }
+      Tab("Sync", systemImage: "arrow.triangle.2.circlepath", value: .sync) {
+        SyncSettings(model: model)
+          .frame(width: 560, height: 680)
+      }
       Tab("Appearance", systemImage: "circle.lefthalf.filled", value: .appearance) {
         AppearanceSettingsView(appearance: appearance)
           .frame(width: 560, height: 220)

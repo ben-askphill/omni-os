@@ -10,9 +10,12 @@ import { HomePage } from './pages/Home.tsx';
 import { NewChannelPage } from './pages/ChannelSettings.tsx';
 import { SearchPage } from './pages/Search.tsx';
 import { SecretsPage } from './pages/Secrets.tsx';
+import { SyncPage } from './pages/Sync.tsx';
 import { ThreadPage } from './pages/Thread.tsx';
 import { href, navigate, requestComposerFocus, useHash, useRoute, type Route } from './router.ts';
 import { AppProvider, useApp } from './store.tsx';
+import { api } from './api.ts';
+import { createSyncNudge } from './sync-nudge.ts';
 
 function Page({ route }: { route: Route }) {
   switch (route.name) {
@@ -28,6 +31,8 @@ function Page({ route }: { route: Route }) {
       return <AutomationsPage />;
     case 'secrets':
       return <SecretsPage />;
+    case 'sync':
+      return <SyncPage />;
     case 'artifacts':
       return <ArtifactsPage />;
     case 'new-channel':
@@ -57,6 +62,8 @@ function mobileTitle(route: Route, channelName: (id: string) => string | undefin
       return 'Automations';
     case 'secrets':
       return 'Secrets';
+    case 'sync':
+      return 'Sync';
     case 'artifacts':
       return 'Artifacts';
     case 'new-channel':
@@ -126,6 +133,20 @@ function Shell() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Back on the tab: ask the server to sync, so the other Mac's work shows up now rather than on its timer.
+  useEffect(() => {
+    const sync = createSyncNudge({ post: () => api.post('/sync/now') });
+    const onFocus = () => sync.nudge();
+    const onVisible = () => document.visibilityState === 'visible' && sync.nudge();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+      sync.cancel();
+    };
   }, []);
 
   useEffect(() => {

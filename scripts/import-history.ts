@@ -295,18 +295,18 @@ async function remap(dryRun: boolean) {
       if (ch && ch.id !== IMPORTED_CHANNEL.id) moves.push({ id: r.id, title: r.title, to: ch.id });
     }
   } else {
-    const { db, channels } = await import('../server/db.ts');
+    const { db, channels, threads } = await import('../server/db.ts');
     const chans = channels.list(false);
     const rows = db.prepare(`SELECT id, title, cwd FROM threads WHERE channel_id = ? AND source = 'import'`).all(IMPORTED_CHANNEL.id) as {
       id: string;
       title: string;
       cwd: string;
     }[];
-    const move = db.prepare('UPDATE threads SET channel_id = ? WHERE id = ?');
     for (const r of rows) {
       const ch = matchChannel(r.cwd, chans);
       if (!ch || ch.id === IMPORTED_CHANNEL.id) continue;
-      move.run(ch.id, r.id);
+      // Through the repo, so with sync on the move reaches the other Mac.
+      threads.setChannel(r.id, ch.id);
       moves.push({ id: r.id, title: r.title, to: ch.id });
     }
   }

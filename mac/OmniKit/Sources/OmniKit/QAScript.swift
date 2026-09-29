@@ -199,7 +199,7 @@ public struct QAScript: Hashable, Sendable {
       return .open(window)
     case "settings":
       guard let name = value as? String, let tab = SettingsTab(rawValue: name) else {
-        throw QAScriptError("settings takes connection, secrets or appearance")
+        throw QAScriptError("settings takes connection, secrets, sync or appearance")
       }
       return .settings(tab)
     case "openThread":
