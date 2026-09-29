@@ -54,6 +54,8 @@ export interface SyncStatus {
 
 export interface SyncWorker {
   readonly machineId: string;
+  /** The relay it syncs through. server/sync/files.ts moves thread and session files over it too. */
+  readonly transport: SyncTransport;
   /** Sync now. Joins a sync in flight, then runs one more so the caller's writes are in it. Never rejects. */
   syncNow(): Promise<SyncResult>;
   /** Sync within ms, coalescing calls. */
@@ -169,6 +171,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
 
   const worker: SyncWorker = {
     machineId,
+    transport,
     syncNow() {
       if (!inflight) return (inflight = cycle().finally(() => (inflight = null)));
       return (queued ??= inflight.then(() => {
