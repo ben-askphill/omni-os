@@ -20,6 +20,8 @@ private struct ThreadInspector: ViewModifier {
   /// Presenting the inspector in the same pass that puts the thread on screen loops the window's layout and
   /// traps, so it comes one beat after.
   @State private var settled = false
+  @Environment(\.paneTop) private var paneTop
+  @State private var contentTop: CGFloat?
 
   init(model: AppModel, store: ThreadStore) {
     self.model = model
@@ -33,9 +35,15 @@ private struct ThreadInspector: ViewModifier {
 
   func body(content: Content) -> some View {
     let count = store.artifacts.count
+    // The inspector's split view lays both columns out from the window's top edge, not the pane's, which put
+    // the header and the panel's tabs under the toolbar and outside the pane's clip. Push them back down.
+    let drop = max(0, (paneTop ?? 0) - (contentTop ?? paneTop ?? 0))
     content
+      .padding(.top, drop)
+      .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { contentTop = $0 }
       .inspector(isPresented: Binding(get: { open && settled }, set: { open = $0 })) {
         InspectorPanel(model: model, store: store, selection: $selection) { open = false }
+          .padding(.top, drop)
           .inspectorColumnWidth(min: 340, ideal: 360, max: 760)
       }
       .toolbar {
