@@ -24,6 +24,7 @@ import { claudeAdapter } from './harness/claude/adapter.ts';
 import { codexAdapter } from './harness/codex/adapter.ts';
 import { cursorAdapter } from './harness/cursor/adapter.ts';
 import { hermesAdapter } from './harness/hermes/adapter.ts';
+import { beforeResume, turnFinished } from './sync/files.ts';
 
 const omniUrl = () => `http://127.0.0.1:${config.port}`;
 
@@ -402,6 +403,7 @@ function endTurn(live: Live, status: ThreadStatus) {
   });
   emitThread(id);
   if (t?.parent_id && status !== 'stopped' && !shuttingDown) reportToParent(id, status, runText);
+  void turnFinished(id);
   armIdle(live);
   pump();
 }
@@ -509,6 +511,7 @@ function onExit(live: Live, code: number | null, signal: NodeJS.Signals | null) 
   } else if (thread && live.resultSeen && !thread.has_run) {
     threads.update(id, { has_run: 1, updated_at: thread.updated_at });
   }
+  if (thread && (wasTurn || live.resultSeen)) void turnFinished(id);
   emitThread(id);
   pump();
 }
@@ -584,7 +587,9 @@ async function spawnLive(live: Live, thread: Thread) {
   } catch (err) {
     addEvent(thread.id, 'error', { text: `Could not read secrets: ${(err as Error).message}` });
   }
-  // Interrupted or shut down while secrets were read.
+  // With sync on, the other Mac's session file and uploads first, so the harness resumes where it left off.
+  await beforeResume(thread);
+  // Interrupted or shut down while secrets or files were read.
   if (lives.get(thread.id) !== live) return;
 
   const ctx: AdapterContext = {
