@@ -15,7 +15,7 @@ import { listCrew } from './crew.ts';
 import { listSecrets, setSecret, deleteSecret } from './secrets.ts';
 import { mimeFor } from './artifacts.ts';
 import { checkUploads, imageMime, safeName, saveUploads } from './uploads.ts';
-import { detectRepo, listPRs, branchPR, getPR, mergePR } from './github.ts';
+import { detectRepo, listPRs, branchPRs, getPR, mergePR } from './github.ts';
 import { loadAutomations, runAutomation, setEnabled, lastRuns } from './automations.ts';
 import { commandsApi } from './commands-api.ts';
 import { threadsApi } from './threads-api.ts';
@@ -306,13 +306,14 @@ const repoOf = (channelId: string) => {
 
 api.get('/channels/:id/prs', async (c) => c.json(await listPRs(repoOf(c.req.param('id')), c.req.query('state') ?? 'open')));
 api.get('/channels/:id/prs/:n', async (c) => c.json(await getPR(repoOf(c.req.param('id')), Number(c.req.param('n')))));
-// The PR opened from a thread's branch, open or not. null when there is none or no repo to ask.
+// The PRs opened from a thread's branch, newest first, and `pr`, the one to show: the open one,
+// else the newest. null and [] when there is none or no repo to ask.
 api.get('/threads/:id/pr', async (c) => {
   const t = threads.get(c.req.param('id'));
   if (!t) return c.json({ error: 'not found' }, 404);
   const repo = channels.get(t.channel_id)?.github_repo;
-  if (!t.branch || !repo) return c.json({ pr: null });
-  return c.json({ pr: await branchPR(repo, t.branch) });
+  if (!t.branch || !repo) return c.json({ pr: null, prs: [] });
+  return c.json(await branchPRs(repo, t.branch));
 });
 api.post('/channels/:id/prs/:n/merge', async (c) => {
   const { method, delete_branch, confirm } = z
