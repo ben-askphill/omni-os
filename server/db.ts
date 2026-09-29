@@ -256,7 +256,11 @@ if (armedId) armedId = JSON.parse(armedId) as string;
 /** Note that a row changed. Call it inside the write's tx. Remote-applied changes never call it, so nothing echoes back. */
 function record(entity: SyncEntity, entityId: string, op: SyncOp = 'upsert') {
   if (!armedId) return;
-  const ts = now();
+  let ts = now();
+  // A write here always comes after the last write the row took: in the same millisecond, or after one from a Mac
+  // whose clock runs ahead. Otherwise the other Mac would keep the older value while this one shows the newer.
+  const last = LWW.has(entity) ? syncMeta.get(entity, entityId)?.ts : undefined;
+  if (last && ts <= last) ts = new Date(Date.parse(last) + 1).toISOString();
   db.prepare('INSERT INTO sync_outbox (entity, entity_id, op, ts) VALUES (?, ?, ?, ?)').run(entity, entityId, op, ts);
   if (LWW.has(entity)) syncMeta.set(entity, entityId, ts, armedId);
   onRecord?.();

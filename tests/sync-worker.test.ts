@@ -70,7 +70,7 @@ describe('sync worker', () => {
     const r = await worker.syncNow();
     expect(r.error).toBeUndefined();
     const mine = relay.pushCalls.filter((c) => c[0].machine_id === 'mac-a');
-    expect(mine.map((c) => c.length)).toEqual([3, 3]); // the thread and five events
+    expect(mine.map((c) => c.length)).toEqual([3, 3, 2]); // the two seeded channels, the thread and five events
     expect(r.pulled).toBe(4);
     expect(db.threads.get('r4')?.title).toBe('remote r4');
     expect(db.kv.get<number>('sync.cursor')).toBe(relay.changes.filter((c) => c.machine_id === 'mac-z').at(-1)!.seq);
@@ -118,16 +118,18 @@ describe('sync worker', () => {
   });
 
   it('holds changes for an entity with no handler yet, without blocking the rest', async () => {
+    const channel = apply.getHandler('channel')!;
+    apply.unregisterHandler('channel');
     db.channels.create({ id: 'held', name: 'Held' });
     db.threads.update('l1', { title: 'after held' });
     await worker.syncNow();
-    expect(relay.changes.some((c) => c.entity === 'channel')).toBe(false);
+    expect(relay.changes.some((c) => c.entity === 'channel' && c.entity_id === 'held')).toBe(false);
     expect((relay.changes.at(-1)!.data as any).title).toBe('after held');
-    expect(worker.status()).toMatchObject({ pending: 0, held: 3 }); // conductor and inbox from the seed, and this one
+    expect(worker.status()).toMatchObject({ pending: 0, held: 1 });
     // A handler registered later picks them up.
-    apply.registerHandler('channel', { serialize: (id) => ({ id }), apply: () => false });
+    apply.registerHandler('channel', channel);
     await worker.syncNow();
-    expect(relay.changes.filter((c) => c.entity === 'channel').map((c) => c.entity_id).sort()).toEqual(['conductor', 'held', 'inbox']);
+    expect(relay.changes.at(-1)).toMatchObject({ entity: 'channel', entity_id: 'held', data: { name: 'Held' } });
     expect(worker.status().held).toBe(0);
   });
 

@@ -81,7 +81,8 @@ describe('two machines, one relay', () => {
     await b.worker.syncNow();
     await a.worker.syncNow();
     expect(relay.changes.length).toBe(before);
-    expect(relay.changes.every((c) => c.machine_id === 'mac-a')).toBe(true);
+    // B only ever pushed its own seed: the two system channels every install has.
+    expect(relay.changes.filter((c) => c.machine_id === 'mac-b').map((c) => `${c.entity}:${c.entity_id}`).sort()).toEqual(['channel:conductor', 'channel:inbox']);
     expect(b.worker.status().pending).toBe(0);
   });
 

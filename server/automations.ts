@@ -91,7 +91,7 @@ export function lastRuns(id: string, limit = 10) {
   return db
     .prepare(
       `SELECT r.id, r.automation, r.thread_id, r.trigger, r.created_at, t.status, t.title FROM automation_runs r LEFT JOIN threads t ON t.id = r.thread_id
-       WHERE r.automation = ? ORDER BY r.id DESC LIMIT ?`,
+       WHERE r.automation = ? ORDER BY r.created_at DESC, r.id DESC LIMIT ?`,
     )
     .all(id, limit);
 }

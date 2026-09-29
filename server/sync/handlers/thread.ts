@@ -1,9 +1,9 @@
 import { db, threads, type Thread } from '../../db.ts';
 import { publishFeed } from '../../bus.ts';
 import { claim, registerHandler } from '../apply.ts';
-import { fromPortable, toPortable } from '../paths.ts';
+import { fromPortable, toRemote } from '../paths.ts';
 
-// Threads: last writer wins on the whole row. cwd travels with the home dir as "~".
+// Threads: last writer wins on the whole row. cwd travels with the home dir as "~", through each Mac's path map.
 
 const COLUMNS = [
   'id', 'channel_id', 'title', 'status', 'role', 'model', 'harness', 'effort', 'session_id', 'has_run', 'cwd',
@@ -18,7 +18,7 @@ const upsert = db.prepare(
 registerHandler('thread', {
   serialize(id) {
     const t = threads.get(id);
-    return t ? { ...t, cwd: toPortable(t.cwd) } : null;
+    return t ? { ...t, cwd: toRemote(t.cwd) } : null;
   },
   apply(change) {
     if (!claim(change)) return false;

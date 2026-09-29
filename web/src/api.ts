@@ -54,6 +54,8 @@ export interface ThreadDetail {
   pending?: PendingMsg[];
   /** A warm CLI process is attached (idle or mid-turn), so the next message starts instantly. */
   live?: boolean;
+  /** Why this Mac cannot start a turn in the thread (sync: it runs on the other Mac, or its folder is not here). */
+  blocked?: string;
 }
 
 /** How a message reaches a busy thread: read at its next step, run after the turn, or interrupt then run. */
@@ -370,14 +372,17 @@ export function openSSE(
 export type StreamMessage =
   | { type: 'event'; event: EventRow }
   | { type: 'artifact'; artifact: Artifact }
-  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean };
+  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string };
 
 function classifyStream(d: unknown): StreamMessage | null {
   if (!d || typeof d !== 'object') return null;
   const o = d as Record<string, unknown>;
   if (o.kind === 'artifact' && o.artifact) return { type: 'artifact', artifact: o.artifact as Artifact };
   if (o.kind === 'thread' && o.thread)
-    return { type: 'thread', thread: o.thread as Thread, pending: o.pending as PendingMsg[] | undefined, live: typeof o.live === 'boolean' ? o.live : undefined };
+    return {
+      type: 'thread', thread: o.thread as Thread, pending: o.pending as PendingMsg[] | undefined, live: typeof o.live === 'boolean' ? o.live : undefined,
+      blocked: typeof o.blocked === 'string' ? o.blocked : undefined,
+    };
   if (typeof o.id === 'number' && typeof o.payload === 'string') return { type: 'event', event: o as unknown as EventRow };
   return null;
 }
