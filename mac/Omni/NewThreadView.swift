@@ -218,7 +218,7 @@ private struct NewThreadBox: View {
         pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest)
       effortMenu
       Spacer(minLength: 8)
-      Text("⌘↩").font(.system(size: 11.5)).foregroundStyle(.tertiary).accessibilityHidden(true)
+      Text("↩").font(.system(size: 11.5)).foregroundStyle(.tertiary).accessibilityHidden(true)
       SendButton(title: "Start", armed: composer.canSend, sending: composer.sending) { start() }
     }
     .padding(.horizontal, 8)

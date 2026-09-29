@@ -4,7 +4,7 @@ import SwiftUI
 
 /// What the reply box reports to the view around it.
 struct ComposerCallbacks {
-  /// Cmd-Return, or Shift-Cmd-Return with `interrupt`.
+  /// Return, or Shift-Cmd-Return with `interrupt`.
   var send: (_ interrupt: Bool) -> Void
   /// Esc with nothing composing. Gets the key's context; true when it took the key.
   var escape: (_ context: EscapeContext) -> Bool
@@ -138,7 +138,8 @@ struct ComposerTextView: NSViewRepresentable {
       parent.callbacks.edited(tv.string, tv.selectedRange().location)
     }
 
-    // The arrows, Return and Tab go to the `/` menu while it is open. An input method composing keeps them.
+    // The arrows, Return and Tab go to the `/` menu while it is open, and plain Return sends when it is
+    // not. Shift-Return stays a newline. An input method composing keeps them all.
     func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
       guard let parent, !textView.hasMarkedText() else { return false }
       let key: SlashKey
@@ -149,7 +150,8 @@ struct ComposerTextView: NSViewRepresentable {
       case #selector(NSResponder.insertNewline(_:)):
         let flags = NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
         guard flags.isDisjoint(with: [.shift, .option, .command, .control]) else { return false }
-        key = .return
+        if !parent.callbacks.slash(.return) { parent.callbacks.send(false) }
+        return true
       default: return false
       }
       return parent.callbacks.slash(key)
@@ -198,13 +200,13 @@ final class ComposerNSTextView: NSTextView {
       withAttributes: [.font: ComposerTextView.font, .foregroundColor: NSColor.placeholderTextColor])
   }
 
-  // Cmd-Return and Shift-Cmd-Return send. Plain Return stays a newline. Nothing while an input method composes.
+  // Cmd-Return inserts a newline and Shift-Cmd-Return interrupts. Nothing while an input method composes.
   override func performKeyEquivalent(with event: NSEvent) -> Bool {
     let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
     if event.type == .keyDown, window?.firstResponder === self, !hasMarkedText(), event.keyCode == 36 || event.keyCode == 76,
       flags.contains(.command), flags.isDisjoint(with: [.option, .control])
     {
-      callbacks?.send(flags.contains(.shift))
+      if flags.contains(.shift) { callbacks?.send(true) } else { insertNewlineIgnoringFieldEditor(nil) }
       return true
     }
     return super.performKeyEquivalent(with: event)

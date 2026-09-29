@@ -252,7 +252,7 @@ private struct ReplyComposerView: View {
         ThreadPRSlot(model: model, thread: thread, busy: busyThread, opening: reply.openingPR) { Task { await openPR() } }
       }
       Spacer(minLength: 8)
-      Text("⌘↩")
+      Text("↩")
         .font(.system(size: 11.5))
         .foregroundStyle(.tertiary)
         .accessibilityHidden(true)

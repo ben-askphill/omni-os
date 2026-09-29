@@ -206,16 +206,33 @@ function SendButton({ armed, busy, onClick, children }: { armed: boolean; busy: 
   );
 }
 
-/** `enterSends`: the new-thread box, where Enter sends and the modifier adds a newline. */
-function Hint({ enterSends = false }: { enterSends?: boolean }) {
-  const mod = isMac ? '⌘↵' : 'Ctrl ↵';
+function Hint() {
   return (
     <span className="hidden items-center gap-3.5 pr-1 text-[11.5px] text-fg-4 sm:inline-flex">
-      <span>{enterSends ? '↵' : mod} send</span>
-      <span>{enterSends ? mod : '↵'} newline</span>
+      <span>↵ send</span>
+      <span>{isMac ? '⌘↵' : 'Ctrl ↵'} newline</span>
       <span>/ commands</span>
     </span>
   );
+}
+
+/**
+ * Enter sends, Shift+Cmd/Ctrl+Enter interrupts, Cmd/Ctrl+Enter inserts a newline (Shift+Enter keeps the
+ * textarea's own). Null for every other key, and for the Enter that ends an IME composition (229: Safari's,
+ * which it doesn't flag as composing). Prevents the default for the keys it acts on.
+ */
+function enterKey(e: ReactKeyboardEvent<HTMLTextAreaElement>, text: string, onText: (text: string) => void): 'send' | 'interrupt' | null {
+  if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229 || e.altKey) return null;
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod && e.shiftKey) return null;
+  e.preventDefault();
+  if (mod && e.shiftKey) return 'interrupt';
+  if (!mod) return 'send';
+  const el = e.currentTarget;
+  const at = el.selectionStart + 1;
+  onText(text.slice(0, el.selectionStart) + '\n' + text.slice(el.selectionEnd));
+  requestAnimationFrame(() => el.setSelectionRange(at, at));
+  return null;
 }
 
 const shell = (shape: string, over = false) =>
@@ -480,18 +497,7 @@ export function NewThreadComposer({
         onPaste={att.onPaste}
         onKeyDown={(e) => {
           if (slashMenu.onKey(e)) return;
-          // 229: Safari's Enter that ends an IME composition, which it doesn't flag as composing.
-          if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return;
-          if (e.metaKey || e.ctrlKey) {
-            e.preventDefault();
-            const el = e.currentTarget;
-            const at = el.selectionStart + 1;
-            update(text.slice(0, el.selectionStart) + '\n' + text.slice(el.selectionEnd));
-            requestAnimationFrame(() => el.setSelectionRange(at, at));
-          } else if (!e.shiftKey && !e.altKey) {
-            e.preventDefault();
-            void submit();
-          }
+          if (enterKey(e, text, update)) void submit();
         }}
         rows={big ? 3 : 2}
         placeholder={placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task')}
@@ -526,7 +532,7 @@ export function NewThreadComposer({
         })()}
         <AttachButton onPick={att.add} disabled={busy} />
         <div className="ml-auto flex items-center gap-2.5">
-          <Hint enterSends />
+          <Hint />
           <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>
             Start
           </SendButton>
@@ -541,7 +547,7 @@ export function NewThreadComposer({
 }
 
 const SEND_OPTIONS: { mode: SendMode; label: string; hint: string; icon: IconName; keys?: string[] }[] = [
-  { mode: 'steer', label: 'Steer now', hint: 'The agent reads it at its next step', icon: 'send', keys: [MOD, 'Enter'] },
+  { mode: 'steer', label: 'Steer now', hint: 'The agent reads it at its next step', icon: 'send', keys: ['Enter'] },
   { mode: 'queue', label: 'Queue for after this turn', hint: 'Runs when the current turn ends', icon: 'clock' },
   { mode: 'interrupt', label: 'Interrupt and send', hint: 'Stops the current step, then runs this', icon: 'stop', keys: [MOD, 'Shift', 'Enter'] },
 ];
@@ -821,10 +827,10 @@ export function ReplyComposer({
         onPaste={att.onPaste}
         onKeyDown={(e) => {
           if (slashMenu.onKey(e)) return;
-          if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.nativeEvent.isComposing) return;
-          e.preventDefault();
+          const key = enterKey(e, text, update);
+          if (!key) return;
           if (omni) return void runOmni();
-          const busyMode: SendMode = e.shiftKey ? 'interrupt' : canSteer ? 'steer' : 'queue';
+          const busyMode: SendMode = key === 'interrupt' ? 'interrupt' : canSteer ? 'steer' : 'queue';
           void submit(busyThread ? busyMode : undefined);
         }}
         rows={1}
