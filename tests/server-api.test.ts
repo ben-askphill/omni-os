@@ -55,6 +55,14 @@ describe('GET /api/status', () => {
   });
 });
 
+describe('GET /api/threads/:id/pr', () => {
+  it('is a JSON 404 for an unknown thread', async () => {
+    const res = await call('/api/threads/nope/pr');
+    expect(res.status).toBe(404);
+    expect(JSON.parse(res.text)).toEqual({ error: 'not found' });
+  });
+});
+
 describe('an unknown /api request', () => {
   it('is a JSON 404, whatever the method', async () => {
     const json = { headers: { 'content-type': 'application/json' }, body: '{}' };

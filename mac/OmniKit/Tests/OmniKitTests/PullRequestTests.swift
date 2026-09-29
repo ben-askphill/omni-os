@@ -111,6 +111,20 @@ import OmniKit
     #expect(t.requests[0].url?.absoluteString == "http://127.0.0.1:4799/api/channels/acme/prs?state=merged")
   }
 
+  @Test func threadPRIsNilWithoutOne() async throws {
+    let t = StubTransport(body: #"{"pr":null}"#)
+    let pr = try await OmniClient(port: 4799, transport: t).pullRequest(forThread: "t1")
+    #expect(pr == nil)
+    #expect(t.requests[0].url?.path == "/api/threads/t1/pr")
+  }
+
+  @Test func badgeSaysWhetherItMerged() throws {
+    let list = try decodeFixture([PullRequestSummary].self, "prs.json")
+    let draft = try #require(list.first { $0.isDraft })
+    #expect(draft.badge == "draft")
+    #expect(list.contains { $0.badge == "open" })
+  }
+
   @Test func decodesTheListAndTheDetail() throws {
     let list = try decodeFixture([PullRequestSummary].self, "prs.json")
     #expect(list.count >= 2)

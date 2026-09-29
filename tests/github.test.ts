@@ -4,7 +4,7 @@ vi.mock('../server/db.ts', () => {
   throw new Error('db.ts must not be imported by github tests');
 });
 
-import { summarizeChecks } from '../server/github.ts';
+import { pickBranchPR, summarizeChecks } from '../server/github.ts';
 
 describe('summarizeChecks', () => {
   it('returns zeros for null, undefined and empty rollups', () => {
@@ -48,5 +48,13 @@ describe('summarizeChecks', () => {
 
   it('is case-insensitive and counts blank entries as pending', () => {
     expect(summarizeChecks([{ conclusion: 'success' }, { state: 'failure' }, {}])).toEqual({ passed: 1, failed: 1, pending: 1 });
+  });
+});
+
+describe('pickBranchPR', () => {
+  it('prefers the open PR, else the newest, else none', () => {
+    expect(pickBranchPR([{ number: 3, state: 'MERGED' }, { number: 2, state: 'OPEN' }])).toEqual({ number: 2, state: 'OPEN' });
+    expect(pickBranchPR([{ number: 3, state: 'MERGED' }, { number: 1, state: 'CLOSED' }])).toEqual({ number: 3, state: 'MERGED' });
+    expect(pickBranchPR([])).toBeNull();
   });
 });

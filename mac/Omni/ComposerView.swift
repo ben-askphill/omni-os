@@ -60,6 +60,77 @@ struct InterruptButton: View {
   }
 }
 
+/// Open PR until the branch has a PR, then that PR and whether it merged: `ThreadPR` in Thread.tsx.
+private struct ThreadPRSlot: View {
+  let model: AppModel
+  let thread: OmniThread
+  let busy: Bool
+  let opening: Bool
+  let open: () -> Void
+  /// nil until the first answer, so the button does not flash before the PR shows.
+  @State private var pr: PullRequestSummary??
+
+  var body: some View {
+    HStack(spacing: 4) {
+      switch pr {
+      case .none: EmptyView()
+      case .some(.none): openButton
+      case .some(.some(let pr)):
+        Button {
+          model.route = .channel(id: thread.channelID, tab: .prs, pr: pr.number)
+        } label: {
+          HStack(spacing: 5) {
+            Image(systemName: "arrow.triangle.pull")
+            Text("#\(pr.number)")
+            PRChip(text: pr.badge, tone: pr.badge == "open" ? .ok : pr.badge == "merged" ? .info : .outline)
+          }
+          .font(.system(size: 12.5))
+          .padding(.horizontal, 8)
+          .frame(height: 26)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .help(pr.title)
+        if pr.state == "CLOSED" { openButton }
+      }
+    }
+    // Again when a turn ends (it may have opened the PR), and every minute to catch a merge.
+    .task(id: busy) {
+      guard !busy else { return }
+      while !Task.isCancelled {
+        await load()
+        try? await Task.sleep(for: .seconds(60))
+      }
+    }
+  }
+
+  private var openButton: some View {
+    Button(action: open) {
+      HStack(spacing: 5) {
+        if opening { ProgressView().controlSize(.mini) } else { Image(systemName: "arrow.triangle.pull") }
+        Text("Open PR")
+      }
+      .font(.system(size: 12.5))
+      .padding(.horizontal, 8)
+      .frame(height: 26)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .foregroundStyle(.secondary)
+    .disabled(opening)
+    .help(ReplyComposerModel.openPRPrompt)
+  }
+
+  private func load() async {
+    do {
+      pr = .some(try await model.client.pullRequest(forThread: thread.id))
+    } catch {
+      if pr == nil { pr = .some(nil) }
+    }
+  }
+}
+
 private struct ReplyComposerView: View {
   let model: AppModel
   let store: ThreadStore
@@ -177,22 +248,7 @@ private struct ReplyComposerView: View {
       .help("Attach files")
       .accessibilityLabel("Attach files")
       if thread.branch != nil {
-        Button {
-          Task { await openPR() }
-        } label: {
-          HStack(spacing: 5) {
-            if reply.openingPR { ProgressView().controlSize(.mini) } else { Image(systemName: "arrow.triangle.pull") }
-            Text("Open PR")
-          }
-          .font(.system(size: 12.5))
-          .padding(.horizontal, 8)
-          .frame(height: 26)
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .disabled(reply.openingPR)
-        .help(ReplyComposerModel.openPRPrompt)
+        ThreadPRSlot(model: model, thread: thread, busy: busyThread, opening: reply.openingPR) { Task { await openPR() } }
       }
       Spacer(minLength: 8)
       Text("⌘↩")
