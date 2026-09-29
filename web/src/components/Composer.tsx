@@ -4,8 +4,9 @@ import { bytes } from '../format.ts';
 import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset, takeComposerFocus } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { ErrorNote, Icon, IconButton, Kbd, Loader, Picker, type IconName, type PickerOption } from './ui.tsx';
-import { CrewMark, isCrewRole } from './brand.tsx';
+import { CrewMark, HarnessLogo, harnessLabel, isCrewRole } from './brand.tsx';
 import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
+import { threadRunLabels } from '../thread-run.ts';
 import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
 import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '../../../shared/slash-menu.ts';
 import { menuCommands, newThreadHint, replySlash } from '../../../shared/composer-slash.ts';
@@ -665,6 +666,32 @@ function SteerButton({ disabled, busy, canSteer = true, onSend }: { disabled: bo
 
 const finePointer = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: fine)').matches;
 
+const pillCls = 'inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] font-medium text-fg';
+
+/** The model and effort this thread is running on. Fixed, so they stay visible and are not pickers. */
+function ThreadRunPills({ thread }: { thread: Thread }) {
+  const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
+  const labels = threadRunLabels(thread, harnesses);
+  const harnessName = labels.harnessName || harnessLabel(thread.harness);
+  return (
+    <>
+      <span title="Fixed for this thread" aria-label={`Model: ${labels.model} on ${harnessName}`} className={pillCls}>
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg text-fg">
+          <HarnessLogo harness={thread.harness} size={13} />
+        </span>
+        <span className="min-w-0 truncate">{labels.model}</span>
+        <span className="hidden shrink-0 text-fg-4 sm:inline">· {harnessName}</span>
+      </span>
+      <span title="Fixed for this thread" aria-label={`Effort: ${labels.effort}`} className={pillCls}>
+        <span className="grid h-6 w-6 shrink-0 place-items-center text-fg-3">
+          <Icon name="sliders" size={14} />
+        </span>
+        <span className="min-w-0 truncate">{labels.effort}</span>
+      </span>
+    </>
+  );
+}
+
 /** Follow-up composer pinned under a thread. On a busy thread it steers by default. */
 export function ReplyComposer({
   thread,
@@ -807,6 +834,7 @@ export function ReplyComposer({
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
         {extra}
         <AttachButton onPick={att.add} disabled={busy} />
+        <ThreadRunPills thread={thread} />
         <div className="ml-auto flex items-center gap-2.5">
           <Hint />
           {omni ? (

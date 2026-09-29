@@ -113,6 +113,31 @@ private let channels: Set<String> = ["conductor", "acme", "inbox"]
   }
 }
 
+@Suite struct ThreadRunLabelsTests {
+  @Test func namesTheChosenModelAndEffort() {
+    let labels = ThreadRunLabels.make(harness: .claudeCode, model: "opus", effort: "high", harnesses: harnesses())
+    #expect(labels == ThreadRunLabels(model: "Opus", harnessName: "Claude Code", effort: "high"))
+  }
+
+  @Test func namesAnEmptyEffortAsTheModelDefault() {
+    #expect(ThreadRunLabels.make(harness: .claudeCode, model: "opus", effort: nil, harnesses: harnesses()).effort == "Default (high)")
+    #expect(ThreadRunLabels.make(harness: .claudeCode, model: "haiku", effort: nil, harnesses: harnesses()).effort == "Auto effort")
+  }
+
+  @Test func namesAnEmptyModelAsTheHarnessDefault() {
+    let labels = ThreadRunLabels.make(harness: .claudeCode, model: nil, effort: nil, harnesses: harnesses())
+    #expect(labels.model == "Sonnet")
+    #expect(labels.effort == "Default (medium)")
+  }
+
+  @Test func keepsTheStoredIdWhenTheCatalogHasNotArrived() {
+    let labels = ThreadRunLabels.make(harness: .claudeCode, model: "opus", effort: "high", harnesses: [])
+    #expect(labels == ThreadRunLabels(model: "opus", harnessName: "Claude Code", effort: "high"))
+    let empty = ThreadRunLabels.make(harness: .codex, model: nil, effort: nil, harnesses: [])
+    #expect(empty == ThreadRunLabels(model: "default", harnessName: "Codex", effort: "default"))
+  }
+}
+
 @Suite struct ModelSearchTests {
   @Test func filtersAcrossGroupsByLabelIdHarnessAndPlan() {
     let all = harnesses()

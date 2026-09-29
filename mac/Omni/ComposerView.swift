@@ -247,6 +247,7 @@ private struct ReplyComposerView: View {
       .disabled(reply.sending)
       .help("Attach files")
       .accessibilityLabel("Attach files")
+      ThreadRunPills(thread: thread, harnesses: model.store.harnesses)
       if thread.branch != nil {
         ThreadPRSlot(model: model, thread: thread, busy: busyThread, opening: reply.openingPR) { Task { await openPR() } }
       }
@@ -349,6 +350,36 @@ private struct ReplyComposerView: View {
       return
     }
     reply.addFiles([StagedFile(url: url, size: data.count, modified: .now, isTemporary: true)])
+  }
+}
+
+/// The model and effort this thread is running on. Fixed, so they stay visible and are not pickers.
+private struct ThreadRunPills: View {
+  let thread: OmniThread
+  let harnesses: [HarnessInfo]
+
+  var body: some View {
+    let labels = ThreadRunLabels.make(harness: thread.harness, model: thread.model, effort: thread.effort, harnesses: harnesses)
+    HStack(spacing: 6) {
+      pill(symbol: "bolt", text: labels.model, detail: labels.harnessName, label: "Model: \(labels.model) on \(labels.harnessName)")
+      pill(symbol: "slider.horizontal.3", text: labels.effort, detail: nil, label: "Effort: \(labels.effort)")
+    }
+  }
+
+  private func pill(symbol: String, text: String, detail: String?, label: String) -> some View {
+    HStack(spacing: 6) {
+      Image(systemName: symbol).font(.system(size: 11.5)).foregroundStyle(.secondary)
+      Text(text).font(.system(size: 12.5, weight: .medium)).lineLimit(1)
+      if let detail { Text("· \(detail)").font(.system(size: 12.5)).foregroundStyle(.tertiary).lineLimit(1) }
+    }
+    .padding(.horizontal, 10)
+    .frame(height: 28)
+    .frame(maxWidth: 220)
+    .background(ThreadStyle.surface2, in: Capsule())
+    .help("Fixed for this thread")
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(label)
+    .fixedSize()
   }
 }
 
