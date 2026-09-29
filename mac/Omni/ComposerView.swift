@@ -73,7 +73,9 @@ private struct ThreadPRSlot: View {
   @State private var failed = false
 
   var body: some View {
-    Group {
+    // A ZStack, not a Group: a Group spreads its modifiers over its children, and before the first
+    // answer it has none, so the .task below never ran and Open PR never showed.
+    ZStack {
       if let pr = prs?.pr, let prs {
         Menu {
           Section("\(prs.prs.count) PR\(prs.prs.count == 1 ? "" : "s") from \(thread.branch ?? "this branch")") {
@@ -106,6 +108,8 @@ private struct ThreadPRSlot: View {
         .help(pr.title)
       } else if prs != nil || failed {
         openButton
+      } else {
+        Color.clear.frame(width: 0, height: 0)
       }
     }
     // Again when a turn ends (it may have opened the PR), and every minute to catch a merge.
