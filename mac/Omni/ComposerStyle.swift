@@ -39,8 +39,12 @@ extension View {
 
 /// Hint in Composer.tsx: the keys, quiet, beside the send button.
 struct ComposerHints: View {
+  /// The reply box shows a suggestion that Tab takes.
+  var tab = false
+
   var body: some View {
     HStack(spacing: 14) {
+      if tab { Text("⇥ use suggestion") }
       Text("↵ send")
       Text("⌘↵ newline")
       Text("/ commands")

@@ -19,6 +19,8 @@
 //   /<command>        a message starting with a slash is a local command: no model call, a zero-turn success result
 //                     whose text is the command output
 //   TITLE:<ms>        text mode (Omni's title call): take that long to write the title
+//   SUGGEST:<ms>      text mode (Omni's reply suggestion): take that long to answer
+//   SUGGEST_NONE      text mode (Omni's reply suggestion): answer NONE
 //   RICH              before the answer, the calls a real turn is made of: a plan updated as it goes, a sub-agent
 //                     with calls of its own, a status, a failing command and an MCP tool
 //   ORPHAN            leave a child behind that holds our stdout until it is killed (two minutes at most), like a
@@ -573,6 +575,12 @@ async function main() {
     // One-shot print mode: prompt from the arguments or stdin.
     const prompt = positional.length ? positional.join(' ') : (await readAll()).trim();
     if (!prompt) return fail('Error: Input must be provided either through stdin or as a prompt argument when using --print');
+    if (outFmt === 'text' && prompt.includes('Predict the short reply')) {
+      // Omni's reply suggestion. The agent's answer echoes the thread's message, so directives reach here too.
+      const wait = Number(/SUGGEST:(\d+)/.exec(prompt)?.[1] ?? 0);
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      return process.stdout.write(prompt.includes('SUGGEST_NONE') ? 'NONE\n' : 'Yes, open a PR\n');
+    }
     if (outFmt === 'text') {
       if (process.env.FAKE_CLAUDE_TITLE_ORPHAN === '1') leaveOrphan();
       const wait = Number(/TITLE:(\d+)/.exec(prompt)?.[1] ?? 0);

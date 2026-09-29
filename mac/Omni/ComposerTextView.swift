@@ -16,6 +16,8 @@ struct ComposerCallbacks {
   var slash: (SlashKey) -> Bool = { _ in false }
   /// The text and caret (a UTF-16 offset) after Ben typed or moved the caret, and when the box takes focus.
   var edited: (_ text: String, _ caret: Int) -> Void = { _, _ in }
+  /// Tab with the `/` menu closed. True when it took the key (the reply box's suggestion), else Tab types a tab.
+  var tab: () -> Bool = { false }
 }
 
 /// A caret position the view sets once, after it changed the text itself (a picked command).
@@ -148,15 +150,16 @@ struct ComposerTextView: NSViewRepresentable {
       parent.callbacks.edited(tv.string, tv.selectedRange().location)
     }
 
-    // The arrows, Return and Tab go to the `/` menu while it is open, and plain Return sends when it is
-    // not. Shift-Return stays a newline. An input method composing keeps them all.
+    // The arrows, Return and Tab go to the `/` menu while it is open, plain Return sends when it is
+    // not, and Tab takes the reply box's suggestion. Shift-Return stays a newline. An input method composing keeps them all.
     func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
       guard let parent, !textView.hasMarkedText() else { return false }
       let key: SlashKey
       switch selector {
       case #selector(NSResponder.moveUp(_:)): key = .up
       case #selector(NSResponder.moveDown(_:)): key = .down
-      case #selector(NSResponder.insertTab(_:)): key = .tab
+      case #selector(NSResponder.insertTab(_:)):
+        return parent.callbacks.slash(.tab) || parent.callbacks.tab()
       case #selector(NSResponder.insertNewline(_:)):
         let flags = NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
         guard flags.isDisjoint(with: [.shift, .option, .command, .control]) else { return false }

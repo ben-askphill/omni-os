@@ -206,9 +206,10 @@ function SendButton({ armed, busy, onClick, children }: { armed: boolean; busy: 
   );
 }
 
-function Hint() {
+function Hint({ tab = false }: { tab?: boolean }) {
   return (
     <span className="hidden items-center gap-3.5 pr-1 text-[11.5px] text-fg-4 sm:inline-flex">
+      {tab && <span>⇥ use suggestion</span>}
       <span>↵ send</span>
       <span>{isMac ? '⌘↵' : 'Ctrl ↵'} newline</span>
       <span>/ commands</span>
@@ -731,6 +732,8 @@ export function ReplyComposer({
   }, [key]);
 
   const busyThread = status === 'running' || status === 'queued';
+  // The server's guess at the next reply, shown in the empty box. Tab takes it.
+  const suggestion = !busyThread && !text && thread.suggestion ? thread.suggestion : null;
   const latest = useRef(text);
   latest.current = text;
 
@@ -827,6 +830,10 @@ export function ReplyComposer({
         onPaste={att.onPaste}
         onKeyDown={(e) => {
           if (slashMenu.onKey(e)) return;
+          if (e.key === 'Tab' && suggestion && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            return update(suggestion);
+          }
           const key = enterKey(e, text, update);
           if (!key) return;
           if (omni) return void runOmni();
@@ -834,7 +841,7 @@ export function ReplyComposer({
           void submit(busyThread ? busyMode : undefined);
         }}
         rows={1}
-        placeholder={busyThread ? 'Steer the agent. It reads this at its next step.' : 'Reply'}
+        placeholder={busyThread ? 'Steer the agent. It reads this at its next step.' : suggestion ?? 'Reply'}
         className="block max-h-[220px] min-h-[60px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.5] outline-none placeholder:text-fg-4"
       />
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
@@ -842,7 +849,7 @@ export function ReplyComposer({
         <AttachButton onPick={att.add} disabled={busy} />
         <ThreadRunPills thread={thread} />
         <div className="ml-auto flex items-center gap-2.5">
-          <Hint />
+          <Hint tab={!!suggestion} />
           {omni ? (
             <SendButton armed={slash.armed} busy={busy} onClick={() => void runOmni()}>
               {slash.label ?? 'Send'}
