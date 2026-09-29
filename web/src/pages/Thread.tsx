@@ -857,7 +857,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
         {/* transcript */}
         <div className="relative min-h-0 flex-1">
           <div ref={scrollRef} onScroll={onScroll} className="scroll-thin h-full overflow-y-auto">
-            <div ref={contentRef} className="mx-auto max-w-3xl px-4 pt-4 pb-10 md:px-6">
+            <div ref={contentRef} className="mx-auto max-w-4xl px-4 pt-4 pb-10 md:px-6">
               {error && (
                 <ErrorNote className="mb-3" onRetry={() => void load(false)}>
                   {error}
@@ -881,7 +881,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
 
         {/* composer */}
         <div className="relative shrink-0 bg-bg px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4">
-          <div className="mx-auto max-w-3xl">
+          <div className="mx-auto max-w-4xl">
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             {blocked && <ErrorNote className="mb-2">{blocked}</ErrorNote>}
             <ReplyComposer
