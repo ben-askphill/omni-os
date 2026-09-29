@@ -6,20 +6,32 @@ struct MainWindow: View {
   let model: AppModel
   let updater: Updater
   @Environment(\.openSettings) private var openSettings
+  @AppStorage(sidebarShownKey) private var sidebarShown = true
 
   var body: some View {
-    NavigationSplitView {
-      SidebarView(model: model)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 340)
-    } detail: {
+    HStack(spacing: 0) {
+      if sidebarShown {
+        SidebarView(model: model)
+          .transition(.move(edge: .leading).combined(with: .opacity))
+      }
+      // The pane: a white card with a hairline edge, inset from the canvas, as the main in App.tsx.
       VStack(spacing: 0) {
         UpdateBar(updater: updater)
         DetailView(model: model)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
       .overlay(alignment: .bottomTrailing) { BannerStack(model: model) }
+      .background(Tok.bg)
+      .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+      .cardShadow(22)
+      .padding(.leading, sidebarShown ? 0 : 8)
+      .padding([.trailing, .bottom], 8)
     }
+    .background(Tok.canvas.ignoresSafeArea())
+    .tint(Tok.fg)
     .navigationTitle(model.title)
+    .toolbar(removing: .title)
+    .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     .toolbar { toolbar }
     .overlay { PaletteOverlay(model: model) }
     .modifier(ThreadWindowSupport(model: model))
@@ -38,35 +50,48 @@ struct MainWindow: View {
 
   @ToolbarContentBuilder private var toolbar: some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
-      Button(action: model.goBack) {
-        Label("Back", systemImage: "chevron.left")
+      Button {
+        withAnimation(Motion.settle) { sidebarShown.toggle() }
+      } label: {
+        Label("Toggle Sidebar", systemImage: "sidebar.left")
       }
+      .buttonStyle(.icon(size: 28))
+      .help(sidebarShown ? "Hide sidebar (⌃⌘S)" : "Show sidebar (⌃⌘S)")
+      Button(action: model.goBack) {
+        Label { Text("Back") } icon: { OmniIcon(name: "chevronLeft", size: 15) }
+      }
+      .buttonStyle(.icon(size: 28))
       .disabled(!model.shell.history.canGoBack)
       .help("Back (⌘[)")
       Button(action: model.goForward) {
-        Label("Forward", systemImage: "chevron.right")
+        Label { Text("Forward") } icon: { OmniIcon(name: "chevronRight", size: 15) }
       }
+      .buttonStyle(.icon(size: 28))
       .disabled(!model.shell.history.canGoForward)
       .help("Forward (⌘])")
     }
+    .sharedBackgroundVisibility(.hidden)
     if let notice = model.connectionNotice {
       ToolbarItem(placement: .status) {
         ReconnectingLabel(text: notice)
       }
-    }
-    ToolbarItem(placement: .primaryAction) {
-      Menu {
-        ServerMenuItems(model: model, shortcuts: false)
-      } label: {
-        Label("Server", systemImage: "server.rack")
-      }
-      .help("Server")
-    }
-    ToolbarItem(placement: .primaryAction) {
-      NewThreadButton(model: model)
-        .help("New thread")
+      .sharedBackgroundVisibility(.hidden)
     }
     OpenInNewWindowToolbar(model: model)
+  }
+}
+
+let sidebarShownKey = "sidebar.shown"
+
+/// View > Show Sidebar, since the sidebar is ours rather than a split view's.
+struct SidebarToggleCommand: View {
+  @AppStorage(sidebarShownKey) private var shown = true
+
+  var body: some View {
+    Button(shown ? "Hide Sidebar" : "Show Sidebar") {
+      withAnimation(Motion.settle) { shown.toggle() }
+    }
+    .keyboardShortcut("s", modifiers: [.control, .command])
   }
 }
 
@@ -75,10 +100,11 @@ struct ReconnectingLabel: View {
 
   var body: some View {
     HStack(spacing: 6) {
-      ProgressView().controlSize(.small)
+      GlyphView(glyph: .running, size: 6)
       Text(text)
     }
-    .foregroundStyle(.secondary)
+    .font(.system(size: 12))
+    .foregroundStyle(Tok.fg3)
     .padding(.horizontal, 8)
     .accessibilityElement(children: .combine)
   }

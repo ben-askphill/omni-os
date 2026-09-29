@@ -95,9 +95,8 @@ private struct ThreadHeader: View {
             .buttonStyle(.plain)
             .fixedSize()
           if let parent = store.parent {
-            Image(systemName: "chevron.right")
-              .font(.system(size: 9, weight: .semibold))
-              .foregroundStyle(.tertiary)
+            OmniIcon(name: "chevronRight", size: 10)
+              .foregroundStyle(Tok.fg4)
             Button(parent.title) { model.route = .thread(id: parent.id) }
               .buttonStyle(.plain)
               .lineLimit(1)
@@ -108,15 +107,16 @@ private struct ThreadHeader: View {
             Text(task)
               .font(.system(size: 10.5))
               .monospacedDigit()
-              .foregroundStyle(.tertiary)
+              .foregroundStyle(Tok.fg4)
               .padding(.leading, 4)
               .fixedSize()
           }
         }
         .font(.system(size: 12))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Tok.fg3)
         Text(thread.title)
-          .font(.system(size: 17, weight: .semibold))
+          .font(.system(size: 17, weight: .medium))
+          .foregroundStyle(Tok.fg)
           .lineLimit(1)
           .truncationMode(.tail)
           .help(thread.title)
@@ -125,13 +125,11 @@ private struct ThreadHeader: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       if store.isReconnecting {
         HStack(spacing: 6) {
-          Image(systemName: "circle.fill")
-            .font(.system(size: 6))
-            .symbolEffect(.pulse)
+          GlyphView(glyph: .running, size: 6)
           Text("Reconnecting")
         }
         .font(.system(size: 11))
-        .foregroundStyle(ThreadStyle.warn)
+        .foregroundStyle(Tok.fg3)
         .help("Reconnecting to the live stream")
         .accessibilityElement(children: .combine)
       }
@@ -143,60 +141,52 @@ private struct ThreadHeader: View {
   }
 }
 
-/// A round badge in the name's hue with its first letter, as Avatar in ui.tsx.
+/// A neutral disc with the channel's first letter, as Avatar in ui.tsx. Conductor wears the ink mark.
 struct ChannelAvatar: View {
   let name: String
   var conductor = false
   var size: CGFloat = 34
 
   var body: some View {
-    let mark = AvatarMark(name: name)
-    let hue = Double(mark.hue) / 360
     ZStack {
-      Circle().fill(Self.dynamic(light: NSColor(hue: hue, saturation: 0.13, brightness: 0.95, alpha: 1),
-                                 dark: NSColor(hue: hue, saturation: 0.35, brightness: 0.34, alpha: 1)))
-      Group {
-        if conductor {
-          Image(systemName: "scope").font(.system(size: size * 0.45))
-        } else {
-          Text(mark.letter).font(.system(size: size * 0.42, weight: .medium, design: .rounded))
-        }
+      Circle().fill(conductor ? Tok.fg : Tok.surface2)
+      if conductor {
+        StaticMark(size: size * 0.55)
+          .foregroundStyle(Tok.onInk)
+      } else {
+        Text(AvatarMark(name: name).letter)
+          .font(.system(size: size * 0.42, weight: .medium, design: .rounded))
+          .foregroundStyle(Tok.fg2)
       }
-      .foregroundStyle(Self.dynamic(light: NSColor(hue: hue, saturation: 0.55, brightness: 0.45, alpha: 1),
-                                    dark: NSColor(hue: hue, saturation: 0.18, brightness: 0.92, alpha: 1)))
     }
     .frame(width: size, height: size)
     .accessibilityHidden(true)
   }
-
-  private static func dynamic(light: NSColor, dark: NSColor) -> Color {
-    Color(nsColor: NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light })
-  }
 }
 
+/// A failure: the vermilion diamond carries the alarm, the text stays ink.
 struct ErrorNote: View {
   let text: String
   var retry: (() -> Void)?
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: 10) {
-      Image(systemName: "exclamationmark.circle")
+      GlyphView(glyph: .needs, size: 8)
+        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
       Text(text)
         .frame(maxWidth: .infinity, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
         .textSelection(.enabled)
       if let retry {
         Button("Retry", action: retry)
-          .buttonStyle(.plain)
-          .fontWeight(.medium)
-          .underline()
+          .buttonStyle(.pill(.secondary, height: 26))
       }
     }
     .font(.system(size: 13))
-    .foregroundStyle(ThreadStyle.bad)
+    .foregroundStyle(Tok.fg)
     .padding(.horizontal, 16)
     .padding(.vertical, 10)
-    .background(ThreadStyle.badBackground, in: RoundedRectangle(cornerRadius: 16))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     .accessibilityElement(children: .contain)
   }
 }
