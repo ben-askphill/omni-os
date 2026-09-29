@@ -1,8 +1,8 @@
-import { Fragment, useRef, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type ReactNode } from 'react';
 import type { BackgroundTask, ChannelWithRunning, HarnessId, ThreadStub, Usage, UsageWindow } from '../api.ts';
 import { duration, plural, toDate, untilLabel } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
-import { useApp, useNow } from '../store.tsx';
+import { readPref, useApp, useNow, writePref } from '../store.tsx';
 import { ThemeSwitch } from './theme.tsx';
 import { HarnessLogo, Loader, OmniMark } from './brand.tsx';
 import { ErrorNote, Icon, Kbd, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
@@ -60,31 +60,60 @@ function HarnessUsageRow({ id, name, usage }: { id: HarnessId; name: string; usa
   );
 }
 
+/** Plan usage per harness. Collapsed by default to one row with the live dot and the busiest window; click to open. */
 function UsageCard() {
   const { usage, status, feedLive } = useApp();
+  const [open, setOpen] = useState(() => readPref('usage.open', false));
+  const toggle = () => setOpen((o) => { writePref('usage.open', !o); return !o; });
   const slots = status?.slots ?? {};
   const footer = HARNESS_ROWS.filter((r) => slots[r.id]).map((r) => `${r.name} ${slots[r.id]!.running}/${slots[r.id]!.cap}`).join(' · ');
+  const peak = HARNESS_ROWS.reduce<number | null>((max, r) => {
+    const u = usage[r.id];
+    for (const p of [windowPct(u?.five_hour), windowPct(u?.seven_day)]) if (p !== null && (max === null || p > max)) max = p;
+    return max;
+  }, null);
   return (
-    <div className="space-y-2 rounded-[20px] bg-bg/70 p-3 shadow-[var(--shadow-card)]">
-      <div className="flex items-center gap-2 pb-0.5 text-[11px] font-medium text-fg-4">
-        <span className="w-[66px] shrink-0" />
-        <span className="flex-1">5h</span>
-        <span className="flex-1">Week</span>
-      </div>
-      {HARNESS_ROWS.map((r) => (
-        <HarnessUsageRow key={r.id} id={r.id} name={r.name} usage={usage[r.id]} />
-      ))}
-      <div className="flex items-center gap-2 border-t border-line pt-2.5 text-[11px] text-fg-3">
+    <div className="rounded-[20px] bg-bg/70 shadow-[var(--shadow-card)]">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 rounded-[20px] px-3 py-2.5 text-[11px] text-fg-3 hover:text-fg"
+      >
         <span className="relative inline-block h-1.5 w-1.5 shrink-0" title={feedLive ? 'Live' : 'Reconnecting'}>
           {feedLive && <span className="ping absolute inset-0 rounded-full bg-done" />}
           <span className={`absolute inset-0 rounded-full ${feedLive ? 'bg-done' : 'bg-fg-4'}`} />
         </span>
-        {footer ? (
-          <span className="font-num tabular-nums">{footer}</span>
-        ) : (
-          <span>{feedLive ? 'Connected' : 'Connecting'}</span>
+        <span className="font-medium text-fg-2">Usage</span>
+        <span className="min-w-0 flex-1 truncate text-left font-num tabular-nums">
+          {open ? '' : footer || (feedLive ? 'Connected' : 'Connecting')}
+        </span>
+        {peak !== null && !open && (
+          <span className={`font-num text-[10px] tabular-nums ${peak >= 0.9 ? 'text-needs' : 'text-fg-2'}`} title="Highest window across plans">
+            {Math.round(peak * 100)}%
+          </span>
         )}
-      </div>
+        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={13} className="shrink-0 text-fg-4" />
+      </button>
+      {open && (
+        <div className="space-y-2 px-3 pb-3">
+          <div className="flex items-center gap-2 pb-0.5 text-[11px] font-medium text-fg-4">
+            <span className="w-[66px] shrink-0" />
+            <span className="flex-1">5h</span>
+            <span className="flex-1">Week</span>
+          </div>
+          {HARNESS_ROWS.map((r) => (
+            <HarnessUsageRow key={r.id} id={r.id} name={r.name} usage={usage[r.id]} />
+          ))}
+          <div className="flex items-center gap-2 border-t border-line pt-2.5 text-[11px] text-fg-3">
+            {footer ? (
+              <span className="font-num tabular-nums">{footer}</span>
+            ) : (
+              <span>{feedLive ? 'Connected' : 'Connecting'}</span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
