@@ -60,6 +60,16 @@ export class MemoryTransport implements SyncTransport {
   private failures: { left: number; message: string } = { left: 0, message: '' };
   private listeners = new Set<{ exclude: string; fn: () => void }>();
 
+  /** Live subscriptions, so tests can check the worker lets go of them. */
+  get subscribers() {
+    return this.listeners.size;
+  }
+
+  /** Nudge every subscriber, as Realtime does when its link comes back after a drop. */
+  reconnect() {
+    for (const l of this.listeners) queueMicrotask(l.fn);
+  }
+
   /** Make the next n calls throw, as an unreachable relay would. */
   failNext(n: number, message = 'relay unavailable') {
     this.failures = { left: n, message };
@@ -123,6 +133,8 @@ export interface SupabaseTransportOptions {
 }
 
 const BUCKET = 'omni';
+/** First wait before trying Realtime again after a failed sign-in. */
+const REALTIME_RETRY_MS = 5_000;
 
 /**
  * The Supabase relay: the `changes` table (pushed through the omni_push function so one user's rows commit in
@@ -184,20 +196,40 @@ export function createSupabaseTransport(opts: SupabaseTransportOptions): SyncTra
     subscribe(excludeMachine, onRemote) {
       let off = () => {};
       let closed = false;
-      session()
-        .then((c) => {
-          if (closed) return;
-          const channel = c
-            .channel('omni-changes')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'changes' }, (p) => {
-              if ((p.new as { machine_id?: string }).machine_id !== excludeMachine) onRemote();
-            })
-            .subscribe();
-          off = () => void c.removeChannel(channel);
-        })
-        .catch((err) => console.error('[sync] realtime unavailable:', (err as Error).message));
+      let retry: NodeJS.Timeout | undefined;
+      let wait = REALTIME_RETRY_MS;
+      // Offline at boot, sign-in fails: try again, doubling up to 5 min, so Realtime comes up with the network.
+      const open = () =>
+        session()
+          .then((c) => {
+            if (closed) return;
+            const channel = c
+              .channel(`omni-changes-${excludeMachine}`)
+              .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'changes', filter: `machine_id=neq.${excludeMachine}` },
+                (p) => {
+                  if ((p.new as { machine_id?: string }).machine_id !== excludeMachine) onRemote();
+                },
+              )
+              // Joined, at first and again each time the client rejoins after a drop. Pushes made while the link
+              // was down sent no event, so a join is a reason to sync too.
+              .subscribe((status) => {
+                if (status === 'SUBSCRIBED') onRemote();
+              });
+            off = () => void c.removeChannel(channel);
+          })
+          .catch((err) => {
+            if (closed) return;
+            console.error(`[sync] realtime unavailable, retrying in ${Math.round(wait / 1000)}s:`, (err as Error).message);
+            retry = setTimeout(open, wait);
+            retry.unref();
+            wait = Math.min(wait * 2, 5 * 60_000);
+          });
+      void open();
       return () => {
         closed = true;
+        clearTimeout(retry);
         off();
       };
     },

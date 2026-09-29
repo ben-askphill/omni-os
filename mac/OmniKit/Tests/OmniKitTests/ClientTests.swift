@@ -95,6 +95,20 @@ func bodyJSON(_ request: URLRequest) throws -> JSONValue {
     #expect(r[3].httpBody == nil)
   }
 
+  @Test func asksTheServerToSyncNow() async throws {
+    let t = StubTransport(body: #"{"pushed":2,"pulled":1,"applied":1,"skipped":0,"deferred":0,"status":{}}"#)
+    try await OmniClient(port: 4799, transport: t).syncNow()
+    let req = try #require(t.requests.first)
+    #expect(req.httpMethod == "POST")
+    #expect(req.url?.absoluteString == "http://127.0.0.1:4799/api/sync/now")
+    #expect(req.httpBody == nil)
+
+    let off = StubTransport(status: 409, body: #"{"error":"sync is not configured"}"#)
+    await #expect(throws: OmniAPIError.http(status: 409, message: "sync is not configured")) {
+      try await OmniClient(port: 4799, transport: off).syncNow()
+    }
+  }
+
   @Test func readsTheErrorEnvelope() async {
     let t = StubTransport(status: 404, body: #"{"error":"not found"}"#)
     await #expect(throws: OmniAPIError.http(status: 404, message: "not found")) {

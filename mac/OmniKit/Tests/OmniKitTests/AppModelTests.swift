@@ -27,6 +27,7 @@ private final class Rig {
     switch req.url?.path {
     case "/api/status": StubTransport.Reply(body: oldStatus)
     case "/api/threads/p1": StubTransport.Reply(body: #"{"thread":\#(parentThread),"events":[]}"#)
+    case "/api/sync/now": StubTransport.Reply(status: 409, body: #"{"error":"sync is not configured"}"#)
     default: StubTransport.Reply(body: "[]")
     }
   }
@@ -205,6 +206,23 @@ struct AppModelTests {
     model.didWake()
     try await waitFor("dropped after the wake") { second.isDropped }
     _ = try await rig.sse.next()
+  }
+
+  @Test func aWakeOrANetworkChangeAsksTheServerToSync() async throws {
+    let rig = Rig(port: freePort())
+    let model = rig.model
+    let syncs = { rig.http.requests.filter { $0.httpMethod == "POST" && $0.url?.path == "/api/sync/now" }.count }
+    #expect(syncs() == 0)
+
+    // The rig's server has sync off and answers 409. That is nothing to show.
+    model.didWake()
+    try await waitFor("a sync after the wake") { syncs() == 1 }
+    model.networkChanged()
+    try await waitFor("a sync after the network change") { syncs() == 2 }
+
+    model.didBecomeActive()
+    await settle()
+    #expect(syncs() == 2, "coming to the front alone does not")
   }
 
   @Test func aDroppedFeedChecksTheServerAgain() async throws {
