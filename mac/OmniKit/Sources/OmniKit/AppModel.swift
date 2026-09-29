@@ -230,14 +230,23 @@ public final class AppModel {
     checkServer()
   }
 
-  /// The Mac woke from sleep. Connections from before rarely survive it.
+  /// The Mac woke from sleep. Connections from before rarely survive it, and the other Mac may have moved on.
   public func didWake() {
     reconnectStreams()
     checkServer()
+    requestSync()
   }
 
   public func networkChanged() {
     reconnectStreams()
+    requestSync()
+  }
+
+  /// Asks the server to sync with the other Mac now rather than on its timer. Sync off (409) or the relay
+  /// down (502) is nothing to show here: the server keeps trying on its own.
+  private func requestSync() {
+    let client = client
+    Task { try? await client.syncNow() }
   }
 
   private func reconnectStreams(ifQuietFor quiet: Duration? = nil) {

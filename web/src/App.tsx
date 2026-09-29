@@ -13,6 +13,8 @@ import { SecretsPage } from './pages/Secrets.tsx';
 import { ThreadPage } from './pages/Thread.tsx';
 import { href, navigate, requestComposerFocus, useHash, useRoute, type Route } from './router.ts';
 import { AppProvider, useApp } from './store.tsx';
+import { api } from './api.ts';
+import { createSyncNudge } from './sync-nudge.ts';
 
 function Page({ route }: { route: Route }) {
   switch (route.name) {
@@ -126,6 +128,20 @@ function Shell() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Back on the tab: ask the server to sync, so the other Mac's work shows up now rather than on its timer.
+  useEffect(() => {
+    const sync = createSyncNudge({ post: () => api.post('/sync/now') });
+    const onFocus = () => sync.nudge();
+    const onVisible = () => document.visibilityState === 'visible' && sync.nudge();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+      sync.cancel();
+    };
   }, []);
 
   useEffect(() => {

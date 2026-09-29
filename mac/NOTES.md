@@ -299,7 +299,7 @@ OMNI_LIVE_PORT=4791 swift test --package-path mac/OmniKit --filter LiveServerTes
 | `SecretsSettingsView.swift` | The Secrets tab: `SecretsSettings` (a `SecretsModel` per client and visit), `SecretsForm`, `SecretRowView` |
 | `AppearanceSettingsView.swift` | The Appearance tab, `Appearance.nsAppearance` |
 | `AutomationsView.swift` | The Automations page: `AutomationsView` (an `AutomationsModel` per client and visit), `AutomationSection`, `RunStrip`, `RunRow`, `FlowRow` |
-| `SystemEvents.swift` | Wake (`NSWorkspace.didWakeNotification`) to `didWake()`, `NWPathMonitor` changes (not the first update) to `networkChanged()` |
+| `SystemEvents.swift` | Wake (`NSWorkspace.didWakeNotification`) to `didWake()`, `NWPathMonitor` changes (not the first update) to `networkChanged()`. Both also `POST /api/sync/now`, ignoring a 409 (sync off) or 502 |
 | `QARunner.swift` | Debug only. The QA harness, below |
 
 `AppModel` (OmniKit) is the app's one connection to Omni: `ServerSettings`, the `ServerSupervisor`, an `OmniClient` and `WorkspaceStore` for the port in the settings, and `route`. `launch()` opens the feed, checks the server, and follows the settings with `Observations`: a port change swaps the client and store, any change checks the server again. The feed dropping or opening checks the server again too, so the window follows a server killed or started somewhere else. A failed start stays on screen (`startFailure`) until the server runs, Start is pressed again or the settings change.

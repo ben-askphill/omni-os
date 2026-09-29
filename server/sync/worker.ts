@@ -2,10 +2,12 @@ import { kv, outbox, type OutboxRow } from '../db.ts';
 import { globalSecret, listSecrets, setSecret, SYNC_SECRETS } from '../secrets.ts';
 import { applyBatch, deferredCount, getHandler, registeredEntities, retryDeferred, type ApplyContext } from './apply.ts';
 import { createSupabaseTransport, isoTs, type Change, type SyncTransport } from './transport.ts';
+import { watchNetwork, type NetworkWatch } from './network.ts';
 import './handlers/index.ts';
 
 // The sync loop: push the outbox in batches, then pull what other machines pushed since the cursor and apply it.
-// Every 60s, soon after a local write, when Realtime says another machine pushed, and on syncNow().
+// On start, every 60s, soon after a local write, when Realtime says another machine pushed or its link comes
+// back, when the network comes back, and on syncNow() (POST /api/sync/now, which the apps call on wake and focus).
 // A failure backs off exponentially and keeps the outbox; the next success clears it.
 
 export interface SyncWorkerOptions {
@@ -18,6 +20,8 @@ export interface SyncWorkerOptions {
   autoPushMs?: number;
   /** Changes per push and per pull. Default 200. */
   batchSize?: number;
+  /** Sync soon when this says the network is back. startSync passes watchNetwork; tests pass a fake. */
+  network?: NetworkWatch;
 }
 
 export interface SyncResult {
@@ -103,6 +107,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   let timer: NodeJS.Timeout | undefined;
   let soon: NodeJS.Timeout | undefined;
   let unsubscribe: (() => void) | undefined;
+  let offNetwork: (() => void) | undefined;
   let inflight: Promise<SyncResult> | null = null;
   let queued: Promise<SyncResult> | null = null;
 
@@ -188,6 +193,8 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       if (started) return;
       started = true;
       unsubscribe = transport.subscribe?.(machineId, () => worker.syncSoon(300));
+      // A second or so, so the Wi-Fi's DNS and routes settle first. A failure still backs off as usual.
+      offNetwork = opts.network?.(() => worker.syncSoon(1_000));
       if (opts.autoPushMs !== undefined) outbox.onRecord(() => worker.syncSoon(opts.autoPushMs));
       void worker.syncNow();
     },
@@ -199,6 +206,8 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       nextAt = null;
       unsubscribe?.();
       unsubscribe = undefined;
+      offNetwork?.();
+      offNetwork = undefined;
       outbox.onRecord(null);
     },
     status() {
@@ -277,7 +286,7 @@ export async function startSync(): Promise<SyncWorker | null> {
     refreshToken,
     onRefreshToken: (token) => setSecret('global', SYNC_SECRETS.refreshToken, token),
   });
-  const w = createSyncWorker({ transport, autoPushMs: 2_000 });
+  const w = createSyncWorker({ transport, autoPushMs: 2_000, network: watchNetwork });
   setActiveWorker(w);
   w.start();
   console.log(`[sync] on, machine ${w.machineId}`);
