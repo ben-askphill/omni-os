@@ -2,33 +2,64 @@ import OmniKit
 import SwiftUI
 
 /// Plan usage per harness, the 5 hour and the 7 day window, as UsageCard in Sidebar.tsx.
+/// Collapsed by default to one row with the live dot and the busiest window; click to open.
 struct UsageCard: View {
   let model: AppModel
+  @AppStorage("usageCard.open") private var open = false
 
   var body: some View {
     let rows = HarnessUsageRow.rows(usage: model.store.usage, slots: model.store.status?.slots ?? [:])
     let slots = rows.compactMap { r in r.slot.map { "\(r.name) \($0.running)/\($0.cap)" } }
     let live = model.connectionNotice == nil && model.supervisor.isRunning
+    let summary = slots.isEmpty ? (live ? "Connected" : "Connecting") : slots.joined(separator: " · ")
+    let peak = rows.flatMap { [$0.fiveHour, $0.week] }.compactMap { $0 }.max { $0.fraction < $1.fraction }
     VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 8) {
-        Color.clear.frame(width: 66, height: 1)
-        Text("5h").frame(maxWidth: .infinity, alignment: .leading)
-        Text("Week").frame(maxWidth: .infinity, alignment: .leading)
+      Button {
+        withAnimation(.snappy(duration: 0.2)) { open.toggle() }
+      } label: {
+        HStack(spacing: 8) {
+          GlyphView(glyph: live ? .done : .settled, size: 6)
+          Text("Usage")
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(Tok.fg2)
+          Text(open ? "" : summary)
+            .monospacedDigit()
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          if let peak, !open {
+            Text("\(peak.percent)%")
+              .font(.system(size: 10))
+              .monospacedDigit()
+              .foregroundStyle(peak.tone == .bad ? Tok.needs : Tok.fg2)
+              .help("Highest window across plans")
+          }
+          OmniIcon(name: open ? "chevronDown" : "chevronRight", size: 13)
+            .foregroundStyle(Tok.fg4)
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(Tok.fg3)
+        .contentShape(Rectangle())
       }
-      .font(.system(size: 11, weight: .medium))
-      .foregroundStyle(Tok.fg4)
-      .padding(.bottom, 2)
-      ForEach(rows) { UsageRow(row: $0) }
-      Rectangle().fill(Tok.line).frame(height: 1)
-      HStack(spacing: 8) {
-        GlyphView(glyph: live ? .done : .settled, size: 6)
-        Text(slots.isEmpty ? (live ? "Connected" : "Connecting") : slots.joined(separator: " · "))
+      .buttonStyle(.plain)
+      .accessibilityLabel(open ? "Hide plan usage" : "Show plan usage")
+      if open {
+        HStack(spacing: 8) {
+          Color.clear.frame(width: 66, height: 1)
+          Text("5h").frame(maxWidth: .infinity, alignment: .leading)
+          Text("Week").frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(Tok.fg4)
+        .padding(.top, 2)
+        ForEach(rows) { UsageRow(row: $0) }
+        Rectangle().fill(Tok.line).frame(height: 1)
+        Text(summary)
           .monospacedDigit()
           .lineLimit(1)
+          .font(.system(size: 11))
+          .foregroundStyle(Tok.fg3)
+          .padding(.top, 2)
       }
-      .font(.system(size: 11))
-      .foregroundStyle(Tok.fg3)
-      .padding(.top, 2)
     }
     .padding(12)
     .background(Tok.bg.opacity(0.7), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
