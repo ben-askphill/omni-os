@@ -13,7 +13,7 @@ struct SyncSettings: View {
       if let sync {
         SyncForm(sync: sync)
       } else {
-        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        Loader(size: 18).frame(maxWidth: .infinity, maxHeight: .infinity).background(Tok.bg)
       }
     }
     .task(id: model.client.baseURL) {
@@ -38,33 +38,17 @@ struct SyncForm: View {
   @State private var confirmingSignOut = false
 
   var body: some View {
-    Form {
-      Section {
-        Label {
-          Text("Sync keeps this Mac's history in step with your other Mac through your own Supabase project. Each Mac keeps its own database; Supabase only relays the changes. The sign-in token lives in the Keychain, and the password is never stored.")
-        } icon: {
-          Image(systemName: "arrow.triangle.2.circlepath")
-        }
-        .foregroundStyle(.secondary)
-      }
+    SettingsPage {
+      SettingsIntro(
+        icon: "refresh",
+        text: Text("Sync keeps this Mac's history in step with your other Mac through your own Supabase project. Each Mac keeps its own database; Supabase only relays the changes. The sign-in token lives in the Keychain, and the password is never stored.")
+      )
 
       switch sync.loadState {
       case .loading:
-        Section {
-          HStack {
-            ProgressView().controlSize(.small)
-            Text("Loading").foregroundStyle(.secondary)
-          }
-        }
+        LoadingNote()
       case .failed(let message):
-        Section {
-          HStack(alignment: .firstTextBaseline) {
-            Label(message, systemImage: "exclamationmark.triangle")
-              .foregroundStyle(.red)
-            Spacer()
-            Button("Retry") { Task { await sync.load() } }
-          }
-        }
+        ErrorNote(text: message) { Task { await sync.load() } }
       case .loaded:
         if let status = sync.status {
           if status.configured { statusSection(status) }
@@ -73,7 +57,6 @@ struct SyncForm: View {
         }
       }
     }
-    .formStyle(.grouped)
     .confirmationDialog("Sign out of sync on this Mac?", isPresented: $confirmingSignOut) {
       Button("Sign Out", role: .destructive) { Task { await sync.signOut() } }
       Button("Cancel", role: .cancel) {}
@@ -85,152 +68,170 @@ struct SyncForm: View {
   // MARK: Status
 
   private func statusSection(_ s: SyncStatus) -> some View {
-    Section {
-      LabeledContent("Status") {
-        HStack(spacing: 6) {
-          Circle().fill(phaseColor(s.phase)).frame(width: 8, height: 8)
-          Text(s.phaseLabel)
-        }
-      }
-      TimelineView(.periodic(from: .now, by: 5)) { context in
-        LabeledContent("Last sync", value: s.lastSyncAt.map { RelTime.label($0, now: context.date) } ?? "Not yet")
-      }
-      if s.enabled, let next = s.nextSyncAt, s.lastError != nil {
-        LabeledContent("Next try", value: next.formatted(date: .omitted, time: .standard))
-      }
-      LabeledContent("To push", value: s.held > 0 ? "\(s.pending) (\(s.held) held)" : "\(s.pending)")
-      if s.deferred > 0 {
-        LabeledContent("Waiting", value: "\(s.deferred)")
-          .help("Changes from the other Mac that wait for a row they depend on. Omni tries them again after each pull.")
-      }
-      if let id = s.machineId {
-        LabeledContent("This Mac") {
-          HStack(spacing: 6) {
-            Text(id).font(.body.monospaced()).textSelection(.enabled)
-            Button("Copy", systemImage: "doc.on.doc") {
-              NSPasteboard.general.clearContents()
-              NSPasteboard.general.setString(id, forType: .string)
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
-            .help("Copy")
-          }
-        }
-      }
-      LabeledContent("Cursor", value: "\(s.cursor)")
-      if let error = s.lastError {
-        Label(error, systemImage: "exclamationmark.triangle")
-          .foregroundStyle(.red)
-          .textSelection(.enabled)
-      }
-      if let error = sync.actionError, error != s.lastError {
-        Label(error, systemImage: "exclamationmark.triangle")
-          .foregroundStyle(.red)
-      }
-      HStack {
+    SettingsCard(title: "Status") {
+      HStack(spacing: 6) {
+        if sync.busy != nil { Loader(size: 14) }
         Button(s.enabled ? "Pause" : "Resume", systemImage: s.enabled ? "pause" : "play") {
           Task { await sync.togglePause() }
         }
+        .buttonStyle(.pill(.ghost, height: 28))
         .disabled(sync.busy != nil)
-        Button("Sign Out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
-          confirmingSignOut = true
-        }
-        .disabled(sync.busy != nil)
-        Spacer()
-        if sync.busy != nil { ProgressView().controlSize(.small) }
         Button("Sync Now", systemImage: "arrow.triangle.2.circlepath") {
           Task { await sync.syncNow() }
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.pill(.primary, height: 28))
         .disabled(sync.busy != nil || !s.enabled || s.signedOut)
       }
-    } header: {
-      Text("Status")
+      .labelStyle(.titleOnly)
+    } content: {
+      InfoRows {
+        InfoRow(label: "Status") {
+          HStack(spacing: 8) {
+            GlyphView(glyph: phaseGlyph(s.phase), size: 7)
+            Text(s.phaseLabel)
+          }
+        }
+        TimelineView(.periodic(from: .now, by: 5)) { context in
+          InfoRow("Last sync", value: s.lastSyncAt.map { RelTime.label($0, now: context.date) } ?? "Not yet")
+        }
+        if s.enabled, let next = s.nextSyncAt, s.lastError != nil {
+          InfoRow("Next try", value: next.formatted(date: .omitted, time: .standard))
+        }
+        InfoRow(label: "To push") {
+          Text(s.held > 0 ? "\(s.pending) (\(s.held) held)" : "\(s.pending)").monospacedDigit()
+        }
+        if s.deferred > 0 {
+          InfoRow(label: "Waiting") {
+            Text("\(s.deferred)").monospacedDigit()
+          }
+          .help("Changes from the other Mac that wait for a row they depend on. Omni tries them again after each pull.")
+        }
+        if let id = s.machineId {
+          InfoRow(label: "This Mac") {
+            HStack(spacing: 6) {
+              Text(id).font(.system(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.middle)
+                .textSelection(.enabled)
+              Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(id, forType: .string)
+              } label: {
+                OmniIcon(name: "copy", size: 13)
+              }
+              .buttonStyle(.icon(size: 26))
+              .accessibilityLabel("Copy")
+              .help("Copy")
+            }
+          }
+        }
+        InfoRow(label: "Cursor") {
+          Text("\(s.cursor)").monospacedDigit().foregroundStyle(Tok.fg2)
+        }
+      }
+      if let error = s.lastError {
+        ErrorNote(text: error)
+      }
+      if let error = sync.actionError, error != s.lastError {
+        ErrorNote(text: error)
+      }
+      HStack(alignment: .firstTextBaseline, spacing: 12) {
+        Text("Signing out removes the credentials from the Keychain. History stays on this Mac.")
+          .font(.system(size: 12))
+          .foregroundStyle(Tok.fg3)
+          .fixedSize(horizontal: false, vertical: true)
+        Spacer(minLength: 0)
+        Button("Sign Out", role: .destructive) {
+          confirmingSignOut = true
+        }
+        .buttonStyle(.pill(.secondary, height: 28))
+        .disabled(sync.busy != nil)
+      }
     }
   }
 
-  private func phaseColor(_ phase: SyncStatus.Phase) -> Color {
+  private func phaseGlyph(_ phase: SyncStatus.Phase) -> Glyph {
     switch phase {
-    case .upToDate: .green
-    case .syncing, .waiting, .starting: .blue
-    case .failing: .red
-    case .paused: .secondary
+    case .upToDate: .done
+    case .syncing, .waiting, .starting: .running
+    case .failing: .needs
+    case .paused: .settled
     }
   }
 
   // MARK: Sign-in
 
   private func signInSection(signedOut: Bool) -> some View {
-    Section {
+    SettingsCard(
+      title: signedOut ? "Sign in again" : "Sign in to your relay",
+      note: "Use the same Supabase user on each Mac. The one-time Supabase setup is in the README. Use the anon key, never the service-role key."
+    ) {
       if signedOut {
-        Label("The relay signed this Mac out. Sign in again to keep syncing.", systemImage: "exclamationmark.triangle")
-          .foregroundStyle(.orange)
+        NeedsNote(text: "The relay signed this Mac out. Sign in again to keep syncing.")
       }
-      LabeledContent("Supabase URL") {
-        TextField("Supabase URL", text: $sync.url, prompt: Text("https://abcd.supabase.co"))
-          .labelsHidden()
-          .autocorrectionDisabled()
+      HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
+          FieldLabel(text: "Supabase URL")
+          TextField("Supabase URL", text: $sync.url, prompt: Text(verbatim: "https://abcd.supabase.co"))
+            .textFieldStyle(.omniMono)
+            .autocorrectionDisabled()
+        }
+        VStack(alignment: .leading, spacing: 0) {
+          FieldLabel(text: "Anon key")
+          SecureField("Anon key", text: $sync.anonKey, prompt: Text("The anon or publishable key"))
+            .textFieldStyle(.omniMono)
+        }
       }
-      LabeledContent("Anon key") {
-        SecureField("Anon key", text: $sync.anonKey, prompt: Text("The anon or publishable key"))
-          .labelsHidden()
-          .font(.body.monospaced())
-      }
-      LabeledContent("Email") {
-        TextField("Email", text: $sync.email, prompt: Text("you@example.com"))
-          .labelsHidden()
+      VStack(alignment: .leading, spacing: 0) {
+        FieldLabel(text: "Email")
+        TextField("Email", text: $sync.email, prompt: Text(verbatim: "you@example.com"))
+          .textFieldStyle(.omni)
           .textContentType(.username)
           .autocorrectionDisabled()
       }
-      Picker("Sign in with", selection: $sync.method) {
-        Text("Password").tag(SyncModel.Method.password)
-        Text("Email code").tag(SyncModel.Method.code)
+      VStack(alignment: .leading, spacing: 0) {
+        FieldLabel(text: "Sign in with")
+        SegmentedPill(
+          selection: $sync.method,
+          options: [(SyncModel.Method.password, "Password"), (SyncModel.Method.code, "Email code")],
+          small: true
+        )
+        .accessibilityLabel("Sign in with")
       }
-      .pickerStyle(.segmented)
       switch sync.method {
       case .password:
-        LabeledContent("Password") {
+        VStack(alignment: .leading, spacing: 0) {
+          FieldLabel(text: "Password")
           SecureField("Password", text: $sync.password)
-            .labelsHidden()
+            .textFieldStyle(.omni)
             .textContentType(.password)
             .privacySensitive()
             .onSubmit(signIn)
         }
       case .code:
         if let email = sync.codeSentTo {
-          LabeledContent("Code") {
-            HStack {
+          VStack(alignment: .leading, spacing: 0) {
+            FieldLabel(text: "Code", hint: "Omni emailed a code to \(email).")
+            HStack(spacing: 8) {
               TextField("Code", text: $sync.code, prompt: Text("123456"))
-                .labelsHidden()
-                .font(.body.monospaced())
+                .textFieldStyle(.omniMono)
                 .textContentType(.oneTimeCode)
                 .privacySensitive()
                 .onSubmit(signIn)
               Button("Send Again") { sync.resetCode() }
-                .buttonStyle(.borderless)
+                .buttonStyle(.pill(.ghost, height: 32))
             }
           }
-          Text("Omni emailed a code to \(email).")
-            .foregroundStyle(.secondary)
         }
       }
       if let error = sync.signInError {
-        Label(error, systemImage: "exclamationmark.triangle")
-          .foregroundStyle(.red)
-          .textSelection(.enabled)
+        ErrorNote(text: error)
       }
-      HStack {
-        Spacer()
-        if sync.isSigningIn { ProgressView().controlSize(.small) }
-        Button(sync.signInTitle, systemImage: sync.needsCode ? "envelope" : "person.badge.key", action: signIn)
-          .buttonStyle(.borderedProminent)
+      HStack(spacing: 10) {
+        Button(sync.signInTitle, action: signIn)
+          .buttonStyle(.pill(.primary, height: 34))
           .disabled(!sync.canSignIn)
+        if sync.isSigningIn { Loader(size: 14) }
+        Spacer(minLength: 0)
       }
-    } header: {
-      Text(signedOut ? "Sign in again" : "Sign in")
-    } footer: {
-      Text("Use the same Supabase user on each Mac. The one-time Supabase setup is in the README. Use the anon key, never the service-role key.")
-        .foregroundStyle(.secondary)
     }
   }
 
@@ -241,41 +242,47 @@ struct SyncForm: View {
   // MARK: Path map
 
   private var pathMapSection: some View {
-    Section {
-      ForEach($sync.mappings) { $row in
-        HStack {
-          TextField("From", text: $row.from, prompt: Text("~/work"))
-            .labelsHidden()
-            .font(.body.monospaced())
-          Image(systemName: "arrow.right").foregroundStyle(.secondary)
-          TextField("To", text: $row.to, prompt: Text("~/code"))
-            .labelsHidden()
-            .font(.body.monospaced())
-          Button("Remove", systemImage: "minus.circle") { sync.removeMapping(row.id) }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
-            .help("Remove")
+    SettingsCard(
+      title: "Path map",
+      note: "Paths travel with your home folder as ~. When the other Mac keeps a folder somewhere else, map it here: ~/work to ~/code turns its ~/work/volero into ~/code/volero on this Mac."
+    ) {
+      if !sync.mappings.isEmpty {
+        VStack(spacing: 8) {
+          ForEach($sync.mappings) { $row in
+            HStack(spacing: 8) {
+              TextField("From", text: $row.from, prompt: Text("~/work"))
+                .textFieldStyle(.omniMono)
+              OmniIcon(name: "arrowRight", size: 14).foregroundStyle(Tok.fg4)
+              TextField("To", text: $row.to, prompt: Text("~/code"))
+                .textFieldStyle(.omniMono)
+              Button { sync.removeMapping(row.id) } label: {
+                OmniIcon(name: "trash", size: 14)
+              }
+              .buttonStyle(.icon(size: 30))
+              .accessibilityLabel("Remove")
+              .help("Remove")
+            }
+          }
         }
       }
       if let error = sync.mappingsError {
-        Label(error, systemImage: "exclamationmark.triangle")
-          .foregroundStyle(.red)
+        ErrorNote(text: error)
       }
-      HStack {
-        Button("Add Mapping", systemImage: "plus") { sync.addMapping() }
-        Spacer()
-        if sync.mappingsSaved {
-          Label("Saved", systemImage: "checkmark").foregroundStyle(.green)
+      HStack(spacing: 10) {
+        Button { sync.addMapping() } label: {
+          HStack(spacing: 6) {
+            OmniIcon(name: "plus", size: 13)
+            Text("Add Mapping")
+          }
         }
-        if sync.isSavingMappings { ProgressView().controlSize(.small) }
+        .buttonStyle(.pill(.secondary, height: 32))
         Button("Save") { Task { await sync.saveMappings() } }
+          .buttonStyle(.pill(.primary, height: 32))
           .disabled(!sync.mappingsLoaded || sync.isSavingMappings)
+        if sync.isSavingMappings { Loader(size: 14) }
+        if sync.mappingsSaved { DoneNote(text: "Saved") }
+        Spacer(minLength: 0)
       }
-    } header: {
-      Text("Path map")
-    } footer: {
-      Text("Paths travel with your home folder as ~. When the other Mac keeps a folder somewhere else, map it here: ~/work to ~/code turns its ~/work/volero into ~/code/volero on this Mac.")
-        .foregroundStyle(.secondary)
     }
   }
 }

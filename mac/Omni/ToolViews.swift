@@ -48,34 +48,38 @@ struct ToolGroupView: View {
   private var card: some View {
     let open = ui.isOpen(key)
     return VStack(alignment: .leading, spacing: 0) {
-      Button { withAnimation(.snappy(duration: 0.25)) { ui.toggle(key) } } label: {
+      Button { withAnimation(Motion.settle) { ui.toggle(key) } } label: {
         HStack(spacing: 8) {
           Chevron(open: open)
-          Image(systemName: "wrench.and.screwdriver")
-            .font(.system(size: 11.5))
-            .foregroundStyle(.secondary)
+          OmniIcon(name: "tool", size: 13)
+            .foregroundStyle(Tok.fg3)
           Text("\(group.total) tool calls")
             .monospacedDigit()
             .fontWeight(.medium)
-            .foregroundStyle(.primary.opacity(0.85))
+            .foregroundStyle(Tok.fg2)
             .layoutPriority(1)
           summary
             .lineLimit(1)
             .truncationMode(.tail)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Tok.fg3)
             .frame(maxWidth: .infinity, alignment: .leading)
           if group.failures > 0 {
-            Text("\(group.failures) failed")
-              .font(.system(size: 11))
-              .monospacedDigit()
-              .foregroundStyle(ThreadStyle.bad)
+            HStack(spacing: 4) {
+              GlyphView(glyph: .needs, size: 7)
+              Text("\(group.failures) failed")
+            }
+            .font(.system(size: 11))
+            .monospacedDigit()
+            .foregroundStyle(Tok.fg)
+            .fixedSize()
           }
-          if live { Spinner() }
+          if live { Loader(size: 11).foregroundStyle(Tok.fg3) }
         }
         .font(.system(size: ThreadStyle.small))
         .padding(.horizontal, 14)
         .frame(height: 40)
-        .contentShape(Rectangle())
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .rowHover(radius: 20)
       }
       .buttonStyle(.plain)
       .accessibilityValue(open ? "Expanded" : "Collapsed")
@@ -87,9 +91,10 @@ struct ToolGroupView: View {
         }
         .padding(.horizontal, 6)
         .padding(.bottom, 6)
+        .transition(.opacity)
       }
     }
-    .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: ThreadStyle.card))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
   }
 
   @ViewBuilder private var summary: some View {
@@ -116,22 +121,21 @@ struct ToolRowView: View {
   var body: some View {
     let open = ui.isOpen(key)
     let pending = call.isPending
+    let indent = depth > 0 || call.orphan
     VStack(alignment: .leading, spacing: 0) {
-      Button { withAnimation(.snappy(duration: 0.25)) { ui.toggle(key) } } label: {
+      Button { withAnimation(Motion.settle) { ui.toggle(key) } } label: {
         HStack(spacing: 8) {
           Chevron(open: open)
-          Image(systemName: ToolText.icon(call.name))
-            .font(.system(size: 11.5))
-            .foregroundStyle(call.isFailed ? AnyShapeStyle(ThreadStyle.bad) : AnyShapeStyle(.secondary))
-            .frame(width: 14)
+          OmniIcon(name: TranscriptIcon.tool(call.name), size: 13)
+            .foregroundStyle(Tok.fg3)
           Text(call.label)
             .fontWeight(.medium)
-            .foregroundStyle(call.isFailed ? AnyShapeStyle(ThreadStyle.bad) : AnyShapeStyle(.primary.opacity(0.85)))
+            .foregroundStyle(Tok.fg2)
             .lineLimit(1)
             .layoutPriority(1)
           Text(call.summary(cwd: cwd))
             .font(ToolText.isMonospaced(call.name) ? .system(size: ThreadStyle.mono, design: .monospaced) : .system(size: ThreadStyle.small))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Tok.fg3)
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -139,20 +143,28 @@ struct ToolRowView: View {
             Text("\(call.children.count) sub-calls")
               .font(.system(size: 11))
               .monospacedDigit()
-              .foregroundStyle(.tertiary)
+              .foregroundStyle(Tok.fg4)
+              .fixedSize()
           }
           if pending && running {
-            Spinner()
+            Loader(size: 11).foregroundStyle(Tok.fg3)
           } else if call.isFailed {
-            Text("error").font(.system(size: 11)).foregroundStyle(ThreadStyle.bad)
+            HStack(spacing: 4) {
+              GlyphView(glyph: .needs, size: 7)
+              Text("error")
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(Tok.fg)
+            .fixedSize()
           } else if call.isStopped {
-            Text("stopped").font(.system(size: 11)).foregroundStyle(.tertiary)
+            Text("stopped").font(.system(size: 11)).foregroundStyle(Tok.fg4).fixedSize()
           }
         }
         .font(.system(size: ThreadStyle.small))
         .padding(.horizontal, 10)
         .frame(height: 32)
-        .contentShape(Rectangle())
+        .contentShape(Capsule())
+        .rowHover(radius: 16)
       }
       .buttonStyle(.plain)
       .accessibilityValue(open ? "Expanded" : "Collapsed")
@@ -160,8 +172,10 @@ struct ToolRowView: View {
       if open {
         ToolDetail(call: call, running: running)
           .padding(.leading, 28)
+          .padding(.trailing, 4)
           .padding(.top, 4)
           .padding(.bottom, 10)
+          .transition(.opacity)
       }
       if !call.children.isEmpty && (open || (pending && running)) {
         VStack(alignment: .leading, spacing: 0) {
@@ -173,13 +187,13 @@ struct ToolRowView: View {
         .padding(.bottom, 4)
       }
     }
-    .padding(.leading, depth > 0 || call.orphan ? 10 : 0)
+    .padding(.leading, indent ? 10 : 0)
     .overlay(alignment: .leading) {
-      if depth > 0 || call.orphan {
-        Rectangle().fill(ThreadStyle.line).frame(width: 1)
+      if indent {
+        Rectangle().fill(Tok.line).frame(width: 1)
       }
     }
-    .padding(.leading, depth > 0 || call.orphan ? 14 : 0)
+    .padding(.leading, indent ? 14 : 0)
   }
 
   private var key: String { "c\(call.id)" }
@@ -195,12 +209,12 @@ private struct ToolDetail: View {
       if let result = call.result {
         Pre(text: result.text.isEmpty ? "(no output)" : result.text, tone: call.isFailed ? .bad : .plain)
         if result.truncated {
-          Text("Output truncated").font(.system(size: 11)).foregroundStyle(.tertiary)
+          Text("Output truncated").font(.system(size: 11)).foregroundStyle(Tok.fg4)
         }
       } else {
         Text(running ? "Waiting for result" : "No result recorded")
           .font(.system(size: ThreadStyle.mono))
-          .foregroundStyle(.tertiary)
+          .foregroundStyle(Tok.fg4)
       }
     }
   }
@@ -213,7 +227,7 @@ struct ToolInputView: View {
     switch input {
     case .bash(let description, let command):
       if let description {
-        Text(description).font(.system(size: 12)).foregroundStyle(.secondary)
+        Text(description).font(.system(size: 12)).foregroundStyle(Tok.fg3)
       }
       Pre(text: command)
     case .edits(let path, let edits):
@@ -225,9 +239,9 @@ struct ToolInputView: View {
         }
       }
     case .write(let file, let lines, let preview):
-      Text("\(file)\(Text(" (\(lines) lines)").foregroundStyle(.tertiary))")
+      Text("\(file)\(Text(" (\(lines) lines)").foregroundStyle(Tok.fg4))")
         .font(.system(size: ThreadStyle.mono, design: .monospaced))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Tok.fg3)
         .textSelection(.enabled)
       Pre(text: preview, tone: .add)
     case .prompt(let prompt):
@@ -248,56 +262,96 @@ struct ToolInputView: View {
   private func pathLine(_ p: String) -> some View {
     Text(p)
       .font(.system(size: ThreadStyle.mono, design: .monospaced))
-      .foregroundStyle(.secondary)
+      .foregroundStyle(Tok.fg3)
       .textSelection(.enabled)
   }
 }
 
-struct Chevron: View {
-  let open: Bool
-
-  var body: some View {
-    Image(systemName: "chevron.right")
-      .font(.system(size: 9.5, weight: .semibold))
-      .foregroundStyle(.tertiary)
-      .rotationEffect(.degrees(open ? 90 : 0))
-      .frame(width: 12)
-  }
-}
-
-/// A to-do: a box that fills when done, a dot while in progress, as CheckItem in ui.tsx.
+/// A to-do, as CheckItem in ui.tsx (Bencho "chk"): an 18pt box that fills with ink and draws its tick when
+/// done, a live dot pulsing inside while in progress, and the label struck through and faded once done.
 struct CheckItem: View {
   let state: String
   let text: String
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 9) {
-      box.alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+    let done = state == "completed"
+    let active = state == "in_progress"
+    HStack(alignment: .firstTextBaseline, spacing: 10) {
+      CheckBox(done: done, active: active)
+        .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4.5 }
       Text(text)
-        .font(.system(size: 13.5, weight: state == "in_progress" ? .medium : .regular))
-        .strikethrough(state == "completed", color: .secondary)
-        .foregroundStyle(state == "in_progress" ? AnyShapeStyle(.primary) : AnyShapeStyle(.primary.opacity(0.75)))
+        .font(.system(size: 13.5, weight: active ? .medium : .regular))
+        .lineSpacing(2)
+        .strikethrough(done, color: Tok.fg4)
+        .foregroundStyle(done ? Tok.fg4 : active ? Tok.fg : Tok.fg2)
         .fixedSize(horizontal: false, vertical: true)
+        .animation(.easeOut(duration: 0.3), value: done)
     }
     .padding(.vertical, 3)
     .accessibilityElement(children: .combine)
-    .accessibilityValue(state == "completed" ? "Done" : state == "in_progress" ? "In progress" : "Not started")
+    .accessibilityValue(done ? "Done" : active ? "In progress" : "Not started")
   }
+}
 
-  private var box: some View {
+private struct CheckBox: View {
+  let done: Bool
+  let active: Bool
+  @State private var pulse = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  var body: some View {
+    let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
     ZStack {
-      RoundedRectangle(cornerRadius: 4)
-        .fill(state == "completed" ? Color.primary : .clear)
-      RoundedRectangle(cornerRadius: 4)
-        .strokeBorder(state == "completed" ? Color.primary : Color.primary.opacity(0.35), lineWidth: 1.5)
-      if state == "completed" {
-        Image(systemName: "checkmark")
-          .font(.system(size: 8.5, weight: .bold))
-          .foregroundStyle(Color(nsColor: .windowBackgroundColor))
-      } else if state == "in_progress" {
-        Circle().fill(Color.primary).frame(width: 6, height: 6)
+      shape.strokeBorder(active ? Tok.fg : Tok.fg.opacity(0.28), lineWidth: 1.5)
+      shape.fill(Tok.fg).scaleEffect(done ? 1 : 0.001)
+      TickShape()
+        .trim(from: 0, to: done ? 1 : 0)
+        .stroke(Tok.onInk, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+        .frame(width: 12.6, height: 12.6)
+      if active {
+        Circle().fill(Tok.live)
+          .frame(width: 7, height: 7)
+          .opacity(pulse ? 0.45 : 1)
+          .scaleEffect(pulse ? 0.82 : 1)
+          .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { pulse = true }
+          }
       }
     }
-    .frame(width: 15, height: 15)
+    .frame(width: 18, height: 18)
+    .clipShape(shape)
+    .animation(Motion.spring, value: done)
+  }
+}
+
+/// The tick in CheckItem: M5 12.5 l4.5 4.5 L19 7.5 on a 24 grid.
+private struct TickShape: Shape {
+  func path(in rect: CGRect) -> Path {
+    let s = rect.width / 24
+    var p = Path()
+    p.move(to: CGPoint(x: 5 * s, y: 12.5 * s))
+    p.addLine(to: CGPoint(x: 9.5 * s, y: 17 * s))
+    p.addLine(to: CGPoint(x: 19 * s, y: 7.5 * s))
+    return p
+  }
+}
+
+extension View {
+  /// `.hov` in index.css: a wash under a row while the pointer is on it.
+  func rowHover(radius: CGFloat) -> some View {
+    modifier(RowHover(radius: radius))
+  }
+}
+
+private struct RowHover: ViewModifier {
+  let radius: CGFloat
+  @State private var hover = false
+
+  func body(content: Content) -> some View {
+    content
+      .background(Tok.wash.opacity(hover ? 1 : 0), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+      .onHover { hover = $0 }
+      .animation(.easeOut(duration: 0.14), value: hover)
   }
 }

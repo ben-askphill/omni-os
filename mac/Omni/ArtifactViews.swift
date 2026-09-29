@@ -14,6 +14,15 @@ func artifactSymbol(_ kind: String) -> String {
   }
 }
 
+/// The web's kindIcon: the OmniIcon for an artifact kind.
+func artifactIcon(_ kind: String) -> String {
+  switch kind {
+  case "image", "screenshot": "image"
+  case "html", "svg": "globe"
+  default: "file"
+  }
+}
+
 /// A file's header (name, kind, size, age, and the window and download buttons) over its rendering.
 struct ArtifactViewer: View {
   let client: OmniClient
@@ -25,16 +34,16 @@ struct ArtifactViewer: View {
   var body: some View {
     VStack(spacing: 0) {
       HStack(spacing: 10) {
-        Image(systemName: artifactSymbol(ref.kind))
-          .font(.system(size: 13))
-          .foregroundStyle(.secondary)
-          .frame(width: 28, height: 28)
-          .background(ThreadStyle.surface, in: Circle())
-        VStack(alignment: .leading, spacing: 0) {
-          Text(ref.name).font(.system(size: 13, weight: .medium)).lineLimit(1).truncationMode(.middle)
+        OmniIcon(name: artifactIcon(ref.kind), size: 14)
+          .foregroundStyle(Tok.fg3)
+          .frame(width: 30, height: 30)
+          .background(Tok.surface2, in: Circle())
+        VStack(alignment: .leading, spacing: 1) {
+          Text(ref.name).font(.system(size: 11.5, weight: .medium, design: .monospaced)).foregroundStyle(Tok.fg)
+            .lineLimit(1).truncationMode(.middle)
           Text("\(ref.kind) · \(Format.bytes(ref.size)) · updated \(Format.relTime(ref.updatedAt))")
-            .font(.system(size: 10.5).monospacedDigit())
-            .foregroundStyle(.tertiary)
+            .font(.system(size: 11).monospacedDigit())
+            .foregroundStyle(Tok.fg4)
             .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -42,21 +51,22 @@ struct ArtifactViewer: View {
           Button {
             openWindow(id: "artifact", value: ref)
           } label: {
-            Image(systemName: "arrow.up.forward.app")
+            Label("Open in its own window", systemImage: "arrow.up.forward.app")
           }
+          .buttonStyle(.icon(size: 30))
           .help("Open in its own window")
         }
         Button {
           Task { saveError = await ArtifactSaver.save(client: client, ref: ref) }
         } label: {
-          Image(systemName: "arrow.down.circle")
+          Label { Text("Download") } icon: { OmniIcon(name: "download", size: 15) }
         }
+        .buttonStyle(.icon(size: 30))
         .help("Download")
       }
-      .buttonStyle(.borderless)
-      .padding(.vertical, 6)
+      .padding(.vertical, 8)
       .padding(.horizontal, 12)
-      Divider()
+      Hairline()
       if let saveError {
         ErrorNote(text: saveError).padding(8)
       }
@@ -100,14 +110,14 @@ struct ArtifactBody: View {
     } else if !["pdf", "image", "screenshot", "markdown", "csv", "json", "text"].contains(ref.kind) {
       Text("No preview for this file type. Download it instead.")
         .font(.system(size: 13))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Tok.fg3)
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     } else {
       Group {
         switch phase {
         case .loading:
-          ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+          LoadingNote().padding(.horizontal, 12).frame(maxHeight: .infinity, alignment: .top)
         case .failed(let message):
           VStack { ErrorNote(text: message) { phase = .loading; Task { await load() } }.padding(12); Spacer() }
         case .loaded(let data):
@@ -142,13 +152,13 @@ private struct NativeBody: View {
           Image(nsImage: image)
             .resizable()
             .scaledToFit()
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
             .padding(12)
             .frame(maxWidth: .infinity)
         }
       } else {
-        Text("This image could not be read.").foregroundStyle(.secondary).padding(16)
+        Text("This image could not be read.").font(.system(size: 13)).foregroundStyle(Tok.fg3).padding(16)
       }
     case "markdown":
       ScrollView {
@@ -180,12 +190,12 @@ private struct PlainTextView: View {
       VStack(alignment: .leading, spacing: 8) {
         Text(text.count > Self.limit ? String(text.prefix(Self.limit)) : text)
           .font(.system(size: 12, design: .monospaced))
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Tok.fg2)
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
         if text.count > Self.limit {
           Text("Showing the first \(Self.limit / 1000) KB. Download for the full file.")
-            .font(.system(size: 11.5)).foregroundStyle(.tertiary)
+            .font(.system(size: 11.5)).foregroundStyle(Tok.fg4)
         }
       }
       .padding(12)
@@ -209,19 +219,19 @@ private struct CSVTableView: View {
                   csvRow(row, width: width, header: false)
                 }
               } header: {
-                csvRow(head, width: width, header: true).background(.regularMaterial)
+                csvRow(head, width: width, header: true).background(Tok.surface)
               }
               if table.truncated {
                 Text("Showing the first 500 rows. Download for the full file.")
-                  .font(.system(size: 11.5)).foregroundStyle(.tertiary).padding(8)
+                  .font(.system(size: 11.5)).foregroundStyle(Tok.fg4).padding(8)
               }
             }
           }
         } else {
-          Text("Empty file").font(.system(size: 13)).foregroundStyle(.secondary).padding(16)
+          Text("Empty file").font(.system(size: 13)).foregroundStyle(Tok.fg3).padding(16)
         }
       } else {
-        ProgressView().controlSize(.small)
+        LoadingNote().padding(.horizontal, 12)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -232,9 +242,8 @@ private struct CSVTableView: View {
     HStack(alignment: .top, spacing: 0) {
       ForEach(0..<max(width, row.count), id: \.self) { i in
         Text(i < row.count ? row[i] : "")
-          .font(header ? .system(size: 10.5, weight: .medium).monospaced() : .system(size: 12))
-          .foregroundStyle(header ? .secondary : .primary)
-          .textCase(header ? .uppercase : nil)
+          .font(.system(size: 12, weight: header ? .medium : .regular))
+          .foregroundStyle(header ? Tok.fg3 : Tok.fg)
           .lineLimit(header ? 1 : 3)
           .frame(width: 180, alignment: .leading)
           .padding(.horizontal, 10)
@@ -242,7 +251,7 @@ private struct CSVTableView: View {
           .textSelection(.enabled)
       }
     }
-    .overlay(alignment: .bottom) { Divider() }
+    .overlay(alignment: .bottom) { Hairline() }
   }
 }
 

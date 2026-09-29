@@ -48,30 +48,21 @@ struct ChannelSettingsForm: View {
         }
         SettingsField("Id", hint: isNew ? "Lowercase slug, used in URLs and by the Conductor. Cannot change later." : "Fixed after creation.") {
           TextField("", text: Binding(get: { form.id }, set: { form.setID($0) }), prompt: Text("volero"))
-            .font(.system(size: 13, design: .monospaced))
+            .textFieldStyle(.omniMono)
             .disabled(!isNew)
             .accessibilityLabel("Id")
         }
       }
       if !isSystem {
         SettingsField("Kind") {
-          Picker("Kind", selection: $form.kind) {
-            Text("Client").tag(ChannelKind.client)
-            Text("Internal").tag(ChannelKind.internal)
-            Text("Personal").tag(ChannelKind.personal)
-          }
-          .pickerStyle(.segmented)
-          .labelsHidden()
-          .fixedSize()
+          SegmentedPill(selection: $form.kind, options: [(.client, "Client"), (.internal, "Internal"), (.personal, "Personal")])
+            .fixedSize()
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Kind")
         }
       }
       SettingsField("Notes", hint: "Added to every thread's system prompt in this channel. Keep it short: who the client is, conventions, what not to touch.") {
-        TextEditor(text: $form.notes)
-          .font(.system(size: 13))
-          .scrollContentBackground(.hidden)
-          .frame(minHeight: 84)
-          .padding(4)
-          .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 8))
+        OmniTextEditor(text: $form.notes)
           .accessibilityLabel("Notes")
       }
     }
@@ -82,14 +73,14 @@ struct ChannelSettingsForm: View {
       SettingsField("Repo path", hint: "Absolute path to a local git repo. Enables per-thread worktrees and the PRs tab.") {
         HStack(spacing: 8) {
           TextField("", text: $form.repoPath, prompt: Text("/Users/benrosenberg/code/apa-volero"))
-            .font(.system(size: 13, design: .monospaced))
+            .textFieldStyle(.omniMono)
             .accessibilityLabel("Repo path")
           FolderButton(title: "Choose repo folder", path: $form.repoPath)
         }
       }
       SettingsField("GitHub repo", hint: "owner/name. Auto-detected from the repo path when left empty.") {
         TextField("", text: $form.githubRepo, prompt: Text("askphill/apa-volero"))
-          .font(.system(size: 13, design: .monospaced))
+          .textFieldStyle(.omniMono)
           .accessibilityLabel("GitHub repo")
       }
       SettingsToggle(
@@ -101,7 +92,7 @@ struct ChannelSettingsForm: View {
       SettingsField("Base directory", hint: "Where threads run when there is no repo. Defaults to the brain folder (phillbert) so skills load.") {
         HStack(spacing: 8) {
           TextField("", text: $form.baseDir, prompt: Text("/Users/benrosenberg/phillbert"))
-            .font(.system(size: 13, design: .monospaced))
+            .textFieldStyle(.omniMono)
             .accessibilityLabel("Base directory")
           FolderButton(title: "Choose base folder", path: $form.baseDir)
         }
@@ -114,12 +105,12 @@ struct ChannelSettingsForm: View {
       HStack(alignment: .top, spacing: 16) {
         SettingsField("Store domain", hint: "The myshopify domain, e.g. volero-eu.myshopify.com") {
           TextField("", text: $form.storeDomain, prompt: Text("volero-eu.myshopify.com"))
-            .font(.system(size: 13, design: .monospaced))
+            .textFieldStyle(.omniMono)
             .accessibilityLabel("Store domain")
         }
         SettingsField("Portal slug", hint: "Ask Phill Portal company slug, for client context.") {
           TextField("", text: $form.portalSlug, prompt: Text("volero"))
-            .font(.system(size: 13, design: .monospaced))
+            .textFieldStyle(.omniMono)
             .accessibilityLabel("Portal slug")
         }
       }
@@ -136,19 +127,22 @@ struct ChannelSettingsForm: View {
       Button {
         Task { await save() }
       } label: {
-        HStack(spacing: 6) {
-          if busy { ProgressView().controlSize(.small) }
+        HStack(spacing: 8) {
+          if busy { Loader(size: 14) }
           Text(isNew ? "Create channel" : "Save changes")
         }
       }
-      .buttonStyle(.borderedProminent)
-      .controlSize(.large)
+      .buttonStyle(.pill(.primary, height: 34))
       .keyboardShortcut(.defaultAction)
       .disabled(busy)
       if saved {
-        Label("Saved", systemImage: "checkmark")
-          .font(.system(size: 12.5))
-          .foregroundStyle(ThreadStyle.ok)
+        HStack(spacing: 6) {
+          GlyphView(glyph: .done, size: 8)
+          Text("Saved")
+        }
+        .font(.system(size: 12.5))
+        .foregroundStyle(Tok.fg2)
+        .transition(.scale(scale: 0.8).combined(with: .opacity))
       }
       Spacer()
       if let existing, !isSystem, existing.id != "inbox" {
@@ -161,18 +155,27 @@ struct ChannelSettingsForm: View {
     if confirmArchive {
       HStack(spacing: 8) {
         Button("Cancel") { confirmArchive = false }
+          .buttonStyle(.pill(.ghost, height: 34))
           .disabled(archiving)
-        Button(archiving ? "Archiving" : "Archive", role: .destructive) { Task { await archive() } }
-          .disabled(archiving)
+        Button(role: .destructive) { Task { await archive() } } label: {
+          HStack(spacing: 8) {
+            if archiving { Loader(size: 14) }
+            Text(archiving ? "Archiving" : "Archive")
+          }
+        }
+        .buttonStyle(.pill(.needs, height: 34))
+        .disabled(archiving)
       }
-      .controlSize(.large)
     } else {
       Button {
         confirmArchive = true
       } label: {
-        Label("Archive channel", systemImage: "archivebox")
+        HStack(spacing: 8) {
+          OmniIcon(name: "archive", size: 15)
+          Text("Archive channel")
+        }
       }
-      .controlSize(.large)
+      .buttonStyle(.pill(.secondary, height: 34))
     }
   }
 
@@ -223,16 +226,11 @@ struct NewChannelScreen: View {
 
   var body: some View {
     ScreenColumn(width: 672) {
-      VStack(alignment: .leading, spacing: 20) {
-        VStack(alignment: .leading, spacing: 6) {
-          Text("New channel").font(.system(size: 28, weight: .semibold))
-          Text("One channel per client or project. Threads, PRs, secrets and the browser profile are scoped to it.")
-            .font(.system(size: 13.5))
-            .foregroundStyle(.secondary)
-        }
+      VStack(alignment: .leading, spacing: 24) {
+        OmniPageHeader(title: "New channel", subtitle: "One channel per client or project. Threads, PRs, secrets and the browser profile are scoped to it.")
         ChannelSettingsForm(model: model)
       }
-      .padding(.top, 32)
+      .padding(.top, 40)
     }
   }
 }
@@ -247,40 +245,45 @@ struct MissingChannelView: View {
   @State private var error: String?
 
   var body: some View {
-    VStack(spacing: 12) {
+    VStack(spacing: 0) {
       if let archived {
-        Image(systemName: "archivebox").font(.system(size: 26)).foregroundStyle(.tertiary)
-        Text("#\(archived.name) is archived").font(.system(size: 15, weight: .medium))
-        Text("Its threads are kept. Unarchive to see them in the sidebar and start new ones.")
-          .font(.system(size: 12.5))
-          .foregroundStyle(.secondary)
-          .multilineTextAlignment(.center)
-        if let error { Text(error).font(.system(size: 12.5)).foregroundStyle(ThreadStyle.bad) }
-        HStack {
-          Button {
-            Task { await unarchive() }
-          } label: {
-            Label("Unarchive", systemImage: "archivebox")
+        EmptyNote(symbol: "archive", title: "#\(archived.name) is archived",
+                  message: "Its threads are kept. Unarchive to see them in the sidebar and start new ones.") {
+          VStack(spacing: 12) {
+            if let error {
+              HStack(spacing: 6) {
+                GlyphView(glyph: .needs, size: 7)
+                Text(error)
+              }
+              .font(.system(size: 12.5))
+              .foregroundStyle(Tok.fg2)
+            }
+            HStack(spacing: 8) {
+              Button {
+                Task { await unarchive() }
+              } label: {
+                HStack(spacing: 8) {
+                  if busy { Loader(size: 14) } else { OmniIcon(name: "archive", size: 15) }
+                  Text("Unarchive")
+                }
+              }
+              .buttonStyle(.pill(.primary, height: 34))
+              .disabled(busy)
+              Button("Go home") { model.route = .home }
+                .buttonStyle(.pill(.secondary, height: 34))
+            }
           }
-          .buttonStyle(.borderedProminent)
-          .disabled(busy)
-          Button("Go Home") { model.route = .home }
         }
-        .controlSize(.large)
       } else if checked {
-        ContentUnavailableView {
-          Label("#\(id) not found", systemImage: "number")
-        } description: {
-          Text("The id is wrong, or the channel was deleted.")
-        } actions: {
-          Button("Go Home") { model.route = .home }
+        EmptyNote(symbol: "hash", title: "#\(id) not found", message: "The id is wrong, or the channel was deleted.") {
+          Button("Go home") { model.route = .home }
+            .buttonStyle(.pill(.secondary, height: 34))
         }
       } else {
-        ProgressView().controlSize(.small)
+        LoadingNote().padding(.horizontal, 32)
       }
     }
-    .frame(maxWidth: 420)
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .task(id: id) {
       let found = try? await model.client.channel(id)
       archived = found.flatMap { $0.archived ? $0.channel : nil }
@@ -312,12 +315,12 @@ private struct SettingsSection<Content: View>: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text(title).font(.system(size: 16, weight: .semibold))
+      Text(title).font(.system(size: 16, weight: .medium)).tracking(-0.16).foregroundStyle(Tok.fg)
       content
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(20)
-    .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(ThreadStyle.line))
+    .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Tok.line))
   }
 }
 
@@ -333,16 +336,10 @@ private struct SettingsField<Content: View>: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 5) {
-      Text(label).font(.system(size: 12.5, weight: .medium))
+    VStack(alignment: .leading, spacing: 0) {
+      FieldLabel(text: label, hint: hint)
       content
-        .textFieldStyle(.roundedBorder)
-      if let hint {
-        Text(hint)
-          .font(.system(size: 11.5))
-          .foregroundStyle(.tertiary)
-          .fixedSize(horizontal: false, vertical: true)
-      }
+        .textFieldStyle(.omni)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -356,20 +353,20 @@ private struct SettingsToggle: View {
   var body: some View {
     HStack(alignment: .top, spacing: 16) {
       VStack(alignment: .leading, spacing: 2) {
-        Text(title).font(.system(size: 13, weight: .medium))
+        Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(Tok.fg)
         Text(detail)
           .font(.system(size: 12))
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Tok.fg3)
           .fixedSize(horizontal: false, vertical: true)
       }
       Spacer(minLength: 0)
       Toggle(title, isOn: $isOn)
-        .labelsHidden()
-        .toggleStyle(.switch)
+        .toggleStyle(.omni)
+        .accessibilityLabel(title)
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 12)
-    .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 14))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
   }
 }
 
@@ -390,8 +387,9 @@ private struct FolderButton: View {
       if !current.isEmpty { panel.directoryURL = URL(fileURLWithPath: (current as NSString).expandingTildeInPath) }
       if panel.runModal() == .OK, let url = panel.url { path = url.path }
     } label: {
-      Label("Choose", systemImage: "folder")
+      Text("Choose")
     }
+    .buttonStyle(.pill(.secondary, height: 38))
     .help(title)
   }
 }

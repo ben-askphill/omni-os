@@ -12,18 +12,21 @@ struct UpdateBar: View {
     VStack(spacing: 0) {
       if step.isActive {
         row(icon: nil, text: step.label ?? "") {
-          if case .waitingForIdle = step { Button("Cancel") { updater.restart.cancel() } }
+          if case .waitingForIdle = step {
+            Button("Cancel") { updater.restart.cancel() }.buttonStyle(.pill(.ghost, height: 26))
+          }
         }
       } else if case .failed(let message) = step {
-        row(icon: "exclamationmark.triangle.fill", text: message, tint: .orange) {
-          Button("Open Log") { NSWorkspace.shared.open(Updater.webBuildLog) }
-          Button("Dismiss") { updater.restart.dismissFailure() }
+        row(icon: .needs, text: message) {
+          Button("Open Log") { NSWorkspace.shared.open(Updater.webBuildLog) }.buttonStyle(.pill(.secondary, height: 26))
+          Button("Dismiss") { updater.restart.dismissFailure() }.buttonStyle(.pill(.ghost, height: 26))
         }
       } else if updater.notices.serverBehind {
-        row(icon: "arrow.triangle.2.circlepath", text: "The server is behind main.") {
+        row(icon: .icon("refresh"), text: "The server is behind main.") {
           Button("Restart") {
             if updater.restartStopsOutsideServer { confirmRestart = true } else { Task { await updater.restartServer() } }
           }
+          .buttonStyle(.pill(.primary, height: 26))
         }
       }
 
@@ -31,14 +34,15 @@ struct UpdateBar: View {
       case .building:
         row(icon: nil, text: "Building the app. It relaunches when it is done.") {}
       case .failed(let message):
-        row(icon: "exclamationmark.triangle.fill", text: message, tint: .orange) {
-          Button("Open Log") { NSWorkspace.shared.open(Updater.appRebuildLog) }
-          Button("Dismiss") { updater.dismissRebuildFailure() }
+        row(icon: .needs, text: message) {
+          Button("Open Log") { NSWorkspace.shared.open(Updater.appRebuildLog) }.buttonStyle(.pill(.secondary, height: 26))
+          Button("Dismiss") { updater.dismissRebuildFailure() }.buttonStyle(.pill(.ghost, height: 26))
         }
       case .idle:
         if updater.notices.appBehind {
-          row(icon: "arrow.down.app", text: "This app is behind main.") {
+          row(icon: .icon("download"), text: "This app is behind main.") {
             Button("Rebuild and Relaunch") { Task { await updater.rebuildApp() } }
+              .buttonStyle(.pill(.primary, height: 26))
           }
         }
       }
@@ -53,27 +57,35 @@ struct UpdateBar: View {
     }
   }
 
+  private enum RowIcon {
+    case progress, needs, icon(String)
+  }
+
   private func row<Actions: View>(
-    icon: String?, text: String, tint: Color = .secondary, @ViewBuilder actions: () -> Actions
+    icon: RowIcon?, text: String, @ViewBuilder actions: () -> Actions
   ) -> some View {
-    VStack(spacing: 0) {
-      HStack(spacing: 8) {
-        if let icon {
-          Image(systemName: icon).foregroundStyle(tint)
-        } else {
-          ProgressView().controlSize(.small)
+    HStack(spacing: 10) {
+      Group {
+        switch icon ?? .progress {
+        case .progress: Loader(size: 14)
+        case .needs: GlyphView(glyph: .needs, size: 8)
+        case .icon(let name): OmniIcon(name: name, size: 14).foregroundStyle(Tok.fg3)
         }
-        Text(text)
-          .lineLimit(2)
-          .frame(maxWidth: .infinity, alignment: .leading)
-        actions()
       }
-      .controlSize(.small)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 7)
-      .background(Color(nsColor: .windowBackgroundColor))
-      Divider()
+      .frame(width: 16)
+      Text(text)
+        .font(.system(size: 12.5))
+        .foregroundStyle(Tok.fg)
+        .lineLimit(2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      actions()
     }
+    .padding(.leading, 14)
+    .padding(.trailing, 6)
+    .frame(minHeight: 38)
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .padding(.horizontal, 12)
+    .padding(.top, 8)
   }
 }
 
@@ -106,25 +118,30 @@ struct BannerView: View {
     HStack(spacing: 10) {
       ThreadStatusIcon(status: banner.status)
       VStack(alignment: .leading, spacing: 1) {
-        Text(banner.title).fontWeight(.medium).lineLimit(1)
-        Text(banner.body).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        Text(banner.title)
+          .font(.system(size: 13, weight: .medium))
+          .foregroundStyle(Tok.fg)
+          .lineLimit(1)
+        Text(banner.body)
+          .font(.system(size: 12))
+          .foregroundStyle(Tok.fg3)
+          .lineLimit(1)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       Button("Open", action: open)
-        .buttonStyle(.borderedProminent)
-        .controlSize(.small)
+        .buttonStyle(.pill(.primary, height: 26))
       Button(action: dismiss) {
-        Image(systemName: "xmark")
+        OmniIcon(name: "x", size: 13)
       }
-      .buttonStyle(.borderless)
+      .buttonStyle(.icon(size: 26))
       .accessibilityLabel("Dismiss")
     }
-    .padding(.leading, 12)
-    .padding(.trailing, 10)
+    .padding(.leading, 14)
+    .padding(.trailing, 8)
     .padding(.vertical, 8)
     .frame(width: 340)
-    .background(.regularMaterial, in: .rect(cornerRadius: 12))
-    .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+    .background(Tok.elev, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .menuShadow(22)
     .onHover { hovering = $0 }
     .task(id: hovering) {
       guard !hovering else { return }

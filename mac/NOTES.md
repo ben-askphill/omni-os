@@ -48,6 +48,8 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `ServerSupervisor.swift` | `ServerSupervisor` (the state machine), `ServerRecord` |
 | `Navigation.swift` | `SidebarItem` (a sidebar row and its route), `Route.title(channelName:)`, `Route.newThreadRoute` |
 | `AppModel.swift` | `AppModel` (settings, supervisor, client and store, the route), `ServerScreen`, `StartFailure`, `State.label` and `canStart` |
+| `SVGPath.swift` | `SVGPath.cgPath`: SVG path data to a `CGPath` (every command, compact numbers, packed arc flags) |
+| `BrandPaths.swift` | `BrandPaths`: the Web UI's icon paths (`ui.tsx`), harness logos and wordmark (`brand.tsx`), generated from those files; `BrandPathsTests` keeps them in step |
 | `QAScript.swift` | Debug only. `QAScript`, `QAStep`, `QACondition`, `QAFacts`, `QAServer`, `QASnapshot.looksBlank` |
 
 ## Build and test
@@ -306,14 +308,14 @@ OMNI_LIVE_PORT=4791 swift test --package-path mac/OmniKit --filter LiveServerTes
 
 Main window:
 
-- The sidebar matches `Sidebar.tsx`: Home, Conductor, the channels by kind (Clients, Internal, Personal, then others), Add channel, and Workspace (Artifacts, Automations, Secrets). A channel's badge is its running count, hidden at 0. Under each channel, its active threads from `SidebarSections.threads(of:)`, with a spinner (running), a clock (queued) or a red mark (failed), and "N more", which opens the channel. It all comes from the store, so counts and threads move with the feed.
+- The sidebar matches `Sidebar.tsx`: Home, Conductor, the channels by kind (Clients, Internal, Personal, then others), Add channel, and Workspace (Artifacts, Automations, Secrets). A channel's badge is its running count, hidden at 0. Under each channel, its active threads from `SidebarSections.threads(of:)`, with the Loader (running) or the status glyph, and "N more", which opens the channel. It all comes from the store, so counts and threads move with the feed.
 - The selection is `SidebarItem(route: model.route)`; picking a row sets `model.route`. Routes without a row (search) select nothing. Secrets is the exception: it opens Settings on the Secrets tab (`model.show`) and the window stays where it was. Any other write of `#/secrets` to the route does the same (`MainWindow`'s `onChange`), going back to the route last drawn.
-- A red row under Home when the channel list fails to load while the server runs. With no server, the server screen says so instead.
-- The footer: a dot (green running, orange running but the feed is retrying, red not running or failed), `State.label` ("Started by the app", "Started outside the app", "Not running"), the port, and an orange "Reconnecting".
+- An error note under Home when the channel list fails to load while the server runs. With no server, the server screen says so instead.
+- Under the usage card, the footer: a dot (volt running, grey while the feed retries, vermilion not running or failed), `State.label` ("Started by the app", "Started outside the app", "Not running"), the port and "Reconnecting". It opens the Server menu.
 - The detail is the server screen while `model.serverScreen` is set, else the screen for the route. Automations has its screen (below). The other routes show a `ContentUnavailableView` with their title and hash. Unknown routes show "Nothing here" and Go Home.
 - The title follows the route (`#acme` on a channel), "Omni" while the server screen shows.
-- Toolbar: "Reconnecting" with a spinner while the feed retries, a Server menu, New Thread. Menus: File > New Thread (Cmd-N, in place of New Window), a Server menu (Check Again is Cmd-R), and the sidebar commands in View.
-- The standard macOS 27 look: `.listStyle(.sidebar)`, system materials, no custom glass or colors.
+- Toolbar (transparent, no title): the sidebar toggle, back and forward, "Reconnecting" while the feed retries, Open in New Window on a thread. New thread and search are in the sidebar, as on the web. Menus: File > New Thread (Cmd-N, in place of New Window), a Server menu (Check Again is Cmd-R), View > Hide Sidebar (Ctrl-Cmd-S, `SidebarToggleCommand`).
+- The look is the Web UI's, not the stock macOS one: the design system's tokens (`web/src/index.css`) are `Tok` in `Theme.swift`, with its pill buttons, `SegmentedPill`, fields, chips and card shadows. `Brand.swift` draws the web's icons, wordmark, mark, Loader and harness logos from `BrandPaths`. The window is a white canvas with a 252pt custom sidebar (not a `List`) and the screen in a 22pt card inset 8pt, as the web's pane. Status is the only color: ultramarine running, vermilion needs you, volt done; vermilion is never text.
 
 Server screen (`ServerScreen`):
 

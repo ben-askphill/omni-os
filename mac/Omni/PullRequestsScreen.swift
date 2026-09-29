@@ -21,16 +21,20 @@ struct PullRequestsScreen: View {
           PullRequestListView(model: model, channelID: channelID, repo: repo)
         }
       } else {
-        ContentUnavailableView {
-          Label("No GitHub repo linked", systemImage: "arrow.triangle.pull")
-        } description: {
-          Text("Set a local repo path in settings. Omni detects the GitHub repo from it, and builder threads get their own worktree.")
-        } actions: {
-          Button("Open settings") { model.route = .channel(id: channelID, tab: .settings) }
+        EmptyNote(symbol: "pr", title: "No GitHub repo linked",
+                  message: "Set a local repo path in settings. Omni detects the GitHub repo from it, and builder threads get their own worktree.") {
+          Button { model.route = .channel(id: channelID, tab: .settings) } label: {
+            HStack(spacing: 8) {
+              OmniIcon(name: "sliders", size: 15)
+              Text("Open settings")
+            }
+          }
+          .buttonStyle(.pill(.secondary, height: 34))
         }
+        .frame(maxHeight: .infinity, alignment: .top)
       }
     } else {
-      ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+      LoadingNote().padding(.horizontal, 32).frame(maxHeight: .infinity, alignment: .top)
     }
   }
 }
@@ -48,29 +52,38 @@ private struct PullRequestListView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 12) {
-        HStack {
-          Picker("State", selection: $state) {
-            ForEach(PullRequestListState.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
-          }
-          .pickerStyle(.segmented)
-          .labelsHidden()
-          .fixedSize()
+        HStack(spacing: 4) {
+          SegmentedPill(selection: $state, options: PullRequestListState.allCases.map { ($0, $0.rawValue.capitalized) }, small: true)
+            .fixedSize()
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("State")
           Spacer()
           Button {
             Task { await load() }
           } label: {
-            Label("Refresh", systemImage: "arrow.clockwise")
+            HStack(spacing: 6) {
+              if reloading && result != nil { Loader(size: 12) } else { OmniIcon(name: "refresh", size: 14) }
+              Text("Refresh")
+            }
           }
+          .buttonStyle(.pill(.ghost, height: 28))
           .disabled(reloading)
           if let url = URL(string: "https://github.com/\(repo)/pulls") {
-            Link(destination: url) { Label("GitHub", systemImage: "arrow.up.right.square") }
+            Link(destination: url) {
+              HStack(spacing: 6) {
+                OmniIcon(name: "external", size: 14)
+                Text("GitHub")
+              }
+            }
+            .buttonStyle(.pill(.ghost, height: 28))
           }
         }
         content
       }
       .frame(maxWidth: 896)
-      .padding(.horizontal, 24)
-      .padding(.vertical, 20)
+      .padding(.horizontal, 32)
+      .padding(.top, 24)
+      .padding(.bottom, 64)
       .frame(maxWidth: .infinity)
     }
     .task(id: state) {
@@ -82,18 +95,13 @@ private struct PullRequestListView: View {
   @ViewBuilder private var content: some View {
     switch result {
     case nil:
-      ProgressView("Asking GitHub").controlSize(.small).foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity).padding(.top, 60)
+      LoadingNote(label: "Asking GitHub")
     case .failure(let error):
       ErrorNote(text: error.message) { Task { await load() } }
     case .success(let prs) where prs.isEmpty:
-      ContentUnavailableView {
-        Label("No \(state == .all ? "" : state.rawValue + " ")pull requests", systemImage: "arrow.triangle.pull")
-      } description: {
-        Text(repo)
-      }
+      EmptyNote(symbol: "pr", title: "No \(state == .all ? "" : state.rawValue + " ")pull requests", message: repo)
     case .success(let prs):
-      VStack(spacing: 2) {
+      VStack(spacing: 0) {
         ForEach(prs) { pr in
           Button {
             model.route = .channel(id: channelID, tab: .prs, pr: pr.number)
@@ -118,21 +126,20 @@ private struct PullRequestListView: View {
 private struct RowButtonStyle: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .contentShape(Rectangle())
-      .background(configuration.isPressed ? ThreadStyle.surface2 : .clear, in: RoundedRectangle(cornerRadius: 14))
+      .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+      .background(configuration.isPressed ? Tok.surface2 : .clear, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
   }
 }
 
 private struct PullRequestRow: View {
   let pr: PullRequestSummary
-  @State private var hovering = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 3) {
       HStack(spacing: 8) {
         PRStateIcon(state: pr.state, isDraft: pr.isDraft)
-        Text(pr.title).font(.system(size: 14, weight: .medium)).lineLimit(1)
-        Text("#\(pr.number)").font(.system(size: 11.5)).monospacedDigit().foregroundStyle(.tertiary)
+        Text(pr.title).font(.system(size: 14, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1)
+        Text("#\(pr.number)").font(.system(size: 11.5)).monospacedDigit().foregroundStyle(Tok.fg4)
         if pr.isDraft { PRChip(text: "Draft", tone: .outline) }
         ReviewChip(decision: pr.reviewDecision)
         Spacer(minLength: 8)
@@ -143,16 +150,15 @@ private struct PullRequestRow: View {
         BranchLabel(head: pr.headRefName, base: pr.baseRefName)
         Changes(add: pr.additions, del: pr.deletions)
         Spacer(minLength: 8)
-        Text(Format.relTime(pr.updatedAt)).foregroundStyle(.tertiary)
+        Text(Format.relTime(pr.updatedAt)).font(.system(size: 11)).monospacedDigit().foregroundStyle(Tok.fg4)
       }
       .font(.system(size: 12))
-      .foregroundStyle(.secondary)
+      .foregroundStyle(Tok.fg3)
       .padding(.leading, 22)
     }
     .padding(.horizontal, 14)
-    .padding(.vertical, 10)
-    .background(hovering ? ThreadStyle.surface : .clear, in: RoundedRectangle(cornerRadius: 14))
-    .onHover { hovering = $0 }
+    .padding(.vertical, 12)
+    .hoverWash()
     .accessibilityElement(children: .combine)
   }
 }
@@ -164,18 +170,18 @@ struct PRStateIcon: View {
   let isDraft: Bool
 
   var body: some View {
-    Image(systemName: state == "MERGED" ? "arrow.triangle.merge" : "arrow.triangle.pull")
-      .font(.system(size: 13))
+    OmniIcon(name: "pr", size: 14)
       .foregroundStyle(color)
       .frame(width: 14)
   }
 
+  /// Open is live, merged is fg-2, closed and drafts recede.
   private var color: Color {
-    if isDraft { return .secondary }
+    if isDraft { return Tok.fg4 }
     switch state {
-    case "MERGED": return ThreadStyle.info
-    case "CLOSED": return ThreadStyle.bad
-    default: return ThreadStyle.ok
+    case "MERGED": return Tok.fg2
+    case "CLOSED": return Tok.fg4
+    default: return Tok.live
     }
   }
 }
@@ -185,24 +191,18 @@ struct PRChip: View {
   let text: String
   var tone = Tone.plain
 
+  /// The tones map onto Chip's: ok is volt, bad is vermilion with ink text, info is ultramarine.
   var body: some View {
-    Text(text)
-      .font(.system(size: 11, weight: .medium))
-      .foregroundStyle(colors.fg)
-      .padding(.horizontal, 8)
-      .frame(height: 20)
-      .background(colors.bg, in: Capsule())
-      .overlay { if tone == .outline { Capsule().strokeBorder(ThreadStyle.line) } }
+    Chip(text: text, tone: chipTone)
   }
 
-  private var colors: (fg: Color, bg: Color) {
+  private var chipTone: Chip.Tone {
     switch tone {
-    case .ok: (ThreadStyle.ok, ThreadStyle.okBackground)
-    case .bad: (ThreadStyle.bad, ThreadStyle.badBackground)
-    case .warn: (ThreadStyle.warn, ThreadStyle.warnBackground)
-    case .info: (ThreadStyle.info, ThreadStyle.infoBackground)
-    case .outline: (.secondary, .clear)
-    case .plain: (.primary.opacity(0.8), ThreadStyle.surface2)
+    case .ok: .done
+    case .bad: .needs
+    case .info: .live
+    case .outline: .outline
+    case .warn, .plain: .plain
     }
   }
 }
@@ -226,16 +226,23 @@ struct ChecksSummary: View {
 
   var body: some View {
     if checks.isEmpty {
-      Text("no checks").font(.system(size: 12)).foregroundStyle(.tertiary)
+      Text("no checks").font(.system(size: 12)).foregroundStyle(Tok.fg4)
     } else {
       HStack(spacing: 8) {
-        if checks.passed > 0 { Text("✓ \(checks.passed)").foregroundStyle(ThreadStyle.ok) }
-        if checks.failed > 0 { Text("✗ \(checks.failed)").foregroundStyle(ThreadStyle.bad) }
-        if checks.pending > 0 { Text("• \(checks.pending)").foregroundStyle(ThreadStyle.warn) }
+        if checks.passed > 0 { count(.done, checks.passed).foregroundStyle(Tok.fg2) }
+        if checks.failed > 0 { count(.needs, checks.failed).foregroundStyle(Tok.fg2) }
+        if checks.pending > 0 { count(.running, checks.pending).foregroundStyle(Tok.live) }
       }
       .font(.system(size: 11.5))
       .monospacedDigit()
       .help("\(checks.passed) passed, \(checks.failed) failed, \(checks.pending) pending")
+    }
+  }
+
+  private func count(_ glyph: Glyph, _ n: Int) -> some View {
+    HStack(spacing: 4) {
+      GlyphView(glyph: glyph, size: 7)
+      Text("\(n)")
     }
   }
 }
@@ -245,7 +252,7 @@ struct BranchLabel: View {
   let base: String
 
   var body: some View {
-    (Text(head) + Text(" into ").font(.system(size: 11.5)).foregroundStyle(.tertiary) + Text(base))
+    (Text(head) + Text(" into ").font(.system(size: 11.5)).foregroundStyle(Tok.fg4) + Text(base))
       .font(.system(size: 11.5, design: .monospaced))
       .lineLimit(1)
       .truncationMode(.middle)
@@ -258,8 +265,8 @@ struct Changes: View {
 
   var body: some View {
     HStack(spacing: 4) {
-      Text("+\(add)").foregroundStyle(ThreadStyle.ok)
-      Text("-\(del)").foregroundStyle(ThreadStyle.bad)
+      Text("+\(add)").foregroundStyle(Tok.fg2)
+      Text("-\(del)").foregroundStyle(Tok.fg3)
     }
     .font(.system(size: 11))
     .monospacedDigit()

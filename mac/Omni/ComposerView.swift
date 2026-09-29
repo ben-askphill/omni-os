@@ -47,7 +47,7 @@ struct InterruptButton: View {
     } label: {
       if store.interrupting {
         HStack(spacing: 6) {
-          ProgressView().controlSize(.small)
+          Loader(size: 13)
           Text("Interrupting")
         }
       } else {
@@ -92,7 +92,7 @@ private struct ThreadPRSlot: View {
             if opening { ProgressView().controlSize(.mini) } else { Image(systemName: "arrow.triangle.pull") }
             Text("#\(pr.number)")
             PRChip(text: pr.badge, tone: pr.badge == "open" ? .ok : pr.badge == "merged" ? .info : .outline)
-            if prs.prs.count > 1 { Text("+\(prs.prs.count - 1)").foregroundStyle(.tertiary) }
+            if prs.prs.count > 1 { Text("+\(prs.prs.count - 1)").foregroundStyle(Tok.fg4) }
           }
           .font(.system(size: 12.5))
         }
@@ -102,7 +102,7 @@ private struct ThreadPRSlot: View {
         .fixedSize()
         .padding(.horizontal, 8)
         .frame(height: 26)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Tok.fg3)
         .help(pr.title)
       } else if prs != nil || failed {
         openButton
@@ -120,17 +120,12 @@ private struct ThreadPRSlot: View {
 
   private var openButton: some View {
     Button(action: open) {
-      HStack(spacing: 5) {
-        if opening { ProgressView().controlSize(.mini) } else { Image(systemName: "arrow.triangle.pull") }
+      HStack(spacing: 6) {
+        if opening { Loader(size: 13) } else { OmniIcon(name: "pr", size: 14) }
         Text("Open PR")
       }
-      .font(.system(size: 12.5))
-      .padding(.horizontal, 8)
-      .frame(height: 26)
-      .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
-    .foregroundStyle(.secondary)
+    .buttonStyle(.pill(.ghost, height: 28))
     .disabled(opening)
     .help(ReplyComposerModel.openPRPrompt)
   }
@@ -216,7 +211,7 @@ private struct ReplyComposerView: View {
       if let e = reply.attachError {
         Text(e)
           .font(.system(size: 12))
-          .foregroundStyle(ThreadStyle.bad)
+          .foregroundStyle(Tok.fg)
           .padding(.horizontal, 16)
           .padding(.bottom, 4)
       }
@@ -226,19 +221,7 @@ private struct ReplyComposerView: View {
         .padding(.bottom, menu.hint == nil ? 0 : 10)
         .padding(.top, menu.hint == nil ? 0 : 2)
     }
-    .background(Color(nsColor: .textBackgroundColor).opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
-    .overlay {
-      RoundedRectangle(cornerRadius: 24)
-        .strokeBorder(Color.primary.opacity(over || focused ? 0.3 : 0.12), lineWidth: over ? 1.5 : 1)
-    }
-    .overlay {
-      if over {
-        RoundedRectangle(cornerRadius: 24)
-          .fill(.background.opacity(0.85))
-          .overlay { Label("Drop to attach", systemImage: "paperclip").font(.system(size: 13, weight: .medium)) }
-          .allowsHitTesting(false)
-      }
-    }
+    .composerShell(radius: 26, focused: focused, over: over)
     .dropDestination(for: URL.self) { urls, _ in
       stage(urls)
       return true
@@ -249,37 +232,26 @@ private struct ReplyComposerView: View {
   }
 
   private var footer: some View {
-    HStack(spacing: 8) {
-      Button {
-        picking = true
-      } label: {
-        Image(systemName: "paperclip").frame(width: 28, height: 28).contentShape(Rectangle())
-      }
-      .buttonStyle(.plain)
-      .foregroundStyle(.secondary)
-      .disabled(reply.sending)
-      .help("Attach files")
-      .accessibilityLabel("Attach files")
+    ComposerFooterLayout {
+      AttachButton(disabled: reply.sending) { picking = true }
       ThreadRunPills(thread: thread, harnesses: model.store.harnesses)
       if thread.branch != nil {
         ThreadPRSlot(model: model, thread: thread, busy: busyThread, opening: reply.openingPR) { Task { await openPR() } }
       }
-      Spacer(minLength: 8)
-      Text("↩")
-        .font(.system(size: 11.5))
-        .foregroundStyle(.tertiary)
-        .accessibilityHidden(true)
-      if let omni = menu.reply, omni.action != .send {
-        SendButton(title: omni.label ?? "Send", armed: omni.armed, sending: omniBusy) { runOmni() }
-      } else if busyThread {
-        SteerButton(canSteer: canSteer, enabled: reply.canSend, sending: reply.sending) { send($0) }
-      } else {
-        SendButton(armed: reply.canSend, sending: reply.sending) { send(nil) }
+      HStack(spacing: 10) {
+        ComposerHints()
+        if let omni = menu.reply, omni.action != .send {
+          SendButton(title: omni.label ?? "Send", armed: omni.armed, sending: omniBusy) { runOmni() }
+        } else if busyThread {
+          SteerButton(canSteer: canSteer, enabled: reply.canSend, sending: reply.sending) { send($0) }
+        } else {
+          SendButton(armed: reply.canSend, sending: reply.sending) { send(nil) }
+        }
       }
     }
     .padding(.horizontal, 8)
     .padding(.bottom, 8)
-    .padding(.top, 2)
+    .padding(.top, 6)
   }
 
   private var callbacks: ComposerCallbacks {
@@ -381,14 +353,15 @@ private struct ThreadRunPills: View {
 
   private func pill(symbol: String, text: String, detail: String?, label: String) -> some View {
     HStack(spacing: 6) {
-      Image(systemName: symbol).font(.system(size: 11.5)).foregroundStyle(.secondary)
+      Image(systemName: symbol).font(.system(size: 11.5)).foregroundStyle(Tok.fg3)
       Text(text).font(.system(size: 12.5, weight: .medium)).lineLimit(1)
-      if let detail { Text("· \(detail)").font(.system(size: 12.5)).foregroundStyle(.tertiary).lineLimit(1) }
+      if let detail { Text("· \(detail)").font(.system(size: 12.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
     }
     .padding(.horizontal, 10)
     .frame(height: 28)
     .frame(maxWidth: 220)
-    .background(ThreadStyle.surface2, in: Capsule())
+    .foregroundStyle(Tok.fg)
+    .background(Tok.surface2, in: Capsule())
     .help("Fixed for this thread")
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(label)
@@ -396,7 +369,7 @@ private struct ThreadRunPills: View {
   }
 }
 
-/// Send, quiet until there is something to send.
+/// SendButton in Composer.tsx: Bencho's round "cmd" go button, quiet until there is something to send, then ink.
 struct SendButton: View {
   var title = "Send"
   let armed: Bool
@@ -405,23 +378,31 @@ struct SendButton: View {
 
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 6) {
-        if sending { ProgressView().controlSize(.mini) } else { Image(systemName: "paperplane.fill").font(.system(size: 11)) }
-        Text(title).font(.system(size: 13, weight: .medium))
+      Group {
+        if sending { Loader(size: 16) } else { OmniIcon(name: "send", size: 16, weight: 2) }
       }
-      .padding(.leading, 12)
-      .padding(.trailing, 14)
-      .frame(height: 30)
-      .foregroundStyle(armed ? Color(nsColor: .textBackgroundColor) : Color.secondary)
-      .background(armed ? Color.primary : ThreadStyle.surface2, in: Capsule())
-      .contentShape(Capsule())
+      .foregroundStyle(Tok.onInk)
+      .frame(width: 34, height: 34)
+      .background(Tok.fg, in: Circle())
+      .contentShape(Circle())
     }
-    .buttonStyle(.plain)
+    .buttonStyle(PressScale())
+    .opacity(armed && !sending ? 1 : 0.25)
     .fixedSize()
     .layoutPriority(1)
     .disabled(!armed || sending)
-    .animation(.easeOut(duration: 0.2), value: armed)
+    .animation(.easeOut(duration: 0.15), value: armed)
+    .help(title)
     .accessibilityLabel(title)
+  }
+}
+
+/// `active:scale-[.92]`.
+private struct PressScale: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .scaleEffect(configuration.isPressed ? 0.92 : 1)
+      .animation(Motion.settle, value: configuration.isPressed)
   }
 }
 
@@ -441,26 +422,25 @@ private struct SteerButton: View {
   }
 
   var body: some View {
-    let ink = Color(nsColor: .textBackgroundColor)
     HStack(spacing: 0) {
       Button {
         send(SendRules.primary(canSteer: canSteer))
       } label: {
         HStack(spacing: 6) {
           if sending {
-            ProgressView().controlSize(.mini)
+            Loader(size: 16)
           } else {
-            Image(systemName: canSteer ? "paperplane.fill" : "clock").font(.system(size: 11))
+            OmniIcon(name: canSteer ? "send" : "clock", size: 16, weight: 2)
           }
           Text(SendRules.buttonTitle(canSteer: canSteer)).font(.system(size: 13, weight: .medium))
         }
-        .padding(.leading, 12)
-        .padding(.trailing, 9)
-        .frame(height: 30)
+        .padding(.leading, 14)
+        .padding(.trailing, 10)
+        .frame(height: 34)
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      Rectangle().fill(ink.opacity(0.25)).frame(width: 1, height: 30)
+      Rectangle().fill(Tok.onInk.opacity(0.25)).frame(width: 1, height: 34)
       Menu {
         ForEach(SendRules.options(canSteer: canSteer), id: \.rawValue) { mode in
           Button {
@@ -471,9 +451,9 @@ private struct SteerButton: View {
           .help(SendRules.hint(mode))
         }
       } label: {
-        Image(systemName: "chevron.down")
-          .font(.system(size: 10, weight: .semibold))
-          .frame(width: 26, height: 30)
+        OmniIcon(name: "chevronDown", size: 13)
+          .foregroundStyle(Tok.onInk)
+          .frame(width: 32, height: 34)
           .contentShape(Rectangle())
       }
       .menuStyle(.button)
@@ -483,10 +463,10 @@ private struct SteerButton: View {
       .help("More ways to send")
       .accessibilityLabel("More ways to send")
     }
-    .foregroundStyle(ink)
-    .background(Color.primary, in: Capsule())
+    .foregroundStyle(Tok.onInk)
+    .background(Tok.fg, in: Capsule())
     .clipShape(Capsule())
-    .opacity(enabled ? 1 : 0.4)
+    .opacity(enabled ? 1 : 0.25)
     .disabled(!enabled || sending)
   }
 }
@@ -503,29 +483,29 @@ struct AttachmentStrip: View {
           HStack(spacing: 8) {
             Thumb(file: f)
             VStack(alignment: .leading, spacing: 1) {
-              Text(f.name).font(.system(size: 12.5, weight: .medium)).lineLimit(1).truncationMode(.middle)
-              Text(Format.bytes(f.size)).font(.system(size: 10.5)).foregroundStyle(.tertiary).monospacedDigit()
+              Text(f.name).font(.system(size: 12.5, weight: .medium)).foregroundStyle(Tok.fg2).lineLimit(1).truncationMode(.middle)
+              Text(Format.bytes(f.size)).font(.system(size: 10.5)).foregroundStyle(Tok.fg4).monospacedDigit()
             }
             .frame(maxWidth: 170, alignment: .leading)
             Button {
               remove(f)
             } label: {
-              Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)).frame(width: 22, height: 22).contentShape(Rectangle())
+              OmniIcon(name: "x", size: 13)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .buttonStyle(.icon(size: 24))
             .help("Remove \(f.name)")
             .accessibilityLabel("Remove \(f.name)")
           }
           .padding(.leading, 4)
           .padding(.trailing, 4)
           .frame(height: 44)
-          .background(ThreadStyle.surface2, in: RoundedRectangle(cornerRadius: 16))
+          .background(Tok.surface2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
       }
-      .padding(.horizontal, 8)
+      .padding(.horizontal, 12)
     }
-    .padding(.top, 8)
+    .padding(.top, 12)
+    .padding(.bottom, 2)
   }
 }
 
@@ -538,12 +518,13 @@ private struct Thumb: View {
       if let image {
         Image(nsImage: image).resizable().scaledToFill()
       } else {
-        Image(systemName: "doc").font(.system(size: 15)).foregroundStyle(.secondary)
+        OmniIcon(name: "file", size: 15).foregroundStyle(Tok.fg3)
       }
     }
     .frame(width: 36, height: 36)
-    .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 10))
-    .clipShape(RoundedRectangle(cornerRadius: 10))
+    .background(Tok.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Tok.line))
     .task(id: file.url) {
       guard file.isImage else { return }
       let url = file.url

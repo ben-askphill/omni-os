@@ -39,7 +39,7 @@ struct SlashMenuDemo: View {
         SlashHintView(model: menu) {}
       }
       .padding(10)
-      .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+      .background(Tok.surface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
       .slashMenu(menu)
       .padding(20)
       .frame(maxWidth: ThreadStyle.column)

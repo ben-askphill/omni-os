@@ -24,72 +24,97 @@ struct ServerView: View {
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(Tok.bg)
   }
 
   private func progress(_ text: String) -> some View {
-    ProgressView {
+    VStack(spacing: 14) {
+      Loader(size: 22)
       Text(text)
+        .font(.system(size: 13))
+        .foregroundStyle(Tok.fg3)
     }
+    .accessibilityElement(children: .combine)
   }
 
   private func notRunning(port: Int, repo: String) -> some View {
     VStack(spacing: 20) {
-      Image(systemName: "server.rack")
-        .font(.system(size: 40))
-        .foregroundStyle(.secondary)
+      OmniIcon(name: "terminal", size: 20, weight: 1.5)
+        .foregroundStyle(Tok.fg3)
+        .frame(width: 48, height: 48)
+        .background(Tok.surface2, in: Circle())
       VStack(spacing: 6) {
         Text("The Omni server is not running")
-          .font(.title2.weight(.semibold))
+          .font(.system(size: 22, weight: .medium))
+          .tracking(-0.22)
+          .foregroundStyle(Tok.fg)
         Text("Start it here, or run npm start in the repo. It keeps running when the app quits.")
-          .foregroundStyle(.secondary)
+          .font(.system(size: 13.5))
+          .foregroundStyle(Tok.fg3)
           .multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
       }
       ServerDetails(port: port, repo: repo, node: model.settings.nodePath)
-      HStack {
+      HStack(spacing: 8) {
         Button("Start Server") { Task { await model.startServer() } }
-          .buttonStyle(.borderedProminent)
+          .buttonStyle(.pill(.primary, height: 34))
           .keyboardShortcut(.defaultAction)
         Button("Check Again") { Task { await model.checkAgain() } }
-        SettingsLink { Text("Settings…") }
+          .buttonStyle(.pill(.secondary, height: 34))
+        SettingsLink { Text("Settings") }
+          .buttonStyle(.pill(.ghost, height: 34))
       }
-      .controlSize(.large)
     }
+    .padding(32)
     .frame(maxWidth: 520)
+    .omniCard(28)
+    .cardShadow(28)
     .padding(32)
   }
 
   private func failed(message: String, logTail: [String]) -> some View {
     VStack(spacing: 16) {
-      Image(systemName: "exclamationmark.triangle.fill")
-        .font(.system(size: 36))
-        .foregroundStyle(.yellow)
+      GlyphView(glyph: .needs, size: 14)
+        .frame(width: 48, height: 48)
+        .background(Tok.surface2, in: Circle())
       VStack(spacing: 6) {
         Text("Server problem")
-          .font(.title2.weight(.semibold))
+          .font(.system(size: 22, weight: .medium))
+          .tracking(-0.22)
+          .foregroundStyle(Tok.fg)
         Text(message)
+          .font(.system(size: 13.5))
+          .foregroundStyle(Tok.fg2)
           .multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
           .textSelection(.enabled)
       }
       if !logTail.isEmpty {
         LogTail(lines: logTail)
       }
-      HStack {
+      HStack(spacing: 8) {
         if model.supervisor.state.canStart {
           Button("Try Again") { Task { await model.startServer() } }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.pill(.primary, height: 34))
         }
         if logExists(model) {
           Button("Open Log") { openLog(model) }
+            .buttonStyle(.pill(.secondary, height: 34))
         }
         if model.supervisor.canStop {
           Button("Stop Server") { confirmStop(model) }
+            .buttonStyle(.pill(.secondary, height: 34))
         }
         Button("Check Again") { Task { await model.checkAgain() } }
-        SettingsLink { Text("Settings…") }
+          .buttonStyle(.pill(.secondary, height: 34))
+        SettingsLink { Text("Settings") }
+          .buttonStyle(.pill(.ghost, height: 34))
       }
-      .controlSize(.large)
     }
+    .padding(32)
     .frame(maxWidth: 640)
+    .omniCard(28)
+    .cardShadow(28)
     .padding(32)
   }
 }
@@ -100,25 +125,22 @@ struct ServerDetails: View {
   let node: String
 
   var body: some View {
-    GroupBox {
-      Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-        GridRow {
-          Text("Port").foregroundStyle(.secondary)
-          Text(verbatim: "\(port)").monospacedDigit()
-        }
-        GridRow {
-          Text("Repo").foregroundStyle(.secondary)
-          Text(repo).truncationMode(.middle).textSelection(.enabled)
-        }
-        GridRow {
-          Text("Node").foregroundStyle(.secondary)
-          Text(node.isEmpty ? "Detect automatically" : node).truncationMode(.middle).textSelection(.enabled)
+    InfoRows(fill: Tok.bg) {
+      InfoRow(label: "Port") {
+        Text(verbatim: "\(port)").monospacedDigit()
+      }
+      InfoRow(label: "Repo") {
+        Text(repo).font(.system(size: 12, design: .monospaced)).truncationMode(.middle).textSelection(.enabled)
+      }
+      InfoRow(label: "Node") {
+        if node.isEmpty {
+          Text("Detect automatically").foregroundStyle(Tok.fg3)
+        } else {
+          Text(node).font(.system(size: 12, design: .monospaced)).truncationMode(.middle).textSelection(.enabled)
         }
       }
-      .lineLimit(1)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(4)
     }
+    .lineLimit(1)
   }
 }
 
@@ -129,21 +151,22 @@ struct LogTail: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       Text("Last lines of the log")
-        .font(.caption)
-        .foregroundStyle(.secondary)
+        .omniCaption()
+        .padding(.leading, 4)
       // As tall as the lines, and it scrolls from the bottom past 220 points.
       ScrollView { text }
         .defaultScrollAnchor(.bottom)
         .frame(maxHeight: 220)
         .fixedSize(horizontal: false, vertical: true)
-      .background(Color(nsColor: .textBackgroundColor), in: .rect(cornerRadius: 8))
-      .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
+      .background(Tok.bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Tok.line))
     }
   }
 
   private var text: some View {
     Text(lines.joined(separator: "\n"))
-      .font(.system(.caption, design: .monospaced))
+      .font(.system(size: 11.5, design: .monospaced))
+      .foregroundStyle(Tok.fg2)
       .textSelection(.enabled)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(10)

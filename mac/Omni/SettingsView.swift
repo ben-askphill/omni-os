@@ -35,43 +35,58 @@ struct ConnectionSettings: View {
   let model: AppModel
 
   var body: some View {
-    Form {
-      Section {
-        PortField(port: $settings.port)
+    SettingsPage {
+      SettingsCard(
+        title: "Server",
+        note: "The app looks for the server on this port and starts it from this repo. Leave Node empty to use the newest Node 24 or later it finds."
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          FieldLabel(text: "Port")
+          PortField(port: $settings.port)
+            .textFieldStyle(.omniMono)
+            .frame(maxWidth: 140)
+        }
         PathField(title: "Repo", path: $settings.repoPath, prompt: ServerSettings.defaultRepoPath) {
           chooseRepo(from: settings.config.repo)
         }
         PathField(title: "Node", path: $settings.nodePath, prompt: "Detect automatically") {
           chooseNode(from: settings.config.node)
         }
-      } header: {
-        Text("Server")
-      } footer: {
-        Text("The app looks for the server on this port and starts it from this repo. Leave Node empty to use the newest Node 24 or later it finds.")
-          .foregroundStyle(.secondary)
-      }
-
-      if settings.isVolatile {
-        Section {
-          Label("Launch arguments set these values, so changes last until the app quits.", systemImage: "info.circle")
-            .foregroundStyle(.secondary)
+        if settings.isVolatile {
+          HStack(spacing: 8) {
+            OmniIcon(name: "info", size: 13).foregroundStyle(Tok.fg3)
+            Text("Launch arguments set these values, so changes last until the app quits.")
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          .font(.system(size: 12.5))
+          .foregroundStyle(Tok.fg2)
+          .padding(.horizontal, 14)
+          .padding(.vertical, 10)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .omniCard(16)
         }
       }
 
-      Section("Status") {
-        LabeledContent("Server", value: model.supervisor.state.label)
-        LabeledContent("Feed", value: feedLabel)
-        LabeledContent("Log") {
-          Button("Open Log") { openLog(model) }
-            .disabled(!logExists(model))
-        }
-        if let commit = Bundle.main.object(forInfoDictionaryKey: "OmniGitCommit") as? String, !commit.isEmpty {
-          LabeledContent("Build", value: String(commit.prefix(12)))
-            .textSelection(.enabled)
+      SettingsCard(title: "Status") {
+        InfoRows {
+          InfoRow("Server", value: model.supervisor.state.label)
+          InfoRow("Feed", value: feedLabel)
+          InfoRow(label: "Log") {
+            Button("Open Log") { openLog(model) }
+              .buttonStyle(.pill(.secondary, height: 26))
+              .disabled(!logExists(model))
+          }
+          if let commit = Bundle.main.object(forInfoDictionaryKey: "OmniGitCommit") as? String, !commit.isEmpty {
+            InfoRow(label: "Build") {
+              Text(String(commit.prefix(12)))
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(Tok.fg2)
+                .textSelection(.enabled)
+            }
+          }
         }
       }
     }
-    .formStyle(.grouped)
   }
 
   private var feedLabel: String {
@@ -122,19 +137,21 @@ struct PathField: View {
   @FocusState private var focused: Bool
 
   var body: some View {
-    LabeledContent(title) {
-      HStack {
+    VStack(alignment: .leading, spacing: 0) {
+      FieldLabel(text: title)
+      HStack(spacing: 8) {
         TextField(title, text: $draft, prompt: Text(prompt))
-          .labelsHidden()
+          .textFieldStyle(.omniMono)
           .frame(minWidth: 160, idealWidth: 260, maxWidth: .infinity)
           .focused($focused)
           .onSubmit(commit)
-        Button("Choose…") {
+        Button("Choose") {
           if let picked = choose() {
             draft = picked
             commit()
           }
         }
+        .buttonStyle(.pill(.secondary, height: 38))
       }
     }
     .onAppear { draft = path }

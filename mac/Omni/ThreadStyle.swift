@@ -9,50 +9,74 @@ enum ThreadStyle {
   static let prose: CGFloat = 14
   static let small: CGFloat = 12.5
   static let mono: CGFloat = 11.5
-  static let card: CGFloat = 18
+  static let card: CGFloat = 20
 
-  static let surface = Color.primary.opacity(0.045)
-  static let surface2 = Color.primary.opacity(0.07)
-  static let bubble = Color.primary.opacity(0.075)
-  static let code = Color.primary.opacity(0.04)
-  static let line = Color.primary.opacity(0.1)
-  static let info = Color.blue
-  static let infoBackground = Color.blue.opacity(0.12)
-  static let ok = Color.green
-  static let okBackground = Color.green.opacity(0.13)
-  static let bad = Color.red
-  static let badBackground = Color.red.opacity(0.09)
-  static let warn = Color.orange
-  static let warnBackground = Color.orange.opacity(0.13)
-  static let add = Color.green.opacity(0.12)
-  static let delete = Color.red.opacity(0.1)
+  static let surface = Tok.surface
+  static let surface2 = Tok.surface2
+  static let bubble = Tok.surface2
+  static let code = Tok.surface
+  static let line = Tok.line
+  /// Status colors. Vermilion is never text on white, so `bad` text is ink and the glyph carries the pop.
+  static let info = Tok.live
+  static let infoBackground = Tok.live.opacity(0.1)
+  static let ok = Tok.fg2
+  static let okBackground = Tok.done
+  static let bad = Tok.fg
+  static let badBackground = Tok.surface
+  static let warn = Tok.fg2
+  static let warnBackground = Tok.surface2
+  static let add = Tok.diffAdd
+  static let delete = Tok.diffDelete
 }
 
-/// A thread's status, as StatusPill in web/src/components/ui.tsx.
+/// The glyph a status draws, as glyphFor in web/src/components/ui.tsx: a failure needs you, a stop settles.
+enum Glyph {
+  case running, needs, done, settled, idle, queued
+
+  init(_ status: ThreadStatus) {
+    switch status {
+    case .running: self = .running
+    case .queued: self = .queued
+    case .done: self = .done
+    case .failed: self = .needs
+    case .imported: self = .idle
+    default: self = .settled
+    }
+  }
+}
+
+/// A thread's status, as StatusPill in ui.tsx: neutral, except needs and done, which fill with their pop.
 struct StatusPill: View {
   let status: ThreadStatus
+  var label: String?
 
   var body: some View {
-    HStack(spacing: 5) {
-      StatusDot(status: status, size: 6)
-      Text(status.label)
+    let glyph = Glyph(status)
+    HStack(spacing: 6) {
+      GlyphView(glyph: glyph, size: 6, onPop: glyph == .needs || glyph == .done)
+      Text(label ?? status.label)
     }
     .font(.system(size: 12, weight: .medium))
-    .foregroundStyle(tone.fg)
+    .foregroundStyle(fg(glyph))
     .padding(.leading, 8)
     .padding(.trailing, 10)
-    .frame(height: 22)
-    .background(tone.bg, in: Capsule())
+    .frame(height: 24)
+    .background(bg(glyph), in: Capsule())
   }
 
-  private var tone: (fg: Color, bg: Color) {
-    switch status {
-    case .running: (ThreadStyle.info, ThreadStyle.infoBackground)
-    case .done: (ThreadStyle.ok, ThreadStyle.okBackground)
-    case .failed: (ThreadStyle.bad, ThreadStyle.badBackground)
-    case .stopped: (ThreadStyle.warn, ThreadStyle.warnBackground)
-    case .imported: (.secondary, ThreadStyle.surface2)
-    default: (.primary.opacity(0.8), ThreadStyle.surface2)
+  private func fg(_ g: Glyph) -> Color {
+    switch g {
+    case .running: Tok.live
+    case .needs, .done: Tok.ink
+    default: Tok.fg2
+    }
+  }
+
+  private func bg(_ g: Glyph) -> Color {
+    switch g {
+    case .needs: Tok.needs
+    case .done: Tok.done
+    default: Tok.surface2
     }
   }
 }
@@ -62,25 +86,56 @@ struct StatusDot: View {
   var size: CGFloat = 8
 
   var body: some View {
-    let hollow = status == .imported || status == .queued
-    Circle()
-      .fill(hollow ? .clear : color)
-      .strokeBorder(hollow ? color : .clear, lineWidth: 1.5)
-      .frame(width: size, height: size)
-  }
-
-  private var color: Color {
-    switch status {
-    case .running: ThreadStyle.info
-    case .done: ThreadStyle.ok
-    case .failed: ThreadStyle.bad
-    case .stopped: ThreadStyle.warn
-    default: .secondary
-    }
+    GlyphView(glyph: Glyph(status), size: size)
+      .help(status.label)
   }
 }
 
-/// Monospaced text in a box, as Pre in Transcript.tsx: wrapped, and scrolling past about 20 lines.
+/// `.glyph` in index.css: running pings ultramarine, needs is a still vermilion diamond, done is a volt
+/// disc with an ink edge on white, settled is grey, idle and queued are hollow.
+struct GlyphView: View {
+  let glyph: Glyph
+  var size: CGFloat = 8
+  /// Inside a needs or done pill: the glyph takes the ink.
+  var onPop = false
+  @State private var ping = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  var body: some View {
+    ZStack {
+      switch glyph {
+      case .running:
+        Circle().fill(Tok.live)
+          .scaleEffect(ping ? 2.6 : 1)
+          .opacity(ping ? 0 : 0.55)
+        Circle().fill(Tok.live)
+      case .needs:
+        RoundedRectangle(cornerRadius: 1.5)
+          .fill(onPop ? Tok.ink : Tok.needs)
+          .rotationEffect(.degrees(45))
+          .scaleEffect(0.86)
+      case .done:
+        if onPop {
+          Circle().fill(Tok.ink)
+        } else {
+          Circle().fill(Tok.done).overlay(Circle().strokeBorder(Tok.doneEdge, lineWidth: 1))
+        }
+      case .settled:
+        Circle().fill(Tok.fg4)
+      case .idle, .queued:
+        Circle().strokeBorder(Tok.fg4, lineWidth: 1.5)
+      }
+    }
+    .frame(width: size, height: size)
+    .onAppear {
+      guard glyph == .running, !reduceMotion else { return }
+      withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 1.6).repeatForever(autoreverses: false)) { ping = true }
+    }
+    .accessibilityHidden(true)
+  }
+}
+
+/// Monospaced text in a 12pt box, as Pre in Transcript.tsx: wrapped, and scrolling past about 20 lines.
 struct Pre: View {
   enum Tone { case plain, bad, add, delete }
 
@@ -90,12 +145,12 @@ struct Pre: View {
   var body: some View {
     let body = Text(text)
       .font(.system(size: ThreadStyle.mono, design: .monospaced))
-      .lineSpacing(2)
-      .foregroundStyle(tone == .bad ? AnyShapeStyle(ThreadStyle.bad) : AnyShapeStyle(.primary.opacity(0.85)))
+      .lineSpacing(4)
+      .foregroundStyle(tone == .bad ? Tok.fg : Tok.fg2)
       .textSelection(.enabled)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, 12)
-      .padding(.vertical, 9)
+      .padding(.vertical, 10)
     Group {
       if Format.isTall(text) {
         ScrollView { body }
@@ -104,8 +159,8 @@ struct Pre: View {
         body
       }
     }
-    .background(background, in: RoundedRectangle(cornerRadius: 10))
-    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(ThreadStyle.line))
+    .background(background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(ThreadStyle.line))
   }
 
   private var background: Color {
@@ -120,8 +175,8 @@ struct Pre: View {
 /// A small spinner the size of the text next to it.
 struct Spinner: View {
   var body: some View {
-    ProgressView()
-      .controlSize(.mini)
+    Loader(size: 12)
+      .foregroundStyle(Tok.live)
       .frame(width: 12, height: 12)
   }
 }

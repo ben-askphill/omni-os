@@ -141,8 +141,6 @@ final class QARunner {
         case .appearance(let appearance):
           NSApp.appearance = NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
           try? await Task.sleep(for: .milliseconds(500))
-        case .expand:
-          break
         case .palette(let query):
           if let query { model.shell.openPalette(query: query) } else { model.shell.paletteOpen = false }
           try? await Task.sleep(for: .milliseconds(400))

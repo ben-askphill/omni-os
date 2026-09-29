@@ -94,8 +94,10 @@ struct OpenInNewWindowToolbar: ToolbarContent {
         } label: {
           Label("Open in New Window", systemImage: "macwindow.badge.plus")
         }
+        .buttonStyle(.icon(size: 28))
         .help("Open in New Window")
       }
+      .sharedBackgroundVisibility(.hidden)
     }
   }
 }

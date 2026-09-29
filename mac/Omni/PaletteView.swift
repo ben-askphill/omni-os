@@ -9,7 +9,7 @@ struct PaletteOverlay: View {
   var body: some View {
     if model.shell.paletteOpen, model.serverScreen == nil {
       ZStack(alignment: .top) {
-        Color.black.opacity(0.22)
+        Color(hex: 0x17181a).opacity(0.22)
           .ignoresSafeArea()
           .onTapGesture { close() }
         PaletteView(model: model, close: close)
@@ -40,39 +40,33 @@ private struct PaletteView: View {
     let at = min(cursor, max(0, items.count - 1))
     VStack(spacing: 0) {
       HStack(spacing: 12) {
-        Image(systemName: "magnifyingglass")
-          .font(.system(size: 16))
-          .foregroundStyle(.tertiary)
+        OmniIcon(name: "search", size: 18)
+          .foregroundStyle(Tok.fg4)
         TextField("Search or jump to", text: $query)
           .textFieldStyle(.plain)
           .font(.system(size: 16))
+          .foregroundStyle(Tok.fg)
           .focused($focused)
           .onSubmit { run(items.indices.contains(at) ? items[at] : nil) }
           .onKeyPress(.downArrow) { cursor = min(items.count - 1, at + 1); return .handled }
           .onKeyPress(.upArrow) { cursor = max(0, at - 1); return .handled }
           .onKeyPress(.escape) { close(); return .handled }
-        Text("esc")
-          .font(.system(size: 11, design: .monospaced))
-          .foregroundStyle(.tertiary)
-          .padding(.horizontal, 6)
-          .padding(.vertical, 2)
-          .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(ThreadStyle.line))
+        Kbd(text: "Esc")
       }
-      .padding(.horizontal, 20)
-      .frame(height: 52)
-      Divider()
+      .padding(.leading, 24)
+      .padding(.trailing, 16)
+      .frame(height: 64)
+      Rectangle().fill(Tok.line).frame(height: 1)
       ScrollViewReader { proxy in
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
               if index == 0 || items[index - 1].group != item.group {
-                Text(item.group.title.uppercased())
-                  .font(.system(size: 10.5, weight: .medium))
-                  .tracking(0.6)
-                  .foregroundStyle(.tertiary)
-                  .padding(.horizontal, 14)
-                  .padding(.top, index == 0 ? 4 : 12)
-                  .padding(.bottom, 4)
+                Text(item.group.title)
+                  .omniCaption()
+                  .padding(.horizontal, 16)
+                  .padding(.top, 12)
+                  .padding(.bottom, 8)
               }
               PaletteRow(item: item, selected: index == at)
                 .id(item.id)
@@ -84,32 +78,40 @@ private struct PaletteView: View {
             if items.isEmpty {
               Text("Nothing matches")
                 .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Tok.fg3)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 32)
+                .padding(.vertical, 40)
             }
           }
-          .padding(8)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 8)
         }
         .onChange(of: at) { if items.indices.contains(at) { proxy.scrollTo(items[at].id) } }
       }
-      Divider()
+      Rectangle().fill(Tok.line).frame(height: 1)
       HStack(spacing: 16) {
-        Text("↑↓ move")
-        Text("↵ open")
+        HStack(spacing: 6) {
+          Kbd(text: "↑")
+          Kbd(text: "↓")
+          Text("move")
+        }
+        HStack(spacing: 6) {
+          Kbd(text: "↵")
+          Text("open")
+        }
         Spacer()
       }
       .font(.system(size: 11.5))
-      .foregroundStyle(.tertiary)
-      .padding(.horizontal, 20)
-      .frame(height: 32)
+      .foregroundStyle(Tok.fg4)
+      .padding(.horizontal, 24)
+      .padding(.vertical, 10)
     }
     .frame(width: 620)
-    .frame(maxHeight: 520)
+    .frame(maxHeight: 640)
     .fixedSize(horizontal: false, vertical: true)
-    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22))
-    .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(ThreadStyle.line))
-    .shadow(color: .black.opacity(0.25), radius: 30, y: 12)
+    .background(Tok.elev, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+    .menuShadow(28)
     .onChange(of: query) { cursor = 0 }
     .onAppear { focused = true }
     .accessibilityElement(children: .contain)
@@ -131,27 +133,34 @@ private struct PaletteRow: View {
   let item: PaletteItem
   let selected: Bool
 
+  /// The web's icon for each page, from the SF Symbol names OmniKit carries.
+  private var icon: String {
+    switch item.symbol {
+    case "plus": item.id == "p:new-channel" ? "hash" : "plus"
+    case "house": "home"
+    case "square.stack.3d.up": "layers"
+    case "bolt": "zap"
+    case "key": "key"
+    case "arrow.triangle.2.circlepath", "arrow.clockwise": "refresh"
+    case "sun.max": "sun"
+    case "moon": "moon"
+    case "desktopcomputer": "monitor"
+    default: "more"
+    }
+  }
+
   var body: some View {
     HStack(spacing: 12) {
-      Group {
-        if let status = item.status {
-          StatusDot(status: status)
-        } else {
-          Image(systemName: item.symbol)
-            .font(.system(size: 13))
-            .foregroundStyle(.secondary)
-        }
-      }
-      .frame(width: 26, height: 26)
-      .background(ThreadStyle.surface2, in: Circle())
+      lead.frame(width: 28, height: 28)
       HStack(alignment: .firstTextBaseline, spacing: 8) {
         Text(item.label)
           .font(.system(size: 13.5))
+          .foregroundStyle(Tok.fg)
           .lineLimit(1)
         if let sub = item.sub {
           Text(sub)
             .font(.system(size: 12))
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(Tok.fg4)
             .lineLimit(1)
         }
       }
@@ -160,17 +169,38 @@ private struct PaletteRow: View {
         Text(trailing)
           .font(.system(size: 11))
           .monospacedDigit()
-          .foregroundStyle(item.group == .channels ? AnyShapeStyle(ThreadStyle.info) : AnyShapeStyle(.tertiary))
+          .foregroundStyle(item.group == .channels ? Tok.live : Tok.fg4)
       }
       if selected {
-        Image(systemName: "arrow.right")
-          .font(.system(size: 11))
-          .foregroundStyle(.secondary)
+        OmniIcon(name: "arrowRight", size: 14)
+          .foregroundStyle(Tok.fg3)
       }
     }
-    .padding(.horizontal, 8)
-    .frame(height: 42)
-    .background(selected ? ThreadStyle.surface2 : .clear, in: RoundedRectangle(cornerRadius: 12))
+    .padding(.horizontal, 12)
+    .frame(height: 48)
+    .background(selected ? Tok.surface2 : .clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     .contentShape(Rectangle())
+  }
+
+  @ViewBuilder private var lead: some View {
+    if let status = item.status {
+      StatusDot(status: status)
+    } else if item.group == .channels {
+      ZStack {
+        Circle().fill(Tok.surface2)
+        if item.symbol == "scope" {
+          OmniIcon(name: "target", size: 14).foregroundStyle(Tok.fg2)
+        } else {
+          Text(AvatarMark(name: String(item.label.drop { $0 == "#" })).letter)
+            .font(.system(size: 11.5, weight: .medium, design: .rounded))
+            .foregroundStyle(Tok.fg2)
+        }
+      }
+    } else {
+      OmniIcon(name: icon, size: 14)
+        .foregroundStyle(Tok.fg3)
+        .frame(width: 28, height: 28)
+        .background(Tok.surface2, in: Circle())
+    }
   }
 }

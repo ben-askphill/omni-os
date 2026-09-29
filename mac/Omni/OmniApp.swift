@@ -12,7 +12,6 @@ struct OmniApp: App {
     }
     .defaultSize(width: 1100, height: 720)
     .commands {
-      SidebarCommands()
       OmniCommands(model: delegate.model)
     }
 
@@ -124,6 +123,9 @@ struct OmniCommands: Commands {
       CopyThreadMarkdownCommand(model: model)
     }
     ThreadCommands(model: model)
+    CommandGroup(before: .toolbar) {
+      SidebarToggleCommand()
+    }
     CommandGroup(after: .toolbar) {
       InspectorCommand(model: model)
     }

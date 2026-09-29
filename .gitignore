@@ -3,7 +3,7 @@ data/
 web/dist/
 .env
 .DS_Store
-mac/.xcode/
+mac/.xcode*/
 mac/OmniKit/.build/
 mac/OmniKit/.swiftpm/
 xcuserdata/

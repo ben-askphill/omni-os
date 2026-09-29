@@ -27,8 +27,9 @@ struct UserBubbleView: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(Self.text(pieces, cut: long && !more))
           .font(.system(size: ThreadStyle.prose + 0.5))
-          .lineSpacing(3)
-          .tint(.primary)
+          .lineSpacing(5)
+          .foregroundStyle(Tok.fg)
+          .tint(Tok.fg)
           .textSelection(.enabled)
           .fixedSize(horizontal: false, vertical: true)
           .environment(\.openURL, OpenURLAction { url in
@@ -38,17 +39,17 @@ struct UserBubbleView: View {
             return .handled
           })
         if let about {
-          Divider()
-          Text("\(about.description.isEmpty ? "No description" : about.description)\(Text(" · \(about.sourceTag)").foregroundStyle(.tertiary))")
+          Hairline().padding(.top, 2)
+          Text("\(about.description.isEmpty ? "No description" : about.description)\(Text(" · \(about.sourceTag)").foregroundStyle(Tok.fg4))")
             .font(.system(size: ThreadStyle.small))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Tok.fg3)
             .fixedSize(horizontal: false, vertical: true)
         }
         if long {
           Button(more ? "Show less" : "Show all") { ui.toggle(moreKey) }
             .buttonStyle(.link)
             .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Tok.fg3)
             .underline()
         }
       }
@@ -69,35 +70,33 @@ struct UserBubbleView: View {
       if let label = message.sourceLabel {
         Text(label)
           .fontWeight(.medium)
-          .foregroundStyle(message.source == "conductor" ? AnyShapeStyle(ThreadStyle.info) : AnyShapeStyle(.secondary))
+          .foregroundStyle(message.source == "conductor" ? Tok.live : Tok.fg3)
       }
       if let how = message.sendLabel {
-        Label(how, systemImage: message.mode == .interrupt ? "stop.fill" : "paperplane")
-          .labelStyle(TightLabel())
+        IconLabel(how, icon: message.mode == .interrupt ? "stop" : "send")
           .fontWeight(.medium)
-          .foregroundStyle(message.mode == .interrupt ? AnyShapeStyle(ThreadStyle.warn) : AnyShapeStyle(.secondary))
+          .foregroundStyle(message.mode == .interrupt ? Tok.fg2 : Tok.fg3)
       }
       if message.dropped == true {
-        Label("Not sent", systemImage: "xmark")
-          .labelStyle(TightLabel())
+        IconLabel("Not sent", icon: "x")
           .fontWeight(.medium)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Tok.fg3)
           .help("The run ended before the agent read this message")
       }
       Text(Format.clock(at))
         .font(.system(size: 11))
         .monospacedDigit()
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(Tok.fg4)
     }
     .font(.system(size: 11.5))
+    .foregroundStyle(Tok.fg3)
   }
 
   @ViewBuilder private var background: some View {
-    let shape = UnevenRoundedRectangle(topLeadingRadius: 20, bottomLeadingRadius: 20, bottomTrailingRadius: 20, topTrailingRadius: 7)
+    let shape = UnevenRoundedRectangle(
+      topLeadingRadius: 22, bottomLeadingRadius: 22, bottomTrailingRadius: 22, topTrailingRadius: 8, style: .continuous)
     if message.dropped == true {
-      shape.strokeBorder(ThreadStyle.line, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-    } else if message.source == "conductor" {
-      shape.fill(ThreadStyle.infoBackground)
+      shape.strokeBorder(Tok.lineStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
     } else {
       shape.fill(ThreadStyle.bubble)
     }
@@ -109,7 +108,8 @@ struct UserBubbleView: View {
       var run = AttributedString(piece.text)
       if let hit = piece.hit {
         run.font = .system(size: ThreadStyle.prose - 1, weight: .medium, design: .monospaced)
-        run.backgroundColor = ThreadStyle.surface2
+        run.backgroundColor = Tok.surface3
+        run.foregroundColor = Tok.fg
         run.link = URL(string: "\(pillScheme)://\(hit.start)")
       }
       out.append(run)
@@ -119,11 +119,22 @@ struct UserBubbleView: View {
   }
 }
 
-struct TightLabel: LabelStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    HStack(spacing: 3) {
-      configuration.icon.imageScale(.small)
-      configuration.title
+/// An OmniIcon and a word, tight, as the web's `<Icon size={11}/> Label` spans.
+struct IconLabel: View {
+  let title: String
+  let icon: String
+  var size: CGFloat = 11
+
+  init(_ title: String, icon: String, size: CGFloat = 11) {
+    self.title = title
+    self.icon = icon
+    self.size = size
+  }
+
+  var body: some View {
+    HStack(spacing: 4) {
+      OmniIcon(name: icon, size: size)
+      Text(title)
     }
   }
 }
@@ -156,35 +167,36 @@ struct AttachmentsView: View {
       case .success(let image):
         image.resizable().scaledToFit()
       case .failure:
-        Image(systemName: "photo").foregroundStyle(.tertiary).frame(width: 80, height: 60)
+        OmniIcon(name: "image", size: 16).foregroundStyle(Tok.fg4).frame(width: 80, height: 60)
       default:
         ProgressView().controlSize(.small).frame(width: 80, height: 60)
       }
     }
     .frame(maxWidth: 224, maxHeight: 176)
-    .clipShape(RoundedRectangle(cornerRadius: 12))
-    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(ThreadStyle.line))
+    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Tok.line))
     .padding(4)
-    .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 16))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     .accessibilityLabel(a.name)
   }
 
   private func chip(_ a: Attachment) -> some View {
     HStack(spacing: 8) {
-      Image(systemName: "doc")
-        .font(.system(size: 14))
-        .foregroundStyle(.secondary)
-        .frame(width: 30, height: 30)
-        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+      OmniIcon(name: "file", size: 15)
+        .foregroundStyle(Tok.fg3)
+        .frame(width: 32, height: 32)
+        .background(Tok.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
       VStack(alignment: .leading, spacing: 1) {
-        Text(a.name).font(.system(size: ThreadStyle.small, weight: .medium)).lineLimit(1).truncationMode(.middle)
-        Text(Format.bytes(a.size)).font(.system(size: 10.5)).monospacedDigit().foregroundStyle(.tertiary)
+        Text(a.name).font(.system(size: ThreadStyle.small, weight: .medium)).foregroundStyle(Tok.fg2)
+          .lineLimit(1).truncationMode(.middle)
+        Text(Format.bytes(a.size)).font(.system(size: 10.5)).monospacedDigit().foregroundStyle(Tok.fg4)
       }
       .frame(maxWidth: 190, alignment: .leading)
+      OmniIcon(name: "download", size: 14).foregroundStyle(Tok.fg3)
     }
     .padding(.horizontal, 8)
     .frame(height: 44)
-    .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 16))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 
   /// Quick Look needs a file, so the upload is fetched into a temporary folder first.
@@ -255,44 +267,57 @@ struct FlowLayout: Layout {
   }
 }
 
-/// How a turn ended, as a rule across the column.
+/// How a turn ended, as ResultLine in Transcript.tsx: a rule across the column, the line in sentence case with
+/// a volt dot when done, a needs diamond when it failed.
 struct ResultLineView: View {
   let result: TurnResult
 
   var body: some View {
     HStack(spacing: 12) {
       rule
-      HStack(spacing: 7) {
-        Circle().fill(dot).frame(width: 4, height: 4)
-        Text(result.line.uppercased())
-          .font(.system(size: 10.5))
+      HStack(spacing: 8) {
+        if result.isBad {
+          GlyphView(glyph: .needs, size: 8)
+        } else if result.ok {
+          Circle().fill(Tok.done).overlay(Circle().strokeBorder(Tok.doneEdge, lineWidth: 0.5)).frame(width: 5, height: 5)
+        } else {
+          Circle().fill(Tok.fg4).frame(width: 4, height: 4)
+        }
+        Text(Self.sentence(result.line))
+          .font(.system(size: 12, weight: .medium))
           .monospacedDigit()
-          .kerning(0.6)
       }
-      .foregroundStyle(result.isBad ? AnyShapeStyle(ThreadStyle.bad) : AnyShapeStyle(.tertiary))
+      .foregroundStyle(result.isBad ? Tok.fg2 : Tok.fg4)
       .fixedSize()
       rule
     }
     .padding(.vertical, 4)
   }
 
-  private var rule: some View { Rectangle().fill(ThreadStyle.line).frame(height: 1) }
+  private var rule: some View { Rectangle().fill(Tok.line).frame(height: 1) }
 
-  private var dot: Color {
-    result.isBad ? ThreadStyle.bad : result.ok ? ThreadStyle.ok : ThreadStyle.warn
+  static func sentence(_ s: String) -> String {
+    guard let first = s.first else { return s }
+    return first.uppercased() + s.dropFirst()
   }
 }
 
+/// ErrorCallout in Transcript.tsx: a surface card, the needs diamond and Error in ink, the text in mono fg-2.
 struct ErrorCallout: View {
   let text: String
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Label("Error", systemImage: "exclamationmark.triangle")
-        .font(.system(size: ThreadStyle.small, weight: .semibold))
+      HStack(spacing: 6) {
+        GlyphView(glyph: .needs, size: 9)
+        Text("Error")
+      }
+      .font(.system(size: ThreadStyle.small, weight: .semibold))
+      .foregroundStyle(Tok.fg)
       let body = Text(text)
         .font(.system(size: ThreadStyle.mono, design: .monospaced))
-        .lineSpacing(2)
+        .lineSpacing(3)
+        .foregroundStyle(Tok.fg2)
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
       if Format.isTall(text) {
@@ -301,10 +326,9 @@ struct ErrorCallout: View {
         body
       }
     }
-    .foregroundStyle(ThreadStyle.bad)
     .padding(.horizontal, 16)
     .padding(.vertical, 12)
-    .background(ThreadStyle.badBackground, in: RoundedRectangle(cornerRadius: ThreadStyle.card))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: ThreadStyle.card, style: .continuous))
   }
 }
 
@@ -317,25 +341,24 @@ struct ReportCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       HStack(spacing: 8) {
-        Image(systemName: "tray")
-          .font(.system(size: 12))
-          .foregroundStyle(.secondary)
-          .frame(width: 26, height: 26)
-          .background(Color(nsColor: .windowBackgroundColor), in: Circle())
-        Text("Report from \(report.role ?? "crew")").fontWeight(.medium)
+        OmniIcon(name: "inbox", size: 14)
+          .foregroundStyle(Tok.fg3)
+          .frame(width: 28, height: 28)
+          .background(Tok.bg, in: Circle())
+        Text("Report from \(report.role ?? "crew")").fontWeight(.medium).foregroundStyle(Tok.fg)
         if report.dropped == true {
           Text("Not delivered")
             .font(.system(size: 11.5, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Tok.fg3)
             .help("The run ended before the agent read this report")
         }
         if let task = report.taskID, !task.isEmpty {
-          Text(task).font(.system(size: ThreadStyle.mono, design: .monospaced)).foregroundStyle(.secondary)
+          Text(task).font(.system(size: ThreadStyle.mono, design: .monospaced)).foregroundStyle(Tok.fg3)
         }
         if let channel = report.channel, !channel.isEmpty {
           Button("#\(channel)") { model.route = .channel(id: channel) }
             .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Tok.fg3)
         }
         Spacer(minLength: 8)
         if let status = report.status, !status.isEmpty {
@@ -345,13 +368,14 @@ struct ReportCard: View {
           Button { model.route = .thread(id: thread) } label: {
             HStack(spacing: 4) {
               Text("Open thread")
-              Image(systemName: "arrow.right").imageScale(.small)
+              OmniIcon(name: "arrowRight", size: 12)
             }
-            .font(.system(size: 12, weight: .medium))
-            .padding(.horizontal, 11)
-            .frame(height: 26)
-            .background(Color(nsColor: .windowBackgroundColor), in: Capsule())
-            .shadow(color: .black.opacity(0.08), radius: 1, y: 1)
+            .font(.system(size: 12.5, weight: .medium))
+            .foregroundStyle(Tok.fg)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .background(Tok.bg, in: Capsule())
+            .cardShadow(14)
           }
           .buttonStyle(.plain)
         }
@@ -362,6 +386,7 @@ struct ReportCard: View {
       if let title = report.title, !title.isEmpty {
         Text(title)
           .font(.system(size: 15, weight: .medium))
+          .foregroundStyle(Tok.fg)
           .padding(.horizontal, 16)
           .padding(.top, 12)
       }
@@ -370,7 +395,7 @@ struct ReportCard: View {
         .padding(.top, 8)
         .padding(.bottom, 16)
     }
-    .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: ThreadStyle.card + 2))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     .opacity(report.dropped == true ? 0.6 : 1)
   }
 }
@@ -382,32 +407,30 @@ struct PlanCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       HStack(spacing: 12) {
-        Text("PLAN")
-          .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-          .kerning(0.8)
-          .foregroundStyle(.secondary)
+        Text("Plan").omniCaption()
         TicksView(ticks: plan.ticks)
-          .frame(maxWidth: 160, maxHeight: 6)
+          .frame(maxWidth: 160)
+          .frame(height: 6)
           .accessibilityLabel("Plan progress")
         Spacer(minLength: 0)
         Text("\(plan.done)/\(plan.todos.count)")
           .font(.system(size: 11))
           .monospacedDigit()
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Tok.fg3)
       }
-      .padding(.bottom, 9)
+      .padding(.bottom, 10)
       ForEach(Array(plan.todos.enumerated()), id: \.offset) { _, todo in
         CheckItem(state: todo.status ?? "pending", text: todo.label ?? "")
       }
       if plan.active == nil && plan.allDone {
-        Text("All done").font(.system(size: 12)).foregroundStyle(.tertiary).padding(.top, 6)
+        Text("All done").font(.system(size: 12)).foregroundStyle(Tok.fg4).padding(.top, 6)
       }
     }
     .padding(.horizontal, 16)
     .padding(.top, 14)
     .padding(.bottom, 12)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: ThreadStyle.card + 2))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Plan")
   }
@@ -417,13 +440,20 @@ struct TicksView: View {
   let ticks: Ticks
 
   var body: some View {
-    HStack(spacing: 2) {
+    HStack(alignment: .bottom, spacing: 2) {
       ForEach(0..<ticks.count, id: \.self) { i in
-        RoundedRectangle(cornerRadius: 1)
-          .fill(i < ticks.on ? Color.primary : Color.primary.opacity(0.12))
+        let on = i < ticks.on
+        GeometryReader { g in
+          VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            RoundedRectangle(cornerRadius: 1.5)
+              .fill(on ? Tok.fg : Tok.fg.opacity(0.14))
+              .frame(height: g.size.height * (on ? 1 : 0.55))
+          }
+        }
       }
     }
-    .animation(.snappy, value: ticks.on)
+    .animation(Motion.settle, value: ticks.on)
   }
 }
 
@@ -433,11 +463,11 @@ struct WorkingLine: View {
 
   var body: some View {
     HStack(spacing: 8) {
-      Spinner()
+      Loader(size: 13).foregroundStyle(Tok.fg3)
       Text(text).lineLimit(1).truncationMode(.tail)
     }
     .font(.system(size: ThreadStyle.small))
-    .foregroundStyle(.secondary)
+    .foregroundStyle(Tok.fg3)
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
@@ -453,32 +483,32 @@ struct QueuedMessagesView: View {
     VStack(alignment: .trailing, spacing: 12) {
       ForEach(Array(items.enumerated()), id: \.element.id) { i, m in
         if m.kind == "crew_report" {
-          Label(m.label(lead: i == lead), systemImage: m.state == .sent ? "paperplane" : "clock")
-            .labelStyle(TightLabel())
+          IconLabel(m.label(lead: i == lead), icon: m.state == .sent ? "send" : "clock", size: 12)
             .font(.system(size: 12))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Tok.fg3)
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
           VStack(alignment: .trailing, spacing: 4) {
             HStack(spacing: 4) {
-              Label(m.label(lead: i == lead), systemImage: m.state == .sent ? "paperplane" : "clock")
-                .labelStyle(TightLabel())
+              IconLabel(m.label(lead: i == lead), icon: m.state == .sent ? "send" : "clock", size: 12)
               if let files = m.attachments, !files.isEmpty {
-                Text("· \(Format.plural(files.count, "file"))").foregroundStyle(.tertiary)
+                Text("· \(Format.plural(files.count, "file"))").foregroundStyle(Tok.fg4)
               }
             }
             .font(.system(size: 11.5, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Tok.fg3)
             Text(m.text)
               .font(.system(size: ThreadStyle.prose))
-              .lineSpacing(3)
+              .lineSpacing(5)
+              .foregroundStyle(Tok.fg)
               .textSelection(.enabled)
               .fixedSize(horizontal: false, vertical: true)
               .padding(.horizontal, 16)
               .padding(.vertical, 10)
               .background(
-                UnevenRoundedRectangle(topLeadingRadius: 20, bottomLeadingRadius: 20, bottomTrailingRadius: 20, topTrailingRadius: 7)
-                  .strokeBorder(Color.primary.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                UnevenRoundedRectangle(
+                  topLeadingRadius: 22, bottomLeadingRadius: 22, bottomTrailingRadius: 22, topTrailingRadius: 8, style: .continuous)
+                  .strokeBorder(Tok.lineStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
               )
               .frame(maxWidth: 600, alignment: .trailing)
           }

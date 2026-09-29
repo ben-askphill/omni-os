@@ -16,11 +16,9 @@ struct SlashMenuView: View {
           note
           ForEach(Array(sections.enumerated()), id: \.offset) { s, section in
             if let label = section.label {
-              Text(label.uppercased())
-                .font(.system(size: 10.5, design: .monospaced))
-                .tracking(0.6)
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 10)
+              Text(label)
+                .omniCaption()
+                .padding(.horizontal, 12)
                 .padding(.top, 8)
                 .padding(.bottom, 4)
             }
@@ -31,7 +29,7 @@ struct SlashMenuView: View {
             }
           }
         }
-        .padding(4)
+        .padding(6)
       }
       .scrollIndicators(.automatic)
       .onChange(of: active) {
@@ -41,9 +39,9 @@ struct SlashMenuView: View {
     }
     .frame(maxHeight: 352)
     .fixedSize(horizontal: false, vertical: true)
-    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(ThreadStyle.line))
-    .shadow(color: .black.opacity(0.14), radius: 14, y: 4)
+    .background(Tok.elev, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .menuShadow(22)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Commands")
   }
@@ -54,22 +52,24 @@ struct SlashMenuView: View {
       // A thread's menu still lists Omni's own commands, so say why the harness's are missing.
       Group {
         if let fix = list?.fix {
-          Text("Couldn't read the commands. Run \(Text(fix).font(.system(size: 12, design: .monospaced))) in a terminal to see why.")
+          Text("Couldn't read the commands. Run \(Text(fix).font(.system(size: 12, design: .monospaced)).foregroundStyle(Tok.fg2)) in a terminal to see why.")
         } else {
           Text("Couldn't read the commands.")
         }
       }
       .font(.system(size: 12.5))
-      .foregroundStyle(.secondary)
-      .padding(10)
+      .foregroundStyle(Tok.fg3)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
     } else if list == nil || list?.status == .loading {
       HStack(spacing: 8) {
-        ProgressView().controlSize(.small)
+        Loader(size: 13)
         Text("Loading commands")
       }
       .font(.system(size: 12.5))
-      .foregroundStyle(.secondary)
-      .padding(10)
+      .foregroundStyle(Tok.fg3)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
     }
   }
 }
@@ -81,41 +81,42 @@ private struct SlashRow: View {
   let onPick: () -> Void
 
   var body: some View {
-    HStack(alignment: .top, spacing: 10) {
+    HStack(alignment: .center, spacing: 10) {
       VStack(alignment: .leading, spacing: 1) {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
           Text("/\(command.name)")
             .font(.system(size: 13, weight: .medium, design: .monospaced))
+            .foregroundStyle(Tok.fg)
             .lineLimit(1)
             .truncationMode(.middle)
             .layoutPriority(1)
           if let hint = command.argumentHint {
             Text(hint)
               .font(.system(size: 12, design: .monospaced))
-              .foregroundStyle(.tertiary)
+              .foregroundStyle(Tok.fg4)
               .lineLimit(1)
           }
         }
         if !command.description.isEmpty {
           Text(command.description)
-            .font(.system(size: 12))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 11.5))
+            .foregroundStyle(Tok.fg4)
             .lineLimit(1)
         }
       }
       Spacer(minLength: 0)
       Text(command.sourceTag)
-        .font(.system(size: 10.5))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 6)
+        .font(.system(size: 11))
+        .foregroundStyle(Tok.fg3)
+        .padding(.horizontal, 8)
         .padding(.vertical, 1)
-        .background(ThreadStyle.surface2, in: RoundedRectangle(cornerRadius: 4))
-        .padding(.top, 2)
+        .background(Tok.surface2, in: Capsule())
     }
-    .padding(.horizontal, 10)
+    .padding(.horizontal, 12)
     .padding(.vertical, 6)
+    .frame(minHeight: 40)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(isActive ? ThreadStyle.surface2 : .clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+    .background(isActive ? Tok.wash : .clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     .contentShape(Rectangle())
     .onTapGesture(perform: onPick)
     .onContinuousHover { phase in
@@ -138,12 +139,13 @@ struct SlashHintView: View {
         Text(hint)
         if model.reply?.action == .fixed {
           Button("New thread on another model", action: onNewThreadOnAnotherModel)
-            .buttonStyle(.link)
+            .buttonStyle(.plain)
             .fontWeight(.medium)
+            .foregroundStyle(Tok.fg2)
         }
       }
       .font(.system(size: 12))
-      .foregroundStyle(.secondary)
+      .foregroundStyle(Tok.fg3)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
