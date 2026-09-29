@@ -107,6 +107,38 @@ public enum EffortRules {
   }
 }
 
+/// The model and effort a reply composer shows. They are fixed once a thread starts, so this only names them.
+/// An empty model is the harness default. An empty effort is that model's default. `threadRunLabels` in web/src/thread-run.ts is the same.
+public struct ThreadRunLabels: Hashable, Sendable {
+  public let model: String
+  public let harnessName: String
+  public let effort: String
+
+  public init(model: String, harnessName: String, effort: String) {
+    self.model = model
+    self.harnessName = harnessName
+    self.effort = effort
+  }
+
+  public static func make(harness: HarnessID, model: String?, effort: String?, harnesses: [HarnessInfo]) -> ThreadRunLabels {
+    let info = harnesses.first { $0.id == harness }
+    let picked = model.flatMap { id in info?.models.first { $0.id == id } }
+    let entry = picked ?? (model == nil ? info?.models.first { $0.isDefault } ?? info?.models.first : nil)
+    return ThreadRunLabels(
+      model: entry?.label ?? model ?? "default",
+      harnessName: info?.name ?? ThreadDetails.harnessName(harness),
+      effort: effortText(effort, model: entry, catalog: info != nil))
+  }
+
+  private static func effortText(_ effort: String?, model: ModelEntry?, catalog: Bool) -> String {
+    guard catalog, let model else { return (effort?.isEmpty == false ? effort : nil) ?? "default" }
+    if model.efforts.isEmpty { return "Auto effort" }
+    if let effort, !effort.isEmpty { return effort }
+    if let def = model.defaultEffort { return "Default (\(def))" }
+    return "Default"
+  }
+}
+
 public struct ModelGroup: Hashable, Sendable, Identifiable {
   public let harness: HarnessInfo
   public let models: [ModelEntry]

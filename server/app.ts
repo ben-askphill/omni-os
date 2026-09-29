@@ -15,7 +15,7 @@ import { listCrew } from './crew.ts';
 import { listSecrets, setSecret, deleteSecret } from './secrets.ts';
 import { mimeFor } from './artifacts.ts';
 import { checkUploads, imageMime, safeName, saveUploads } from './uploads.ts';
-import { detectRepo, listPRs, getPR, mergePR } from './github.ts';
+import { detectRepo, listPRs, branchPRs, getPR, mergePR } from './github.ts';
 import { loadAutomations, runAutomation, setEnabled, lastRuns } from './automations.ts';
 import { commandsApi } from './commands-api.ts';
 import { threadsApi } from './threads-api.ts';
@@ -65,25 +65,32 @@ const channelSchema = z.object({
   notes: z.string().nullish(),
 });
 
-/** A channel plus its running and queued threads, so the sidebar can list them under the name. */
-const withActive = (ch: Channel, busy: Thread[]) => {
+/** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */
+const RECENT_PER_CHANNEL = 5;
+
+const stub = ({ id, channel_id, title, status, created_at }: Thread) => ({ id, channel_id, title, status, created_at });
+
+/** A channel plus its running and queued threads, and its latest ones, so the sidebar can list them under the name. */
+const withActive = (ch: Channel, busy: Thread[], recent: Thread[]) => {
   const mine = busy.filter((t) => t.channel_id === ch.id);
   return {
     ...ch,
     running: mine.length,
-    active: mine.map(({ id, channel_id, title, status, created_at }) => ({ id, channel_id, title, status, created_at })),
+    active: mine.map(stub),
+    recent: recent.filter((t) => t.channel_id === ch.id).map(stub),
   };
 };
 
 api.get('/channels', (c) => {
   const busy = threads.running();
-  return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy)));
+  const recent = threads.recentPerChannel(RECENT_PER_CHANNEL);
+  return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy, recent)));
 });
 
 api.get('/channels/:id', (c) => {
   const ch = channels.get(c.req.param('id'));
   if (!ch) return c.json({ error: 'not found' }, 404);
-  return c.json(withActive(ch, threads.running()));
+  return c.json(withActive(ch, threads.running(), threads.byChannel(ch.id, RECENT_PER_CHANNEL)));
 });
 
 api.post('/channels', async (c) => {
@@ -306,6 +313,15 @@ const repoOf = (channelId: string) => {
 
 api.get('/channels/:id/prs', async (c) => c.json(await listPRs(repoOf(c.req.param('id')), c.req.query('state') ?? 'open')));
 api.get('/channels/:id/prs/:n', async (c) => c.json(await getPR(repoOf(c.req.param('id')), Number(c.req.param('n')))));
+// The PRs opened from a thread's branch, newest first, and `pr`, the one to show: the open one,
+// else the newest. null and [] when there is none or no repo to ask.
+api.get('/threads/:id/pr', async (c) => {
+  const t = threads.get(c.req.param('id'));
+  if (!t) return c.json({ error: 'not found' }, 404);
+  const repo = channels.get(t.channel_id)?.github_repo;
+  if (!t.branch || !repo) return c.json({ pr: null, prs: [] });
+  return c.json(await branchPRs(repo, t.branch));
+});
 api.post('/channels/:id/prs/:n/merge', async (c) => {
   const { method, delete_branch, confirm } = z
     .object({ method: z.enum(['squash', 'merge', 'rebase']).default('squash'), delete_branch: z.boolean().default(true), confirm: z.literal(true) })

@@ -476,6 +476,21 @@ private func loaded(_ store: WorkspaceStore) async throws {
     #expect(links.more == 2)
   }
 
+  @Test func theHighlightedChannelListsItsRecentThreads() throws {
+    let recent = (0..<5).map { i in #"{"id":"r\#(i)","channel_id":"acme","title":"r\#(i)","status":"done","created_at":"\#(iso(i + 1))"}"# }
+    var row = channelRow("acme", active: ["a"])
+    row.removeLast()
+    row += #","recent":[\#(recent.joined(separator: ","))]}"#
+    let c = try #require(try channelList(row).first)
+    let quiet = SidebarSections.threads(of: c)
+    #expect(quiet.shown.map(\.id) == ["a"], "finished threads stay hidden until the channel is highlighted")
+    #expect(!quiet.seeAll)
+    let focused = SidebarSections.threads(of: c, focused: true)
+    #expect(focused.shown.map(\.id) == ["r4", "r3", "r2", "r1", "r0"])
+    #expect(focused.seeAll)
+    #expect(focused.more == 0)
+  }
+
   @Test func keepsTheOpenThreadListed() throws {
     let c = try #require(try channelList(channelRow("acme", active: ["a", "b", "c", "d", "e", "f", "g"])).first)
     let a = try #require(c.active.first)

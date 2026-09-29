@@ -20,6 +20,14 @@ public struct PullRequestSummary: Decodable, Hashable, Sendable, Identifiable {
 
   public var id: Int { number }
   public var isOpen: Bool { PullRequestState.isOpen(state) }
+  /// The composer's word for it, as `ThreadPR` in Thread.tsx: open, draft, merged or closed.
+  public var badge: String {
+    switch state {
+    case "MERGED": "merged"
+    case "CLOSED": "closed"
+    default: isDraft ? "draft" : "open"
+    }
+  }
 }
 
 public struct PRPerson: Decodable, Hashable, Sendable {
@@ -180,7 +188,31 @@ private struct MergeReply: Decodable {
   let output: String?
 }
 
+/// What GET /api/threads/:id/pr answers: every PR from the thread's branch, newest first, and the one to show.
+public struct ThreadPullRequests: Decodable, Hashable, Sendable {
+  /// The open one, else the newest. nil when the branch has none.
+  public let pr: PullRequestSummary?
+  public let prs: [PullRequestSummary]
+
+  /// No PR opened from the branch is still open, so another can be.
+  public var canOpenAnother: Bool { !prs.contains { $0.isOpen } }
+
+  enum CodingKeys: String, CodingKey { case pr, prs }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    pr = try c.decodeIfPresent(PullRequestSummary.self, forKey: .pr)
+    // An older server answered only `pr`.
+    prs = try c.decodeIfPresent([PullRequestSummary].self, forKey: .prs) ?? (pr.map { [$0] } ?? [])
+  }
+}
+
 extension OmniClient {
+  /// The PRs opened from a thread's branch, open or not.
+  public func pullRequests(forThread id: String) async throws(OmniAPIError) -> ThreadPullRequests {
+    try await send("GET", "/api/threads/\(uriComponent(id))/pr")
+  }
+
   public func pullRequests(in channel: String, state: PullRequestListState = .open) async throws(OmniAPIError) -> [PullRequestSummary] {
     try await send("GET", "/api/channels/\(uriComponent(channel))/prs", query: [("state", state.rawValue)])
   }

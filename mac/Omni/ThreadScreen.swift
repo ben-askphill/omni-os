@@ -233,7 +233,7 @@ private struct TranscriptView: View {
   var body: some View {
     ScrollView {
       TranscriptRows(model: model, store: store, ui: ui, markdown: markdown)
-        .frame(maxWidth: ThreadStyle.column)
+        .frame(maxWidth: ThreadStyle.thread)
         .padding(.horizontal, 24)
         .padding(.top, 16)
         .padding(.bottom, 40)

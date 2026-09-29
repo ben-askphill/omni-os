@@ -256,6 +256,8 @@ public struct SidebarSections: Hashable, Sendable {
     public let shown: [ThreadStub]
     /// How many more there are, for "N more".
     public let more: Int
+    /// The highlighted channel links to all its threads instead of "N more".
+    public let seeAll: Bool
   }
 
   public static let conductorID = "conductor"
@@ -277,13 +279,15 @@ public struct SidebarSections: Hashable, Sendable {
   }
 
   /// A channel's running and queued threads, newest first, at most `maxThreads`. The open thread, if it
-  /// is in this channel, joins them and stays after it stops, so the highlight never jumps away.
-  public static func threads(of channel: ChannelWithRunning, open: ThreadStub? = nil) -> ThreadLinks {
+  /// is in this channel, joins them and stays after it stops, so the highlight never jumps away. The
+  /// highlighted channel also lists its latest threads of any status, so finished ones stay findable.
+  public static func threads(of channel: ChannelWithRunning, open: ThreadStub? = nil, focused: Bool = false) -> ThreadLinks {
     let open = open?.channelID == channel.id ? open : nil
-    var list = channel.active.filter { $0.id != open?.id }
+    var seen: Set<String> = open.map { [$0.id] } ?? []
+    var list = (channel.active + (focused ? channel.recent : [])).filter { seen.insert($0.id).inserted }
     if let open { list.insert(open, at: 0) }
     list.sort { $0.createdAt > $1.createdAt }
     let shown = list.enumerated().filter { $0.offset < maxThreads || $0.element.id == open?.id }.map(\.element)
-    return ThreadLinks(shown: shown, more: list.count - shown.count)
+    return ThreadLinks(shown: shown, more: focused ? 0 : list.count - shown.count, seeAll: focused)
   }
 }

@@ -460,7 +460,7 @@ The overlay sits above the composer, like the Web UI's, not at the caret: `TextE
 Wired (both composers):
 
 - `ComposerCallbacks` got `slash` (arrows, Return, Tab from the text view's `doCommandBy`, Esc from `cancelOperation`; not while an input method composes) and `edited` (text and caret on every change, selection move and focus). `CaretRequest` sets the caret after a pick. `.slashMenu(menu)` is on the composer's shell for its overlay; its key handler never sees the keys because the AppKit text view takes them first.
-- Reply box: `menu.reply` decides the Send button (`Rename`, `New thread`, ...) and Cmd-Return; `runOmni()` calls `OmniKit.OmniCommands.run` (qualified: the app has its own `OmniCommands: Commands`). `/model`, `/effort`, `/fast` show the hint with "New thread on another model".
+- Reply box: `menu.reply` decides the Send button (`Rename`, `New thread`, ...) and Return; `runOmni()` calls `OmniKit.OmniCommands.run` (qualified: the app has its own `OmniCommands: Commands`). `/model`, `/effort`, `/fast` show the hint with "New thread on another model".
 - New thread: `.slashMenu(menu, below: true)`; `menu.commands.source` and `menu.harness` follow the pickers. `AppModel.openNewThread(preset)` puts the preset in `shell.newThreadPreset` and opens the channel; that channel's composer takes it (`NewThreadComposerModel.apply`) and opens the model list for `pickModel`.
 - QA: `{"type": ...}` also focuses the box. In this environment, opening a thread with `{"route": "#/t/<id>"}` crashes the app (window constraint loop) on main too; use `{"openThread": "<id>"}` and read `-window1.png`.
 
@@ -491,7 +491,7 @@ Wired (both composers):
 ## Reply composer (#64)
 
 - OmniKit: `SendRules` (steer/queue/interrupt per harness, `EscapeGate` for Esc), `Attachments.swift` (`StagedFile`, `AttachmentRules.add`: 10 files, `maxUploadMb`, empty files dropped, Web UI wording), `DraftStore` (one file per key in `~/Library/Application Support/Omni/Drafts`), `ReplyComposerModel` (text as draft, staged files, send, Open PR), `OmniClient.reply(to:prompt:mode:files:)` (JSON, or multipart with a `payload` field and `files` parts when there are files; an idle thread sends no `mode`).
-- App: `ComposerTextView.swift` (AppKit text view: IME, spellcheck, undo, grows to 240pt, Cmd-Return and Shift-Cmd-Return in `performKeyEquivalent`, Esc in `cancelOperation`, file drop and paste, screenshot paste to a temp `image.png`), `ComposerView.swift` (`ReplyComposerHost` is the one line in the thread screen; split Steer button; paperclip; Open PR; toolbar Interrupt), `ThreadCommands.swift` (Thread > Interrupt, Cmd-period). If another slice adds a "Thread" menu, merge the two.
+- App: `ComposerTextView.swift` (AppKit text view: IME, spellcheck, undo, grows to 240pt, Return sends in `doCommandBy`, Cmd-Return newline and Shift-Cmd-Return interrupt in `performKeyEquivalent`, Esc in `cancelOperation`, file drop and paste, screenshot paste to a temp `image.png`), `ComposerView.swift` (`ReplyComposerHost` is the one line in the thread screen; split Steer button; paperclip; Open PR; toolbar Interrupt), `ThreadCommands.swift` (Thread > Interrupt, Cmd-period). If another slice adds a "Thread" menu, merge the two.
 - QA steps: `{"type": "text"}` fills the reply box, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`) sends it. `QARunner` also got a stub for `.expand`, which the tree did not handle (Debug build failed on it); replace it with the real one.
 - Not built: the slash menu (Esc gating has a slot for it), scroll-to-bottom on send.
 

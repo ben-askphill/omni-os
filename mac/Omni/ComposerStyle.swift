@@ -41,8 +41,8 @@ extension View {
 struct ComposerHints: View {
   var body: some View {
     HStack(spacing: 14) {
-      Text("⌘↵ send")
-      Text("↵ newline")
+      Text("↵ send")
+      Text("⌘↵ newline")
       Text("/ commands")
     }
     .font(.system(size: 11.5))

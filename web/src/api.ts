@@ -16,8 +16,8 @@ export type CommandList = HarnessCommands & { recent?: string[] };
 
 /** Just enough of a thread to list it under its channel in the sidebar. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'>;
-/** `active`: the channel's running and queued threads. */
-export type ChannelWithRunning = Channel & { running: number; active?: ThreadStub[] };
+/** `active`: the channel's running and queued threads. `recent`: its latest threads of any status. */
+export type ChannelWithRunning = Channel & { running: number; active?: ThreadStub[]; recent?: ThreadStub[] };
 export type ArtifactWithThread = Artifact & { thread_title: string; channel_id: string };
 
 export interface UsageWindow {

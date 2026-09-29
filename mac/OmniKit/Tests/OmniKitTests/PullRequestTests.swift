@@ -111,6 +111,35 @@ import OmniKit
     #expect(t.requests[0].url?.absoluteString == "http://127.0.0.1:4799/api/channels/acme/prs?state=merged")
   }
 
+  @Test func threadPRIsNilWithoutOne() async throws {
+    let t = StubTransport(body: #"{"pr":null,"prs":[]}"#)
+    let r = try await OmniClient(port: 4799, transport: t).pullRequests(forThread: "t1")
+    #expect(r.pr == nil)
+    #expect(r.prs.isEmpty)
+    #expect(r.canOpenAnother)
+    #expect(t.requests[0].url?.path == "/api/threads/t1/pr")
+  }
+
+  @Test func threadPRsListEveryPRAndFallBackToTheOneAnOlderServerSent() throws {
+    let all = try decode(ThreadPullRequests.self, #"{"pr":null,"prs":"# + (try fixture("prs.json")) + "}")
+    #expect(all.prs.count >= 2)
+    #expect(!all.canOpenAnother)
+    let merged = #"{"number":5,"title":"t","author":null,"headRefName":"b","baseRefName":"main","state":"MERGED","isDraft":false,"#
+      + #""updatedAt":"2026-09-28T16:06:24.648Z","reviewDecision":null,"url":"u","additions":1,"deletions":0,"mergeable":null,"#
+      + #""checks":{"passed":0,"failed":0,"pending":0}}"#
+    let old = try decode(ThreadPullRequests.self, #"{"pr":"# + merged + "}")
+    #expect(old.prs.map(\.number) == [5])
+    #expect(old.prs[0].badge == "merged")
+    #expect(old.canOpenAnother)
+  }
+
+  @Test func badgeSaysWhetherItMerged() throws {
+    let list = try decodeFixture([PullRequestSummary].self, "prs.json")
+    let draft = try #require(list.first { $0.isDraft })
+    #expect(draft.badge == "draft")
+    #expect(list.contains { $0.badge == "open" })
+  }
+
   @Test func decodesTheListAndTheDetail() throws {
     let list = try decodeFixture([PullRequestSummary].self, "prs.json")
     #expect(list.count >= 2)

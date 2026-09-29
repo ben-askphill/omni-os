@@ -152,16 +152,16 @@ struct SidebarView: View {
         }
       }
     }
-    let links = SidebarSections.threads(of: channel, open: model.openThread)
+    let links = SidebarSections.threads(of: channel, open: model.openThread, focused: model.focusedChannel == channel.id)
     ForEach(links.shown) { thread in
       let item = SidebarItem.thread(thread.id)
       row(item) { ThreadRow(thread: thread, active: selected == item) }
         .padding(.leading, 25)
         .openInNewWindow(thread.id)
     }
-    if links.more > 0 {
+    if links.seeAll || links.more > 0 {
       Button { pick(.more(channel.id)) } label: {
-        Text("\(links.more) more")
+        Text(links.seeAll ? "See all threads" : "\(links.more) more")
           .font(.system(size: 12))
           .foregroundStyle(Tok.fg4)
           .frame(maxWidth: .infinity, alignment: .leading)

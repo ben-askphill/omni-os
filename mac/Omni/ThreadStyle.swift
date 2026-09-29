@@ -4,6 +4,8 @@ import SwiftUI
 /// The transcript's sizes and colors, after the Web UI's tokens (web/src/index.css).
 enum ThreadStyle {
   static let column: CGFloat = 768
+  /// An open thread: wide enough that the reply composer's pills, hints and send button share one row.
+  static let thread: CGFloat = 896
   static let prose: CGFloat = 14
   static let small: CGFloat = 12.5
   static let mono: CGFloat = 11.5

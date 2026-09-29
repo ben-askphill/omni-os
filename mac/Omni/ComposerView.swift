@@ -24,7 +24,7 @@ struct ReplyComposerHost: View {
       commands: SlashCommandsStore(api: model.client, source: .thread(store.id)), placement: .reply, harness: thread.harness.rawValue)
     box.menu = menu
     return ReplyComposerView(model: model, store: store, thread: thread, reply: reply, menu: menu)
-    .frame(maxWidth: ThreadStyle.column)
+    .frame(maxWidth: ThreadStyle.thread)
     .padding(.horizontal, 24)
     .padding(.top, 4)
     .padding(.bottom, 16)
@@ -57,6 +57,85 @@ struct InterruptButton: View {
     .disabled(store.interrupting)
     .help("Interrupt the agent (Esc). Messages already sent still run.")
     .accessibilityLabel(store.interrupting ? "Interrupting" : "Interrupt")
+  }
+}
+
+/// Open PR until the branch has a PR, then that PR and whether it merged: `ThreadPR` in Thread.tsx.
+/// It opens a menu of every PR from the branch, with Open PR there while none is open.
+private struct ThreadPRSlot: View {
+  let model: AppModel
+  let thread: OmniThread
+  let busy: Bool
+  let opening: Bool
+  let open: () -> Void
+  /// nil until the first answer, so the button does not flash before the PR shows.
+  @State private var prs: ThreadPullRequests?
+  @State private var failed = false
+
+  var body: some View {
+    Group {
+      if let pr = prs?.pr, let prs {
+        Menu {
+          Section("\(prs.prs.count) PR\(prs.prs.count == 1 ? "" : "s") from \(thread.branch ?? "this branch")") {
+            ForEach(prs.prs) { p in
+              Button("#\(p.number)  \(p.title)  (\(p.badge))") {
+                model.route = .channel(id: thread.channelID, tab: .prs, pr: p.number)
+              }
+            }
+          }
+          if prs.canOpenAnother {
+            Divider()
+            Button("Open a new PR", action: open).disabled(opening)
+          }
+        } label: {
+          HStack(spacing: 5) {
+            if opening { ProgressView().controlSize(.mini) } else { Image(systemName: "arrow.triangle.pull") }
+            Text("#\(pr.number)")
+            PRChip(text: pr.badge, tone: pr.badge == "open" ? .ok : pr.badge == "merged" ? .info : .outline)
+            if prs.prs.count > 1 { Text("+\(prs.prs.count - 1)").foregroundStyle(Tok.fg4) }
+          }
+          .font(.system(size: 12.5))
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.visible)
+        .fixedSize()
+        .padding(.horizontal, 8)
+        .frame(height: 26)
+        .foregroundStyle(Tok.fg3)
+        .help(pr.title)
+      } else if prs != nil || failed {
+        openButton
+      }
+    }
+    // Again when a turn ends (it may have opened the PR), and every minute to catch a merge.
+    .task(id: busy) {
+      guard !busy else { return }
+      while !Task.isCancelled {
+        await load()
+        try? await Task.sleep(for: .seconds(60))
+      }
+    }
+  }
+
+  private var openButton: some View {
+    Button(action: open) {
+      HStack(spacing: 6) {
+        if opening { Loader(size: 13) } else { OmniIcon(name: "pr", size: 14) }
+        Text("Open PR")
+      }
+    }
+    .buttonStyle(.pill(.ghost, height: 28))
+    .disabled(opening)
+    .help(ReplyComposerModel.openPRPrompt)
+  }
+
+  private func load() async {
+    do {
+      prs = try await model.client.pullRequests(forThread: thread.id)
+    } catch {
+      failed = true
+    }
   }
 }
 
@@ -154,20 +233,11 @@ private struct ReplyComposerView: View {
 
   private var footer: some View {
     ComposerFooterLayout {
-      if thread.branch != nil {
-        Button {
-          Task { await openPR() }
-        } label: {
-          HStack(spacing: 6) {
-            if reply.openingPR { Loader(size: 13) } else { OmniIcon(name: "pr", size: 14) }
-            Text("Open PR")
-          }
-        }
-        .buttonStyle(.pill(.ghost, height: 28))
-        .disabled(reply.openingPR)
-        .help(ReplyComposerModel.openPRPrompt)
-      }
       AttachButton(disabled: reply.sending) { picking = true }
+      ThreadRunPills(thread: thread, harnesses: model.store.harnesses)
+      if thread.branch != nil {
+        ThreadPRSlot(model: model, thread: thread, busy: busyThread, opening: reply.openingPR) { Task { await openPR() } }
+      }
       HStack(spacing: 10) {
         ComposerHints()
         if let omni = menu.reply, omni.action != .send {
@@ -265,6 +335,37 @@ private struct ReplyComposerView: View {
       return
     }
     reply.addFiles([StagedFile(url: url, size: data.count, modified: .now, isTemporary: true)])
+  }
+}
+
+/// The model and effort this thread is running on. Fixed, so they stay visible and are not pickers.
+private struct ThreadRunPills: View {
+  let thread: OmniThread
+  let harnesses: [HarnessInfo]
+
+  var body: some View {
+    let labels = ThreadRunLabels.make(harness: thread.harness, model: thread.model, effort: thread.effort, harnesses: harnesses)
+    HStack(spacing: 6) {
+      pill(symbol: "bolt", text: labels.model, detail: labels.harnessName, label: "Model: \(labels.model) on \(labels.harnessName)")
+      pill(symbol: "slider.horizontal.3", text: labels.effort, detail: nil, label: "Effort: \(labels.effort)")
+    }
+  }
+
+  private func pill(symbol: String, text: String, detail: String?, label: String) -> some View {
+    HStack(spacing: 6) {
+      Image(systemName: symbol).font(.system(size: 11.5)).foregroundStyle(Tok.fg3)
+      Text(text).font(.system(size: 12.5, weight: .medium)).lineLimit(1)
+      if let detail { Text("· \(detail)").font(.system(size: 12.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
+    }
+    .padding(.horizontal, 10)
+    .frame(height: 28)
+    .frame(maxWidth: 220)
+    .foregroundStyle(Tok.fg)
+    .background(Tok.surface2, in: Capsule())
+    .help("Fixed for this thread")
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(label)
+    .fixedSize()
   }
 }
 
