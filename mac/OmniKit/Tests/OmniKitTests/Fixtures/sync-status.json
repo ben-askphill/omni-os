@@ -11,5 +11,6 @@
   "pending": 2,
   "held": 0,
   "deferred": 1,
-  "cursor": 418
+  "cursor": 418,
+  "automations": { "owner": "3f9c2a1e7b4d", "isThisMac": true }
 }

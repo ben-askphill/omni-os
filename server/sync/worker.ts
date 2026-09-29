@@ -3,6 +3,7 @@ import { globalSecret, listSecrets, setSecret, SYNC_SECRETS } from '../secrets.t
 import { applyBatch, deferredCount, getHandler, registeredEntities, retryDeferred, type ApplyContext } from './apply.ts';
 import { createSupabaseTransport, isoTs, isSignedOut, type Change, type SyncTransport } from './transport.ts';
 import { watchNetwork, type NetworkWatch } from './network.ts';
+import { automationsOwner, claimIfUnowned, type AutomationsOwner } from './owner.ts';
 import './handlers/index.ts';
 
 // The sync loop: push the outbox in batches, then pull what other machines pushed since the cursor and apply it.
@@ -56,6 +57,8 @@ export interface SyncStatus {
   /** Remote changes that could not apply yet. */
   deferred: number;
   cursor: number;
+  /** Which Mac runs the scheduled automations (server/sync/owner.ts). */
+  automations: AutomationsOwner;
 }
 
 export interface SyncWorker {
@@ -162,6 +165,8 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
     try {
       result.pushed = await push();
       await pull(result);
+      // Everything the relay had is in: an owner another Mac set would be here by now. A claim goes out at once.
+      if (!stopped && claimIfUnowned()) result.pushed += await push();
       failures = 0;
       lastError = null;
       signedOut = false;
@@ -294,6 +299,7 @@ function baseStatus(): SyncStatus {
     held: counts.held,
     deferred: deferredCount(),
     cursor: kv.get<number>('sync.cursor') ?? 0,
+    automations: automationsOwner(),
   };
 }
 

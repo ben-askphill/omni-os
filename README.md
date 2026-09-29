@@ -148,6 +148,7 @@ On each Mac: Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the UR
 - `npm run sync:backfill`: queue every existing row again, for instance after restoring a database. It is idempotent and skips rows the other Mac wrote last.
 - Signing in to a different project or user starts that relay from the beginning and queues the history again.
 - A thread runs on one Mac at a time. Its row names the Mac running it (`run_machine`), so the other Mac shows it read-only until the run ends there, and an edit from the other Mac mid-run (a rename) never changes its status. After a crash, only the Mac that ran it marks it failed.
+- Scheduled automations run on one Mac: the Sync page says which, and "Run them here" moves them. The first Mac to finish a sync with no owner set takes them. Manual runs work on either Mac.
 
 ## Other entry points
 

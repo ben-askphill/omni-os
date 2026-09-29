@@ -1,6 +1,7 @@
 // /api/sync: the sync status, a manual sync, and sign-in from Settings. Its own app so tests can call it without starting the server.
 import { Hono, type Context } from 'hono';
 import { kv } from './db.ts';
+import { claimAutomations } from './sync/owner.ts';
 import { pathMap } from './sync/paths.ts';
 import { checkPathMap, checkSetup, defaultSetupDeps, disableSync, enableSync, SetupError, setupSync, type SetupDeps } from './sync/setup.ts';
 import { syncNow, syncStatus } from './sync/worker.ts';
@@ -47,6 +48,12 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
   /** Resume with the stored credentials. 409 before a sign-in. */
   app.post('/enable', async (c) => {
     await enableSync(deps);
+    return c.json({ ok: true, status: syncStatus() });
+  });
+
+  /** Run the scheduled automations on this Mac from now on, and not on the other. 409 before sync is set up here. */
+  app.post('/automations-owner', (c) => {
+    if (!claimAutomations()) return c.json({ error: 'Sync is not set up on this Mac' }, 409);
     return c.json({ ok: true, status: syncStatus() });
   });
 

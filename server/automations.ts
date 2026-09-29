@@ -5,6 +5,7 @@ import YAML from 'yaml';
 import { config, paths } from './config.ts';
 import { automationRuns, db } from './db.ts';
 import { createThread } from './runner.ts';
+import { runsAutomationsHere } from './sync/owner.ts';
 
 export interface Automation {
   id: string;
@@ -87,6 +88,15 @@ export async function runAutomation(a: Automation, trigger: 'cron' | 'manual') {
   return thread;
 }
 
+/**
+ * A cron tick. With sync on, only the Mac that owns scheduled automations runs it (server/sync/owner.ts); the
+ * other Mac skips it and returns null. Manual runs call runAutomation directly and are never skipped.
+ */
+export async function fireScheduled(a: Automation) {
+  if (!runsAutomationsHere()) return null;
+  return runAutomation(a, 'cron');
+}
+
 export function lastRuns(id: string, limit = 10) {
   return db
     .prepare(
@@ -112,7 +122,7 @@ function scheduleAll() {
     jobs.set(
       a.id,
       new Cron(a.cron, { timezone: a.timezone, protect: true }, () => {
-        runAutomation(a, 'cron').catch((err) => console.error(`[automations] ${a.id} failed:`, err));
+        fireScheduled(a).catch((err) => console.error(`[automations] ${a.id} failed:`, err));
       }),
     );
   }

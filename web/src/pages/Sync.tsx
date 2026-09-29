@@ -69,11 +69,11 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function StatusCard({ s, onChange }: { s: Status; onChange: () => void }) {
-  const [busy, setBusy] = useState<'now' | 'pause' | null>(null);
+  const [busy, setBusy] = useState<'now' | 'pause' | 'owner' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const state = stateOf(s);
 
-  const run = async (what: 'now' | 'pause', fn: () => Promise<unknown>) => {
+  const run = async (what: 'now' | 'pause' | 'owner', fn: () => Promise<unknown>) => {
     setBusy(what);
     setError(null);
     try {
@@ -134,6 +134,17 @@ function StatusCard({ s, onChange }: { s: Status; onChange: () => void }) {
           ) : (
             <span className="text-fg-3">Gets an id on the first sync</span>
           )}
+        </Row>
+        <Row label="Automations">
+          {/* One Mac runs the scheduled ones (server/sync/owner.ts), so a nightly job does not run twice. Manual runs go anywhere. */}
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>Scheduled ones run on {s.automations.isThisMac ? 'this Mac' : 'your other Mac'}</span>
+            {!s.automations.isThisMac && (
+              <Button variant="secondary" size="sm" icon="play" busy={busy === 'owner'} onClick={() => run('owner', () => api.post('/sync/automations-owner'))}>
+                Run them here
+              </Button>
+            )}
+          </span>
         </Row>
         <Row label="Cursor">
           <span className="font-num text-fg-2">{s.cursor}</span>

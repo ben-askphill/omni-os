@@ -70,7 +70,8 @@ describe('sync worker', () => {
     const r = await worker.syncNow();
     expect(r.error).toBeUndefined();
     const mine = relay.pushCalls.filter((c) => c[0].machine_id === 'mac-a');
-    expect(mine.map((c) => c.length)).toEqual([3, 3, 2]); // the two seeded channels, the thread and five events
+    // The two seeded channels, the thread and five events, then this Mac's claim on the scheduled automations.
+    expect(mine.map((c) => c.length)).toEqual([3, 3, 2, 1]);
     expect(r.pulled).toBe(4);
     expect(db.threads.get('r4')?.title).toBe('remote r4');
     expect(db.kv.get<number>('sync.cursor')).toBe(relay.changes.filter((c) => c.machine_id === 'mac-z').at(-1)!.seq);
