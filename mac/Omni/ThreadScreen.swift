@@ -44,13 +44,11 @@ private struct ThreadView: View {
   var body: some View {
     switch store.loadState {
     case .notFound:
-      ContentUnavailableView {
-        Label("Thread not found", systemImage: "text.bubble")
-      } description: {
-        Text("It may have been deleted, or the link is wrong.")
-      } actions: {
-        Button("Go Home") { model.route = .home }
+      EmptyNote(symbol: "message", title: "Thread not found", message: "It may have been deleted, or the link is wrong.") {
+        Button("Go home") { model.route = .home }
+          .buttonStyle(.pill(.secondary))
       }
+      .frame(maxHeight: .infinity)
     case .failed(let error):
       VStack {
         ErrorNote(text: error.message) { Task { await store.reload() } }
@@ -58,10 +56,13 @@ private struct ThreadView: View {
       }
       .padding(24)
     case .loading:
-      ProgressView("Loading thread")
-        .controlSize(.small)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      HStack(spacing: 8) {
+        Loader(size: 14)
+        Text("Loading thread")
+      }
+      .font(.system(size: 13))
+      .foregroundStyle(Tok.fg3)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     case .loaded:
       if let thread = store.thread {
         VStack(spacing: 0) {
@@ -237,6 +238,7 @@ private struct TranscriptView: View {
         .padding(.top, 16)
         .padding(.bottom, 40)
         .frame(maxWidth: .infinity)
+        .foregroundStyle(Tok.fg)
     }
     .scrollPosition($position)
     .defaultScrollAnchor(.bottom, for: .initialOffset)
@@ -290,13 +292,20 @@ private struct NewActivityPill: View {
   var body: some View {
     if pin.showsJump {
       Button(action: jump) {
-        Label("New activity", systemImage: "chevron.down")
-          .font(.system(size: 12, weight: .medium))
-          .padding(.horizontal, 6)
-          .padding(.vertical, 2)
+        HStack(spacing: 6) {
+          OmniIcon(name: "chevronDown", size: 13)
+          Text("New activity")
+        }
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(Tok.fg)
+        .padding(.horizontal, 14)
+        .frame(height: 32)
+        .background(Tok.elev, in: Capsule())
+        .menuShadow(16)
+        .contentShape(Capsule())
       }
-      .buttonStyle(.glass)
-      .buttonBorderShape(.capsule)
+      .buttonStyle(.plain)
+      .accessibilityLabel("New activity")
       .padding(.bottom, 16)
       .transition(.scale(scale: 0.9).combined(with: .opacity))
     }

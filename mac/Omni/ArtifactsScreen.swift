@@ -34,16 +34,15 @@ private struct ArtifactsPage: View {
   var body: some View {
     let items = store.gallery.items(matching: filter)
     ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
-        Text("Pages, reports and files the crew produced, newest first.")
-          .font(.system(size: 13))
-          .foregroundStyle(.secondary)
-        filters
+      VStack(alignment: .leading, spacing: 0) {
+        OmniPageHeader(title: "Artifacts", subtitle: "Pages, reports and files the crew produced, newest first.")
+          .padding(.top, 40)
+          .padding(.bottom, 24)
+        filters.padding(.bottom, 20)
         content(items)
       }
-      .padding(.horizontal, 24)
-      .padding(.top, 8)
-      .padding(.bottom, 32)
+      .padding(.horizontal, 32)
+      .padding(.bottom, 64)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .onAppear {
@@ -54,15 +53,10 @@ private struct ArtifactsPage: View {
   }
 
   private var filters: some View {
-    Picker("Filter artifacts", selection: $filter) {
-      ForEach(ArtifactFilter.allCases) { f in
-        let n = store.gallery.count(matching: f)
-        Text(n > 0 ? "\(f.label) \(n)" : f.label).tag(f)
-      }
-    }
-    .pickerStyle(.segmented)
-    .labelsHidden()
-    .fixedSize()
+    SegmentedPill(selection: $filter, counted: ArtifactFilter.allCases.map { ($0, $0.label, store.gallery.count(matching: $0)) }, small: true)
+      .fixedSize()
+      .accessibilityElement(children: .contain)
+      .accessibilityLabel("Filter artifacts")
   }
 
   @ViewBuilder private func content(_ items: [GalleryArtifact]) -> some View {
@@ -70,17 +64,13 @@ private struct ArtifactsPage: View {
     case .failed(let error) where store.gallery.items.isEmpty:
       ErrorNote(text: error.message) { Task { await store.reload() } }
     case .loading where store.gallery.items.isEmpty:
-      ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding(.top, 60)
+      LoadingNote()
     default:
       if items.isEmpty {
-        ContentUnavailableView {
-          Label(store.gallery.items.isEmpty ? "No artifacts yet" : "Nothing matches this filter", systemImage: "square.stack.3d.up")
-        } description: {
-          Text("Ask for a report, audit or mockup and it lands here and in the thread's side panel.")
-        }
-        .padding(.top, 40)
+        EmptyNote(symbol: "layers", title: store.gallery.items.isEmpty ? "No artifacts yet" : "Nothing matches this filter",
+                  message: "Ask for a report, audit or mockup and it lands here and in the thread's side panel.")
       } else {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 230, maximum: 340), spacing: 14, alignment: .top)], spacing: 14) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 16, alignment: .top)], spacing: 16) {
           ForEach(items) { item in
             ArtifactCard(model: model, client: client, item: item, isNew: seenAt.map { item.artifact.updatedAt > $0 } ?? false)
           }
@@ -106,54 +96,58 @@ private struct ArtifactCard: View {
       VStack(alignment: .leading, spacing: 0) {
         ArtifactThumbnail(client: client, ref: ref)
           .aspectRatio(16.0 / 10.0, contentMode: .fit)
-          .background(ThreadStyle.surface2)
-          .clipShape(RoundedRectangle(cornerRadius: 12))
-          .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(ThreadStyle.line))
+          .background(Tok.surface2)
+          .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+          .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Tok.line))
           .overlay(alignment: .topLeading) {
-            if isNew {
-              Label("New", systemImage: "circle.fill")
-                .labelStyle(NewBadgeStyle())
-                .padding(8)
-            }
+            if isNew { NewBadge().padding(8) }
           }
         VStack(alignment: .leading, spacing: 2) {
           HStack(spacing: 6) {
-            Image(systemName: artifactSymbol(a.kind)).font(.system(size: 11)).foregroundStyle(.secondary)
-            Text(a.name).font(.system(size: 13.5, weight: .medium)).lineLimit(1).truncationMode(.middle)
+            OmniIcon(name: artifactIcon(a.kind), size: 13).foregroundStyle(Tok.fg3)
+            Text(a.name).font(.system(size: 13.5, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1).truncationMode(.middle)
           }
-          Text(item.threadTitle).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
-          HStack {
+          Text(item.threadTitle).font(.system(size: 12)).foregroundStyle(Tok.fg3).lineLimit(1)
+          HStack(spacing: 8) {
             Text("#\(model.store.channel(item.channelID)?.name ?? item.channelID)").lineLimit(1)
             Spacer(minLength: 6)
-            Text(Format.relTime(a.updatedAt)).monospacedDigit()
+            Text(Format.relTime(a.updatedAt)).font(.system(size: 10.5)).monospacedDigit()
           }
           .font(.system(size: 11.5))
-          .foregroundStyle(.tertiary)
+          .foregroundStyle(Tok.fg4)
           .padding(.top, 4)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 8)
         .padding(.top, 10)
-        .padding(.bottom, 4)
+        .padding(.bottom, 6)
       }
       .padding(6)
-      .background(hovering ? ThreadStyle.surface2 : ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 18))
-      .contentShape(RoundedRectangle(cornerRadius: 18))
+      .background(hovering ? Tok.elev : Tok.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Tok.paneEdge, lineWidth: 0.5).opacity(hovering ? 1 : 0)
+      }
+      .shadow(color: .black.opacity(hovering ? 0.06 : 0), radius: 8, y: 3)
+      .offset(y: hovering ? -2 : 0)
+      .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
     .buttonStyle(.plain)
     .onHover { hovering = $0 }
+    .animation(Motion.spring, value: hovering)
     .help("Open \(a.name) in its thread")
     .accessibilityLabel("\(a.name), \(item.threadTitle)")
   }
 }
 
-private struct NewBadgeStyle: LabelStyle {
-  func makeBody(configuration: Configuration) -> some View {
+/// Changed since the last visit: an ink pill with a volt dot, as the web's badge.
+private struct NewBadge: View {
+  var body: some View {
     HStack(spacing: 4) {
-      configuration.icon.font(.system(size: 4)).foregroundStyle(.orange)
-      configuration.title.font(.system(size: 10, weight: .medium)).textCase(.uppercase)
+      Circle().fill(Tok.done).frame(width: 4, height: 4)
+      Text("New").font(.system(size: 10.5, weight: .medium))
     }
+    .foregroundStyle(Tok.onInk)
     .padding(.horizontal, 8)
     .frame(height: 20)
-    .background(.regularMaterial, in: Capsule())
+    .background(Tok.fg, in: Capsule())
   }
 }

@@ -113,9 +113,8 @@ struct ArtifactThumbnail: View {
           .aspectRatio(contentMode: .fill)
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
       } else {
-        Image(systemName: artifactSymbol(ref.kind))
-          .font(.system(size: 26, weight: .light))
-          .foregroundStyle(.tertiary)
+        OmniIcon(name: artifactIcon(ref.kind), size: 28, weight: 1.25)
+          .foregroundStyle(Tok.fg4)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)

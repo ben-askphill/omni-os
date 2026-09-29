@@ -12,7 +12,7 @@ struct SecretsSettings: View {
       if let secrets {
         SecretsForm(secrets: secrets)
       } else {
-        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        Loader(size: 18).frame(maxWidth: .infinity, maxHeight: .infinity).background(Tok.bg)
       }
     }
     .task(id: model.client.baseURL) {
@@ -34,67 +34,81 @@ struct SecretsForm: View {
   @FocusState private var valueFocused: Bool
 
   var body: some View {
-    Form {
-      Section {
-        Label {
-          Text("Values live in the Keychain under the service \(Text("omni-os").monospaced()) and are injected as environment variables when a thread runs. A channel secret overrides a global one with the same name. Omni never shows a value again after you save it; to change one, save it again with the same name.")
-        } icon: {
-          Image(systemName: "lock")
-        }
-        .foregroundStyle(.secondary)
-      }
+    SettingsPage {
+      SettingsIntro(
+        icon: "lock",
+        text: Text("Values live in the Keychain under the service \(Text("omni-os").monospaced()) and are injected as environment variables when a thread runs. A channel secret overrides a global one with the same name. Omni never shows a value again after you save it; to change one, save it again with the same name.")
+      )
 
-      Section("Add or replace") {
-        Picker("Scope", selection: $secrets.scope) {
-          ForEach(secrets.scopeOptions) { Text($0.label).tag($0.scope) }
-        }
-        LabeledContent("Name") {
-          TextField("Name", text: $secrets.name, prompt: Text("SHOPIFY_ADMIN_TOKEN"))
+      SettingsCard(title: "Add or replace") {
+        VStack(alignment: .leading, spacing: 0) {
+          FieldLabel(text: "Scope")
+          FieldBox {
+            Picker("Scope", selection: $secrets.scope) {
+              ForEach(secrets.scopeOptions) { Text($0.label).tag($0.scope) }
+            }
             .labelsHidden()
-            .font(.body.monospaced())
+            .pickerStyle(.menu)
+            .buttonStyle(.plain)
+            .font(.system(size: 14))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .trailing) {
+              OmniIcon(name: "chevronDown", size: 13).foregroundStyle(Tok.fg3).allowsHitTesting(false)
+            }
+          }
+        }
+        VStack(alignment: .leading, spacing: 0) {
+          FieldLabel(text: "Name")
+          TextField("Name", text: $secrets.name, prompt: Text("SHOPIFY_ADMIN_TOKEN"))
+            .textFieldStyle(.omniMono)
             .autocorrectionDisabled()
             .onSubmit { valueFocused = true }
-        }
-        if secrets.name.isEmpty {
-          Button("Use HERMES_API_KEY", systemImage: "wand.and.stars") {
-            secrets.scope = .global
-            secrets.name = "HERMES_API_KEY"
-            valueFocused = true
+          if secrets.name.isEmpty {
+            Button {
+              secrets.scope = .global
+              secrets.name = "HERMES_API_KEY"
+              valueFocused = true
+            } label: {
+              HStack(spacing: 6) {
+                OmniIcon(name: "key", size: 12)
+                Text("Use HERMES_API_KEY")
+              }
+            }
+            .buttonStyle(.pill(.ghost, height: 28))
+            .help("The Hermes API bearer token. Global. Sent on HTTP requests, not in a shell environment.")
+            .padding(.top, 8)
           }
-          .help("The Hermes API bearer token. Global. Sent on HTTP requests, not in a shell environment.")
         }
-        LabeledContent("Value") {
+        VStack(alignment: .leading, spacing: 0) {
+          FieldLabel(text: "Value")
           SecureField("Value", text: $secrets.value, prompt: Text("Paste the value"))
-            .labelsHidden()
-            .font(.body.monospaced())
+            .textFieldStyle(.omniMono)
             .privacySensitive()
             .focused($valueFocused)
             .onSubmit(save)
-        }
-        if let hint = secrets.valueHint {
-          Label(hint, systemImage: "info.circle")
-            .foregroundStyle(.secondary)
+          if let hint = secrets.valueHint {
+            Text(hint)
+              .font(.system(size: 12))
+              .foregroundStyle(Tok.fg3)
+              .fixedSize(horizontal: false, vertical: true)
+              .padding(.top, 6)
+          }
         }
         if let error = secrets.formError {
-          Label(error, systemImage: "exclamationmark.triangle")
-            .foregroundStyle(.red)
+          ErrorNote(text: error)
         }
-        HStack {
-          if let message = secrets.savedMessage {
-            Label(message, systemImage: "checkmark")
-              .foregroundStyle(.green)
-          }
-          Spacer()
-          if secrets.isSaving { ProgressView().controlSize(.small) }
-          Button(secrets.saveTitle, systemImage: "key", action: save)
-            .buttonStyle(.borderedProminent)
+        HStack(spacing: 10) {
+          Button(secrets.saveTitle, action: save)
+            .buttonStyle(.pill(.primary, height: 34))
             .disabled(!secrets.canSave)
+          if secrets.isSaving { Loader(size: 14) }
+          if let message = secrets.savedMessage { DoneNote(text: message) }
+          Spacer(minLength: 0)
         }
       }
 
       list
     }
-    .formStyle(.grouped)
     .confirmationDialog(
       confirming.map { "Delete \($0.name) from \(secrets.label(for: $0.scope))?" } ?? "",
       isPresented: Binding { confirming != nil } set: { if !$0 { confirming = nil } },
@@ -110,45 +124,33 @@ struct SecretsForm: View {
   @ViewBuilder private var list: some View {
     switch secrets.loadState {
     case .loading:
-      Section {
-        HStack {
-          ProgressView().controlSize(.small)
-          Text("Loading").foregroundStyle(.secondary)
-        }
-      }
+      LoadingNote()
     case .failed(let message):
-      Section {
-        HStack(alignment: .firstTextBaseline) {
-          Label(message, systemImage: "exclamationmark.triangle")
-            .foregroundStyle(.red)
-          Spacer()
-          Button("Retry") { Task { await secrets.load() } }
-        }
-      }
+      ErrorNote(text: message) { Task { await secrets.load() } }
     case .loaded where secrets.groups.isEmpty:
-      Section {
-        ContentUnavailableView {
-          Label("No secrets yet", systemImage: "key")
-        } description: {
-          Text("Add a token above, for example a Shopify Admin API token scoped to the client's channel.")
-        }
-        .frame(maxWidth: .infinity)
-      }
+      EmptyNote(
+        symbol: "key",
+        title: "No secrets yet",
+        message: "Add a token above, for example a Shopify Admin API token scoped to the client's channel."
+      )
     case .loaded:
       ForEach(secrets.groups) { group in
-        Section {
-          ForEach(group.rows) { row in
-            SecretRowView(
-              row: row, deleting: secrets.deleting.contains(row.id),
-              error: secrets.deleteError?.id == row.id ? secrets.deleteError?.message : nil
-            ) {
-              confirming = row
-            }
-          }
-        } header: {
+        VStack(alignment: .leading, spacing: 6) {
           HStack(spacing: 6) {
             Text(secrets.label(for: group.scope))
-            Text("\(group.rows.count)").foregroundStyle(.tertiary)
+            Text("\(group.rows.count)").monospacedDigit().foregroundStyle(Tok.fg4)
+          }
+          .omniCaption()
+          .padding(.horizontal, 12)
+          VStack(spacing: 0) {
+            ForEach(group.rows) { row in
+              SecretRowView(
+                row: row, deleting: secrets.deleting.contains(row.id),
+                error: secrets.deleteError?.id == row.id ? secrets.deleteError?.message : nil
+              ) {
+                confirming = row
+              }
+            }
           }
         }
       }
@@ -169,35 +171,39 @@ struct SecretRowView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       HStack(spacing: 10) {
-        Image(systemName: "key")
-          .foregroundStyle(.secondary)
+        OmniIcon(name: "key", size: 14)
+          .foregroundStyle(Tok.fg3)
         Text(row.name)
-          .font(.body.monospaced())
+          .font(.system(size: 12.5, design: .monospaced))
+          .foregroundStyle(Tok.fg)
           .lineLimit(1)
           .truncationMode(.middle)
           .textSelection(.enabled)
         Spacer()
         TimelineView(.everyMinute) { context in
           Text(RelTime.label(row.updatedAt, now: context.date))
-            .font(.callout.monospacedDigit())
-            .foregroundStyle(.secondary)
+            .font(.system(size: 12).monospacedDigit())
+            .foregroundStyle(Tok.fg4)
         }
         .help(row.updatedAt.formatted(date: .complete, time: .standard))
         if deleting {
-          ProgressView().controlSize(.small)
+          Loader(size: 14).frame(width: 28, height: 28)
         } else {
-          Button("Delete", systemImage: "trash", role: .destructive, action: delete)
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
-            .help("Delete")
+          Button(role: .destructive, action: delete) {
+            OmniIcon(name: "trash", size: 14)
+          }
+          .buttonStyle(.icon(size: 28))
+          .accessibilityLabel("Delete")
+          .help("Delete")
         }
       }
       if let error {
-        Text(error)
-          .font(.callout)
-          .foregroundStyle(.red)
-          .padding(.leading, 28)
+        NeedsNote(text: error)
+          .padding(.leading, 24)
       }
     }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 6)
+    .hoverWash(18)
   }
 }

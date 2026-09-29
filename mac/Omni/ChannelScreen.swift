@@ -12,7 +12,7 @@ struct ChannelScreen: View {
     if let channel = model.store.channel(id) {
       ChannelView(model: model, channel: channel, tab: tab, pr: pr)
     } else if model.store.loadState == .loading {
-      ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+      LoadingNote().padding(.horizontal, 32).frame(maxHeight: .infinity, alignment: .top)
     } else {
       MissingChannelView(model: model, id: id)
     }
@@ -31,7 +31,7 @@ private struct ChannelView: View {
     ScreenColumn {
       VStack(alignment: .leading, spacing: 0) {
         header
-          .padding(.top, 32)
+          .padding(.top, 40)
         links
         tabs.padding(.top, 20)
         Group {
@@ -57,25 +57,24 @@ private struct ChannelView: View {
       ChannelAvatar(name: channel.name, conductor: conductor, size: 44)
       VStack(alignment: .leading, spacing: 4) {
         HStack(spacing: 8) {
-          Text(kindLabel.uppercased())
-            .tracking(0.8)
+          Text(kindLabel)
           if channel.running > 0 {
-            HStack(spacing: 5) {
-              Circle().fill(ThreadStyle.info).frame(width: 6, height: 6)
+            HStack(spacing: 6) {
+              GlyphView(glyph: .running, size: 7)
               Text("\(channel.running) running")
             }
-            .foregroundStyle(ThreadStyle.info)
+            .foregroundStyle(Tok.live)
           }
         }
-        .font(.system(size: 11, weight: .medium))
-        .foregroundStyle(.tertiary)
-        HStack(alignment: .firstTextBaseline, spacing: 2) {
+        .omniCaption()
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
           if !conductor {
-            Text("#").foregroundStyle(.tertiary)
+            Text("#").foregroundStyle(Tok.fg4)
           }
-          Text(channel.name).lineLimit(1)
+          Text(channel.name).lineLimit(1).foregroundStyle(Tok.fg)
         }
-        .font(.system(size: 28, weight: .semibold))
+        .font(.system(size: 30, weight: .medium))
+        .tracking(-0.3)
       }
       Spacer()
     }
@@ -99,27 +98,28 @@ private struct ChannelView: View {
     if domain != nil || repo != nil || path != nil || note != nil {
       HStack(spacing: 6) {
         if let domain, let url = URL(string: "https://\(domain)/admin") {
-          LinkPill(symbol: "globe", text: domain, url: url)
+          LinkPill(icon: "globe", text: domain, url: url)
         }
         if let repo, let url = URL(string: "https://github.com/\(repo)") {
-          LinkPill(symbol: "arrow.triangle.branch", text: repo, url: url)
+          LinkPill(icon: "branch", text: repo, url: url)
         }
         if let path {
           Text(path)
             .font(.system(size: 11, design: .monospaced))
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(Tok.fg4)
             .lineLimit(1)
             .truncationMode(.head)
             .padding(.horizontal, 10)
-            .frame(height: 26)
-            .overlay(Capsule().strokeBorder(ThreadStyle.line))
+            .frame(height: 28)
+            .overlay(Capsule().strokeBorder(Tok.line))
             .help(path)
         }
         if let note {
           Text(note)
             .font(.system(size: 12.5))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Tok.fg3)
             .lineLimit(1)
+            .padding(.horizontal, 4)
         }
         Spacer(minLength: 0)
       }
@@ -140,14 +140,13 @@ private struct ChannelTabsPicker: View {
   let conductor: Bool
 
   var body: some View {
-    Picker("Channel tabs", selection: Binding(get: { tab }, set: { model.route = .channel(id: channelID, tab: $0) })) {
-      Text("Threads").tag(ChannelTab.threads)
-      if !conductor { Text("PRs").tag(ChannelTab.prs) }
-      Text("Settings").tag(ChannelTab.settings)
-    }
-    .pickerStyle(.segmented)
-    .labelsHidden()
-    .fixedSize()
+    let options: [(ChannelTab, String)] = conductor
+      ? [(.threads, "Threads"), (.settings, "Settings")]
+      : [(.threads, "Threads"), (.prs, "PRs"), (.settings, "Settings")]
+    SegmentedPill(selection: Binding(get: { tab }, set: { model.route = .channel(id: channelID, tab: $0) }), options: options)
+      .fixedSize()
+      .accessibilityElement(children: .contain)
+      .accessibilityLabel("Channel tabs")
   }
 }
 
@@ -160,8 +159,13 @@ struct ChannelTabsBar: View {
     if let channel = model.store.channel(channelID) {
       let conductor = channel.id == SidebarSections.conductorID
       HStack(spacing: 10) {
-        ChannelAvatar(name: channel.name, conductor: conductor, size: 24)
-        Text(conductor ? channel.name : "#\(channel.name)").font(.headline).lineLimit(1)
+        ChannelAvatar(name: channel.name, conductor: conductor, size: 28)
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
+          if !conductor { Text("#").foregroundStyle(Tok.fg4) }
+          Text(channel.name).foregroundStyle(Tok.fg)
+        }
+        .font(.system(size: 15, weight: .medium))
+        .lineLimit(1)
         Spacer()
         ChannelTabsPicker(model: model, channelID: channel.id, tab: .prs, conductor: conductor)
       }
@@ -171,23 +175,27 @@ struct ChannelTabsBar: View {
   }
 }
 
+/// A store or repo link in the header: a surface pill that deepens on hover.
 private struct LinkPill: View {
-  let symbol: String
+  let icon: String
   let text: String
   let url: URL
+  @State private var hovering = false
 
   var body: some View {
     Link(destination: url) {
-      HStack(spacing: 5) {
-        Image(systemName: symbol).foregroundStyle(.secondary)
-        Text(text).lineLimit(1)
+      HStack(spacing: 6) {
+        OmniIcon(name: icon, size: 13).foregroundStyle(Tok.fg3)
+        Text(text).lineLimit(1).foregroundStyle(Tok.fg2)
       }
       .font(.system(size: 12))
       .padding(.horizontal, 10)
-      .frame(height: 26)
-      .background(ThreadStyle.surface, in: Capsule())
+      .frame(height: 28)
+      .background(hovering ? Tok.surface2 : Tok.surface, in: Capsule())
+      .contentShape(Capsule())
     }
     .buttonStyle(.plain)
+    .onHover { hovering = $0 }
   }
 }
 
@@ -206,9 +214,9 @@ private struct ChannelThreads: View {
       if let error, loaded == nil {
         ErrorNote(text: error) { Task { await load() } }
       } else if loaded == nil {
-        ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding(.vertical, 24)
+        LoadingNote()
       } else if threads.isEmpty {
-        EmptyNote(symbol: "bubble.left", title: "No threads in this channel yet", message: "Start one above. Crew threads delegated by the Conductor land here too.")
+        EmptyNote(symbol: "message", title: "No threads in this channel yet", message: "Start one above. Crew threads delegated by the Conductor land here too.")
       } else {
         ThreadDayList(model: model, threads: threads)
       }

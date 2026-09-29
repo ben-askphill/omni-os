@@ -25,13 +25,16 @@ struct NewThreadScreen: View {
   }
 
   private var greeting: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)).uppercased())
-        .font(.system(size: 11, design: .monospaced))
-        .tracking(0.6)
-        .foregroundStyle(.tertiary)
+    VStack(alignment: .leading, spacing: 0) {
+      StaticMark(size: 40).foregroundStyle(Tok.fg)
+      Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "en_GB"))))
+        .omniCaption()
+        .padding(.top, 16)
+        .padding(.bottom, 10)
       Text(NewThreadText.greeting(hour: Calendar.current.component(.hour, from: .now)))
-        .font(.system(size: 34, weight: .regular, design: .serif))
+        .font(.system(size: 36, weight: .medium))
+        .tracking(-0.36)
+        .foregroundStyle(Tok.fg)
     }
     .padding(.horizontal, 4)
   }
@@ -106,12 +109,6 @@ private struct NewThreadBox: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       shell
-      if let role = composer.role, !role.description.isEmpty {
-        Text(role.description)
-          .font(.system(size: 12))
-          .foregroundStyle(.secondary)
-          .padding(.horizontal, 16)
-      }
       if let e = composer.sendError { ErrorNote(text: e) }
     }
     #if DEBUG
@@ -162,34 +159,31 @@ private struct NewThreadBox: View {
   }
 
   private var shell: some View {
-    let radius: CGFloat = big ? 28 : 24
+    let radius: CGFloat = big ? 30 : 26
     return VStack(alignment: .leading, spacing: 0) {
       if !composer.files.isEmpty { AttachmentStrip(files: composer.files, remove: composer.removeFile) }
       ComposerTextView(
         text: $composer.text, placeholder: placeholder, running: false, interrupting: false, focusTick: focusTick,
-        callbacks: callbacks, heightRange: range, label: "New thread", caretRequest: caret)
+        callbacks: callbacks, heightRange: range, label: "New thread", caretRequest: caret, fontSize: big ? 16 : 14.5)
       if let e = composer.attachError {
-        Text(e).font(.system(size: 12)).foregroundStyle(ThreadStyle.bad).padding(.horizontal, 16).padding(.bottom, 4)
+        Text(e).font(.system(size: 12)).foregroundStyle(Tok.fg).padding(.horizontal, 16).padding(.bottom, 4)
       }
       footer
       SlashHintView(model: menu) {}
         .padding(.horizontal, 16)
         .padding(.bottom, menu.hint == nil ? 0 : 10)
         .padding(.top, menu.hint == nil ? 0 : 2)
-    }
-    .background(Color(nsColor: .textBackgroundColor).opacity(0.6), in: RoundedRectangle(cornerRadius: radius))
-    .overlay {
-      RoundedRectangle(cornerRadius: radius)
-        .strokeBorder(Color.primary.opacity(over || focused ? 0.3 : 0.12), lineWidth: over ? 1.5 : 1)
-    }
-    .overlay {
-      if over {
-        RoundedRectangle(cornerRadius: radius)
-          .fill(.background.opacity(0.85))
-          .overlay { Label("Drop to attach", systemImage: "paperclip").font(.system(size: 13, weight: .medium)) }
-          .allowsHitTesting(false)
+      // The role's charter, inside the card, as Composer.tsx.
+      if let role = composer.role, !role.description.isEmpty {
+        Text(role.description)
+          .font(.system(size: 12))
+          .foregroundStyle(Tok.fg3)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(.horizontal, 16)
+          .padding(.bottom, 10)
       }
     }
+    .composerShell(radius: radius, focused: focused, over: over)
     .dropDestination(for: URL.self) { urls, _ in
       stage(urls)
       return true
@@ -200,30 +194,22 @@ private struct NewThreadBox: View {
   }
 
   private var footer: some View {
-    HStack(spacing: 6) {
-      Button {
-        picking = true
-      } label: {
-        Image(systemName: "paperclip").frame(width: 28, height: 28).contentShape(Rectangle())
-      }
-      .buttonStyle(.plain)
-      .foregroundStyle(.secondary)
-      .disabled(composer.sending)
-      .help("Attach files")
-      .accessibilityLabel("Attach files")
+    ComposerFooterLayout {
       if composer.fixedChannel == nil { channelMenu }
       roleMenu
       ModelPickerButton(
         harnesses: composer.harnesses, choice: composer.choice,
         pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest)
       effortMenu
-      Spacer(minLength: 8)
-      Text("⌘↩").font(.system(size: 11.5)).foregroundStyle(.tertiary).accessibilityHidden(true)
-      SendButton(title: "Start", armed: composer.canSend, sending: composer.sending) { start() }
+      AttachButton(disabled: composer.sending) { picking = true }
+      HStack(spacing: 10) {
+        ComposerHints()
+        SendButton(title: "Start", armed: composer.canSend, sending: composer.sending) { start() }
+      }
     }
     .padding(.horizontal, 8)
     .padding(.bottom, 8)
-    .padding(.top, 2)
+    .padding(.top, 6)
   }
 
   // MARK: Pickers
@@ -239,7 +225,13 @@ private struct NewThreadBox: View {
       .pickerStyle(.inline)
       .labelsHidden()
     } label: {
-      PillLabel(symbol: current == NewThreadRules.conductor ? "scope" : "number", text: channelName(current))
+      PickerPill(text: channelName(current)) {
+        if current == NewThreadRules.conductor {
+          PillIcon(name: "target")
+        } else {
+          PillAvatar { Text(AvatarMark(name: channelName(current)).letter) }
+        }
+      }
     }
     .pillMenu()
     .help("Channel")
@@ -260,7 +252,17 @@ private struct NewThreadBox: View {
       .pickerStyle(.inline)
       .labelsHidden()
     } label: {
-      PillLabel(symbol: "person", text: current?.name ?? "No role")
+      PickerPill(text: current?.name ?? "No role") {
+        if let current {
+          if current.id == NewThreadRules.conductor {
+            PillAvatar(fill: Tok.bg) { StaticMark(size: 13, ring: true).foregroundStyle(Tok.fg) }
+          } else {
+            PillAvatar { Text(AvatarMark(name: current.name).letter) }
+          }
+        } else {
+          PillIcon(name: "x")
+        }
+      }
     }
     .pillMenu()
     .help("Role")
@@ -270,8 +272,8 @@ private struct NewThreadBox: View {
   @ViewBuilder private var effortMenu: some View {
     let options = composer.effortOptions
     if options.isEmpty {
-      PillLabel(symbol: "slider.horizontal.3", text: "Auto effort", chevron: false)
-        .opacity(0.5)
+      PickerPill(text: "Auto effort") { PillIcon(name: "sliders") }
+        .opacity(0.45)
         .help("This model has no effort levels")
     } else {
       let label = options.first { $0.value == composer.choice.effort }?.label ?? options[0].label
@@ -282,7 +284,7 @@ private struct NewThreadBox: View {
         .pickerStyle(.inline)
         .labelsHidden()
       } label: {
-        PillLabel(symbol: "slider.horizontal.3", text: label)
+        PickerPill(text: label) { PillIcon(name: "sliders") }
       }
       .pillMenu()
       .help("Effort")
@@ -346,27 +348,6 @@ private struct NewThreadBox: View {
   }
 }
 
-/// A picker's closed state: an icon, a name and a chevron, as the Web UI's pills.
-private struct PillLabel: View {
-  let symbol: String
-  let text: String
-  var chevron = true
-
-  var body: some View {
-    HStack(spacing: 6) {
-      Image(systemName: symbol).font(.system(size: 11.5)).foregroundStyle(.secondary)
-      Text(text).font(.system(size: 12.5, weight: .medium)).lineLimit(1).truncationMode(.tail)
-      if chevron { Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(.tertiary) }
-    }
-    .padding(.horizontal, 10)
-    .frame(height: 28)
-    .frame(maxWidth: 190)
-    .background(ThreadStyle.surface2, in: Capsule())
-    .contentShape(Capsule())
-    .fixedSize()
-  }
-}
-
 private extension View {
   func pillMenu() -> some View {
     menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
@@ -414,30 +395,27 @@ private struct ModelPickerButton: View {
   }
 
   private func pill(_ c: (harness: HarnessInfo?, model: ModelEntry?), harness: Bool) -> some View {
-    HStack(spacing: 6) {
-      Image(systemName: "bolt").font(.system(size: 11.5)).foregroundStyle(.secondary)
-      Text(c.model?.label ?? "Model").font(.system(size: 12.5, weight: .medium)).lineLimit(1)
-      if harness, let h = c.harness { Text("· \(h.name)").font(.system(size: 12.5)).foregroundStyle(.tertiary).lineLimit(1) }
-      Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(.tertiary)
+    PickerPill(text: c.model?.label ?? "Model", secondary: harness ? c.harness?.name : nil) {
+      if let h = c.harness {
+        PillAvatar(fill: Tok.bg) { HarnessLogo(harness: h.id.rawValue, size: 13).foregroundStyle(Tok.fg) }
+      } else {
+        PillIcon(name: "zap")
+      }
     }
-    .padding(.horizontal, 10)
-    .frame(height: 28)
-    .background(ThreadStyle.surface2, in: Capsule())
-    .contentShape(Capsule())
-    .fixedSize()
   }
 
   private var list: some View {
     let groups = ModelSearch.groups(harnesses, query: query)
     return VStack(spacing: 0) {
       HStack(spacing: 8) {
-        Image(systemName: "magnifyingglass").foregroundStyle(.tertiary)
-        TextField("Find a model or harness", text: $query).textFieldStyle(.plain).font(.system(size: 13))
+        OmniIcon(name: "search", size: 15).foregroundStyle(Tok.fg4)
+        TextField("Find a model or harness", text: $query).textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Tok.fg)
       }
       .padding(.horizontal, 12)
-      .frame(height: 36)
-      .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 12))
-      .padding(8)
+      .frame(height: 40)
+      .background(Tok.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+      .padding([.horizontal, .top], 6)
+      .padding(.bottom, 4)
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
           ForEach(groups) { group in
@@ -448,23 +426,30 @@ private struct ModelPickerButton: View {
             }
           }
         }
+        .padding(.horizontal, 6)
         .padding(.bottom, 6)
       }
       .frame(height: 320)
     }
     .frame(width: 340)
+    .background(Tok.elev)
   }
 
   private func header(_ h: HarnessInfo) -> some View {
     HStack {
-      Text(h.name.uppercased()).font(.system(size: 11, weight: .semibold)).tracking(0.5).foregroundStyle(.secondary)
+      HStack(spacing: 6) {
+        HarnessLogo(harness: h.id.rawValue, size: 12)
+        Text(h.name).lineLimit(1)
+      }
+      .omniCaption()
       Spacer()
-      Text(h.available ? "Bills your \(h.plan)" : "Unavailable").font(.system(size: 10.5)).foregroundStyle(.tertiary)
+      Text(h.available ? "Bills your \(h.plan)" : "Unavailable").font(.system(size: 11.5)).foregroundStyle(Tok.fg4)
     }
     .padding(.horizontal, 12)
-    .padding(.vertical, 6)
+    .padding(.top, 8)
+    .padding(.bottom, 4)
     .frame(maxWidth: .infinity)
-    .background(.regularMaterial)
+    .background(Tok.elev)
   }
 
   @ViewBuilder private func rows(_ group: ModelGroup) -> some View {
@@ -472,12 +457,12 @@ private struct ModelPickerButton: View {
     if !h.available {
       Text("Not available. Run \(Text(h.fix ?? "the harness login").monospaced()).")
         .font(.system(size: 11.5))
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(Tok.fg4)
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
     } else if group.models.isEmpty {
       if !query.trimmingCharacters(in: .whitespaces).isEmpty {
-        Text("No match").font(.system(size: 11.5)).foregroundStyle(.tertiary).padding(.horizontal, 12).padding(.bottom, 8)
+        Text("No match").font(.system(size: 11.5)).foregroundStyle(Tok.fg4).padding(.horizontal, 12).padding(.bottom, 8)
       }
     } else {
       ForEach(group.models) { m in
@@ -487,25 +472,41 @@ private struct ModelPickerButton: View {
           open = false
         } label: {
           HStack(spacing: 10) {
-            Image(systemName: "bolt")
-              .font(.system(size: 12))
-              .foregroundStyle(.secondary)
+            HarnessLogo(harness: h.id.rawValue, size: 13)
+              .foregroundStyle(Tok.fg)
               .frame(width: 28, height: 28)
-              .background(ThreadStyle.surface2, in: Circle())
+              .background(Tok.surface2, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
-              (Text(m.label) + Text(m.isDefault ? " (default)" : "").foregroundStyle(.tertiary)).font(.system(size: 13)).lineLimit(1)
-              if let note = m.note { Text(note).font(.system(size: 11.5)).foregroundStyle(.tertiary).lineLimit(1) }
+              (Text(m.label).foregroundStyle(Tok.fg) + Text(m.isDefault ? " (default)" : "").foregroundStyle(Tok.fg4)).font(.system(size: 13)).lineLimit(1)
+              if let note = m.note { Text(note).font(.system(size: 11.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
             }
             Spacer(minLength: 4)
-            if selected { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
+            PickMark(on: selected)
           }
-          .padding(.horizontal, 12)
-          .padding(.vertical, 5)
-          .contentShape(Rectangle())
+          .padding(.horizontal, 8)
+          .padding(.vertical, 6)
+          .frame(minHeight: 40)
+          .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
       }
     }
+  }
+}
+
+/// `.pik-mark` in index.css: an outlined square that fills with ink when picked.
+private struct PickMark: View {
+  let on: Bool
+
+  var body: some View {
+    let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+    ZStack {
+      shape.fill(on ? Tok.fg : .clear)
+      shape.strokeBorder(on ? Tok.fg : Tok.lineStrong, lineWidth: 1.5)
+      if on { OmniIcon(name: "check", size: 12, weight: 2.4).foregroundStyle(Tok.onInk) }
+    }
+    .frame(width: 18, height: 18)
+    .animation(.easeOut(duration: 0.16), value: on)
   }
 }

@@ -7,7 +7,7 @@ enum ThreadStyle {
   static let prose: CGFloat = 14
   static let small: CGFloat = 12.5
   static let mono: CGFloat = 11.5
-  static let card: CGFloat = 18
+  static let card: CGFloat = 20
 
   static let surface = Tok.surface
   static let surface2 = Tok.surface2
@@ -133,7 +133,7 @@ struct GlyphView: View {
   }
 }
 
-/// Monospaced text in a box, as Pre in Transcript.tsx: wrapped, and scrolling past about 20 lines.
+/// Monospaced text in a 12pt box, as Pre in Transcript.tsx: wrapped, and scrolling past about 20 lines.
 struct Pre: View {
   enum Tone { case plain, bad, add, delete }
 
@@ -143,12 +143,12 @@ struct Pre: View {
   var body: some View {
     let body = Text(text)
       .font(.system(size: ThreadStyle.mono, design: .monospaced))
-      .lineSpacing(2)
+      .lineSpacing(4)
       .foregroundStyle(tone == .bad ? Tok.fg : Tok.fg2)
       .textSelection(.enabled)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, 12)
-      .padding(.vertical, 9)
+      .padding(.vertical, 10)
     Group {
       if Format.isTall(text) {
         ScrollView { body }
@@ -157,8 +157,8 @@ struct Pre: View {
         body
       }
     }
-    .background(background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(ThreadStyle.line))
+    .background(background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(ThreadStyle.line))
   }
 
   private var background: Color {

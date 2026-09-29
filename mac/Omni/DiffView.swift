@@ -7,11 +7,11 @@ struct DiffView: View {
 
   var body: some View {
     if diff.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-      Text("No diff.").font(.system(size: 13)).foregroundStyle(.secondary)
+      Text("No diff.").font(.system(size: 13)).foregroundStyle(Tok.fg3)
     } else {
       let files = DiffParser.parse(diff)
       if files.isEmpty {
-        Text(diff).font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
+        Text(diff).font(.system(size: 12, design: .monospaced)).foregroundStyle(Tok.fg).textSelection(.enabled)
       } else {
         LazyVStack(spacing: 8) {
           ForEach(Array(files.enumerated()), id: \.offset) { _, file in
@@ -27,6 +27,7 @@ private struct DiffFileView: View {
   let file: FileDiff
   @State private var open: Bool
   @State private var showAll = false
+  @State private var hover = false
 
   init(file: FileDiff, startsOpen: Bool) {
     self.file = file
@@ -39,18 +40,22 @@ private struct DiffFileView: View {
         open.toggle()
       } label: {
         HStack(spacing: 8) {
-          Image(systemName: "chevron.right")
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .rotationEffect(.degrees(open ? 90 : 0))
-            .frame(width: 12)
-          Text(file.path).font(.system(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.middle)
-          Spacer()
-          Changes(add: file.add, del: file.del)
+          Chevron(open: open, color: Tok.fg3)
+          Text(file.path)
+            .font(.system(size: 12, design: .monospaced))
+            .foregroundStyle(Tok.fg)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          Text("+\(file.add)").foregroundStyle(Tok.fg2)
+          Text("-\(file.del)").foregroundStyle(Tok.fg3)
         }
+        .font(.system(size: 11))
+        .monospacedDigit()
         .padding(.horizontal, 14)
-        .frame(height: 38)
-        .background(ThreadStyle.surface)
+        .frame(height: 40)
+        .background(hover ? Tok.surface2 : Tok.surface)
+        .onHover { hover = $0 }
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
@@ -59,7 +64,7 @@ private struct DiffFileView: View {
 
       if open {
         if file.binary {
-          Text("Binary file").font(.system(size: 12)).foregroundStyle(.secondary)
+          Text("Binary file").font(.system(size: 12)).foregroundStyle(Tok.fg3)
             .padding(.horizontal, 12).padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -67,37 +72,42 @@ private struct DiffFileView: View {
           ForEach(Array(file.shown(all: showAll).enumerated()), id: \.offset) { _, line in
             Text(line.isEmpty ? " " : line)
               .font(.system(size: ThreadStyle.mono, design: .monospaced))
+              .lineSpacing(0)
               .foregroundStyle(color(line))
               .padding(.horizontal, 12)
+              .padding(.vertical, 2)
               .frame(maxWidth: .infinity, alignment: .leading)
               .background(background(line))
           }
         }
         .textSelection(.enabled)
+        .background(Tok.bg)
         if !showAll, file.hiddenLines > 0 {
-          Divider()
+          Hairline()
           Button("Show \(file.hiddenLines) more lines") { showAll = true }
             .buttonStyle(.plain)
             .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, minHeight: 34)
+            .foregroundStyle(Tok.fg3)
+            .frame(maxWidth: .infinity, minHeight: 36)
+            .background(Tok.bg)
         }
       }
     }
-    .clipShape(RoundedRectangle(cornerRadius: 16))
-    .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(ThreadStyle.line) }
+    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Tok.line) }
   }
 
   private func color(_ line: String) -> Color {
-    if line.hasPrefix("@@") { return ThreadStyle.info }
-    if line.hasPrefix("\\") { return .secondary.opacity(0.7) }
-    return .primary.opacity(0.85)
+    if line.hasPrefix("@@") { return Tok.fg3 }
+    if line.hasPrefix("\\") { return Tok.fg4 }
+    if line.hasPrefix("+") || line.hasPrefix("-") { return Tok.fg }
+    return Tok.fg2
   }
 
   private func background(_ line: String) -> Color {
-    if line.hasPrefix("@@") { return ThreadStyle.infoBackground }
-    if line.hasPrefix("+") { return ThreadStyle.add }
-    if line.hasPrefix("-") { return ThreadStyle.delete }
+    if line.hasPrefix("@@") { return Tok.surface }
+    if line.hasPrefix("+") { return Tok.diffAdd }
+    if line.hasPrefix("-") { return Tok.diffDelete }
     return .clear
   }
 }

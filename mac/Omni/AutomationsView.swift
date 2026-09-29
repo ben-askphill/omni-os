@@ -12,7 +12,7 @@ struct AutomationsView: View {
       if let automations {
         AutomationsList(model: model, automations: automations)
       } else {
-        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        LoadingNote().padding(.horizontal, 32).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
       }
     }
     .task(id: model.client.baseURL) {
@@ -35,26 +35,28 @@ struct AutomationsList: View {
   let automations: AutomationsModel
 
   var body: some View {
-    Form {
-      Section {
-        Label {
-          Text("Scheduled prompts. Each run becomes a thread in its channel. Definitions live in \(Text("automations/*.yaml").monospaced()) and reload on save.")
-        } icon: {
-          Image(systemName: "bolt")
+    ScreenColumn {
+      VStack(alignment: .leading, spacing: 0) {
+        OmniPageHeader(
+          title: "Automations",
+          subtitle: "Scheduled prompts. Each run becomes a thread in its channel. Definitions live in automations/*.yaml and reload on save."
+        ) {
+          Button {
+            Task { await automations.load() }
+          } label: {
+            if automations.isRefreshing && automations.loadState == .loaded {
+              Loader(size: 12)
+            } else {
+              OmniIcon(name: "refresh", size: 14)
+            }
+          }
+          .buttonStyle(.pill(.ghost, height: 28))
+          .help("Refresh")
+          .accessibilityLabel("Refresh")
         }
-        .foregroundStyle(.secondary)
-      }
-      content
-    }
-    .formStyle(.grouped)
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        if automations.isRefreshing && automations.loadState == .loaded {
-          ProgressView().controlSize(.small)
-        } else {
-          Button("Refresh", systemImage: "arrow.clockwise") { Task { await automations.load() } }
-            .help("Refresh")
-        }
+        .padding(.top, 40)
+        .padding(.bottom, 24)
+        content
       }
     }
   }
@@ -62,89 +64,108 @@ struct AutomationsList: View {
   @ViewBuilder private var content: some View {
     switch automations.loadState {
     case .loading:
-      Section {
-        HStack {
-          ProgressView().controlSize(.small)
-          Text("Loading").foregroundStyle(.secondary)
-        }
-      }
+      LoadingNote()
     case .failed(let message):
-      Section {
-        HStack(alignment: .firstTextBaseline) {
-          Label(message, systemImage: "exclamationmark.triangle")
-            .foregroundStyle(.red)
-          Spacer()
-          Button("Retry") { Task { await automations.load() } }
-        }
-      }
+      ErrorNote(text: message) { Task { await automations.load() } }
     case .loaded where automations.automations.isEmpty:
-      Section {
-        ContentUnavailableView {
-          Label("No automations yet", systemImage: "clock")
-        } description: {
-          Text("Add a YAML file to \(Text("automations/").monospaced()) with name, cron, channel and prompt. It shows up here right away.")
-        }
-        .frame(maxWidth: .infinity)
-      }
+      EmptyNote(symbol: "clock", title: "No automations yet",
+                message: "Add a YAML file to automations/ with name, cron, channel and prompt. It shows up here right away.")
     case .loaded:
-      ForEach(automations.automations) { a in
-        AutomationSection(model: model, automations: automations, automation: a)
+      VStack(spacing: 12) {
+        ForEach(automations.automations) { a in
+          AutomationSection(model: model, automations: automations, automation: a)
+        }
       }
     }
   }
 }
 
+/// AutomationCard in Automations.tsx: a surface card at 24pt corners.
 struct AutomationSection: View {
   let model: AppModel
   let automations: AutomationsModel
   let automation: Automation
+  @State private var showPrompt = false
 
   private var enabled: Bool { automations.isEnabled(automation) }
 
   var body: some View {
-    Section {
-      header
+    VStack(alignment: .leading, spacing: 0) {
+      header.padding(20)
       if let note = automation.errorNote {
-        Label(note, systemImage: "exclamationmark.triangle")
-          .foregroundStyle(.red)
-          .textSelection(.enabled)
+        ErrorNote(text: note).padding(.horizontal, 20).padding(.bottom, 16)
       }
       if let error = automations.errors[automation.id] {
-        Label(error, systemImage: "exclamationmark.triangle")
-          .foregroundStyle(.red)
+        ErrorNote(text: error).padding(.horizontal, 20).padding(.bottom, 16)
       }
-      DisclosureGroup("Prompt") {
+      prompt.padding(.horizontal, 10).padding(.bottom, 4)
+      runs.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 16)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    .overlay {
+      if automation.error != nil {
+        RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Tok.needs.opacity(0.35))
+      }
+    }
+  }
+
+  private var prompt: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Button {
+        withAnimation(Motion.settle) { showPrompt.toggle() }
+      } label: {
+        HStack(spacing: 6) {
+          OmniIcon(name: "chevronRight", size: 12)
+            .rotationEffect(.degrees(showPrompt ? 90 : 0))
+          Text("Prompt")
+        }
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(Tok.fg3)
+        .padding(.horizontal, 10)
+        .frame(height: 32)
+        .hoverWash(16, fill: Tok.surface2)
+      }
+      .buttonStyle(.plain)
+      .accessibilityValue(showPrompt ? "Expanded" : "Collapsed")
+      if showPrompt {
         Text(automation.prompt.isEmpty ? "(empty)" : automation.prompt)
-          .font(.callout.monospaced())
-          .foregroundStyle(.secondary)
+          .font(.system(size: 12, design: .monospaced))
+          .lineSpacing(3)
+          .foregroundStyle(Tok.fg2)
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.horizontal, 14)
+          .padding(.vertical, 12)
+          .background(Tok.bg, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+          .padding(.horizontal, 10)
+          .padding(.bottom, 8)
       }
-      runs
     }
   }
 
   private var header: some View {
     HStack(alignment: .top, spacing: 12) {
-      Image(systemName: "bolt.fill")
-        .font(.callout)
-        .foregroundStyle(enabled && automation.error == nil ? .primary : .tertiary)
-        .frame(width: 30, height: 30)
-        .background(.quaternary.opacity(0.6), in: Circle())
-      VStack(alignment: .leading, spacing: 6) {
+      OmniIcon(name: "zap", size: 16)
+        .foregroundStyle(enabled && automation.error == nil ? Tok.fg : Tok.fg4)
+        .frame(width: 36, height: 36)
+        .background(Tok.bg, in: Circle())
+        .padding(.top, 2)
+      VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: 8) {
-          Text(automation.name).font(.headline)
+          Text(automation.name).font(.system(size: 16, weight: .medium)).foregroundStyle(Tok.fg)
           if let badge = automation.badge(enabled: enabled) { Badge(badge: badge) }
         }
-        details
+        details.padding(.top, 8)
         if automation.nextRun(enabled: enabled) != nil {
           TimelineView(.everyMinute) { context in
             if let next = automation.nextRun(enabled: enabled, now: context.date) {
-              Text("Next run \(Text(next.when).foregroundStyle(.primary).fontWeight(.medium))\(next.zone.map { " (\($0))" } ?? "")")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+              Text("Next run \(Text(next.when).foregroundStyle(Tok.fg).fontWeight(.medium))\(next.zone.map { " (\($0))" } ?? "")")
+                .font(.system(size: 12.5))
+                .foregroundStyle(Tok.fg3)
             }
           }
+          .padding(.top, 10)
         }
       }
       Spacer(minLength: 8)
@@ -154,41 +175,44 @@ struct AutomationSection: View {
             if let id = await automations.runNow(automation) { model.route = .thread(id: id) }
           }
         } label: {
-          if automations.starting.contains(automation.id) {
-            HStack(spacing: 6) {
-              ProgressView().controlSize(.mini)
-              Text("Run now")
+          HStack(spacing: 6) {
+            if automations.starting.contains(automation.id) {
+              Loader(size: 12)
+            } else {
+              OmniIcon(name: "play", size: 14)
             }
-          } else {
-            Label("Run now", systemImage: "play.fill")
+            Text("Run now")
           }
         }
+        .buttonStyle(.pill(.secondary, height: 28))
         .disabled(!automations.canRun(automation))
         Toggle(enabled ? "Pause automation" : "Enable automation", isOn: Binding {
           enabled
         } set: { on in
           Task { await automations.setEnabled(on, for: automation) }
         })
-        .toggleStyle(.switch)
-        .labelsHidden()
+        .toggleStyle(.omni)
+        .accessibilityLabel(enabled ? "Pause automation" : "Enable automation")
         .disabled(!automations.canToggle(automation))
         .help(enabled ? "Pause automation" : "Enable automation")
       }
     }
-    .padding(.vertical, 2)
   }
 
   private var details: some View {
     FlowRow(spacing: 6, lineSpacing: 6) {
-      Label(automation.schedule, systemImage: "clock")
-        .chip()
-        .help(automation.scheduleHelp)
+      HStack(spacing: 6) {
+        OmniIcon(name: "clock", size: 12).foregroundStyle(Tok.fg3)
+        Text(automation.schedule)
+      }
+      .chip()
+      .help(automation.scheduleHelp)
       Text(automation.cron)
-        .font(.caption.monospaced())
-        .foregroundStyle(.tertiary)
-        .padding(.horizontal, 7)
-        .frame(height: 20)
-        .overlay(Capsule().strokeBorder(.separator))
+        .font(.system(size: 11, design: .monospaced))
+        .foregroundStyle(Tok.fg4)
+        .padding(.horizontal, 8)
+        .frame(height: 24)
+        .overlay(Capsule().strokeBorder(Tok.line))
       Button("#\(model.store.channel(automation.channel)?.name ?? automation.channel)") {
         model.route = .channel(id: automation.channel)
       }
@@ -196,22 +220,27 @@ struct AutomationSection: View {
       .chip()
       .help("Open the channel")
       if let role = automation.role { Text(role).chip() }
-      if let m = automation.model { Text(m).monospacedDigit().chip() }
+      if let m = automation.model { Text(m).font(.system(size: 11)).monospacedDigit().chip() }
     }
-    .font(.caption)
-    .foregroundStyle(.secondary)
+    .font(.system(size: 12))
+    .foregroundStyle(Tok.fg2)
   }
 
   @ViewBuilder private var runs: some View {
-    HStack(spacing: 10) {
-      Text("Last runs").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
-      RunStrip(automation: automation)
-    }
-    if automation.runs.isEmpty {
-      Text("Never run.").foregroundStyle(.tertiary)
-    } else {
-      ForEach(Array(automation.runs.enumerated()), id: \.offset) { _, run in
-        RunRow(run: run) { id in model.route = .thread(id: id) }
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 12) {
+        Text("Last runs").omniCaption()
+        RunStrip(automation: automation)
+      }
+      if automation.runs.isEmpty {
+        Text("Never run.").font(.system(size: 12.5)).foregroundStyle(Tok.fg4)
+      } else {
+        VStack(spacing: 0) {
+          ForEach(Array(automation.runs.enumerated()), id: \.offset) { _, run in
+            RunRow(run: run) { id in model.route = .thread(id: id) }
+          }
+        }
+        .padding(.horizontal, -8)
       }
     }
   }
@@ -222,20 +251,8 @@ private struct Badge: View {
 
   var body: some View {
     switch badge {
-    case .paused:
-      Text(badge.title)
-        .font(.caption.weight(.medium))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 7)
-        .frame(height: 18)
-        .overlay(Capsule().strokeBorder(.separator))
-    case .invalid:
-      Text(badge.title)
-        .font(.caption.weight(.medium))
-        .foregroundStyle(.red)
-        .padding(.horizontal, 7)
-        .frame(height: 18)
-        .background(.red.opacity(0.14), in: Capsule())
+    case .paused: Chip(text: badge.title, tone: .outline)
+    case .invalid: Chip(text: badge.title, tone: .needs)
     }
   }
 }
@@ -275,56 +292,53 @@ private struct RunRow: View {
 
   var body: some View {
     if let id = run.threadID {
-      Button { open(id) } label: { content.contentShape(Rectangle()) }
+      Button { open(id) } label: { content.foregroundStyle(Tok.fg).hoverWash(16, fill: Tok.surface2) }
         .buttonStyle(.plain)
         .help("Open the thread")
     } else {
-      content.foregroundStyle(.secondary)
+      content.foregroundStyle(Tok.fg3)
     }
   }
 
   private var content: some View {
     HStack(spacing: 10) {
-      Group {
-        if run.dotIsHollow {
-          Circle().strokeBorder(runColor(run.dotStatus), lineWidth: 1.5)
-        } else {
-          Circle().fill(runColor(run.dotStatus))
-        }
-      }
-      .frame(width: 7, height: 7)
+      GlyphView(glyph: Glyph(run.dotStatus), size: 7)
       Text(run.label).lineLimit(1).truncationMode(.tail)
       Spacer(minLength: 8)
       if run.isManual {
-        Text("manual").font(.caption).foregroundStyle(.tertiary)
+        Text("manual").font(.system(size: 10.5)).foregroundStyle(Tok.fg4)
       }
       TimelineView(.everyMinute) { context in
         Text(RelTime.label(run.createdAt, now: context.date))
-          .font(.callout.monospacedDigit())
-          .foregroundStyle(.secondary)
+          .font(.system(size: 11).monospacedDigit())
+          .foregroundStyle(Tok.fg4)
+          .frame(width: 96, alignment: .trailing)
       }
       .help(run.createdAt.formatted(date: .complete, time: .standard))
     }
+    .font(.system(size: 12.5))
+    .padding(.horizontal, 8)
+    .frame(height: 32)
   }
 }
 
 /// RUN_TONE in the Web UI's Automations page.
 private func runColor(_ status: ThreadStatus?) -> Color {
   switch status {
-  case .done?: .green
-  case .failed?: .red
-  case .stopped?: .orange
-  case .running?: .blue
-  case .queued?: .secondary
-  default: Color(nsColor: .quaternaryLabelColor)
+  case .done?: Tok.done
+  case .failed?: Tok.needs
+  case .stopped?: Tok.fg4
+  case .running?: Tok.live
+  case .queued?: Tok.fg4
+  default: Tok.lineStrong
   }
 }
 
 private extension View {
   func chip() -> some View {
-    padding(.horizontal, 8)
-      .frame(height: 20)
-      .background(.quaternary.opacity(0.6), in: Capsule())
+    padding(.horizontal, 10)
+      .frame(height: 24)
+      .background(Tok.bg, in: Capsule())
   }
 }
 

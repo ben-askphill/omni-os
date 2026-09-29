@@ -131,31 +131,57 @@ struct ThreadDayList: View {
   }
 }
 
-/// A short centred note where a list would be.
-struct EmptyNote: View {
+/// A short centred note where a list would be, as Empty in ui.tsx: the icon in a surface-2 disc, a medium
+/// title, fg-3 text and an optional action.
+struct EmptyNote<Action: View>: View {
   let symbol: String
   let title: String
   let message: String
+  @ViewBuilder var action: Action
+
+  /// SF Symbol names the screens used before OmniIcon, mapped onto the web's icon set.
+  private static var icons: [String: String] { [
+    "bubble.left": "message", "magnifyingglass": "search", "checkmark": "check", "square.stack.3d.up": "layers",
+    "bolt": "zap", "key": "key", "house": "home", "scope": "target", "text.bubble": "message", "archivebox": "archive", "number": "hash", "arrow.triangle.pull": "pr",
+  ] }
 
   var body: some View {
-    VStack(spacing: 8) {
-      Image(systemName: symbol)
-        .font(.system(size: 19))
-        .foregroundStyle(Tok.fg3)
-        .frame(width: 48, height: 48)
-        .background(Tok.surface2, in: Circle())
-        .padding(.bottom, 8)
+    VStack(spacing: 0) {
+      Group {
+        if let icon = BrandPaths.icons[symbol] != nil ? symbol : Self.icons[symbol] {
+          OmniIcon(name: icon, size: 19)
+        } else {
+          Image(systemName: symbol).font(.system(size: 17))
+        }
+      }
+      .foregroundStyle(Tok.fg3)
+      .frame(width: 48, height: 48)
+      .background(Tok.surface2, in: Circle())
+      .padding(.bottom, 16)
       Text(title)
         .font(.system(size: 17, weight: .medium))
+        .tracking(-0.17)
         .foregroundStyle(Tok.fg)
-      Text(message)
-        .font(.system(size: 13))
-        .foregroundStyle(Tok.fg3)
         .multilineTextAlignment(.center)
-        .fixedSize(horizontal: false, vertical: true)
+      if !message.isEmpty {
+        Text(message)
+          .font(.system(size: 13))
+          .foregroundStyle(Tok.fg3)
+          .multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: 384)
+          .padding(.top, 6)
+      }
+      action.padding(.top, 20)
     }
-    .frame(maxWidth: 420)
     .frame(maxWidth: .infinity)
-    .padding(.vertical, 40)
+    .padding(.horizontal, 24)
+    .padding(.vertical, 64)
+  }
+}
+
+extension EmptyNote where Action == EmptyView {
+  init(symbol: String, title: String, message: String) {
+    self.init(symbol: symbol, title: title, message: message) { EmptyView() }
   }
 }

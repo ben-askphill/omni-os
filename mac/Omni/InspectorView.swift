@@ -35,8 +35,8 @@ private struct ThreadInspector: ViewModifier {
     let count = store.artifacts.count
     content
       .inspector(isPresented: Binding(get: { open && settled }, set: { open = $0 })) {
-        InspectorPanel(model: model, store: store, selection: $selection)
-          .inspectorColumnWidth(min: 340, ideal: 420, max: 760)
+        InspectorPanel(model: model, store: store, selection: $selection) { open = false }
+          .inspectorColumnWidth(min: 340, ideal: 360, max: 760)
       }
       .toolbar {
         ToolbarItem(placement: .primaryAction) {
@@ -44,7 +44,7 @@ private struct ThreadInspector: ViewModifier {
             open.toggle()
           } label: {
             HStack(spacing: 4) {
-              Image(systemName: "sidebar.trailing")
+              OmniIcon(name: "panel", size: 15)
               if count > 0 { Text("\(count)").font(.system(size: 11, weight: .medium).monospacedDigit()) }
             }
           }
@@ -101,23 +101,28 @@ struct InspectorCommand: View {
   }
 }
 
+/// The panel in Thread.tsx: small tabs and a close button over the tab, all on the surface.
 private struct InspectorPanel: View {
   let model: AppModel
   let store: ThreadStore
   @Binding var selection: InspectorSelection
+  let close: () -> Void
 
   var body: some View {
     let files = store.files
     VStack(spacing: 0) {
-      Picker("Inspector", selection: $selection.tab) {
-        ForEach(InspectorSelection.Tab.allCases, id: \.self) { tab in
-          Text(label(tab, files: files.count)).tag(tab)
-        }
+      HStack(spacing: 4) {
+        SegmentedPill(
+          selection: $selection.tab,
+          counted: InspectorSelection.Tab.allCases.map { ($0, $0.title, count($0, files: files.count)) },
+          small: true)
+        Spacer(minLength: 0)
+        Button("Close panel", systemImage: "xmark", action: close)
+          .labelStyle(.iconOnly)
+          .buttonStyle(.icon(size: 28))
+          .help("Close panel")
       }
-      .pickerStyle(.segmented)
-      .labelsHidden()
       .padding(10)
-      Divider()
       switch selection.tab {
       case .artifacts:
         ArtifactsTab(client: model.client, files: files, selection: $selection)
@@ -127,11 +132,13 @@ private struct InspectorPanel: View {
         DetailsTab(model: model, store: store)
       }
     }
+    .frame(maxHeight: .infinity, alignment: .top)
+    .background(Tok.surface)
   }
 
-  private func label(_ tab: InspectorSelection.Tab, files: Int) -> String {
+  private func count(_ tab: InspectorSelection.Tab, files: Int) -> Int? {
     let n = tab == .artifacts ? files : tab == .browser ? store.screenshots.count : 0
-    return n > 0 ? "\(tab.title) \(n)" : tab.title
+    return n > 0 ? n : nil
   }
 }
 
@@ -142,44 +149,47 @@ private struct ArtifactsTab: View {
 
   var body: some View {
     if files.isEmpty {
-      ContentUnavailableView {
-        Label("No artifacts yet", systemImage: "square.stack.3d.up")
-      } description: {
-        Text("Files the agent writes to its artifacts folder show up here and render inline.")
-      }
+      EmptyNote(symbol: "layers", title: "No artifacts yet", message: "Files the agent writes to its artifacts folder show up here and render inline.")
+        .frame(maxHeight: .infinity, alignment: .top)
     } else {
       let shown = selection.shown(in: files)
       VStack(spacing: 0) {
         if files.count > 1 {
           ScrollView {
-            VStack(spacing: 1) {
+            VStack(spacing: 0) {
               ForEach(files.reversed()) { file in
+                let on = file.id == shown?.id
                 Button {
                   selection.artifactID = file.id
                 } label: {
                   HStack(spacing: 8) {
-                    Image(systemName: artifactSymbol(file.kind)).font(.system(size: 11)).foregroundStyle(.secondary).frame(width: 16)
-                    Text(file.name).font(.system(size: 12.5, weight: .medium)).lineLimit(1).truncationMode(.middle)
+                    OmniIcon(name: TranscriptIcon.artifact(file.kind), size: 13).foregroundStyle(Tok.fg3)
+                    Text(file.name)
+                      .font(.system(size: 12.5, weight: .medium))
+                      .foregroundStyle(on ? Tok.fg : Tok.fg2)
+                      .lineLimit(1)
+                      .truncationMode(.middle)
                     Spacer(minLength: 4)
-                    Text(Format.relTime(file.updatedAt)).font(.system(size: 10.5).monospacedDigit()).foregroundStyle(.tertiary)
+                    Text(Format.relTime(file.updatedAt)).font(.system(size: 10.5).monospacedDigit()).foregroundStyle(Tok.fg4)
                   }
-                  .padding(.horizontal, 10)
-                  .frame(height: 28)
+                  .padding(.horizontal, 12)
+                  .frame(height: 32)
                   .contentShape(Capsule())
-                  .background(file.id == shown?.id ? ThreadStyle.surface2 : .clear, in: Capsule())
+                  .background(on ? Tok.surface3 : .clear, in: Capsule())
+                  .rowHover(radius: 16)
                 }
                 .buttonStyle(.plain)
-                .accessibilityAddTraits(file.id == shown?.id ? .isSelected : [])
+                .accessibilityAddTraits(on ? .isSelected : [])
               }
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.bottom, 8)
           }
           .frame(maxHeight: 168)
-          Divider()
         }
         if let shown {
           ArtifactViewer(client: client, ref: ArtifactRef(shown))
+            .background(Tok.bg)
         }
       }
     }

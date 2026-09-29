@@ -174,21 +174,22 @@ struct RoutePlaceholder: View {
   let goHome: () -> Void
 
   var body: some View {
-    if case .notFound(let path) = route {
-      ContentUnavailableView {
-        Label("Nothing here", systemImage: "questionmark.folder")
-      } description: {
-        Text("Nothing lives at \(path).")
-      } actions: {
-        Button("Go Home", action: goHome)
-      }
-    } else {
-      ContentUnavailableView {
-        Label(title, systemImage: route.symbol)
-      } description: {
-        Text("This screen is not built yet.\n\(Text(route.hash).monospaced())")
+    Group {
+      if case .notFound(let path) = route {
+        EmptyNote(symbol: "home", title: "Nothing here", message: "Nothing lives at \(path).") {
+          Button("Go Home", action: goHome)
+            .buttonStyle(.pill(.secondary, height: 32))
+        }
+      } else {
+        EmptyNote(symbol: route.symbol, title: title, message: "This screen is not built yet.") {
+          Text(route.hash)
+            .font(.system(size: 12, design: .monospaced))
+            .foregroundStyle(Tok.fg4)
+        }
       }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(Tok.bg)
   }
 }
 

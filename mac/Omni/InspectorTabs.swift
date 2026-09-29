@@ -11,15 +11,12 @@ struct BrowserTab: View {
 
   var body: some View {
     if shots.isEmpty {
-      ContentUnavailableView {
-        Label("No screenshots yet", systemImage: "globe")
-      } description: {
-        Text("When the agent uses the channel browser, its screenshots collect here.")
-      }
+      EmptyNote(symbol: "globe", title: "No screenshots yet", message: "When the agent uses the channel browser, its screenshots collect here.")
+        .frame(maxHeight: .infinity, alignment: .top)
     } else {
       let list = Array(shots.reversed())
       ScrollView {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
           ForEach(list) { shot in
             Button {
               openID = shot.id
@@ -31,23 +28,26 @@ struct BrowserTab: View {
                     AsyncImage(url: client.artifactURL(shot)) { image in
                       image.resizable().scaledToFill()
                     } placeholder: {
-                      ProgressView().controlSize(.small)
+                      Loader(size: 14).foregroundStyle(Tok.fg3)
                     }
                   }
-                  .clipShape(RoundedRectangle(cornerRadius: 8))
-                  .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(ThreadStyle.line))
+                  .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                  .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Tok.line))
                 Text(Format.relTime(shot.updatedAt))
                   .font(.system(size: 10.5).monospacedDigit())
-                  .foregroundStyle(.tertiary)
+                  .foregroundStyle(Tok.fg4)
+                  .padding(.horizontal, 6)
+                  .padding(.bottom, 2)
               }
               .padding(4)
-              .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 12))
+              .background(Tok.bg, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
             .buttonStyle(.plain)
             .help(shot.name)
           }
         }
-        .padding(10)
+        .padding(.horizontal, 10)
+        .padding(.bottom, 10)
       }
       .sheet(isPresented: Binding(get: { openID != nil }, set: { if !$0 { openID = nil } })) {
         ShotViewer(client: client, list: list, openID: $openID)
@@ -67,33 +67,38 @@ private struct ShotViewer: View {
     VStack(spacing: 0) {
       HStack {
         VStack(alignment: .leading, spacing: 0) {
-          Text(index.map { list[$0].name } ?? "").font(.system(size: 13, weight: .medium)).lineLimit(1)
+          Text(index.map { list[$0].name } ?? "").font(.system(size: 13, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1)
           Text(index.map { ThreadDetails.fullDate(list[$0].updatedAt) } ?? "")
-            .font(.system(size: 11)).foregroundStyle(.secondary)
+            .font(.system(size: 11)).foregroundStyle(Tok.fg3)
         }
         Spacer()
         Button("Newer", systemImage: "chevron.left") { if let index, index > 0 { openID = list[index - 1].id } }
           .keyboardShortcut(.leftArrow, modifiers: [])
           .disabled(index == nil || index == 0)
+          .buttonStyle(.icon)
         Button("Older", systemImage: "chevron.right") { if let index, index < list.count - 1 { openID = list[index + 1].id } }
           .keyboardShortcut(.rightArrow, modifiers: [])
           .disabled(index == nil || index == list.count - 1)
-        Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+          .buttonStyle(.icon)
+        Button("Done") { dismiss() }
+          .keyboardShortcut(.defaultAction)
+          .buttonStyle(.pill(.primary, height: 28))
       }
       .labelStyle(.iconOnly)
       .padding(12)
-      Divider()
+      Hairline()
       if let index {
         AsyncImage(url: client.artifactURL(list[index])) { image in
           image.resizable().scaledToFit()
         } placeholder: {
-          ProgressView().controlSize(.small)
+          Loader(size: 14).foregroundStyle(Tok.fg3)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ThreadStyle.surface2)
+        .background(Tok.surface2)
       }
     }
     .frame(width: 880, height: 640)
+    .background(Tok.bg)
   }
 }
 
@@ -119,17 +124,22 @@ struct DetailsTab: View {
               Button("#\(channel)") { model.route = .channel(id: thread.channelID) }.buttonStyle(.plain).fontWeight(.medium)
             }
             row("Role") { muted(thread.role, or: "none") }
-            row("Harness") { Text(ThreadDetails.harnessName(thread.harness)) }
+            row("Harness") {
+              HStack(spacing: 8) {
+                HarnessLogo(harness: thread.harness.rawValue, size: 14)
+                Text(ThreadDetails.harnessName(thread.harness))
+              }
+            }
             row("Model") {
               if let m = thread.model, !m.isEmpty {
-                Text(m) + Text(session.map { $0.model != m ? " (\($0.model))" : "" } ?? "").foregroundStyle(.secondary)
+                Text(m) + Text(session.map { $0.model != m ? " (\($0.model))" : "" } ?? "").foregroundStyle(Tok.fg3)
               } else {
                 muted(session?.model, or: "default")
               }
             }
             row("Effort") { muted(thread.effort, or: "default") }
             row("Source") {
-              Text(thread.source.rawValue) + Text(thread.automation.map { " · \($0)" } ?? "").foregroundStyle(.secondary)
+              Text(thread.source.rawValue) + Text(thread.automation.map { " · \($0)" } ?? "").foregroundStyle(Tok.fg3)
             }
             if let branch = thread.branch, !branch.isEmpty { row("Branch") { mono(branch) } }
             row("Working dir") { mono(cwd) }
@@ -141,7 +151,7 @@ struct DetailsTab: View {
                     StatusDot(status: warm ? .done : .imported, size: 6)
                     Text(warm ? "Live, the next message starts instantly" : "Not running, the next message starts a new process")
                   }
-                  .foregroundStyle(.secondary)
+                  .foregroundStyle(Tok.fg3)
                 }
               }
             }
@@ -161,11 +171,12 @@ struct DetailsTab: View {
             row("Updated") { Text(ThreadDetails.fullDate(thread.updatedAt)) }
             if let ms = last?.durationMs {
               row("Last run") {
-                Text(Format.duration(ms: ms)) + Text(last?.turns.flatMap { $0 > 0 ? " · \(Format.plural($0, "turn"))" : nil } ?? "").foregroundStyle(.secondary)
+                Text(Format.duration(ms: ms)) + Text(last?.turns.flatMap { $0 > 0 ? " · \(Format.plural($0, "turn"))" : nil } ?? "").foregroundStyle(Tok.fg3)
               }
             }
           }
-          .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 16))
+          .padding(.vertical, 4)
+          .background(Tok.bg, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
           if !store.children.isEmpty { delegated }
           if let resume = ThreadDetails.resumeCommand(harness: thread.harness, sessionID: thread.sessionID, cwd: cwd) {
@@ -173,14 +184,21 @@ struct DetailsTab: View {
           }
         }
         .font(.system(size: 12.5))
-        .padding(10)
+        .foregroundStyle(Tok.fg)
+        .padding(.horizontal, 10)
+        .padding(.bottom, 12)
       }
     }
   }
 
   private var delegated: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Text("DELEGATED THREADS").font(.system(size: 10.5, weight: .medium, design: .monospaced)).foregroundStyle(.secondary).padding(.horizontal, 8)
+      HStack {
+        Text("Delegated threads").omniCaption()
+        Spacer()
+        Text("\(store.children.count)").font(.system(size: 11)).monospacedDigit().foregroundStyle(Tok.fg3)
+      }
+      .padding(.horizontal, 8)
       VStack(spacing: 0) {
         ForEach(store.children) { child in
           Button {
@@ -190,47 +208,56 @@ struct DetailsTab: View {
               StatusDot(status: child.status, size: 7)
               Text(child.title).lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity, alignment: .leading)
               if let task = child.taskID, !task.isEmpty {
-                Text(task).font(.system(size: 11, design: .monospaced)).foregroundStyle(.tertiary)
+                Text(task).font(.system(size: 11, design: .monospaced)).foregroundStyle(Tok.fg4)
               }
-              Text("#\(model.store.channel(child.channelID)?.name ?? child.channelID)").font(.system(size: 11)).foregroundStyle(.secondary)
+              Text("#\(model.store.channel(child.channelID)?.name ?? child.channelID)").font(.system(size: 11)).foregroundStyle(Tok.fg3)
             }
-            .padding(.horizontal, 10)
-            .frame(height: 34)
-            .contentShape(Rectangle())
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .contentShape(Capsule())
+            .rowHover(radius: 18)
           }
           .buttonStyle(.plain)
         }
       }
       .padding(4)
-      .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 16))
+      .background(Tok.bg, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
+    .padding(.top, 2)
   }
 
   private func resumeCard(_ command: String) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack {
-        Text("RESUME IN TERMINAL").font(.system(size: 10.5, weight: .medium, design: .monospaced)).foregroundStyle(.secondary)
+        Text("Resume in terminal").omniCaption()
         Spacer()
-        Button(copied ? "Copied" : "Copy") {
+        Button {
           Pasteboard.copy(command)
           copied = true
           Task {
             try? await Task.sleep(for: .seconds(1.5))
             copied = false
           }
+        } label: {
+          HStack(spacing: 6) {
+            OmniIcon(name: copied ? "check" : "copy", size: 13)
+            Text(copied ? "Copied" : "Copy")
+          }
         }
-        .controlSize(.small)
+        .buttonStyle(.pill(.secondary, height: 28))
       }
       Text(command)
         .font(.system(size: 11.5, design: .monospaced))
-        .foregroundStyle(.secondary)
+        .lineSpacing(3)
+        .foregroundStyle(Tok.fg2)
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(ThreadStyle.code, in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Tok.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
-    .padding(12)
-    .background(ThreadStyle.surface, in: RoundedRectangle(cornerRadius: 16))
+    .padding(14)
+    .background(Tok.bg, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
   }
 
   private func mcpList(_ servers: [MCPServer]) -> some View {
@@ -238,9 +265,9 @@ struct DetailsTab: View {
     let good = servers.filter(\.ok)
     return VStack(alignment: .leading, spacing: 4) {
       HStack(spacing: 6) {
-        Text("\(good.count) connected") + Text(bad.isEmpty ? "" : " · \(bad.count) not connected").foregroundStyle(ThreadStyle.warn)
+        Text("\(good.count) connected") + Text(bad.isEmpty ? "" : " · \(bad.count) not connected")
         Button(showMCP ? "Hide" : "Show") { showMCP.toggle() }
-          .buttonStyle(.plain).foregroundStyle(.secondary).underline()
+          .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Tok.fg3)
       }
       Flow(spacing: 4) {
         ForEach(bad) { chip($0, warn: true) }
@@ -250,26 +277,24 @@ struct DetailsTab: View {
   }
 
   private func chip(_ server: MCPServer, warn: Bool) -> some View {
-    Text(server.label)
-      .font(.system(size: 11))
-      .padding(.horizontal, 8)
-      .padding(.vertical, 2)
-      .foregroundStyle(warn ? ThreadStyle.warn : .secondary)
-      .background(warn ? ThreadStyle.warnBackground : ThreadStyle.surface2, in: Capsule())
+    Chip(text: server.label, tone: warn ? .needs : .plain)
       .help(warn ? "\(server.name) (\(server.status))" : server.name)
   }
 
   private func row<V: View>(_ key: String, @ViewBuilder _ value: () -> V) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 8) {
-      Text(key.uppercased())
-        .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-        .foregroundStyle(.secondary)
-        .frame(width: 92, alignment: .leading)
-      value().frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
+      Text(key)
+        .foregroundStyle(Tok.fg3)
+        .frame(width: 104, alignment: .leading)
+      value()
+        .foregroundStyle(Tok.fg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .textSelection(.enabled)
     }
     .padding(.horizontal, 14)
-    .padding(.vertical, 7)
-    .overlay(alignment: .bottom) { Divider().padding(.horizontal, 14) }
+    .padding(.vertical, 9)
+    .overlay(alignment: .top) { if key != "Channel" { Hairline() } }
   }
 
   private func mono(_ text: String) -> some View {
@@ -277,7 +302,7 @@ struct DetailsTab: View {
   }
 
   @ViewBuilder private func muted(_ text: String?, or fallback: String) -> some View {
-    if let text, !text.isEmpty { Text(text) } else { Text(fallback).foregroundStyle(.secondary) }
+    if let text, !text.isEmpty { Text(text) } else { Text(fallback).foregroundStyle(Tok.fg3) }
   }
 }
 

@@ -37,10 +37,17 @@ struct ComposerTextView: NSViewRepresentable {
   var heightRange: ClosedRange<CGFloat> = ComposerTextView.minHeight...ComposerTextView.maxHeight
   var label = "Reply"
   var caretRequest: CaretRequest?
+  /// 14.5 in a reply, 16 in the big box on Home.
+  var fontSize: CGFloat = 14.5
   static let maxHeight: CGFloat = 240
   static let minHeight: CGFloat = 44
   static let font = NSFont.systemFont(ofSize: 14.5)
-  static let inset = NSSize(width: 14, height: 11)
+  static let inset = NSSize(width: 16, height: 11)
+  /// `text-fg` and `placeholder:text-fg-4`.
+  static let ink = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: 0xeceae5) : NSColor(hex: 0x17181a) }
+  static let quiet = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: 0x6f6e69) : NSColor(hex: 0x9d9c96) }
+
+  static func font(_ size: CGFloat) -> NSFont { size == 14.5 ? font : NSFont.systemFont(ofSize: size) }
 
   func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -68,9 +75,12 @@ struct ComposerTextView: NSViewRepresentable {
     tv.isAutomaticSpellingCorrectionEnabled = false
     tv.isAutomaticQuoteSubstitutionEnabled = false
     tv.isAutomaticDashSubstitutionEnabled = false
-    tv.font = Self.font
-    tv.textColor = .labelColor
-    tv.typingAttributes = [.font: Self.font, .foregroundColor: NSColor.labelColor]
+    let font = Self.font(fontSize)
+    tv.font = font
+    tv.textColor = Self.ink
+    tv.insertionPointColor = Self.ink
+    tv.typingAttributes = [.font: font, .foregroundColor: Self.ink]
+    tv.placeholderFont = font
     tv.setAccessibilityLabel(label)
     tv.delegate = context.coordinator
     tv.string = text
@@ -106,15 +116,15 @@ struct ComposerTextView: NSViewRepresentable {
 
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSScrollView, context: Context) -> CGSize? {
     let width = proposal.width ?? 400
-    return CGSize(width: width, height: Self.height(of: text, width: width, range: heightRange))
+    return CGSize(width: width, height: Self.height(of: text, width: width, range: heightRange, fontSize: fontSize))
   }
 
   /// The height the text needs at this width, between the minimum and 240pt.
-  static func height(of text: String, width: CGFloat, range: ClosedRange<CGFloat> = minHeight...maxHeight) -> CGFloat {
+  static func height(of text: String, width: CGFloat, range: ClosedRange<CGFloat> = minHeight...maxHeight, fontSize: CGFloat = 14.5) -> CGFloat {
     let measured = text.hasSuffix("\n") || text.isEmpty ? text + " " : text
     let box = CGSize(width: max(1, width - inset.width * 2), height: .greatestFiniteMagnitude)
     let rect = (measured as NSString).boundingRect(
-      with: box, options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font])
+      with: box, options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font(fontSize)])
     return min(range.upperBound, max(range.lowerBound, ceil(rect.height) + inset.height * 2))
   }
 
@@ -160,6 +170,7 @@ struct ComposerTextView: NSViewRepresentable {
 final class ComposerNSTextView: NSTextView {
   var callbacks: ComposerCallbacks?
   var placeholder = ""
+  var placeholderFont = ComposerTextView.font
   var running = false
   var interrupting = false
   private var didFocus = false
@@ -195,7 +206,7 @@ final class ComposerNSTextView: NSTextView {
     let origin = textContainerOrigin
     (placeholder as NSString).draw(
       at: NSPoint(x: origin.x + (textContainer?.lineFragmentPadding ?? 0), y: origin.y),
-      withAttributes: [.font: ComposerTextView.font, .foregroundColor: NSColor.placeholderTextColor])
+      withAttributes: [.font: placeholderFont, .foregroundColor: ComposerTextView.quiet])
   }
 
   // Cmd-Return and Shift-Cmd-Return send. Plain Return stays a newline. Nothing while an input method composes.

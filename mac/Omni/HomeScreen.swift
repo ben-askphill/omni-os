@@ -17,18 +17,16 @@ struct HomeScreen: View {
         NewThreadComposerView(model: model, channelID: nil, big: true)
         HStack {
           Text("Recent")
-            .font(.system(size: 17, weight: .semibold))
+            .font(.system(size: 17, weight: .medium))
+            .tracking(-0.17)
+            .foregroundStyle(Tok.fg)
           Spacer()
-          Picker("Filter threads", selection: $filter) {
-            ForEach(ThreadFilter.allCases, id: \.self) { f in
-              Text(title(f, recent: recent)).tag(f)
-            }
-          }
-          .pickerStyle(.segmented)
-          .labelsHidden()
-          .fixedSize()
+          SegmentedPill(selection: $filter, counted: ThreadFilter.allCases.map { f in
+            (f, label(f), f == .all ? nil : f.apply(to: recent).count)
+          }, small: true)
+          .accessibilityLabel("Filter threads")
         }
-        .padding(.top, 36)
+        .padding(.top, 40)
         .padding(.bottom, 8)
         .padding(.horizontal, 4)
         list(shown, recent: recent)
@@ -38,15 +36,19 @@ struct HomeScreen: View {
 
   private var header: some View {
     HStack(alignment: .bottom) {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: 0) {
+        StaticMark(size: 40)
+          .foregroundStyle(Tok.fg)
         TimelineView(.everyMinute) { context in
-          VStack(alignment: .leading, spacing: 8) {
-            Text(context.date.formatted(.dateTime.weekday(.wide).day().month(.wide)).uppercased())
-              .font(.system(size: 11, weight: .medium))
-              .tracking(0.8)
-              .foregroundStyle(.tertiary)
+          VStack(alignment: .leading, spacing: 0) {
+            Text(context.date.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "en_GB"))))
+              .omniCaption()
+              .padding(.top, 16)
+              .padding(.bottom, 10)
             Text(Greeting.text(hour: Calendar.current.component(.hour, from: context.date)))
-              .font(.system(size: 34, weight: .semibold))
+              .font(.system(size: 36, weight: .medium))
+              .tracking(-0.36)
+              .foregroundStyle(Tok.fg)
           }
         }
       }
@@ -56,16 +58,16 @@ struct HomeScreen: View {
     .padding(.horizontal, 4)
   }
 
-  private func title(_ f: ThreadFilter, recent: [OmniThread]) -> String {
-    let n = f == .all ? 0 : f.apply(to: recent).count
-    return n > 0 ? "\(f.label) \(n)" : f.label
+  /// The web says Active where OmniKit says Running.
+  private func label(_ f: ThreadFilter) -> String {
+    f == .active ? "Active" : f.label
   }
 
   @ViewBuilder private func list(_ shown: [OmniThread], recent: [OmniThread]) -> some View {
     if !shown.isEmpty {
       ThreadDayList(model: model, threads: shown, showChannel: true)
     } else if recent.isEmpty && model.store.loadState == .loading {
-      ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding(.vertical, 40)
+      Loader(size: 16).foregroundStyle(Tok.fg3).frame(maxWidth: .infinity).padding(.vertical, 40)
     } else {
       switch filter {
       case .all:
@@ -92,20 +94,18 @@ private struct Pulse: View {
   var body: some View {
     let busy = status.running > 0
     HStack(spacing: 8) {
-      Circle()
-        .fill(busy ? ThreadStyle.info : ThreadStyle.ok)
-        .frame(width: 6, height: 6)
+      GlyphView(glyph: busy ? .running : .idle, size: 7)
       Text(busy ? "\(status.running) running" : "All quiet")
       if status.queued > 0 {
-        Text("\(status.queued) queued")
-          .foregroundStyle(.tertiary)
+        Text("· \(status.queued) queued")
+          .foregroundStyle(Tok.fg4)
       }
     }
     .font(.system(size: 11.5))
     .monospacedDigit()
-    .foregroundStyle(.secondary)
+    .foregroundStyle(Tok.fg2)
     .padding(.horizontal, 12)
     .frame(height: 28)
-    .background(ThreadStyle.surface, in: Capsule())
+    .background(Tok.surface, in: Capsule())
   }
 }
