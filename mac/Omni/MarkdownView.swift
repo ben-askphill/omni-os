@@ -1,3 +1,4 @@
+import AppKit
 import OmniKit
 import SwiftUI
 
@@ -78,11 +79,20 @@ private struct MarkdownBlockView: View {
   }
 
   private func prose(_ text: AttributedString) -> some View {
-    Text(text)
+    let text = Self.underlined(text)
+    return Text(text)
       .font(.system(size: size))
       .lineSpacing(size * 0.4)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)
+      .modifier(LinkCursor(text: text, size: size))
+  }
+
+  /// Links read as links: underlined, as `.md a` in index.css.
+  static func underlined(_ text: AttributedString) -> AttributedString {
+    var out = text
+    for run in text.runs where run.link != nil { out[run.range].underlineStyle = .single }
+    return out
   }
 
   static func headingSize(_ level: Int, base: CGFloat) -> CGFloat {
@@ -157,7 +167,7 @@ private struct MarkdownTableView: View {
   }
 
   private func cell(_ text: MarkdownText) -> some View {
-    Text(text.attributed)
+    Text(MarkdownBlockView.underlined(text.attributed))
       .font(.system(size: 13))
       .frame(maxWidth: 360, alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
@@ -182,5 +192,54 @@ struct ThreadLinks: ViewModifier {
         return .discarded
       }
     })
+  }
+}
+
+/// A pointing hand over a link. Text selection owns the cursor (an I-beam everywhere in the text), so the link
+/// under the pointer is found by laying the same string out with TextKit at the view's width.
+private struct LinkCursor: ViewModifier {
+  let text: AttributedString
+  let size: CGFloat
+  @State private var width: CGFloat = 0
+  @State private var pushed = false
+
+  func body(content: Content) -> some View {
+    content
+      .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
+      .onContinuousHover { phase in
+        switch phase {
+        case .active(let point): setHand(overLink(at: point))
+        case .ended: setHand(false)
+        }
+      }
+      .onDisappear { setHand(false) }
+  }
+
+  private func setHand(_ on: Bool) {
+    guard on != pushed else { return }
+    pushed = on
+    if on { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+  }
+
+  private func overLink(at point: CGPoint) -> Bool {
+    guard width > 0, text.runs.contains(where: { $0.link != nil }) else { return false }
+    let style = NSMutableParagraphStyle()
+    style.lineSpacing = size * 0.4
+    let string = NSMutableAttributedString(attributedString: NSAttributedString(text))
+    let whole = NSRange(location: 0, length: string.length)
+    string.addAttribute(.paragraphStyle, value: style, range: whole)
+    string.enumerateAttribute(.font, in: whole) { value, range, _ in
+      if value == nil { string.addAttribute(.font, value: NSFont.systemFont(ofSize: size), range: range) }
+    }
+    let storage = NSTextStorage(attributedString: string)
+    let layout = NSLayoutManager()
+    let container = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
+    container.lineFragmentPadding = 0
+    layout.addTextContainer(container)
+    storage.addLayoutManager(layout)
+    let glyph = layout.glyphIndex(for: point, in: container, fractionOfDistanceThroughGlyph: nil)
+    guard layout.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: container).contains(point) else { return false }
+    let index = layout.characterIndexForGlyph(at: glyph)
+    return storage.attribute(.link, at: index, effectiveRange: nil) != nil
   }
 }
