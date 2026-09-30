@@ -127,6 +127,11 @@
     text-rendering: optimizeLegibility;
     font-variant-numeric: tabular-nums;
   }
+  .md,
+  .md * {
+    -webkit-user-select: text;
+    user-select: text;
+  }
   ::selection {
     background: var(--mark);
   }

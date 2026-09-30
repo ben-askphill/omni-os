@@ -196,3 +196,39 @@ enum Pasteboard {
     NSPasteboard.general.setString(text, forType: .string)
   }
 }
+
+/// A message with a Copy control under it that shows on hover. Copies the source text, not the rendered runs.
+struct CopyableMessage<Content: View>: View {
+  let text: String
+  var alignment: HorizontalAlignment = .leading
+  @ViewBuilder let content: () -> Content
+  @State private var hovering = false
+  @State private var copied = false
+
+  var body: some View {
+    VStack(alignment: alignment, spacing: 2) {
+      content()
+      Button {
+        Pasteboard.copy(text)
+        copied = true
+        Task {
+          try? await Task.sleep(for: .seconds(1.4))
+          copied = false
+        }
+      } label: {
+        Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+          .labelStyle(.titleAndIcon)
+          .font(.system(size: 11.5, weight: .medium))
+          .foregroundStyle(Tok.fg4)
+          .padding(.horizontal, 6)
+          .frame(height: 22)
+      }
+      .buttonStyle(.plain)
+      .help("Copy message")
+      .opacity(hovering || copied ? 1 : 0)
+      .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+    .frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .center))
+    .onHover { hovering = $0 }
+  }
+}
