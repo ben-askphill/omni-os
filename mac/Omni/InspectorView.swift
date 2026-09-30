@@ -3,7 +3,7 @@ import SwiftUI
 import WebKit
 
 extension View {
-  /// The thread's inspector: Artifacts, Browser and Details in a side panel, its toggle in the toolbar.
+  /// The thread's inspector: Artifacts, Browser, Terminal and Details in a side panel, its toggle in the toolbar.
   func threadInspector(model: AppModel, store: ThreadStore) -> some View {
     modifier(ThreadInspector(model: model, store: store))
   }
@@ -56,7 +56,7 @@ private struct ThreadInspector: ViewModifier {
               if count > 0 { Text("\(count)").font(.system(size: 11, weight: .medium).monospacedDigit()) }
             }
           }
-          .help(count > 0 ? "Artifacts, browser, details (\(count))" : "Artifacts, browser, details")
+          .help(count > 0 ? "Artifacts, browser, terminal, details (\(count))" : "Artifacts, browser, terminal, details")
         }
       }
       .onChange(of: store.arrivedHTML?.id) {
@@ -82,7 +82,7 @@ private struct ThreadInspector: ViewModifier {
           switch command {
           case .open: isOpen.wrappedValue = true
           case .close: isOpen.wrappedValue = false
-          case .artifacts, .browser, .details:
+          case .artifacts, .browser, .terminal, .details:
             isOpen.wrappedValue = true
             picked.wrappedValue.tab = InspectorSelection.Tab(rawValue: command.rawValue) ?? .details
           }
@@ -136,6 +136,8 @@ private struct InspectorPanel: View {
         ArtifactsTab(client: model.client, files: files, selection: $selection)
       case .browser:
         BrowserTab(client: model.client, channel: store.thread?.channelID, shots: store.screenshots)
+      case .terminal:
+        TerminalTab(client: model.client, thread: store.id, cwd: store.thread?.cwd)
       case .details:
         DetailsTab(model: model, store: store)
       }

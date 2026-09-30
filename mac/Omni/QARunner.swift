@@ -456,6 +456,12 @@ final class QARunner {
       }
       context.restoreGState()
     }
+    // A terminal (SwiftTerm) comes out shifted and clipped in the window's cache. Drawn on its own it is right.
+    for term in descendants(of: root) where "\(type(of: term))" == "TerminalView" && !term.isHiddenOrHasHiddenAncestor {
+      if let image = cache(term) {
+        context.draw(image, in: pixels(term.convert(term.bounds, to: root)))
+      }
+    }
     return context.makeImage() ?? base
   }
 

@@ -126,6 +126,8 @@ function Shell() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Ctrl+K in the terminal is the shell's (kill to end of line); Cmd+K still opens the palette.
+      if (e.ctrlKey && !e.metaKey && e.target instanceof HTMLElement && e.target.closest('.xterm')) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setPalette((p) => !p);

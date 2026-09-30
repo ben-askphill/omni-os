@@ -4,12 +4,13 @@ import Foundation
 /// (ThreadPage in web/src/pages/Thread.tsx), with its first-artifact quirk fixed.
 public struct InspectorSelection: Equatable, Sendable {
   public enum Tab: String, CaseIterable, Sendable {
-    case artifacts, browser, details
+    case artifacts, browser, terminal, details
 
     public var title: String {
       switch self {
       case .artifacts: "Artifacts"
       case .browser: "Browser"
+      case .terminal: "Terminal"
       case .details: "Details"
       }
     }
@@ -30,10 +31,11 @@ public struct InspectorSelection: Equatable, Sendable {
     return Self(tab: .details)
   }
 
-  /// A new HTML artifact is selected and shown, the first one too.
+  /// A new HTML artifact is selected and shown, the first one too. The Terminal tab stays put, so a
+  /// page landing never pulls Ben out of the shell mid-command.
   public mutating func arrived(_ a: Artifact) {
-    tab = .artifacts
     artifactID = a.id
+    if tab != .terminal { tab = .artifacts }
   }
 
   public mutating func open(artifact id: Int) {
