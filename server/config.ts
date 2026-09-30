@@ -20,7 +20,7 @@ export const config = {
   host: env.OMNI_HOST ?? '127.0.0.1',
   brainDir: env.OMNI_BRAIN_DIR ?? join(homedir(), 'phillbert'),
   claudeBin: env.OMNI_CLAUDE_BIN ?? 'claude',
-  defaultModel: env.OMNI_DEFAULT_MODEL ?? 'claude-opus-5-5',
+  defaultModel: env.OMNI_DEFAULT_MODEL ?? 'claude-sonnet-5-5',
   permissionMode: env.OMNI_PERMISSION_MODE ?? 'bypassPermissions',
   maxConcurrent: Number(env.OMNI_MAX_CONCURRENT ?? 4),
   /** Per-harness concurrency caps. Claude Code uses OMNI_MAX_CONCURRENT. */

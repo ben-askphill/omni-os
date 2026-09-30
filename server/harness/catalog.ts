@@ -13,7 +13,7 @@ export const CLAUDE_DEFAULT_EFFORT = 'high';
 /** The short aliases stay valid for roles and the conductor. */
 export const CLAUDE_ALIASES: Record<string, string> = {
   opus: 'claude-opus-5-5',
-  sonnet: 'claude-sonnet-5',
+  sonnet: 'claude-sonnet-5-5',
   haiku: 'claude-haiku-4-5',
   fable: 'claude-fable-5-1',
 };
@@ -27,8 +27,9 @@ const claudeModel = (id: string, label: string, isDefault = false): ModelEntry =
 });
 
 /** The fixed Claude Code list Omni has today. `defaultModelId` marks the harness default. */
-export function claudeModels(defaultModelId = 'claude-opus-5-5'): ModelEntry[] {
+export function claudeModels(defaultModelId = 'claude-sonnet-5-5'): ModelEntry[] {
   const models = [
+    claudeModel('claude-sonnet-5-5', 'Sonnet 5.5'),
     claudeModel('claude-opus-5-5', 'Opus 5.5'),
     claudeModel('claude-sonnet-5', 'Sonnet 5'),
     claudeModel('claude-fable-5-1', 'Fable 5.1'),
