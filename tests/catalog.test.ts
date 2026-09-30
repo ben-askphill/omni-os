@@ -28,14 +28,15 @@ const cat: Catalog = { harnesses: [claudeHarness(4), codexHarness(codexProbe, 4)
 
 describe('claude catalog', () => {
   it('lists the fixed models with efforts and marks the default', () => {
-    const models = claudeModels('claude-opus-5-5');
-    expect(models.map((m) => m.id)).toEqual(['claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5-1', 'claude-haiku-4-5']);
+    const models = claudeModels();
+    expect(models.map((m) => m.id)).toEqual(['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5-1', 'claude-haiku-4-5']);
     expect(models.every((m) => m.efforts.includes('xhigh'))).toBe(true);
-    expect(models.find((m) => m.default)?.id).toBe('claude-opus-5-5');
+    expect(models.find((m) => m.default)?.id).toBe('claude-sonnet-5-5');
   });
 
   it('marks the default via alias', () => {
-    expect(claudeModels('sonnet').find((m) => m.default)?.id).toBe('claude-sonnet-5');
+    expect(claudeModels('sonnet').find((m) => m.default)?.id).toBe('claude-sonnet-5-5');
+    expect(claudeModels('opus').find((m) => m.default)?.id).toBe('claude-opus-5-5');
   });
 
   it('resolves aliases', () => {
