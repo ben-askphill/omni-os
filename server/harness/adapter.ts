@@ -22,6 +22,8 @@ export interface AdapterContext {
   secretEnv: Record<string, string>;
   /** Another thread already holds the channel's browser profile. */
   browserBusy: boolean;
+  /** The channel browser Omni runs, for the browser MCP to attach to. */
+  cdpEndpoint?: string | null;
   omniUrl: string;
   /** Whether the CLI should resume its stored session rather than start fresh. */
   resume: boolean;

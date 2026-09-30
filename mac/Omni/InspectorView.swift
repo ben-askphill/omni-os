@@ -135,7 +135,7 @@ private struct InspectorPanel: View {
       case .artifacts:
         ArtifactsTab(client: model.client, files: files, selection: $selection)
       case .browser:
-        BrowserTab(client: model.client, shots: store.screenshots)
+        BrowserTab(client: model.client, channel: store.thread?.channelID, shots: store.screenshots)
       case .details:
         DetailsTab(model: model, store: store)
       }

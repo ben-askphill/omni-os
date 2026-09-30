@@ -66,7 +66,7 @@ export const cursorAdapter: HarnessAdapter = {
     let chatId: string | null = resume ? thread.session_id : null;
     const modelId = thread.model ? cursorModelId(thread.model, thread.effort || '') : 'auto';
     // Omni's MCP servers load from a per-thread plugin folder; nothing touches the repo or ~/.cursor.
-    const pluginDir = writeCursorPlugin({ threadId: thread.id, channel: ctx.channel, role: ctx.role, browserBusy: ctx.browserBusy, omniUrl: ctx.omniUrl });
+    const pluginDir = writeCursorPlugin({ threadId: thread.id, channel: ctx.channel, role: ctx.role, browserBusy: ctx.browserBusy, cdpEndpoint: ctx.cdpEndpoint, omniUrl: ctx.omniUrl });
 
     // A persistent holder keeps the runner's warm-process logic happy between per-turn runs.
     const holder = spawn('sh', ['-c', 'exec cat >/dev/null'], { stdio: ['pipe', 'pipe', 'pipe'] });

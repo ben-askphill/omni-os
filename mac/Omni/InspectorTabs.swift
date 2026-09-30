@@ -3,15 +3,57 @@ import SwiftUI
 
 // MARK: Browser
 
-/// The channel browser's screenshots, newest first, and a viewer to page through them.
+/// The channel's browser, live: the Chrome the agent drives, which Ben can click and type in. The
+/// screenshots the agent saved are one button away.
 struct BrowserTab: View {
+  let client: OmniClient
+  let channel: String?
+  let shots: [Artifact]
+  @State private var browser: ChannelBrowserModel?
+  @State private var showShots = false
+
+  var body: some View {
+    Group {
+      if showShots {
+        VStack(spacing: 0) {
+          HStack {
+            Button("Live browser", systemImage: "chevron.left") { showShots = false }
+              .buttonStyle(.pill(.ghost, height: 28))
+            Spacer()
+            Text(shots.count == 1 ? "1 screenshot" : "\(shots.count) screenshots")
+              .font(.system(size: 11).monospacedDigit())
+              .foregroundStyle(Tok.fg4)
+              .padding(.horizontal, 8)
+          }
+          .padding(.horizontal, 8)
+          .padding(.bottom, 8)
+          ScreenshotGrid(client: client, shots: shots)
+        }
+      } else if let browser {
+        LiveBrowserView(model: browser, trailing: AnyView(
+          Button(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))", systemImage: "photo") { showShots = true }
+            .help(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))")
+        ))
+      } else {
+        Color.clear
+      }
+    }
+    .frame(maxHeight: .infinity, alignment: .top)
+    .onChange(of: channel, initial: true) { _, id in
+      if let id, browser?.channel != id { browser = ChannelBrowserModel(client: client, channel: id) }
+    }
+  }
+}
+
+/// The channel browser's screenshots, newest first, and a viewer to page through them.
+struct ScreenshotGrid: View {
   let client: OmniClient
   let shots: [Artifact]
   @State private var openID: Int?
 
   var body: some View {
     if shots.isEmpty {
-      EmptyNote(symbol: "globe", title: "No screenshots yet", message: "When the agent uses the channel browser, its screenshots collect here.")
+      EmptyNote(symbol: "globe", title: "No screenshots yet", message: "When the agent takes a screenshot in the channel browser, it collects here.")
         .frame(maxHeight: .infinity, alignment: .top)
     } else {
       let list = Array(shots.reversed())

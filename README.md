@@ -13,7 +13,7 @@ Both show the same channels and threads. They never share code directly: see [We
 
 - **Channels** per client or project (Volero, Pink Gellac, Acne, internal, personal)
 - **Threads** per task, dated and full-text searchable, resumable any time
-- **Sandbox per thread**: own git worktree in repo channels, a persistent browser per channel (logins survive), secrets from the Keychain injected as env
+- **Sandbox per thread**: own git worktree in repo channels, a persistent browser per channel (logins survive) shown live in the thread's Browser panel, where you can click and type in it too, secrets from the Keychain injected as env
 - **Artifacts** rendered inline: anything the agent writes to its artifacts dir
 - **GitHub panel** per repo channel: PRs, checks, diff, merge (with confirm)
 - **Conductor**: one front agent that delegates to crew roles; reports come back to it automatically
@@ -55,7 +55,7 @@ Each thread gets one long-lived `claude -p --input-format stream-json --output-f
 | cwd | worktree `data/worktrees/<thread>` on branch `omni/<id>` (repo channels), else the channel base dir, else `~/phillbert` |
 | context | `~/phillbert` added with `--add-dir`, its CLAUDE.md loaded, all your user skills and MCP servers |
 | system prompt | channel facts (store, Portal slug, repo, notes), artifacts and browser rules, the crew role charter |
-| MCP | `omni-browser` (Playwright, profile in `data/browsers/<channel>`); conductor also gets `omni` |
+| MCP | `omni-browser` (Playwright, attached over CDP to the channel's Chrome that Omni runs, profile in `data/browsers/<channel>`); conductor also gets `omni` |
 | env | `OMNI_THREAD_ID`, `OMNI_ARTIFACTS_DIR`, `OMNI_URL`, plus global and channel secrets |
 | session | `--session-id` on the first run, `--resume` after, so every follow-up keeps full context |
 
@@ -188,6 +188,7 @@ data/        gitignored: db, thread dirs, worktrees, browser profiles, logs
 
 - Isolation is a worktree plus a browser profile, not a VM. Threads run with `bypassPermissions` because nobody can answer prompts headless; the write boundaries in phillbert's CLAUDE.md still apply.
 - Only one live thread per channel gets the persistent browser profile; parallel ones get an isolated browser.
+- The channel browser (`server/browser.ts`) is one Chrome per channel that Omni launches on first use (a thread's MCP or the Browser panel) and closes after 5 idle minutes. The panel streams it with a CDP screencast and sends mouse, wheel and keys back (`/api/channels/:id/browser/*`). Its viewport is 1280 wide, so the agent sees desktop layouts; Expand shows it bigger.
 - Worktrees are not cleaned up automatically yet (`git worktree prune` in the repo).
 - The run queue lives in memory. Restarting the server marks running threads failed and drops queued follow-ups; resend them.
 - Subscription limits still apply. Each harness has its own concurrency cap (4 by default): `OMNI_MAX_CONCURRENT` (Claude Code), `OMNI_MAX_CONCURRENT_CODEX`, `OMNI_MAX_CONCURRENT_CURSOR`, `OMNI_MAX_CONCURRENT_HERMES`. A full harness never holds up threads on another. Hermes also enforces its own concurrent-run cap; Omni backs off and retries on HTTP 429.
