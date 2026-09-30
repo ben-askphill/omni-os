@@ -76,13 +76,18 @@ struct HarnessMark: View {
   }
 }
 
-/// The continuous line "omni", leaning 10 degrees.
+/// The continuous line "omni", leaning 10 degrees. With `writeOnHover` it writes itself out again, one pen
+/// stroke, each time the pointer comes over it (the sidebar's, as `.wordmark-write` in index.css).
 struct Wordmark: View {
   var height: CGFloat = 18
+  var writeOnHover = false
 
-  private static let box = CGRect(x: BrandPaths.wordmarkBox.x, y: BrandPaths.wordmarkBox.y,
-                                  width: BrandPaths.wordmarkBox.width, height: BrandPaths.wordmarkBox.height)
-  private static let line: CGPath = {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var drawn: CGFloat = 1
+
+  fileprivate static let box = CGRect(x: BrandPaths.wordmarkBox.x, y: BrandPaths.wordmarkBox.y,
+                                      width: BrandPaths.wordmarkBox.width, height: BrandPaths.wordmarkBox.height)
+  fileprivate static let line: CGPath = {
     let skew = CGAffineTransform(a: 1, b: 0, c: tan(-10 * .pi / 180), d: 1, tx: 0, ty: 0)
     var t = skew
     return SVGPath.cgPath(BrandPaths.wordmark).copy(using: &t) ?? SVGPath.cgPath(BrandPaths.wordmark)
@@ -90,14 +95,39 @@ struct Wordmark: View {
 
   var body: some View {
     let scale = height / Self.box.height
-    Canvas { context, _ in
-      let t = CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: -Self.box.minX, y: -Self.box.minY)
-      context.stroke(Path(Self.line).applying(t), with: .color(Tok.fg),
-                     style: StrokeStyle(lineWidth: 20 * scale, lineCap: .round, lineJoin: .round))
-    }
-    .frame(width: Self.box.width * scale, height: height)
-    .accessibilityElement()
-    .accessibilityLabel("omni")
+    WordmarkLine(drawn: drawn)
+      .stroke(Tok.fg, style: StrokeStyle(lineWidth: 20 * scale, lineCap: .round, lineJoin: .round))
+      .frame(width: Self.box.width * scale, height: height)
+      .contentShape(Rectangle())
+      .onHover { inside in
+        guard inside, writeOnHover, !reduceMotion else { return }
+        var reset = Transaction()
+        reset.disablesAnimations = true
+        withTransaction(reset) { drawn = 0 }
+        DispatchQueue.main.async {
+          withAnimation(.timingCurve(0.45, 0, 0.2, 1, duration: 0.9)) { drawn = 1 }
+        }
+      }
+      .accessibilityElement()
+      .accessibilityLabel("omni")
+  }
+}
+
+/// The wordmark's line fitted to its frame, drawn from the o's start up to `drawn` (0...1) of its length.
+private struct WordmarkLine: Shape {
+  var drawn: CGFloat
+
+  var animatableData: CGFloat {
+    get { drawn }
+    set { drawn = newValue }
+  }
+
+  func path(in rect: CGRect) -> Path {
+    let box = Wordmark.box
+    let scale = rect.height / box.height
+    let t = CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: -box.minX, y: -box.minY)
+    let full = Path(Wordmark.line).applying(t)
+    return drawn >= 1 ? full : full.trimmedPath(from: 0, to: drawn)
   }
 }
 

@@ -24,7 +24,7 @@ struct SidebarView: View {
     let sections = model.store.sidebar
     VStack(spacing: 0) {
       HStack {
-        Button { pick(.home) } label: { Wordmark(height: 18) }
+        Button { pick(.home) } label: { Wordmark(height: 18, writeOnHover: true) }
           .buttonStyle(.plain)
           .help("Omni home")
         Spacer()

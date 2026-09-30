@@ -254,7 +254,7 @@ export function OmniLogo({ variant = 'wordmark', height = 32, live = false, mark
   if (variant === 'mark') return <OmniMark size={height} state={markState} title={title} />;
   const word = (
     <svg width={VB.w * (height / VB.h)} height={height} viewBox={`${VB.x} ${VB.y} ${VB.w} ${VB.h}`} role="img" aria-label={title} className="block shrink-0 text-fg">
-      <path transform="skewX(-10)" d={LINE} fill="none" stroke="currentColor" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
+      <path className="wordmark-line" transform="skewX(-10)" d={LINE} pathLength={1} fill="none" stroke="currentColor" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
   if (!live) return word;
