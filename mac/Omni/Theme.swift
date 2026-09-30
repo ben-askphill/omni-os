@@ -5,6 +5,8 @@ import SwiftUI
 /// and three status pops. Each is `light-dark()` there, a dynamic color here.
 enum Tok {
   static let canvas = dyn(0xffffff, 0x0c0d0f)
+  /// The chrome around the pane (sidebar, toolbar strip, gutters): dark in both appearances, as `--chrome`.
+  static let chrome = Color(hex: 0x0c0d0f)
   static let bg = dyn(0xffffff, 0x121316)
   static let surface = dyn(0xf7f7f6, 0x191b1e)
   static let surface2 = dyn(0xf1f1f0, 0x222428)

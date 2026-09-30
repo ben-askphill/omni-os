@@ -8,6 +8,8 @@ struct MainWindow: View {
   @Environment(\.openSettings) private var openSettings
   @AppStorage(sidebarShownKey) private var sidebarShown = true
   @State private var paneTop: CGFloat?
+  /// The window's own appearance. The chrome is drawn dark, the pane and the palette follow this.
+  @Environment(\.colorScheme) private var scheme
 
   var body: some View {
     HStack(spacing: 0) {
@@ -25,20 +27,22 @@ struct MainWindow: View {
       .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { paneTop = $0 }
       .overlay(alignment: .bottomTrailing) { BannerStack(model: model) }
       .background(Tok.bg)
+      .environment(\.colorScheme, scheme)
       .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
       .cardShadow(22)
       .padding(.leading, sidebarShown ? 0 : 8)
       .padding([.trailing, .bottom], 8)
     }
-    .background(Tok.canvas.ignoresSafeArea())
+    .background(Tok.chrome.ignoresSafeArea())
     .tint(Tok.fg)
     .navigationTitle(model.title)
     .toolbar(removing: .title)
     .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     .toolbar { toolbar }
-    .overlay { PaletteOverlay(model: model) }
+    .overlay { PaletteOverlay(model: model).environment(\.colorScheme, scheme) }
     .modifier(ThreadWindowSupport(model: model))
     .frame(minWidth: 720, minHeight: 460)
+    .environment(\.colorScheme, .dark)
     .onChange(of: model.route) { old, new in
       // A route that lives in Settings, such as #/secrets from a script, opens it there instead.
       guard let tab = new.settingsTab else { return }
