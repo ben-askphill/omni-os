@@ -293,7 +293,7 @@ function BrowserTab({ channelId, shots }: { channelId: string; shots: Artifact[]
       )}
       <Modal open={expanded} onClose={() => setExpanded(false)} wide title="Browser">
         <div className="h-[78vh] pb-3">
-          <LiveBrowser channelId={channelId} fill />
+          <LiveBrowser channelId={channelId} />
         </div>
       </Modal>
     </div>

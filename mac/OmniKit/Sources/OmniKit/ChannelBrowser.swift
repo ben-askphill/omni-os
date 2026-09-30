@@ -5,11 +5,41 @@ public struct BrowserTabInfo: Codable, Hashable, Sendable, Identifiable {
   public var id: String
   public var url: String
   public var title: String
+  /// The page's icon, or its origin's /favicon.ico. Absent for blank and non-web pages.
+  public var favicon: String?
 
-  public init(id: String, url: String, title: String) {
+  public init(id: String, url: String, title: String, favicon: String? = nil) {
     self.id = id
     self.url = url
     self.title = title
+    self.favicon = favicon
+  }
+
+  /// The title as the tab shows it.
+  public var label: String {
+    if !title.isEmpty, title != "about:blank" { return title }
+    let shown = BrowserTabInfo.displayURL(url)
+    return shown.isEmpty ? "New Tab" : shown
+  }
+
+  /// The address as Chrome shows it at rest: no scheme, no www, no trailing slash on a bare host.
+  public static func displayURL(_ url: String) -> String {
+    guard !url.isEmpty, url != "about:blank" else { return "" }
+    var s = url
+    for p in ["https://", "http://"] where s.hasPrefix(p) { s.removeFirst(p.count) }
+    if s.hasPrefix("www.") { s.removeFirst(4) }
+    if s.hasSuffix("/"), s.dropLast().allSatisfy({ !"/?#".contains($0) }) { s.removeLast() }
+    return s
+  }
+}
+
+/// A page viewport in CSS pixels.
+public struct BrowserViewport: Codable, Hashable, Sendable {
+  public var width: Double
+  public var height: Double
+  public init(width: Double, height: Double) {
+    self.width = width
+    self.height = height
   }
 }
 
@@ -23,10 +53,13 @@ public struct BrowserState: Codable, Hashable, Sendable {
   public var canForward: Bool
   public var tabs: [BrowserTabInfo]
   public var active: String?
+  /// The size the page lays out at: the viewer's while one is watching.
+  public var viewport: BrowserViewport?
 
   public static let stopped = BrowserState(running: false, url: "", title: "", loading: false, canBack: false, canForward: false, tabs: [], active: nil)
 
-  public init(running: Bool, url: String, title: String, loading: Bool, canBack: Bool, canForward: Bool, tabs: [BrowserTabInfo], active: String?) {
+  public init(running: Bool, url: String, title: String, loading: Bool, canBack: Bool, canForward: Bool, tabs: [BrowserTabInfo], active: String?, viewport: BrowserViewport? = nil) {
+    self.viewport = viewport
     self.running = running
     self.url = url
     self.title = title
@@ -136,8 +169,10 @@ public enum BrowserAction: Encodable, Hashable, Sendable {
   case newTab
   case tab(String)
   case closeTab(String)
+  /// The viewer's size in points, and its backing scale, so the page lays out to fit it.
+  case resize(width: Double, height: Double, scale: Double)
 
-  private enum Keys: String, CodingKey { case action, url, id }
+  private enum Keys: String, CodingKey { case action, url, id, width, height, scale }
 
   public func encode(to encoder: any Encoder) throws {
     var c = encoder.container(keyedBy: Keys.self)
@@ -157,11 +192,18 @@ public enum BrowserAction: Encodable, Hashable, Sendable {
     case let .closeTab(id):
       try c.encode("closeTab", forKey: .action)
       try c.encode(id, forKey: .id)
+    case let .resize(width, height, scale):
+      try c.encode("resize", forKey: .action)
+      try c.encode(width.rounded(), forKey: .width)
+      try c.encode(height.rounded(), forKey: .height)
+      try c.encode(scale, forKey: .scale)
     }
   }
 }
 
 private struct OKReply: Decodable { let ok: Bool }
+private struct InputBatch: Encodable { let events: [BrowserInput] }
+private struct CopyReply: Decodable { let text: String }
 
 extension OmniClient {
   public func browserStreamURL(channel: String) -> URL {
@@ -177,7 +219,18 @@ extension OmniClient {
   }
 
   public func browserInput(channel: String, _ input: BrowserInput) async throws(OmniAPIError) {
-    let _: OKReply = try await send("POST", "/api/channels/\(uriComponent(channel))/browser/input", body: input)
+    try await browserInput(channel: channel, [input])
+  }
+
+  /// Several events in order, in one request.
+  public func browserInput(channel: String, _ events: [BrowserInput]) async throws(OmniAPIError) {
+    let _: OKReply = try await send("POST", "/api/channels/\(uriComponent(channel))/browser/input", body: InputBatch(events: events))
+  }
+
+  /// The text selected in the page, for Cmd-C.
+  public func browserCopy(channel: String) async throws(OmniAPIError) -> String {
+    let r: CopyReply = try await send("POST", "/api/channels/\(uriComponent(channel))/browser/copy", body: [String: String]())
+    return r.text
   }
 
   public func browserAction(channel: String, _ action: BrowserAction) async throws(OmniAPIError) -> BrowserState {
@@ -248,7 +301,9 @@ public final class ChannelBrowserModel {
   @ObservationIgnored private let client: OmniClient
   @ObservationIgnored private var stream: SSEClient<BrowserStreamMessage>?
   @ObservationIgnored private var task: Task<Void, Never>?
-  @ObservationIgnored private var queue: Task<Void, Never>?
+  @ObservationIgnored private var pending: [BrowserInput] = []
+  @ObservationIgnored private var sending = false
+  @ObservationIgnored private var size: (width: Double, height: Double, scale: Double)?
 
   public init(client: OmniClient, channel: String) {
     self.client = client
@@ -279,10 +334,15 @@ public final class ChannelBrowserModel {
     switch e {
     case let .state(c):
       connection = c
-      if c == .open { error = nil }
+      if c == .open {
+        error = nil
+        if let s = size { perform(.resize(width: s.width, height: s.height, scale: s.scale)) }
+      }
     case let .message(.state(s)):
+      let started = s.running && !state.running
       state = s
       if !s.running { frame = nil }
+      if started, let z = size { perform(.resize(width: z.width, height: z.height, scale: z.scale)) }
     case let .message(.frame(f)):
       frame = f
     case let .message(.error(text)):
@@ -290,13 +350,56 @@ public final class ChannelBrowserModel {
     }
   }
 
+  /// Input goes out in order, a batch at a time: while one is on its way, the next queues and
+  /// merges (moves keep the newest, scrolls add up), so a busy page never falls behind the mouse.
   public func send(_ input: BrowserInput) {
-    let prev = queue
-    let client = client, channel = channel
-    queue = Task {
-      await prev?.value
-      try? await client.browserInput(channel: channel, input)
+    Self.enqueue(&pending, input)
+    flush()
+  }
+
+  public static func enqueue(_ q: inout [BrowserInput], _ e: BrowserInput) {
+    switch (q.last, e) {
+    case (.mouse(.mouseMoved, _, _, _, _, _, _)?, .mouse(.mouseMoved, _, _, _, _, _, _)):
+      q[q.count - 1] = e
+    case let (.wheel(_, _, dx0, dy0, m0)?, .wheel(x, y, dx, dy, m)) where m0 == m:
+      q[q.count - 1] = .wheel(x: x, y: y, deltaX: dx0 + dx, deltaY: dy0 + dy, modifiers: m)
+    default:
+      q.append(e)
     }
+  }
+
+  private func flush() {
+    guard !sending, !pending.isEmpty else { return }
+    sending = true
+    let events = pending
+    pending = []
+    let client = client, channel = channel
+    Task { [weak self] in
+      try? await client.browserInput(channel: channel, events)
+      guard let self else { return }
+      self.sending = false
+      self.flush()
+    }
+  }
+
+  /// The view's size. The page lays out to fit it; the same size again sends nothing.
+  public func resize(width: Double, height: Double, scale: Double) {
+    guard width > 0, height > 0 else { return }
+    if let s = size, abs(s.width - width) < 1, abs(s.height - height) < 1, s.scale == scale { return }
+    size = (width, height, scale)
+    perform(.resize(width: width, height: height, scale: scale))
+  }
+
+  /// Claims the page size for this view again, after another viewer (the web panel) changed it.
+  public func claimSize() {
+    guard let s = size, state.running else { return }
+    if let v = state.viewport, abs(v.width - s.width.rounded()) <= 1, abs(v.height - s.height.rounded()) <= 1 { return }
+    perform(.resize(width: s.width, height: s.height, scale: s.scale))
+  }
+
+  /// The page's selected text, for Cmd-C.
+  public func copySelection() async -> String {
+    (try? await client.browserCopy(channel: channel)) ?? ""
   }
 
   public func perform(_ action: BrowserAction) {
