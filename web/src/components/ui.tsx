@@ -12,6 +12,7 @@ import {
   type RefObject,
 } from 'react';
 import type { ThreadStatus } from '../../../server/db.ts';
+import { CHANNEL_GLYPHS, parseChannelIcon } from '../../../shared/channel-icon.ts';
 import { Loader, OmniLogo } from './brand.tsx';
 
 export { Loader } from './brand.tsx';
@@ -261,8 +262,19 @@ export function Chip({ children, tone = 'default', className = '', title }: { ch
   );
 }
 
-/** Letter avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. A channel's own emoji replaces the letter. */
-export function Avatar({ name, size = 28, icon, emoji, ink, className = '' }: { name: string; size?: number; icon?: IconName; emoji?: string | null; ink?: boolean; className?: string }) {
+// Every icon a channel can pick is one this file draws.
+const _channelGlyphsDrawn: readonly IconName[] = CHANNEL_GLYPHS;
+
+/** A channel's own icon (an emoji or a design system icon), or nothing when it has none. */
+export function ChannelMark({ icon, size }: { icon: string | null | undefined; size: number }) {
+  const mark = parseChannelIcon(icon);
+  if (!mark) return null;
+  return mark.kind === 'glyph' ? <Icon name={mark.name} size={size} /> : <span className="leading-none" style={{ fontSize: size }}>{mark.text}</span>;
+}
+
+/** Letter avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. A channel's own icon replaces the letter. */
+export function Avatar({ name, size = 28, icon, channelIcon, ink, className = '' }: { name: string; size?: number; icon?: IconName; channelIcon?: string | null; ink?: boolean; className?: string }) {
+  const mark = parseChannelIcon(channelIcon);
   return (
     <span
       aria-hidden="true"
@@ -271,8 +283,8 @@ export function Avatar({ name, size = 28, icon, emoji, ink, className = '' }: { 
     >
       {icon ? (
         <Icon name={icon} size={size * 0.5} />
-      ) : emoji ? (
-        <span style={{ fontSize: size * 0.52 }}>{emoji}</span>
+      ) : mark ? (
+        <ChannelMark icon={channelIcon} size={mark.kind === 'glyph' ? size * 0.5 : size * 0.52} />
       ) : (
         name.replace(/[^a-z0-9]/gi, '').slice(0, 1) || '?'
       )}
@@ -837,8 +849,8 @@ export interface PickerOption<T extends string> {
   icon?: IconName;
   /** Letter avatar seed; defaults to the label. Set `avatar: false` to hide it. */
   avatar?: string | false;
-  /** An emoji for the avatar in place of the letter. */
-  emoji?: string | null;
+  /** A channel icon for the avatar in place of the letter. */
+  channelIcon?: string | null;
   /** A mark to lead with instead of the avatar (a HarnessLogo or CrewMark). */
   lead?: ReactNode;
 }
@@ -947,7 +959,7 @@ export function Picker<T extends string>({
         {current?.lead ? (
           <span className="grid h-6 w-6 place-items-center rounded-full bg-bg text-fg">{current.lead}</span>
         ) : current && current.avatar !== false ? (
-          <Avatar name={current.avatar || current.label} icon={current.icon} emoji={current.emoji} size={24} />
+          <Avatar name={current.avatar || current.label} icon={current.icon} channelIcon={current.channelIcon} size={24} />
         ) : current?.icon ? (
           <span className="grid h-6 w-6 place-items-center text-fg-3">
             <Icon name={current.icon} size={14} />
@@ -997,7 +1009,7 @@ export function Picker<T extends string>({
                 {o.lead ? (
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">{o.lead}</span>
                 ) : o.avatar !== false ? (
-                  <Avatar name={o.avatar || o.label} icon={o.icon} emoji={o.emoji} size={28} />
+                  <Avatar name={o.avatar || o.label} icon={o.icon} channelIcon={o.channelIcon} size={28} />
                 ) : o.icon ? (
                   <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-2 text-fg-3">
                     <Icon name={o.icon} size={14} />

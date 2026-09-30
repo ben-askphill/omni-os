@@ -119,6 +119,11 @@ describe('channel icon', () => {
     expect(JSON.parse((await send('PATCH', '/api/channels/iconic', { icon: '' })).text).icon).toBeNull();
   });
 
+  it('takes a design system icon by name', async () => {
+    expect(JSON.parse((await send('PATCH', '/api/channels/iconic', { icon: 'icon:terminal' })).text).icon).toBe('icon:terminal');
+    expect((await send('PATCH', '/api/channels/iconic', { icon: 'icon:nope' })).status).toBe(400);
+  });
+
   it('refuses more than one character', async () => {
     expect((await send('PATCH', '/api/channels/iconic', { icon: '📸💅' })).status).toBe(400);
     expect((await send('POST', '/api/channels', { id: 'wordy', name: 'Wordy', icon: 'KE' })).status).toBe(400);

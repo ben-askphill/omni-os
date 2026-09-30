@@ -54,7 +54,7 @@ private struct ChannelView: View {
 
   private var header: some View {
     HStack(spacing: 14) {
-      ChannelAvatar(name: channel.name, conductor: conductor, size: 44, emoji: channel.icon)
+      ChannelAvatar(name: channel.name, conductor: conductor, size: 44, icon: channel.icon)
       VStack(alignment: .leading, spacing: 4) {
         HStack(spacing: 8) {
           Text(kindLabel)
@@ -159,7 +159,7 @@ struct ChannelTabsBar: View {
     if let channel = model.store.channel(channelID) {
       let conductor = channel.id == SidebarSections.conductorID
       HStack(spacing: 10) {
-        ChannelAvatar(name: channel.name, conductor: conductor, size: 28, emoji: channel.icon)
+        ChannelAvatar(name: channel.name, conductor: conductor, size: 28, icon: channel.icon)
         HStack(alignment: .firstTextBaseline, spacing: 2) {
           if !conductor { Text("#").foregroundStyle(Tok.fg4) }
           Text(channel.name).foregroundStyle(Tok.fg)

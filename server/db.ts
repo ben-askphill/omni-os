@@ -20,7 +20,7 @@ export interface Channel {
   portal_slug: string | null;
   browser_headless: number;
   notes: string | null;
-  /** One emoji (or other single character) shown in place of the letter avatar and the sidebar's #. */
+  /** One emoji, or `icon:<name>` for a design system icon (shared/channel-icon.ts), shown in place of the letter avatar and the sidebar's #. */
   icon: string | null;
   archived: number;
   created_at: string;

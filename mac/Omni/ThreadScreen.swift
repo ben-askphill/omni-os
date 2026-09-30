@@ -89,7 +89,7 @@ private struct ThreadHeader: View {
   var body: some View {
     let channel = store.channel?.name ?? thread.channelID
     HStack(spacing: 12) {
-      ChannelAvatar(name: channel, conductor: thread.channelID == SidebarSections.conductorID, emoji: store.channel?.icon)
+      ChannelAvatar(name: channel, conductor: thread.channelID == SidebarSections.conductorID, icon: store.channel?.icon)
       VStack(alignment: .leading, spacing: 1) {
         HStack(spacing: 4) {
           Button("#\(channel)") { model.route = .channel(id: thread.channelID) }
@@ -147,8 +147,8 @@ struct ChannelAvatar: View {
   let name: String
   var conductor = false
   var size: CGFloat = 34
-  /// The channel's own icon, in place of the letter.
-  var emoji: String?
+  /// The channel's own icon (an emoji or `icon:<name>`), in place of the letter.
+  var icon: String?
 
   var body: some View {
     ZStack {
@@ -156,9 +156,9 @@ struct ChannelAvatar: View {
       if conductor {
         StaticMark(size: size * 0.55)
           .foregroundStyle(Tok.onInk)
-      } else if let emoji, !emoji.isEmpty {
-        Text(emoji)
-          .font(.system(size: size * 0.52))
+      } else if let mark = ChannelIcon(icon) {
+        ChannelMark(icon: mark, size: size * (mark.isGlyph ? 0.5 : 0.52))
+          .foregroundStyle(Tok.fg2)
       } else {
         Text(AvatarMark(name: name).letter)
           .font(.system(size: size * 0.42, weight: .medium, design: .rounded))
@@ -168,6 +168,23 @@ struct ChannelAvatar: View {
     .frame(width: size, height: size)
     .accessibilityHidden(true)
   }
+}
+
+/// A channel's own icon: the emoji, or the design system icon in the text color.
+struct ChannelMark: View {
+  let icon: ChannelIcon
+  let size: CGFloat
+
+  var body: some View {
+    switch icon {
+    case .glyph(let name): OmniIcon(name: name, size: size)
+    case .emoji(let text): Text(text).font(.system(size: size))
+    }
+  }
+}
+
+extension ChannelIcon {
+  var isGlyph: Bool { if case .glyph = self { true } else { false } }
 }
 
 /// A failure: the vermilion diamond carries the alarm, the text stays ink.

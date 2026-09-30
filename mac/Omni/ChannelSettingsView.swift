@@ -53,19 +53,22 @@ struct ChannelSettingsForm: View {
             .accessibilityLabel("Id")
         }
       }
-      SettingsField("Icon", hint: "One emoji, shown in the sidebar and on the channel. Ctrl+Cmd+Space opens the emoji picker. Empty uses the first letter.") {
-        HStack(spacing: 12) {
-          ChannelAvatar(name: form.name.isEmpty ? form.id : form.name, size: 36, emoji: form.icon)
-          TextField("", text: Binding(get: { form.icon }, set: { form.setIcon($0) }), prompt: Text("📸"))
-            .font(.system(size: 18))
-            .multilineTextAlignment(.center)
-            .frame(width: 96)
-            .accessibilityLabel("Icon")
-          if !form.icon.isEmpty {
-            Button("Clear") { form.icon = "" }
-              .buttonStyle(.pill(.secondary, height: 30))
+      SettingsField("Icon", hint: "Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker) or pick an icon. Empty uses the first letter.") {
+        VStack(alignment: .leading, spacing: 12) {
+          HStack(spacing: 12) {
+            ChannelAvatar(name: form.name.isEmpty ? form.id : form.name, size: 36, icon: form.icon)
+            TextField("", text: Binding(get: { form.emoji }, set: { form.setIcon($0) }), prompt: Text("Emoji"))
+              .font(.system(size: 18))
+              .multilineTextAlignment(.center)
+              .frame(width: 96)
+              .accessibilityLabel("Emoji")
+            if !form.icon.isEmpty {
+              Button("Clear") { form.icon = "" }
+                .buttonStyle(.pill(.secondary, height: 30))
+            }
+            Spacer(minLength: 0)
           }
-          Spacer(minLength: 0)
+          GlyphPicker(selection: ChannelIcon(form.icon)) { form.toggleGlyph($0) }
         }
       }
       if !isSystem {
@@ -406,5 +409,32 @@ private struct FolderButton: View {
     }
     .buttonStyle(.pill(.secondary, height: 38))
     .help(title)
+  }
+}
+
+/// The design system icons a channel can pick, as IconPicker in ChannelSettings.tsx. The picked one is ink.
+private struct GlyphPicker: View {
+  let selection: ChannelIcon?
+  let pick: (String) -> Void
+
+  var body: some View {
+    LazyVGrid(columns: [GridItem(.adaptive(minimum: 36, maximum: 36), spacing: 4)], alignment: .leading, spacing: 4) {
+      ForEach(ChannelIcon.glyphs, id: \.self) { name in
+        let on = selection == .glyph(name)
+        Button { pick(name) } label: {
+          OmniIcon(name: name, size: 17)
+            .foregroundStyle(on ? Tok.onInk : Tok.fg2)
+            .frame(width: 36, height: 36)
+            .background(on ? Tok.fg : .clear, in: Circle())
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(name)
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(on ? .isSelected : [])
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Icon")
   }
 }

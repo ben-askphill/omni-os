@@ -66,6 +66,25 @@ import OmniKit
     #expect(f.icon == "")
   }
 
+  @Test func glyphsToggleAndHideFromTheEmojiField() throws {
+    var f = ChannelForm()
+    f.setIcon("📸")
+    f.toggleGlyph("terminal")
+    #expect(f.icon == "icon:terminal")
+    #expect(f.emoji == "")
+    #expect(try encoded(f.body(system: false))["icon"] == .string("icon:terminal"))
+    f.toggleGlyph("terminal")
+    #expect(f.icon == "")
+  }
+
+  @Test func readsStoredIcons() {
+    #expect(ChannelIcon("icon:terminal") == .glyph("terminal"))
+    #expect(ChannelIcon("icon:nope") == nil)
+    #expect(ChannelIcon(" 👩‍💻 ") == .emoji("👩‍💻"))
+    #expect(ChannelIcon("KE") == nil)
+    #expect(ChannelIcon(nil) == nil)
+  }
+
   @Test func systemChannelsKeepTheirKindAndBrowserToggleInverts() throws {
     var f = ChannelForm()
     f.name = "Inbox"

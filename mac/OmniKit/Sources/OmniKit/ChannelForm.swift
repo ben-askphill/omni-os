@@ -15,7 +15,7 @@ public struct ChannelForm: Hashable, Sendable {
   /// Off runs the channel browser headless.
   public var showBrowser = false
   public var notes = ""
-  /// One emoji, or empty for the letter avatar.
+  /// One emoji, `icon:<name>` for a design system icon, or empty for the letter avatar.
   public var icon = ""
   public private(set) var idTouched = false
 
@@ -51,6 +51,16 @@ public struct ChannelForm: Hashable, Sendable {
   /// Keeps the last character typed, whole when it is a multi-part emoji, so typing over the icon replaces it.
   public mutating func setIcon(_ value: String) {
     icon = value.trimmingCharacters(in: .whitespacesAndNewlines).last.map(String.init) ?? ""
+  }
+
+  /// The emoji field's text: empty while a design system icon is picked.
+  public var emoji: String {
+    if case .emoji(let text) = ChannelIcon(icon) { text } else { "" }
+  }
+
+  /// Picks a design system icon, or clears it when it is the one picked.
+  public mutating func toggleGlyph(_ name: String) {
+    icon = ChannelIcon(icon) == .glyph(name) ? "" : ChannelIcon.stored(glyph: name)
   }
 
   public var idValid: Bool {
