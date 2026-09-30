@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type EventRow, type PendingMsg, type PRSummary, type SendMode, type Thread, type ThreadDetail } from '../api.ts';
 import { ArtifactViewer, kindIcon } from '../components/ArtifactViewer.tsx';
 import { ReplyComposer } from '../components/Composer.tsx';
@@ -11,7 +11,10 @@ import { duration, fullDate, plural, relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { readPref, useApp, useFeed, useIsMobile, writePref } from '../store.tsx';
 
-type PanelTab = 'artifacts' | 'browser' | 'details';
+type PanelTab = 'artifacts' | 'browser' | 'terminal' | 'details';
+
+// xterm.js is large; load it the first time the tab opens.
+const TerminalView = lazy(() => import('../components/TerminalView.tsx').then((m) => ({ default: m.TerminalView })));
 
 const OPEN_PR_PROMPT = 'Commit your work, push the branch and open a PR with gh. Reply with the PR URL.';
 
@@ -621,7 +624,8 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     artifactIds.current.add(a.id);
     if (isNew && a.kind === 'html') {
       setSelected(a.id);
-      setPanelTab('artifacts');
+      // Never pull Ben out of the shell mid-command.
+      setPanelTab((t) => (t === 'terminal' ? t : 'artifacts'));
     }
     setArtifacts((prev) => (prev.some((x) => x.id === a.id) ? prev.map((x) => (x.id === a.id ? a : x)) : [...prev, a]));
   }, []);
@@ -762,6 +766,8 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
   useEffect(() => {
     if (!sheetOpen) return;
     const onKey = (e: KeyboardEvent) => {
+      // Esc in the terminal is for the shell (vim, less).
+      if (e.target instanceof HTMLElement && e.target.closest('.xterm')) return;
       if (e.key === 'Escape' && !document.querySelector('[aria-modal="true"]:not([data-sheet])')) setMobilePanel(false);
     };
     window.addEventListener('keydown', onKey);
@@ -908,6 +914,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
           tabs={[
             { id: 'artifacts', label: 'Artifacts', badge: files.length ? <span className="font-num text-[10.5px] text-fg-4">{files.length}</span> : undefined },
             { id: 'browser', label: 'Browser', badge: shots.length ? <span className="font-num text-[10.5px] text-fg-4">{shots.length}</span> : undefined },
+            { id: 'terminal', label: 'Terminal' },
             { id: 'details', label: 'Details' },
           ]}
         />
@@ -916,6 +923,11 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
       <div className="min-h-0 flex-1">
         {panelTab === 'artifacts' && <ArtifactsTab artifacts={files} selected={selectedArtifact} onSelect={setSelected} />}
         {panelTab === 'browser' && <BrowserTab channelId={thread.channel_id} shots={shots} />}
+        {panelTab === 'terminal' && (
+          <Suspense fallback={<Loading />}>
+            <TerminalView threadId={thread.id} cwd={thread.cwd} />
+          </Suspense>
+        )}
         {panelTab === 'details' && <DetailsTab thread={thread} channel={channel} parent={parent} children={children} init={init} lastResult={lastResult} warm={warm} />}
       </div>
     </div>
@@ -974,7 +986,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
               </Button>
             )}
             <span className="relative">
-              <IconButton icon="panel" label="Artifacts, browser, details" active={isMobile ? mobilePanel : panelOpen} onClick={togglePanel} />
+              <IconButton icon="panel" label="Artifacts, browser, terminal, details" active={isMobile ? mobilePanel : panelOpen} onClick={togglePanel} />
               {artifactCount > 0 && (
                 <span className="pointer-events-none absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-fg px-1 font-num text-[9.5px] text-on-ink">{artifactCount}</span>
               )}

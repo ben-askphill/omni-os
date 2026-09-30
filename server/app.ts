@@ -20,6 +20,7 @@ import { detectRepo, listPRs, branchPRs, getPR, mergePR } from './github.ts';
 import { loadAutomations, runAutomation, setEnabled, lastRuns } from './automations.ts';
 import { commandsApi } from './commands-api.ts';
 import { threadsApi } from './threads-api.ts';
+import { terminalApi } from './terminal-api.ts';
 import { syncApi } from './sync-api.ts';
 import { turnBlocked } from './sync/guard.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
@@ -321,6 +322,7 @@ api.get('/threads/:id/summary', (c) => {
 });
 
 api.route('/threads', threadsApi);
+api.route('/threads', terminalApi);
 
 api.post('/threads/:id/messages', async (c) => {
   const id = c.req.param('id');

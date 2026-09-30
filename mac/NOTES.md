@@ -61,6 +61,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 - In Xcode, open `mac/Omni.xcodeproj` to run the app. Its scheme has no tests: Xcode does not offer a local package's test target to the project's schemes. For Cmd-U on OmniKit, open `mac/OmniKit/Package.swift`.
 - `mac/.xcode`, `mac/OmniKit/.build`, `mac/OmniKit/.swiftpm` and `xcuserdata` are gitignored.
 - OmniKit's one dependency is swift-markdown (from 0.6.0), which brings swift-cmark. Two `Package.resolved` files pin them and are committed: `mac/OmniKit/Package.resolved` for `swift test`, and `mac/Omni.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` for xcodebuild and Xcode. Keep their pins the same: after `swift package update` in `mac/OmniKit`, copy its file over the Xcode one (or resolve in Xcode and copy back). The first build of a checkout fetches both from GitHub; later ones use the cache.
+- The app target, not OmniKit, also depends on SwiftTerm (the Terminal tab), so the Xcode `Package.resolved` has a swiftterm pin that OmniKit's file lacks. That difference is deliberate; the swift-markdown and swift-cmark pins must still match. SwiftTerm is held at `upToNextMinorVersion 1.11.2`: 1.12 and later compile Metal shaders (xcodebuild fails without the Metal Toolchain component), and 1.19 and later add a build plugin that needs a trust prompt, which a headless build cannot answer.
 
 ### Golden fixtures
 
@@ -352,8 +353,14 @@ Automations page (#73), like `Automations.tsx`. The Web UI has no create or edit
 - OmniKit, all pure: `InspectorSelection` (initial pick: `?artifact`, else newest HTML, else newest file, else Details; `arrived` selects a new HTML even the first), `RequestPolicy` (blocks loopback, 100.64.0.0/10, `.ts.net` and the Omni port; `ruleListJSON` is the same policy as a WebKit content rule list, a test keeps them equal), `CSV`, `ThreadDetails` (resume command, MCP list, dates), `ArtifactRef` (Codable, the value of the artifact window) and `OmniClient.artifactData`.
 - `mac/Omni`: `InspectorView` (modifier, panel, Artifacts tab), `InspectorTabs` (Browser, Details), `LiveBrowserView` (the live channel browser: toolbar, tabs, and `BrowserCanvas`, an NSView that draws frames and sends mouse, scroll and keys; model in OmniKit's `ChannelBrowser.swift`), `ArtifactViews` (viewer, native PDF/image/CSV/JSON/markdown/text, save panel, `ArtifactWindowView`), `ArtifactWebView` (HTML and SVG).
 - The web view: non-persistent data store, page served by the `omni-artifact` scheme (only its own artifact), rule list on, no script message handlers, links and window.open go to the default browser (http, https, mailto, never a blocked host). The window scene is `WindowGroup(id: "artifact", for: ArtifactRef.self)` in `OmniApp`.
-- QA steps: `{"inspector": "open|close|artifacts|browser|details"}` and `{"webTitle": "BLOCKED"}` (waits for the inspector web view's document.title). The check used an HTML artifact that no-cors fetches the local API and reports `BLOCKED` only when every local fetch failed and a control fetch to the internet worked.
+- QA steps: `{"inspector": "open|close|artifacts|browser|terminal|details"}` and `{"webTitle": "BLOCKED"}` (waits for the inspector web view's document.title). The check used an HTML artifact that no-cors fetches the local API and reports `BLOCKED` only when every local fetch failed and a control fetch to the internet worked.
 - To seed a QA thread: write files into `<data>/threads/<id>/artifacts/` (and `browser/*.png` for screenshots); the server's watcher picks them up.
+
+### Terminal tab
+
+The inspector's fourth tab, like the Web UI's `TerminalView.tsx`: the thread's shell (`server/terminal.ts`), in its cwd. `Client+Terminal.swift` has the API (`TerminalMessage`, `terminalEvents`, `TerminalInputQueue` for ordered keystrokes); `Omni/TerminalTab.swift` hosts a SwiftTerm `TerminalView` in a plain container NSView (handed to SwiftUI directly it keeps its first frame). Every (re)connection starts with a snapshot the server serialized from a headless xterm at this client's size, so the view resets and feeds it. A new artifact does not pull the inspector off the Terminal tab (`InspectorSelection.arrived`).
+
+- `cacheDisplay` draws a SwiftTerm view shifted and clipped, so the QA snapshot draws each one on its own and lays it over the capture. On screen it is fine.
 
 ## Artifacts page (#69)
 

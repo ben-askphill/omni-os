@@ -18,6 +18,7 @@ const { app } = await import('./app.ts');
 const { threads } = await import('./db.ts');
 const { shutdownAll } = await import('./runner.ts');
 const { closeAllBrowsers } = await import('./browser.ts');
+const { closeAllTerminals } = await import('./terminal.ts');
 const { startArtifactWatcher } = await import('./artifacts.ts');
 const { startScheduler } = await import('./automations.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
@@ -52,6 +53,7 @@ const shutdown = (sig: string) => {
   exiting = true;
   console.log(`[omni] ${sig}, closing live sessions`);
   server.close();
+  closeAllTerminals();
   setTimeout(() => process.exit(0), 6000).unref();
   void shutdownAll().finally(() => {
     closeAllBrowsers();

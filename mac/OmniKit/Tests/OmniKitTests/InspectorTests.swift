@@ -29,6 +29,13 @@ private func list(_ items: [(Int, String)]) throws -> [Artifact] { try items.map
     #expect(s.shown(in: [first])?.id == 1)
   }
 
+  @Test func aNewPageSelectsItButLeavesTheTerminalOpen() throws {
+    var s = InspectorSelection(tab: .terminal)
+    s.arrived(try art(4))
+    #expect(s == .init(tab: .terminal, artifactID: 4))
+    #expect(InspectorSelection.Tab.allCases.map(\.title) == ["Artifacts", "Browser", "Terminal", "Details"])
+  }
+
   @Test func aMissingSelectionFallsBackToTheNewestFile() throws {
     let s = InspectorSelection(tab: .artifacts, artifactID: 9)
     #expect(s.shown(in: try list([(1, "text"), (2, "screenshot"), (3, "markdown")]))?.id == 3)
