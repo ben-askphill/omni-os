@@ -15,6 +15,8 @@ export interface BrowserTab {
   id: string;
   url: string;
   title: string;
+  /** The page's icon, or its origin's /favicon.ico. Absent for blank and non-web pages. */
+  favicon?: string;
 }
 
 export interface BrowserState {
@@ -26,6 +28,8 @@ export interface BrowserState {
   canForward: boolean;
   tabs: BrowserTab[];
   active: string | null;
+  /** The viewport the page lays out at, in CSS pixels: the viewer's size while one is watching. */
+  viewport: { width: number; height: number };
 }
 
 export interface BrowserFrame {
@@ -41,6 +45,68 @@ export type BrowserEvent = { type: 'state'; state: BrowserState } | ({ type: 'fr
 type Listener = (e: BrowserEvent) => void;
 
 const VIEWPORT = { width: 1280, height: 800 };
+/** The window's page area at VIEWPORT, what the agent gets with no viewer resizing it. */
+const WINDOW_PAGE = { width: 1280, height: 713 };
+
+/** A viewer's size, clamped to what a page can sensibly lay out at. */
+export function clampViewport(width: number, height: number, scale = 1) {
+  const clamp = (n: number, lo: number, hi: number) => Math.round(Math.min(hi, Math.max(lo, n || lo)));
+  return { width: clamp(width, 320, 2560), height: clamp(height, 240, 1600), scale: Math.min(2, Math.max(1, scale || 1)) };
+}
+
+/** The origin's /favicon.ico for a web page, the default a page without a <link rel=icon> gets. */
+export function defaultFavicon(url: string): string | undefined {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:' ? safeIcon(`${u.origin}/favicon.ico`) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Only web and inline images for a tab's icon, never file:// or chrome://. The clients load it
+ * themselves, so nothing on this machine either: a page must not point Omni's UI at localhost.
+ */
+export function safeIcon(href: unknown): string | undefined {
+  if (typeof href !== 'string') return undefined;
+  if (/^data:image\/(png|x-icon|vnd\.microsoft\.icon|gif|jpeg|webp|svg\+xml)[;,]/i.test(href)) return href.length < 64_000 ? href : undefined;
+  try {
+    const u = new URL(href);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return undefined;
+    if (/^(localhost|127\.\d+\.\d+\.\d+|\[::1\]|0\.0\.0\.0)$/i.test(u.hostname) || u.hostname.endsWith('.localhost')) return undefined;
+    return u.href;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The editing commands a Cmd shortcut runs in the page. On macOS Chrome maps these from the menu,
+ * which CDP key events never reach, so they go along with the key event.
+ */
+export function keyCommands(key: string, modifiers: number): string[] | undefined {
+  const meta = (modifiers & 4) !== 0;
+  const shift = (modifiers & 8) !== 0;
+  if (!meta) return undefined;
+  switch (key.toLowerCase()) {
+    case 'a':
+      return ['selectAll'];
+    case 'z':
+      return [shift ? 'redo' : 'undo'];
+    case 'arrowleft':
+      return [shift ? 'moveToBeginningOfLineAndModifySelection' : 'moveToBeginningOfLine'];
+    case 'arrowright':
+      return [shift ? 'moveToEndOfLineAndModifySelection' : 'moveToEndOfLine'];
+    case 'arrowup':
+      return [shift ? 'moveToBeginningOfDocumentAndModifySelection' : 'moveToBeginningOfDocument'];
+    case 'arrowdown':
+      return [shift ? 'moveToEndOfDocumentAndModifySelection' : 'moveToEndOfDocument'];
+    case 'backspace':
+      return ['deleteToBeginningOfLine'];
+  }
+  return undefined;
+}
 /** With nobody watching and no thread attached, the browser closes after this long. */
 const IDLE_MS = 5 * 60_000;
 
@@ -99,6 +165,8 @@ class ChannelBrowser {
   private starting: Promise<string> | null = null;
   /** Set while Omni opens a tab itself, so targetCreated does not attach it a second time. */
   private creating = false;
+  /** The viewer's size while one is watching; null lays the page out at the window's size. */
+  private viewport: { width: number; height: number; scale: number } | null = null;
   /** Threads whose MCP is attached. The browser stays up while any is. */
   holders = new Set<string>();
 
@@ -245,7 +313,7 @@ class ChannelBrowser {
       case 'Page.frameStoppedLoading':
         if (msg.sessionId !== this.session) break;
         this.nav.loading = msg.method === 'Page.frameStartedLoading';
-        if (!this.nav.loading) void this.refreshHistory();
+        if (!this.nav.loading) void this.refreshHistory().then(() => this.refreshIcon());
         this.emitState();
         break;
       case 'Page.frameNavigated':
@@ -258,8 +326,30 @@ class ChannelBrowser {
   /** Tracks page targets. True for one worth showing. */
   private onTarget(t: { targetId: string; type: string; url: string; title: string }) {
     if (t.type !== 'page' || t.url.startsWith('devtools://') || t.url.startsWith('chrome-extension://')) return false;
-    this.targets.set(t.targetId, { id: t.targetId, url: t.url, title: t.title });
+    const old = this.targets.get(t.targetId);
+    const sameOrigin = old && defaultFavicon(old.url) === defaultFavicon(t.url);
+    this.targets.set(t.targetId, { id: t.targetId, url: t.url, title: t.title, favicon: sameOrigin ? old.favicon : defaultFavicon(t.url) });
     return true;
+  }
+
+  /** The active page's own icon, from its <link rel=icon>. */
+  private async refreshIcon() {
+    const id = this.active;
+    try {
+      const { result } = await this.page('Runtime.evaluate', {
+        expression: `(() => { const l = [...document.querySelectorAll('link[rel~="icon" i], link[rel="shortcut icon" i]')]; return (l.find((e) => /svg|png/.test(e.type)) ?? l[0])?.href ?? null })()`,
+        returnByValue: true,
+      });
+      const tab = id && this.targets.get(id);
+      if (!tab || id !== this.active) return;
+      const icon = safeIcon(result?.value) ?? defaultFavicon(tab.url);
+      if (icon !== tab.favicon) {
+        tab.favicon = icon;
+        this.emitState();
+      }
+    } catch {
+      // The tab went away mid-call.
+    }
   }
 
   async attach(targetId: string) {
@@ -273,9 +363,38 @@ class ChannelBrowser {
     if (old) void this.send('Target.detachFromTarget', { sessionId: old }).catch(() => {});
     await this.send('Target.activateTarget', { targetId }).catch(() => {});
     await this.page('Page.enable');
+    await this.applyViewport();
     await this.refreshHistory();
+    void this.refreshIcon();
     if (this.listeners.size) await this.cast(true);
     this.emitState();
+  }
+
+  /** Lays the active page out at the viewer's size, so it is responsive to the panel rather than a scaled-down desktop. */
+  private async applyViewport() {
+    if (!this.session) return;
+    const v = this.viewport;
+    if (v) await this.page('Emulation.setDeviceMetricsOverride', { width: v.width, height: v.height, deviceScaleFactor: v.scale, mobile: false }).catch(() => {});
+    else await this.page('Emulation.clearDeviceMetricsOverride').catch(() => {});
+  }
+
+  /** A viewer's size. The last viewer to report one wins; with none watching, the page goes back to the window's size. */
+  async resize(width: number, height: number, scale = 1) {
+    const v = clampViewport(width, height, scale);
+    const cur = this.viewport;
+    if (cur && cur.width === v.width && cur.height === v.height && cur.scale === v.scale) return;
+    this.viewport = v;
+    await this.applyViewport();
+    this.emitState();
+  }
+
+  /** The text selected in the page (or in its focused field), for Cmd-C. The browser's own clipboard is not the Mac's. */
+  async selection(): Promise<string> {
+    const { result } = await this.page('Runtime.evaluate', {
+      expression: `(() => { const a = document.activeElement; if (a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && /^(text|search|url|tel|email|)$/i.test(a.type))) && a.selectionStart !== a.selectionEnd) return a.value.slice(a.selectionStart, a.selectionEnd); return String(getSelection() ?? '') })()`,
+      returnByValue: true,
+    });
+    return typeof result?.value === 'string' ? result.value : '';
   }
 
   async newTab(url = 'about:blank') {
@@ -305,7 +424,7 @@ class ChannelBrowser {
   private async cast(on: boolean) {
     if (!this.session || on === this.casting) return;
     this.casting = on;
-    if (on) await this.page('Page.startScreencast', { format: 'jpeg', quality: 70, maxWidth: 1600, maxHeight: 1600, everyNthFrame: 1 }).catch(() => (this.casting = false));
+    if (on) await this.page('Page.startScreencast', { format: 'jpeg', quality: 80, maxWidth: 2560 * 2, maxHeight: 1600 * 2, everyNthFrame: 1 }).catch(() => (this.casting = false));
     else await this.page('Page.stopScreencast').catch(() => {});
   }
 
@@ -320,6 +439,7 @@ class ChannelBrowser {
       canForward: this.nav.canForward,
       tabs: [...this.targets.values()],
       active: this.active,
+      viewport: this.viewport ? { width: this.viewport.width, height: this.viewport.height } : WINDOW_PAGE,
     };
   }
 
@@ -340,7 +460,12 @@ class ChannelBrowser {
     void this.cast(true);
     return () => {
       this.listeners.delete(l);
-      if (!this.listeners.size) void this.cast(false);
+      if (!this.listeners.size) {
+        void this.cast(false);
+        // Nobody to fit: the agent gets its desktop-sized page back.
+        this.viewport = null;
+        void this.applyViewport();
+      }
       this.touch();
     };
   }
@@ -382,7 +507,7 @@ class ChannelBrowser {
     switch (e.type) {
       case 'mouse':
         return this.page('Input.dispatchMouseEvent', {
-          type: e.event, x: e.x, y: e.y, button: e.button ?? 'left', buttons: e.event === 'mouseReleased' ? 0 : e.event === 'mousePressed' ? 1 : (e.buttons ?? 0),
+          type: e.event, x: e.x, y: e.y, button: e.button ?? 'left', buttons: e.buttons ?? (e.event === 'mousePressed' ? 1 : 0),
           clickCount: e.clickCount ?? (e.event === 'mouseMoved' ? 0 : 1), modifiers: e.modifiers ?? 0,
         });
       case 'wheel':
@@ -392,6 +517,7 @@ class ChannelBrowser {
           type: e.event === 'keyDown' && e.text ? 'keyDown' : e.event === 'keyDown' ? 'rawKeyDown' : 'keyUp',
           key: e.key, code: e.code, text: e.event === 'keyDown' ? e.text : undefined, unmodifiedText: e.event === 'keyDown' ? e.text : undefined,
           windowsVirtualKeyCode: e.keyCode, nativeVirtualKeyCode: e.keyCode, modifiers: e.modifiers ?? 0,
+          ...(e.event === 'keyDown' && { commands: keyCommands(e.key, e.modifiers ?? 0) }),
         });
       case 'text':
         return this.page('Input.insertText', { text: e.text });
@@ -413,6 +539,7 @@ class ChannelBrowser {
     this.active = null;
     this.casting = false;
     this.lastFrame = null;
+    this.viewport = null;
     this.targets.clear();
     this.emitState();
   }

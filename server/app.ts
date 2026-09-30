@@ -153,7 +153,7 @@ function browserFor(c: Context) {
 
 api.get('/channels/:id/browser', (c) => {
   const b = existingBrowser(c.req.param('id'));
-  return c.json(b?.state() ?? { running: false, url: '', title: '', loading: false, canBack: false, canForward: false, tabs: [], active: null });
+  return c.json(b?.state() ?? { running: false, url: '', title: '', loading: false, canBack: false, canForward: false, tabs: [], active: null, viewport: { width: 1280, height: 713 } });
 });
 
 /** Live view: `state` messages, and `frame` messages with a JPEG. A slow client skips frames rather than queueing them. */
@@ -203,11 +203,24 @@ const browserInput = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string().max(10_000) }),
 ]);
 
+/**
+ * One event, or `{events}` in order. A batch goes out to Chrome at once and the reply waits for
+ * all of it, so a client queues (and merges moves and scrolls) while Chrome catches up.
+ */
 api.post('/channels/:id/browser/input', async (c) => {
   const b = browserFor(c);
   if (!b.running) return c.json({ error: 'The browser is not running' }, 409);
-  await b.input(browserInput.parse(await c.req.json()) as BrowserInput);
+  const body = await c.req.json();
+  const events = (body && Array.isArray(body.events) ? z.array(browserInput).max(200).parse(body.events) : [browserInput.parse(body)]) as BrowserInput[];
+  await Promise.all(events.map((e) => b.input(e)?.catch(() => {})));
   return c.json({ ok: true });
+});
+
+/** The page's selected text, for Cmd-C in the panel. */
+api.post('/channels/:id/browser/copy', async (c) => {
+  const b = browserFor(c);
+  if (!b.running) return c.json({ text: '' });
+  return c.json({ text: await b.selection().catch(() => '') });
 });
 
 api.post('/channels/:id/browser/action', async (c) => {
@@ -218,6 +231,7 @@ api.post('/channels/:id/browser/action', async (c) => {
       z.object({ action: z.enum(['back', 'forward', 'reload', 'stop', 'start', 'restart']) }),
       z.object({ action: z.literal('newTab'), url: z.string().max(4000).optional() }),
       z.object({ action: z.enum(['tab', 'closeTab']), id: z.string().max(100) }),
+      z.object({ action: z.literal('resize'), width: z.number(), height: z.number(), scale: z.number().optional() }),
     ])
     .parse(await c.req.json());
   if (body.action === 'restart') b.close();
@@ -252,6 +266,9 @@ api.post('/channels/:id/browser/action', async (c) => {
       break;
     case 'closeTab':
       await b.closeTab(body.id);
+      break;
+    case 'resize':
+      await b.resize(body.width, body.height, body.scale);
       break;
   }
   return c.json(b.state());
