@@ -1014,6 +1014,20 @@
   animation-delay: calc(min(var(--i, 0), 12) * 28ms);
 }
 
+/* The wordmark writes itself out again, one pen stroke, on hover. */
+@keyframes omni-write {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.wordmark-write:is(:hover, :focus-visible) .wordmark-line {
+  stroke-dasharray: 1;
+  animation: omni-write 0.9s cubic-bezier(0.45, 0, 0.2, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
