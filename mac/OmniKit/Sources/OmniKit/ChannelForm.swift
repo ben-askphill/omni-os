@@ -15,6 +15,8 @@ public struct ChannelForm: Hashable, Sendable {
   /// Off runs the channel browser headless.
   public var showBrowser = false
   public var notes = ""
+  /// One emoji, or empty for the letter avatar.
+  public var icon = ""
   public private(set) var idTouched = false
 
   public init() {}
@@ -31,6 +33,7 @@ public struct ChannelForm: Hashable, Sendable {
     portalSlug = c.portalSlug ?? ""
     showBrowser = !c.browserHeadless
     notes = c.notes ?? ""
+    icon = c.icon ?? ""
     idTouched = true
   }
 
@@ -43,6 +46,11 @@ public struct ChannelForm: Hashable, Sendable {
   public mutating func setID(_ value: String) {
     idTouched = true
     id = value.lowercased()
+  }
+
+  /// Keeps the last character typed, whole when it is a multi-part emoji, so typing over the icon replaces it.
+  public mutating func setIcon(_ value: String) {
+    icon = value.trimmingCharacters(in: .whitespacesAndNewlines).last.map(String.init) ?? ""
   }
 
   public var idValid: Bool {
@@ -89,6 +97,7 @@ public struct ChannelForm: Hashable, Sendable {
       "portal_slug": text(portalSlug),
       "browser_headless": .number(showBrowser ? 0 : 1),
       "notes": text(notes),
+      "icon": text(icon),
     ]
     if !system { o["kind"] = .string(kind.rawValue) }
     return .object(o)

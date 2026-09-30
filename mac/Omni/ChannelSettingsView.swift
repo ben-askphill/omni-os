@@ -53,6 +53,21 @@ struct ChannelSettingsForm: View {
             .accessibilityLabel("Id")
         }
       }
+      SettingsField("Icon", hint: "One emoji, shown in the sidebar and on the channel. Ctrl+Cmd+Space opens the emoji picker. Empty uses the first letter.") {
+        HStack(spacing: 12) {
+          ChannelAvatar(name: form.name.isEmpty ? form.id : form.name, size: 36, emoji: form.icon)
+          TextField("", text: Binding(get: { form.icon }, set: { form.setIcon($0) }), prompt: Text("📸"))
+            .font(.system(size: 18))
+            .multilineTextAlignment(.center)
+            .frame(width: 96)
+            .accessibilityLabel("Icon")
+          if !form.icon.isEmpty {
+            Button("Clear") { form.icon = "" }
+              .buttonStyle(.pill(.secondary, height: 30))
+          }
+          Spacer(minLength: 0)
+        }
+      }
       if !isSystem {
         SettingsField("Kind") {
           SegmentedPill(selection: $form.kind, options: [(.client, "Client"), (.internal, "Internal"), (.personal, "Personal")])

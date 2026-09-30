@@ -144,6 +144,10 @@ struct SidebarView: View {
           StaticMark(size: 17)
             .foregroundStyle(Tok.fg)
             .frame(width: 15)
+        } else if let icon = channel.icon, !icon.isEmpty {
+          Text(icon)
+            .font(.system(size: 13))
+            .frame(width: 15)
         } else {
           Text("#")
             .font(.system(size: 12))

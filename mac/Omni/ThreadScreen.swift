@@ -89,7 +89,7 @@ private struct ThreadHeader: View {
   var body: some View {
     let channel = store.channel?.name ?? thread.channelID
     HStack(spacing: 12) {
-      ChannelAvatar(name: channel, conductor: thread.channelID == SidebarSections.conductorID)
+      ChannelAvatar(name: channel, conductor: thread.channelID == SidebarSections.conductorID, emoji: store.channel?.icon)
       VStack(alignment: .leading, spacing: 1) {
         HStack(spacing: 4) {
           Button("#\(channel)") { model.route = .channel(id: thread.channelID) }
@@ -142,11 +142,13 @@ private struct ThreadHeader: View {
   }
 }
 
-/// A neutral disc with the channel's first letter, as Avatar in ui.tsx. Conductor wears the ink mark.
+/// A neutral disc with the channel's icon or first letter, as Avatar in ui.tsx. Conductor wears the ink mark.
 struct ChannelAvatar: View {
   let name: String
   var conductor = false
   var size: CGFloat = 34
+  /// The channel's own icon, in place of the letter.
+  var emoji: String?
 
   var body: some View {
     ZStack {
@@ -154,6 +156,9 @@ struct ChannelAvatar: View {
       if conductor {
         StaticMark(size: size * 0.55)
           .foregroundStyle(Tok.onInk)
+      } else if let emoji, !emoji.isEmpty {
+        Text(emoji)
+          .font(.system(size: size * 0.52))
       } else {
         Text(AvatarMark(name: name).letter)
           .font(.system(size: size * 0.42, weight: .medium, design: .rounded))

@@ -882,7 +882,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
         {/* header */}
         <div className="flex shrink-0 items-center gap-3 px-3 pt-3 pb-2 md:px-6 md:pt-4">
           <span className="hidden sm:block">
-            <Avatar name={channel?.name ?? thread.channel_id} icon={thread.channel_id === 'conductor' ? 'target' : undefined} size={34} />
+            <Avatar name={channel?.name ?? thread.channel_id} emoji={channel?.icon} icon={thread.channel_id === 'conductor' ? 'target' : undefined} size={34} />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1 text-[12px] text-fg-3">

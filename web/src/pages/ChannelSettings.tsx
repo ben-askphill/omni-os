@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, type Channel } from '../api.ts';
-import { Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
-import { slugify } from '../format.ts';
+import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
+import { lastGrapheme, slugify } from '../format.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
 
@@ -17,6 +17,7 @@ interface FormState {
   portal_slug: string;
   showBrowser: boolean;
   notes: string;
+  icon: string;
 }
 
 function fromChannel(c?: Channel): FormState {
@@ -32,6 +33,7 @@ function fromChannel(c?: Channel): FormState {
     portal_slug: c?.portal_slug ?? '',
     showBrowser: c ? c.browser_headless === 0 : false,
     notes: c?.notes ?? '',
+    icon: c?.icon ?? '',
   };
 }
 
@@ -95,6 +97,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
       portal_slug: orNull(f.portal_slug),
       browser_headless: f.showBrowser ? 0 : 1,
       notes: orNull(f.notes),
+      icon: orNull(f.icon),
     };
     if (!isSystem) body.kind = f.kind;
     try {
@@ -155,6 +158,24 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             />
           </Field>
         </div>
+        <Field label="Icon" htmlFor="ch-icon" hint="One emoji, shown in the sidebar and on the channel. Ctrl+Cmd+Space opens the emoji picker. Empty uses the first letter.">
+          <div className="flex items-center gap-3">
+            <Avatar name={f.name || f.id} emoji={f.icon} size={36} />
+            <input
+              id="ch-icon"
+              className="field w-24 text-center !text-[18px]"
+              value={f.icon}
+              onChange={(e) => set('icon', lastGrapheme(e.target.value))}
+              placeholder="📸"
+              aria-label="Icon"
+            />
+            {f.icon && (
+              <Button type="button" onClick={() => set('icon', '')}>
+                Clear
+              </Button>
+            )}
+          </div>
+        </Field>
         {!isSystem && (
           <Field label="Kind">
             <Segmented

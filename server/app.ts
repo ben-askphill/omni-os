@@ -51,6 +51,16 @@ async function readBody(c: Context): Promise<{ data: unknown; files: File[] }> {
 
 // ---------- channels ----------
 
+const graphemes = new Intl.Segmenter();
+/** One emoji or character. Blank clears it. */
+const channelIcon = z
+  .string()
+  .trim()
+  .max(32)
+  .refine((s) => [...graphemes.segment(s)].length <= 1, 'one emoji or character')
+  .transform((s) => s || null)
+  .nullish();
+
 const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
   name: z.string().min(1),
@@ -63,6 +73,7 @@ const channelSchema = z.object({
   portal_slug: z.string().nullish(),
   browser_headless: z.coerce.number().int().min(0).max(1).optional(),
   notes: z.string().nullish(),
+  icon: channelIcon,
 });
 
 /** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */

@@ -80,7 +80,7 @@ struct ThreadListRow: View {
 
   @ViewBuilder private var leading: some View {
     if showChannel {
-      ChannelAvatar(name: thread.channelID, conductor: thread.channelID == SidebarSections.conductorID, size: 32)
+      ChannelAvatar(name: thread.channelID, conductor: thread.channelID == SidebarSections.conductorID, size: 32, emoji: model.store.channel(thread.channelID)?.icon)
         .overlay(alignment: .bottomTrailing) {
           StatusDot(status: thread.status, size: 8)
             .padding(2)

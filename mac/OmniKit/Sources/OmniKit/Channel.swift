@@ -23,11 +23,13 @@ public struct Channel: Decodable, Hashable, Sendable, Identifiable {
   public let portalSlug: String?
   public let browserHeadless: Bool
   public let notes: String?
+  /// One emoji shown in place of the letter avatar and the sidebar's #.
+  public let icon: String?
   public let archived: Bool
   public let createdAt: Date
 
   enum CodingKeys: String, CodingKey {
-    case id, name, kind, notes, archived
+    case id, name, kind, notes, icon, archived
     case repoPath = "repo_path"
     case githubRepo = "github_repo"
     case useWorktree = "use_worktree"
@@ -51,6 +53,7 @@ public struct Channel: Decodable, Hashable, Sendable, Identifiable {
     portalSlug = try c.decodeIfPresent(String.self, forKey: .portalSlug)
     browserHeadless = try c.decodeFlag(.browserHeadless)
     notes = try c.decodeIfPresent(String.self, forKey: .notes)
+    icon = try c.decodeIfPresent(String.self, forKey: .icon)
     archived = try c.decodeFlag(.archived)
     createdAt = try c.decode(Date.self, forKey: .createdAt)
   }

@@ -3,7 +3,7 @@ import { useCallback, type CSSProperties, type ReactNode } from 'react';
 import { useApi, type Thread } from '../api.ts';
 import { groupByDay, relTime } from '../format.ts';
 import { href } from '../router.ts';
-import { useFeed, useNow } from '../store.tsx';
+import { useApp, useFeed, useNow } from '../store.tsx';
 import { Avatar, Chip, Empty, ErrorNote, Loading, StatusDot } from './ui.tsx';
 
 /** Loads a thread list and keeps it current from /feed. */
@@ -33,13 +33,14 @@ const SOURCE_LABEL: Record<string, string> = {
 
 export function ThreadRow({ t, showChannel }: { t: Thread; showChannel?: boolean }) {
   useNow(60_000);
+  const { channels } = useApp();
   const source = SOURCE_LABEL[t.source];
   const preview = t.last_text ? t.last_text.replace(/\s+/g, ' ').slice(0, 240) : t.status === 'running' ? 'Working' : t.status === 'queued' ? 'Waiting for a slot' : '';
   return (
     <a href={href.thread(t.id)} className="hov group flex items-start gap-3 rounded-[18px] px-3 py-3 [--hov:var(--surface)] md:px-3.5">
       {showChannel ? (
         <span className="relative mt-0.5 shrink-0">
-          <Avatar name={t.channel_id} size={32} />
+          <Avatar name={t.channel_id} emoji={channels.find((c) => c.id === t.channel_id)?.icon} size={32} />
           <span className="absolute -right-0.5 -bottom-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
             <StatusDot status={t.status} size={8} />
           </span>

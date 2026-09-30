@@ -20,6 +20,8 @@ export interface Channel {
   portal_slug: string | null;
   browser_headless: number;
   notes: string | null;
+  /** One emoji (or other single character) shown in place of the letter avatar and the sidebar's #. */
+  icon: string | null;
   archived: number;
   created_at: string;
 }
@@ -98,6 +100,7 @@ CREATE TABLE IF NOT EXISTS channels (
   portal_slug TEXT,
   browser_headless INTEGER NOT NULL DEFAULT 1,
   notes TEXT,
+  icon TEXT,
   archived INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -215,6 +218,7 @@ export function migrate() {
   // Sync: the machine id of the Mac running or queueing the thread, null otherwise. Synced, kept out of the API.
   ensureColumn('threads', 'run_machine', 'TEXT');
   ensureColumn('threads', 'suggestion', 'TEXT');
+  ensureColumn('channels', 'icon', 'TEXT');
   // Sync matches these rows on uid, never on the local integer id. Old rows get one once; the index then makes the check free.
   for (const table of ['events', 'artifacts', 'automation_runs']) {
     ensureColumn(table, 'uid', 'TEXT');
@@ -397,8 +401,8 @@ export const channels = {
   create(c: Partial<Channel> & { id: string; name: string }) {
     return tx(() => {
       db.prepare(
-        `INSERT INTO channels (id, name, kind, repo_path, github_repo, use_worktree, base_dir, store_domain, portal_slug, browser_headless, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO channels (id, name, kind, repo_path, github_repo, use_worktree, base_dir, store_domain, portal_slug, browser_headless, notes, icon)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         c.id,
         c.name,
@@ -411,6 +415,7 @@ export const channels = {
         c.portal_slug ?? null,
         c.browser_headless ?? 1,
         c.notes ?? null,
+        c.icon ?? null,
       );
       record('channel', c.id);
       return channels.get(c.id)!;
@@ -419,7 +424,7 @@ export const channels = {
   update(id: string, patch: Partial<Channel>) {
     const allowed = [
       'name', 'kind', 'repo_path', 'github_repo', 'use_worktree', 'base_dir',
-      'store_domain', 'portal_slug', 'browser_headless', 'notes', 'archived',
+      'store_domain', 'portal_slug', 'browser_headless', 'notes', 'icon', 'archived',
     ] as const;
     const keys = allowed.filter((k) => k in patch);
     if (keys.length) {

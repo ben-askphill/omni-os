@@ -49,8 +49,21 @@ import OmniKit
       "name": .string("Acme"), "kind": .string("internal"),
       "repo_path": .null, "github_repo": .null, "use_worktree": .number(1), "base_dir": .null,
       "store_domain": .string("acme.myshopify.com"), "portal_slug": .null, "browser_headless": .number(1),
-      "notes": .string("Be brief"),
+      "notes": .string("Be brief"), "icon": .null,
     ]))
+  }
+
+  @Test func iconKeepsTheLastCharacterTyped() throws {
+    var f = ChannelForm()
+    f.setIcon("📸")
+    #expect(f.icon == "📸")
+    f.setIcon("📸💅")
+    #expect(f.icon == "💅")
+    f.setIcon("👩‍💻")
+    #expect(f.icon == "👩‍💻")
+    #expect(try encoded(f.body(system: false))["icon"] == .string("👩‍💻"))
+    f.setIcon("  ")
+    #expect(f.icon == "")
   }
 
   @Test func systemChannelsKeepTheirKindAndBrowserToggleInverts() throws {

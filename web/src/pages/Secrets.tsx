@@ -83,7 +83,7 @@ export function SecretsPage() {
 
   const scopeOptions: PickerOption<string>[] = [
     { value: 'global', label: 'Global', sub: 'All channels', icon: 'globe' },
-    ...channels.map((c) => ({ value: `channel:${c.id}`, label: `#${c.name}`, sub: c.kind, avatar: c.name, icon: c.id === 'conductor' ? ('target' as const) : undefined })),
+    ...channels.map((c) => ({ value: `channel:${c.id}`, label: `#${c.name}`, sub: c.kind, avatar: c.name, emoji: c.icon, icon: c.id === 'conductor' ? ('target' as const) : undefined })),
   ];
 
   return (

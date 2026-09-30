@@ -256,7 +256,13 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
         active={activeChannel === c.id}
         onNavigate={onNavigate}
         right={<RunningBadge n={c.running} />}
-        lead={<span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-4'}`}>#</span>}
+        lead={
+          c.icon ? (
+            <span className="w-[15px] text-center text-[13px] leading-none">{c.icon}</span>
+          ) : (
+            <span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-4'}`}>#</span>
+          )
+        }
       >
         {c.name}
       </NavLink>

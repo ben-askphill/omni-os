@@ -261,15 +261,21 @@ export function Chip({ children, tone = 'default', className = '', title }: { ch
   );
 }
 
-/** Letter avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. */
-export function Avatar({ name, size = 28, icon, ink, className = '' }: { name: string; size?: number; icon?: IconName; ink?: boolean; className?: string }) {
+/** Letter avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. A channel's own emoji replaces the letter. */
+export function Avatar({ name, size = 28, icon, emoji, ink, className = '' }: { name: string; size?: number; icon?: IconName; emoji?: string | null; ink?: boolean; className?: string }) {
   return (
     <span
       aria-hidden="true"
       className={`inline-grid shrink-0 place-items-center rounded-full font-rounded font-medium uppercase leading-none ${ink ? 'bg-fg text-on-ink' : 'bg-surface-2 text-fg-2'} ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.42 }}
     >
-      {icon ? <Icon name={icon} size={size * 0.5} /> : name.replace(/[^a-z0-9]/gi, '').slice(0, 1) || '?'}
+      {icon ? (
+        <Icon name={icon} size={size * 0.5} />
+      ) : emoji ? (
+        <span style={{ fontSize: size * 0.52 }}>{emoji}</span>
+      ) : (
+        name.replace(/[^a-z0-9]/gi, '').slice(0, 1) || '?'
+      )}
     </span>
   );
 }
@@ -831,6 +837,8 @@ export interface PickerOption<T extends string> {
   icon?: IconName;
   /** Letter avatar seed; defaults to the label. Set `avatar: false` to hide it. */
   avatar?: string | false;
+  /** An emoji for the avatar in place of the letter. */
+  emoji?: string | null;
   /** A mark to lead with instead of the avatar (a HarnessLogo or CrewMark). */
   lead?: ReactNode;
 }
@@ -939,7 +947,7 @@ export function Picker<T extends string>({
         {current?.lead ? (
           <span className="grid h-6 w-6 place-items-center rounded-full bg-bg text-fg">{current.lead}</span>
         ) : current && current.avatar !== false ? (
-          <Avatar name={current.avatar || current.label} icon={current.icon} size={24} />
+          <Avatar name={current.avatar || current.label} icon={current.icon} emoji={current.emoji} size={24} />
         ) : current?.icon ? (
           <span className="grid h-6 w-6 place-items-center text-fg-3">
             <Icon name={current.icon} size={14} />
@@ -989,7 +997,7 @@ export function Picker<T extends string>({
                 {o.lead ? (
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">{o.lead}</span>
                 ) : o.avatar !== false ? (
-                  <Avatar name={o.avatar || o.label} icon={o.icon} size={28} />
+                  <Avatar name={o.avatar || o.label} icon={o.icon} emoji={o.emoji} size={28} />
                 ) : o.icon ? (
                   <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-2 text-fg-3">
                     <Icon name={o.icon} size={14} />

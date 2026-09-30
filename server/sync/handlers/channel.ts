@@ -7,7 +7,7 @@ import { fromPortable, safeSegment, toRemote } from '../paths.ts';
 
 const COLUMNS = [
   'id', 'name', 'kind', 'repo_path', 'github_repo', 'use_worktree', 'base_dir', 'store_domain', 'portal_slug',
-  'browser_headless', 'notes', 'archived', 'created_at',
+  'browser_headless', 'notes', 'icon', 'archived', 'created_at',
 ] as const;
 const PATHS = new Set<string>(['repo_path', 'base_dir']);
 
