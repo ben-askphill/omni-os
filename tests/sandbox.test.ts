@@ -73,6 +73,22 @@ describe('buildMcpConfig: browser', () => {
     expect(args).toContain('--headless');
   });
 
+  it("attaches to the channel browser Omni runs, instead of launching one", () => {
+    const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), browserBusy: false, cdpEndpoint: 'http://127.0.0.1:9333', omniUrl: OMNI_URL });
+    const args = cfg.mcpServers['omni-browser'].args;
+    expect(args[args.indexOf('--cdp-endpoint') + 1]).toBe('http://127.0.0.1:9333');
+    expect(args).not.toContain('--user-data-dir');
+    expect(args).not.toContain('--headless');
+    expect(args).not.toContain('--isolated');
+  });
+
+  it('keeps a thread that does not hold the profile isolated, even with the channel browser up', () => {
+    const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), browserBusy: true, cdpEndpoint: 'http://127.0.0.1:9333', omniUrl: OMNI_URL });
+    const args = cfg.mcpServers['omni-browser'].args;
+    expect(args).toContain('--isolated');
+    expect(args).not.toContain('--cdp-endpoint');
+  });
+
   it('adds no browser when OMNI_BROWSER is off', () => {
     config.browser = false;
     const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), browserBusy: false, omniUrl: OMNI_URL });

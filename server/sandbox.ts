@@ -68,6 +68,8 @@ export interface McpInput {
   role?: CrewRole;
   /** Another thread in this channel already holds the persistent browser profile. */
   browserBusy: boolean;
+  /** The channel browser Omni runs, when it is up. The MCP attaches to it instead of launching its own. */
+  cdpEndpoint?: string | null;
   omniUrl: string;
 }
 
@@ -77,10 +79,13 @@ export function buildMcpConfig(input: McpInput) {
 
   if (config.browser) {
     const args = ['-y', '@playwright/mcp@latest', '--output-dir', browserOutDir(input.threadId)];
-    if (input.channel.browser_headless) args.push('--headless');
     // Chrome locks a profile dir, so only one live thread per channel gets the persistent logins.
-    if (input.browserBusy) args.push('--isolated');
-    else args.push('--user-data-dir', join(paths.browsers, input.channel.id));
+    if (input.cdpEndpoint && !input.browserBusy) args.push('--cdp-endpoint', input.cdpEndpoint);
+    else {
+      if (input.channel.browser_headless) args.push('--headless');
+      if (input.browserBusy) args.push('--isolated');
+      else args.push('--user-data-dir', join(paths.browsers, input.channel.id));
+    }
     servers['omni-browser'] = { command: 'npx', args };
   }
 

@@ -359,7 +359,7 @@ extension OmniClient {
     }, decode: Self.json(ThreadStreamMessage.self))
   }
 
-  private static func json<T: Decodable & Sendable>(_ type: T.Type) -> @Sendable (SSEMessage) -> T? {
+  static func json<T: Decodable & Sendable>(_ type: T.Type) -> @Sendable (SSEMessage) -> T? {
     let decoder = OmniJSON.decoder()
     return { m in
       guard m.event == "message" else { return nil }

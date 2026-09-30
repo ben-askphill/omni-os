@@ -7,6 +7,7 @@ import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
 import { channels, events, threads, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
 import { commandsFolder, prepareWorkdir, writeMcpConfig } from './sandbox.ts';
+import { attachThread, detachThread } from './browser.ts';
 import { prepareTurn, turnBlocked } from './sync/guard.ts';
 import { parseSlash, resolveSlash, runnableCommands, slashRecord, type SlashCommand, type SlashRecord } from '../shared/slash.ts';
 import { invalidateCommands, listCommands, peekCommands, type CommandList } from './commands.ts';
@@ -483,7 +484,10 @@ function teardown(live: Live) {
   clearTimeout(live.idleTimer);
   endTasks(live);
   clearInterrupt(live);
-  if (live.browser && browserHolder.get(live.channelId) === live.threadId) browserHolder.delete(live.channelId);
+  if (live.browser && browserHolder.get(live.channelId) === live.threadId) {
+    browserHolder.delete(live.channelId);
+    detachThread(live.channelId, live.threadId);
+  }
   if (lives.get(live.threadId) === live) lives.delete(live.threadId);
   live.turn = false;
   live.inflight = [];
@@ -689,7 +693,13 @@ async function spawnLive(live: Live, thread: Thread) {
     browserHolder.set(channel.id, thread.id);
     live.browser = true;
   }
-  const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, omniUrl: omniUrl() });
+  const cdpEndpoint = live.browser ? await attachThread(channel.id, thread.id, !!channel.browser_headless) : null;
+  // Torn down while Chrome started: teardown already ran, so let go of the browser here.
+  if (lives.get(thread.id) !== live) {
+    detachThread(channel.id, thread.id);
+    return;
+  }
+  const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl() });
 
   let secretEnv: Record<string, string> = {};
   try {
@@ -715,6 +725,7 @@ async function spawnLive(live: Live, thread: Thread) {
     mcpFile,
     secretEnv,
     browserBusy,
+    cdpEndpoint,
     omniUrl: omniUrl(),
     resume: !!thread.has_run,
   };
@@ -813,7 +824,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
           '',
           '## Browser',
           config.browser
-            ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads. Screenshots land in ${browserOutDir(thread.id)} and show up in the thread.`
+            ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? " Ben sees it live in the thread's Browser panel and can click and type in it too, so ask him to take over there when a page needs a login or a captcha." : ''} Screenshots land in ${browserOutDir(thread.id)} and show up in the thread.`
             : '',
         ]),
     '',

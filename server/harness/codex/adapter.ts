@@ -279,6 +279,7 @@ export const codexAdapter: HarnessAdapter = {
         channel: ctx.channel,
         role: ctx.role,
         browserBusy: ctx.browserBusy,
+        cdpEndpoint: ctx.cdpEndpoint,
         omniUrl: ctx.omniUrl,
       });
       const params = {

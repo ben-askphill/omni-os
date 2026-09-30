@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type EventRow, type PendingMsg, type PRSummary, type SendMode, type Thread, type ThreadDetail } from '../api.ts';
 import { ArtifactViewer, kindIcon } from '../components/ArtifactViewer.tsx';
 import { ReplyComposer } from '../components/Composer.tsx';
+import { LiveBrowser } from '../components/LiveBrowser.tsx';
 import { CAPABILITIES, isHarnessId } from '../../../server/harness/types.ts';
 import { HarnessMark } from '../components/brand.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
@@ -247,12 +248,61 @@ function ArtifactsTab({ artifacts, selected, onSelect }: { artifacts: Artifact[]
   );
 }
 
-function BrowserTab({ shots }: { shots: Artifact[] }) {
+/**
+ * The channel's browser, live: the same Chrome the agent drives, which Ben can click and type in.
+ * The screenshots the agent saved sit one click away.
+ */
+function BrowserTab({ channelId, shots }: { channelId: string; shots: Artifact[] }) {
+  const [view, setView] = useState<'live' | 'shots'>('live');
+  const [expanded, setExpanded] = useState(false);
+  const extra = (
+    <>
+      <span className="relative">
+        <IconButton icon="image" label={`Screenshots${shots.length ? ` (${shots.length})` : ''}`} size={15} active={view === 'shots'} onClick={() => setView((v) => (v === 'shots' ? 'live' : 'shots'))} />
+        {shots.length > 0 && <span className="pointer-events-none absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-fg-3" />}
+      </span>
+      {view === 'live' && <IconButton icon="maximize" label="Expand" size={15} onClick={() => setExpanded(true)} />}
+    </>
+  );
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {view === 'shots' ? (
+        <>
+          <div className="flex items-center gap-1 px-2 pb-2">
+            <Button size="sm" variant="ghost" icon="chevronLeft" onClick={() => setView('live')}>
+              Live browser
+            </Button>
+            <span className="flex-1" />
+            <span className="px-2 font-num text-[11px] text-fg-4">{plural(shots.length, 'screenshot')}</span>
+          </div>
+          <div className="min-h-0 flex-1">
+            <Screenshots shots={shots} />
+          </div>
+        </>
+      ) : expanded ? (
+        <Empty icon="browser" title="Open in the expanded view">
+          <Button size="sm" onClick={() => setExpanded(false)}>
+            Bring it back here
+          </Button>
+        </Empty>
+      ) : (
+        <LiveBrowser channelId={channelId} extra={extra} />
+      )}
+      <Modal open={expanded} onClose={() => setExpanded(false)} wide title="Browser">
+        <div className="h-[78vh] pb-3">
+          <LiveBrowser channelId={channelId} fill />
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function Screenshots({ shots }: { shots: Artifact[] }) {
   const [open, setOpen] = useState<Artifact | null>(null);
   if (!shots.length) {
     return (
       <Empty icon="globe" title="No screenshots yet">
-        When the agent uses the channel browser, its screenshots collect here.
+        When the agent takes a screenshot in the channel browser, it collects here.
       </Empty>
     );
   }
@@ -865,7 +915,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
       </div>
       <div className="min-h-0 flex-1">
         {panelTab === 'artifacts' && <ArtifactsTab artifacts={files} selected={selectedArtifact} onSelect={setSelected} />}
-        {panelTab === 'browser' && <BrowserTab shots={shots} />}
+        {panelTab === 'browser' && <BrowserTab channelId={thread.channel_id} shots={shots} />}
         {panelTab === 'details' && <DetailsTab thread={thread} channel={channel} parent={parent} children={children} init={init} lastResult={lastResult} warm={warm} />}
       </div>
     </div>
