@@ -17,6 +17,7 @@ struct ChannelSettingsForm: View {
   @State private var archiveError: String?
   @State private var confirmArchive = false
   @State private var archiving = false
+  @State private var svgError: String?
 
   init(model: AppModel, existing: Channel? = nil) {
     self.model = model
@@ -25,6 +26,23 @@ struct ChannelSettingsForm: View {
   }
 
   private var isNew: Bool { existing == nil }
+
+  /// Reads an SVG file into the form. The server cleans it and refuses one with scripts or links on save.
+  private func uploadSVG() {
+    let panel = NSOpenPanel()
+    panel.allowedContentTypes = [.svg]
+    panel.allowsMultipleSelection = false
+    panel.prompt = "Use SVG"
+    panel.message = "Choose an SVG for the channel icon"
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    svgError = nil
+    let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+    guard size <= ChannelIcon.svgFileMax else { svgError = "That SVG is too big: keep it under 20 KB."; return }
+    guard let text = try? String(contentsOf: url, encoding: .utf8), form.setSVG(text) else {
+      svgError = "That file is not an SVG."
+      return
+    }
+  }
   private var isSystem: Bool { existing?.kind == .system }
 
   var body: some View {
@@ -53,7 +71,7 @@ struct ChannelSettingsForm: View {
             .accessibilityLabel("Id")
         }
       }
-      SettingsField("Icon", hint: "Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker) or pick an icon. Empty uses the first letter.") {
+      SettingsField("Icon", hint: "Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG or pick an icon. Empty uses the first letter.") {
         VStack(alignment: .leading, spacing: 12) {
           HStack(spacing: 12) {
             ChannelAvatar(name: form.name.isEmpty ? form.id : form.name, size: 36, icon: form.icon)
@@ -62,13 +80,21 @@ struct ChannelSettingsForm: View {
               .multilineTextAlignment(.center)
               .frame(width: 96)
               .accessibilityLabel("Emoji")
+            Button { uploadSVG() } label: {
+              HStack(spacing: 6) {
+                OmniIcon(name: "image", size: 14)
+                Text(form.hasSVG ? "Replace SVG" : "Upload SVG")
+              }
+            }
+            .buttonStyle(.pill(.secondary, height: 30))
             if !form.icon.isEmpty {
-              Button("Clear") { form.icon = "" }
+              Button("Clear") { form.icon = ""; svgError = nil }
                 .buttonStyle(.pill(.secondary, height: 30))
             }
             Spacer(minLength: 0)
           }
-          GlyphPicker(selection: ChannelIcon(form.icon)) { form.toggleGlyph($0) }
+          if let svgError { ErrorNote(text: svgError) }
+          GlyphPicker(selection: ChannelIcon(form.icon)) { form.toggleGlyph($0); svgError = nil }
         }
       }
       if !isSystem {

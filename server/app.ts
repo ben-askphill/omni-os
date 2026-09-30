@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { config, paths, uploadsDir } from './config.ts';
 import { channels, threads, events, artifacts, search, type Channel, type Thread } from './db.ts';
 import { bus } from './bus.ts';
-import { parseChannelIcon } from '../shared/channel-icon.ts';
+import { parseChannelIcon, readSvgIcon, SVG_MAX, SVG_PREFIX } from '../shared/channel-icon.ts';
 import { createThread, postMessage, interruptThread, runningCount, activeTasks, runningByHarness, slotsByHarness, queuedCount, pendingFor, isLive, runsHere } from './runner.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
@@ -53,14 +53,27 @@ async function readBody(c: Context): Promise<{ data: unknown; files: File[] }> {
 
 // ---------- channels ----------
 
-/** One emoji or character, or `icon:<name>` for a design system icon. Blank clears it. */
+/**
+ * One emoji or character, `icon:<name>` for a design system icon, or `svg:` and a file's text. Blank clears it.
+ * An SVG is checked and cleaned by withSvgIcon, so its refusal reads as a sentence.
+ */
 const channelIcon = z
   .string()
   .trim()
-  .max(32)
-  .refine((s) => !s || parseChannelIcon(s), 'one emoji or character, or icon:<name> from the design system')
+  .max(SVG_MAX * 4)
+  .refine((s) => !s || s.startsWith(SVG_PREFIX) || parseChannelIcon(s), 'one emoji or character, icon:<name> from the design system, or svg:<markup>')
   .transform((s) => s || null)
   .nullish();
+
+/** The body with an uploaded SVG icon cleaned for storing, or the reason it is refused. */
+function withSvgIcon<T extends { icon?: string | null }>(body: T): T | { error: string } {
+  if (!body.icon?.startsWith(SVG_PREFIX)) return body;
+  try {
+    return { ...body, icon: readSvgIcon(body.icon.slice(SVG_PREFIX.length)) };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+}
 
 const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
@@ -106,7 +119,9 @@ api.get('/channels/:id', (c) => {
 });
 
 api.post('/channels', async (c) => {
-  const body = channelSchema.parse(await c.req.json());
+  const parsed = withSvgIcon(channelSchema.parse(await c.req.json()));
+  if ('error' in parsed) return c.json(parsed, 400);
+  const body = parsed;
   if (channels.get(body.id)) return c.json({ error: 'channel exists' }, 409);
   if (body.repo_path && !existsSync(body.repo_path)) return c.json({ error: `repo path not found: ${body.repo_path}` }, 400);
   if (body.repo_path && !body.github_repo) body.github_repo = await detectRepo(body.repo_path);
@@ -116,7 +131,9 @@ api.post('/channels', async (c) => {
 api.patch('/channels/:id', async (c) => {
   const id = c.req.param('id');
   if (!channels.get(id)) return c.json({ error: 'not found' }, 404);
-  const body = channelSchema.partial().extend({ archived: z.coerce.number().optional() }).parse(await c.req.json());
+  const parsed = withSvgIcon(channelSchema.partial().extend({ archived: z.coerce.number().optional() }).parse(await c.req.json()));
+  if ('error' in parsed) return c.json(parsed, 400);
+  const body = parsed;
   delete (body as any).id;
   if (body.repo_path && !body.github_repo && !channels.get(id)!.github_repo) body.github_repo = await detectRepo(body.repo_path);
   return c.json(channels.update(id, body as any));

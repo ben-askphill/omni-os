@@ -1,7 +1,7 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, type Channel } from '../api.ts';
 import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
-import { CHANNEL_GLYPHS, glyphIcon, parseChannelIcon } from '../../../shared/channel-icon.ts';
+import { CHANNEL_GLYPHS, glyphIcon, parseChannelIcon, readSvgIcon } from '../../../shared/channel-icon.ts';
 import { lastGrapheme, slugify } from '../format.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -51,8 +51,28 @@ function Field({ label, hint, children, htmlFor }: { label: string; hint?: React
   );
 }
 
+/** Bigger than any SVG that could be kept once cleaned, so it is refused before being read. */
+const SVG_FILE_MAX = 512 * 1024;
+
 function IconPicker({ value, name, onChange }: { value: string; name: string; onChange: (v: string) => void }) {
   const mark = parseChannelIcon(value);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [svgError, setSvgError] = useState<string | null>(null);
+  const change = (v: string) => {
+    setSvgError(null);
+    onChange(v);
+  };
+
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      if (file.size > SVG_FILE_MAX) throw new Error('That SVG is too big: keep it under 20 KB.');
+      change(readSvgIcon(await file.text()));
+    } catch (err) {
+      setSvgError(errorText(err));
+    }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
@@ -61,16 +81,31 @@ function IconPicker({ value, name, onChange }: { value: string; name: string; on
           id="ch-icon"
           className="field w-24 text-center !text-[18px] placeholder:!text-[13px]"
           value={mark?.kind === 'emoji' ? mark.text : ''}
-          onChange={(e) => onChange(lastGrapheme(e.target.value))}
+          onChange={(e) => change(lastGrapheme(e.target.value))}
           placeholder="Emoji"
           aria-label="Emoji"
         />
+        <Button type="button" icon="image" onClick={() => fileRef.current?.click()}>
+          {mark?.kind === 'svg' ? 'Replace SVG' : 'Upload SVG'}
+        </Button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".svg,image/svg+xml"
+          className="hidden"
+          aria-label="SVG file"
+          onChange={(e) => {
+            void upload(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
         {value && (
-          <Button type="button" onClick={() => onChange('')}>
+          <Button type="button" onClick={() => change('')}>
             Clear
           </Button>
         )}
       </div>
+      {svgError && <ErrorNote>{svgError}</ErrorNote>}
       <div role="radiogroup" aria-label="Icon" className="flex flex-wrap gap-1">
         {CHANNEL_GLYPHS.map((g) => {
           const on = mark?.kind === 'glyph' && mark.name === g;
@@ -82,7 +117,7 @@ function IconPicker({ value, name, onChange }: { value: string; name: string; on
               aria-checked={on}
               aria-label={g}
               title={g}
-              onClick={() => onChange(on ? '' : glyphIcon(g))}
+              onClick={() => change(on ? '' : glyphIcon(g))}
               className={`grid h-9 w-9 place-items-center rounded-full transition-colors ${on ? 'bg-fg text-on-ink' : 'hov text-fg-2 [--hov:var(--surface)]'}`}
             >
               <Icon name={g} size={17} />
@@ -202,7 +237,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             />
           </Field>
         </div>
-        <Field label="Icon" htmlFor="ch-icon" hint="Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker) or pick an icon. Empty uses the first letter.">
+        <Field label="Icon" htmlFor="ch-icon" hint="Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG or pick an icon. Empty uses the first letter.">
           <IconPicker value={f.icon} name={f.name || f.id} onChange={(v) => set('icon', v)} />
         </Field>
         {!isSystem && (

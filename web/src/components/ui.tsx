@@ -12,7 +12,7 @@ import {
   type RefObject,
 } from 'react';
 import type { ThreadStatus } from '../../../server/db.ts';
-import { CHANNEL_GLYPHS, parseChannelIcon } from '../../../shared/channel-icon.ts';
+import { CHANNEL_GLYPHS, parseChannelIcon, svgDataUrl } from '../../../shared/channel-icon.ts';
 import { Loader, OmniLogo } from './brand.tsx';
 
 export { Loader } from './brand.tsx';
@@ -265,11 +265,14 @@ export function Chip({ children, tone = 'default', className = '', title }: { ch
 // Every icon a channel can pick is one this file draws.
 const _channelGlyphsDrawn: readonly IconName[] = CHANNEL_GLYPHS;
 
-/** A channel's own icon (an emoji or a design system icon), or nothing when it has none. */
+/** A channel's own icon (an emoji, a design system icon or an uploaded SVG), or nothing when it has none. */
 export function ChannelMark({ icon, size }: { icon: string | null | undefined; size: number }) {
   const mark = parseChannelIcon(icon);
   if (!mark) return null;
-  return mark.kind === 'glyph' ? <Icon name={mark.name} size={size} /> : <span className="leading-none" style={{ fontSize: size }}>{mark.text}</span>;
+  if (mark.kind === 'glyph') return <Icon name={mark.name} size={size} />;
+  // An image, never markup in the page: the SVG cannot run anything or load from elsewhere.
+  if (mark.kind === 'svg') return <img src={svgDataUrl(mark.markup)} alt="" draggable={false} className="object-contain" style={{ width: size, height: size }} />;
+  return <span className="leading-none" style={{ fontSize: size }}>{mark.text}</span>;
 }
 
 /** Letter avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. A channel's own icon replaces the letter. */
@@ -284,7 +287,7 @@ export function Avatar({ name, size = 28, icon, channelIcon, ink, className = ''
       {icon ? (
         <Icon name={icon} size={size * 0.5} />
       ) : mark ? (
-        <ChannelMark icon={channelIcon} size={mark.kind === 'glyph' ? size * 0.5 : size * 0.52} />
+        <ChannelMark icon={channelIcon} size={size * { glyph: 0.5, emoji: 0.52, svg: 0.58 }[mark.kind]} />
       ) : (
         name.replace(/[^a-z0-9]/gi, '').slice(0, 1) || '?'
       )}
