@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { config, paths, uploadsDir } from './config.ts';
 import { channels, threads, events, artifacts, search, type Channel, type Thread } from './db.ts';
 import { bus } from './bus.ts';
+import { parseChannelIcon } from '../shared/channel-icon.ts';
 import { createThread, postMessage, interruptThread, runningCount, activeTasks, runningByHarness, slotsByHarness, queuedCount, pendingFor, isLive, runsHere } from './runner.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
@@ -51,6 +52,15 @@ async function readBody(c: Context): Promise<{ data: unknown; files: File[] }> {
 
 // ---------- channels ----------
 
+/** One emoji or character, or `icon:<name>` for a design system icon. Blank clears it. */
+const channelIcon = z
+  .string()
+  .trim()
+  .max(32)
+  .refine((s) => !s || parseChannelIcon(s), 'one emoji or character, or icon:<name> from the design system')
+  .transform((s) => s || null)
+  .nullish();
+
 const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
   name: z.string().min(1),
@@ -63,6 +73,7 @@ const channelSchema = z.object({
   portal_slug: z.string().nullish(),
   browser_headless: z.coerce.number().int().min(0).max(1).optional(),
   notes: z.string().nullish(),
+  icon: channelIcon,
 });
 
 /** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */

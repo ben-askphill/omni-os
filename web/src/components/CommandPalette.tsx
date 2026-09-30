@@ -68,7 +68,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         group: 'Channels',
         label: c.id === 'conductor' ? 'Conductor' : `#${c.name}`,
         sub: c.store_domain ?? c.github_repo ?? undefined,
-        lead: <Avatar name={c.name} icon={c.id === 'conductor' ? 'target' : undefined} size={28} />,
+        lead: <Avatar name={c.name} channelIcon={c.icon} icon={c.id === 'conductor' ? 'target' : undefined} size={28} />,
         right: c.running ? <span className="font-num text-[11px] text-live-text">{c.running} running</span> : undefined,
         run: () => go(href.channel(c.id)),
       })),

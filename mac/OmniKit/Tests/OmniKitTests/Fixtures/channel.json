@@ -10,6 +10,7 @@
   "portal_slug": null,
   "browser_headless": 1,
   "notes": "Fixture",
+  "icon": null,
   "archived": 0,
   "created_at": "2026-01-05T09:00:00.000Z",
   "running": 1,

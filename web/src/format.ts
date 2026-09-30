@@ -150,6 +150,13 @@ export function nextRunLabel(iso: string, timeZone: string) {
 
 // ---------- misc ----------
 
+const graphemes = new Intl.Segmenter();
+/** The last character of what was typed, whole even when it is a multi-part emoji. Typing over a channel icon replaces it. */
+export function lastGrapheme(s: string) {
+  const all = [...graphemes.segment(s.trim())];
+  return all.length ? all[all.length - 1].segment : '';
+}
+
 export function slugify(s: string) {
   return s
     .toLowerCase()

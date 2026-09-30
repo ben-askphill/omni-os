@@ -1,7 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, type Channel } from '../api.ts';
-import { Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
-import { slugify } from '../format.ts';
+import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
+import { CHANNEL_GLYPHS, glyphIcon, parseChannelIcon } from '../../../shared/channel-icon.ts';
+import { lastGrapheme, slugify } from '../format.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
 
@@ -17,6 +18,7 @@ interface FormState {
   portal_slug: string;
   showBrowser: boolean;
   notes: string;
+  icon: string;
 }
 
 function fromChannel(c?: Channel): FormState {
@@ -32,6 +34,7 @@ function fromChannel(c?: Channel): FormState {
     portal_slug: c?.portal_slug ?? '',
     showBrowser: c ? c.browser_headless === 0 : false,
     notes: c?.notes ?? '',
+    icon: c?.icon ?? '',
   };
 }
 
@@ -44,6 +47,49 @@ function Field({ label, hint, children, htmlFor }: { label: string; hint?: React
         {label}
       </Label>
       {children}
+    </div>
+  );
+}
+
+function IconPicker({ value, name, onChange }: { value: string; name: string; onChange: (v: string) => void }) {
+  const mark = parseChannelIcon(value);
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <Avatar name={name} channelIcon={value} size={36} />
+        <input
+          id="ch-icon"
+          className="field w-24 text-center !text-[18px] placeholder:!text-[13px]"
+          value={mark?.kind === 'emoji' ? mark.text : ''}
+          onChange={(e) => onChange(lastGrapheme(e.target.value))}
+          placeholder="Emoji"
+          aria-label="Emoji"
+        />
+        {value && (
+          <Button type="button" onClick={() => onChange('')}>
+            Clear
+          </Button>
+        )}
+      </div>
+      <div role="radiogroup" aria-label="Icon" className="flex flex-wrap gap-1">
+        {CHANNEL_GLYPHS.map((g) => {
+          const on = mark?.kind === 'glyph' && mark.name === g;
+          return (
+            <button
+              key={g}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-label={g}
+              title={g}
+              onClick={() => onChange(on ? '' : glyphIcon(g))}
+              className={`grid h-9 w-9 place-items-center rounded-full transition-colors ${on ? 'bg-fg text-on-ink' : 'hov text-fg-2 [--hov:var(--surface)]'}`}
+            >
+              <Icon name={g} size={17} />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -95,6 +141,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
       portal_slug: orNull(f.portal_slug),
       browser_headless: f.showBrowser ? 0 : 1,
       notes: orNull(f.notes),
+      icon: orNull(f.icon),
     };
     if (!isSystem) body.kind = f.kind;
     try {
@@ -155,6 +202,9 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             />
           </Field>
         </div>
+        <Field label="Icon" htmlFor="ch-icon" hint="Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker) or pick an icon. Empty uses the first letter.">
+          <IconPicker value={f.icon} name={f.name || f.id} onChange={(v) => set('icon', v)} />
+        </Field>
         {!isSystem && (
           <Field label="Kind">
             <Segmented

@@ -49,8 +49,40 @@ import OmniKit
       "name": .string("Acme"), "kind": .string("internal"),
       "repo_path": .null, "github_repo": .null, "use_worktree": .number(1), "base_dir": .null,
       "store_domain": .string("acme.myshopify.com"), "portal_slug": .null, "browser_headless": .number(1),
-      "notes": .string("Be brief"),
+      "notes": .string("Be brief"), "icon": .null,
     ]))
+  }
+
+  @Test func iconKeepsTheLastCharacterTyped() throws {
+    var f = ChannelForm()
+    f.setIcon("📸")
+    #expect(f.icon == "📸")
+    f.setIcon("📸💅")
+    #expect(f.icon == "💅")
+    f.setIcon("👩‍💻")
+    #expect(f.icon == "👩‍💻")
+    #expect(try encoded(f.body(system: false))["icon"] == .string("👩‍💻"))
+    f.setIcon("  ")
+    #expect(f.icon == "")
+  }
+
+  @Test func glyphsToggleAndHideFromTheEmojiField() throws {
+    var f = ChannelForm()
+    f.setIcon("📸")
+    f.toggleGlyph("terminal")
+    #expect(f.icon == "icon:terminal")
+    #expect(f.emoji == "")
+    #expect(try encoded(f.body(system: false))["icon"] == .string("icon:terminal"))
+    f.toggleGlyph("terminal")
+    #expect(f.icon == "")
+  }
+
+  @Test func readsStoredIcons() {
+    #expect(ChannelIcon("icon:terminal") == .glyph("terminal"))
+    #expect(ChannelIcon("icon:nope") == nil)
+    #expect(ChannelIcon(" 👩‍💻 ") == .emoji("👩‍💻"))
+    #expect(ChannelIcon("KE") == nil)
+    #expect(ChannelIcon(nil) == nil)
   }
 
   @Test func systemChannelsKeepTheirKindAndBrowserToggleInverts() throws {

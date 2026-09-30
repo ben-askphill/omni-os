@@ -104,3 +104,28 @@ describe('the Web UI', () => {
     expect(await call('/apiary')).toMatchObject({ status: 200, text: INDEX });
   });
 });
+
+describe('channel icon', () => {
+  const send = (method: string, path: string, body: unknown) =>
+    call(path, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  it('sets, keeps and clears one emoji', async () => {
+    const made = await send('POST', '/api/channels', { id: 'iconic', name: 'Iconic', icon: ' 💅 ' });
+    expect(made.status).toBe(200);
+    expect(JSON.parse(made.text).icon).toBe('💅');
+    // A ZWJ sequence is one emoji.
+    expect(JSON.parse((await send('PATCH', '/api/channels/iconic', { icon: '👩‍💻' })).text).icon).toBe('👩‍💻');
+    expect(JSON.parse((await send('PATCH', '/api/channels/iconic', { notes: 'x' })).text).icon).toBe('👩‍💻');
+    expect(JSON.parse((await send('PATCH', '/api/channels/iconic', { icon: '' })).text).icon).toBeNull();
+  });
+
+  it('takes a design system icon by name', async () => {
+    expect(JSON.parse((await send('PATCH', '/api/channels/iconic', { icon: 'icon:terminal' })).text).icon).toBe('icon:terminal');
+    expect((await send('PATCH', '/api/channels/iconic', { icon: 'icon:nope' })).status).toBe(400);
+  });
+
+  it('refuses more than one character', async () => {
+    expect((await send('PATCH', '/api/channels/iconic', { icon: '📸💅' })).status).toBe(400);
+    expect((await send('POST', '/api/channels', { id: 'wordy', name: 'Wordy', icon: 'KE' })).status).toBe(400);
+  });
+});

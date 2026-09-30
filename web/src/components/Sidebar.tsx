@@ -3,9 +3,10 @@ import type { BackgroundTask, ChannelWithRunning, HarnessId, ThreadStub, Usage, 
 import { duration, plural, toDate, untilLabel } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { readPref, useApp, useNow, writePref } from '../store.tsx';
+import { parseChannelIcon } from '../../../shared/channel-icon.ts';
 import { ThemeSwitch } from './theme.tsx';
 import { HarnessLogo, Loader, OmniMark } from './brand.tsx';
-import { ErrorNote, Icon, Kbd, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
+import { ChannelMark, ErrorNote, Icon, Kbd, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -256,7 +257,15 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
         active={activeChannel === c.id}
         onNavigate={onNavigate}
         right={<RunningBadge n={c.running} />}
-        lead={<span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-4'}`}>#</span>}
+        lead={
+          parseChannelIcon(c.icon) ? (
+            <span className={`grid w-[15px] place-items-center ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-3'}`}>
+              <ChannelMark icon={c.icon} size={14} />
+            </span>
+          ) : (
+            <span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-4'}`}>#</span>
+          )
+        }
       >
         {c.name}
       </NavLink>

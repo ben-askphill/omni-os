@@ -24,6 +24,7 @@ const channel = (patch: Partial<Channel> = {}): Channel => ({
   base_dir: null,
   store_domain: null,
   portal_slug: null,
+  icon: null,
   browser_headless: 1,
   notes: null,
   archived: 0,

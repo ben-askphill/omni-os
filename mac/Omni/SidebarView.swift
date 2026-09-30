@@ -144,6 +144,10 @@ struct SidebarView: View {
           StaticMark(size: 17)
             .foregroundStyle(Tok.fg)
             .frame(width: 15)
+        } else if let mark = ChannelIcon(channel.icon) {
+          ChannelMark(icon: mark, size: 14)
+            .foregroundStyle(selected == item ? Tok.fg2 : Tok.fg3)
+            .frame(width: 15)
         } else {
           Text("#")
             .font(.system(size: 12))

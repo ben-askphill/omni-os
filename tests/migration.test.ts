@@ -46,6 +46,10 @@ describe('threads harness migration', () => {
     expect(t.model).toBe('claude-sonnet-5');
   });
 
+  it('gives existing channels an empty icon', () => {
+    expect(db.channels.get('inbox')!.icon).toBeNull();
+  });
+
   it('is safe to run again', () => {
     expect(() => db.migrate()).not.toThrow();
   });
