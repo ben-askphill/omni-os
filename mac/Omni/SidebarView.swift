@@ -108,7 +108,7 @@ struct SidebarView: View {
       .padding(.bottom, 12)
     }
     .frame(width: Self.width)
-    .background(Tok.canvas)
+    .background(Tok.chrome)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Sidebar")
   }

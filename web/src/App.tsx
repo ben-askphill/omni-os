@@ -158,7 +158,7 @@ function Shell() {
   const showNav = route.name !== 'thread';
 
   return (
-    <div className="flex h-full min-h-0 flex-col md:flex-row md:py-2 md:pr-2">
+    <div className="flex h-full min-h-0 flex-col md:flex-row md:bg-[var(--chrome)] md:py-2 md:pr-2">
       {/* Mobile top bar */}
       <header className="relative bg-bg z-20 flex h-[calc(52px+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-line px-2 pt-[env(safe-area-inset-top)] shadow-none md:hidden">
         <IconButton icon="menu" label="Open menu" onClick={() => setDrawer(true)} size={18} />
@@ -170,7 +170,7 @@ function Shell() {
       </header>
 
       {/* Desktop sidebar */}
-      <aside className="hidden w-[252px] shrink-0 md:block">
+      <aside className="scheme-dark hidden w-[252px] shrink-0 md:block">
         <Sidebar onSearch={openPalette} />
       </aside>
 
@@ -178,7 +178,7 @@ function Shell() {
       {drawer && (
         <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="scrim absolute inset-0" onClick={() => setDrawer(false)} />
-          <div className="drawer-in absolute inset-y-0 left-0 flex w-[86%] max-w-[300px] flex-col overflow-hidden rounded-r-[28px] shadow-[var(--shadow-menu)]">
+          <div className="scheme-dark drawer-in absolute inset-y-0 left-0 flex w-[86%] max-w-[300px] flex-col overflow-hidden rounded-r-[28px] shadow-[var(--shadow-menu)]">
             <div className="absolute top-3 right-2 z-10 pt-[env(safe-area-inset-top)]">
               <IconButton icon="x" label="Close menu" onClick={() => setDrawer(false)} />
             </div>
