@@ -4,7 +4,7 @@ import { bytes, clock, duration, plural, shortPath, toDate } from '../format.ts'
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { Markdown } from './Markdown.tsx';
-import { CheckItem, Icon, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
+import { CheckItem, copyText, Icon, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
 import { SOURCE_TAG } from '../../../shared/slash-menu.ts';
 import { slashPieces } from '../../../shared/slash-pills.ts';
 import { statusLabel } from '../status-line.ts';
@@ -626,6 +626,27 @@ function CommandPill({ label, cmd, open, onToggle }: { label: string; cmd: Slash
   );
 }
 
+/** A small Copy control under a message, shown on hover or keyboard focus (always on touch). Copies the source text. */
+function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'end' }) {
+  const [done, setDone] = useState(false);
+  if (!text.trim()) return null;
+  return (
+    <button
+      type="button"
+      aria-label="Copy message"
+      title="Copy message"
+      onClick={async () => {
+        await copyText(text);
+        setDone(true);
+        setTimeout(() => setDone(false), 1400);
+      }}
+      className={`hov press mt-0.5 inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium text-fg-4 opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${align === 'end' ? 'self-end' : 'self-start'}`}
+    >
+      <Icon name={done ? 'check' : 'copy'} size={12} /> {done ? 'Copied' : 'Copy'}
+    </button>
+  );
+}
+
 function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: string }) {
   const [more, setMore] = useState(false);
   // Where the pill whose description is open starts.
@@ -638,7 +659,7 @@ function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: strin
   const label = p.source ? SOURCE_LABEL[p.source] : undefined;
   const how = p.dropped ? null : p.mode === 'steer' ? 'Steered' : p.mode === 'interrupt' ? 'Interrupted and sent' : null;
   return (
-    <div className={`flex flex-col items-end ${p.dropped ? 'opacity-60' : ''}`}>
+    <div className={`group/msg flex flex-col items-end ${p.dropped ? 'opacity-60' : ''}`}>
       <div className="mb-1 flex flex-wrap items-center justify-end gap-x-2 text-[11.5px] text-fg-3">
         {label && <span className={`font-medium ${p.source === 'conductor' ? 'text-live-text' : ''}`}>{label}</span>}
         {how && (
@@ -678,6 +699,7 @@ function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: strin
           </button>
         )}
       </div>
+      <CopyMsg text={text} align="end" />
     </div>
   );
 }
@@ -817,7 +839,12 @@ export const Transcript = memo(function Transcript({
             case 'user':
               return <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} />;
             case 'text':
-              return <Markdown key={it.key} text={it.p.text ?? ''} />;
+              return (
+                <div key={it.key} className="group/msg flex flex-col">
+                  <Markdown text={it.p.text ?? ''} />
+                  <CopyMsg text={it.p.text ?? ''} />
+                </div>
+              );
             case 'tools': {
               const group = <ToolGroup key={it.key} calls={it.calls} total={it.total} cwd={cwd} running={running} isLast={idx === items.length - 1} />;
               // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.

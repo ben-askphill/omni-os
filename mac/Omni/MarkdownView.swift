@@ -11,6 +11,8 @@ struct MarkdownView: View {
     MarkdownBlocks(blocks: document.blocks, size: size)
       .foregroundStyle(Tok.fg)
       .tint(Tok.fg)
+      // One selection region for the whole reply: per-Text selection stops at each block edge.
+      .textSelection(.enabled)
   }
 }
 
@@ -47,7 +49,6 @@ private struct MarkdownBlockView: View {
           .font(.system(size: 12.5, design: .monospaced))
           .lineSpacing(4)
           .foregroundStyle(Tok.fg)
-          .textSelection(.enabled)
           .fixedSize()
           .padding(.horizontal, 14)
           .padding(.vertical, 12)
@@ -80,7 +81,6 @@ private struct MarkdownBlockView: View {
     Text(text)
       .font(.system(size: size))
       .lineSpacing(size * 0.4)
-      .textSelection(.enabled)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -159,7 +159,6 @@ private struct MarkdownTableView: View {
   private func cell(_ text: MarkdownText) -> some View {
     Text(text.attributed)
       .font(.system(size: 13))
-      .textSelection(.enabled)
       .frame(maxWidth: 360, alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
       .padding(.trailing, 12)

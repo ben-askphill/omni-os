@@ -1068,26 +1068,30 @@ export function CheckItem({ state, children }: { state: 'pending' | 'in_progress
 
 // ---------- misc ----------
 
+/** Clipboard write with a fallback for plain http (Tailscale), where the async API is unavailable. */
+export async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+    } catch {
+      /* ignore */
+    }
+    ta.remove();
+  }
+}
+
 export function CopyButton({ text, label = 'Copy', className = '' }: { text: string; label?: string; className?: string }) {
   const [done, setDone] = useState(false);
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // Clipboard API needs a secure context; fall back for plain http over Tailscale.
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand('copy');
-      } catch {
-        /* ignore */
-      }
-      ta.remove();
-    }
+    await copyText(text);
     setDone(true);
     setTimeout(() => setDone(false), 1400);
   };

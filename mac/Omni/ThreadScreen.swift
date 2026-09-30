@@ -381,9 +381,13 @@ private struct TranscriptRow: View {
   var body: some View {
     switch item {
     case .user(let id, let at, let message):
-      UserBubbleView(eventID: id, at: at, message: message, threadID: threadID, client: model.client, ui: ui)
+      CopyableMessage(text: message.text, alignment: .trailing) {
+        UserBubbleView(eventID: id, at: at, message: message, threadID: threadID, client: model.client, ui: ui)
+      }
     case .text(let id, _, let text):
-      MarkdownView(document: markdown.document(for: id, text: text))
+      CopyableMessage(text: text) {
+        MarkdownView(document: markdown.document(for: id, text: text))
+      }
     case .tools(let group):
       ToolGroupView(group: group, live: live, running: running, cwd: cwd, ui: ui)
     case .plan(let plan):
