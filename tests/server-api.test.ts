@@ -124,6 +124,15 @@ describe('channel icon', () => {
     expect((await send('PATCH', '/api/channels/iconic', { icon: 'icon:nope' })).status).toBe(400);
   });
 
+  it('cleans an uploaded SVG and refuses one with a script', async () => {
+    const svg = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8"/></svg>';
+    const ok = await send('PATCH', '/api/channels/iconic', { icon: `svg:${svg}` });
+    expect(JSON.parse(ok.text).icon).toBe('svg:<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8"/></svg>');
+    const bad = await send('PATCH', '/api/channels/iconic', { icon: 'svg:<svg><script>alert(1)</script></svg>' });
+    expect(bad.status).toBe(400);
+    expect(JSON.parse(bad.text).error).toMatch(/scripts/);
+  });
+
   it('refuses more than one character', async () => {
     expect((await send('PATCH', '/api/channels/iconic', { icon: '📸💅' })).status).toBe(400);
     expect((await send('POST', '/api/channels', { id: 'wordy', name: 'Wordy', icon: 'KE' })).status).toBe(400);

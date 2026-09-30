@@ -77,6 +77,19 @@ import OmniKit
     #expect(f.icon == "")
   }
 
+  @Test func svgFilesAreCleanedLikeTheServer() {
+    var f = ChannelForm()
+    let took = f.setSVG("\u{FEFF}<?xml version=\"1.0\"?>\n<!-- Figma -->\n<svg viewBox=\"0 0 8 8\"><rect width=\"8\" height=\"8\"/></svg>\n")
+    #expect(took)
+    #expect(f.icon == "svg:<svg viewBox=\"0 0 8 8\"><rect width=\"8\" height=\"8\"/></svg>")
+    #expect(f.hasSVG)
+    #expect(f.emoji == "")
+    #expect(ChannelIcon(f.icon) == .svg("<svg viewBox=\"0 0 8 8\"><rect width=\"8\" height=\"8\"/></svg>"))
+    let refused = f.setSVG("<html></html>")
+    #expect(!refused)
+    #expect(f.hasSVG)
+  }
+
   @Test func readsStoredIcons() {
     #expect(ChannelIcon("icon:terminal") == .glyph("terminal"))
     #expect(ChannelIcon("icon:nope") == nil)

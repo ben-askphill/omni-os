@@ -157,7 +157,7 @@ struct ChannelAvatar: View {
         StaticMark(size: size * 0.55)
           .foregroundStyle(Tok.onInk)
       } else if let mark = ChannelIcon(icon) {
-        ChannelMark(icon: mark, size: size * (mark.isGlyph ? 0.5 : 0.52))
+        ChannelMark(icon: mark, size: size * mark.avatarScale)
           .foregroundStyle(Tok.fg2)
       } else {
         Text(AvatarMark(name: name).letter)
@@ -170,7 +170,7 @@ struct ChannelAvatar: View {
   }
 }
 
-/// A channel's own icon: the emoji, or the design system icon in the text color.
+/// A channel's own icon: the emoji, the design system icon in the text color, or the uploaded SVG in its own colors.
 struct ChannelMark: View {
   let icon: ChannelIcon
   let size: CGFloat
@@ -179,12 +179,43 @@ struct ChannelMark: View {
     switch icon {
     case .glyph(let name): OmniIcon(name: name, size: size)
     case .emoji(let text): Text(text).font(.system(size: size))
+    case .svg(let markup):
+      if let image = SVGIconCache.image(markup) {
+        Image(nsImage: image)
+          .resizable()
+          .interpolation(.high)
+          .scaledToFit()
+          .frame(width: size, height: size)
+      } else {
+        OmniIcon(name: "image", size: size)
+      }
     }
   }
 }
 
 extension ChannelIcon {
-  var isGlyph: Bool { if case .glyph = self { true } else { false } }
+  /// Its size in a ChannelAvatar, as a share of the disc, as in Avatar in ui.tsx.
+  var avatarScale: CGFloat {
+    switch self {
+    case .glyph: 0.5
+    case .emoji: 0.52
+    case .svg: 0.58
+    }
+  }
+}
+
+/// Uploaded SVGs, parsed once each: the sidebar redraws its rows often. NSImage draws SVG itself (NSSVGImageRep)
+/// and runs nothing in it.
+@MainActor enum SVGIconCache {
+  private static var images: [String: NSImage] = [:]
+
+  static func image(_ markup: String) -> NSImage? {
+    if let hit = images[markup] { return hit }
+    guard let image = NSImage(data: Data(markup.utf8)), image.isValid else { return nil }
+    if images.count > 64 { images.removeAll() }
+    images[markup] = image
+    return image
+  }
 }
 
 /// A failure: the vermilion diamond carries the alarm, the text stays ink.

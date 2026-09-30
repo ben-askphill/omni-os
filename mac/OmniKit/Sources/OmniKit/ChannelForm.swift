@@ -58,6 +58,19 @@ public struct ChannelForm: Hashable, Sendable {
     if case .emoji(let text) = ChannelIcon(icon) { text } else { "" }
   }
 
+  /// Takes an SVG file's text as the icon, cleaned as the server will. False when it is not an SVG. The server
+  /// refuses one with scripts or links on save.
+  @discardableResult
+  public mutating func setSVG(_ text: String) -> Bool {
+    guard let markup = ChannelIcon.cleanSVG(text) else { return false }
+    icon = ChannelIcon.svgPrefix + markup
+    return true
+  }
+
+  public var hasSVG: Bool {
+    if case .svg = ChannelIcon(icon) { true } else { false }
+  }
+
   /// Picks a design system icon, or clears it when it is the one picked.
   public mutating func toggleGlyph(_ name: String) {
     icon = ChannelIcon(icon) == .glyph(name) ? "" : ChannelIcon.stored(glyph: name)
