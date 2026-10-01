@@ -1,6 +1,6 @@
 import { createContext, Fragment, memo, useContext, useMemo, useState, type ReactNode } from 'react';
-import { parsePayload, uploadUrl, type Attachment, type EventRow, type PendingMsg } from '../api.ts';
-import { bytes, clock, duration, plural, shortPath, toDate } from '../format.ts';
+import { uploadUrl, type Attachment, type EventRow, type PendingMsg } from '../api.ts';
+import { bytes, clock, duration, plural, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { Markdown } from './Markdown.tsx';
@@ -8,254 +8,26 @@ import { CheckItem, copyText, Icon, Loader, Modal, StatusDot, StatusPill, Ticks 
 import { SOURCE_TAG } from '../../../shared/slash-menu.ts';
 import { slashPieces } from '../../../shared/slash-pills.ts';
 import { statusLabel } from '../status-line.ts';
-import type { SlashHit, SlashRecord } from '../../../shared/slash.ts';
+import type { SlashHit } from '../../../shared/slash.ts';
+import {
+  buildItems,
+  buildTasks,
+  str,
+  toolLabel,
+  toolSummary,
+  type ReportP,
+  type ResultP,
+  type TaskView,
+  type TextP,
+  type Todo,
+  type ToolCall,
+  type UserP,
+} from '../transcript/fold.ts';
 
-// ---------- payloads ----------
-
-interface UserP {
-  text: string;
-  source?: string;
-  attachments?: Attachment[];
-  /** Set when the message was sent while a turn was in progress. */
-  mode?: 'steer' | 'queue' | 'interrupt';
-  /** The run ended before the agent saw this message. */
-  dropped?: boolean;
-  /** The harness command the message starts with and its Mentions, as they resolved when sent. */
-  slash?: SlashRecord;
-}
-interface TextP {
-  text: string;
-}
-interface ToolUseP {
-  id: string;
-  name: string;
-  input: unknown;
-  parent?: string | null;
-}
-interface ToolResultP {
-  tool_use_id: string;
-  text: string;
-  is_error: boolean;
-  truncated: boolean;
-}
-interface ResultP {
-  ok: boolean;
-  subtype: string;
-  duration_ms?: number;
-  turns?: number;
-  cost_usd?: number;
-  stopped?: boolean;
-  model?: string;
-  input_tokens?: number;
-  output_tokens?: number;
-}
-interface ReportP {
-  text: string;
-  task_id?: string | null;
-  thread_id: string;
-  title?: string;
-  role?: string | null;
-  channel?: string;
-  status?: string;
-  dropped?: boolean;
-}
-
-interface TaskP {
-  task_id: string;
-  event: 'started' | 'progress' | 'ended';
-  tool_use_id?: string;
-  background?: boolean;
-  status?: string;
-  tool_uses?: number;
-}
-
-/** What a sub-agent's Agent row shows: live while the CLI still runs it, else how it ended. */
-interface TaskView {
-  running: boolean;
-  background: boolean;
-  status?: string;
-  tool_uses?: number;
-  started: string;
-  ended?: string;
-}
+export { toolLabel, toolSummary, type ToolCall };
 
 /** Task state by the Agent call's tool_use id. */
 const TaskCtx = createContext<Map<string, TaskView>>(new Map());
-
-export interface ToolCall {
-  id: string;
-  name: string;
-  input: Record<string, unknown>;
-  parent: string | null;
-  result?: ToolResultP;
-  at: string;
-  children: ToolCall[];
-  orphan: boolean;
-}
-
-type Item =
-  | { type: 'user'; key: number; at: string; p: UserP }
-  | { type: 'text'; key: number; at: string; p: TextP }
-  | { type: 'tools'; key: number; calls: ToolCall[]; total: number }
-  | { type: 'result'; key: number; p: ResultP }
-  | { type: 'error'; key: number; p: TextP }
-  | { type: 'report'; key: number; at: string; p: ReportP };
-
-interface Todo {
-  content?: string;
-  activeForm?: string;
-  status?: string;
-}
-
-/** Stored task rows folded per Agent call. One with no end row reads as running; the live list decides. */
-function buildTasks(events: EventRow[]) {
-  const byTask = new Map<string, string>();
-  const out = new Map<string, TaskView>();
-  for (const e of events) {
-    if (e.kind !== 'task') continue;
-    const p = parsePayload<TaskP>(e);
-    const tool = p.tool_use_id ?? byTask.get(p.task_id);
-    if (!tool) continue;
-    byTask.set(p.task_id, tool);
-    const prev = out.get(tool);
-    if (p.event === 'started' || !prev) {
-      const ended = p.event === 'ended' ? e.created_at : undefined;
-      out.set(tool, { running: !ended, background: !!p.background, status: p.status, tool_uses: p.tool_uses, started: e.created_at, ended });
-    } else if (p.event === 'progress') {
-      out.set(tool, { ...prev, background: p.background ?? prev.background, tool_uses: p.tool_uses ?? prev.tool_uses });
-    } else {
-      out.set(tool, { ...prev, running: false, status: p.status ?? 'completed', tool_uses: p.tool_uses ?? prev.tool_uses, ended: e.created_at });
-    }
-  }
-  return out;
-}
-
-function buildItems(events: EventRow[]): { items: Item[]; plan: { todos: Todo[]; after: number } | null } {
-  const results = new Map<string, ToolResultP>();
-  for (const e of events) {
-    if (e.kind === 'tool_result') {
-      const p = parsePayload<ToolResultP>(e);
-      if (p.tool_use_id) results.set(p.tool_use_id, p);
-    }
-  }
-  const items: Item[] = [];
-  // Every call so far, not just this group's: a background agent's calls land after later text and turns.
-  const byId = new Map<string, ToolCall>();
-  const groupOf = new Map<string, Extract<Item, { type: 'tools' }>>();
-  let group: Extract<Item, { type: 'tools' }> | null = null;
-  let plan: { todos: Todo[]; after: number } | null = null;
-
-  for (const e of events) {
-    switch (e.kind) {
-      case 'tool_use': {
-        const p = parsePayload<ToolUseP>(e);
-        const call: ToolCall = {
-          id: p.id,
-          name: p.name ?? 'tool',
-          input: (p.input && typeof p.input === 'object' ? p.input : { value: p.input }) as Record<string, unknown>,
-          parent: p.parent ?? null,
-          result: results.get(p.id),
-          at: e.created_at,
-          children: [],
-          orphan: false,
-        };
-        const parent = call.parent ? byId.get(call.parent) : undefined;
-        let home = parent && groupOf.get(parent.id);
-        if (!home) {
-          if (!group) {
-            group = { type: 'tools', key: e.id, calls: [], total: 0 };
-            items.push(group);
-          }
-          home = group;
-        }
-        byId.set(call.id, call);
-        groupOf.set(call.id, home);
-        home.total++;
-        if (call.name === 'TodoWrite' && Array.isArray(call.input.todos)) plan = { todos: call.input.todos as Todo[], after: home.key };
-        if (parent) parent.children.push(call);
-        else {
-          call.orphan = !!call.parent;
-          home.calls.push(call);
-        }
-        break;
-      }
-      case 'tool_result':
-      case 'status':
-      case 'init':
-        break;
-      case 'user':
-        group = null;
-        items.push({ type: 'user', key: e.id, at: e.created_at, p: parsePayload<UserP>(e) });
-        break;
-      case 'assistant_text':
-        group = null;
-        items.push({ type: 'text', key: e.id, at: e.created_at, p: parsePayload<TextP>(e) });
-        break;
-      case 'result': {
-        const p = parsePayload<ResultP>(e);
-        // Zero-turn success is not a real turn: a local slash command (its output is stored as text
-        // just before) or, in older threads, the CLI flushing a background task on resume.
-        if (p.ok && !p.turns) break;
-        group = null;
-        items.push({ type: 'result', key: e.id, p });
-        break;
-      }
-      case 'error':
-        group = null;
-        items.push({ type: 'error', key: e.id, p: parsePayload<TextP>(e) });
-        break;
-      case 'crew_report':
-        group = null;
-        items.push({ type: 'report', key: e.id, at: e.created_at, p: parsePayload<ReportP>(e) });
-        break;
-      default:
-        break;
-    }
-  }
-  return { items, plan };
-}
-
-// ---------- tool summaries ----------
-
-const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : typeof v === 'number' || typeof v === 'boolean' ? String(v) : '');
-
-function firstLine(s: string, max = 160) {
-  const line = s.trim().split('\n')[0] ?? '';
-  return line.length > max ? line.slice(0, max - 1) + '...' : line;
-}
-
-export function toolLabel(name: string) {
-  const m = name.match(/^mcp__(.+?)__(.+)$/);
-  if (m) {
-    const server = /^[0-9a-f]{8}-[0-9a-f-]{27,}$/.test(m[1]) ? 'mcp' : m[1].replace(/^plugin_[^_]+_/, '');
-    return `${server} · ${m[2]}`;
-  }
-  return name;
-}
-
-export function toolSummary(c: Pick<ToolCall, 'name' | 'input'>, cwd?: string | null): string {
-  const i = c.input;
-  const n = c.name;
-  if (n === 'Bash' || n === 'BashOutput') return firstLine(str(i.command) || str(i.description) || str(i.bash_id));
-  if (['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'NotebookRead'].includes(n)) return shortPath(str(i.file_path) || str(i.notebook_path), cwd);
-  if (n === 'Glob') return str(i.pattern);
-  if (n === 'Grep') return `${str(i.pattern)}${i.path ? `  in ${shortPath(str(i.path), cwd)}` : ''}`;
-  if (n === 'WebFetch') return str(i.url);
-  if (n === 'WebSearch') return str(i.query);
-  if (n === 'Task' || n === 'Agent') return `${str(i.description)}${i.subagent_type ? ` (${str(i.subagent_type)})` : ''}`;
-  if (n === 'TodoWrite') {
-    const todos = Array.isArray(i.todos) ? (i.todos as { status?: string }[]) : [];
-    const done = todos.filter((t) => t.status === 'completed').length;
-    return `${done}/${todos.length} done`;
-  }
-  if (n === 'Skill') return str(i.skill) || str(i.command);
-  if (n === 'KillShell' || n === 'KillBash') return str(i.shell_id);
-  for (const k of ['url', 'query', 'q', 'path', 'file_path', 'selector', 'name', 'title', 'id', 'command', 'prompt', 'text']) {
-    if (str(i[k])) return firstLine(str(i[k]));
-  }
-  for (const v of Object.values(i)) if (str(v)) return firstLine(str(v));
-  return '';
-}
 
 function toolIcon(name: string) {
   if (name === 'Bash' || name === 'BashOutput') return 'terminal' as const;
