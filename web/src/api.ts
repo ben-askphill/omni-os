@@ -186,6 +186,7 @@ export type FeedEvent =
   | { type: 'tasks'; tasks: BackgroundTask[] }
   | { type: 'usage'; harness?: HarnessId; usage: Usage | null }
   | { type: 'artifact'; artifact: Artifact }
+  | { type: 'channel'; id: string }
   | { type: 'reconnect' };
 
 // ---------- fetch helpers ----------

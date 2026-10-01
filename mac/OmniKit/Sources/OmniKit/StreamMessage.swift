@@ -44,10 +44,12 @@ public enum FeedEvent: Decodable, Hashable, Sendable {
   case artifact(Artifact)
   /// Every sub-agent running now, across all threads, whenever one starts, progresses or ends.
   case tasks([BackgroundTask])
+  /// A channel changed on another Mac (sync): refetch the channel list.
+  case channel(id: String)
   case unknown(JSONValue)
 
   private enum CodingKeys: String, CodingKey {
-    case type, thread, harness, usage, artifact, tasks
+    case type, thread, harness, usage, artifact, tasks, id
   }
 
   public init(from decoder: any Decoder) throws {
@@ -67,6 +69,8 @@ public enum FeedEvent: Decodable, Hashable, Sendable {
       self = .artifact(try c.decode(Artifact.self, forKey: .artifact))
     case "tasks":
       self = .tasks(try c.decode([BackgroundTask].self, forKey: .tasks))
+    case "channel":
+      self = .channel(id: try c.decode(String.self, forKey: .id))
     default:
       self = .unknown(try JSONValue(from: decoder))
     }

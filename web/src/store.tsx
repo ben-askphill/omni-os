@@ -95,7 +95,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const e = d as FeedEvent;
         if (e.type === 'usage') {
           setUsage((prev) => ({ ...prev, [e.harness ?? 'claude-code']: e.usage }));
-        } else if (e.type === 'thread') {
+        } else if (e.type === 'thread' || e.type === 'channel') {
           scheduleRefresh();
         } else if (e.type === 'tasks') {
           setTasks(e.tasks);
