@@ -56,6 +56,8 @@ struct SidebarView: View {
             }
           }
 
+          agents
+
           if let error = channelsError {
             ErrorNote(text: error)
           }
@@ -127,6 +129,34 @@ struct SidebarView: View {
         }
       }
       .accessibilityAddTraits(on ? .isSelected : [])
+  }
+
+  /// Agents in Sidebar.tsx: hidden when nothing is running. Each row is AgentLink: the task, its channel,
+  /// and a link to the thread that started it.
+  @ViewBuilder private var agents: some View {
+    let tasks = model.store.tasks
+    if !tasks.isEmpty {
+      VStack(alignment: .leading, spacing: 0) {
+        HStack {
+          Text("Agents").omniCaption()
+          Spacer(minLength: 8)
+          Text("\(tasks.count)")
+            .font(.system(size: 11).monospacedDigit())
+            .foregroundStyle(Tok.live)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
+        VStack(spacing: 1) {
+          ForEach(tasks) { task in
+            AgentRow(task: task, channel: model.store.channel(task.channelID)?.name) {
+              pick(.thread(task.threadID))
+            }
+            .openInNewWindow(task.threadID)
+          }
+        }
+      }
+    }
   }
 
   /// The channel list failed to load while the server runs. With no server, the detail says so instead.
@@ -254,6 +284,58 @@ struct ThreadRow: View {
     .padding(.horizontal, 12)
     .frame(height: 28)
     .help("\(thread.title.isEmpty ? "Untitled" : thread.title) · \(thread.status.label)")
+  }
+}
+
+/// AgentLink in Sidebar.tsx: a running sub-agent, linked to the thread that started it. The channel name
+/// sits with the running time; the help text is the web's title.
+private struct AgentRow: View {
+  let task: BackgroundTask
+  let channel: String?
+  let open: () -> Void
+
+  var body: some View {
+    Button(action: open) {
+      TimelineView(.periodic(from: .now, by: 1)) { context in
+        HStack(spacing: 10) {
+          Loader(size: 11)
+            .foregroundStyle(Tok.live)
+            .frame(width: 15)
+            .accessibilityHidden(true)
+          Text(task.description)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          if let channel {
+            Text("#\(channel)")
+              .lineLimit(1)
+              .font(.system(size: 11))
+              .foregroundStyle(Tok.fg4)
+          }
+          Text(elapsed(now: context.date))
+            .font(.system(size: 11).monospacedDigit())
+            .foregroundStyle(Tok.fg4)
+        }
+        .font(.system(size: 12.5))
+        .foregroundStyle(Tok.fg2)
+        .padding(.horizontal, 12)
+        .frame(height: 32)
+      }
+    }
+    .buttonStyle(RailRowStyle())
+    .help(tip)
+    .accessibilityLabel(channel.map { "\(task.description), #\($0)" } ?? task.description)
+  }
+
+  private func elapsed(now: Date) -> String {
+    Format.duration(ms: max(0, now.timeIntervalSince(task.startedAt) * 1000))
+  }
+
+  private var tip: String {
+    var parts = [task.description]
+    if let channel { parts.append("#\(channel)") }
+    if let uses = task.toolUses { parts.append(Format.plural(uses, "tool")) }
+    if let last = task.lastTool { parts.append("last \(last)") }
+    return parts.joined(separator: " · ")
   }
 }
 

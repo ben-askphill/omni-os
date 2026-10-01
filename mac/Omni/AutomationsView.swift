@@ -6,6 +6,7 @@ import SwiftUI
 struct AutomationsView: View {
   let model: AppModel
   @State private var automations: AutomationsModel?
+  @State private var feedTicket: UUID?
 
   var body: some View {
     Group {
@@ -16,17 +17,31 @@ struct AutomationsView: View {
       }
     }
     .task(id: model.client.baseURL) {
+      detachFeed()
       automations?.stop()
-      let automations = AutomationsModel(client: model.client)
-      automations.recentChanged(model.store.recent)
-      self.automations = automations
-      await automations.load()
+      let page = AutomationsModel(client: model.client)
+      automations = page
+      feedTicket = model.subscribeFeed { event in
+        if case .message(let message) = event { page.feed(message) }
+      }
+      await page.load()
     }
-    .onChange(of: model.store.recent) { _, recent in automations?.recentChanged(recent) }
-    .onChange(of: model.store.connection) { _, connection in
-      if connection == .open { automations?.scheduleReload() }
+    .onChange(of: model.store.feedOpens) { _, opens in
+      // The first open is the initial connection. Later ones are reconnects: the Web UI reloads for
+      // `e.type === 'reconnect'`, a second later. The workspace refetch on that open stays immediate.
+      if opens > 1 { automations?.scheduleReload() }
     }
-    .onDisappear { automations?.stop() }
+    .onDisappear {
+      detachFeed()
+      automations?.stop()
+    }
+  }
+
+  private func detachFeed() {
+    if let feedTicket {
+      model.unsubscribeFeed(feedTicket)
+      self.feedTicket = nil
+    }
   }
 }
 

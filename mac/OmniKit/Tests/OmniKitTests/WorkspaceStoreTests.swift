@@ -50,6 +50,7 @@ final class FakeWorkspaceAPI: WorkspaceAPI {
     var crew: [CrewRole] = []
     var recent: [OmniThread] = []
     var harnesses: [HarnessInfo] = []
+    var tasks: [BackgroundTask] = []
     var calls: [String: Int] = [:]
     var recentLimits: [Int?] = []
     var channelsHold: Gate?
@@ -153,9 +154,16 @@ final class FakeWorkspaceAPI: WorkspaceAPI {
       return s.harnesses
     }
   }
+
+  func tasks() async throws(OmniAPIError) -> [BackgroundTask] {
+    state.withLock { s in
+      s.calls["tasks", default: 0] += 1
+      return s.tasks
+    }
+  }
 }
 
-private let endpoints = ["channels", "status", "crew", "recent", "harnesses"]
+private let endpoints = ["channels", "status", "crew", "recent", "harnesses", "tasks"]
 
 @MainActor
 private func makeStore(
@@ -169,10 +177,11 @@ private func makeStore(
 }
 
 @MainActor
-private func loaded(_ store: WorkspaceStore) async throws {
+private func loaded(_ store: WorkspaceStore, _ api: FakeWorkspaceAPI) async throws {
   try await waitFor("the first load") {
     let s = store.snapshot
     return store.loadState == .loaded && s.status != nil && !s.crew.isEmpty && !s.recent.isEmpty && !s.harnesses.isEmpty
+      && api.calls("tasks") >= 1
   }
 }
 
@@ -184,7 +193,7 @@ private func loaded(_ store: WorkspaceStore) async throws {
     #expect(store.loadState == .loading)
     #expect(store.connection == .connecting)
 
-    try await loaded(store)
+    try await loaded(store, api)
     let s = store.snapshot
     #expect(s.channels.map(\.id) == ["conductor", "acme"])
     #expect(s.channel("acme")?.kind == .client)
@@ -228,7 +237,7 @@ private func loaded(_ store: WorkspaceStore) async throws {
     let api = try FakeWorkspaceAPI.standard()
     let (store, feed, clock) = makeStore(api)
     defer { store.stop(); feed.finish() }
-    try await loaded(store)
+    try await loaded(store, api)
     feed.yield(.state(.open))
     #expect(store.snapshot.channel("acme")?.running == 0)
 
@@ -255,6 +264,23 @@ private func loaded(_ store: WorkspaceStore) async throws {
     try await waitFor("the next refetch") { api.calls("channels") == 3 }
   }
 
+  @Test func storesTasksFromTheFeed() async throws {
+    let api = try FakeWorkspaceAPI.standard()
+    let (store, feed, _) = makeStore(api)
+    defer { store.stop(); feed.finish() }
+    try await loaded(store, api)
+    let running = try decode([BackgroundTask].self, """
+      [{"thread_id":"t1","channel_id":"acme","task_id":"task-1","tool_use_id":"tu1","description":"Check the cart","background":true,
+        "started_at":"2026-09-28T07:57:15Z","last_tool":"Read","tool_uses":2}]
+      """)
+    feed.yield(.message(.tasks(running)))
+    try await waitFor("the agents") { store.tasks == running }
+    #expect(store.snapshot.tasks.map(\.description) == ["Check the cart"])
+
+    feed.yield(.message(.tasks([])))
+    try await waitFor("cleared") { store.tasks.isEmpty }
+  }
+
   @Test func passesEachFeedMessageOn() async throws {
     let (store, feed, _) = makeStore(try FakeWorkspaceAPI.standard())
     defer { store.stop(); feed.finish() }
@@ -273,7 +299,7 @@ private func loaded(_ store: WorkspaceStore) async throws {
     api.recent = [try thread("t1", updated: 10), try thread("t2", updated: 9)]
     let (store, feed, _) = makeStore(api)
     defer { store.stop(); feed.finish() }
-    try await loaded(store)
+    try await loaded(store, api)
     #expect(store.snapshot.recent.map(\.id) == ["t1", "t2"])
 
     feed.yield(.message(.thread(try thread("t2", status: "done", updated: 11))))
@@ -289,7 +315,7 @@ private func loaded(_ store: WorkspaceStore) async throws {
     api.recent = try (0..<60).map { try thread("r\($0)", updated: 200 - $0) }
     let (store, feed, _) = makeStore(api)
     defer { store.stop(); feed.finish() }
-    try await loaded(store)
+    try await loaded(store, api)
 
     feed.yield(.message(.thread(try thread("new", updated: 300))))
     try await waitFor("the new thread") { store.snapshot.recent.first?.id == "new" }
@@ -302,7 +328,7 @@ private func loaded(_ store: WorkspaceStore) async throws {
     api.status = try status(usage: #"{"claude-code":{"five_hour":{"utilization":0.1,"resetsAt":1790600000}}}"#)
     let (store, feed, _) = makeStore(api)
     defer { store.stop(); feed.finish() }
-    try await loaded(store)
+    try await loaded(store, api)
     #expect(store.snapshot.usage[.claudeCode]?.fiveHour?.utilization == 0.1)
 
     feed.yield(.message(.usage(harness: .codex, usage: try usage(0.3))))
@@ -323,7 +349,7 @@ private func loaded(_ store: WorkspaceStore) async throws {
     let api = try FakeWorkspaceAPI.standard()
     let (store, feed, _) = makeStore(api)
     defer { store.stop(); feed.finish() }
-    try await loaded(store)
+    try await loaded(store, api)
     feed.yield(.state(.open))
     try await waitFor("open") { store.connection == .open }
     await settle()
@@ -357,7 +383,7 @@ private func loaded(_ store: WorkspaceStore) async throws {
     let api = try FakeWorkspaceAPI.standard()
     let (store, feed, _) = makeStore(api)
     defer { store.stop(); feed.finish() }
-    try await loaded(store)
+    try await loaded(store, api)
 
     let gate = api.holdNextChannels()
     api.channels = .success(try channelList(channelRow("acme", running: 1)))
@@ -377,7 +403,7 @@ private func loaded(_ store: WorkspaceStore) async throws {
     api.recent = [try thread("x", updated: 1)]
     let (store, feed, _) = makeStore(api)
     defer { store.stop(); feed.finish() }
-    try await loaded(store)
+    try await loaded(store, api)
 
     // The refetch on a feed reopen: the server answers with x still running, then x ends and the feed
     // says so before the answer lands.
@@ -399,7 +425,7 @@ private func loaded(_ store: WorkspaceStore) async throws {
     api.recent = [try thread("x", updated: 1)]
     let (store, feed, _) = makeStore(api)
     defer { store.stop(); feed.finish() }
-    try await loaded(store)
+    try await loaded(store, api)
 
     // The query ran after the event, so its row is the newer one.
     let gate = api.holdNextRecent()
