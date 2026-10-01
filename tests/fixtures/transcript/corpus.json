@@ -1,0 +1,623 @@
+{
+  "cases": [
+    {
+      "name": "grouping",
+      "events": [
+        {
+          "id": 1,
+          "thread_id": "t",
+          "kind": "user",
+          "payload": "{\"text\":\"fix it\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 2,
+          "thread_id": "t",
+          "kind": "init",
+          "payload": "{\"model\":\"m\",\"cwd\":\"/x\",\"tools\":1,\"mcp\":[]}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 3,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"t\",\"name\":\"Task\",\"input\":{\"description\":\"Find\",\"subagent_type\":\"Explore\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 4,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"g\",\"name\":\"Grep\",\"input\":{\"pattern\":\"cart\"},\"parent\":\"t\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 5,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"lost\",\"name\":\"Bash\",\"input\":{\"command\":\"ls\"},\"parent\":\"gone\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 6,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"t\",\"text\":\"done\",\"is_error\":false,\"truncated\":false}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 7,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"g\",\"text\":\"hit\",\"is_error\":false,\"truncated\":false}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 8,
+          "thread_id": "t",
+          "kind": "status",
+          "payload": "{\"text\":\"Thinking\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 9,
+          "thread_id": "t",
+          "kind": "assistant_text",
+          "payload": "{\"text\":\"Done.\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 10,
+          "thread_id": "t",
+          "kind": "result",
+          "payload": "{\"ok\":true,\"subtype\":\"success\",\"turns\":2}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        }
+      ],
+      "items": [
+        {
+          "type": "user",
+          "key": 1,
+          "text": "fix it"
+        },
+        {
+          "type": "tools",
+          "key": 3,
+          "total": 3,
+          "calls": [
+            {
+              "id": "t",
+              "name": "Task",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "description": "Find",
+                "subagent_type": "Explore"
+              },
+              "summary": "Find (Explore)",
+              "result": {
+                "text": "done",
+                "is_error": false,
+                "truncated": false
+              },
+              "children": [
+                {
+                  "id": "g",
+                  "name": "Grep",
+                  "parent": "t",
+                  "orphan": false,
+                  "input": {
+                    "pattern": "cart"
+                  },
+                  "summary": "cart",
+                  "result": {
+                    "text": "hit",
+                    "is_error": false,
+                    "truncated": false
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "lost",
+              "name": "Bash",
+              "parent": "gone",
+              "orphan": true,
+              "input": {
+                "command": "ls"
+              },
+              "summary": "ls",
+              "result": null,
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "key": 9,
+          "text": "Done."
+        },
+        {
+          "type": "result",
+          "key": 10,
+          "ok": true,
+          "subtype": "success",
+          "turns": 2
+        }
+      ],
+      "plan": null
+    },
+    {
+      "name": "result-before-call",
+      "events": [
+        {
+          "id": 1,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"a\",\"name\":\"Bash\",\"input\":{\"command\":\"ls\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 2,
+          "thread_id": "t",
+          "kind": "assistant_text",
+          "payload": "{\"text\":\"while it runs\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 3,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"b\",\"text\":\"early\",\"is_error\":false,\"truncated\":false}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 4,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"a\",\"text\":\"late\",\"is_error\":true,\"truncated\":false}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 5,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"b\",\"name\":\"Read\",\"input\":{\"file_path\":\"/tmp/a.ts\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        }
+      ],
+      "items": [
+        {
+          "type": "tools",
+          "key": 1,
+          "total": 1,
+          "calls": [
+            {
+              "id": "a",
+              "name": "Bash",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "command": "ls"
+              },
+              "summary": "ls",
+              "result": {
+                "text": "late",
+                "is_error": true,
+                "truncated": false
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "key": 2,
+          "text": "while it runs"
+        },
+        {
+          "type": "tools",
+          "key": 5,
+          "total": 1,
+          "calls": [
+            {
+              "id": "b",
+              "name": "Read",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "file_path": "/tmp/a.ts"
+              },
+              "summary": "/tmp/a.ts",
+              "result": {
+                "text": "early",
+                "is_error": false,
+                "truncated": false
+              },
+              "children": []
+            }
+          ]
+        }
+      ],
+      "plan": null
+    },
+    {
+      "name": "zero-turn-success",
+      "events": [
+        {
+          "id": 1,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"a\",\"name\":\"Bash\",\"input\":{\"command\":\"a\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 2,
+          "thread_id": "t",
+          "kind": "result",
+          "payload": "{\"ok\":true,\"subtype\":\"success\",\"turns\":0}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 3,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"b\",\"name\":\"Bash\",\"input\":{\"command\":\"b\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 4,
+          "thread_id": "t",
+          "kind": "result",
+          "payload": "{\"ok\":false,\"subtype\":\"error_max_turns\",\"turns\":0}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 5,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"c\",\"name\":\"Bash\",\"input\":{\"command\":\"c\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        }
+      ],
+      "items": [
+        {
+          "type": "tools",
+          "key": 1,
+          "total": 2,
+          "calls": [
+            {
+              "id": "a",
+              "name": "Bash",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "command": "a"
+              },
+              "summary": "a",
+              "result": null,
+              "children": []
+            },
+            {
+              "id": "b",
+              "name": "Bash",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "command": "b"
+              },
+              "summary": "b",
+              "result": null,
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "result",
+          "key": 4,
+          "ok": false,
+          "subtype": "error_max_turns",
+          "turns": 0
+        },
+        {
+          "type": "tools",
+          "key": 5,
+          "total": 1,
+          "calls": [
+            {
+              "id": "c",
+              "name": "Bash",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "command": "c"
+              },
+              "summary": "c",
+              "result": null,
+              "children": []
+            }
+          ]
+        }
+      ],
+      "plan": null
+    },
+    {
+      "name": "plan-placement",
+      "events": [
+        {
+          "id": 1,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"p1\",\"name\":\"TodoWrite\",\"input\":{\"todos\":[{\"content\":\"Step 1\",\"activeForm\":\"Doing step 1\",\"status\":\"in_progress\"},{\"content\":\"Step 2\",\"activeForm\":\"Doing step 2\",\"status\":\"pending\"}]},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 2,
+          "thread_id": "t",
+          "kind": "assistant_text",
+          "payload": "{\"text\":\"Looking\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 3,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"b\",\"name\":\"Bash\",\"input\":{\"command\":\"ls\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 4,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"p2\",\"name\":\"TodoWrite\",\"input\":{\"todos\":[{\"content\":\"Step 1\",\"activeForm\":\"Doing step 1\",\"status\":\"completed\"},{\"content\":\"Step 2\",\"activeForm\":\"Doing step 2\",\"status\":\"completed\"}]},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        }
+      ],
+      "items": [
+        {
+          "type": "tools",
+          "key": 1,
+          "total": 1,
+          "calls": [
+            {
+              "id": "p1",
+              "name": "TodoWrite",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "todos": [
+                  {
+                    "content": "Step 1",
+                    "activeForm": "Doing step 1",
+                    "status": "in_progress"
+                  },
+                  {
+                    "content": "Step 2",
+                    "activeForm": "Doing step 2",
+                    "status": "pending"
+                  }
+                ]
+              },
+              "summary": "0/2 done",
+              "result": null,
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "key": 2,
+          "text": "Looking"
+        },
+        {
+          "type": "tools",
+          "key": 3,
+          "total": 2,
+          "calls": [
+            {
+              "id": "b",
+              "name": "Bash",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "command": "ls"
+              },
+              "summary": "ls",
+              "result": null,
+              "children": []
+            },
+            {
+              "id": "p2",
+              "name": "TodoWrite",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "todos": [
+                  {
+                    "content": "Step 1",
+                    "activeForm": "Doing step 1",
+                    "status": "completed"
+                  },
+                  {
+                    "content": "Step 2",
+                    "activeForm": "Doing step 2",
+                    "status": "completed"
+                  }
+                ]
+              },
+              "summary": "2/2 done",
+              "result": null,
+              "children": []
+            }
+          ]
+        }
+      ],
+      "plan": {
+        "after": 3,
+        "todos": [
+          {
+            "content": "Step 1",
+            "activeForm": "Doing step 1",
+            "status": "completed"
+          },
+          {
+            "content": "Step 2",
+            "activeForm": "Doing step 2",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "self-parent",
+      "events": [
+        {
+          "id": 1,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"me\",\"name\":\"Bash\",\"input\":{\"command\":\"nope\"},\"parent\":\"me\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 2,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"ok\",\"name\":\"Bash\",\"input\":{\"command\":\"ls\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        }
+      ],
+      "items": [
+        {
+          "type": "tools",
+          "key": 2,
+          "total": 1,
+          "calls": [
+            {
+              "id": "ok",
+              "name": "Bash",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "command": "ls"
+              },
+              "summary": "ls",
+              "result": null,
+              "children": []
+            }
+          ]
+        }
+      ],
+      "plan": null
+    },
+    {
+      "name": "undecodable-tool-use",
+      "events": [
+        {
+          "id": 1,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"tool\":\"Read\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 2,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "not json",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        }
+      ],
+      "items": [
+        {
+          "type": "tools",
+          "key": 1,
+          "total": 2,
+          "calls": [
+            {
+              "id": null,
+              "name": "tool",
+              "parent": null,
+              "orphan": false,
+              "input": {},
+              "summary": "",
+              "result": null,
+              "children": []
+            },
+            {
+              "id": null,
+              "name": "tool",
+              "parent": null,
+              "orphan": false,
+              "input": {},
+              "summary": "",
+              "result": null,
+              "children": []
+            }
+          ]
+        }
+      ],
+      "plan": null
+    },
+    {
+      "name": "first-string-field",
+      "events": [
+        {
+          "id": 1,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"u1\",\"name\":\"mcp__x__y\",\"input\":{\"b\":1,\"2\":\"two\",\"a\":\"first\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 2,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"u2\",\"name\":\"mcp__x__y\",\"input\":{\"zeta\":{\"a\":1},\"alpha\":\"\",\"mid\":\"second\",\"beta\":\"third\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        }
+      ],
+      "items": [
+        {
+          "type": "tools",
+          "key": 1,
+          "total": 2,
+          "calls": [
+            {
+              "id": "u1",
+              "name": "mcp__x__y",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "2": "two",
+                "b": 1,
+                "a": "first"
+              },
+              "summary": "two",
+              "result": null,
+              "children": []
+            },
+            {
+              "id": "u2",
+              "name": "mcp__x__y",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "zeta": {
+                  "a": 1
+                },
+                "alpha": "",
+                "mid": "second",
+                "beta": "third"
+              },
+              "summary": "second",
+              "result": null,
+              "children": []
+            }
+          ]
+        }
+      ],
+      "plan": null
+    }
+  ]
+}

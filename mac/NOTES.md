@@ -155,9 +155,8 @@ What the server sends (see the `.sse` fixtures and `server/app.ts`):
 - Ids are stable across updates: a group is `.event(first call's event id)`, the plan is `.plan`. The live plan is one item, updated in place, placed after the group of its latest `TodoWrite`.
 - `update(_:)` works from the last item that can still change, so a streamed event costs the tail, not the thread. If the list does not extend the one it saw (an earlier event turned up), it lays everything out again. `TranscriptTests` checks piece by piece equals all at once, over random splits of the recorded threads and random turns.
 - A zero-turn success result (a slash command) shows nothing and does not break the group, like the Web UI.
-- Differences: a call that names itself as its parent is shown at the top, not dropped. A `tool_use` whose payload does not decode shows nothing.
 
-`ToolText.summary` needs the input's keys in the order JavaScript gives them, for the "first string field" fallback: `ToolUse.inputKeys` keeps the top level's order (integer keys first, then as sent). Nested objects are not ordered, so part C's pretty JSON of an input will not match the Web UI's key order until that is solved (`JSONKeyOrder` can be extended).
+`ToolText.summary` needs the input's keys in the order JavaScript gives them, for the "first string field" fallback: `ToolUse.inputKeys` keeps the top level's order (integer keys first, then as sent). Nested objects are not ordered, so a nested tool input's keys can differ from the Web UI.
 
 `Format` spells month names out (en-GB, "Sept") instead of taking them from the system, so they match the Web UI.
 

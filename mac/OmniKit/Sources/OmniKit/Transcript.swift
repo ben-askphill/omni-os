@@ -183,8 +183,9 @@ public struct Transcript: Sendable {
   }
 
   private mutating func add(_ e: EventRow) {
-    switch e.content {
-    case .toolUse(let use): addCall(use, e)
+    switch Self.content(of: e) {
+    case .toolUse(let use):
+      if !Self.isSelfParent(use) { addCall(use, e) }
     case .toolResult(let r):
       guard !r.toolUseID.isEmpty else { return }
       results[r.toolUseID] = r
@@ -203,6 +204,58 @@ public struct Transcript: Sendable {
     case .unknown(let kind, _):
       if Self.breaking.contains(kind) { close(nil) }
     }
+  }
+
+  /// A `tool_use` whose payload does not decode still folds, the way the Web UI's parsePayload does:
+  /// a missing name is "tool", a missing input is empty, and a non-object input is wrapped as `{value}`.
+  private static func content(of e: EventRow) -> EventPayload {
+    if case .unknown(let kind, let payload) = e.content, kind == "tool_use" {
+      return .toolUse(lenientToolUse(payload, raw: e.payload))
+    }
+    return e.content
+  }
+
+  /// A call whose parent id is its own id. The Web UI drops it; it is not shown at the top of the group.
+  private static func isSelfParent(_ use: ToolUse) -> Bool {
+    guard let parent = use.parent, !parent.isEmpty else { return false }
+    return parent == use.id
+  }
+
+  /// A tool call from a payload that did not decode as `ToolUse`, with the Web UI's defaults.
+  private static func lenientToolUse(_ payload: JSONValue, raw: String) -> ToolUse {
+    struct Spec: Encodable {
+      var id: String
+      var name: String
+      var input: JSONValue
+      var parent: String?
+    }
+    let fields: [String: JSONValue] = if case .object(let o) = payload { o } else { [:] }
+    let id = fields["id"]?.stringValue ?? ""
+    let name = fields["name"]?.stringValue ?? "tool"
+    let parent = fields["parent"]?.stringValue
+    let input: JSONValue
+    if let rawInput = fields["input"] {
+      switch rawInput {
+      case .object, .array: input = rawInput
+      default: input = .object(["value": rawInput])
+      }
+    } else {
+      // A missing input is `{value: undefined}` on the web, which JSON leaves out, so the object is empty.
+      input = .object([:])
+    }
+    let data = (try? JSONEncoder().encode(Spec(id: id, name: name, input: input, parent: parent)))
+      ?? Data(#"{"id":"","name":"tool","input":{}}"#.utf8)
+    let fallback = Data(#"{"id":"","name":"tool","input":{}}"#.utf8)
+    guard var use = (try? OmniJSON.decoder().decode(ToolUse.self, from: data))
+      ?? (try? OmniJSON.decoder().decode(ToolUse.self, from: fallback))
+    else {
+      preconditionFailure("lenient tool use")
+    }
+    if case .object = use.input {
+      use.inputKeys = JSONKeyOrder.keys(ofObjectAt: "input", in: raw)
+      use.inputJSON = JSONKeyOrder.valueText(ofKey: "input", in: raw)
+    }
+    return use
   }
 
   /// Kinds that end a group of calls.
@@ -289,8 +342,9 @@ extension Transcript {
     var group: Group?
     var plan: Plan?
     for e in events {
-      switch e.content {
+      switch Self.content(of: e) {
       case .toolUse(let use):
+        if Self.isSelfParent(use) { break }
         if group == nil {
           let g = Group(e.id, use.id)
           rows.append(.group(g))
