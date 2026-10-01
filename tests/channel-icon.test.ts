@@ -46,7 +46,7 @@ describe('channel icons', () => {
   });
 
   it('offers only icons the Web UI draws', () => {
-    const ui = readFileSync(resolve(root, 'web/src/components/ui.tsx'), 'utf8');
+    const ui = readFileSync(resolve(root, 'web/src/components/ui/icons.tsx'), 'utf8');
     for (const name of CHANNEL_GLYPHS) expect(ui, name).toMatch(new RegExp(`^  ${name}: '`, 'm'));
   });
 
