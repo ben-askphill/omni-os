@@ -8,19 +8,26 @@ public protocol WorkspaceAPI: Sendable {
   func crew() async throws(OmniAPIError) -> [CrewRole]
   func recent(limit: Int?) async throws(OmniAPIError) -> [OmniThread]
   func harnesses() async throws(OmniAPIError) -> [HarnessInfo]
+  /// Every sub-agent running now, oldest first. `GET /api/tasks`.
+  func tasks() async throws(OmniAPIError) -> [BackgroundTask]
 }
 
 extension OmniClient: WorkspaceAPI {}
 
 /// What the sidebar and Home show of the whole workspace, kept current from the feed with the Web UI's
 /// rules (web/src/store.tsx):
-/// - `start()` loads everything.
+/// - `start()` loads everything, including the agents running now (`GET /api/tasks`).
 /// - A thread event updates `recent` in place, and refetches channels and status 500ms after the first
 ///   event of a burst, so running counts follow. One that comes in while `recent` loads is laid over the
 ///   answer, unless the answer has a newer copy of the thread.
+/// - A `tasks` event replaces the agent list. The server sends every agent still running.
 /// - Every feed open after the first refetches everything, since events were missed. So does the first
-///   one when the start load failed: the server came up.
+///   one when the start load failed: the server came up. That refetch is immediate. The Web UI debounces
+///   channels and status and lets each list reload itself (see mac/NOTES.md).
 /// - After the app changes a channel itself, call `reloadChannels()`. The server sends no event for it.
+///
+/// `init(client:)` opens a feed of its own, for a store used on its own. `AppModel` owns the app's one
+/// feed and pushes it in with `apply(_:)`.
 ///
 /// Each piece is its own observed property, so a view reading `channels` does not redraw for `recent`.
 @MainActor @Observable
@@ -42,6 +49,8 @@ public final class WorkspaceStore {
     /// Most recently updated first, at most `recentLimit`.
     public let recent: [OmniThread]
     public let harnesses: [HarnessInfo]
+    /// Sub-agents running now, in the order the server sent them.
+    public let tasks: [BackgroundTask]
 
     public func channel(_ id: String) -> ChannelWithRunning? { channels.first { $0.id == id } }
     public var sidebar: SidebarSections { SidebarSections(channels) }
@@ -56,24 +65,28 @@ public final class WorkspaceStore {
   public private(set) var crew: [CrewRole] = []
   public private(set) var recent: [OmniThread] = []
   public private(set) var harnesses: [HarnessInfo] = []
+  /// Sub-agents running now. Empty shows nothing in the sidebar.
+  public private(set) var tasks: [BackgroundTask] = []
   public private(set) var loadState = LoadState.loading
   public private(set) var connection = ConnectionState.connecting
+  /// How many times the feed has opened. The first is the initial connection; each later one is a reconnect.
+  public private(set) var feedOpens = 0
   /// Each feed message as it comes, for the thread stores that follow it.
   @ObservationIgnored public var onFeed: ((FeedEvent) -> Void)?
 
   public var snapshot: Snapshot {
-    Snapshot(channels: channels, status: status, usage: usage, crew: crew, recent: recent, harnesses: harnesses)
+    Snapshot(channels: channels, status: status, usage: usage, crew: crew, recent: recent, harnesses: harnesses, tasks: tasks)
   }
 
   public var sidebar: SidebarSections { SidebarSections(channels) }
   public func channel(_ id: String) -> ChannelWithRunning? { channels.first { $0.id == id } }
 
   private enum Part: CaseIterable {
-    case channels, status, crew, recent, harnesses
+    case channels, status, crew, recent, harnesses, tasks
   }
 
   @ObservationIgnored private let api: any WorkspaceAPI
-  @ObservationIgnored private let events: AsyncStream<SSEEvent<FeedEvent>>
+  @ObservationIgnored private let events: AsyncStream<SSEEvent<FeedEvent>>?
   @ObservationIgnored private let ticker: Ticker
   @ObservationIgnored private var feedClient: SSEClient<FeedEvent>?
   @ObservationIgnored private var feedTask: Task<Void, Never>?
@@ -84,9 +97,12 @@ public final class WorkspaceStore {
   @ObservationIgnored private var tokens: [Part: Int] = [:]
   /// Feed threads that came in while `recent` loaded, by id. nil while no load is out.
   @ObservationIgnored private var recentSinceLoad: [String: OmniThread]?
+  /// Bumps on each `tasks` event, so a list fetch that started earlier cannot overwrite it.
+  @ObservationIgnored private var tasksEpoch = 0
 
-  /// - Parameter feed: the feed's events, as `SSEClient.events` sends them.
-  public init(api: any WorkspaceAPI, feed: AsyncStream<SSEEvent<FeedEvent>>, clock: any Clock<Duration> = ContinuousClock()) {
+  /// - Parameter feed: the feed's events, as `SSEClient.events` sends them. Nil when something else, the
+  ///   app's `AppFeed`, pushes events with `apply(_:)`.
+  public init(api: any WorkspaceAPI, feed: AsyncStream<SSEEvent<FeedEvent>>? = nil, clock: any Clock<Duration> = ContinuousClock()) {
     self.api = api
     self.events = feed
     self.ticker = Ticker(clock)
@@ -104,10 +120,12 @@ public final class WorkspaceStore {
   public func start() {
     guard !started else { return }
     started = true
-    feedTask = Task { [weak self, events] in
-      for await e in events {
-        guard let self else { return }
-        self.handle(e)
+    if let events {
+      feedTask = Task { [weak self, events] in
+        for await e in events {
+          guard let self else { return }
+          self.apply(e)
+        }
       }
     }
     feedClient?.start()
@@ -139,7 +157,8 @@ public final class WorkspaceStore {
     await load([.channels])
   }
 
-  private func handle(_ e: SSEEvent<FeedEvent>) {
+  /// One event from the app's feed. A store that reads `feed` itself calls this too.
+  func apply(_ e: SSEEvent<FeedEvent>) {
     if case .message(let m) = e { onFeed?(m) }
     switch e {
     case .state(let s):
@@ -147,6 +166,9 @@ public final class WorkspaceStore {
       guard s == .open else { return }
       let again = opened
       opened = true
+      feedOpens += 1
+      // Immediate, and it includes recent, harnesses and tasks. The Web UI debounces channels and status
+      // and lets each list reload itself (mac/NOTES.md).
       if again || loadState.isFailed {
         Task { await refresh() }
       }
@@ -155,9 +177,12 @@ public final class WorkspaceStore {
     case .message(.thread(let t)):
       upsertRecent(t)
       scheduleRefresh()
-    case .message(.channel):
+    case .message(.channel(_)):
       scheduleRefresh()
-    case .message:
+    case .message(.tasks(let list)):
+      tasksEpoch += 1
+      if tasks != list { tasks = list }
+    case .message(.artifact(_)), .message(.unknown(_)):
       break
     }
   }
@@ -234,7 +259,17 @@ public final class WorkspaceStore {
     case .harnesses:
       guard let list = try? await api.harnesses(), current(), harnesses != list else { return }
       harnesses = list
+    case .tasks:
+      let epoch = tasksEpoch
+      guard let list = try? await api.tasks(), current(), tasksEpoch == epoch else { return }
+      if tasks != list { tasks = list }
     }
+  }
+}
+
+extension OmniClient {
+  public func tasks() async throws(OmniAPIError) -> [BackgroundTask] {
+    try await send("GET", "/api/tasks")
   }
 }
 

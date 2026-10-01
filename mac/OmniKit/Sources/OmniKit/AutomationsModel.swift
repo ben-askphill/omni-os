@@ -2,8 +2,8 @@ import Foundation
 import Observation
 
 /// The Automations page, like the Web UI's: the list, Run now, and the enabled switch, which shows its new value
-/// at once and turns back if the server refuses. The list loads again a second after an automation's thread
-/// changes or the feed reconnects.
+/// at once and turns back if the server refuses. The list loads again a second after a feed thread event whose
+/// thread has `automation` set, or after the feed reconnects. The thread does not have to still be in `recent`.
 @MainActor @Observable
 public final class AutomationsModel {
   public enum LoadState: Hashable, Sendable {
@@ -30,8 +30,6 @@ public final class AutomationsModel {
   @ObservationIgnored private let ticker: Ticker
   @ObservationIgnored private var loads = 0
   @ObservationIgnored private var reloadTimer: Task<Void, Never>?
-  /// The automation threads last seen in the recent list. nil until the first one.
-  @ObservationIgnored private var seen: [OmniThread.ID: OmniThread]?
 
   public init(client: OmniClient, clock: any Clock<Duration> = ContinuousClock()) {
     self.client = client
@@ -91,13 +89,15 @@ public final class AutomationsModel {
     }
   }
 
-  /// Reloads soon when an automation's thread in the recent list is new or has changed since the last call.
-  /// The first call only takes note: the page loads on its own.
-  public func recentChanged(_ threads: [OmniThread]) {
-    let now = Dictionary(threads.filter { $0.automation != nil }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-    defer { seen = now }
-    guard let seen else { return }
-    if now.contains(where: { seen[$0.key] != $0.value }) { scheduleReload() }
+  /// The Web UI's predicate (Automations.tsx): a thread event whose thread has `automation` set schedules a
+  /// reload. Anything else does not. A reconnect calls `scheduleReload()` on its own.
+  public func feed(_ event: FeedEvent) {
+    switch event {
+    case .thread(let thread):
+      if let automation = thread.automation, !automation.isEmpty { scheduleReload() }
+    case .usage(_, _), .artifact(_), .tasks(_), .channel(_), .unknown(_):
+      break
+    }
   }
 
   /// Loads the list `reloadDelay` from now. Asking again while it waits does nothing more.

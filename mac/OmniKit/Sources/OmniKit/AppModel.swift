@@ -62,22 +62,26 @@ extension ServerSupervisor.State {
   }
 }
 
-/// The app's one connection to Omni: settings, the supervisor, and a client and workspace store for the
-/// port in the settings. A port change swaps the client and store; any settings change checks again.
+/// The app's one connection to Omni: settings, the supervisor, and a client, workspace store and feed for
+/// the port in the settings. A port change swaps them; any settings change checks again.
 /// The feed dropping or opening checks the server again, so the window follows a server that was killed
-/// or started somewhere else.
+/// or started somewhere else. There is one `/api/feed`. The workspace, the open threads, artifacts and
+/// automations all read it.
 @MainActor @Observable
 public final class AppModel {
   public struct Connection {
     public let client: OmniClient
     public let store: WorkspaceStore
     public let threads: ThreadStoreRegistry
+    /// The one `/api/feed` for this port.
+    public let feed: AppFeed
 
     /// - Parameter threads: the stores for open threads, on `client` by default.
-    @MainActor public init(client: OmniClient, store: WorkspaceStore, threads: ThreadStoreRegistry? = nil) {
+    @MainActor public init(client: OmniClient, store: WorkspaceStore, threads: ThreadStoreRegistry? = nil, feed: AppFeed) {
       self.client = client
       self.store = store
       self.threads = threads ?? ThreadStoreRegistry(client: client)
+      self.feed = feed
     }
   }
 
@@ -85,8 +89,10 @@ public final class AppModel {
   public let supervisor: ServerSupervisor
   public private(set) var client: OmniClient
   public private(set) var store: WorkspaceStore
-  /// The open threads' stores, fed from `store`'s feed. Swapped with it on a port change.
+  /// The open threads' stores. Feed thread events are passed to `apply(feed:)`. Swapped on a port change.
   public private(set) var threads: ThreadStoreRegistry
+  /// The one `/api/feed`. Swapped with the client on a port change.
+  public private(set) var feed: AppFeed
   public var route = Route.home {
     // A route that lives in Settings is put back at once, so it is no stop in the history.
     didSet { if route.settingsTab == nil { shell.history.visit(route) } }
@@ -105,6 +111,8 @@ public final class AppModel {
   @ObservationIgnored private var lastConnection = ConnectionState.connecting
   @ObservationIgnored private var watchers: [Task<Void, Never>] = []
   @ObservationIgnored private var launched = false
+  /// The workspace's subscription on `feed`. Dropped before the feed is replaced.
+  @ObservationIgnored private var feedTicket: UUID?
 
   /// - Parameter connect: makes the client and store for a port. `liveConnection` by default.
   public init(
@@ -119,27 +127,32 @@ public final class AppModel {
     client = c.client
     store = c.store
     threads = c.threads
+    feed = c.feed
     follow(c)
   }
 
   isolated deinit {
     for w in watchers { w.cancel() }
+    unfollow()
+    feed.stop()
     store.stop()
   }
 
-  /// A client with its own ephemeral session, so nothing is cached or proxied, and a store on its feed.
+  /// A client with its own ephemeral session, so nothing is cached or proxied, and the one feed.
   public static func liveConnection(port: Int) -> Connection {
     let c = URLSessionConfiguration.ephemeral
     c.requestCachePolicy = .reloadIgnoringLocalCacheData
     c.connectionProxyDictionary = [:]
     let client = OmniClient(port: port, transport: URLSessionTransport(session: URLSession(configuration: c)))
-    return Connection(client: client, store: WorkspaceStore(client: client))
+    let feed = AppFeed(source: client.feedEvents())
+    return Connection(client: client, store: WorkspaceStore(api: client), feed: feed)
   }
 
   /// Opens the feed, checks the server and starts following the settings. Once.
   public func launch() {
     guard !launched else { return }
     launched = true
+    feed.start()
     store.start()
     checkServer()
     watchers.append(Task { [weak self, settings] in
@@ -256,17 +269,39 @@ public final class AppModel {
   }
 
   private func reconnectStreams(ifQuietFor quiet: Duration? = nil) {
-    store.reconnectNow(ifQuietFor: quiet)
+    feed.reconnectNow(ifQuietFor: quiet)
     threads.reconnectNow(ifQuietFor: quiet)
+  }
+
+  /// Calls `handler` with each feed event until `unsubscribeFeed`.
+  @discardableResult
+  public func subscribeFeed(_ handler: @escaping @MainActor (SSEEvent<FeedEvent>) -> Void) -> UUID {
+    feed.subscribe(handler)
+  }
+
+  public func unsubscribeFeed(_ id: UUID) {
+    feed.unsubscribe(id)
   }
 
   // MARK: Following changes
 
   private func follow(_ c: Connection) {
-    c.store.onFeed = { [threads = c.threads, weak self] in
-      threads.apply(feed: $0)
-      self?.feedArrived($0)
+    c.store.onFeed = { [threads = c.threads, weak self] event in
+      threads.apply(feed: event)
+      self?.feedArrived(event)
     }
+    feedTicket = c.feed.subscribe { [store = c.store] event in
+      store.apply(event)
+    }
+    FeedDirectory.register(c.feed, for: c.client.baseURL)
+  }
+
+  private func unfollow() {
+    if let feedTicket {
+      feed.unsubscribe(feedTicket)
+      self.feedTicket = nil
+    }
+    FeedDirectory.unregister(feed)
   }
 
   private func checkServer() {
@@ -284,14 +319,18 @@ public final class AppModel {
     config = new
     startFailure = nil
     if portChanged {
+      unfollow()
+      feed.stop()
       store.stop()
       threads.stopAll()
       let c = connect(new.port)
       client = c.client
       store = c.store
       threads = c.threads
+      feed = c.feed
       follow(c)
       lastConnection = .connecting
+      feed.start()
       store.start()
     }
     checkServer()
@@ -323,5 +362,79 @@ public final class AppModel {
     default:
       break
     }
+  }
+}
+
+/// The app's one `/api/feed`. `AppModel` starts and closes it. The workspace, artifacts, automations and the
+/// open threads subscribe; none of them opens a second connection.
+@MainActor
+public final class AppFeed {
+  private let source: SSEClient<FeedEvent>
+  private let events: AsyncStream<SSEEvent<FeedEvent>>
+  private var listeners: [UUID: @MainActor (SSEEvent<FeedEvent>) -> Void] = [:]
+  private var task: Task<Void, Never>?
+  /// True once the feed has been `.open`, including when it has since dropped.
+  private(set) var hasOpened = false
+
+  public init(source: SSEClient<FeedEvent>) {
+    self.source = source
+    events = source.events
+  }
+
+  public func start() {
+    guard task == nil else { return }
+    source.start()
+    task = Task { [weak self, events] in
+      for await event in events {
+        self?.receive(event)
+      }
+    }
+  }
+
+  public func stop() {
+    source.close()
+    task?.cancel()
+    task = nil
+  }
+
+  /// See `SSEClient.reconnectNow(ifQuietFor:)`.
+  public func reconnectNow(ifQuietFor quiet: Duration? = nil) {
+    source.reconnectNow(ifQuietFor: quiet)
+  }
+
+  @discardableResult
+  func subscribe(_ handler: @escaping @MainActor (SSEEvent<FeedEvent>) -> Void) -> UUID {
+    let id = UUID()
+    listeners[id] = handler
+    return id
+  }
+
+  func unsubscribe(_ id: UUID) {
+    listeners[id] = nil
+  }
+
+  private func receive(_ event: SSEEvent<FeedEvent>) {
+    if case .state(.open) = event { hasOpened = true }
+    for listener in Array(listeners.values) {
+      listener(event)
+    }
+  }
+}
+
+/// The live feed for a server, so a screen that only has the client can read the one `AppModel` opened.
+@MainActor
+enum FeedDirectory {
+  private static var feeds: [URL: AppFeed] = [:]
+
+  static func register(_ feed: AppFeed, for baseURL: URL) {
+    feeds[baseURL] = feed
+  }
+
+  static func unregister(_ feed: AppFeed) {
+    feeds = feeds.filter { $0.value !== feed }
+  }
+
+  static func feed(for baseURL: URL) -> AppFeed? {
+    feeds[baseURL]
   }
 }

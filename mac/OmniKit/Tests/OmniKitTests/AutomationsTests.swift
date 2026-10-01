@@ -483,38 +483,37 @@ private final class AutomationsServer: HTTPTransport {
     await toggle.value
   }
 
-  @Test func reloadsASecondAfterAnAutomationThreadChanges() async throws {
+  @Test func reloadsASecondAfterAnAutomationThreadEvent() async throws {
     let server = try AutomationsServer(), clock = TestClock()
     let m = model(server, clock: clock)
     await m.load()
-    let manual = try thread("m1", automation: nil)
-    m.recentChanged([manual])
-    m.recentChanged([try thread("r1", automation: "daily-digest"), manual])
+    // The thread is not in `recent`. The event is enough, including a run that has aged out of that list.
+    m.feed(.thread(try thread("r1", automation: "daily-digest")))
     clock.advance(by: .milliseconds(999))
     await settle()
     #expect(server.reads == 1)
     // Changes while it waits ride along.
-    m.recentChanged([try thread("r1", automation: "daily-digest", updated: "2026-09-28T07:59:00Z", status: "done"), manual])
+    m.feed(.thread(try thread("r1", automation: "daily-digest", updated: "2026-09-28T07:59:00Z", status: "done")))
     clock.advance(by: .milliseconds(1))
     try await waitFor("the reload") { server.reads == 2 }
     await settle()
     #expect(server.reads == 2)
 
-    m.recentChanged([try thread("r1", automation: "daily-digest", updated: "2026-09-28T08:00:00Z", status: "done"), manual])
+    m.feed(.thread(try thread("r1", automation: "daily-digest", updated: "2026-09-28T08:00:00Z", status: "done")))
     clock.advance(by: .seconds(1))
     try await waitFor("the next reload") { server.reads == 3 }
   }
 
-  @Test func ignoresOtherThreadsAndRemovals() async throws {
+  @Test func ignoresThreadsThatAreNotAutomations() async throws {
     let server = try AutomationsServer(), clock = TestClock()
     let m = model(server, clock: clock)
     await m.load()
-    let run = try thread("r1", automation: "daily-digest")
-    // The first list is only taken note of: the page loads on its own.
-    m.recentChanged([run])
-    m.recentChanged([run, try thread("m1", automation: nil)])
-    m.recentChanged([run, try thread("m1", automation: nil, status: "done")])
-    m.recentChanged([])
+    m.feed(.thread(try thread("m1", automation: nil)))
+    m.feed(.thread(try thread("blank", automation: "")))
+    m.feed(.usage(harness: .claudeCode, usage: nil))
+    m.feed(.tasks([]))
+    m.feed(.channel(id: "acme"))
+    m.feed(.unknown(.string("x")))
     clock.advance(by: .seconds(2))
     await settle()
     #expect(server.reads == 1)

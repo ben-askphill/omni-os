@@ -12,7 +12,10 @@ import OmniKit
     )
     let model = AppModel(settings: settings, supervisor: supervisor) { port in
       let client = OmniClient(port: port, transport: StubTransport(body: "[]"))
-      return AppModel.Connection(client: client, store: WorkspaceStore(client: client, transport: ScriptedSSETransport(), clock: TestClock()))
+      let clock = TestClock()
+      return AppModel.Connection(
+        client: client, store: WorkspaceStore(api: client, clock: clock),
+        feed: AppFeed(source: client.feedEvents(transport: ScriptedSSETransport(), clock: clock)))
     }
     return (model, dir)
   }

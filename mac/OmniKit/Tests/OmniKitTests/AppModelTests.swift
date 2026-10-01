@@ -40,8 +40,9 @@ private final class Rig {
     return AppModel(settings: settings, supervisor: supervisor) { port in
       let client = OmniClient(port: port, transport: http)
       return AppModel.Connection(
-        client: client, store: WorkspaceStore(client: client, transport: sse, clock: clock),
-        threads: ThreadStoreRegistry(client: client, transport: sse))
+        client: client, store: WorkspaceStore(api: client, clock: clock),
+        threads: ThreadStoreRegistry(client: client, transport: sse),
+        feed: AppFeed(source: client.feedEvents(transport: sse, clock: clock)))
     }
   }()
 
@@ -300,5 +301,42 @@ struct AppModelTests {
     try await waitFor("running", within: .seconds(3)) { model.supervisor.isRunning }
     #expect(model.serverScreen == nil)
     #expect(model.connectionNotice == nil)
+  }
+
+  @Test func twoScreensShareOneFeed() async throws {
+    let port = freePort()
+    let rig = Rig(port: port)
+    let model = rig.model
+    model.launch()
+    let feed = try await rig.sse.next()
+    #expect(feed.request.url == rig.feedURL(port))
+    feed.accept()
+    try await waitFor("open") { model.store.connection == .open }
+
+    let first = ArtifactsStore(client: model.client) { _ in ("Cart", "acme") }
+    let second = ArtifactsStore(client: model.client) { _ in ("Cart", "acme") }
+    first.start()
+    second.start()
+    await settle()
+    #expect(rig.sse.count == 1, "opening Artifacts does not open another /api/feed")
+    try await waitFor("the galleries loaded") { first.loadState == .loaded && second.loadState == .loaded }
+
+    feed.send(
+      "data: {\"type\":\"artifact\",\"artifact\":{\"id\":7,\"thread_id\":\"t1\",\"path\":\"/x/7\",\"name\":\"a.html\",\"kind\":\"html\",\"size\":10,\"created_at\":\"2026-09-28T07:57:15Z\",\"updated_at\":\"2026-09-28T07:57:15Z\"}}\n\n"
+    )
+    try await waitFor("both screens") {
+      first.gallery.items.map(\.id) == [7] && second.gallery.items.map(\.id) == [7]
+    }
+
+    feed.send(
+      "data: {\"type\":\"tasks\",\"tasks\":[{\"thread_id\":\"t1\",\"channel_id\":\"acme\",\"task_id\":\"task-1\",\"description\":\"Check the cart\",\"background\":true,\"started_at\":\"2026-09-28T07:57:15Z\"}]}\n\n"
+    )
+    try await waitFor("the agents") { model.store.tasks.map(\.description) == ["Check the cart"] }
+
+    first.stop()
+    second.stop()
+    await settle()
+    #expect(rig.sse.count == 1)
+    #expect(model.store.connection == .open, "closing Artifacts leaves the app's feed up")
   }
 }

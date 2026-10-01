@@ -12,6 +12,8 @@ extension OmniClient: ArtifactsAPI {}
 /// A new artifact joins at once when its thread is known (`ArtifactGallery.upsert`). Otherwise, and after
 /// the feed reconnects (events were missed), the list is fetched again, once per burst, 1.5s after the first
 /// trigger like the Web UI does.
+///
+/// `init(client:)` reads the `AppFeed` the app already opened.
 @MainActor @Observable
 public final class ArtifactsStore {
   public enum LoadState: Hashable, Sendable {
@@ -26,7 +28,7 @@ public final class ArtifactsStore {
   public private(set) var loadState = LoadState.loading
 
   @ObservationIgnored private let api: any ArtifactsAPI
-  @ObservationIgnored private let events: AsyncStream<SSEEvent<FeedEvent>>
+  @ObservationIgnored private let events: AsyncStream<SSEEvent<FeedEvent>>?
   @ObservationIgnored private let ticker: Ticker
   @ObservationIgnored private let thread: @MainActor (String) -> (title: String, channelID: String)?
   @ObservationIgnored private var feedClient: SSEClient<FeedEvent>?
@@ -36,11 +38,16 @@ public final class ArtifactsStore {
   /// Feed artifacts that arrived while a reload was out; nil when none is.
   @ObservationIgnored private var sinceLoad: [Int: Artifact]?
   @ObservationIgnored private var opened = false
+  @ObservationIgnored private var started = false
+  /// The app's feed, when this store did not open one. `stop` leaves that connection up.
+  @ObservationIgnored private var sharedFeed: AppFeed?
+  @ObservationIgnored private var feedTicket: UUID?
+  @ObservationIgnored private var baseURL: URL?
 
   /// - Parameter thread: the title and channel of a thread the caller knows, for an artifact of a thread
   ///   with none listed yet.
   public init(
-    api: any ArtifactsAPI, feed: AsyncStream<SSEEvent<FeedEvent>>, clock: any Clock<Duration> = ContinuousClock(),
+    api: any ArtifactsAPI, feed: AsyncStream<SSEEvent<FeedEvent>>? = nil, clock: any Clock<Duration> = ContinuousClock(),
     thread: @escaping @MainActor (String) -> (title: String, channelID: String)? = { _ in nil }
   ) {
     self.api = api
@@ -49,34 +56,47 @@ public final class ArtifactsStore {
     self.thread = thread
   }
 
-  /// Reads the server's feed with a connection of its own, started and closed with the store.
+  /// Reads the app's one feed, the `AppFeed` registered for `client`.
   public convenience init(
-    client: OmniClient, transport: any SSETransport = URLSessionSSETransport.shared, clock: any Clock<Duration> = ContinuousClock(),
+    client: OmniClient, clock: any Clock<Duration> = ContinuousClock(),
     thread: @escaping @MainActor (String) -> (title: String, channelID: String)? = { _ in nil }
   ) {
-    let feed = client.feedEvents(transport: transport, clock: clock)
-    self.init(api: client, feed: feed.events, clock: clock, thread: thread)
-    feedClient = feed
+    self.init(api: client, feed: nil, clock: clock, thread: thread)
+    baseURL = client.baseURL
   }
 
   public func start() {
-    guard feedTask == nil else { return }
-    feedTask = Task { [weak self, events] in
-      for await e in events {
-        guard let self else { return }
-        self.handle(e)
+    guard !started else { return }
+    started = true
+    if let events {
+      feedTask = Task { [weak self, events] in
+        for await e in events {
+          guard let self else { return }
+          self.handle(e)
+        }
       }
+    } else if let baseURL, let feed = FeedDirectory.feed(for: baseURL) {
+      sharedFeed = feed
+      feedTicket = feed.subscribe { [weak self] event in
+        self?.handle(event)
+      }
+      // Already open: the next `.open` is a reconnect, so the list refetches. `start` loaded it just now.
+      if feed.hasOpened { opened = true }
     }
     feedClient?.start()
     Task { await reload() }
   }
 
   public func stop() {
+    if let feedTicket { sharedFeed?.unsubscribe(feedTicket) }
+    feedTicket = nil
+    sharedFeed = nil
     feedClient?.close()
     feedTask?.cancel()
     feedTask = nil
     reloadTimer?.cancel()
     reloadTimer = nil
+    started = false
   }
 
   public func reload() async {
