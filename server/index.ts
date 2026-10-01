@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server';
 import { config, paths } from './config.ts';
 import { releaseLock, takeLock } from './lock.ts';
 import { about } from './about.ts';
+import { isLoopback } from './loopback.ts';
 
 // Boot order: the data dir's lock, then the database, then the port, and only then the threads.
 // So a second server on the same data, or on the same port, exits having changed nothing.
@@ -42,6 +43,9 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startCatalogRefresh();
   // Off unless the sync credentials are in the Keychain; then it runs alongside, and a failure only logs.
   startSync().catch((err) => console.error('[sync] could not start:', (err as Error).message));
+  if (!isLoopback(config.host)) {
+    console.warn(`[omni] ${config.host} is not loopback. Anyone who can open the port can read threads, write Keychain entries via POST /api/secrets, merge PRs, and type into a thread shell.`);
+  }
   console.log(`[omni] listening on http://${config.host}:${info.port}  brain=${config.brainDir}`);
 });
 server.once('error', onBindError);

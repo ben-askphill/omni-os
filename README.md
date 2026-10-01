@@ -46,6 +46,10 @@ Or open `mac/Omni.xcodeproj` in Xcode and run the `Omni` scheme. The app finds t
 
 Config is optional, see `.env.example` (brain dir, default model, concurrency, permission mode).
 
+## Who can call the API
+
+The network is the auth. The server binds `OMNI_HOST`, or `127.0.0.1` when that is unset, and Omni does not check a token. Anyone who can open the port can read threads, write Keychain entries via `POST /api/secrets`, merge PRs, and type into a thread shell. `tailscale serve` (above) is the supported remote path: the server stays on loopback, and the tailnet is the door.
+
 ## How a thread runs
 
 Each thread gets one long-lived `claude -p --input-format stream-json --output-format stream-json` process. Messages go in on stdin, the process runs many turns and stays warm for `OMNI_KEEPALIVE_SECONDS` (default 10 minutes) after the last one, so a follow-up starts instantly. It is launched with:
