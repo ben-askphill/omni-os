@@ -14,6 +14,7 @@ import type { IPty } from 'node-pty';
 import type { Terminal as Headless } from '@xterm/headless';
 import type { SerializeAddon } from '@xterm/addon-serialize';
 import { artifactsDir } from './config.ts';
+import { terminalEnv } from './terminal-env.ts';
 
 /** Lines of history kept for a client that attaches later. */
 export const SCROLLBACK_LINES = 2000;
@@ -91,11 +92,7 @@ export function openTerminal(threadId: string, cwd: string, size: { cols?: numbe
   const cols = clampSize(size.cols, 80, 500);
   const rows = clampSize(size.rows, 24, 200);
   const shell = process.env.SHELL || '/bin/zsh';
-  const env: Record<string, string> = {};
-  for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
-  // The server's own flags are not the shell's business.
-  delete env.NODE_OPTIONS;
-  delete env.NODE_ENV;
+  const env = terminalEnv();
   Object.assign(env, {
     TERM: 'xterm-256color',
     COLORTERM: 'truecolor',
