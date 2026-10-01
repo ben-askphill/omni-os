@@ -2,7 +2,7 @@ import SwiftUI
 
 /// `shell` in Composer.tsx: the surface card that lifts to the page color with an inset line and a wash ring on focus.
 struct ComposerShell: ViewModifier {
-  var radius: CGFloat = 26
+  var radius: CGFloat = 12
   var focused = false
   var over = false
 
@@ -32,7 +32,7 @@ struct ComposerShell: ViewModifier {
 }
 
 extension View {
-  func composerShell(radius: CGFloat = 26, focused: Bool, over: Bool) -> some View {
+  func composerShell(radius: CGFloat = 12, focused: Bool, over: Bool) -> some View {
     modifier(ComposerShell(radius: radius, focused: focused, over: over))
   }
 }

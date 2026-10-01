@@ -486,7 +486,7 @@ export function NewThreadComposer({
     ...crew.map((r) => ({ value: r.id, label: r.name, sub: r.description, avatar: r.name, lead: isCrewRole(r.id) ? <CrewMark role={r.id} size={13} /> : undefined })),
   ];
   return (
-    <div className={shell(big ? 'rounded-[30px] bg-surface' : 'rounded-[26px] bg-surface', att.over)} {...att.dropZone}>
+    <div className={shell('rounded-xl bg-surface', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
       {/* Near the top of the page, so it opens downward. */}
       {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
@@ -818,7 +818,7 @@ export function ReplyComposer({
   };
 
   return (
-    <div className={shell('rounded-[26px] bg-surface', att.over)} {...att.dropZone}>
+    <div className={shell('rounded-xl bg-surface', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
       {slashMenu.menu && <SlashMenu {...slashMenu.menu} />}
       <AttachmentStrip files={att.files} onRemove={att.remove} />
