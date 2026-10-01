@@ -290,7 +290,7 @@ struct ThreadRow: View {
 /// AgentLink in Sidebar.tsx: a running sub-agent, linked to the thread that started it. The channel name
 /// sits with the running time; the help text is the web's title.
 private struct AgentRow: View {
-  let task: BackgroundTask
+  let task: OmniKit.BackgroundTask
   let channel: String?
   let open: () -> Void
 
