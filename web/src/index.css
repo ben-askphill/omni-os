@@ -2,12 +2,13 @@
 
 /* Tokens and blocks follow Bencho (bencho.dev, MIT): warm neutrals, ink as the action color,
    pill radii, spring easing. light-dark() keeps one token table; <html data-theme> forces a scheme. */
-:root {
+:root,
+.scheme-dark {
   color-scheme: light dark;
   /* Base is pure white in light (canvas and main); greys only for surfaces inside it. */
   --canvas: light-dark(#ffffff, #0c0d0f);
   --bg: light-dark(#ffffff, #121316);
-  --bg-sidebar: var(--canvas);
+  --bg-sidebar: var(--chrome);
   /* The chrome around the pane (sidebar and gutters) is dark in both schemes: dark mode's canvas. */
   --chrome: #0c0d0f;
   --surface: light-dark(#f7f7f6, #191b1e);
@@ -64,7 +65,8 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 }
-/* The sidebar always draws with the dark tokens: light-dark() resolves per element. */
+/* The sidebar always draws with the dark tokens. The tokens re-declare here (see the :root rule)
+   so light-dark() resolves against this scheme, not the root's. */
 .scheme-dark {
   color-scheme: dark;
 }
