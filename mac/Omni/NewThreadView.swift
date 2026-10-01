@@ -159,8 +159,7 @@ private struct NewThreadBox: View {
   }
 
   private var shell: some View {
-    let radius: CGFloat = big ? 30 : 26
-    return VStack(alignment: .leading, spacing: 0) {
+    VStack(alignment: .leading, spacing: 0) {
       if !composer.files.isEmpty { AttachmentStrip(files: composer.files, remove: composer.removeFile) }
       ComposerTextView(
         text: $composer.text, placeholder: placeholder, running: false, interrupting: false, focusTick: focusTick,
@@ -183,7 +182,7 @@ private struct NewThreadBox: View {
           .padding(.bottom, 10)
       }
     }
-    .composerShell(radius: radius, focused: focused, over: over)
+    .composerShell(focused: focused, over: over)
     .dropDestination(for: URL.self) { urls, _ in
       stage(urls)
       return true
