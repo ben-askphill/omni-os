@@ -82,6 +82,23 @@ describe('channels', () => {
     await exchange();
     expect(b.db.channels.get('volero')!.archived).toBe(0);
   });
+
+  it('an icon set on one Mac shows on the other, and open sidebars hear about it', async () => {
+    const svg = 'svg:<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>';
+    b.feed.length = 0;
+    a.db.channels.update('volero', { icon: svg });
+    await exchange();
+    expect(b.db.channels.get('volero')!.icon).toBe(svg);
+    expect(b.feed).toContainEqual({ type: 'channel', id: 'volero' });
+  });
+
+  it('a change from a Mac on an older build, without the icon, keeps the icon this Mac has', async () => {
+    const icon = a.db.channels.get('volero')!.icon;
+    const { icon: _drop, ...row } = relay.changes.findLast((c) => c.entity === 'channel' && c.entity_id === 'volero')!.data as any;
+    await relay.push([{ machine_id: 'mac-old', entity: 'channel', entity_id: 'volero', op: 'upsert', ts: new Date(Date.now() + 1000).toISOString(), data: { ...row, notes: 'from an old Mac' } }]);
+    await exchange();
+    for (const m of [a, b]) expect(m.db.channels.get('volero')).toMatchObject({ notes: 'from an old Mac', icon });
+  });
 });
 
 describe('kv', () => {

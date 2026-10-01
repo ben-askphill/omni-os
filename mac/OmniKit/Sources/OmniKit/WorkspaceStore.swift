@@ -155,6 +155,8 @@ public final class WorkspaceStore {
     case .message(.thread(let t)):
       upsertRecent(t)
       scheduleRefresh()
+    case .message(.channel):
+      scheduleRefresh()
     case .message:
       break
     }
