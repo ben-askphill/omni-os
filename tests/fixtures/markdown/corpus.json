@@ -1,0 +1,586 @@
+{
+  "acceptedDifferences": [
+    {
+      "name": "emphasis-around-url",
+      "summary": "micromark finds a literal URL before it pairs *, _ and ~, so the web keeps the URL whole. cmark pairs those delimiters first, so a delimiter in the URL that pairs with one outside splits the URL on the Mac."
+    },
+    {
+      "name": "amp-after-url",
+      "summary": "cmark decodes &amp; before autolinking, so the Mac link takes the &. The web stops before the entity."
+    },
+    {
+      "name": "unparsed-url",
+      "summary": "A URL Foundation cannot parse (a port that is not a number, or no host) stays plain on the Mac. The web links it."
+    },
+    {
+      "name": "thread-id-linking",
+      "summary": "A thread id inside a URL stays in the URL on the Mac; the web links the id and breaks the URL. An id in <...> or _..._ is linked on the Mac and not on the web."
+    },
+    {
+      "name": "relative-link",
+      "summary": "A relative link is plain text on the Mac and a dead link on the web."
+    }
+  ],
+  "snippets": [
+    {
+      "id": "heading",
+      "source": "## See the docs",
+      "difference": null,
+      "web": "<div class=\"md \"><h2>See the docs</h2></div>",
+      "mac": [
+        {
+          "type": "heading",
+          "level": 2,
+          "runs": [
+            {
+              "text": "See the docs"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unordered-list",
+      "source": "- alpha\n- beta",
+      "difference": null,
+      "web": "<div class=\"md \"><ul>\n<li>alpha</li>\n<li>beta</li>\n</ul></div>",
+      "mac": [
+        {
+          "type": "list",
+          "ordered": false,
+          "start": 1,
+          "loose": false,
+          "items": [
+            {
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "runs": [
+                    {
+                      "text": "alpha"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "runs": [
+                    {
+                      "text": "beta"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ordered-list",
+      "source": "1. first\n2. second",
+      "difference": null,
+      "web": "<div class=\"md \"><ol>\n<li>first</li>\n<li>second</li>\n</ol></div>",
+      "mac": [
+        {
+          "type": "list",
+          "ordered": true,
+          "start": 1,
+          "loose": false,
+          "items": [
+            {
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "runs": [
+                    {
+                      "text": "first"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "runs": [
+                    {
+                      "text": "second"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "task-list",
+      "source": "- [ ] todo\n- [x] done",
+      "difference": null,
+      "web": "<div class=\"md \"><ul class=\"contains-task-list\">\n<li class=\"task-list-item\"><input type=\"checkbox\" disabled=\"\"/> todo</li>\n<li class=\"task-list-item\"><input type=\"checkbox\" disabled=\"\" checked=\"\"/> done</li>\n</ul></div>",
+      "mac": [
+        {
+          "type": "list",
+          "ordered": false,
+          "start": 1,
+          "loose": false,
+          "items": [
+            {
+              "checked": false,
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "runs": [
+                    {
+                      "text": "todo"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "checked": true,
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "runs": [
+                    {
+                      "text": "done"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "source": "| Name | Qty |\n| --- | ---: |\n| apple | 2 |",
+      "difference": null,
+      "web": "<div class=\"md \"><table><thead><tr><th>Name</th><th style=\"text-align:right\">Qty</th></tr></thead><tbody><tr><td>apple</td><td style=\"text-align:right\">2</td></tr></tbody></table></div>",
+      "mac": [
+        {
+          "type": "table",
+          "align": [
+            null,
+            "right"
+          ],
+          "head": [
+            [
+              {
+                "text": "Name"
+              }
+            ],
+            [
+              {
+                "text": "Qty"
+              }
+            ]
+          ],
+          "rows": [
+            [
+              [
+                {
+                  "text": "apple"
+                }
+              ],
+              [
+                {
+                  "text": "2"
+                }
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "code-fence",
+      "source": "```ts\nconst n = 1\n```",
+      "difference": null,
+      "web": "<div class=\"md \"><pre><code class=\"language-ts\">const n = 1\n</code></pre></div>",
+      "mac": [
+        {
+          "type": "code",
+          "language": "ts",
+          "code": "const n = 1"
+        }
+      ]
+    },
+    {
+      "id": "code-fence-leaves-urls-and-ids",
+      "source": "```\nhttps://x.com\n0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b\n```",
+      "difference": null,
+      "web": "<div class=\"md \"><pre><code>https://x.com\n0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b\n</code></pre></div>",
+      "mac": [
+        {
+          "type": "code",
+          "code": "https://x.com\n0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b"
+        }
+      ]
+    },
+    {
+      "id": "link",
+      "source": "[docs](https://x.com/docs)",
+      "difference": null,
+      "web": "<div class=\"md \"><p><a href=\"https://x.com/docs\" target=\"_blank\" rel=\"noopener noreferrer\">docs</a></p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "docs",
+              "link": "https://x.com/docs"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bare-url",
+      "source": "see https://example.com/a.",
+      "difference": null,
+      "web": "<div class=\"md \"><p>see <a href=\"https://example.com/a\" target=\"_blank\" rel=\"noopener noreferrer\">https://example.com/a</a>.</p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "see "
+            },
+            {
+              "text": "https://example.com/a",
+              "link": "https://example.com/a"
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bare-thread-id",
+      "source": "see 0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b now",
+      "difference": null,
+      "web": "<div class=\"md \"><p>see <a href=\"#/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b\">0b7c6d2e</a> now</p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "see "
+            },
+            {
+              "text": "0b7c6d2e",
+              "link": "#/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b"
+            },
+            {
+              "text": " now"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inline-code-thread-id",
+      "source": "`0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b`",
+      "difference": null,
+      "web": "<div class=\"md \"><p><a href=\"#/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b\"><code>0b7c6d2e</code></a></p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "0b7c6d2e",
+              "link": "#/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b",
+              "style": [
+                "code"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "emphasis-and-strike",
+      "source": "**bold** and *em*, ~~old~~ `code`",
+      "difference": null,
+      "web": "<div class=\"md \"><p><strong>bold</strong> and <em>em</em>, <del>old</del> <code>code</code></p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "bold",
+              "style": [
+                "strong"
+              ]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "em",
+              "style": [
+                "em"
+              ]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "old",
+              "style": [
+                "strike"
+              ]
+            },
+            {
+              "text": " "
+            },
+            {
+              "text": "code",
+              "style": [
+                "code"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "emphasis-url-strong",
+      "source": "**https://x.com/a**/",
+      "difference": "emphasis-around-url",
+      "web": "<div class=\"md \"><p>**<a href=\"https://x.com/a**/\" target=\"_blank\" rel=\"noopener noreferrer\">https://x.com/a**/</a></p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "https://x.com/a",
+              "link": "https://x.com/a",
+              "style": [
+                "strong"
+              ]
+            },
+            {
+              "text": "/"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "emphasis-url-underscore",
+      "source": "_https://en.wikipedia.org/wiki/Foo_(bar)_",
+      "difference": "emphasis-around-url",
+      "web": "<div class=\"md \"><p><em><a href=\"https://en.wikipedia.org/wiki/Foo_(bar)\" target=\"_blank\" rel=\"noopener noreferrer\">https://en.wikipedia.org/wiki/Foo_(bar)</a></em></p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "https://en.wikipedia.org/wiki/Foo",
+              "link": "https://en.wikipedia.org/wiki/Foo",
+              "style": [
+                "em"
+              ]
+            },
+            {
+              "text": "(bar)_"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "emphasis-url-tilde",
+      "source": "https://x.com/a-b_c~d~",
+      "difference": "emphasis-around-url",
+      "web": "<div class=\"md \"><p><a href=\"https://x.com/a-b_c~d\" target=\"_blank\" rel=\"noopener noreferrer\">https://x.com/a-b_c~d</a>~</p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "https://x.com/a-b_c",
+              "link": "https://x.com/a-b_c"
+            },
+            {
+              "text": "d",
+              "style": [
+                "strike"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "amp-after-url",
+      "source": "https://x.com/a&amp;",
+      "difference": "amp-after-url",
+      "web": "<div class=\"md \"><p><a href=\"https://x.com/a\" target=\"_blank\" rel=\"noopener noreferrer\">https://x.com/a</a>&amp;</p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "https://x.com/a&",
+              "link": "https://x.com/a&"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unparsed-url-port-quote",
+      "source": "https://x.com:443'}",
+      "difference": "unparsed-url",
+      "web": "<div class=\"md \"><p><a href=\"https://x.com:443&#x27;%7D\" target=\"_blank\" rel=\"noopener noreferrer\">https://x.com:443&#x27;}</a></p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "https://x.com:443'}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unparsed-url-port-letter",
+      "source": "www.x.co:y",
+      "difference": "unparsed-url",
+      "web": "<div class=\"md \"><p><a href=\"http://www.x.co:y\" target=\"_blank\" rel=\"noopener noreferrer\">www.x.co:y</a></p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "www.x.co:y"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unparsed-url-no-host",
+      "source": "www.@",
+      "difference": "unparsed-url",
+      "web": "<div class=\"md \"><p><a href=\"http://www.@\" target=\"_blank\" rel=\"noopener noreferrer\">www.@</a></p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "www.@"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thread-id-inside-url",
+      "source": "https://x.com/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b",
+      "difference": "thread-id-linking",
+      "web": "<div class=\"md \"><p><a href=\"https://x.com/t/%5B0b7c6d2e\" target=\"_blank\" rel=\"noopener noreferrer\">https://x.com/t/[0b7c6d2e</a>](#/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b)</p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "https://x.com/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b",
+              "link": "https://x.com/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thread-id-in-angle-brackets",
+      "source": "<0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b>",
+      "difference": "thread-id-linking",
+      "web": "<div class=\"md \"><p>&lt;0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b&gt;</p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "<"
+            },
+            {
+              "text": "0b7c6d2e",
+              "link": "#/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b"
+            },
+            {
+              "text": ">"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thread-id-in-underscores",
+      "source": "_0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b_",
+      "difference": "thread-id-linking",
+      "web": "<div class=\"md \"><p><em>0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b</em></p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "0b7c6d2e",
+              "link": "#/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b",
+              "style": [
+                "em"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "relative-link-www",
+      "source": "[x](www.x.com)",
+      "difference": "relative-link",
+      "web": "<div class=\"md \"><p><a href=\"www.x.com\" target=\"_blank\" rel=\"noopener noreferrer\">x</a></p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "x"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "relative-link-path",
+      "source": "[x](docs/a.md)",
+      "difference": "relative-link",
+      "web": "<div class=\"md \"><p><a href=\"docs/a.md\" target=\"_blank\" rel=\"noopener noreferrer\">x</a></p></div>",
+      "mac": [
+        {
+          "type": "paragraph",
+          "runs": [
+            {
+              "text": "x"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
