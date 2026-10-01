@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, sep } from 'node:path';
 import { threadDir } from '../config.ts';
 import { db, kv, threads, type Thread } from '../db.ts';
-import { safeSegment } from './paths.ts';
+import { safeRel, safeSegment } from './paths.ts';
 import type { SyncTransport } from './transport.ts';
 import { activeWorker, onSynced, type SyncWorker } from './worker.ts';
 
@@ -109,11 +109,6 @@ function writeAtomic(path: string, body: Uint8Array, mtime?: unknown) {
   if (typeof mtime === 'number' && Number.isFinite(mtime) && mtime > 0) utimesSync(tmp, new Date(mtime), new Date(mtime));
   renameSync(tmp, path);
 }
-
-/** A relative path from another machine that stays inside its folder. */
-const safeRel = (rel: string) =>
-  typeof rel === 'string' && rel.length > 0 && !rel.startsWith('/') && !rel.includes('\\') && !rel.includes('\0') &&
-  rel.split('/').every((part) => part && part !== '.' && part !== '..');
 
 // ---------- thread files ----------
 

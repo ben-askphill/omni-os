@@ -50,5 +50,13 @@ export function fromPortable<T extends string | null>(p: T, opts: { home?: strin
 export const safeSegment = (id: unknown): id is string =>
   typeof id === 'string' && id.length > 0 && id.length <= 200 && id !== '.' && id !== '..' && !/[/\\\0]/.test(id);
 
+/**
+ * True when a relative path from another machine stays inside its folder: no empty part, no absolute path,
+ * no backslash, no NUL, no "." or "..".
+ */
+export const safeRel = (rel: string) =>
+  typeof rel === 'string' && rel.length > 0 && !rel.startsWith('/') && !rel.includes('\\') && !rel.includes('\0') &&
+  rel.split('/').every((part) => part && part !== '.' && part !== '..');
+
 /** This machine's path map, from kv `sync.path_map`. */
 export const pathMap = (): PathMap => kv.get<PathMap>('sync.path_map') ?? {};
