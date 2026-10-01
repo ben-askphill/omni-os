@@ -1,14 +1,14 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, artifactUrl, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type EventRow, type PendingMsg, type PRSummary, type SendMode, type Thread, type ThreadDetail } from '../api.ts';
+import { api, artifactUrl, errorText, parsePayload, useApi, useThreadStream, type Artifact, type Channel, type EventRow, type HarnessWithRunning, type PendingMsg, type PRSummary, type SendMode, type Thread, type ThreadDetail } from '../api.ts';
 import { ArtifactViewer, kindIcon } from '../components/ArtifactViewer.tsx';
 import { ReplyComposer } from '../components/Composer.tsx';
 import { LiveBrowser } from '../components/LiveBrowser.tsx';
-import { CAPABILITIES, isHarnessId } from '../../../server/harness/types.ts';
 import { HarnessMark } from '../components/brand.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
 import { Avatar, Button, Chip, CopyButton, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Modal, StatusDot, StatusPill, Tabs } from '../components/ui.tsx';
 import { duration, fullDate, plural, relTime } from '../format.ts';
 import { href } from '../router.ts';
+import { canSteer } from '../steer.ts';
 import { readPref, useApp, useFeed, useIsMobile, writePref } from '../store.tsx';
 
 type PanelTab = 'artifacts' | 'browser' | 'terminal' | 'details';
@@ -580,6 +580,8 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
   const [actionError, setActionError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [prBusy, setPrBusy] = useState(false);
+  // GET /api/harnesses, the same list the reply pills load. Until it arrives, canSteer uses the Cursor fallback.
+  const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
 
   const lastId = useRef(0);
   const seen = useRef(new Set<number>());
@@ -1026,7 +1028,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
             {blocked && <ErrorNote className="mb-2">{blocked}</ErrorNote>}
             <ReplyComposer
               thread={thread}
-              canSteer={isHarnessId(thread.harness) ? CAPABILITIES[thread.harness].steer : thread.harness !== 'cursor'}
+              canSteer={canSteer(thread.harness, harnesses)}
               onSent={(t) => {
                 setThread((prev) => newer(prev, t, true));
                 nearBottom.current = true;
