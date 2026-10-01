@@ -3,7 +3,7 @@ import { paths } from '../../config.ts';
 import { ARTIFACT_COLUMNS, db, type Artifact } from '../../db.ts';
 import { publishFeed, publishThread } from '../../bus.ts';
 import { claim, registerHandler } from '../apply.ts';
-import { fromPortable, toRemote } from '../paths.ts';
+import { fromPortable, safeRel, toRemote } from '../paths.ts';
 
 // Artifacts: the metadata row, last writer wins, keyed by uid. The file itself travels separately. A path inside
 // the threads folder goes relative to it ("<thread>/artifacts/x.html"), so it lands in this Mac's threads folder.
@@ -28,7 +28,14 @@ function toShared(path: string) {
   const rel = relative(paths.threads, path);
   return rel && !rel.startsWith('..') && !isAbsolute(rel) ? rel.split(sep).join('/') : toRemote(path);
 }
-const fromShared = (path: string) => (path.startsWith('/') || path.startsWith('~') ? fromPortable(path) : join(paths.threads, path));
+
+// A relative path is joined onto this Mac's threads folder only when every segment is a plain name. One with
+// "..", a backslash or a NUL is refused. A path that already starts with "/" or "~" is outside that folder on
+// purpose and stays portable.
+const fromShared = (path: string): string | null => {
+  if (path.startsWith('/') || path.startsWith('~')) return fromPortable(path);
+  return safeRel(path) ? join(paths.threads, path) : null;
+};
 
 registerHandler('artifact', {
   serialize(uid) {
@@ -36,10 +43,14 @@ registerHandler('artifact', {
     return a ? ({ ...a, path: toShared(a.path) } satisfies ArtifactData) : null;
   },
   apply(change) {
-    if (!claim(change)) return false;
-    if (change.op === 'delete') return db.prepare('DELETE FROM artifacts WHERE uid = ?').run(change.entity_id).changes > 0;
+    if (change.op === 'delete') {
+      if (!claim(change)) return false;
+      return db.prepare('DELETE FROM artifacts WHERE uid = ?').run(change.entity_id).changes > 0;
+    }
     const a = change.data as ArtifactData;
     const path = fromShared(a.path);
+    // A relative path names a file under the threads folder: one that would leave it is dropped, not retried.
+    if (!path || !claim(change)) return false;
     const uid = change.entity_id;
     // The same file registered on both Macs under two uids (a watcher saw a synced file before its row came):
     // both keep the lower uid, so they agree without talking.
