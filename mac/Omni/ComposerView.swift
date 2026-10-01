@@ -230,7 +230,7 @@ private struct ReplyComposerView: View {
         .padding(.bottom, menu.hint == nil ? 0 : 10)
         .padding(.top, menu.hint == nil ? 0 : 2)
     }
-    .composerShell(radius: 26, focused: focused, over: over)
+    .composerShell(radius: 12, focused: focused, over: over)
     .dropDestination(for: URL.self) { urls, _ in
       stage(urls)
       return true
