@@ -4,13 +4,13 @@
 // Omni's system prompt goes as `instructions` on the first run of a session. The transcript
 // replay is only what Ben typed. A stable session id (`omni-<thread id>`) continues the
 // same remote conversation, which keeps its own context.
-import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { config } from '../../config.ts';
 import type { Attachment } from '../../uploads.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
 import { HERMES_FIX } from '../catalog.ts';
 import { harnessEnv } from '../env-guard.ts';
+import { spawnHolder } from '../holder.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
 import { HermesClient, HermesHttpError } from './client.ts';
@@ -81,11 +81,7 @@ export const hermesAdapter: HarnessAdapter = {
 
     // The holder is what the runner signals and waits on. The API key is an HTTP header, not
     // an env var: strip it even when the shell exported it, so the holder cannot see it.
-    const holder = spawn('sh', ['-c', 'exec cat >/dev/null'], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: harnessEnv('hermes', {}),
-    });
-    holder.stdin?.on('error', () => {});
+    const holder = spawnHolder(harnessEnv('hermes', {}));
 
     const outbox: Outgoing[] = [];
     let holderDead = false;

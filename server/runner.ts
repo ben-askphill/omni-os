@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { readFileSync } from 'node:fs';
 import { closePipesAfterExit } from './child.ts';
+import { resolveDelivery, type DeliveryPhase } from './delivery.ts';
 import { config, artifactsDir, threadDir, browserOutDir } from './config.ts';
 import { channels, events, threads, type Channel, type Thread, type ThreadSource, type ThreadStatus } from './db.ts';
 import { getCrew, type CrewRole } from './crew.ts';
@@ -300,27 +301,45 @@ function drop(threadId: string, msgs: Msg[]) {
 
 // ---------- queue ----------
 
+/** startup: no child yet, or init has not arrived. running: the CLI has begun a turn. */
+const deliveryPhase = (live: Live): DeliveryPhase => (live.child && live.initSeen ? 'running' : 'startup');
+
 function deliver(threadId: string, m: Msg) {
   if (shuttingDown) throw new Error('Omni is shutting down');
   clearSuggestion(threadId);
   let live = lives.get(threadId);
+  const caps = { steer: harnessSteers(threadId) };
   // Interrupt and send while the process is still starting: stop it like Interrupt does and start fresh with this message.
-  if (live?.turn && !live.closing && m.mode === 'interrupt' && (!live.child || !live.initSeen)) {
+  if (live?.turn && !live.closing && resolveDelivery(m.mode, caps, deliveryPhase(live)) === 'stop-startup') {
     stopStartup(live);
     live = lives.get(threadId);
   }
   if (live?.turn && !live.closing) {
-    const steerable = harnessSteers(threadId);
     // A harness that can't steer queues a steer, and stops the process on interrupt so the next
-    // message resumes the session (there is no mid-turn control to send).
-    if (m.mode === 'queue' || (m.mode === 'steer' && !steerable)) live.held.push(m);
-    else if (m.mode === 'interrupt' && !steerable) {
-      live.held.push(m);
-      hardKill(live);
-    } else {
-      m.midTurn = true;
-      send(live, m);
-      if (m.mode === 'interrupt') requestInterrupt(live);
+    // message resumes the session (there is no mid-turn control to send). Startup interrupts were
+    // already stopped above, so this pass is the running decision.
+    const action = resolveDelivery(m.mode, caps, 'running');
+    switch (action) {
+      case 'queue':
+        live.held.push(m);
+        break;
+      case 'kill':
+        live.held.push(m);
+        hardKill(live);
+        break;
+      case 'steer':
+        m.midTurn = true;
+        send(live, m);
+        break;
+      case 'interrupt':
+        m.midTurn = true;
+        send(live, m);
+        requestInterrupt(live);
+        break;
+      default: {
+        const unreachable: never = action;
+        throw new Error(unreachable);
+      }
     }
   } else {
     if (m.mode === 'interrupt') m.mode = 'steer';
@@ -1044,17 +1063,27 @@ export function interruptThread(threadId: string): Thread | undefined {
   }
   // A process already being stopped needs nothing more; what waited for its successor was dropped above.
   if (live?.turn && !live.closing) {
-    // Still starting up (MCP servers can take 13s): no turn to wind down, and a queued message would run anyway.
-    if (!live.child || !live.initSeen) stopStartup(live);
-    else if (!harnessSteers(threadId)) {
-      // No graceful interrupt: end the process. The next message resumes the session.
-      drop(threadId, live.held);
-      live.held = [];
-      hardKill(live);
-    } else {
-      drop(threadId, live.held);
-      live.held = [];
-      requestInterrupt(live);
+    const action = resolveDelivery('interrupt', { steer: harnessSteers(threadId) }, deliveryPhase(live));
+    switch (action) {
+      case 'stop-startup':
+        // Still starting up (MCP servers can take 13s): no turn to wind down, and a queued message would run anyway.
+        stopStartup(live);
+        break;
+      case 'kill':
+        // No graceful interrupt: end the process. The next message resumes the session.
+        drop(threadId, live.held);
+        live.held = [];
+        hardKill(live);
+        break;
+      case 'interrupt':
+        drop(threadId, live.held);
+        live.held = [];
+        requestInterrupt(live);
+        break;
+      default: {
+        const unreachable: never = action;
+        throw new Error(unreachable);
+      }
     }
   } else if (w < 0 && !live) {
     // Nothing runs it, so a busy status is stale.

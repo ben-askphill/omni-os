@@ -11,6 +11,7 @@ import { writeCursorPlugin } from '../../sandbox.ts';
 import { describeAttachments, type Attachment } from '../../uploads.ts';
 import { LineSplitter } from '../../stream.ts';
 import { harnessEnv } from '../env-guard.ts';
+import { spawnHolder } from '../holder.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
 import { cursorBin } from './bin.ts';
@@ -69,8 +70,7 @@ export const cursorAdapter: HarnessAdapter = {
     const pluginDir = writeCursorPlugin({ threadId: thread.id, channel: ctx.channel, role: ctx.role, browserBusy: ctx.browserBusy, cdpEndpoint: ctx.cdpEndpoint, omniUrl: ctx.omniUrl });
 
     // A persistent holder keeps the runner's warm-process logic happy between per-turn runs.
-    const holder = spawn('sh', ['-c', 'exec cat >/dev/null'], { stdio: ['pipe', 'pipe', 'pipe'] });
-    holder.stdin?.on('error', () => {});
+    const holder = spawnHolder();
 
     let ready = false;
     let firstTurn = true;
