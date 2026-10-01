@@ -7,9 +7,9 @@ private let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().a
 
 @Suite struct BrandPathsTests {
   @Test func iconsMatchTheWebUI() throws {
-    let ui = try String(contentsOf: repo.appending(path: "web/src/components/ui.tsx"), encoding: .utf8)
+    let ui = try String(contentsOf: repo.appending(path: "web/src/components/ui/icons.tsx"), encoding: .utf8)
     for (name, d) in BrandPaths.icons {
-      #expect(ui.contains("\(name): '\(d)'"), "\(name) differs from ui.tsx")
+      #expect(ui.contains("\(name): '\(d)'"), "\(name) differs from icons.tsx")
     }
     #expect(BrandPaths.icons.count >= 50)
   }
