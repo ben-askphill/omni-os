@@ -376,6 +376,7 @@ private struct TranscriptRows: View {
     let running = store.thread?.status == .running
     let cwd = store.cwd
     let transcript = store.transcript
+    let agents = Set(model.store.tasks.filter { $0.threadID == store.id }.compactMap(\.toolUseID))
     let live: TranscriptItemID? =
       if case .tools(let g)? = transcript.last, transcript.isLive(g, running: running) { .event(g.eventID) } else { nil }
     LazyVStack(alignment: .leading, spacing: 16) {
@@ -385,7 +386,7 @@ private struct TranscriptRows: View {
       ForEach(transcript.items) { item in
         TranscriptRow(
           item: item, live: item.id == live, running: running, cwd: cwd, threadID: store.id, model: model, ui: ui,
-          markdown: markdown
+          markdown: markdown, agents: agents
         )
         .copyMenu { TranscriptMarkdown.copyText(item, cwd: cwd) }
       }
@@ -408,6 +409,7 @@ private struct TranscriptRow: View {
   let model: AppModel
   let ui: TranscriptUI
   let markdown: MarkdownCache<Int>
+  var agents: Set<String> = []
 
   var body: some View {
     switch item {
@@ -420,7 +422,7 @@ private struct TranscriptRow: View {
         MarkdownView(document: markdown.document(for: id, text: text))
       }
     case .tools(let group):
-      ToolGroupView(group: group, live: live, running: running, cwd: cwd, ui: ui)
+      ToolGroupView(group: group, live: live, running: running, cwd: cwd, ui: ui, agents: agents)
     case .plan(let plan):
       PlanCard(plan: plan)
     case .result(_, let result):
