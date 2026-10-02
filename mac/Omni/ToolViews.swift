@@ -34,14 +34,19 @@ struct ToolGroupView: View {
   let running: Bool
   let cwd: String?
   let ui: TranscriptUI
+  /// Agent calls (by tool_use id) the server still runs. A background agent's result comes back at launch.
+  var agents: Set<String> = []
 
   var body: some View {
     if group.isSingle, let call = group.calls.first {
-      ToolRowView(call: call, running: running, cwd: cwd, ui: ui)
+      ToolRowView(call: call, running: running, cwd: cwd, ui: ui, agents: agents)
     } else {
       card
     }
   }
+
+  /// Sub-agents still at work stay in view while the group is folded.
+  private var working: [ToolCall] { group.calls.filter { agents.contains($0.callID) } }
 
   private var key: String { "g\(group.eventID)" }
 
@@ -73,7 +78,13 @@ struct ToolGroupView: View {
             .foregroundStyle(Tok.fg)
             .fixedSize()
           }
-          if live { Loader(size: 11).foregroundStyle(Tok.fg3) }
+          if !working.isEmpty && !open {
+            Text(Format.plural(working.count, "agent") + " running")
+              .font(.system(size: 11).monospacedDigit())
+              .foregroundStyle(Tok.live)
+              .fixedSize()
+          }
+          if live || !working.isEmpty { Loader(size: 11).foregroundStyle(working.isEmpty ? Tok.fg3 : Tok.live) }
         }
         .font(.system(size: ThreadStyle.small))
         .padding(.horizontal, 14)
@@ -83,10 +94,10 @@ struct ToolGroupView: View {
       }
       .buttonStyle(.plain)
       .accessibilityValue(open ? "Expanded" : "Collapsed")
-      if open {
+      if open || !working.isEmpty {
         VStack(alignment: .leading, spacing: 0) {
-          ForEach(group.calls) { call in
-            ToolRowView(call: call, running: running, cwd: cwd, ui: ui)
+          ForEach(open ? group.calls : working) { call in
+            ToolRowView(call: call, running: running, cwd: cwd, ui: ui, agents: agents)
           }
         }
         .padding(.horizontal, 6)
@@ -115,12 +126,14 @@ struct ToolRowView: View {
   let running: Bool
   let cwd: String?
   let ui: TranscriptUI
+  var agents: Set<String> = []
 
   static let liveChildren = 3
 
   var body: some View {
     let open = ui.isOpen(key)
-    let pending = call.isPending
+    let agent = agents.contains(call.callID)
+    let pending = call.isPending || agent
     let indent = depth > 0 || call.orphan
     VStack(alignment: .leading, spacing: 0) {
       Button { withAnimation(Motion.settle) { ui.toggle(key) } } label: {
@@ -139,14 +152,16 @@ struct ToolRowView: View {
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
-          if !call.children.isEmpty {
+          if !call.children.isEmpty && !agent {
             Text("\(call.children.count) sub-calls")
               .font(.system(size: 11))
               .monospacedDigit()
               .foregroundStyle(Tok.fg4)
               .fixedSize()
           }
-          if pending && running {
+          if agent {
+            Loader(size: 11).foregroundStyle(Tok.live)
+          } else if pending && running {
             Loader(size: 11).foregroundStyle(Tok.fg3)
           } else if call.isFailed {
             HStack(spacing: 4) {
@@ -177,10 +192,10 @@ struct ToolRowView: View {
           .padding(.bottom, 10)
           .transition(.opacity)
       }
-      if !call.children.isEmpty && (open || (pending && running)) {
+      if !call.children.isEmpty && (open || (pending && (running || agent))) {
         VStack(alignment: .leading, spacing: 0) {
           ForEach(open ? call.children : Array(call.children.suffix(Self.liveChildren))) { child in
-            ToolRowView(call: child, depth: depth + 1, running: running, cwd: cwd, ui: ui)
+            ToolRowView(call: child, depth: depth + 1, running: running, cwd: cwd, ui: ui, agents: agents)
           }
         }
         .padding(.leading, 12)
