@@ -2,7 +2,8 @@ import { db, now, tx } from '../connection.ts';
 import { outbox, record } from '../sync.ts';
 
 export type ThreadStatus = 'queued' | 'running' | 'done' | 'failed' | 'stopped' | 'imported';
-export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture';
+/** `team`: a member of a team, run under its lead thread and listed only there. */
+export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team';
 
 export interface Thread {
   id: string;
@@ -39,19 +40,25 @@ const runMachine = (status: ThreadStatus) => (status === 'running' || status ===
 
 export const threads = {
   get: (id: string) => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE id = ?`).get(id) as unknown as Thread | undefined,
+  /** A channel's threads, without team members: those are listed under their lead. */
   byChannel: (channelId: string, limit = 200) =>
     db
-      .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? ORDER BY updated_at DESC LIMIT ?`)
+      .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' ORDER BY updated_at DESC LIMIT ?`)
       .all(channelId, limit) as unknown as Thread[],
   recent: (limit = 50) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
   children: (parentId: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? ORDER BY created_at`).all(parentId) as unknown as Thread[],
-  /** Each channel's `perChannel` most recently updated threads, whatever their status. */
+  /** A team lead's members, in the order they were handed out. */
+  team: (leadId: string) =>
+    db
+      .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? AND source = 'team' ORDER BY created_at`)
+      .all(leadId) as unknown as Thread[],
+  /** Each channel's `perChannel` most recently updated threads, whatever their status. Team members are listed under their lead. */
   recentPerChannel: (perChannel = 5) =>
     db
       .prepare(
-        `SELECT ${THREAD_COLUMNS} FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY updated_at DESC) AS n FROM threads) WHERE n <= ?`,
+        `SELECT ${THREAD_COLUMNS} FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY updated_at DESC) AS n FROM threads WHERE source != 'team') WHERE n <= ?`,
       )
       .all(perChannel) as unknown as Thread[],
   running: () => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],

@@ -105,7 +105,7 @@ async function spawnLive(live: Live, thread: Thread) {
     thread,
     channel,
     role,
-    systemPrompt: buildSystemPrompt(thread, channel, role),
+    systemPrompt: buildSystemPrompt(thread, channel, role, threads.team(thread.id).length > 0),
     mcpFile,
     secretEnv,
     browserBusy,

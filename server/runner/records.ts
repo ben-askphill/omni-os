@@ -197,7 +197,7 @@ export function onExit(live: Live, code: number | null, signal: NodeJS.Signals |
       has_run: live.resultSeen || thread.has_run ? 1 : 0,
       last_text: runText ? runText.slice(0, 600) : thread.last_text,
     });
-    if (thread.parent_id && status !== 'stopped' && !isShuttingDown()) reportToParent(id, status, runText);
+    if (thread.parent_id && !isShuttingDown()) reportToParent(id, status, runText);
   } else if (thread && live.resultSeen && !thread.has_run) {
     threads.update(id, { has_run: 1, updated_at: thread.updated_at });
   }

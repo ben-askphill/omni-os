@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { ReplyComposer } from '../components/Composer.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
@@ -10,6 +10,7 @@ import { OPEN_PR_PROMPT, ThreadPR } from '../components/thread/ThreadPR.tsx';
 import { Avatar, Button, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, StatusPill, Tabs } from '../components/ui.tsx';
 import { href } from '../router.ts';
 import { canSteer } from '../steer.ts';
+import { teamOf } from '../transcript/delegation.ts';
 import { readPref, useApp, useIsMobile, writePref } from '../store.tsx';
 import { useThreadInterruptKey } from './useThreadInterruptKey.ts';
 import { useThreadSession } from './useThreadSession.ts';
@@ -28,6 +29,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     channel,
     parent,
     children,
+    team,
     events,
     files,
     shots,
@@ -55,6 +57,8 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     betweenTurns,
   } = useThreadSession(id, artifactParam);
   const { scrollRef, contentRef, onScroll, showJump, jump, pin } = useTranscriptScroll(events, thread !== null);
+  const known = useMemo(() => [...children, ...team], [children, team]);
+  const members = useMemo(() => teamOf(children), [children]);
   const [panelOpen, setPanelOpen] = useState<boolean>(() => readPref('threadPanel', true));
   const [mobilePanel, setMobilePanel] = useState(!!artifactParam);
   const [panelWidth, setPanelWidth] = useState<number | null>(() => {
@@ -265,7 +269,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                 </ErrorNote>
               )}
               {/* Queued means waiting for a slot: nothing is working yet. */}
-              <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} />
+              <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} />
               <QueuedMessages items={queued} starting={betweenTurns} />
             </div>
           </div>

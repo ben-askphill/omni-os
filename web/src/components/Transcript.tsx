@@ -1,8 +1,9 @@
 import { createContext, Fragment, memo, useContext, useMemo, useState, type ReactNode } from 'react';
-import { uploadUrl, type Attachment, type EventRow, type PendingMsg } from '../api.ts';
+import { uploadUrl, type Attachment, type EventRow, type PendingMsg, type Thread } from '../api.ts';
 import { bytes, clock, duration, plural, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
+import { DelegationCard } from './Delegation.tsx';
 import { Markdown } from './Markdown.tsx';
 import { CheckItem, copyText, Icon, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
 import { SOURCE_TAG } from '../../../shared/slash-menu.ts';
@@ -23,8 +24,11 @@ import {
   type ToolCall,
   type UserP,
 } from '../transcript/fold.ts';
+import { delegations, isDelegation, withLive, type Branch } from '../transcript/delegation.ts';
 
 export { toolLabel, toolSummary, type ToolCall };
+
+const NO_THREADS: Thread[] = [];
 
 /** Task state by the Agent call's tool_use id. */
 const TaskCtx = createContext<Map<string, TaskView>>(new Map());
@@ -336,6 +340,7 @@ export function Attachments({ threadId, items }: { threadId: string; items: Atta
 
 const SOURCE_LABEL: Record<string, string> = {
   conductor: 'from Conductor',
+  team: 'Team',
   automation: 'Automation',
   capture: 'Captured',
   import: 'Imported',
@@ -576,12 +581,19 @@ export const Transcript = memo(function Transcript({
   events,
   running,
   cwd,
+  known = NO_THREADS,
+  team,
 }: {
   threadId: string;
   events: EventRow[];
   running: boolean;
   cwd?: string | null;
+  /** Threads this one started, and their team members: delegation cards read their live state from here. */
+  known?: Thread[];
+  /** A team lead's members, shown as a card under its brief. */
+  team?: Branch[];
 }) {
+  const byId = useMemo(() => new Map(known.map((t) => [t.id, t])), [known]);
   const { items, plan } = useMemo(() => buildItems(events), [events]);
   const { tasks: live, feedLive } = useApp();
   const stored = useMemo(() => buildTasks(events), [events]);
@@ -608,8 +620,10 @@ export const Transcript = memo(function Transcript({
       <div className="space-y-4">
         {items.map((it, idx) => {
           switch (it.type) {
-            case 'user':
-              return <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} />;
+            case 'user': {
+              const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} />;
+              return idx === 0 && team?.length ? [bubble, <DelegationCard key="team" branches={team} team />] : bubble;
+            }
             case 'text':
               return (
                 <div key={it.key} className="group/msg flex flex-col">
@@ -618,9 +632,17 @@ export const Transcript = memo(function Transcript({
                 </div>
               );
             case 'tools': {
-              const group = <ToolGroup key={it.key} calls={it.calls} total={it.total} cwd={cwd} running={running} isLast={idx === items.length - 1} />;
+              const cards = delegations(it.calls).map((d) => (
+                <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} />
+              ));
+              // A group of nothing but delegations is just its cards.
+              if (cards.length && it.calls.every((c) => isDelegation(c.name) && c.result && !c.result.is_error)) return cards;
+              const group = [
+                <ToolGroup key={it.key} calls={it.calls} total={it.total} cwd={cwd} running={running} isLast={idx === items.length - 1} />,
+                ...cards,
+              ];
               // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
-              return plan?.after === it.key ? [group, <PlanCard key="plan" todos={plan.todos} />] : group;
+              return plan?.after === it.key ? [...group, <PlanCard key="plan" todos={plan.todos} />] : group;
             }
             case 'result':
               return <ResultLine key={it.key} p={it.p} />;

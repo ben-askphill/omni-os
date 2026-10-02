@@ -3,7 +3,7 @@ import { config, artifactsDir, browserOutDir } from '../config.ts';
 import type { Channel, Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
 
-export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole) {
+export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false) {
   const remote = thread.harness === 'hermes';
   const lines = [
     '# Omni OS context',
@@ -44,11 +44,24 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     '## Reply',
     'Your final message is what gets shown and reported. Lead with the outcome, keep it short, bullets over prose.',
   ];
-  if (thread.parent_id) {
+  if (thread.source === 'team') {
+    lines.push(
+      '',
+      '## Team task',
+      `You are one member of a team${thread.task_id ? `, on task ${thread.task_id}` : ''}. Your final message is automatically reported to the team lead, who combines it with the other members' replies. Stick to your own task. Report outcomes and blockers, even if the answer is "nothing found".`,
+    );
+  } else if (thread.parent_id) {
     lines.push(
       '',
       '## Delegated task',
       `The conductor handed you this task${thread.task_id ? ` as ${thread.task_id}` : ''}. Your final message is automatically reported back to it. Report outcomes and blockers, even if the answer is "nothing found".`,
+    );
+  }
+  if (lead) {
+    lines.push(
+      '',
+      '## Team lead',
+      'You lead a team. Your members have already done the work in their own threads, and their replies are in your first message. Combine them into one answer: lead with the verdict, keep what each member found that matters, link the member threads, and say where they disagree. Do not redo their work.',
     );
   }
   if (role) lines.push('', `## Your role: ${role.name}`, role.charter);

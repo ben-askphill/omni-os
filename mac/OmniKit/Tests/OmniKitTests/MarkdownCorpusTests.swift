@@ -78,7 +78,7 @@ private func corpusBlock(_ block: MarkdownBlock) -> CorpusBlock {
   case .paragraph(let text):
     return CorpusBlock(type: "paragraph", runs: corpusRuns(text))
   case .heading(let level, let text):
-    return CorpusBlock(type: "heading", level: level, runs: corpusRuns(text))
+    return CorpusBlock(type: "heading", runs: corpusRuns(text), level: level)
   case .code(let language, let code):
     return CorpusBlock(type: "code", language: language, code: code)
   case .quote(let children):

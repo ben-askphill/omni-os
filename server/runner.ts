@@ -21,6 +21,6 @@ export {
   threadCommands,
 } from './runner/state.ts';
 
-export { createThread, postMessage, sendMessage } from './runner/api.ts';
+export { createTeam, createThread, postMessage, sendMessage } from './runner/api.ts';
 export { interruptThread, shutdownAll, stopThread } from './runner/session.ts';
 export { buildSystemPrompt } from './runner/prompts.ts';

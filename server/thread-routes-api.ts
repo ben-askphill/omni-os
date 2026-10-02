@@ -10,7 +10,7 @@ import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
 import { artifacts, channels, events, threads, type Thread } from './db.ts';
 import { readBody } from './read-body.ts';
-import { createThread, interruptThread, isLive, pendingFor, postMessage, runsHere } from './runner.ts';
+import { createTeam, createThread, interruptThread, isLive, pendingFor, postMessage, runsHere } from './runner.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
 import { checkUploads, imageMime, safeName, saveUploads } from './uploads.ts';
@@ -51,6 +51,36 @@ threadRoutesApi.post('/', async (c) => {
   return c.json(await createThread({ ...body, files }));
 });
 
+const teamSchema = z.object({
+  channel: z.string().default('inbox'),
+  prompt: z.string().min(1),
+  title: z.string().nullish(),
+  role: z.string().nullish(),
+  parent_id: z.string().nullish(),
+  task_id: z.string().nullish(),
+  source: z.enum(['manual', 'conductor']).default('conductor'),
+  tasks: z
+    .array(
+      z.object({
+        prompt: z.string().min(1),
+        title: z.string().nullish(),
+        role: z.string().nullish(),
+        task_id: z.string().nullish(),
+        harness: z.string().nullish(),
+        model: z.string().nullish(),
+        effort: z.string().nullish(),
+      }),
+    )
+    .min(1),
+});
+
+/** A lead thread in the channel and one member thread per task under it. */
+threadRoutesApi.post('/team', async (c) => {
+  const body = teamSchema.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: body.error.issues[0]?.message ?? 'invalid team' }, 400);
+  return c.json(await createTeam(body.data));
+});
+
 threadRoutesApi.get('/:id', (c) => {
   const t = threads.get(c.req.param('id'));
   if (!t) return c.json({ error: 'not found' }, 404);
@@ -62,6 +92,8 @@ threadRoutesApi.get('/:id', (c) => {
     events: events.since(t.id),
     artifacts: artifacts.byThread(t.id),
     children: threads.children(t.id),
+    // Members of the teams this thread started, so its delegation cards can show their state.
+    team: threads.children(t.id).flatMap((ch) => threads.team(ch.id)),
     parent: t.parent_id ? threads.get(t.parent_id) : null,
     pending: pendingFor(t.id),
     live: isLive(t.id),
