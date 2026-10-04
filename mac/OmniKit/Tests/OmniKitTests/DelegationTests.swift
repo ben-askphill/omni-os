@@ -47,4 +47,29 @@ private let team =
     #expect(card.live(["a": t]).title == "Best price")
     #expect(Delegation.team(of: [t]).map(\.id) == ["a"])
   }
+
+  @Test func splitsSubagentsOutOfTheGroupAndReadsTheirState() throws {
+    let items = Transcript(
+      try events([
+        ("tool_use", #"{"id":"a1","name":"Agent","input":{"description":"Price","prompt":"p","subagent_type":"Explore"},"parent":null}"#),
+        ("tool_use", #"{"id":"r","name":"Read","input":{"file_path":"/x"},"parent":null}"#),
+        ("tool_use", #"{"id":"a2","name":"Task","input":{"description":"Reviews","prompt":"q"},"parent":null}"#),
+        ("tool_use", #"{"id":"g","name":"Grep","input":{"pattern":"x"},"parent":"a2"}"#),
+        ("tool_use", #"{"id":"d","name":"mcp__omni__delegate","input":{"channel":"inbox","prompt":"y"},"parent":null}"#),
+        ("tool_result", #"{"tool_use_id":"r","text":"x","is_error":false,"truncated":false}"#),
+        ("tool_result", #"{"tool_use_id":"a2","text":"boom","is_error":true,"truncated":false}"#),
+        ("tool_result", #"{"tool_use_id":"d","text":\#(json(solo)),"is_error":false,"truncated":false}"#),
+      ])
+    ).items
+    guard case .tools(let group)? = items.first else { Issue.record("no tool group: \(items)"); return }
+    let (agents, rest, agentsFirst) = Delegation.split(group.calls)
+    #expect(agents.map(\.callID) == ["a1", "a2"])
+    #expect(agents[1].children.map(\.callID) == ["g"])
+    #expect(rest.map(\.callID) == ["r"])
+    #expect(agentsFirst)
+    #expect(Delegation.status(of: agents[0], live: false, running: true) == .running)
+    #expect(Delegation.status(of: agents[0], live: false, running: false) == .stopped)
+    #expect(Delegation.status(of: agents[1], live: false, running: false) == .failed)
+    #expect(Delegation.status(of: agents[1], live: true, running: false) == .running)
+  }
 }

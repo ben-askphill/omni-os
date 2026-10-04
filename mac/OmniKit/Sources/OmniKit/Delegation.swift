@@ -37,7 +37,8 @@ public struct DelegationBranch: Hashable, Sendable, Identifiable {
   }
 }
 
-/// A card: the Conductor's delegate calls in one tool group, or one delegate_team call with its lead.
+/// A card: the Conductor's delegate calls in one tool group, or one delegate_team call with its lead. A thread's
+/// own sub-agents get a card too, from `Delegation.split`.
 public struct Delegation: Hashable, Sendable, Identifiable {
   public let id: String
   public var lead: DelegationBranch?
@@ -51,6 +52,26 @@ public struct Delegation: Hashable, Sendable, Identifiable {
 
   public static func isDelegation(_ name: String) -> Bool {
     name == "mcp__omni__delegate" || name == "mcp__omni__delegate_team"
+  }
+
+  /// A sub-agent the harness runs inside the thread's own process: Claude Code's Agent (Task before it), Hermes's subagent.
+  public static func isSubagent(_ name: String) -> Bool { name == "Agent" || name == "Task" }
+
+  /// A tool group split for display, as splitGroup in delegation.ts: its sub-agents, and every call that is
+  /// neither one nor a delegation that worked (that one shows as its card).
+  public static func split(_ calls: [ToolCall]) -> (agents: [ToolCall], rest: [ToolCall], agentsFirst: Bool) {
+    let agents = calls.filter { isSubagent($0.name) }
+    let rest = calls.filter { !isSubagent($0.name) && !(isDelegation($0.name) && $0.result?.isError == false) }
+    let first = { (c: ToolCall?) in c.flatMap { c in calls.firstIndex { $0.id == c.id } } ?? .max }
+    return (agents, rest, !agents.isEmpty && first(agents.first) < first(rest.first))
+  }
+
+  /// A sub-agent's state as a thread status. `live`: the server still runs it, which a background agent's result
+  /// (back at launch) cannot say. Otherwise no result yet means it still runs, if the turn does.
+  public static func status(of call: ToolCall, live: Bool, running: Bool) -> ThreadStatus {
+    if live { return .running }
+    guard call.result != nil else { return running ? .running : .stopped }
+    return call.isStopped ? .stopped : call.isFailed ? .failed : .done
   }
 
   /// The delegations among a group's calls, consecutive delegate calls folded into one card. Failed calls are left out.

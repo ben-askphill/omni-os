@@ -214,7 +214,7 @@ struct ToolRowView: View {
   private var key: String { "c\(call.id)" }
 }
 
-private struct ToolDetail: View {
+struct ToolDetail: View {
   let call: ToolCall
   let running: Bool
 

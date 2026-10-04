@@ -1,20 +1,28 @@
 import OmniKit
 import SwiftUI
 
-/// DelegationCard in Delegation.tsx: the threads a Conductor or a team lead fanned out to, each with its live state.
+/// DelegationCard in Delegation.tsx: the threads a Conductor or a team lead fanned out to, or a thread's own
+/// sub-agents, each with its live state.
 struct DelegationCard: View {
   let delegation: Delegation
   /// The lead's own view of its team: "Team of 3", no lead link.
   var team = false
   let model: AppModel
+  /// Sub-agents the thread's own run launched, which have no thread to link to.
+  var agents: AgentRows?
 
   var body: some View {
-    let n = delegation.branches.count
+    let n = delegation.branches.count + (agents?.calls.count ?? 0)
     VStack(alignment: .leading, spacing: 8) {
       header(n)
       VStack(alignment: .leading, spacing: 8) {
         ForEach(delegation.branches) { b in
           BranchRow(branch: b, model: model)
+        }
+        if let agents {
+          ForEach(agents.calls) { c in
+            AgentRow(call: c, rows: agents)
+          }
         }
       }
       .padding(.top, 4)
@@ -62,47 +70,90 @@ struct DelegationCard: View {
   }
 }
 
+/// What the transcript knows about a card's sub-agents: the calls, which ones the server still runs, and what
+/// their nested tool rows need.
+struct AgentRows {
+  let calls: [ToolCall]
+  /// Agent calls (by tool_use id) the server still runs.
+  let live: Set<String>
+  let running: Bool
+  let cwd: String?
+  let ui: TranscriptUI
+}
+
+/// BranchFace in Delegation.tsx: a row's mark, title, meta line and state.
+private struct BranchFace<Meta: View>: View {
+  let role: String?
+  let title: String
+  let status: ThreadStatus
+  @ViewBuilder let meta: Meta
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 12) {
+      CrewGlyph(role: role, size: 15)
+        .foregroundStyle(Tok.fg2)
+        .frame(width: 32, height: 32)
+        .background(Tok.surface, in: Circle())
+      VStack(alignment: .leading, spacing: 4) {
+        Text(title)
+          .font(.system(size: 14, weight: .medium))
+          .foregroundStyle(Tok.fg)
+          .lineLimit(1)
+        HStack(spacing: 8) { meta }
+          .font(.system(size: 12))
+          .foregroundStyle(Tok.fg3)
+          .lineLimit(1)
+      }
+      Spacer(minLength: 8)
+      StatusPill(status: status)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 12)
+    .background(Tok.bg, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    .cardShadow(20)
+    .contentShape(Rectangle())
+  }
+}
+
+/// A row on the card's rail, its connector in the row's state colour.
+private struct RailRow: ViewModifier {
+  let status: ThreadStatus
+
+  func body(content: Content) -> some View {
+    content
+      .padding(.leading, 16)
+      .overlay(alignment: .topLeading) { Rail(color: color).frame(width: 16, height: 34) }
+  }
+
+  /// Ink when done, blue while running, vermilion when it needs Ben.
+  private var color: Color {
+    switch Glyph(status) {
+    case .done: Tok.fg
+    case .running, .queued: Tok.live
+    case .needs: Tok.needs
+    default: Tok.lineStrong
+    }
+  }
+}
+
 private struct BranchRow: View {
   let branch: DelegationBranch
   let model: AppModel
 
   var body: some View {
     Button { model.route = .thread(id: branch.id) } label: {
-      HStack(alignment: .top, spacing: 12) {
-        CrewGlyph(role: branch.role, size: 15)
-          .foregroundStyle(Tok.fg2)
-          .frame(width: 32, height: 32)
-          .background(Tok.surface, in: Circle())
-        VStack(alignment: .leading, spacing: 4) {
-          Text(branch.title)
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(Tok.fg)
-            .lineLimit(1)
-          HStack(spacing: 8) {
-            if let role = branch.role { Text(role) }
-            if !branch.channel.isEmpty { Text("#\(branch.channel)") }
-            HarnessMark(harness: branch.harness.rawValue)
-            if let task = branch.taskID {
-              Text(task).font(.system(size: ThreadStyle.mono, design: .monospaced)).foregroundStyle(Tok.fg2)
-            }
-            if let detail { Text(detail).foregroundStyle(Tok.fg4) }
-          }
-          .font(.system(size: 12))
-          .foregroundStyle(Tok.fg3)
-          .lineLimit(1)
+      BranchFace(role: branch.role, title: branch.title, status: branch.status) {
+        if let role = branch.role { Text(role) }
+        if !branch.channel.isEmpty { Text("#\(branch.channel)") }
+        HarnessMark(harness: branch.harness.rawValue)
+        if let task = branch.taskID {
+          Text(task).font(.system(size: ThreadStyle.mono, design: .monospaced)).foregroundStyle(Tok.fg2)
         }
-        Spacer(minLength: 8)
-        StatusPill(status: branch.status)
+        if let detail { Text(detail).foregroundStyle(Tok.fg4) }
       }
-      .padding(.horizontal, 14)
-      .padding(.vertical, 12)
-      .background(Tok.bg, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-      .cardShadow(20)
-      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .padding(.leading, 16)
-    .overlay(alignment: .topLeading) { Rail(color: rail).frame(width: 16, height: 34) }
+    .modifier(RailRow(status: branch.status))
   }
 
   private var detail: String? {
@@ -110,16 +161,56 @@ private struct BranchRow: View {
     guard let at = branch.updatedAt else { return nil }
     return branch.status == .running ? "started \(RelTime.label(at))" : "report in · \(RelTime.label(at))"
   }
+}
 
-  /// Ink when done, blue while running, vermilion when it needs Ben.
-  private var rail: Color {
-    switch Glyph(branch.status) {
-    case .done: Tok.fg
-    case .running, .queued: Tok.live
-    case .needs: Tok.needs
-    default: Tok.lineStrong
+/// AgentRow in Transcript.tsx: a sub-agent has no thread to open, so it opens in place: its prompt, its answer
+/// and the calls it made. While it runs its latest calls show under it.
+private struct AgentRow: View {
+  let call: ToolCall
+  let rows: AgentRows
+
+  var body: some View {
+    let open = rows.ui.isOpen(key)
+    let status = Delegation.status(of: call, live: rows.live.contains(call.callID), running: rows.running)
+    let type = call.use.input["subagent_type"]?.stringValue
+    VStack(alignment: .leading, spacing: 4) {
+      Button { withAnimation(Motion.settle) { rows.ui.toggle(key) } } label: {
+        BranchFace(role: type, title: description, status: status) {
+          Text(type ?? "agent")
+          if call.use.input["run_in_background"] == .bool(true) { Text("background") }
+          if calls > 0 { Text(Format.plural(calls, "tool")).monospacedDigit() }
+          Chevron(open: open)
+        }
+      }
+      .buttonStyle(.plain)
+      .accessibilityValue(open ? "Expanded" : "Collapsed")
+      if open {
+        ToolDetail(call: call, running: rows.running)
+          .padding(.horizontal, 4)
+          .padding(.top, 4)
+          .transition(.opacity)
+      }
+      if !call.children.isEmpty && (open || status == .running) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(open ? call.children : Array(call.children.suffix(ToolRowView.liveChildren))) { child in
+            ToolRowView(call: child, depth: 1, running: rows.running, cwd: rows.cwd, ui: rows.ui, agents: rows.live)
+          }
+        }
+      }
     }
+    .modifier(RailRow(status: status))
   }
+
+  private var key: String { "a\(call.id)" }
+
+  private var description: String {
+    let d = call.use.input["description"].map(ToolText.str) ?? ""
+    return d.isEmpty ? "Sub-agent" : d
+  }
+
+  /// Every call it made, however deep.
+  private var calls: Int { Self.count(call) }
+  private static func count(_ c: ToolCall) -> Int { c.children.reduce(0) { $0 + 1 + count($1) } }
 }
 
 /// The curved connector from the card's rail into a row.

@@ -100,6 +100,14 @@ public struct ToolGroup: Hashable, Sendable, Identifiable {
     return top.prefix(4).map { counts[$0.element]! > 1 ? "\($0.element) \(counts[$0.element]!)" : $0.element }.joined(separator: ", ")
   }
 
+  /// The same group with only these top-level calls, its total counting them and their sub-calls.
+  public func keeping(_ calls: [ToolCall]) -> ToolGroup {
+    var g = self
+    g.calls = calls
+    g.total = g.flat.count
+    return g
+  }
+
   private static func flatten(_ c: ToolCall) -> [ToolCall] { [c] + c.children.flatMap(flatten) }
 }
 
