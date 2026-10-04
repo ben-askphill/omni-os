@@ -28,6 +28,8 @@ public final class ThreadStore {
   public private(set) var channel: Channel?
   public private(set) var parent: OmniThread?
   public private(set) var children: [OmniThread] = []
+  /// Members of the teams among `children`.
+  public private(set) var team: [OmniThread] = []
   /// In id order, each once.
   public private(set) var events: [EventRow] = []
   public private(set) var transcript = Transcript()
@@ -168,17 +170,20 @@ public final class ThreadStore {
     merge(t, pending: nil, live: nil, isReply: isReply)
   }
 
-  /// Keeps children and the parent current.
+  /// Keeps children, their team members and the parent current.
   public func apply(feed: FeedEvent) {
     guard case .thread(let t) = feed else { return }
-    if t.parentID == id {
-      if let i = children.firstIndex(where: { $0.id == t.id }) {
-        children[i] = t
-      } else {
-        children.append(t)
-      }
-    }
+    if t.parentID == id { Self.upsert(t, into: &children) }
+    if t.source == .team, children.contains(where: { $0.id == t.parentID }) { Self.upsert(t, into: &team) }
     if let parent, parent.id == t.id { self.parent = t }
+  }
+
+  private static func upsert(_ t: OmniThread, into list: inout [OmniThread]) {
+    if let i = list.firstIndex(where: { $0.id == t.id }) {
+      list[i] = t
+    } else {
+      list.append(t)
+    }
   }
 
   /// Asks the server to stop the turn. `stopping` stays up until the turn ends, a new result comes, or
@@ -254,6 +259,7 @@ public final class ThreadStore {
     channel = d.channel
     parent = d.parent
     children = d.children
+    team = d.team
     var list = d.artifacts
     for a in (artifactsSinceLoad ?? [:]).values.sorted(by: { $0.id < $1.id }) {
       if let i = list.firstIndex(where: { $0.id == a.id }) {

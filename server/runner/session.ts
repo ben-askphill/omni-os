@@ -130,7 +130,7 @@ export function endTurn(live: Live, status: ThreadStatus) {
     last_text: runText ? runText.slice(0, 600) : threads.get(id)?.last_text ?? null,
   });
   emitThread(id);
-  if (t?.parent_id && status !== 'stopped' && !isShuttingDown()) reportToParent(id, status, runText);
+  if (t?.parent_id && !isShuttingDown()) reportToParent(id, status, runText);
   if (status === 'done' && !t?.parent_id && runText && !isShuttingDown()) suggestReply(id, runText);
   void turnFinished(id);
   armIdle(live);
@@ -145,6 +145,14 @@ export function endTurn(live: Live, status: ThreadStatus) {
 export function interruptThread(threadId: string) {
   const live = lives.get(threadId);
   const w = waiting.indexOf(threadId);
+  // A lead still waiting on its team has no process: stopping it stops the members it waits for.
+  const lead = threads.get(threadId);
+  if (lead && !lead.has_run && !live && w < 0 && lead.status === 'running') {
+    threads.update(threadId, { status: 'stopped' });
+    for (const m of threads.team(threadId)) if (m.status === 'running' || m.status === 'queued') interruptThread(m.id);
+    emitThread(threadId);
+    return;
+  }
   if (w >= 0) {
     waiting.splice(w, 1);
     drop(threadId, waitingMsgs.get(threadId) ?? []);

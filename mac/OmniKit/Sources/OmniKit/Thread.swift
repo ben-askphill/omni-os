@@ -37,6 +37,8 @@ public struct ThreadSource: OpenEnum {
   public static let conductor: Self = "conductor"
   public static let `import`: Self = "import"
   public static let capture: Self = "capture"
+  /// A member of a team, run under its lead thread and listed only there.
+  public static let team: Self = "team"
 }
 
 /// A thread row. Field names follow `Thread` in server/db.ts; named OmniThread so it never clashes with Foundation.Thread.
@@ -151,13 +153,15 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
   public let events: [EventRow]
   public let artifacts: [Artifact]
   public let children: [OmniThread]
+  /// Members of the teams among `children`, for the delegation cards. Older servers leave it out.
+  public let team: [OmniThread]
   public let parent: OmniThread?
   public let pending: [PendingMsg]
   /// A warm CLI process is attached, so the next message starts at once.
   public let live: Bool
 
   enum CodingKeys: String, CodingKey {
-    case thread, channel, events, artifacts, children, parent, pending, live
+    case thread, channel, events, artifacts, children, team, parent, pending, live
   }
 
   public init(from decoder: any Decoder) throws {
@@ -167,6 +171,7 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
     events = try c.decode([EventRow].self, forKey: .events)
     artifacts = try c.decodeIfPresent([Artifact].self, forKey: .artifacts) ?? []
     children = try c.decodeIfPresent([OmniThread].self, forKey: .children) ?? []
+    team = try c.decodeIfPresent([OmniThread].self, forKey: .team) ?? []
     parent = try c.decodeIfPresent(OmniThread.self, forKey: .parent)
     pending = try c.decodeIfPresent([PendingMsg].self, forKey: .pending) ?? []
     live = try c.decodeIfPresent(Bool.self, forKey: .live) ?? false

@@ -12,9 +12,9 @@ import type { Catalog } from '../harness/catalog.ts';
 import { freshCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { resolveRun } from '../harness/resolve.ts';
 import type { CommandUse } from '../harness/adapter.ts';
-import { deliver } from './queue.ts';
+import { assembling, deliver, settleTeam } from './queue.ts';
 import { fallbackTitle, generateTitle } from './aux.ts';
-import { runsHere, threadCommands, type SendMode } from './state.ts';
+import { addEvent, emitThread, runsHere, threadCommands, type SendMode } from './state.ts';
 
 // ---------- slash commands ----------
 
@@ -82,7 +82,8 @@ export interface CreateThreadInput {
   files?: File[];
 }
 
-export async function createThread(input: CreateThreadInput): Promise<Thread> {
+/** Resolve the run, make the workdir and write the row. Nothing is delivered yet. */
+async function openThread(input: CreateThreadInput, status: Thread['status'] = 'queued') {
   const role = getCrew(input.role);
   const channelId = input.channel || role?.channel || 'inbox';
   const channel = channels.get(channelId);
@@ -108,7 +109,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     id,
     channel_id: channel.id,
     title: input.title?.trim() || fallbackTitle(input.prompt),
-    status: 'queued',
+    status,
     role: role?.id ?? null,
     model: run.model || null,
     harness,
@@ -121,9 +122,13 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     source: input.source ?? 'manual',
     automation: input.automation ?? null,
   });
+  return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
+}
+
+export async function createThread(input: CreateThreadInput): Promise<Thread> {
+  const { thread, harness, folder } = await openThread(input);
   const saved = await saveUploads(thread.id, input.files ?? []);
   const attachments = saved.length ? saved : undefined;
-  const folder = commandsFolder(channel) ?? wd.cwd;
   await warmCommands(harness, folder, input.prompt);
   const { text, slash, commands } = slashFor(input.prompt, () => peekCommands(harness as HarnessId, folder).commands);
   deliver(thread.id, {
@@ -139,6 +144,67 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   });
   if (!input.title) void generateTitle(thread.id, input.prompt);
   return threads.get(thread.id)!;
+}
+
+export interface TeamTask {
+  prompt: string;
+  title?: string | null;
+  role?: string | null;
+  task_id?: string | null;
+  harness?: string | null;
+  model?: string | null;
+  effort?: string | null;
+}
+
+export interface CreateTeamInput {
+  channel: string;
+  /** What the team is for. The lead gets it with every member's reply once the last one reports. */
+  prompt: string;
+  title?: string | null;
+  /** The lead's role, and each member's unless the task names one. */
+  role?: string | null;
+  parent_id?: string | null;
+  task_id?: string | null;
+  source?: ThreadSource;
+  tasks: TeamTask[];
+}
+
+/**
+ * One lead thread in the channel with a member thread per task under it. The members run now; the lead
+ * waits (shown as running) and runs once, when the last member reports, to combine their replies.
+ */
+export async function createTeam(input: CreateTeamInput): Promise<{ lead: Thread; members: Thread[] }> {
+  if (!input.tasks.length) throw new Error('a team needs at least one task');
+  const { thread: lead } = await openThread({ ...input, source: input.source ?? 'conductor' }, 'running');
+  addEvent(lead.id, 'user', { text: input.prompt, source: lead.source });
+  if (!input.title) void generateTitle(lead.id, input.prompt);
+  const members: Thread[] = [];
+  // A member can finish before the last one is created; the lead settles once all of them exist.
+  assembling.add(lead.id);
+  try {
+    for (const [i, t] of input.tasks.entries()) {
+      members.push(
+        await createThread({
+          ...t,
+          channel: lead.channel_id,
+          role: t.role ?? input.role,
+          parent_id: lead.id,
+          task_id: t.task_id ?? (lead.task_id ? `${lead.task_id}.${i + 1}` : null),
+          source: 'team',
+        }),
+      );
+    }
+  } catch (err) {
+    // A member that could not start: the lead fails with the reason instead of waiting for it forever.
+    addEvent(lead.id, 'error', { text: `Could not start task ${input.tasks[members.length]?.title ?? members.length + 1}: ${(err as Error).message}` });
+    threads.update(lead.id, { status: members.length ? 'running' : 'failed' });
+    if (!members.length) throw err;
+  } finally {
+    assembling.delete(lead.id);
+  }
+  settleTeam(lead.id);
+  emitThread(lead.id);
+  return { lead: threads.get(lead.id)!, members };
 }
 
 export function sendMessage(

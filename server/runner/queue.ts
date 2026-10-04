@@ -1,11 +1,12 @@
 // Who runs next: deliver a message, take a free slot, start the turn.
 import { randomUUID } from 'node:crypto';
 import { resolveDelivery } from '../delivery.ts';
-import { threads } from '../db.ts';
+import { events, threads } from '../db.ts';
 import { clearSuggestion } from './aux.ts';
 import { hardKill, requestInterrupt, stopStartup } from './session.ts';
 import { launch } from './spawn.ts';
 import {
+  addEvent,
   bindPump,
   bindReportToParent,
   capFor,
@@ -123,6 +124,9 @@ export function reportToParent(childId: string, status: string, text: string) {
     channel: child.channel_id,
     status,
   };
+  // A lead that has not run yet waits for its whole team, then runs once with every report.
+  if (child.source === 'team' && !parent.has_run && !lives.has(parent.id) && !waiting.includes(parent.id)) return teamReported(parent.id, report);
+  if (status === 'stopped') return;
   // Wake the parent, or steer it if busy, exactly like a crewmate messaging firstmate.
   deliver(parent.id, {
     uuid: randomUUID(),
@@ -132,6 +136,41 @@ export function reportToParent(childId: string, status: string, text: string) {
       `[crew report] task ${child.task_id ?? '(none)'} from ${child.role ?? 'crew'} in #${child.channel_id} ` +
       `(thread ${child.id}), status: ${status}\n\n${report.text}\n\n` +
       'Relay what matters to Ben in one short update. Delegate follow-ups if needed. Do not redo the work.',
+  });
+}
+
+/**
+ * A member's report reaches a lead that is still waiting. It shows in the lead's transcript at once; the last
+ * one starts the lead's first turn with the brief and every member's reply. A stopped lead stays stopped.
+ */
+function teamReported(leadId: string, report: Record<string, unknown>) {
+  addEvent(leadId, 'crew_report', report);
+  emitThread(leadId);
+  settleTeam(leadId);
+}
+
+/** Leads whose members are still being created. */
+export const assembling = new Set<string>();
+
+/** Start a waiting lead's turn once no member is queued or running. */
+export function settleTeam(leadId: string) {
+  const lead = threads.get(leadId);
+  if (!lead || lead.has_run || assembling.has(leadId)) return;
+  const team = threads.team(leadId);
+  if (team.some((m) => m.status === 'running' || m.status === 'queued')) return;
+  if (lead.status !== 'running') return;
+  const brief = (events.firstUserText(leadId) ?? '').trim();
+  const replies = team.map(
+    (m) =>
+      `### ${m.task_id ?? m.id} · ${m.title} (${m.role ?? 'crew'}, thread ${m.id}), status: ${m.status}\n\n` +
+      (events.lastRunText(m.id) || m.last_text || '(no reply)'),
+  );
+  const said = `All ${team.length} reports are in.`;
+  deliver(leadId, {
+    uuid: randomUUID(),
+    mode: 'steer',
+    event: { kind: 'user', payload: { text: said, source: 'team' } },
+    text: `${brief}\n\n## Your team's reports\n\n${replies.join('\n\n')}\n\n${said} Combine them into one answer. Do not redo their work.`,
   });
 }
 

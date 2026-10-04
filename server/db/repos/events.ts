@@ -61,6 +61,13 @@ export const events = {
       .all(threadId, threadId, after) as { payload: string }[];
     return rows.map((r) => JSON.parse(r.payload).text as string).join('\n\n');
   },
+  /** The text of the thread's first message: a team lead's brief. */
+  firstUserText(threadId: string): string | null {
+    const row = db.prepare(`SELECT payload FROM events WHERE thread_id = ? AND kind = 'user' ORDER BY id LIMIT 1`).get(threadId) as
+      | { payload: string }
+      | undefined;
+    return row ? ((JSON.parse(row.payload).text as string) ?? null) : null;
+  },
   /** The text of the thread's last message that was not dropped. */
   lastUserText(threadId: string): string {
     const row = db

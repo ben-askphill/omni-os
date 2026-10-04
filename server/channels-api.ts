@@ -52,7 +52,7 @@ const stub = ({ id, channel_id, title, status, created_at }: Thread) => ({ id, c
 
 /** A channel plus its running and queued threads, and its latest ones, so the sidebar can list them under the name. */
 const withActive = (ch: Channel, busy: Thread[], recent: Thread[]) => {
-  const mine = busy.filter((t) => t.channel_id === ch.id);
+  const mine = busy.filter((t) => t.channel_id === ch.id && t.source !== 'team');
   return {
     ...ch,
     running: mine.length,

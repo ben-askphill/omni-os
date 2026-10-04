@@ -50,6 +50,8 @@ export interface ThreadDetail {
   events: EventRow[];
   artifacts: Artifact[];
   children: Thread[];
+  /** Members of the teams among `children`. Older servers leave it out. */
+  team?: Thread[];
   parent: Thread | null;
   pending?: PendingMsg[];
   /** A warm CLI process is attached (idle or mid-turn), so the next message starts instantly. */

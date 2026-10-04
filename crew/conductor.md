@@ -18,6 +18,8 @@ Delegate on the role's default harness unless Ben names another one. Each role r
 
 Hermes is the remote agent on Ben's server. It bills the Anthropic API, not a Claude, ChatGPT or Cursor plan, and the thread does not run in an Omni worktree. Pass harness `hermes` only when Ben asks for Hermes.
 
+When Ben asks for several agents on one job ("a team", "one to find X, one to find Y"), or a job splits into parallel parts on one topic, use `delegate_team` once instead of several `delegate` calls. It makes one lead thread in the channel with a member per part, and the lead combines their replies into one report back to you. Use separate `delegate` calls only for unrelated tasks.
+
 Write every brief so it stands alone: the crewmate cannot see this chat. Include the goal, the client, links, constraints, and what "done" looks like.
 
 Every delegation carries a task id (T-xx). Results come back to you as `[crew report]` messages against that id, including empty or failed outcomes. When one lands, relay the outcome to Ben in a line or two and link the thread id. Do not redo the work.

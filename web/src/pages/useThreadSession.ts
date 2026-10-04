@@ -20,6 +20,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
   const [channel, setChannel] = useState<Channel | undefined>(undefined);
   const [parent, setParent] = useState<Thread | null>(null);
   const [children, setChildren] = useState<Thread[]>([]);
+  const [team, setTeam] = useState<Thread[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +92,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
         setChannel(d.channel);
         setParent(d.parent);
         setChildren(d.children);
+        setTeam(d.team ?? []);
         setArtifacts(d.artifacts);
         d.artifacts.forEach((a) => artifactIds.current.add(a.id));
         if (initial) {
@@ -150,10 +152,13 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
   );
 
   useFeed((e) => {
-    if (e.type === 'thread' && e.thread.parent_id === id) {
-      setChildren((prev) => (prev.some((c) => c.id === e.thread.id) ? prev.map((c) => (c.id === e.thread.id ? e.thread : c)) : [...prev, e.thread]));
-    }
-    if (e.type === 'thread' && parent && e.thread.id === parent.id) setParent(e.thread);
+    if (e.type !== 'thread') return;
+    const t = e.thread;
+    const upsert = (prev: Thread[]) => (prev.some((c) => c.id === t.id) ? prev.map((c) => (c.id === t.id ? t : c)) : [...prev, t]);
+    if (t.parent_id === id) setChildren(upsert);
+    // A member of a team this thread started: its delegation card shows the change.
+    if (t.source === 'team' && children.some((c) => c.id === t.parent_id)) setTeam(upsert);
+    if (parent && t.id === parent.id) setParent(t);
   });
 
   // Queued or running: the header interrupt and the composer treat both as busy.
@@ -222,6 +227,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     channel,
     parent,
     children,
+    team,
     events,
     files,
     shots,

@@ -66,6 +66,45 @@ server.registerTool(
 );
 
 server.registerTool(
+  'delegate_team',
+  {
+    description:
+      'Hand several parts of one job to a team: one lead thread in the channel with a member thread per task under it. ' +
+      'Use it when Ben asks for several agents on one topic (for example price, reviews and alternatives for one product). ' +
+      'The members run in parallel; once all have reported, the lead combines their replies into one answer, ' +
+      'which comes back to you as a single [crew report]. Do not poll for it.',
+    inputSchema: {
+      channel: z.string().describe('Channel id, e.g. "inbox". Use list_channels.'),
+      title: z.string().describe('Short title for the lead thread, e.g. "Shure MV7+ research".'),
+      prompt: z.string().describe('What the team is for and what the combined answer should look like. The lead gets this with every report.'),
+      role: z.string().optional().describe('Crew role id for the lead, and for every task that names none. Use list_crew.'),
+      task_id: z.string().optional().describe('Short id like T-12 for the team. Members get T-12.1, T-12.2 unless they name their own.'),
+      tasks: z
+        .array(
+          z.object({
+            title: z.string().describe('Short title, e.g. "Best price in NL".'),
+            prompt: z.string().describe('Self-contained brief for this member. It cannot see your chat or the other members.'),
+            role: z.string().optional(),
+            task_id: z.string().optional(),
+            harness: z.string().optional(),
+            model: z.string().optional(),
+            effort: z.string().optional(),
+          }),
+        )
+        .min(1),
+    },
+  },
+  async ({ channel, title, prompt, role, task_id, tasks }) => {
+    const { lead, members } = await call('/threads/team', {
+      method: 'POST',
+      body: JSON.stringify({ channel, title, prompt, role, task_id, tasks, parent_id: SELF, source: 'conductor' }),
+    });
+    const brief = (t: any) => ({ thread_id: t.id, task_id: t.task_id, title: t.title, channel: t.channel_id, role: t.role, harness: t.harness, status: t.status });
+    return text({ lead: brief(lead), members: members.map(brief) });
+  },
+);
+
+server.registerTool(
   'list_harnesses',
   { description: 'List the agent harnesses (Claude Code, Codex, Cursor, Hermes) with their availability, fix command, models and effort levels, so you can pass valid ids to delegate.' },
   async () => {

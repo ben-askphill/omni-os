@@ -377,6 +377,9 @@ private struct TranscriptRows: View {
     let cwd = store.cwd
     let transcript = store.transcript
     let agents = Set(model.store.tasks.filter { $0.threadID == store.id }.compactMap(\.toolUseID))
+    let known = Dictionary((store.children + store.team).map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
+    let members = Delegation.team(of: store.children)
+    let first = transcript.items.first?.id
     let live: TranscriptItemID? =
       if case .tools(let g)? = transcript.last, transcript.isLive(g, running: running) { .event(g.eventID) } else { nil }
     LazyVStack(alignment: .leading, spacing: 16) {
@@ -386,9 +389,13 @@ private struct TranscriptRows: View {
       ForEach(transcript.items) { item in
         TranscriptRow(
           item: item, live: item.id == live, running: running, cwd: cwd, threadID: store.id, model: model, ui: ui,
-          markdown: markdown, agents: agents
+          markdown: markdown, agents: agents, known: known
         )
         .copyMenu { TranscriptMarkdown.copyText(item, cwd: cwd) }
+        // A team lead's members, under its brief.
+        if item.id == first, case .user = item, !members.isEmpty {
+          DelegationCard(delegation: Delegation(id: "team", lead: nil, branches: members), team: true, model: model)
+        }
       }
       if let line = store.workingLine {
         WorkingLine(text: line)
@@ -410,6 +417,8 @@ private struct TranscriptRow: View {
   let ui: TranscriptUI
   let markdown: MarkdownCache<Int>
   var agents: Set<String> = []
+  /// Threads this one started and their team members, for the delegation cards.
+  var known: [String: OmniThread] = [:]
 
   var body: some View {
     switch item {
@@ -422,7 +431,16 @@ private struct TranscriptRow: View {
         MarkdownView(document: markdown.document(for: id, text: text))
       }
     case .tools(let group):
-      ToolGroupView(group: group, live: live, running: running, cwd: cwd, ui: ui, agents: agents)
+      let cards = Delegation.of(group.calls).map { d in
+        Delegation(id: d.id, lead: d.lead?.live(known), branches: d.branches.map { $0.live(known) })
+      }
+      VStack(alignment: .leading, spacing: 16) {
+        // A group of nothing but delegations is just its cards.
+        if cards.isEmpty || !group.calls.allSatisfy({ Delegation.isDelegation($0.name) && $0.result?.isError == false }) {
+          ToolGroupView(group: group, live: live, running: running, cwd: cwd, ui: ui, agents: agents)
+        }
+        ForEach(cards) { DelegationCard(delegation: $0, model: model) }
+      }
     case .plan(let plan):
       PlanCard(plan: plan)
     case .result(_, let result):
