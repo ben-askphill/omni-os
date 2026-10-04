@@ -382,11 +382,13 @@ The inspector's fourth tab, like the Web UI's `TerminalView.tsx`: the thread's s
 `scripts/build-mac.sh [--no-open] [-- app arguments]`:
 
 1. Release build with xcodebuild into `mac/.xcode` (log in `mac/.xcode/build-release.log`; errors are printed on failure).
-2. `git rev-parse HEAD` goes into the built app's Info.plist as `OmniGitCommit`.
+2. `git rev-parse HEAD` goes into the built app's Info.plist as `OmniGitCommit`, and a build number (`YYYYMMDD.HHMMSS`) as `CFBundleVersion`. Every Debug build, worktree build and temp build registers with LaunchServices under the same bundle id; with `CFBundleVersion` 1 everywhere, the Dock could take its icon from an old copy with no icon and show a blank tile. The build number keeps the installed copy the newest one.
 3. Signs again (the stamp broke the build's signature): the first "Apple Development" identity from `security find-identity -v -p codesigning`, else ad hoc. `--timestamp=none`, then `codesign --verify --strict`. If the keychain asks whether codesign may use the key, the script waits for the answer.
 4. Quits a running installed copy: processes whose command starts with `~/Applications/Omni.app/Contents/MacOS/Omni` only, SIGTERM, then SIGKILL after 5s. Debug builds and the server are left alone.
-5. Moves the old `~/Applications/Omni.app` to the Trash (to `mac/.xcode/replaced/` when the Trash can't be written), after checking it is this app by bundle id. It refuses to replace anything else.
-6. Copies the new app in with ditto, prints its path, and opens it, passing what follows `--`.
+5. Moves the old `~/Applications/Omni.app` to the Trash (to `mac/.xcode/replaced/` when the Trash can't be written), after checking it is this app by bundle id. It refuses to replace anything else. The moved copy is unregistered from LaunchServices (`lsregister -u`), which otherwise follows it into the Trash.
+6. Copies the new app in with ditto, touches it (ditto keeps the build folder's date, which the icon cache reads), registers it with `lsregister -f` and unregisters the build product in `mac/.xcode`. Prints its path, and opens it, passing what follows `--`.
+
+If the Dock tile is blank anyway, list the registered copies with `lsregister -dump | grep -B30 'identifier: *com.omni-os.mac' | grep '^path:'` (lsregister lives in `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/`), `lsregister -u` the stale ones, then `killall Dock`. Restarting the Dock alone does not help: it asks LaunchServices again and gets the same stale copy.
 
 The installed app with no arguments talks to port 4747, the live server. For a check, run `scripts/build-mac.sh -- -serverPort 4759` (nothing listens there) and quit it after.
 
