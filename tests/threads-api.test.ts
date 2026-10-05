@@ -58,4 +58,16 @@ describe('PATCH /api/threads/:id', () => {
   it('is 404 for a thread that does not exist', async () => {
     expect((await patch('nope', { title: 'New title' })).status).toBe(404);
   });
+
+  it('archives a thread out of the lists and brings it back, keeping its place', async () => {
+    const t = await idle();
+    const { threads } = await import('../server/db.ts');
+    expect(await patch(t.id, { archived: true })).toMatchObject({ status: 200, body: { id: t.id, archived: 1, title: 'Old title' } });
+    expect(r.thread(t.id).updated_at).toBe(t.updated_at);
+    expect(threads.byChannel(t.channel_id).some((x) => x.id === t.id)).toBe(false);
+    expect(threads.recent(500).some((x) => x.id === t.id)).toBe(false);
+    expect(threads.byChannel(t.channel_id, 200, true).some((x) => x.id === t.id)).toBe(true);
+    expect((await patch(t.id, { archived: false })).body.archived).toBe(0);
+    expect(threads.byChannel(t.channel_id).some((x) => x.id === t.id)).toBe(true);
+  });
 });

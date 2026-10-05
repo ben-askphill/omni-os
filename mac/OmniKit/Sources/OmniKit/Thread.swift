@@ -63,11 +63,13 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   public let lastText: String?
   /// The server's guess at Ben's next reply once a turn is done: the reply box's placeholder, Tab takes it.
   public let suggestion: String?
+  /// Archived by Ben: out of the lists, still reachable by search and by its link.
+  public let archived: Bool
   public let createdAt: Date
   public let updatedAt: Date
 
   enum CodingKeys: String, CodingKey {
-    case id, title, status, role, model, harness, effort, cwd, branch, source, automation, suggestion
+    case id, title, status, role, model, harness, effort, cwd, branch, source, automation, suggestion, archived
     case channelID = "channel_id"
     case sessionID = "session_id"
     case hasRun = "has_run"
@@ -98,6 +100,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     automation = try c.decodeIfPresent(String.self, forKey: .automation)
     lastText = try c.decodeIfPresent(String.self, forKey: .lastText)
     suggestion = try c.decodeIfPresent(String.self, forKey: .suggestion)
+    archived = (try? c.decodeFlag(.archived)) ?? false
     createdAt = try c.decode(Date.self, forKey: .createdAt)
     updatedAt = try c.decode(Date.self, forKey: .updatedAt)
   }

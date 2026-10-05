@@ -189,6 +189,10 @@ public final class WorkspaceStore {
 
   private func upsertRecent(_ t: OmniThread) {
     recentSinceLoad?[t.id] = t
+    if t.archived {
+      recent.removeAll { $0.id == t.id }
+      return
+    }
     recent = Self.upserting(t, into: recent)
   }
 
@@ -253,7 +257,11 @@ public final class WorkspaceStore {
       guard var list = answer else { return }
       // The answer can predate an event read while it was out. A newer copy in the answer wins.
       for t in since.values where list.first(where: { $0.id == t.id }).map({ $0.updatedAt <= t.updatedAt }) ?? true {
-        list = Self.upserting(t, into: list)
+        if t.archived {
+          list.removeAll { $0.id == t.id }
+        } else {
+          list = Self.upserting(t, into: list)
+        }
       }
       if recent != list { recent = list }
     case .harnesses:

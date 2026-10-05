@@ -14,7 +14,7 @@ struct DelegationCard: View {
       header(n)
       VStack(alignment: .leading, spacing: 8) {
         ForEach(delegation.branches) { b in
-          BranchRow(branch: b, model: model)
+          BranchRow(branch: b, model: model).openInNewWindow(b.id, model: model)
         }
       }
       .padding(.top, 4)

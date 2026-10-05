@@ -134,6 +134,7 @@ export function migrate() {
   // Sync: the machine id of the Mac running or queueing the thread, null otherwise. Synced, kept out of the API.
   ensureColumn('threads', 'run_machine', 'TEXT');
   ensureColumn('threads', 'suggestion', 'TEXT');
+  ensureColumn('threads', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('channels', 'icon', 'TEXT');
   // Sync matches these rows on uid, never on the local integer id. Old rows get one once; the index then makes the check free.
   for (const table of ['events', 'artifacts', 'automation_runs']) {

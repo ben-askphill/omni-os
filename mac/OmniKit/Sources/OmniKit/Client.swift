@@ -91,6 +91,10 @@ private struct TitleBody: Encodable, Sendable {
   let title: String
 }
 
+private struct ArchivedBody: Encodable, Sendable {
+  let archived: Bool
+}
+
 private struct ErrorBody: Decodable {
   let error: String
 }
@@ -171,6 +175,10 @@ public struct OmniClient: Sendable {
 
   public func renameThread(_ id: String, title: String) async throws(OmniAPIError) -> OmniThread {
     try await send("PATCH", "/api/threads/\(uriComponent(id))", body: TitleBody(title: title))
+  }
+
+  public func archiveThread(_ id: String, archived: Bool = true) async throws(OmniAPIError) -> OmniThread {
+    try await send("PATCH", "/api/threads/\(uriComponent(id))", body: ArchivedBody(archived: archived))
   }
 
   public func stopThread(_ id: String) async throws(OmniAPIError) -> OmniThread {

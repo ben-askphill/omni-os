@@ -132,19 +132,25 @@ struct CopyThreadMarkdownCommand: View {
 
 extension View {
   /// Open in New Window in the context menu, and on an Option-click.
-  func openInNewWindow(_ threadID: String) -> some View {
-    modifier(OpenInNewWindow(threadID: threadID))
+  func openInNewWindow(_ threadID: String, model: AppModel? = nil) -> some View {
+    modifier(OpenInNewWindow(threadID: threadID, model: model))
   }
 }
 
 private struct OpenInNewWindow: ViewModifier {
   let threadID: String
+  /// With a model the menu also archives the thread.
+  let model: AppModel?
   @Environment(\.openWindow) private var openWindow
 
   func body(content: Content) -> some View {
     content
       .contextMenu {
         Button("Open in New Window") { openWindow(id: ThreadWindow.id, value: threadID) }
+        if let model {
+          Divider()
+          Button("Archive Thread") { Task { await model.setThreadArchived(threadID, true) } }
+        }
       }
       .simultaneousGesture(
         TapGesture().modifiers(.option).onEnded { openWindow(id: ThreadWindow.id, value: threadID) }

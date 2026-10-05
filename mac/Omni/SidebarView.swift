@@ -152,7 +152,7 @@ struct SidebarView: View {
             AgentRow(task: task, channel: model.store.channel(task.channelID)?.name) {
               pick(.thread(task.threadID))
             }
-            .openInNewWindow(task.threadID)
+            .openInNewWindow(task.threadID, model: model)
           }
         }
       }
@@ -186,12 +186,15 @@ struct SidebarView: View {
         }
       }
     }
+    .contextMenu {
+      Button("Channel Settings") { model.route = .channel(id: channel.id, tab: .settings) }
+    }
     let links = SidebarSections.threads(of: channel, open: model.openThread, focused: model.focusedChannel == channel.id)
     ForEach(links.shown) { thread in
       let item = SidebarItem.thread(thread.id)
       row(item) { ThreadRow(thread: thread, active: selected == item) }
         .padding(.leading, 25)
-        .openInNewWindow(thread.id)
+        .openInNewWindow(thread.id, model: model)
     }
     if links.seeAll || links.more > 0 {
       Button { pick(.more(channel.id)) } label: {

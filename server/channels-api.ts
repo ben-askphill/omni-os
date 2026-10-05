@@ -94,4 +94,4 @@ channelsApi.patch('/:id', async (c) => {
   return c.json(channels.update(id, body as any));
 });
 
-channelsApi.get('/:id/threads', (c) => c.json(threads.byChannel(c.req.param('id'))));
+channelsApi.get('/:id/threads', (c) => c.json(threads.byChannel(c.req.param('id'), 200, c.req.query('archived') === '1')));

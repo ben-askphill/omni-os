@@ -124,7 +124,9 @@ struct ThreadDayList: View {
           .omniCaption()
           .padding(.horizontal, 10)
           .padding(.vertical, 6)
-          ForEach(group.threads) { ThreadListRow(model: model, thread: $0, showChannel: showChannel) }
+          ForEach(group.threads) {
+            ThreadListRow(model: model, thread: $0, showChannel: showChannel).openInNewWindow($0.id, model: model)
+          }
         }
       }
     }

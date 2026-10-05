@@ -27,13 +27,15 @@ export interface Thread {
   last_text: string | null;
   /** A guess at Ben's next reply once a turn is done, the reply box's placeholder. Local only, not synced. */
   suggestion: string | null;
+  /** 1 once Ben archived it: hidden from the lists, still found by search and by its link. */
+  archived: number;
   created_at: string;
   updated_at: string;
 }
 
 /** The columns clients read, without sync's run_machine. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, archived, created_at, updated_at';
 
 /** Who runs a thread with this status: this machine while it is running or queued here and sync is set up, else nobody. */
 const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? outbox.machineId() : null);
@@ -41,12 +43,12 @@ const runMachine = (status: ThreadStatus) => (status === 'running' || status ===
 export const threads = {
   get: (id: string) => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE id = ?`).get(id) as unknown as Thread | undefined,
   /** A channel's threads, without team members: those are listed under their lead. */
-  byChannel: (channelId: string, limit = 200) =>
+  byChannel: (channelId: string, limit = 200, archived = false) =>
     db
-      .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' ORDER BY updated_at DESC LIMIT ?`)
-      .all(channelId, limit) as unknown as Thread[],
+      .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' AND archived = ? ORDER BY updated_at DESC LIMIT ?`)
+      .all(channelId, archived ? 1 : 0, limit) as unknown as Thread[],
   recent: (limit = 50) =>
-    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
+    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
   children: (parentId: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? ORDER BY created_at`).all(parentId) as unknown as Thread[],
   /** A team lead's members, in the order they were handed out. */
@@ -58,7 +60,7 @@ export const threads = {
   recentPerChannel: (perChannel = 5) =>
     db
       .prepare(
-        `SELECT ${THREAD_COLUMNS} FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY updated_at DESC) AS n FROM threads WHERE source != 'team') WHERE n <= ?`,
+        `SELECT ${THREAD_COLUMNS} FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY updated_at DESC) AS n FROM threads WHERE source != 'team' AND archived = 0) WHERE n <= ?`,
       )
       .all(perChannel) as unknown as Thread[],
   running: () => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],
@@ -66,7 +68,7 @@ export const threads = {
   runMachine: (id: string) =>
     (db.prepare('SELECT run_machine FROM threads WHERE id = ?').get(id) as { run_machine: string | null } | undefined)?.run_machine ?? null,
   list(filter: { channel?: string; status?: string; limit?: number }) {
-    const where: string[] = [];
+    const where: string[] = ['archived = 0'];
     const args: (string | number)[] = [];
     if (filter.channel) (where.push('channel_id = ?'), args.push(filter.channel));
     if (filter.status) (where.push('status = ?'), args.push(filter.status));
@@ -75,7 +77,7 @@ export const threads = {
       .prepare(`SELECT ${THREAD_COLUMNS} FROM threads ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY updated_at DESC LIMIT ?`)
       .all(...args) as unknown as Thread[];
   },
-  create(t: Omit<Thread, 'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'harness' | 'effort'> & { has_run?: number; created_at?: string; harness?: string; effort?: string }) {
+  create(t: Omit<Thread, 'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'harness' | 'effort' | 'archived'> & { has_run?: number; created_at?: string; harness?: string; effort?: string }) {
     const ts = t.created_at ?? now();
     return tx(() => {
       db.prepare(
@@ -90,7 +92,7 @@ export const threads = {
     });
   },
   update(id: string, patch: Partial<Thread>) {
-    const allowed = ['title', 'status', 'model', 'harness', 'effort', 'session_id', 'has_run', 'cwd', 'branch', 'last_text', 'updated_at'] as const;
+    const allowed = ['title', 'status', 'model', 'harness', 'effort', 'session_id', 'has_run', 'cwd', 'branch', 'last_text', 'archived', 'updated_at'] as const;
     const keys = allowed.filter((k) => k in patch);
     const sets = keys.map((k) => `${k} = ?`);
     const vals = keys.map((k) => (patch[k] ?? null) as string | number | null);
