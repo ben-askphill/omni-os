@@ -115,7 +115,7 @@ export function ChannelMark({ icon, size }: { icon: string | null | undefined; s
   if (mark.kind === 'glyph') return <Icon name={mark.name} size={size} />;
   // An image, never markup in the page: the SVG cannot run anything or load from elsewhere.
   if (mark.kind === 'svg') return <img src={svgDataUrl(mark.markup)} alt="" draggable={false} className="object-contain" style={{ width: size, height: size }} />;
-  return <span className="leading-none" style={{ fontSize: size }}>{mark.text}</span>;
+  return <span className="inline-grid place-items-center overflow-visible leading-none" style={{ fontSize: size * 0.85, width: size, height: size }}>{mark.text}</span>;
 }
 
 /** Letter avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. A channel's own icon replaces the letter. */
