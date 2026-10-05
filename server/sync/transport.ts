@@ -47,6 +47,21 @@ export interface SyncTransport {
 /** Normalize a timestamp from anywhere (Postgres gives "+00:00" and microseconds) to the local ISO form. */
 export const isoTs = (ts: string) => new Date(ts).toISOString();
 
+const PG_REFUSED = /\u0000|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
+
+/**
+ * A value Postgres jsonb will take. It refuses U+0000 ("unsupported Unicode escape sequence") and lone surrogates,
+ * and one such string fails the whole push, so the outbox never drains. Tool output can carry either: they become
+ * U+FFFD, in keys too.
+ */
+export function pgJson<T>(value: T): T {
+  if (typeof value === 'string') return value.replace(PG_REFUSED, '\uFFFD') as T;
+  if (Array.isArray(value)) return value.map(pgJson) as T;
+  if (value && typeof value === 'object' && (value.constructor === Object || !value.constructor))
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [pgJson(k), pgJson(v)])) as T;
+  return value;
+}
+
 // ---------- in memory ----------
 
 /** A relay in memory, for tests. Machines sharing one instance see each other's pushes. */
@@ -242,7 +257,7 @@ export function createSupabaseTransport(opts: SupabaseTransportOptions): SyncTra
 
   return {
     async push(changes) {
-      const { error } = await call((c) => c.rpc('omni_push', { changes }));
+      const { error } = await call((c) => c.rpc('omni_push', { changes: pgJson(changes) }));
       if (error) throw new Error(`push failed: ${error.message}`);
     },
 
