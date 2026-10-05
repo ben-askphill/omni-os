@@ -178,7 +178,9 @@ struct ChannelMark: View {
   var body: some View {
     switch icon {
     case .glyph(let name): OmniIcon(name: name, size: size)
-    case .emoji(let text): Text(text).font(.system(size: size))
+    case .emoji(let text):
+      // An emoji is wider than its font size; scale it down to fit the box so a row never clips it.
+      Text(text).font(.system(size: size * 0.85)).lineLimit(1).fixedSize().frame(width: size, height: size)
     case .svg(let markup):
       if let image = SVGIconCache.image(markup) {
         Image(nsImage: image)
