@@ -16,7 +16,8 @@ export function useLiveThreads(path: string, accept: (t: Thread) => boolean, lim
     if (e.type !== 'thread' || !acceptCb(e.thread)) return;
     setData((prev) => {
       const list = (prev ?? []).filter((t) => t.id !== e.thread.id);
-      list.push(e.thread);
+      // Archived threads leave the list; they are not in it to begin with.
+      if (!e.thread.archived) list.push(e.thread);
       list.sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : 0));
       return list.slice(0, limit);
     });

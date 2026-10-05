@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ContextMenuHost } from './components/ContextMenu.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { ThreadNotifier, ToastProvider } from './components/Toaster.tsx';
@@ -198,6 +199,7 @@ function Shell() {
       {showNav && <MobileNav route={route} onMenu={() => setDrawer(true)} onSearch={openPalette} />}
       <CommandPalette open={palette} onClose={closePalette} />
       <ThreadNotifier />
+      <ContextMenuHost />
     </div>
   );
 }

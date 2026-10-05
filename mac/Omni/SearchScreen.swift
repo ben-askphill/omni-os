@@ -75,7 +75,7 @@ struct SearchScreen: View {
             .omniCaption()
             .padding(.horizontal, 14)
             .padding(.bottom, 8)
-          ForEach(hits) { SearchRow(model: model, hit: $0) }
+          ForEach(hits) { SearchRow(model: model, hit: $0).openInNewWindow($0.threadID, model: model) }
         }
       }
     }

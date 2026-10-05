@@ -221,6 +221,16 @@ public final class AppModel {
 
   // MARK: Actions
 
+  /// Archives a thread (or brings it back) from a right-click, then refreshes the lists. Archiving the
+  /// thread on screen moves to its channel.
+  public func setThreadArchived(_ id: String, _ archived: Bool) async {
+    // A failed call leaves the thread where it is, which is the answer.
+    guard let t = try? await client.archiveThread(id, archived: archived) else { return }
+    await store.reloadChannels()
+    if archived, case .thread(let open, _) = route, open == id { route = .channel(id: t.channelID) }
+  }
+
+
   /// Starts the server, or attaches to one that answers, then reconnects the feed without waiting out its backoff.
   public func startServer() async {
     startFailure = nil

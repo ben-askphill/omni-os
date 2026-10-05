@@ -8,7 +8,7 @@ import { fromPortable, safeSegment, toRemote } from '../paths.ts';
 
 const COLUMNS = [
   'id', 'channel_id', 'title', 'status', 'role', 'model', 'harness', 'effort', 'session_id', 'has_run', 'cwd',
-  'branch', 'parent_id', 'task_id', 'source', 'automation', 'last_text', 'run_machine', 'created_at', 'updated_at',
+  'branch', 'parent_id', 'task_id', 'source', 'automation', 'last_text', 'archived', 'run_machine', 'created_at', 'updated_at',
 ] as const;
 
 type Row = Thread & { run_machine: string | null };
@@ -29,7 +29,7 @@ registerHandler('thread', {
     if (!safeSegment(change.entity_id) || !claim(change)) return false;
     if (change.op === 'delete') return db.prepare('DELETE FROM threads WHERE id = ?').run(change.entity_id).changes > 0;
     // The row is the one the change names, which is also the one claim just stamped.
-    const t = { harness: 'claude-code', effort: '', has_run: 0, run_machine: null, ...(change.data as Partial<Row>), id: change.entity_id } as Row;
+    const t = { harness: 'claude-code', effort: '', archived: 0, has_run: 0, run_machine: null, ...(change.data as Partial<Row>), id: change.entity_id } as Row;
     // A run this Mac has (or the other Mac thinks it has) is this Mac's to report: an edit from over there carries
     // the status it last saw, which is stale by the time it lands. Keep this Mac's status and send the row back.
     const here = runOf.get(change.entity_id) as Pick<Row, 'status' | 'run_machine'> | undefined;

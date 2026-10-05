@@ -119,10 +119,11 @@ function UsageCard() {
   );
 }
 
-function NavLink({ to, icon, lead, active, children, right, onNavigate }: { to: string; icon?: IconName; lead?: ReactNode; active?: boolean; children: ReactNode; right?: ReactNode; onNavigate?: () => void }) {
+function NavLink({ to, icon, lead, active, children, right, onNavigate, channelId }: { channelId?: string; to: string; icon?: IconName; lead?: ReactNode; active?: boolean; children: ReactNode; right?: ReactNode; onNavigate?: () => void }) {
   return (
     <a
       href={to}
+      data-channel-id={channelId}
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
       data-active={active || undefined}
@@ -254,6 +255,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
     <Fragment key={c.id}>
       <NavLink
         to={href.channel(c.id)}
+        channelId={c.id}
         active={activeChannel === c.id}
         onNavigate={onNavigate}
         right={<RunningBadge n={c.running} />}
