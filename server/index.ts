@@ -21,6 +21,7 @@ const { shutdownAll } = await import('./runner.ts');
 const { closeAllBrowsers } = await import('./browser.ts');
 const { closeAllTerminals } = await import('./terminal.ts');
 const { startArtifactWatcher } = await import('./artifacts.ts');
+const { backfillPublished } = await import('./published.ts');
 const { startScheduler } = await import('./automations.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
 const { startSync } = await import('./sync/worker.ts');
@@ -39,6 +40,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   const interrupted = threads.failInterrupted();
   if (interrupted) console.log(`[omni] marked ${interrupted} interrupted thread(s) as failed`);
   startArtifactWatcher();
+  backfillPublished();
   startScheduler();
   startCatalogRefresh();
   // Off unless the sync credentials are in the Keychain; then it runs alongside, and a failure only logs.

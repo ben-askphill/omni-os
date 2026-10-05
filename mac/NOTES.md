@@ -33,6 +33,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `SSEClient.swift` | `SSEClient`, `SSEEvent`, `ConnectionState`, `SSETransport`, `URLSessionSSETransport`, and `feedEvents` and `threadEvents` on `OmniClient` |
 | `Ticker.swift` | Internal. A `Clock` with its instant type erased, so tests can inject one |
 | `WorkspaceStore.swift` | `WorkspaceStore`, `WorkspaceAPI`, `SidebarSections` |
+| `PublishedPage.swift` | `PublishedPage`: a page a thread published to claude.ai (`publishedFrom` in `shared/published.ts`), `byGroup` for the transcript cards, and `checkComments(threadID:url:)` on `OmniClient` |
 | `Client+Thread.swift` | `ThreadAPI` (the calls `ThreadStore` makes), `artifactURL` and `uploadURL` on `OmniClient` |
 | `ThreadStore.swift` | `ThreadStore` (one thread, live), `ThreadStoreRegistry` |
 | `Transcript.swift` | `Transcript` (the Web UI's `buildItems`, incremental), `TranscriptItem`, `ToolGroup`, `ToolCall`, `Plan`, `Todo`, `TurnResult.line` |

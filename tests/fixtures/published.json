@@ -1,0 +1,58 @@
+[
+  {
+    "case": "first publish from a scratchpad",
+    "name": "Artifact",
+    "input": { "file_path": "/private/tmp/claude-501/x/scratchpad/dossier-audit.html", "description": "Code review of the Dossier codebase.", "icon": "code" },
+    "result": { "text": "Published /private/tmp/claude-501/x/scratchpad/dossier-audit.html at https://claude.ai/code/artifact/f7567ad1-8b55-4689-b824-1a865c7fe003\n\nLive subscription: arming in the background.", "is_error": false },
+    "expected": { "url": "https://claude.ai/code/artifact/f7567ad1-8b55-4689-b824-1a865c7fe003", "file_path": "/private/tmp/claude-501/x/scratchpad/dossier-audit.html", "title": "dossier-audit.html", "description": "Code review of the Dossier codebase.", "update": false }
+  },
+  {
+    "case": "republish to the same url",
+    "name": "Artifact",
+    "input": { "action": "publish", "file_path": "/Users/ben/p/report.html", "url": "https://claude.ai/code/artifact/0a1b2c3d-0000-4000-8000-000000000001" },
+    "result": { "text": "A newer version was published elsewhere.\nPublished /Users/ben/p/report.html at https://claude.ai/code/artifact/0a1b2c3d-0000-4000-8000-000000000001", "is_error": false },
+    "expected": { "url": "https://claude.ai/code/artifact/0a1b2c3d-0000-4000-8000-000000000001", "file_path": "/Users/ben/p/report.html", "title": "report.html", "update": true }
+  },
+  {
+    "case": "a page created from an Artifact type, no file",
+    "name": "Artifact",
+    "input": { "type_url": "https://claude.ai/artifact/type/slides", "title": "Q3 review" },
+    "result": { "text": "Created \"Q3 review\" at https://claude.ai/artifact/9f9f9f9f-1111-4222-8333-444444444444 from the Slides type.", "is_error": false },
+    "expected": { "url": "https://claude.ai/artifact/9f9f9f9f-1111-4222-8333-444444444444", "title": "Q3 review", "update": false }
+  },
+  {
+    "case": "a read is not a publish",
+    "name": "Artifact",
+    "input": { "action": "read", "url": "https://claude.ai/code/artifact/0a1b2c3d-0000-4000-8000-000000000001" },
+    "result": { "text": "[Artifact 0a1b2c3d \"Report\" owned by you]", "is_error": false },
+    "expected": null
+  },
+  {
+    "case": "an asset upload is not a page",
+    "name": "Artifact",
+    "input": { "url": "https://claude.ai/code/artifact/0a1b2c3d-0000-4000-8000-000000000001", "file_path": "/Users/ben/p/logo.png", "asset": true },
+    "result": { "text": "Uploaded logo.png: https://claude.ai/code/artifact/0a1b2c3d-0000-4000-8000-000000000001/assets/abc", "is_error": false },
+    "expected": null
+  },
+  {
+    "case": "a failed publish",
+    "name": "Artifact",
+    "input": { "file_path": "/Users/ben/p/report.html" },
+    "result": { "text": "Publish refused: the artifact changed.", "is_error": true },
+    "expected": null
+  },
+  {
+    "case": "a result with no url in it",
+    "name": "Artifact",
+    "input": { "file_path": "/Users/ben/p/report.html" },
+    "result": { "text": "Something new happened.", "is_error": false },
+    "expected": null
+  },
+  {
+    "case": "another tool that mentions an artifact url",
+    "name": "Bash",
+    "input": { "command": "echo https://claude.ai/code/artifact/0a1b2c3d-0000-4000-8000-000000000001" },
+    "result": { "text": "https://claude.ai/code/artifact/0a1b2c3d-0000-4000-8000-000000000001", "is_error": false },
+    "expected": null
+  }
+]

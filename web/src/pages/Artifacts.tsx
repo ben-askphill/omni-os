@@ -116,6 +116,11 @@ export function ArtifactsPage() {
                       <span className="h-1 w-1 rounded-full bg-done" /> New
                     </span>
                   )}
+                  {a.url && (
+                    <span title="Published on claude.ai" className="absolute top-2 right-2 inline-flex h-5 items-center gap-1 rounded-full bg-elev px-2 text-[10.5px] font-medium text-fg-2 shadow-[var(--shadow-card)]">
+                      <Icon name="globe" size={11} /> claude.ai
+                    </span>
+                  )}
                 </div>
                 <div className="min-w-0 px-2 pt-2.5 pb-1.5">
                   <div className="flex min-w-0 items-center gap-1.5">

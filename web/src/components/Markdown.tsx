@@ -7,8 +7,9 @@ const UUID_EXACT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 /**
  * Agents (the conductor especially) cite thread ids. Turn bare ids outside code into links.
- * Code fences and inline code are left alone; inline code that is exactly an id becomes a link
- * via the `code` renderer below.
+ * Code fences, inline code, links and bare URLs are left alone, so an id inside a URL (a claude.ai
+ * artifact link) stays part of it; inline code that is exactly an id becomes a link via the `code`
+ * renderer below.
  */
 function linkThreadIds(md: string) {
   return md
@@ -16,7 +17,7 @@ function linkThreadIds(md: string) {
     .map((block, i) => {
       if (i % 2 === 1) return block;
       return block
-        .split(/(`[^`\n]*`|\[[^\]\n]*\]\([^)\n]*\)|<[^>\n]*>)/g)
+        .split(/(`[^`\n]*`|\[[^\]\n]*\]\([^)\n]*\)|<[^>\n]*>|\bhttps?:\/\/[^\s<]+)/g)
         .map((seg, j) => (j % 2 === 1 ? seg : seg.replace(UUID, (id) => `[${id.slice(0, 8)}](#/t/${id})`)))
         .join('');
     })

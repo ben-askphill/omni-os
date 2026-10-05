@@ -170,6 +170,36 @@ server.registerTool(
 );
 
 server.registerTool(
+  'list_published_artifacts',
+  {
+    description:
+      'Pages threads published to claude.ai with the Artifact tool, one row per page, newest first: its url, the thread that published it, and the local file. ' +
+      'Read a page\'s comments with ArtifactComments (action "read") and hand open ones to its thread with check_artifact_comments.',
+    inputSchema: { channel: z.string().optional(), limit: z.number().optional() },
+  },
+  async ({ channel, limit }) => {
+    const q = new URLSearchParams({ limit: String(limit ?? 50) });
+    if (channel) q.set('channel', channel);
+    const list = await call(`/artifacts/published?${q}`);
+    return text(list.map((a: any) => ({ url: a.url, name: a.name, description: a.description, thread_id: a.thread_id, thread: a.thread_title, channel: a.channel_id, updated_at: a.updated_at })));
+  },
+);
+
+server.registerTool(
+  'check_artifact_comments',
+  {
+    description:
+      'Ask the thread that published a claude.ai page to act on its comments: it reads them, makes the changes, republishes, replies and resolves. ' +
+      'Queued after the thread\'s current turn. Only call it for pages with open comment threads sent to Claude.',
+    inputSchema: { thread_id: z.string(), url: z.string().describe('The page url from list_published_artifacts.') },
+  },
+  async ({ thread_id, url }) => {
+    const t = await call(`/threads/${thread_id}/published/comments`, { method: 'POST', body: JSON.stringify({ url }) });
+    return text({ thread_id: t.id, status: t.status });
+  },
+);
+
+server.registerTool(
   'search_history',
   { description: 'Full-text search across every thread Ben has run.', inputSchema: { query: z.string() } },
   async ({ query }) => text(await call(`/search?q=${encodeURIComponent(query)}`)),

@@ -1,6 +1,7 @@
 // Stream records: tasks, results, and the process exit.
 import { events, threads, type ThreadStatus } from '../db.ts';
 import { publishFeed } from '../bus.ts';
+import { onToolResult } from '../published.ts';
 import { turnFinished } from '../sync/files.ts';
 import { type Record as StreamRecord, type TaskUpdate } from '../stream.ts';
 import { armIdle, clearInterrupt, endTurn, teardown } from './session.ts';
@@ -162,6 +163,7 @@ export function onRecord(live: Live, rec: StreamRecord) {
       if (opens) openTurn(live);
       const row = addEvent(id, rec.kind, rec.payload);
       if (opens) live.turnFrom = row.id - 1;
+      if (rec.kind === 'tool_result') onToolResult(id, rec.payload);
     }
   }
 }

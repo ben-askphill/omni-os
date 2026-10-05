@@ -15,6 +15,7 @@ Both show the same channels and threads. They never share code directly: see [We
 - **Threads** per task, dated and full-text searchable, resumable any time
 - **Sandbox per thread**: own git worktree in repo channels, a persistent browser per channel (logins survive) shown live in the thread's Browser panel, where you can click and type in it too, secrets from the Keychain injected as env
 - **Artifacts** rendered inline: anything the agent writes to its artifacts dir
+- **Published artifacts**: a page a Claude Code thread publishes to claude.ai with its Artifact tool shows as a card in the thread, linked to its local file. The channel's pages go into later threads' system prompt, so an update lands at the same URL, and "Check comments" (or the `artifact-comments` automation) hands a page's comments back to the thread that made it. There is no public Artifacts API, so Omni reads this from the CLI's own tool calls (`shared/published.ts`)
 - **GitHub panel** per repo channel: PRs, checks, diff, merge (with confirm)
 - **Conductor**: one front agent that delegates to crew roles; reports come back to it automatically
 - **Automations**: cron YAML, every run is its own thread

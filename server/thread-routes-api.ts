@@ -6,6 +6,7 @@ import { streamSSE } from 'hono/streaming';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { commentsPrompt, isArtifactUrl } from '../shared/published.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
 import { artifacts, channels, events, threads, type Thread } from './db.ts';
@@ -129,6 +130,14 @@ threadActionsApi.post('/:id/messages', async (c) => {
   checkUploads(files);
   const attachments = await saveUploads(id, files);
   return c.json(await postMessage(id, prompt, { from, mode, attachments }));
+});
+
+/** Ask the thread to act on the comments on a page it published. Queued, so it never cuts into a running turn. */
+threadActionsApi.post('/:id/published/comments', async (c) => {
+  const id = c.req.param('id');
+  const { url } = z.object({ url: z.string().refine(isArtifactUrl, 'not a claude.ai artifact url') }).parse(await c.req.json());
+  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  return c.json(await postMessage(id, commentsPrompt(url), { mode: 'queue' }));
 });
 
 /** Serves a file Ben attached, by its name inside the thread's uploads folder. */

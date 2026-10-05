@@ -16,6 +16,9 @@ interface ArtifactData {
   name: string;
   kind: string;
   size: number;
+  /** Absent from a Mac on a version before published pages. */
+  url?: string | null;
+  description?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,13 +64,14 @@ registerHandler('artifact', {
     }
     const res = db
       .prepare(
-        `UPDATE artifacts SET thread_id = ?, path = ?, name = ?, kind = ?, size = ?, created_at = ?, updated_at = ? WHERE uid = ?`,
+        `UPDATE artifacts SET thread_id = ?, path = ?, name = ?, kind = ?, size = ?, url = COALESCE(?, url), description = COALESCE(?, description),
+         created_at = ?, updated_at = ? WHERE uid = ?`,
       )
-      .run(a.thread_id, path, a.name, a.kind, a.size, a.created_at, a.updated_at, uid);
+      .run(a.thread_id, path, a.name, a.kind, a.size, a.url ?? null, a.description ?? null, a.created_at, a.updated_at, uid);
     if (!res.changes) {
       db.prepare(
-        'INSERT INTO artifacts (uid, thread_id, path, name, kind, size, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      ).run(uid, a.thread_id, path, a.name, a.kind, a.size, a.created_at, a.updated_at);
+        'INSERT INTO artifacts (uid, thread_id, path, name, kind, size, url, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ).run(uid, a.thread_id, path, a.name, a.kind, a.size, a.url ?? null, a.description ?? null, a.created_at, a.updated_at);
     }
     return true;
   },

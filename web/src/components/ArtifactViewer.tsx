@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { artifactUrl, type Artifact } from '../api.ts';
 import { bytes, relTime } from '../format.ts';
 import { Markdown } from './Markdown.tsx';
+import { PublishedActions } from './Published.tsx';
 import { ErrorNote, Icon, IconButton, IconLink, Loading, Modal, type IconName } from './ui.tsx';
 
 export const kindIcon = (kind: string): IconName =>
@@ -142,6 +143,7 @@ export function ArtifactBody({ a }: { a: Artifact }) {
 export function ArtifactActions({ a, onExpand }: { a: Artifact; onExpand?: () => void }) {
   return (
     <div className="flex items-center">
+      <PublishedActions a={a} />
       {onExpand && <IconButton icon="maximize" label="Full screen" onClick={onExpand} size={15} />}
       <IconLink href={artifactUrl(a)} icon="external" label="Open in new tab" newTab />
       <IconLink href={artifactUrl(a, true)} icon="download" label="Download" download />
@@ -161,7 +163,7 @@ export function ArtifactViewer({ a }: { a: Artifact }) {
         <div className="min-w-0 flex-1">
           <div className="truncate font-mono text-[11.5px] font-medium">{a.name}</div>
           <div className="font-num text-[11px] text-fg-4">
-            {a.kind} · {bytes(a.size)} · updated {relTime(a.updated_at)}
+            {a.kind} · {bytes(a.size)} · {a.url ? 'published' : 'updated'} {relTime(a.updated_at)}
           </div>
         </div>
         <ArtifactActions a={a} onExpand={() => setFull(true)} />

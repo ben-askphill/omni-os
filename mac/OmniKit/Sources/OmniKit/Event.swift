@@ -251,11 +251,15 @@ public struct Artifact: Decodable, Hashable, Sendable, Identifiable {
   /// html, markdown, svg, image, screenshot, pdf, csv, json or text.
   public let kind: String
   public let size: Int
+  /// The claude.ai page this file was published as, if it was.
+  public let url: String?
+  /// What the publish said the page is.
+  public let description: String?
   public let createdAt: Date
   public let updatedAt: Date
 
   enum CodingKeys: String, CodingKey {
-    case id, path, name, kind, size
+    case id, path, name, kind, size, url, description
     case threadID = "thread_id"
     case createdAt = "created_at"
     case updatedAt = "updated_at"

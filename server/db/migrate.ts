@@ -136,6 +136,9 @@ export function migrate() {
   ensureColumn('threads', 'suggestion', 'TEXT');
   ensureColumn('threads', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('channels', 'icon', 'TEXT');
+  // The claude.ai page an artifact was published as (shared/published.ts), and what the publish said it was.
+  ensureColumn('artifacts', 'url', 'TEXT');
+  ensureColumn('artifacts', 'description', 'TEXT');
   // Sync matches these rows on uid, never on the local integer id. Old rows get one once; the index then makes the check free.
   for (const table of ['events', 'artifacts', 'automation_runs']) {
     ensureColumn(table, 'uid', 'TEXT');

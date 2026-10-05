@@ -29,7 +29,9 @@ struct ArtifactViewer: View {
   let ref: ArtifactRef
   var windowed = false
   @Environment(\.openWindow) private var openWindow
+  @Environment(\.openURL) private var openURL
   @State private var saveError: String?
+  @State private var comments = CommentsAsk.idle
 
   var body: some View {
     VStack(spacing: 0) {
@@ -41,12 +43,29 @@ struct ArtifactViewer: View {
         VStack(alignment: .leading, spacing: 1) {
           Text(ref.name).font(.system(size: 11.5, weight: .medium, design: .monospaced)).foregroundStyle(Tok.fg)
             .lineLimit(1).truncationMode(.middle)
-          Text("\(ref.kind) · \(Format.bytes(ref.size)) · updated \(Format.relTime(ref.updatedAt))")
+          Text("\(ref.kind) · \(Format.bytes(ref.size)) · \(ref.url == nil ? "updated" : "published") \(Format.relTime(ref.updatedAt))")
             .font(.system(size: 11).monospacedDigit())
             .foregroundStyle(Tok.fg4)
             .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        if let url = ref.url, let threadID = ref.threadID {
+          Button {
+            Task { comments = .sending; comments = await CommentsAsk.run(client: client, threadID: threadID, url: url) }
+          } label: {
+            Label { Text("Check comments") } icon: { OmniIcon(name: comments == .sent ? "check" : "message", size: 15) }
+          }
+          .buttonStyle(.icon(size: 30))
+          .disabled(comments == .sending || comments == .sent)
+          .help(comments.help)
+          if let link = URL(string: url) {
+            Button { openURL(link) } label: {
+              Label { Text("Open on claude.ai") } icon: { OmniIcon(name: "globe", size: 15) }
+            }
+            .buttonStyle(.icon(size: 30))
+            .help("Open on claude.ai")
+          }
+        }
         if !windowed {
           Button {
             openWindow(id: "artifact", value: ref)
@@ -71,6 +90,30 @@ struct ArtifactViewer: View {
         ErrorNote(text: saveError).padding(8)
       }
       ArtifactBody(client: client, ref: ref)
+    }
+  }
+}
+
+/// Asking a thread to act on the comments on a page it published: the ask, then what came of it.
+enum CommentsAsk: Equatable {
+  case idle, sending, sent
+  case failed(String)
+
+  var help: String {
+    switch self {
+    case .sent: "Asked the thread to check comments. It runs after the current turn."
+    case .failed(let message): message
+    default: "Check comments on claude.ai"
+    }
+  }
+
+  @MainActor
+  static func run(client: OmniClient, threadID: String, url: String) async -> CommentsAsk {
+    do {
+      _ = try await client.checkComments(threadID: threadID, url: url)
+      return .sent
+    } catch {
+      return .failed(error.message)
     }
   }
 }

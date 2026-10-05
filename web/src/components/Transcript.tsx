@@ -1,19 +1,22 @@
 import { createContext, Fragment, memo, useContext, useMemo, useState, type ReactNode } from 'react';
-import { uploadUrl, type Attachment, type EventRow, type PendingMsg, type Thread } from '../api.ts';
+import { uploadUrl, type Artifact, type Attachment, type EventRow, type PendingMsg, type Thread } from '../api.ts';
 import { bytes, clock, duration, plural, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { BranchFace, DelegationCard, RailItem, ROW_CARD } from './Delegation.tsx';
+import { PublishedCard } from './Published.tsx';
 import { Markdown } from './Markdown.tsx';
 import { CheckItem, copyText, Icon, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
 import { SOURCE_TAG } from '../../../shared/slash-menu.ts';
 import { slashPieces } from '../../../shared/slash-pills.ts';
 import { statusLabel } from '../status-line.ts';
 import type { SlashHit } from '../../../shared/slash.ts';
+import { publishedFrom, type Published } from '../../../shared/published.ts';
 import {
   buildItems,
   buildTasks,
   str,
+  type Item,
   toolLabel,
   toolSummary,
   type ReportP,
@@ -29,6 +32,7 @@ import { agentStatus, delegations, splitGroup, withLive, type Branch } from '../
 export { toolLabel, toolSummary, type ToolCall };
 
 const NO_THREADS: Thread[] = [];
+const NO_ARTIFACTS: Artifact[] = [];
 
 /** Task state by the Agent call's tool_use id. */
 const TaskCtx = createContext<Map<string, TaskView>>(new Map());
@@ -272,6 +276,23 @@ function countNames(calls: ToolCall[]) {
 
 function flatten(calls: ToolCall[]): ToolCall[] {
   return calls.flatMap((c) => [c, ...flatten(c.children)]);
+}
+
+/** The pages the thread published, each under the last tool group that published it, so a republish moves the card down. */
+function publishedByGroup(items: Item[]) {
+  const last = new Map<string, { key: number; p: Published }>();
+  for (const it of items) {
+    if (it.type !== 'tools') continue;
+    for (const c of flatten(it.calls)) {
+      const p = publishedFrom(c.name, c.input, c.result);
+      if (!p) continue;
+      last.delete(p.url);
+      last.set(p.url, { key: it.key, p });
+    }
+  }
+  const out = new Map<number, Published[]>();
+  for (const { key, p } of last.values()) out.set(key, [...(out.get(key) ?? []), p]);
+  return out;
 }
 
 function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; total: number; cwd?: string | null; running: boolean; isLast: boolean }) {
@@ -627,6 +648,7 @@ export const Transcript = memo(function Transcript({
   cwd,
   known = NO_THREADS,
   team,
+  artifacts = NO_ARTIFACTS,
 }: {
   threadId: string;
   events: EventRow[];
@@ -636,9 +658,12 @@ export const Transcript = memo(function Transcript({
   known?: Thread[];
   /** A team lead's members, shown as a card under its brief. */
   team?: Branch[];
+  /** The thread's files: a published page's card previews the one linked to its url. */
+  artifacts?: Artifact[];
 }) {
   const byId = useMemo(() => new Map(known.map((t) => [t.id, t])), [known]);
   const { items, plan } = useMemo(() => buildItems(events), [events]);
+  const pages = useMemo(() => publishedByGroup(items), [items]);
   const { tasks: live, feedLive } = useApp();
   const stored = useMemo(() => buildTasks(events), [events]);
   // The server's live list wins: a task it no longer runs has ended, even if no end row was stored.
@@ -677,9 +702,14 @@ export const Transcript = memo(function Transcript({
               );
             case 'tools': {
               const { agents, rest, agentsFirst } = splitGroup(it.calls);
-              const cards = delegations(it.calls).map((d) => (
-                <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} />
-              ));
+              const cards = [
+                ...delegations(it.calls).map((d) => (
+                  <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} />
+                )),
+                ...(pages.get(it.key) ?? []).map((p) => (
+                  <PublishedCard key={`p${p.url}`} p={p} threadId={threadId} artifact={artifacts.findLast((a) => a.url === p.url)} />
+                )),
+              ];
               const isLast = idx === items.length - 1;
               const group = rest.length ? (
                 <ToolGroup key={it.key} calls={rest} total={rest.length + rest.reduce((n, c) => n + countCalls(c), 0)} cwd={cwd} running={running} isLast={isLast} />

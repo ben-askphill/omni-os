@@ -1,7 +1,20 @@
 // The system prompt handed to a harness for one thread.
 import { config, artifactsDir, browserOutDir } from '../config.ts';
-import type { Channel, Thread } from '../db.ts';
+import { artifacts, type Channel, type Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
+
+/** Claude Code's Artifact tool publishes to claude.ai. Omni links a publish to its file and keeps the URL per channel. */
+function publishedLines(channelId: string) {
+  const pages = artifacts.published(channelId, 10);
+  return [
+    '',
+    '## Published artifacts',
+    'When you publish a page with the Artifact tool, write it into OMNI_ARTIFACTS_DIR and publish it from there, so Omni links the file to its claude.ai URL. To change a page that is already published, republish it to its url rather than creating a new one.',
+    ...(pages.length
+      ? ['Pages this channel already published, newest first:', ...pages.map((a) => `- ${a.name}: ${a.url} (thread "${a.thread_title}")`)]
+      : []),
+  ];
+}
 
 export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false) {
   const remote = thread.harness === 'hermes';
@@ -26,6 +39,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     remote
       ? 'OMNI_ARTIFACTS_DIR does not exist on this machine. Return artifacts as links or as text in your reply.'
       : `Write any HTML page, report, diagram, CSV or document meant for Ben into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).\nOmni renders files there inline in the thread. Prefer a self-contained .html file for anything visual. Mention the filename in your reply.`,
+    ...(thread.harness === 'claude-code' ? publishedLines(channel.id) : []),
     ...(remote
       ? []
       : [
