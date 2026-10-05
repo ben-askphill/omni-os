@@ -10,6 +10,7 @@ function fakeSupabase() {
   const listeners: ((event: string, s: { refresh_token: string } | null) => void)[] = [];
   const refreshes: string[] = [];
   const rpcs: Reply[] = [];
+  const rpcArgs: unknown[] = [];
   const refreshReplies: Reply[] = [];
   let rotation = 0;
   let clients = 0;
@@ -30,13 +31,14 @@ function fakeSupabase() {
         },
         stopAutoRefresh: async () => {},
       },
-      rpc: async () => rpcs.shift() ?? { data: null, error: null },
+      rpc: async (_fn: string, args: unknown) => (rpcArgs.push(args), rpcs.shift()) ?? { data: null, error: null },
     } as never;
   };
   return {
     create,
     refreshes,
     rpcs,
+    rpcArgs,
     refreshReplies,
     get clients() {
       return clients;
@@ -54,6 +56,20 @@ const transport = (fake: ReturnType<typeof fakeSupabase>, stored: string[]) =>
     onRefreshToken: (t) => void stored.push(t),
     createClient: fake.create,
   });
+
+describe('supabase transport push', () => {
+  it('replaces what Postgres jsonb refuses, NUL and lone surrogates, so one event cannot block the outbox', async () => {
+    const fake = fakeSupabase();
+    const t = transport(fake, []);
+    const ts = '2026-10-05T12:00:00.000Z';
+    await t.push([
+      { machine_id: 'm', entity: 'event', entity_id: 'e1', op: 'upsert', ts, data: { text: 'a\u0000b', list: ['\ud83d', '😀', 3, null], 'k\u0000': true } },
+    ]);
+    const sent = (fake.rpcArgs[0] as { changes: { data: unknown }[] }).changes[0].data;
+    expect(sent).toEqual({ text: 'a\uFFFDb', list: ['\uFFFD', '😀', 3, null], 'k\uFFFD': true });
+    expect(JSON.stringify(sent)).not.toMatch(/\\u0000|\\ud83d/i);
+  });
+});
 
 describe('supabase transport tokens', () => {
   it('signs in lazily and stores each rotated refresh token', async () => {
