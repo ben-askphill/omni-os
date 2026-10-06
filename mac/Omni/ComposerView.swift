@@ -21,7 +21,8 @@ struct ReplyComposerHost: View {
     let reply = box.model ?? ReplyComposerModel(threadID: store.id, api: model.client)
     box.model = reply
     let menu = box.menu ?? SlashMenuModel(
-      commands: SlashCommandsStore(api: model.client, source: .thread(store.id)), placement: .reply, harness: thread.harness.rawValue)
+      commands: SlashCommandsStore(api: model.client, source: .thread(store.id)),
+      files: FileMentionsStore(api: model.client, source: .thread(store.id)), placement: .reply, harness: thread.harness.rawValue)
     box.menu = menu
     return ReplyComposerView(model: model, store: store, thread: thread, reply: reply, menu: menu)
     .frame(maxWidth: ThreadStyle.thread)

@@ -48,6 +48,7 @@ struct ComposerHints: View {
       Text("↵ send")
       Text("⌘↵ newline")
       Text("/ commands")
+      Text("@ files")
     }
     .font(.system(size: 11.5))
     .foregroundStyle(Tok.fg4)

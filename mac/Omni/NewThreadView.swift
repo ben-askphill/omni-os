@@ -64,7 +64,8 @@ struct NewThreadComposerView: View {
     let composer = box.composer ?? NewThreadComposerModel(fixedChannel: channelID, api: model.client)
     box.composer = composer
     let menu = box.menu ?? SlashMenuModel(
-      commands: SlashCommandsStore(api: model.client, source: Self.source(composer.choice)), placement: .newThread,
+      commands: SlashCommandsStore(api: model.client, source: Self.source(composer.choice)),
+      files: FileMentionsStore(api: model.client, source: .channel(composer.choice.channel)), placement: .newThread,
       harness: composer.choice.harness.rawValue)
     box.menu = menu
     // The menu's box overflows below the composer, over what follows it.
@@ -147,6 +148,7 @@ private struct NewThreadBox: View {
     // Another harness or channel has its own list.
     .onChange(of: NewThreadComposerView.source(composer.choice), initial: true) { _, source in
       menu.commands.source = source
+      menu.files?.source = .channel(composer.choice.channel)
       menu.harness = composer.choice.harness.rawValue
       if menu.isOpen || menu.hint != nil { Task { await menu.commands.load() } }
     }

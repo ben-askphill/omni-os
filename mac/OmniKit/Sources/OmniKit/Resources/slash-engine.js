@@ -208,6 +208,22 @@
     return { text: text.slice(0, at.start) + insert + after, caret: at.start + name.length + 2 };
   }
 
+  // shared/mention-menu.ts
+  var TYPING2 = /(?<![\w@/.-])@([A-Za-z0-9._\-/]*)$/;
+  var NAME_REST2 = /^[A-Za-z0-9._\-/]*/;
+  function fileQuery(text, caret) {
+    const m = TYPING2.exec(text.slice(0, caret));
+    if (!m) return null;
+    const end = caret + NAME_REST2.exec(text.slice(caret))[0].length;
+    if (end < text.length && !/\s/.test(text[end])) return null;
+    return { query: m[1], start: m.index, end };
+  }
+  function pickFile(text, at, insert) {
+    const after = text.slice(at.end);
+    const put = `@${insert}${/^[ \t]/.test(after) ? "" : " "}`;
+    return { text: text.slice(0, at.start) + put + after, caret: at.start + insert.length + 2 };
+  }
+
   // shared/slash-pills.ts
   function slashPieces(text, slash, visible = text.length) {
     const end = Math.min(visible, text.length);
@@ -235,6 +251,8 @@
     reply: call(({ text, list, harness }) => replySlash(text, list, harness)),
     newThreadHint: call(({ text, list, harness }) => newThreadHint(text, list, harness)),
     pieces: call(({ text, slash, visible }) => slashPieces(text, slash, visible)),
+    fileQuery: call(({ text, caret }) => fileQuery(text, caret)),
+    pickFile: call(({ text, at, insert }) => pickFile(text, at, insert)),
     omniCommands: call(() => OMNI_COMMANDS)
   };
 })();

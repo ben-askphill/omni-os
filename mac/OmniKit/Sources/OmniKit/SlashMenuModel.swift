@@ -13,6 +13,8 @@ public enum SlashKey: Sendable {
 @MainActor @Observable
 public final class SlashMenuModel {
   public let commands: SlashCommandsStore
+  /// The files an `@` lists. Nil where there are none to name.
+  public let files: FileMentionsStore?
   public let placement: SlashWhere
   public var harness: String
   /// Called with the new text and caret (a UTF-16 offset) when a row is picked.
@@ -31,8 +33,9 @@ public final class SlashMenuModel {
   /// Bumped by `update` and `setFocused`, so a view re-reads.
   private var tick = 0
 
-  public init(commands: SlashCommandsStore, placement: SlashWhere, harness: String, engine: SlashEngine = .shared) {
+  public init(commands: SlashCommandsStore, files: FileMentionsStore? = nil, placement: SlashWhere, harness: String, engine: SlashEngine = .shared) {
     self.commands = commands
+    self.files = files
     self.placement = placement
     self.harness = harness
     self.engine = engine
@@ -45,7 +48,8 @@ public final class SlashMenuModel {
     self.caret = caret
     tick += 1
     // Deleting the command ends an Esc, so typing `/` again reopens the menu.
-    if query == nil { dismissed = nil }
+    if query == nil && fileAt == nil { dismissed = nil }
+    if let at = fileAt { files?.search(at.query) }
     loadWhenOpened()
   }
 
@@ -53,13 +57,17 @@ public final class SlashMenuModel {
     guard focused != isFocused else { return }
     isFocused = focused
     tick += 1
-    if focused { Task { await commands.load() } }
+    if focused {
+      Task { await commands.load() }
+      files?.invalidate()
+      if let at = fileAt { files?.search(at.query) }
+    }
     loadWhenOpened()
   }
 
   private func loadWhenOpened() {
     let open = isOpen
-    if open && !wasOpen { Task { await commands.load() } }
+    if open && !wasOpen && fileAt == nil { Task { await commands.load() } }
     wasOpen = open
   }
 
@@ -74,6 +82,27 @@ public final class SlashMenuModel {
 
   private var here: String? { query.map { "\($0.start)\0\(text)" } }
 
+  /// The file being typed at the caret: an `@` that starts a word. Never at the same time as a command.
+  public var fileAt: FileQuery? {
+    _ = tick
+    guard isFocused, files != nil, query == nil else { return nil }
+    return engine.fileQuery(text, caret: caret)
+  }
+
+  private var fileHere: String? { fileAt.map { "@\($0.start)\0\(text)" } }
+
+  /// Whether the open menu lists files, not commands.
+  public var isFileMenu: Bool { fileAt != nil }
+
+  public var fileRows: [FileMention] { files?.rows ?? [] }
+
+  private var rowCount: Int { isFileMenu ? fileRows.count : items.count }
+  private var rowIDs: [String] { isFileMenu ? fileRows.map(\.id) : items.map(\.id) }
+  private var navKey: String? {
+    if let f = fileAt { return "@\(f.start)\0\(f.query)" }
+    return query.map { "\($0.start)\0\($0.query)" }
+  }
+
   public var sections: [SlashSection] {
     guard let q = query else { return [] }
     let key = "\(q.query)\0\(q.isMention)\0\(commands.revision)\0\(placement.rawValue)"
@@ -87,21 +116,20 @@ public final class SlashMenuModel {
 
   /// A ready list with nothing matching shows no menu: the text is sent as it is.
   public var isOpen: Bool {
+    if fileAt != nil { return dismissed != fileHere && !fileRows.isEmpty }
     guard let here, dismissed != here else { return false }
     return !items.isEmpty || commands.list?.status != .ready
   }
 
   /// The row the highlight is on. It follows a command, not a row number, so a list that refreshes while open keeps it.
   public var activeIndex: Int {
-    guard let q = query else { return 0 }
-    let key = "\(q.start)\0\(q.query)"
-    guard nav.key == key, let row = nav.row, let i = items.firstIndex(where: { $0.id == row }) else { return 0 }
+    guard let key = navKey, nav.key == key, let row = nav.row, let i = rowIDs.firstIndex(of: row) else { return 0 }
     return i
   }
 
   public func setActive(_ index: Int) {
-    guard let q = query, items.indices.contains(index) else { return }
-    nav = ("\(q.start)\0\(q.query)", items[index].id)
+    guard let key = navKey, rowIDs.indices.contains(index) else { return }
+    nav = (key, rowIDs[index])
     tick += 1
   }
 
@@ -110,12 +138,13 @@ public final class SlashMenuModel {
   /// Arrow keys, Return, Tab and Esc drive the menu while it is open. True when the key was used.
   public func handle(_ key: SlashKey) -> Bool {
     guard isOpen else { return false }
-    let n = items.count
+    let n = rowCount
     switch key {
     case .up where n > 0: setActive((activeIndex - 1 + n) % n)
     case .down where n > 0: setActive((activeIndex + 1) % n)
-    case .return where n > 0, .tab where n > 0: pick(items[activeIndex])
-    case .escape: dismissed = here; tick += 1
+    case .return where n > 0, .tab where n > 0:
+      if isFileMenu { pick(file: fileRows[activeIndex]) } else { pick(items[activeIndex]) }
+    case .escape: dismissed = isFileMenu ? fileHere : here; tick += 1
     default: return false
     }
     return true
@@ -124,6 +153,15 @@ public final class SlashMenuModel {
   public func pick(_ command: SlashCommand) {
     guard let q = query else { return }
     let next = engine.pick(text, at: q, name: command.name)
+    text = next.text
+    caret = next.caret
+    tick += 1
+    onEdit?(next.text, next.caret)
+  }
+
+  public func pick(file: FileMention) {
+    guard let at = fileAt else { return }
+    let next = engine.pickFile(text, at: at, insert: file.insert)
     text = next.text
     caret = next.caret
     tick += 1

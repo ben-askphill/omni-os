@@ -8,6 +8,14 @@ struct SlashMenuView: View {
   let model: SlashMenuModel
 
   var body: some View {
+    if model.isFileMenu {
+      FileMenuView(model: model)
+    } else {
+      commandsBody
+    }
+  }
+
+  @ViewBuilder private var commandsBody: some View {
     let sections = model.sections
     let active = model.activeIndex
     ScrollViewReader { proxy in
@@ -71,6 +79,86 @@ struct SlashMenuView: View {
       .padding(.horizontal, 12)
       .padding(.vertical, 10)
     }
+  }
+}
+
+/// The `@` menu, as web/src/components/FileMenu.tsx: the thread's artifacts, then the repo's files.
+private struct FileMenuView: View {
+  let model: SlashMenuModel
+
+  var body: some View {
+    let rows = model.fileRows
+    let active = model.activeIndex
+    ScrollViewReader { proxy in
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(Array(rows.enumerated()), id: \.element.id) { i, row in
+            FileRow(row: row, isActive: i == active, onHover: { model.setActive(i) }, onPick: { model.pick(file: row) })
+              .id(row.id)
+          }
+        }
+        .padding(6)
+      }
+      .scrollIndicators(.automatic)
+      .onChange(of: active) {
+        if rows.indices.contains(active) { proxy.scrollTo(rows[active].id) }
+      }
+    }
+    .frame(maxHeight: 352)
+    .fixedSize(horizontal: false, vertical: true)
+    .background(Tok.elev, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .menuShadow(22)
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Files")
+  }
+}
+
+private struct FileRow: View {
+  let row: FileMention
+  let isActive: Bool
+  let onHover: () -> Void
+  let onPick: () -> Void
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 10) {
+      Image(systemName: "doc")
+        .font(.system(size: 13))
+        .foregroundStyle(Tok.fg3)
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        Text(row.name)
+          .font(.system(size: 13, weight: .medium))
+          .foregroundStyle(Tok.fg)
+          .lineLimit(1)
+          .layoutPriority(1)
+        Text(row.detail)
+          .font(.system(size: 11.5))
+          .foregroundStyle(Tok.fg4)
+          .lineLimit(1)
+          .truncationMode(.head)
+      }
+      Spacer(minLength: 0)
+      if row.kind == .artifact {
+        Text("artifact")
+          .font(.system(size: 11))
+          .foregroundStyle(Tok.fg3)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 1)
+          .background(Tok.surface2, in: Capsule())
+      }
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 6)
+    .frame(minHeight: 40)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(isActive ? Tok.wash : .clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .contentShape(Rectangle())
+    .onTapGesture(perform: onPick)
+    .onContinuousHover { phase in
+      if case .active = phase, !isActive { onHover() }
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
   }
 }
 
