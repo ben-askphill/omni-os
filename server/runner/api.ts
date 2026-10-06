@@ -6,6 +6,7 @@ import { commandsFolder, prepareWorkdir } from '../sandbox.ts';
 import { prepareTurn, turnBlocked } from '../sync/guard.ts';
 import { parseSlash, resolveSlash, slashRecord, type SlashCommand, type SlashRecord } from '../../shared/slash.ts';
 import { listCommands, peekCommands } from '../commands.ts';
+import { withMentions } from '../mentions.ts';
 import { saveUploads, type Attachment } from '../uploads.ts';
 import type { HarnessId } from '../harness/types.ts';
 import type { Catalog } from '../harness/catalog.ts';
@@ -137,7 +138,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const { text, slash, commands } = slashFor(input.prompt, () => peekCommands(harness as HarnessId, folder).commands);
   deliver(thread.id, {
     uuid: randomUUID(),
-    text,
+    text: withMentions(text, { cwd: thread.cwd, threadId: thread.id }),
     mode: 'steer',
     attachments,
     commands,
@@ -225,7 +226,7 @@ export function sendMessage(
   const { text, slash, commands } = slashFor(prompt, () => (threadCommands(threadId) ?? peekCommands(thread.harness as HarnessId, thread.cwd)).commands);
   deliver(threadId, {
     uuid: randomUUID(),
-    text,
+    text: withMentions(text, { cwd: thread.cwd, threadId }),
     mode: opts.mode ?? 'steer',
     attachments,
     commands,

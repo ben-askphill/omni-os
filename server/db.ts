@@ -10,7 +10,7 @@ seedSystemChannels();
 export { db, tx } from './db/connection.ts';
 export { migrate } from './db/migrate.ts';
 export type { ChannelKind, Channel } from './db/repos/channels.ts';
-export { channels } from './db/repos/channels.ts';
+export { channels, publicChannel } from './db/repos/channels.ts';
 export type { ThreadStatus, ThreadSource, Thread } from './db/repos/threads.ts';
 export { THREAD_COLUMNS, threads } from './db/repos/threads.ts';
 export type { EventRow } from './db/repos/events.ts';

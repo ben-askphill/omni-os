@@ -20,6 +20,8 @@ struct ChannelSettingsForm: View {
   @State private var svgError: String?
   /// The harness list as the model picker last fetched it, over the workspace's.
   @State private var fetchedHarnesses: [HarnessInfo]?
+  @State private var designBusy = false
+  @State private var designError: String?
 
   init(model: AppModel, existing: Channel? = nil) {
     self.model = model
@@ -45,6 +47,79 @@ struct ChannelSettingsForm: View {
       return
     }
   }
+  /// Sent as soon as the file is chosen, not with Save: the file is too big to hold in the form.
+  private func chooseDesignSystem() {
+    guard let existing else { return }
+    let panel = NSOpenPanel()
+    panel.allowedContentTypes = [.html]
+    panel.allowsMultipleSelection = false
+    panel.prompt = "Use file"
+    panel.message = "Choose the channel's design system, a standalone HTML file"
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    designError = nil
+    guard let data = try? Data(contentsOf: url) else { designError = "Could not read that file."; return }
+    switch DesignSystemFile.read(data) {
+    case .failure(let e): designError = e.message
+    case .success(let html):
+      Task { await changeDesignSystem(existing.id, set: (url.lastPathComponent, html)) }
+    }
+  }
+
+  /// Sets the channel's design system to a file, or removes it when there is none.
+  private func changeDesignSystem(_ id: String, set file: (name: String, html: String)? = nil) async {
+    designBusy = true
+    designError = nil
+    defer { designBusy = false }
+    do {
+      if let file {
+        _ = try await model.client.setDesignSystem(id, name: file.name, html: file.html)
+      } else {
+        _ = try await model.client.removeDesignSystem(id)
+      }
+      await model.store.reloadChannels()
+    } catch {
+      designError = error.message
+    }
+  }
+
+  private var designSystem: some View {
+    SettingsField(
+      "Design system",
+      hint: "One standalone HTML file with your tokens, type and components. Threads in this channel read it before they write an HTML page, so every artifact looks the same. Saved as soon as you pick the file."
+    ) {
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(spacing: 8) {
+          if let name = existing?.designSystemName, let existing {
+            HStack(spacing: 8) {
+              OmniIcon(name: "file", size: 14)
+              Link(name, destination: model.client.designSystemURL(existing.id))
+              Text("\(max(1, Int((Double(existing.designSystemSize) / 1024).rounded()))) KB").foregroundStyle(Tok.fg3)
+            }
+            .font(.system(size: 13))
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .background(Capsule().fill(Tok.surface))
+          }
+          Button { chooseDesignSystem() } label: {
+            HStack(spacing: 6) {
+              if designBusy { Loader(size: 14) } else { OmniIcon(name: "file", size: 14) }
+              Text(existing?.designSystemName == nil ? "Upload HTML file" : "Replace file")
+            }
+          }
+          .buttonStyle(.pill(.secondary, height: 30))
+          .disabled(designBusy)
+          if existing?.designSystemName != nil, let existing {
+            Button("Remove") { Task { await changeDesignSystem(existing.id) } }
+              .buttonStyle(.pill(.secondary, height: 30))
+              .disabled(designBusy)
+          }
+          Spacer(minLength: 0)
+        }
+        if let designError { ErrorNote(text: designError) }
+      }
+    }
+  }
+
   private var isSystem: Bool { existing?.kind == .system }
 
   var body: some View {
@@ -110,6 +185,7 @@ struct ChannelSettingsForm: View {
       SettingsField("Default model", hint: "What a new thread here starts on. A thread or crew role that picks its own wins.") {
         runDefaults
       }
+      if !isNew { designSystem }
       SettingsField("Notes", hint: "Added to every thread's system prompt in this channel. Keep it short: who the client is, conventions, what not to touch.") {
         OmniTextEditor(text: $form.notes)
           .accessibilityLabel("Notes")

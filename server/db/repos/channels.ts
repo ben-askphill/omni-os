@@ -21,6 +21,9 @@ export interface Channel {
   default_harness: string | null;
   default_model: string | null;
   default_effort: string | null;
+  /** A standalone HTML file the channel's threads follow for the pages they write. Kept out of the API: see publicChannel. */
+  design_system: string | null;
+  design_system_name: string | null;
   archived: number;
   created_at: string;
 }
@@ -70,7 +73,7 @@ export const channels = {
   update(id: string, patch: Partial<Channel>) {
     const allowed = [
       'name', 'kind', 'repo_path', 'github_repo', 'use_worktree', 'base_dir',
-      'store_domain', 'portal_slug', 'browser_headless', 'notes', 'icon', 'archived',
+      'store_domain', 'portal_slug', 'browser_headless', 'notes', 'icon', 'design_system', 'design_system_name', 'archived',
       'default_harness', 'default_model', 'default_effort',
     ] as const;
     const keys = allowed.filter((k) => k in patch);
@@ -86,3 +89,8 @@ export const channels = {
     return channels.get(id);
   },
 };
+
+/** The channel as the API sends it: the design system's name and size, never the file, which can be large. */
+export function publicChannel<T extends Channel>({ design_system, ...rest }: T) {
+  return { ...rest, design_system_size: design_system ? Buffer.byteLength(design_system) : 0 };
+}

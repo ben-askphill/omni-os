@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS channels (
   browser_headless INTEGER NOT NULL DEFAULT 1,
   notes TEXT,
   icon TEXT,
+  design_system TEXT,
+  design_system_name TEXT,
   archived INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -138,6 +140,9 @@ export function migrate() {
   ensureColumn('channels', 'icon', 'TEXT');
   // What a new thread in the channel runs on when neither the thread nor its role picks (server/harness/resolve.ts).
   for (const col of ['default_harness', 'default_model', 'default_effort']) ensureColumn('channels', col, 'TEXT');
+  // The channel's design system: one standalone HTML file for the pages its threads write, and the file's name.
+  ensureColumn('channels', 'design_system', 'TEXT');
+  ensureColumn('channels', 'design_system_name', 'TEXT');
   // The claude.ai page an artifact was published as (shared/published.ts), and what the publish said it was.
   ensureColumn('artifacts', 'url', 'TEXT');
   ensureColumn('artifacts', 'description', 'TEXT');

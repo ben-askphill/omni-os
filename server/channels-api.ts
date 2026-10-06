@@ -3,7 +3,8 @@ import { Hono } from 'hono';
 import { existsSync } from 'node:fs';
 import { z } from 'zod';
 import { parseChannelIcon, readSvgIcon, SVG_MAX, SVG_PREFIX } from '../shared/channel-icon.ts';
-import { channels, threads, type Channel, type Thread } from './db.ts';
+import { readDesignSystem } from '../shared/design-system.ts';
+import { channels, publicChannel, threads, type Channel, type Thread } from './db.ts';
 import { detectRepo } from './github.ts';
 import { getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
@@ -74,7 +75,7 @@ const stub = ({ id, channel_id, title, status, created_at }: Thread) => ({ id, c
 const withActive = (ch: Channel, busy: Thread[], recent: Thread[]) => {
   const mine = busy.filter((t) => t.channel_id === ch.id && t.source !== 'team');
   return {
-    ...ch,
+    ...publicChannel(ch),
     running: mine.length,
     active: mine.map(stub),
     recent: recent.filter((t) => t.channel_id === ch.id).map(stub),
@@ -102,7 +103,7 @@ channelsApi.post('/', async (c) => {
   if (runError) return c.json({ error: runError }, 400);
   if (body.repo_path && !existsSync(body.repo_path)) return c.json({ error: `repo path not found: ${body.repo_path}` }, 400);
   if (body.repo_path && !body.github_repo) body.github_repo = await detectRepo(body.repo_path);
-  return c.json(channels.create(body as any));
+  return c.json(publicChannel(channels.create(body as any)));
 });
 
 channelsApi.patch('/:id', async (c) => {
@@ -116,7 +117,34 @@ channelsApi.patch('/:id', async (c) => {
   const runError = runDefaultsError(body, current);
   if (runError) return c.json({ error: runError }, 400);
   if (body.repo_path && !body.github_repo && !current.github_repo) body.github_repo = await detectRepo(body.repo_path);
-  return c.json(channels.update(id, body as any));
+  return c.json(publicChannel(channels.update(id, body as any)!));
+});
+
+/** The channel's design system: a standalone HTML file. PUT replaces it, DELETE removes it, GET returns the file. */
+channelsApi.get('/:id/design-system', (c) => {
+  const ch = channels.get(c.req.param('id'));
+  if (!ch?.design_system) return c.json({ error: 'not found' }, 404);
+  // Sandboxed, so opening the file in a tab never runs its scripts with this server's origin.
+  return c.body(ch.design_system, 200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': 'sandbox' });
+});
+
+channelsApi.put('/:id/design-system', async (c) => {
+  const id = c.req.param('id');
+  if (!channels.get(id)) return c.json({ error: 'not found' }, 404);
+  const body = z.object({ name: z.string().trim().min(1).max(200), html: z.string() }).parse(await c.req.json());
+  let html: string;
+  try {
+    html = readDesignSystem(body.html);
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 400);
+  }
+  return c.json(publicChannel(channels.update(id, { design_system: html, design_system_name: body.name })!));
+});
+
+channelsApi.delete('/:id/design-system', (c) => {
+  const id = c.req.param('id');
+  if (!channels.get(id)) return c.json({ error: 'not found' }, 404);
+  return c.json(publicChannel(channels.update(id, { design_system: null, design_system_name: null })!));
 });
 
 channelsApi.get('/:id/threads', (c) => c.json(threads.byChannel(c.req.param('id'), 200, c.req.query('archived') === '1')));

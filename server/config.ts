@@ -69,5 +69,7 @@ for (const p of [paths.data, paths.threads, paths.worktrees, paths.browsers]) mk
 
 export const threadDir = (threadId: string) => join(paths.threads, threadId);
 export const artifactsDir = (threadId: string) => join(paths.threads, threadId, 'artifacts');
+/** The channel's design system, written here before each turn. Not in artifacts/, which Omni renders in the thread. */
+export const designSystemFile = (threadId: string) => join(paths.threads, threadId, 'design-system.html');
 export const browserOutDir = (threadId: string) => join(paths.threads, threadId, 'browser');
 export const uploadsDir = (threadId: string) => join(paths.threads, threadId, 'uploads');

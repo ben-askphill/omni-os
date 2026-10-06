@@ -11,11 +11,13 @@
   "browser_headless": 1,
   "notes": "Fixture",
   "icon": null,
+  "design_system_name": null,
   "archived": 0,
   "created_at": "2026-01-05T09:00:00.000Z",
   "default_harness": null,
   "default_model": null,
   "default_effort": null,
+  "design_system_size": 0,
   "running": 1,
   "active": [
     {

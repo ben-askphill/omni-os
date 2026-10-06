@@ -8,6 +8,7 @@ import { CrewMark, HarnessLogo, harnessLabel, isCrewRole } from './brand.tsx';
 import { EffortPicker, ModelPicker, type ModelChoice } from './ModelPicker.tsx';
 import { threadRunLabels } from '../thread-run.ts';
 import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
+import { FileMenu, useFileMenu } from './FileMenu.tsx';
 import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '../../../shared/slash-menu.ts';
 import { menuCommands, newThreadHint, replySlash } from '../../../shared/composer-slash.ts';
 import { channelRun, newThreadBody, otherModel, runPreselect, sameSettings } from '../new-thread-preset.ts';
@@ -213,6 +214,7 @@ function Hint({ tab = false }: { tab?: boolean }) {
       <span>↵ send</span>
       <span>{isMac ? '⌘↵' : 'Ctrl ↵'} newline</span>
       <span>/ commands</span>
+      <span>@ files</span>
     </span>
   );
 }
@@ -359,6 +361,35 @@ function useSlashMenu({
   return { open, menu, onKey, textarea };
 }
 
+/** The `/` and `@` menus on one textarea: the handlers of both, and the keys go to whichever is open. */
+function joinMenus(slash: ReturnType<typeof useSlashMenu>, files: ReturnType<typeof useFileMenu>) {
+  const { aria, ...f } = files.textarea;
+  return {
+    textarea: {
+      ...slash.textarea,
+      onChange: (e: ChangeEvent<HTMLTextAreaElement>) => {
+        slash.textarea.onChange(e);
+        f.onChange(e);
+      },
+      onSelect: (e: SyntheticEvent<HTMLTextAreaElement>) => {
+        slash.textarea.onSelect(e);
+        f.onSelect(e);
+      },
+      onFocus: (e: ReactFocusEvent<HTMLTextAreaElement>) => {
+        slash.textarea.onFocus(e);
+        f.onFocus(e);
+      },
+      onBlur: () => {
+        slash.textarea.onBlur();
+        f.onBlur();
+      },
+      ...(files.open ? aria : {}),
+    },
+    onKey: (e: ReactKeyboardEvent<HTMLTextAreaElement>) => slash.onKey(e) || files.onKey(e),
+    open: slash.open || files.open,
+  };
+}
+
 /** Starts a new thread. `channelId` fixes the channel (channel page); otherwise a picker is shown. */
 export function NewThreadComposer({
   channelId,
@@ -452,6 +483,8 @@ export function NewThreadComposer({
   // ----- the `/` menu: the harness in the picker, for the folder a thread in this channel reads its commands from -----
   const commands = useCommands(`harness=${encodeURIComponent(choice.harness)}&channel=${encodeURIComponent(channel)}`);
   const slashMenu = useSlashMenu({ ref, text, onText: update, commands, where: 'new-thread' });
+  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `channel=${encodeURIComponent(channel)}` });
+  const menus = joinMenus(slashMenu, fileMenu);
   const hint = useMemo(() => newThreadHint(text, commands.list, choice.harness), [text, commands.list, choice.harness]);
   // Another harness or channel has its own list: fetch it for what is typed, so the hint re-checks it.
   const latest = useRef(text);
@@ -501,14 +534,15 @@ export function NewThreadComposer({
       <DropHint over={att.over} />
       {/* Near the top of the page, so it opens downward. */}
       {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
+      {fileMenu.menu && <FileMenu {...fileMenu.menu} below />}
       <AttachmentStrip files={att.files} onRemove={att.remove} />
       <textarea
         ref={ref}
         value={text}
-        {...slashMenu.textarea}
+        {...menus.textarea}
         onPaste={att.onPaste}
         onKeyDown={(e) => {
-          if (slashMenu.onKey(e)) return;
+          if (menus.onKey(e)) return;
           if (enterKey(e, text, update)) void submit();
         }}
         rows={big ? 3 : 2}
@@ -540,7 +574,7 @@ export function NewThreadComposer({
         </div>
       </div>
       {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
-      <div aria-live="polite">{hint && !slashMenu.open && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
+      <div aria-live="polite">{hint && !menus.open && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
       {roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
       {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
     </div>
@@ -745,6 +779,8 @@ export function ReplyComposer({
   const commands = useCommands(`thread=${encodeURIComponent(threadId)}`);
   const { list } = commands;
   const slashMenu = useSlashMenu({ ref, text, onText: update, commands, where: 'reply' });
+  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(threadId)}` });
+  const menus = joinMenus(slashMenu, fileMenu);
 
   // `mode` only matters while a turn is in progress; an idle thread just starts the next turn.
   const submit = async (mode?: SendMode) => {
@@ -821,15 +857,16 @@ export function ReplyComposer({
     <div className={shell('rounded-xl bg-surface', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
       {slashMenu.menu && <SlashMenu {...slashMenu.menu} />}
+      {fileMenu.menu && <FileMenu {...fileMenu.menu} />}
       <AttachmentStrip files={att.files} onRemove={att.remove} />
       <textarea
         ref={ref}
         data-reply-composer
         value={text}
-        {...slashMenu.textarea}
+        {...menus.textarea}
         onPaste={att.onPaste}
         onKeyDown={(e) => {
-          if (slashMenu.onKey(e)) return;
+          if (menus.onKey(e)) return;
           if (e.key === 'Tab' && suggestion && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             return update(suggestion);
@@ -865,7 +902,7 @@ export function ReplyComposer({
       </div>
       {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
       <div aria-live="polite">
-        {slash.hint && !slashMenu.open && (
+        {slash.hint && !menus.open && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pb-2.5 text-[12px] text-fg-3">
             <span>{slash.hint}</span>
             {slash.action.kind === 'fixed' && (

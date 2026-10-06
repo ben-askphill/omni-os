@@ -25,6 +25,9 @@ public struct Channel: Decodable, Hashable, Sendable, Identifiable {
   public let notes: String?
   /// One emoji shown in place of the letter avatar and the sidebar's #.
   public let icon: String?
+  /// The name and size in bytes of the channel's design system file, a standalone HTML page its threads follow. The file stays on the server.
+  public let designSystemName: String?
+  public let designSystemSize: Int
   public let archived: Bool
   public let createdAt: Date
   /// What a new thread here runs on unless the thread or its crew role picks. nil is Claude Code's default.
@@ -35,6 +38,8 @@ public struct Channel: Decodable, Hashable, Sendable, Identifiable {
   enum CodingKeys: String, CodingKey {
     case id, name, kind, notes, icon, archived
     case repoPath = "repo_path"
+    case designSystemName = "design_system_name"
+    case designSystemSize = "design_system_size"
     case githubRepo = "github_repo"
     case useWorktree = "use_worktree"
     case baseDir = "base_dir"
@@ -61,6 +66,8 @@ public struct Channel: Decodable, Hashable, Sendable, Identifiable {
     browserHeadless = try c.decodeFlag(.browserHeadless)
     notes = try c.decodeIfPresent(String.self, forKey: .notes)
     icon = try c.decodeIfPresent(String.self, forKey: .icon)
+    designSystemName = try c.decodeIfPresent(String.self, forKey: .designSystemName)
+    designSystemSize = try c.decodeIfPresent(Int.self, forKey: .designSystemSize) ?? 0
     archived = try c.decodeFlag(.archived)
     createdAt = try c.decode(Date.self, forKey: .createdAt)
     defaultHarness = try c.decodeIfPresent(String.self, forKey: .defaultHarness).flatMap { $0.isEmpty ? nil : HarnessID(rawValue: $0) }
