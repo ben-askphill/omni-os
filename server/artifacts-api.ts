@@ -1,4 +1,4 @@
-// /api/artifacts: recent artifacts, and the raw file for one of them.
+// /api/artifacts: recent artifacts, published pages, and the raw file for one of them.
 import { Hono } from 'hono';
 import { existsSync, readFileSync } from 'node:fs';
 import { relative } from 'node:path';
@@ -10,6 +10,11 @@ import { threadFilesReady } from './sync/files.ts';
 export const artifactsApi = new Hono();
 
 artifactsApi.get('/', (c) => c.json(artifacts.recent()));
+
+/** Pages threads published to claude.ai, one row per page, newest first. */
+artifactsApi.get('/published', (c) =>
+  c.json(artifacts.published(c.req.query('channel') || undefined, Math.min(200, Number(c.req.query('limit')) || 50))),
+);
 
 artifactsApi.get('/:id/raw', async (c) => {
   const a = artifacts.get(Number(c.req.param('id')));

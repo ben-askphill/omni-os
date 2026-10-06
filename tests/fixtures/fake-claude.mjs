@@ -23,6 +23,7 @@
 //   SUGGEST_NONE      text mode (Omni's reply suggestion): answer NONE
 //   RICH              before the answer, the calls a real turn is made of: a plan updated as it goes, a sub-agent
 //                     with calls of its own, a status, a failing command and an MCP tool
+//   PUBLISH:<path>    an Artifact tool call that publishes that file, answered "Published <path> at <url>" like the real CLI
 //   ORPHAN            leave a child behind that holds our stdout until it is killed (two minutes at most), like a
 //                     daemon started without redirecting its output: once we exit, the runner never sees our pipes close
 // Env:
@@ -273,6 +274,7 @@ async function runTurn() {
   const tools = [];
   let think = 0;
   let rich = false;
+  const publishes = [];
   let steps = 0;
 
   emit({
@@ -301,6 +303,7 @@ async function runTurn() {
       if (m.text.includes('IGNORE_INTERRUPT')) t.ignoreInterrupt = true;
       if (m.text.includes('ORPHAN')) leaveOrphan();
       if (m.text.includes('RICH')) rich = true;
+      for (const x of m.text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
     }
     return true;
   };
@@ -323,6 +326,12 @@ async function runTurn() {
   if (rich) {
     steps += await richCalls(t);
     if (dead) return;
+  }
+  for (const file of publishes.splice(0)) {
+    const toolId = `toolu_fake_${++seq}`;
+    steps++;
+    assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id: toolId, name: 'Artifact', input: { file_path: file, description: 'A fake page', icon: 'chart' } }]);
+    toolResult(toolId, `Published ${file} at https://claude.ai/code/artifact/00000000-0000-4000-8000-${String(seq).padStart(12, '0')}`, false);
   }
   for (;;) {
     // One model call: either a tool call or the final answer.

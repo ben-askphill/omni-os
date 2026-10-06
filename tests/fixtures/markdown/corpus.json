@@ -14,7 +14,7 @@
     },
     {
       "name": "thread-id-linking",
-      "summary": "A thread id inside a URL stays in the URL on the Mac; the web links the id and breaks the URL. An id in <...> or _..._ is linked on the Mac and not on the web."
+      "summary": "An id in <...> or _..._ is linked on the Mac and not on the web."
     },
     {
       "name": "relative-link",
@@ -493,8 +493,8 @@
     {
       "id": "thread-id-inside-url",
       "source": "https://x.com/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b",
-      "difference": "thread-id-linking",
-      "web": "<div class=\"md \"><p><a href=\"https://x.com/t/%5B0b7c6d2e\" target=\"_blank\" rel=\"noopener noreferrer\">https://x.com/t/[0b7c6d2e</a>](#/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b)</p></div>",
+      "difference": null,
+      "web": "<div class=\"md \"><p><a href=\"https://x.com/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b\" target=\"_blank\" rel=\"noopener noreferrer\">https://x.com/t/0b7c6d2e-5a1f-4c3e-9d8b-7a6f5e4d3c2b</a></p></div>",
       "mac": [
         {
           "type": "paragraph",

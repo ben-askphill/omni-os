@@ -7,6 +7,10 @@ public struct ArtifactRef: Codable, Hashable, Sendable, Identifiable {
   public let kind: String
   public let size: Int
   public let updatedAt: Date
+  /// Optional so a window saved by an older version still reopens.
+  public let threadID: String?
+  /// The claude.ai page the file was published as.
+  public let url: String?
 
   public init(_ a: Artifact) {
     id = a.id
@@ -14,6 +18,8 @@ public struct ArtifactRef: Codable, Hashable, Sendable, Identifiable {
     kind = a.kind
     size = a.size
     updatedAt = a.updatedAt
+    threadID = a.threadID
+    url = a.url
   }
 
   /// Rendered in a web view, not natively.

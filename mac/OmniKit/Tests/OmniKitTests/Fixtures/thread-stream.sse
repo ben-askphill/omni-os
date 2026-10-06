@@ -48,7 +48,7 @@ data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","ch
 
 data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart and the tests","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","suggestion":null,"archived":0,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[{"uuid":"00000000-0000-4000-8000-000000000002","kind":"user","text":"then tidy up","source":"ben","mode":"queue","state":"held"}],"live":true}
 
-data: {"kind":"artifact","artifact":{"id":1,"thread_id":"00000000-0000-4000-8000-000000000001","path":"/tmp/omni-fixtures/data/threads/00000000-0000-4000-8000-000000000001/artifacts/report.md","name":"report.md","kind":"markdown","size":9,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"}}
+data: {"kind":"artifact","artifact":{"id":1,"thread_id":"00000000-0000-4000-8000-000000000001","path":"/tmp/omni-fixtures/data/threads/00000000-0000-4000-8000-000000000001/artifacts/report.md","name":"report.md","kind":"markdown","size":9,"url":null,"description":null,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"}}
 
 data: {"id":12,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"tool_result","payload":"{\"tool_use_id\":\"toolu_fake_3\",\"text\":\"slept 4000ms\",\"is_error\":false,\"truncated\":false}","created_at":"2026-01-05T09:00:00.000Z"}
 id: 12

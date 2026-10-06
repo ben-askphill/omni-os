@@ -61,6 +61,23 @@ export const events = {
       .all(threadId, threadId, after) as { payload: string }[];
     return rows.map((r) => JSON.parse(r.payload).text as string).join('\n\n');
   },
+  /** The payload of a thread's tool_use event, by the tool call's id. */
+  toolUse(threadId: string, toolUseId: string): { id: string; name: string; input: unknown } | null {
+    const row = db
+      .prepare(`SELECT payload FROM events WHERE thread_id = ? AND kind = 'tool_use' AND json_extract(payload, '$.id') = ? ORDER BY id DESC LIMIT 1`)
+      .get(threadId, toolUseId) as { payload: string } | undefined;
+    return row ? JSON.parse(row.payload) : null;
+  },
+  /** Every Artifact tool call that has a result, oldest first, for linking what was published before Omni tracked it. */
+  artifactCalls(): { thread_id: string; use: string; result: string }[] {
+    return db
+      .prepare(
+        `SELECT u.thread_id, u.payload AS use, r.payload AS result FROM events u
+         JOIN events r ON r.thread_id = u.thread_id AND r.kind = 'tool_result' AND json_extract(r.payload, '$.tool_use_id') = json_extract(u.payload, '$.id')
+         WHERE u.kind = 'tool_use' AND json_extract(u.payload, '$.name') = 'Artifact' ORDER BY r.id`,
+      )
+      .all() as { thread_id: string; use: string; result: string }[];
+  },
   /** The text of the thread's first message: a team lead's brief. */
   firstUserText(threadId: string): string | null {
     const row = db.prepare(`SELECT payload FROM events WHERE thread_id = ? AND kind = 'user' ORDER BY id LIMIT 1`).get(threadId) as

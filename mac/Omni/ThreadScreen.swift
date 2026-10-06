@@ -381,6 +381,7 @@ private struct TranscriptRows: View {
     let agents = Set(model.store.tasks.filter { $0.threadID == store.id }.compactMap(\.toolUseID))
     let known = Dictionary((store.children + store.team).map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
     let members = Delegation.team(of: store.children)
+    let pages = PublishedPage.byGroup(transcript.items)
     let first = transcript.items.first?.id
     let live: TranscriptItemID? =
       if case .tools(let g)? = transcript.last, transcript.isLive(g, running: running) { .event(g.eventID) } else { nil }
@@ -391,7 +392,7 @@ private struct TranscriptRows: View {
       ForEach(transcript.items) { item in
         TranscriptRow(
           item: item, live: item.id == live, running: running, cwd: cwd, threadID: store.id, model: model, ui: ui,
-          markdown: markdown, agents: agents, known: known
+          markdown: markdown, agents: agents, known: known, pages: pages, artifacts: store.artifacts
         )
         .copyMenu { TranscriptMarkdown.copyText(item, cwd: cwd) }
         // A team lead's members, under its brief.
@@ -421,6 +422,9 @@ private struct TranscriptRow: View {
   var agents: Set<String> = []
   /// Threads this one started and their team members, for the delegation cards.
   var known: [String: OmniThread] = [:]
+  /// Pages the thread published, by the tool group that shows each one's card.
+  var pages: [Int: [PublishedPage]] = [:]
+  var artifacts: [Artifact] = []
 
   var body: some View {
     switch item {
@@ -446,6 +450,9 @@ private struct TranscriptRow: View {
         }
         if !agentsFirst { subagentCard(subagents) }
         ForEach(cards) { DelegationCard(delegation: $0, model: model) }
+        ForEach(pages[group.eventID] ?? []) { page in
+          PublishedCard(page: page, threadID: threadID, artifact: artifacts.last { $0.url == page.url }, model: model)
+        }
       }
     case .plan(let plan):
       PlanCard(plan: plan)

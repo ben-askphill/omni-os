@@ -269,7 +269,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                 </ErrorNote>
               )}
               {/* Queued means waiting for a slot: nothing is working yet. */}
-              <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} />
+              <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} />
               <QueuedMessages items={queued} starting={betweenTurns} />
             </div>
           </div>
