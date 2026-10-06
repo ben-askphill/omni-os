@@ -22,6 +22,7 @@ struct ThreadListRow: View {
   let model: AppModel
   let thread: OmniThread
   var showChannel = false
+  var pr: BranchPRMark?
   @State private var hovering = false
 
   private static let sources: [ThreadSource: String] = [
@@ -42,6 +43,7 @@ struct ThreadListRow: View {
               .lineLimit(1)
             if let role = thread.role, !role.isEmpty { Chip(text: role) }
             if let source = Self.sources[thread.source] { Chip(text: source, tone: .outline) }
+            if let pr { PRMarkIcon(pr: pr) }
             Spacer(minLength: 8)
             TimelineView(.everyMinute) { _ in
               Text(Format.relTime(thread.updatedAt))
@@ -106,11 +108,26 @@ struct ThreadListRow: View {
   }
 }
 
+/// A small PR icon on a thread row: live when the PR is open, done when it merged, as PRMark in ThreadList.tsx.
+struct PRMarkIcon: View {
+  let pr: BranchPRMark
+
+  var body: some View {
+    OmniIcon(name: "pr", size: 12)
+      .foregroundStyle(pr.isMerged ? Tok.ink : Tok.onLive)
+      .frame(width: 20, height: 20)
+      .background(pr.isMerged ? Tok.done : Tok.live, in: Circle())
+      .help("PR #\(pr.number) \(pr.badge)")
+      .accessibilityLabel("PR #\(pr.number) \(pr.badge)")
+  }
+}
+
 /// Threads in runs of a day, each under its date, as ThreadGroups in ThreadList.tsx.
 struct ThreadDayList: View {
   let model: AppModel
   let threads: [OmniThread]
   var showChannel = false
+  var prs: [String: BranchPRMark] = [:]
 
   var body: some View {
     LazyVStack(alignment: .leading, spacing: 12) {
@@ -125,7 +142,7 @@ struct ThreadDayList: View {
           .padding(.horizontal, 10)
           .padding(.vertical, 6)
           ForEach(group.threads) {
-            ThreadListRow(model: model, thread: $0, showChannel: showChannel).openInNewWindow($0.id, model: model)
+            ThreadListRow(model: model, thread: $0, showChannel: showChannel, pr: $0.branch.flatMap { prs[$0] }).openInNewWindow($0.id, model: model)
           }
         }
       }

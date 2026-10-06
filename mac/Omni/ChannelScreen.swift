@@ -204,6 +204,7 @@ private struct ChannelThreads: View {
   let model: AppModel
   let channel: ChannelWithRunning
   @State private var loaded: [OmniThread]?
+  @State private var prs: [String: BranchPRMark] = [:]
   @State private var error: String?
 
   var body: some View {
@@ -218,12 +219,20 @@ private struct ChannelThreads: View {
       } else if threads.isEmpty {
         EmptyNote(symbol: "message", title: "No threads in this channel yet", message: "Start one above. Crew threads delegated by the Conductor land here too.")
       } else {
-        ThreadDayList(model: model, threads: threads)
+        ThreadDayList(model: model, threads: threads, prs: prs)
       }
     }
     .task(id: "\(channel.id)/\(ObjectIdentifier(model.store).hashValue)") {
       loaded = nil
+      prs = [:]
       await load()
+    }
+    // A merge shows up within a minute, as on the web.
+    .task(id: channel.id) {
+      while !Task.isCancelled {
+        if let marks = try? await model.client.threadPullRequests(in: channel.id) { prs = marks }
+        try? await Task.sleep(for: .seconds(60))
+      }
     }
   }
 

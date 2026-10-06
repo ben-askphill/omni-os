@@ -207,7 +207,25 @@ public struct ThreadPullRequests: Decodable, Hashable, Sendable {
   }
 }
 
+/// What GET /api/channels/:id/thread-prs marks a branch with: its open or merged PR.
+public struct BranchPRMark: Decodable, Hashable, Sendable {
+  public let number: Int
+  /// `OPEN` or `MERGED`.
+  public let state: String
+  public let isDraft: Bool
+  public let url: String
+
+  public var isMerged: Bool { state == "MERGED" }
+  /// The word the thread list's icon is labelled with, as the composer's `badge`.
+  public var badge: String { isMerged ? "merged" : isDraft ? "draft" : "open" }
+}
+
 extension OmniClient {
+  /// Branch name to its open or merged PR, for marking threads in a list.
+  public func threadPullRequests(in channel: String) async throws(OmniAPIError) -> [String: BranchPRMark] {
+    try await send("GET", "/api/channels/\(uriComponent(channel))/thread-prs")
+  }
+
   /// The PRs opened from a thread's branch, open or not.
   public func pullRequests(forThread id: String) async throws(OmniAPIError) -> ThreadPullRequests {
     try await send("GET", "/api/threads/\(uriComponent(id))/pr")

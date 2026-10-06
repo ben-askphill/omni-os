@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { api, errorText, useApi, type ChannelWithRunning, type Thread } from '../api.ts';
 import { NewThreadComposer } from '../components/Composer.tsx';
-import { ThreadGroups, useLiveThreads } from '../components/ThreadList.tsx';
+import { ThreadGroups, useLiveThreads, useThreadPRs } from '../components/ThreadList.tsx';
 import { Avatar, Button, Empty, StatusDot, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { href, type ChannelTab } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -11,6 +11,7 @@ import { PRDetail, PRList } from './PRs.tsx';
 function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
   const accept = useCallback((t: Thread) => t.channel_id === id, [id]);
   const list = useLiveThreads(`/channels/${encodeURIComponent(id)}/threads`, accept);
+  const prs = useThreadPRs(id);
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-16 md:px-8">
       <NewThreadComposer channelId={id} placeholder={isConductor ? 'Ask the Conductor. It delegates to the crew.' : undefined} />
@@ -20,6 +21,7 @@ function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
           loading={list.loading}
           error={list.error}
           onRetry={list.reload}
+          prs={prs}
           empty={
             <Empty icon="message" title="No threads in this channel yet">
               Start one above. Crew threads delegated by the Conductor land here too.

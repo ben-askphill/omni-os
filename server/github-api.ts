@@ -2,7 +2,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { channels, threads } from './db.ts';
-import { branchPRs, getPR, listPRs, mergePR } from './github.ts';
+import { branchPRs, getPR, listPRs, mergePR, threadPRMarks } from './github.ts';
 
 export const githubApi = new Hono();
 
@@ -13,6 +13,12 @@ const repoOf = (channelId: string) => {
 };
 
 githubApi.get('/channels/:id/prs', async (c) => c.json(await listPRs(repoOf(c.req.param('id')), c.req.query('state') ?? 'open')));
+// Branch name to the open or merged PR from it, for marking threads in a list. {} with no repo or when gh fails.
+githubApi.get('/channels/:id/thread-prs', async (c) => {
+  const repo = channels.get(c.req.param('id'))?.github_repo;
+  if (!repo) return c.json({});
+  return c.json(await threadPRMarks(repo).catch(() => ({})));
+});
 githubApi.get('/channels/:id/prs/:n', async (c) => c.json(await getPR(repoOf(c.req.param('id')), Number(c.req.param('n')))));
 // The PRs opened from a thread's branch, newest first, and `pr`, the one to show: the open one,
 // else the newest. null and [] when there is none or no repo to ask.
