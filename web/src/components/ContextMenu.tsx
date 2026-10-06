@@ -52,6 +52,9 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
   const [pos, setPos] = useState({ x: open.x, y: open.y });
   const [archived, setArchived] = useState<boolean | null>(null);
   const [error, setError] = useState('');
+  const [current, setCurrent] = useState<string | null>(null);
+  // Set while the menu shows the title field in place of its items.
+  const [draft, setDraft] = useState<string | null>(null);
 
   // Ask for the thread's state so the item reads "Unarchive" on one that is.
   useEffect(() => {
@@ -59,7 +62,11 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     let live = true;
     api
       .get<ThreadDetail>(`/threads/${encodeURIComponent(target.id)}`)
-      .then((d) => live && setArchived(!!d.thread.archived))
+      .then((d) => {
+        if (!live) return;
+        setArchived(!!d.thread.archived);
+        setCurrent(d.thread.title);
+      })
       .catch(() => {});
     return () => {
       live = false;
@@ -105,9 +112,24 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     }
   };
 
+  const rename = async () => {
+    const next = (draft ?? '').replace(/\s+/g, ' ').trim();
+    if (!next || next === current) return onClose();
+    try {
+      await api.patch<Thread>(`/threads/${encodeURIComponent(target.id)}`, { title: next });
+      await reloadChannels();
+      onClose();
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+
   const items: { label: string; icon: IconName; run: () => void }[] =
     target.kind === 'thread'
-      ? [{ label: archived ? 'Unarchive thread' : 'Archive thread', icon: 'archive', run: toggleArchive }]
+      ? [
+          { label: 'Rename thread', icon: 'pencil', run: () => setDraft(current ?? '') },
+          { label: archived ? 'Unarchive thread' : 'Archive thread', icon: 'archive', run: toggleArchive },
+        ]
       : [
           { label: 'Channel settings', icon: 'sliders', run: () => (navigate(href.settings(target.id)), onClose()) },
         ];
@@ -122,12 +144,24 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
       className="pop-in fixed z-[60] min-w-[190px] rounded-[16px] bg-elev p-1.5 shadow-[var(--shadow-menu)]"
     >
       {title && <div className="caption truncate px-2.5 pt-1 pb-1.5 text-fg-4">#{title}</div>}
-      {items.map((it) => (
+      {draft !== null ? (
+        <input
+          autoFocus
+          value={draft}
+          maxLength={200}
+          aria-label="Thread title"
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && rename()}
+          className="h-8 w-[260px] rounded-[10px] bg-surface px-2.5 text-[13px] text-fg outline-none"
+        />
+      ) : (
+      items.map((it) => (
         <button key={it.label} role="menuitem" onClick={it.run} className="hov flex h-8 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[13px] text-fg-2 hover:text-fg">
           <Icon name={it.icon} size={14} className="text-fg-3" />
           {it.label}
         </button>
-      ))}
+      )))}
       {error && <div className="px-2.5 py-1.5 text-[12px] text-fg-3">{error}</div>}
     </div>
   );

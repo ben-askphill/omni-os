@@ -142,7 +142,7 @@ struct ThreadDayList: View {
           .padding(.horizontal, 10)
           .padding(.vertical, 6)
           ForEach(group.threads) {
-            ThreadListRow(model: model, thread: $0, showChannel: showChannel, pr: $0.branch.flatMap { prs[$0] }).openInNewWindow($0.id, model: model)
+            ThreadListRow(model: model, thread: $0, showChannel: showChannel, pr: $0.branch.flatMap { prs[$0] }).openInNewWindow($0.id, model: model, title: $0.title)
           }
         }
       }

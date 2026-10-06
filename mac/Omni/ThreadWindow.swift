@@ -132,8 +132,8 @@ struct CopyThreadMarkdownCommand: View {
 
 extension View {
   /// Open in New Window in the context menu, and on an Option-click.
-  func openInNewWindow(_ threadID: String, model: AppModel? = nil) -> some View {
-    modifier(OpenInNewWindow(threadID: threadID, model: model))
+  func openInNewWindow(_ threadID: String, model: AppModel? = nil, title: String = "") -> some View {
+    modifier(OpenInNewWindow(threadID: threadID, model: model, title: title))
   }
 }
 
@@ -141,7 +141,11 @@ private struct OpenInNewWindow: ViewModifier {
   let threadID: String
   /// With a model the menu also archives the thread.
   let model: AppModel?
+  /// The thread's title, which the rename alert starts from.
+  let title: String
   @Environment(\.openWindow) private var openWindow
+  @State private var renaming = false
+  @State private var draft = ""
 
   func body(content: Content) -> some View {
     content
@@ -149,8 +153,19 @@ private struct OpenInNewWindow: ViewModifier {
         Button("Open in New Window") { openWindow(id: ThreadWindow.id, value: threadID) }
         if let model {
           Divider()
+          Button("Rename Thread...") {
+            draft = title
+            renaming = true
+          }
           Button("Archive Thread") { Task { await model.setThreadArchived(threadID, true) } }
         }
+      }
+      .alert("Rename Thread", isPresented: $renaming) {
+        TextField("Title", text: $draft)
+        Button("Rename") {
+          if let model { Task { await model.renameThread(threadID, to: draft) } }
+        }
+        Button("Cancel", role: .cancel) {}
       }
       .simultaneousGesture(
         TapGesture().modifiers(.option).onEnded { openWindow(id: ThreadWindow.id, value: threadID) }

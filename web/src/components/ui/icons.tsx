@@ -29,6 +29,7 @@ const PATHS = {
   terminal: 'm4 17 6-6-6-6M12 19h8',
   clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
   play: 'M7 4v16l13-8z',
+  pencil: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
   archive: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
   key: 'M3 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M11 12h10M17 12v3M20 12v2',
   zap: 'M13 2 3 14h9l-1 8 10-12h-9z',
