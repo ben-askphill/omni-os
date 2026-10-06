@@ -59,7 +59,7 @@ Each thread gets one long-lived `claude -p --input-format stream-json --output-f
 | --- | --- |
 | cwd | worktree `data/worktrees/<thread>` on branch `omni/<id>` (repo channels), else the channel base dir, else `~/phillbert` |
 | context | `~/phillbert` added with `--add-dir`, its CLAUDE.md loaded, all your user skills and MCP servers |
-| system prompt | channel facts (store, Portal slug, repo, notes), artifacts and browser rules, the crew role charter |
+| system prompt | channel facts (store, Portal slug, repo, notes), artifacts and browser rules, the channel's design system file, the crew role charter |
 | MCP | `omni-browser` (Playwright, attached over CDP to the channel's Chrome that Omni runs, profile in `data/browsers/<channel>`); conductor also gets `omni` |
 | env | `OMNI_THREAD_ID`, `OMNI_ARTIFACTS_DIR`, `OMNI_URL`, plus global and channel secrets |
 | session | `--session-id` on the first run, `--resume` after, so every follow-up keeps full context |

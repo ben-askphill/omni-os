@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import type { Thread, Channel, EventRow, Artifact } from '../../server/db.ts';
+import type { Thread, Channel as ChannelRow, EventRow, Artifact } from '../../server/db.ts';
 import type { Attachment } from '../../server/uploads.ts';
 import type { HarnessInfo, ModelEntry, HarnessId } from '../../server/harness/types.ts';
 import type { CommandList as HarnessCommands } from '../../server/commands.ts';
 
-export type { Thread, Channel, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId };
+export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number };
@@ -13,6 +13,9 @@ export type HarnessWithRunning = HarnessInfo & { running: number };
 export type CommandList = HarnessCommands & { recent?: string[] };
 
 // ---------- response shapes ----------
+
+/** A channel as the API sends it: the design system's file stays on the server, only its name and size come. */
+export type Channel = Omit<ChannelRow, 'design_system'> & { design_system_size: number };
 
 /** Just enough of a thread to list it under its channel in the sidebar. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'>;

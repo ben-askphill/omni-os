@@ -1,5 +1,5 @@
 // The system prompt handed to a harness for one thread.
-import { config, artifactsDir, browserOutDir } from '../config.ts';
+import { config, artifactsDir, browserOutDir, designSystemFile } from '../config.ts';
 import { artifacts, type Channel, type Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
 
@@ -13,6 +13,17 @@ function publishedLines(channelId: string) {
     ...(pages.length
       ? ['Pages this channel already published, newest first:', ...pages.map((a) => `- ${a.name}: ${a.url} (thread "${a.thread_title}")`)]
       : []),
+  ];
+}
+
+/** The channel's design system, as a file the agent reads before it writes a page. Local harnesses only. */
+function designSystemLines(thread: Thread, channel: Channel) {
+  if (!channel.design_system || thread.harness === 'hermes') return [];
+  return [
+    '',
+    '## Design system',
+    `This channel has a design system${channel.design_system_name ? ` (${channel.design_system_name})` : ''}, a standalone HTML file at ${designSystemFile(thread.id)}.`,
+    'Read it before you write any HTML page, report, dashboard or diagram for this channel. Build the page on its tokens, type, spacing, components and tone, with the CSS inline so the page stays self-contained, and do not approximate or invent a style of your own. Skip it only when Ben names a different style. Never copy the file itself into the artifacts folder.',
   ];
 }
 
@@ -39,6 +50,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     remote
       ? 'OMNI_ARTIFACTS_DIR does not exist on this machine. Return artifacts as links or as text in your reply.'
       : `Write any HTML page, report, diagram, CSV or document meant for Ben into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).\nOmni renders files there inline in the thread. Prefer a self-contained .html file for anything visual. Mention the filename in your reply.`,
+    ...designSystemLines(thread, channel),
     ...(thread.harness === 'claude-code' ? publishedLines(channel.id) : []),
     ...(remote
       ? []

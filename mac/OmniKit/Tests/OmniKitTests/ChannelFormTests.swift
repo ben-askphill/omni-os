@@ -150,4 +150,20 @@ import OmniKit
   private func encoded(_ value: some Encodable) throws -> JSONValue {
     try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
   }
+
+  @Test func readsTheDesignSystemTheServerSends() throws {
+    let base = #"{"id":"a","name":"A","kind":"client","use_worktree":1,"browser_headless":1,"archived":0,"created_at":"2026-01-05T09:00:00.000Z""#
+    let with = try decode(Channel.self, base + #","design_system_name":"brand.html","design_system_size":2048}"#)
+    #expect(with.designSystemName == "brand.html")
+    #expect(with.designSystemSize == 2048)
+    let without = try decode(Channel.self, base + "}")
+    #expect(without.designSystemName == nil)
+    #expect(without.designSystemSize == 0)
+  }
+
+  @Test func refusesADesignSystemFileThatIsTooBigOrNotText() {
+    #expect(DesignSystemFile.read(Data("<html></html>".utf8)) == .success("<html></html>"))
+    #expect(DesignSystemFile.read(Data(count: DesignSystemFile.maxBytes + 1)) == .failure(.init(message: "That file is too big: keep it under 512 KB.")))
+    #expect(DesignSystemFile.read(Data([0xff, 0xfe, 0xfd])) == .failure(.init(message: "That file is not text.")))
+  }
 }

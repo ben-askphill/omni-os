@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, type Channel } from '../api.ts';
 import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { CHANNEL_GLYPHS, glyphIcon, parseChannelIcon, readSvgIcon } from '../../../shared/channel-icon.ts';
+import { readDesignSystem } from '../../../shared/design-system.ts';
 import { lastGrapheme, slugify } from '../format.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -125,6 +126,66 @@ function IconPicker({ value, name, onChange }: { value: string; name: string; on
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Sent as soon as it is chosen, not with Save: the file is too big to hold in the form's state. */
+function DesignSystemPicker({ channel, onChange }: { channel: Channel; onChange: (c: Channel) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const url = `/channels/${encodeURIComponent(channel.id)}/design-system`;
+
+  const send = async (run: () => Promise<Channel>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      onChange(await run());
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const upload = (file: File | undefined) =>
+    file &&
+    send(async () => api.put<Channel>(url, { name: file.name, html: readDesignSystem(await file.text()) }));
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {channel.design_system_name && (
+          <span className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-[13px] text-fg">
+            <Icon name="file" size={14} />
+            <a className="hov" href={`/api${url}`} target="_blank" rel="noreferrer" title="Open the file">
+              {channel.design_system_name}
+            </a>
+            <span className="text-fg-3">{Math.max(1, Math.round(channel.design_system_size / 1024))} KB</span>
+          </span>
+        )}
+        <Button type="button" icon="file" busy={busy} onClick={() => fileRef.current?.click()}>
+          {channel.design_system_name ? 'Replace file' : 'Upload HTML file'}
+        </Button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".html,.htm,text/html"
+          className="hidden"
+          aria-label="Design system file"
+          onChange={(e) => {
+            void upload(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
+        {channel.design_system_name && (
+          <Button type="button" disabled={busy} onClick={() => void send(() => api.del<Channel>(url))}>
+            Remove
+          </Button>
+        )}
+      </div>
+      {error && <ErrorNote>{error}</ErrorNote>}
     </div>
   );
 }
@@ -253,6 +314,14 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
                 { id: 'personal', label: 'Personal' },
               ]}
             />
+          </Field>
+        )}
+        {existing && (
+          <Field
+            label="Design system"
+            hint="One standalone HTML file with your tokens, type and components. Threads in this channel read it before they write an HTML page, so every artifact looks the same. Saved as soon as you pick the file."
+          >
+            <DesignSystemPicker channel={existing} onChange={() => void reloadChannels()} />
           </Field>
         )}
         <Field label="Notes" htmlFor="ch-notes" hint="Added to every thread's system prompt in this channel. Keep it short: who the client is, conventions, what not to touch.">

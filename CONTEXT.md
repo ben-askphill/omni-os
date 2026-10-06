@@ -10,6 +10,10 @@ Ben's local workspace for agent work: channels, threads, crew and automations, r
 A client, project or area that groups threads and carries their shared facts (repo, store, Portal slug, browser profile).
 _Avoid_: Project, workspace
 
+**Design system**:
+A standalone HTML file set in a **Channel**'s settings. Its threads read it before writing an HTML page, so every artifact in the channel shares one look.
+_Avoid_: Theme, style guide
+
 **Thread**:
 One task's conversation with one agent, from the first prompt through every follow-up, stored and searchable in Omni.
 _Avoid_: Chat, session, conversation
