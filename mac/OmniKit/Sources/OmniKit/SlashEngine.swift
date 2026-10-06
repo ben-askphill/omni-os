@@ -44,6 +44,15 @@ public final class SlashEngine: @unchecked Sendable {
     call("pick", Pick(text: text, at: at, name: name)) ?? SlashPick(text: text, caret: text.utf16.count)
   }
 
+  /// The `@file` being typed at the caret.
+  public func fileQuery(_ text: String, caret: Int) -> FileQuery? {
+    call("fileQuery", Text(text: text, caret: caret))
+  }
+
+  public func pickFile(_ text: String, at: FileQuery, insert: String) -> SlashPick {
+    call("pickFile", PickFile(text: text, at: at, insert: insert)) ?? SlashPick(text: text, caret: text.utf16.count)
+  }
+
   /// What Send does with a reply, and the hint under the composer.
   public func reply(_ text: String, list: CommandList?, harness: String) -> ReplySlash {
     call("reply", Reply(text: text, list: list, harness: harness))
@@ -82,6 +91,11 @@ public final class SlashEngine: @unchecked Sendable {
     let text: String
     let at: SlashQuery
     let name: String
+  }
+  private struct PickFile: Encodable {
+    let text: String
+    let at: FileQuery
+    let insert: String
   }
   private struct Reply: Encodable {
     let text: String

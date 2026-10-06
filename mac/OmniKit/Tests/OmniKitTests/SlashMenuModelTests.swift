@@ -161,3 +161,67 @@ private final class FakeCommandsAPI: CommandsAPI {
     #expect(store.list == nil)
   }
 }
+
+private final class FakeFilesAPI: MentionsAPI {
+  let calls = Mutex<[String]>([])
+  func mentions(_ source: MentionsSource, query: String) async throws(OmniAPIError) -> [FileMention] {
+    calls.withLock { $0.append(query) }
+    return [
+      FileMention(insert: "artifacts/report.html", name: "report.html", detail: "artifact in this thread", kind: .artifact),
+      FileMention(insert: "src/app.ts", name: "app.ts", detail: "src", kind: .file),
+    ]
+  }
+}
+
+@MainActor @Suite struct FileMenuModelTests {
+  private func fileModel() -> (SlashMenuModel, FileMentionsStore, FakeFilesAPI) {
+    let api = FakeFilesAPI()
+    let files = FileMentionsStore(api: api, source: .thread("t1"), debounce: .zero)
+    let commands = SlashCommandsStore(api: FakeCommandsAPI([]), source: .thread("t1"))
+    commands.set(ready)
+    return (SlashMenuModel(commands: commands, files: files, placement: .reply, harness: "claude-code"), files, api)
+  }
+
+  @Test func opensOnAnAtAndPicksAFileInPlace() async {
+    let (m, files, _) = fileModel()
+    m.setFocused(true)
+    m.update(text: "compare @re", caret: 11)
+    await files.settled()
+    #expect(m.isFileMenu)
+    #expect(m.isOpen)
+    #expect(m.fileRows.map(\.insert) == ["artifacts/report.html", "src/app.ts"])
+    var edit: (String, Int)?
+    m.onEdit = { edit = ($0, $1) }
+    #expect(m.handle(.down))
+    #expect(m.handle(.return))
+    #expect(edit?.0 == "compare @src/app.ts ")
+    #expect(edit?.1 == "compare @src/app.ts ".utf16.count)
+  }
+
+  @Test func escapeClosesItUntilTheTextChanges() async {
+    let (m, files, _) = fileModel()
+    m.setFocused(true)
+    m.update(text: "@a", caret: 2)
+    await files.settled()
+    #expect(m.isOpen)
+    #expect(m.handle(.escape))
+    #expect(!m.isOpen)
+    // The same text, a moved caret: still closed. Typing on reopens it.
+    m.update(text: "@a", caret: 1)
+    #expect(!m.isOpen)
+    m.update(text: "@ab", caret: 3)
+    await files.settled()
+    #expect(m.isOpen)
+  }
+
+  @Test func ignoresAddressesAndTheSlashMenuStillWorks() async {
+    let (m, files, api) = fileModel()
+    m.setFocused(true)
+    m.update(text: "mail ben@x.com", caret: 14)
+    await files.settled()
+    #expect(!m.isFileMenu)
+    #expect(api.calls.withLock { $0 }.isEmpty)
+    m.update(text: "/", caret: 1)
+    #expect(m.isOpen && !m.isFileMenu)
+  }
+}

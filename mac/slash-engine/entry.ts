@@ -5,6 +5,7 @@
 import { OMNI_COMMANDS, type CommandList, type SlashCommand, type SlashRecord } from '../../shared/slash.ts';
 import { menuCommands, newThreadHint, replySlash } from '../../shared/composer-slash.ts';
 import { mentionSections, menuSections, pickCommand, slashQuery, type SlashQuery } from '../../shared/slash-menu.ts';
+import { fileQuery, pickFile, type FileQuery } from '../../shared/mention-menu.ts';
 import { slashPieces } from '../../shared/slash-pills.ts';
 
 const call =
@@ -21,5 +22,7 @@ const call =
   reply: call(({ text, list, harness }: { text: string; list: CommandList | null; harness: string }) => replySlash(text, list, harness)),
   newThreadHint: call(({ text, list, harness }: { text: string; list: CommandList | null; harness: string }) => newThreadHint(text, list, harness)),
   pieces: call(({ text, slash, visible }: { text: string; slash?: SlashRecord; visible?: number }) => slashPieces(text, slash, visible)),
+  fileQuery: call(({ text, caret }: { text: string; caret: number }) => fileQuery(text, caret)),
+  pickFile: call(({ text, at, insert }: { text: string; at: FileQuery; insert: string }) => pickFile(text, at, insert)),
   omniCommands: call(() => OMNI_COMMANDS),
 };
