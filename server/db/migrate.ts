@@ -136,6 +136,8 @@ export function migrate() {
   ensureColumn('threads', 'suggestion', 'TEXT');
   ensureColumn('threads', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('channels', 'icon', 'TEXT');
+  // What a new thread in the channel runs on when neither the thread nor its role picks (server/harness/resolve.ts).
+  for (const col of ['default_harness', 'default_model', 'default_effort']) ensureColumn('channels', col, 'TEXT');
   // The claude.ai page an artifact was published as (shared/published.ts), and what the publish said it was.
   ensureColumn('artifacts', 'url', 'TEXT');
   ensureColumn('artifacts', 'description', 'TEXT');

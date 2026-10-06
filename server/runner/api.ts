@@ -89,16 +89,20 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const channel = channels.get(channelId);
   if (!channel) throw new Error(`unknown channel "${channelId}"`);
 
-  // Resolve harness/model/effort: the thread's own choice, then the role's default, then Claude Code.
+  // Resolve harness/model/effort: the thread's own choice, then the role's default, then the channel's, then Claude Code.
   // On a miss, probe the harnesses that are down and try again: Ben may have just logged in.
-  const resolve = (cat: Catalog) =>
+  const channelDefaults = { harness: channel.default_harness ?? undefined, model: channel.default_model ?? undefined, effort: channel.default_effort ?? undefined };
+  const resolve = (cat: Catalog, withChannel = true) =>
     resolveRun(
       { harness: input.harness, model: input.model, effort: input.effort },
       role ? { harness: role.harness, model: role.model, effort: role.effort } : undefined,
       cat,
+      withChannel ? channelDefaults : undefined,
     );
   let run = resolve(getCatalog());
   if (!run.ok) run = resolve(await freshCatalog());
+  // A channel default the catalog no longer has (a retired model) never blocks a thread: drop it.
+  if (!run.ok) run = resolve(getCatalog(), false);
   if (!run.ok) throw new Error(run.error);
   const harness = run.harness;
   const effort = run.effort;

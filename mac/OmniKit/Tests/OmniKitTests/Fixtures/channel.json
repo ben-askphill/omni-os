@@ -13,6 +13,9 @@
   "icon": null,
   "archived": 0,
   "created_at": "2026-01-05T09:00:00.000Z",
+  "default_harness": null,
+  "default_model": null,
+  "default_effort": null,
   "running": 1,
   "active": [
     {

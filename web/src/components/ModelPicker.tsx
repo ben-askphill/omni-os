@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { HarnessWithRunning, ModelEntry } from '../api.ts';
-import { Icon } from './ui.tsx';
+import { Icon, Picker, type PickerOption } from './ui.tsx';
 import { HarnessLogo } from './brand.tsx';
 
 export interface ModelChoice {
@@ -20,6 +20,7 @@ export function ModelPicker({
   onChange,
   onOpen,
   defaultOpen,
+  placeholder = 'Model',
 }: {
   harnesses: HarnessWithRunning[];
   value: ModelChoice;
@@ -27,6 +28,8 @@ export function ModelPicker({
   onOpen?: () => void;
   /** Start with the list open, as "New thread on another model" does. */
   defaultOpen?: boolean;
+  /** The pill's label when no model is picked. */
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const [q, setQ] = useState('');
@@ -69,7 +72,7 @@ export function ModelPicker({
     btn.current?.focus();
   };
 
-  const buttonLabel = current.m ? current.m.label : 'Model';
+  const buttonLabel = current.m ? current.m.label : placeholder;
 
   return (
     <div ref={wrap} className="relative">
@@ -168,4 +171,22 @@ export function ModelPicker({
       )}
     </div>
   );
+}
+
+/**
+ * The effort pill for a model choice: "Default" plus the model's levels, or a disabled "Auto effort" when it has
+ * none. With no model picked, the levels are the harness default model's.
+ */
+export function EffortPicker({ harnesses, choice, value, onChange }: { harnesses: HarnessWithRunning[]; choice: ModelChoice; value: string; onChange: (v: string) => void }) {
+  const h = harnesses.find((x) => x.id === choice.harness);
+  const m = h?.models.find((x) => x.id === choice.model) ?? (choice.model ? undefined : h?.models.find((x) => x.default) ?? h?.models[0]);
+  const efforts = m?.efforts ?? [];
+  if (!efforts.length) {
+    return <Picker label="Effort" value="" options={[{ value: '', label: 'Auto effort', avatar: false, icon: 'sliders' }]} onChange={() => {}} disabled />;
+  }
+  const options: PickerOption<string>[] = [
+    { value: '', label: m?.defaultEffort ? `Default (${m.defaultEffort})` : 'Default', avatar: false, icon: 'sliders' },
+    ...efforts.map((e) => ({ value: e, label: e, avatar: false as const, icon: 'sliders' as const })),
+  ];
+  return <Picker label="Effort" value={value} options={options} onChange={onChange} />;
 }
