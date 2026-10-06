@@ -436,11 +436,15 @@ private struct TranscriptRow: View {
       let cards = Delegation.of(group.calls).map { d in
         Delegation(id: d.id, lead: d.lead?.live(known), branches: d.branches.map { $0.live(known) })
       }
+      // Sub-agents and the delegations that worked show as cards; the group keeps every other call.
+      let (subagents, rest, agentsFirst) = Delegation.split(group.calls)
       VStack(alignment: .leading, spacing: 16) {
-        // A group of nothing but delegations is just its cards.
-        if cards.isEmpty || !group.calls.allSatisfy({ Delegation.isDelegation($0.name) && $0.result?.isError == false }) {
-          ToolGroupView(group: group, live: live, running: running, cwd: cwd, ui: ui, agents: agents)
+        if agentsFirst { subagentCard(subagents) }
+        if !rest.isEmpty {
+          let kept = group.keeping(rest)
+          ToolGroupView(group: kept, live: live && kept.hasPending, running: running, cwd: cwd, ui: ui, agents: agents)
         }
+        if !agentsFirst { subagentCard(subagents) }
         ForEach(cards) { DelegationCard(delegation: $0, model: model) }
       }
     case .plan(let plan):
@@ -451,6 +455,14 @@ private struct TranscriptRow: View {
       ErrorCallout(text: text)
     case .report(let id, _, let report):
       ReportCard(report: report, document: markdown.document(for: id, text: report.text.isEmpty ? "(no reply)" : report.text), model: model)
+    }
+  }
+
+  @ViewBuilder private func subagentCard(_ calls: [ToolCall]) -> some View {
+    if !calls.isEmpty {
+      DelegationCard(
+        delegation: Delegation(id: "agents", lead: nil, branches: []), model: model,
+        agents: AgentRows(calls: calls, live: agents, running: running, cwd: cwd, ui: ui))
     }
   }
 }

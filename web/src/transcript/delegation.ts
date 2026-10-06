@@ -1,6 +1,7 @@
-// The Conductor's delegate and delegate_team calls as delegation cards: which threads they started.
+// Delegation cards: the threads the Conductor's delegate and delegate_team calls started, and the sub-agents
+// any thread's own run launched with the harness's Agent tool.
 import type { Thread } from '../api.ts';
-import { str, type ToolCall } from './fold.ts';
+import { str, type TaskView, type ToolCall } from './fold.ts';
 
 /** One delegated thread as a card row. Live fields come from the thread itself once it is known. */
 export interface Branch {
@@ -22,6 +23,31 @@ export interface Delegation {
 }
 
 export const isDelegation = (name: string) => name === 'mcp__omni__delegate' || name === 'mcp__omni__delegate_team';
+
+/** A sub-agent the harness runs inside this thread's process: Claude Code's Agent (Task before it), Hermes's subagent. */
+export const isSubagent = (name: string) => name === 'Agent' || name === 'Task';
+
+const TASK_END: Record<string, string> = { completed: 'done', failed: 'failed', killed: 'stopped', stopped: 'stopped' };
+
+/**
+ * A sub-agent's state as a thread status. Its task says while it has one: a background agent's result comes
+ * back at launch. Without one, no result yet means it still runs, if the turn does.
+ */
+export function agentStatus(c: ToolCall, task: TaskView | undefined, running: boolean, stopped: boolean): string {
+  if (task) return task.running ? 'running' : (TASK_END[task.status ?? ''] ?? 'done');
+  if (!c.result) return running ? 'running' : 'stopped';
+  if (stopped) return 'stopped';
+  return c.result.is_error ? 'failed' : 'done';
+}
+
+/** A tool group split for display: its sub-agents, its delegations, and every other call. */
+export function splitGroup(calls: ToolCall[]): { agents: ToolCall[]; rest: ToolCall[]; agentsFirst: boolean } {
+  const agents = calls.filter((c) => isSubagent(c.name));
+  // A delegation that worked shows as its card; one that failed stays a tool row with its error.
+  const rest = calls.filter((c) => !isSubagent(c.name) && !(isDelegation(c.name) && c.result && !c.result.is_error));
+  const agentsFirst = agents.length > 0 && calls.indexOf(agents[0]) < (rest.length ? calls.indexOf(rest[0]) : Infinity);
+  return { agents, rest, agentsFirst };
+}
 
 const parse = (text: string | undefined): any => {
   try {

@@ -3,7 +3,7 @@ import { uploadUrl, type Attachment, type EventRow, type PendingMsg, type Thread
 import { bytes, clock, duration, plural, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
-import { DelegationCard } from './Delegation.tsx';
+import { BranchFace, DelegationCard, RailItem, ROW_CARD } from './Delegation.tsx';
 import { Markdown } from './Markdown.tsx';
 import { CheckItem, copyText, Icon, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
 import { SOURCE_TAG } from '../../../shared/slash-menu.ts';
@@ -24,7 +24,7 @@ import {
   type ToolCall,
   type UserP,
 } from '../transcript/fold.ts';
-import { delegations, isDelegation, withLive, type Branch } from '../transcript/delegation.ts';
+import { agentStatus, delegations, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 
 export { toolLabel, toolSummary, type ToolCall };
 
@@ -128,6 +128,9 @@ function Elapsed({ since }: { since: string }) {
 
 const TASK_END: Record<string, string> = { completed: 'done', failed: 'failed', killed: 'stopped', stopped: 'stopped' };
 
+/** Every call a sub-agent made, however deep. */
+const countCalls = (c: ToolCall): number => c.children.reduce((n, ch) => n + 1 + countCalls(ch), 0);
+
 /** A sub-agent's line on its Agent row: background or not, calls so far and time running, or how it ended. */
 function TaskBadge({ t }: { t: TaskView }) {
   if (t.running) {
@@ -210,6 +213,51 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
   );
 }
 
+/**
+ * A sub-agent as a delegation card row. It has no thread to open, so it opens in place: its prompt, its
+ * answer and the calls it made. While it runs its latest calls show under it.
+ */
+function AgentRow({ c, cwd, running }: { c: ToolCall; cwd?: string | null; running: boolean }) {
+  const [open, setOpen] = useState(false);
+  const task = useContext(TaskCtx).get(c.id);
+  const stopped = interruptedTool(c);
+  const status = agentStatus(c, task, running, stopped);
+  const busy = status === 'running';
+  const type = str(c.input.subagent_type);
+  const calls = task?.tool_uses ?? countCalls(c);
+  const err = c.result?.is_error && !stopped;
+  return (
+    <RailItem status={status}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={ROW_CARD}>
+        <BranchFace role={type} title={str(c.input.description) || 'Sub-agent'} status={status}>
+          <span>{type || 'agent'}</span>
+          {(task?.background || c.input.run_in_background === true) && <span>background</span>}
+          {calls > 0 && <span className="font-num">{plural(calls, 'tool')}</span>}
+          {task && (
+            <span className="font-num text-fg-4 tabular-nums">
+              {busy ? <Elapsed since={task.started} /> : task.ended ? duration(toDate(task.ended).getTime() - toDate(task.started).getTime()) : null}
+            </span>
+          )}
+          <Icon name="chevronRight" size={11} className={`text-fg-4 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
+        </BranchFace>
+      </button>
+      {open && (
+        <div className="fade-in mt-2 space-y-1.5 px-1">
+          <ToolInput c={c} />
+          {c.result ? <Pre tone={err ? 'bad' : undefined}>{c.result.text || '(no output)'}</Pre> : null}
+        </div>
+      )}
+      {c.children.length > 0 && (open || busy) && (
+        <div className="mt-1">
+          {(open ? c.children : c.children.slice(-3)).map((ch) => (
+            <ToolRow key={ch.id} c={ch} cwd={cwd} running={running} depth={1} />
+          ))}
+        </div>
+      )}
+    </RailItem>
+  );
+}
+
 function countNames(calls: ToolCall[]) {
   const m = new Map<string, number>();
   const walk = (cs: ToolCall[]) =>
@@ -228,7 +276,6 @@ function flatten(calls: ToolCall[]): ToolCall[] {
 
 function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; total: number; cwd?: string | null; running: boolean; isLast: boolean }) {
   const [open, setOpen] = useState(false);
-  const tasks = useContext(TaskCtx);
   if (total === 1 && calls.length === 1) {
     return <ToolRow c={calls[0]} cwd={cwd} running={running} />;
   }
@@ -236,8 +283,6 @@ function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; 
   const errors = all.filter((c) => c.result?.is_error && !interruptedTool(c)).length;
   const live = running && isLast && all.some((c) => !c.result);
   const latest = all[all.length - 1];
-  // Sub-agents still at work stay in view while the group is folded.
-  const agents = calls.filter((c) => tasks.get(c.id)?.running);
   const names = countNames(calls);
   return (
     <div className="rounded-[20px] bg-surface">
@@ -269,12 +314,11 @@ function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; 
             <StatusDot status="needs" size={7} /> {errors} failed
           </span>
         )}
-        {agents.length > 0 && !open && <span className="shrink-0 font-num text-[11px] text-live-text">{plural(agents.length, 'agent')} running</span>}
-        {(live || agents.length > 0) && <Loader size={11} className={agents.length ? 'text-live-text' : 'text-fg-3'} />}
+        {live && <Loader size={11} className="text-fg-3" />}
       </button>
-      {(open || agents.length > 0) && (
+      {open && (
         <div className="fade-in px-1.5 pb-1.5">
-          {(open ? calls : agents).map((c) => (
+          {calls.map((c) => (
             <ToolRow key={c.id} c={c} cwd={cwd} running={running} />
           ))}
         </div>
@@ -632,17 +676,20 @@ export const Transcript = memo(function Transcript({
                 </div>
               );
             case 'tools': {
+              const { agents, rest, agentsFirst } = splitGroup(it.calls);
               const cards = delegations(it.calls).map((d) => (
                 <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} />
               ));
-              // A group of nothing but delegations is just its cards.
-              if (cards.length && it.calls.every((c) => isDelegation(c.name) && c.result && !c.result.is_error)) return cards;
-              const group = [
-                <ToolGroup key={it.key} calls={it.calls} total={it.total} cwd={cwd} running={running} isLast={idx === items.length - 1} />,
-                ...cards,
-              ];
+              const isLast = idx === items.length - 1;
+              const group = rest.length ? (
+                <ToolGroup key={it.key} calls={rest} total={rest.length + rest.reduce((n, c) => n + countCalls(c), 0)} cwd={cwd} running={running} isLast={isLast} />
+              ) : null;
+              const subagents = agents.length ? (
+                <DelegationCard key={`a${it.key}`} agents={agents.map((c) => <AgentRow key={c.id} c={c} cwd={cwd} running={running} />)} />
+              ) : null;
+              const out = [...(agentsFirst ? [subagents, group] : [group, subagents]), ...cards].filter(Boolean);
               // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
-              return plan?.after === it.key ? [...group, <PlanCard key="plan" todos={plan.todos} />] : group;
+              return plan?.after === it.key ? [...out, <PlanCard key="plan" todos={plan.todos} />] : out;
             }
             case 'result':
               return <ResultLine key={it.key} p={it.p} />;
