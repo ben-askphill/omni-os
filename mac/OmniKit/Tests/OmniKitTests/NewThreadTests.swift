@@ -65,11 +65,15 @@ private let channels: Set<String> = ["conductor", "acme", "inbox"]
     #expect(c.harness == .claudeCode && c.model == "sonnet" && c.effort == "low")
   }
 
-  @Test func noRoleKeepsTheRestAndAChoiceAfterARoleWins() {
+  @Test func noRoleGoesBackToTheChannelsRunAndAChoiceAfterARoleWins() {
     var c = NewThreadRules.selectingRole(
       "builder", from: NewThreadRules.initial(fixedChannel: nil), crew: crew(), channels: channels, harnesses: harnesses(), channelFixed: false)
     let none = NewThreadRules.selectingRole("", from: c, crew: crew(), channels: channels, harnesses: harnesses(), channelFixed: false)
-    #expect(none.role == "" && none.harness == .codex && none.model == "gpt-x" && none.effort == "high")
+    #expect(none == NewThreadChoice(channel: "acme", role: "", harness: .claudeCode, model: "sonnet", effort: ""))
+    let acme = ["acme": RunDefaults(harness: .codex, effort: "high")]
+    let back = NewThreadRules.selectingRole(
+      "", from: c, crew: crew(), channels: channels, harnesses: harnesses(), channelFixed: false, defaults: acme)
+    #expect(back == NewThreadChoice(channel: "acme", role: "", harness: .codex, model: "gpt-y", effort: "high"))
     c = NewThreadRules.selectingModel(harness: .claudeCode, model: "opus", from: c)
     c.effort = "low"
     #expect(c.role == "builder" && c.channel == "acme" && c.harness == .claudeCode && c.model == "opus" && c.effort == "low")
@@ -77,12 +81,55 @@ private let channels: Set<String> = ["conductor", "acme", "inbox"]
 
   @Test func theConductorChannelAndRoleGoTogether() {
     var c = NewThreadChoice(channel: "acme", role: "conductor", harness: .claudeCode, model: "opus", effort: "")
-    c = NewThreadRules.selectingChannel("inbox", from: c, crew: crew())
+    c = NewThreadRules.selectingChannel("inbox", from: c, crew: crew(), harnesses: harnesses(), defaults: [:])
     #expect(c.channel == "inbox" && c.role == "")
-    c = NewThreadRules.selectingChannel("conductor", from: c, crew: crew())
+    c = NewThreadRules.selectingChannel("conductor", from: c, crew: crew(), harnesses: harnesses(), defaults: [:])
     #expect(c.role == "conductor")
     c.role = "builder"
-    #expect(NewThreadRules.selectingChannel("conductor", from: c, crew: crew()).role == "builder")
+    #expect(NewThreadRules.selectingChannel("conductor", from: c, crew: crew(), harnesses: harnesses(), defaults: [:]).role == "builder")
+  }
+
+  @Test func preselectsTheChannelsRunWhenTheRoleSetsNone() {
+    let d: [String: RunDefaults] = [
+      "acme": RunDefaults(harness: .codex, model: "gpt-x", effort: "minimal"),
+      "inbox": RunDefaults(harness: .codex),
+      "solo": RunDefaults(effort: "low"),
+      "gone": RunDefaults(harness: "nope", model: "x", effort: "high"),
+    ]
+    func pre(_ channel: String, role: String = "") -> NewThreadChoice {
+      NewThreadRules.preselecting(
+        NewThreadChoice(channel: channel, role: role, harness: .claudeCode, model: "opus", effort: "high"),
+        crew: crew(), harnesses: harnesses(), defaults: d)
+    }
+    #expect(pre("acme") == NewThreadChoice(channel: "acme", role: "", harness: .codex, model: "gpt-x", effort: "minimal"))
+    // Only a harness: its default model.
+    #expect(pre("inbox").harness == .codex && pre("inbox").model == "gpt-y" && pre("inbox").effort == "")
+    // Only an effort: Claude Code's default model at that effort.
+    #expect(pre("solo") == NewThreadChoice(channel: "solo", role: "", harness: .claudeCode, model: "sonnet", effort: "low"))
+    // Nothing set: Claude Code's default.
+    #expect(pre("other") == NewThreadChoice(channel: "other", role: "", harness: .claudeCode, model: "sonnet", effort: ""))
+    // A harness the catalog lacks: Claude Code on its default model, not the stale model id.
+    #expect(pre("gone").harness == .claudeCode && pre("gone").model == "sonnet")
+    // A role without run defaults leaves the channel's; one with any replaces them whole.
+    #expect(pre("acme", role: "plain").model == "gpt-x")
+    #expect(pre("acme", role: "builder") == NewThreadChoice(channel: "acme", role: "builder", harness: .codex, model: "gpt-x", effort: "high"))
+    #expect(pre("inbox", role: "conductor") == NewThreadChoice(channel: "inbox", role: "conductor", harness: .claudeCode, model: "opus", effort: ""))
+  }
+
+  @Test func changingChannelPreselectsItsRunUnlessTheRoleSetsOne() {
+    let d = ["acme": RunDefaults(harness: .codex, model: "gpt-x")]
+    let start = NewThreadChoice(channel: "inbox", role: "", harness: .claudeCode, model: "opus", effort: "high")
+    let c = NewThreadRules.selectingChannel("acme", from: start, crew: crew(), harnesses: harnesses(), defaults: d)
+    #expect(c == NewThreadChoice(channel: "acme", role: "", harness: .codex, model: "gpt-x", effort: ""))
+    let ghost = NewThreadChoice(channel: "inbox", role: "ghost", harness: .claudeCode, model: "opus", effort: "low")
+    #expect(NewThreadRules.selectingChannel("acme", from: ghost, crew: crew(), harnesses: harnesses(), defaults: d).harness == .claudeCode)
+  }
+
+  @Test func runDefaultsCountWhenAnyFieldIsSet() {
+    #expect(!RunDefaults().setsRun)
+    #expect(!RunDefaults(model: "", effort: "").setsRun)
+    #expect(RunDefaults(effort: "low").setsRun)
+    #expect(crew()[1].runDefaults.setsRun && !crew()[2].runDefaults.setsRun)
   }
 
   @Test func changingTheModelResetsEffort() {
@@ -233,6 +280,33 @@ private final class FakeNewThreadAPI: NewThreadAPI {
     #expect(await m.send() == nil)
     #expect(m.sendError == "bad role")
     #expect(DraftStore(directory: dir.url).text(for: "new:acme") == "hi")
+  }
+
+  @Test func opensOnTheChannelsRunAndKeepsAPickOrPreset() {
+    let dir = TempDir("drafts")
+    let d = ["acme": RunDefaults(harness: .codex, effort: "high"), "inbox": RunDefaults(model: "opus")]
+    let m = NewThreadComposerModel(fixedChannel: "acme", api: FakeNewThreadAPI(), drafts: DraftStore(directory: dir.url))
+    // The catalog arrives after the defaults: the harness's default model fills in then.
+    m.update(crew: crew(), channels: channels, harnesses: [], defaults: d)
+    #expect(m.choice.harness == .claudeCode && m.choice.effort == "high")
+    m.update(crew: crew(), channels: channels, harnesses: harnesses(), defaults: d)
+    #expect(m.choice == NewThreadChoice(channel: "acme", role: "", harness: .codex, model: "gpt-y", effort: "high"))
+    m.selectRole("builder")
+    #expect(m.choice.model == "gpt-x")
+    m.selectRole("plain")
+    #expect(m.choice.harness == .codex && m.choice.model == "gpt-y" && m.choice.effort == "high")
+    // A pick survives the lists reloading.
+    m.selectModel(harness: .claudeCode, model: "haiku")
+    m.update(crew: crew(), channels: channels, harnesses: harnesses(), defaults: d)
+    #expect(m.choice.model == "haiku")
+
+    let home = NewThreadComposerModel(fixedChannel: nil, api: FakeNewThreadAPI(), drafts: DraftStore(directory: dir.url))
+    home.update(crew: crew(), channels: channels, harnesses: harnesses(), defaults: d)
+    home.selectChannel("inbox")
+    #expect(home.choice.channel == "inbox" && home.choice.role == "" && home.choice.model == "opus")
+    home.apply(NewThreadPreset(channel: "inbox", role: "", harness: .codex, model: "gpt-x"))
+    home.update(crew: crew(), channels: channels, harnesses: harnesses(), defaults: d)
+    #expect(home.choice.harness == .codex && home.choice.model == "gpt-x")
   }
 
   @Test func restoresTheDraftPerChannelKey() {

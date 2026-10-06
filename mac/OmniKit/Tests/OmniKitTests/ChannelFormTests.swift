@@ -50,6 +50,7 @@ import OmniKit
       "repo_path": .null, "github_repo": .null, "use_worktree": .number(1), "base_dir": .null,
       "store_domain": .string("acme.myshopify.com"), "portal_slug": .null, "browser_headless": .number(1),
       "notes": .string("Be brief"), "icon": .null,
+      "default_harness": .null, "default_model": .null, "default_effort": .null,
     ]))
   }
 
@@ -109,6 +110,23 @@ import OmniKit
     #expect(json["use_worktree"] == .number(0))
   }
 
+  @Test func defaultModelPicksResetEffortAndResetClearsAll() throws {
+    var f = ChannelForm()
+    #expect(!f.hasDefaultRun && f.defaultRun.harness == .claudeCode && f.defaultRun.model == "")
+    // An effort alone sits on Claude Code's default model.
+    f.setDefaultEffort("low")
+    #expect(f.defaultHarness == "claude-code" && f.defaultModel == "" && f.defaultEffort == "low")
+    f.setDefaultModel(harness: .codex, model: "gpt-x")
+    #expect(f.defaultEffort == "")
+    f.setDefaultEffort("high")
+    var json = try encoded(f.body(system: false))
+    #expect(json["default_harness"] == .string("codex") && json["default_model"] == .string("gpt-x") && json["default_effort"] == .string("high"))
+    f.clearDefaultRun()
+    #expect(!f.hasDefaultRun)
+    json = try encoded(f.body(system: false))
+    #expect(json["default_harness"] == .null && json["default_model"] == .null && json["default_effort"] == .null)
+  }
+
   @Test func createBodyAddsTheID() throws {
     var f = ChannelForm()
     f.setName("Acme")
@@ -126,6 +144,14 @@ import OmniKit
     #expect(f.id == "acme" && f.kind == .personal && f.repoPath == "/r" && f.githubRepo == "")
     #expect(!f.useWorktree && f.showBrowser)
     #expect(f.notes == "")
+    #expect(!f.hasDefaultRun && c.runDefaults == RunDefaults())
+    let set = try OmniJSON.decoder().decode(Channel.self, from: Data(#"""
+      {"id":"acme","name":"Acme","kind":"client","use_worktree":0,"browser_headless":1,"archived":0,"created_at":"2026-01-01T00:00:00.000Z",
+       "default_harness":"codex","default_model":"","default_effort":"high"}
+      """#.utf8))
+    #expect(set.runDefaults == RunDefaults(harness: .codex, effort: "high"))
+    let g = ChannelForm(channel: set)
+    #expect(g.defaultHarness == "codex" && g.defaultModel == "" && g.defaultEffort == "high")
   }
 
   @Test func clientCallsTheChannelEndpoints() async throws {

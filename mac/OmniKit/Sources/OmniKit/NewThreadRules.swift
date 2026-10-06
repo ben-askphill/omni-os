@@ -18,6 +18,26 @@ public struct NewThreadChoice: Hashable, Sendable {
   }
 }
 
+/// What a crew role or a channel picks for a new thread's run. nil fields leave it to the harness default.
+public struct RunDefaults: Hashable, Sendable {
+  public var harness: HarnessID?
+  public var model: String?
+  public var effort: String?
+
+  public init(harness: HarnessID? = nil, model: String? = nil, effort: String? = nil) {
+    self.harness = harness
+    self.model = model
+    self.effort = effort
+  }
+
+  /// Whether it picks anything. `setsRun` in server/harness/resolve.ts.
+  public var setsRun: Bool { harness != nil || model?.isEmpty == false || effort?.isEmpty == false }
+}
+
+extension CrewRole {
+  public var runDefaults: RunDefaults { RunDefaults(harness: harness, model: model, effort: effort) }
+}
+
 /// How the pickers move each other, as `NewThreadComposer` in web/src/components/Composer.tsx.
 public enum NewThreadRules {
   public static let conductor = "conductor"
@@ -42,27 +62,45 @@ public enum NewThreadRules {
     return c
   }
 
-  /// Picking a role presets its channel (unless the channel is fixed), harness, model and effort. "No role" changes only the role.
+  /// Picking a role presets its channel (unless the channel is fixed), then the run: the role's defaults when it sets any,
+  /// else the channel's. "No role" goes back to the channel's.
   public static func selectingRole(
-    _ id: String, from choice: NewThreadChoice, crew: [CrewRole], channels: Set<String>, harnesses: [HarnessInfo], channelFixed: Bool
+    _ id: String, from choice: NewThreadChoice, crew: [CrewRole], channels: Set<String>, harnesses: [HarnessInfo], channelFixed: Bool,
+    defaults: [String: RunDefaults] = [:]
   ) -> NewThreadChoice {
     var c = choice
     c.role = id
-    guard let role = crew.first(where: { $0.id == id }) else { return c }
-    if !channelFixed, let channel = role.channel, channels.contains(channel) { c.channel = channel }
-    let harness = role.harness.flatMap { h in harnesses.contains { $0.id == h } ? h : nil } ?? .claudeCode
-    c.harness = harness
-    c.model = role.model.flatMap { $0.isEmpty ? nil : $0 } ?? defaultModel(harness, in: harnesses) ?? ""
-    c.effort = role.effort ?? ""
-    return c
+    let role = crew.first { $0.id == id }
+    if !channelFixed, let channel = role?.channel, channels.contains(channel) { c.channel = channel }
+    return preselecting(c, crew: crew, harnesses: harnesses, defaults: defaults)
   }
 
   /// The Conductor role and channel go together: entering the channel without a role takes it, leaving drops it.
-  public static func selectingChannel(_ id: String, from choice: NewThreadChoice, crew: [CrewRole]) -> NewThreadChoice {
+  /// The run is preselected again for the channel and role this leaves.
+  public static func selectingChannel(
+    _ id: String, from choice: NewThreadChoice, crew: [CrewRole], harnesses: [HarnessInfo], defaults: [String: RunDefaults]
+  ) -> NewThreadChoice {
     var c = choice
     c.channel = id
     if id == conductor, c.role.isEmpty, crew.contains(where: { $0.id == conductor }) { c.role = conductor }
     if id != conductor, c.role == conductor { c.role = "" }
+    return preselecting(c, crew: crew, harnesses: harnesses, defaults: defaults)
+  }
+
+  /// The harness, model and effort a new thread starts on, as `runPreselect` in web/src/new-thread-preset.ts: the role's
+  /// defaults when it sets any (they replace the channel's whole, as the server resolves), else the channel's, else
+  /// Claude Code's default model. A harness the catalog lacks falls back to Claude Code, on its default model.
+  public static func preselecting(
+    _ choice: NewThreadChoice, crew: [CrewRole], harnesses: [HarnessInfo], defaults: [String: RunDefaults]
+  ) -> NewThreadChoice {
+    let role = crew.first { $0.id == choice.role }?.runDefaults
+    let channel = defaults[choice.channel]
+    let d = role?.setsRun == true ? role! : channel?.setsRun == true ? channel! : RunDefaults()
+    var c = choice
+    let named = d.harness ?? .claudeCode
+    c.harness = harnesses.contains { $0.id == named } ? named : .claudeCode
+    c.model = (c.harness == named ? d.model.flatMap { $0.isEmpty ? nil : $0 } : nil) ?? defaultModel(c.harness, in: harnesses) ?? ""
+    c.effort = d.effort ?? ""
     return c
   }
 
@@ -98,6 +136,13 @@ public enum EffortRules {
     guard let model, !model.efforts.isEmpty else { return [] }
     let def = EffortOption(value: "", label: model.defaultEffort.map { "Default (\($0))" } ?? "Default")
     return [def] + model.efforts.map { EffortOption(value: $0, label: $0) }
+  }
+
+  /// The model whose levels apply: the one picked, or with none ("") the harness's default.
+  public static func model(harness: HarnessID, model: String, in harnesses: [HarnessInfo]) -> ModelEntry? {
+    let info = harnesses.first { $0.id == harness }
+    if !model.isEmpty { return info?.models.first { $0.id == model } }
+    return info?.models.first { $0.isDefault } ?? info?.models.first
   }
 
   /// The level if the model takes it, else "" for the default.

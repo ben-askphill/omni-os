@@ -93,10 +93,14 @@ private struct NewThreadBox: View {
     let crew: [CrewRole]
     let channels: Set<String>
     let harnesses: [HarnessInfo]
+    let defaults: [String: RunDefaults]
   }
 
   private var lists: Lists {
-    Lists(crew: model.store.crew, channels: Set(model.store.channels.map(\.id)), harnesses: model.store.harnesses)
+    let channels = model.store.channels
+    return Lists(
+      crew: model.store.crew, channels: Set(channels.map(\.id)), harnesses: model.store.harnesses,
+      defaults: Dictionary(channels.map { ($0.id, $0.runDefaults) }, uniquingKeysWith: { a, _ in a }))
   }
 
   private var placeholder: String {
@@ -130,7 +134,7 @@ private struct NewThreadBox: View {
     }
     #endif
     .onChange(of: lists, initial: true) { _, l in
-      composer.update(crew: l.crew, channels: l.channels, harnesses: l.harnesses)
+      composer.update(crew: l.crew, channels: l.channels, harnesses: l.harnesses, defaults: l.defaults)
     }
     .onAppear {
       menu.onEdit = { text, at in
@@ -197,9 +201,9 @@ private struct NewThreadBox: View {
       if composer.fixedChannel == nil { channelMenu }
       roleMenu
       ModelPickerButton(
-        harnesses: composer.harnesses, choice: composer.choice,
+        harnesses: composer.harnesses, harness: composer.choice.harness, model: composer.choice.model,
         pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest)
-      effortMenu
+      EffortMenu(options: composer.effortOptions, value: composer.choice.effort, pick: composer.selectEffort)
       AttachButton(disabled: composer.sending) { picking = true }
       HStack(spacing: 10) {
         ComposerHints()
@@ -268,33 +272,11 @@ private struct NewThreadBox: View {
     .accessibilityLabel("Role: \(current?.name ?? "No role")")
   }
 
-  @ViewBuilder private var effortMenu: some View {
-    let options = composer.effortOptions
-    if options.isEmpty {
-      PickerPill(text: "Auto effort") { PillIcon(name: "sliders") }
-        .opacity(0.45)
-        .help("This model has no effort levels")
-    } else {
-      let label = options.first { $0.value == composer.choice.effort }?.label ?? options[0].label
-      Menu {
-        Picker("Effort", selection: Binding(get: { composer.choice.effort }, set: { composer.selectEffort($0) })) {
-          ForEach(options) { o in Text(o.label).tag(o.value) }
-        }
-        .pickerStyle(.inline)
-        .labelsHidden()
-      } label: {
-        PickerPill(text: label) { PillIcon(name: "sliders") }
-      }
-      .pillMenu()
-      .help("Effort")
-      .accessibilityLabel("Effort: \(label)")
-    }
-  }
-
   private func refreshHarnesses() {
     Task {
       guard let list = try? await model.client.harnesses() else { return }
-      composer.update(crew: composer.crew, channels: Set(model.store.channels.map(\.id)), harnesses: list)
+      let l = lists
+      composer.update(crew: composer.crew, channels: l.channels, harnesses: list, defaults: l.defaults)
     }
   }
 
@@ -353,11 +335,44 @@ private extension View {
   }
 }
 
+/// The effort pill: Default and the model's levels, or a disabled "Auto effort" when the model has none.
+struct EffortMenu: View {
+  let options: [EffortOption]
+  let value: String
+  let pick: (String) -> Void
+
+  var body: some View {
+    if options.isEmpty {
+      PickerPill(text: "Auto effort") { PillIcon(name: "sliders") }
+        .opacity(0.45)
+        .help("This model has no effort levels")
+    } else {
+      let label = options.first { $0.value == value }?.label ?? options[0].label
+      Menu {
+        Picker("Effort", selection: Binding(get: { value }, set: { pick($0) })) {
+          ForEach(options) { o in Text(o.label).tag(o.value) }
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
+      } label: {
+        PickerPill(text: label) { PillIcon(name: "sliders") }
+      }
+      .pillMenu()
+      .help("Effort")
+      .accessibilityLabel("Effort: \(label)")
+    }
+  }
+}
+
 /// The model pill and its list: models under each harness with its plan, one search, the default marked, and a
 /// harness that isn't installed or logged in shown disabled with the command that fixes it (`ModelPicker.tsx`).
-private struct ModelPickerButton: View {
+struct ModelPickerButton: View {
   let harnesses: [HarnessInfo]
-  let choice: NewThreadChoice
+  let harness: HarnessID
+  /// "" when none is picked: the pill reads `placeholder`.
+  let model: String
+  /// The pill's label when no model is picked.
+  var placeholder = "Model"
   let pick: (HarnessID, String) -> Void
   let refresh: () -> Void
   /// Bumped to open the list, for "New thread on another model".
@@ -366,8 +381,8 @@ private struct ModelPickerButton: View {
   @State private var query = ""
 
   private var current: (harness: HarnessInfo?, model: ModelEntry?) {
-    let h = harnesses.first { $0.id == choice.harness }
-    return (h, h?.models.first { $0.id == choice.model })
+    let h = harnesses.first { $0.id == harness }
+    return (h, h?.models.first { $0.id == model })
   }
 
   var body: some View {
@@ -394,7 +409,7 @@ private struct ModelPickerButton: View {
   }
 
   private func pill(_ c: (harness: HarnessInfo?, model: ModelEntry?), harness: Bool) -> some View {
-    PickerPill(text: c.model?.label ?? "Model", secondary: harness ? c.harness?.name : nil) {
+    PickerPill(text: c.model?.label ?? placeholder, secondary: harness && c.model != nil ? c.harness?.name : nil) {
       if let h = c.harness {
         PillAvatar(fill: Tok.bg) { HarnessLogo(harness: h.id.rawValue, size: 13).foregroundStyle(Tok.fg) }
       } else {
@@ -465,7 +480,7 @@ private struct ModelPickerButton: View {
       }
     } else {
       ForEach(group.models) { m in
-        let selected = h.id == choice.harness && m.id == choice.model
+        let selected = h.id == harness && m.id == model
         Button {
           pick(h.id, m.id)
           open = false
