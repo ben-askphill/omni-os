@@ -51,4 +51,12 @@ describe('channel run defaults', () => {
     const t = await H.runner.createThread({ channel: 'tuned', prompt: 'hi' });
     expect(H.thread(t.id)).toMatchObject({ harness: 'claude-code', model: null, effort: '' });
   });
+
+  it('a retired default does not block a save that leaves it alone', async () => {
+    H.db.channels.update('tuned', { default_model: 'claude-retired-1' });
+    expect((await patch({ archived: 1 })).status).toBe(200);
+    expect((await patch({ archived: 0, notes: 'y' })).status).toBe(200);
+    // Touching the defaults still checks them.
+    expect((await patch({ default_effort: 'low' })).status).toBe(400);
+  });
 });
