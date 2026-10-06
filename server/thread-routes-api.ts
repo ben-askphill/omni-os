@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { commentsPrompt, isArtifactUrl } from '../shared/published.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
-import { artifacts, channels, events, threads, type Thread } from './db.ts';
+import { artifacts, channels, events, publicChannel, threads, type Thread } from './db.ts';
 import { readBody } from './read-body.ts';
 import { createTeam, createThread, interruptThread, isLive, pendingFor, postMessage, runsHere } from './runner.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
@@ -89,7 +89,7 @@ threadRoutesApi.get('/:id', (c) => {
   void threadOpened(t.id);
   const detail = {
     thread: t,
-    channel: channels.get(t.channel_id),
+    channel: (ch => ch && publicChannel(ch))(channels.get(t.channel_id)),
     events: events.since(t.id),
     artifacts: artifacts.byThread(t.id),
     children: threads.children(t.id),

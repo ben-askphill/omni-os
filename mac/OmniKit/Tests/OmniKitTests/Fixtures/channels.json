@@ -12,8 +12,10 @@
     "browser_headless": 1,
     "notes": "Front agent. Delegates to crew threads in other channels.",
     "icon": null,
+    "design_system_name": null,
     "archived": 0,
     "created_at": "2026-01-05T09:00:00.000Z",
+    "design_system_size": 0,
     "running": 0,
     "active": [],
     "recent": []
@@ -31,8 +33,10 @@
     "browser_headless": 1,
     "notes": "Fixture",
     "icon": null,
+    "design_system_name": null,
     "archived": 0,
     "created_at": "2026-01-05T09:00:00.000Z",
+    "design_system_size": 0,
     "running": 1,
     "active": [
       {
@@ -66,8 +70,10 @@
     "browser_headless": 1,
     "notes": "Default channel for quick asks, research and ops.",
     "icon": null,
+    "design_system_name": null,
     "archived": 0,
     "created_at": "2026-01-05T09:00:00.000Z",
+    "design_system_size": 0,
     "running": 0,
     "active": [],
     "recent": []

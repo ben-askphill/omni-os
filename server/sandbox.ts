@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { config, paths, threadDir, artifactsDir, browserOutDir } from './config.ts';
+import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile } from './config.ts';
 import type { Channel } from './db.ts';
 import type { CrewRole } from './crew.ts';
 
@@ -141,4 +141,19 @@ export async function restoreWorktree(repoPath: string, dir: string, branch: str
 
 export async function removeWorktree(repoPath: string, dir: string) {
   await run('git', ['-C', repoPath, 'worktree', 'remove', '--force', dir]).catch(() => {});
+}
+
+/**
+ * Puts the channel's design system in the thread's folder, where the system prompt points at it, or takes a
+ * stale copy out when the channel no longer has one. Written every turn, so a change in settings reaches
+ * threads that are already open.
+ */
+export function writeDesignSystem(threadId: string, channel: Channel) {
+  const file = designSystemFile(threadId);
+  if (channel.design_system) {
+    mkdirSync(threadDir(threadId), { recursive: true });
+    writeFileSync(file, channel.design_system);
+  } else {
+    rmSync(file, { force: true });
+  }
 }

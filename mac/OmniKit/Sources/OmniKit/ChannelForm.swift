@@ -146,7 +146,36 @@ public struct ChannelForm: Hashable, Sendable {
   }
 }
 
+/// A channel's design system file, as `readDesignSystem` in shared/design-system.ts. The server checks the rest.
+public enum DesignSystemFile {
+  public static let maxBytes = 512 * 1024
+
+  /// The file's text, or the message to show when it is too big or not text.
+  public static func read(_ data: Data) -> Result<String, DesignSystemError> {
+    if data.count > maxBytes { return .failure(.init(message: "That file is too big: keep it under 512 KB.")) }
+    guard let text = String(data: data, encoding: .utf8) else { return .failure(.init(message: "That file is not text.")) }
+    return .success(text)
+  }
+}
+
+public struct DesignSystemError: Error, Hashable, Sendable {
+  public let message: String
+  public init(message: String) { self.message = message }
+}
+
 extension OmniClient {
+  /// Sets the channel's design system. The server refuses a file that is empty, too big or not HTML.
+  public func setDesignSystem(_ id: String, name: String, html: String) async throws(OmniAPIError) -> Channel {
+    try await send("PUT", "/api/channels/\(uriComponent(id))/design-system", body: JSONValue.object(["name": .string(name), "html": .string(html)]))
+  }
+
+  public func removeDesignSystem(_ id: String) async throws(OmniAPIError) -> Channel {
+    try await send("DELETE", "/api/channels/\(uriComponent(id))/design-system")
+  }
+
+  /// Where the file opens in a browser.
+  public func designSystemURL(_ id: String) -> URL { url("/api/channels/\(uriComponent(id))/design-system") }
+
   public func createChannel(_ form: ChannelForm) async throws(OmniAPIError) -> Channel {
     try await send("POST", "/api/channels", body: form.createBody())
   }

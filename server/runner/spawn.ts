@@ -2,7 +2,7 @@
 import { config } from '../config.ts';
 import { channels, threads, type Thread } from '../db.ts';
 import { getCrew } from '../crew.ts';
-import { writeMcpConfig } from '../sandbox.ts';
+import { writeDesignSystem, writeMcpConfig } from '../sandbox.ts';
 import { attachThread, detachThread } from '../browser.ts';
 import { globalSecret, secretsEnv } from '../secrets.ts';
 import { closePipesAfterExit } from '../child.ts';
@@ -83,6 +83,7 @@ async function spawnLive(live: Live, thread: Thread) {
     detachThread(channel.id, thread.id);
     return;
   }
+  if (!remote) writeDesignSystem(thread.id, channel);
   const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl() });
 
   let secretEnv: Record<string, string> = {};
