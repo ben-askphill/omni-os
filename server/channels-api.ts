@@ -41,8 +41,12 @@ const runDefault = z
   .transform((s) => s || null)
   .nullish();
 
-/** Why the run defaults a body would leave the channel with are refused, against the harness catalog. */
+/**
+ * Why the run defaults a body would leave the channel with are refused, against the harness catalog. A body that
+ * sets none of them is not checked, so a default the catalog has since retired never blocks a rename or an archive.
+ */
 function runDefaultsError(body: { default_harness?: string | null; default_model?: string | null; default_effort?: string | null }, current?: Channel) {
+  if (!('default_harness' in body || 'default_model' in body || 'default_effort' in body)) return undefined;
   const pick = (k: 'default_harness' | 'default_model' | 'default_effort') => (k in body ? body[k] : current?.[k]) ?? undefined;
   const err = validateDefaults({ harness: pick('default_harness'), model: pick('default_model'), effort: pick('default_effort') }, getCatalog());
   return err ? `Default model: ${err}` : undefined;
