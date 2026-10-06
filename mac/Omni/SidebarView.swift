@@ -194,7 +194,7 @@ struct SidebarView: View {
       let item = SidebarItem.thread(thread.id)
       row(item) { ThreadRow(thread: thread, active: selected == item) }
         .padding(.leading, 25)
-        .openInNewWindow(thread.id, model: model)
+        .openInNewWindow(thread.id, model: model, title: thread.title)
     }
     if links.seeAll || links.more > 0 {
       Button { pick(.more(channel.id)) } label: {

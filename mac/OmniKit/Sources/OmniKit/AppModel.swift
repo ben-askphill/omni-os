@@ -221,6 +221,13 @@ public final class AppModel {
 
   // MARK: Actions
 
+  /// Renames a thread from a right-click. A blank title or a failed call leaves it as it was.
+  public func renameThread(_ id: String, to title: String) async {
+    let title = title.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    guard !title.isEmpty, (try? await client.renameThread(id, title: title)) != nil else { return }
+    await store.reloadChannels()
+  }
+
   /// Archives a thread (or brings it back) from a right-click, then refreshes the lists. Archiving the
   /// thread on screen moves to its channel.
   public func setThreadArchived(_ id: String, _ archived: Bool) async {
