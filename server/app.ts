@@ -7,6 +7,7 @@ import { artifactsApi } from './artifacts-api.ts';
 import { browserApi } from './browser-api.ts';
 import { channelsApi } from './channels-api.ts';
 import { commandsApi } from './commands-api.ts';
+import { mentionsApi } from './mentions-api.ts';
 import { feedApi } from './feed-api.ts';
 import { githubApi } from './github-api.ts';
 import { metaApi } from './meta-api.ts';
@@ -38,6 +39,7 @@ api.route('/artifacts', artifactsApi);
 api.route('/', githubApi);
 api.route('/', metaApi);
 api.route('/commands', commandsApi);
+api.route('/mentions', mentionsApi);
 api.route('/sync', syncApi);
 
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
