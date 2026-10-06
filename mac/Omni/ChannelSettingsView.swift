@@ -93,7 +93,7 @@ struct ChannelSettingsForm: View {
             HStack(spacing: 8) {
               OmniIcon(name: "file", size: 14)
               Link(name, destination: model.client.designSystemURL(existing.id))
-              Text("\(max(1, Int((Double(existing.designSystemSize) / 1024).rounded()))) KB").foregroundStyle(Tok.fg3)
+              Text(Format.bytes(existing.designSystemSize)).foregroundStyle(Tok.fg3)
             }
             .font(.system(size: 13))
             .padding(.horizontal, 12)

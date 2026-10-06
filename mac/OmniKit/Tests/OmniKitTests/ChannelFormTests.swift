@@ -189,7 +189,7 @@ import OmniKit
 
   @Test func refusesADesignSystemFileThatIsTooBigOrNotText() {
     #expect(DesignSystemFile.read(Data("<html></html>".utf8)) == .success("<html></html>"))
-    #expect(DesignSystemFile.read(Data(count: DesignSystemFile.maxBytes + 1)) == .failure(.init(message: "That file is too big: keep it under 512 KB.")))
+    #expect(DesignSystemFile.read(Data(count: DesignSystemFile.maxBytes + 1)) == .failure(.init(message: "That file is too big: keep it under 25 MB.")))
     #expect(DesignSystemFile.read(Data([0xff, 0xfe, 0xfd])) == .failure(.init(message: "That file is not text.")))
   }
 }
