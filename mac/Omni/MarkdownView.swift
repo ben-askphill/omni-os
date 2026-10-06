@@ -22,10 +22,31 @@ private struct MarkdownBlocks: View {
   let size: CGFloat
   var spacing: CGFloat = 9
 
+  private enum Group {
+    case flow([MarkdownBlock])
+    case block(MarkdownBlock)
+  }
+
+  /// Neighbouring text blocks go to one text view so a selection can cross them.
+  private static func groups(_ blocks: [MarkdownBlock]) -> [Group] {
+    var out: [Group] = []
+    for block in blocks {
+      if block.flowsAsText {
+        if case .flow(let run)? = out.last { out[out.count - 1] = .flow(run + [block]) } else { out.append(.flow([block])) }
+      } else {
+        out.append(.block(block))
+      }
+    }
+    return out
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: spacing) {
-      ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-        MarkdownBlockView(block: block, size: size)
+      ForEach(Array(Self.groups(blocks).enumerated()), id: \.offset) { _, group in
+        switch group {
+        case .flow(let run): SelectableMarkdown(blocks: run, size: size)
+        case .block(let block): MarkdownBlockView(block: block, size: size)
+        }
       }
     }
   }
@@ -85,7 +106,6 @@ private struct MarkdownBlockView: View {
       .lineSpacing(size * 0.4)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .modifier(LinkCursor(text: text, size: size))
   }
 
   /// Links read as links: underlined, as `.md a` in index.css.
@@ -192,54 +212,5 @@ struct ThreadLinks: ViewModifier {
         return .discarded
       }
     })
-  }
-}
-
-/// A pointing hand over a link. Text selection owns the cursor (an I-beam everywhere in the text), so the link
-/// under the pointer is found by laying the same string out with TextKit at the view's width.
-private struct LinkCursor: ViewModifier {
-  let text: AttributedString
-  let size: CGFloat
-  @State private var width: CGFloat = 0
-  @State private var pushed = false
-
-  func body(content: Content) -> some View {
-    content
-      .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
-      .onContinuousHover { phase in
-        switch phase {
-        case .active(let point): setHand(overLink(at: point))
-        case .ended: setHand(false)
-        }
-      }
-      .onDisappear { setHand(false) }
-  }
-
-  private func setHand(_ on: Bool) {
-    guard on != pushed else { return }
-    pushed = on
-    if on { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-  }
-
-  private func overLink(at point: CGPoint) -> Bool {
-    guard width > 0, text.runs.contains(where: { $0.link != nil }) else { return false }
-    let style = NSMutableParagraphStyle()
-    style.lineSpacing = size * 0.4
-    let string = NSMutableAttributedString(attributedString: NSAttributedString(text))
-    let whole = NSRange(location: 0, length: string.length)
-    string.addAttribute(.paragraphStyle, value: style, range: whole)
-    string.enumerateAttribute(.font, in: whole) { value, range, _ in
-      if value == nil { string.addAttribute(.font, value: NSFont.systemFont(ofSize: size), range: range) }
-    }
-    let storage = NSTextStorage(attributedString: string)
-    let layout = NSLayoutManager()
-    let container = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
-    container.lineFragmentPadding = 0
-    layout.addTextContainer(container)
-    storage.addLayoutManager(layout)
-    let glyph = layout.glyphIndex(for: point, in: container, fractionOfDistanceThroughGlyph: nil)
-    guard layout.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: container).contains(point) else { return false }
-    let index = layout.characterIndexForGlyph(at: glyph)
-    return storage.attribute(.link, at: index, effectiveRange: nil) != nil
   }
 }
