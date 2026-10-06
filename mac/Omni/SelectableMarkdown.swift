@@ -57,10 +57,7 @@ struct SelectableMarkdown: NSViewRepresentable {
 
   func sizeThatFits(_ proposal: ProposedViewSize, nsView view: FlowTextView, context: Context) -> CGSize? {
     let width = max(proposal.width ?? 600, 40)
-    guard let container = view.textContainer, let layout = view.layoutManager else { return nil }
-    container.size = NSSize(width: width, height: .greatestFiniteMagnitude)
-    layout.ensureLayout(for: container)
-    return CGSize(width: width, height: ceil(layout.usedRect(for: container).height))
+    return CGSize(width: width, height: view.height(forWidth: width))
   }
 
   struct Key: Equatable {
@@ -86,6 +83,25 @@ final class FlowTextView: NSTextView {
     guard let container = textContainer, let layout = layoutManager else { return super.intrinsicContentSize }
     layout.ensureLayout(for: container)
     return NSSize(width: NSView.noIntrinsicMetric, height: ceil(layout.usedRect(for: container).height))
+  }
+
+  /// The text's height at `width`, measured without moving the container off the view's own width. SwiftUI probes
+  /// several widths before it settles, and a probe left in the container made the text wrap at that width inside
+  /// a frame sized for another, spilling out of its card.
+  func height(forWidth width: CGFloat) -> CGFloat {
+    guard let container = textContainer, let layout = layoutManager else { return 0 }
+    let current = container.size
+    container.size = NSSize(width: width, height: .greatestFiniteMagnitude)
+    layout.ensureLayout(for: container)
+    let height = ceil(layout.usedRect(for: container).height)
+    container.size = current
+    return height
+  }
+
+  /// The text wraps at the width SwiftUI gave the view.
+  override func setFrameSize(_ newSize: NSSize) {
+    super.setFrameSize(newSize)
+    textContainer?.size = NSSize(width: newSize.width, height: .greatestFiniteMagnitude)
   }
 
   override func scrollWheel(with event: NSEvent) { nextResponder?.scrollWheel(with: event) }
