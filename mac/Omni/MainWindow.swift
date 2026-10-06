@@ -10,6 +10,7 @@ struct MainWindow: View {
   @State private var paneTop: CGFloat?
   /// The window's own appearance. The chrome is drawn dark, the pane and the palette follow this.
   @Environment(\.colorScheme) private var scheme
+  private static let paneShape = ConcentricRectangle(corners: .concentric(minimum: 8), isUniform: true)
 
   var body: some View {
     HStack(spacing: 0) {
@@ -28,8 +29,12 @@ struct MainWindow: View {
       .overlay(alignment: .bottomTrailing) { BannerStack(model: model) }
       .background(Tok.bg)
       .environment(\.colorScheme, scheme)
-      .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-      .cardShadow(22)
+      // Concentric with the window's own corners, whatever radius the system gives them, so the
+      // band of chrome around the pane stays an even 8pt all the way round the corner.
+      .clipShape(Self.paneShape)
+      // The shape isn't insettable: a 1pt stroke clipped to itself is the 0.5pt inner hairline.
+      .overlay(Self.paneShape.stroke(Tok.paneEdge, lineWidth: 1).clipShape(Self.paneShape))
+      .shadow(color: .black.opacity(0.05), radius: 1, y: 1)
       .padding(.leading, sidebarShown ? 0 : 8)
       .padding([.trailing, .bottom], 8)
     }
