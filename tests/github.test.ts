@@ -4,7 +4,7 @@ vi.mock('../server/db.ts', () => {
   throw new Error('db.ts must not be imported by github tests');
 });
 
-import { pickBranchPR, summarizeChecks } from '../server/github.ts';
+import { markBranches, pickBranchPR, summarizeChecks } from '../server/github.ts';
 
 describe('summarizeChecks', () => {
   it('returns zeros for null, undefined and empty rollups', () => {
@@ -56,5 +56,17 @@ describe('pickBranchPR', () => {
     expect(pickBranchPR([{ number: 3, state: 'MERGED' }, { number: 2, state: 'OPEN' }])).toEqual({ number: 2, state: 'OPEN' });
     expect(pickBranchPR([{ number: 3, state: 'MERGED' }, { number: 1, state: 'CLOSED' }])).toEqual({ number: 3, state: 'MERGED' });
     expect(pickBranchPR([])).toBeNull();
+  });
+});
+
+describe('markBranches', () => {
+  const pr = (number: number, state: string, headRefName: string) => ({ number, state, isDraft: false, url: `u/${number}`, headRefName });
+  it('marks a branch with its open PR, else its newest merged one', () => {
+    const marks = markBranches([pr(3, 'MERGED', 'a'), pr(2, 'OPEN', 'a'), pr(1, 'MERGED', 'b'), pr(0, 'MERGED', 'b')]);
+    expect(marks.a.number).toBe(2);
+    expect(marks.b.number).toBe(1);
+  });
+  it('leaves out branches whose PRs were closed unmerged', () => {
+    expect(markBranches([pr(4, 'CLOSED', 'c')])).toEqual({});
   });
 });

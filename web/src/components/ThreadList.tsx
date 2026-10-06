@@ -1,10 +1,10 @@
 import { Loader } from './brand.tsx';
-import { useCallback, type CSSProperties, type ReactNode } from 'react';
-import { useApi, type Thread } from '../api.ts';
+import { useCallback, useEffect, type CSSProperties, type ReactNode } from 'react';
+import { useApi, type BranchPRMark, type Thread } from '../api.ts';
 import { groupByDay, relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useFeed, useNow } from '../store.tsx';
-import { Avatar, Chip, Empty, ErrorNote, Loading, StatusDot } from './ui.tsx';
+import { Avatar, Chip, Empty, ErrorNote, Icon, Loading, StatusDot } from './ui.tsx';
 
 /** Loads a thread list and keeps it current from /feed. */
 export function useLiveThreads(path: string, accept: (t: Thread) => boolean, limit = 500) {
@@ -32,7 +32,29 @@ const SOURCE_LABEL: Record<string, string> = {
   capture: 'Capture',
 };
 
-export function ThreadRow({ t, showChannel }: { t: Thread; showChannel?: boolean }) {
+/** Branch to PR for a channel's threads. Empty while loading, or when the channel has no repo. */
+export function useThreadPRs(channelId: string): Record<string, BranchPRMark> {
+  const q = useApi<Record<string, BranchPRMark>>(`/channels/${encodeURIComponent(channelId)}/thread-prs`);
+  const { reload } = q;
+  useEffect(() => {
+    const tick = setInterval(() => document.visibilityState === 'visible' && reload(), 60_000);
+    return () => clearInterval(tick);
+  }, [reload]);
+  return q.data ?? {};
+}
+
+/** A small PR icon: filled live when the PR is open, done when it merged. */
+function PRMark({ pr }: { pr: BranchPRMark }) {
+  const merged = pr.state === 'MERGED';
+  const label = `PR #${pr.number} ${merged ? 'merged' : pr.isDraft ? 'draft' : 'open'}`;
+  return (
+    <span title={label} aria-label={label} role="img" className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${merged ? 'bg-done text-on-done' : 'bg-live text-on-live'}`}>
+      <Icon name="pr" size={12} strokeWidth={2.2} />
+    </span>
+  );
+}
+
+export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boolean; pr?: BranchPRMark }) {
   useNow(60_000);
   const { channels } = useApp();
   const source = SOURCE_LABEL[t.source];
@@ -56,6 +78,7 @@ export function ThreadRow({ t, showChannel }: { t: Thread; showChannel?: boolean
           <span className="min-w-0 truncate text-[14px] text-fg-2 group-hover:text-fg">{t.title || 'Untitled'}</span>
           {t.role && <Chip>{t.role}</Chip>}
           {source && <Chip tone="outline">{source}</Chip>}
+          {pr && <PRMark pr={pr} />}
           <span className="ml-auto shrink-0 pl-2 font-num text-[11px] text-fg-4 tabular-nums">{relTime(t.updated_at)}</span>
         </div>
         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
@@ -75,6 +98,7 @@ export function ThreadGroups({
   error,
   onRetry,
   showChannel,
+  prs,
   empty,
 }: {
   threads: Thread[] | undefined;
@@ -82,6 +106,7 @@ export function ThreadGroups({
   error: string | null;
   onRetry?: () => void;
   showChannel?: boolean;
+  prs?: Record<string, BranchPRMark>;
   empty?: ReactNode;
 }) {
   if (error && !threads) return <ErrorNote onRetry={onRetry}>{error}</ErrorNote>;
@@ -98,7 +123,7 @@ export function ThreadGroups({
           <div className="rise">
             {g.items.map((t, i) => (
               <div key={t.id} style={{ '--i': Math.min(i, 12) } as CSSProperties}>
-                <ThreadRow t={t} showChannel={showChannel} />
+                <ThreadRow t={t} showChannel={showChannel} pr={t.branch ? prs?.[t.branch] : undefined} />
               </div>
             ))}
           </div>

@@ -125,6 +125,13 @@ export interface PRSummary {
   mergeable: string;
   checks: Checks;
 }
+/** What GET /channels/:id/thread-prs marks a branch with: its open or merged PR. */
+export interface BranchPRMark {
+  number: number;
+  state: 'OPEN' | 'MERGED';
+  isDraft: boolean;
+  url: string;
+}
 export interface PRDetail extends PRSummary {
   body: string;
   files: { path: string; additions: number; deletions: number }[];

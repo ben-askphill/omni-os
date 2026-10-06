@@ -111,6 +111,15 @@ import OmniKit
     #expect(t.requests[0].url?.absoluteString == "http://127.0.0.1:4799/api/channels/acme/prs?state=merged")
   }
 
+  @Test func threadMarksMapABranchToItsPR() async throws {
+    let t = StubTransport(body: #"{"omni/a":{"number":7,"state":"MERGED","isDraft":false,"url":"u"},"omni/b":{"number":8,"state":"OPEN","isDraft":true,"url":"v"}}"#)
+    let marks = try await OmniClient(port: 4799, transport: t).threadPullRequests(in: "acme")
+    #expect(t.requests[0].url?.path == "/api/channels/acme/thread-prs")
+    #expect(marks["omni/a"]?.badge == "merged")
+    #expect(marks["omni/b"]?.badge == "draft")
+    #expect(marks["omni/c"] == nil)
+  }
+
   @Test func threadPRIsNilWithoutOne() async throws {
     let t = StubTransport(body: #"{"pr":null,"prs":[]}"#)
     let r = try await OmniClient(port: 4799, transport: t).pullRequests(forThread: "t1")

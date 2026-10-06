@@ -70,3 +70,34 @@ export async function mergePR(repo: string, n: number, method: 'squash' | 'merge
   if (deleteBranch) args.push('--delete-branch');
   return gh(args);
 }
+
+export interface BranchPRMark {
+  number: number;
+  state: string;
+  isDraft: boolean;
+  url: string;
+}
+
+/** The one PR to mark each branch with: its open one, else its newest. Closed PRs that never merged are left out. */
+export function markBranches(prs: (BranchPRMark & { headRefName: string })[]): Record<string, BranchPRMark> {
+  const byBranch = new Map<string, (BranchPRMark & { headRefName: string })[]>();
+  for (const p of prs) byBranch.set(p.headRefName, [...(byBranch.get(p.headRefName) ?? []), p]);
+  const out: Record<string, BranchPRMark> = {};
+  for (const [branch, list] of byBranch) {
+    const pr = pickBranchPR(list.filter((p) => p.state === 'OPEN' || p.state === 'MERGED'));
+    if (pr) out[branch] = { number: pr.number, state: pr.state, isDraft: pr.isDraft, url: pr.url };
+  }
+  return out;
+}
+
+const markCache = new Map<string, { at: number; marks: Record<string, BranchPRMark> }>();
+
+/** Branch to PR for a whole repo in one gh call, so a thread list does not ask per thread. Cached for 30s. */
+export async function threadPRMarks(repo: string) {
+  const hit = markCache.get(repo);
+  if (hit && Date.now() - hit.at < 30_000) return hit.marks;
+  const raw = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--state', 'all', '--limit', '200', '--json', 'number,state,isDraft,headRefName,url']));
+  const marks = markBranches(raw);
+  markCache.set(repo, { at: Date.now(), marks });
+  return marks;
+}
