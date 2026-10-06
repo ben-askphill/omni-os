@@ -186,11 +186,11 @@ public struct ChannelForm: Hashable, Sendable {
 
 /// A channel's design system file, as `readDesignSystem` in shared/design-system.ts. The server checks the rest.
 public enum DesignSystemFile {
-  public static let maxBytes = 512 * 1024
+  public static let maxBytes = 25 * 1024 * 1024
 
   /// The file's text, or the message to show when it is too big or not text.
   public static func read(_ data: Data) -> Result<String, DesignSystemError> {
-    if data.count > maxBytes { return .failure(.init(message: "That file is too big: keep it under 512 KB.")) }
+    if data.count > maxBytes { return .failure(.init(message: "That file is too big: keep it under 25 MB.")) }
     guard let text = String(data: data, encoding: .utf8) else { return .failure(.init(message: "That file is not text.")) }
     return .success(text)
   }

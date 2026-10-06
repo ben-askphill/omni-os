@@ -40,7 +40,7 @@ describe('channel design system', () => {
   });
 
   it('refuses a file that is empty, too big or not HTML', async () => {
-    for (const html of ['  ', 'just words', 'x'.repeat(600 * 1024)]) {
+    for (const html of ['  ', 'just words', 'x'.repeat(26 * 1024 * 1024)]) {
       expect((await send('PUT', '/api/channels/branded/design-system', { name: 'bad.html', html })).status).toBe(400);
     }
     expect((await send('PUT', '/api/channels/nope/design-system', { name: 'a.html', html: HTML })).status).toBe(404);

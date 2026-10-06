@@ -4,7 +4,7 @@ import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
 import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { CHANNEL_GLYPHS, glyphIcon, parseChannelIcon, readSvgIcon } from '../../../shared/channel-icon.ts';
 import { readDesignSystem } from '../../../shared/design-system.ts';
-import { lastGrapheme, slugify } from '../format.ts';
+import { bytes, lastGrapheme, slugify } from '../format.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
 
@@ -190,7 +190,7 @@ function DesignSystemPicker({ channel, onChange }: { channel: Channel; onChange:
             <a className="hov" href={`/api${url}`} target="_blank" rel="noreferrer" title="Open the file">
               {channel.design_system_name}
             </a>
-            <span className="text-fg-3">{Math.max(1, Math.round(channel.design_system_size / 1024))} KB</span>
+            <span className="text-fg-3">{bytes(channel.design_system_size)}</span>
           </span>
         )}
         <Button type="button" icon="file" busy={busy} onClick={() => fileRef.current?.click()}>
