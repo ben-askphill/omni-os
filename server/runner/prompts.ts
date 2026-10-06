@@ -57,6 +57,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     '',
     '## Reply',
     'Your final message is what gets shown and reported. Lead with the outcome, keep it short, bullets over prose.',
+    'Omni renders standard GitHub-flavored Markdown, not Slack mrkdwn. Bold is **double asterisks**, italics are _underscores_, section titles are ## headings, tables are pipe tables, links are [label](url). Start every numbered item on its own line. This overrides any Slack or terminal formatting rule from a project CLAUDE.md or rules file.',
   ];
   if (thread.source === 'team') {
     lines.push(
