@@ -5,13 +5,13 @@ import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset, take
 import { useApp } from '../store.tsx';
 import { ErrorNote, Icon, IconButton, Kbd, Loader, Picker, type IconName, type PickerOption } from './ui.tsx';
 import { CrewMark, HarnessLogo, harnessLabel, isCrewRole } from './brand.tsx';
-import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
+import { EffortPicker, ModelPicker, type ModelChoice } from './ModelPicker.tsx';
 import { threadRunLabels } from '../thread-run.ts';
 import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
 import { FileMenu, useFileMenu } from './FileMenu.tsx';
 import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '../../../shared/slash-menu.ts';
 import { menuCommands, newThreadHint, replySlash } from '../../../shared/composer-slash.ts';
-import { newThreadBody, otherModel, sameSettings } from '../new-thread-preset.ts';
+import { channelRun, newThreadBody, otherModel, runPreselect, sameSettings } from '../new-thread-preset.ts';
 import { parseSlash, type SlashCommand } from '../../../shared/slash.ts';
 
 // Unsent text survives navigation (not reloads). Keyed by where the composer lives.
@@ -423,15 +423,29 @@ export function NewThreadComposer({
   useFocusRequests(ref, true);
 
   useEffect(() => {
-    if (channelId) setChannel(channelId);
+    if (!channelId || channelId === channel) return;
+    setChannel(channelId);
+    preselect(role, channelId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
 
-  // A new composer starts on its harness's default model (Claude Code's, unless a preset says), not on the last pick.
+  // Preselect the role's run defaults, else the channel's, else Claude Code's default model.
+  const preselect = (r: string, c: string) => {
+    if (!harnesses) return;
+    const ro = crew.find((x) => x.id === r);
+    const run = runPreselect(ro && { harness: ro.harness, model: ro.model, effort: ro.effort }, channelRun(channels.find((x) => x.id === c)), harnesses);
+    setChoice(run.choice);
+    setEffort(run.effort);
+  };
+
+  // A new composer starts on those defaults (unless a preset says), not on the last pick.
   useEffect(() => {
     if (!harnesses || choice.model) return;
-    const h = harnesses.find((x) => x.id === choice.harness);
-    const def = h?.models.find((m) => m.default) ?? h?.models[0];
-    if (def) setChoice({ harness: choice.harness, model: def.id });
+    if (preset?.choice) {
+      const h = harnesses.find((x) => x.id === choice.harness);
+      const def = h?.models.find((m) => m.default) ?? h?.models[0];
+      if (def) setChoice({ harness: choice.harness, model: def.id });
+    } else preselect(role, channel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [harnesses]);
 
@@ -448,20 +462,17 @@ export function NewThreadComposer({
     setRole(r);
     const roleObj = crew.find((x) => x.id === r);
     const rc = roleObj?.channel;
-    if (!channelId && rc && channels.some((c) => c.id === rc)) setChannel(rc);
-    // Preselect the role's harness, model and effort defaults.
-    if (roleObj && harnesses) {
-      const h = roleObj.harness && harnesses.some((x) => x.id === roleObj.harness) ? roleObj.harness : 'claude-code';
-      const info = harnesses.find((x) => x.id === h);
-      const model = roleObj.model || info?.models.find((m) => m.default)?.id || info?.models[0]?.id || '';
-      setChoice({ harness: h, model });
-      setEffort(roleObj.effort || '');
-    }
+    const next = !channelId && rc && channels.some((c) => c.id === rc) ? rc : channel;
+    setChannel(next);
+    preselect(r, next);
   };
   const onChannel = (c: string) => {
     setChannel(c);
-    if (c === 'conductor' && !role && crew.some((r) => r.id === 'conductor')) setRole('conductor');
-    if (c !== 'conductor' && role === 'conductor') setRole('');
+    let r = role;
+    if (c === 'conductor' && !role && crew.some((x) => x.id === 'conductor')) r = 'conductor';
+    if (c !== 'conductor' && role === 'conductor') r = '';
+    setRole(r);
+    preselect(r, c);
   };
 
   const update = (v: string) => {
@@ -553,18 +564,7 @@ export function NewThreadComposer({
             }}
           />
         )}
-        {harnesses && (() => {
-          const m = harnesses.find((h) => h.id === choice.harness)?.models.find((x) => x.id === choice.model);
-          const efforts = m?.efforts ?? [];
-          if (!efforts.length) {
-            return <Picker label="Effort" value="" options={[{ value: '', label: 'Auto effort', avatar: false, icon: 'sliders' }]} onChange={() => {}} disabled />;
-          }
-          const effortOptions: PickerOption<string>[] = [
-            { value: '', label: m?.defaultEffort ? `Default (${m.defaultEffort})` : 'Default', avatar: false, icon: 'sliders' },
-            ...efforts.map((e) => ({ value: e, label: e, avatar: false as const, icon: 'sliders' as const })),
-          ];
-          return <Picker label="Effort" value={effort} options={effortOptions} onChange={setEffort} />;
-        })()}
+        {harnesses && <EffortPicker harnesses={harnesses} choice={choice} value={effort} onChange={setEffort} />}
         <AttachButton onPick={att.add} disabled={busy} />
         <div className="ml-auto flex items-center gap-2.5">
           <Hint />

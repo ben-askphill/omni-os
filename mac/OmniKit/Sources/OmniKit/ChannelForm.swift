@@ -17,6 +17,11 @@ public struct ChannelForm: Hashable, Sendable {
   public var notes = ""
   /// One emoji, `icon:<name>` for a design system icon, or empty for the letter avatar.
   public var icon = ""
+  /// The default model, as ChannelSettings.tsx's `run`: harness "" is no default at all, model "" is the harness's
+  /// default, effort "" is the model's.
+  public private(set) var defaultHarness = ""
+  public private(set) var defaultModel = ""
+  public private(set) var defaultEffort = ""
   public private(set) var idTouched = false
 
   public init() {}
@@ -34,7 +39,37 @@ public struct ChannelForm: Hashable, Sendable {
     showBrowser = !c.browserHeadless
     notes = c.notes ?? ""
     icon = c.icon ?? ""
+    defaultHarness = c.defaultHarness?.rawValue ?? ""
+    defaultModel = c.defaultModel ?? ""
+    defaultEffort = c.defaultEffort ?? ""
     idTouched = true
+  }
+
+  /// The default model as the pickers show it: Claude Code when no harness is set.
+  public var defaultRun: (harness: HarnessID, model: String) {
+    (defaultHarness.isEmpty ? .claudeCode : HarnessID(rawValue: defaultHarness), defaultModel)
+  }
+
+  public var hasDefaultRun: Bool { !(defaultHarness.isEmpty && defaultModel.isEmpty && defaultEffort.isEmpty) }
+
+  /// A new default model resets its effort to the model's default.
+  public mutating func setDefaultModel(harness: HarnessID, model: String) {
+    defaultHarness = harness.rawValue
+    defaultModel = model
+    defaultEffort = ""
+  }
+
+  /// An effort with no model set applies to the harness's default model, Claude Code's when none is set.
+  public mutating func setDefaultEffort(_ effort: String) {
+    defaultHarness = defaultRun.harness.rawValue
+    defaultEffort = effort
+  }
+
+  /// Back to Claude Code's default: clears all three.
+  public mutating func clearDefaultRun() {
+    defaultHarness = ""
+    defaultModel = ""
+    defaultEffort = ""
   }
 
   /// Editing the name fills in the id until the id has been typed in.
@@ -121,6 +156,9 @@ public struct ChannelForm: Hashable, Sendable {
       "browser_headless": .number(showBrowser ? 0 : 1),
       "notes": text(notes),
       "icon": text(icon),
+      "default_harness": text(defaultHarness),
+      "default_model": text(defaultModel),
+      "default_effort": text(defaultEffort),
     ]
     if !system { o["kind"] = .string(kind.rawValue) }
     return .object(o)

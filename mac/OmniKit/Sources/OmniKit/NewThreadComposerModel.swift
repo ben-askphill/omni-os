@@ -25,6 +25,11 @@ public final class NewThreadComposerModel {
   public var effortOptions: [EffortOption] { EffortRules.options(for: model) }
 
   @ObservationIgnored private var channels: Set<String> = []
+  /// Each channel's run defaults, by id.
+  @ObservationIgnored private var defaults: [String: RunDefaults] = [:]
+  /// The pickers hold the preselected run (the role's or the channel's), not a preset or a pick, so they follow the
+  /// lists as they load.
+  @ObservationIgnored private var preselected = true
   @ObservationIgnored private let api: any NewThreadAPI
   @ObservationIgnored private let drafts: DraftStore
   @ObservationIgnored private let readFile: @Sendable (StagedFile) throws -> UploadFile
@@ -42,13 +47,15 @@ public final class NewThreadComposerModel {
     text = drafts.text(for: "new:\(fixedChannel ?? "*")")
   }
 
-  /// Takes the workspace's lists as they load or change.
-  public func update(crew: [CrewRole], channels: Set<String>, harnesses: [HarnessInfo]) {
+  /// Takes the workspace's lists as they load or change: channel ids, and each one's run defaults.
+  public func update(crew: [CrewRole], channels: Set<String>, harnesses: [HarnessInfo], defaults: [String: RunDefaults] = [:]) {
     if self.crew != crew { self.crew = crew }
     if self.harnesses != harnesses { self.harnesses = harnesses }
     self.channels = channels
-    let settled = NewThreadRules.settled(choice, crew: crew, harnesses: harnesses)
-    if settled != choice { choice = settled }
+    self.defaults = defaults
+    var next = NewThreadRules.settled(choice, crew: crew, harnesses: harnesses)
+    if preselected { next = NewThreadRules.preselecting(next, crew: crew, harnesses: harnesses, defaults: defaults) }
+    if next != choice { choice = next }
   }
 
   /// Starts from a preset (`/clear` and `/new` in a thread): its role, harness, model and effort. A preset without a
@@ -60,24 +67,29 @@ public final class NewThreadComposerModel {
     c.harness = preset.harness ?? .claudeCode
     c.model = preset.model ?? ""
     c.effort = preset.effort ?? ""
+    preselected = false
     choice = NewThreadRules.settled(c, crew: crew, harnesses: harnesses)
   }
 
   public func selectRole(_ id: String) {
+    preselected = true
     choice = NewThreadRules.selectingRole(
-      id, from: choice, crew: crew, channels: channels, harnesses: harnesses, channelFixed: fixedChannel != nil)
+      id, from: choice, crew: crew, channels: channels, harnesses: harnesses, channelFixed: fixedChannel != nil, defaults: defaults)
   }
 
   public func selectChannel(_ id: String) {
     guard fixedChannel == nil else { return }
-    choice = NewThreadRules.selectingChannel(id, from: choice, crew: crew)
+    preselected = true
+    choice = NewThreadRules.selectingChannel(id, from: choice, crew: crew, harnesses: harnesses, defaults: defaults)
   }
 
   public func selectModel(harness: HarnessID, model: String) {
+    preselected = false
     choice = NewThreadRules.selectingModel(harness: harness, model: model, from: choice)
   }
 
   public func selectEffort(_ effort: String) {
+    preselected = false
     choice.effort = EffortRules.resolved(effort, for: model)
   }
 

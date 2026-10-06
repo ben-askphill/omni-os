@@ -30,6 +30,10 @@ public struct Channel: Decodable, Hashable, Sendable, Identifiable {
   public let designSystemSize: Int
   public let archived: Bool
   public let createdAt: Date
+  /// What a new thread here runs on unless the thread or its crew role picks. nil is Claude Code's default.
+  public let defaultHarness: HarnessID?
+  public let defaultModel: String?
+  public let defaultEffort: String?
 
   enum CodingKeys: String, CodingKey {
     case id, name, kind, notes, icon, archived
@@ -43,6 +47,9 @@ public struct Channel: Decodable, Hashable, Sendable, Identifiable {
     case portalSlug = "portal_slug"
     case browserHeadless = "browser_headless"
     case createdAt = "created_at"
+    case defaultHarness = "default_harness"
+    case defaultModel = "default_model"
+    case defaultEffort = "default_effort"
   }
 
   public init(from decoder: any Decoder) throws {
@@ -63,7 +70,12 @@ public struct Channel: Decodable, Hashable, Sendable, Identifiable {
     designSystemSize = try c.decodeIfPresent(Int.self, forKey: .designSystemSize) ?? 0
     archived = try c.decodeFlag(.archived)
     createdAt = try c.decode(Date.self, forKey: .createdAt)
+    defaultHarness = try c.decodeIfPresent(String.self, forKey: .defaultHarness).flatMap { $0.isEmpty ? nil : HarnessID(rawValue: $0) }
+    defaultModel = try c.decodeIfPresent(String.self, forKey: .defaultModel).flatMap { $0.isEmpty ? nil : $0 }
+    defaultEffort = try c.decodeEffort(.defaultEffort)
   }
+
+  public var runDefaults: RunDefaults { RunDefaults(harness: defaultHarness, model: defaultModel, effort: defaultEffort) }
 }
 
 /// A channel as GET /api/channels lists it: the row plus its running and queued threads.

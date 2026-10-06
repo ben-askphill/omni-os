@@ -6,6 +6,8 @@ import { parseChannelIcon, readSvgIcon, SVG_MAX, SVG_PREFIX } from '../shared/ch
 import { readDesignSystem } from '../shared/design-system.ts';
 import { channels, publicChannel, threads, type Channel, type Thread } from './db.ts';
 import { detectRepo } from './github.ts';
+import { getCatalog } from './harness/catalog-service.ts';
+import { validateDefaults } from './harness/resolve.ts';
 
 export const channelsApi = new Hono();
 
@@ -31,6 +33,25 @@ function withSvgIcon<T extends { icon?: string | null }>(body: T): T | { error: 
   }
 }
 
+/** A run default: blank clears it, so the channel falls back to Claude Code's default. */
+const runDefault = z
+  .string()
+  .trim()
+  .max(120)
+  .transform((s) => s || null)
+  .nullish();
+
+/**
+ * Why the run defaults a body would leave the channel with are refused, against the harness catalog. A body that
+ * sets none of them is not checked, so a default the catalog has since retired never blocks a rename or an archive.
+ */
+function runDefaultsError(body: { default_harness?: string | null; default_model?: string | null; default_effort?: string | null }, current?: Channel) {
+  if (!('default_harness' in body || 'default_model' in body || 'default_effort' in body)) return undefined;
+  const pick = (k: 'default_harness' | 'default_model' | 'default_effort') => (k in body ? body[k] : current?.[k]) ?? undefined;
+  const err = validateDefaults({ harness: pick('default_harness'), model: pick('default_model'), effort: pick('default_effort') }, getCatalog());
+  return err ? `Default model: ${err}` : undefined;
+}
+
 const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
   name: z.string().min(1),
@@ -44,6 +65,9 @@ const channelSchema = z.object({
   browser_headless: z.coerce.number().int().min(0).max(1).optional(),
   notes: z.string().nullish(),
   icon: channelIcon,
+  default_harness: runDefault,
+  default_model: runDefault,
+  default_effort: runDefault,
 });
 
 /** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */
@@ -79,6 +103,8 @@ channelsApi.post('/', async (c) => {
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
   if (channels.get(body.id)) return c.json({ error: 'channel exists' }, 409);
+  const runError = runDefaultsError(body);
+  if (runError) return c.json({ error: runError }, 400);
   if (body.repo_path && !existsSync(body.repo_path)) return c.json({ error: `repo path not found: ${body.repo_path}` }, 400);
   if (body.repo_path && !body.github_repo) body.github_repo = await detectRepo(body.repo_path);
   return c.json(publicChannel(channels.create(body as any)));
@@ -86,12 +112,15 @@ channelsApi.post('/', async (c) => {
 
 channelsApi.patch('/:id', async (c) => {
   const id = c.req.param('id');
-  if (!channels.get(id)) return c.json({ error: 'not found' }, 404);
+  const current = channels.get(id);
+  if (!current) return c.json({ error: 'not found' }, 404);
   const parsed = withSvgIcon(channelSchema.partial().extend({ archived: z.coerce.number().optional() }).parse(await c.req.json()));
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
   delete (body as any).id;
-  if (body.repo_path && !body.github_repo && !channels.get(id)!.github_repo) body.github_repo = await detectRepo(body.repo_path);
+  const runError = runDefaultsError(body, current);
+  if (runError) return c.json({ error: runError }, 400);
+  if (body.repo_path && !body.github_repo && !current.github_repo) body.github_repo = await detectRepo(body.repo_path);
   return c.json(publicChannel(channels.update(id, body as any)!));
 });
 

@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { api, errorText, type Channel } from '../api.ts';
+import { api, errorText, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
+import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
 import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { CHANNEL_GLYPHS, glyphIcon, parseChannelIcon, readSvgIcon } from '../../../shared/channel-icon.ts';
 import { readDesignSystem } from '../../../shared/design-system.ts';
@@ -20,6 +21,8 @@ interface FormState {
   showBrowser: boolean;
   notes: string;
   icon: string;
+  /** The default model as a picker choice: model '' is the harness default. Harness '' is no default at all. */
+  run: { harness: string; model: string; effort: string };
 }
 
 function fromChannel(c?: Channel): FormState {
@@ -36,6 +39,7 @@ function fromChannel(c?: Channel): FormState {
     showBrowser: c ? c.browser_headless === 0 : false,
     notes: c?.notes ?? '',
     icon: c?.icon ?? '',
+    run: { harness: c?.default_harness ?? '', model: c?.default_model ?? '', effort: c?.default_effort ?? '' },
   };
 }
 
@@ -126,6 +130,30 @@ function IconPicker({ value, name, onChange }: { value: string; name: string; on
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** The model and effort a new thread in the channel starts on, unless the thread or its role picks. */
+function RunDefaultsField({ value, onChange }: { value: FormState['run']; onChange: (v: FormState['run']) => void }) {
+  const { data: harnesses, reload } = useApi<HarnessWithRunning[]>('/harnesses');
+  if (!harnesses) return null;
+  const choice = { harness: value.harness || 'claude-code', model: value.model };
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <ModelPicker
+        harnesses={harnesses}
+        onOpen={reload}
+        placeholder="Claude Code default"
+        value={choice}
+        onChange={(c) => onChange({ harness: c.harness, model: c.model, effort: '' })}
+      />
+      <EffortPicker harnesses={harnesses} choice={choice} value={value.effort} onChange={(effort) => onChange({ ...choice, effort })} />
+      {(value.harness || value.model || value.effort) && (
+        <Button type="button" onClick={() => onChange({ harness: '', model: '', effort: '' })}>
+          Reset
+        </Button>
+      )}
     </div>
   );
 }
@@ -238,6 +266,9 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
       browser_headless: f.showBrowser ? 0 : 1,
       notes: orNull(f.notes),
       icon: orNull(f.icon),
+      default_harness: orNull(f.run.harness),
+      default_model: orNull(f.run.model),
+      default_effort: orNull(f.run.effort),
     };
     if (!isSystem) body.kind = f.kind;
     try {
@@ -316,6 +347,9 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             />
           </Field>
         )}
+        <Field label="Default model" hint="What a new thread here starts on. A thread or crew role that picks its own wins.">
+          <RunDefaultsField value={f.run} onChange={(v) => set('run', v)} />
+        </Field>
         {existing && (
           <Field
             label="Design system"

@@ -17,6 +17,10 @@ export interface Channel {
   notes: string | null;
   /** One emoji, or `icon:<name>` for a design system icon (shared/channel-icon.ts), shown in place of the letter avatar and the sidebar's #. */
   icon: string | null;
+  /** What a new thread here runs on when neither the thread nor its role picks. Null for Claude Code's default. */
+  default_harness: string | null;
+  default_model: string | null;
+  default_effort: string | null;
   /** A standalone HTML file the channel's threads follow for the pages they write. Kept out of the API: see publicChannel. */
   design_system: string | null;
   design_system_name: string | null;
@@ -42,8 +46,9 @@ export const channels = {
   create(c: Partial<Channel> & { id: string; name: string }) {
     return tx(() => {
       db.prepare(
-        `INSERT INTO channels (id, name, kind, repo_path, github_repo, use_worktree, base_dir, store_domain, portal_slug, browser_headless, notes, icon)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO channels (id, name, kind, repo_path, github_repo, use_worktree, base_dir, store_domain, portal_slug, browser_headless, notes, icon,
+           default_harness, default_model, default_effort)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         c.id,
         c.name,
@@ -57,6 +62,9 @@ export const channels = {
         c.browser_headless ?? 1,
         c.notes ?? null,
         c.icon ?? null,
+        c.default_harness ?? null,
+        c.default_model ?? null,
+        c.default_effort ?? null,
       );
       record('channel', c.id);
       return channels.get(c.id)!;
@@ -66,6 +74,7 @@ export const channels = {
     const allowed = [
       'name', 'kind', 'repo_path', 'github_repo', 'use_worktree', 'base_dir',
       'store_domain', 'portal_slug', 'browser_headless', 'notes', 'icon', 'design_system', 'design_system_name', 'archived',
+      'default_harness', 'default_model', 'default_effort',
     ] as const;
     const keys = allowed.filter((k) => k in patch);
     if (keys.length) {

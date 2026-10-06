@@ -116,3 +116,26 @@ describe('validateDefaults', () => {
     expect(validateDefaults({ model: 'opus' }, cat)).toBeUndefined();
   });
 });
+
+describe('channel defaults', () => {
+  const channel = { harness: 'codex', model: 'gpt-5.6-sol', effort: 'high' };
+
+  it('apply when neither the thread nor a role picks', () => {
+    expect(ok(resolveRun({}, undefined, cat, channel))).toMatchObject(channel);
+    expect(ok(resolveRun({}, {}, cat, channel))).toMatchObject(channel);
+  });
+
+  it('give way to a role that sets anything about the run, whole', () => {
+    expect(ok(resolveRun({}, { model: 'opus' }, cat, channel))).toEqual({ ok: true, harness: 'claude-code', model: 'opus', effort: '' });
+  });
+
+  it("give way to the thread's own model, keeping only a matching harness", () => {
+    expect(ok(resolveRun({ harness: 'codex', model: 'gpt-5.6-terra' }, undefined, cat, channel))).toMatchObject({ model: 'gpt-5.6-terra', effort: '' });
+    expect(ok(resolveRun({ harness: 'claude-code' }, undefined, cat, channel))).toMatchObject({ harness: 'claude-code', model: '', effort: '' });
+  });
+
+  it('can set only an effort, on the default model', () => {
+    expect(ok(resolveRun({}, undefined, cat, { effort: 'max' }))).toMatchObject({ harness: 'claude-code', model: '', effort: 'max' });
+    expect(ok(resolveRun({ model: 'claude-haiku-4-5' }, undefined, cat, { effort: 'max' }))).toMatchObject({ model: 'claude-haiku-4-5', effort: '' });
+  });
+});

@@ -138,6 +138,8 @@ export function migrate() {
   ensureColumn('threads', 'suggestion', 'TEXT');
   ensureColumn('threads', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('channels', 'icon', 'TEXT');
+  // What a new thread in the channel runs on when neither the thread nor its role picks (server/harness/resolve.ts).
+  for (const col of ['default_harness', 'default_model', 'default_effort']) ensureColumn('channels', col, 'TEXT');
   // The channel's design system: one standalone HTML file for the pages its threads write, and the file's name.
   ensureColumn('channels', 'design_system', 'TEXT');
   ensureColumn('channels', 'design_system_name', 'TEXT');

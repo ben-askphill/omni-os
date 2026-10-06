@@ -18,6 +18,8 @@ struct ChannelSettingsForm: View {
   @State private var confirmArchive = false
   @State private var archiving = false
   @State private var svgError: String?
+  /// The harness list as the model picker last fetched it, over the workspace's.
+  @State private var fetchedHarnesses: [HarnessInfo]?
   @State private var designBusy = false
   @State private var designError: String?
 
@@ -180,11 +182,46 @@ struct ChannelSettingsForm: View {
             .accessibilityLabel("Kind")
         }
       }
+      SettingsField("Default model", hint: "What a new thread here starts on. A thread or crew role that picks its own wins.") {
+        runDefaults
+      }
       if !isNew { designSystem }
       SettingsField("Notes", hint: "Added to every thread's system prompt in this channel. Keep it short: who the client is, conventions, what not to touch.") {
         OmniTextEditor(text: $form.notes)
           .accessibilityLabel("Notes")
       }
+    }
+  }
+
+  /// The model picker and effort pill the new-thread composer uses, on the form's default model.
+  @ViewBuilder private var runDefaults: some View {
+    let harnesses = fetchedHarnesses ?? model.store.harnesses
+    if harnesses.isEmpty {
+      Text("Loading models").font(.system(size: 12.5)).foregroundStyle(Tok.fg3)
+    } else {
+      let run = form.defaultRun
+      let name = harnesses.first { $0.id == run.harness }?.name ?? run.harness.rawValue
+      HStack(spacing: 6) {
+        ModelPickerButton(
+          harnesses: harnesses, harness: run.harness, model: run.model,
+          placeholder: form.defaultHarness.isEmpty ? "Claude Code default" : "\(name) default",
+          pick: { form.setDefaultModel(harness: $0, model: $1) }, refresh: refreshHarnesses)
+        EffortMenu(
+          options: EffortRules.options(for: EffortRules.model(harness: run.harness, model: run.model, in: harnesses)),
+          value: form.defaultEffort, pick: { form.setDefaultEffort($0) })
+        if form.hasDefaultRun {
+          Button("Reset") { form.clearDefaultRun() }
+            .buttonStyle(.pill(.secondary, height: 30))
+            .help("Back to Claude Code's default model")
+        }
+        Spacer(minLength: 0)
+      }
+    }
+  }
+
+  private func refreshHarnesses() {
+    Task {
+      if let list = try? await model.client.harnesses() { fetchedHarnesses = list }
     }
   }
 
