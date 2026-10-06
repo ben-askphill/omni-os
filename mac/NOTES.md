@@ -530,3 +530,13 @@ Wired (both composers):
 - Buttons and links inside a thread window still set `model.route`, so they navigate the main window; the thread window brings it forward when it changes the route while key.
 - QA: `{"openThread": "<id>"}` opens the window; snapshots write it as `<name>-window<n>.png`.
 - The composer and inspector show in the thread window once #64 puts them in `ThreadScreen`.
+
+## Known issue: top bar cut off (not reproduced)
+
+Ben sees the top bar's formatting cut off now and then, with parts of the UI out of reach, sometimes after opening a PR. Not reproduced yet.
+
+- Tried: Debug app on a throwaway server (4757), a thread with the "server is behind main" bar over it, snapshots with the inspector on and off. The toolbar, thread header and pane all drew correctly. The QA snapshot is an offscreen `cacheDisplay`, so it can miss a live window glitch, and it showed no inspector panel.
+- Suspect 1: `ThreadInspector` in `InspectorView.swift` pads the header and panel by `paneTop - contentTop`, both read with `onGeometryChange`. A stale reading would slide them under the toolbar.
+- Suspect 2: toolbar items come from four places and come and go with state (`MainWindow`, `OpenInNewWindowToolbar`, the inspector toggle, Interrupt in `ComposerView`). Opening a PR makes the thread active, so Interrupt appears. The toolbar background is hidden, so a mis-sized toolbar would look like a cut-off bar.
+- Also: a crash report at `~/Library/Logs/DiagnosticReports/Omni-2026-10-06-093235.ips` was not read. The inspector's `settled` delay comment mentions a layout loop that traps.
+- Next: a live repro (open a PR from the Debug app and watch the toolbar and inspector offset as the status changes), or a screenshot of the broken state.
