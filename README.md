@@ -11,17 +11,22 @@ One Node server runs everything (threads, harnesses, database, secrets, automati
 
 Both show the same channels and threads. They never share code directly: see [Web UI and Mac app](#web-ui-and-mac-app).
 
-- **Channels** per client or project (Volero, Pink Gellac, Acne, internal, personal)
-- **Threads** per task, dated and full-text searchable, resumable any time
+- **Channels** per client or project (Volero, Pink Gellac, Acne, internal, personal). Each has its own icon (emoji, design-system icon or SVG), default harness, model and effort, a design system file for the agent, and facts like the repo, Shopify store and Portal slug
+- **Threads** per task, dated and full-text searchable (Search page), resumable any time. Rename or archive from the right-click menu or `/rename`
+- **Composer**: `/` menu for skills, slash commands and MCP prompts per harness; `@` to mention artifacts and repo files; attachments; after a finished turn, Haiku suggests your likely next reply (Tab fills it in, `OMNI_SUGGESTIONS=0` turns it off)
+- **Terminal tab** per thread: a real shell (PTY) in the thread's cwd. Billing and sync keys are kept out of its env
 - **Sandbox per thread**: own git worktree in repo channels, a persistent browser per channel (logins survive) shown live in the thread's Browser panel, where you can click and type in it too, secrets from the Keychain injected as env
 - **Artifacts** rendered inline: anything the agent writes to its artifacts dir
 - **Published artifacts**: a page a Claude Code thread publishes to claude.ai with its Artifact tool shows as a card in the thread, linked to its local file. The channel's pages go into later threads' system prompt, so an update lands at the same URL, and "Check comments" (or the `artifact-comments` automation) hands a page's comments back to the thread that made it. There is no public Artifacts API, so Omni reads this from the CLI's own tool calls (`shared/published.ts`)
-- **GitHub panel** per repo channel: PRs, checks, diff, merge (with confirm)
-- **Conductor**: one front agent that delegates to crew roles; reports come back to it automatically
+- **Artifacts page**: every artifact across channels in one list
+- **GitHub panel** per repo channel: PRs, checks, diff, merge (with confirm). Threads whose branch has an open or merged PR get a PR icon in the thread list
+- **Conductor**: one front agent that delegates to crew roles, alone or as a team (a lead plus members); reports come back to it automatically and show as delegation cards
 - **Automations**: cron YAML, every run is its own thread
 - Runs each thread on the harness you pick — **Claude Code** (Claude plan), **Codex** (ChatGPT plan), **Cursor Agent** (Cursor plan) or **Hermes** (Anthropic API, on a remote server) — through its official CLI, or over HTTP for Hermes.
 
 ## Run
+
+Needs Node 24+, the `claude` CLI signed in to your Claude plan, and `gh` signed in for the GitHub panel. Codex, Cursor Agent and Hermes are optional; the model picker shows each one's fix when it is not set up.
 
 ```bash
 npm install
@@ -32,8 +37,17 @@ Production (one process, serves the built UI on http://127.0.0.1:4747):
 
 ```bash
 npm run build && npm start
-./scripts/install-launchd.sh      # autostart at login, keeps the Mac awake while running
 tailscale serve --bg 4747         # reach it from your phone over the tailnet
+```
+
+Optional: `./scripts/install-launchd.sh` installs a LaunchAgent that starts the server at login and keeps the Mac awake while it runs. Skip it when you use the Mac app, which starts and stops the server itself.
+
+Checks:
+
+```bash
+npm test             # vitest suite
+npm run typecheck
+npm run test:all     # vitest plus the Mac app's Swift tests
 ```
 
 Mac app (needs Xcode, Node and this checkout on the Mac):
@@ -45,7 +59,7 @@ npm run test:mac                  # OmniKit tests, headless
 
 Or open `mac/Omni.xcodeproj` in Xcode and run the `Omni` scheme. The app finds the server on :4747, or starts one from the repo. See `mac/NOTES.md`.
 
-Config is optional, see `.env.example` (brain dir, default model, concurrency, permission mode).
+Config is optional: copy `.env.example` to `.env` (gitignored) and uncomment what you need. It covers the brain dir (`~/phillbert` by default, the cwd and context for non-repo channels), default model, permission mode, concurrency per harness, keepalive, Hermes URL, browser flags, data and automations dirs, upload cap, reply suggestions and timezone.
 
 ## Who can call the API
 
@@ -53,7 +67,7 @@ The network is the auth. The server binds `OMNI_HOST`, or `127.0.0.1` when that 
 
 ## How a thread runs
 
-Each thread gets one long-lived `claude -p --input-format stream-json --output-format stream-json` process. Messages go in on stdin, the process runs many turns and stays warm for `OMNI_KEEPALIVE_SECONDS` (default 10 minutes) after the last one, so a follow-up starts instantly. It is launched with:
+Each Claude Code thread gets one long-lived `claude -p --input-format stream-json --output-format stream-json` process. Messages go in on stdin, the process runs many turns and stays warm for `OMNI_KEEPALIVE_SECONDS` (default 10 minutes) after the last one, so a follow-up starts instantly. While background agents of that thread are still running, it stays up to `OMNI_TASK_KEEPALIVE_SECONDS` (default 4 hours). It is launched with:
 
 | Piece | What |
 | --- | --- |
@@ -64,17 +78,19 @@ Each thread gets one long-lived `claude -p --input-format stream-json --output-f
 | env | `OMNI_THREAD_ID`, `OMNI_ARTIFACTS_DIR`, `OMNI_URL`, plus global and channel secrets |
 | session | `--session-id` on the first run, `--resume` after, so every follow-up keeps full context |
 
-Every stream event is stored in SQLite (`data/omni.db`) and pushed to the UI over SSE. The CLI's rate-limit events drive the 5h / 7d usage meter.
+Codex threads run on `codex app-server` (ADR 0001) and Cursor threads on `cursor-agent`, each through an adapter in `server/harness/` that turns its stream into the same events. Hermes is below.
+
+Every stream event is stored in SQLite (`data/omni.db`) and pushed to the UI over SSE. The usage meter is per harness: Claude's rate-limit events drive the 5h / 7d meter, Codex reports its own, Cursor reports none.
 
 Messages sent while a thread is busy:
 
 | Mode | What happens |
 | --- | --- |
-| Steer (default, Cmd/Ctrl+Enter) | Written to the CLI now. The agent reads it at its next step (after the running tool) and keeps going |
+| Steer (default, Enter) | Written to the CLI now. The agent reads it at its next step (after the running tool) and keeps going |
 | Queue for after this turn | Held by Omni, runs as a new turn once the current one ends |
 | Interrupt and send (Cmd/Ctrl+Shift+Enter) | Stops the current step, then runs the message |
 
-Pending messages show under the live output and enter the transcript at the point the agent actually read them. Interrupt (header button or Esc) stops the turn but keeps the process and its context. Steers already sent still run; queued ones are recorded as "Not sent". A CLI that does not stop within `OMNI_INTERRUPT_GRACE_MS` is killed. Only turns in progress count toward `OMNI_MAX_CONCURRENT`; warm idle processes do not.
+Cmd/Ctrl+Enter adds a newline. Pending messages show under the live output and enter the transcript at the point the agent actually read them. Interrupt (header button or Esc) stops the turn but keeps the process and its context. Steers already sent still run; queued ones are recorded as "Not sent". A CLI that does not stop within `OMNI_INTERRUPT_GRACE_MS` is killed. Only turns in progress count toward `OMNI_MAX_CONCURRENT`; warm idle processes do not.
 
 Files can ride along with a message (paperclip, drag-and-drop or paste). They land in `data/threads/<id>/uploads/`, keeping their original names, and the agent gets every one by absolute path; images small enough for the API also go in as real image blocks. `OMNI_MAX_UPLOAD_MB` caps a single file.
 
@@ -82,7 +98,7 @@ To continue a thread in a terminal or Claude Desktop: `cd <cwd> && claude --resu
 
 ## Hermes (remote)
 
-Hermes is Ben's always-on agent on a Linux server. Omni does not spawn it. The Hermes API server listens on the server's Tailscale address and is not public. A thread talks to it at `OMNI_HERMES_URL` (default `http://100.110.128.38:8642`). The Mac must be on the tailnet.
+Hermes is Ben's always-on agent on a Linux server. Omni does not spawn it. The Hermes API server listens on the server's Tailscale address and is not public. A thread talks to it at `OMNI_HERMES_URL`, the server's Tailscale address and port (set it in `.env`; unset means Hermes is off). The Mac must be on the tailnet.
 
 The bearer token is the Keychain secret `HERMES_API_KEY` (global). It is not an env var, not a database column and not written to logs.
 
@@ -108,25 +124,28 @@ Roles live in `crew/*.md` (frontmatter + charter, edit freely, read on every run
 | builder | Code in a repo channel, own worktree, opens PRs |
 | inbox | Mail, calendar, Productive, Notion, Slack drafts. Never sends on its own |
 
-The conductor's `omni` MCP (`mcp/omni.ts`) exposes `list_channels`, `list_crew`, `delegate`, `message_thread`, `get_thread`, `list_threads`, `search_history`. A delegated thread runs in the target channel; when it finishes, its reply is posted to the conductor as a crew report (tagged with the task id) and the conductor is woken to relay it.
+The frontmatter sets each role's model (Opus for most, Sonnet for inbox) and, for conductor and inbox, its default channel.
+
+The conductor's `omni` MCP (`mcp/omni.ts`) exposes `list_channels`, `list_crew`, `list_harnesses`, `delegate`, `delegate_team`, `message_thread`, `get_thread`, `list_threads`, `search_history`, `list_published_artifacts`, `check_artifact_comments`. A delegated thread runs in the target channel; when it finishes, its reply is posted to the conductor as a crew report (tagged with the task id) and the conductor is woken to relay it.
 
 ## Automations
 
-`automations/*.yaml`:
+`automations/*.yaml` (shipped: `morning-coffee`, `weekly-review`, `artifact-comments`, all off until you enable them):
 
 ```yaml
 name: Morning coffee
 enabled: false          # toggle here or in the UI
 cron: "0 8 * * 1-5"
 timezone: Europe/Amsterdam
-channel: inbox
+channel: inbox          # default inbox
 role: inbox
-model: sonnet           # optional
+harness: claude         # optional, like model and effort
+model: sonnet
 prompt: |
   Run the morning-coffee skill for today.
 ```
 
-The folder is watched; edits apply without a restart. The Mac has to be awake at the scheduled time.
+`timezone` defaults to `OMNI_TZ` (Europe/Amsterdam). The folder is watched; edits apply without a restart. The Mac has to be awake at the scheduled time.
 
 ## Secrets
 
@@ -159,7 +178,7 @@ On each Mac: Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the UR
 
 ## Other entry points
 
-- `scripts/omni.sh "prompt" -c volero -r researcher`: start a thread from the shell
+- `scripts/omni.sh "prompt" -c volero -r researcher`: start a thread from the shell (`OMNI_URL` points it at another server)
 - claude-bar hotkey prompt: set `"target": "omni"` in its config to send captures here
 - `npm run import-history -- --days 30`: pull existing Claude Code sessions into Omni as resumable threads
 
@@ -177,17 +196,28 @@ The two clients are kept apart so a change to one cannot break the other:
 ## Layout
 
 ```
-server/      Hono API, runner (claude CLI), sandbox, secrets, artifacts watcher, GitHub, scheduler
+server/      Hono API (*-api.ts), runner/, harness/ (claude, codex, cursor, hermes adapters),
+             db/, sync/, sandbox, secrets, terminal, browser, artifacts, GitHub, scheduler
 mcp/omni.ts  conductor tools
 web/         Web UI (React)
 mac/         Mac app: SwiftUI app (Omni/), OmniKit package, slash engine entry
 shared/      pure TypeScript both clients use (slash grammar, menu, pills)
 crew/        role charters
 automations/ cron YAML
-scripts/     launchd install, shell shim, history import, Mac build, slash bundle
+scripts/     shell shim, history import, sync backfill, Mac build, slash bundle,
+             PR screenshots, launchd install
 tests/       vitest suite, including the Mac fixtures and the app boundary check
+docs/        ADRs (adr/0001 to 0004) and the PR screenshot guide
+supabase/    sync relay migration
+CONTEXT.md   domain glossary (channel, thread, harness, crew...)
 data/        gitignored: db, thread dirs, worktrees, browser profiles, logs
 ```
+
+## Contributing
+
+- Read `CLAUDE.md` and `CONTEXT.md` first; the agent working in this repo reads them too.
+- A change visible in the Web UI or Mac app ships with before/after screenshots in the PR, taken against a throwaway server (never :4747). See `docs/pr-screenshots.md` and `scripts/pr-screenshots.sh`.
+- Never commit `data/` or `.env`, and never put a secret value anywhere but the Keychain.
 
 ## Limits
 
