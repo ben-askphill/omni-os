@@ -81,27 +81,6 @@ struct ThreadWindowSupport: ViewModifier {
   }
 }
 
-/// A button in the main window's toolbar while it shows a thread.
-struct OpenInNewWindowToolbar: ToolbarContent {
-  let model: AppModel
-  @Environment(\.openWindow) private var openWindow
-
-  var body: some ToolbarContent {
-    if model.serverScreen == nil, case .thread(let id, _) = model.route {
-      ToolbarItem(placement: .primaryAction) {
-        Button {
-          openWindow(id: ThreadWindow.id, value: id)
-        } label: {
-          Label("Open in New Window", systemImage: "macwindow.badge.plus")
-        }
-        .buttonStyle(.icon(size: 28))
-        .help("Open in New Window")
-      }
-      .sharedBackgroundVisibility(.hidden)
-    }
-  }
-}
-
 /// File > Open in New Window, for the thread the focused window shows.
 struct OpenInNewWindowCommand: View {
   @FocusedValue(\.shownThread) private var shown

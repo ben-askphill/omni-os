@@ -3,8 +3,8 @@ import OmniKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The reply box pinned under a thread, and the toolbar's Interrupt button. It is the one line
-/// `ReplyComposerHost` in ThreadScreen.swift; `ReplyComposer` in Composer.tsx is the behavior.
+/// The reply box pinned under a thread. It is the one line `ReplyComposerHost` in ThreadScreen.swift;
+/// `ReplyComposer` in Composer.tsx is the behavior. Interrupt lives in the thread toolbar, beside the panel.
 struct ReplyComposerHost: View {
   let model: AppModel
   let store: ThreadStore
@@ -30,11 +30,6 @@ struct ReplyComposerHost: View {
     .padding(.top, 4)
     .padding(.bottom, 16)
     .frame(maxWidth: .infinity)
-    .toolbar {
-      if thread.status.isActive {
-        ToolbarItem(placement: .primaryAction) { InterruptButton(store: store) }
-      }
-    }
   }
 }
 

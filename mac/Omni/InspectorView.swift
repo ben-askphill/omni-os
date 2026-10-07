@@ -47,6 +47,12 @@ private struct ThreadInspector: ViewModifier {
           .inspectorColumnWidth(min: 340, ideal: 360, max: 760)
       }
       .toolbar {
+        // .primaryAction is the leading cluster, right after Back and Forward. Interrupt and the
+        // panel belong to this thread, so the spacer takes them to the trailing edge, Interrupt first.
+        ToolbarSpacer(.flexible, placement: .primaryAction)
+        if store.running {
+          ToolbarItem(placement: .primaryAction) { InterruptButton(store: store) }
+        }
         ToolbarItem(placement: .primaryAction) {
           Button {
             open.toggle()
