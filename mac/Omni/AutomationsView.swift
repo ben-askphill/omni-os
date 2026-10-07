@@ -13,7 +13,7 @@ struct AutomationsView: View {
       if let automations {
         AutomationsList(model: model, automations: automations)
       } else {
-        LoadingNote().padding(.horizontal, 32).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        LoadingNote().padding(.horizontal, z(32)).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
       }
     }
     .task(id: model.client.baseURL) {
@@ -69,8 +69,8 @@ struct AutomationsList: View {
           .help("Refresh")
           .accessibilityLabel("Refresh")
         }
-        .padding(.top, 40)
-        .padding(.bottom, 24)
+        .padding(.top, z(40))
+        .padding(.bottom, z(24))
         content
       }
     }
@@ -86,7 +86,7 @@ struct AutomationsList: View {
       EmptyNote(symbol: "clock", title: "No automations yet",
                 message: "Add a YAML file to automations/ with name, cron, channel and prompt. It shows up here right away.")
     case .loaded:
-      VStack(spacing: 12) {
+      VStack(spacing: z(12)) {
         ForEach(automations.automations) { a in
           AutomationSection(model: model, automations: automations, automation: a)
         }
@@ -106,38 +106,38 @@ struct AutomationSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      header.padding(20)
+      header.padding(z(20))
       if let note = automation.errorNote {
-        ErrorNote(text: note).padding(.horizontal, 20).padding(.bottom, 16)
+        ErrorNote(text: note).padding(.horizontal, z(20)).padding(.bottom, z(16))
       }
       if let error = automations.errors[automation.id] {
-        ErrorNote(text: error).padding(.horizontal, 20).padding(.bottom, 16)
+        ErrorNote(text: error).padding(.horizontal, z(20)).padding(.bottom, z(16))
       }
-      prompt.padding(.horizontal, 10).padding(.bottom, 4)
-      runs.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 16)
+      prompt.padding(.horizontal, z(10)).padding(.bottom, z(4))
+      runs.padding(.horizontal, z(20)).padding(.top, z(8)).padding(.bottom, z(16))
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(24), style: .continuous))
     .overlay {
       if automation.error != nil {
-        RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Tok.needs.opacity(0.35))
+        RoundedRectangle(cornerRadius: z(24), style: .continuous).strokeBorder(Tok.needs.opacity(0.35))
       }
     }
   }
 
   private var prompt: some View {
-    VStack(alignment: .leading, spacing: 4) {
+    VStack(alignment: .leading, spacing: z(4)) {
       Button {
         withAnimation(Motion.settle) { showPrompt.toggle() }
       } label: {
-        HStack(spacing: 6) {
+        HStack(spacing: z(6)) {
           OmniIcon(name: "chevronRight", size: 12)
             .rotationEffect(.degrees(showPrompt ? 90 : 0))
           Text("Prompt")
         }
         .font(.omni(size: 12, weight: .medium))
         .foregroundStyle(Tok.fg3)
-        .padding(.horizontal, 10)
+        .padding(.horizontal, z(10))
         .frame(height: z(32))
         .hoverWash(16, fill: Tok.surface2)
       }
@@ -150,28 +150,28 @@ struct AutomationSection: View {
           .foregroundStyle(Tok.fg2)
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.horizontal, 14)
-          .padding(.vertical, 12)
-          .background(Tok.bg, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-          .padding(.horizontal, 10)
-          .padding(.bottom, 8)
+          .padding(.horizontal, z(14))
+          .padding(.vertical, z(12))
+          .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
+          .padding(.horizontal, z(10))
+          .padding(.bottom, z(8))
       }
     }
   }
 
   private var header: some View {
-    HStack(alignment: .top, spacing: 12) {
+    HStack(alignment: .top, spacing: z(12)) {
       OmniIcon(name: "zap", size: 16)
         .foregroundStyle(enabled && automation.error == nil ? Tok.fg : Tok.fg4)
         .frame(width: z(36), height: z(36))
         .background(Tok.bg, in: Circle())
-        .padding(.top, 2)
+        .padding(.top, z(2))
       VStack(alignment: .leading, spacing: 0) {
-        HStack(spacing: 8) {
+        HStack(spacing: z(8)) {
           Text(automation.name).font(.omni(size: 16, weight: .medium)).foregroundStyle(Tok.fg)
           if let badge = automation.badge(enabled: enabled) { Badge(badge: badge) }
         }
-        details.padding(.top, 8)
+        details.padding(.top, z(8))
         if automation.nextRun(enabled: enabled) != nil {
           TimelineView(.everyMinute) { context in
             if let next = automation.nextRun(enabled: enabled, now: context.date) {
@@ -180,17 +180,17 @@ struct AutomationSection: View {
                 .foregroundStyle(Tok.fg3)
             }
           }
-          .padding(.top, 10)
+          .padding(.top, z(10))
         }
       }
-      Spacer(minLength: 8)
-      HStack(spacing: 10) {
+      Spacer(minLength: z(8))
+      HStack(spacing: z(10)) {
         Button {
           Task {
             if let id = await automations.runNow(automation) { model.route = .thread(id: id) }
           }
         } label: {
-          HStack(spacing: 6) {
+          HStack(spacing: z(6)) {
             if automations.starting.contains(automation.id) {
               Loader(size: 12)
             } else {
@@ -216,7 +216,7 @@ struct AutomationSection: View {
 
   private var details: some View {
     FlowRow(spacing: 6, lineSpacing: 6) {
-      HStack(spacing: 6) {
+      HStack(spacing: z(6)) {
         OmniIcon(name: "clock", size: 12).foregroundStyle(Tok.fg3)
         Text(automation.schedule)
       }
@@ -225,7 +225,7 @@ struct AutomationSection: View {
       Text(automation.cron)
         .font(.omni(size: 11, design: .monospaced))
         .foregroundStyle(Tok.fg4)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, z(8))
         .frame(height: z(24))
         .overlay(Capsule().strokeBorder(Tok.line))
       Button("#\(model.store.channel(automation.channel)?.name ?? automation.channel)") {
@@ -242,8 +242,8 @@ struct AutomationSection: View {
   }
 
   @ViewBuilder private var runs: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 12) {
+    VStack(alignment: .leading, spacing: z(8)) {
+      HStack(spacing: z(12)) {
         Text("Last runs").omniCaption()
         RunStrip(automation: automation)
       }
@@ -255,7 +255,7 @@ struct AutomationSection: View {
             RunRow(run: run) { id in model.route = .thread(id: id) }
           }
         }
-        .padding(.horizontal, -8)
+        .padding(.horizontal, z(-8))
       }
     }
   }
@@ -280,7 +280,7 @@ private struct RunStrip: View {
   var body: some View {
     if !automation.runs.isEmpty {
       TimelineView(.everyMinute) { context in
-        HStack(alignment: .bottom, spacing: 3) {
+        HStack(alignment: .bottom, spacing: z(3)) {
           ForEach(Array(automation.strip.enumerated()), id: \.offset) { _, run in
             Capsule()
               .fill(runColor(run.status))
@@ -316,10 +316,10 @@ private struct RunRow: View {
   }
 
   private var content: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: z(10)) {
       GlyphView(glyph: Glyph(run.dotStatus), size: 7)
       Text(run.label).lineLimit(1).truncationMode(.tail)
-      Spacer(minLength: 8)
+      Spacer(minLength: z(8))
       if run.isManual {
         Text("manual").font(.omni(size: 10.5)).foregroundStyle(Tok.fg4)
       }
@@ -332,7 +332,7 @@ private struct RunRow: View {
       .help(run.createdAt.formatted(date: .complete, time: .standard))
     }
     .font(.omni(size: 12.5))
-    .padding(.horizontal, 8)
+    .padding(.horizontal, z(8))
     .frame(height: z(32))
   }
 }

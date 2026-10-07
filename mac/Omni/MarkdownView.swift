@@ -44,7 +44,7 @@ private struct MarkdownBlocks: View {
     VStack(alignment: .leading, spacing: spacing) {
       ForEach(Array(Self.groups(blocks).enumerated()), id: \.offset) { _, group in
         switch group {
-        case .flow(let run): SelectableMarkdown(blocks: run, size: size)
+        case .flow(let run): SelectableMarkdown(blocks: run, size: size, scale: UIZoom.settings.scale)
         case .block(let block): MarkdownBlockView(block: block, size: size)
         }
       }
@@ -64,7 +64,7 @@ private struct MarkdownBlockView: View {
       prose(text.attributed)
         .font(.omni(size: Self.headingSize(level, base: size), weight: level <= 2 ? .medium : .semibold))
         .lineSpacing(1)
-        .padding(.top, 6)
+        .padding(.top, z(6))
     case .code(_, let code):
       ScrollView(.horizontal) {
         Text(code)
@@ -72,15 +72,15 @@ private struct MarkdownBlockView: View {
           .lineSpacing(4)
           .foregroundStyle(Tok.fg)
           .fixedSize()
-          .padding(.horizontal, 14)
-          .padding(.vertical, 12)
+          .padding(.horizontal, z(14))
+          .padding(.vertical, z(12))
       }
       .scrollIndicators(.automatic)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Tok.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-      .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Tok.line))
+      .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(14), style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: z(14), style: .continuous).strokeBorder(Tok.line))
     case .quote(let blocks):
-      HStack(alignment: .top, spacing: 12) {
+      HStack(alignment: .top, spacing: z(12)) {
         Rectangle()
           .fill(Tok.lineStrong)
           .frame(width: z(2))
@@ -93,7 +93,7 @@ private struct MarkdownBlockView: View {
     case .table(let table):
       MarkdownTableView(table: table, size: size)
     case .thematicBreak:
-      Hairline().padding(.vertical, 8)
+      Hairline().padding(.vertical, z(8))
     case .html(let raw):
       prose(AttributedString(raw))
     }
@@ -131,14 +131,14 @@ private struct MarkdownListView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: list.isLoose ? 8 : 3) {
       ForEach(Array(list.items.enumerated()), id: \.offset) { i, item in
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: z(8)) {
           marker(i, item)
             .frame(minWidth: list.isOrdered ? 18 : 10, alignment: .trailing)
           MarkdownBlocks(blocks: item.blocks, size: size, spacing: list.isLoose ? 8 : 4)
         }
       }
     }
-    .padding(.leading, 4)
+    .padding(.leading, z(4))
   }
 
   @ViewBuilder private func marker(_ i: Int, _ item: MarkdownListItem) -> some View {
@@ -191,8 +191,8 @@ private struct MarkdownTableView: View {
       .font(.omni(size: 13))
       .frame(maxWidth: z(360), alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
-      .padding(.trailing, 12)
-      .padding(.vertical, 6)
+      .padding(.trailing, z(12))
+      .padding(.vertical, z(6))
   }
 }
 

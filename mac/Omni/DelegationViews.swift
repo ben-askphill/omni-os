@@ -13,9 +13,9 @@ struct DelegationCard: View {
 
   var body: some View {
     let n = delegation.branches.count + (agents?.calls.count ?? 0)
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: z(8)) {
       header(n)
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: z(8)) {
         ForEach(delegation.branches) { b in
           BranchRow(branch: b, model: model).openInNewWindow(b.id, model: model)
         }
@@ -25,19 +25,19 @@ struct DelegationCard: View {
           }
         }
       }
-      .padding(.top, 4)
-      .padding(.leading, 8)
+      .padding(.top, z(4))
+      .padding(.leading, z(8))
       .overlay(alignment: .leading) { Rectangle().fill(Tok.line).frame(width: z(1.5)) }
     }
-    .padding(.horizontal, 14)
-    .padding(.top, 14)
-    .padding(.bottom, 12)
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    .padding(.horizontal, z(14))
+    .padding(.top, z(14))
+    .padding(.bottom, z(12))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(24), style: .continuous))
     .accessibilityElement(children: .contain)
   }
 
   private func header(_ n: Int) -> some View {
-    HStack(spacing: 10) {
+    HStack(spacing: z(10)) {
       CrewGlyph(role: "conductor", size: 16).foregroundStyle(Tok.fg)
       Text(delegation.lead != nil || team ? "Team of \(n)" : "Delegated \(Format.plural(n, "task"))")
         .fontWeight(.medium)
@@ -50,7 +50,7 @@ struct DelegationCard: View {
         .buttonStyle(.plain)
         .foregroundStyle(Tok.fg3)
         .help("Open the lead thread")
-        Spacer(minLength: 8)
+        Spacer(minLength: z(8))
         StatusPill(status: lead.status, label: combining(lead) ? "Combining" : nil)
       } else {
         Text(delegation.branches.compactMap(\.taskID).joined(separator: " "))
@@ -61,7 +61,7 @@ struct DelegationCard: View {
       }
     }
     .font(.omni(size: 13.5))
-    .padding(.horizontal, 4)
+    .padding(.horizontal, z(4))
   }
 
   /// Every member has reported and the lead is still at it: it is writing the combined answer.
@@ -89,27 +89,27 @@ private struct BranchFace<Meta: View>: View {
   @ViewBuilder let meta: Meta
 
   var body: some View {
-    HStack(alignment: .top, spacing: 12) {
+    HStack(alignment: .top, spacing: z(12)) {
       CrewGlyph(role: role, size: 15)
         .foregroundStyle(Tok.fg2)
         .frame(width: z(32), height: z(32))
         .background(Tok.surface, in: Circle())
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: z(4)) {
         Text(title)
           .font(.omni(size: 14, weight: .medium))
           .foregroundStyle(Tok.fg)
           .lineLimit(1)
-        HStack(spacing: 8) { meta }
+        HStack(spacing: z(8)) { meta }
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
           .lineLimit(1)
       }
-      Spacer(minLength: 8)
+      Spacer(minLength: z(8))
       StatusPill(status: status)
     }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 12)
-    .background(Tok.bg, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    .padding(.horizontal, z(14))
+    .padding(.vertical, z(12))
+    .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
     .cardShadow(20)
     .contentShape(Rectangle())
   }
@@ -121,7 +121,7 @@ private struct RailRow: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .padding(.leading, 16)
+      .padding(.leading, z(16))
       .overlay(alignment: .topLeading) { Rail(color: color).frame(width: z(16), height: z(34)) }
   }
 
@@ -173,7 +173,7 @@ private struct AgentRow: View {
     let open = rows.ui.isOpen(key)
     let status = Delegation.status(of: call, live: rows.live.contains(call.callID), running: rows.running)
     let type = call.use.input["subagent_type"]?.stringValue
-    VStack(alignment: .leading, spacing: 4) {
+    VStack(alignment: .leading, spacing: z(4)) {
       Button { withAnimation(Motion.settle) { rows.ui.toggle(key) } } label: {
         BranchFace(role: type, title: description, status: status) {
           Text(type ?? "agent")
@@ -186,8 +186,8 @@ private struct AgentRow: View {
       .accessibilityValue(open ? "Expanded" : "Collapsed")
       if open {
         ToolDetail(call: call, running: rows.running)
-          .padding(.horizontal, 4)
-          .padding(.top, 4)
+          .padding(.horizontal, z(4))
+          .padding(.top, z(4))
           .transition(.opacity)
       }
       if !call.children.isEmpty && (open || status == .running) {
@@ -234,7 +234,7 @@ struct CrewGlyph: View {
   var size: CGFloat = 16
 
   var body: some View {
-    let s = size / 24
+    let s = z(size) / 24
     ZStack {
       switch role {
       case "conductor":
@@ -243,13 +243,13 @@ struct CrewGlyph: View {
         Circle().stroke(lineWidth: 1.75 * s).frame(width: 17 * s, height: 17 * s)
         Circle().frame(width: 6.4 * s, height: 6.4 * s)
       case "builder":
-        RoundedRectangle(cornerRadius: 3.5 * s).stroke(lineWidth: 1.75 * s).frame(width: 16 * s, height: 16 * s)
-        RoundedRectangle(cornerRadius: 2 * s).frame(width: 8 * s, height: 8 * s).offset(x: 4 * s, y: 4 * s)
+        RoundedRectangle(cornerRadius: z(3.5) * s).stroke(lineWidth: 1.75 * s).frame(width: 16 * s, height: 16 * s)
+        RoundedRectangle(cornerRadius: z(2) * s).frame(width: 8 * s, height: 8 * s).offset(x: 4 * s, y: 4 * s)
       default:
         OmniIcon(name: "layers", size: size * 0.9)
       }
     }
-    .frame(width: size, height: size)
+    .frame(width: z(size), height: z(size))
     .accessibilityHidden(true)
   }
 }

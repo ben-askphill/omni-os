@@ -4,6 +4,7 @@ import SwiftUI
 
 struct AppearanceSettingsView: View {
   @Bindable var appearance: AppearanceSettings
+  @Bindable var zoom: ZoomSettings
 
   var body: some View {
     Form {
@@ -17,9 +18,25 @@ struct AppearanceSettingsView: View {
           .foregroundStyle(.secondary)
       }
 
+      Section {
+        Picker("Zoom", selection: $zoom.scale) {
+          ForEach(ZoomSettings.levels, id: \.self) { Text(ZoomSettings.label($0)).tag($0) }
+        }
+      } footer: {
+        Text("Text, icons and spacing in every window. View > Zoom In (⌘=), Zoom Out (⌘-) and Actual Size (⌘0) change it too.")
+          .foregroundStyle(.secondary)
+      }
+
       if appearance.isVolatile {
         Section {
           Label("A launch argument sets the appearance, so changes last until the app quits.", systemImage: "info.circle")
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      if zoom.isVolatile {
+        Section {
+          Label("A launch argument sets the zoom, so changes last until the app quits.", systemImage: "info.circle")
             .foregroundStyle(.secondary)
         }
       }

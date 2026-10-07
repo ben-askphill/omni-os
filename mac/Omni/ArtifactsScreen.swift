@@ -36,13 +36,13 @@ private struct ArtifactsPage: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
         OmniPageHeader(title: "Artifacts", subtitle: "Pages, reports and files the crew produced, newest first.")
-          .padding(.top, 40)
-          .padding(.bottom, 24)
-        filters.padding(.bottom, 20)
+          .padding(.top, z(40))
+          .padding(.bottom, z(24))
+        filters.padding(.bottom, z(20))
         content(items)
       }
-      .padding(.horizontal, 32)
-      .padding(.bottom, 64)
+      .padding(.horizontal, z(32))
+      .padding(.bottom, z(64))
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .onAppear {
@@ -97,38 +97,38 @@ private struct ArtifactCard: View {
         ArtifactThumbnail(client: client, ref: ref)
           .aspectRatio(16.0 / 10.0, contentMode: .fit)
           .background(Tok.surface2)
-          .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-          .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Tok.line))
+          .clipShape(RoundedRectangle(cornerRadius: z(16), style: .continuous))
+          .overlay(RoundedRectangle(cornerRadius: z(16), style: .continuous).strokeBorder(Tok.line))
           .overlay(alignment: .topLeading) {
-            if isNew { NewBadge().padding(8) }
+            if isNew { NewBadge().padding(z(8)) }
           }
-        VStack(alignment: .leading, spacing: 2) {
-          HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: z(2)) {
+          HStack(spacing: z(6)) {
             OmniIcon(name: artifactIcon(a.kind), size: 13).foregroundStyle(Tok.fg3)
             Text(a.name).font(.omni(size: 13.5, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1).truncationMode(.middle)
           }
           Text(item.threadTitle).font(.omni(size: 12)).foregroundStyle(Tok.fg3).lineLimit(1)
-          HStack(spacing: 8) {
+          HStack(spacing: z(8)) {
             Text("#\(model.store.channel(item.channelID)?.name ?? item.channelID)").lineLimit(1)
-            Spacer(minLength: 6)
+            Spacer(minLength: z(6))
             Text(Format.relTime(a.updatedAt)).font(.omni(size: 10.5)).monospacedDigit()
           }
           .font(.omni(size: 11.5))
           .foregroundStyle(Tok.fg4)
-          .padding(.top, 4)
+          .padding(.top, z(4))
         }
-        .padding(.horizontal, 8)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
+        .padding(.horizontal, z(8))
+        .padding(.top, z(10))
+        .padding(.bottom, z(6))
       }
-      .padding(6)
-      .background(hovering ? Tok.elev : Tok.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+      .padding(z(6))
+      .background(hovering ? Tok.elev : Tok.surface, in: RoundedRectangle(cornerRadius: z(22), style: .continuous))
       .overlay {
-        RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Tok.paneEdge, lineWidth: 0.5).opacity(hovering ? 1 : 0)
+        RoundedRectangle(cornerRadius: z(22), style: .continuous).strokeBorder(Tok.paneEdge, lineWidth: 0.5).opacity(hovering ? 1 : 0)
       }
       .shadow(color: .black.opacity(hovering ? 0.06 : 0), radius: 8, y: 3)
       .offset(y: hovering ? -2 : 0)
-      .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+      .contentShape(RoundedRectangle(cornerRadius: z(22), style: .continuous))
     }
     .buttonStyle(.plain)
     .onHover { hovering = $0 }
@@ -141,12 +141,12 @@ private struct ArtifactCard: View {
 /// Changed since the last visit: an ink pill with a volt dot, as the web's badge.
 private struct NewBadge: View {
   var body: some View {
-    HStack(spacing: 4) {
+    HStack(spacing: z(4)) {
       Circle().fill(Tok.done).frame(width: z(4), height: z(4))
       Text("New").font(.omni(size: 10.5, weight: .medium))
     }
     .foregroundStyle(Tok.onInk)
-    .padding(.horizontal, 8)
+    .padding(.horizontal, z(8))
     .frame(height: z(20))
     .background(Tok.fg, in: Capsule())
   }

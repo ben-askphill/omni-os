@@ -52,14 +52,14 @@ struct StatusPill: View {
 
   var body: some View {
     let glyph = Glyph(status)
-    HStack(spacing: 6) {
+    HStack(spacing: z(6)) {
       GlyphView(glyph: glyph, size: 6, onPop: glyph == .needs || glyph == .done)
       Text(label ?? status.label)
     }
     .font(.omni(size: 12, weight: .medium))
     .foregroundStyle(fg(glyph))
-    .padding(.leading, 8)
-    .padding(.trailing, 10)
+    .padding(.leading, z(8))
+    .padding(.trailing, z(10))
     .frame(height: z(24))
     .background(bg(glyph), in: Capsule())
   }
@@ -110,7 +110,7 @@ struct GlyphView: View {
           .opacity(ping ? 0 : 0.55)
         Circle().fill(Tok.live)
       case .needs:
-        RoundedRectangle(cornerRadius: 1.5)
+        RoundedRectangle(cornerRadius: z(1.5))
           .fill(onPop ? Tok.ink : Tok.needs)
           .rotationEffect(.degrees(45))
           .scaleEffect(0.86)
@@ -126,7 +126,7 @@ struct GlyphView: View {
         Circle().strokeBorder(Tok.fg4, lineWidth: 1.5)
       }
     }
-    .frame(width: size, height: size)
+    .frame(width: z(size), height: z(size))
     .onAppear {
       guard glyph == .running, !reduceMotion else { return }
       withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 1.6).repeatForever(autoreverses: false)) { ping = true }
@@ -149,8 +149,8 @@ struct Pre: View {
       .foregroundStyle(tone == .bad ? Tok.fg : Tok.fg2)
       .textSelection(.enabled)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 10)
+      .padding(.horizontal, z(12))
+      .padding(.vertical, z(10))
     Group {
       if Format.isTall(text) {
         ScrollView { body }
@@ -159,8 +159,8 @@ struct Pre: View {
         body
       }
     }
-    .background(background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(ThreadStyle.line))
+    .background(background, in: RoundedRectangle(cornerRadius: z(12), style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: z(12), style: .continuous).strokeBorder(ThreadStyle.line))
   }
 
   private var background: Color {
@@ -206,7 +206,7 @@ struct CopyableMessage<Content: View>: View {
   @State private var copied = false
 
   var body: some View {
-    VStack(alignment: alignment, spacing: 2) {
+    VStack(alignment: alignment, spacing: z(2)) {
       content()
       Button {
         Pasteboard.copy(text)
@@ -220,7 +220,7 @@ struct CopyableMessage<Content: View>: View {
           .labelStyle(.titleAndIcon)
           .font(.omni(size: 11.5, weight: .medium))
           .foregroundStyle(Tok.fg4)
-          .padding(.horizontal, 6)
+          .padding(.horizontal, z(6))
           .frame(height: z(22))
       }
       .buttonStyle(.plain)

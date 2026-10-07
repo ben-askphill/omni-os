@@ -28,7 +28,7 @@ struct ServerView: View {
   }
 
   private func progress(_ text: String) -> some View {
-    VStack(spacing: 14) {
+    VStack(spacing: z(14)) {
       Loader(size: 22)
       Text(text)
         .font(.omni(size: 13))
@@ -38,12 +38,12 @@ struct ServerView: View {
   }
 
   private func notRunning(port: Int, repo: String) -> some View {
-    VStack(spacing: 20) {
+    VStack(spacing: z(20)) {
       OmniIcon(name: "terminal", size: 20, weight: 1.5)
         .foregroundStyle(Tok.fg3)
         .frame(width: z(48), height: z(48))
         .background(Tok.surface2, in: Circle())
-      VStack(spacing: 6) {
+      VStack(spacing: z(6)) {
         Text("The Omni server is not running")
           .font(.omni(size: 22, weight: .medium))
           .tracking(-0.22)
@@ -55,7 +55,7 @@ struct ServerView: View {
           .fixedSize(horizontal: false, vertical: true)
       }
       ServerDetails(port: port, repo: repo, node: model.settings.nodePath)
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         Button("Start Server") { Task { await model.startServer() } }
           .buttonStyle(.pill(.primary, height: 34))
           .keyboardShortcut(.defaultAction)
@@ -65,19 +65,19 @@ struct ServerView: View {
           .buttonStyle(.pill(.ghost, height: 34))
       }
     }
-    .padding(32)
+    .padding(z(32))
     .frame(maxWidth: z(520))
     .omniCard(28)
     .cardShadow(28)
-    .padding(32)
+    .padding(z(32))
   }
 
   private func failed(message: String, logTail: [String]) -> some View {
-    VStack(spacing: 16) {
+    VStack(spacing: z(16)) {
       GlyphView(glyph: .needs, size: 14)
         .frame(width: z(48), height: z(48))
         .background(Tok.surface2, in: Circle())
-      VStack(spacing: 6) {
+      VStack(spacing: z(6)) {
         Text("Server problem")
           .font(.omni(size: 22, weight: .medium))
           .tracking(-0.22)
@@ -92,7 +92,7 @@ struct ServerView: View {
       if !logTail.isEmpty {
         LogTail(lines: logTail)
       }
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         if model.supervisor.state.canStart {
           Button("Try Again") { Task { await model.startServer() } }
             .buttonStyle(.pill(.primary, height: 34))
@@ -111,11 +111,11 @@ struct ServerView: View {
           .buttonStyle(.pill(.ghost, height: 34))
       }
     }
-    .padding(32)
+    .padding(z(32))
     .frame(maxWidth: z(640))
     .omniCard(28)
     .cardShadow(28)
-    .padding(32)
+    .padding(z(32))
   }
 }
 
@@ -149,17 +149,17 @@ struct LogTail: View {
   let lines: [String]
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .leading, spacing: z(6)) {
       Text("Last lines of the log")
         .omniCaption()
-        .padding(.leading, 4)
+        .padding(.leading, z(4))
       // As tall as the lines, and it scrolls from the bottom past 220 points.
       ScrollView { text }
         .defaultScrollAnchor(.bottom)
         .frame(maxHeight: z(220))
         .fixedSize(horizontal: false, vertical: true)
-      .background(Tok.bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-      .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Tok.line))
+      .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(12), style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: z(12), style: .continuous).strokeBorder(Tok.line))
     }
   }
 
@@ -169,7 +169,7 @@ struct LogTail: View {
       .foregroundStyle(Tok.fg2)
       .textSelection(.enabled)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(10)
+      .padding(z(10))
   }
 }
 

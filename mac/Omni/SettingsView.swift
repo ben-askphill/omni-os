@@ -21,8 +21,8 @@ struct SettingsView: View {
           .frame(width: z(560), height: 680)
       }
       Tab("Appearance", systemImage: "circle.lefthalf.filled", value: .appearance) {
-        AppearanceSettingsView(appearance: appearance)
-          .frame(width: 560, height: 220)
+        AppearanceSettingsView(appearance: appearance, zoom: UIZoom.settings)
+          .frame(width: 560, height: 360)
       }
     }
   }
@@ -53,15 +53,15 @@ struct ConnectionSettings: View {
           chooseNode(from: settings.config.node)
         }
         if settings.isVolatile {
-          HStack(spacing: 8) {
+          HStack(spacing: z(8)) {
             OmniIcon(name: "info", size: 13).foregroundStyle(Tok.fg3)
             Text("Launch arguments set these values, so changes last until the app quits.")
               .fixedSize(horizontal: false, vertical: true)
           }
           .font(.omni(size: 12.5))
           .foregroundStyle(Tok.fg2)
-          .padding(.horizontal, 14)
-          .padding(.vertical, 10)
+          .padding(.horizontal, z(14))
+          .padding(.vertical, z(10))
           .frame(maxWidth: .infinity, alignment: .leading)
           .omniCard(16)
         }
@@ -139,7 +139,7 @@ struct PathField: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       FieldLabel(text: title)
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         TextField(title, text: $draft, prompt: Text(prompt))
           .textFieldStyle(.omniMono)
           .frame(minWidth: z(160), idealWidth: z(260), maxWidth: .infinity)

@@ -20,6 +20,8 @@ extension MarkdownBlock {
 struct SelectableMarkdown: NSViewRepresentable {
   let blocks: [MarkdownBlock]
   let size: CGFloat
+  /// `UIZoom.settings.scale`, read in the parent's body so a zoom change redraws the text.
+  let scale: CGFloat
   @Environment(\.openURL) private var openURL
 
   func makeCoordinator() -> Coordinator { Coordinator() }
@@ -48,10 +50,10 @@ struct SelectableMarkdown: NSViewRepresentable {
 
   func updateNSView(_ view: FlowTextView, context: Context) {
     context.coordinator.openURL = openURL
-    let key = Key(blocks: blocks, size: size)
+    let key = Key(blocks: blocks, size: size, scale: scale)
     guard context.coordinator.key != key else { return }
     context.coordinator.key = key
-    view.textStorage?.setAttributedString(MarkdownFlow(size: size).build(blocks))
+    view.textStorage?.setAttributedString(MarkdownFlow(size: size * scale, scale: scale).build(blocks))
     view.invalidateIntrinsicContentSize()
   }
 
@@ -63,6 +65,7 @@ struct SelectableMarkdown: NSViewRepresentable {
   struct Key: Equatable {
     let blocks: [MarkdownBlock]
     let size: CGFloat
+    let scale: CGFloat
   }
 
   final class Coordinator: NSObject, NSTextViewDelegate {
@@ -110,13 +113,15 @@ final class FlowTextView: NSTextView {
 /// A reply's blocks as attributed text, sized and spaced as `.md` in index.css.
 struct MarkdownFlow {
   let size: CGFloat
+  /// The zoom, for the fixed gaps, indents and code size. `size` is already at it.
+  var scale: CGFloat = 1
 
   private var fg: NSColor { NSColor(Tok.fg) }
   private var quoteInk: NSColor { NSColor(Tok.fg2) }
 
   func build(_ blocks: [MarkdownBlock]) -> NSAttributedString {
     let out = NSMutableAttributedString()
-    append(blocks, to: out, ink: fg, indent: 0, gap: 9)
+    append(blocks, to: out, ink: fg, indent: 0, gap: 9 * scale)
     trimTrailingSpacing(out)
     return out
   }
@@ -128,7 +133,7 @@ struct MarkdownFlow {
         paragraph(text, font: .systemFont(ofSize: size), ink: ink, indent: indent, gap: gap, to: out)
       case .heading(let level, let text):
         paragraph(text, font: .systemFont(ofSize: MarkdownBlockSizes.heading(level, base: size), weight: level <= 2 ? .medium : .semibold),
-                  ink: ink, indent: indent, gap: gap, before: 6, to: out)
+                  ink: ink, indent: indent, gap: gap, before: 6 * scale, to: out)
       case .html(let raw):
         paragraph(MarkdownText([MarkdownRun(raw)]), font: .systemFont(ofSize: size), ink: ink, indent: indent, gap: gap, to: out)
       case .code(_, let code):
@@ -190,27 +195,28 @@ struct MarkdownFlow {
 
   private func codeBlock(_ code: String, indent: CGFloat, gap: CGFloat, to out: NSMutableAttributedString) {
     let style = NSMutableParagraphStyle()
-    style.lineSpacing = 4
-    style.firstLineHeadIndent = indent + 10
-    style.headIndent = indent + 10
-    style.tailIndent = -10
+    style.lineSpacing = 4 * scale
+    style.firstLineHeadIndent = indent + 10 * scale
+    style.headIndent = indent + 10 * scale
+    style.tailIndent = -10 * scale
     style.paragraphSpacing = 0
     let body = NSMutableAttributedString(
       string: code.hasSuffix("\n") ? code : code + "\n",
-      attributes: [.font: NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular), .foregroundColor: fg, .paragraphStyle: style, .backgroundColor: NSColor(Tok.surface)])
+      attributes: [.font: NSFont.monospacedSystemFont(ofSize: 12.5 * scale, weight: .regular), .foregroundColor: fg, .paragraphStyle: style, .backgroundColor: NSColor(Tok.surface)])
     out.append(body)
     setSpacing(out, from: out.length - body.length, to: gap)
   }
 
   private func quote(_ inner: [MarkdownBlock], indent: CGFloat, gap: CGFloat, to out: NSMutableAttributedString) {
-    append(inner, to: out, ink: quoteInk, indent: indent + 14, gap: gap)
+    append(inner, to: out, ink: quoteInk, indent: indent + 14 * scale, gap: gap)
   }
 
   private func list(_ list: MarkdownList, indent: CGFloat, ink: NSColor, gap: CGFloat, to out: NSMutableAttributedString) {
-    let itemGap: CGFloat = list.isLoose ? 8 : 3
-    let inner: CGFloat = list.isLoose ? 8 : 4
-    let markerWidth: CGFloat = list.isOrdered ? 22 : 14
-    let body = indent + 4 + markerWidth + 8
+    let itemGap: CGFloat = (list.isLoose ? 8 : 3) * scale
+    let inner: CGFloat = (list.isLoose ? 8 : 4) * scale
+    let markerWidth: CGFloat = (list.isOrdered ? 22 : 14) * scale
+    let pad = 4 * scale
+    let body = indent + pad + markerWidth + 8 * scale
     for (i, item) in list.items.enumerated() {
       let marker: String
       if let checked = item.checked { marker = checked ? "\u{2611}" : "\u{2610}" }
@@ -228,20 +234,20 @@ struct MarkdownFlow {
           }
           line.append(inline(text, font: .systemFont(ofSize: size), ink: ink))
           line.append(NSAttributedString(string: "\n"))
-          let style = style(indent: indent + 4, head: body, gap: inner)
-          style.tabStops = [NSTextTab(textAlignment: .right, location: indent + 4 + markerWidth), NSTextTab(textAlignment: .left, location: body)]
+          let style = style(indent: indent + pad, head: body, gap: inner)
+          style.tabStops = [NSTextTab(textAlignment: .right, location: indent + pad + markerWidth), NSTextTab(textAlignment: .left, location: body)]
           line.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: line.length))
           out.append(line)
           first = false
         case .list(let nested):
-          self.list(nested, indent: body - 4, ink: ink, gap: inner, to: out)
+          self.list(nested, indent: body - pad, ink: ink, gap: inner, to: out)
         default:
           append([block], to: out, ink: ink, indent: body, gap: inner)
         }
       }
       if first {
         let line = NSMutableAttributedString(string: "\t\(marker)\n", attributes: [.font: NSFont.systemFont(ofSize: size), .foregroundColor: NSColor(Tok.fg4)])
-        line.addAttribute(.paragraphStyle, value: style(indent: indent + 4, head: body, gap: inner), range: NSRange(location: 0, length: line.length))
+        line.addAttribute(.paragraphStyle, value: style(indent: indent + pad, head: body, gap: inner), range: NSRange(location: 0, length: line.length))
         out.append(line)
       }
       setSpacing(out, from: start, to: i == list.items.count - 1 ? gap : itemGap)

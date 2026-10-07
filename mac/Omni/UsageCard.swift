@@ -13,11 +13,11 @@ struct UsageCard: View {
     let live = model.connectionNotice == nil && model.supervisor.isRunning
     let summary = slots.isEmpty ? (live ? "Connected" : "Connecting") : slots.joined(separator: " · ")
     let peak = rows.flatMap { [$0.fiveHour, $0.week] }.compactMap { $0 }.max { $0.fraction < $1.fraction }
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: z(8)) {
       Button {
         withAnimation(.snappy(duration: 0.2)) { open.toggle() }
       } label: {
-        HStack(spacing: 8) {
+        HStack(spacing: z(8)) {
           GlyphView(glyph: live ? .done : .settled, size: 6)
           Text("Usage")
             .font(.omni(size: 11, weight: .medium))
@@ -43,14 +43,14 @@ struct UsageCard: View {
       .buttonStyle(.plain)
       .accessibilityLabel(open ? "Hide plan usage" : "Show plan usage")
       if open {
-        HStack(spacing: 8) {
+        HStack(spacing: z(8)) {
           Color.clear.frame(width: z(66), height: 1)
           Text("5h").frame(maxWidth: .infinity, alignment: .leading)
           Text("Week").frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.omni(size: 11, weight: .medium))
         .foregroundStyle(Tok.fg4)
-        .padding(.top, 2)
+        .padding(.top, z(2))
         ForEach(rows) { UsageRow(row: $0) }
         Rectangle().fill(Tok.line).frame(height: 1)
         Text(summary)
@@ -58,11 +58,11 @@ struct UsageCard: View {
           .lineLimit(1)
           .font(.omni(size: 11))
           .foregroundStyle(Tok.fg3)
-          .padding(.top, 2)
+          .padding(.top, z(2))
       }
     }
-    .padding(12)
-    .background(Tok.bg.opacity(0.7), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    .padding(z(12))
+    .background(Tok.bg.opacity(0.7), in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
     .cardShadow(20)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Plan usage")
@@ -74,8 +74,8 @@ private struct UsageRow: View {
 
   var body: some View {
     TimelineView(.everyMinute) { context in
-      HStack(spacing: 8) {
-        HStack(spacing: 6) {
+      HStack(spacing: z(8)) {
+        HStack(spacing: z(6)) {
           HarnessLogo(harness: row.id.rawValue, size: 12)
             .foregroundStyle(Tok.fg)
           Text(row.name)
@@ -106,10 +106,10 @@ private struct Meter: View {
   var body: some View {
     if let meter {
       let on = meter.fraction > 0 ? max(1, Int((meter.fraction * 10).rounded())) : 0
-      HStack(spacing: 6) {
-        HStack(alignment: .bottom, spacing: 2) {
+      HStack(spacing: z(6)) {
+        HStack(alignment: .bottom, spacing: z(2)) {
           ForEach(0..<10, id: \.self) { i in
-            RoundedRectangle(cornerRadius: 1.5)
+            RoundedRectangle(cornerRadius: z(1.5))
               .fill(i < on ? (meter.tone == .bad ? Tok.needs : Tok.fg) : Tok.fg.opacity(0.14))
               .frame(height: i < on ? 10 : 5.5)
           }

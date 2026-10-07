@@ -27,11 +27,11 @@ struct SearchScreen: View {
     ScreenColumn {
       VStack(alignment: .leading, spacing: 0) {
         OmniPageHeader(title: "Search", subtitle: "Titles, prompts, replies and tool output across every channel.")
-          .padding(.top, 40)
-          .padding(.bottom, 24)
+          .padding(.top, z(40))
+          .padding(.bottom, z(24))
         field
         results
-          .padding(.top, 20)
+          .padding(.top, z(20))
       }
     }
     .task(id: "\(trimmed)/\(ObjectIdentifier(model.store).hashValue)") { await run() }
@@ -40,7 +40,7 @@ struct SearchScreen: View {
   }
 
   private var field: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: z(10)) {
       OmniIcon(name: "search", size: 17).foregroundStyle(Tok.fg3)
       TextField("Search threads", text: $value, prompt: Text("Search threads").foregroundStyle(Tok.fg4))
         .textFieldStyle(.plain)
@@ -49,12 +49,12 @@ struct SearchScreen: View {
         .onSubmit { model.route = .search(query: value.trimmingCharacters(in: .whitespacesAndNewlines)) }
     }
     .foregroundStyle(Tok.fg)
-    .padding(.leading, 18)
-    .padding(.trailing, 20)
+    .padding(.leading, z(18))
+    .padding(.trailing, z(20))
     .frame(height: z(48))
     .background(focused ? Tok.bg : Tok.surface, in: Capsule())
     .overlay(Capsule().strokeBorder(focused ? Tok.lineStrong : Tok.line))
-    .background(Capsule().fill(Tok.wash).padding(-5).opacity(focused ? 1 : 0))
+    .background(Capsule().fill(Tok.wash).padding(z(-5)).opacity(focused ? 1 : 0))
     .animation(.easeOut(duration: 0.16), value: focused)
   }
 
@@ -73,8 +73,8 @@ struct SearchScreen: View {
         VStack(alignment: .leading, spacing: 0) {
           Text(hits.count >= 40 ? "Top 40 results" : Format.plural(hits.count, "result"))
             .omniCaption()
-            .padding(.horizontal, 14)
-            .padding(.bottom, 8)
+            .padding(.horizontal, z(14))
+            .padding(.bottom, z(8))
           ForEach(hits) { SearchRow(model: model, hit: $0).openInNewWindow($0.threadID, model: model) }
         }
       }
@@ -99,18 +99,18 @@ private struct SearchRow: View {
     Button {
       model.route = .thread(id: hit.threadID)
     } label: {
-      VStack(alignment: .leading, spacing: 4) {
-        HStack(spacing: 8) {
+      VStack(alignment: .leading, spacing: z(4)) {
+        HStack(spacing: z(8)) {
           StatusDot(status: hit.status)
           Text(hit.title.isEmpty ? "Untitled" : hit.title)
             .font(.omni(size: 13.5, weight: .medium))
             .foregroundStyle(Tok.fg)
             .lineLimit(1)
-          Spacer(minLength: 8)
+          Spacer(minLength: z(8))
           Text("#\(model.store.channel(hit.channelID)?.name ?? hit.channelID)")
             .font(.omni(size: 11.5))
             .foregroundStyle(Tok.fg2)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, z(8))
             .frame(height: z(20))
             .background(Tok.surface2, in: Capsule())
           Text(Format.relTime(hit.updatedAt))
@@ -125,13 +125,13 @@ private struct SearchRow: View {
             .foregroundStyle(Tok.fg2)
             .lineSpacing(3)
             .lineLimit(2)
-            .padding(.leading, 16)
+            .padding(.leading, z(16))
             .multilineTextAlignment(.leading)
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, 14)
-      .padding(.vertical, 12)
+      .padding(.horizontal, z(14))
+      .padding(.vertical, z(12))
       .hoverWash()
     }
     .buttonStyle(.plain)

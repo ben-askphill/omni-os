@@ -12,7 +12,7 @@ struct ChannelScreen: View {
     if let channel = model.store.channel(id) {
       ChannelView(model: model, channel: channel, tab: tab, pr: pr)
     } else if model.store.loadState == .loading {
-      LoadingNote().padding(.horizontal, 32).frame(maxHeight: .infinity, alignment: .top)
+      LoadingNote().padding(.horizontal, z(32)).frame(maxHeight: .infinity, alignment: .top)
     } else {
       MissingChannelView(model: model, id: id)
     }
@@ -31,9 +31,9 @@ private struct ChannelView: View {
     ScreenColumn {
       VStack(alignment: .leading, spacing: 0) {
         header
-          .padding(.top, 40)
+          .padding(.top, z(40))
         links
-        tabs.padding(.top, 20)
+        tabs.padding(.top, z(20))
         Group {
           switch tab {
           case .threads:
@@ -47,19 +47,19 @@ private struct ChannelView: View {
             EmptyView()
           }
         }
-        .padding(.top, 24)
+        .padding(.top, z(24))
       }
     }
   }
 
   private var header: some View {
-    HStack(spacing: 14) {
+    HStack(spacing: z(14)) {
       ChannelAvatar(name: channel.name, conductor: conductor, size: 44, icon: channel.icon)
-      VStack(alignment: .leading, spacing: 4) {
-        HStack(spacing: 8) {
+      VStack(alignment: .leading, spacing: z(4)) {
+        HStack(spacing: z(8)) {
           Text(kindLabel)
           if channel.running > 0 {
-            HStack(spacing: 6) {
+            HStack(spacing: z(6)) {
               GlyphView(glyph: .running, size: 7)
               Text("\(channel.running) running")
             }
@@ -67,7 +67,7 @@ private struct ChannelView: View {
           }
         }
         .omniCaption()
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
+        HStack(alignment: .firstTextBaseline, spacing: z(4)) {
           if !conductor {
             Text("#").foregroundStyle(Tok.fg4)
           }
@@ -96,7 +96,7 @@ private struct ChannelView: View {
     let path = channel.repoPath.flatMap { $0.isEmpty ? nil : $0 }
     let note = conductor ? channel.notes.flatMap { $0.isEmpty ? nil : $0 } : nil
     if domain != nil || repo != nil || path != nil || note != nil {
-      HStack(spacing: 6) {
+      HStack(spacing: z(6)) {
         if let domain, let url = URL(string: "https://\(domain)/admin") {
           LinkPill(icon: "globe", text: domain, url: url)
         }
@@ -109,7 +109,7 @@ private struct ChannelView: View {
             .foregroundStyle(Tok.fg4)
             .lineLimit(1)
             .truncationMode(.head)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, z(10))
             .frame(height: z(28))
             .overlay(Capsule().strokeBorder(Tok.line))
             .help(path)
@@ -119,11 +119,11 @@ private struct ChannelView: View {
             .font(.omni(size: 12.5))
             .foregroundStyle(Tok.fg3)
             .lineLimit(1)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, z(4))
         }
         Spacer(minLength: 0)
       }
-      .padding(.top, 16)
+      .padding(.top, z(16))
     }
   }
 
@@ -158,9 +158,9 @@ struct ChannelTabsBar: View {
   var body: some View {
     if let channel = model.store.channel(channelID) {
       let conductor = channel.id == SidebarSections.conductorID
-      HStack(spacing: 10) {
+      HStack(spacing: z(10)) {
         ChannelAvatar(name: channel.name, conductor: conductor, size: 28, icon: channel.icon)
-        HStack(alignment: .firstTextBaseline, spacing: 2) {
+        HStack(alignment: .firstTextBaseline, spacing: z(2)) {
           if !conductor { Text("#").foregroundStyle(Tok.fg4) }
           Text(channel.name).foregroundStyle(Tok.fg)
         }
@@ -169,8 +169,8 @@ struct ChannelTabsBar: View {
         Spacer()
         ChannelTabsPicker(model: model, channelID: channel.id, tab: .prs, conductor: conductor)
       }
-      .padding(.horizontal, 24)
-      .padding(.top, 12)
+      .padding(.horizontal, z(24))
+      .padding(.top, z(12))
     }
   }
 }
@@ -184,12 +184,12 @@ private struct LinkPill: View {
 
   var body: some View {
     Link(destination: url) {
-      HStack(spacing: 6) {
+      HStack(spacing: z(6)) {
         OmniIcon(name: icon, size: 13).foregroundStyle(Tok.fg3)
         Text(text).lineLimit(1).foregroundStyle(Tok.fg2)
       }
       .font(.omni(size: 12))
-      .padding(.horizontal, 10)
+      .padding(.horizontal, z(10))
       .frame(height: z(28))
       .background(hovering ? Tok.surface2 : Tok.surface, in: Capsule())
       .contentShape(Capsule())
@@ -209,7 +209,7 @@ private struct ChannelThreads: View {
 
   var body: some View {
     let threads = ThreadListing.merging(loaded: loaded ?? [], live: model.store.recent, channel: channel.id)
-    VStack(alignment: .leading, spacing: 32) {
+    VStack(alignment: .leading, spacing: z(32)) {
       NewThreadComposerView(model: model, channelID: channel.id)
         .id(channel.id)
       if let error, loaded == nil {

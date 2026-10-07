@@ -26,9 +26,9 @@ struct ReplyComposerHost: View {
     box.menu = menu
     return ReplyComposerView(model: model, store: store, thread: thread, reply: reply, menu: menu)
     .frame(maxWidth: ThreadStyle.thread)
-    .padding(.horizontal, 24)
-    .padding(.top, 4)
-    .padding(.bottom, 16)
+    .padding(.horizontal, z(24))
+    .padding(.top, z(4))
+    .padding(.bottom, z(16))
     .frame(maxWidth: .infinity)
   }
 }
@@ -42,7 +42,7 @@ struct InterruptButton: View {
       Task { await store.interrupt() }
     } label: {
       if store.interrupting {
-        HStack(spacing: 6) {
+        HStack(spacing: z(6)) {
           Loader(size: 13)
           Text("Interrupting")
         }
@@ -86,7 +86,7 @@ private struct ThreadPRSlot: View {
             Button("Open a new PR", action: open).disabled(opening)
           }
         } label: {
-          HStack(spacing: 5) {
+          HStack(spacing: z(5)) {
             if opening { ProgressView().controlSize(.mini) } else { Image(systemName: "arrow.triangle.pull") }
             Text("#\(pr.number)")
             PRChip(text: pr.badge, tone: pr.badge == "open" ? .ok : pr.badge == "merged" ? .info : .outline)
@@ -98,7 +98,7 @@ private struct ThreadPRSlot: View {
         .buttonStyle(.plain)
         .menuIndicator(.visible)
         .fixedSize()
-        .padding(.horizontal, 8)
+        .padding(.horizontal, z(8))
         .frame(height: z(26))
         .foregroundStyle(Tok.fg3)
         .help(pr.title)
@@ -120,7 +120,7 @@ private struct ThreadPRSlot: View {
 
   private var openButton: some View {
     Button(action: open) {
-      HStack(spacing: 6) {
+      HStack(spacing: z(6)) {
         if opening { Loader(size: 13) } else { OmniIcon(name: "pr", size: 14) }
         Text("Open PR")
       }
@@ -165,7 +165,7 @@ private struct ReplyComposerView: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: z(8)) {
       if let e = store.actionError { ErrorNote(text: e.message) }
       if let e = reply.sendError ?? omniError { ErrorNote(text: e) }
       shell
@@ -210,19 +210,20 @@ private struct ReplyComposerView: View {
       }
       ComposerTextView(
         text: $reply.text, placeholder: suggestion ?? SendRules.placeholder(busy: busyThread), running: busyThread,
-        interrupting: store.interrupting, focusTick: focusTick, callbacks: callbacks, caretRequest: caret
+        interrupting: store.interrupting, focusTick: focusTick, callbacks: callbacks, caretRequest: caret,
+        scale: UIZoom.settings.scale
       )
       .fixedSize(horizontal: false, vertical: false)
       if let e = reply.attachError {
         Text(e)
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg)
-          .padding(.horizontal, 16)
-          .padding(.bottom, 4)
+          .padding(.horizontal, z(16))
+          .padding(.bottom, z(4))
       }
       footer
       SlashHintView(model: menu) { newThreadOnAnotherModel() }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, z(16))
         .padding(.bottom, menu.hint == nil ? 0 : 10)
         .padding(.top, menu.hint == nil ? 0 : 2)
     }
@@ -243,7 +244,7 @@ private struct ReplyComposerView: View {
       if thread.branch != nil {
         ThreadPRSlot(model: model, thread: thread, busy: busyThread, opening: reply.openingPR) { Task { await openPR() } }
       }
-      HStack(spacing: 10) {
+      HStack(spacing: z(10)) {
         ComposerHints(tab: suggestion != nil)
         if let omni = menu.reply, omni.action != .send {
           SendButton(title: omni.label ?? "Send", armed: omni.armed, sending: omniBusy) { runOmni() }
@@ -254,9 +255,9 @@ private struct ReplyComposerView: View {
         }
       }
     }
-    .padding(.horizontal, 8)
-    .padding(.bottom, 8)
-    .padding(.top, 6)
+    .padding(.horizontal, z(8))
+    .padding(.bottom, z(8))
+    .padding(.top, z(6))
   }
 
   private var callbacks: ComposerCallbacks {
@@ -355,19 +356,19 @@ private struct ThreadRunPills: View {
 
   var body: some View {
     let labels = ThreadRunLabels.make(harness: thread.harness, model: thread.model, effort: thread.effort, harnesses: harnesses)
-    HStack(spacing: 6) {
+    HStack(spacing: z(6)) {
       pill(symbol: "bolt", text: labels.model, detail: labels.harnessName, label: "Model: \(labels.model) on \(labels.harnessName)")
       pill(symbol: "slider.horizontal.3", text: labels.effort, detail: nil, label: "Effort: \(labels.effort)")
     }
   }
 
   private func pill(symbol: String, text: String, detail: String?, label: String) -> some View {
-    HStack(spacing: 6) {
+    HStack(spacing: z(6)) {
       Image(systemName: symbol).font(.omni(size: 11.5)).foregroundStyle(Tok.fg3)
       Text(text).font(.omni(size: 12.5, weight: .medium)).lineLimit(1)
       if let detail { Text("· \(detail)").font(.omni(size: 12.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
     }
-    .padding(.horizontal, 10)
+    .padding(.horizontal, z(10))
     .frame(height: z(28))
     .frame(maxWidth: z(220))
     .foregroundStyle(Tok.fg)
@@ -436,7 +437,7 @@ private struct SteerButton: View {
       Button {
         send(SendRules.primary(canSteer: canSteer))
       } label: {
-        HStack(spacing: 6) {
+        HStack(spacing: z(6)) {
           if sending {
             Loader(size: 16)
           } else {
@@ -444,8 +445,8 @@ private struct SteerButton: View {
           }
           Text(SendRules.buttonTitle(canSteer: canSteer)).font(.omni(size: 13, weight: .medium))
         }
-        .padding(.leading, 14)
-        .padding(.trailing, 10)
+        .padding(.leading, z(14))
+        .padding(.trailing, z(10))
         .frame(height: z(34))
         .contentShape(Rectangle())
       }
@@ -488,9 +489,9 @@ struct AttachmentStrip: View {
 
   var body: some View {
     ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: 6) {
+      HStack(spacing: z(6)) {
         ForEach(files) { f in
-          HStack(spacing: 8) {
+          HStack(spacing: z(8)) {
             Thumb(file: f)
             VStack(alignment: .leading, spacing: 1) {
               Text(f.name).font(.omni(size: 12.5, weight: .medium)).foregroundStyle(Tok.fg2).lineLimit(1).truncationMode(.middle)
@@ -506,16 +507,16 @@ struct AttachmentStrip: View {
             .help("Remove \(f.name)")
             .accessibilityLabel("Remove \(f.name)")
           }
-          .padding(.leading, 4)
-          .padding(.trailing, 4)
+          .padding(.leading, z(4))
+          .padding(.trailing, z(4))
           .frame(height: z(44))
-          .background(Tok.surface2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+          .background(Tok.surface2, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
         }
       }
-      .padding(.horizontal, 12)
+      .padding(.horizontal, z(12))
     }
-    .padding(.top, 12)
-    .padding(.bottom, 2)
+    .padding(.top, z(12))
+    .padding(.bottom, z(2))
   }
 }
 
@@ -532,9 +533,9 @@ private struct Thumb: View {
       }
     }
     .frame(width: z(36), height: z(36))
-    .background(Tok.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Tok.line))
+    .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(8), style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: z(8), style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: z(8), style: .continuous).strokeBorder(Tok.line))
     .task(id: file.url) {
       guard file.isImage else { return }
       let url = file.url

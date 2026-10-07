@@ -37,9 +37,10 @@ struct OmniIcon: View {
 
   var body: some View {
     let d = BrandPaths.icons[name] ?? BrandPaths.icons["more"]!
+    let side = z(size)
     SVGShape(d)
-      .stroke(style: StrokeStyle(lineWidth: (name == "more" ? 3 : weight) * size / 24, lineCap: .round, lineJoin: .round))
-      .frame(width: size, height: size)
+      .stroke(style: StrokeStyle(lineWidth: (name == "more" ? 3 : weight) * side / 24, lineCap: .round, lineJoin: .round))
+      .frame(width: side, height: side)
       .accessibilityHidden(true)
   }
 }
@@ -58,7 +59,7 @@ struct HarnessLogo: View {
           .font(.omni(size: max(7, size * 0.62), weight: .medium))
       }
     }
-    .frame(width: size, height: size)
+    .frame(width: z(size), height: z(size))
     .accessibilityHidden(true)
   }
 }
@@ -71,7 +72,7 @@ struct HarnessMark: View {
   var body: some View {
     HarnessLogo(harness: harness, size: large ? 16 : 13)
       .foregroundStyle(Tok.fg)
-      .frame(width: large ? 26 : 20, height: large ? 26 : 20)
+      .frame(width: z(large ? 26 : 20), height: z(large ? 26 : 20))
       .background(Tok.surface2, in: Circle())
   }
 }
@@ -94,10 +95,10 @@ struct Wordmark: View {
   }()
 
   var body: some View {
-    let scale = height / Self.box.height
+    let scale = z(height) / Self.box.height
     WordmarkLine(drawn: drawn)
       .stroke(Tok.fg, style: StrokeStyle(lineWidth: 20 * scale, lineCap: .round, lineJoin: .round))
-      .frame(width: Self.box.width * scale, height: height)
+      .frame(width: Self.box.width * scale, height: z(height))
       .contentShape(Rectangle())
       .onHover { inside in
         guard inside, writeOnHover, !reduceMotion else { return }
@@ -153,7 +154,7 @@ struct StaticMark: View {
         context.fill(Path(ellipseIn: CGRect(x: 49.5 - 12, y: -49.5 - 12, width: 24, height: 24)).applying(m), with: .foreground)
       }
     }
-    .frame(width: size, height: size)
+    .frame(width: z(size), height: z(size))
     .accessibilityHidden(true)
   }
 }
@@ -176,7 +177,7 @@ struct Loader: View {
         g.fill(Path(ellipseIn: CGRect(x: bead.x - 13 * s, y: bead.y - 13 * s, width: 26 * s, height: 26 * s)), with: .foreground)
       }
     }
-    .frame(width: size, height: size)
+    .frame(width: z(size), height: z(size))
     .accessibilityLabel("Loading")
   }
 }

@@ -17,14 +17,19 @@ extension Font {
   }
 }
 
-/// `.font(.omni(...))` for places that are not on the main actor, such as a `TextFieldStyle`'s `_body`:
-/// the modifier's body is, so it can read the zoom.
-struct OmniFont: ViewModifier {
-  let size: CGFloat
-  var weight: Font.Weight?
-  var design: Font.Design?
+/// View > Actual Size, Zoom In and Zoom Out, with the browser's shortcuts.
+struct ZoomCommands: View {
+  let zoom: ZoomSettings
 
-  func body(content: Content) -> some View {
-    content.font(.omni(size: size, weight: weight, design: design))
+  var body: some View {
+    Button("Actual Size") { zoom.actualSize() }
+      .keyboardShortcut("0")
+      .disabled(zoom.isActualSize)
+    Button("Zoom In") { zoom.zoomIn() }
+      .keyboardShortcut("=")
+      .disabled(!zoom.canZoomIn)
+    Button("Zoom Out") { zoom.zoomOut() }
+      .keyboardShortcut("-")
+      .disabled(!zoom.canZoomOut)
   }
 }

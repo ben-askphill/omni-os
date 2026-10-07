@@ -20,7 +20,7 @@ struct ArtifactWebView: View {
         SandboxedWebView(client: client, ref: ref, rules: rules, port: port)
           .id(ref)
       } else if let failure {
-        ErrorNote(text: failure).padding(12)
+        ErrorNote(text: failure).padding(z(12))
       } else {
         ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
       }

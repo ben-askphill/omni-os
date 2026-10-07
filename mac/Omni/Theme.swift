@@ -101,7 +101,7 @@ struct PillButtonStyle: ButtonStyle {
       .lineLimit(1)
       .foregroundStyle(fg)
       .padding(.horizontal, height <= 28 ? 11 : 14)
-      .frame(height: height)
+      .frame(height: z(height))
       .background(bg(pressed: configuration.isPressed), in: Capsule())
       .contentShape(Capsule())
       .opacity(enabled ? 1 : 0.4)
@@ -139,7 +139,7 @@ struct IconButtonStyle: ButtonStyle {
       .labelStyle(.iconOnly)
       .font(.omni(size: size * 0.48))
       .foregroundStyle(active || hover ? Tok.fg : Tok.fg3)
-      .frame(width: size, height: size)
+      .frame(width: z(size), height: z(size))
       .background {
         Circle().fill(Tok.wash)
           .opacity(hover || active || configuration.isPressed ? 1 : 0)
@@ -189,13 +189,13 @@ struct SegmentedPill<T: Hashable>: View {
   }
 
   var body: some View {
-    HStack(spacing: 2) {
+    HStack(spacing: z(2)) {
       ForEach(options, id: \.value) { option in
         let on = option.value == selection
         Button {
           withAnimation(Motion.spring) { selection = option.value }
         } label: {
-          HStack(spacing: 6) {
+          HStack(spacing: z(6)) {
             Text(option.label)
             if let count = option.count, count > 0 {
               Text("\(count)").foregroundStyle(Tok.fg4).monospacedDigit()
@@ -204,7 +204,7 @@ struct SegmentedPill<T: Hashable>: View {
           .font(.omni(size: small ? 12.5 : 13))
           .foregroundStyle(on ? Tok.fg : Tok.fg3)
           .padding(.horizontal, small ? 11 : 14)
-          .frame(height: small ? 26 : 30)
+          .frame(height: z(small ? 26 : 30))
           .background {
             if on {
               Capsule().fill(Tok.thumb)
@@ -219,7 +219,7 @@ struct SegmentedPill<T: Hashable>: View {
         .accessibilityAddTraits(on ? .isSelected : [])
       }
     }
-    .padding(3)
+    .padding(z(3))
     .background(Tok.surface2, in: Capsule())
   }
 }
@@ -228,18 +228,36 @@ struct SegmentedPill<T: Hashable>: View {
 
 /// `.field` in index.css: a surface pill with an inset line, lifting to the page color on focus.
 struct OmniFieldStyle: TextFieldStyle {
-  @FocusState private var focused: Bool
-
   func _body(configuration: TextField<Self._Label>) -> some View {
     configuration
       .textFieldStyle(.plain)
-      .modifier(OmniFont(size: 14))
+      .modifier(FieldChrome(size: 14, vertical: 9))
+  }
+}
+
+/// The look both field styles share, at the zoom. A modifier, since a `TextFieldStyle`'s `_body` is not on
+/// the main actor and the zoom is: this body is.
+struct FieldChrome: ViewModifier {
+  let size: CGFloat
+  var design: Font.Design?
+  let vertical: CGFloat
+  @FocusState private var focused: Bool
+
+  nonisolated init(size: CGFloat, design: Font.Design? = nil, vertical: CGFloat) {
+    self.size = size
+    self.design = design
+    self.vertical = vertical
+  }
+
+  func body(content: Content) -> some View {
+    content
+      .font(.omni(size: size, design: design))
       .focused($focused)
-      .padding(.horizontal, 14)
-      .padding(.vertical, 9)
-      .background(focused ? Tok.bg : Tok.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-      .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(focused ? Tok.lineStrong : Tok.line))
-      .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Tok.wash).padding(-4).opacity(focused ? 1 : 0))
+      .padding(.horizontal, z(14))
+      .padding(.vertical, z(vertical))
+      .background(focused ? Tok.bg : Tok.surface, in: RoundedRectangle(cornerRadius: z(14), style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: z(14), style: .continuous).strokeBorder(focused ? Tok.lineStrong : Tok.line))
+      .background(RoundedRectangle(cornerRadius: z(18), style: .continuous).fill(Tok.wash).padding(z(-4)).opacity(focused ? 1 : 0))
       .animation(.easeOut(duration: 0.16), value: focused)
   }
 }
@@ -255,9 +273,9 @@ struct Kbd: View {
     Text(text)
       .font(.omni(size: 11, weight: .medium))
       .foregroundStyle(Tok.fg3)
-      .padding(.horizontal, 5)
+      .padding(.horizontal, z(5))
       .frame(height: z(18))
-      .background(Tok.surface2, in: RoundedRectangle(cornerRadius: 5))
+      .background(Tok.surface2, in: RoundedRectangle(cornerRadius: z(5)))
   }
 }
 
@@ -272,7 +290,7 @@ struct Chip: View {
       .font(.omni(size: 11, weight: .medium))
       .lineLimit(1)
       .foregroundStyle(fg)
-      .padding(.horizontal, 8)
+      .padding(.horizontal, z(8))
       .frame(height: z(20))
       .background(bg, in: Capsule())
       .overlay { if tone == .outline { Capsule().strokeBorder(Tok.lineStrong) } }

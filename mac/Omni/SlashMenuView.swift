@@ -26,9 +26,9 @@ struct SlashMenuView: View {
             if let label = section.label {
               Text(label)
                 .omniCaption()
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
+                .padding(.horizontal, z(12))
+                .padding(.top, z(8))
+                .padding(.bottom, z(4))
             }
             ForEach(Array(section.commands.enumerated()), id: \.element.id) { i, command in
               let index = sections[..<s].reduce(0) { $0 + $1.commands.count } + i
@@ -37,7 +37,7 @@ struct SlashMenuView: View {
             }
           }
         }
-        .padding(6)
+        .padding(z(6))
       }
       .scrollIndicators(.automatic)
       .onChange(of: active) {
@@ -47,8 +47,8 @@ struct SlashMenuView: View {
     }
     .frame(maxHeight: z(352))
     .fixedSize(horizontal: false, vertical: true)
-    .background(Tok.elev, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .background(Tok.elev, in: RoundedRectangle(cornerRadius: z(22), style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: z(22), style: .continuous))
     .menuShadow(22)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Commands")
@@ -67,17 +67,17 @@ struct SlashMenuView: View {
       }
       .font(.omni(size: 12.5))
       .foregroundStyle(Tok.fg3)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 10)
+      .padding(.horizontal, z(12))
+      .padding(.vertical, z(10))
     } else if list == nil || list?.status == .loading {
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         Loader(size: 13)
         Text("Loading commands")
       }
       .font(.omni(size: 12.5))
       .foregroundStyle(Tok.fg3)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 10)
+      .padding(.horizontal, z(12))
+      .padding(.vertical, z(10))
     }
   }
 }
@@ -97,7 +97,7 @@ private struct FileMenuView: View {
               .id(row.id)
           }
         }
-        .padding(6)
+        .padding(z(6))
       }
       .scrollIndicators(.automatic)
       .onChange(of: active) {
@@ -106,8 +106,8 @@ private struct FileMenuView: View {
     }
     .frame(maxHeight: z(352))
     .fixedSize(horizontal: false, vertical: true)
-    .background(Tok.elev, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .background(Tok.elev, in: RoundedRectangle(cornerRadius: z(22), style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: z(22), style: .continuous))
     .menuShadow(22)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Files")
@@ -121,11 +121,11 @@ private struct FileRow: View {
   let onPick: () -> Void
 
   var body: some View {
-    HStack(alignment: .center, spacing: 10) {
+    HStack(alignment: .center, spacing: z(10)) {
       Image(systemName: "doc")
         .font(.omni(size: 13))
         .foregroundStyle(Tok.fg3)
-      HStack(alignment: .firstTextBaseline, spacing: 8) {
+      HStack(alignment: .firstTextBaseline, spacing: z(8)) {
         Text(row.name)
           .font(.omni(size: 13, weight: .medium))
           .foregroundStyle(Tok.fg)
@@ -142,16 +142,16 @@ private struct FileRow: View {
         Text("artifact")
           .font(.omni(size: 11))
           .foregroundStyle(Tok.fg3)
-          .padding(.horizontal, 8)
+          .padding(.horizontal, z(8))
           .padding(.vertical, 1)
           .background(Tok.surface2, in: Capsule())
       }
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 6)
+    .padding(.horizontal, z(12))
+    .padding(.vertical, z(6))
     .frame(minHeight: z(40))
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(isActive ? Tok.wash : .clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .background(isActive ? Tok.wash : .clear, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
     .contentShape(Rectangle())
     .onTapGesture(perform: onPick)
     .onContinuousHover { phase in
@@ -169,9 +169,9 @@ private struct SlashRow: View {
   let onPick: () -> Void
 
   var body: some View {
-    HStack(alignment: .center, spacing: 10) {
+    HStack(alignment: .center, spacing: z(10)) {
       VStack(alignment: .leading, spacing: 1) {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: z(8)) {
           Text("/\(command.name)")
             .font(.omni(size: 13, weight: .medium, design: .monospaced))
             .foregroundStyle(Tok.fg)
@@ -196,15 +196,15 @@ private struct SlashRow: View {
       Text(command.sourceTag)
         .font(.omni(size: 11))
         .foregroundStyle(Tok.fg3)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, z(8))
         .padding(.vertical, 1)
         .background(Tok.surface2, in: Capsule())
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 6)
+    .padding(.horizontal, z(12))
+    .padding(.vertical, z(6))
     .frame(minHeight: z(40))
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(isActive ? Tok.wash : .clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .background(isActive ? Tok.wash : .clear, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
     .contentShape(Rectangle())
     .onTapGesture(perform: onPick)
     .onContinuousHover { phase in
@@ -223,7 +223,7 @@ struct SlashHintView: View {
 
   var body: some View {
     if let hint = model.hint {
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         Text(hint)
         if model.reply?.action == .fixed {
           Button("New thread on another model", action: onNewThreadOnAnotherModel)
