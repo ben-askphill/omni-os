@@ -6,6 +6,7 @@ struct MainWindow: View {
   let model: AppModel
   let updater: Updater
   @Environment(\.openSettings) private var openSettings
+  @Environment(\.openWindow) private var openWindow
   @AppStorage(sidebarShownKey) private var sidebarShown = true
   @State private var paneTop: CGFloat?
   /// The window's own appearance. The chrome is drawn dark, the pane and the palette follow this.
@@ -81,6 +82,17 @@ struct MainWindow: View {
       .buttonStyle(.icon(size: 28))
       .disabled(!model.shell.history.canGoForward)
       .help("Forward (⌘])")
+      // After Forward. The thread's Interrupt and panel toggle are .primaryAction, and a flexible
+      // spacer in that cluster sends the items after it to the trailing edge.
+      if model.serverScreen == nil, case .thread(let id, _) = model.route {
+        Button {
+          openWindow(id: ThreadWindow.id, value: id)
+        } label: {
+          Label("Open in New Window", systemImage: "macwindow.badge.plus")
+        }
+        .buttonStyle(.icon(size: 28))
+        .help("Open in New Window")
+      }
     }
     .sharedBackgroundVisibility(.hidden)
     if let notice = model.connectionNotice {
@@ -89,7 +101,6 @@ struct MainWindow: View {
       }
       .sharedBackgroundVisibility(.hidden)
     }
-    OpenInNewWindowToolbar(model: model)
   }
 }
 
