@@ -142,7 +142,7 @@ export async function probeHermesHarness(cap: number): Promise<HarnessInfo> {
   const unavailable: HermesProbe = { available: false };
   try {
     const key = await globalSecret('HERMES_API_KEY');
-    if (!key) return hermesHarness(unavailable, cap);
+    if (!key || !config.hermesUrl) return hermesHarness(unavailable, cap);
     const ok = await probeHermes(config.hermesUrl, key);
     return hermesHarness({ available: ok }, cap);
   } catch {

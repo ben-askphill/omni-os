@@ -29,8 +29,8 @@ export const config = {
   maxConcurrentHermes: Number(env.OMNI_MAX_CONCURRENT_HERMES ?? 4),
   codexBin: env.OMNI_CODEX_BIN,
   cursorBin: env.OMNI_CURSOR_BIN,
-  /** Hermes API server on the server's Tailscale address. It is not public; the Mac must be on the tailnet. Override with OMNI_HERMES_URL. The bearer token is the Keychain secret HERMES_API_KEY, not an env var. */
-  hermesUrl: (env.OMNI_HERMES_URL ?? 'http://100.110.128.38:8642').replace(/\/$/, ''),
+  /** Hermes API server on the server's Tailscale address, like http://100.x.y.z:8642. Unset means Hermes is off. The bearer token is the Keychain secret HERMES_API_KEY, not an env var. */
+  hermesUrl: (env.OMNI_HERMES_URL ?? '').replace(/\/$/, ''),
   /** How long a thread's claude process stays warm after a turn. 0 closes it right away. */
   keepAliveSeconds: Number(env.OMNI_KEEPALIVE_SECONDS ?? 600),
   /** How long an idle process stays up for background agents that have not ended yet. */

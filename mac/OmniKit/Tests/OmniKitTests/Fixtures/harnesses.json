@@ -108,7 +108,7 @@
     },
     "cap": 4,
     "available": false,
-    "fix": "Set HERMES_API_KEY in Secrets and connect this Mac to Tailscale (OMNI_HERMES_URL, default http://100.110.128.38:8642)",
+    "fix": "Set OMNI_HERMES_URL to the Hermes Tailscale address, set HERMES_API_KEY in Secrets, and connect this Mac to Tailscale",
     "models": [],
     "running": 0
   }
