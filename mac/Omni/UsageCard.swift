@@ -20,7 +20,7 @@ struct UsageCard: View {
         HStack(spacing: 8) {
           GlyphView(glyph: live ? .done : .settled, size: 6)
           Text("Usage")
-            .font(.system(size: 11, weight: .medium))
+            .font(.omni(size: 11, weight: .medium))
             .foregroundStyle(Tok.fg2)
           Text(open ? "" : summary)
             .monospacedDigit()
@@ -28,7 +28,7 @@ struct UsageCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
           if let peak, !open {
             Text("\(peak.percent)%")
-              .font(.system(size: 10))
+              .font(.omni(size: 10))
               .monospacedDigit()
               .foregroundStyle(peak.tone == .bad ? Tok.needs : Tok.fg2)
               .help("Highest window across plans")
@@ -36,7 +36,7 @@ struct UsageCard: View {
           OmniIcon(name: open ? "chevronDown" : "chevronRight", size: 13)
             .foregroundStyle(Tok.fg4)
         }
-        .font(.system(size: 11))
+        .font(.omni(size: 11))
         .foregroundStyle(Tok.fg3)
         .contentShape(Rectangle())
       }
@@ -44,11 +44,11 @@ struct UsageCard: View {
       .accessibilityLabel(open ? "Hide plan usage" : "Show plan usage")
       if open {
         HStack(spacing: 8) {
-          Color.clear.frame(width: 66, height: 1)
+          Color.clear.frame(width: z(66), height: 1)
           Text("5h").frame(maxWidth: .infinity, alignment: .leading)
           Text("Week").frame(maxWidth: .infinity, alignment: .leading)
         }
-        .font(.system(size: 11, weight: .medium))
+        .font(.omni(size: 11, weight: .medium))
         .foregroundStyle(Tok.fg4)
         .padding(.top, 2)
         ForEach(rows) { UsageRow(row: $0) }
@@ -56,7 +56,7 @@ struct UsageCard: View {
         Text(summary)
           .monospacedDigit()
           .lineLimit(1)
-          .font(.system(size: 11))
+          .font(.omni(size: 11))
           .foregroundStyle(Tok.fg3)
           .padding(.top, 2)
       }
@@ -80,15 +80,15 @@ private struct UsageRow: View {
             .foregroundStyle(Tok.fg)
           Text(row.name)
         }
-        .font(.system(size: 12, weight: .medium))
+        .font(.omni(size: 12, weight: .medium))
         .foregroundStyle(Tok.fg2)
-        .frame(width: 66, alignment: .leading)
+        .frame(width: z(66), alignment: .leading)
         if row.hasData {
           Meter(meter: row.fiveHour, label: "\(row.name) 5 hour", now: context.date)
           Meter(meter: row.week, label: "\(row.name) week", now: context.date)
         } else {
           Text("no data")
-            .font(.system(size: 10.5))
+            .font(.omni(size: 10.5))
             .foregroundStyle(Tok.fg4)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -114,12 +114,12 @@ private struct Meter: View {
               .frame(height: i < on ? 10 : 5.5)
           }
         }
-        .frame(height: 10, alignment: .bottom)
+        .frame(height: z(10), alignment: .bottom)
         Text("\(meter.percent)%")
-          .font(.system(size: 10))
+          .font(.omni(size: 10))
           .monospacedDigit()
           .foregroundStyle(Tok.fg2)
-          .frame(width: 28, alignment: .trailing)
+          .frame(width: z(28), alignment: .trailing)
       }
       .frame(maxWidth: .infinity)
       .help("\(label): \(meter.percent)% used, resets \(meter.resetLabel(now: now))")
@@ -128,7 +128,7 @@ private struct Meter: View {
       .accessibilityValue("\(meter.percent) percent")
     } else {
       Text("—")
-        .font(.system(size: 10))
+        .font(.omni(size: 10))
         .foregroundStyle(Tok.fg4)
         .frame(maxWidth: .infinity)
     }

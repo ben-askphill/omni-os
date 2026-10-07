@@ -17,7 +17,7 @@ struct TerminalTab: View {
       HStack(spacing: 8) {
         OmniIcon(name: "terminal", size: 13).foregroundStyle(Tok.fg3)
         Text(cwd.map { Format.shortPath($0) } ?? "")
-          .font(.system(size: 11.5, design: .monospaced))
+          .font(.omni(size: 11.5, design: .monospaced))
           .foregroundStyle(Tok.fg3)
           .lineLimit(1)
           .truncationMode(.head)
@@ -38,10 +38,10 @@ struct TerminalTab: View {
         }
       }
       .padding(.horizontal, 14)
-      .frame(height: 32)
+      .frame(height: z(32))
       if let error = session?.error {
         Text(error)
-          .font(.system(size: 12))
+          .font(.omni(size: 12))
           .foregroundStyle(Tok.fg2)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.horizontal, 14)

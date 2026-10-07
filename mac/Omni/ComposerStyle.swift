@@ -21,7 +21,7 @@ struct ComposerShell: ViewModifier {
                 OmniIcon(name: "paperclip", size: 15)
                 Text("Drop to attach")
               }
-              .font(.system(size: 13, weight: .medium))
+              .font(.omni(size: 13, weight: .medium))
               .foregroundStyle(Tok.fg2)
             }
             .allowsHitTesting(false)
@@ -50,7 +50,7 @@ struct ComposerHints: View {
       Text("/ commands")
       Text("@ files")
     }
-    .font(.system(size: 11.5))
+    .font(.omni(size: 11.5))
     .foregroundStyle(Tok.fg4)
     .lineLimit(1)
     .fixedSize()
@@ -85,16 +85,16 @@ struct PickerPill<Lead: View>: View {
 
   var body: some View {
     HStack(spacing: 8) {
-      lead.frame(width: 24, height: 24)
+      lead.frame(width: z(24), height: z(24))
       Text(text).foregroundStyle(Tok.fg).lineLimit(1).truncationMode(.tail)
       if let secondary { Text("· \(secondary)").foregroundStyle(Tok.fg4).lineLimit(1) }
       if chevron { OmniIcon(name: "chevronDown", size: 13).foregroundStyle(Tok.fg4) }
     }
-    .font(.system(size: 12.5, weight: .medium))
+    .font(.omni(size: 12.5, weight: .medium))
     .padding(.leading, 4)
     .padding(.trailing, 10)
-    .frame(height: 32)
-    .frame(maxWidth: 240)
+    .frame(height: z(32))
+    .frame(maxWidth: z(240))
     .background(hover ? Tok.surface3 : Tok.surface2, in: Capsule())
     .contentShape(Capsule())
     .onHover { hover = $0 }
@@ -116,9 +116,9 @@ struct PillAvatar<Content: View>: View {
 
   var body: some View {
     content
-      .font(.system(size: 10, weight: .medium, design: .rounded))
+      .font(.omni(size: 10, weight: .medium, design: .rounded))
       .foregroundStyle(Tok.fg2)
-      .frame(width: 24, height: 24)
+      .frame(width: z(24), height: z(24))
       .background(fill, in: Circle())
   }
 }

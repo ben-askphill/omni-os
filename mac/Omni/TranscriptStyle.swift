@@ -35,6 +35,6 @@ struct Chevron: View {
       .foregroundStyle(color)
       .rotationEffect(.degrees(open ? 90 : 0))
       .animation(Motion.settle, value: open)
-      .frame(width: 12)
+      .frame(width: z(12))
   }
 }

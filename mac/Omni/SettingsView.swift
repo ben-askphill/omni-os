@@ -10,19 +10,19 @@ struct SettingsView: View {
     TabView(selection: $model.settingsTab) {
       Tab("Connection", systemImage: "network", value: .connection) {
         ConnectionSettings(settings: model.settings, model: model)
-          .frame(width: 560, height: 520)
+          .frame(width: z(560), height: z(520))
       }
       Tab("Secrets", systemImage: "key", value: .secrets) {
         SecretsSettings(model: model)
-          .frame(width: 560, height: 680)
+          .frame(width: z(560), height: z(680))
       }
       Tab("Sync", systemImage: "arrow.triangle.2.circlepath", value: .sync) {
         SyncSettings(model: model)
-          .frame(width: 560, height: 680)
+          .frame(width: z(560), height: z(680))
       }
       Tab("Appearance", systemImage: "circle.lefthalf.filled", value: .appearance) {
         AppearanceSettingsView(appearance: appearance)
-          .frame(width: 560, height: 220)
+          .frame(width: z(560), height: z(220))
       }
     }
   }
@@ -44,7 +44,7 @@ struct ConnectionSettings: View {
           FieldLabel(text: "Port")
           PortField(port: $settings.port)
             .textFieldStyle(.omniMono)
-            .frame(maxWidth: 140)
+            .frame(maxWidth: z(140))
         }
         PathField(title: "Repo", path: $settings.repoPath, prompt: ServerSettings.defaultRepoPath) {
           chooseRepo(from: settings.config.repo)
@@ -58,7 +58,7 @@ struct ConnectionSettings: View {
             Text("Launch arguments set these values, so changes last until the app quits.")
               .fixedSize(horizontal: false, vertical: true)
           }
-          .font(.system(size: 12.5))
+          .font(.omni(size: 12.5))
           .foregroundStyle(Tok.fg2)
           .padding(.horizontal, 14)
           .padding(.vertical, 10)
@@ -79,7 +79,7 @@ struct ConnectionSettings: View {
           if let commit = Bundle.main.object(forInfoDictionaryKey: "OmniGitCommit") as? String, !commit.isEmpty {
             InfoRow(label: "Build") {
               Text(String(commit.prefix(12)))
-                .font(.system(size: 12, design: .monospaced))
+                .font(.omni(size: 12, design: .monospaced))
                 .foregroundStyle(Tok.fg2)
                 .textSelection(.enabled)
             }
@@ -142,7 +142,7 @@ struct PathField: View {
       HStack(spacing: 8) {
         TextField(title, text: $draft, prompt: Text(prompt))
           .textFieldStyle(.omniMono)
-          .frame(minWidth: 160, idealWidth: 260, maxWidth: .infinity)
+          .frame(minWidth: z(160), idealWidth: z(260), maxWidth: .infinity)
           .focused($focused)
           .onSubmit(commit)
         Button("Choose") {

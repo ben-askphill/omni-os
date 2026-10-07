@@ -32,7 +32,7 @@ struct NewThreadScreen: View {
         .padding(.top, 16)
         .padding(.bottom, 10)
       Text(NewThreadText.greeting(hour: Calendar.current.component(.hour, from: .now)))
-        .font(.system(size: 36, weight: .medium))
+        .font(.omni(size: 36, weight: .medium))
         .tracking(-0.36)
         .foregroundStyle(Tok.fg)
     }
@@ -171,7 +171,7 @@ private struct NewThreadBox: View {
         text: $composer.text, placeholder: placeholder, running: false, interrupting: false, focusTick: focusTick,
         callbacks: callbacks, heightRange: range, label: "New thread", caretRequest: caret, fontSize: big ? 16 : 14.5)
       if let e = composer.attachError {
-        Text(e).font(.system(size: 12)).foregroundStyle(Tok.fg).padding(.horizontal, 16).padding(.bottom, 4)
+        Text(e).font(.omni(size: 12)).foregroundStyle(Tok.fg).padding(.horizontal, 16).padding(.bottom, 4)
       }
       footer
       SlashHintView(model: menu) {}
@@ -181,7 +181,7 @@ private struct NewThreadBox: View {
       // The role's charter, inside the card, as Composer.tsx.
       if let role = composer.role, !role.description.isEmpty {
         Text(role.description)
-          .font(.system(size: 12))
+          .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
           .fixedSize(horizontal: false, vertical: true)
           .padding(.horizontal, 16)
@@ -425,10 +425,10 @@ struct ModelPickerButton: View {
     return VStack(spacing: 0) {
       HStack(spacing: 8) {
         OmniIcon(name: "search", size: 15).foregroundStyle(Tok.fg4)
-        TextField("Find a model or harness", text: $query).textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Tok.fg)
+        TextField("Find a model or harness", text: $query).textFieldStyle(.plain).font(.omni(size: 13)).foregroundStyle(Tok.fg)
       }
       .padding(.horizontal, 12)
-      .frame(height: 40)
+      .frame(height: z(40))
       .background(Tok.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
       .padding([.horizontal, .top], 6)
       .padding(.bottom, 4)
@@ -445,9 +445,9 @@ struct ModelPickerButton: View {
         .padding(.horizontal, 6)
         .padding(.bottom, 6)
       }
-      .frame(height: 320)
+      .frame(height: z(320))
     }
-    .frame(width: 340)
+    .frame(width: z(340))
     .background(Tok.elev)
   }
 
@@ -459,7 +459,7 @@ struct ModelPickerButton: View {
       }
       .omniCaption()
       Spacer()
-      Text(h.available ? "Bills your \(h.plan)" : "Unavailable").font(.system(size: 11.5)).foregroundStyle(Tok.fg4)
+      Text(h.available ? "Bills your \(h.plan)" : "Unavailable").font(.omni(size: 11.5)).foregroundStyle(Tok.fg4)
     }
     .padding(.horizontal, 12)
     .padding(.top, 8)
@@ -472,13 +472,13 @@ struct ModelPickerButton: View {
     let h = group.harness
     if !h.available {
       Text("Not available. Run \(Text(h.fix ?? "the harness login").monospaced()).")
-        .font(.system(size: 11.5))
+        .font(.omni(size: 11.5))
         .foregroundStyle(Tok.fg4)
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
     } else if group.models.isEmpty {
       if !query.trimmingCharacters(in: .whitespaces).isEmpty {
-        Text("No match").font(.system(size: 11.5)).foregroundStyle(Tok.fg4).padding(.horizontal, 12).padding(.bottom, 8)
+        Text("No match").font(.omni(size: 11.5)).foregroundStyle(Tok.fg4).padding(.horizontal, 12).padding(.bottom, 8)
       }
     } else {
       ForEach(group.models) { m in
@@ -490,18 +490,18 @@ struct ModelPickerButton: View {
           HStack(spacing: 10) {
             HarnessLogo(harness: h.id.rawValue, size: 13)
               .foregroundStyle(Tok.fg)
-              .frame(width: 28, height: 28)
+              .frame(width: z(28), height: z(28))
               .background(Tok.surface2, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
-              (Text(m.label).foregroundStyle(Tok.fg) + Text(m.isDefault ? " (default)" : "").foregroundStyle(Tok.fg4)).font(.system(size: 13)).lineLimit(1)
-              if let note = m.note { Text(note).font(.system(size: 11.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
+              (Text(m.label).foregroundStyle(Tok.fg) + Text(m.isDefault ? " (default)" : "").foregroundStyle(Tok.fg4)).font(.omni(size: 13)).lineLimit(1)
+              if let note = m.note { Text(note).font(.omni(size: 11.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
             }
             Spacer(minLength: 4)
             PickMark(on: selected)
           }
           .padding(.horizontal, 8)
           .padding(.vertical, 6)
-          .frame(minHeight: 40)
+          .frame(minHeight: z(40))
           .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -522,7 +522,7 @@ private struct PickMark: View {
       shape.strokeBorder(on ? Tok.fg : Tok.lineStrong, lineWidth: 1.5)
       if on { OmniIcon(name: "check", size: 12, weight: 2.4).foregroundStyle(Tok.onInk) }
     }
-    .frame(width: 18, height: 18)
+    .frame(width: z(18), height: z(18))
     .animation(.easeOut(duration: 0.16), value: on)
   }
 }

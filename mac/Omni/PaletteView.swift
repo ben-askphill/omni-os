@@ -44,7 +44,7 @@ private struct PaletteView: View {
           .foregroundStyle(Tok.fg4)
         TextField("Search or jump to", text: $query)
           .textFieldStyle(.plain)
-          .font(.system(size: 16))
+          .font(.omni(size: 16))
           .foregroundStyle(Tok.fg)
           .focused($focused)
           .onSubmit { run(items.indices.contains(at) ? items[at] : nil) }
@@ -55,7 +55,7 @@ private struct PaletteView: View {
       }
       .padding(.leading, 24)
       .padding(.trailing, 16)
-      .frame(height: 64)
+      .frame(height: z(64))
       Rectangle().fill(Tok.line).frame(height: 1)
       ScrollViewReader { proxy in
         ScrollView {
@@ -77,7 +77,7 @@ private struct PaletteView: View {
             }
             if items.isEmpty {
               Text("Nothing matches")
-                .font(.system(size: 13))
+                .font(.omni(size: 13))
                 .foregroundStyle(Tok.fg3)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
@@ -101,13 +101,13 @@ private struct PaletteView: View {
         }
         Spacer()
       }
-      .font(.system(size: 11.5))
+      .font(.omni(size: 11.5))
       .foregroundStyle(Tok.fg4)
       .padding(.horizontal, 24)
       .padding(.vertical, 10)
     }
-    .frame(width: 620)
-    .frame(maxHeight: 640)
+    .frame(width: z(620))
+    .frame(maxHeight: z(640))
     .fixedSize(horizontal: false, vertical: true)
     .background(Tok.elev, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
     .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -151,15 +151,15 @@ private struct PaletteRow: View {
 
   var body: some View {
     HStack(spacing: 12) {
-      lead.frame(width: 28, height: 28)
+      lead.frame(width: z(28), height: z(28))
       HStack(alignment: .firstTextBaseline, spacing: 8) {
         Text(item.label)
-          .font(.system(size: 13.5))
+          .font(.omni(size: 13.5))
           .foregroundStyle(Tok.fg)
           .lineLimit(1)
         if let sub = item.sub {
           Text(sub)
-            .font(.system(size: 12))
+            .font(.omni(size: 12))
             .foregroundStyle(Tok.fg4)
             .lineLimit(1)
         }
@@ -167,7 +167,7 @@ private struct PaletteRow: View {
       Spacer(minLength: 8)
       if let trailing = item.trailing {
         Text(trailing)
-          .font(.system(size: 11))
+          .font(.omni(size: 11))
           .monospacedDigit()
           .foregroundStyle(item.group == .channels ? Tok.live : Tok.fg4)
       }
@@ -177,7 +177,7 @@ private struct PaletteRow: View {
       }
     }
     .padding(.horizontal, 12)
-    .frame(height: 48)
+    .frame(height: z(48))
     .background(selected ? Tok.surface2 : .clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     .contentShape(Rectangle())
   }
@@ -192,14 +192,14 @@ private struct PaletteRow: View {
           OmniIcon(name: "target", size: 14).foregroundStyle(Tok.fg2)
         } else {
           Text(AvatarMark(name: String(item.label.drop { $0 == "#" })).letter)
-            .font(.system(size: 11.5, weight: .medium, design: .rounded))
+            .font(.omni(size: 11.5, weight: .medium, design: .rounded))
             .foregroundStyle(Tok.fg2)
         }
       }
     } else {
       OmniIcon(name: icon, size: 14)
         .foregroundStyle(Tok.fg3)
-        .frame(width: 28, height: 28)
+        .frame(width: z(28), height: z(28))
         .background(Tok.surface2, in: Circle())
     }
   }

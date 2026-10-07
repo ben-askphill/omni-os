@@ -82,7 +82,7 @@ extension View {
 
   /// `.caption`: sentence case, 12pt medium, fg-3. No caps, no mono.
   func omniCaption(_ size: CGFloat = 12) -> some View {
-    font(.system(size: size, weight: .medium)).foregroundStyle(Tok.fg3)
+    font(.omni(size: size, weight: .medium)).foregroundStyle(Tok.fg3)
   }
 }
 
@@ -97,7 +97,7 @@ struct PillButtonStyle: ButtonStyle {
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .font(.system(size: height <= 28 ? 12.5 : 13, weight: .medium))
+      .font(.omni(size: height <= 28 ? 12.5 : 13, weight: .medium))
       .lineLimit(1)
       .foregroundStyle(fg)
       .padding(.horizontal, height <= 28 ? 11 : 14)
@@ -137,7 +137,7 @@ struct IconButtonStyle: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
       .labelStyle(.iconOnly)
-      .font(.system(size: size * 0.48))
+      .font(.omni(size: size * 0.48))
       .foregroundStyle(active || hover ? Tok.fg : Tok.fg3)
       .frame(width: size, height: size)
       .background {
@@ -201,7 +201,7 @@ struct SegmentedPill<T: Hashable>: View {
               Text("\(count)").foregroundStyle(Tok.fg4).monospacedDigit()
             }
           }
-          .font(.system(size: small ? 12.5 : 13))
+          .font(.omni(size: small ? 12.5 : 13))
           .foregroundStyle(on ? Tok.fg : Tok.fg3)
           .padding(.horizontal, small ? 11 : 14)
           .frame(height: small ? 26 : 30)
@@ -233,7 +233,7 @@ struct OmniFieldStyle: TextFieldStyle {
   func _body(configuration: TextField<Self._Label>) -> some View {
     configuration
       .textFieldStyle(.plain)
-      .font(.system(size: 14))
+      .font(.omni(size: 14))
       .focused($focused)
       .padding(.horizontal, 14)
       .padding(.vertical, 9)
@@ -253,10 +253,10 @@ struct Kbd: View {
   let text: String
   var body: some View {
     Text(text)
-      .font(.system(size: 11, weight: .medium))
+      .font(.omni(size: 11, weight: .medium))
       .foregroundStyle(Tok.fg3)
       .padding(.horizontal, 5)
-      .frame(height: 18)
+      .frame(height: z(18))
       .background(Tok.surface2, in: RoundedRectangle(cornerRadius: 5))
   }
 }
@@ -269,11 +269,11 @@ struct Chip: View {
 
   var body: some View {
     Text(text)
-      .font(.system(size: 11, weight: .medium))
+      .font(.omni(size: 11, weight: .medium))
       .lineLimit(1)
       .foregroundStyle(fg)
       .padding(.horizontal, 8)
-      .frame(height: 20)
+      .frame(height: z(20))
       .background(bg, in: Capsule())
       .overlay { if tone == .outline { Capsule().strokeBorder(Tok.lineStrong) } }
   }

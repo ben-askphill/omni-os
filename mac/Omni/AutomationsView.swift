@@ -135,17 +135,17 @@ struct AutomationSection: View {
             .rotationEffect(.degrees(showPrompt ? 90 : 0))
           Text("Prompt")
         }
-        .font(.system(size: 12, weight: .medium))
+        .font(.omni(size: 12, weight: .medium))
         .foregroundStyle(Tok.fg3)
         .padding(.horizontal, 10)
-        .frame(height: 32)
+        .frame(height: z(32))
         .hoverWash(16, fill: Tok.surface2)
       }
       .buttonStyle(.plain)
       .accessibilityValue(showPrompt ? "Expanded" : "Collapsed")
       if showPrompt {
         Text(automation.prompt.isEmpty ? "(empty)" : automation.prompt)
-          .font(.system(size: 12, design: .monospaced))
+          .font(.omni(size: 12, design: .monospaced))
           .lineSpacing(3)
           .foregroundStyle(Tok.fg2)
           .textSelection(.enabled)
@@ -163,12 +163,12 @@ struct AutomationSection: View {
     HStack(alignment: .top, spacing: 12) {
       OmniIcon(name: "zap", size: 16)
         .foregroundStyle(enabled && automation.error == nil ? Tok.fg : Tok.fg4)
-        .frame(width: 36, height: 36)
+        .frame(width: z(36), height: z(36))
         .background(Tok.bg, in: Circle())
         .padding(.top, 2)
       VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: 8) {
-          Text(automation.name).font(.system(size: 16, weight: .medium)).foregroundStyle(Tok.fg)
+          Text(automation.name).font(.omni(size: 16, weight: .medium)).foregroundStyle(Tok.fg)
           if let badge = automation.badge(enabled: enabled) { Badge(badge: badge) }
         }
         details.padding(.top, 8)
@@ -176,7 +176,7 @@ struct AutomationSection: View {
           TimelineView(.everyMinute) { context in
             if let next = automation.nextRun(enabled: enabled, now: context.date) {
               Text("Next run \(Text(next.when).foregroundStyle(Tok.fg).fontWeight(.medium))\(next.zone.map { " (\($0))" } ?? "")")
-                .font(.system(size: 12.5))
+                .font(.omni(size: 12.5))
                 .foregroundStyle(Tok.fg3)
             }
           }
@@ -223,10 +223,10 @@ struct AutomationSection: View {
       .chip()
       .help(automation.scheduleHelp)
       Text(automation.cron)
-        .font(.system(size: 11, design: .monospaced))
+        .font(.omni(size: 11, design: .monospaced))
         .foregroundStyle(Tok.fg4)
         .padding(.horizontal, 8)
-        .frame(height: 24)
+        .frame(height: z(24))
         .overlay(Capsule().strokeBorder(Tok.line))
       Button("#\(model.store.channel(automation.channel)?.name ?? automation.channel)") {
         model.route = .channel(id: automation.channel)
@@ -235,9 +235,9 @@ struct AutomationSection: View {
       .chip()
       .help("Open the channel")
       if let role = automation.role { Text(role).chip() }
-      if let m = automation.model { Text(m).font(.system(size: 11)).monospacedDigit().chip() }
+      if let m = automation.model { Text(m).font(.omni(size: 11)).monospacedDigit().chip() }
     }
-    .font(.system(size: 12))
+    .font(.omni(size: 12))
     .foregroundStyle(Tok.fg2)
   }
 
@@ -248,7 +248,7 @@ struct AutomationSection: View {
         RunStrip(automation: automation)
       }
       if automation.runs.isEmpty {
-        Text("Never run.").font(.system(size: 12.5)).foregroundStyle(Tok.fg4)
+        Text("Never run.").font(.omni(size: 12.5)).foregroundStyle(Tok.fg4)
       } else {
         VStack(spacing: 0) {
           ForEach(Array(automation.runs.enumerated()), id: \.offset) { _, run in
@@ -284,12 +284,12 @@ private struct RunStrip: View {
           ForEach(Array(automation.strip.enumerated()), id: \.offset) { _, run in
             Capsule()
               .fill(runColor(run.status))
-              .frame(width: 5, height: run.isTall ? 14 : 10)
+              .frame(width: z(5), height: run.isTall ? 14 : 10)
               .opacity(run.status == .running && dim ? 0.35 : 1)
               .help(run.stripHelp(now: context.date))
           }
         }
-        .frame(height: 14, alignment: .bottom)
+        .frame(height: z(14), alignment: .bottom)
       }
       .accessibilityElement()
       .accessibilityLabel(automation.stripSummary)
@@ -321,19 +321,19 @@ private struct RunRow: View {
       Text(run.label).lineLimit(1).truncationMode(.tail)
       Spacer(minLength: 8)
       if run.isManual {
-        Text("manual").font(.system(size: 10.5)).foregroundStyle(Tok.fg4)
+        Text("manual").font(.omni(size: 10.5)).foregroundStyle(Tok.fg4)
       }
       TimelineView(.everyMinute) { context in
         Text(RelTime.label(run.createdAt, now: context.date))
-          .font(.system(size: 11).monospacedDigit())
+          .font(.omni(size: 11).monospacedDigit())
           .foregroundStyle(Tok.fg4)
-          .frame(width: 96, alignment: .trailing)
+          .frame(width: z(96), alignment: .trailing)
       }
       .help(run.createdAt.formatted(date: .complete, time: .standard))
     }
-    .font(.system(size: 12.5))
+    .font(.omni(size: 12.5))
     .padding(.horizontal, 8)
-    .frame(height: 32)
+    .frame(height: z(32))
   }
 }
 
@@ -352,7 +352,7 @@ private func runColor(_ status: ThreadStatus?) -> Color {
 private extension View {
   func chip() -> some View {
     padding(.horizontal, 10)
-      .frame(height: 24)
+      .frame(height: z(24))
       .background(Tok.bg, in: Capsule())
   }
 }

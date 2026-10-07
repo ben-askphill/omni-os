@@ -34,7 +34,7 @@ struct PullRequestDetailView: View {
           content(pr)
         }
       }
-      .frame(maxWidth: 1024, alignment: .leading)
+      .frame(maxWidth: z(1024), alignment: .leading)
       .padding(.horizontal, 32)
       .padding(.top, 24)
       .padding(.bottom, 64)
@@ -60,10 +60,10 @@ struct PullRequestDetailView: View {
         OmniIcon(name: "chevronLeft", size: 13)
         Text("All pull requests")
       }
-      .font(.system(size: 12.5))
+      .font(.omni(size: 12.5))
       .foregroundStyle(Tok.fg3)
       .padding(.horizontal, 10)
-      .frame(height: 28)
+      .frame(height: z(28))
       .hoverWash(14, fill: Tok.wash)
     }
     .buttonStyle(.plain)
@@ -79,7 +79,7 @@ struct PullRequestDetailView: View {
         GlyphView(glyph: .done, size: 9)
         Text(mergedOutput).textSelection(.enabled)
       }
-      .font(.system(size: 13))
+      .font(.omni(size: 13))
       .foregroundStyle(Tok.fg)
       .padding(.horizontal, 16).padding(.vertical, 12)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -113,8 +113,8 @@ struct PullRequestDetailView: View {
   private func header(_ pr: PullRequestDetail) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack(alignment: .top, spacing: 12) {
-        (Text(pr.title).font(.system(size: 22, weight: .medium)).foregroundStyle(Tok.fg)
-          + Text("  #\(pr.number)").font(.system(size: 15)).foregroundStyle(Tok.fg4))
+        (Text(pr.title).font(.omni(size: 22, weight: .medium)).foregroundStyle(Tok.fg)
+          + Text("  #\(pr.number)").font(.omni(size: 15)).foregroundStyle(Tok.fg4))
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
         HStack(spacing: 8) {
@@ -156,13 +156,13 @@ struct PullRequestDetailView: View {
         ReviewChip(decision: pr.reviewDecision)
         Text(pr.author?.login ?? "unknown")
         BranchLabel(head: pr.headRefName, base: pr.baseRefName)
-          .font(.system(size: 11, design: .monospaced))
-          .padding(.horizontal, 8).frame(height: 20)
+          .font(.omni(size: 11, design: .monospaced))
+          .padding(.horizontal, 8).frame(height: z(20))
           .background(Tok.surface2, in: Capsule())
         ChecksSummary(checks: pr.checks)
         Changes(add: pr.additions, del: pr.deletions)
       }
-      .font(.system(size: 12.5))
+      .font(.omni(size: 12.5))
       .foregroundStyle(Tok.fg3)
     }
   }
@@ -229,12 +229,12 @@ private struct MergeSheet: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
-      Text("Merge #\(pr.number)").font(.system(size: 17, weight: .medium)).foregroundStyle(Tok.fg)
-      (Text(pr.headRefName).font(.system(size: 12, design: .monospaced))
-        + Text(" into ") + Text(pr.baseRefName).font(.system(size: 12, design: .monospaced))
-        + Text(" on ") + Text(repo).font(.system(size: 12, design: .monospaced))
+      Text("Merge #\(pr.number)").font(.omni(size: 17, weight: .medium)).foregroundStyle(Tok.fg)
+      (Text(pr.headRefName).font(.omni(size: 12, design: .monospaced))
+        + Text(" into ") + Text(pr.baseRefName).font(.omni(size: 12, design: .monospaced))
+        + Text(" on ") + Text(repo).font(.omni(size: 12, design: .monospaced))
         + Text(deleteBranch ? ", then the branch is deleted." : "."))
-        .font(.system(size: 12.5))
+        .font(.omni(size: 12.5))
         .foregroundStyle(Tok.fg3)
       if !warnings.isEmpty {
         HStack(spacing: 6) { ForEach(warnings, id: \.self) { PRChip(text: $0, tone: .bad) } }
@@ -250,11 +250,11 @@ private struct MergeSheet: View {
         Toggle("Delete branch after merge", isOn: $deleteBranch)
           .toggleStyle(.omni)
           .accessibilityLabel("Delete branch after merge")
-        Text("Delete branch after merge").font(.system(size: 13)).foregroundStyle(Tok.fg2)
+        Text("Delete branch after merge").font(.omni(size: 13)).foregroundStyle(Tok.fg2)
           .accessibilityHidden(true)
       }
       Text("Runs gh pr merge and cannot be undone from here.")
-        .font(.system(size: 12)).foregroundStyle(Tok.fg3)
+        .font(.omni(size: 12)).foregroundStyle(Tok.fg3)
       if let error { ErrorNote(text: error) }
       HStack {
         Spacer()
@@ -281,7 +281,7 @@ private struct MergeSheet: View {
       }
     }
     .padding(24)
-    .frame(width: 460)
+    .frame(width: z(460))
     .background(Tok.bg)
   }
 }
@@ -296,7 +296,7 @@ private struct ConversationTab: View {
     VStack(alignment: .leading, spacing: 14) {
       card {
         if body.isEmpty {
-          Text("No description.").font(.system(size: 13)).foregroundStyle(Tok.fg3)
+          Text("No description.").font(.omni(size: 13)).foregroundStyle(Tok.fg3)
         } else {
           MarkdownView(document: MarkdownDocument(parsing: body))
         }
@@ -305,18 +305,18 @@ private struct ConversationTab: View {
         VStack(alignment: .leading, spacing: 8) {
           HStack(spacing: 8) {
             Text(String((item.who ?? "?").prefix(1)).uppercased())
-              .font(.system(size: 10.5, weight: .medium))
+              .font(.omni(size: 10.5, weight: .medium))
               .foregroundStyle(Tok.fg2)
-              .frame(width: 22, height: 22)
+              .frame(width: z(22), height: z(22))
               .background(Tok.surface2, in: Circle())
             Text(item.who ?? "unknown").fontWeight(.medium).foregroundStyle(Tok.fg2)
             if let state = item.reviewState {
               PRChip(text: state.lowercased().replacingOccurrences(of: "_", with: " "), tone: state == "APPROVED" ? .ok : state == "CHANGES_REQUESTED" ? .bad : .plain)
             }
             Spacer()
-            if let at = item.at { Text(Format.relTime(at)).font(.system(size: 11)).monospacedDigit().foregroundStyle(Tok.fg4) }
+            if let at = item.at { Text(Format.relTime(at)).font(.omni(size: 11)).monospacedDigit().foregroundStyle(Tok.fg4) }
           }
-          .font(.system(size: 12.5))
+          .font(.omni(size: 12.5))
           .foregroundStyle(Tok.fg3)
           if !item.body.isEmpty { MarkdownView(document: MarkdownDocument(parsing: item.body)) }
         }
@@ -340,16 +340,16 @@ private struct ChecksTab: View {
 
   var body: some View {
     if runs.isEmpty {
-      Text("No checks on this PR.").font(.system(size: 13)).foregroundStyle(Tok.fg3)
+      Text("No checks on this PR.").font(.omni(size: 13)).foregroundStyle(Tok.fg3)
     } else {
       VStack(spacing: 0) {
         ForEach(Array(runs.enumerated()), id: \.offset) { _, run in
           HStack(spacing: 10) {
-            GlyphView(glyph: glyph(run.tone), size: 7).frame(width: 12)
+            GlyphView(glyph: glyph(run.tone), size: 7).frame(width: z(12))
             Text(run.name).foregroundStyle(Tok.fg).lineLimit(1)
             Spacer()
             Text(run.state.isEmpty ? "pending" : run.state.lowercased().replacingOccurrences(of: "_", with: " "))
-              .font(.system(size: 11)).foregroundStyle(color(run.tone))
+              .font(.omni(size: 11)).foregroundStyle(color(run.tone))
             if let url = run.url.flatMap(URL.init(string:)) {
               Link(destination: url) {
                 Label { Text("Open check") } icon: { OmniIcon(name: "external", size: 13) }
@@ -358,9 +358,9 @@ private struct ChecksTab: View {
               .help("Open check")
             }
           }
-          .font(.system(size: 13))
+          .font(.omni(size: 13))
           .padding(.horizontal, 12)
-          .frame(height: 40)
+          .frame(height: z(40))
         }
       }
       .padding(6)
@@ -390,20 +390,20 @@ private struct FilesTab: View {
 
   var body: some View {
     if files.isEmpty {
-      Text("No files.").font(.system(size: 13)).foregroundStyle(Tok.fg3)
+      Text("No files.").font(.omni(size: 13)).foregroundStyle(Tok.fg3)
     } else {
       VStack(spacing: 0) {
         ForEach(files, id: \.path) { f in
           Button(action: showDiff) {
             HStack(spacing: 8) {
               OmniIcon(name: "file", size: 13).foregroundStyle(Tok.fg4)
-              Text(f.path).font(.system(size: 12, design: .monospaced)).foregroundStyle(Tok.fg).lineLimit(1).truncationMode(.middle)
+              Text(f.path).font(.omni(size: 12, design: .monospaced)).foregroundStyle(Tok.fg).lineLimit(1).truncationMode(.middle)
               Spacer()
               Changes(add: f.additions, del: f.deletions)
             }
-            .font(.system(size: 12.5))
+            .font(.omni(size: 12.5))
             .padding(.horizontal, 12)
-            .frame(height: 36)
+            .frame(height: z(36))
             .hoverWash(16, fill: Tok.surface2)
           }
           .buttonStyle(.plain)

@@ -56,11 +56,11 @@ struct StatusPill: View {
       GlyphView(glyph: glyph, size: 6, onPop: glyph == .needs || glyph == .done)
       Text(label ?? status.label)
     }
-    .font(.system(size: 12, weight: .medium))
+    .font(.omni(size: 12, weight: .medium))
     .foregroundStyle(fg(glyph))
     .padding(.leading, 8)
     .padding(.trailing, 10)
-    .frame(height: 24)
+    .frame(height: z(24))
     .background(bg(glyph), in: Capsule())
   }
 
@@ -144,7 +144,7 @@ struct Pre: View {
 
   var body: some View {
     let body = Text(text)
-      .font(.system(size: ThreadStyle.mono, design: .monospaced))
+      .font(.omni(size: ThreadStyle.mono, design: .monospaced))
       .lineSpacing(4)
       .foregroundStyle(tone == .bad ? Tok.fg : Tok.fg2)
       .textSelection(.enabled)
@@ -154,7 +154,7 @@ struct Pre: View {
     Group {
       if Format.isTall(text) {
         ScrollView { body }
-          .frame(height: 320)
+          .frame(height: z(320))
       } else {
         body
       }
@@ -177,7 +177,7 @@ struct Spinner: View {
   var body: some View {
     Loader(size: 12)
       .foregroundStyle(Tok.live)
-      .frame(width: 12, height: 12)
+      .frame(width: z(12), height: z(12))
   }
 }
 
@@ -218,10 +218,10 @@ struct CopyableMessage<Content: View>: View {
       } label: {
         Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
           .labelStyle(.titleAndIcon)
-          .font(.system(size: 11.5, weight: .medium))
+          .font(.omni(size: 11.5, weight: .medium))
           .foregroundStyle(Tok.fg4)
           .padding(.horizontal, 6)
-          .frame(height: 22)
+          .frame(height: z(22))
       }
       .buttonStyle(.plain)
       .help("Copy message")

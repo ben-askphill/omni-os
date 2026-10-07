@@ -27,7 +27,7 @@ struct DelegationCard: View {
       }
       .padding(.top, 4)
       .padding(.leading, 8)
-      .overlay(alignment: .leading) { Rectangle().fill(Tok.line).frame(width: 1.5) }
+      .overlay(alignment: .leading) { Rectangle().fill(Tok.line).frame(width: z(1.5)) }
     }
     .padding(.horizontal, 14)
     .padding(.top, 14)
@@ -54,13 +54,13 @@ struct DelegationCard: View {
         StatusPill(status: lead.status, label: combining(lead) ? "Combining" : nil)
       } else {
         Text(delegation.branches.compactMap(\.taskID).joined(separator: " "))
-          .font(.system(size: ThreadStyle.mono, design: .monospaced))
+          .font(.omni(size: ThreadStyle.mono, design: .monospaced))
           .foregroundStyle(Tok.fg4)
           .lineLimit(1)
         Spacer(minLength: 0)
       }
     }
-    .font(.system(size: 13.5))
+    .font(.omni(size: 13.5))
     .padding(.horizontal, 4)
   }
 
@@ -92,15 +92,15 @@ private struct BranchFace<Meta: View>: View {
     HStack(alignment: .top, spacing: 12) {
       CrewGlyph(role: role, size: 15)
         .foregroundStyle(Tok.fg2)
-        .frame(width: 32, height: 32)
+        .frame(width: z(32), height: z(32))
         .background(Tok.surface, in: Circle())
       VStack(alignment: .leading, spacing: 4) {
         Text(title)
-          .font(.system(size: 14, weight: .medium))
+          .font(.omni(size: 14, weight: .medium))
           .foregroundStyle(Tok.fg)
           .lineLimit(1)
         HStack(spacing: 8) { meta }
-          .font(.system(size: 12))
+          .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
           .lineLimit(1)
       }
@@ -122,7 +122,7 @@ private struct RailRow: ViewModifier {
   func body(content: Content) -> some View {
     content
       .padding(.leading, 16)
-      .overlay(alignment: .topLeading) { Rail(color: color).frame(width: 16, height: 34) }
+      .overlay(alignment: .topLeading) { Rail(color: color).frame(width: z(16), height: z(34)) }
   }
 
   /// Ink when done, blue while running, vermilion when it needs Ben.
@@ -147,7 +147,7 @@ private struct BranchRow: View {
         if !branch.channel.isEmpty { Text("#\(branch.channel)") }
         HarnessMark(harness: branch.harness.rawValue)
         if let task = branch.taskID {
-          Text(task).font(.system(size: ThreadStyle.mono, design: .monospaced)).foregroundStyle(Tok.fg2)
+          Text(task).font(.omni(size: ThreadStyle.mono, design: .monospaced)).foregroundStyle(Tok.fg2)
         }
         if let detail { Text(detail).foregroundStyle(Tok.fg4) }
       }
@@ -238,13 +238,13 @@ struct CrewGlyph: View {
     ZStack {
       switch role {
       case "conductor":
-        Circle().stroke(lineWidth: 3.6 * s).frame(width: 14 * s, height: 14 * s)
+        Circle().stroke(lineWidth: 3.6 * s).frame(width: z(14) * s, height: z(14) * s)
       case "researcher":
-        Circle().stroke(lineWidth: 1.75 * s).frame(width: 17 * s, height: 17 * s)
-        Circle().frame(width: 6.4 * s, height: 6.4 * s)
+        Circle().stroke(lineWidth: 1.75 * s).frame(width: z(17) * s, height: z(17) * s)
+        Circle().frame(width: z(6.4) * s, height: z(6.4) * s)
       case "builder":
-        RoundedRectangle(cornerRadius: 3.5 * s).stroke(lineWidth: 1.75 * s).frame(width: 16 * s, height: 16 * s)
-        RoundedRectangle(cornerRadius: 2 * s).frame(width: 8 * s, height: 8 * s).offset(x: 4 * s, y: 4 * s)
+        RoundedRectangle(cornerRadius: 3.5 * s).stroke(lineWidth: 1.75 * s).frame(width: z(16) * s, height: z(16) * s)
+        RoundedRectangle(cornerRadius: 2 * s).frame(width: z(8) * s, height: z(8) * s).offset(x: 4 * s, y: 4 * s)
       default:
         OmniIcon(name: "layers", size: size * 0.9)
       }

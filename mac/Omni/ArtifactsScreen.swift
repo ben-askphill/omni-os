@@ -105,15 +105,15 @@ private struct ArtifactCard: View {
         VStack(alignment: .leading, spacing: 2) {
           HStack(spacing: 6) {
             OmniIcon(name: artifactIcon(a.kind), size: 13).foregroundStyle(Tok.fg3)
-            Text(a.name).font(.system(size: 13.5, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1).truncationMode(.middle)
+            Text(a.name).font(.omni(size: 13.5, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1).truncationMode(.middle)
           }
-          Text(item.threadTitle).font(.system(size: 12)).foregroundStyle(Tok.fg3).lineLimit(1)
+          Text(item.threadTitle).font(.omni(size: 12)).foregroundStyle(Tok.fg3).lineLimit(1)
           HStack(spacing: 8) {
             Text("#\(model.store.channel(item.channelID)?.name ?? item.channelID)").lineLimit(1)
             Spacer(minLength: 6)
-            Text(Format.relTime(a.updatedAt)).font(.system(size: 10.5)).monospacedDigit()
+            Text(Format.relTime(a.updatedAt)).font(.omni(size: 10.5)).monospacedDigit()
           }
-          .font(.system(size: 11.5))
+          .font(.omni(size: 11.5))
           .foregroundStyle(Tok.fg4)
           .padding(.top, 4)
         }
@@ -142,12 +142,12 @@ private struct ArtifactCard: View {
 private struct NewBadge: View {
   var body: some View {
     HStack(spacing: 4) {
-      Circle().fill(Tok.done).frame(width: 4, height: 4)
-      Text("New").font(.system(size: 10.5, weight: .medium))
+      Circle().fill(Tok.done).frame(width: z(4), height: z(4))
+      Text("New").font(.omni(size: 10.5, weight: .medium))
     }
     .foregroundStyle(Tok.onInk)
     .padding(.horizontal, 8)
-    .frame(height: 20)
+    .frame(height: z(20))
     .background(Tok.fg, in: Capsule())
   }
 }

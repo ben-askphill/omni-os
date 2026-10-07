@@ -30,7 +30,7 @@ struct SidebarView: View {
         Spacer()
       }
       .padding(.leading, 20)
-      .frame(height: 44)
+      .frame(height: z(44))
 
       VStack(spacing: 8) {
         SearchPill { model.shell.openPalette() }
@@ -141,7 +141,7 @@ struct SidebarView: View {
           Text("Agents").omniCaption()
           Spacer(minLength: 8)
           Text("\(tasks.count)")
-            .font(.system(size: 11).monospacedDigit())
+            .font(.omni(size: 11).monospacedDigit())
             .foregroundStyle(Tok.live)
         }
         .padding(.horizontal, 12)
@@ -173,16 +173,16 @@ struct SidebarView: View {
         if title != nil {
           StaticMark(size: 17)
             .foregroundStyle(Tok.fg)
-            .frame(width: 15)
+            .frame(width: z(15))
         } else if let mark = ChannelIcon(channel.icon) {
           ChannelMark(icon: mark, size: 14)
             .foregroundStyle(selected == item ? Tok.fg2 : Tok.fg3)
-            .frame(width: 15)
+            .frame(width: z(15))
         } else {
           Text("#")
-            .font(.system(size: 12))
+            .font(.omni(size: 12))
             .foregroundStyle(selected == item ? Tok.fg2 : Tok.fg4)
-            .frame(width: 15)
+            .frame(width: z(15))
         }
       }
     }
@@ -199,11 +199,11 @@ struct SidebarView: View {
     if links.seeAll || links.more > 0 {
       Button { pick(.more(channel.id)) } label: {
         Text(links.seeAll ? "See all threads" : "\(links.more) more")
-          .font(.system(size: 12))
+          .font(.omni(size: 12))
           .foregroundStyle(Tok.fg4)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.leading, 32)
-          .frame(height: 28)
+          .frame(height: z(28))
       }
       .buttonStyle(RailRowStyle())
       .padding(.leading, 25)
@@ -251,15 +251,15 @@ struct NavRow<Lead: View>: View {
           GlyphView(glyph: .running, size: 6)
           Text("\(running)").monospacedDigit()
         }
-        .font(.system(size: 11))
+        .font(.omni(size: 11))
         .foregroundStyle(Tok.live)
         .help("\(running) running or queued")
       }
     }
-    .font(.system(size: 13, weight: active ? .medium : .regular))
+    .font(.omni(size: 13, weight: active ? .medium : .regular))
     .foregroundStyle(active ? Tok.fg : Tok.fg2)
     .padding(.horizontal, 12)
-    .frame(height: 32)
+    .frame(height: z(32))
   }
 }
 
@@ -277,15 +277,15 @@ struct ThreadRow: View {
   var body: some View {
     HStack(spacing: 8) {
       ThreadStatusIcon(status: thread.status)
-        .frame(width: 12)
+        .frame(width: z(12))
       Text(thread.title.isEmpty ? "Untitled" : thread.title)
         .lineLimit(1)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .font(.system(size: 12.5, weight: active ? .medium : .regular))
+    .font(.omni(size: 12.5, weight: active ? .medium : .regular))
     .foregroundStyle(active ? Tok.fg : Tok.fg3)
     .padding(.horizontal, 12)
-    .frame(height: 28)
+    .frame(height: z(28))
     .help("\(thread.title.isEmpty ? "Untitled" : thread.title) · \(thread.status.label)")
   }
 }
@@ -303,7 +303,7 @@ private struct AgentRow: View {
         HStack(spacing: 10) {
           Loader(size: 11)
             .foregroundStyle(Tok.live)
-            .frame(width: 15)
+            .frame(width: z(15))
             .accessibilityHidden(true)
           Text(task.description)
             .lineLimit(1)
@@ -311,17 +311,17 @@ private struct AgentRow: View {
           if let channel {
             Text("#\(channel)")
               .lineLimit(1)
-              .font(.system(size: 11))
+              .font(.omni(size: 11))
               .foregroundStyle(Tok.fg4)
           }
           Text(elapsed(now: context.date))
-            .font(.system(size: 11).monospacedDigit())
+            .font(.omni(size: 11).monospacedDigit())
             .foregroundStyle(Tok.fg4)
         }
-        .font(.system(size: 12.5))
+        .font(.omni(size: 12.5))
         .foregroundStyle(Tok.fg2)
         .padding(.horizontal, 12)
-        .frame(height: 32)
+        .frame(height: z(32))
       }
     }
     .buttonStyle(RailRowStyle())
@@ -370,11 +370,11 @@ struct SearchPill: View {
           .frame(maxWidth: .infinity, alignment: .leading)
         Kbd(text: "⌘K")
       }
-      .font(.system(size: 13))
+      .font(.omni(size: 13))
       .foregroundStyle(hover ? Tok.fg3 : Tok.fg4)
       .padding(.leading, 14)
       .padding(.trailing, 8)
-      .frame(height: 40)
+      .frame(height: z(40))
       .background(Tok.bg.opacity(0.7), in: Capsule())
       .cardShadow(20)
       .clipShape(Capsule())
@@ -399,7 +399,7 @@ struct StatusFooter: View {
         Circle()
           .fill(color(state))
           .overlay(Circle().strokeBorder(model.supervisor.isRunning && model.connectionNotice == nil ? Tok.doneEdge : .clear, lineWidth: 1))
-          .frame(width: 7, height: 7)
+          .frame(width: z(7), height: z(7))
         VStack(alignment: .leading, spacing: 1) {
           Text(state.label)
             .foregroundStyle(Tok.fg2)
@@ -416,7 +416,7 @@ struct StatusFooter: View {
         OmniIcon(name: "chevronDown", size: 12)
           .foregroundStyle(Tok.fg4)
       }
-      .font(.system(size: 11))
+      .font(.omni(size: 11))
       .padding(.horizontal, 8)
       .contentShape(Rectangle())
     }

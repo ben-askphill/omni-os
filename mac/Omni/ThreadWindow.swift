@@ -45,7 +45,7 @@ struct ThreadWindowView: View {
         }
       }
     }
-    .frame(minWidth: 480, minHeight: 360)
+    .frame(minWidth: z(480), minHeight: z(360))
     .focusedSceneValue(\.shownThread, id.map { ShownThread(id: $0, inOwnWindow: true) })
     // Links and buttons in a thread window navigate the main window, so bring it forward.
     .onChange(of: model.route) {

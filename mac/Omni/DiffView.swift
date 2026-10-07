@@ -7,11 +7,11 @@ struct DiffView: View {
 
   var body: some View {
     if diff.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-      Text("No diff.").font(.system(size: 13)).foregroundStyle(Tok.fg3)
+      Text("No diff.").font(.omni(size: 13)).foregroundStyle(Tok.fg3)
     } else {
       let files = DiffParser.parse(diff)
       if files.isEmpty {
-        Text(diff).font(.system(size: 12, design: .monospaced)).foregroundStyle(Tok.fg).textSelection(.enabled)
+        Text(diff).font(.omni(size: 12, design: .monospaced)).foregroundStyle(Tok.fg).textSelection(.enabled)
       } else {
         LazyVStack(spacing: 8) {
           ForEach(Array(files.enumerated()), id: \.offset) { _, file in
@@ -42,7 +42,7 @@ private struct DiffFileView: View {
         HStack(spacing: 8) {
           Chevron(open: open, color: Tok.fg3)
           Text(file.path)
-            .font(.system(size: 12, design: .monospaced))
+            .font(.omni(size: 12, design: .monospaced))
             .foregroundStyle(Tok.fg)
             .lineLimit(1)
             .truncationMode(.middle)
@@ -50,10 +50,10 @@ private struct DiffFileView: View {
           Text("+\(file.add)").foregroundStyle(Tok.fg2)
           Text("-\(file.del)").foregroundStyle(Tok.fg3)
         }
-        .font(.system(size: 11))
+        .font(.omni(size: 11))
         .monospacedDigit()
         .padding(.horizontal, 14)
-        .frame(height: 40)
+        .frame(height: z(40))
         .background(hover ? Tok.surface2 : Tok.surface)
         .onHover { hover = $0 }
         .contentShape(Rectangle())
@@ -64,14 +64,14 @@ private struct DiffFileView: View {
 
       if open {
         if file.binary {
-          Text("Binary file").font(.system(size: 12)).foregroundStyle(Tok.fg3)
+          Text("Binary file").font(.omni(size: 12)).foregroundStyle(Tok.fg3)
             .padding(.horizontal, 12).padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(Array(file.shown(all: showAll).enumerated()), id: \.offset) { _, line in
             Text(line.isEmpty ? " " : line)
-              .font(.system(size: ThreadStyle.mono, design: .monospaced))
+              .font(.omni(size: ThreadStyle.mono, design: .monospaced))
               .lineSpacing(0)
               .foregroundStyle(color(line))
               .padding(.horizontal, 12)
@@ -86,9 +86,9 @@ private struct DiffFileView: View {
           Hairline()
           Button("Show \(file.hiddenLines) more lines") { showAll = true }
             .buttonStyle(.plain)
-            .font(.system(size: 12, weight: .medium))
+            .font(.omni(size: 12, weight: .medium))
             .foregroundStyle(Tok.fg3)
-            .frame(maxWidth: .infinity, minHeight: 36)
+            .frame(maxWidth: .infinity, minHeight: z(36))
             .background(Tok.bg)
         }
       }

@@ -53,7 +53,7 @@ private struct ThreadInspector: ViewModifier {
           } label: {
             HStack(spacing: 4) {
               OmniIcon(name: "panel", size: 15)
-              if count > 0 { Text("\(count)").font(.system(size: 11, weight: .medium).monospacedDigit()) }
+              if count > 0 { Text("\(count)").font(.omni(size: 11, weight: .medium).monospacedDigit()) }
             }
           }
           .help(count > 0 ? "Artifacts, browser, terminal, details (\(count))" : "Artifacts, browser, terminal, details")
@@ -175,15 +175,15 @@ private struct ArtifactsTab: View {
                   HStack(spacing: 8) {
                     OmniIcon(name: TranscriptIcon.artifact(file.kind), size: 13).foregroundStyle(Tok.fg3)
                     Text(file.name)
-                      .font(.system(size: 12.5, weight: .medium))
+                      .font(.omni(size: 12.5, weight: .medium))
                       .foregroundStyle(on ? Tok.fg : Tok.fg2)
                       .lineLimit(1)
                       .truncationMode(.middle)
                     Spacer(minLength: 4)
-                    Text(Format.relTime(file.updatedAt)).font(.system(size: 10.5).monospacedDigit()).foregroundStyle(Tok.fg4)
+                    Text(Format.relTime(file.updatedAt)).font(.omni(size: 10.5).monospacedDigit()).foregroundStyle(Tok.fg4)
                   }
                   .padding(.horizontal, 12)
-                  .frame(height: 32)
+                  .frame(height: z(32))
                   .contentShape(Capsule())
                   .background(on ? Tok.surface3 : .clear, in: Capsule())
                   .rowHover(radius: 16)
@@ -195,7 +195,7 @@ private struct ArtifactsTab: View {
             .padding(.horizontal, 8)
             .padding(.bottom, 8)
           }
-          .frame(maxHeight: 168)
+          .frame(maxHeight: z(168))
         }
         if let shown {
           ArtifactViewer(client: client, ref: ArtifactRef(shown))

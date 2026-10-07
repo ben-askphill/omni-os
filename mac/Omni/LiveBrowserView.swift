@@ -29,7 +29,7 @@ struct LiveBrowserView: View {
         if let error = model.error {
           HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle").foregroundStyle(Tok.fg3)
-            Text(error).font(.system(size: 12)).foregroundStyle(Tok.fg2).frame(maxWidth: .infinity, alignment: .leading)
+            Text(error).font(.omni(size: 12)).foregroundStyle(Tok.fg2).frame(maxWidth: .infinity, alignment: .leading)
             Button("Restart") { model.perform(.restart) }
               .buttonStyle(.pill(.secondary, height: 26))
           }
@@ -48,7 +48,7 @@ struct LiveBrowserView: View {
                 Loader(size: 12)
                 Text(s.running ? "Waiting for the page" : "Starting the browser")
               }
-              .font(.system(size: 12.5))
+              .font(.omni(size: 12.5))
               .foregroundStyle(Tok.fg3)
               .allowsHitTesting(false)
             }
@@ -88,11 +88,11 @@ struct LiveBrowserView: View {
       }
       HStack(spacing: 7) {
         Image(systemName: s.url.hasPrefix("https://") ? "lock.fill" : s.url.isEmpty || s.url == "about:blank" ? "magnifyingglass" : "info.circle")
-          .font(.system(size: 10.5, weight: .semibold))
+          .font(.omni(size: 10.5, weight: .semibold))
           .foregroundStyle(Tok.fg3)
         TextField("", text: editing ? $address : .constant(BrowserTabInfo.displayURL(address)), prompt: Text("Search Google or type a URL"))
           .textFieldStyle(.plain)
-          .font(.system(size: 13))
+          .font(.omni(size: 13))
           .foregroundStyle(Tok.fg)
           .focused($editing)
           .onSubmit {
@@ -106,7 +106,7 @@ struct LiveBrowserView: View {
           }
       }
       .padding(.horizontal, 11)
-      .frame(height: 30)
+      .frame(height: z(30))
       .background(editing ? Tok.bg : Tok.surface2, in: Capsule())
       .overlay(Capsule().strokeBorder(editing ? Tok.lineStrong : .clear, lineWidth: 2))
       .contentShape(Capsule())
@@ -168,11 +168,11 @@ struct BrowserTabStrip: View {
                 .buttonStyle(.icon(size: 18))
             }
           }
-          .font(.system(size: 12))
+          .font(.omni(size: 12))
           .foregroundStyle(on ? Tok.fg : Tok.fg3)
           .padding(.leading, 11)
           .padding(.trailing, 4)
-          .frame(minWidth: 60, maxWidth: 208, minHeight: 32)
+          .frame(minWidth: z(60), maxWidth: z(208), minHeight: z(32))
           .background(on ? Tok.bg : .clear, in: UnevenRoundedRectangle(topLeadingRadius: 12, topTrailingRadius: 12, style: .continuous))
           .contentShape(Rectangle())
           .onTapGesture { if !on, s.running { model.perform(.tab(tab.id)) } }
@@ -186,7 +186,7 @@ struct BrowserTabStrip: View {
       }
       .padding(.horizontal, 8)
     }
-    .frame(height: 34)
+    .frame(height: z(34))
   }
 }
 
@@ -206,11 +206,11 @@ private struct TabIcon: View {
         globe
       }
     }
-    .frame(width: 15, height: 15)
+    .frame(width: z(15), height: z(15))
   }
 
   private var globe: some View {
-    Image(systemName: "globe").font(.system(size: 12)).foregroundStyle(Tok.fg4)
+    Image(systemName: "globe").font(.omni(size: 12)).foregroundStyle(Tok.fg4)
   }
 }
 

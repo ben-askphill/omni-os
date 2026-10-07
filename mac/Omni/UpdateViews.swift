@@ -72,9 +72,9 @@ struct UpdateBar: View {
         case .icon(let name): OmniIcon(name: name, size: 14).foregroundStyle(Tok.fg3)
         }
       }
-      .frame(width: 16)
+      .frame(width: z(16))
       Text(text)
-        .font(.system(size: 12.5))
+        .font(.omni(size: 12.5))
         .foregroundStyle(Tok.fg)
         .lineLimit(2)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -82,7 +82,7 @@ struct UpdateBar: View {
     }
     .padding(.leading, 14)
     .padding(.trailing, 6)
-    .frame(minHeight: 38)
+    .frame(minHeight: z(38))
     .background(Tok.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     .padding(.horizontal, 12)
     .padding(.top, 8)
@@ -119,11 +119,11 @@ struct BannerView: View {
       ThreadStatusIcon(status: banner.status)
       VStack(alignment: .leading, spacing: 1) {
         Text(banner.title)
-          .font(.system(size: 13, weight: .medium))
+          .font(.omni(size: 13, weight: .medium))
           .foregroundStyle(Tok.fg)
           .lineLimit(1)
         Text(banner.body)
-          .font(.system(size: 12))
+          .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
           .lineLimit(1)
       }
@@ -139,7 +139,7 @@ struct BannerView: View {
     .padding(.leading, 14)
     .padding(.trailing, 8)
     .padding(.vertical, 8)
-    .frame(width: 340)
+    .frame(width: z(340))
     .background(Tok.elev, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     .menuShadow(22)
     .onHover { hovering = $0 }

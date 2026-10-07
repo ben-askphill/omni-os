@@ -62,13 +62,13 @@ private struct MarkdownBlockView: View {
       prose(text.attributed)
     case .heading(let level, let text):
       prose(text.attributed)
-        .font(.system(size: Self.headingSize(level, base: size), weight: level <= 2 ? .medium : .semibold))
+        .font(.omni(size: Self.headingSize(level, base: size), weight: level <= 2 ? .medium : .semibold))
         .lineSpacing(1)
         .padding(.top, 6)
     case .code(_, let code):
       ScrollView(.horizontal) {
         Text(code)
-          .font(.system(size: 12.5, design: .monospaced))
+          .font(.omni(size: 12.5, design: .monospaced))
           .lineSpacing(4)
           .foregroundStyle(Tok.fg)
           .fixedSize()
@@ -83,7 +83,7 @@ private struct MarkdownBlockView: View {
       HStack(alignment: .top, spacing: 12) {
         Rectangle()
           .fill(Tok.lineStrong)
-          .frame(width: 2)
+          .frame(width: z(2))
         MarkdownBlocks(blocks: blocks, size: size)
           .foregroundStyle(Tok.fg2)
       }
@@ -102,7 +102,7 @@ private struct MarkdownBlockView: View {
   private func prose(_ text: AttributedString) -> some View {
     let text = Self.underlined(text)
     return Text(text)
-      .font(.system(size: size))
+      .font(.omni(size: size))
       .lineSpacing(size * 0.4)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -144,17 +144,17 @@ private struct MarkdownListView: View {
   @ViewBuilder private func marker(_ i: Int, _ item: MarkdownListItem) -> some View {
     if let checked = item.checked {
       Image(systemName: checked ? "checkmark.square.fill" : "square")
-        .font(.system(size: size - 1))
+        .font(.omni(size: size - 1))
         .foregroundStyle(checked ? Tok.fg : Tok.fg3)
         .accessibilityLabel(checked ? "Done" : "Not done")
     } else if list.isOrdered {
       Text("\(list.start + i).")
-        .font(.system(size: size))
+        .font(.omni(size: size))
         .monospacedDigit()
         .foregroundStyle(Tok.fg4)
     } else {
       Text("•")
-        .font(.system(size: size))
+        .font(.omni(size: size))
         .foregroundStyle(Tok.fg4)
     }
   }
@@ -188,8 +188,8 @@ private struct MarkdownTableView: View {
 
   private func cell(_ text: MarkdownText) -> some View {
     Text(MarkdownBlockView.underlined(text.attributed))
-      .font(.system(size: 13))
-      .frame(maxWidth: 360, alignment: .leading)
+      .font(.omni(size: 13))
+      .frame(maxWidth: z(360), alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
       .padding(.trailing, 12)
       .padding(.vertical, 6)

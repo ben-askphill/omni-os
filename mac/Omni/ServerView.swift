@@ -31,7 +31,7 @@ struct ServerView: View {
     VStack(spacing: 14) {
       Loader(size: 22)
       Text(text)
-        .font(.system(size: 13))
+        .font(.omni(size: 13))
         .foregroundStyle(Tok.fg3)
     }
     .accessibilityElement(children: .combine)
@@ -41,15 +41,15 @@ struct ServerView: View {
     VStack(spacing: 20) {
       OmniIcon(name: "terminal", size: 20, weight: 1.5)
         .foregroundStyle(Tok.fg3)
-        .frame(width: 48, height: 48)
+        .frame(width: z(48), height: z(48))
         .background(Tok.surface2, in: Circle())
       VStack(spacing: 6) {
         Text("The Omni server is not running")
-          .font(.system(size: 22, weight: .medium))
+          .font(.omni(size: 22, weight: .medium))
           .tracking(-0.22)
           .foregroundStyle(Tok.fg)
         Text("Start it here, or run npm start in the repo. It keeps running when the app quits.")
-          .font(.system(size: 13.5))
+          .font(.omni(size: 13.5))
           .foregroundStyle(Tok.fg3)
           .multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
@@ -66,7 +66,7 @@ struct ServerView: View {
       }
     }
     .padding(32)
-    .frame(maxWidth: 520)
+    .frame(maxWidth: z(520))
     .omniCard(28)
     .cardShadow(28)
     .padding(32)
@@ -75,15 +75,15 @@ struct ServerView: View {
   private func failed(message: String, logTail: [String]) -> some View {
     VStack(spacing: 16) {
       GlyphView(glyph: .needs, size: 14)
-        .frame(width: 48, height: 48)
+        .frame(width: z(48), height: z(48))
         .background(Tok.surface2, in: Circle())
       VStack(spacing: 6) {
         Text("Server problem")
-          .font(.system(size: 22, weight: .medium))
+          .font(.omni(size: 22, weight: .medium))
           .tracking(-0.22)
           .foregroundStyle(Tok.fg)
         Text(message)
-          .font(.system(size: 13.5))
+          .font(.omni(size: 13.5))
           .foregroundStyle(Tok.fg2)
           .multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
@@ -112,7 +112,7 @@ struct ServerView: View {
       }
     }
     .padding(32)
-    .frame(maxWidth: 640)
+    .frame(maxWidth: z(640))
     .omniCard(28)
     .cardShadow(28)
     .padding(32)
@@ -130,13 +130,13 @@ struct ServerDetails: View {
         Text(verbatim: "\(port)").monospacedDigit()
       }
       InfoRow(label: "Repo") {
-        Text(repo).font(.system(size: 12, design: .monospaced)).truncationMode(.middle).textSelection(.enabled)
+        Text(repo).font(.omni(size: 12, design: .monospaced)).truncationMode(.middle).textSelection(.enabled)
       }
       InfoRow(label: "Node") {
         if node.isEmpty {
           Text("Detect automatically").foregroundStyle(Tok.fg3)
         } else {
-          Text(node).font(.system(size: 12, design: .monospaced)).truncationMode(.middle).textSelection(.enabled)
+          Text(node).font(.omni(size: 12, design: .monospaced)).truncationMode(.middle).textSelection(.enabled)
         }
       }
     }
@@ -156,7 +156,7 @@ struct LogTail: View {
       // As tall as the lines, and it scrolls from the bottom past 220 points.
       ScrollView { text }
         .defaultScrollAnchor(.bottom)
-        .frame(maxHeight: 220)
+        .frame(maxHeight: z(220))
         .fixedSize(horizontal: false, vertical: true)
       .background(Tok.bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
       .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Tok.line))
@@ -165,7 +165,7 @@ struct LogTail: View {
 
   private var text: some View {
     Text(lines.joined(separator: "\n"))
-      .font(.system(size: 11.5, design: .monospaced))
+      .font(.omni(size: 11.5, design: .monospaced))
       .foregroundStyle(Tok.fg2)
       .textSelection(.enabled)
       .frame(maxWidth: .infinity, alignment: .leading)

@@ -73,22 +73,22 @@ struct ToolGroupView: View {
               GlyphView(glyph: .needs, size: 7)
               Text("\(group.failures) failed")
             }
-            .font(.system(size: 11))
+            .font(.omni(size: 11))
             .monospacedDigit()
             .foregroundStyle(Tok.fg)
             .fixedSize()
           }
           if !working.isEmpty && !open {
             Text(Format.plural(working.count, "agent") + " running")
-              .font(.system(size: 11).monospacedDigit())
+              .font(.omni(size: 11).monospacedDigit())
               .foregroundStyle(Tok.live)
               .fixedSize()
           }
           if live || !working.isEmpty { Loader(size: 11).foregroundStyle(working.isEmpty ? Tok.fg3 : Tok.live) }
         }
-        .font(.system(size: ThreadStyle.small))
+        .font(.omni(size: ThreadStyle.small))
         .padding(.horizontal, 14)
-        .frame(height: 40)
+        .frame(height: z(40))
         .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .rowHover(radius: 20)
       }
@@ -111,7 +111,7 @@ struct ToolGroupView: View {
   @ViewBuilder private var summary: some View {
     if live, let latest = group.latest {
       Text("\(latest.label) \(latest.summary(cwd: cwd))")
-        .font(.system(size: ThreadStyle.mono, design: .monospaced))
+        .font(.omni(size: ThreadStyle.mono, design: .monospaced))
     } else {
       Text(group.names)
     }
@@ -147,14 +147,14 @@ struct ToolRowView: View {
             .lineLimit(1)
             .layoutPriority(1)
           Text(call.summary(cwd: cwd))
-            .font(ToolText.isMonospaced(call.name) ? .system(size: ThreadStyle.mono, design: .monospaced) : .system(size: ThreadStyle.small))
+            .font(ToolText.isMonospaced(call.name) ? .omni(size: ThreadStyle.mono, design: .monospaced) : .omni(size: ThreadStyle.small))
             .foregroundStyle(Tok.fg3)
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
           if !call.children.isEmpty && !agent {
             Text("\(call.children.count) sub-calls")
-              .font(.system(size: 11))
+              .font(.omni(size: 11))
               .monospacedDigit()
               .foregroundStyle(Tok.fg4)
               .fixedSize()
@@ -168,16 +168,16 @@ struct ToolRowView: View {
               GlyphView(glyph: .needs, size: 7)
               Text("error")
             }
-            .font(.system(size: 11))
+            .font(.omni(size: 11))
             .foregroundStyle(Tok.fg)
             .fixedSize()
           } else if call.isStopped {
-            Text("stopped").font(.system(size: 11)).foregroundStyle(Tok.fg4).fixedSize()
+            Text("stopped").font(.omni(size: 11)).foregroundStyle(Tok.fg4).fixedSize()
           }
         }
-        .font(.system(size: ThreadStyle.small))
+        .font(.omni(size: ThreadStyle.small))
         .padding(.horizontal, 10)
-        .frame(height: 32)
+        .frame(height: z(32))
         .contentShape(Capsule())
         .rowHover(radius: 16)
       }
@@ -224,11 +224,11 @@ struct ToolDetail: View {
       if let result = call.result {
         Pre(text: result.text.isEmpty ? "(no output)" : result.text, tone: call.isFailed ? .bad : .plain)
         if result.truncated {
-          Text("Output truncated").font(.system(size: 11)).foregroundStyle(Tok.fg4)
+          Text("Output truncated").font(.omni(size: 11)).foregroundStyle(Tok.fg4)
         }
       } else {
         Text(running ? "Waiting for result" : "No result recorded")
-          .font(.system(size: ThreadStyle.mono))
+          .font(.omni(size: ThreadStyle.mono))
           .foregroundStyle(Tok.fg4)
       }
     }
@@ -242,7 +242,7 @@ struct ToolInputView: View {
     switch input {
     case .bash(let description, let command):
       if let description {
-        Text(description).font(.system(size: 12)).foregroundStyle(Tok.fg3)
+        Text(description).font(.omni(size: 12)).foregroundStyle(Tok.fg3)
       }
       Pre(text: command)
     case .edits(let path, let edits):
@@ -255,7 +255,7 @@ struct ToolInputView: View {
       }
     case .write(let file, let lines, let preview):
       Text("\(file)\(Text(" (\(lines) lines)").foregroundStyle(Tok.fg4))")
-        .font(.system(size: ThreadStyle.mono, design: .monospaced))
+        .font(.omni(size: ThreadStyle.mono, design: .monospaced))
         .foregroundStyle(Tok.fg3)
         .textSelection(.enabled)
       Pre(text: preview, tone: .add)
@@ -276,7 +276,7 @@ struct ToolInputView: View {
 
   private func pathLine(_ p: String) -> some View {
     Text(p)
-      .font(.system(size: ThreadStyle.mono, design: .monospaced))
+      .font(.omni(size: ThreadStyle.mono, design: .monospaced))
       .foregroundStyle(Tok.fg3)
       .textSelection(.enabled)
   }
@@ -295,7 +295,7 @@ struct CheckItem: View {
       CheckBox(done: done, active: active)
         .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4.5 }
       Text(text)
-        .font(.system(size: 13.5, weight: active ? .medium : .regular))
+        .font(.omni(size: 13.5, weight: active ? .medium : .regular))
         .lineSpacing(2)
         .strikethrough(done, color: Tok.fg4)
         .foregroundStyle(done ? Tok.fg4 : active ? Tok.fg : Tok.fg2)
@@ -322,10 +322,10 @@ private struct CheckBox: View {
       TickShape()
         .trim(from: 0, to: done ? 1 : 0)
         .stroke(Tok.onInk, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-        .frame(width: 12.6, height: 12.6)
+        .frame(width: z(12.6), height: z(12.6))
       if active {
         Circle().fill(Tok.live)
-          .frame(width: 7, height: 7)
+          .frame(width: z(7), height: z(7))
           .opacity(pulse ? 0.45 : 1)
           .scaleEffect(pulse ? 0.82 : 1)
           .onAppear {
@@ -334,7 +334,7 @@ private struct CheckBox: View {
           }
       }
     }
-    .frame(width: 18, height: 18)
+    .frame(width: z(18), height: z(18))
     .clipShape(shape)
     .animation(Motion.spring, value: done)
   }

@@ -38,7 +38,7 @@ struct ThreadListRow: View {
         VStack(alignment: .leading, spacing: 2) {
           HStack(spacing: 8) {
             Text(thread.title.isEmpty ? "Untitled" : thread.title)
-              .font(.system(size: 14))
+              .font(.omni(size: 14))
               .foregroundStyle(Tok.fg)
               .lineLimit(1)
             if let role = thread.role, !role.isEmpty { Chip(text: role) }
@@ -47,7 +47,7 @@ struct ThreadListRow: View {
             Spacer(minLength: 8)
             TimelineView(.everyMinute) { _ in
               Text(Format.relTime(thread.updatedAt))
-                .font(.system(size: 11))
+                .font(.omni(size: 11))
                 .monospacedDigit()
                 .foregroundStyle(Tok.fg4)
             }
@@ -59,14 +59,14 @@ struct ThreadListRow: View {
             }
             if let branch = thread.branch, !branch.isEmpty {
               Text(branch)
-                .font(.system(size: 10.5, design: .monospaced))
+                .font(.omni(size: 10.5, design: .monospaced))
                 .padding(.horizontal, 6)
                 .background(ThreadStyle.surface2, in: Capsule())
             }
             Text(preview)
               .lineLimit(1)
           }
-          .font(.system(size: 12.5))
+          .font(.omni(size: 12.5))
           .foregroundStyle(Tok.fg3)
         }
       }
@@ -91,7 +91,7 @@ struct ThreadListRow: View {
         }
     } else {
       StatusDot(status: thread.status)
-        .frame(width: 32, height: 32)
+        .frame(width: z(32), height: z(32))
         .background(ThreadStyle.surface, in: Circle())
     }
   }
@@ -115,7 +115,7 @@ struct PRMarkIcon: View {
   var body: some View {
     OmniIcon(name: "pr", size: 12)
       .foregroundStyle(pr.isMerged ? Tok.ink : Tok.onLive)
-      .frame(width: 20, height: 20)
+      .frame(width: z(20), height: z(20))
       .background(pr.isMerged ? Tok.done : Tok.live, in: Circle())
       .help("PR #\(pr.number) \(pr.badge)")
       .accessibilityLabel("PR #\(pr.number) \(pr.badge)")
@@ -170,25 +170,25 @@ struct EmptyNote<Action: View>: View {
         if let icon = BrandPaths.icons[symbol] != nil ? symbol : Self.icons[symbol] {
           OmniIcon(name: icon, size: 19)
         } else {
-          Image(systemName: symbol).font(.system(size: 17))
+          Image(systemName: symbol).font(.omni(size: 17))
         }
       }
       .foregroundStyle(Tok.fg3)
-      .frame(width: 48, height: 48)
+      .frame(width: z(48), height: z(48))
       .background(Tok.surface2, in: Circle())
       .padding(.bottom, 16)
       Text(title)
-        .font(.system(size: 17, weight: .medium))
+        .font(.omni(size: 17, weight: .medium))
         .tracking(-0.17)
         .foregroundStyle(Tok.fg)
         .multilineTextAlignment(.center)
       if !message.isEmpty {
         Text(message)
-          .font(.system(size: 13))
+          .font(.omni(size: 13))
           .foregroundStyle(Tok.fg3)
           .multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
-          .frame(maxWidth: 384)
+          .frame(maxWidth: z(384))
           .padding(.top, 6)
       }
       action.padding(.top, 20)

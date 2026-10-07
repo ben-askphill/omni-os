@@ -44,14 +44,14 @@ struct SearchScreen: View {
       OmniIcon(name: "search", size: 17).foregroundStyle(Tok.fg3)
       TextField("Search threads", text: $value, prompt: Text("Search threads").foregroundStyle(Tok.fg4))
         .textFieldStyle(.plain)
-        .font(.system(size: 15))
+        .font(.omni(size: 15))
         .focused($focused)
         .onSubmit { model.route = .search(query: value.trimmingCharacters(in: .whitespacesAndNewlines)) }
     }
     .foregroundStyle(Tok.fg)
     .padding(.leading, 18)
     .padding(.trailing, 20)
-    .frame(height: 48)
+    .frame(height: z(48))
     .background(focused ? Tok.bg : Tok.surface, in: Capsule())
     .overlay(Capsule().strokeBorder(focused ? Tok.lineStrong : Tok.line))
     .background(Capsule().fill(Tok.wash).padding(-5).opacity(focused ? 1 : 0))
@@ -103,25 +103,25 @@ private struct SearchRow: View {
         HStack(spacing: 8) {
           StatusDot(status: hit.status)
           Text(hit.title.isEmpty ? "Untitled" : hit.title)
-            .font(.system(size: 13.5, weight: .medium))
+            .font(.omni(size: 13.5, weight: .medium))
             .foregroundStyle(Tok.fg)
             .lineLimit(1)
           Spacer(minLength: 8)
           Text("#\(model.store.channel(hit.channelID)?.name ?? hit.channelID)")
-            .font(.system(size: 11.5))
+            .font(.omni(size: 11.5))
             .foregroundStyle(Tok.fg2)
             .padding(.horizontal, 8)
-            .frame(height: 20)
+            .frame(height: z(20))
             .background(Tok.surface2, in: Capsule())
           Text(Format.relTime(hit.updatedAt))
-            .font(.system(size: 11))
+            .font(.omni(size: 11))
             .monospacedDigit()
             .foregroundStyle(Tok.fg4)
-            .frame(width: 64, alignment: .trailing)
+            .frame(width: z(64), alignment: .trailing)
         }
         if !hit.snippet.isEmpty {
           Text(Self.highlighted(hit.snippet))
-            .font(.system(size: 12.5))
+            .font(.omni(size: 12.5))
             .foregroundStyle(Tok.fg2)
             .lineSpacing(3)
             .lineLimit(2)
@@ -142,7 +142,7 @@ private struct SearchRow: View {
     for run in Snippet.runs(snippet) {
       var piece = AttributedString(run.text)
       if run.marked {
-        piece.font = .system(size: 12.5, weight: .medium)
+        piece.font = .omni(size: 12.5, weight: .medium)
         piece.foregroundColor = Tok.fg
         piece.backgroundColor = Tok.mark
       }

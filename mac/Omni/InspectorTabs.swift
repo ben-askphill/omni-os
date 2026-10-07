@@ -21,7 +21,7 @@ struct BrowserTab: View {
               .buttonStyle(.pill(.ghost, height: 28))
             Spacer()
             Text(shots.count == 1 ? "1 screenshot" : "\(shots.count) screenshots")
-              .font(.system(size: 11).monospacedDigit())
+              .font(.omni(size: 11).monospacedDigit())
               .foregroundStyle(Tok.fg4)
               .padding(.horizontal, 8)
           }
@@ -76,7 +76,7 @@ struct ScreenshotGrid: View {
                   .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                   .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Tok.line))
                 Text(Format.relTime(shot.updatedAt))
-                  .font(.system(size: 10.5).monospacedDigit())
+                  .font(.omni(size: 10.5).monospacedDigit())
                   .foregroundStyle(Tok.fg4)
                   .padding(.horizontal, 6)
                   .padding(.bottom, 2)
@@ -109,9 +109,9 @@ private struct ShotViewer: View {
     VStack(spacing: 0) {
       HStack {
         VStack(alignment: .leading, spacing: 0) {
-          Text(index.map { list[$0].name } ?? "").font(.system(size: 13, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1)
+          Text(index.map { list[$0].name } ?? "").font(.omni(size: 13, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1)
           Text(index.map { ThreadDetails.fullDate(list[$0].updatedAt) } ?? "")
-            .font(.system(size: 11)).foregroundStyle(Tok.fg3)
+            .font(.omni(size: 11)).foregroundStyle(Tok.fg3)
         }
         Spacer()
         Button("Newer", systemImage: "chevron.left") { if let index, index > 0 { openID = list[index - 1].id } }
@@ -139,7 +139,7 @@ private struct ShotViewer: View {
         .background(Tok.surface2)
       }
     }
-    .frame(width: 880, height: 640)
+    .frame(width: z(880), height: z(640))
     .background(Tok.bg)
   }
 }
@@ -225,7 +225,7 @@ struct DetailsTab: View {
             resumeCard(resume)
           }
         }
-        .font(.system(size: 12.5))
+        .font(.omni(size: 12.5))
         .foregroundStyle(Tok.fg)
         .padding(.horizontal, 10)
         .padding(.bottom, 12)
@@ -238,7 +238,7 @@ struct DetailsTab: View {
       HStack {
         Text("Delegated threads").omniCaption()
         Spacer()
-        Text("\(store.children.count)").font(.system(size: 11)).monospacedDigit().foregroundStyle(Tok.fg3)
+        Text("\(store.children.count)").font(.omni(size: 11)).monospacedDigit().foregroundStyle(Tok.fg3)
       }
       .padding(.horizontal, 8)
       VStack(spacing: 0) {
@@ -250,12 +250,12 @@ struct DetailsTab: View {
               StatusDot(status: child.status, size: 7)
               Text(child.title).lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity, alignment: .leading)
               if let task = child.taskID, !task.isEmpty {
-                Text(task).font(.system(size: 11, design: .monospaced)).foregroundStyle(Tok.fg4)
+                Text(task).font(.omni(size: 11, design: .monospaced)).foregroundStyle(Tok.fg4)
               }
-              Text("#\(model.store.channel(child.channelID)?.name ?? child.channelID)").font(.system(size: 11)).foregroundStyle(Tok.fg3)
+              Text("#\(model.store.channel(child.channelID)?.name ?? child.channelID)").font(.omni(size: 11)).foregroundStyle(Tok.fg3)
             }
             .padding(.horizontal, 12)
-            .frame(height: 36)
+            .frame(height: z(36))
             .contentShape(Capsule())
             .rowHover(radius: 18)
           }
@@ -289,7 +289,7 @@ struct DetailsTab: View {
         .buttonStyle(.pill(.secondary, height: 28))
       }
       Text(command)
-        .font(.system(size: 11.5, design: .monospaced))
+        .font(.omni(size: 11.5, design: .monospaced))
         .lineSpacing(3)
         .foregroundStyle(Tok.fg2)
         .textSelection(.enabled)
@@ -309,7 +309,7 @@ struct DetailsTab: View {
       HStack(spacing: 6) {
         Text("\(good.count) connected") + Text(bad.isEmpty ? "" : " · \(bad.count) not connected")
         Button(showMCP ? "Hide" : "Show") { showMCP.toggle() }
-          .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Tok.fg3)
+          .buttonStyle(.plain).font(.omni(size: 12)).foregroundStyle(Tok.fg3)
       }
       Flow(spacing: 4) {
         ForEach(bad) { chip($0, warn: true) }
@@ -327,7 +327,7 @@ struct DetailsTab: View {
     HStack(alignment: .firstTextBaseline, spacing: 8) {
       Text(key)
         .foregroundStyle(Tok.fg3)
-        .frame(width: 104, alignment: .leading)
+        .frame(width: z(104), alignment: .leading)
       value()
         .foregroundStyle(Tok.fg)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -340,7 +340,7 @@ struct DetailsTab: View {
   }
 
   private func mono(_ text: String) -> some View {
-    Text(text).font(.system(size: 12, design: .monospaced))
+    Text(text).font(.omni(size: 12, design: .monospaced))
   }
 
   @ViewBuilder private func muted(_ text: String?, or fallback: String) -> some View {

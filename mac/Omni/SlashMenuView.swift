@@ -45,7 +45,7 @@ struct SlashMenuView: View {
         if items.indices.contains(active) { proxy.scrollTo(items[active].id) }
       }
     }
-    .frame(maxHeight: 352)
+    .frame(maxHeight: z(352))
     .fixedSize(horizontal: false, vertical: true)
     .background(Tok.elev, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -60,12 +60,12 @@ struct SlashMenuView: View {
       // A thread's menu still lists Omni's own commands, so say why the harness's are missing.
       Group {
         if let fix = list?.fix {
-          Text("Couldn't read the commands. Run \(Text(fix).font(.system(size: 12, design: .monospaced)).foregroundStyle(Tok.fg2)) in a terminal to see why.")
+          Text("Couldn't read the commands. Run \(Text(fix).font(.omni(size: 12, design: .monospaced)).foregroundStyle(Tok.fg2)) in a terminal to see why.")
         } else {
           Text("Couldn't read the commands.")
         }
       }
-      .font(.system(size: 12.5))
+      .font(.omni(size: 12.5))
       .foregroundStyle(Tok.fg3)
       .padding(.horizontal, 12)
       .padding(.vertical, 10)
@@ -74,7 +74,7 @@ struct SlashMenuView: View {
         Loader(size: 13)
         Text("Loading commands")
       }
-      .font(.system(size: 12.5))
+      .font(.omni(size: 12.5))
       .foregroundStyle(Tok.fg3)
       .padding(.horizontal, 12)
       .padding(.vertical, 10)
@@ -104,7 +104,7 @@ private struct FileMenuView: View {
         if rows.indices.contains(active) { proxy.scrollTo(rows[active].id) }
       }
     }
-    .frame(maxHeight: 352)
+    .frame(maxHeight: z(352))
     .fixedSize(horizontal: false, vertical: true)
     .background(Tok.elev, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -123,16 +123,16 @@ private struct FileRow: View {
   var body: some View {
     HStack(alignment: .center, spacing: 10) {
       Image(systemName: "doc")
-        .font(.system(size: 13))
+        .font(.omni(size: 13))
         .foregroundStyle(Tok.fg3)
       HStack(alignment: .firstTextBaseline, spacing: 8) {
         Text(row.name)
-          .font(.system(size: 13, weight: .medium))
+          .font(.omni(size: 13, weight: .medium))
           .foregroundStyle(Tok.fg)
           .lineLimit(1)
           .layoutPriority(1)
         Text(row.detail)
-          .font(.system(size: 11.5))
+          .font(.omni(size: 11.5))
           .foregroundStyle(Tok.fg4)
           .lineLimit(1)
           .truncationMode(.head)
@@ -140,7 +140,7 @@ private struct FileRow: View {
       Spacer(minLength: 0)
       if row.kind == .artifact {
         Text("artifact")
-          .font(.system(size: 11))
+          .font(.omni(size: 11))
           .foregroundStyle(Tok.fg3)
           .padding(.horizontal, 8)
           .padding(.vertical, 1)
@@ -149,7 +149,7 @@ private struct FileRow: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
-    .frame(minHeight: 40)
+    .frame(minHeight: z(40))
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(isActive ? Tok.wash : .clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     .contentShape(Rectangle())
@@ -173,28 +173,28 @@ private struct SlashRow: View {
       VStack(alignment: .leading, spacing: 1) {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
           Text("/\(command.name)")
-            .font(.system(size: 13, weight: .medium, design: .monospaced))
+            .font(.omni(size: 13, weight: .medium, design: .monospaced))
             .foregroundStyle(Tok.fg)
             .lineLimit(1)
             .truncationMode(.middle)
             .layoutPriority(1)
           if let hint = command.argumentHint {
             Text(hint)
-              .font(.system(size: 12, design: .monospaced))
+              .font(.omni(size: 12, design: .monospaced))
               .foregroundStyle(Tok.fg4)
               .lineLimit(1)
           }
         }
         if !command.description.isEmpty {
           Text(command.description)
-            .font(.system(size: 11.5))
+            .font(.omni(size: 11.5))
             .foregroundStyle(Tok.fg4)
             .lineLimit(1)
         }
       }
       Spacer(minLength: 0)
       Text(command.sourceTag)
-        .font(.system(size: 11))
+        .font(.omni(size: 11))
         .foregroundStyle(Tok.fg3)
         .padding(.horizontal, 8)
         .padding(.vertical, 1)
@@ -202,7 +202,7 @@ private struct SlashRow: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
-    .frame(minHeight: 40)
+    .frame(minHeight: z(40))
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(isActive ? Tok.wash : .clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     .contentShape(Rectangle())
@@ -232,7 +232,7 @@ struct SlashHintView: View {
             .foregroundStyle(Tok.fg2)
         }
       }
-      .font(.system(size: 12))
+      .font(.omni(size: 12))
       .foregroundStyle(Tok.fg3)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
