@@ -13,14 +13,14 @@ struct PublishedCard: View {
   @State private var comments = CommentsAsk.idle
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      HStack(alignment: .top, spacing: 12) {
+    VStack(alignment: .leading, spacing: z(10)) {
+      HStack(alignment: .top, spacing: z(12)) {
         OmniIcon(name: "globe", size: 15)
           .foregroundStyle(Tok.fg3)
           .frame(width: z(32), height: z(32))
           .background(Tok.bg, in: Circle())
-        VStack(alignment: .leading, spacing: 2) {
-          HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: z(2)) {
+          HStack(alignment: .firstTextBaseline, spacing: z(8)) {
             Text(page.title)
               .font(.omni(size: 13.5, weight: .medium))
               .foregroundStyle(Tok.fg)
@@ -40,7 +40,7 @@ struct PublishedCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
-      HStack(spacing: 6) {
+      HStack(spacing: z(6)) {
         if let link = URL(string: page.url) {
           Button { openURL(link) } label: {
             Label { Text("Open") } icon: { OmniIcon(name: "external", size: 13) }
@@ -70,11 +70,11 @@ struct PublishedCard: View {
           Text(message).font(.omni(size: 11.5)).foregroundStyle(Tok.fg2).lineLimit(1)
         }
       }
-      .padding(.leading, 44)
+      .padding(.leading, z(44))
     }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 12)
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .padding(.horizontal, z(16))
+    .padding(.vertical, z(12))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(22), style: .continuous))
     .accessibilityElement(children: .contain)
   }
 }

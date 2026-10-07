@@ -41,6 +41,8 @@ struct ComposerTextView: NSViewRepresentable {
   var caretRequest: CaretRequest?
   /// 14.5 in a reply, 16 in the big box on Home.
   var fontSize: CGFloat = 14.5
+  /// `UIZoom.settings.scale`, read in the parent's body: the font, inset and height range grow with it.
+  var scale: CGFloat = 1
   static let maxHeight: CGFloat = 240
   static let minHeight: CGFloat = 44
   static let font = NSFont.systemFont(ofSize: 14.5)
@@ -68,7 +70,6 @@ struct ComposerTextView: NSViewRepresentable {
     tv.autoresizingMask = [.width]
     tv.textContainer?.widthTracksTextView = true
     tv.textContainer?.lineFragmentPadding = 0
-    tv.textContainerInset = Self.inset
     tv.drawsBackground = false
     tv.isRichText = false
     tv.importsGraphics = false
@@ -77,12 +78,9 @@ struct ComposerTextView: NSViewRepresentable {
     tv.isAutomaticSpellingCorrectionEnabled = false
     tv.isAutomaticQuoteSubstitutionEnabled = false
     tv.isAutomaticDashSubstitutionEnabled = false
-    let font = Self.font(fontSize)
-    tv.font = font
     tv.textColor = Self.ink
     tv.insertionPointColor = Self.ink
-    tv.typingAttributes = [.font: font, .foregroundColor: Self.ink]
-    tv.placeholderFont = font
+    zoom(tv)
     tv.setAccessibilityLabel(label)
     tv.delegate = context.coordinator
     tv.string = text
@@ -99,6 +97,7 @@ struct ComposerTextView: NSViewRepresentable {
     tv.placeholder = placeholder
     tv.running = running
     tv.interrupting = interrupting
+    if tv.font?.pointSize != fontSize * scale { zoom(tv) }
     c.updating = true
     defer { c.updating = false }
     if tv.string != text, !tv.hasMarkedText() {
@@ -116,13 +115,24 @@ struct ComposerTextView: NSViewRepresentable {
     tv.needsDisplay = true
   }
 
+  /// The font and inset at the zoom.
+  private func zoom(_ tv: ComposerNSTextView) {
+    let font = Self.font(fontSize * scale)
+    tv.font = font
+    tv.typingAttributes = [.font: font, .foregroundColor: Self.ink]
+    tv.placeholderFont = font
+    tv.textContainerInset = NSSize(width: Self.inset.width * scale, height: Self.inset.height * scale)
+  }
+
   func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSScrollView, context: Context) -> CGSize? {
     let width = proposal.width ?? 400
-    return CGSize(width: width, height: Self.height(of: text, width: width, range: heightRange, fontSize: fontSize))
+    return CGSize(width: width, height: Self.height(of: text, width: width, range: heightRange.lowerBound * scale...heightRange.upperBound * scale,
+                                                      fontSize: fontSize * scale, scale: scale))
   }
 
   /// The height the text needs at this width, between the minimum and 240pt.
-  static func height(of text: String, width: CGFloat, range: ClosedRange<CGFloat> = minHeight...maxHeight, fontSize: CGFloat = 14.5) -> CGFloat {
+  static func height(of text: String, width: CGFloat, range: ClosedRange<CGFloat> = minHeight...maxHeight, fontSize: CGFloat = 14.5, scale: CGFloat = 1) -> CGFloat {
+    let inset = NSSize(width: Self.inset.width * scale, height: Self.inset.height * scale)
     let measured = text.hasSuffix("\n") || text.isEmpty ? text + " " : text
     let box = CGSize(width: max(1, width - inset.width * 2), height: .greatestFiniteMagnitude)
     let rect = (measured as NSString).boundingRect(

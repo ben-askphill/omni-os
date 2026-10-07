@@ -23,6 +23,8 @@ export function useThreadInterruptKey({
       if (document.querySelector('[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return;
       // Esc in another field (sidebar search, a form) belongs to that field. The reply composer is the exception.
       const el = e.target instanceof HTMLElement ? e.target : null;
+      // A zoomed image preview keeps Esc to zoom back out.
+      if (el?.closest('[data-keeps-esc]')) return;
       if (el && (el.isContentEditable || el.matches('input, select') || (el.matches('textarea') && !el.hasAttribute('data-reply-composer')))) return;
       void interrupt();
     };

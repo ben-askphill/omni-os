@@ -23,10 +23,10 @@ struct BrowserTab: View {
             Text(shots.count == 1 ? "1 screenshot" : "\(shots.count) screenshots")
               .font(.omni(size: 11).monospacedDigit())
               .foregroundStyle(Tok.fg4)
-              .padding(.horizontal, 8)
+              .padding(.horizontal, z(8))
           }
-          .padding(.horizontal, 8)
-          .padding(.bottom, 8)
+          .padding(.horizontal, z(8))
+          .padding(.bottom, z(8))
           ScreenshotGrid(client: client, shots: shots)
         }
       } else if let browser {
@@ -63,7 +63,7 @@ struct ScreenshotGrid: View {
             Button {
               openID = shot.id
             } label: {
-              VStack(alignment: .leading, spacing: 4) {
+              VStack(alignment: .leading, spacing: z(4)) {
                 Color.clear
                   .aspectRatio(4 / 3, contentMode: .fit)
                   .overlay(alignment: .top) {
@@ -73,23 +73,23 @@ struct ScreenshotGrid: View {
                       Loader(size: 14).foregroundStyle(Tok.fg3)
                     }
                   }
-                  .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                  .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Tok.line))
+                  .clipShape(RoundedRectangle(cornerRadius: z(12), style: .continuous))
+                  .overlay(RoundedRectangle(cornerRadius: z(12), style: .continuous).strokeBorder(Tok.line))
                 Text(Format.relTime(shot.updatedAt))
                   .font(.omni(size: 10.5).monospacedDigit())
                   .foregroundStyle(Tok.fg4)
-                  .padding(.horizontal, 6)
-                  .padding(.bottom, 2)
+                  .padding(.horizontal, z(6))
+                  .padding(.bottom, z(2))
               }
-              .padding(4)
-              .background(Tok.bg, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+              .padding(z(4))
+              .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
             }
             .buttonStyle(.plain)
             .help(shot.name)
           }
         }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 10)
+        .padding(.horizontal, z(10))
+        .padding(.bottom, z(10))
       }
       .sheet(isPresented: Binding(get: { openID != nil }, set: { if !$0 { openID = nil } })) {
         ShotViewer(client: client, list: list, openID: $openID)
@@ -127,7 +127,7 @@ private struct ShotViewer: View {
           .buttonStyle(.pill(.primary, height: 28))
       }
       .labelStyle(.iconOnly)
-      .padding(12)
+      .padding(z(12))
       Hairline()
       if let index {
         AsyncImage(url: client.artifactURL(list[index])) { image in
@@ -159,7 +159,7 @@ struct DetailsTab: View {
       let last = store.events.last { $0.kind == "result" }.flatMap { if case .result(let r) = $0.content { r } else { nil } }
       let cwd = store.cwd ?? ""
       ScrollView {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: z(14)) {
           VStack(spacing: 0) {
             let channel = store.channel?.name ?? thread.channelID
             row("Channel") {
@@ -167,7 +167,7 @@ struct DetailsTab: View {
             }
             row("Role") { muted(thread.role, or: "none") }
             row("Harness") {
-              HStack(spacing: 8) {
+              HStack(spacing: z(8)) {
                 HarnessLogo(harness: thread.harness.rawValue, size: 14)
                 Text(ThreadDetails.harnessName(thread.harness))
               }
@@ -186,10 +186,10 @@ struct DetailsTab: View {
             if let branch = thread.branch, !branch.isEmpty { row("Branch") { mono(branch) } }
             row("Working dir") { mono(cwd) }
             row("Session") {
-              VStack(alignment: .leading, spacing: 3) {
+              VStack(alignment: .leading, spacing: z(3)) {
                 mono(thread.sessionID ?? "none")
                 if let warm = store.warm {
-                  HStack(spacing: 5) {
+                  HStack(spacing: z(5)) {
                     StatusDot(status: warm ? .done : .imported, size: 6)
                     Text(warm ? "Live, the next message starts instantly" : "Not running, the next message starts a new process")
                   }
@@ -203,7 +203,7 @@ struct DetailsTab: View {
                 Button {
                   model.route = .thread(id: parent.id)
                 } label: {
-                  HStack(spacing: 6) { StatusDot(status: parent.status, size: 6); Text(parent.title) }
+                  HStack(spacing: z(6)) { StatusDot(status: parent.status, size: 6); Text(parent.title) }
                 }
                 .buttonStyle(.plain)
               }
@@ -217,8 +217,8 @@ struct DetailsTab: View {
               }
             }
           }
-          .padding(.vertical, 4)
-          .background(Tok.bg, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+          .padding(.vertical, z(4))
+          .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
 
           if !store.children.isEmpty { delegated }
           if let resume = ThreadDetails.resumeCommand(harness: thread.harness, sessionID: thread.sessionID, cwd: cwd) {
@@ -227,26 +227,26 @@ struct DetailsTab: View {
         }
         .font(.omni(size: 12.5))
         .foregroundStyle(Tok.fg)
-        .padding(.horizontal, 10)
-        .padding(.bottom, 12)
+        .padding(.horizontal, z(10))
+        .padding(.bottom, z(12))
       }
     }
   }
 
   private var delegated: some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .leading, spacing: z(6)) {
       HStack {
         Text("Delegated threads").omniCaption()
         Spacer()
         Text("\(store.children.count)").font(.omni(size: 11)).monospacedDigit().foregroundStyle(Tok.fg3)
       }
-      .padding(.horizontal, 8)
+      .padding(.horizontal, z(8))
       VStack(spacing: 0) {
         ForEach(store.children) { child in
           Button {
             model.route = .thread(id: child.id)
           } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: z(8)) {
               StatusDot(status: child.status, size: 7)
               Text(child.title).lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity, alignment: .leading)
               if let task = child.taskID, !task.isEmpty {
@@ -254,7 +254,7 @@ struct DetailsTab: View {
               }
               Text("#\(model.store.channel(child.channelID)?.name ?? child.channelID)").font(.omni(size: 11)).foregroundStyle(Tok.fg3)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, z(12))
             .frame(height: z(36))
             .contentShape(Capsule())
             .rowHover(radius: 18)
@@ -262,14 +262,14 @@ struct DetailsTab: View {
           .buttonStyle(.plain)
         }
       }
-      .padding(4)
-      .background(Tok.bg, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+      .padding(z(4))
+      .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
     }
-    .padding(.top, 2)
+    .padding(.top, z(2))
   }
 
   private func resumeCard(_ command: String) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: z(8)) {
       HStack {
         Text("Resume in terminal").omniCaption()
         Spacer()
@@ -281,7 +281,7 @@ struct DetailsTab: View {
             copied = false
           }
         } label: {
-          HStack(spacing: 6) {
+          HStack(spacing: z(6)) {
             OmniIcon(name: copied ? "check" : "copy", size: 13)
             Text(copied ? "Copied" : "Copy")
           }
@@ -294,19 +294,19 @@ struct DetailsTab: View {
         .foregroundStyle(Tok.fg2)
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Tok.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, z(12))
+        .padding(.vertical, z(10))
+        .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(12), style: .continuous))
     }
-    .padding(14)
-    .background(Tok.bg, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    .padding(z(14))
+    .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
   }
 
   private func mcpList(_ servers: [MCPServer]) -> some View {
     let bad = servers.filter { !$0.ok }
     let good = servers.filter(\.ok)
-    return VStack(alignment: .leading, spacing: 4) {
-      HStack(spacing: 6) {
+    return VStack(alignment: .leading, spacing: z(4)) {
+      HStack(spacing: z(6)) {
         Text("\(good.count) connected") + Text(bad.isEmpty ? "" : " · \(bad.count) not connected")
         Button(showMCP ? "Hide" : "Show") { showMCP.toggle() }
           .buttonStyle(.plain).font(.omni(size: 12)).foregroundStyle(Tok.fg3)
@@ -324,7 +324,7 @@ struct DetailsTab: View {
   }
 
   private func row<V: View>(_ key: String, @ViewBuilder _ value: () -> V) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
+    HStack(alignment: .firstTextBaseline, spacing: z(8)) {
       Text(key)
         .foregroundStyle(Tok.fg3)
         .frame(width: z(104), alignment: .leading)
@@ -334,8 +334,8 @@ struct DetailsTab: View {
         .fixedSize(horizontal: false, vertical: true)
         .textSelection(.enabled)
     }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 9)
+    .padding(.horizontal, z(14))
+    .padding(.vertical, z(9))
     .overlay(alignment: .top) { if key != "Channel" { Hairline() } }
   }
 

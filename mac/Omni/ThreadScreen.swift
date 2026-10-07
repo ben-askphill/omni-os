@@ -54,9 +54,9 @@ private struct ThreadView: View {
         ErrorNote(text: error.message) { Task { await store.reload() } }
         Spacer()
       }
-      .padding(24)
+      .padding(z(24))
     case .loading:
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         Loader(size: 14)
         Text("Loading thread")
       }
@@ -88,10 +88,10 @@ private struct ThreadHeader: View {
 
   var body: some View {
     let channel = store.channel?.name ?? thread.channelID
-    HStack(spacing: 12) {
+    HStack(spacing: z(12)) {
       ChannelAvatar(name: channel, conductor: thread.channelID == SidebarSections.conductorID, icon: store.channel?.icon)
       VStack(alignment: .leading, spacing: 1) {
-        HStack(spacing: 4) {
+        HStack(spacing: z(4)) {
           Button("#\(channel)") { model.route = .channel(id: thread.channelID) }
             .buttonStyle(.plain)
             .fixedSize()
@@ -109,7 +109,7 @@ private struct ThreadHeader: View {
               .font(.omni(size: 10.5))
               .monospacedDigit()
               .foregroundStyle(Tok.fg4)
-              .padding(.leading, 4)
+              .padding(.leading, z(4))
               .fixedSize()
           }
         }
@@ -125,7 +125,7 @@ private struct ThreadHeader: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       if store.isReconnecting {
-        HStack(spacing: 6) {
+        HStack(spacing: z(6)) {
           GlyphView(glyph: .running, size: 6)
           Text("Reconnecting")
         }
@@ -136,9 +136,9 @@ private struct ThreadHeader: View {
       }
       StatusPill(status: thread.status)
     }
-    .padding(.horizontal, 24)
-    .padding(.top, 12)
-    .padding(.bottom, 8)
+    .padding(.horizontal, z(24))
+    .padding(.top, z(12))
+    .padding(.bottom, z(8))
   }
 }
 
@@ -165,7 +165,7 @@ struct ChannelAvatar: View {
           .foregroundStyle(Tok.fg2)
       }
     }
-    .frame(width: size, height: size)
+    .frame(width: z(size), height: z(size))
     .accessibilityHidden(true)
   }
 }
@@ -180,14 +180,14 @@ struct ChannelMark: View {
     case .glyph(let name): OmniIcon(name: name, size: size)
     case .emoji(let text):
       // An emoji is wider than its font size; scale it down to fit the box so a row never clips it.
-      Text(text).font(.omni(size: size * 0.85)).lineLimit(1).fixedSize().frame(width: size, height: size)
+      Text(text).font(.omni(size: size * 0.85)).lineLimit(1).fixedSize().frame(width: z(size), height: z(size))
     case .svg(let markup):
       if let image = SVGIconCache.image(markup) {
         Image(nsImage: image)
           .resizable()
           .interpolation(.high)
           .scaledToFit()
-          .frame(width: size, height: size)
+          .frame(width: z(size), height: z(size))
       } else {
         OmniIcon(name: "image", size: size)
       }
@@ -226,7 +226,7 @@ struct ErrorNote: View {
   var retry: (() -> Void)?
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 10) {
+    HStack(alignment: .firstTextBaseline, spacing: z(10)) {
       GlyphView(glyph: .needs, size: 8)
         .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
       Text(text)
@@ -241,9 +241,9 @@ struct ErrorNote: View {
     }
     .font(.omni(size: 13))
     .foregroundStyle(Tok.fg)
-    .padding(.horizontal, 16)
-    .padding(.vertical, 10)
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .padding(.horizontal, z(16))
+    .padding(.vertical, z(10))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
     .accessibilityElement(children: .contain)
   }
 }
@@ -290,9 +290,9 @@ private struct TranscriptView: View {
     ScrollView {
       TranscriptRows(model: model, store: store, ui: ui, markdown: markdown)
         .frame(maxWidth: ThreadStyle.thread)
-        .padding(.horizontal, 24)
-        .padding(.top, 16)
-        .padding(.bottom, 40)
+        .padding(.horizontal, z(24))
+        .padding(.top, z(16))
+        .padding(.bottom, z(40))
         .frame(maxWidth: .infinity)
         .foregroundStyle(Tok.fg)
     }
@@ -348,13 +348,13 @@ private struct NewActivityPill: View {
   var body: some View {
     if pin.showsJump {
       Button(action: jump) {
-        HStack(spacing: 6) {
+        HStack(spacing: z(6)) {
           OmniIcon(name: "chevronDown", size: 13)
           Text("New activity")
         }
         .font(.omni(size: 12, weight: .medium))
         .foregroundStyle(Tok.fg)
-        .padding(.horizontal, 14)
+        .padding(.horizontal, z(14))
         .frame(height: z(32))
         .background(Tok.elev, in: Capsule())
         .menuShadow(16)
@@ -362,7 +362,7 @@ private struct NewActivityPill: View {
       }
       .buttonStyle(.plain)
       .accessibilityLabel("New activity")
-      .padding(.bottom, 16)
+      .padding(.bottom, z(16))
       .transition(.scale(scale: 0.9).combined(with: .opacity))
     }
   }
@@ -386,7 +386,7 @@ private struct TranscriptRows: View {
     let first = transcript.items.first?.id
     let live: TranscriptItemID? =
       if case .tools(let g)? = transcript.last, transcript.isLive(g, running: running) { .event(g.eventID) } else { nil }
-    LazyVStack(alignment: .leading, spacing: 16) {
+    LazyVStack(alignment: .leading, spacing: z(16)) {
       if let error = store.refreshError {
         ErrorNote(text: error.message) { Task { await store.reload() } }
       }
@@ -443,7 +443,7 @@ private struct TranscriptRow: View {
       }
       // Sub-agents and the delegations that worked show as cards; the group keeps every other call.
       let (subagents, rest, agentsFirst) = Delegation.split(group.calls)
-      VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: z(16)) {
         if agentsFirst { subagentCard(subagents) }
         if !rest.isEmpty {
           let kept = group.keeping(rest)

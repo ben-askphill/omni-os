@@ -69,7 +69,7 @@ struct SyncForm: View {
 
   private func statusSection(_ s: SyncStatus) -> some View {
     SettingsCard(title: "Status") {
-      HStack(spacing: 6) {
+      HStack(spacing: z(6)) {
         if sync.busy != nil { Loader(size: 14) }
         Button(s.enabled ? "Pause" : "Resume", systemImage: s.enabled ? "pause" : "play") {
           Task { await sync.togglePause() }
@@ -86,7 +86,7 @@ struct SyncForm: View {
     } content: {
       InfoRows {
         InfoRow(label: "Status") {
-          HStack(spacing: 8) {
+          HStack(spacing: z(8)) {
             GlyphView(glyph: phaseGlyph(s.phase), size: 7)
             Text(s.phaseLabel)
           }
@@ -108,7 +108,7 @@ struct SyncForm: View {
         }
         if let id = s.machineId {
           InfoRow(label: "This Mac") {
-            HStack(spacing: 6) {
+            HStack(spacing: z(6)) {
               Text(id).font(.omni(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.middle)
                 .textSelection(.enabled)
               Button {
@@ -133,7 +133,7 @@ struct SyncForm: View {
       if let error = sync.actionError, error != s.lastError {
         ErrorNote(text: error)
       }
-      HStack(alignment: .firstTextBaseline, spacing: 12) {
+      HStack(alignment: .firstTextBaseline, spacing: z(12)) {
         Text("Signing out removes the credentials from the Keychain. History stays on this Mac.")
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
@@ -167,7 +167,7 @@ struct SyncForm: View {
       if signedOut {
         NeedsNote(text: "The relay signed this Mac out. Sign in again to keep syncing.")
       }
-      HStack(alignment: .top, spacing: 12) {
+      HStack(alignment: .top, spacing: z(12)) {
         VStack(alignment: .leading, spacing: 0) {
           FieldLabel(text: "Supabase URL")
           TextField("Supabase URL", text: $sync.url, prompt: Text(verbatim: "https://abcd.supabase.co"))
@@ -210,7 +210,7 @@ struct SyncForm: View {
         if let email = sync.codeSentTo {
           VStack(alignment: .leading, spacing: 0) {
             FieldLabel(text: "Code", hint: "Omni emailed a code to \(email).")
-            HStack(spacing: 8) {
+            HStack(spacing: z(8)) {
               TextField("Code", text: $sync.code, prompt: Text("123456"))
                 .textFieldStyle(.omniMono)
                 .textContentType(.oneTimeCode)
@@ -225,7 +225,7 @@ struct SyncForm: View {
       if let error = sync.signInError {
         ErrorNote(text: error)
       }
-      HStack(spacing: 10) {
+      HStack(spacing: z(10)) {
         Button(sync.signInTitle, action: signIn)
           .buttonStyle(.pill(.primary, height: 34))
           .disabled(!sync.canSignIn)
@@ -247,9 +247,9 @@ struct SyncForm: View {
       note: "Paths travel with your home folder as ~. When the other Mac keeps a folder somewhere else, map it here: ~/work to ~/code turns its ~/work/volero into ~/code/volero on this Mac."
     ) {
       if !sync.mappings.isEmpty {
-        VStack(spacing: 8) {
+        VStack(spacing: z(8)) {
           ForEach($sync.mappings) { $row in
-            HStack(spacing: 8) {
+            HStack(spacing: z(8)) {
               TextField("From", text: $row.from, prompt: Text("~/work"))
                 .textFieldStyle(.omniMono)
               OmniIcon(name: "arrowRight", size: 14).foregroundStyle(Tok.fg4)
@@ -268,9 +268,9 @@ struct SyncForm: View {
       if let error = sync.mappingsError {
         ErrorNote(text: error)
       }
-      HStack(spacing: 10) {
+      HStack(spacing: z(10)) {
         Button { sync.addMapping() } label: {
-          HStack(spacing: 6) {
+          HStack(spacing: z(6)) {
             OmniIcon(name: "plus", size: 13)
             Text("Add Mapping")
           }

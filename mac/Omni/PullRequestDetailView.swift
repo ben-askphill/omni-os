@@ -29,15 +29,15 @@ struct PullRequestDetailView: View {
         case nil:
           LoadingNote(label: "Loading pull request")
         case .failure(let error):
-          ErrorNote(text: error.message) { Task { await load() } }.padding(.top, 12)
+          ErrorNote(text: error.message) { Task { await load() } }.padding(.top, z(12))
         case .success(let pr):
           content(pr)
         }
       }
       .frame(maxWidth: z(1024), alignment: .leading)
-      .padding(.horizontal, 32)
-      .padding(.top, 24)
-      .padding(.bottom, 64)
+      .padding(.horizontal, z(32))
+      .padding(.top, z(24))
+      .padding(.bottom, z(64))
       .frame(maxWidth: .infinity)
     }
     .task { await load() }
@@ -56,43 +56,43 @@ struct PullRequestDetailView: View {
     Button {
       model.route = .channel(id: channelID, tab: .prs)
     } label: {
-      HStack(spacing: 4) {
+      HStack(spacing: z(4)) {
         OmniIcon(name: "chevronLeft", size: 13)
         Text("All pull requests")
       }
       .font(.omni(size: 12.5))
       .foregroundStyle(Tok.fg3)
-      .padding(.horizontal, 10)
+      .padding(.horizontal, z(10))
       .frame(height: z(28))
       .hoverWash(14, fill: Tok.wash)
     }
     .buttonStyle(.plain)
-    .padding(.leading, -10)
-    .padding(.bottom, 12)
+    .padding(.leading, z(-10))
+    .padding(.bottom, z(12))
   }
 
   @ViewBuilder private func content(_ pr: PullRequestDetail) -> some View {
     header(pr)
-    if let reviewError { ErrorNote(text: reviewError).padding(.top, 8) }
+    if let reviewError { ErrorNote(text: reviewError).padding(.top, z(8)) }
     if let mergedOutput {
-      HStack(alignment: .firstTextBaseline, spacing: 10) {
+      HStack(alignment: .firstTextBaseline, spacing: z(10)) {
         GlyphView(glyph: .done, size: 9)
         Text(mergedOutput).textSelection(.enabled)
       }
       .font(.omni(size: 13))
       .foregroundStyle(Tok.fg)
-      .padding(.horizontal, 16).padding(.vertical, 12)
+      .padding(.horizontal, z(16)).padding(.vertical, z(12))
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Tok.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-      .padding(.top, 20)
+      .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
+      .padding(.top, z(20))
     }
 
     SegmentedPill(selection: $tab, counted: DetailTab.allCases.map { ($0, $0.rawValue, count($0, pr)) }, small: true)
       .fixedSize()
       .accessibilityElement(children: .contain)
       .accessibilityLabel("Section")
-      .padding(.top, 24)
-      .padding(.bottom, 16)
+      .padding(.top, z(24))
+      .padding(.bottom, z(16))
 
     switch tab {
     case .conversation: ConversationTab(pr: pr)
@@ -111,13 +111,13 @@ struct PullRequestDetailView: View {
   }
 
   private func header(_ pr: PullRequestDetail) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
-      HStack(alignment: .top, spacing: 12) {
+    VStack(alignment: .leading, spacing: z(10)) {
+      HStack(alignment: .top, spacing: z(12)) {
         (Text(pr.title).font(.omni(size: 22, weight: .medium)).foregroundStyle(Tok.fg)
           + Text("  #\(pr.number)").font(.omni(size: 15)).foregroundStyle(Tok.fg4))
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
-        HStack(spacing: 8) {
+        HStack(spacing: z(8)) {
           if let url = URL(string: pr.url) {
             Link(destination: url) {
               Label { Text("Open on GitHub") } icon: { OmniIcon(name: "external", size: 15) }
@@ -139,7 +139,7 @@ struct PullRequestDetailView: View {
           Button {
             Task { await askForReview(pr) }
           } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: z(8)) {
               if reviewBusy { Loader(size: 14) } else { OmniIcon(name: "layers", size: 15) }
               Text("Ask builder to review")
             }
@@ -148,7 +148,7 @@ struct PullRequestDetailView: View {
           .disabled(reviewBusy)
         }
       }
-      HStack(spacing: 12) {
+      HStack(spacing: z(12)) {
         if let state = pr.state {
           PRChip(text: state.lowercased(), tone: state == "OPEN" ? .info : state == "MERGED" ? .ok : .outline)
         }
@@ -157,7 +157,7 @@ struct PullRequestDetailView: View {
         Text(pr.author?.login ?? "unknown")
         BranchLabel(head: pr.headRefName, base: pr.baseRefName)
           .font(.omni(size: 11, design: .monospaced))
-          .padding(.horizontal, 8).frame(height: z(20))
+          .padding(.horizontal, z(8)).frame(height: z(20))
           .background(Tok.surface2, in: Capsule())
         ChecksSummary(checks: pr.checks)
         Changes(add: pr.additions, del: pr.deletions)
@@ -228,7 +228,7 @@ private struct MergeSheet: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: z(14)) {
       Text("Merge #\(pr.number)").font(.omni(size: 17, weight: .medium)).foregroundStyle(Tok.fg)
       (Text(pr.headRefName).font(.omni(size: 12, design: .monospaced))
         + Text(" into ") + Text(pr.baseRefName).font(.omni(size: 12, design: .monospaced))
@@ -237,7 +237,7 @@ private struct MergeSheet: View {
         .font(.omni(size: 12.5))
         .foregroundStyle(Tok.fg3)
       if !warnings.isEmpty {
-        HStack(spacing: 6) { ForEach(warnings, id: \.self) { PRChip(text: $0, tone: .bad) } }
+        HStack(spacing: z(6)) { ForEach(warnings, id: \.self) { PRChip(text: $0, tone: .bad) } }
       }
       VStack(alignment: .leading, spacing: 0) {
         FieldLabel(text: "Method", hint: Self.methods.first { $0.0 == method }?.2)
@@ -246,7 +246,7 @@ private struct MergeSheet: View {
           .accessibilityElement(children: .contain)
           .accessibilityLabel("Method")
       }
-      HStack(spacing: 10) {
+      HStack(spacing: z(10)) {
         Toggle("Delete branch after merge", isOn: $deleteBranch)
           .toggleStyle(.omni)
           .accessibilityLabel("Delete branch after merge")
@@ -271,7 +271,7 @@ private struct MergeSheet: View {
             if let failure { error = failure } else { dismiss() }
           }
         } label: {
-          HStack(spacing: 8) {
+          HStack(spacing: z(8)) {
             if busy { Loader(size: 14) }
             Text("Merge")
           }
@@ -280,7 +280,7 @@ private struct MergeSheet: View {
         .disabled(busy)
       }
     }
-    .padding(24)
+    .padding(z(24))
     .frame(width: z(460))
     .background(Tok.bg)
   }
@@ -293,7 +293,7 @@ private struct ConversationTab: View {
 
   var body: some View {
     let body = PullRequestDetail.cleanBody(pr.body)
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: z(14)) {
       card {
         if body.isEmpty {
           Text("No description.").font(.omni(size: 13)).foregroundStyle(Tok.fg3)
@@ -302,8 +302,8 @@ private struct ConversationTab: View {
         }
       }
       ForEach(pr.conversation) { item in
-        VStack(alignment: .leading, spacing: 8) {
-          HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: z(8)) {
+          HStack(spacing: z(8)) {
             Text(String((item.who ?? "?").prefix(1)).uppercased())
               .font(.omni(size: 10.5, weight: .medium))
               .foregroundStyle(Tok.fg2)
@@ -320,7 +320,7 @@ private struct ConversationTab: View {
           .foregroundStyle(Tok.fg3)
           if !item.body.isEmpty { MarkdownView(document: MarkdownDocument(parsing: item.body)) }
         }
-        .padding(.horizontal, 16).padding(.vertical, 12)
+        .padding(.horizontal, z(16)).padding(.vertical, z(12))
         .frame(maxWidth: .infinity, alignment: .leading)
         .omniCard()
       }
@@ -329,7 +329,7 @@ private struct ConversationTab: View {
 
   private func card<C: View>(@ViewBuilder _ content: () -> C) -> some View {
     content()
-      .padding(.horizontal, 20).padding(.vertical, 16)
+      .padding(.horizontal, z(20)).padding(.vertical, z(16))
       .frame(maxWidth: .infinity, alignment: .leading)
       .omniCard()
   }
@@ -344,7 +344,7 @@ private struct ChecksTab: View {
     } else {
       VStack(spacing: 0) {
         ForEach(Array(runs.enumerated()), id: \.offset) { _, run in
-          HStack(spacing: 10) {
+          HStack(spacing: z(10)) {
             GlyphView(glyph: glyph(run.tone), size: 7).frame(width: z(12))
             Text(run.name).foregroundStyle(Tok.fg).lineLimit(1)
             Spacer()
@@ -359,11 +359,11 @@ private struct ChecksTab: View {
             }
           }
           .font(.omni(size: 13))
-          .padding(.horizontal, 12)
+          .padding(.horizontal, z(12))
           .frame(height: z(40))
         }
       }
-      .padding(6)
+      .padding(z(6))
       .omniCard()
     }
   }
@@ -395,21 +395,21 @@ private struct FilesTab: View {
       VStack(spacing: 0) {
         ForEach(files, id: \.path) { f in
           Button(action: showDiff) {
-            HStack(spacing: 8) {
+            HStack(spacing: z(8)) {
               OmniIcon(name: "file", size: 13).foregroundStyle(Tok.fg4)
               Text(f.path).font(.omni(size: 12, design: .monospaced)).foregroundStyle(Tok.fg).lineLimit(1).truncationMode(.middle)
               Spacer()
               Changes(add: f.additions, del: f.deletions)
             }
             .font(.omni(size: 12.5))
-            .padding(.horizontal, 12)
+            .padding(.horizontal, z(12))
             .frame(height: z(36))
             .hoverWash(16, fill: Tok.surface2)
           }
           .buttonStyle(.plain)
         }
       }
-      .padding(6)
+      .padding(z(6))
       .omniCard()
     }
   }

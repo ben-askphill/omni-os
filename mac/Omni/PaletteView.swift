@@ -13,7 +13,7 @@ struct PaletteOverlay: View {
           .ignoresSafeArea()
           .onTapGesture { close() }
         PaletteView(model: model, close: close)
-          .padding(.top, 60)
+          .padding(.top, z(60))
       }
       .transition(.opacity)
     }
@@ -39,7 +39,7 @@ private struct PaletteView: View {
     let items = Palette.items(query: query, channels: model.store.channels, recent: model.store.recent)
     let at = min(cursor, max(0, items.count - 1))
     VStack(spacing: 0) {
-      HStack(spacing: 12) {
+      HStack(spacing: z(12)) {
         OmniIcon(name: "search", size: 18)
           .foregroundStyle(Tok.fg4)
         TextField("Search or jump to", text: $query)
@@ -53,8 +53,8 @@ private struct PaletteView: View {
           .onKeyPress(.escape) { close(); return .handled }
         Kbd(text: "Esc")
       }
-      .padding(.leading, 24)
-      .padding(.trailing, 16)
+      .padding(.leading, z(24))
+      .padding(.trailing, z(16))
       .frame(height: z(64))
       Rectangle().fill(Tok.line).frame(height: 1)
       ScrollViewReader { proxy in
@@ -64,9 +64,9 @@ private struct PaletteView: View {
               if index == 0 || items[index - 1].group != item.group {
                 Text(item.group.title)
                   .omniCaption()
-                  .padding(.horizontal, 16)
-                  .padding(.top, 12)
-                  .padding(.bottom, 8)
+                  .padding(.horizontal, z(16))
+                  .padding(.top, z(12))
+                  .padding(.bottom, z(8))
               }
               PaletteRow(item: item, selected: index == at)
                 .id(item.id)
@@ -80,22 +80,22 @@ private struct PaletteView: View {
                 .font(.omni(size: 13))
                 .foregroundStyle(Tok.fg3)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
+                .padding(.vertical, z(40))
             }
           }
-          .padding(.horizontal, 8)
-          .padding(.vertical, 8)
+          .padding(.horizontal, z(8))
+          .padding(.vertical, z(8))
         }
         .onChange(of: at) { if items.indices.contains(at) { proxy.scrollTo(items[at].id) } }
       }
       Rectangle().fill(Tok.line).frame(height: 1)
-      HStack(spacing: 16) {
-        HStack(spacing: 6) {
+      HStack(spacing: z(16)) {
+        HStack(spacing: z(6)) {
           Kbd(text: "↑")
           Kbd(text: "↓")
           Text("move")
         }
-        HStack(spacing: 6) {
+        HStack(spacing: z(6)) {
           Kbd(text: "↵")
           Text("open")
         }
@@ -103,14 +103,14 @@ private struct PaletteView: View {
       }
       .font(.omni(size: 11.5))
       .foregroundStyle(Tok.fg4)
-      .padding(.horizontal, 24)
-      .padding(.vertical, 10)
+      .padding(.horizontal, z(24))
+      .padding(.vertical, z(10))
     }
     .frame(width: z(620))
     .frame(maxHeight: z(640))
     .fixedSize(horizontal: false, vertical: true)
-    .background(Tok.elev, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+    .background(Tok.elev, in: RoundedRectangle(cornerRadius: z(28), style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: z(28), style: .continuous))
     .menuShadow(28)
     .onChange(of: query) { cursor = 0 }
     .onAppear { focused = true }
@@ -150,9 +150,9 @@ private struct PaletteRow: View {
   }
 
   var body: some View {
-    HStack(spacing: 12) {
+    HStack(spacing: z(12)) {
       lead.frame(width: z(28), height: z(28))
-      HStack(alignment: .firstTextBaseline, spacing: 8) {
+      HStack(alignment: .firstTextBaseline, spacing: z(8)) {
         Text(item.label)
           .font(.omni(size: 13.5))
           .foregroundStyle(Tok.fg)
@@ -164,7 +164,7 @@ private struct PaletteRow: View {
             .lineLimit(1)
         }
       }
-      Spacer(minLength: 8)
+      Spacer(minLength: z(8))
       if let trailing = item.trailing {
         Text(trailing)
           .font(.omni(size: 11))
@@ -176,9 +176,9 @@ private struct PaletteRow: View {
           .foregroundStyle(Tok.fg3)
       }
     }
-    .padding(.horizontal, 12)
+    .padding(.horizontal, z(12))
     .frame(height: z(48))
-    .background(selected ? Tok.surface2 : .clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .background(selected ? Tok.surface2 : .clear, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
     .contentShape(Rectangle())
   }
 

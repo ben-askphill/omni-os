@@ -37,7 +37,7 @@ struct MainWindow: View {
       .overlay(Self.paneShape.stroke(Tok.paneEdge, lineWidth: 1).clipShape(Self.paneShape))
       .shadow(color: .black.opacity(0.05), radius: 1, y: 1)
       .padding(.leading, sidebarShown ? 0 : 8)
-      .padding([.trailing, .bottom], 8)
+      .padding([.trailing, .bottom], z(8))
     }
     .background(Tok.chrome.ignoresSafeArea())
     .tint(Tok.fg)
@@ -127,13 +127,13 @@ struct ReconnectingLabel: View {
   let text: String
 
   var body: some View {
-    HStack(spacing: 6) {
+    HStack(spacing: z(6)) {
       GlyphView(glyph: .running, size: 6)
       Text(text)
     }
     .font(.omni(size: 12))
     .foregroundStyle(Tok.fg3)
-    .padding(.horizontal, 8)
+    .padding(.horizontal, z(8))
     .accessibilityElement(children: .combine)
   }
 }

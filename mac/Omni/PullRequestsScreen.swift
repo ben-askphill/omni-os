@@ -24,7 +24,7 @@ struct PullRequestsScreen: View {
         EmptyNote(symbol: "pr", title: "No GitHub repo linked",
                   message: "Set a local repo path in settings. Omni detects the GitHub repo from it, and builder threads get their own worktree.") {
           Button { model.route = .channel(id: channelID, tab: .settings) } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: z(8)) {
               OmniIcon(name: "sliders", size: 15)
               Text("Open settings")
             }
@@ -34,7 +34,7 @@ struct PullRequestsScreen: View {
         .frame(maxHeight: .infinity, alignment: .top)
       }
     } else {
-      LoadingNote().padding(.horizontal, 32).frame(maxHeight: .infinity, alignment: .top)
+      LoadingNote().padding(.horizontal, z(32)).frame(maxHeight: .infinity, alignment: .top)
     }
   }
 }
@@ -51,8 +51,8 @@ private struct PullRequestListView: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 12) {
-        HStack(spacing: 4) {
+      VStack(alignment: .leading, spacing: z(12)) {
+        HStack(spacing: z(4)) {
           SegmentedPill(selection: $state, options: PullRequestListState.allCases.map { ($0, $0.rawValue.capitalized) }, small: true)
             .fixedSize()
             .accessibilityElement(children: .contain)
@@ -61,7 +61,7 @@ private struct PullRequestListView: View {
           Button {
             Task { await load() }
           } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: z(6)) {
               if reloading && result != nil { Loader(size: 12) } else { OmniIcon(name: "refresh", size: 14) }
               Text("Refresh")
             }
@@ -70,7 +70,7 @@ private struct PullRequestListView: View {
           .disabled(reloading)
           if let url = URL(string: "https://github.com/\(repo)/pulls") {
             Link(destination: url) {
-              HStack(spacing: 6) {
+              HStack(spacing: z(6)) {
                 OmniIcon(name: "external", size: 14)
                 Text("GitHub")
               }
@@ -81,9 +81,9 @@ private struct PullRequestListView: View {
         content
       }
       .frame(maxWidth: z(896))
-      .padding(.horizontal, 32)
-      .padding(.top, 24)
-      .padding(.bottom, 64)
+      .padding(.horizontal, z(32))
+      .padding(.top, z(24))
+      .padding(.bottom, z(64))
       .frame(maxWidth: .infinity)
     }
     .task(id: state) {
@@ -126,8 +126,8 @@ private struct PullRequestListView: View {
 private struct RowButtonStyle: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-      .background(configuration.isPressed ? Tok.surface2 : .clear, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+      .contentShape(RoundedRectangle(cornerRadius: z(18), style: .continuous))
+      .background(configuration.isPressed ? Tok.surface2 : .clear, in: RoundedRectangle(cornerRadius: z(18), style: .continuous))
   }
 }
 
@@ -135,29 +135,29 @@ private struct PullRequestRow: View {
   let pr: PullRequestSummary
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 3) {
-      HStack(spacing: 8) {
+    VStack(alignment: .leading, spacing: z(3)) {
+      HStack(spacing: z(8)) {
         PRStateIcon(state: pr.state, isDraft: pr.isDraft)
         Text(pr.title).font(.omni(size: 14, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1)
         Text("#\(pr.number)").font(.omni(size: 11.5)).monospacedDigit().foregroundStyle(Tok.fg4)
         if pr.isDraft { PRChip(text: "Draft", tone: .outline) }
         ReviewChip(decision: pr.reviewDecision)
-        Spacer(minLength: 8)
+        Spacer(minLength: z(8))
         ChecksSummary(checks: pr.checks)
       }
-      HStack(spacing: 12) {
+      HStack(spacing: z(12)) {
         Text(pr.author?.login ?? "unknown")
         BranchLabel(head: pr.headRefName, base: pr.baseRefName)
         Changes(add: pr.additions, del: pr.deletions)
-        Spacer(minLength: 8)
+        Spacer(minLength: z(8))
         Text(Format.relTime(pr.updatedAt)).font(.omni(size: 11)).monospacedDigit().foregroundStyle(Tok.fg4)
       }
       .font(.omni(size: 12))
       .foregroundStyle(Tok.fg3)
-      .padding(.leading, 22)
+      .padding(.leading, z(22))
     }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 12)
+    .padding(.horizontal, z(14))
+    .padding(.vertical, z(12))
     .hoverWash()
     .accessibilityElement(children: .combine)
   }
@@ -228,7 +228,7 @@ struct ChecksSummary: View {
     if checks.isEmpty {
       Text("no checks").font(.omni(size: 12)).foregroundStyle(Tok.fg4)
     } else {
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         if checks.passed > 0 { count(.done, checks.passed).foregroundStyle(Tok.fg2) }
         if checks.failed > 0 { count(.needs, checks.failed).foregroundStyle(Tok.fg2) }
         if checks.pending > 0 { count(.running, checks.pending).foregroundStyle(Tok.live) }
@@ -240,7 +240,7 @@ struct ChecksSummary: View {
   }
 
   private func count(_ glyph: Glyph, _ n: Int) -> some View {
-    HStack(spacing: 4) {
+    HStack(spacing: z(4)) {
       GlyphView(glyph: glyph, size: 7)
       Text("\(n)")
     }
@@ -264,7 +264,7 @@ struct Changes: View {
   let del: Int
 
   var body: some View {
-    HStack(spacing: 4) {
+    HStack(spacing: z(4)) {
       Text("+\(add)").foregroundStyle(Tok.fg2)
       Text("-\(del)").foregroundStyle(Tok.fg3)
     }

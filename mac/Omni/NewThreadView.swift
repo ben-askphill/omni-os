@@ -11,14 +11,14 @@ struct NewThreadScreen: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 20) {
+      VStack(alignment: .leading, spacing: z(20)) {
         if channelID == nil { greeting }
         NewThreadComposerView(model: model, channelID: channelID, big: channelID == nil)
       }
       .frame(maxWidth: ThreadStyle.column)
-      .padding(.horizontal, 24)
+      .padding(.horizontal, z(24))
       .padding(.top, channelID == nil ? 56 : 24)
-      .padding(.bottom, 48)
+      .padding(.bottom, z(48))
       .frame(maxWidth: .infinity)
     }
     .id(channelID)
@@ -29,14 +29,14 @@ struct NewThreadScreen: View {
       StaticMark(size: 40).foregroundStyle(Tok.fg)
       Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "en_GB"))))
         .omniCaption()
-        .padding(.top, 16)
-        .padding(.bottom, 10)
+        .padding(.top, z(16))
+        .padding(.bottom, z(10))
       Text(NewThreadText.greeting(hour: Calendar.current.component(.hour, from: .now)))
         .font(.omni(size: 36, weight: .medium))
         .tracking(-0.36)
         .foregroundStyle(Tok.fg)
     }
-    .padding(.horizontal, 4)
+    .padding(.horizontal, z(4))
   }
 }
 
@@ -112,7 +112,7 @@ private struct NewThreadBox: View {
   private var range: ClosedRange<CGFloat> { big ? 96...360 : 60...260 }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: z(8)) {
       shell
       if let e = composer.sendError { ErrorNote(text: e) }
     }
@@ -169,13 +169,13 @@ private struct NewThreadBox: View {
       if !composer.files.isEmpty { AttachmentStrip(files: composer.files, remove: composer.removeFile) }
       ComposerTextView(
         text: $composer.text, placeholder: placeholder, running: false, interrupting: false, focusTick: focusTick,
-        callbacks: callbacks, heightRange: range, label: "New thread", caretRequest: caret, fontSize: big ? 16 : 14.5)
+        callbacks: callbacks, heightRange: range, label: "New thread", caretRequest: caret, fontSize: big ? 16 : 14.5, scale: UIZoom.settings.scale)
       if let e = composer.attachError {
-        Text(e).font(.omni(size: 12)).foregroundStyle(Tok.fg).padding(.horizontal, 16).padding(.bottom, 4)
+        Text(e).font(.omni(size: 12)).foregroundStyle(Tok.fg).padding(.horizontal, z(16)).padding(.bottom, z(4))
       }
       footer
       SlashHintView(model: menu) {}
-        .padding(.horizontal, 16)
+        .padding(.horizontal, z(16))
         .padding(.bottom, menu.hint == nil ? 0 : 10)
         .padding(.top, menu.hint == nil ? 0 : 2)
       // The role's charter, inside the card, as Composer.tsx.
@@ -184,8 +184,8 @@ private struct NewThreadBox: View {
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
           .fixedSize(horizontal: false, vertical: true)
-          .padding(.horizontal, 16)
-          .padding(.bottom, 10)
+          .padding(.horizontal, z(16))
+          .padding(.bottom, z(10))
       }
     }
     .composerShell(radius: 12, focused: focused, over: over)
@@ -208,14 +208,14 @@ private struct NewThreadBox: View {
       EffortMenu(options: composer.effortOptions, value: composer.choice.effort, pick: composer.selectEffort)
       AttachButton(disabled: composer.sending) { picking = true }
       DictateButton { focusTick += 1 }
-      HStack(spacing: 10) {
+      HStack(spacing: z(10)) {
         ComposerHints()
         SendButton(title: "Start", armed: composer.canSend, sending: composer.sending) { start() }
       }
     }
-    .padding(.horizontal, 8)
-    .padding(.bottom, 8)
-    .padding(.top, 6)
+    .padding(.horizontal, z(8))
+    .padding(.bottom, z(8))
+    .padding(.top, z(6))
   }
 
   // MARK: Pickers
@@ -424,15 +424,15 @@ struct ModelPickerButton: View {
   private var list: some View {
     let groups = ModelSearch.groups(harnesses, query: query)
     return VStack(spacing: 0) {
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         OmniIcon(name: "search", size: 15).foregroundStyle(Tok.fg4)
         TextField("Find a model or harness", text: $query).textFieldStyle(.plain).font(.omni(size: 13)).foregroundStyle(Tok.fg)
       }
-      .padding(.horizontal, 12)
+      .padding(.horizontal, z(12))
       .frame(height: z(40))
-      .background(Tok.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-      .padding([.horizontal, .top], 6)
-      .padding(.bottom, 4)
+      .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
+      .padding([.horizontal, .top], z(6))
+      .padding(.bottom, z(4))
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
           ForEach(groups) { group in
@@ -443,8 +443,8 @@ struct ModelPickerButton: View {
             }
           }
         }
-        .padding(.horizontal, 6)
-        .padding(.bottom, 6)
+        .padding(.horizontal, z(6))
+        .padding(.bottom, z(6))
       }
       .frame(height: z(320))
     }
@@ -454,7 +454,7 @@ struct ModelPickerButton: View {
 
   private func header(_ h: HarnessInfo) -> some View {
     HStack {
-      HStack(spacing: 6) {
+      HStack(spacing: z(6)) {
         HarnessLogo(harness: h.id.rawValue, size: 12)
         Text(h.name).lineLimit(1)
       }
@@ -462,9 +462,9 @@ struct ModelPickerButton: View {
       Spacer()
       Text(h.available ? "Bills your \(h.plan)" : "Unavailable").font(.omni(size: 11.5)).foregroundStyle(Tok.fg4)
     }
-    .padding(.horizontal, 12)
-    .padding(.top, 8)
-    .padding(.bottom, 4)
+    .padding(.horizontal, z(12))
+    .padding(.top, z(8))
+    .padding(.bottom, z(4))
     .frame(maxWidth: .infinity)
     .background(Tok.elev)
   }
@@ -475,11 +475,11 @@ struct ModelPickerButton: View {
       Text("Not available. Run \(Text(h.fix ?? "the harness login").monospaced()).")
         .font(.omni(size: 11.5))
         .foregroundStyle(Tok.fg4)
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+        .padding(.horizontal, z(12))
+        .padding(.bottom, z(8))
     } else if group.models.isEmpty {
       if !query.trimmingCharacters(in: .whitespaces).isEmpty {
-        Text("No match").font(.omni(size: 11.5)).foregroundStyle(Tok.fg4).padding(.horizontal, 12).padding(.bottom, 8)
+        Text("No match").font(.omni(size: 11.5)).foregroundStyle(Tok.fg4).padding(.horizontal, z(12)).padding(.bottom, z(8))
       }
     } else {
       ForEach(group.models) { m in
@@ -488,7 +488,7 @@ struct ModelPickerButton: View {
           pick(h.id, m.id)
           open = false
         } label: {
-          HStack(spacing: 10) {
+          HStack(spacing: z(10)) {
             HarnessLogo(harness: h.id.rawValue, size: 13)
               .foregroundStyle(Tok.fg)
               .frame(width: z(28), height: z(28))
@@ -497,13 +497,13 @@ struct ModelPickerButton: View {
               (Text(m.label).foregroundStyle(Tok.fg) + Text(m.isDefault ? " (default)" : "").foregroundStyle(Tok.fg4)).font(.omni(size: 13)).lineLimit(1)
               if let note = m.note { Text(note).font(.omni(size: 11.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
             }
-            Spacer(minLength: 4)
+            Spacer(minLength: z(4))
             PickMark(on: selected)
           }
-          .padding(.horizontal, 8)
-          .padding(.vertical, 6)
+          .padding(.horizontal, z(8))
+          .padding(.vertical, z(6))
           .frame(minHeight: z(40))
-          .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+          .contentShape(RoundedRectangle(cornerRadius: z(16), style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -517,7 +517,7 @@ private struct PickMark: View {
   let on: Bool
 
   var body: some View {
-    let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+    let shape = RoundedRectangle(cornerRadius: z(6), style: .continuous)
     ZStack {
       shape.fill(on ? Tok.fg : .clear)
       shape.strokeBorder(on ? Tok.fg : Tok.lineStrong, lineWidth: 1.5)

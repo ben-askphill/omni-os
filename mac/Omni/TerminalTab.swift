@@ -14,7 +14,7 @@ struct TerminalTab: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         OmniIcon(name: "terminal", size: 13).foregroundStyle(Tok.fg3)
         Text(cwd.map { Format.shortPath($0) } ?? "")
           .font(.omni(size: 11.5, design: .monospaced))
@@ -22,7 +22,7 @@ struct TerminalTab: View {
           .lineLimit(1)
           .truncationMode(.head)
           .help(cwd ?? "")
-        Spacer(minLength: 4)
+        Spacer(minLength: z(4))
         if let session {
           if session.exited {
             Button("Restart", systemImage: "arrow.clockwise") { session.restart() }
@@ -37,27 +37,27 @@ struct TerminalTab: View {
           }
         }
       }
-      .padding(.horizontal, 14)
+      .padding(.horizontal, z(14))
       .frame(height: z(32))
       if let error = session?.error {
         Text(error)
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg2)
           .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.horizontal, 14)
-          .padding(.bottom, 6)
+          .padding(.horizontal, z(14))
+          .padding(.bottom, z(6))
       }
       Group {
         if let session {
-          ShellView(session: session)
+          ShellView(session: session, scale: UIZoom.settings.scale)
         } else {
           Color.clear
         }
       }
-      .padding(8)
-      .background(TerminalSession.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-      .padding(.horizontal, 10)
-      .padding(.bottom, 10)
+      .padding(z(8))
+      .background(TerminalSession.background, in: RoundedRectangle(cornerRadius: z(12), style: .continuous))
+      .padding(.horizontal, z(10))
+      .padding(.bottom, z(10))
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .task(id: thread) {
@@ -93,11 +93,14 @@ final class TerminalSession {
   @ObservationIgnored private var wake: (() -> Void)?
   @ObservationIgnored private var stopped = false
 
+  /// 12pt mono at the zoom. A new font changes the cell size, so SwiftTerm resizes the shell to match.
+  static func font(scale: CGFloat) -> NSFont { .monospacedSystemFont(ofSize: 12 * scale, weight: .regular) }
+
   init(client: OmniClient, thread: String) {
     self.client = client
     self.thread = thread
     view = SwiftTerm.TerminalView(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
-    view.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+    view.font = Self.font(scale: UIZoom.settings.scale)
     view.nativeBackgroundColor = NSColor(TerminalSession.background)
     view.nativeForegroundColor = NSColor(red: 0xec / 255, green: 0xea / 255, blue: 0xe5 / 255, alpha: 1)
     view.caretColor = NSColor(red: 0xec / 255, green: 0xea / 255, blue: 0xe5 / 255, alpha: 1)
@@ -289,6 +292,8 @@ final class TerminalSession {
 /// container that sizes it to the panel: handed to SwiftUI directly it keeps the frame it was made with.
 private struct ShellView: NSViewRepresentable {
   let session: TerminalSession
+  /// `UIZoom.settings.scale`, read in the parent's body.
+  let scale: CGFloat
 
   func makeNSView(context: Context) -> NSView {
     let container = NSView()
@@ -301,5 +306,8 @@ private struct ShellView: NSViewRepresentable {
     return container
   }
 
-  func updateNSView(_ nsView: NSView, context: Context) {}
+  func updateNSView(_ nsView: NSView, context: Context) {
+    let font = TerminalSession.font(scale: scale)
+    if session.view.font.pointSize != font.pointSize { session.view.font = font }
+  }
 }
