@@ -9,10 +9,10 @@ struct OmniPageHeader<Actions: View>: View {
   @ViewBuilder var actions: Actions
 
   var body: some View {
-    HStack(alignment: .bottom, spacing: 12) {
+    HStack(alignment: .bottom, spacing: z(12)) {
       VStack(alignment: .leading, spacing: 0) {
         if let eyebrow {
-          Text(eyebrow).omniCaption().padding(.bottom, 10)
+          Text(eyebrow).omniCaption().padding(.bottom, z(10))
         }
         Text(title)
           .font(.omni(size: 30, weight: .medium))
@@ -25,11 +25,11 @@ struct OmniPageHeader<Actions: View>: View {
             .foregroundStyle(Tok.fg3)
             .frame(maxWidth: z(576), alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 6)
+            .padding(.top, z(6))
         }
       }
       Spacer(minLength: 0)
-      HStack(spacing: 8) { actions }
+      HStack(spacing: z(8)) { actions }
     }
   }
 }
@@ -45,14 +45,14 @@ struct LoadingNote: View {
   var label = "Loading"
 
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: z(8)) {
       Loader(size: 14)
       Text(label)
     }
     .font(.omni(size: 13))
     .foregroundStyle(Tok.fg3)
-    .padding(.horizontal, 4)
-    .padding(.vertical, 24)
+    .padding(.horizontal, z(4))
+    .padding(.vertical, z(24))
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
@@ -92,7 +92,7 @@ extension View {
   /// A settings group: rows on the surface at 20pt corners.
   func omniGroup() -> some View {
     padding(.horizontal, 18)
-      .padding(.vertical, 14)
+      .padding(.vertical, z(14))
       .frame(maxWidth: .infinity, alignment: .leading)
       .omniCard(20)
   }
@@ -104,14 +104,14 @@ struct FieldLabel: View {
   var hint: String?
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 2) {
+    VStack(alignment: .leading, spacing: z(2)) {
       Text(text).font(.omni(size: 12.5, weight: .medium)).foregroundStyle(Tok.fg2)
       if let hint {
         Text(hint).font(.omni(size: 12)).foregroundStyle(Tok.fg3)
           .fixedSize(horizontal: false, vertical: true)
       }
     }
-    .padding(.bottom, 6)
+    .padding(.bottom, z(6))
   }
 }
 
@@ -122,8 +122,8 @@ struct FieldBox<Content: View>: View {
 
   var body: some View {
     content
-      .padding(.horizontal, 12)
-      .padding(.vertical, 7)
+      .padding(.horizontal, z(12))
+      .padding(.vertical, z(7))
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(Tok.surface, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
       .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Tok.line))
@@ -139,7 +139,7 @@ struct OmniToggleStyle: ToggleStyle {
 
   func makeBody(configuration: Configuration) -> some View {
     // The label is for VoiceOver only, as the web's aria-label: pass it with `.accessibilityLabel`.
-    HStack(spacing: 8) {
+    HStack(spacing: z(8)) {
       Capsule()
         .fill(configuration.isOn ? Tok.fg : Tok.surface3)
         .frame(width: z(38), height: z(22))
@@ -148,7 +148,7 @@ struct OmniToggleStyle: ToggleStyle {
             .fill(configuration.isOn ? Tok.onInk : Self.knobOff)
             .shadow(color: .black.opacity(0.18), radius: 1.5, y: 1)
             .frame(width: z(18), height: z(18))
-            .padding(2)
+            .padding(z(2))
         }
         .contentShape(Capsule())
         .onTapGesture {
@@ -170,20 +170,11 @@ extension ToggleStyle where Self == OmniToggleStyle {
 
 /// `.field` with the mono face for paths, slugs and ids, as `field font-mono !text-[13px]`.
 struct OmniMonoFieldStyle: TextFieldStyle {
-  @FocusState private var focused: Bool
-
   func _body(configuration: TextField<Self._Label>) -> some View {
     configuration
       .textFieldStyle(.plain)
-      .modifier(OmniFont(size: 13, design: .monospaced))
       .foregroundStyle(Tok.fg)
-      .focused($focused)
-      .padding(.horizontal, 14)
-      .padding(.vertical, 10)
-      .background(focused ? Tok.bg : Tok.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-      .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(focused ? Tok.lineStrong : Tok.line))
-      .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Tok.wash).padding(-4).opacity(focused ? 1 : 0))
-      .animation(.easeOut(duration: 0.16), value: focused)
+      .modifier(FieldChrome(size: 13, design: .monospaced, vertical: 10))
   }
 }
 
@@ -205,11 +196,11 @@ struct OmniTextEditor: View {
       .scrollContentBackground(.hidden)
       .focused($focused)
       .frame(minHeight: minHeight)
-      .padding(.horizontal, 9)
-      .padding(.vertical, 8)
-      .background(focused ? Tok.bg : Tok.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-      .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(focused ? Tok.lineStrong : Tok.line))
-      .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Tok.wash).padding(-4).opacity(focused ? 1 : 0))
+      .padding(.horizontal, z(9))
+      .padding(.vertical, z(8))
+      .background(focused ? Tok.bg : Tok.surface, in: RoundedRectangle(cornerRadius: z(14), style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: z(14), style: .continuous).strokeBorder(focused ? Tok.lineStrong : Tok.line))
+      .background(RoundedRectangle(cornerRadius: z(18), style: .continuous).fill(Tok.wash).padding(z(-4)).opacity(focused ? 1 : 0))
       .animation(.easeOut(duration: 0.16), value: focused)
   }
 }
@@ -220,9 +211,9 @@ struct SettingsPage<Content: View>: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 16) { content }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 22)
+      VStack(alignment: .leading, spacing: z(16)) { content }
+        .padding(.horizontal, z(24))
+        .padding(.vertical, z(22))
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     .scrollIndicators(.automatic)
@@ -239,9 +230,9 @@ struct SettingsCard<Content: View, Trailing: View>: View {
   @ViewBuilder var content: Content
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      HStack(alignment: .firstTextBaseline, spacing: 10) {
-        VStack(alignment: .leading, spacing: 4) {
+    VStack(alignment: .leading, spacing: z(14)) {
+      HStack(alignment: .firstTextBaseline, spacing: z(10)) {
+        VStack(alignment: .leading, spacing: z(4)) {
           Text(title).font(.omni(size: 16, weight: .medium)).tracking(-0.16).foregroundStyle(Tok.fg)
           if let note {
             Text(note).font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
@@ -249,13 +240,13 @@ struct SettingsCard<Content: View, Trailing: View>: View {
           }
         }
         Spacer(minLength: 0)
-        HStack(spacing: 8) { trailing }
+        HStack(spacing: z(8)) { trailing }
       }
       content
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(20)
-    .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Tok.line))
+    .padding(z(20))
+    .overlay(RoundedRectangle(cornerRadius: z(24), style: .continuous).strokeBorder(Tok.line))
   }
 }
 
@@ -271,7 +262,7 @@ struct SettingsIntro: View {
   let text: Text
 
   var body: some View {
-    HStack(alignment: .top, spacing: 12) {
+    HStack(alignment: .top, spacing: z(12)) {
       OmniIcon(name: icon, size: 15)
         .foregroundStyle(Tok.fg3)
         .frame(width: z(32), height: z(32))
@@ -283,7 +274,7 @@ struct SettingsIntro: View {
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .padding(16)
+    .padding(z(16))
     .omniCard(20)
   }
 }
@@ -295,7 +286,7 @@ struct InfoRows<Content: View>: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) { content }
-      .padding(6)
+      .padding(z(6))
       .frame(maxWidth: .infinity, alignment: .leading)
       .omniCard(20, fill: fill)
   }
@@ -307,7 +298,7 @@ struct InfoRow<Content: View>: View {
   @ViewBuilder var content: Content
 
   var body: some View {
-    HStack(spacing: 12) {
+    HStack(spacing: z(12)) {
       Text(label).font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
         .frame(width: z(112), alignment: .leading)
       content
@@ -315,7 +306,7 @@ struct InfoRow<Content: View>: View {
         .foregroundStyle(Tok.fg)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .padding(.horizontal, 10)
+    .padding(.horizontal, z(10))
     .frame(minHeight: z(36))
     .accessibilityElement(children: .combine)
   }
@@ -332,7 +323,7 @@ struct DoneNote: View {
   let text: String
 
   var body: some View {
-    HStack(spacing: 6) {
+    HStack(spacing: z(6)) {
       GlyphView(glyph: .done, size: 8)
       Text(text)
     }
@@ -346,7 +337,7 @@ struct NeedsNote: View {
   let text: String
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
+    HStack(alignment: .firstTextBaseline, spacing: z(8)) {
       GlyphView(glyph: .needs, size: 8)
         .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
       Text(text)

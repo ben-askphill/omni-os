@@ -12,8 +12,8 @@ struct HomeScreen: View {
     ScreenColumn {
       VStack(alignment: .leading, spacing: 0) {
         header
-          .padding(.top, 40)
-          .padding(.bottom, 20)
+          .padding(.top, z(40))
+          .padding(.bottom, z(20))
         NewThreadComposerView(model: model, channelID: nil, big: true)
         HStack {
           Text("Recent")
@@ -26,9 +26,9 @@ struct HomeScreen: View {
           }, small: true)
           .accessibilityLabel("Filter threads")
         }
-        .padding(.top, 40)
-        .padding(.bottom, 8)
-        .padding(.horizontal, 4)
+        .padding(.top, z(40))
+        .padding(.bottom, z(8))
+        .padding(.horizontal, z(4))
         list(shown, recent: recent)
       }
     }
@@ -43,8 +43,8 @@ struct HomeScreen: View {
           VStack(alignment: .leading, spacing: 0) {
             Text(context.date.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "en_GB"))))
               .omniCaption()
-              .padding(.top, 16)
-              .padding(.bottom, 10)
+              .padding(.top, z(16))
+              .padding(.bottom, z(10))
             Text(Greeting.text(hour: Calendar.current.component(.hour, from: context.date)))
               .font(.omni(size: 36, weight: .medium))
               .tracking(-0.36)
@@ -55,7 +55,7 @@ struct HomeScreen: View {
       Spacer()
       if let status = model.store.status { Pulse(status: status) }
     }
-    .padding(.horizontal, 4)
+    .padding(.horizontal, z(4))
   }
 
   /// The web says Active where OmniKit says Running.
@@ -67,7 +67,7 @@ struct HomeScreen: View {
     if !shown.isEmpty {
       ThreadDayList(model: model, threads: shown, showChannel: true)
     } else if recent.isEmpty && model.store.loadState == .loading {
-      Loader(size: 16).foregroundStyle(Tok.fg3).frame(maxWidth: .infinity).padding(.vertical, 40)
+      Loader(size: 16).foregroundStyle(Tok.fg3).frame(maxWidth: .infinity).padding(.vertical, z(40))
     } else {
       switch filter {
       case .all:
@@ -93,7 +93,7 @@ private struct Pulse: View {
 
   var body: some View {
     let busy = status.running > 0
-    HStack(spacing: 8) {
+    HStack(spacing: z(8)) {
       GlyphView(glyph: busy ? .running : .idle, size: 7)
       Text(busy ? "\(status.running) running" : "All quiet")
       if status.queued > 0 {
@@ -104,7 +104,7 @@ private struct Pulse: View {
     .font(.omni(size: 11.5))
     .monospacedDigit()
     .foregroundStyle(Tok.fg2)
-    .padding(.horizontal, 12)
+    .padding(.horizontal, z(12))
     .frame(height: z(28))
     .background(Tok.surface, in: Capsule())
   }

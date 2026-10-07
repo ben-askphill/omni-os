@@ -64,7 +64,7 @@ struct UpdateBar: View {
   private func row<Actions: View>(
     icon: RowIcon?, text: String, @ViewBuilder actions: () -> Actions
   ) -> some View {
-    HStack(spacing: 10) {
+    HStack(spacing: z(10)) {
       Group {
         switch icon ?? .progress {
         case .progress: Loader(size: 14)
@@ -80,12 +80,12 @@ struct UpdateBar: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       actions()
     }
-    .padding(.leading, 14)
-    .padding(.trailing, 6)
+    .padding(.leading, z(14))
+    .padding(.trailing, z(6))
     .frame(minHeight: z(38))
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    .padding(.horizontal, 12)
-    .padding(.top, 8)
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(18), style: .continuous))
+    .padding(.horizontal, z(12))
+    .padding(.top, z(8))
   }
 }
 
@@ -94,7 +94,7 @@ struct BannerStack: View {
   let model: AppModel
 
   var body: some View {
-    VStack(alignment: .trailing, spacing: 8) {
+    VStack(alignment: .trailing, spacing: z(8)) {
       ForEach(model.banners.banners) { banner in
         BannerView(banner: banner, open: {
           model.route = .thread(id: banner.threadID)
@@ -103,7 +103,7 @@ struct BannerStack: View {
         .transition(.move(edge: .trailing).combined(with: .opacity))
       }
     }
-    .padding(16)
+    .padding(z(16))
     .animation(.default, value: model.banners.banners)
   }
 }
@@ -115,7 +115,7 @@ struct BannerView: View {
   @State private var hovering = false
 
   var body: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: z(10)) {
       ThreadStatusIcon(status: banner.status)
       VStack(alignment: .leading, spacing: 1) {
         Text(banner.title)
@@ -136,11 +136,11 @@ struct BannerView: View {
       .buttonStyle(.icon(size: 26))
       .accessibilityLabel("Dismiss")
     }
-    .padding(.leading, 14)
-    .padding(.trailing, 8)
-    .padding(.vertical, 8)
+    .padding(.leading, z(14))
+    .padding(.trailing, z(8))
+    .padding(.vertical, z(8))
     .frame(width: z(340))
-    .background(Tok.elev, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .background(Tok.elev, in: RoundedRectangle(cornerRadius: z(22), style: .continuous))
     .menuShadow(22)
     .onHover { hovering = $0 }
     .task(id: hovering) {

@@ -54,7 +54,7 @@ struct ToolGroupView: View {
     let open = ui.isOpen(key)
     return VStack(alignment: .leading, spacing: 0) {
       Button { withAnimation(Motion.settle) { ui.toggle(key) } } label: {
-        HStack(spacing: 8) {
+        HStack(spacing: z(8)) {
           Chevron(open: open)
           OmniIcon(name: "tool", size: 13)
             .foregroundStyle(Tok.fg3)
@@ -69,7 +69,7 @@ struct ToolGroupView: View {
             .foregroundStyle(Tok.fg3)
             .frame(maxWidth: .infinity, alignment: .leading)
           if group.failures > 0 {
-            HStack(spacing: 4) {
+            HStack(spacing: z(4)) {
               GlyphView(glyph: .needs, size: 7)
               Text("\(group.failures) failed")
             }
@@ -87,9 +87,9 @@ struct ToolGroupView: View {
           if live || !working.isEmpty { Loader(size: 11).foregroundStyle(working.isEmpty ? Tok.fg3 : Tok.live) }
         }
         .font(.omni(size: ThreadStyle.small))
-        .padding(.horizontal, 14)
+        .padding(.horizontal, z(14))
         .frame(height: z(40))
-        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: z(20), style: .continuous))
         .rowHover(radius: 20)
       }
       .buttonStyle(.plain)
@@ -100,12 +100,12 @@ struct ToolGroupView: View {
             ToolRowView(call: call, running: running, cwd: cwd, ui: ui, agents: agents)
           }
         }
-        .padding(.horizontal, 6)
-        .padding(.bottom, 6)
+        .padding(.horizontal, z(6))
+        .padding(.bottom, z(6))
         .transition(.opacity)
       }
     }
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
   }
 
   @ViewBuilder private var summary: some View {
@@ -137,7 +137,7 @@ struct ToolRowView: View {
     let indent = depth > 0 || call.orphan
     VStack(alignment: .leading, spacing: 0) {
       Button { withAnimation(Motion.settle) { ui.toggle(key) } } label: {
-        HStack(spacing: 8) {
+        HStack(spacing: z(8)) {
           Chevron(open: open)
           OmniIcon(name: TranscriptIcon.tool(call.name), size: 13)
             .foregroundStyle(Tok.fg3)
@@ -164,7 +164,7 @@ struct ToolRowView: View {
           } else if pending && running {
             Loader(size: 11).foregroundStyle(Tok.fg3)
           } else if call.isFailed {
-            HStack(spacing: 4) {
+            HStack(spacing: z(4)) {
               GlyphView(glyph: .needs, size: 7)
               Text("error")
             }
@@ -176,7 +176,7 @@ struct ToolRowView: View {
           }
         }
         .font(.omni(size: ThreadStyle.small))
-        .padding(.horizontal, 10)
+        .padding(.horizontal, z(10))
         .frame(height: z(32))
         .contentShape(Capsule())
         .rowHover(radius: 16)
@@ -186,10 +186,10 @@ struct ToolRowView: View {
 
       if open {
         ToolDetail(call: call, running: running)
-          .padding(.leading, 28)
-          .padding(.trailing, 4)
-          .padding(.top, 4)
-          .padding(.bottom, 10)
+          .padding(.leading, z(28))
+          .padding(.trailing, z(4))
+          .padding(.top, z(4))
+          .padding(.bottom, z(10))
           .transition(.opacity)
       }
       if !call.children.isEmpty && (open || (pending && (running || agent))) {
@@ -198,8 +198,8 @@ struct ToolRowView: View {
             ToolRowView(call: child, depth: depth + 1, running: running, cwd: cwd, ui: ui, agents: agents)
           }
         }
-        .padding(.leading, 12)
-        .padding(.bottom, 4)
+        .padding(.leading, z(12))
+        .padding(.bottom, z(4))
       }
     }
     .padding(.leading, indent ? 10 : 0)
@@ -219,7 +219,7 @@ struct ToolDetail: View {
   let running: Bool
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .leading, spacing: z(6)) {
       ToolInputView(input: ToolInput(call.use))
       if let result = call.result {
         Pre(text: result.text.isEmpty ? "(no output)" : result.text, tone: call.isFailed ? .bad : .plain)
@@ -248,7 +248,7 @@ struct ToolInputView: View {
     case .edits(let path, let edits):
       pathLine(path)
       ForEach(Array(edits.enumerated()), id: \.offset) { _, edit in
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: z(4)) {
           if let old = edit.old { Pre(text: old, tone: .delete) }
           Pre(text: edit.new, tone: .add)
         }
@@ -291,7 +291,7 @@ struct CheckItem: View {
   var body: some View {
     let done = state == "completed"
     let active = state == "in_progress"
-    HStack(alignment: .firstTextBaseline, spacing: 10) {
+    HStack(alignment: .firstTextBaseline, spacing: z(10)) {
       CheckBox(done: done, active: active)
         .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4.5 }
       Text(text)
@@ -302,7 +302,7 @@ struct CheckItem: View {
         .fixedSize(horizontal: false, vertical: true)
         .animation(.easeOut(duration: 0.3), value: done)
     }
-    .padding(.vertical, 3)
+    .padding(.vertical, z(3))
     .accessibilityElement(children: .combine)
     .accessibilityValue(done ? "Done" : active ? "In progress" : "Not started")
   }
@@ -315,7 +315,7 @@ private struct CheckBox: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
-    let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+    let shape = RoundedRectangle(cornerRadius: z(6), style: .continuous)
     ZStack {
       shape.strokeBorder(active ? Tok.fg : Tok.fg.opacity(0.28), lineWidth: 1.5)
       shape.fill(Tok.fg).scaleEffect(done ? 1 : 0.001)

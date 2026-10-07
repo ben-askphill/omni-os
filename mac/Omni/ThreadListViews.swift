@@ -11,8 +11,8 @@ struct ScreenColumn<Content: View>: View {
       content
         .frame(maxWidth: width, alignment: .leading)
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.bottom, 48)
+        .padding(.horizontal, z(24))
+        .padding(.bottom, z(48))
     }
   }
 }
@@ -33,10 +33,10 @@ struct ThreadListRow: View {
     Button {
       model.route = .thread(id: thread.id)
     } label: {
-      HStack(alignment: .top, spacing: 12) {
+      HStack(alignment: .top, spacing: z(12)) {
         leading
-        VStack(alignment: .leading, spacing: 2) {
-          HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: z(2)) {
+          HStack(spacing: z(8)) {
             Text(thread.title.isEmpty ? "Untitled" : thread.title)
               .font(.omni(size: 14))
               .foregroundStyle(Tok.fg)
@@ -44,7 +44,7 @@ struct ThreadListRow: View {
             if let role = thread.role, !role.isEmpty { Chip(text: role) }
             if let source = Self.sources[thread.source] { Chip(text: source, tone: .outline) }
             if let pr { PRMarkIcon(pr: pr) }
-            Spacer(minLength: 8)
+            Spacer(minLength: z(8))
             TimelineView(.everyMinute) { _ in
               Text(Format.relTime(thread.updatedAt))
                 .font(.omni(size: 11))
@@ -52,7 +52,7 @@ struct ThreadListRow: View {
                 .foregroundStyle(Tok.fg4)
             }
           }
-          HStack(spacing: 6) {
+          HStack(spacing: z(6)) {
             if showChannel {
               Text("#\(thread.channelID)")
                 .foregroundStyle(Tok.fg2)
@@ -60,7 +60,7 @@ struct ThreadListRow: View {
             if let branch = thread.branch, !branch.isEmpty {
               Text(branch)
                 .font(.omni(size: 10.5, design: .monospaced))
-                .padding(.horizontal, 6)
+                .padding(.horizontal, z(6))
                 .background(ThreadStyle.surface2, in: Capsule())
             }
             Text(preview)
@@ -70,10 +70,10 @@ struct ThreadListRow: View {
           .foregroundStyle(Tok.fg3)
         }
       }
-      .padding(.horizontal, 10)
-      .padding(.vertical, 10)
+      .padding(.horizontal, z(10))
+      .padding(.vertical, z(10))
       .contentShape(Rectangle())
-      .background(hovering ? Tok.surface : .clear, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+      .background(hovering ? Tok.surface : .clear, in: RoundedRectangle(cornerRadius: z(18), style: .continuous))
     }
     .buttonStyle(.plain)
     .onHover { hovering = $0 }
@@ -85,7 +85,7 @@ struct ThreadListRow: View {
       ChannelAvatar(name: thread.channelID, conductor: thread.channelID == SidebarSections.conductorID, size: 32, icon: model.store.channel(thread.channelID)?.icon)
         .overlay(alignment: .bottomTrailing) {
           StatusDot(status: thread.status, size: 8)
-            .padding(2)
+            .padding(z(2))
             .background(Tok.bg, in: Circle())
             .offset(x: 2, y: 2)
         }
@@ -130,17 +130,17 @@ struct ThreadDayList: View {
   var prs: [String: BranchPRMark] = [:]
 
   var body: some View {
-    LazyVStack(alignment: .leading, spacing: 12) {
+    LazyVStack(alignment: .leading, spacing: z(12)) {
       ForEach(ThreadListing.byDay(threads)) { group in
         VStack(alignment: .leading, spacing: 0) {
-          HStack(spacing: 6) {
+          HStack(spacing: z(6)) {
             Text(group.label)
             Text("\(group.threads.count)")
               .foregroundStyle(Tok.fg4)
           }
           .omniCaption()
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
+          .padding(.horizontal, z(10))
+          .padding(.vertical, z(6))
           ForEach(group.threads) {
             ThreadListRow(model: model, thread: $0, showChannel: showChannel, pr: $0.branch.flatMap { prs[$0] }).openInNewWindow($0.id, model: model, title: $0.title)
           }
@@ -176,7 +176,7 @@ struct EmptyNote<Action: View>: View {
       .foregroundStyle(Tok.fg3)
       .frame(width: z(48), height: z(48))
       .background(Tok.surface2, in: Circle())
-      .padding(.bottom, 16)
+      .padding(.bottom, z(16))
       Text(title)
         .font(.omni(size: 17, weight: .medium))
         .tracking(-0.17)
@@ -189,13 +189,13 @@ struct EmptyNote<Action: View>: View {
           .multilineTextAlignment(.center)
           .fixedSize(horizontal: false, vertical: true)
           .frame(maxWidth: z(384))
-          .padding(.top, 6)
+          .padding(.top, z(6))
       }
-      action.padding(.top, 20)
+      action.padding(.top, z(20))
     }
     .frame(maxWidth: .infinity)
-    .padding(.horizontal, 24)
-    .padding(.vertical, 64)
+    .padding(.horizontal, z(24))
+    .padding(.vertical, z(64))
   }
 }
 

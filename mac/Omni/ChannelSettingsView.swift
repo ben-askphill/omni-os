@@ -87,21 +87,21 @@ struct ChannelSettingsForm: View {
       "Design system",
       hint: "One standalone HTML file with your tokens, type and components. Threads in this channel read it before they write an HTML page, so every artifact looks the same. Saved as soon as you pick the file."
     ) {
-      VStack(alignment: .leading, spacing: 8) {
-        HStack(spacing: 8) {
+      VStack(alignment: .leading, spacing: z(8)) {
+        HStack(spacing: z(8)) {
           if let name = existing?.designSystemName, let existing {
-            HStack(spacing: 8) {
+            HStack(spacing: z(8)) {
               OmniIcon(name: "file", size: 14)
               Link(name, destination: model.client.designSystemURL(existing.id))
               Text(Format.bytes(existing.designSystemSize)).foregroundStyle(Tok.fg3)
             }
             .font(.omni(size: 13))
-            .padding(.horizontal, 12)
+            .padding(.horizontal, z(12))
             .frame(height: z(30))
             .background(Capsule().fill(Tok.surface))
           }
           Button { chooseDesignSystem() } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: z(6)) {
               if designBusy { Loader(size: 14) } else { OmniIcon(name: "file", size: 14) }
               Text(existing?.designSystemName == nil ? "Upload HTML file" : "Replace file")
             }
@@ -123,7 +123,7 @@ struct ChannelSettingsForm: View {
   private var isSystem: Bool { existing?.kind == .system }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
+    VStack(alignment: .leading, spacing: z(16)) {
       basics
       code
       storeAndBrowser
@@ -136,7 +136,7 @@ struct ChannelSettingsForm: View {
 
   private var basics: some View {
     SettingsSection("Basics") {
-      HStack(alignment: .top, spacing: 16) {
+      HStack(alignment: .top, spacing: z(16)) {
         SettingsField("Name") {
           TextField("", text: Binding(get: { form.name }, set: { form.setName($0) }), prompt: Text("Volero"))
             .accessibilityLabel("Name")
@@ -149,8 +149,8 @@ struct ChannelSettingsForm: View {
         }
       }
       SettingsField("Icon", hint: "Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG or pick an icon. Empty uses the first letter.") {
-        VStack(alignment: .leading, spacing: 12) {
-          HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: z(12)) {
+          HStack(spacing: z(12)) {
             ChannelAvatar(name: form.name.isEmpty ? form.id : form.name, size: 36, icon: form.icon)
             TextField("", text: Binding(get: { form.emoji }, set: { form.setIcon($0) }), prompt: Text("Emoji"))
               .font(.omni(size: 18))
@@ -158,7 +158,7 @@ struct ChannelSettingsForm: View {
               .frame(width: z(96))
               .accessibilityLabel("Emoji")
             Button { uploadSVG() } label: {
-              HStack(spacing: 6) {
+              HStack(spacing: z(6)) {
                 OmniIcon(name: "image", size: 14)
                 Text(form.hasSVG ? "Replace SVG" : "Upload SVG")
               }
@@ -201,7 +201,7 @@ struct ChannelSettingsForm: View {
     } else {
       let run = form.defaultRun
       let name = harnesses.first { $0.id == run.harness }?.name ?? run.harness.rawValue
-      HStack(spacing: 6) {
+      HStack(spacing: z(6)) {
         ModelPickerButton(
           harnesses: harnesses, harness: run.harness, model: run.model,
           placeholder: form.defaultHarness.isEmpty ? "Claude Code default" : "\(name) default",
@@ -228,7 +228,7 @@ struct ChannelSettingsForm: View {
   private var code: some View {
     SettingsSection("Code") {
       SettingsField("Repo path", hint: "Absolute path to a local git repo. Enables per-thread worktrees and the PRs tab.") {
-        HStack(spacing: 8) {
+        HStack(spacing: z(8)) {
           TextField("", text: $form.repoPath, prompt: Text("/Users/benrosenberg/code/apa-volero"))
             .textFieldStyle(.omniMono)
             .accessibilityLabel("Repo path")
@@ -247,7 +247,7 @@ struct ChannelSettingsForm: View {
       )
       .disabled(form.repoPath.trimmingCharacters(in: .whitespaces).isEmpty)
       SettingsField("Base directory", hint: "Where threads run when there is no repo. Defaults to the brain folder (phillbert) so skills load.") {
-        HStack(spacing: 8) {
+        HStack(spacing: z(8)) {
           TextField("", text: $form.baseDir, prompt: Text("/Users/benrosenberg/phillbert"))
             .textFieldStyle(.omniMono)
             .accessibilityLabel("Base directory")
@@ -259,7 +259,7 @@ struct ChannelSettingsForm: View {
 
   private var storeAndBrowser: some View {
     SettingsSection("Store and browser") {
-      HStack(alignment: .top, spacing: 16) {
+      HStack(alignment: .top, spacing: z(16)) {
         SettingsField("Store domain", hint: "The myshopify domain, e.g. volero-eu.myshopify.com") {
           TextField("", text: $form.storeDomain, prompt: Text("volero-eu.myshopify.com"))
             .textFieldStyle(.omniMono)
@@ -280,11 +280,11 @@ struct ChannelSettingsForm: View {
   }
 
   private var actions: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: z(10)) {
       Button {
         Task { await save() }
       } label: {
-        HStack(spacing: 8) {
+        HStack(spacing: z(8)) {
           if busy { Loader(size: 14) }
           Text(isNew ? "Create channel" : "Save changes")
         }
@@ -293,7 +293,7 @@ struct ChannelSettingsForm: View {
       .keyboardShortcut(.defaultAction)
       .disabled(busy)
       if saved {
-        HStack(spacing: 6) {
+        HStack(spacing: z(6)) {
           GlyphView(glyph: .done, size: 8)
           Text("Saved")
         }
@@ -310,12 +310,12 @@ struct ChannelSettingsForm: View {
 
   @ViewBuilder private var archiveControl: some View {
     if confirmArchive {
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         Button("Cancel") { confirmArchive = false }
           .buttonStyle(.pill(.ghost, height: 34))
           .disabled(archiving)
         Button(role: .destructive) { Task { await archive() } } label: {
-          HStack(spacing: 8) {
+          HStack(spacing: z(8)) {
             if archiving { Loader(size: 14) }
             Text(archiving ? "Archiving" : "Archive")
           }
@@ -327,7 +327,7 @@ struct ChannelSettingsForm: View {
       Button {
         confirmArchive = true
       } label: {
-        HStack(spacing: 8) {
+        HStack(spacing: z(8)) {
           OmniIcon(name: "archive", size: 15)
           Text("Archive channel")
         }
@@ -383,11 +383,11 @@ struct NewChannelScreen: View {
 
   var body: some View {
     ScreenColumn(width: 672) {
-      VStack(alignment: .leading, spacing: 24) {
+      VStack(alignment: .leading, spacing: z(24)) {
         OmniPageHeader(title: "New channel", subtitle: "One channel per client or project. Threads, PRs, secrets and the browser profile are scoped to it.")
         ChannelSettingsForm(model: model)
       }
-      .padding(.top, 40)
+      .padding(.top, z(40))
     }
   }
 }
@@ -406,20 +406,20 @@ struct MissingChannelView: View {
       if let archived {
         EmptyNote(symbol: "archive", title: "#\(archived.name) is archived",
                   message: "Its threads are kept. Unarchive to see them in the sidebar and start new ones.") {
-          VStack(spacing: 12) {
+          VStack(spacing: z(12)) {
             if let error {
-              HStack(spacing: 6) {
+              HStack(spacing: z(6)) {
                 GlyphView(glyph: .needs, size: 7)
                 Text(error)
               }
               .font(.omni(size: 12.5))
               .foregroundStyle(Tok.fg2)
             }
-            HStack(spacing: 8) {
+            HStack(spacing: z(8)) {
               Button {
                 Task { await unarchive() }
               } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: z(8)) {
                   if busy { Loader(size: 14) } else { OmniIcon(name: "archive", size: 15) }
                   Text("Unarchive")
                 }
@@ -437,7 +437,7 @@ struct MissingChannelView: View {
             .buttonStyle(.pill(.secondary, height: 34))
         }
       } else {
-        LoadingNote().padding(.horizontal, 32)
+        LoadingNote().padding(.horizontal, z(32))
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -471,13 +471,13 @@ private struct SettingsSection<Content: View>: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
+    VStack(alignment: .leading, spacing: z(16)) {
       Text(title).font(.omni(size: 16, weight: .medium)).tracking(-0.16).foregroundStyle(Tok.fg)
       content
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(20)
-    .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Tok.line))
+    .padding(z(20))
+    .overlay(RoundedRectangle(cornerRadius: z(24), style: .continuous).strokeBorder(Tok.line))
   }
 }
 
@@ -508,8 +508,8 @@ private struct SettingsToggle: View {
   @Binding var isOn: Bool
 
   var body: some View {
-    HStack(alignment: .top, spacing: 16) {
-      VStack(alignment: .leading, spacing: 2) {
+    HStack(alignment: .top, spacing: z(16)) {
+      VStack(alignment: .leading, spacing: z(2)) {
         Text(title).font(.omni(size: 13, weight: .medium)).foregroundStyle(Tok.fg)
         Text(detail)
           .font(.omni(size: 12))
@@ -521,9 +521,9 @@ private struct SettingsToggle: View {
         .toggleStyle(.omni)
         .accessibilityLabel(title)
     }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 12)
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .padding(.horizontal, z(16))
+    .padding(.vertical, z(12))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(18), style: .continuous))
   }
 }
 

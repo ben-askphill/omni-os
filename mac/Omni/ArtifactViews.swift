@@ -35,7 +35,7 @@ struct ArtifactViewer: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      HStack(spacing: 10) {
+      HStack(spacing: z(10)) {
         OmniIcon(name: artifactIcon(ref.kind), size: 14)
           .foregroundStyle(Tok.fg3)
           .frame(width: z(30), height: z(30))
@@ -83,11 +83,11 @@ struct ArtifactViewer: View {
         .buttonStyle(.icon(size: 30))
         .help("Download")
       }
-      .padding(.vertical, 8)
-      .padding(.horizontal, 12)
+      .padding(.vertical, z(8))
+      .padding(.horizontal, z(12))
       Hairline()
       if let saveError {
-        ErrorNote(text: saveError).padding(8)
+        ErrorNote(text: saveError).padding(z(8))
       }
       ArtifactBody(client: client, ref: ref)
     }
@@ -154,15 +154,15 @@ struct ArtifactBody: View {
       Text("No preview for this file type. Download it instead.")
         .font(.omni(size: 13))
         .foregroundStyle(Tok.fg3)
-        .padding(16)
+        .padding(z(16))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     } else {
       Group {
         switch phase {
         case .loading:
-          LoadingNote().padding(.horizontal, 12).frame(maxHeight: .infinity, alignment: .top)
+          LoadingNote().padding(.horizontal, z(12)).frame(maxHeight: .infinity, alignment: .top)
         case .failed(let message):
-          VStack { ErrorNote(text: message) { phase = .loading; Task { await load() } }.padding(12); Spacer() }
+          VStack { ErrorNote(text: message) { phase = .loading; Task { await load() } }.padding(z(12)); Spacer() }
         case .loaded(let data):
           NativeBody(ref: ref, data: data)
         }
@@ -195,19 +195,19 @@ private struct NativeBody: View {
           Image(nsImage: image)
             .resizable()
             .scaledToFit()
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: z(12), style: .continuous))
             .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
-            .padding(12)
+            .padding(z(12))
             .frame(maxWidth: .infinity)
         }
       } else {
-        Text("This image could not be read.").font(.omni(size: 13)).foregroundStyle(Tok.fg3).padding(16)
+        Text("This image could not be read.").font(.omni(size: 13)).foregroundStyle(Tok.fg3).padding(z(16))
       }
     case "markdown":
       ScrollView {
         MarkdownView(document: MarkdownDocument(parsing: String(decoding: data, as: UTF8.self)))
-          .padding(.horizontal, 20)
-          .padding(.vertical, 16)
+          .padding(.horizontal, z(20))
+          .padding(.vertical, z(16))
           .frame(maxWidth: .infinity, alignment: .leading)
           .textSelection(.enabled)
       }
@@ -230,7 +230,7 @@ private struct PlainTextView: View {
 
   var body: some View {
     ScrollView([.vertical]) {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: z(8)) {
         Text(text.count > Self.limit ? String(text.prefix(Self.limit)) : text)
           .font(.omni(size: 12, design: .monospaced))
           .foregroundStyle(Tok.fg2)
@@ -241,7 +241,7 @@ private struct PlainTextView: View {
             .font(.omni(size: 11.5)).foregroundStyle(Tok.fg4)
         }
       }
-      .padding(12)
+      .padding(z(12))
     }
   }
 }
@@ -266,15 +266,15 @@ private struct CSVTableView: View {
               }
               if table.truncated {
                 Text("Showing the first 500 rows. Download for the full file.")
-                  .font(.omni(size: 11.5)).foregroundStyle(Tok.fg4).padding(8)
+                  .font(.omni(size: 11.5)).foregroundStyle(Tok.fg4).padding(z(8))
               }
             }
           }
         } else {
-          Text("Empty file").font(.omni(size: 13)).foregroundStyle(Tok.fg3).padding(16)
+          Text("Empty file").font(.omni(size: 13)).foregroundStyle(Tok.fg3).padding(z(16))
         }
       } else {
-        LoadingNote().padding(.horizontal, 12)
+        LoadingNote().padding(.horizontal, z(12))
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -289,7 +289,7 @@ private struct CSVTableView: View {
           .foregroundStyle(header ? Tok.fg3 : Tok.fg)
           .lineLimit(header ? 1 : 3)
           .frame(width: z(180), alignment: .leading)
-          .padding(.horizontal, 10)
+          .padding(.horizontal, z(10))
           .padding(.vertical, header ? 7 : 5)
           .textSelection(.enabled)
       }

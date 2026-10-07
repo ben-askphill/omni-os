@@ -27,14 +27,14 @@ struct LiveBrowserView: View {
         .clipped()
 
         if let error = model.error {
-          HStack(spacing: 8) {
+          HStack(spacing: z(8)) {
             Image(systemName: "exclamationmark.triangle").foregroundStyle(Tok.fg3)
             Text(error).font(.omni(size: 12)).foregroundStyle(Tok.fg2).frame(maxWidth: .infinity, alignment: .leading)
             Button("Restart") { model.perform(.restart) }
               .buttonStyle(.pill(.secondary, height: 26))
           }
-          .padding(.horizontal, 12)
-          .padding(.vertical, 8)
+          .padding(.horizontal, z(12))
+          .padding(.vertical, z(8))
           Tok.line.frame(height: 1)
         }
 
@@ -44,7 +44,7 @@ struct LiveBrowserView: View {
             BrowserCanvas(frame: model.frame, send: model.send, shortcut: shortcut)
               .accessibilityLabel(s.title.isEmpty ? "Browser page" : s.title)
             if model.frame == nil, model.error == nil {
-              HStack(spacing: 8) {
+              HStack(spacing: z(8)) {
                 Loader(size: 12)
                 Text(s.running ? "Waiting for the page" : "Starting the browser")
               }
@@ -62,7 +62,7 @@ struct LiveBrowserView: View {
         }
       }
       .background(Tok.bg)
-      .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+      .clipShape(RoundedRectangle(cornerRadius: z(14), style: .continuous))
     }
     .onAppear { model.start() }
     .onDisappear { model.stop() }
@@ -72,7 +72,7 @@ struct LiveBrowserView: View {
   }
 
   private func toolbar(_ s: BrowserState) -> some View {
-    HStack(spacing: 2) {
+    HStack(spacing: z(2)) {
       Button("Back", systemImage: "chevron.left") { model.perform(.back) }
         .disabled(!s.canBack)
         .help("Back (⌘[)")
@@ -86,7 +86,7 @@ struct LiveBrowserView: View {
           .disabled(!s.running)
           .help("Reload (⌘R)")
       }
-      HStack(spacing: 7) {
+      HStack(spacing: z(7)) {
         Image(systemName: s.url.hasPrefix("https://") ? "lock.fill" : s.url.isEmpty || s.url == "about:blank" ? "magnifyingglass" : "info.circle")
           .font(.omni(size: 10.5, weight: .semibold))
           .foregroundStyle(Tok.fg3)
@@ -105,19 +105,19 @@ struct LiveBrowserView: View {
             editing = false
           }
       }
-      .padding(.horizontal, 11)
+      .padding(.horizontal, z(11))
       .frame(height: z(30))
       .background(editing ? Tok.bg : Tok.surface2, in: Capsule())
       .overlay(Capsule().strokeBorder(editing ? Tok.lineStrong : .clear, lineWidth: 2))
       .contentShape(Capsule())
       .onTapGesture { editing = true }
-      .padding(.leading, 4)
+      .padding(.leading, z(4))
       trailing
     }
     .labelStyle(.iconOnly)
     .buttonStyle(.icon(size: 28))
-    .padding(.horizontal, 6)
-    .padding(.vertical, 6)
+    .padding(.horizontal, z(6))
+    .padding(.vertical, z(6))
   }
 
   /// Chrome's own shortcuts from the page. True when handled here rather than sent to the page.
@@ -154,10 +154,10 @@ struct BrowserTabStrip: View {
     let s = model.state
     let tabs = s.tabs.isEmpty ? [BrowserTabInfo(id: "blank", url: "", title: s.running ? "New Tab" : "Starting")] : s.tabs
     ScrollView(.horizontal, showsIndicators: false) {
-      HStack(alignment: .bottom, spacing: 2) {
+      HStack(alignment: .bottom, spacing: z(2)) {
         ForEach(tabs) { tab in
           let on = tab.id == s.active || tabs.count == 1
-          HStack(spacing: 7) {
+          HStack(spacing: z(7)) {
             TabIcon(tab: tab, loading: on && s.loading)
             Text(tab.label)
               .lineLimit(1)
@@ -170,8 +170,8 @@ struct BrowserTabStrip: View {
           }
           .font(.omni(size: 12))
           .foregroundStyle(on ? Tok.fg : Tok.fg3)
-          .padding(.leading, 11)
-          .padding(.trailing, 4)
+          .padding(.leading, z(11))
+          .padding(.trailing, z(4))
           .frame(minWidth: z(60), maxWidth: z(208), minHeight: z(32))
           .background(on ? Tok.bg : .clear, in: UnevenRoundedRectangle(topLeadingRadius: 12, topTrailingRadius: 12, style: .continuous))
           .contentShape(Rectangle())
@@ -182,9 +182,9 @@ struct BrowserTabStrip: View {
           .labelStyle(.iconOnly)
           .buttonStyle(.icon(size: 26))
           .disabled(!s.running)
-          .padding(.bottom, 3)
+          .padding(.bottom, z(3))
       }
-      .padding(.horizontal, 8)
+      .padding(.horizontal, z(8))
     }
     .frame(height: z(34))
   }

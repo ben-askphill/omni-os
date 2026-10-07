@@ -24,6 +24,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `Secrets.swift` | `SecretScope`, `SecretRow`, `SecretName` (the Web UI's name rules), `SecretGroup`, `SecretScopeOption`, `SecretsModel` (the Secrets tab) |
 | `RelTime.swift` | `RelTime.label`: `relTime` in `web/src/format.ts` |
 | `Appearance.swift` | `Appearance`, `AppearanceSettings` (in UserDefaults, `-appearance` for a run) |
+| `Zoom.swift` | `ZoomSettings`: the zoom level (80% to 160%, in UserDefaults, `-zoom` for a run), Zoom In, Zoom Out, Actual Size |
 | `SettingsTab.swift` | `SettingsTab`, `Route.settingsTab`, `AppModel.show(_:)` |
 | `Client+Automations.swift` | `automations()`, `runAutomation(_:)`, `setAutomationEnabled(_:_:)` on `OmniClient` |
 | `Automation.swift` | `Automation`, `AutomationRun`, `AutomationTrigger`, `AutomationBadge`, `NextRunText`, `AutomationSchedule` (`describeCron` and `nextRunLabel` in `web/src/format.ts`) |
@@ -90,6 +91,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 - Tests: Swift Testing only. HTTP goes through `StubTransport` in `ClientTests.swift`, SSE through `ScriptedSSETransport` in `TestSupport.swift`, never the network. `LiveServerTests` is the one exception, and it only runs when asked (see below).
 - Swift 6 language mode, complete strict concurrency, macOS 27.0. The app target has no default MainActor isolation; SwiftUI views are MainActor anyway.
 - User-visible strings: plain and short, no em dashes, no double dashes, no emojis.
+- Zoom: text sizes go through `Font.omni(size:)` and fixed sizes (icons, padding, spacing, corner radii) through `z(_:)`, both in `Omni/Zoom.swift`. They read `UIZoom.settings`, so a body that uses them redraws at a new level. AppKit views (`SelectableMarkdown`, the composer, the terminal) take `scale` from the parent's body. Window minimums stay fixed. View > Zoom In (⌘=), Zoom Out (⌘-), Actual Size (⌘0), and a picker in Settings > Appearance.
 
 ## Decisions
 

@@ -19,12 +19,12 @@ struct UserBubbleView: View {
     let more = ui.isOpen(moreKey)
     let pieces = message.pieces(cut: !more)
     let about = pieces.compactMap(\.hit).first { ui.isOpen(aboutKey($0.start)) }
-    VStack(alignment: .trailing, spacing: 5) {
+    VStack(alignment: .trailing, spacing: z(5)) {
       header
       if let files = message.attachments, !files.isEmpty {
         AttachmentsView(threadID: threadID, items: files, client: client)
       }
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: z(4)) {
         Text(Self.text(pieces, cut: long && !more))
           .font(.omni(size: ThreadStyle.prose + 0.5))
           .lineSpacing(5)
@@ -39,7 +39,7 @@ struct UserBubbleView: View {
             return .handled
           })
         if let about {
-          Hairline().padding(.top, 2)
+          Hairline().padding(.top, z(2))
           Text("\(about.description.isEmpty ? "No description" : about.description)\(Text(" · \(about.sourceTag)").foregroundStyle(Tok.fg4))")
             .font(.omni(size: ThreadStyle.small))
             .foregroundStyle(Tok.fg3)
@@ -53,8 +53,8 @@ struct UserBubbleView: View {
             .underline()
         }
       }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 10)
+      .padding(.horizontal, z(16))
+      .padding(.vertical, z(10))
       .background(background)
       .frame(maxWidth: z(600), alignment: .trailing)
     }
@@ -66,7 +66,7 @@ struct UserBubbleView: View {
   private func aboutKey(_ start: Int) -> String { "p\(eventID):\(start)" }
 
   private var header: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: z(8)) {
       if let label = message.sourceLabel {
         Text(label)
           .fontWeight(.medium)
@@ -132,7 +132,7 @@ struct IconLabel: View {
   }
 
   var body: some View {
-    HStack(spacing: 4) {
+    HStack(spacing: z(4)) {
       OmniIcon(name: icon, size: size)
       Text(title)
     }
@@ -173,19 +173,19 @@ struct AttachmentsView: View {
       }
     }
     .frame(maxWidth: z(224), maxHeight: z(176))
-    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Tok.line))
-    .padding(4)
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: z(12), style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: z(12), style: .continuous).strokeBorder(Tok.line))
+    .padding(z(4))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
     .accessibilityLabel(a.name)
   }
 
   private func chip(_ a: Attachment) -> some View {
-    HStack(spacing: 8) {
+    HStack(spacing: z(8)) {
       OmniIcon(name: "file", size: 15)
         .foregroundStyle(Tok.fg3)
         .frame(width: z(32), height: z(32))
-        .background(Tok.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(8), style: .continuous))
       VStack(alignment: .leading, spacing: 1) {
         Text(a.name).font(.omni(size: ThreadStyle.small, weight: .medium)).foregroundStyle(Tok.fg2)
           .lineLimit(1).truncationMode(.middle)
@@ -194,9 +194,9 @@ struct AttachmentsView: View {
       .frame(maxWidth: z(190), alignment: .leading)
       OmniIcon(name: "download", size: 14).foregroundStyle(Tok.fg3)
     }
-    .padding(.horizontal, 8)
+    .padding(.horizontal, z(8))
     .frame(height: z(44))
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
   }
 
   /// Quick Look needs a file, so the upload is fetched into a temporary folder first.
@@ -273,9 +273,9 @@ struct ResultLineView: View {
   let result: TurnResult
 
   var body: some View {
-    HStack(spacing: 12) {
+    HStack(spacing: z(12)) {
       rule
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         if result.isBad {
           GlyphView(glyph: .needs, size: 8)
         } else if result.ok {
@@ -291,7 +291,7 @@ struct ResultLineView: View {
       .fixedSize()
       rule
     }
-    .padding(.vertical, 4)
+    .padding(.vertical, z(4))
   }
 
   private var rule: some View { Rectangle().fill(Tok.line).frame(height: 1) }
@@ -307,8 +307,8 @@ struct ErrorCallout: View {
   let text: String
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 6) {
+    VStack(alignment: .leading, spacing: z(6)) {
+      HStack(spacing: z(6)) {
         GlyphView(glyph: .needs, size: 9)
         Text("Error")
       }
@@ -326,8 +326,8 @@ struct ErrorCallout: View {
         body
       }
     }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 12)
+    .padding(.horizontal, z(16))
+    .padding(.vertical, z(12))
     .background(Tok.surface, in: RoundedRectangle(cornerRadius: ThreadStyle.card, style: .continuous))
   }
 }
@@ -340,7 +340,7 @@ struct ReportCard: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         OmniIcon(name: "inbox", size: 14)
           .foregroundStyle(Tok.fg3)
           .frame(width: z(28), height: z(28))
@@ -360,19 +360,19 @@ struct ReportCard: View {
             .buttonStyle(.plain)
             .foregroundStyle(Tok.fg3)
         }
-        Spacer(minLength: 8)
+        Spacer(minLength: z(8))
         if let status = report.status, !status.isEmpty {
           StatusPill(status: ThreadStatus(rawValue: status))
         }
         if let thread = report.threadID {
           Button { model.route = .thread(id: thread) } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: z(4)) {
               Text("Open thread")
               OmniIcon(name: "arrowRight", size: 12)
             }
             .font(.omni(size: 12.5, weight: .medium))
             .foregroundStyle(Tok.fg)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, z(12))
             .frame(height: z(28))
             .background(Tok.bg, in: Capsule())
             .cardShadow(14)
@@ -381,21 +381,21 @@ struct ReportCard: View {
         }
       }
       .font(.omni(size: ThreadStyle.small))
-      .padding(.horizontal, 16)
-      .padding(.top, 12)
+      .padding(.horizontal, z(16))
+      .padding(.top, z(12))
       if let title = report.title, !title.isEmpty {
         Text(title)
           .font(.omni(size: 15, weight: .medium))
           .foregroundStyle(Tok.fg)
-          .padding(.horizontal, 16)
-          .padding(.top, 12)
+          .padding(.horizontal, z(16))
+          .padding(.top, z(12))
       }
       MarkdownView(document: document)
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
+        .padding(.horizontal, z(16))
+        .padding(.top, z(8))
+        .padding(.bottom, z(16))
     }
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(22), style: .continuous))
     .opacity(report.dropped == true ? 0.6 : 1)
   }
 }
@@ -406,7 +406,7 @@ struct PlanCard: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      HStack(spacing: 12) {
+      HStack(spacing: z(12)) {
         Text("Plan").omniCaption()
         TicksView(ticks: plan.ticks)
           .frame(maxWidth: z(160))
@@ -418,19 +418,19 @@ struct PlanCard: View {
           .monospacedDigit()
           .foregroundStyle(Tok.fg3)
       }
-      .padding(.bottom, 10)
+      .padding(.bottom, z(10))
       ForEach(Array(plan.todos.enumerated()), id: \.offset) { _, todo in
         CheckItem(state: todo.status ?? "pending", text: todo.label ?? "")
       }
       if plan.active == nil && plan.allDone {
-        Text("All done").font(.omni(size: 12)).foregroundStyle(Tok.fg4).padding(.top, 6)
+        Text("All done").font(.omni(size: 12)).foregroundStyle(Tok.fg4).padding(.top, z(6))
       }
     }
-    .padding(.horizontal, 16)
-    .padding(.top, 14)
-    .padding(.bottom, 12)
+    .padding(.horizontal, z(16))
+    .padding(.top, z(14))
+    .padding(.bottom, z(12))
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(22), style: .continuous))
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Plan")
   }
@@ -440,13 +440,13 @@ struct TicksView: View {
   let ticks: Ticks
 
   var body: some View {
-    HStack(alignment: .bottom, spacing: 2) {
+    HStack(alignment: .bottom, spacing: z(2)) {
       ForEach(0..<ticks.count, id: \.self) { i in
         let on = i < ticks.on
         GeometryReader { g in
           VStack(spacing: 0) {
             Spacer(minLength: 0)
-            RoundedRectangle(cornerRadius: 1.5)
+            RoundedRectangle(cornerRadius: z(1.5))
               .fill(on ? Tok.fg : Tok.fg.opacity(0.14))
               .frame(height: g.size.height * (on ? 1 : 0.55))
           }
@@ -462,7 +462,7 @@ struct WorkingLine: View {
   let text: String
 
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: z(8)) {
       Loader(size: 13).foregroundStyle(Tok.fg3)
       Text(text).lineLimit(1).truncationMode(.tail)
     }
@@ -480,7 +480,7 @@ struct QueuedMessagesView: View {
 
   var body: some View {
     let lead = PendingMsg.lead(in: items, starting: starting)
-    VStack(alignment: .trailing, spacing: 12) {
+    VStack(alignment: .trailing, spacing: z(12)) {
       ForEach(Array(items.enumerated()), id: \.element.id) { i, m in
         if m.kind == "crew_report" {
           IconLabel(m.label(lead: i == lead), icon: m.state == .sent ? "send" : "clock", size: 12)
@@ -488,8 +488,8 @@ struct QueuedMessagesView: View {
             .foregroundStyle(Tok.fg3)
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
-          VStack(alignment: .trailing, spacing: 4) {
-            HStack(spacing: 4) {
+          VStack(alignment: .trailing, spacing: z(4)) {
+            HStack(spacing: z(4)) {
               IconLabel(m.label(lead: i == lead), icon: m.state == .sent ? "send" : "clock", size: 12)
               if let files = m.attachments, !files.isEmpty {
                 Text("· \(Format.plural(files.count, "file"))").foregroundStyle(Tok.fg4)
@@ -503,8 +503,8 @@ struct QueuedMessagesView: View {
               .foregroundStyle(Tok.fg)
               .textSelection(.enabled)
               .fixedSize(horizontal: false, vertical: true)
-              .padding(.horizontal, 16)
-              .padding(.vertical, 10)
+              .padding(.horizontal, z(16))
+              .padding(.vertical, z(10))
               .background(
                 UnevenRoundedRectangle(
                   topLeadingRadius: 22, bottomLeadingRadius: 22, bottomTrailingRadius: 22, topTrailingRadius: 8, style: .continuous)
@@ -517,6 +517,6 @@ struct QueuedMessagesView: View {
         }
       }
     }
-    .padding(.top, 4)
+    .padding(.top, z(4))
   }
 }

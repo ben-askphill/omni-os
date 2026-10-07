@@ -31,17 +31,17 @@ struct SlashMenuDemo: View {
   var body: some View {
     VStack {
       Spacer()
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: z(4)) {
         TextEditor(text: $text, selection: $selection)
           .focused($focused)
           .frame(height: z(60))
           .scrollContentBackground(.hidden)
         SlashHintView(model: menu) {}
       }
-      .padding(10)
-      .background(Tok.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+      .padding(z(10))
+      .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(12), style: .continuous))
       .slashMenu(menu)
-      .padding(20)
+      .padding(z(20))
       .frame(maxWidth: ThreadStyle.column)
     }
     .frame(maxWidth: .infinity)

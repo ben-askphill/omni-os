@@ -13,7 +13,7 @@ struct DiffView: View {
       if files.isEmpty {
         Text(diff).font(.omni(size: 12, design: .monospaced)).foregroundStyle(Tok.fg).textSelection(.enabled)
       } else {
-        LazyVStack(spacing: 8) {
+        LazyVStack(spacing: z(8)) {
           ForEach(Array(files.enumerated()), id: \.offset) { _, file in
             DiffFileView(file: file, startsOpen: DiffParser.startsOpen(file, fileCount: files.count))
           }
@@ -39,7 +39,7 @@ private struct DiffFileView: View {
       Button {
         open.toggle()
       } label: {
-        HStack(spacing: 8) {
+        HStack(spacing: z(8)) {
           Chevron(open: open, color: Tok.fg3)
           Text(file.path)
             .font(.omni(size: 12, design: .monospaced))
@@ -52,7 +52,7 @@ private struct DiffFileView: View {
         }
         .font(.omni(size: 11))
         .monospacedDigit()
-        .padding(.horizontal, 14)
+        .padding(.horizontal, z(14))
         .frame(height: z(40))
         .background(hover ? Tok.surface2 : Tok.surface)
         .onHover { hover = $0 }
@@ -65,7 +65,7 @@ private struct DiffFileView: View {
       if open {
         if file.binary {
           Text("Binary file").font(.omni(size: 12)).foregroundStyle(Tok.fg3)
-            .padding(.horizontal, 12).padding(.vertical, 8)
+            .padding(.horizontal, z(12)).padding(.vertical, z(8))
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         LazyVStack(alignment: .leading, spacing: 0) {
@@ -74,8 +74,8 @@ private struct DiffFileView: View {
               .font(.omni(size: ThreadStyle.mono, design: .monospaced))
               .lineSpacing(0)
               .foregroundStyle(color(line))
-              .padding(.horizontal, 12)
-              .padding(.vertical, 2)
+              .padding(.horizontal, z(12))
+              .padding(.vertical, z(2))
               .frame(maxWidth: .infinity, alignment: .leading)
               .background(background(line))
           }
@@ -93,8 +93,8 @@ private struct DiffFileView: View {
         }
       }
     }
-    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Tok.line) }
+    .clipShape(RoundedRectangle(cornerRadius: z(18), style: .continuous))
+    .overlay { RoundedRectangle(cornerRadius: z(18), style: .continuous).strokeBorder(Tok.line) }
   }
 
   private func color(_ line: String) -> Color {

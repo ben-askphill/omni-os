@@ -128,6 +128,8 @@ struct OmniCommands: Commands {
     }
     CommandGroup(after: .toolbar) {
       InspectorCommand(model: model)
+      Divider()
+      ZoomCommands(zoom: UIZoom.settings)
     }
     CommandMenu("Go") {
       Button("Back") { model.goBack() }

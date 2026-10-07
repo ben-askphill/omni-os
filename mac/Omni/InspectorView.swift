@@ -57,7 +57,7 @@ private struct ThreadInspector: ViewModifier {
           Button {
             open.toggle()
           } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: z(4)) {
               OmniIcon(name: "panel", size: 15)
               if count > 0 { Text("\(count)").font(.omni(size: 11, weight: .medium).monospacedDigit()) }
             }
@@ -125,7 +125,7 @@ private struct InspectorPanel: View {
   var body: some View {
     let files = store.files
     VStack(spacing: 0) {
-      HStack(spacing: 4) {
+      HStack(spacing: z(4)) {
         SegmentedPill(
           selection: $selection.tab,
           counted: InspectorSelection.Tab.allCases.map { ($0, $0.title, count($0, files: files.count)) },
@@ -136,7 +136,7 @@ private struct InspectorPanel: View {
           .buttonStyle(.icon(size: 28))
           .help("Close panel")
       }
-      .padding(10)
+      .padding(z(10))
       switch selection.tab {
       case .artifacts:
         ArtifactsTab(client: model.client, files: files, selection: $selection)
@@ -178,17 +178,17 @@ private struct ArtifactsTab: View {
                 Button {
                   selection.artifactID = file.id
                 } label: {
-                  HStack(spacing: 8) {
+                  HStack(spacing: z(8)) {
                     OmniIcon(name: TranscriptIcon.artifact(file.kind), size: 13).foregroundStyle(Tok.fg3)
                     Text(file.name)
                       .font(.omni(size: 12.5, weight: .medium))
                       .foregroundStyle(on ? Tok.fg : Tok.fg2)
                       .lineLimit(1)
                       .truncationMode(.middle)
-                    Spacer(minLength: 4)
+                    Spacer(minLength: z(4))
                     Text(Format.relTime(file.updatedAt)).font(.omni(size: 10.5).monospacedDigit()).foregroundStyle(Tok.fg4)
                   }
-                  .padding(.horizontal, 12)
+                  .padding(.horizontal, z(12))
                   .frame(height: z(32))
                   .contentShape(Capsule())
                   .background(on ? Tok.surface3 : .clear, in: Capsule())
@@ -198,8 +198,8 @@ private struct ArtifactsTab: View {
                 .accessibilityAddTraits(on ? .isSelected : [])
               }
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
+            .padding(.horizontal, z(8))
+            .padding(.bottom, z(8))
           }
           .frame(maxHeight: z(168))
         }

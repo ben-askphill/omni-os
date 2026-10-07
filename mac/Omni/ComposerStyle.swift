@@ -12,12 +12,12 @@ struct ComposerShell: ViewModifier {
     content
       .background(lifted ? Tok.bg : Tok.surface, in: shape)
       .overlay { shape.strokeBorder(Tok.lineStrong, lineWidth: 1).opacity(lifted ? 1 : 0) }
-      .background { RoundedRectangle(cornerRadius: radius + 4, style: .continuous).fill(Tok.wash).padding(-4).opacity(lifted ? 1 : 0) }
+      .background { RoundedRectangle(cornerRadius: radius + 4, style: .continuous).fill(Tok.wash).padding(z(-4)).opacity(lifted ? 1 : 0) }
       .overlay {
         if over {
           shape.fill(Tok.bg.opacity(0.85))
             .overlay {
-              HStack(spacing: 8) {
+              HStack(spacing: z(8)) {
                 OmniIcon(name: "paperclip", size: 15)
                 Text("Drop to attach")
               }
@@ -43,7 +43,7 @@ struct ComposerHints: View {
   var tab = false
 
   var body: some View {
-    HStack(spacing: 14) {
+    HStack(spacing: z(14)) {
       if tab { Text("⇥ use suggestion") }
       Text("↵ send")
       Text("⌘↵ newline")
@@ -54,7 +54,7 @@ struct ComposerHints: View {
     .foregroundStyle(Tok.fg4)
     .lineLimit(1)
     .fixedSize()
-    .padding(.trailing, 4)
+    .padding(.trailing, z(4))
     .accessibilityHidden(true)
   }
 }
@@ -84,15 +84,15 @@ struct PickerPill<Lead: View>: View {
   @State private var hover = false
 
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: z(8)) {
       lead.frame(width: z(24), height: z(24))
       Text(text).foregroundStyle(Tok.fg).lineLimit(1).truncationMode(.tail)
       if let secondary { Text("· \(secondary)").foregroundStyle(Tok.fg4).lineLimit(1) }
       if chevron { OmniIcon(name: "chevronDown", size: 13).foregroundStyle(Tok.fg4) }
     }
     .font(.omni(size: 12.5, weight: .medium))
-    .padding(.leading, 4)
-    .padding(.trailing, 10)
+    .padding(.leading, z(4))
+    .padding(.trailing, z(10))
     .frame(height: z(32))
     .frame(maxWidth: z(240))
     .background(hover ? Tok.surface3 : Tok.surface2, in: Capsule())

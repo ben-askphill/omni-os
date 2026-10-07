@@ -29,15 +29,15 @@ struct SidebarView: View {
           .help("Omni home")
         Spacer()
       }
-      .padding(.leading, 20)
+      .padding(.leading, z(20))
       .frame(height: z(44))
 
-      VStack(spacing: 8) {
+      VStack(spacing: z(8)) {
         SearchPill { model.shell.openPalette() }
         Button {
           model.startNewThread()
         } label: {
-          HStack(spacing: 8) {
+          HStack(spacing: z(8)) {
             OmniIcon(name: "plus", size: 15, weight: 2)
             Text("New thread")
           }
@@ -45,10 +45,10 @@ struct SidebarView: View {
         }
         .buttonStyle(PillButtonStyle(variant: .primary, height: 40))
       }
-      .padding(.horizontal, 12)
+      .padding(.horizontal, z(12))
 
       ScrollView {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: z(16)) {
           VStack(spacing: 1) {
             row(.home) { NavRow(title: "Home", icon: "home", active: selected == .home) }
             if let conductor = sections.conductor {
@@ -66,9 +66,9 @@ struct SidebarView: View {
             VStack(alignment: .leading, spacing: 0) {
               Text(group.label)
                 .omniCaption()
-                .padding(.horizontal, 12)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
+                .padding(.horizontal, z(12))
+                .padding(.top, z(4))
+                .padding(.bottom, z(8))
               VStack(spacing: 1) {
                 ForEach(group.channels) { channelRows($0) }
               }
@@ -85,9 +85,9 @@ struct SidebarView: View {
           VStack(alignment: .leading, spacing: 0) {
             Text("Workspace")
               .omniCaption()
-              .padding(.horizontal, 12)
-              .padding(.top, 4)
-              .padding(.bottom, 8)
+              .padding(.horizontal, z(12))
+              .padding(.top, z(4))
+              .padding(.bottom, z(8))
             VStack(spacing: 1) {
               row(.artifacts) { NavRow(title: "Artifacts", icon: "layers", active: selected == .artifacts) }
               row(.automations) { NavRow(title: "Automations", icon: "zap", active: selected == .automations) }
@@ -95,19 +95,19 @@ struct SidebarView: View {
             }
           }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 12)
-        .padding(.bottom, 16)
+        .padding(.horizontal, z(12))
+        .padding(.top, z(12))
+        .padding(.bottom, z(16))
       }
       .scrollIndicators(.never)
 
-      VStack(spacing: 10) {
+      VStack(spacing: z(10)) {
         UsageCard(model: model)
         StatusFooter(model: model)
       }
-      .padding(.horizontal, 12)
-      .padding(.top, 4)
-      .padding(.bottom, 12)
+      .padding(.horizontal, z(12))
+      .padding(.top, z(4))
+      .padding(.bottom, z(12))
     }
     .frame(width: z(Self.width))
     .background(Tok.chrome)
@@ -139,14 +139,14 @@ struct SidebarView: View {
       VStack(alignment: .leading, spacing: 0) {
         HStack {
           Text("Agents").omniCaption()
-          Spacer(minLength: 8)
+          Spacer(minLength: z(8))
           Text("\(tasks.count)")
             .font(.omni(size: 11).monospacedDigit())
             .foregroundStyle(Tok.live)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 4)
-        .padding(.bottom, 8)
+        .padding(.horizontal, z(12))
+        .padding(.top, z(4))
+        .padding(.bottom, z(8))
         VStack(spacing: 1) {
           ForEach(tasks) { task in
             AgentRow(task: task, channel: model.store.channel(task.channelID)?.name) {
@@ -193,7 +193,7 @@ struct SidebarView: View {
     ForEach(links.shown) { thread in
       let item = SidebarItem.thread(thread.id)
       row(item) { ThreadRow(thread: thread, active: selected == item) }
-        .padding(.leading, 25)
+        .padding(.leading, z(25))
         .openInNewWindow(thread.id, model: model, title: thread.title)
     }
     if links.seeAll || links.more > 0 {
@@ -202,11 +202,11 @@ struct SidebarView: View {
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg4)
           .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.leading, 32)
+          .padding(.leading, z(32))
           .frame(height: z(28))
       }
       .buttonStyle(RailRowStyle())
-      .padding(.leading, 25)
+      .padding(.leading, z(25))
     }
   }
 }
@@ -237,7 +237,7 @@ struct NavRow<Lead: View>: View {
   @ViewBuilder var lead: Lead
 
   var body: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: z(10)) {
       if let icon {
         OmniIcon(name: icon, size: 15)
           .foregroundStyle(active ? Tok.fg : Tok.fg3)
@@ -247,7 +247,7 @@ struct NavRow<Lead: View>: View {
         .lineLimit(1)
         .frame(maxWidth: .infinity, alignment: .leading)
       if running > 0 {
-        HStack(spacing: 6) {
+        HStack(spacing: z(6)) {
           GlyphView(glyph: .running, size: 6)
           Text("\(running)").monospacedDigit()
         }
@@ -258,7 +258,7 @@ struct NavRow<Lead: View>: View {
     }
     .font(.omni(size: 13, weight: active ? .medium : .regular))
     .foregroundStyle(active ? Tok.fg : Tok.fg2)
-    .padding(.horizontal, 12)
+    .padding(.horizontal, z(12))
     .frame(height: z(32))
   }
 }
@@ -275,7 +275,7 @@ struct ThreadRow: View {
   var active = false
 
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: z(8)) {
       ThreadStatusIcon(status: thread.status)
         .frame(width: z(12))
       Text(thread.title.isEmpty ? "Untitled" : thread.title)
@@ -284,7 +284,7 @@ struct ThreadRow: View {
     }
     .font(.omni(size: 12.5, weight: active ? .medium : .regular))
     .foregroundStyle(active ? Tok.fg : Tok.fg3)
-    .padding(.horizontal, 12)
+    .padding(.horizontal, z(12))
     .frame(height: z(28))
     .help("\(thread.title.isEmpty ? "Untitled" : thread.title) · \(thread.status.label)")
   }
@@ -300,7 +300,7 @@ private struct AgentRow: View {
   var body: some View {
     Button(action: open) {
       TimelineView(.periodic(from: .now, by: 1)) { context in
-        HStack(spacing: 10) {
+        HStack(spacing: z(10)) {
           Loader(size: 11)
             .foregroundStyle(Tok.live)
             .frame(width: z(15))
@@ -320,7 +320,7 @@ private struct AgentRow: View {
         }
         .font(.omni(size: 12.5))
         .foregroundStyle(Tok.fg2)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, z(12))
         .frame(height: z(32))
       }
     }
@@ -364,7 +364,7 @@ struct SearchPill: View {
 
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 10) {
+      HStack(spacing: z(10)) {
         OmniIcon(name: "search", size: 15)
         Text("Search or jump to")
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -372,8 +372,8 @@ struct SearchPill: View {
       }
       .font(.omni(size: 13))
       .foregroundStyle(hover ? Tok.fg3 : Tok.fg4)
-      .padding(.leading, 14)
-      .padding(.trailing, 8)
+      .padding(.leading, z(14))
+      .padding(.trailing, z(8))
       .frame(height: z(40))
       .background(Tok.bg.opacity(0.7), in: Capsule())
       .cardShadow(20)
@@ -395,7 +395,7 @@ struct StatusFooter: View {
     Menu {
       ServerMenuItems(model: model, shortcuts: false)
     } label: {
-      HStack(spacing: 8) {
+      HStack(spacing: z(8)) {
         Circle()
           .fill(color(state))
           .overlay(Circle().strokeBorder(model.supervisor.isRunning && model.connectionNotice == nil ? Tok.doneEdge : .clear, lineWidth: 1))
@@ -403,7 +403,7 @@ struct StatusFooter: View {
         VStack(alignment: .leading, spacing: 1) {
           Text(state.label)
             .foregroundStyle(Tok.fg2)
-          HStack(spacing: 6) {
+          HStack(spacing: z(6)) {
             Text("Port \(model.settings.port, format: .number.grouping(.never))")
               .monospacedDigit()
             if let notice = model.connectionNotice {
@@ -417,7 +417,7 @@ struct StatusFooter: View {
           .foregroundStyle(Tok.fg4)
       }
       .font(.omni(size: 11))
-      .padding(.horizontal, 8)
+      .padding(.horizontal, z(8))
       .contentShape(Rectangle())
     }
     .menuStyle(.button)

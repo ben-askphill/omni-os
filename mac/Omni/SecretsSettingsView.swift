@@ -69,14 +69,14 @@ struct SecretsForm: View {
               secrets.name = "HERMES_API_KEY"
               valueFocused = true
             } label: {
-              HStack(spacing: 6) {
+              HStack(spacing: z(6)) {
                 OmniIcon(name: "key", size: 12)
                 Text("Use HERMES_API_KEY")
               }
             }
             .buttonStyle(.pill(.ghost, height: 28))
             .help("The Hermes API bearer token. Global. Sent on HTTP requests, not in a shell environment.")
-            .padding(.top, 8)
+            .padding(.top, z(8))
           }
         }
         VStack(alignment: .leading, spacing: 0) {
@@ -91,13 +91,13 @@ struct SecretsForm: View {
               .font(.omni(size: 12))
               .foregroundStyle(Tok.fg3)
               .fixedSize(horizontal: false, vertical: true)
-              .padding(.top, 6)
+              .padding(.top, z(6))
           }
         }
         if let error = secrets.formError {
           ErrorNote(text: error)
         }
-        HStack(spacing: 10) {
+        HStack(spacing: z(10)) {
           Button(secrets.saveTitle, action: save)
             .buttonStyle(.pill(.primary, height: 34))
             .disabled(!secrets.canSave)
@@ -135,13 +135,13 @@ struct SecretsForm: View {
       )
     case .loaded:
       ForEach(secrets.groups) { group in
-        VStack(alignment: .leading, spacing: 6) {
-          HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: z(6)) {
+          HStack(spacing: z(6)) {
             Text(secrets.label(for: group.scope))
             Text("\(group.rows.count)").monospacedDigit().foregroundStyle(Tok.fg4)
           }
           .omniCaption()
-          .padding(.horizontal, 12)
+          .padding(.horizontal, z(12))
           VStack(spacing: 0) {
             ForEach(group.rows) { row in
               SecretRowView(
@@ -169,8 +169,8 @@ struct SecretRowView: View {
   let delete: () -> Void
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      HStack(spacing: 10) {
+    VStack(alignment: .leading, spacing: z(4)) {
+      HStack(spacing: z(10)) {
         OmniIcon(name: "key", size: 14)
           .foregroundStyle(Tok.fg3)
         Text(row.name)
@@ -199,11 +199,11 @@ struct SecretRowView: View {
       }
       if let error {
         NeedsNote(text: error)
-          .padding(.leading, 24)
+          .padding(.leading, z(24))
       }
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 6)
+    .padding(.horizontal, z(12))
+    .padding(.vertical, z(6))
     .hoverWash(18)
   }
 }
