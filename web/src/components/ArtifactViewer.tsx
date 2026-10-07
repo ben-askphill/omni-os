@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { artifactUrl, type Artifact } from '../api.ts';
 import { bytes, relTime } from '../format.ts';
+import { useImageZoom, ZoomableImage, ZoomControls, type ImageZoom } from './ImageZoom.tsx';
 import { Markdown } from './Markdown.tsx';
 import { PublishedActions } from './Published.tsx';
 import { ErrorNote, Icon, IconButton, IconLink, Loading, Modal, type IconName } from './ui.tsx';
@@ -120,7 +121,16 @@ function TextBody({ a }: { a: Artifact }) {
   return <pre className="scroll-thin h-full overflow-auto p-3 font-mono text-[12px] leading-[1.55] whitespace-pre-wrap break-words text-fg-2">{shown}</pre>;
 }
 
-export function ArtifactBody({ a }: { a: Artifact }) {
+const isImage = (a: Artifact) => a.kind === 'image' || a.kind === 'screenshot';
+
+function ImageBody({ a, z }: { a: Artifact; z?: ImageZoom }) {
+  const src = artifactUrl(a);
+  const own = useImageZoom(src);
+  return <ZoomableImage key={src} src={src} alt={a.name} z={z ?? own} />;
+}
+
+/** `zoom` lets the caller put an image's zoom controls in its header; without it the image keeps its own. */
+export function ArtifactBody({ a, zoom }: { a: Artifact; zoom?: ImageZoom }) {
   const src = artifactUrl(a);
   if (a.kind === 'html' || a.kind === 'svg') {
     return <iframe key={src} title={a.name} src={src} sandbox="allow-scripts allow-popups" className="h-full w-full border-0 bg-white" />;
@@ -129,13 +139,7 @@ export function ArtifactBody({ a }: { a: Artifact }) {
     // Chrome refuses to run its PDF viewer inside a sandboxed iframe, so PDFs get a plain one.
     return <iframe key={src} title={a.name} src={src} className="h-full w-full border-0 bg-white" />;
   }
-  if (a.kind === 'image' || a.kind === 'screenshot') {
-    return (
-      <div className="scroll-thin flex h-full items-start justify-center overflow-auto bg-surface-2 p-3">
-        <img src={src} alt={a.name} className="max-w-full rounded-xl shadow-[var(--shadow-card)]" />
-      </div>
-    );
-  }
+  if (isImage(a)) return <ImageBody a={a} z={zoom} />;
   if (['markdown', 'csv', 'json', 'text'].includes(a.kind)) return <TextBody a={a} />;
   return <div className="p-4 text-[13px] text-fg-3">No preview for this file type. Download it instead.</div>;
 }
@@ -154,6 +158,8 @@ export function ArtifactActions({ a, onExpand }: { a: Artifact; onExpand?: () =>
 /** Header + body, with a full-screen mode. */
 export function ArtifactViewer({ a }: { a: Artifact }) {
   const [full, setFull] = useState(false);
+  const zoom = useImageZoom(artifactUrl(a));
+  const fullZoom = useImageZoom(artifactUrl(a));
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2.5 py-1.5 pr-1.5 pl-3 shadow-[0_1px_0_var(--line)]">
@@ -166,10 +172,11 @@ export function ArtifactViewer({ a }: { a: Artifact }) {
             {a.kind} · {bytes(a.size)} · {a.url ? 'published' : 'updated'} {relTime(a.updated_at)}
           </div>
         </div>
+        {isImage(a) && <ZoomControls z={zoom} />}
         <ArtifactActions a={a} onExpand={() => setFull(true)} />
       </div>
       <div className="min-h-0 flex-1">
-        <ArtifactBody a={a} />
+        <ArtifactBody a={a} zoom={zoom} />
       </div>
       <Modal
         open={full}
@@ -178,12 +185,13 @@ export function ArtifactViewer({ a }: { a: Artifact }) {
         title={
           <span className="flex items-center gap-2">
             {a.name}
+            {isImage(a) && <ZoomControls z={fullZoom} />}
             <ArtifactActions a={a} />
           </span>
         }
       >
         <div className="h-[80vh]">
-          <ArtifactBody a={a} />
+          <ArtifactBody a={a} zoom={fullZoom} />
         </div>
       </Modal>
     </div>
