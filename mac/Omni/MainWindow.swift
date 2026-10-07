@@ -47,7 +47,7 @@ struct MainWindow: View {
     .toolbar { toolbar }
     .overlay { PaletteOverlay(model: model).environment(\.colorScheme, scheme) }
     .modifier(ThreadWindowSupport(model: model))
-    .frame(minWidth: z(720), minHeight: z(460))
+    .frame(minWidth: 720, minHeight: 460)
     .environment(\.colorScheme, .dark)
     .onChange(of: model.route) { old, new in
       // A route that lives in Settings, such as #/secrets from a script, opens it there instead.

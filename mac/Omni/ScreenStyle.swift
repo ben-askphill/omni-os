@@ -175,7 +175,7 @@ struct OmniMonoFieldStyle: TextFieldStyle {
   func _body(configuration: TextField<Self._Label>) -> some View {
     configuration
       .textFieldStyle(.plain)
-      .font(.omni(size: 13, design: .monospaced))
+      .modifier(OmniFont(size: 13, design: .monospaced))
       .foregroundStyle(Tok.fg)
       .focused($focused)
       .padding(.horizontal, 14)

@@ -10,19 +10,19 @@ struct SettingsView: View {
     TabView(selection: $model.settingsTab) {
       Tab("Connection", systemImage: "network", value: .connection) {
         ConnectionSettings(settings: model.settings, model: model)
-          .frame(width: z(560), height: z(520))
+          .frame(width: z(560), height: 520)
       }
       Tab("Secrets", systemImage: "key", value: .secrets) {
         SecretsSettings(model: model)
-          .frame(width: z(560), height: z(680))
+          .frame(width: z(560), height: 680)
       }
       Tab("Sync", systemImage: "arrow.triangle.2.circlepath", value: .sync) {
         SyncSettings(model: model)
-          .frame(width: z(560), height: z(680))
+          .frame(width: z(560), height: 680)
       }
       Tab("Appearance", systemImage: "circle.lefthalf.filled", value: .appearance) {
         AppearanceSettingsView(appearance: appearance)
-          .frame(width: z(560), height: z(220))
+          .frame(width: 560, height: 220)
       }
     }
   }
