@@ -230,8 +230,9 @@ struct ErrorNote: View {
       GlyphView(glyph: .needs, size: 8)
         .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
       Text(text)
+        // No vertical fixedSize: the composer shows this under the thread, and a fixed height measured at a
+        // narrow proposed width pushed the pane past the window, header and reply box off screen.
         .frame(maxWidth: .infinity, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
         .textSelection(.enabled)
       if let retry {
         Button("Retry", action: retry)
