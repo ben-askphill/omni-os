@@ -7,6 +7,7 @@ const PATHS = {
   x: 'M18 6 6 18M6 6l12 12',
   search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5',
   plus: 'M12 5v14M5 12h14',
+  minus: 'M5 12h14',
   chevronRight: 'm9 18 6-6-6-6',
   chevronDown: 'm6 9 6 6 6-6',
   chevronLeft: 'm15 18-6-6 6-6',
