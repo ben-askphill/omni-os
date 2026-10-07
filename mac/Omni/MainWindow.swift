@@ -47,7 +47,7 @@ struct MainWindow: View {
     .toolbar { toolbar }
     .overlay { PaletteOverlay(model: model).environment(\.colorScheme, scheme) }
     .modifier(ThreadWindowSupport(model: model))
-    .frame(minWidth: 720, minHeight: 460)
+    .frame(minWidth: z(720), minHeight: z(460))
     .environment(\.colorScheme, .dark)
     .onChange(of: model.route) { old, new in
       // A route that lives in Settings, such as #/secrets from a script, opens it there instead.
@@ -131,7 +131,7 @@ struct ReconnectingLabel: View {
       GlyphView(glyph: .running, size: 6)
       Text(text)
     }
-    .font(.system(size: 12))
+    .font(.omni(size: 12))
     .foregroundStyle(Tok.fg3)
     .padding(.horizontal, 8)
     .accessibilityElement(children: .combine)
@@ -211,7 +211,7 @@ struct RoutePlaceholder: View {
       } else {
         EmptyNote(symbol: route.symbol, title: title, message: "This screen is not built yet.") {
           Text(route.hash)
-            .font(.system(size: 12, design: .monospaced))
+            .font(.omni(size: 12, design: .monospaced))
             .foregroundStyle(Tok.fg4)
         }
       }

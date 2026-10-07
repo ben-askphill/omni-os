@@ -38,13 +38,13 @@ struct ArtifactViewer: View {
       HStack(spacing: 10) {
         OmniIcon(name: artifactIcon(ref.kind), size: 14)
           .foregroundStyle(Tok.fg3)
-          .frame(width: 30, height: 30)
+          .frame(width: z(30), height: z(30))
           .background(Tok.surface2, in: Circle())
         VStack(alignment: .leading, spacing: 1) {
-          Text(ref.name).font(.system(size: 11.5, weight: .medium, design: .monospaced)).foregroundStyle(Tok.fg)
+          Text(ref.name).font(.omni(size: 11.5, weight: .medium, design: .monospaced)).foregroundStyle(Tok.fg)
             .lineLimit(1).truncationMode(.middle)
           Text("\(ref.kind) · \(Format.bytes(ref.size)) · \(ref.url == nil ? "updated" : "published") \(Format.relTime(ref.updatedAt))")
-            .font(.system(size: 11).monospacedDigit())
+            .font(.omni(size: 11).monospacedDigit())
             .foregroundStyle(Tok.fg4)
             .lineLimit(1)
         }
@@ -152,7 +152,7 @@ struct ArtifactBody: View {
       ArtifactWebView(client: client, ref: ref)
     } else if !["pdf", "image", "screenshot", "markdown", "csv", "json", "text"].contains(ref.kind) {
       Text("No preview for this file type. Download it instead.")
-        .font(.system(size: 13))
+        .font(.omni(size: 13))
         .foregroundStyle(Tok.fg3)
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -201,7 +201,7 @@ private struct NativeBody: View {
             .frame(maxWidth: .infinity)
         }
       } else {
-        Text("This image could not be read.").font(.system(size: 13)).foregroundStyle(Tok.fg3).padding(16)
+        Text("This image could not be read.").font(.omni(size: 13)).foregroundStyle(Tok.fg3).padding(16)
       }
     case "markdown":
       ScrollView {
@@ -232,13 +232,13 @@ private struct PlainTextView: View {
     ScrollView([.vertical]) {
       VStack(alignment: .leading, spacing: 8) {
         Text(text.count > Self.limit ? String(text.prefix(Self.limit)) : text)
-          .font(.system(size: 12, design: .monospaced))
+          .font(.omni(size: 12, design: .monospaced))
           .foregroundStyle(Tok.fg2)
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
         if text.count > Self.limit {
           Text("Showing the first \(Self.limit / 1000) KB. Download for the full file.")
-            .font(.system(size: 11.5)).foregroundStyle(Tok.fg4)
+            .font(.omni(size: 11.5)).foregroundStyle(Tok.fg4)
         }
       }
       .padding(12)
@@ -266,12 +266,12 @@ private struct CSVTableView: View {
               }
               if table.truncated {
                 Text("Showing the first 500 rows. Download for the full file.")
-                  .font(.system(size: 11.5)).foregroundStyle(Tok.fg4).padding(8)
+                  .font(.omni(size: 11.5)).foregroundStyle(Tok.fg4).padding(8)
               }
             }
           }
         } else {
-          Text("Empty file").font(.system(size: 13)).foregroundStyle(Tok.fg3).padding(16)
+          Text("Empty file").font(.omni(size: 13)).foregroundStyle(Tok.fg3).padding(16)
         }
       } else {
         LoadingNote().padding(.horizontal, 12)
@@ -285,10 +285,10 @@ private struct CSVTableView: View {
     HStack(alignment: .top, spacing: 0) {
       ForEach(0..<max(width, row.count), id: \.self) { i in
         Text(i < row.count ? row[i] : "")
-          .font(.system(size: 12, weight: header ? .medium : .regular))
+          .font(.omni(size: 12, weight: header ? .medium : .regular))
           .foregroundStyle(header ? Tok.fg3 : Tok.fg)
           .lineLimit(header ? 1 : 3)
-          .frame(width: 180, alignment: .leading)
+          .frame(width: z(180), alignment: .leading)
           .padding(.horizontal, 10)
           .padding(.vertical, header ? 7 : 5)
           .textSelection(.enabled)
@@ -319,6 +319,6 @@ struct ArtifactWindowView: View {
   var body: some View {
     ArtifactViewer(client: model.client, ref: ref, windowed: true)
       .navigationTitle(ref.name)
-      .frame(minWidth: 480, minHeight: 360)
+      .frame(minWidth: z(480), minHeight: z(360))
   }
 }

@@ -80,7 +80,7 @@ private struct PullRequestListView: View {
         }
         content
       }
-      .frame(maxWidth: 896)
+      .frame(maxWidth: z(896))
       .padding(.horizontal, 32)
       .padding(.top, 24)
       .padding(.bottom, 64)
@@ -138,8 +138,8 @@ private struct PullRequestRow: View {
     VStack(alignment: .leading, spacing: 3) {
       HStack(spacing: 8) {
         PRStateIcon(state: pr.state, isDraft: pr.isDraft)
-        Text(pr.title).font(.system(size: 14, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1)
-        Text("#\(pr.number)").font(.system(size: 11.5)).monospacedDigit().foregroundStyle(Tok.fg4)
+        Text(pr.title).font(.omni(size: 14, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1)
+        Text("#\(pr.number)").font(.omni(size: 11.5)).monospacedDigit().foregroundStyle(Tok.fg4)
         if pr.isDraft { PRChip(text: "Draft", tone: .outline) }
         ReviewChip(decision: pr.reviewDecision)
         Spacer(minLength: 8)
@@ -150,9 +150,9 @@ private struct PullRequestRow: View {
         BranchLabel(head: pr.headRefName, base: pr.baseRefName)
         Changes(add: pr.additions, del: pr.deletions)
         Spacer(minLength: 8)
-        Text(Format.relTime(pr.updatedAt)).font(.system(size: 11)).monospacedDigit().foregroundStyle(Tok.fg4)
+        Text(Format.relTime(pr.updatedAt)).font(.omni(size: 11)).monospacedDigit().foregroundStyle(Tok.fg4)
       }
-      .font(.system(size: 12))
+      .font(.omni(size: 12))
       .foregroundStyle(Tok.fg3)
       .padding(.leading, 22)
     }
@@ -172,7 +172,7 @@ struct PRStateIcon: View {
   var body: some View {
     OmniIcon(name: "pr", size: 14)
       .foregroundStyle(color)
-      .frame(width: 14)
+      .frame(width: z(14))
   }
 
   /// Open is live, merged is fg-2, closed and drafts recede.
@@ -226,14 +226,14 @@ struct ChecksSummary: View {
 
   var body: some View {
     if checks.isEmpty {
-      Text("no checks").font(.system(size: 12)).foregroundStyle(Tok.fg4)
+      Text("no checks").font(.omni(size: 12)).foregroundStyle(Tok.fg4)
     } else {
       HStack(spacing: 8) {
         if checks.passed > 0 { count(.done, checks.passed).foregroundStyle(Tok.fg2) }
         if checks.failed > 0 { count(.needs, checks.failed).foregroundStyle(Tok.fg2) }
         if checks.pending > 0 { count(.running, checks.pending).foregroundStyle(Tok.live) }
       }
-      .font(.system(size: 11.5))
+      .font(.omni(size: 11.5))
       .monospacedDigit()
       .help("\(checks.passed) passed, \(checks.failed) failed, \(checks.pending) pending")
     }
@@ -252,8 +252,8 @@ struct BranchLabel: View {
   let base: String
 
   var body: some View {
-    (Text(head) + Text(" into ").font(.system(size: 11.5)).foregroundStyle(Tok.fg4) + Text(base))
-      .font(.system(size: 11.5, design: .monospaced))
+    (Text(head) + Text(" into ").font(.omni(size: 11.5)).foregroundStyle(Tok.fg4) + Text(base))
+      .font(.omni(size: 11.5, design: .monospaced))
       .lineLimit(1)
       .truncationMode(.middle)
   }
@@ -268,7 +268,7 @@ struct Changes: View {
       Text("+\(add)").foregroundStyle(Tok.fg2)
       Text("-\(del)").foregroundStyle(Tok.fg3)
     }
-    .font(.system(size: 11))
+    .font(.omni(size: 11))
     .monospacedDigit()
   }
 }

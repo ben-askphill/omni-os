@@ -60,7 +60,7 @@ private struct ThreadView: View {
         Loader(size: 14)
         Text("Loading thread")
       }
-      .font(.system(size: 13))
+      .font(.omni(size: 13))
       .foregroundStyle(Tok.fg3)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     case .loaded:
@@ -106,17 +106,17 @@ private struct ThreadHeader: View {
           }
           if let task = thread.taskID, !task.isEmpty {
             Text(task)
-              .font(.system(size: 10.5))
+              .font(.omni(size: 10.5))
               .monospacedDigit()
               .foregroundStyle(Tok.fg4)
               .padding(.leading, 4)
               .fixedSize()
           }
         }
-        .font(.system(size: 12))
+        .font(.omni(size: 12))
         .foregroundStyle(Tok.fg3)
         Text(thread.title)
-          .font(.system(size: 17, weight: .medium))
+          .font(.omni(size: 17, weight: .medium))
           .foregroundStyle(Tok.fg)
           .lineLimit(1)
           .truncationMode(.tail)
@@ -129,7 +129,7 @@ private struct ThreadHeader: View {
           GlyphView(glyph: .running, size: 6)
           Text("Reconnecting")
         }
-        .font(.system(size: 11))
+        .font(.omni(size: 11))
         .foregroundStyle(Tok.fg3)
         .help("Reconnecting to the live stream")
         .accessibilityElement(children: .combine)
@@ -161,7 +161,7 @@ struct ChannelAvatar: View {
           .foregroundStyle(Tok.fg2)
       } else {
         Text(AvatarMark(name: name).letter)
-          .font(.system(size: size * 0.42, weight: .medium, design: .rounded))
+          .font(.omni(size: size * 0.42, weight: .medium, design: .rounded))
           .foregroundStyle(Tok.fg2)
       }
     }
@@ -180,7 +180,7 @@ struct ChannelMark: View {
     case .glyph(let name): OmniIcon(name: name, size: size)
     case .emoji(let text):
       // An emoji is wider than its font size; scale it down to fit the box so a row never clips it.
-      Text(text).font(.system(size: size * 0.85)).lineLimit(1).fixedSize().frame(width: size, height: size)
+      Text(text).font(.omni(size: size * 0.85)).lineLimit(1).fixedSize().frame(width: size, height: size)
     case .svg(let markup):
       if let image = SVGIconCache.image(markup) {
         Image(nsImage: image)
@@ -238,7 +238,7 @@ struct ErrorNote: View {
           .buttonStyle(.pill(.secondary, height: 26))
       }
     }
-    .font(.system(size: 13))
+    .font(.omni(size: 13))
     .foregroundStyle(Tok.fg)
     .padding(.horizontal, 16)
     .padding(.vertical, 10)
@@ -351,10 +351,10 @@ private struct NewActivityPill: View {
           OmniIcon(name: "chevronDown", size: 13)
           Text("New activity")
         }
-        .font(.system(size: 12, weight: .medium))
+        .font(.omni(size: 12, weight: .medium))
         .foregroundStyle(Tok.fg)
         .padding(.horizontal, 14)
-        .frame(height: 32)
+        .frame(height: z(32))
         .background(Tok.elev, in: Capsule())
         .menuShadow(16)
         .contentShape(Capsule())

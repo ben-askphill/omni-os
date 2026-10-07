@@ -95,9 +95,9 @@ struct ChannelSettingsForm: View {
               Link(name, destination: model.client.designSystemURL(existing.id))
               Text(Format.bytes(existing.designSystemSize)).foregroundStyle(Tok.fg3)
             }
-            .font(.system(size: 13))
+            .font(.omni(size: 13))
             .padding(.horizontal, 12)
-            .frame(height: 30)
+            .frame(height: z(30))
             .background(Capsule().fill(Tok.surface))
           }
           Button { chooseDesignSystem() } label: {
@@ -153,9 +153,9 @@ struct ChannelSettingsForm: View {
           HStack(spacing: 12) {
             ChannelAvatar(name: form.name.isEmpty ? form.id : form.name, size: 36, icon: form.icon)
             TextField("", text: Binding(get: { form.emoji }, set: { form.setIcon($0) }), prompt: Text("Emoji"))
-              .font(.system(size: 18))
+              .font(.omni(size: 18))
               .multilineTextAlignment(.center)
-              .frame(width: 96)
+              .frame(width: z(96))
               .accessibilityLabel("Emoji")
             Button { uploadSVG() } label: {
               HStack(spacing: 6) {
@@ -197,7 +197,7 @@ struct ChannelSettingsForm: View {
   @ViewBuilder private var runDefaults: some View {
     let harnesses = fetchedHarnesses ?? model.store.harnesses
     if harnesses.isEmpty {
-      Text("Loading models").font(.system(size: 12.5)).foregroundStyle(Tok.fg3)
+      Text("Loading models").font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
     } else {
       let run = form.defaultRun
       let name = harnesses.first { $0.id == run.harness }?.name ?? run.harness.rawValue
@@ -297,7 +297,7 @@ struct ChannelSettingsForm: View {
           GlyphView(glyph: .done, size: 8)
           Text("Saved")
         }
-        .font(.system(size: 12.5))
+        .font(.omni(size: 12.5))
         .foregroundStyle(Tok.fg2)
         .transition(.scale(scale: 0.8).combined(with: .opacity))
       }
@@ -412,7 +412,7 @@ struct MissingChannelView: View {
                 GlyphView(glyph: .needs, size: 7)
                 Text(error)
               }
-              .font(.system(size: 12.5))
+              .font(.omni(size: 12.5))
               .foregroundStyle(Tok.fg2)
             }
             HStack(spacing: 8) {
@@ -472,7 +472,7 @@ private struct SettingsSection<Content: View>: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text(title).font(.system(size: 16, weight: .medium)).tracking(-0.16).foregroundStyle(Tok.fg)
+      Text(title).font(.omni(size: 16, weight: .medium)).tracking(-0.16).foregroundStyle(Tok.fg)
       content
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -510,9 +510,9 @@ private struct SettingsToggle: View {
   var body: some View {
     HStack(alignment: .top, spacing: 16) {
       VStack(alignment: .leading, spacing: 2) {
-        Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(Tok.fg)
+        Text(title).font(.omni(size: 13, weight: .medium)).foregroundStyle(Tok.fg)
         Text(detail)
-          .font(.system(size: 12))
+          .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
           .fixedSize(horizontal: false, vertical: true)
       }
@@ -563,7 +563,7 @@ private struct GlyphPicker: View {
         Button { pick(name) } label: {
           OmniIcon(name: name, size: 17)
             .foregroundStyle(on ? Tok.onInk : Tok.fg2)
-            .frame(width: 36, height: 36)
+            .frame(width: z(36), height: z(36))
             .background(on ? Tok.fg : .clear, in: Circle())
             .contentShape(Circle())
         }

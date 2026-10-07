@@ -26,7 +26,7 @@ struct UserBubbleView: View {
       }
       VStack(alignment: .leading, spacing: 4) {
         Text(Self.text(pieces, cut: long && !more))
-          .font(.system(size: ThreadStyle.prose + 0.5))
+          .font(.omni(size: ThreadStyle.prose + 0.5))
           .lineSpacing(5)
           .foregroundStyle(Tok.fg)
           .tint(Tok.fg)
@@ -41,14 +41,14 @@ struct UserBubbleView: View {
         if let about {
           Hairline().padding(.top, 2)
           Text("\(about.description.isEmpty ? "No description" : about.description)\(Text(" · \(about.sourceTag)").foregroundStyle(Tok.fg4))")
-            .font(.system(size: ThreadStyle.small))
+            .font(.omni(size: ThreadStyle.small))
             .foregroundStyle(Tok.fg3)
             .fixedSize(horizontal: false, vertical: true)
         }
         if long {
           Button(more ? "Show less" : "Show all") { ui.toggle(moreKey) }
             .buttonStyle(.link)
-            .font(.system(size: 12, weight: .medium))
+            .font(.omni(size: 12, weight: .medium))
             .foregroundStyle(Tok.fg3)
             .underline()
         }
@@ -56,7 +56,7 @@ struct UserBubbleView: View {
       .padding(.horizontal, 16)
       .padding(.vertical, 10)
       .background(background)
-      .frame(maxWidth: 600, alignment: .trailing)
+      .frame(maxWidth: z(600), alignment: .trailing)
     }
     .frame(maxWidth: .infinity, alignment: .trailing)
     .opacity(message.dropped == true ? 0.6 : 1)
@@ -84,11 +84,11 @@ struct UserBubbleView: View {
           .help("The run ended before the agent read this message")
       }
       Text(Format.clock(at))
-        .font(.system(size: 11))
+        .font(.omni(size: 11))
         .monospacedDigit()
         .foregroundStyle(Tok.fg4)
     }
-    .font(.system(size: 11.5))
+    .font(.omni(size: 11.5))
     .foregroundStyle(Tok.fg3)
   }
 
@@ -107,7 +107,7 @@ struct UserBubbleView: View {
     for piece in pieces {
       var run = AttributedString(piece.text)
       if let hit = piece.hit {
-        run.font = .system(size: ThreadStyle.prose - 1, weight: .medium, design: .monospaced)
+        run.font = .omni(size: ThreadStyle.prose - 1, weight: .medium, design: .monospaced)
         run.backgroundColor = Tok.surface3
         run.foregroundColor = Tok.fg
         run.link = URL(string: "\(pillScheme)://\(hit.start)")
@@ -167,12 +167,12 @@ struct AttachmentsView: View {
       case .success(let image):
         image.resizable().scaledToFit()
       case .failure:
-        OmniIcon(name: "image", size: 16).foregroundStyle(Tok.fg4).frame(width: 80, height: 60)
+        OmniIcon(name: "image", size: 16).foregroundStyle(Tok.fg4).frame(width: z(80), height: z(60))
       default:
-        ProgressView().controlSize(.small).frame(width: 80, height: 60)
+        ProgressView().controlSize(.small).frame(width: z(80), height: z(60))
       }
     }
-    .frame(maxWidth: 224, maxHeight: 176)
+    .frame(maxWidth: z(224), maxHeight: z(176))
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Tok.line))
     .padding(4)
@@ -184,18 +184,18 @@ struct AttachmentsView: View {
     HStack(spacing: 8) {
       OmniIcon(name: "file", size: 15)
         .foregroundStyle(Tok.fg3)
-        .frame(width: 32, height: 32)
+        .frame(width: z(32), height: z(32))
         .background(Tok.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
       VStack(alignment: .leading, spacing: 1) {
-        Text(a.name).font(.system(size: ThreadStyle.small, weight: .medium)).foregroundStyle(Tok.fg2)
+        Text(a.name).font(.omni(size: ThreadStyle.small, weight: .medium)).foregroundStyle(Tok.fg2)
           .lineLimit(1).truncationMode(.middle)
-        Text(Format.bytes(a.size)).font(.system(size: 10.5)).monospacedDigit().foregroundStyle(Tok.fg4)
+        Text(Format.bytes(a.size)).font(.omni(size: 10.5)).monospacedDigit().foregroundStyle(Tok.fg4)
       }
-      .frame(maxWidth: 190, alignment: .leading)
+      .frame(maxWidth: z(190), alignment: .leading)
       OmniIcon(name: "download", size: 14).foregroundStyle(Tok.fg3)
     }
     .padding(.horizontal, 8)
-    .frame(height: 44)
+    .frame(height: z(44))
     .background(Tok.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 
@@ -279,12 +279,12 @@ struct ResultLineView: View {
         if result.isBad {
           GlyphView(glyph: .needs, size: 8)
         } else if result.ok {
-          Circle().fill(Tok.done).overlay(Circle().strokeBorder(Tok.doneEdge, lineWidth: 0.5)).frame(width: 5, height: 5)
+          Circle().fill(Tok.done).overlay(Circle().strokeBorder(Tok.doneEdge, lineWidth: 0.5)).frame(width: z(5), height: z(5))
         } else {
-          Circle().fill(Tok.fg4).frame(width: 4, height: 4)
+          Circle().fill(Tok.fg4).frame(width: z(4), height: z(4))
         }
         Text(Self.sentence(result.line))
-          .font(.system(size: 12, weight: .medium))
+          .font(.omni(size: 12, weight: .medium))
           .monospacedDigit()
       }
       .foregroundStyle(result.isBad ? Tok.fg2 : Tok.fg4)
@@ -312,16 +312,16 @@ struct ErrorCallout: View {
         GlyphView(glyph: .needs, size: 9)
         Text("Error")
       }
-      .font(.system(size: ThreadStyle.small, weight: .semibold))
+      .font(.omni(size: ThreadStyle.small, weight: .semibold))
       .foregroundStyle(Tok.fg)
       let body = Text(text)
-        .font(.system(size: ThreadStyle.mono, design: .monospaced))
+        .font(.omni(size: ThreadStyle.mono, design: .monospaced))
         .lineSpacing(3)
         .foregroundStyle(Tok.fg2)
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
       if Format.isTall(text) {
-        ScrollView { body }.frame(height: 288)
+        ScrollView { body }.frame(height: z(288))
       } else {
         body
       }
@@ -343,17 +343,17 @@ struct ReportCard: View {
       HStack(spacing: 8) {
         OmniIcon(name: "inbox", size: 14)
           .foregroundStyle(Tok.fg3)
-          .frame(width: 28, height: 28)
+          .frame(width: z(28), height: z(28))
           .background(Tok.bg, in: Circle())
         Text("Report from \(report.role ?? "crew")").fontWeight(.medium).foregroundStyle(Tok.fg)
         if report.dropped == true {
           Text("Not delivered")
-            .font(.system(size: 11.5, weight: .medium))
+            .font(.omni(size: 11.5, weight: .medium))
             .foregroundStyle(Tok.fg3)
             .help("The run ended before the agent read this report")
         }
         if let task = report.taskID, !task.isEmpty {
-          Text(task).font(.system(size: ThreadStyle.mono, design: .monospaced)).foregroundStyle(Tok.fg3)
+          Text(task).font(.omni(size: ThreadStyle.mono, design: .monospaced)).foregroundStyle(Tok.fg3)
         }
         if let channel = report.channel, !channel.isEmpty {
           Button("#\(channel)") { model.route = .channel(id: channel) }
@@ -370,22 +370,22 @@ struct ReportCard: View {
               Text("Open thread")
               OmniIcon(name: "arrowRight", size: 12)
             }
-            .font(.system(size: 12.5, weight: .medium))
+            .font(.omni(size: 12.5, weight: .medium))
             .foregroundStyle(Tok.fg)
             .padding(.horizontal, 12)
-            .frame(height: 28)
+            .frame(height: z(28))
             .background(Tok.bg, in: Capsule())
             .cardShadow(14)
           }
           .buttonStyle(.plain)
         }
       }
-      .font(.system(size: ThreadStyle.small))
+      .font(.omni(size: ThreadStyle.small))
       .padding(.horizontal, 16)
       .padding(.top, 12)
       if let title = report.title, !title.isEmpty {
         Text(title)
-          .font(.system(size: 15, weight: .medium))
+          .font(.omni(size: 15, weight: .medium))
           .foregroundStyle(Tok.fg)
           .padding(.horizontal, 16)
           .padding(.top, 12)
@@ -409,12 +409,12 @@ struct PlanCard: View {
       HStack(spacing: 12) {
         Text("Plan").omniCaption()
         TicksView(ticks: plan.ticks)
-          .frame(maxWidth: 160)
-          .frame(height: 6)
+          .frame(maxWidth: z(160))
+          .frame(height: z(6))
           .accessibilityLabel("Plan progress")
         Spacer(minLength: 0)
         Text("\(plan.done)/\(plan.todos.count)")
-          .font(.system(size: 11))
+          .font(.omni(size: 11))
           .monospacedDigit()
           .foregroundStyle(Tok.fg3)
       }
@@ -423,7 +423,7 @@ struct PlanCard: View {
         CheckItem(state: todo.status ?? "pending", text: todo.label ?? "")
       }
       if plan.active == nil && plan.allDone {
-        Text("All done").font(.system(size: 12)).foregroundStyle(Tok.fg4).padding(.top, 6)
+        Text("All done").font(.omni(size: 12)).foregroundStyle(Tok.fg4).padding(.top, 6)
       }
     }
     .padding(.horizontal, 16)
@@ -466,7 +466,7 @@ struct WorkingLine: View {
       Loader(size: 13).foregroundStyle(Tok.fg3)
       Text(text).lineLimit(1).truncationMode(.tail)
     }
-    .font(.system(size: ThreadStyle.small))
+    .font(.omni(size: ThreadStyle.small))
     .foregroundStyle(Tok.fg3)
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -484,7 +484,7 @@ struct QueuedMessagesView: View {
       ForEach(Array(items.enumerated()), id: \.element.id) { i, m in
         if m.kind == "crew_report" {
           IconLabel(m.label(lead: i == lead), icon: m.state == .sent ? "send" : "clock", size: 12)
-            .font(.system(size: 12))
+            .font(.omni(size: 12))
             .foregroundStyle(Tok.fg3)
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
@@ -495,10 +495,10 @@ struct QueuedMessagesView: View {
                 Text("· \(Format.plural(files.count, "file"))").foregroundStyle(Tok.fg4)
               }
             }
-            .font(.system(size: 11.5, weight: .medium))
+            .font(.omni(size: 11.5, weight: .medium))
             .foregroundStyle(Tok.fg3)
             Text(m.text)
-              .font(.system(size: ThreadStyle.prose))
+              .font(.omni(size: ThreadStyle.prose))
               .lineSpacing(5)
               .foregroundStyle(Tok.fg)
               .textSelection(.enabled)
@@ -510,7 +510,7 @@ struct QueuedMessagesView: View {
                   topLeadingRadius: 22, bottomLeadingRadius: 22, bottomTrailingRadius: 22, topTrailingRadius: 8, style: .continuous)
                   .strokeBorder(Tok.lineStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
               )
-              .frame(maxWidth: 600, alignment: .trailing)
+              .frame(maxWidth: z(600), alignment: .trailing)
           }
           .frame(maxWidth: .infinity, alignment: .trailing)
           .opacity(0.7)

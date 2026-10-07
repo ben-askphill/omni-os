@@ -17,23 +17,23 @@ struct PublishedCard: View {
       HStack(alignment: .top, spacing: 12) {
         OmniIcon(name: "globe", size: 15)
           .foregroundStyle(Tok.fg3)
-          .frame(width: 32, height: 32)
+          .frame(width: z(32), height: z(32))
           .background(Tok.bg, in: Circle())
         VStack(alignment: .leading, spacing: 2) {
           HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(page.title)
-              .font(.system(size: 13.5, weight: .medium))
+              .font(.omni(size: 13.5, weight: .medium))
               .foregroundStyle(Tok.fg)
               .lineLimit(1)
               .truncationMode(.middle)
             Text(page.update ? "Republished on claude.ai" : "Published on claude.ai")
-              .font(.system(size: 11.5))
+              .font(.omni(size: 11.5))
               .foregroundStyle(Tok.fg4)
               .fixedSize()
           }
           if let text = page.description {
             Text(text)
-              .font(.system(size: 12.5))
+              .font(.omni(size: 12.5))
               .foregroundStyle(Tok.fg3)
               .lineLimit(2)
           }
@@ -67,7 +67,7 @@ struct PublishedCard: View {
         .disabled(comments == .sending || comments == .sent)
         .help(comments.help)
         if case .failed(let message) = comments {
-          Text(message).font(.system(size: 11.5)).foregroundStyle(Tok.fg2).lineLimit(1)
+          Text(message).font(.omni(size: 11.5)).foregroundStyle(Tok.fg2).lineLimit(1)
         }
       }
       .padding(.leading, 44)

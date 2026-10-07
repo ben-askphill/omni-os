@@ -92,14 +92,14 @@ private struct ThreadPRSlot: View {
             PRChip(text: pr.badge, tone: pr.badge == "open" ? .ok : pr.badge == "merged" ? .info : .outline)
             if prs.prs.count > 1 { Text("+\(prs.prs.count - 1)").foregroundStyle(Tok.fg4) }
           }
-          .font(.system(size: 12.5))
+          .font(.omni(size: 12.5))
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.visible)
         .fixedSize()
         .padding(.horizontal, 8)
-        .frame(height: 26)
+        .frame(height: z(26))
         .foregroundStyle(Tok.fg3)
         .help(pr.title)
       } else if prs != nil || failed {
@@ -215,7 +215,7 @@ private struct ReplyComposerView: View {
       .fixedSize(horizontal: false, vertical: false)
       if let e = reply.attachError {
         Text(e)
-          .font(.system(size: 12))
+          .font(.omni(size: 12))
           .foregroundStyle(Tok.fg)
           .padding(.horizontal, 16)
           .padding(.bottom, 4)
@@ -363,13 +363,13 @@ private struct ThreadRunPills: View {
 
   private func pill(symbol: String, text: String, detail: String?, label: String) -> some View {
     HStack(spacing: 6) {
-      Image(systemName: symbol).font(.system(size: 11.5)).foregroundStyle(Tok.fg3)
-      Text(text).font(.system(size: 12.5, weight: .medium)).lineLimit(1)
-      if let detail { Text("· \(detail)").font(.system(size: 12.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
+      Image(systemName: symbol).font(.omni(size: 11.5)).foregroundStyle(Tok.fg3)
+      Text(text).font(.omni(size: 12.5, weight: .medium)).lineLimit(1)
+      if let detail { Text("· \(detail)").font(.omni(size: 12.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
     }
     .padding(.horizontal, 10)
-    .frame(height: 28)
-    .frame(maxWidth: 220)
+    .frame(height: z(28))
+    .frame(maxWidth: z(220))
     .foregroundStyle(Tok.fg)
     .background(Tok.surface2, in: Capsule())
     .help("Fixed for this thread")
@@ -392,7 +392,7 @@ struct SendButton: View {
         if sending { Loader(size: 16) } else { OmniIcon(name: "send", size: 16, weight: 2) }
       }
       .foregroundStyle(Tok.onInk)
-      .frame(width: 34, height: 34)
+      .frame(width: z(34), height: z(34))
       .background(Tok.fg, in: Circle())
       .contentShape(Circle())
     }
@@ -442,15 +442,15 @@ private struct SteerButton: View {
           } else {
             OmniIcon(name: canSteer ? "send" : "clock", size: 16, weight: 2)
           }
-          Text(SendRules.buttonTitle(canSteer: canSteer)).font(.system(size: 13, weight: .medium))
+          Text(SendRules.buttonTitle(canSteer: canSteer)).font(.omni(size: 13, weight: .medium))
         }
         .padding(.leading, 14)
         .padding(.trailing, 10)
-        .frame(height: 34)
+        .frame(height: z(34))
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      Rectangle().fill(Tok.onInk.opacity(0.25)).frame(width: 1, height: 34)
+      Rectangle().fill(Tok.onInk.opacity(0.25)).frame(width: 1, height: z(34))
       Menu {
         ForEach(SendRules.options(canSteer: canSteer), id: \.rawValue) { mode in
           Button {
@@ -463,7 +463,7 @@ private struct SteerButton: View {
       } label: {
         OmniIcon(name: "chevronDown", size: 13)
           .foregroundStyle(Tok.onInk)
-          .frame(width: 32, height: 34)
+          .frame(width: z(32), height: z(34))
           .contentShape(Rectangle())
       }
       .menuStyle(.button)
@@ -493,10 +493,10 @@ struct AttachmentStrip: View {
           HStack(spacing: 8) {
             Thumb(file: f)
             VStack(alignment: .leading, spacing: 1) {
-              Text(f.name).font(.system(size: 12.5, weight: .medium)).foregroundStyle(Tok.fg2).lineLimit(1).truncationMode(.middle)
-              Text(Format.bytes(f.size)).font(.system(size: 10.5)).foregroundStyle(Tok.fg4).monospacedDigit()
+              Text(f.name).font(.omni(size: 12.5, weight: .medium)).foregroundStyle(Tok.fg2).lineLimit(1).truncationMode(.middle)
+              Text(Format.bytes(f.size)).font(.omni(size: 10.5)).foregroundStyle(Tok.fg4).monospacedDigit()
             }
-            .frame(maxWidth: 170, alignment: .leading)
+            .frame(maxWidth: z(170), alignment: .leading)
             Button {
               remove(f)
             } label: {
@@ -508,7 +508,7 @@ struct AttachmentStrip: View {
           }
           .padding(.leading, 4)
           .padding(.trailing, 4)
-          .frame(height: 44)
+          .frame(height: z(44))
           .background(Tok.surface2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
       }
@@ -531,7 +531,7 @@ private struct Thumb: View {
         OmniIcon(name: "file", size: 15).foregroundStyle(Tok.fg3)
       }
     }
-    .frame(width: 36, height: 36)
+    .frame(width: z(36), height: z(36))
     .background(Tok.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Tok.line))

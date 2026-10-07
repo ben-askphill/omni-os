@@ -40,7 +40,7 @@ private struct ChannelView: View {
             ChannelThreads(model: model, channel: channel)
           case .settings:
             ChannelSettingsForm(model: model, existing: channel.channel)
-              .frame(maxWidth: 672, alignment: .leading)
+              .frame(maxWidth: z(672), alignment: .leading)
               .id(channel.id)
           case .prs:
             // The main window shows the PRs tab through PullRequestsScreen, under ChannelTabsBar.
@@ -73,7 +73,7 @@ private struct ChannelView: View {
           }
           Text(channel.name).lineLimit(1).foregroundStyle(Tok.fg)
         }
-        .font(.system(size: 30, weight: .medium))
+        .font(.omni(size: 30, weight: .medium))
         .tracking(-0.3)
       }
       Spacer()
@@ -105,18 +105,18 @@ private struct ChannelView: View {
         }
         if let path {
           Text(path)
-            .font(.system(size: 11, design: .monospaced))
+            .font(.omni(size: 11, design: .monospaced))
             .foregroundStyle(Tok.fg4)
             .lineLimit(1)
             .truncationMode(.head)
             .padding(.horizontal, 10)
-            .frame(height: 28)
+            .frame(height: z(28))
             .overlay(Capsule().strokeBorder(Tok.line))
             .help(path)
         }
         if let note {
           Text(note)
-            .font(.system(size: 12.5))
+            .font(.omni(size: 12.5))
             .foregroundStyle(Tok.fg3)
             .lineLimit(1)
             .padding(.horizontal, 4)
@@ -164,7 +164,7 @@ struct ChannelTabsBar: View {
           if !conductor { Text("#").foregroundStyle(Tok.fg4) }
           Text(channel.name).foregroundStyle(Tok.fg)
         }
-        .font(.system(size: 15, weight: .medium))
+        .font(.omni(size: 15, weight: .medium))
         .lineLimit(1)
         Spacer()
         ChannelTabsPicker(model: model, channelID: channel.id, tab: .prs, conductor: conductor)
@@ -188,9 +188,9 @@ private struct LinkPill: View {
         OmniIcon(name: icon, size: 13).foregroundStyle(Tok.fg3)
         Text(text).lineLimit(1).foregroundStyle(Tok.fg2)
       }
-      .font(.system(size: 12))
+      .font(.omni(size: 12))
       .padding(.horizontal, 10)
-      .frame(height: 28)
+      .frame(height: z(28))
       .background(hovering ? Tok.surface2 : Tok.surface, in: Capsule())
       .contentShape(Capsule())
     }

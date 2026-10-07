@@ -34,7 +34,7 @@ struct SlashMenuDemo: View {
       VStack(alignment: .leading, spacing: 4) {
         TextEditor(text: $text, selection: $selection)
           .focused($focused)
-          .frame(height: 60)
+          .frame(height: z(60))
           .scrollContentBackground(.hidden)
         SlashHintView(model: menu) {}
       }

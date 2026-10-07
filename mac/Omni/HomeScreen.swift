@@ -17,7 +17,7 @@ struct HomeScreen: View {
         NewThreadComposerView(model: model, channelID: nil, big: true)
         HStack {
           Text("Recent")
-            .font(.system(size: 17, weight: .medium))
+            .font(.omni(size: 17, weight: .medium))
             .tracking(-0.17)
             .foregroundStyle(Tok.fg)
           Spacer()
@@ -46,7 +46,7 @@ struct HomeScreen: View {
               .padding(.top, 16)
               .padding(.bottom, 10)
             Text(Greeting.text(hour: Calendar.current.component(.hour, from: context.date)))
-              .font(.system(size: 36, weight: .medium))
+              .font(.omni(size: 36, weight: .medium))
               .tracking(-0.36)
               .foregroundStyle(Tok.fg)
           }
@@ -101,11 +101,11 @@ private struct Pulse: View {
           .foregroundStyle(Tok.fg4)
       }
     }
-    .font(.system(size: 11.5))
+    .font(.omni(size: 11.5))
     .monospacedDigit()
     .foregroundStyle(Tok.fg2)
     .padding(.horizontal, 12)
-    .frame(height: 28)
+    .frame(height: z(28))
     .background(Tok.surface, in: Capsule())
   }
 }

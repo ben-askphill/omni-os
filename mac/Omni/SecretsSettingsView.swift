@@ -50,7 +50,7 @@ struct SecretsForm: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .buttonStyle(.plain)
-            .font(.system(size: 14))
+            .font(.omni(size: 14))
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(alignment: .trailing) {
               OmniIcon(name: "chevronDown", size: 13).foregroundStyle(Tok.fg3).allowsHitTesting(false)
@@ -88,7 +88,7 @@ struct SecretsForm: View {
             .onSubmit(save)
           if let hint = secrets.valueHint {
             Text(hint)
-              .font(.system(size: 12))
+              .font(.omni(size: 12))
               .foregroundStyle(Tok.fg3)
               .fixedSize(horizontal: false, vertical: true)
               .padding(.top, 6)
@@ -174,7 +174,7 @@ struct SecretRowView: View {
         OmniIcon(name: "key", size: 14)
           .foregroundStyle(Tok.fg3)
         Text(row.name)
-          .font(.system(size: 12.5, design: .monospaced))
+          .font(.omni(size: 12.5, design: .monospaced))
           .foregroundStyle(Tok.fg)
           .lineLimit(1)
           .truncationMode(.middle)
@@ -182,12 +182,12 @@ struct SecretRowView: View {
         Spacer()
         TimelineView(.everyMinute) { context in
           Text(RelTime.label(row.updatedAt, now: context.date))
-            .font(.system(size: 12).monospacedDigit())
+            .font(.omni(size: 12).monospacedDigit())
             .foregroundStyle(Tok.fg4)
         }
         .help(row.updatedAt.formatted(date: .complete, time: .standard))
         if deleting {
-          Loader(size: 14).frame(width: 28, height: 28)
+          Loader(size: 14).frame(width: z(28), height: z(28))
         } else {
           Button(role: .destructive, action: delete) {
             OmniIcon(name: "trash", size: 14)

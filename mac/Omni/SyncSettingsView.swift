@@ -109,7 +109,7 @@ struct SyncForm: View {
         if let id = s.machineId {
           InfoRow(label: "This Mac") {
             HStack(spacing: 6) {
-              Text(id).font(.system(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.middle)
+              Text(id).font(.omni(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.middle)
                 .textSelection(.enabled)
               Button {
                 NSPasteboard.general.clearContents()
@@ -135,7 +135,7 @@ struct SyncForm: View {
       }
       HStack(alignment: .firstTextBaseline, spacing: 12) {
         Text("Signing out removes the credentials from the Keychain. History stays on this Mac.")
-          .font(.system(size: 12))
+          .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
           .fixedSize(horizontal: false, vertical: true)
         Spacer(minLength: 0)

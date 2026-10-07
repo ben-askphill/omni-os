@@ -55,7 +55,7 @@ struct HarnessLogo: View {
         SVGShape(d).fill(style: FillStyle(eoFill: false))
       } else {
         Text(harness.prefix(2).uppercased())
-          .font(.system(size: max(7, size * 0.62), weight: .medium))
+          .font(.omni(size: max(7, size * 0.62), weight: .medium))
       }
     }
     .frame(width: size, height: size)
