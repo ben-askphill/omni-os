@@ -319,6 +319,6 @@ struct ArtifactWindowView: View {
   var body: some View {
     ArtifactViewer(client: model.client, ref: ref, windowed: true)
       .navigationTitle(ref.name)
-      .frame(minWidth: z(480), minHeight: z(360))
+      .frame(minWidth: 480, minHeight: 360)
   }
 }

@@ -238,13 +238,13 @@ struct CrewGlyph: View {
     ZStack {
       switch role {
       case "conductor":
-        Circle().stroke(lineWidth: 3.6 * s).frame(width: z(14) * s, height: z(14) * s)
+        Circle().stroke(lineWidth: 3.6 * s).frame(width: 14 * s, height: 14 * s)
       case "researcher":
-        Circle().stroke(lineWidth: 1.75 * s).frame(width: z(17) * s, height: z(17) * s)
-        Circle().frame(width: z(6.4) * s, height: z(6.4) * s)
+        Circle().stroke(lineWidth: 1.75 * s).frame(width: 17 * s, height: 17 * s)
+        Circle().frame(width: 6.4 * s, height: 6.4 * s)
       case "builder":
-        RoundedRectangle(cornerRadius: 3.5 * s).stroke(lineWidth: 1.75 * s).frame(width: z(16) * s, height: z(16) * s)
-        RoundedRectangle(cornerRadius: 2 * s).frame(width: z(8) * s, height: z(8) * s).offset(x: 4 * s, y: 4 * s)
+        RoundedRectangle(cornerRadius: 3.5 * s).stroke(lineWidth: 1.75 * s).frame(width: 16 * s, height: 16 * s)
+        RoundedRectangle(cornerRadius: 2 * s).frame(width: 8 * s, height: 8 * s).offset(x: 4 * s, y: 4 * s)
       default:
         OmniIcon(name: "layers", size: size * 0.9)
       }

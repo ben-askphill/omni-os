@@ -16,3 +16,15 @@ extension Font {
     .system(size: z(size), weight: weight, design: design)
   }
 }
+
+/// `.font(.omni(...))` for places that are not on the main actor, such as a `TextFieldStyle`'s `_body`:
+/// the modifier's body is, so it can read the zoom.
+struct OmniFont: ViewModifier {
+  let size: CGFloat
+  var weight: Font.Weight?
+  var design: Font.Design?
+
+  func body(content: Content) -> some View {
+    content.font(.omni(size: size, weight: weight, design: design))
+  }
+}

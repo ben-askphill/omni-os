@@ -233,7 +233,7 @@ struct OmniFieldStyle: TextFieldStyle {
   func _body(configuration: TextField<Self._Label>) -> some View {
     configuration
       .textFieldStyle(.plain)
-      .font(.omni(size: 14))
+      .modifier(OmniFont(size: 14))
       .focused($focused)
       .padding(.horizontal, 14)
       .padding(.vertical, 9)
