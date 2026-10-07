@@ -239,6 +239,7 @@ private struct ReplyComposerView: View {
   private var footer: some View {
     ComposerFooterLayout {
       AttachButton(disabled: reply.sending) { picking = true }
+      DictateButton { focusTick += 1 }
       ThreadRunPills(thread: thread, harnesses: model.store.harnesses)
       if thread.branch != nil {
         ThreadPRSlot(model: model, thread: thread, busy: busyThread, opening: reply.openingPR) { Task { await openPR() } }

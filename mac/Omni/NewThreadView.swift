@@ -207,6 +207,7 @@ private struct NewThreadBox: View {
         pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest)
       EffortMenu(options: composer.effortOptions, value: composer.choice.effort, pick: composer.selectEffort)
       AttachButton(disabled: composer.sending) { picking = true }
+      DictateButton { focusTick += 1 }
       HStack(spacing: 10) {
         ComposerHints()
         SendButton(title: "Start", armed: composer.canSend, sending: composer.sending) { start() }
