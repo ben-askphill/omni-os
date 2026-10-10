@@ -68,6 +68,7 @@ private struct ThreadView: View {
         VStack(spacing: 0) {
           ThreadHeader(model: model, store: store, thread: thread)
           TranscriptView(model: model, store: store, ui: ui, markdown: markdown)
+            .overlay(alignment: .topTrailing) { ModToastStack(store: store) }
           ReplyComposerHost(model: model, store: store, thread: thread)
         }
         #if DEBUG
@@ -122,6 +123,7 @@ private struct ThreadHeader: View {
           .truncationMode(.tail)
           .help(thread.title)
           .textSelection(.enabled)
+        ModStatusLines(mods: model.store.mods.filter { $0.threadID == thread.id })
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       if store.isReconnecting {
@@ -463,6 +465,8 @@ private struct TranscriptRow: View {
       ErrorCallout(text: text)
     case .report(let id, _, let report):
       ReportCard(report: report, document: markdown.document(for: id, text: report.text.isEmpty ? "(no reply)" : report.text), model: model)
+    case .mod(_, let lines):
+      ModLogView(lines: lines)
     }
   }
 

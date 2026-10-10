@@ -17,6 +17,7 @@ const REQUIRED = [
   'self-parent',
   'undecodable-tool-use',
   'first-string-field',
+  'mod-logs',
 ];
 
 describe('transcript fold', () => {

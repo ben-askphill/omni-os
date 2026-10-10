@@ -63,6 +63,9 @@ struct ThreadListRow: View {
                 .padding(.horizontal, z(6))
                 .background(ThreadStyle.surface2, in: Capsule())
             }
+            if let mod = model.store.mods.last(where: { $0.threadID == thread.id }) {
+              ModStatusChip(mod: mod)
+            }
             Text(preview)
               .lineLimit(1)
           }

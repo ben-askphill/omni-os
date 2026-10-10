@@ -11,7 +11,7 @@ import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
 import { artifacts, channels, events, publicChannel, threads, type Thread } from './db.ts';
 import { readBody } from './read-body.ts';
-import { createTeam, createThread, interruptThread, isLive, pendingFor, postMessage, runsHere } from './runner.ts';
+import { activeMods, createTeam, createThread, interruptThread, isLive, pendingFor, postMessage, runsHere } from './runner.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
 import { checkUploads, imageMime, safeName, saveUploads } from './uploads.ts';
@@ -98,6 +98,8 @@ threadRoutesApi.get('/:id', (c) => {
     parent: t.parent_id ? threads.get(t.parent_id) : null,
     pending: pendingFor(t.id),
     live: isLive(t.id),
+    // The status lines its mods pinned, while its process runs. The feed's mods event keeps them current.
+    mods: activeMods().filter((m) => m.thread_id === t.id),
   };
   // Only when a turn cannot start here (a synced thread): why, for the composer to show.
   const blocked = turnBlocked(t, runsHere(t.id));

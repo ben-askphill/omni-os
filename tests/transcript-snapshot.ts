@@ -56,6 +56,8 @@ function projectItem(it: Item) {
       if (it.p.task_id != null) row.task_id = it.p.task_id;
       return row;
     }
+    case 'mod':
+      return { type: 'mod' as const, key: it.key, lines: it.lines.map((l) => ({ key: l.key, plugin: l.plugin, text: l.text })) };
     default: {
       const unreachable: never = it;
       return unreachable;

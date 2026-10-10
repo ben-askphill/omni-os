@@ -408,3 +408,54 @@ describe('LineSplitter', () => {
     expect(got.every((l) => typeof JSON.parse(l) === 'object')).toBe(true);
   });
 });
+
+describe('parseEvent: mod ui events', () => {
+  // As claude 2.1.287 prints them under -p --output-format stream-json, from a plugin's $.ui calls.
+  const LOG = '{"type":"system","subtype":"ui_log","plugin":"omni-tool","text":"omni-tool: thread_info served","uuid":"u1","session_id":"s"}';
+  const TOAST = '{"type":"system","subtype":"ui_toast","plugin":"omni-tool","text":"thread_info ran","timeout_ms":4000,"uuid":"u2","session_id":"s"}';
+  const STATUS = '{"type":"system","subtype":"ui_status","plugin":"omni-tool","text":"omni-tool: ready","uuid":"u3","session_id":"s"}';
+  const records = (line: string | object) => parseEvent(typeof line === 'string' ? JSON.parse(line) : line).records;
+
+  it('maps ui_log to a log', () => {
+    expect(records(LOG)).toEqual([{ kind: 'mod', payload: { plugin: 'omni-tool', level: 'log', text: 'omni-tool: thread_info served' } }]);
+  });
+
+  it('maps ui_toast to a toast with its timeout', () => {
+    expect(records(TOAST)).toEqual([{ kind: 'mod', payload: { plugin: 'omni-tool', level: 'toast', text: 'thread_info ran', timeout_ms: 4000 } }]);
+  });
+
+  it('maps ui_status to a status', () => {
+    expect(records(STATUS)).toEqual([{ kind: 'mod', payload: { plugin: 'omni-tool', level: 'status', text: 'omni-tool: ready' } }]);
+  });
+
+  it('reads a status with null, empty or no text as a clear', () => {
+    const clear = [{ kind: 'mod', payload: { plugin: 'omni-tool', level: 'status', text: null } }];
+    expect(records({ type: 'system', subtype: 'ui_status', plugin: 'omni-tool', text: null })).toEqual(clear);
+    expect(records({ type: 'system', subtype: 'ui_status', plugin: 'omni-tool', text: '  ' })).toEqual(clear);
+    expect(records({ type: 'system', subtype: 'ui_status', plugin: 'omni-tool' })).toEqual(clear);
+  });
+
+  it('reads an unknown ui_* subtype with text as a log', () => {
+    expect(records({ type: 'system', subtype: 'ui_foo', plugin: 'omni-tool', text: 'hello' })).toEqual([
+      { kind: 'mod', payload: { plugin: 'omni-tool', level: 'log', text: 'hello' } },
+    ]);
+  });
+
+  it('ignores drawing-protocol messages and toasts or logs without text', () => {
+    expect(records({ type: 'system', subtype: 'ui_render', plugin: 'omni-tool', tree: { type: 'box' } })).toEqual([]);
+    expect(records({ type: 'system', subtype: 'ui_attach', plugin: 'omni-tool', pane: 'p1' })).toEqual([]);
+    expect(records({ type: 'system', subtype: 'ui_toast', plugin: 'omni-tool', text: '' })).toEqual([]);
+    expect(records({ type: 'system', subtype: 'ui_log', plugin: 'omni-tool', text: { not: 'text' } })).toEqual([]);
+  });
+
+  it('caps text at 2,000 characters and names a missing plugin "mod"', () => {
+    const [r] = records({ type: 'system', subtype: 'ui_log', text: 'x'.repeat(5000) });
+    expect(r).toEqual({ kind: 'mod', payload: { plugin: 'mod', level: 'log', text: 'x'.repeat(2000) } });
+  });
+
+  it('leaves out a toast timeout that is not a positive number', () => {
+    expect(records({ type: 'system', subtype: 'ui_toast', plugin: 'p', text: 't', timeout_ms: 'soon' })).toEqual([
+      { kind: 'mod', payload: { plugin: 'p', level: 'toast', text: 't' } },
+    ]);
+  });
+});

@@ -193,9 +193,28 @@ export interface BackgroundTask {
   summary?: string;
 }
 
+/** A mod's pinned status line in a running thread, as GET /api/mods and the feed's 'mods' event carry it. */
+export interface ModStatus {
+  thread_id: string;
+  channel_id: string;
+  plugin: string;
+  text: string;
+  /** ISO time. */
+  updated_at: string;
+}
+
+/** A mod's $.ui.toast, sent on the thread's stream to whoever watches it and never stored. */
+export interface ModToast {
+  thread_id: string;
+  plugin: string;
+  text: string;
+  timeout_ms?: number;
+}
+
 export type FeedEvent =
   | { type: 'thread'; thread: Thread }
   | { type: 'tasks'; tasks: BackgroundTask[] }
+  | { type: 'mods'; mods: ModStatus[] }
   | { type: 'usage'; harness?: HarnessId; usage: Usage | null }
   | { type: 'artifact'; artifact: Artifact }
   | { type: 'channel'; id: string }
@@ -410,7 +429,8 @@ export function openSSE(
 export type StreamMessage =
   | { type: 'event'; event: EventRow }
   | { type: 'artifact'; artifact: Artifact }
-  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string };
+  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string }
+  | { type: 'mod_toast'; toast: ModToast };
 
 function classifyStream(d: unknown): StreamMessage | null {
   if (!d || typeof d !== 'object') return null;
@@ -421,6 +441,8 @@ function classifyStream(d: unknown): StreamMessage | null {
       type: 'thread', thread: o.thread as Thread, pending: o.pending as PendingMsg[] | undefined, live: typeof o.live === 'boolean' ? o.live : undefined,
       blocked: typeof o.blocked === 'string' ? o.blocked : undefined,
     };
+  if (o.kind === 'mod_toast' && typeof o.text === 'string')
+    return { type: 'mod_toast', toast: { thread_id: String(o.thread_id ?? ''), plugin: String(o.plugin ?? 'mod'), text: o.text, timeout_ms: typeof o.timeout_ms === 'number' ? o.timeout_ms : undefined } };
   if (typeof o.id === 'number' && typeof o.payload === 'string') return { type: 'event', event: o as unknown as EventRow };
   return null;
 }

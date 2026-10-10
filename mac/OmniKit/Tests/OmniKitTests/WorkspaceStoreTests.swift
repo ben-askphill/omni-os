@@ -281,6 +281,21 @@ private func loaded(_ store: WorkspaceStore, _ api: FakeWorkspaceAPI) async thro
     try await waitFor("cleared") { store.tasks.isEmpty }
   }
 
+  @Test func storesModStatusesFromTheFeed() async throws {
+    let api = try FakeWorkspaceAPI.standard()
+    let (store, feed, _) = makeStore(api)
+    defer { store.stop(); feed.finish() }
+    try await loaded(store, api)
+    let mods = try decode([ModStatus].self, """
+      [{"thread_id":"t1","channel_id":"acme","plugin":"omni-tool","text":"omni-tool: ready","updated_at":"2026-10-10T07:57:15Z"}]
+      """)
+    feed.yield(.message(.mods(mods)))
+    try await waitFor("the statuses") { store.mods == mods }
+
+    feed.yield(.message(.mods([])))
+    try await waitFor("cleared") { store.mods.isEmpty }
+  }
+
   @Test func passesEachFeedMessageOn() async throws {
     let (store, feed, _) = makeStore(try FakeWorkspaceAPI.standard())
     defer { store.stop(); feed.finish() }

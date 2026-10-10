@@ -6,10 +6,11 @@ import './runner/aux.ts';
 import './runner/prompts.ts';
 import './runner/api.ts';
 
-export type { ActiveTask, PendingMsg, SendMode } from './runner/state.ts';
+export type { ActiveTask, ModStatus, PendingMsg, SendMode } from './runner/state.ts';
 export type { CreateThreadInput } from './runner/api.ts';
 
 export {
+  activeMods,
   activeTasks,
   isLive,
   pendingFor,

@@ -69,6 +69,14 @@ export interface ReportP {
   dropped?: boolean;
 }
 
+/** A mod's $.ui.log line. */
+export interface ModLine {
+  key: number;
+  at: string;
+  plugin: string;
+  text: string;
+}
+
 interface TaskP {
   task_id: string;
   event: 'started' | 'progress' | 'ended';
@@ -105,7 +113,9 @@ export type Item =
   | { type: 'tools'; key: number; calls: ToolCall[]; total: number }
   | { type: 'result'; key: number; p: ResultP }
   | { type: 'error'; key: number; p: TextP }
-  | { type: 'report'; key: number; at: string; p: ReportP };
+  | { type: 'report'; key: number; at: string; p: ReportP }
+  /** Mod log lines in a row. They do not end a group of calls, so a busy hook does not split it. */
+  | { type: 'mod'; key: number; lines: ModLine[] };
 
 export interface Todo {
   content?: string;
@@ -229,6 +239,16 @@ export function buildItems(events: TranscriptEvent[]): { items: Item[]; plan: Fo
         group = null;
         items.push({ type: 'report', key: e.id, at: e.created_at, p: parsePayload<ReportP>(e) });
         break;
+      case 'mod': {
+        const p = parsePayload<{ plugin?: unknown; text?: unknown }>(e);
+        const text = str(p.text);
+        if (!text) break;
+        const line = { key: e.id, at: e.created_at, plugin: str(p.plugin) || 'mod', text };
+        const last = items[items.length - 1];
+        if (last?.type === 'mod') last.lines.push(line);
+        else items.push({ type: 'mod', key: e.id, lines: [line] });
+        break;
+      }
       default:
         break;
     }

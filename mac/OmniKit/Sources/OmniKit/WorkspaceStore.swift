@@ -10,6 +10,13 @@ public protocol WorkspaceAPI: Sendable {
   func harnesses() async throws(OmniAPIError) -> [HarnessInfo]
   /// Every sub-agent running now, oldest first. `GET /api/tasks`.
   func tasks() async throws(OmniAPIError) -> [BackgroundTask]
+  /// Every mod status line pinned now. `GET /api/mods`.
+  func mods() async throws(OmniAPIError) -> [ModStatus]
+}
+
+extension WorkspaceAPI {
+  /// None, for a fake that does not model mods.
+  public func mods() async throws(OmniAPIError) -> [ModStatus] { [] }
 }
 
 extension OmniClient: WorkspaceAPI {}
@@ -20,7 +27,8 @@ extension OmniClient: WorkspaceAPI {}
 /// - A thread event updates `recent` in place, and refetches channels and status 500ms after the first
 ///   event of a burst, so running counts follow. One that comes in while `recent` loads is laid over the
 ///   answer, unless the answer has a newer copy of the thread.
-/// - A `tasks` event replaces the agent list. The server sends every agent still running.
+/// - A `tasks` event replaces the agent list. The server sends every agent still running. A `mods` event
+///   does the same for the mod status lines.
 /// - Every feed open after the first refetches everything, since events were missed. So does the first
 ///   one when the start load failed: the server came up. That refetch is immediate. The Web UI debounces
 ///   channels and status and lets each list reload itself (see mac/NOTES.md).
@@ -67,6 +75,8 @@ public final class WorkspaceStore {
   public private(set) var harnesses: [HarnessInfo] = []
   /// Sub-agents running now. Empty shows nothing in the sidebar.
   public private(set) var tasks: [BackgroundTask] = []
+  /// Mod status lines pinned now, oldest first. One per plugin per thread.
+  public private(set) var mods: [ModStatus] = []
   public private(set) var loadState = LoadState.loading
   public private(set) var connection = ConnectionState.connecting
   /// How many times the feed has opened. The first is the initial connection; each later one is a reconnect.
@@ -82,7 +92,7 @@ public final class WorkspaceStore {
   public func channel(_ id: String) -> ChannelWithRunning? { channels.first { $0.id == id } }
 
   private enum Part: CaseIterable {
-    case channels, status, crew, recent, harnesses, tasks
+    case channels, status, crew, recent, harnesses, tasks, mods
   }
 
   @ObservationIgnored private let api: any WorkspaceAPI
@@ -99,6 +109,8 @@ public final class WorkspaceStore {
   @ObservationIgnored private var recentSinceLoad: [String: OmniThread]?
   /// Bumps on each `tasks` event, so a list fetch that started earlier cannot overwrite it.
   @ObservationIgnored private var tasksEpoch = 0
+  /// The same for `mods` events.
+  @ObservationIgnored private var modsEpoch = 0
 
   /// - Parameter feed: the feed's events, as `SSEClient.events` sends them. Nil when something else, the
   ///   app's `AppFeed`, pushes events with `apply(_:)`.
@@ -182,6 +194,9 @@ public final class WorkspaceStore {
     case .message(.tasks(let list)):
       tasksEpoch += 1
       if tasks != list { tasks = list }
+    case .message(.mods(let list)):
+      modsEpoch += 1
+      if mods != list { mods = list }
     case .message(.artifact(_)), .message(.unknown(_)):
       break
     }
@@ -271,6 +286,10 @@ public final class WorkspaceStore {
       let epoch = tasksEpoch
       guard let list = try? await api.tasks(), current(), tasksEpoch == epoch else { return }
       if tasks != list { tasks = list }
+    case .mods:
+      let epoch = modsEpoch
+      guard let list = try? await api.mods(), current(), modsEpoch == epoch else { return }
+      if mods != list { mods = list }
     }
   }
 }
@@ -278,6 +297,10 @@ public final class WorkspaceStore {
 extension OmniClient {
   public func tasks() async throws(OmniAPIError) -> [BackgroundTask] {
     try await send("GET", "/api/tasks")
+  }
+
+  public func mods() async throws(OmniAPIError) -> [ModStatus] {
+    try await send("GET", "/api/mods")
   }
 }
 

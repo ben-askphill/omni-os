@@ -116,6 +116,8 @@ func sseData(_ text: String) -> [String] {
         if case .unknown = e.content { Issue.record("event \(e.id) of kind \(e.kind) did not decode: \(e.payload)") }
       case .artifact: artifacts += 1
       case .thread: threads += 1
+      // The recorded turn runs no mod; StreamMessageTests reads a toast.
+      case .modToast: break
       case .unknown(let json): Issue.record("unknown message: \(json)")
       }
     }

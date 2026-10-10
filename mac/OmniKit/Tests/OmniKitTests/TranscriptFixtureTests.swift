@@ -41,6 +41,12 @@ private struct FoldPlan: Decodable, Equatable {
   var todos: [FoldTodo]
 }
 
+private struct FoldModLine: Decodable, Equatable {
+  var key: Int
+  var plugin: String
+  var text: String
+}
+
 private struct FoldItem: Decodable, Equatable {
   var type: String
   var key: Int
@@ -51,9 +57,10 @@ private struct FoldItem: Decodable, Equatable {
   var subtype: String? = nil
   var turns: Int? = nil
   var taskId: String? = nil
+  var lines: [FoldModLine]? = nil
 
   enum CodingKeys: String, CodingKey {
-    case type, key, text, total, calls, ok, subtype, turns
+    case type, key, text, total, calls, ok, subtype, turns, lines
     case taskId = "task_id"
   }
 }
@@ -105,6 +112,8 @@ private func project(_ transcript: Transcript) -> (items: [FoldItem], plan: Fold
       items.append(FoldItem(type: "error", key: id, text: text))
     case .report(let id, _, let report):
       items.append(FoldItem(type: "report", key: id, text: report.text, taskId: report.taskID))
+    case .mod(let id, let lines):
+      items.append(FoldItem(type: "mod", key: id, lines: lines.map { FoldModLine(key: $0.id, plugin: $0.plugin, text: $0.text) }))
     }
   }
   return (items, plan)
@@ -116,7 +125,7 @@ private func project(_ transcript: Transcript) -> (items: [FoldItem], plan: Fold
     let corpus = try OmniJSON.decoder().decode(Corpus.self, from: Data(contentsOf: url))
     let names = Set(corpus.cases.map(\.name))
     #expect(names == Set([
-      "first-string-field", "grouping", "plan-placement", "result-before-call", "self-parent", "undecodable-tool-use",
+      "first-string-field", "grouping", "mod-logs", "plan-placement", "result-before-call", "self-parent", "undecodable-tool-use",
       "zero-turn-success",
     ]))
     for c in corpus.cases {
@@ -125,6 +134,7 @@ private func project(_ transcript: Transcript) -> (items: [FoldItem], plan: Fold
       #expect(plans <= 1, "\(c.name) has one plan")
       #expect(got.items == c.items, "\(c.name) items")
       #expect(got.plan == c.plan, "\(c.name) plan")
+      #expect(Transcript(c.events).items == Transcript.build(c.events), "\(c.name) builds the same both ways")
     }
   }
 }

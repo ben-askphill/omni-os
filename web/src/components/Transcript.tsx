@@ -24,6 +24,7 @@ import {
   type TaskView,
   type TextP,
   type Todo,
+  type ModLine,
   type ToolCall,
   type UserP,
 } from '../transcript/fold.ts';
@@ -571,6 +572,20 @@ function ResultLine({ p }: { p: ResultP }) {
   );
 }
 
+/** Mod log lines: dim system rows, each with the plugin that wrote it, in the status line's quiet style. */
+function ModLog({ lines }: { lines: ModLine[] }) {
+  return (
+    <div className="space-y-0.5 text-[12px] leading-[1.5] text-fg-4">
+      {lines.map((l) => (
+        <div key={l.key} className="flex min-w-0 items-baseline gap-2">
+          <span className="shrink-0 font-mono text-[11px] text-fg-3">{l.plugin}</span>
+          <span className="min-w-0 break-words whitespace-pre-wrap">{l.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ErrorCallout({ text }: { text: string }) {
   return (
     <div className="rounded-[20px] bg-surface px-4 py-3">
@@ -681,7 +696,9 @@ export const Transcript = memo(function Transcript({
   }, [stored, live, feedLive, threadId]);
   const latestStatus = useMemo(() => (running ? statusLabel(events) : null), [events, running]);
 
-  const last = items[items.length - 1];
+  // Mod log lines are asides: the row before them is still the live one.
+  const lastIdx = items.findLastIndex((it) => it.type !== 'mod');
+  const last = items[lastIdx];
   const showWorking = running && (!last || last.type === 'user' || last.type === 'report' || last.type === 'text');
 
   return (
@@ -710,7 +727,7 @@ export const Transcript = memo(function Transcript({
                   <PublishedCard key={`p${p.url}`} p={p} threadId={threadId} artifact={artifacts.findLast((a) => a.url === p.url)} />
                 )),
               ];
-              const isLast = idx === items.length - 1;
+              const isLast = idx === lastIdx;
               const group = rest.length ? (
                 <ToolGroup key={it.key} calls={rest} total={rest.length + rest.reduce((n, c) => n + countCalls(c), 0)} cwd={cwd} running={running} isLast={isLast} />
               ) : null;
@@ -727,6 +744,8 @@ export const Transcript = memo(function Transcript({
               return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
             case 'report':
               return <ReportCard key={it.key} p={it.p} />;
+            case 'mod':
+              return <ModLog key={it.key} lines={it.lines} />;
             default:
               return null;
           }
