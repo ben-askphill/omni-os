@@ -291,5 +291,6 @@
   "team": [],
   "parent": null,
   "pending": [],
-  "live": false
+  "live": false,
+  "mods": []
 }

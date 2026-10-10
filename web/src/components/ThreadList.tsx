@@ -56,8 +56,10 @@ function PRMark({ pr }: { pr: BranchPRMark }) {
 
 export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boolean; pr?: BranchPRMark }) {
   useNow(60_000);
-  const { channels } = useApp();
+  const { channels, mods } = useApp();
   const source = SOURCE_LABEL[t.source];
+  // A mod's pinned status, compact beside the running indicator. The newest one when several mods set one.
+  const mod = mods.findLast((m) => m.thread_id === t.id);
   const preview = t.last_text ? t.last_text.replace(/\s+/g, ' ').slice(0, 240) : t.status === 'running' ? 'Working' : t.status === 'queued' ? 'Waiting for a slot' : '';
   return (
     <a href={href.thread(t.id)} className="hov group flex items-start gap-3 rounded-[18px] px-3 py-3 [--hov:var(--surface)] md:px-3.5">
@@ -85,6 +87,11 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
           {showChannel && <span className="shrink-0 text-fg-2">#{t.channel_id}</span>}
           {t.branch && <span className="hidden shrink-0 rounded-full bg-surface-2 px-1.5 font-mono text-[10.5px] leading-[18px] text-fg-3 sm:inline">{t.branch}</span>}
           {!t.last_text && t.status === 'running' && <Loader size={11} className="shrink-0" />}
+          {mod && (
+            <span className="max-w-[45%] shrink-0 truncate rounded-full bg-surface-2 px-1.5 text-[11px] leading-[18px] text-fg-3" title={`${mod.plugin}: ${mod.text}`}>
+              {mod.text}
+            </span>
+          )}
           <span className="min-w-0 truncate">{preview}</span>
         </div>
       </div>

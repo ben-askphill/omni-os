@@ -1,9 +1,9 @@
 // Stream records: tasks, results, and the process exit.
 import { events, threads, type ThreadStatus } from '../db.ts';
-import { publishFeed } from '../bus.ts';
+import { publishFeed, publishThread } from '../bus.ts';
 import { onToolResult } from '../published.ts';
 import { turnFinished } from '../sync/files.ts';
-import { type Record as StreamRecord, type TaskUpdate } from '../stream.ts';
+import { type ModUi, type Record as StreamRecord, type TaskUpdate } from '../stream.ts';
 import { armIdle, clearInterrupt, endTurn, teardown } from './session.ts';
 import {
   activeTasks,
@@ -15,6 +15,7 @@ import {
   eventPayload,
   hasBackground,
   isShuttingDown,
+  publishMods,
   pump,
   reportToParent,
   send,
@@ -97,6 +98,31 @@ export function endTasks(live: Live) {
 
 bindEndTasks(endTasks);
 
+/**
+ * A mod's UI call. A log is a transcript row like any other. A toast is only for whoever watches the thread
+ * now, so it goes out on the thread's stream unstored. A status pins one line per plugin while the process lives.
+ */
+export function onMod(live: Live, m: ModUi) {
+  const id = live.threadId;
+  if (m.level === 'log') {
+    addEvent(id, 'mod', { plugin: m.plugin, level: 'log', text: m.text });
+    return;
+  }
+  if (m.level === 'toast') {
+    publishThread(id, { kind: 'mod_toast', thread_id: id, plugin: m.plugin, text: m.text, timeout_ms: m.timeout_ms });
+    return;
+  }
+  const prev = live.mods.get(m.plugin);
+  if (m.text === null) {
+    if (!prev) return;
+    live.mods.delete(m.plugin);
+  } else {
+    if (prev?.text === m.text) return;
+    live.mods.set(m.plugin, { thread_id: id, channel_id: live.channelId, plugin: m.plugin, text: m.text, updated_at: new Date().toISOString() });
+  }
+  publishMods();
+}
+
 export function onResult(live: Live, p: ResultPayload) {
   const id = live.threadId;
   live.resultSeen = true;
@@ -156,6 +182,8 @@ export function onRecord(live: Live, rec: StreamRecord) {
       return onResult(live, rec.payload);
     case 'task':
       return onTask(live, rec.payload);
+    case 'mod':
+      return onMod(live, rec.payload);
     default: {
       // The model is working with no turn of ours open: a background task finished and the CLI runs a turn
       // about it by itself. Track it like any other so status, last_text and the parent report follow.

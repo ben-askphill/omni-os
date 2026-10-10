@@ -342,6 +342,25 @@ private let turn = [
     try await waitFor("the timer") { !store.stopping }
   }
 
+  @Test func showsModToastsUntilTheyTimeOut() async throws {
+    let api = FakeThreadAPI(try detail(events: turn))
+    let (store, conn, _, clock) = try await openStore(api)
+    defer { store.stop() }
+    for n in 1...4 {
+      conn.send(sse(#"{"kind":"mod_toast","thread_id":"t1","plugin":"omni-tool","text":"toast \#(n)","timeout_ms":\#(n * 1000)}"#))
+    }
+    try await waitFor("the toasts") { store.toasts.last?.toast.text == "toast 4" }
+    #expect(store.toasts.map(\.toast.text) == ["toast 2", "toast 3", "toast 4"], "three at most, the newest")
+    #expect(store.events.count == 3, "a toast is not a transcript event")
+    await settle()
+    clock.advance(by: .seconds(2))
+    try await waitFor("the first times out") { store.toasts.map(\.toast.text) == ["toast 3", "toast 4"] }
+    store.dismissToast(store.toasts[0].id)
+    #expect(store.toasts.map(\.toast.text) == ["toast 4"])
+    clock.advance(by: .seconds(2))
+    try await waitFor("the last times out") { store.toasts.isEmpty }
+  }
+
   @Test func saysWhyItCouldNotInterrupt() async throws {
     let api = FakeThreadAPI(try detail(events: turn))
     api.stop = .failure(.http(status: 404, message: "not found"))

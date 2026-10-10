@@ -43,6 +43,7 @@ export function launch(threadId: string, first: Msg): Live | undefined {
     initSeen: false,
     tasks: new Map(),
     taskSaved: new Map(),
+    mods: new Map(),
     commands: null,
     resultSeen: false,
     spawnFailed: false,

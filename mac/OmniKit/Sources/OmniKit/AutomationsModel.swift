@@ -95,7 +95,7 @@ public final class AutomationsModel {
     switch event {
     case .thread(let thread):
       if let automation = thread.automation, !automation.isEmpty { scheduleReload() }
-    case .usage(_, _), .artifact(_), .tasks(_), .channel(_), .unknown(_):
+    case .usage(_, _), .artifact(_), .tasks(_), .mods(_), .channel(_), .unknown(_):
       break
     }
   }

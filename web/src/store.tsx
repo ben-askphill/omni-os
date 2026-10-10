@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, openSSE, errorText, type BackgroundTask, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type Status, type ThreadStub } from './api.ts';
+import { api, openSSE, errorText, type BackgroundTask, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type ModStatus, type Status, type ThreadStub } from './api.ts';
 
 interface AppState {
   channels: ChannelWithRunning[];
@@ -12,6 +12,8 @@ interface AppState {
   feedLive: boolean;
   /** Every sub-agent running right now, across all threads. */
   tasks: BackgroundTask[];
+  /** Every mod status line pinned right now, across all threads. */
+  mods: ModStatus[];
   subscribe: (fn: (e: FeedEvent) => void) => () => void;
   channel: (id: string) => ChannelWithRunning | undefined;
   /** The thread currently open, so the sidebar can list and highlight it under its channel. */
@@ -30,6 +32,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Omit<Status, 'usage'> | null>(null);
   const [feedLive, setFeedLive] = useState(false);
   const [tasks, setTasks] = useState<BackgroundTask[]>([]);
+  const [mods, setMods] = useState<ModStatus[]>([]);
   const [openThread, setOpenThread] = useState<ThreadStub | null>(null);
   const listeners = useRef(new Set<(e: FeedEvent) => void>());
 
@@ -62,10 +65,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, []);
 
+  // Sub-agents and mod status lines both live only as long as a thread's process: reload them together.
   const reloadTasks = useCallback(() => {
     api
       .get<BackgroundTask[]>('/tasks')
       .then(setTasks)
+      .catch(() => {});
+    api
+      .get<ModStatus[]>('/mods')
+      .then(setMods)
       .catch(() => {});
   }, []);
 
@@ -99,6 +107,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           scheduleRefresh();
         } else if (e.type === 'tasks') {
           setTasks(e.tasks);
+        } else if (e.type === 'mods') {
+          setMods(e.mods);
         }
         emit(e);
       },
@@ -137,12 +147,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       status,
       feedLive,
       tasks,
+      mods,
       subscribe,
       channel: (id: string) => channels.find((c) => c.id === id),
       openThread,
       setOpenThread,
     }),
-    [channels, channelsLoaded, channelsError, reloadChannels, crew, usage, status, feedLive, tasks, subscribe, openThread],
+    [channels, channelsLoaded, channelsError, reloadChannels, crew, usage, status, feedLive, tasks, mods, subscribe, openThread],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

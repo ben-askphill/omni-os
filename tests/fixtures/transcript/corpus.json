@@ -618,6 +618,181 @@
         }
       ],
       "plan": null
+    },
+    {
+      "name": "mod-logs",
+      "events": [
+        {
+          "id": 1,
+          "thread_id": "t",
+          "kind": "user",
+          "payload": "{\"text\":\"go\"}",
+          "created_at": "2026-10-10T07:57:15.000Z"
+        },
+        {
+          "id": 2,
+          "thread_id": "t",
+          "kind": "mod",
+          "payload": "{\"plugin\":\"omni-tool\",\"level\":\"log\",\"text\":\"omni-tool: ready to serve\"}",
+          "created_at": "2026-10-10T07:57:15.000Z"
+        },
+        {
+          "id": 3,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"a\",\"name\":\"Bash\",\"input\":{\"command\":\"ls\"},\"parent\":null}",
+          "created_at": "2026-10-10T07:57:15.000Z"
+        },
+        {
+          "id": 4,
+          "thread_id": "t",
+          "kind": "mod",
+          "payload": "{\"plugin\":\"omni-tool\",\"level\":\"log\",\"text\":\"omni-tool: thread_info served\"}",
+          "created_at": "2026-10-10T07:57:15.000Z"
+        },
+        {
+          "id": 5,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"b\",\"name\":\"Read\",\"input\":{\"file_path\":\"README.md\"},\"parent\":null}",
+          "created_at": "2026-10-10T07:57:15.000Z"
+        },
+        {
+          "id": 6,
+          "thread_id": "t",
+          "kind": "mod",
+          "payload": "{\"plugin\":\"omni-progress\",\"level\":\"log\",\"text\":\"step 2 of 3\"}",
+          "created_at": "2026-10-10T07:57:15.000Z"
+        },
+        {
+          "id": 7,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"a\",\"text\":\"x\",\"is_error\":false,\"truncated\":false}",
+          "created_at": "2026-10-10T07:57:15.000Z"
+        },
+        {
+          "id": 8,
+          "thread_id": "t",
+          "kind": "assistant_text",
+          "payload": "{\"text\":\"Done.\"}",
+          "created_at": "2026-10-10T07:57:15.000Z"
+        },
+        {
+          "id": 9,
+          "thread_id": "t",
+          "kind": "mod",
+          "payload": "{\"level\":\"log\",\"text\":\"no plugin named\"}",
+          "created_at": "2026-10-10T07:57:15.000Z"
+        },
+        {
+          "id": 10,
+          "thread_id": "t",
+          "kind": "mod",
+          "payload": "{\"plugin\":\"omni-tool\",\"level\":\"log\",\"text\":\"\"}",
+          "created_at": "2026-10-10T07:57:15.000Z"
+        },
+        {
+          "id": 11,
+          "thread_id": "t",
+          "kind": "result",
+          "payload": "{\"ok\":true,\"subtype\":\"success\",\"turns\":2}",
+          "created_at": "2026-10-10T07:57:15.000Z"
+        }
+      ],
+      "items": [
+        {
+          "type": "user",
+          "key": 1,
+          "text": "go"
+        },
+        {
+          "type": "mod",
+          "key": 2,
+          "lines": [
+            {
+              "key": 2,
+              "plugin": "omni-tool",
+              "text": "omni-tool: ready to serve"
+            }
+          ]
+        },
+        {
+          "type": "tools",
+          "key": 3,
+          "total": 2,
+          "calls": [
+            {
+              "id": "a",
+              "name": "Bash",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "command": "ls"
+              },
+              "summary": "ls",
+              "result": {
+                "text": "x",
+                "is_error": false,
+                "truncated": false
+              },
+              "children": []
+            },
+            {
+              "id": "b",
+              "name": "Read",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "file_path": "README.md"
+              },
+              "summary": "README.md",
+              "result": null,
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "mod",
+          "key": 4,
+          "lines": [
+            {
+              "key": 4,
+              "plugin": "omni-tool",
+              "text": "omni-tool: thread_info served"
+            },
+            {
+              "key": 6,
+              "plugin": "omni-progress",
+              "text": "step 2 of 3"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "key": 8,
+          "text": "Done."
+        },
+        {
+          "type": "mod",
+          "key": 9,
+          "lines": [
+            {
+              "key": 9,
+              "plugin": "mod",
+              "text": "no plugin named"
+            }
+          ]
+        },
+        {
+          "type": "result",
+          "key": 11,
+          "ok": true,
+          "subtype": "success",
+          "turns": 2
+        }
+      ],
+      "plan": null
     }
   ]
 }

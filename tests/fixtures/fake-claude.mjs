@@ -23,6 +23,9 @@
 //   SUGGEST_NONE      text mode (Omni's reply suggestion): answer NONE
 //   RICH              before the answer, the calls a real turn is made of: a plan updated as it goes, a sub-agent
 //                     with calls of its own, a status, a failing command and an MCP tool
+//   MODS              before the answer, what a mod's hooks send (Claude Code 2.1.287+): a ui_status, a ui_log, a
+//                     ui_toast, and a ui_render with no text that Omni ignores
+//   MOD_CLEAR         before the answer, a ui_status with null text, which clears that mod's status
 //   PUBLISH:<path>    an Artifact tool call that publishes that file, answered "Published <path> at <url>" like the real CLI
 //   ORPHAN            leave a child behind that holds our stdout until it is killed (two minutes at most), like a
 //                     daemon started without redirecting its output: once we exit, the runner never sees our pipes close
@@ -274,6 +277,8 @@ async function runTurn() {
   const tools = [];
   let think = 0;
   let rich = false;
+  let mods = false;
+  let modClear = false;
   const publishes = [];
   let steps = 0;
 
@@ -303,6 +308,8 @@ async function runTurn() {
       if (m.text.includes('IGNORE_INTERRUPT')) t.ignoreInterrupt = true;
       if (m.text.includes('ORPHAN')) leaveOrphan();
       if (m.text.includes('RICH')) rich = true;
+      if (m.text.includes('MODS')) mods = true;
+      if (m.text.includes('MOD_CLEAR')) modClear = true;
       for (const x of m.text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
     }
     return true;
@@ -327,6 +334,14 @@ async function runTurn() {
     steps += await richCalls(t);
     if (dead) return;
   }
+  if (mods) {
+    const ui = (subtype, extra) => emit({ type: 'system', subtype, plugin: 'omni-tool', ...extra });
+    ui('ui_status', { text: 'omni-tool: ready' });
+    ui('ui_log', { text: 'omni-tool: thread_info served' });
+    ui('ui_toast', { text: 'thread_info ran', timeout_ms: 4000 });
+    ui('ui_render', { tree: { type: 'box' } });
+  }
+  if (modClear) emit({ type: 'system', subtype: 'ui_status', plugin: 'omni-tool', text: null });
   for (const file of publishes.splice(0)) {
     const toolId = `toolu_fake_${++seq}`;
     steps++;
