@@ -43,6 +43,8 @@ export const config = {
   /** After a finished turn, ask Haiku for Ben's likely next reply: the reply box's placeholder, Tab fills it in. */
   suggestions: (env.OMNI_SUGGESTIONS ?? '1') !== '0',
   maxUploadMb: Number(env.OMNI_MAX_UPLOAD_MB ?? 25),
+  /** Load the repo's Claude Code mods (mods/) into every Claude thread with --plugin-dir. Off until '1'. */
+  mods: env.OMNI_MODS === '1',
   timezone: env.OMNI_TZ ?? 'Europe/Amsterdam',
 };
 
@@ -62,6 +64,9 @@ export const paths = {
   automations: env.OMNI_AUTOMATIONS_DIR ? resolve(ROOT, env.OMNI_AUTOMATIONS_DIR) : join(ROOT, 'automations'),
   webDist: env.OMNI_WEB_DIST ? resolve(ROOT, env.OMNI_WEB_DIST) : join(ROOT, 'web', 'dist'),
   mcpOmni: join(ROOT, 'mcp', 'omni.ts'),
+  /** Claude Code mods (plugins of function hooks) Omni loads when config.mods is on. */
+  mods: join(ROOT, 'mods'),
+  modProgress: join(ROOT, 'mods', 'omni-progress'),
   tsx: join(ROOT, 'node_modules', '.bin', 'tsx'),
 };
 
