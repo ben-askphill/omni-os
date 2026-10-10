@@ -15,12 +15,14 @@ export const newThreadBody = (t: Thread, prompt: string) => ({
 /** What the new-thread composer starts with when it opens from a thread. */
 export interface NewThreadPreset {
   channel: string;
-  /** A crew role's id, or '' for none. */
-  role: string;
+  /** A crew role's id, or '' for none. Unset leaves the composer's own default. */
+  role?: string;
   choice?: { harness: string; model: string };
   effort?: string;
   /** Open the model picker. */
   pickModel?: boolean;
+  /** The sidebar folder to file the new thread in: "New thread here" on a folder. */
+  folder?: { id: string; name: string };
 }
 
 /** `/clear` or `/new` on its own: this thread's settings, for a first prompt Ben types next. */

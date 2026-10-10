@@ -29,13 +29,15 @@ export interface Thread {
   suggestion: string | null;
   /** 1 once Ben archived it: hidden from the lists, still found by search and by its link. */
   archived: number;
+  /** The sidebar folder it sits in (db/repos/folders.ts), null for ungrouped. Local only, not synced. */
+  folder_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
 /** The columns clients read, without sync's run_machine. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, archived, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, archived, folder_id, created_at, updated_at';
 
 /** Who runs a thread with this status: this machine while it is running or queued here and sync is set up, else nobody. */
 const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? outbox.machineId() : null);
@@ -63,6 +65,14 @@ export const threads = {
         `SELECT ${THREAD_COLUMNS} FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY updated_at DESC) AS n FROM threads WHERE source != 'team' AND archived = 0) WHERE n <= ?`,
       )
       .all(perChannel) as unknown as Thread[],
+  /** Threads in a folder of their own channel, newest first, without archived ones and team members. */
+  filed: (channelId?: string) =>
+    db
+      .prepare(
+        `SELECT ${THREAD_COLUMNS.split(', ').map((c) => `t.${c}`).join(', ')} FROM threads t JOIN folders f ON f.id = t.folder_id AND f.channel_id = t.channel_id
+         WHERE t.archived = 0 AND t.source != 'team' ${channelId ? 'AND t.channel_id = ?' : ''} ORDER BY t.updated_at DESC`,
+      )
+      .all(...(channelId ? [channelId] : [])) as unknown as Thread[],
   running: () => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],
   /** The machine id of the Mac that runs the thread (sync), or null when none does. */
   runMachine: (id: string) =>
@@ -77,15 +87,19 @@ export const threads = {
       .prepare(`SELECT ${THREAD_COLUMNS} FROM threads ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY updated_at DESC LIMIT ?`)
       .all(...args) as unknown as Thread[];
   },
-  create(t: Omit<Thread, 'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'harness' | 'effort' | 'archived'> & { has_run?: number; created_at?: string; harness?: string; effort?: string }) {
+  create(
+    t: Omit<Thread, 'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'harness' | 'effort' | 'archived' | 'folder_id'> & {
+      has_run?: number; created_at?: string; harness?: string; effort?: string; folder_id?: string | null;
+    },
+  ) {
     const ts = t.created_at ?? now();
     return tx(() => {
       db.prepare(
-        `INSERT INTO threads (id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, run_machine, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO threads (id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, run_machine, folder_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         t.id, t.channel_id, t.title, t.status, t.role, t.model, t.harness ?? 'claude-code', t.effort ?? '', t.session_id, t.has_run ?? 0, t.cwd,
-        t.branch, t.parent_id, t.task_id, t.source, t.automation, runMachine(t.status), ts, ts,
+        t.branch, t.parent_id, t.task_id, t.source, t.automation, runMachine(t.status), t.folder_id ?? null, ts, ts,
       );
       record('thread', t.id);
       return threads.get(t.id)!;
@@ -114,7 +128,8 @@ export const threads = {
   /** Move a thread to another channel, keeping its place in the lists. import-history's --move-imported uses it. */
   setChannel(id: string, channelId: string) {
     tx(() => {
-      if (db.prepare('UPDATE threads SET channel_id = ? WHERE id = ?').run(channelId, id).changes) record('thread', id);
+      // A folder belongs to one channel, so the thread leaves it.
+      if (db.prepare('UPDATE threads SET channel_id = ?, folder_id = NULL WHERE id = ?').run(channelId, id).changes) record('thread', id);
     });
   },
   /**

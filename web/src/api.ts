@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import type { Thread, Channel as ChannelRow, EventRow, Artifact } from '../../server/db.ts';
+import type { Thread, Channel as ChannelRow, EventRow, Artifact, Folder } from '../../server/db.ts';
 import type { Attachment } from '../../server/uploads.ts';
 import type { HarnessInfo, ModelEntry, HarnessId } from '../../server/harness/types.ts';
 import type { CommandList as HarnessCommands } from '../../server/commands.ts';
 
-export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId };
+export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number };
@@ -18,9 +18,11 @@ export type CommandList = HarnessCommands & { recent?: string[] };
 export type Channel = Omit<ChannelRow, 'design_system'> & { design_system_size: number };
 
 /** Just enough of a thread to list it under its channel in the sidebar. */
-export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'>;
-/** `active`: the channel's running and queued threads. `recent`: its latest threads of any status. */
-export type ChannelWithRunning = Channel & { running: number; active?: ThreadStub[]; recent?: ThreadStub[] };
+export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> & { folder_id?: string | null };
+/** A sidebar folder with how many threads it holds, how many of them run, and its newest threads. */
+export type FolderWithThreads = Folder & { count: number; running: number; threads: ThreadStub[] };
+/** `active`: the channel's running and queued threads. `recent`: its latest threads of any status. `folders`: its sidebar folders, in order. */
+export type ChannelWithRunning = Channel & { running: number; active?: ThreadStub[]; recent?: ThreadStub[]; folders?: FolderWithThreads[] };
 export type ArtifactWithThread = Artifact & { thread_title: string; channel_id: string };
 
 export interface UsageWindow {

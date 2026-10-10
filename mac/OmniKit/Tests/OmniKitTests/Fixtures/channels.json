@@ -21,7 +21,8 @@
     "design_system_size": 0,
     "running": 0,
     "active": [],
-    "recent": []
+    "recent": [],
+    "folders": []
   },
   {
     "id": "acme",
@@ -50,7 +51,8 @@
         "channel_id": "acme",
         "title": "Fix the cart",
         "status": "running",
-        "created_at": "2026-01-05T09:00:00.000Z"
+        "created_at": "2026-01-05T09:00:00.000Z",
+        "folder_id": null
       }
     ],
     "recent": [
@@ -59,9 +61,11 @@
         "channel_id": "acme",
         "title": "Fix the cart",
         "status": "running",
-        "created_at": "2026-01-05T09:00:00.000Z"
+        "created_at": "2026-01-05T09:00:00.000Z",
+        "folder_id": null
       }
-    ]
+    ],
+    "folders": []
   },
   {
     "id": "inbox",
@@ -85,6 +89,7 @@
     "design_system_size": 0,
     "running": 0,
     "active": [],
-    "recent": []
+    "recent": [],
+    "folders": []
   }
 ]

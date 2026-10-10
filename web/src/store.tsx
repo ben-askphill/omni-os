@@ -6,6 +6,8 @@ interface AppState {
   channelsLoaded: boolean;
   channelsError: string | null;
   reloadChannels: () => Promise<void>;
+  /** Change the channel list in place, ahead of the server: folder edits show at once (web/src/folders.tsx). */
+  updateChannels: (fn: (list: ChannelWithRunning[]) => ChannelWithRunning[]) => void;
   crew: CrewRole[];
   usage: HarnessUsage;
   status: Omit<Status, 'usage'> | null;
@@ -142,6 +144,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       channelsLoaded,
       channelsError,
       reloadChannels,
+      updateChannels: setChannels,
       crew,
       usage,
       status,
