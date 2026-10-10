@@ -50,6 +50,8 @@ public final class ThreadStore {
   public private(set) var arrivedHTML: Artifact?
   /// See `StatusLine.label`.
   public private(set) var statusLabel: String?
+  /// Mod toasts showing now, oldest first, each until its timeout or `dismissToast`. At most `maxToasts`.
+  public private(set) var toasts: [ShownToast] = []
   /// See `StatusLine.betweenTurns`.
   public private(set) var betweenTurns = true
   /// The last result event's id, 0 for none.
@@ -82,6 +84,13 @@ public final class ThreadStore {
   }
 
   static let stopTimeout = Duration.seconds(15)
+  public static let maxToasts = 3
+
+  /// A mod toast on screen.
+  public struct ShownToast: Identifiable, Hashable, Sendable {
+    public let id: Int
+    public let toast: ModToast
+  }
 
   @ObservationIgnored private let api: any ThreadAPI
   @ObservationIgnored private let ticker: Ticker
@@ -92,6 +101,7 @@ public final class ThreadStore {
   @ObservationIgnored private var flushTask: Task<Void, Never>?
   @ObservationIgnored private var stopTimer: Task<Void, Never>?
   @ObservationIgnored private var inbox: [ThreadStreamMessage] = []
+  @ObservationIgnored private var toastSeq = 0
   @ObservationIgnored private var seen: Set<Int> = []
   @ObservationIgnored private var lastID = 0
   @ObservationIgnored private var artifactIDs: Set<Int> = []
@@ -346,10 +356,26 @@ public final class ThreadStore {
       case .event(let e): rows.append(e)
       case .artifact(let a): upsert(a)
       case .thread(let t, let p, let live): merge(t, pending: p, live: live, isReply: false)
+      case .modToast(let t): show(t)
       case .context, .unknown: break
       }
     }
     add(rows)
+  }
+
+  private func show(_ t: ModToast) {
+    toastSeq += 1
+    let id = toastSeq
+    toasts = Array((toasts + [ShownToast(id: id, toast: t)]).suffix(Self.maxToasts))
+    let deadline = ticker.now() + t.shownFor
+    Task { [weak self, ticker] in
+      try? await ticker.sleep(deadline)
+      self?.dismissToast(id)
+    }
+  }
+
+  public func dismissToast(_ id: Int) {
+    toasts.removeAll { $0.id == id }
   }
 
   private func upsert(_ a: Artifact) {

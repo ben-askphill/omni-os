@@ -10,10 +10,12 @@ public enum ThreadStreamMessage: Decodable, Hashable, Sendable {
   /// How full the thread's context window is (ContextUsage in shared/context-meter.ts). The Web UI draws it
   /// as a ring in the thread header; the Mac app has no meter yet, so it keeps the JSON as is.
   case context(JSONValue)
+  /// A mod's `$.ui.toast`, for whoever has the thread open. Never stored.
+  case modToast(ModToast)
   case unknown(JSONValue)
 
   private enum CodingKeys: String, CodingKey {
-    case kind, artifact, thread, pending, live, id, payload, context
+    case kind, artifact, thread, pending, live, id, payload, text, context
   }
 
   public init(from decoder: any Decoder) throws {
@@ -32,6 +34,8 @@ public enum ThreadStreamMessage: Decodable, Hashable, Sendable {
       )
     } else if kind == "context", let usage = try? c.decode(JSONValue.self, forKey: .context) {
       self = .context(usage)
+    } else if kind == "mod_toast", (try? c.decode(String.self, forKey: .text)) != nil {
+      self = .modToast(try ModToast(from: decoder))
     } else if (try? c.decode(Int.self, forKey: .id)) != nil, (try? c.decode(String.self, forKey: .payload)) != nil {
       self = .event(try EventRow(from: decoder))
     } else {
@@ -49,12 +53,14 @@ public enum FeedEvent: Decodable, Hashable, Sendable {
   case artifact(Artifact)
   /// Every sub-agent running now, across all threads, whenever one starts, progresses or ends.
   case tasks([BackgroundTask])
+  /// Every mod status line pinned now, across all threads, whenever one is set or cleared.
+  case mods([ModStatus])
   /// A channel changed on another Mac (sync): refetch the channel list.
   case channel(id: String)
   case unknown(JSONValue)
 
   private enum CodingKeys: String, CodingKey {
-    case type, thread, harness, usage, artifact, tasks, id
+    case type, thread, harness, usage, artifact, tasks, mods, id
   }
 
   public init(from decoder: any Decoder) throws {
@@ -74,11 +80,55 @@ public enum FeedEvent: Decodable, Hashable, Sendable {
       self = .artifact(try c.decode(Artifact.self, forKey: .artifact))
     case "tasks":
       self = .tasks(try c.decode([BackgroundTask].self, forKey: .tasks))
+    case "mods":
+      self = .mods(try c.decode([ModStatus].self, forKey: .mods))
     case "channel":
       self = .channel(id: try c.decode(String.self, forKey: .id))
     default:
       self = .unknown(try JSONValue(from: decoder))
     }
+  }
+}
+
+/// A mod's `$.ui.toast` on a thread's stream.
+public struct ModToast: Decodable, Hashable, Sendable {
+  public let threadID: String?
+  public let plugin: String
+  public let text: String
+  public let timeoutMs: Double?
+
+  enum CodingKeys: String, CodingKey {
+    case plugin, text
+    case threadID = "thread_id"
+    case timeoutMs = "timeout_ms"
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    threadID = try c.decodeIfPresent(String.self, forKey: .threadID)
+    plugin = (try? c.decodeIfPresent(String.self, forKey: .plugin)) ?? "mod"
+    text = try c.decode(String.self, forKey: .text)
+    timeoutMs = try? c.decodeIfPresent(Double.self, forKey: .timeoutMs)
+  }
+
+  /// How long it shows: the mod's timeout, 4s when it gave none, held between 1.5s and 15s like the Web UI.
+  public var shownFor: Duration { .milliseconds(Int(min(15_000, max(1_500, timeoutMs ?? 4_000)))) }
+}
+
+/// A mod's pinned status line in a running thread, as GET /api/mods and the feed's `mods` event carry it.
+public struct ModStatus: Decodable, Hashable, Sendable, Identifiable {
+  public var id: String { "\(threadID)/\(plugin)" }
+  public let threadID: String
+  public let channelID: String
+  public let plugin: String
+  public let text: String
+  public let updatedAt: Date
+
+  enum CodingKeys: String, CodingKey {
+    case plugin, text
+    case threadID = "thread_id"
+    case channelID = "channel_id"
+    case updatedAt = "updated_at"
   }
 }
 

@@ -15,6 +15,7 @@ import { SyncPage } from './pages/Sync.tsx';
 import { ThreadPage } from './pages/Thread.tsx';
 import { href, navigate, requestComposerFocus, useHash, useRoute, type Route } from './router.ts';
 import { AppProvider, useApp } from './store.tsx';
+import { FolderDeleteDialog, FolderProvider } from './folders.tsx';
 import { api } from './api.ts';
 import { createSyncNudge } from './sync-nudge.ts';
 
@@ -200,6 +201,7 @@ function Shell() {
       <CommandPalette open={palette} onClose={closePalette} />
       <ThreadNotifier />
       <ContextMenuHost />
+      <FolderDeleteDialog />
     </div>
   );
 }
@@ -208,7 +210,9 @@ export function App() {
   return (
     <AppProvider>
       <ToastProvider>
-        <Shell />
+        <FolderProvider>
+          <Shell />
+        </FolderProvider>
       </ToastProvider>
     </AppProvider>
   );

@@ -16,6 +16,7 @@ public enum TranscriptMarkdown {
     case .result(_, let r): r.line
     case .error(_, let s): s
     case .report(_, _, let r): r.text
+    case .mod(_, let lines): lines.map { "\($0.plugin): \($0.text)" }.joined(separator: "\n")
     }
   }
 
@@ -45,6 +46,8 @@ public enum TranscriptMarkdown {
       if let title = r.title, !title.isEmpty { parts.append("**\(title)**") }
       parts.append(r.text.isEmpty ? "(no reply)" : r.text)
       return parts.joined(separator: "\n\n")
+    case .mod(_, let lines):
+      return lines.map { "*\($0.plugin)* \($0.text)" }.joined(separator: "\n")
     case .text, .tools:
       return copyText(item, cwd: cwd)
     }

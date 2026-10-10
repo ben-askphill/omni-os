@@ -108,6 +108,8 @@ export interface Live {
   tasks: Map<string, ActiveTask>;
   /** Progress persisted per task, at most every TASK_PROGRESS_MS. */
   taskSaved: Map<string, number>;
+  /** The status line each mod set with $.ui.status, by plugin, until it clears it or the process ends. */
+  mods: Map<string, ModStatus>;
   /** The commands the process listed itself, once it has. */
   commands: CommandList | null;
   resultSeen: boolean;
@@ -133,6 +135,15 @@ export interface ActiveTask {
   tool_uses?: number;
   tokens?: number;
   summary?: string;
+}
+
+/** A mod's pinned status line in some thread's running process. One per plugin. */
+export interface ModStatus {
+  thread_id: string;
+  channel_id: string;
+  plugin: string;
+  text: string;
+  updated_at: string;
 }
 
 export const lives = new Map<string, Live>();
@@ -183,6 +194,19 @@ export const alive = (c: ChildProcess) => c.exitCode === null && c.signalCode ==
 /** Every task still running, oldest first, for the sidebar and /api/tasks. */
 export const activeTasks = (): ActiveTask[] =>
   [...lives.values()].flatMap((l) => [...l.tasks.values()]).sort((a, b) => a.started_at.localeCompare(b.started_at));
+
+/** Every mod status line still pinned, oldest first, for the thread views and /api/mods. */
+export const activeMods = (): ModStatus[] =>
+  [...lives.values()].flatMap((l) => [...l.mods.values()]).sort((a, b) => a.updated_at.localeCompare(b.updated_at));
+
+export const publishMods = () => publishFeed({ type: 'mods', mods: activeMods() });
+
+/** The process is gone: its mods went with it. */
+export function clearMods(live: Live) {
+  if (!live.mods.size) return;
+  live.mods.clear();
+  publishMods();
+}
 
 export const runningCount = () => [...lives.values()].filter((l) => l.turn).length;
 export const queuedCount = () => waiting.length;

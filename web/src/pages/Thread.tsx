@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
+import { api, errorText, useApi, type HarnessWithRunning, type ModStatus, type SendMode, type Thread } from '../api.ts';
 import { ReplyComposer } from '../components/Composer.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
 import { ArtifactsTab } from '../components/thread/panel/ArtifactsTab.tsx';
@@ -20,8 +20,24 @@ import { useTranscriptScroll } from './useTranscriptScroll.ts';
 // xterm.js is large; load it the first time the tab opens.
 const TerminalView = lazy(() => import('../components/TerminalView.tsx').then((m) => ({ default: m.TerminalView })));
 
+/** The status lines the thread's mods pinned with $.ui.status, one per plugin, while its process runs. */
+function ModStatusLines({ lines }: { lines: ModStatus[] }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-[11.5px] text-fg-3" aria-label="Mod status">
+      {lines.map((m) => (
+        <span key={m.plugin} className="inline-flex min-w-0 max-w-full items-center gap-1.5" title={`${m.plugin}: ${m.text}`}>
+          <span className="h-1 w-1 shrink-0 rounded-full bg-fg-4" />
+          <span className="shrink-0 font-mono text-[10.5px] text-fg-4">{m.plugin}</span>
+          <span className="min-w-0 truncate">{m.text}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifact?: number }) {
-  const { setOpenThread } = useApp();
+  const { setOpenThread, mods } = useApp();
+  const modLines = useMemo(() => mods.filter((m) => m.thread_id === id), [mods, id]);
   const isMobile = useIsMobile();
   // GET /api/harnesses, the same list the reply pills load. Until it arrives, canSteer uses the Cursor fallback.
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
@@ -231,6 +247,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
             <h1 className="truncate font-display text-[16px] leading-snug md:text-[18px]" title={thread.title}>
               {thread.title}
             </h1>
+            {modLines.length > 0 && <ModStatusLines lines={modLines} />}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {!live && ready && (

@@ -1,0 +1,26 @@
+{
+  "name": "omni-progress",
+  "version": "0.1.0",
+  "description": "Live turn progress in the status line, and a warning when a tool call runs long or keeps failing the same way.",
+  "author": { "name": "Ben Rosenberg" },
+  "userConfig": {
+    "slowCallMinutes": {
+      "type": "number",
+      "title": "Slow call threshold (minutes)",
+      "description": "Warn once when a single tool call has run this long.",
+      "default": 5
+    },
+    "repeatFailures": {
+      "type": "number",
+      "title": "Repeated failures",
+      "description": "Warn when the same tool fails this many times in a row with the same input.",
+      "default": 3
+    },
+    "watchBash": {
+      "type": "boolean",
+      "title": "Watch Bash calls",
+      "description": "Also observe Bash. Off by default: any tool.call hook matching Bash breaks subagents spawned with isolation: worktree (Claude Code bug #92533).",
+      "default": false
+    }
+  }
+}

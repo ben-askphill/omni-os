@@ -42,6 +42,7 @@ public enum EventPayload: Hashable, Sendable {
   case error(text: String)
   case result(TurnResult)
   case task(TaskEvent)
+  case mod(ModLog)
   case unknown(kind: String, payload: JSONValue)
 
   public init(kind: String, json: String) {
@@ -63,6 +64,7 @@ public enum EventPayload: Hashable, Sendable {
       case "error": self = .error(text: try d.decode(TextPayload.self, from: data).text)
       case "result": self = .result(try d.decode(TurnResult.self, from: data))
       case "task": self = .task(try d.decode(TaskEvent.self, from: data))
+      case "mod": self = .mod(try d.decode(ModLog.self, from: data))
       default: self = .unknown(kind: kind, payload: JSONValue.parse(json))
       }
     } catch {
@@ -89,6 +91,24 @@ public struct TaskEvent: Decodable, Hashable, Sendable {
     case taskID = "task_id"
     case toolUseID = "tool_use_id"
     case toolUses = "tool_uses"
+  }
+}
+
+/// kind `mod`: a line a mod (a Claude Code plugin with JS hooks) wrote with `$.ui.log`.
+public struct ModLog: Decodable, Hashable, Sendable {
+  /// "mod" when the server stored none.
+  public let plugin: String
+  public let text: String
+
+  enum CodingKeys: String, CodingKey {
+    case plugin, text
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    let name = try c.decodeIfPresent(String.self, forKey: .plugin) ?? ""
+    plugin = name.isEmpty ? "mod" : name
+    text = try c.decode(String.self, forKey: .text)
   }
 }
 

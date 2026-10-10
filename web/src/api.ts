@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import type { Thread, Channel as ChannelRow, EventRow, Artifact } from '../../server/db.ts';
+import type { Thread, Channel as ChannelRow, EventRow, Artifact, Folder } from '../../server/db.ts';
 import type { Attachment } from '../../server/uploads.ts';
 import type { HarnessInfo, ModelEntry, HarnessId } from '../../server/harness/types.ts';
 import type { CommandList as HarnessCommands } from '../../server/commands.ts';
 import type { ContextView } from '../../server/context.ts';
 import type { ContextUsage } from '../../shared/context-meter.ts';
 
-export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, ContextUsage, ContextView };
+export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number };
@@ -20,9 +20,11 @@ export type CommandList = HarnessCommands & { recent?: string[] };
 export type Channel = Omit<ChannelRow, 'design_system'> & { design_system_size: number };
 
 /** Just enough of a thread to list it under its channel in the sidebar. */
-export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'>;
-/** `active`: the channel's running and queued threads. `recent`: its latest threads of any status. */
-export type ChannelWithRunning = Channel & { running: number; active?: ThreadStub[]; recent?: ThreadStub[] };
+export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> & { folder_id?: string | null };
+/** A sidebar folder with how many threads it holds, how many of them run, and its newest threads. */
+export type FolderWithThreads = Folder & { count: number; running: number; threads: ThreadStub[] };
+/** `active`: the channel's running and queued threads. `recent`: its latest threads of any status. `folders`: its sidebar folders, in order. */
+export type ChannelWithRunning = Channel & { running: number; active?: ThreadStub[]; recent?: ThreadStub[]; folders?: FolderWithThreads[] };
 export type ArtifactWithThread = Artifact & { thread_title: string; channel_id: string };
 
 export interface UsageWindow {
@@ -195,9 +197,28 @@ export interface BackgroundTask {
   summary?: string;
 }
 
+/** A mod's pinned status line in a running thread, as GET /api/mods and the feed's 'mods' event carry it. */
+export interface ModStatus {
+  thread_id: string;
+  channel_id: string;
+  plugin: string;
+  text: string;
+  /** ISO time. */
+  updated_at: string;
+}
+
+/** A mod's $.ui.toast, sent on the thread's stream to whoever watches it and never stored. */
+export interface ModToast {
+  thread_id: string;
+  plugin: string;
+  text: string;
+  timeout_ms?: number;
+}
+
 export type FeedEvent =
   | { type: 'thread'; thread: Thread }
   | { type: 'tasks'; tasks: BackgroundTask[] }
+  | { type: 'mods'; mods: ModStatus[] }
   | { type: 'usage'; harness?: HarnessId; usage: Usage | null }
   | { type: 'artifact'; artifact: Artifact }
   | { type: 'channel'; id: string }
@@ -414,7 +435,8 @@ export type StreamMessage =
   | { type: 'artifact'; artifact: Artifact }
   | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string }
   /** A new reading of the thread's context window. */
-  | { type: 'context'; context: ContextUsage };
+  | { type: 'context'; context: ContextUsage }
+  | { type: 'mod_toast'; toast: ModToast };
 
 function classifyStream(d: unknown): StreamMessage | null {
   if (!d || typeof d !== 'object') return null;
@@ -426,6 +448,8 @@ function classifyStream(d: unknown): StreamMessage | null {
       blocked: typeof o.blocked === 'string' ? o.blocked : undefined,
     };
   if (o.kind === 'context' && o.context) return { type: 'context', context: o.context as ContextUsage };
+  if (o.kind === 'mod_toast' && typeof o.text === 'string')
+    return { type: 'mod_toast', toast: { thread_id: String(o.thread_id ?? ''), plugin: String(o.plugin ?? 'mod'), text: o.text, timeout_ms: typeof o.timeout_ms === 'number' ? o.timeout_ms : undefined } };
   if (typeof o.id === 'number' && typeof o.payload === 'string') return { type: 'event', event: o as unknown as EventRow };
   return null;
 }

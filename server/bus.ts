@@ -9,6 +9,8 @@ export type FeedEvent =
   | { type: 'usage'; harness?: string; usage: unknown }
   | { type: 'artifact'; artifact: unknown }
   | { type: 'tasks'; tasks: unknown[] }
+  /** Every mod status line pinned now, across all threads, whenever one is set or cleared. */
+  | { type: 'mods'; mods: unknown[] }
   /** A channel changed on another Mac (sync). Clients refetch the channel list. */
   | { type: 'channel'; id: string };
 

@@ -9,6 +9,7 @@ import { suggestReply } from './aux.ts';
 import {
   alive,
   browserHolder,
+  clearMods,
   deliveryPhase,
   drop,
   emitThread,
@@ -97,6 +98,7 @@ export function armIdle(live: Live) {
 export function teardown(live: Live) {
   clearTimeout(live.idleTimer);
   endTasks(live);
+  clearMods(live);
   clearInterrupt(live);
   if (live.browser && browserHolder.get(live.channelId) === live.threadId) {
     browserHolder.delete(live.channelId);

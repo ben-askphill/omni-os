@@ -6,6 +6,7 @@ import { paths } from './config.ts';
 import { artifactsApi } from './artifacts-api.ts';
 import { browserApi } from './browser-api.ts';
 import { channelsApi } from './channels-api.ts';
+import { foldersApi } from './folders-api.ts';
 import { commandsApi } from './commands-api.ts';
 import { mentionsApi } from './mentions-api.ts';
 import { feedApi } from './feed-api.ts';
@@ -30,6 +31,7 @@ app.onError((err, c) => {
 // threadsApi and terminalApi stay between the thread reads and the message, upload, stop, and stream routes.
 api.route('/channels', channelsApi);
 api.route('/channels', browserApi);
+api.route('/folders', foldersApi);
 api.route('/threads', threadRoutesApi);
 api.route('/threads', threadsApi);
 api.route('/threads', terminalApi);

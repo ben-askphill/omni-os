@@ -414,6 +414,8 @@ export function NewThreadComposer({
   const [role, setRole] = useState<string>(() => preset?.role ?? ((channelId ?? defaultChannel) === 'conductor' ? 'conductor' : ''));
   const [choice, setChoice] = useState<ModelChoice>(() => preset?.choice ?? { harness: 'claude-code', model: '' });
   const [effort, setEffort] = useState(preset?.effort ?? '');
+  // "New thread here" on a sidebar folder files the thread in it, until Ben takes it out.
+  const [folder, setFolder] = useState(preset?.folder ?? null);
   const { data: harnesses, reload: reloadHarnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -503,7 +505,15 @@ export function NewThreadComposer({
     try {
       const t = await api.send<Thread>(
         '/threads',
-        { channel, prompt, role: role || undefined, harness: choice.harness, model: choice.model || undefined, effort: effort || undefined },
+        {
+          channel,
+          prompt,
+          role: role || undefined,
+          harness: choice.harness,
+          model: choice.model || undefined,
+          effort: effort || undefined,
+          folder: folder && channel === preset?.channel ? folder.id : undefined,
+        },
         att.files,
       );
       drafts.delete(key);
@@ -566,6 +576,19 @@ export function NewThreadComposer({
         )}
         {harnesses && <EffortPicker harnesses={harnesses} choice={choice} value={effort} onChange={setEffort} />}
         <AttachButton onPick={att.add} disabled={busy} />
+        {folder && channel === preset?.channel && (
+          <button
+            type="button"
+            onClick={() => setFolder(null)}
+            title="Filed in this folder. Click to start it ungrouped."
+            aria-label={`In folder ${folder.name}. Remove`}
+            className="hov inline-flex h-[30px] max-w-[180px] items-center gap-1.5 rounded-full px-2.5 text-[12.5px] text-fg-2 hover:text-fg"
+          >
+            <Icon name="folder" size={13} className="text-fg-3" />
+            <span className="truncate">{folder.name}</span>
+            <Icon name="x" size={12} className="text-fg-4" />
+          </button>
+        )}
         <div className="ml-auto flex items-center gap-2.5">
           <Hint />
           <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>

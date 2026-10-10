@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type ContextUsage, type EventRow, type PendingMsg, type Thread, type ThreadDetail } from '../api.ts';
 import type { InitP, ResultP } from '../components/thread/panel/DetailsTab.tsx';
+import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
 
 export type PanelTab = 'artifacts' | 'browser' | 'terminal' | 'details';
@@ -36,6 +37,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
   // The newest context reading the stream pushed. The meter loads its first one itself.
   const [context, setContext] = useState<ContextUsage | null>(null);
 
+  const toast = useToast();
   const lastId = useRef(0);
   const seen = useRef(new Set<number>());
   const pending = useRef<EventRow[]>([]);
@@ -146,6 +148,10 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
           break;
         case 'context':
           setContext(m.context);
+          break;
+        case 'mod_toast':
+          // A mod's $.ui.toast. Only whoever has the thread open sees it; it is never stored.
+          toast({ icon: 'bell', title: m.toast.text, body: m.toast.plugin, timeout: Math.min(15_000, Math.max(1500, m.toast.timeout_ms ?? 4000)) });
           break;
         default: {
           const unreachable: never = m;

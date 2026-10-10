@@ -15,6 +15,8 @@ export type Record =
   /** One of our own stdin messages, echoed when the CLI adds it to the conversation (--replay-user-messages). */
   | { kind: 'replay'; payload: { uuid: string; text: string } }
   | { kind: 'control'; payload: { request_id: string; subtype: string; still_queued: string[] } }
+  /** A mod (a Claude Code plugin with JS hooks) called $.ui.log, $.ui.toast or $.ui.status. */
+  | { kind: 'mod'; payload: ModUi }
   | {
       kind: 'result';
       payload: {
@@ -51,6 +53,31 @@ export interface TaskUpdate {
   tool_uses?: number;
   tokens?: number;
   duration_ms?: number;
+}
+
+export interface ModUi {
+  plugin: string;
+  level: 'log' | 'toast' | 'status';
+  /** Null on a status clears that plugin's status. */
+  text: string | null;
+  timeout_ms?: number;
+}
+
+export const MAX_MOD_TEXT = 2_000;
+
+/**
+ * A mod's ui_* system message. An unknown ui_* subtype with text is a log; one without text, like the
+ * drawing protocol's ui_render or ui_attach, is dropped. Only a status may have no text: it clears.
+ */
+function modUi(evt: any): ModUi | null {
+  const level = evt.subtype === 'ui_toast' ? 'toast' : evt.subtype === 'ui_status' ? 'status' : 'log';
+  const raw = typeof evt.text === 'string' ? evt.text : typeof evt.text === 'number' ? String(evt.text) : '';
+  const text = raw.trim() ? raw.slice(0, MAX_MOD_TEXT) : null;
+  if (text === null && level !== 'status') return null;
+  const plugin = typeof evt.plugin === 'string' && evt.plugin.trim() ? evt.plugin.trim().slice(0, 100) : 'mod';
+  const out: ModUi = { plugin, level, text };
+  if (level === 'toast' && typeof evt.timeout_ms === 'number' && evt.timeout_ms > 0) out.timeout_ms = evt.timeout_ms;
+  return out;
 }
 
 const opt = <T>(v: T | null | undefined) => (v === null || v === undefined || v === '' ? undefined : v);
@@ -163,6 +190,9 @@ export function parseEvent(evt: any): Parsed {
       } else if (typeof evt.subtype === 'string' && evt.subtype.startsWith('task_')) {
         const u = taskUpdate(evt);
         if (u) out.records.push({ kind: 'task', payload: u });
+      } else if (typeof evt.subtype === 'string' && evt.subtype.startsWith('ui_')) {
+        const m = modUi(evt);
+        if (m) out.records.push({ kind: 'mod', payload: m });
       }
       break;
     }

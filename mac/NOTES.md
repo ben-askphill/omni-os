@@ -184,6 +184,7 @@ For the thread screen (part C). What parts A and B leave ready and what they do 
 - QA: `{"wait": "thread:<id>"}` waits for the laid-out transcript and notes the open time; `{"scroll": "top"|"bottom"|"through"}` and `{"expand": true}` (opens tool groups and failed or nested calls) work on the open thread.
 - Measured on this Mac: a 2,000-event thread opens in about 65 ms; a scroll through it ran 87 frames, mean 19 ms, worst 33 ms.
 - Copy: right-click a row for Copy; Edit > Copy Thread as Markdown (Shift-Cmd-C).
+- Mods (`ModViews.swift`): a mod's `$.ui.log` lines are `.mod` transcript rows, dim with the plugin's name, consecutive lines in one row. `$.ui.status` is `WorkspaceStore.mods` (the feed's `mods` event, one per plugin per live thread), shown under the header's title and as a chip on thread list rows. `$.ui.toast` is `ThreadStore.toasts` (the stream's `mod_toast`, never stored), stacked top right for its `timeout_ms` (1.5 to 15s, 4s by default), three at most; a click dismisses one.
 
 ## Markdown (#63 part B)
 

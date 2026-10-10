@@ -5,7 +5,7 @@ import { about } from './about.ts';
 import { bus } from './bus.ts';
 import { config } from './config.ts';
 import { search, threads } from './db.ts';
-import { activeTasks, queuedCount, runningCount, slotsByHarness } from './runner.ts';
+import { activeMods, activeTasks, queuedCount, runningCount, slotsByHarness } from './runner.ts';
 import { usageByHarness } from './usage.ts';
 
 export const feedApi = new Hono();
@@ -41,6 +41,9 @@ feedApi.get('/status', (c) =>
 
 /** Sub-agents, background shells and workflows still running, across every thread. */
 feedApi.get('/tasks', (c) => c.json(activeTasks()));
+
+/** Mod status lines pinned now, across every thread. Cleared when a thread's process ends. */
+feedApi.get('/mods', (c) => c.json(activeMods()));
 
 feedApi.get('/recent', (c) => c.json(threads.recent(Number(c.req.query('limit') ?? 60))));
 feedApi.get('/search', (c) => c.json(search(c.req.query('q') ?? '')));

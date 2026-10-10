@@ -50,6 +50,11 @@ describe('threads harness migration', () => {
     expect(db.channels.get('inbox')!.icon).toBeNull();
   });
 
+  it('adds the folders table and leaves existing threads ungrouped', () => {
+    expect(db.threads.get('old-1')!.folder_id).toBeNull();
+    expect(db.folders.byChannel('inbox')).toEqual([]);
+  });
+
   it('is safe to run again', () => {
     expect(() => db.migrate()).not.toThrow();
   });

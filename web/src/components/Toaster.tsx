@@ -11,6 +11,8 @@ export interface ToastInput {
   icon?: IconName;
   href?: string;
   action?: string;
+  /** How long it stays, in ms. 6.5s by default. */
+  timeout?: number;
 }
 
 interface ToastItem extends ToastInput {
@@ -25,9 +27,9 @@ function ToastView({ t, dismiss }: { t: ToastItem; dismiss: (id: number) => void
   const [hover, setHover] = useState(false);
   useEffect(() => {
     if (hover || t.leaving) return;
-    const tm = setTimeout(() => dismiss(t.id), 6500);
+    const tm = setTimeout(() => dismiss(t.id), t.timeout ?? 6500);
     return () => clearTimeout(tm);
-  }, [hover, t.leaving, t.id, dismiss]);
+  }, [hover, t.leaving, t.id, t.timeout, dismiss]);
   return (
     <div role="status" className="toast float" data-leaving={t.leaving || undefined} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       {t.status ? <StatusDot status={t.status} /> : t.icon ? <Icon name={t.icon} size={15} className="text-fg-3" /> : null}

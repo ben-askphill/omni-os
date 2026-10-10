@@ -17,13 +17,30 @@ public enum TranscriptItem: Hashable, Sendable, Identifiable {
   case result(eventID: Int, TurnResult)
   case error(eventID: Int, String)
   case report(eventID: Int, at: Date, CrewReport)
+  /// Mod log lines in a row, keyed by the first. They do not end a group of calls, so a busy hook does not split it.
+  case mod(eventID: Int, [ModLine])
 
   public var id: TranscriptItemID {
     switch self {
-    case .user(let id, _, _), .text(let id, _, _), .result(let id, _), .error(let id, _), .report(let id, _, _): .event(id)
+    case .user(let id, _, _), .text(let id, _, _), .result(let id, _), .error(let id, _), .report(let id, _, _), .mod(let id, _): .event(id)
     case .tools(let g): .event(g.eventID)
     case .plan: .plan
     }
+  }
+}
+
+/// One `$.ui.log` line from a mod.
+public struct ModLine: Hashable, Sendable, Identifiable {
+  /// The event's id.
+  public let id: Int
+  public let at: Date
+  public let plugin: String
+  public let text: String
+
+  /// A row for a stored log, or nil when it has no text, as the Web UI drops it.
+  init?(_ log: ModLog, _ e: EventRow) {
+    guard !log.text.isEmpty else { return nil }
+    (id, at, plugin, text) = (e.id, e.createdAt, log.plugin, log.text)
   }
 }
 
@@ -171,9 +188,14 @@ public struct Transcript: Sendable {
     lastID = events.last?.id
   }
 
-  /// The last row that is not the plan.
+  /// The last row that is not the plan or mod log lines, which are asides.
   public var last: TranscriptItem? {
-    items.last { if case .plan = $0 { false } else { true } }
+    items.last {
+      switch $0 {
+      case .plan, .mod: false
+      default: true
+      }
+    }
   }
 
   /// The group is the last row and still has a call waiting for its result.
@@ -208,6 +230,14 @@ public struct Transcript: Sendable {
       close(.result(eventID: e.id, r))
     case .error(let t): close(.error(eventID: e.id, t))
     case .crewReport(let r): close(.report(eventID: e.id, at: e.createdAt, r))
+    case .mod(let log):
+      guard let line = ModLine(log, e) else { return }
+      if case .mod(let first, var lines)? = items.last {
+        lines.append(line)
+        items[items.count - 1] = .mod(eventID: first, lines)
+      } else {
+        items.append(.mod(eventID: e.id, [line]))
+      }
     case .status, .sessionInit, .task: break
     case .unknown(let kind, _):
       if Self.breaking.contains(kind) { close(nil) }
@@ -382,6 +412,14 @@ extension Transcript {
       case .crewReport(let r):
         group = nil
         rows.append(.item(.report(eventID: e.id, at: e.createdAt, r)))
+      case .mod(let log):
+        guard let line = ModLine(log, e) else { break }
+        if case .item(.mod(let first, var lines))? = rows.last {
+          lines.append(line)
+          rows[rows.count - 1] = .item(.mod(eventID: first, lines))
+        } else {
+          rows.append(.item(.mod(eventID: e.id, [line])))
+        }
       case .unknown(let kind, _):
         if breaking.contains(kind) { group = nil }
       }

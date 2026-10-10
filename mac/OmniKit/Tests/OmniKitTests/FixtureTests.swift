@@ -117,6 +117,8 @@ func sseData(_ text: String) -> [String] {
       case .artifact: artifacts += 1
       case .thread: threads += 1
       case .context: contexts += 1
+      // The recorded turn runs no mod; StreamMessageTests reads a toast.
+      case .modToast: break
       case .unknown(let json): Issue.record("unknown message: \(json)")
       }
     }

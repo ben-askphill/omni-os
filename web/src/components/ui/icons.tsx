@@ -62,6 +62,8 @@ const PATHS = {
   pause: 'M9 5v14M15 5v14',
   diff: 'M12 3v8M8 7h8M8 17h8M5 21h14',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
+  folder: 'M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z',
+  folderPlus: 'M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5zM12 11v6M9 14h6',
 } as const;
 
 export type IconName = keyof typeof PATHS;
