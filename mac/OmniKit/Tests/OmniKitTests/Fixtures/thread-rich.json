@@ -19,6 +19,7 @@
     "last_text": "Output of /context",
     "suggestion": null,
     "archived": 0,
+    "folder_id": null,
     "created_at": "2026-01-05T09:00:00.000Z",
     "updated_at": "2026-01-05T09:00:00.000Z"
   },
@@ -284,6 +285,7 @@
       "last_text": "ack: check the checkout",
       "suggestion": null,
       "archived": 0,
+      "folder_id": null,
       "created_at": "2026-01-05T09:00:00.000Z",
       "updated_at": "2026-01-05T09:00:00.000Z"
     }

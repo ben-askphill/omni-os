@@ -89,6 +89,19 @@ CREATE TABLE IF NOT EXISTS automation_runs (
 
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
+-- Sidebar folders (db/repos/folders.ts). One channel each; parent_id stays null until nesting lands. Local, not synced.
+CREATE TABLE IF NOT EXISTS folders (
+  id TEXT PRIMARY KEY,
+  channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+  parent_id TEXT REFERENCES folders(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  position INTEGER,
+  collapsed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS folders_channel ON folders(channel_id);
+
 -- Sync (server/sync/). What changed locally and still has to go to the relay: a reference, read again at push time.
 CREATE TABLE IF NOT EXISTS sync_outbox (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -138,6 +151,9 @@ export function migrate() {
   ensureColumn('threads', 'suggestion', 'TEXT');
   ensureColumn('threads', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('channels', 'icon', 'TEXT');
+  // The sidebar folder a thread sits in, null for ungrouped: every existing thread. Local, not synced.
+  ensureColumn('threads', 'folder_id', 'TEXT REFERENCES folders(id) ON DELETE SET NULL');
+  db.exec('CREATE INDEX IF NOT EXISTS threads_folder ON threads(folder_id) WHERE folder_id IS NOT NULL');
   // What a new thread in the channel runs on when neither the thread nor its role picks (server/harness/resolve.ts).
   for (const col of ['default_harness', 'default_model', 'default_effort']) ensureColumn('channels', col, 'TEXT');
   // The channel's design system: one standalone HTML file for the pages its threads write, and the file's name.

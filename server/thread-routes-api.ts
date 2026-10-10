@@ -33,6 +33,8 @@ const createSchema = z.object({
   parent_id: z.string().nullish(),
   task_id: z.string().nullish(),
   source: z.enum(['manual', 'conductor', 'capture']).default('manual'),
+  /** A sidebar folder of the channel, by id or name. A name no folder has makes one. */
+  folder: z.string().max(200).nullish(),
 });
 
 threadRoutesApi.get('/', (c) =>

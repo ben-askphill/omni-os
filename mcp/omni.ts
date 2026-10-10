@@ -54,12 +54,13 @@ server.registerTool(
       harness: z.string().optional().describe('Override the role default harness: claude-code, codex, cursor or hermes. Use list_harnesses.'),
       model: z.string().optional().describe('Any catalog model id, or a Claude alias (opus, sonnet, haiku, fable). Use list_harnesses.'),
       effort: z.string().optional().describe('Reasoning effort supported by the model, e.g. high. Use list_harnesses.'),
+      folder: z.string().optional().describe('Sidebar folder in the channel to file the thread in, by name or id. A new name creates the folder.'),
     },
   },
-  async ({ channel, role, prompt, task_id, title, harness, model, effort }) => {
+  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder }) => {
     const t = await call('/threads', {
       method: 'POST',
-      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, parent_id: SELF, source: 'conductor' }),
+      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, folder, parent_id: SELF, source: 'conductor' }),
     });
     return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, status: t.status, branch: t.branch });
   },

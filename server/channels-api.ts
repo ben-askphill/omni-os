@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { z } from 'zod';
 import { parseChannelIcon, readSvgIcon, SVG_MAX, SVG_PREFIX } from '../shared/channel-icon.ts';
 import { readDesignSystem } from '../shared/design-system.ts';
-import { channels, publicChannel, threads, type Channel, type Thread } from './db.ts';
+import { channels, folders as folderRepo, publicChannel, threads, type Channel, type Folder, type Thread } from './db.ts';
 import { detectRepo } from './github.ts';
 import { getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
@@ -73,29 +73,56 @@ const channelSchema = z.object({
 /** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */
 const RECENT_PER_CHANNEL = 5;
 
-const stub = ({ id, channel_id, title, status, created_at }: Thread) => ({ id, channel_id, title, status, created_at });
+/** A folder lists at most this many of its threads in the sidebar; its count still says how many there are. */
+const THREADS_PER_FOLDER = 50;
 
-/** A channel plus its running and queued threads, and its latest ones, so the sidebar can list them under the name. */
-const withActive = (ch: Channel, busy: Thread[], recent: Thread[]) => {
+const stub = ({ id, channel_id, title, status, created_at, folder_id }: Thread) => ({ id, channel_id, title, status, created_at, folder_id });
+
+/** Each folder with its count, how many of its threads run, and its newest threads, keyed by channel. */
+function foldersByChannel(list: Folder[], filed: Thread[]) {
+  const byFolder = new Map<string, Thread[]>();
+  for (const t of filed) byFolder.set(t.folder_id!, [...(byFolder.get(t.folder_id!) ?? []), t]);
+  const withThreads = (f: Folder) => {
+    const mine = byFolder.get(f.id) ?? [];
+    return {
+      ...f,
+      count: mine.length,
+      running: mine.filter((t) => t.status === 'running' || t.status === 'queued').length,
+      threads: mine.slice(0, THREADS_PER_FOLDER).map(stub),
+    };
+  };
+  const out = new Map<string, ReturnType<typeof withThreads>[]>();
+  for (const f of list) out.set(f.channel_id, [...(out.get(f.channel_id) ?? []), withThreads(f)]);
+  return out;
+}
+
+/**
+ * A channel plus its running and queued threads, its latest ones, and its folders with their threads, so the sidebar
+ * can list them under the name.
+ */
+const withActive = (ch: Channel, busy: Thread[], recent: Thread[], folders: Map<string, unknown[]>) => {
   const mine = busy.filter((t) => t.channel_id === ch.id && t.source !== 'team');
   return {
     ...publicChannel(ch),
     running: mine.length,
     active: mine.map(stub),
     recent: recent.filter((t) => t.channel_id === ch.id).map(stub),
+    folders: folders.get(ch.id) ?? [],
   };
 };
 
 channelsApi.get('/', (c) => {
   const busy = threads.running();
   const recent = threads.recentPerChannel(RECENT_PER_CHANNEL);
-  return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy, recent)));
+  const folders = foldersByChannel(folderRepo.all(), threads.filed());
+  return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy, recent, folders)));
 });
 
 channelsApi.get('/:id', (c) => {
   const ch = channels.get(c.req.param('id'));
   if (!ch) return c.json({ error: 'not found' }, 404);
-  return c.json(withActive(ch, threads.running(), threads.byChannel(ch.id, RECENT_PER_CHANNEL)));
+  const folders = foldersByChannel(folderRepo.byChannel(ch.id), threads.filed(ch.id));
+  return c.json(withActive(ch, threads.running(), threads.byChannel(ch.id, RECENT_PER_CHANNEL), folders));
 });
 
 channelsApi.post('/', async (c) => {

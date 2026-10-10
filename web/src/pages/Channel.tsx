@@ -3,7 +3,7 @@ import { api, errorText, useApi, type ChannelWithRunning, type Thread } from '..
 import { NewThreadComposer } from '../components/Composer.tsx';
 import { ThreadGroups, useLiveThreads, useThreadPRs } from '../components/ThreadList.tsx';
 import { Avatar, Button, Empty, StatusDot, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
-import { href, type ChannelTab } from '../router.ts';
+import { href, usePresetSeq, type ChannelTab } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { ChannelSettingsForm } from './ChannelSettings.tsx';
 import { PRDetail, PRList } from './PRs.tsx';
@@ -12,9 +12,10 @@ function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
   const accept = useCallback((t: Thread) => t.channel_id === id, [id]);
   const list = useLiveThreads(`/channels/${encodeURIComponent(id)}/threads`, accept);
   const prs = useThreadPRs(id);
+  const presetSeq = usePresetSeq();
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-16 md:px-8">
-      <NewThreadComposer channelId={id} placeholder={isConductor ? 'Ask the Conductor. It delegates to the crew.' : undefined} />
+      <NewThreadComposer key={presetSeq} channelId={id} placeholder={isConductor ? 'Ask the Conductor. It delegates to the crew.' : undefined} />
       <div className="mt-8">
         <ThreadGroups
           threads={list.data}

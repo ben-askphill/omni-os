@@ -1,6 +1,6 @@
 // createThread, sendMessage, and postMessage. Slash commands are resolved here, then delivered.
 import { randomUUID } from 'node:crypto';
-import { channels, threads, type Thread, type ThreadSource } from '../db.ts';
+import { channels, folders, threads, type Thread, type ThreadSource } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { commandsFolder, prepareWorkdir } from '../sandbox.ts';
 import { prepareTurn, turnBlocked } from '../sync/guard.ts';
@@ -79,6 +79,8 @@ export interface CreateThreadInput {
   task_id?: string | null;
   source?: ThreadSource;
   automation?: string | null;
+  /** A sidebar folder of the channel to file the thread in, by id or name. A name no folder has makes one. */
+  folder?: string | null;
   /** Files Ben attached to the first message. Validate them with `checkUploads` before calling. */
   files?: File[];
 }
@@ -108,6 +110,8 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const harness = run.harness;
   const effort = run.effort;
 
+  const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
+
   const id = randomUUID();
   const wd = await prepareWorkdir(channel, id, { remote: harness === 'hermes' });
   const thread = threads.create({
@@ -126,6 +130,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
     task_id: input.task_id ?? (input.parent_id ? `T-${id.slice(0, 4).toUpperCase()}` : null),
     source: input.source ?? 'manual',
     automation: input.automation ?? null,
+    folder_id: filedIn?.id ?? null,
   });
   return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
 }

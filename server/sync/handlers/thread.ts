@@ -5,6 +5,7 @@ import { fromPortable, safeSegment, toRemote } from '../paths.ts';
 
 // Threads: last writer wins on the whole row, except who runs it. cwd travels with the home dir as "~", through
 // each Mac's path map. run_machine names the Mac running or queueing the thread (db.ts sets it with the status).
+// folder_id is this Mac's sidebar grouping: never sent, and kept on apply unless the thread moved channel.
 
 const COLUMNS = [
   'id', 'channel_id', 'title', 'status', 'role', 'model', 'harness', 'effort', 'session_id', 'has_run', 'cwd',
@@ -15,14 +16,18 @@ type Row = Thread & { run_machine: string | null };
 
 const upsert = db.prepare(
   `INSERT INTO threads (${COLUMNS.join(', ')}) VALUES (${COLUMNS.map(() => '?').join(', ')})
-   ON CONFLICT(id) DO UPDATE SET ${COLUMNS.filter((c) => c !== 'id').map((c) => `${c} = excluded.${c}`).join(', ')}`,
+   ON CONFLICT(id) DO UPDATE SET ${COLUMNS.filter((c) => c !== 'id').map((c) => `${c} = excluded.${c}`).join(', ')},
+   folder_id = CASE WHEN threads.channel_id = excluded.channel_id THEN threads.folder_id END`,
 );
 const runOf = db.prepare('SELECT status, run_machine FROM threads WHERE id = ?');
 
 registerHandler('thread', {
   serialize(id) {
     const t = threads.get(id);
-    return t ? { ...t, cwd: toRemote(t.cwd), run_machine: threads.runMachine(id) } : null;
+    if (!t) return null;
+    // Folders are this Mac's sidebar grouping, not synced: the other Mac has no such folder.
+    const { folder_id: _, ...row } = t;
+    return { ...row, cwd: toRemote(t.cwd), run_machine: threads.runMachine(id) };
   },
   apply(change, ctx) {
     // The id names the thread's folder here: one that would leave data/threads is dropped, not retried.

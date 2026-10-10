@@ -106,10 +106,20 @@ export function takeComposerFocus() {
 // ---------- a new thread from a thread (`/clear`, "New thread on another model") ----------
 
 let preset: NewThreadPreset | null = null;
+// Counts presets, so a composer already open on the channel (the folder's "New thread here") remounts to read it.
+let presetSeq = 0;
+const presetListeners = new Set<() => void>();
+export const usePresetSeq = () =>
+  useSyncExternalStore(
+    (fn) => (presetListeners.add(fn), () => void presetListeners.delete(fn)),
+    () => presetSeq,
+  );
 
 /** Open the channel's new-thread composer, set up from `p`. */
 export function openNewThread(p: NewThreadPreset) {
   preset = p;
+  presetSeq++;
+  presetListeners.forEach((fn) => fn());
   // The model picker takes the focus itself.
   if (!p.pickModel) focusPending = true;
   navigate(`/c/${encodeURIComponent(p.channel)}`);

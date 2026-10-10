@@ -1,5 +1,7 @@
-import { Fragment, useRef, useState, type ReactNode } from 'react';
-import type { BackgroundTask, ChannelWithRunning, HarnessId, ThreadStub, Usage, UsageWindow } from '../api.ts';
+import { Fragment, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import type { BackgroundTask, ChannelWithRunning, FolderWithThreads, HarnessId, ThreadStub, Usage, UsageWindow } from '../api.ts';
+import { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, drag, draftKey, freeName, useFolders } from '../folders.tsx';
+import { openMenu } from './ContextMenu.tsx';
 import { duration, plural, toDate, untilLabel } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { readPref, useApp, useNow, writePref } from '../store.tsx';
@@ -149,8 +151,11 @@ function RunningBadge({ n }: { n: number }) {
   );
 }
 
-/** A thread nested under its channel, like a Claude Code session under its project. */
-function ThreadLink({ t, active, agents, onNavigate }: { t: ThreadStub; active: boolean; agents: number; onNavigate?: () => void }) {
+/**
+ * A thread nested under its channel, like a Claude Code session under its project, or one level deeper in a folder.
+ * Dragged onto a folder it files there; onto its channel's name, back to the ungrouped list.
+ */
+function ThreadLink({ t, active, agents, onNavigate, nested }: { t: ThreadStub; active: boolean; agents: number; onNavigate?: () => void; nested?: boolean }) {
   const title = t.title || 'Untitled';
   // A thread whose turn ended still works while its sub-agents run.
   const busy = t.status === 'running' || agents > 0;
@@ -158,10 +163,17 @@ function ThreadLink({ t, active, agents, onNavigate }: { t: ThreadStub; active: 
     <a
       href={href.thread(t.id)}
       onClick={onNavigate}
+      draggable
+      onDragStart={(e) => {
+        drag.start({ kind: 'thread', thread: t });
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', title);
+      }}
+      onDragEnd={drag.end}
       title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : (STATUS_LABEL[t.status] ?? t.status)}`}
       aria-current={active ? 'page' : undefined}
       data-active={active || undefined}
-      className={`hov z-[1] ml-[25px] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${
+      className={`hov z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${nested ? 'ml-[43px]' : 'ml-[25px]'} ${
         active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-3 hover:text-fg'
       }`}
     >
@@ -188,6 +200,183 @@ function AgentLink({ t, channel, onNavigate }: { t: BackgroundTask; channel?: st
   );
 }
 
+/** A folder's name being typed: Enter or leaving the field saves, Escape cancels. */
+function FolderNameField({ initial, onSave, onCancel }: { initial: string; onSave: (name: string) => void; onCancel: () => void }) {
+  const [value, setValue] = useState(initial);
+  // Escape blurs the field too; it must not then save.
+  const done = useRef(false);
+  const finish = (save: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    if (save) onSave(value);
+    else onCancel();
+  };
+  return (
+    <div className="ml-[25px] flex h-8 items-center gap-2 rounded-full pr-1.5 pl-3 md:h-7">
+      <Icon name="folder" size={13} className="shrink-0 text-fg-3" />
+      <input
+        autoFocus
+        value={value}
+        maxLength={FOLDER_NAME_MAX}
+        aria-label="Folder name"
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') finish(true);
+          else if (e.key === 'Escape') finish(false);
+        }}
+        onBlur={() => finish(true)}
+        className="h-6 min-w-0 flex-1 rounded-[8px] bg-surface px-2 text-[12.5px] text-fg shadow-[inset_0_0_0_1px_var(--line-strong)] outline-none"
+      />
+    </div>
+  );
+}
+
+/** Whether a drop on this folder would do something: a thread of its channel from elsewhere, or another of its folders. */
+function accepts(f: FolderWithThreads) {
+  const d = drag.get();
+  if (!d || f.id.startsWith('tmp-')) return false;
+  if (d.kind === 'thread') return d.thread.channel_id === f.channel_id && d.thread.folder_id !== f.id;
+  return d.channel_id === f.channel_id && d.id !== f.id;
+}
+
+/**
+ * A folder under its channel: chevron, name, thread count and a loader while any thread in it runs. Click opens and
+ * closes it, double-click or F2 renames, Delete asks to delete, and the "…" button or a right-click opens its menu.
+ * Drop a thread on it to file it; drop another folder on it to put that one just above.
+ */
+function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThreads; openId: string | null; tasks: BackgroundTask[]; onNavigate?: () => void }) {
+  const folders = useFolders();
+  const [over, setOver] = useState<'thread' | 'folder' | null>(null);
+  const [all, setAll] = useState(false);
+  const editing = folders.editing === f.id;
+  const open = !f.collapsed;
+  const agents = (id: string) => tasks.filter((k) => k.thread_id === id).length;
+  const busy = f.running > 0 || f.threads.some((t) => agents(t.id) > 0);
+  // Closed, it still shows the open thread, so the highlight never vanishes into it.
+  const list = open ? f.threads : f.threads.filter((t) => t.id === openId);
+  const shown = all ? list : list.filter((t, i) => i < MAX_FOLDER_THREADS || t.id === openId);
+  const label = `${f.name}, ${plural(f.count, 'thread')}${f.running ? `, ${f.running} running` : ''}`;
+
+  const onOver = (e: DragEvent) => {
+    if (!accepts(f)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setOver(drag.get()!.kind);
+  };
+  const onDrop = (e: DragEvent) => {
+    const d = drag.get();
+    setOver(null);
+    if (!d || !accepts(f)) return;
+    e.preventDefault();
+    drag.end();
+    if (d.kind === 'thread') void folders.moveThread(d.thread, f.id);
+    else void folders.reorder(f.channel_id, d.id, f.id);
+  };
+
+  return (
+    <div>
+      {editing ? (
+        <FolderNameField
+          initial={f.name}
+          onSave={(name) => (folders.setEditing(null), void folders.rename(f.id, name))}
+          onCancel={() => folders.setEditing(null)}
+        />
+      ) : (
+        <div
+          data-folder-id={f.id}
+          className={`group/folder ml-[25px] flex items-center rounded-full transition-shadow ${
+            over === 'thread' ? 'bg-wash shadow-[inset_0_0_0_1px_var(--line-strong)]' : over === 'folder' ? 'shadow-[inset_0_2px_0_0_var(--fg-3)]' : ''
+          }`}
+          onDragOver={onOver}
+          onDragLeave={() => setOver(null)}
+          onDrop={onDrop}
+        >
+          <button
+            type="button"
+            draggable
+            onDragStart={(e) => {
+              drag.start({ kind: 'folder', id: f.id, channel_id: f.channel_id });
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', f.name);
+            }}
+            onDragEnd={() => (drag.end(), setOver(null))}
+            onClick={() => void folders.toggle(f.id)}
+            onDoubleClick={(e) => {
+              e.preventDefault();
+              folders.setEditing(f.id);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'F2') (e.preventDefault(), folders.setEditing(f.id));
+              else if (e.key === 'Delete' || (e.key === 'Backspace' && (e.metaKey || e.ctrlKey))) (e.preventDefault(), folders.askDelete(f.id));
+              else if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+                e.preventDefault();
+                const r = e.currentTarget.getBoundingClientRect();
+                openMenu({ kind: 'folder', id: f.id }, r.left + 24, r.bottom);
+              }
+            }}
+            aria-expanded={open}
+            aria-label={label}
+            title={`${label}. Double-click or F2 to rename.`}
+            className="hov z-[1] flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full pr-1 pl-3 text-left text-[13px] text-fg-2 transition-colors hover:text-fg md:h-7 md:text-[12.5px]"
+          >
+            <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="-ml-0.5 shrink-0 text-fg-4" />
+            <span className="min-w-0 flex-1 truncate">{f.name}</span>
+            {busy && <Loader size={11} className="shrink-0 text-live-text" />}
+            <span className="shrink-0 font-num text-[11px] text-fg-4 tabular-nums transition-opacity md:group-focus-within/folder:opacity-0 md:group-hover/folder:opacity-0">
+              {f.count}
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-label={`${f.name} actions`}
+            title="Folder actions"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              openMenu({ kind: 'folder', id: f.id }, r.left, r.bottom + 4);
+            }}
+            className="hov relative z-[2] -ml-7 grid h-6 w-6 shrink-0 place-items-center rounded-full text-fg-3 opacity-100 transition-opacity hover:text-fg focus-visible:opacity-100 md:opacity-0 md:group-hover/folder:opacity-100 md:group-focus-within/folder:opacity-100"
+          >
+            <Icon name="more" size={14} />
+          </button>
+        </div>
+      )}
+      {shown.map((t) => (
+        <ThreadLink key={t.id} t={t} nested active={t.id === openId} agents={agents(t.id)} onNavigate={onNavigate} />
+      ))}
+      {open && !all && list.length > shown.length && (
+        <button type="button" onClick={() => setAll(true)} className="hov z-[1] ml-[43px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
+          {list.length - shown.length} more
+        </button>
+      )}
+      {open && f.count > f.threads.length && all && (
+        <span className="ml-[43px] flex h-7 items-center pr-3 pl-8 text-[12px] text-fg-4">{f.count - f.threads.length} older not shown</span>
+      )}
+      {open && f.count === 0 && <div className="ml-[43px] truncate pr-3 pl-8 text-[12px] leading-7 text-fg-4">No threads yet</div>}
+    </div>
+  );
+}
+
+/** The "+" beside a channel's name: a new folder under it, with its name field open. */
+function AddFolderButton({ c }: { c: ChannelWithRunning }) {
+  const folders = useFolders();
+  return (
+    <button
+      type="button"
+      aria-label={`New folder in ${c.name}`}
+      title="New folder"
+      onClick={() => folders.setEditing(draftKey(c.id))}
+      className="hov relative z-[2] -ml-8 mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-fg-3 transition-opacity hover:text-fg focus-visible:opacity-100 md:opacity-0 md:group-hover/ch:opacity-100 md:group-focus-within/ch:opacity-100"
+    >
+      <Icon name="folderPlus" size={14} />
+    </button>
+  );
+}
+
+/** Past this many threads an open folder shows "N more". */
+const MAX_FOLDER_THREADS = 8;
+
 /** Past this many threads a channel shows "N more" (or "See all threads" when highlighted) and links to its full list. */
 const MAX_THREADS = 5;
 
@@ -203,7 +392,10 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
   const route = useRoute();
   const hash = useHash();
   const { channels, channelsError, openThread, tasks } = useApp();
+  const folders = useFolders();
   const listRef = useRef<HTMLDivElement>(null);
+  // The channel whose name a thread is being dragged over, to take it out of its folder.
+  const [dropOn, setDropOn] = useState<string | null>(null);
 
   const activeChannel = route.name === 'channel' ? route.id : null;
   const openId = route.name === 'thread' ? route.id : null;
@@ -214,25 +406,56 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
   // The highlighted channel: the one open, or the one the open thread belongs to.
   const focused = activeChannel ?? (openThread && openThread.id === openId ? openThread.channel_id : null);
 
+  // The folder a thread sits in, as the list knows it now: a move shows before the open thread's own copy hears of it.
+  const folderOf = (c: ChannelWithRunning, t: ThreadStub) => {
+    const inFolder = c.folders?.find((f) => f.threads.some((x) => x.id === t.id));
+    if (inFolder) return inFolder.id;
+    const stub = [...(c.active ?? []), ...(c.recent ?? [])].find((x) => x.id === t.id);
+    const id = (stub ?? t).folder_id ?? null;
+    return id && c.folders?.some((f) => f.id === id) ? id : null;
+  };
+  const openIn = (c: ChannelWithRunning) => (openThread && openThread.id === openId && openThread.channel_id === c.id ? openThread : null);
+
   // Running and queued threads, newest first. The open thread joins them with the page's fresher
   // copy and stays after it stops, so the highlight never jumps out from under you. The highlighted
   // channel also lists its latest threads of any status, so finished ones stay a click away.
+  // Threads in a folder are listed under the folder instead.
   const threadsOf = (c: ChannelWithRunning) => {
-    const open = openThread && openThread.id === openId && openThread.channel_id === c.id ? openThread : null;
+    const open = openIn(c);
     const extra = c.id === focused ? (c.recent ?? []) : [];
     const seen = new Set(open ? [open.id] : []);
     const rest = [...(c.active ?? []), ...extra].filter((t) => !seen.has(t.id) && seen.add(t.id));
-    return (open ? [open, ...rest] : rest).sort(newestFirst);
+    return (open ? [open, ...rest] : rest).filter((t) => !folderOf(c, t)).sort(newestFirst);
+  };
+  /** The channel's folders, with the open thread under its own even past the listed ones. */
+  const foldersOf = (c: ChannelWithRunning) => {
+    const open = openIn(c);
+    const home = open && folderOf(c, open);
+    return (c.folders ?? []).map((f) =>
+      f.id === home && !f.threads.some((t) => t.id === open!.id) ? { ...f, threads: [{ ...open!, folder_id: f.id }, ...f.threads] } : f,
+    );
   };
   // Rows appearing or leaving above the highlighted one move it, so they re-measure the thumb too.
-  const rowsKey = channels.flatMap((c) => threadsOf(c).map((t) => t.id)).join();
-  const box = useSlidingThumb(listRef, `${hash}:${channels.length}:${rowsKey}`, true, '[data-active="true"]');
+  const rowsKey = channels
+    .flatMap((c) => [...foldersOf(c).flatMap((f) => [f.id, f.collapsed, ...f.threads.map((t) => t.id)]), ...threadsOf(c).map((t) => t.id)])
+    .join();
+  const box = useSlidingThumb(listRef, `${hash}:${channels.length}:${rowsKey}:${folders.editing}`, true, '[data-active="true"]');
 
   const threadLinks = (c: ChannelWithRunning) => {
     const list = threadsOf(c);
     const shown = list.filter((t, i) => i < MAX_THREADS || t.id === openId);
     return (
       <>
+        {foldersOf(c).map((f) => (
+          <FolderRow key={f.id} f={f} openId={openId} tasks={tasks} onNavigate={onNavigate} />
+        ))}
+        {folders.editing === draftKey(c.id) && (
+          <FolderNameField
+            initial={freeName(c.folders ?? [], DEFAULT_FOLDER_NAME)}
+            onSave={(name) => (folders.setEditing(null), void folders.create(c.id, name))}
+            onCancel={() => folders.setEditing(null)}
+          />
+        )}
         {shown.map((t) => (
           <ThreadLink key={t.id} t={t} active={t.id === openId} agents={tasks.filter((k) => k.thread_id === t.id).length} onNavigate={onNavigate} />
         ))}
@@ -251,29 +474,74 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
     );
   };
 
+  /** A thread dragged out of one of the channel's folders, dropped on the channel's name, goes back to the ungrouped list. */
+  const ungroupDrop = (c: ChannelWithRunning) => {
+    const ok = () => {
+      const d = drag.get();
+      return d?.kind === 'thread' && d.thread.channel_id === c.id && !!folderOf(c, d.thread);
+    };
+    return {
+      onDragOver: (e: DragEvent) => {
+        if (!ok()) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setDropOn(c.id);
+      },
+      onDragLeave: () => setDropOn(null),
+      onDrop: (e: DragEvent) => {
+        setDropOn(null);
+        const d = drag.get();
+        if (!ok() || d?.kind !== 'thread') return;
+        e.preventDefault();
+        drag.end();
+        void folders.moveThread({ ...d.thread, folder_id: folderOf(c, d.thread) }, null);
+      },
+    };
+  };
+
+  const channelRow = (c: ChannelWithRunning, label: ReactNode, lead: ReactNode) => (
+    <div
+      className={`group/ch flex items-center rounded-full ${dropOn === c.id ? 'bg-wash shadow-[inset_0_0_0_1px_var(--line-strong)]' : ''}`}
+      title={dropOn === c.id ? 'Drop to take it out of its folder' : undefined}
+      {...ungroupDrop(c)}
+    >
+      <div className="min-w-0 flex-1">
+        <NavLink
+          to={href.channel(c.id)}
+          channelId={c.id}
+          active={activeChannel === c.id}
+          onNavigate={onNavigate}
+          right={
+            <span className="mr-6 flex items-center md:mr-0 md:group-focus-within/ch:mr-6 md:group-hover/ch:mr-6">
+              <RunningBadge n={c.running} />
+            </span>
+          }
+          lead={lead}
+        >
+          {label}
+        </NavLink>
+      </div>
+      <AddFolderButton c={c} />
+    </div>
+  );
+
   const channelLink = (c: ChannelWithRunning) => (
     <Fragment key={c.id}>
-      <NavLink
-        to={href.channel(c.id)}
-        channelId={c.id}
-        active={activeChannel === c.id}
-        onNavigate={onNavigate}
-        right={<RunningBadge n={c.running} />}
-        lead={
-          parseChannelIcon(c.icon) ? (
-            <span className={`grid w-[15px] place-items-center ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-3'}`}>
-              <ChannelMark icon={c.icon} size={14} />
-            </span>
-          ) : (
-            <span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-4'}`}>#</span>
-          )
-        }
-      >
-        {c.name}
-      </NavLink>
+      {channelRow(
+        c,
+        c.name,
+        parseChannelIcon(c.icon) ? (
+          <span className={`grid w-[15px] place-items-center ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-3'}`}>
+            <ChannelMark icon={c.icon} size={14} />
+          </span>
+        ) : (
+          <span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-4'}`}>#</span>
+        ),
+      )}
       {threadLinks(c)}
     </Fragment>
   );
+
 
   return (
     <nav className="flex h-full flex-col bg-sidebar" aria-label="Main">
@@ -320,9 +588,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
             </NavLink>
             {conductor && (
               <>
-                <NavLink to={href.channel('conductor')} lead={<span className="grid w-[15px] place-items-center"><OmniMark size={17} /></span>} active={activeChannel === 'conductor'} onNavigate={onNavigate} right={<RunningBadge n={conductor.running} />}>
-                  Conductor
-                </NavLink>
+                {channelRow(conductor, 'Conductor', <span className="grid w-[15px] place-items-center"><OmniMark size={17} /></span>)}
                 {threadLinks(conductor)}
               </>
             )}

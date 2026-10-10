@@ -13,6 +13,8 @@ export type { ChannelKind, Channel } from './db/repos/channels.ts';
 export { channels, publicChannel } from './db/repos/channels.ts';
 export type { ThreadStatus, ThreadSource, Thread } from './db/repos/threads.ts';
 export { THREAD_COLUMNS, threads } from './db/repos/threads.ts';
+export type { Folder } from './db/repos/folders.ts';
+export { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, FolderError, folderName, folders } from './db/repos/folders.ts';
 export type { EventRow } from './db/repos/events.ts';
 export { EVENT_COLUMNS, indexEvent, events } from './db/repos/events.ts';
 export type { SearchHit } from './db/repos/search.ts';
