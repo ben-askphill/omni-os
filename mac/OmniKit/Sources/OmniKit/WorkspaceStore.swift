@@ -169,6 +169,19 @@ public final class WorkspaceStore {
     await load([.channels])
   }
 
+  /// An edit the app shows before the server has it (`FolderModel`). A channel load already out is dropped, so it
+  /// cannot put back the list from before the edit.
+  func editChannel(_ id: String, _ edit: (ChannelWithRunning) -> ChannelWithRunning) {
+    tokens[.channels, default: 0] += 1
+    channels = channels.map { $0.id == id ? edit($0) : $0 }
+  }
+
+  /// The list from before an edit the server refused.
+  func restoreChannels(_ list: [ChannelWithRunning]) {
+    tokens[.channels, default: 0] += 1
+    if channels != list { channels = list }
+  }
+
   /// One event from the app's feed. A store that reads `feed` itself calls this too.
   func apply(_ e: SSEEvent<FeedEvent>) {
     if case .message(let m) = e { onFeed?(m) }
@@ -346,14 +359,56 @@ public struct SidebarSections: Hashable, Sendable {
     other = rest.filter { c in !Self.kinds.contains { $0.kind == c.kind } }
   }
 
+  public struct FolderLinks: Hashable, Sendable {
+    public let shown: [ThreadStub]
+    /// How many more it lists, for "N more".
+    public let more: Int
+    /// An open folder with no threads says "No threads yet".
+    public let empty: Bool
+  }
+
+  /// Past this many threads an open folder shows "N more".
+  public static let maxFolderThreads = 8
+
+  /// The folder a thread sits in, as the list knows it now: a move shows before the open thread's own copy hears of it.
+  public static func folder(of thread: ThreadStub, in channel: ChannelWithRunning) -> String? {
+    if let f = channel.folders.first(where: { f in f.threads.contains { $0.id == thread.id } }) { return f.id }
+    let stub = (channel.active + channel.recent).first { $0.id == thread.id } ?? thread
+    guard let id = stub.folderID, channel.folders.contains(where: { $0.id == id }) else { return nil }
+    return id
+  }
+
+  /// The channel's folders in order, with the open thread under its own folder even past the listed ones.
+  public static func folders(of channel: ChannelWithRunning, open: ThreadStub? = nil) -> [FolderWithThreads] {
+    guard let open, open.channelID == channel.id, let home = folder(of: open, in: channel) else { return channel.folders }
+    return channel.folders.map { f in
+      guard f.id == home, !f.threads.contains(where: { $0.id == open.id }) else { return f }
+      var f = f
+      var t = open
+      t.folderID = f.id
+      f.threads.insert(t, at: 0)
+      return f
+    }
+  }
+
+  /// A folder's rows: its threads while open, at most `maxFolderThreads` unless `all`. Closed, it still shows the
+  /// open thread, so the highlight never vanishes into it.
+  public static func threads(in folder: FolderWithThreads, openID: String?, all: Bool = false) -> FolderLinks {
+    let list = folder.collapsed ? folder.threads.filter { $0.id == openID } : folder.threads
+    let shown = all ? list : list.enumerated().filter { $0.offset < maxFolderThreads || $0.element.id == openID }.map(\.element)
+    return FolderLinks(shown: shown, more: folder.collapsed ? 0 : list.count - shown.count, empty: !folder.collapsed && folder.count == 0)
+  }
+
   /// A channel's running and queued threads, newest first, at most `maxThreads`. The open thread, if it
   /// is in this channel, joins them and stays after it stops, so the highlight never jumps away. The
-  /// highlighted channel also lists its latest threads of any status, so finished ones stay findable.
+  /// highlighted channel also lists its latest threads of any status, so finished ones stay findable. Threads in a
+  /// folder are listed under the folder instead.
   public static func threads(of channel: ChannelWithRunning, open: ThreadStub? = nil, focused: Bool = false) -> ThreadLinks {
     let open = open?.channelID == channel.id ? open : nil
     var seen: Set<String> = open.map { [$0.id] } ?? []
     var list = (channel.active + (focused ? channel.recent : [])).filter { seen.insert($0.id).inserted }
     if let open { list.insert(open, at: 0) }
+    list.removeAll { folder(of: $0, in: channel) != nil }
     list.sort { $0.createdAt > $1.createdAt }
     let shown = list.enumerated().filter { $0.offset < maxThreads || $0.element.id == open?.id }.map(\.element)
     return ThreadLinks(shown: shown, more: focused ? 0 : list.count - shown.count, seeAll: focused)

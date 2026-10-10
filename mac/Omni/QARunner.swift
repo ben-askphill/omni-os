@@ -146,6 +146,12 @@ final class QARunner {
           try? await Task.sleep(for: .milliseconds(400))
         case .channel(let action):
           try await channelStep(action)
+        case .folder(let action):
+          try await folderStep(action)
+          try? await Task.sleep(for: .milliseconds(500))
+        case .screen(let name):
+          try await screen(name)
+          result.files = [name + ".png"]
         case .scroll(let scroll):
           result.note = try await self.scroll(scroll)
         case .expand:
@@ -262,6 +268,127 @@ final class QARunner {
     await model.store.reloadChannels()
   }
 
+  /// Shows a folder state in the sidebar, through the same model the rows use.
+  private func folderStep(_ action: QAFolderAction) async throws(QAScriptError) {
+    let folders = model.folders
+    func folder(_ name: String) throws(QAScriptError) -> FolderWithThreads {
+      let all = model.store.channels.flatMap(\.folders)
+      guard let f = all.first(where: { $0.name == name }) else { throw QAScriptError("no folder named \(name)") }
+      return f
+    }
+    func thread(_ title: String) throws(QAScriptError) -> ThreadStub {
+      let all = model.store.channels.flatMap { $0.active + $0.recent + $0.folders.flatMap(\.threads) }
+      guard let t = all.first(where: { $0.title == title }) else { throw QAScriptError("no thread titled \(title)") }
+      return t
+    }
+    switch action {
+    case .new(let channel):
+      guard model.store.channel(channel) != nil else { throw QAScriptError("no channel \(channel)") }
+      folders.editing = .new(channel: channel)
+    case .create(let channel, let name):
+      guard model.store.channel(channel) != nil else { throw QAScriptError("no channel \(channel)") }
+      await folders.create(in: channel, name: name)
+      if let failure = folders.failure { throw QAScriptError("\(failure.title): \(failure.message)") }
+    case .rename(let name):
+      folders.editing = .rename(try folder(name).id)
+    case .delete(let name):
+      folders.deletingID = try folder(name).id
+    case .here(let name):
+      model.openNewThread(.inFolder(try folder(name)))
+    case .drag(let title, let name):
+      folders.dragging = .thread(try thread(title))
+      folders.dropTarget = try folder(name).id
+    case .file(let title, let name):
+      let t = try thread(title)
+      folders.dragging = nil
+      folders.dropTarget = nil
+      await folders.move(t, to: try folder(name).id)
+    case .menu(let name, let shot):
+      try await menu(on: try folder(name), shot: shot)
+    case .reset:
+      folders.editing = nil
+      folders.deletingID = nil
+      folders.dragging = nil
+      folders.dropTarget = nil
+    }
+  }
+
+  /// Right-clicks the folder's row, shoots the screen while its menu is open, then closes the menu.
+  private func menu(on folder: FolderWithThreads, shot: String) async throws(QAScriptError) {
+    guard let window = Self.windows.first(where: Self.isMain), let content = window.contentView else {
+      throw QAScriptError("no main window")
+    }
+    guard let frame = QAFolderProbe.frames[folder.id] else { throw QAScriptError("the folder \(folder.name) is not on screen") }
+    let mid = NSPoint(x: frame.minX + 60, y: frame.midY)
+    let point = content.convert(content.isFlipped ? mid : NSPoint(x: mid.x, y: content.bounds.height - mid.y), to: nil)
+    guard
+      let event = NSEvent.mouseEvent(
+        with: .rightMouseDown, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+        windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+    else { throw QAScriptError("can't make the right-click") }
+    final class Outcome: @unchecked Sendable { var failure: QAScriptError? }
+    let outcome = Outcome()
+    let observer = NotificationCenter.default.addObserver(
+      forName: NSMenu.didBeginTrackingNotification, object: nil, queue: nil
+    ) { note in
+      nonisolated(unsafe) let menu = note.object as? NSMenu
+      // This step's job holds the main queue while the menu tracks, so a run loop timer (common modes) shoots it.
+      let timer = Timer(timeInterval: 0.8, repeats: false) { _ in
+        MainActor.assumeIsolated {
+          do throws(QAScriptError) { try self.shoot(window, to: shot) } catch { outcome.failure = error }
+          menu?.cancelTracking()
+        }
+      }
+      RunLoop.main.add(timer, forMode: .common)
+    }
+    defer { NotificationCenter.default.removeObserver(observer) }
+    // Returns once the menu closes.
+    window.sendEvent(event)
+    if let failure = outcome.failure { throw failure }
+    guard FileManager.default.fileExists(atPath: out.appending(path: shot + ".png").path) else {
+      throw QAScriptError("no menu opened on \(folder.name)")
+    }
+  }
+
+  /// The main window with what is over it (sheets, menus).
+  private func screen(_ name: String) async throws(QAScriptError) {
+    guard let window = Self.windows.first(where: Self.isMain) else { throw QAScriptError("no main window") }
+    try? await Task.sleep(for: .milliseconds(700))
+    try shoot(window, to: name)
+  }
+
+  /// The main window drawn as `snapshot` draws it, with the app's windows over it (a sheet, an open menu) drawn
+  /// in place on top. No screen capture, so it works with the screen locked and with no permission.
+  private func shoot(_ window: NSWindow, to name: String) throws(QAScriptError) {
+    guard let base = Self.render(window), let space = CGColorSpace(name: CGColorSpace.sRGB),
+      let context = CGContext(
+        data: nil, width: base.width, height: base.height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { throw QAScriptError("can't render \(name).png") }
+    let scale = CGFloat(base.width) / max(window.frame.width, 1)
+    context.draw(base, in: CGRect(x: 0, y: 0, width: base.width, height: base.height))
+    let over = NSApp.windows
+      .filter { $0 !== window && $0.isVisible && $0.frame.intersects(window.frame) }
+      .sorted { ($0.level.rawValue, $0.orderedIndex * -1) < ($1.level.rawValue, $1.orderedIndex * -1) }
+    for w in over {
+      guard let root = w.contentView?.superview ?? w.contentView, let image = Self.cache(root) else { continue }
+      let f = w.frame
+      context.draw(
+        image,
+        in: CGRect(
+          x: (f.minX - window.frame.minX) * scale, y: (f.minY - window.frame.minY) * scale,
+          width: f.width * scale, height: f.height * scale))
+    }
+    guard let image = context.makeImage(),
+      let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+    else { throw QAScriptError("can't encode \(name).png") }
+    do {
+      try png.write(to: out.appending(path: name + ".png"))
+    } catch {
+      throw QAScriptError("can't write \(name).png: \(error.localizedDescription)")
+    }
+  }
+
   private func describe(_ step: QAStep) -> String {
     switch step {
     case .route(let route): "route \(route.hash)"
@@ -281,6 +408,8 @@ final class QARunner {
     case .inspector(let command): "inspector \(command.rawValue)"
     case .webTitle(let title): "webTitle \(title)"
     case .channel(let action): "channel \(action.rawValue)"
+    case .folder(let action): "folder \(action)"
+    case .screen(let name): "screen \(name)"
     case .palette(let query): "palette \(query ?? "close")"
     case .quit: "quit"
     }

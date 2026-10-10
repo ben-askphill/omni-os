@@ -18,6 +18,9 @@ public final class NewThreadComposerModel {
   public private(set) var sendError: String?
   public private(set) var sending = false
   public var maxUploadMB = AttachmentRules.defaultMaxMB
+  /// The folder the thread is filed in, from "New thread here", until Ben takes it out. Only while its channel is picked.
+  public private(set) var folder: (FolderRef, channel: String)?
+  public var folderChip: FolderRef? { folder.flatMap { $0.channel == choice.channel ? $0.0 : nil } }
 
   public var canSend: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !sending }
   public var role: CrewRole? { crew.first { $0.id == choice.role } }
@@ -61,6 +64,12 @@ public final class NewThreadComposerModel {
   /// Starts from a preset (`/clear` and `/new` in a thread): its role, harness, model and effort. A preset without a
   /// model takes the harness's default.
   public func apply(_ preset: NewThreadPreset) {
+    folder = preset.folder.map { ($0, preset.channel) }
+    // "New thread here" only files the thread: the channel's own run stays.
+    if preset.folder != nil, preset.harness == nil, preset.model == nil, preset.role.isEmpty, !preset.pickModel {
+      if fixedChannel == nil, choice.channel != preset.channel { selectChannel(preset.channel) }
+      return
+    }
     var c = choice
     if fixedChannel == nil { c.channel = preset.channel }
     c.role = preset.role
@@ -69,6 +78,11 @@ public final class NewThreadComposerModel {
     c.effort = preset.effort ?? ""
     preselected = false
     choice = NewThreadRules.settled(c, crew: crew, harnesses: harnesses)
+  }
+
+  /// Starts the thread ungrouped instead.
+  public func clearFolder() {
+    folder = nil
   }
 
   public func selectRole(_ id: String) {
@@ -119,8 +133,11 @@ public final class NewThreadComposerModel {
     let read = readFile
     do {
       let uploads = staged.isEmpty ? [] : try await Task.detached { try staged.map(read) }.value
-      let thread = try await api.createThread(NewThreadRules.request(choice, prompt: prompt, harnesses: harnesses), files: uploads)
+      var request = NewThreadRules.request(choice, prompt: prompt, harnesses: harnesses)
+      request.folder = folderChip?.id
+      let thread = try await api.createThread(request, files: uploads)
       if text == raw { text = "" }
+      folder = nil
       files.removeAll { staged.contains($0) }
       staged.forEach(discard)
       attachError = nil
