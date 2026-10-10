@@ -54,7 +54,7 @@ struct ScreenshotGrid: View {
   var body: some View {
     if shots.isEmpty {
       EmptyNote(symbol: "globe", title: "No screenshots yet", message: "When the agent takes a screenshot in the channel browser, it collects here.")
-        .frame(maxHeight: .infinity, alignment: .top)
+        .panelEmptyNote()
     } else {
       let list = Array(shots.reversed())
       ScrollView {
@@ -374,5 +374,15 @@ private struct Flow: Layout {
       maxX = max(maxX, x - spacing)
     }
     return (CGSize(width: maxX, height: y + rowHeight), origins)
+  }
+}
+
+extension View {
+  /// An empty state at the top of a panel tab. It sits in a scroll view like every tab with content: the
+  /// inspector's split view lays a column with no scroll view in it from the window's top edge, which put the
+  /// thread header and the panel's tabs under the toolbar.
+  func panelEmptyNote() -> some View {
+    ScrollView { self.frame(maxWidth: .infinity) }
+      .scrollBounceBehavior(.basedOnSize)
   }
 }
