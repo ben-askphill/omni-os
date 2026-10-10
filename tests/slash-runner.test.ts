@@ -91,7 +91,8 @@ describe("a Claude Code thread's own command list", () => {
   it('is asked for before the first message, and the first turn runs as before', async () => {
     const t = await r.start('hello');
     await r.untilResults(t.id, 1);
-    expect(r.claudeStdin(t.id)).toEqual(['control_request:initialize', 'user']);
+    // The context meter's get_context_usage follows each result; it is not part of starting the turn.
+    expect(r.claudeStdin(t.id).filter((l) => l !== 'control_request:get_context_usage')).toEqual(['control_request:initialize', 'user']);
     expect(r.flow(t.id)).toEqual(['user', 'assistant_text', 'result']);
     expect(r.texts(t.id, 'assistant_text')).toEqual(['ack: hello']);
     expect(r.spawns(t.id).map((s) => s.session_id)).toEqual([t.session_id]);

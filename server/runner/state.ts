@@ -80,6 +80,8 @@ export interface Live {
   write: ((obj: unknown) => boolean) | null;
   /** Flush buffered adapter stdout on close. */
   flush: (() => void) | null;
+  /** Ask the harness for a full context reading. Null when it can't. */
+  requestContext: (() => boolean) | null;
   sessionId: string;
   /** A turn is in progress. Holds a concurrency slot. */
   turn: boolean;
@@ -236,6 +238,12 @@ export const isLive = (threadId: string) => {
   const l = lives.get(threadId);
   return !!l?.child && !l.closing;
 };
+
+/** Ask a warm process for a fresh context reading. False when there is none to ask. */
+export function refreshContext(threadId: string): boolean {
+  const l = lives.get(threadId);
+  return !!l?.child && !l.closing && !!l.requestContext?.();
+}
 
 /** The commands a thread's running process listed itself, MCP prompts included. Null while none has. */
 export function threadCommands(threadId: string): CommandList | null {

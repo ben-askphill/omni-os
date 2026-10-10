@@ -108,7 +108,7 @@ func sseData(_ text: String) -> [String] {
 
   @Test func readsEveryThreadStreamMessage() throws {
     let messages = try Self.threadStream()
-    var events = 0, artifacts = 0, threads = 0
+    var events = 0, artifacts = 0, threads = 0, contexts = 0
     for m in messages {
       switch m {
       case .event(let e):
@@ -116,12 +116,14 @@ func sseData(_ text: String) -> [String] {
         if case .unknown = e.content { Issue.record("event \(e.id) of kind \(e.kind) did not decode: \(e.payload)") }
       case .artifact: artifacts += 1
       case .thread: threads += 1
+      case .context: contexts += 1
       // The recorded turn runs no mod; StreamMessageTests reads a toast.
       case .modToast: break
       case .unknown(let json): Issue.record("unknown message: \(json)")
       }
     }
     #expect(events > 0)
+    #expect(contexts > 0)
     #expect(artifacts == 1)
     #expect(threads > 0)
   }

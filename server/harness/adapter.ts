@@ -6,7 +6,8 @@ import type { ChildProcess } from 'node:child_process';
 import type { SlashCommand } from '../../shared/slash.ts';
 import type { Channel, Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
-import type { Record as StreamRecord, Usage } from '../stream.ts';
+import type { ContextUsage } from '../../shared/context-meter.ts';
+import type { ContextHint, Record as StreamRecord, Usage } from '../stream.ts';
 import type { HarnessCapabilities, HarnessId } from './types.ts';
 
 /** Everything an adapter needs to start a thread's process. */
@@ -54,6 +55,10 @@ export interface AdapterCallbacks {
    * changes. The thread's `/` menu uses it while the process runs.
    */
   commands?: (list: SlashCommand[]) => void;
+  /** A full reading of the context window: the CLI's own split, or a harness's total and window. */
+  context?: (c: ContextUsage) => void;
+  /** A partial one from the stream: the tokens on the last call, or the model's window. */
+  contextHint?: (h: ContextHint) => void;
 }
 
 /** A running harness process, wired to the runner. */
@@ -67,6 +72,8 @@ export interface HarnessSession {
   write(obj: unknown): boolean;
   /** Flush any buffered stdout on close. */
   flush?: () => void;
+  /** Ask the process for a full context reading, answered through `context`. False if it can't. */
+  requestContext?: () => boolean;
 }
 
 export interface HarnessAdapter {

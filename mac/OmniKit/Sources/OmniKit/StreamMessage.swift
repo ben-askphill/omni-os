@@ -7,12 +7,15 @@ public enum ThreadStreamMessage: Decodable, Hashable, Sendable {
   case artifact(Artifact)
   /// The thread row changed. `pending` and `live` come with it when the server sends them.
   case thread(OmniThread, pending: [PendingMsg]?, live: Bool?)
+  /// How full the thread's context window is (ContextUsage in shared/context-meter.ts). The Web UI draws it
+  /// as a ring in the thread header; the Mac app has no meter yet, so it keeps the JSON as is.
+  case context(JSONValue)
   /// A mod's `$.ui.toast`, for whoever has the thread open. Never stored.
   case modToast(ModToast)
   case unknown(JSONValue)
 
   private enum CodingKeys: String, CodingKey {
-    case kind, artifact, thread, pending, live, id, payload, text
+    case kind, artifact, thread, pending, live, id, payload, text, context
   }
 
   public init(from decoder: any Decoder) throws {
@@ -29,6 +32,8 @@ public enum ThreadStreamMessage: Decodable, Hashable, Sendable {
         pending: try c.decodeIfPresent([PendingMsg].self, forKey: .pending),
         live: try? c.decodeIfPresent(Bool.self, forKey: .live)
       )
+    } else if kind == "context", let usage = try? c.decode(JSONValue.self, forKey: .context) {
+      self = .context(usage)
     } else if kind == "mod_toast", (try? c.decode(String.self, forKey: .text)) != nil {
       self = .modToast(try ModToast(from: decoder))
     } else if (try? c.decode(Int.self, forKey: .id)) != nil, (try? c.decode(String.self, forKey: .payload)) != nil {

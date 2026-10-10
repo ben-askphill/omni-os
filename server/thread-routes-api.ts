@@ -11,7 +11,8 @@ import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
 import { artifacts, channels, events, publicChannel, threads, type Thread } from './db.ts';
 import { readBody } from './read-body.ts';
-import { activeMods, createTeam, createThread, interruptThread, isLive, pendingFor, postMessage, runsHere } from './runner.ts';
+import { compactBlocked, contextView } from './context.ts';
+import { activeMods, createTeam, createThread, interruptThread, isLive, pendingFor, postMessage, refreshContext, runsHere } from './runner.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
 import { checkUploads, imageMime, safeName, saveUploads } from './uploads.ts';
@@ -142,6 +143,43 @@ threadActionsApi.post('/:id/published/comments', async (c) => {
   const { url } = z.object({ url: z.string().refine(isArtifactUrl, 'not a claude.ai artifact url') }).parse(await c.req.json());
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
   return c.json(await postMessage(id, commentsPrompt(url), { mode: 'queue' }));
+});
+
+/**
+ * How full the thread's context window is and what fills it, for the meter. `refresh=1` first asks a warm
+ * Claude process for a new split, and waits briefly for it.
+ */
+threadActionsApi.get('/:id/context', async (c) => {
+  const t = threads.get(c.req.param('id'));
+  if (!t) return c.json({ error: 'not found' }, 404);
+  if (c.req.query('refresh') && refreshContext(t.id)) {
+    await new Promise<void>((resolve) => {
+      const done = (e: any) => {
+        if (e?.kind !== 'context') return;
+        clearTimeout(timer);
+        bus.off(`thread:${t.id}`, done);
+        resolve();
+      };
+      const timer = setTimeout(() => (bus.off(`thread:${t.id}`, done), resolve()), 3000);
+      bus.on(`thread:${t.id}`, done);
+    });
+  }
+  return c.json(contextView(threads.get(t.id) ?? t));
+});
+
+/**
+ * Compact the thread's context: its harness's own /compact, as a message, so the transcript shows it.
+ * Claude Code takes `focus` as what to keep; Codex compacts without instructions.
+ */
+threadActionsApi.post('/:id/compact', async (c) => {
+  const id = c.req.param('id');
+  const { focus } = z.object({ focus: z.string().max(2000).optional() }).parse(await c.req.json().catch(() => ({})));
+  const t = threads.get(id);
+  if (!t) return c.json({ error: 'not found' }, 404);
+  const blocked = compactBlocked(t);
+  if (blocked) return c.json({ error: blocked }, 409);
+  const extra = t.harness === 'claude-code' ? focus?.replace(/\s+/g, ' ').trim() : '';
+  return c.json(await postMessage(id, extra ? `/compact ${extra}` : '/compact', { mode: 'queue' }));
 });
 
 /** Serves a file Ben attached, by its name inside the thread's uploads folder. */

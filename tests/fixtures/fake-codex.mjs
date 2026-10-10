@@ -190,11 +190,19 @@ const turnOf = (t) => ({
 const item = (turn, it, phase) => notify(`item/${phase}`, { item: it, threadId, turnId: turn.id, [`${phase}AtMs`]: Date.now() });
 const message = (text) => ({ type: 'agentMessage', id: nextItemId(), text, phase: 'final_answer', memoryCitation: null, delivery: null, questions: null });
 
+// The context in use after each turn, as thread/tokenUsage/updated reports it: 2K more a turn, 5K after a compaction.
+let contextTokens = 30_000;
+
 function end(turn, status, error = null) {
   if (turn.status !== 'inProgress') return;
   turn.status = status;
   turn.error = error;
   if (activeTurn === turn) activeTurn = null;
+  if (status === 'completed') {
+    contextTokens = turn.kind === 'compact' ? 5_000 : contextTokens + 2_000;
+    const last = { totalTokens: contextTokens, inputTokens: contextTokens - 500, cachedInputTokens: 0, outputTokens: 500, reasoningOutputTokens: 0 };
+    notify('thread/tokenUsage/updated', { threadId, turnId: turn.id, tokenUsage: { total: last, last, modelContextWindow: 272_000 } });
+  }
   notify('turn/completed', { threadId, turn: turnOf(turn) });
 }
 

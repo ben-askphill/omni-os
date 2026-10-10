@@ -357,7 +357,7 @@ public final class ThreadStore {
       case .artifact(let a): upsert(a)
       case .thread(let t, let p, let live): merge(t, pending: p, live: live, isReply: false)
       case .modToast(let t): show(t)
-      case .unknown: break
+      case .context, .unknown: break
       }
     }
     add(rows)

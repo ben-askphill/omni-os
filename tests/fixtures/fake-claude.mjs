@@ -29,6 +29,8 @@
 //   PUBLISH:<path>    an Artifact tool call that publishes that file, answered "Published <path> at <url>" like the real CLI
 //   ORPHAN            leave a child behind that holds our stdout until it is killed (two minutes at most), like a
 //                     daemon started without redirecting its output: once we exit, the runner never sees our pipes close
+//   CTX:<tokens>      set the context in use before the turn; each model call adds 1.5K, /compact sets it to 8K.
+//                     get_context_usage and the usage on each assistant message report it, in a 200K window
 // Env:
 //   FAKE_CLAUDE_CRASH_ON=<text>   exit 1 with a stderr message when a message containing <text> starts
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen)
@@ -184,16 +186,21 @@ let background = 0;
 let stdinDone = false;
 let seq = 0;
 
-const assistant = (msgId, content) =>
+// What get_context_usage reports: grows with every model call, and /compact shrinks it.
+let contextTokens = 20_000;
+
+const assistant = (msgId, content) => {
+  contextTokens += 1500;
   emit({
     type: 'assistant',
     message: {
       model, id: msgId, type: 'message', role: 'assistant', content,
-      stop_reason: null, stop_sequence: null, usage: { input_tokens: 12, output_tokens: 6 },
+      stop_reason: null, stop_sequence: null, usage: { input_tokens: 12, cache_read_input_tokens: contextTokens - 12, output_tokens: 6 },
     },
     parent_tool_use_id: null,
     timestamp: now(),
   });
+};
 
 const toolResult = (id, text, isError) =>
   emit({
@@ -303,6 +310,7 @@ async function runTurn() {
       }
       seen.push(m.text);
       for (const x of m.text.matchAll(/TOOL:(\d+)/g)) tools.push(Number(x[1]));
+      for (const x of m.text.matchAll(/CTX:(\d+)/g)) contextTokens = Number(x[1]);
       for (const x of m.text.matchAll(/THINK:(\d+)/g)) think += Number(x[1]);
       for (const x of m.text.matchAll(/BG:(\d+)/g)) startBackground(Number(x[1]));
       if (m.text.includes('IGNORE_INTERRUPT')) t.ignoreInterrupt = true;
@@ -319,6 +327,7 @@ async function runTurn() {
   // A local slash command never calls the model: a zero-turn success result carries its output.
   if (seen.length === 1 && seen[0].startsWith('/')) {
     const output = `Output of ${seen[0].split(/\s/)[0]}`;
+    if (seen[0].startsWith('/compact')) contextTokens = 8_000;
     emit({ type: 'system', subtype: 'local_command_output', content: output });
     emit({
       type: 'result', subtype: 'success', is_error: false, duration_ms: Date.now() - started, duration_api_ms: 0, num_turns: 0,
@@ -526,6 +535,28 @@ function onControl(msg) {
       return finish(1);
     }
     writeRaw({ type: 'control_response', response: { subtype: 'success', request_id: id, response: { commands: commandList() } } });
+  } else if (sub === 'get_context_usage') {
+    const fixed = 12_000;
+    writeRaw({
+      type: 'control_response',
+      response: {
+        subtype: 'success', request_id: id,
+        response: {
+          totalTokens: contextTokens, maxTokens: 200_000, rawMaxTokens: 200_000, percentage: Math.round((contextTokens / 200_000) * 100), model,
+          isAutoCompactEnabled: true, autoCompactThreshold: 167_000,
+          categories: [
+            { name: 'System prompt', tokens: 3_000, kind: 'used' },
+            { name: 'System tools', tokens: fixed - 3_000, kind: 'used' },
+            { name: 'MCP tools (deferred)', tokens: 90_000, kind: 'deferred', isDeferred: true },
+            { name: 'Messages', tokens: contextTokens - fixed, kind: 'used' },
+            { name: 'Autocompact buffer', tokens: 33_000, kind: 'buffer' },
+            { name: 'Free space', tokens: 200_000 - contextTokens - 33_000, kind: 'free' },
+          ],
+          memoryFiles: [{ path: `${process.cwd()}/CLAUDE.md`, type: 'Project', tokens: 400 }],
+          messageBreakdown: { toolCallsByType: [{ name: 'Bash', callTokens: 40, resultTokens: 900 }] },
+        },
+      },
+    });
   } else if (sub === 'set_model' || sub === 'set_permission_mode') {
     writeRaw({ type: 'control_response', response: { subtype: 'success', request_id: id, response: {} } });
   } else {
