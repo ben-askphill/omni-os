@@ -315,4 +315,32 @@ private final class FakeNewThreadAPI: NewThreadAPI {
     #expect(make(FakeNewThreadAPI(), dir, channel: "acme").text == "in acme")
     #expect(make(FakeNewThreadAPI(), dir).text == "")
   }
+
+  @Test func newThreadHereFilesTheThreadAndKeepsTheChannelsRun() async {
+    let dir = TempDir("drafts")
+    let api = FakeNewThreadAPI()
+    let m = make(api, dir, channel: "acme")
+    m.selectModel(harness: .codex, model: "gpt-x")
+    let before = m.choice
+    let f = FolderWithThreads(Folder(id: "f1", channelID: "acme", name: "Launch"))
+    m.apply(.inFolder(f))
+    #expect(m.choice == before)
+    #expect(m.folderChip == FolderRef(id: "f1", name: "Launch"))
+    m.text = "go"
+    _ = await m.send()
+    #expect(api.sent.last?.0.folder == "f1")
+    // Sent once: the next thread starts ungrouped.
+    #expect(m.folderChip == nil)
+    m.apply(.inFolder(f))
+    m.clearFolder()
+    m.text = "again"
+    _ = await m.send()
+    #expect(api.sent.last?.0.folder == nil)
+  }
+
+  @Test func theFolderGoesInTheRequestBody() throws {
+    let json = try OmniJSON.encoder().encode(NewThread(channel: "acme", prompt: "hi", folder: "f1"))
+    let v = try JSONDecoder().decode(JSONValue.self, from: json)
+    #expect(v == .object(["channel": .string("acme"), "prompt": .string("hi"), "folder": .string("f1")]))
+  }
 }

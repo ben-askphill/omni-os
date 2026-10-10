@@ -32,6 +32,23 @@ public enum QAChannelAction: String, Hashable, Sendable {
   case create, edit, archive, unarchive
 }
 
+/// A sidebar folder state to show, by folder and thread names: a folder made as the name field makes it, the inline
+/// name field for a new folder or a rename,
+/// the delete confirm, a thread dragged over a folder, a thread filed in one, a folder's right-click menu (shot
+/// to `<shot>.png` while it is open), or none of these.
+public enum QAFolderAction: Hashable, Sendable {
+  case new(channel: String)
+  case create(channel: String, name: String)
+  case rename(folder: String)
+  case delete(folder: String)
+  /// New Thread Here: the channel's composer with the folder's chip.
+  case here(folder: String)
+  case drag(thread: String, over: String)
+  case file(thread: String, into: String)
+  case menu(folder: String, shot: String)
+  case reset
+}
+
 /// What the Server menu does, without the confirmation Stop asks for.
 public enum QAServerAction: String, Hashable, Sendable {
   case start, stop, check
@@ -43,7 +60,10 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"settings": "secrets"}` (or `connection`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
 /// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`), `{"expand": true}`,
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
-/// `browser`, `terminal`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`), `{"quit": true}`.
+/// `browser`, `terminal`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
+/// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
+/// `{"drag": "<thread title>", "over": "<folder>"}`, `{"file": "<thread title>", "into": "<folder>"}`,
+/// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -75,6 +95,9 @@ public enum QAStep: Hashable, Sendable {
   case palette(String?)
   /// Creates, edits, archives or unarchives the channel `qa-channel`.
   case channel(QAChannelAction)
+  case folder(QAFolderAction)
+  /// The main window to `<name>.png` with the app's windows over it drawn in, such as a sheet or an open menu.
+  case screen(String)
   case quit
 
   static let defaultTimeout = Duration.seconds(10)
@@ -162,7 +185,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "type", "send", "inspector", "webTitle", "palette", "channel", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "type", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -243,8 +266,40 @@ public struct QAScript: Hashable, Sendable {
         throw QAScriptError("channel takes create, edit, archive or unarchive")
       }
       return .channel(action)
+    case "folder":
+      return .folder(try folderAction(value))
+    case "screen":
+      guard let name = value as? String, validName(name) else {
+        throw QAScriptError("screen takes a file name of letters, digits, dots, dashes and underscores")
+      }
+      return .screen(name)
     default:
       return .quit
+    }
+  }
+
+  private static func folderAction(_ value: Any) throws(QAScriptError) -> QAFolderAction {
+    if value as? String == "reset" { return .reset }
+    if let d = value as? [String: String], d.count == 1, let f = d["here"] { return .here(folder: f) }
+    let usage = #"folder takes {"new": channel}, {"new": channel, "name": name}, {"rename"|"delete"|"here": folder}, {"drag": thread, "over": folder}, {"file": thread, "into": folder}, {"menu": folder, "shot": name} or "reset""#
+    guard let d = value as? [String: String] else { throw QAScriptError(usage) }
+    switch (d["new"], d["rename"], d["delete"], d["drag"], d["file"], d["menu"]) {
+    case (let c?, nil, nil, nil, nil, nil) where d.count == 1: return .new(channel: c)
+    case (nil, let f?, nil, nil, nil, nil) where d.count == 1: return .rename(folder: f)
+    case (nil, nil, let f?, nil, nil, nil) where d.count == 1: return .delete(folder: f)
+    case (nil, nil, nil, let t?, nil, nil) where d.count == 2:
+      guard let f = d["over"] else { throw QAScriptError(usage) }
+      return .drag(thread: t, over: f)
+    case (nil, nil, nil, nil, let t?, nil) where d.count == 2:
+      guard let f = d["into"] else { throw QAScriptError(usage) }
+      return .file(thread: t, into: f)
+    case (let c?, nil, nil, nil, nil, nil) where d.count == 2:
+      guard let name = d["name"] else { throw QAScriptError(usage) }
+      return .create(channel: c, name: name)
+    case (nil, nil, nil, nil, nil, let f?) where d.count == 2:
+      guard let shot = d["shot"], validName(shot) else { throw QAScriptError(usage) }
+      return .menu(folder: f, shot: shot)
+    default: throw QAScriptError(usage)
     }
   }
 

@@ -58,10 +58,13 @@ public struct NewThread: Encodable, Hashable, Sendable {
   public var parentID: String?
   public var taskID: String?
   public var source: ThreadSource?
+  /// A sidebar folder of the channel to file it in, by id.
+  public var folder: String?
 
   public init(
     channel: String, prompt: String, role: String? = nil, model: String? = nil, harness: HarnessID? = nil,
-    effort: String? = nil, title: String? = nil, parentID: String? = nil, taskID: String? = nil, source: ThreadSource? = nil
+    effort: String? = nil, title: String? = nil, parentID: String? = nil, taskID: String? = nil, source: ThreadSource? = nil,
+    folder: String? = nil
   ) {
     self.channel = channel
     self.prompt = prompt
@@ -73,10 +76,11 @@ public struct NewThread: Encodable, Hashable, Sendable {
     self.parentID = parentID
     self.taskID = taskID
     self.source = source
+    self.folder = folder
   }
 
   enum CodingKeys: String, CodingKey {
-    case channel, prompt, role, model, harness, effort, title, source
+    case channel, prompt, role, model, harness, effort, title, source, folder
     case parentID = "parent_id"
     case taskID = "task_id"
   }

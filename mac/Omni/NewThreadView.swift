@@ -207,6 +207,15 @@ private struct NewThreadBox: View {
         pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest)
       EffortMenu(options: composer.effortOptions, value: composer.choice.effort, pick: composer.selectEffort)
       AttachButton(disabled: composer.sending) { picking = true }
+      if let folder = composer.folderChip {
+        // "New thread here" on a sidebar folder files the thread in it, until Ben takes it out.
+        Button { composer.clearFolder() } label: {
+          FolderChip(name: folder.name)
+        }
+        .buttonStyle(.plain)
+        .help("Filed in this folder. Click to start it ungrouped.")
+        .accessibilityLabel("In folder \(folder.name). Remove")
+      }
       DictateButton { focusTick += 1 }
       HStack(spacing: z(10)) {
         ComposerHints()
@@ -525,5 +534,28 @@ private struct PickMark: View {
     }
     .frame(width: z(18), height: z(18))
     .animation(.easeOut(duration: 0.16), value: on)
+  }
+}
+
+/// The folder a thread from "New Thread Here" is filed in, as the web composer's chip: folder, name, x.
+private struct FolderChip: View {
+  let name: String
+  @State private var hover = false
+
+  var body: some View {
+    HStack(spacing: z(6)) {
+      OmniIcon(name: "folder", size: 13).foregroundStyle(Tok.fg3)
+      Text(name).lineLimit(1).truncationMode(.tail)
+      OmniIcon(name: "x", size: 12).foregroundStyle(Tok.fg4)
+    }
+    .font(.omni(size: 12.5))
+    .foregroundStyle(hover ? Tok.fg : Tok.fg2)
+    .padding(.horizontal, z(10))
+    .frame(height: z(30))
+    .frame(maxWidth: z(180))
+    .background(hover ? Tok.wash : .clear, in: Capsule())
+    .contentShape(Capsule())
+    .onHover { hover = $0 }
+    .fixedSize()
   }
 }

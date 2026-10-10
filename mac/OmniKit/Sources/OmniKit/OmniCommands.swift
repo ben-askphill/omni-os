@@ -10,14 +10,25 @@ public struct NewThreadPreset: Hashable, Sendable {
   public var effort: String?
   /// Open the model picker.
   public var pickModel: Bool
+  /// The sidebar folder to file the new thread in: "New thread here" on a folder.
+  public var folder: FolderRef?
 
-  public init(channel: String, role: String, harness: HarnessID? = nil, model: String? = nil, effort: String? = nil, pickModel: Bool = false) {
+  public init(
+    channel: String, role: String, harness: HarnessID? = nil, model: String? = nil, effort: String? = nil, pickModel: Bool = false,
+    folder: FolderRef? = nil
+  ) {
     self.channel = channel
     self.role = role
     self.harness = harness
     self.model = model
     self.effort = effort
     self.pickModel = pickModel
+    self.folder = folder
+  }
+
+  /// "New thread here" on a folder: its channel, filed in it, the role and run left to the composer's defaults.
+  public static func inFolder(_ f: FolderWithThreads) -> NewThreadPreset {
+    NewThreadPreset(channel: f.channelID, role: "", folder: FolderRef(id: f.id, name: f.name))
   }
 
   /// `/clear` or `/new` on its own: this thread's settings, for a first prompt Ben types next.
@@ -28,6 +39,17 @@ public struct NewThreadPreset: Hashable, Sendable {
   /// "New thread on another model": the channel and role, and nothing that picks a model.
   public static func otherModel(_ t: OmniThread) -> NewThreadPreset {
     NewThreadPreset(channel: t.channelID, role: t.role ?? "", pickModel: true)
+  }
+}
+
+/// A folder a new thread is filed in, with its name for the composer's chip.
+public struct FolderRef: Hashable, Sendable {
+  public let id: String
+  public let name: String
+
+  public init(id: String, name: String) {
+    self.id = id
+    self.name = name
   }
 }
 
