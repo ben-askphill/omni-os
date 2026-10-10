@@ -3,8 +3,10 @@ import type { Thread, Channel as ChannelRow, EventRow, Artifact } from '../../se
 import type { Attachment } from '../../server/uploads.ts';
 import type { HarnessInfo, ModelEntry, HarnessId } from '../../server/harness/types.ts';
 import type { CommandList as HarnessCommands } from '../../server/commands.ts';
+import type { ContextView } from '../../server/context.ts';
+import type { ContextUsage } from '../../shared/context-meter.ts';
 
-export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId };
+export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, ContextUsage, ContextView };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number };
@@ -410,7 +412,9 @@ export function openSSE(
 export type StreamMessage =
   | { type: 'event'; event: EventRow }
   | { type: 'artifact'; artifact: Artifact }
-  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string };
+  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string }
+  /** A new reading of the thread's context window. */
+  | { type: 'context'; context: ContextUsage };
 
 function classifyStream(d: unknown): StreamMessage | null {
   if (!d || typeof d !== 'object') return null;
@@ -421,6 +425,7 @@ function classifyStream(d: unknown): StreamMessage | null {
       type: 'thread', thread: o.thread as Thread, pending: o.pending as PendingMsg[] | undefined, live: typeof o.live === 'boolean' ? o.live : undefined,
       blocked: typeof o.blocked === 'string' ? o.blocked : undefined,
     };
+  if (o.kind === 'context' && o.context) return { type: 'context', context: o.context as ContextUsage };
   if (typeof o.id === 'number' && typeof o.payload === 'string') return { type: 'event', event: o as unknown as EventRow };
   return null;
 }

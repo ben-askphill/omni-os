@@ -14,6 +14,7 @@ export {
   isLive,
   pendingFor,
   queuedCount,
+  refreshContext,
   runningByHarness,
   runningCount,
   runsHere,

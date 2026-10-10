@@ -9,6 +9,10 @@ id: 2
 
 data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":0,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":null,"suggestion":null,"archived":0,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[],"live":true}
 
+data: {"kind":"context","context":{"max":null,"source":"claude-stream","used":21500,"model":"sonnet","updated_at":"2026-01-05T09:00:00.000Z"}}
+
+data: {"kind":"context","context":{"max":null,"source":"claude-stream","used":23000,"model":"sonnet","updated_at":"2026-01-05T09:00:00.000Z"}}
+
 data: {"id":3,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"tool_use","payload":"{\"id\":\"toolu_fake_1\",\"name\":\"Bash\",\"input\":{\"command\":\"sleep 0.02\",\"description\":\"Fake tool\"},\"parent\":null}","created_at":"2026-01-05T09:00:00.000Z"}
 id: 3
 
@@ -21,6 +25,8 @@ id: 5
 data: {"id":6,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"task","payload":"{\"task_id\":\"toolu_fake_1\",\"event\":\"ended\",\"status\":\"completed\"}","created_at":"2026-01-05T09:00:00.000Z"}
 id: 6
 
+data: {"kind":"context","context":{"max":null,"source":"claude-stream","used":24500,"model":"sonnet","updated_at":"2026-01-05T09:00:00.000Z"}}
+
 data: {"id":7,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"assistant_text","payload":"{\"text\":\"ack: TOOL:20 fix the cart\"}","created_at":"2026-01-05T09:00:00.000Z"}
 id: 7
 
@@ -28,6 +34,8 @@ data: {"id":8,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"result"
 id: 8
 
 data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart","status":"done","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","suggestion":null,"archived":0,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[],"live":true}
+
+data: {"kind":"context","context":{"used":24500,"max":200000,"autoCompactAt":167000,"model":"sonnet","source":"claude-cli","categories":[{"name":"System prompt","tokens":3000,"kind":"used"},{"name":"System tools","tokens":9000,"kind":"used"},{"name":"Messages","tokens":12500,"kind":"used"},{"name":"Autocompact buffer","tokens":33000,"kind":"buffer"},{"name":"Free space","tokens":142500,"kind":"free"}],"tools":[{"name":"Bash","callTokens":40,"resultTokens":900}],"memoryFiles":[{"path":"/tmp/omni-fixtures/acme/CLAUDE.md","tokens":400}],"updated_at":"2026-01-05T09:00:00.000Z"}}
 
 data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","suggestion":null,"archived":0,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[{"uuid":"00000000-0000-4000-8000-000000000003","kind":"user","text":"TOOL:4000 and the tests","source":"ben","mode":"steer","state":"sent"}],"live":true}
 
@@ -37,6 +45,10 @@ data: {"id":9,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"user","
 id: 9
 
 data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","suggestion":null,"archived":0,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[],"live":true}
+
+data: {"kind":"context","context":{"used":26000,"max":200000,"autoCompactAt":167000,"model":"sonnet","source":"claude-cli","categories":[{"name":"System prompt","tokens":3000,"kind":"used"},{"name":"System tools","tokens":9000,"kind":"used"},{"name":"Messages","tokens":12500,"kind":"used"},{"name":"Autocompact buffer","tokens":33000,"kind":"buffer"},{"name":"Free space","tokens":142500,"kind":"free"}],"tools":[{"name":"Bash","callTokens":40,"resultTokens":900}],"memoryFiles":[{"path":"/tmp/omni-fixtures/acme/CLAUDE.md","tokens":400}],"updated_at":"2026-01-05T09:00:00.000Z"}}
+
+data: {"kind":"context","context":{"used":27500,"max":200000,"autoCompactAt":167000,"model":"sonnet","source":"claude-cli","categories":[{"name":"System prompt","tokens":3000,"kind":"used"},{"name":"System tools","tokens":9000,"kind":"used"},{"name":"Messages","tokens":12500,"kind":"used"},{"name":"Autocompact buffer","tokens":33000,"kind":"buffer"},{"name":"Free space","tokens":142500,"kind":"free"}],"tools":[{"name":"Bash","callTokens":40,"resultTokens":900}],"memoryFiles":[{"path":"/tmp/omni-fixtures/acme/CLAUDE.md","tokens":400}],"updated_at":"2026-01-05T09:00:00.000Z"}}
 
 data: {"id":10,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"tool_use","payload":"{\"id\":\"toolu_fake_3\",\"name\":\"Bash\",\"input\":{\"command\":\"sleep 4\",\"description\":\"Fake tool\"},\"parent\":null}","created_at":"2026-01-05T09:00:00.000Z"}
 id: 10
@@ -56,6 +68,8 @@ id: 12
 data: {"id":13,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"task","payload":"{\"task_id\":\"toolu_fake_3\",\"event\":\"ended\",\"status\":\"completed\"}","created_at":"2026-01-05T09:00:00.000Z"}
 id: 13
 
+data: {"kind":"context","context":{"used":29000,"max":200000,"autoCompactAt":167000,"model":"sonnet","source":"claude-cli","categories":[{"name":"System prompt","tokens":3000,"kind":"used"},{"name":"System tools","tokens":9000,"kind":"used"},{"name":"Messages","tokens":12500,"kind":"used"},{"name":"Autocompact buffer","tokens":33000,"kind":"buffer"},{"name":"Free space","tokens":142500,"kind":"free"}],"tools":[{"name":"Bash","callTokens":40,"resultTokens":900}],"memoryFiles":[{"path":"/tmp/omni-fixtures/acme/CLAUDE.md","tokens":400}],"updated_at":"2026-01-05T09:00:00.000Z"}}
+
 data: {"id":14,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"assistant_text","payload":"{\"text\":\"ack: TOOL:4000 and the tests\"}","created_at":"2026-01-05T09:00:00.000Z"}
 id: 14
 
@@ -69,6 +83,10 @@ id: 16
 
 data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart and the tests","status":"running","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: TOOL:20 fix the cart","suggestion":null,"archived":0,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[],"live":true}
 
+data: {"kind":"context","context":{"used":29000,"max":200000,"autoCompactAt":167000,"model":"sonnet","source":"claude-cli","categories":[{"name":"System prompt","tokens":3000,"kind":"used"},{"name":"System tools","tokens":9000,"kind":"used"},{"name":"Messages","tokens":17000,"kind":"used"},{"name":"Autocompact buffer","tokens":33000,"kind":"buffer"},{"name":"Free space","tokens":138000,"kind":"free"}],"tools":[{"name":"Bash","callTokens":40,"resultTokens":900}],"memoryFiles":[{"path":"/tmp/omni-fixtures/acme/CLAUDE.md","tokens":400}],"updated_at":"2026-01-05T09:00:00.000Z"}}
+
+data: {"kind":"context","context":{"used":30500,"max":200000,"autoCompactAt":167000,"model":"sonnet","source":"claude-cli","categories":[{"name":"System prompt","tokens":3000,"kind":"used"},{"name":"System tools","tokens":9000,"kind":"used"},{"name":"Messages","tokens":17000,"kind":"used"},{"name":"Autocompact buffer","tokens":33000,"kind":"buffer"},{"name":"Free space","tokens":138000,"kind":"free"}],"tools":[{"name":"Bash","callTokens":40,"resultTokens":900}],"memoryFiles":[{"path":"/tmp/omni-fixtures/acme/CLAUDE.md","tokens":400}],"updated_at":"2026-01-05T09:00:00.000Z"}}
+
 data: {"id":17,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"assistant_text","payload":"{\"text\":\"ack: then tidy up\"}","created_at":"2026-01-05T09:00:00.000Z"}
 id: 17
 
@@ -76,4 +94,6 @@ data: {"id":18,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"result
 id: 18
 
 data: {"kind":"thread","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart and the tests","status":"done","role":null,"model":null,"harness":"claude-code","effort":"","session_id":"00000000-0000-4000-8000-000000000001","has_run":1,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":"ack: then tidy up","suggestion":null,"archived":0,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"pending":[],"live":true}
+
+data: {"kind":"context","context":{"used":30500,"max":200000,"autoCompactAt":167000,"model":"sonnet","source":"claude-cli","categories":[{"name":"System prompt","tokens":3000,"kind":"used"},{"name":"System tools","tokens":9000,"kind":"used"},{"name":"Messages","tokens":18500,"kind":"used"},{"name":"Autocompact buffer","tokens":33000,"kind":"buffer"},{"name":"Free space","tokens":136500,"kind":"free"}],"tools":[{"name":"Bash","callTokens":40,"resultTokens":900}],"memoryFiles":[{"path":"/tmp/omni-fixtures/acme/CLAUDE.md","tokens":400}],"updated_at":"2026-01-05T09:00:00.000Z"}}
 

@@ -346,7 +346,7 @@ public final class ThreadStore {
       case .event(let e): rows.append(e)
       case .artifact(let a): upsert(a)
       case .thread(let t, let p, let live): merge(t, pending: p, live: live, isReply: false)
-      case .unknown: break
+      case .context, .unknown: break
       }
     }
     add(rows)

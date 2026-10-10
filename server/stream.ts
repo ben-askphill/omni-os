@@ -1,5 +1,6 @@
 // Pure translation of `claude -p --output-format stream-json` events into the
 // small set of records Omni stores and renders. No I/O here so it is testable.
+import { usageTokens } from '../shared/context-meter.ts';
 
 export type Record =
   | { kind: 'init'; payload: { model: string; cwd: string; tools: number; mcp: string[] } }
@@ -109,10 +110,20 @@ export interface Usage {
   updated_at: string;
 }
 
+/** What an event says about the thread's context window. */
+export interface ContextHint {
+  /** Tokens the model saw on its last call. Top-level messages only: a sub-agent has its own window. */
+  used?: number;
+  model?: string;
+  /** Each model's window, from a result's modelUsage. */
+  windows?: { [model: string]: number };
+}
+
 export interface Parsed {
   records: Record[];
   usage?: Usage;
   sessionId?: string;
+  context?: ContextHint;
 }
 
 const MAX_RESULT = 16_000;
@@ -157,6 +168,9 @@ export function parseEvent(evt: any): Parsed {
     }
     case 'assistant': {
       const parent = evt.parent_tool_use_id ?? null;
+      // A local command's reply is '<synthetic>' with zero usage: it says nothing about the window.
+      const used = usageTokens(evt.message?.usage);
+      if (!parent && used && evt.message?.model !== '<synthetic>') out.context = { used, model: evt.message?.model };
       for (const b of (evt.message?.content ?? []) as Block[]) {
         if (b.type === 'text' && b.text?.trim()) {
           // Sub-agent chatter stays inside its tool call; only top-level text is the answer.
@@ -218,6 +232,12 @@ export function parseEvent(evt: any): Parsed {
       break;
     }
     case 'result': {
+      const windows: { [model: string]: number } = {};
+      for (const [m, u] of Object.entries(evt.modelUsage ?? {})) {
+        const w = (u as { contextWindow?: unknown })?.contextWindow;
+        if (typeof w === 'number' && w > 0) windows[m] = w;
+      }
+      if (Object.keys(windows).length) out.context = { windows };
       out.records.push({
         kind: 'result',
         payload: {

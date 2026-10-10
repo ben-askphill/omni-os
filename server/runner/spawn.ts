@@ -7,6 +7,7 @@ import { attachThread, detachThread } from '../browser.ts';
 import { globalSecret, secretsEnv } from '../secrets.ts';
 import { closePipesAfterExit } from '../child.ts';
 import { recordUsage } from '../usage.ts';
+import { recordContext, recordContextHint } from '../context.ts';
 import { beforeResume } from '../sync/files.ts';
 import type { HarnessId } from '../harness/types.ts';
 import type { AdapterContext } from '../harness/adapter.ts';
@@ -28,6 +29,7 @@ export function launch(threadId: string, first: Msg): Live | undefined {
     child: null,
     write: null,
     flush: null,
+    requestContext: null,
     sessionId: thread.session_id,
     turn: true,
     cliTurn: false,
@@ -124,11 +126,14 @@ async function spawnLive(live: Live, thread: Thread) {
     },
     commandsChanged: () => invalidateCommands(thread.harness as HarnessId),
     commands: (list) => (live.commands = { status: 'ready', commands: runnableCommands(list), fetchedAt: Date.now() }),
+    context: (c) => recordContext(thread.id, c),
+    contextHint: (h) => recordContextHint(thread.id, h),
   });
   const child = session.child;
   live.child = child;
   live.write = session.write;
   live.flush = session.flush ?? null;
+  live.requestContext = session.requestContext ?? null;
 
   child.stderr?.setEncoding('utf8');
   child.stderr?.on('data', (d: string) => (live.stderr = (live.stderr + d).slice(-8000)));

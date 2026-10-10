@@ -34,6 +34,8 @@
   --done: #c6f52b;
   --on-done: var(--ink);
   --done-edge: light-dark(var(--ink), transparent);
+  /* Amber for "getting full" (the context meter from 70%). Darker in light mode so it reads on white. */
+  --warn: light-dark(#b45309, #f5b544);
   --scrim: light-dark(rgb(23 24 26 / 0.22), rgb(0 0 0 / 0.5));
   --bubble: var(--surface-2);
   --code-bg: var(--surface);
@@ -93,6 +95,7 @@
   --color-on-needs: var(--on-needs);
   --color-done: var(--done);
   --color-on-done: var(--on-done);
+  --color-warn: var(--warn);
   --color-bubble: var(--bubble);
   --color-code: var(--code-bg);
   /* Apple's typefaces (developer.apple.com/fonts). Their license rules out serving them as web fonts,

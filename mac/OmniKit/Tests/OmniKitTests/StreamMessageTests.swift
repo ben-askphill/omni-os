@@ -32,6 +32,12 @@ let artifactJSON = """
     guard case .thread(_, nil, nil) = bare else { Issue.record("expected no pending or live: \(bare)"); return }
   }
 
+  @Test func readsContextReadings() throws {
+    let m = try decode(ThreadStreamMessage.self, #"{"kind":"context","context":{"used":42000,"max":200000,"source":"claude-cli"}}"#)
+    guard case .context(.object(let o)) = m else { Issue.record("not a context reading: \(m)"); return }
+    #expect(o["used"] == .number(42000))
+  }
+
   @Test func keepsMessagesItDoesNotKnow() throws {
     let m = try decode(ThreadStreamMessage.self, #"{"kind":"typing","who":"agent"}"#)
     #expect(m == .unknown(.object(["kind": .string("typing"), "who": .string("agent")])))

@@ -10,11 +10,22 @@ import type { Thread } from '../../db.ts';
 import { parseEvent, LineSplitter } from '../../stream.ts';
 import { harnessEnv } from '../env-guard.ts';
 import { normalizeClaudeCommands } from './commands.ts';
+import { fromClaudeContext, type ContextUsage } from '../../../shared/context-meter.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
 
 /** Omni's own `initialize` request, whose answer lists the process's commands. */
 const COMMANDS_REQUEST = 'omni-commands';
+/** Omni's `get_context_usage` requests: the CLI's split of the context window. Costs no tokens. */
+const CONTEXT_REQUEST = 'omni-context';
+
+/** The answer to one of Omni's context requests, or null for any other event. */
+function contextAnswer(evt: any): ContextUsage | null {
+  if (evt?.type !== 'control_response') return null;
+  const r = evt.response;
+  if (typeof r?.request_id !== 'string' || !r.request_id.startsWith(CONTEXT_REQUEST) || r.subtype !== 'success') return null;
+  return fromClaudeContext(r.response);
+}
 
 /**
  * A command list the process sent: its answer to Omni's `initialize`, or the whole list again once it
@@ -30,11 +41,12 @@ function listedCommands(evt: any): unknown[] | null {
   return Array.isArray(list) ? list : null;
 }
 
+/** Where the CLI keeps a thread's session: one JSON line per message. */
+export const sessionFile = (t: Pick<Thread, 'cwd' | 'session_id'>) =>
+  join(homedir(), '.claude', 'projects', t.cwd.replace(/[^a-zA-Z0-9]/g, '-'), `${t.session_id}.jsonl`);
+
 // A run killed before its result event may still have written the session file.
-function sessionOnDisk(t: Thread) {
-  const dir = join(homedir(), '.claude', 'projects', t.cwd.replace(/[^a-zA-Z0-9]/g, '-'));
-  return existsSync(join(dir, `${t.session_id}.jsonl`));
-}
+const sessionOnDisk = (t: Thread) => existsSync(sessionFile(t));
 
 export const claudeAdapter: HarnessAdapter = {
   id: 'claude-code',
@@ -85,12 +97,29 @@ export const claudeAdapter: HarnessAdapter = {
       }
       const listed = listedCommands(evt);
       if (listed) cb.commands?.(normalizeClaudeCommands(listed));
+      const context = contextAnswer(evt);
+      if (context) return cb.context?.(context);
       try {
         const parsed = parseEvent(evt);
         if (parsed.usage) cb.usage(parsed.usage);
+        if (parsed.context) cb.contextHint?.(parsed.context);
         for (const rec of parsed.records) cb.record(rec);
       } catch (err) {
         console.error(`[claude] ${thread.id} bad event:`, err);
+      }
+      // Every turn ends with a fresh split of the window, for the meter.
+      if ((evt as { type?: string }).type === 'result') requestContext();
+    };
+
+    let contextRequests = 0;
+    const requestContext = () => {
+      const stdin = child.stdin;
+      if (!stdin || stdin.destroyed || stdin.writableEnded) return false;
+      try {
+        stdin.write(JSON.stringify({ type: 'control_request', request_id: `${CONTEXT_REQUEST}-${++contextRequests}`, request: { subtype: 'get_context_usage' } }) + '\n');
+        return true;
+      } catch {
+        return false;
       }
     };
 
@@ -116,6 +145,7 @@ export const claudeAdapter: HarnessAdapter = {
         }
       },
       flush: () => splitter.flush().forEach(handleLine),
+      requestContext,
     };
   },
 };

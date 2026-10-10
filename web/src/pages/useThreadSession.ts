@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type EventRow, type PendingMsg, type Thread, type ThreadDetail } from '../api.ts';
+import { api, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type ContextUsage, type EventRow, type PendingMsg, type Thread, type ThreadDetail } from '../api.ts';
 import type { InitP, ResultP } from '../components/thread/panel/DetailsTab.tsx';
 import { useFeed } from '../store.tsx';
 
@@ -33,6 +33,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
   const [warm, setWarm] = useState<boolean | undefined>(undefined);
   const [actionError, setActionError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
+  // The newest context reading the stream pushed. The meter loads its first one itself.
+  const [context, setContext] = useState<ContextUsage | null>(null);
 
   const lastId = useRef(0);
   const seen = useRef(new Set<number>());
@@ -141,6 +143,9 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
           if (m.pending) setQueued(m.pending);
           if (m.live !== undefined) setWarm(m.live);
           setBlocked(m.blocked ?? null);
+          break;
+        case 'context':
+          setContext(m.context);
           break;
         default: {
           const unreachable: never = m;
@@ -253,5 +258,6 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     init,
     lastResult,
     betweenTurns,
+    context,
   };
 }

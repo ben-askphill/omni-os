@@ -12,6 +12,7 @@ import { artifactsDir, threadDir } from '../../config.ts';
 import { buildMcpConfig } from '../../sandbox.ts';
 import { describeAttachments, type Attachment } from '../../uploads.ts';
 import { usageFor } from '../../usage.ts';
+import { fromCodexTokenUsage } from '../../../shared/context-meter.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
 import { harnessEnv } from '../env-guard.ts';
 import { CAPABILITIES } from '../types.ts';
@@ -178,6 +179,11 @@ export const codexAdapter: HarnessAdapter = {
           const rl = p.rateLimits as RateLimits | undefined;
           // Only the plan's bucket; a reserve model's has its own.
           if (rl && (rl.limitId ?? PLAN_LIMIT_ID) === PLAN_LIMIT_ID) cb.usage(normalizeRateLimits(rl, usageFor('codex')));
+          break;
+        }
+        case 'thread/tokenUsage/updated': {
+          const c = fromCodexTokenUsage(p, model || null);
+          if (c) cb.context?.(c);
           break;
         }
         case 'skills/changed':

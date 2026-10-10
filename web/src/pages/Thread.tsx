@@ -7,6 +7,7 @@ import { BrowserTab } from '../components/thread/panel/BrowserTab.tsx';
 import { DetailsTab } from '../components/thread/panel/DetailsTab.tsx';
 import { PANEL_MIN, THREAD_MIN, defaultPanelWidth, PanelResizeHandle } from '../components/thread/panel/PanelResizeHandle.tsx';
 import { OPEN_PR_PROMPT, ThreadPR } from '../components/thread/ThreadPR.tsx';
+import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { Avatar, Button, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, StatusPill, Tabs } from '../components/ui.tsx';
 import { href } from '../router.ts';
 import { canSteer } from '../steer.ts';
@@ -55,6 +56,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     init,
     lastResult,
     betweenTurns,
+    context,
   } = useThreadSession(id, artifactParam);
   const { scrollRef, contentRef, onScroll, showJump, jump, pin } = useTranscriptScroll(events, thread !== null);
   const known = useMemo(() => [...children, ...team], [children, team]);
@@ -236,6 +238,14 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                 <span className="pulse h-1.5 w-1.5 rounded-full bg-fg-4" /> Reconnecting
               </span>
             )}
+            <ContextMeter
+              thread={thread}
+              pushed={context}
+              onCompacted={(t) => {
+                applyThread(t, true);
+                pin();
+              }}
+            />
             <StatusPill status={thread.status} />
             {slotBusy && (
               <Button
