@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { config, artifactsDir, threadDir } from '../../config.ts';
+import { config, paths, artifactsDir, threadDir } from '../../config.ts';
 import type { Thread } from '../../db.ts';
 import { parseEvent, LineSplitter } from '../../stream.ts';
 import { harnessEnv } from '../env-guard.ts';
@@ -28,6 +28,16 @@ function listedCommands(evt: any): unknown[] | null {
         ? evt.commands
         : null;
   return Array.isArray(list) ? list : null;
+}
+
+/**
+ * The mod folders a thread's claude loads with --plugin-dir, when OMNI_MODS is on. One entry per mod,
+ * so a future one (omni-guard) is one more line. Hot reload is off under -p: a changed mod reaches a
+ * thread when its warm process restarts.
+ */
+export function modDirs(): string[] {
+  if (!config.mods) return [];
+  return [paths.modProgress];
 }
 
 // A run killed before its result event may still have written the session file.
@@ -59,6 +69,7 @@ export const claudeAdapter: HarnessAdapter = {
     if (thread.effort) args.push('--effort', thread.effort);
     if (thread.cwd !== config.brainDir) args.push('--add-dir', config.brainDir);
     if (mcpFile) args.push('--mcp-config', mcpFile);
+    for (const dir of modDirs()) args.push('--plugin-dir', dir);
     args.push(resume ? '--resume' : '--session-id', thread.session_id);
 
     const child = spawn(config.claudeBin, args, {
