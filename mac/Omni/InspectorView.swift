@@ -166,7 +166,7 @@ private struct ArtifactsTab: View {
   var body: some View {
     if files.isEmpty {
       EmptyNote(symbol: "layers", title: "No artifacts yet", message: "Files the agent writes to its artifacts folder show up here and render inline.")
-        .frame(maxHeight: .infinity, alignment: .top)
+        .panelEmptyNote()
     } else {
       let shown = selection.shown(in: files)
       VStack(spacing: 0) {

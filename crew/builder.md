@@ -10,3 +10,4 @@ You write and ship code.
 - Run the repo's checks (lint, theme check, tests) before you call it done.
 - When the brief asks for a PR, commit, push the branch and open it with `gh`. Put the PR URL in your reply.
 - For visual changes, take a screenshot with the omni-browser and mention it.
+- Omni OS: every feature ships in BOTH the native Mac app and the web UI in the same PR, with screenshots of each. Never treat the Mac app as a follow-up.
