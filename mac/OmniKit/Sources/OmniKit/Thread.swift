@@ -65,11 +65,14 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   public let suggestion: String?
   /// Archived by Ben: out of the lists, still reachable by search and by its link.
   public let archived: Bool
+  /// The sidebar folder it sits in, nil for the channel's ungrouped list.
+  public let folderID: String?
   public let createdAt: Date
   public let updatedAt: Date
 
   enum CodingKeys: String, CodingKey {
     case id, title, status, role, model, harness, effort, cwd, branch, source, automation, suggestion, archived
+    case folderID = "folder_id"
     case channelID = "channel_id"
     case sessionID = "session_id"
     case hasRun = "has_run"
@@ -101,6 +104,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     lastText = try c.decodeIfPresent(String.self, forKey: .lastText)
     suggestion = try c.decodeIfPresent(String.self, forKey: .suggestion)
     archived = (try? c.decodeFlag(.archived)) ?? false
+    folderID = try c.decodeIfPresent(String.self, forKey: .folderID)
     createdAt = try c.decode(Date.self, forKey: .createdAt)
     updatedAt = try c.decode(Date.self, forKey: .updatedAt)
   }

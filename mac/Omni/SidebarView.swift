@@ -8,6 +8,8 @@ struct SidebarView: View {
   let model: AppModel
   @Environment(\.openSettings) private var openSettings
   @Namespace private var thumb
+  /// Folders showing all their listed threads, past "N more".
+  @State private var expanded: Set<String> = []
 
   static let width: CGFloat = 252
 
@@ -113,6 +115,7 @@ struct SidebarView: View {
     .background(Tok.chrome)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Sidebar")
+    .folderAlerts(model)
   }
 
   /// A row that picks `item`, with the thumb under it while it is the selection.
@@ -168,33 +171,45 @@ struct SidebarView: View {
   @ViewBuilder
   private func channelRows(_ channel: ChannelWithRunning, title: String? = nil) -> some View {
     let item = SidebarItem.channel(channel.id)
-    row(item) {
-      NavRow(title: title ?? channel.name, active: selected == item, running: channel.running) {
-        if title != nil {
-          StaticMark(size: 17)
-            .foregroundStyle(Tok.fg)
-            .frame(width: z(15))
-        } else if let mark = ChannelIcon(channel.icon) {
-          ChannelMark(icon: mark, size: 14)
-            .foregroundStyle(selected == item ? Tok.fg2 : Tok.fg3)
-            .frame(width: z(15))
-        } else {
-          Text("#")
-            .font(.omni(size: 12))
-            .foregroundStyle(selected == item ? Tok.fg2 : Tok.fg4)
-            .frame(width: z(15))
+    ChannelRowChrome(model: model, channel: channel) { hover in
+      row(item) {
+        NavRow(title: title ?? channel.name, active: selected == item, running: channel.running, trailingInset: hover ? 24 : 0) {
+          if title != nil {
+            StaticMark(size: 17)
+              .foregroundStyle(Tok.fg)
+              .frame(width: z(15))
+          } else if let mark = ChannelIcon(channel.icon) {
+            ChannelMark(icon: mark, size: 14)
+              .foregroundStyle(selected == item ? Tok.fg2 : Tok.fg3)
+              .frame(width: z(15))
+          } else {
+            Text("#")
+              .font(.omni(size: 12))
+              .foregroundStyle(selected == item ? Tok.fg2 : Tok.fg4)
+              .frame(width: z(15))
+          }
         }
       }
     }
     .contextMenu {
+      Button("New Folder") { model.folders.editing = .new(channel: channel.id) }
       Button("Channel Settings") { model.route = .channel(id: channel.id, tab: .settings) }
+    }
+    ForEach(SidebarSections.folders(of: channel, open: model.openThread)) { folder in
+      folderRows(folder)
+    }
+    if model.folders.editing == .new(channel: channel.id) {
+      FolderNameField(
+        initial: FolderRules.freeName(FolderRules.defaultName, among: channel.folders),
+        onSave: { name in
+          model.folders.editing = nil
+          Task { await model.folders.create(in: channel.id, name: name) }
+        },
+        onCancel: { model.folders.editing = nil })
     }
     let links = SidebarSections.threads(of: channel, open: model.openThread, focused: model.focusedChannel == channel.id)
     ForEach(links.shown) { thread in
-      let item = SidebarItem.thread(thread.id)
-      row(item) { ThreadRow(thread: thread, active: selected == item) }
-        .padding(.leading, z(25))
-        .openInNewWindow(thread.id, model: model, title: thread.title)
+      threadRow(thread, nested: false)
     }
     if links.seeAll || links.more > 0 {
       Button { pick(.more(channel.id)) } label: {
@@ -207,6 +222,70 @@ struct SidebarView: View {
       }
       .buttonStyle(RailRowStyle())
       .padding(.leading, z(25))
+    }
+  }
+
+  /// A thread under its channel, or one level deeper in a folder. Dragged onto a folder it files there; onto its
+  /// channel's name, back to the ungrouped list.
+  private func threadRow(_ thread: ThreadStub, nested: Bool) -> some View {
+    let item = SidebarItem.thread(thread.id)
+    return row(item) { ThreadRow(thread: thread, active: selected == item) }
+      .onDrag {
+        model.folders.dragging = .thread(thread)
+        return NSItemProvider(object: (thread.title.isEmpty ? "Untitled" : thread.title) as NSString)
+      }
+      .padding(.leading, z(nested ? 43 : 25))
+      .openInNewWindow(thread.id, model: model, title: thread.title, stub: thread)
+  }
+
+  /// A folder, its name field while it is renamed, and its threads while it is open.
+  @ViewBuilder
+  private func folderRows(_ folder: FolderWithThreads) -> some View {
+    let tasks = model.store.tasks
+    let busy = folder.running > 0 || folder.threads.contains { t in tasks.contains { $0.threadID == t.id } }
+    if model.folders.editing == .rename(folder.id) {
+      FolderNameField(
+        initial: folder.name,
+        onSave: { name in
+          model.folders.editing = nil
+          Task { await model.folders.rename(folder.id, to: name) }
+        },
+        onCancel: { model.folders.editing = nil })
+    } else {
+      FolderRowView(model: model, folder: folder, busy: busy)
+    }
+    let all = expanded.contains(folder.id)
+    let links = SidebarSections.threads(in: folder, openID: model.openThread?.id, all: all)
+    ForEach(links.shown) { thread in
+      threadRow(thread, nested: true)
+    }
+    if links.more > 0 {
+      Button { expanded.insert(folder.id) } label: {
+        Text("\(links.more) more")
+          .font(.omni(size: 12))
+          .foregroundStyle(Tok.fg4)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.leading, z(32))
+          .frame(height: z(28))
+      }
+      .buttonStyle(RailRowStyle())
+      .padding(.leading, z(43))
+    }
+    if all, !folder.collapsed, folder.count > folder.threads.count {
+      Text("\(folder.count - folder.threads.count) older not shown")
+        .font(.omni(size: 12))
+        .foregroundStyle(Tok.fg4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, z(43 + 32))
+        .frame(height: z(28))
+    }
+    if links.empty {
+      Text("No threads yet")
+        .font(.omni(size: 12))
+        .foregroundStyle(Tok.fg4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, z(43 + 32))
+        .frame(height: z(28))
     }
   }
 }
@@ -234,6 +313,8 @@ struct NavRow<Lead: View>: View {
   var icon: String?
   let active: Bool
   var running = 0
+  /// Room kept on the right for a button laid over the row, like a channel's folder-plus.
+  var trailingInset: CGFloat = 0
   @ViewBuilder var lead: Lead
 
   var body: some View {
@@ -258,7 +339,9 @@ struct NavRow<Lead: View>: View {
     }
     .font(.omni(size: 13, weight: active ? .medium : .regular))
     .foregroundStyle(active ? Tok.fg : Tok.fg2)
-    .padding(.horizontal, z(12))
+    .padding(.leading, z(12))
+    .padding(.trailing, z(12 + trailingInset))
+    .animation(Motion.settle, value: trailingInset)
     .frame(height: z(32))
   }
 }

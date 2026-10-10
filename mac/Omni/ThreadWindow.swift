@@ -111,8 +111,9 @@ struct CopyThreadMarkdownCommand: View {
 
 extension View {
   /// Open in New Window in the context menu, and on an Option-click.
-  func openInNewWindow(_ threadID: String, model: AppModel? = nil, title: String = "") -> some View {
-    modifier(OpenInNewWindow(threadID: threadID, model: model, title: title))
+  /// - Parameter stub: a sidebar row's thread, which also gets "Move to Folder".
+  func openInNewWindow(_ threadID: String, model: AppModel? = nil, title: String = "", stub: ThreadStub? = nil) -> some View {
+    modifier(OpenInNewWindow(threadID: threadID, model: model, title: title, stub: stub))
   }
 }
 
@@ -122,6 +123,7 @@ private struct OpenInNewWindow: ViewModifier {
   let model: AppModel?
   /// The thread's title, which the rename alert starts from.
   let title: String
+  let stub: ThreadStub?
   @Environment(\.openWindow) private var openWindow
   @State private var renaming = false
   @State private var draft = ""
@@ -136,6 +138,7 @@ private struct OpenInNewWindow: ViewModifier {
             draft = title
             renaming = true
           }
+          if let stub { MoveToFolderMenu(model: model, thread: stub) }
           Button("Archive Thread") { Task { await model.setThreadArchived(threadID, true) } }
         }
       }

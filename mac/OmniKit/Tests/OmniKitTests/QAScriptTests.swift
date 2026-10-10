@@ -98,10 +98,31 @@ import OmniKit
     #"[{"appearance": "sepia"}]"#,
     #"[{"scroll": "left"}]"#,
     #"[{"wait": "thread:"}]"#,
+    #"[{"folder": "open"}]"#,
+    #"[{"folder": {"drag": "A thread"}}]"#,
+    #"[{"folder": {"menu": "Specs", "shot": "../x"}}]"#,
+    #"[{"folder": {"rename": "Specs", "delete": "Specs"}}]"#,
+    #"[{"screen": ""}]"#,
     #"{"nope": []}"#,
   ])
   func rejectsWhatItDoesNotKnow(json: String) {
     #expect(throws: QAScriptError.self) { try QAScript(json: Data(json.utf8)) }
+  }
+
+  @Test func readsFolderSteps() throws {
+    let script = try QAScript(json: Data(#"""
+      [{"folder": {"new": "acme"}}, {"folder": {"new": "acme", "name": "Specs"}}, {"folder": {"rename": "Specs"}},
+       {"folder": {"delete": "Specs"}}, {"folder": {"drag": "A thread", "over": "Specs"}},
+       {"folder": {"file": "A thread", "into": "Specs"}}, {"folder": {"menu": "Specs", "shot": "menu-dark"}},
+       {"folder": "reset"}, {"screen": "delete-dark"}, {"folder": {"here": "Specs"}}]
+      """#.utf8))
+    #expect(
+      script.steps == [
+        .folder(.new(channel: "acme")), .folder(.create(channel: "acme", name: "Specs")), .folder(.rename(folder: "Specs")),
+        .folder(.delete(folder: "Specs")), .folder(.drag(thread: "A thread", over: "Specs")),
+        .folder(.file(thread: "A thread", into: "Specs")), .folder(.menu(folder: "Specs", shot: "menu-dark")),
+        .folder(.reset), .screen("delete-dark"), .folder(.here(folder: "Specs")),
+      ])
   }
 
   @Test func namesTheBadStep() throws {

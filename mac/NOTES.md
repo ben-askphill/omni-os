@@ -15,6 +15,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | --- | --- |
 | `JSON.swift` | `OmniJSON.decoder()` and `encoder()`, date parsing, `JSONValue`, `OpenEnum` |
 | `Channel.swift` | `Channel`, `ChannelKind`, `ChannelWithRunning`, `ThreadStub` |
+| `Folders.swift` | `Folder`, `FolderWithThreads`, `FolderRules`, `FolderEdits`, `FolderAPI`, `FolderModel` |
 | `Thread.swift` | `OmniThread`, `ThreadStatus`, `ThreadSource`, `PendingMsg`, `ThreadDetail` |
 | `Event.swift` | `EventRow`, `EventPayload` and its payload structs, `Artifact` |
 | `Status.swift` | `Status`, `Usage`, `HarnessSlot`, `ServerInfo`, `HarnessInfo`, `ModelEntry`, `CrewRole` |
@@ -303,6 +304,7 @@ OMNI_LIVE_PORT=4791 swift test --package-path mac/OmniKit --filter LiveServerTes
 | `OmniApp.swift` | `@main`. One `Window("Omni", id: "main")`, the `Settings` scene, the menus. `AppDelegate` owns the one `AppModel`, calls `launch()`, and `didBecomeActive()` on activation. Closing the window quits the app; the server keeps running. |
 | `MainWindow.swift` | `NavigationSplitView` of the sidebar and the detail, the toolbar, `RoutePlaceholder`, `Route.symbol` |
 | `SidebarView.swift` | The sidebar, `ThreadRow`, `ThreadStatusIcon`, `StatusFooter` |
+| `SidebarFolders.swift` | Folder rows, the inline name field, folder and Move to Folder menus, drops, the delete confirm |
 | `ServerView.swift` | The server screen, `ServerDetails`, `LogTail`, `ServerMenuItems`, `confirmStop` |
 | `SettingsView.swift` | The Settings tabs (`model.settingsTab`), the Connection pane, `PathField`, the folder and file pickers |
 | `SecretsSettingsView.swift` | The Secrets tab: `SecretsSettings` (a `SecretsModel` per client and visit), `SecretsForm`, `SecretRowView` |
@@ -316,6 +318,7 @@ OMNI_LIVE_PORT=4791 swift test --package-path mac/OmniKit --filter LiveServerTes
 Main window:
 
 - The sidebar matches `Sidebar.tsx`: Home, Conductor, the channels by kind (Clients, Internal, Personal, then others), Add channel, and Workspace (Artifacts, Automations, Secrets). A channel's badge is its running count, hidden at 0. Under each channel, its active threads from `SidebarSections.threads(of:)`, with the Loader (running) or the status glyph, and "N more", which opens the channel. It all comes from the store, so counts and threads move with the feed.
+- Folders (#177 on the web): under each channel, its folders (`SidebarSections.folders(of:open:)`, manual order then name), then the ungrouped threads. A folder row has the chevron (collapsed is saved on the server), name, count and a Loader while a thread in it runs; an open folder shows 8 threads then "N more", a closed one still shows the open thread, an empty one "No threads yet". The folder-plus on a channel row (on hover, and in its right-click menu) makes "New folder" in an inline field: Return saves, Escape leaves nothing. A folder's right-click and "..." menu: New Thread Here (the new-thread composer with a folder chip), Rename (also double-click or F2), Duplicate, Delete (a confirm that says the threads go back to ungrouped). A thread's right-click has Move to Folder. Drag a thread onto a folder to file it, onto the channel name to ungroup it; drag a folder onto another to put it just above. `FolderModel` makes every edit at once and puts the list back with an alert when the server refuses. Edits from the web or the conductor arrive through the feed's `channel` event, like any channel change.
 - The selection is `SidebarItem(route: model.route)`; picking a row sets `model.route`. Routes without a row (search) select nothing. Secrets is the exception: it opens Settings on the Secrets tab (`model.show`) and the window stays where it was. Any other write of `#/secrets` to the route does the same (`MainWindow`'s `onChange`), going back to the route last drawn.
 - An error note under Home when the channel list fails to load while the server runs. With no server, the server screen says so instead.
 - Under the usage card, the footer: a dot (volt running, grey while the feed retries, vermilion not running or failed), `State.label` ("Started by the app", "Started outside the app", "Not running"), the port and "Reconnecting". It opens the Server menu.
@@ -428,6 +431,13 @@ Steps (a list, or an object with the list under `steps`):
 | `{"open": "settings"}` | Opens Settings |
 | `{"settings": "secrets"}`, `"appearance"`, `"connection"` | Opens Settings on that tab |
 | `{"server": "start"}`, `"stop"`, `"check"` | Start Server, Stop Server (no confirmation), Check Again. Waits for it to finish |
+| `{"folder": {"new": "acme"}}` | The new folder field under a channel. With `"name"` it makes the folder, as Return would |
+| `{"folder": {"rename": "Specs"}}`, `{"delete": "Specs"}`, `{"here": "Specs"}` | A folder's name field, its delete confirm, or New Thread Here |
+| `{"folder": {"drag": "<thread title>", "over": "Specs"}}` | A thread dragged over a folder, with the drop highlight |
+| `{"folder": {"file": "<thread title>", "into": "Specs"}}` | Files the thread there, as a drop does |
+| `{"folder": {"menu": "Specs", "shot": "menu"}}` | Right-clicks the folder and writes `menu.png` while its menu is open |
+| `{"folder": "reset"}` | Ends any of the above |
+| `{"screen": "name"}` | The main window with the app's windows over it (a sheet, a menu) drawn in place |
 | `{"quit": true}` | Writes the report and exits |
 
 `qa.json` is written after every step: `{ok, error, steps: [{step, action, ok, ms, error, files}], facts: {serverState, connection, sidebarLoaded, channels, route, windows}}`. A failed wait says what the server, feed and sidebar were.
@@ -494,6 +504,7 @@ Wired (both composers):
 
 - `ChannelForm` (OmniKit) holds the form, `slugify`, the validation messages and the PATCH and POST bodies. Empty text goes as `null`, so clearing a field clears it; the store domain is cut to the host; a system channel sends no `kind`. `OmniClient.createChannel`, `updateChannel`, `setChannelArchived`.
 - `ChannelSettingsView.swift`: `ChannelSettingsForm` (create and edit, folder pickers for repo path and base dir, inline Archive confirm), `NewChannelScreen` (`#/new-channel`, a page as in the Web UI, not a sheet) and `MissingChannelView` (archived channel: Unarchive). The channel's Settings tab shows the form. After a save the store reloads channels.
+- `snapshot` leaves out sheets and menus; `screen` and the folder `menu` step draw them in from the app's own windows, so neither needs screen recording or an unlocked screen.
 - QA step `{"channel": "create"}` (or `edit`, `archive`, `unarchive`) runs the same client calls on channel `qa-channel`.
 
 ## Next

@@ -105,6 +105,8 @@ public final class AppModel {
   public private(set) var startFailure: StartFailure?
   /// Banners for threads that finish, fail or stop. The window shows them.
   public let banners = BannerCenter()
+  /// Sidebar folders: their edits, the name being typed and the delete being confirmed. Follows the connection.
+  public let folders = FolderModel()
 
   @ObservationIgnored private let connect: @MainActor (_ port: Int) -> Connection
   @ObservationIgnored private var config: ServerConfig
@@ -126,6 +128,7 @@ public final class AppModel {
     let c = connect(settings.port)
     client = c.client
     store = c.store
+    folders.connect(store: c.store, api: c.client)
     threads = c.threads
     feed = c.feed
     follow(c)
@@ -343,6 +346,7 @@ public final class AppModel {
       let c = connect(new.port)
       client = c.client
       store = c.store
+      folders.connect(store: c.store, api: c.client)
       threads = c.threads
       feed = c.feed
       follow(c)

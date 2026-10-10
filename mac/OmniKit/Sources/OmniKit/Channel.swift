@@ -84,9 +84,11 @@ public struct Channel: Decodable, Hashable, Sendable, Identifiable {
 public struct ChannelWithRunning: Decodable, Hashable, Sendable, Identifiable {
   public let channel: Channel
   public let running: Int
-  public let active: [ThreadStub]
+  public internal(set) var active: [ThreadStub]
   /// Its latest threads of any status, for the highlighted channel to keep finished ones findable.
-  public let recent: [ThreadStub]
+  public internal(set) var recent: [ThreadStub]
+  /// Its sidebar folders, in the server's order (`FolderRules.sorted`), each with its threads.
+  public internal(set) var folders: [FolderWithThreads]
 
   public var id: String { channel.id }
 
@@ -95,7 +97,7 @@ public struct ChannelWithRunning: Decodable, Hashable, Sendable, Identifiable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case running, active, recent
+    case running, active, recent, folders
   }
 
   public init(from decoder: any Decoder) throws {
@@ -104,6 +106,7 @@ public struct ChannelWithRunning: Decodable, Hashable, Sendable, Identifiable {
     running = try c.decodeIfPresent(Int.self, forKey: .running) ?? 0
     active = try c.decodeIfPresent([ThreadStub].self, forKey: .active) ?? []
     recent = try c.decodeIfPresent([ThreadStub].self, forKey: .recent) ?? []
+    folders = try c.decodeIfPresent([FolderWithThreads].self, forKey: .folders) ?? []
   }
 }
 
@@ -114,19 +117,27 @@ public struct ThreadStub: Decodable, Hashable, Sendable, Identifiable {
   public let title: String
   public let status: ThreadStatus
   public let createdAt: Date
+  /// The sidebar folder it sits in, nil for the channel's ungrouped list.
+  public internal(set) var folderID: String?
 
   enum CodingKeys: String, CodingKey {
     case id, title, status
     case channelID = "channel_id"
     case createdAt = "created_at"
+    case folderID = "folder_id"
+  }
+
+  public init(id: String, channelID: String, title: String, status: ThreadStatus, createdAt: Date, folderID: String? = nil) {
+    self.id = id
+    self.channelID = channelID
+    self.title = title
+    self.status = status
+    self.createdAt = createdAt
+    self.folderID = folderID
   }
 
   /// The sidebar's row for a thread it has the whole of.
   public init(_ t: OmniThread) {
-    id = t.id
-    channelID = t.channelID
-    title = t.title
-    status = t.status
-    createdAt = t.createdAt
+    self.init(id: t.id, channelID: t.channelID, title: t.title, status: t.status, createdAt: t.createdAt, folderID: t.folderID)
   }
 }
