@@ -7,9 +7,8 @@ public enum ThreadStreamMessage: Decodable, Hashable, Sendable {
   case artifact(Artifact)
   /// The thread row changed. `pending` and `live` come with it when the server sends them.
   case thread(OmniThread, pending: [PendingMsg]?, live: Bool?)
-  /// How full the thread's context window is (ContextUsage in shared/context-meter.ts). The Web UI draws it
-  /// as a ring in the thread header; the Mac app has no meter yet, so it keeps the JSON as is.
-  case context(JSONValue)
+  /// How full the thread's context window is, after each model call and turn. The thread header's meter.
+  case context(ContextUsage)
   /// A mod's `$.ui.toast`, for whoever has the thread open. Never stored.
   case modToast(ModToast)
   case unknown(JSONValue)
@@ -32,7 +31,7 @@ public enum ThreadStreamMessage: Decodable, Hashable, Sendable {
         pending: try c.decodeIfPresent([PendingMsg].self, forKey: .pending),
         live: try? c.decodeIfPresent(Bool.self, forKey: .live)
       )
-    } else if kind == "context", let usage = try? c.decode(JSONValue.self, forKey: .context) {
+    } else if kind == "context", let usage = try? c.decode(ContextUsage.self, forKey: .context) {
       self = .context(usage)
     } else if kind == "mod_toast", (try? c.decode(String.self, forKey: .text)) != nil {
       self = .modToast(try ModToast(from: decoder))

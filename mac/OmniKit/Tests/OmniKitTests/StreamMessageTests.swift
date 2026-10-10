@@ -33,9 +33,15 @@ let artifactJSON = """
   }
 
   @Test func readsContextReadings() throws {
-    let m = try decode(ThreadStreamMessage.self, #"{"kind":"context","context":{"used":42000,"max":200000,"source":"claude-cli"}}"#)
-    guard case .context(.object(let o)) = m else { Issue.record("not a context reading: \(m)"); return }
-    #expect(o["used"] == .number(42000))
+    let m = try decode(
+      ThreadStreamMessage.self,
+      #"{"kind":"context","context":{"used":42000,"max":200000,"source":"claude-cli","updated_at":"2026-10-10T08:00:00.000Z"}}"#)
+    guard case .context(let c) = m else { Issue.record("not a context reading: \(m)"); return }
+    #expect(c.used == 42000)
+    #expect(c.max == 200_000)
+    #expect(c.summary == "42K / 200K tokens (21%)")
+    let odd = try decode(ThreadStreamMessage.self, #"{"kind":"context","context":{"used":"lots"}}"#)
+    guard case .unknown = odd else { Issue.record("a reading it can't read is unknown: \(odd)"); return }
   }
 
   @Test func keepsMessagesItDoesNotKnow() throws {

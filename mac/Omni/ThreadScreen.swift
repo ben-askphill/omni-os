@@ -136,6 +136,9 @@ private struct ThreadHeader: View {
         .help("Reconnecting to the live stream")
         .accessibilityElement(children: .combine)
       }
+      if ContextMeter.metered.contains(thread.harness) {
+        ContextMeterButton(model: model, store: store, thread: thread)
+      }
       StatusPill(status: thread.status)
     }
     .padding(.horizontal, z(24))
@@ -495,6 +498,7 @@ enum QAProbe {
   static var shownAt: ContinuousClock.Instant?
   static var scroller: Scroller?
   static var expand: (() -> Void)?
+  static var openMeter: (() -> Void)?
 
   static func laidOut(_ store: ThreadStore, _ g: ScrollPin.Geometry) {
     guard shownThread != store.id, store.loadState == .loaded, g.contentHeight > 0 else { return }
