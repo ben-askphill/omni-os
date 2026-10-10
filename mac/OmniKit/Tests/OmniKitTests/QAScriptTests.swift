@@ -45,6 +45,7 @@ import OmniKit
         {"scroll": "bottom"},
         {"scroll": "through"},
         {"expand": true},
+        {"meter": true},
         {"openThread": "t2"}
       ]
       """.utf8))
@@ -56,6 +57,7 @@ import OmniKit
       .scroll(.bottom),
       .scroll(.through),
       .expand,
+      .meter,
       .openThread("t2"),
     ])
   }

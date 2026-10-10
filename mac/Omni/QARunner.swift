@@ -152,6 +152,10 @@ final class QARunner {
           guard let expand = QAProbe.expand else { throw QAScriptError("no thread on screen") }
           expand()
           try? await Task.sleep(for: .milliseconds(600))
+        case .meter:
+          guard let open = QAProbe.openMeter else { throw QAScriptError("no context meter on screen") }
+          open()
+          try? await Task.sleep(for: .milliseconds(800))
         case .sleep(let duration):
           try? await Task.sleep(for: duration)
         case .snapshot(let name):
@@ -276,6 +280,7 @@ final class QARunner {
     case .appearance(let appearance): "appearance \(appearance.rawValue)"
     case .scroll(let scroll): "scroll \(scroll.rawValue)"
     case .expand: "expand"
+    case .meter: "meter"
     case .type(let text): "type \(text.prefix(40))"
     case .send(let mode): "send \(mode?.rawValue ?? "reply")"
     case .inspector(let command): "inspector \(command.rawValue)"
@@ -461,6 +466,25 @@ final class QARunner {
       if let image = cache(term) {
         context.draw(image, in: pixels(term.convert(term.bounds, to: root)))
       }
+    }
+    // An open popover is a window of its own, untitled, so it is drawn over the window it hangs from.
+    for pop in NSApp.windows where pop.isVisible && pop.parent === window && "\(type(of: pop))".contains("Popover") {
+      guard let view = pop.contentView, let image = cache(view) else { continue }
+      let rect = view.convert(view.bounds, to: nil)
+      let onScreen = pop.convertToScreen(rect)
+      let inWindow = window.convertFromScreen(onScreen)
+      let frame = CGRect(x: inWindow.minX * scale, y: inWindow.minY * scale, width: inWindow.width * scale, height: inWindow.height * scale)
+      context.saveGState()
+      context.setShadow(offset: CGSize(width: 0, height: -4 * scale), blur: 18 * scale, color: NSColor.black.withAlphaComponent(0.18).cgColor)
+      context.addPath(CGPath(roundedRect: frame, cornerWidth: 10 * scale, cornerHeight: 10 * scale, transform: nil))
+      context.setFillColor(backdrop)
+      context.fillPath()
+      context.restoreGState()
+      context.saveGState()
+      context.addPath(CGPath(roundedRect: frame, cornerWidth: 10 * scale, cornerHeight: 10 * scale, transform: nil))
+      context.clip()
+      context.draw(image, in: frame)
+      context.restoreGState()
     }
     return context.makeImage() ?? base
   }

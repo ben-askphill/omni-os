@@ -53,6 +53,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `AppModel.swift` | `AppModel` (settings, supervisor, client and store, the route), `ServerScreen`, `StartFailure`, `State.label` and `canStart` |
 | `SVGPath.swift` | `SVGPath.cgPath`: SVG path data to a `CGPath` (every command, compact numbers, packed arc flags) |
 | `BrandPaths.swift` | `BrandPaths`: the Web UI's icon paths (`ui.tsx`), harness logos and wordmark (`brand.tsx`), generated from those files; `BrandPathsTests` keeps them in step |
+| `ContextMeter.swift` | `ContextUsage`, `ContextView`, `ContextMeter` (the math in `shared/context-meter.ts`), `ContextAPI` (`threadContext`, `compactThread` on `OmniClient`), `ContextModel` (one thread's meter and its Compact) |
 | `QAScript.swift` | Debug only. `QAScript`, `QAStep`, `QACondition`, `QAFacts`, `QAServer`, `QASnapshot.looksBlank` |
 
 ## Build and test
@@ -184,6 +185,7 @@ For the thread screen (part C). What parts A and B leave ready and what they do 
 - QA: `{"wait": "thread:<id>"}` waits for the laid-out transcript and notes the open time; `{"scroll": "top"|"bottom"|"through"}` and `{"expand": true}` (opens tool groups and failed or nested calls) work on the open thread.
 - Measured on this Mac: a 2,000-event thread opens in about 65 ms; a scroll through it ran 87 frames, mean 19 ms, worst 33 ms.
 - Copy: right-click a row for Copy; Edit > Copy Thread as Markdown (Shift-Cmd-C).
+- Context meter (`ContextMeterView.swift`), as `ContextMeter.tsx`: a ring before the status pill in Claude Code and Codex threads, amber from 70%, vermilion from 90%, used and window on hover. `ThreadStore.context` is the stream's latest `context` reading; `ContextModel` loads GET /context when the thread opens and each time a turn ends, the newer of the two wins. A click opens a popover with the split, tools, largest results, memory files and Compact (asks first; a focus line for Claude Code; off with the server's reason). QA step `{"meter": true}` opens it; snapshots draw an open popover over its window.
 - Mods (`ModViews.swift`): a mod's `$.ui.log` lines are `.mod` transcript rows, dim with the plugin's name, consecutive lines in one row. `$.ui.status` is `WorkspaceStore.mods` (the feed's `mods` event, one per plugin per live thread), shown under the header's title and as a chip on thread list rows. `$.ui.toast` is `ThreadStore.toasts` (the stream's `mod_toast`, never stored), stacked top right for its `timeout_ms` (1.5 to 15s, 4s by default), three at most; a click dismisses one.
 
 ## Markdown (#63 part B)
@@ -420,6 +422,7 @@ Steps (a list, or an object with the list under `steps`):
 | `{"route": "#/c/acme"}` | Sets the route |
 | `{"wait": "sidebarLoaded"}`, `{"wait": {"for": "serverState:running", "timeout": 30}}` | Polls every 100ms, 10s by default. Conditions: `sidebarLoaded`, `serverState:<unknown, checking, notRunning, starting, running, failed, stopping>`, `connection:<connecting, open, reconnecting, closed>`, `channel:<id>` |
 | `{"sleep": 1.5}` | Seconds |
+| `{"meter": true}` | Opens the open thread's context meter panel |
 | `{"snapshot": "home"}` | `home.png` for the main window, `home-settings.png` for Settings, `home-window<n>.png` for others. Fails on a blank image |
 | `{"port": 4759}` | Sets the port, as Settings would. Never 4747 |
 | `{"open": "settings"}` | Opens Settings |

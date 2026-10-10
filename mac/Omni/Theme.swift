@@ -31,6 +31,8 @@ enum Tok {
   static let onLive = dyn(0xffffff, 0x101114)
   static let needs = Color(hex: 0xff4420)
   static let done = Color(hex: 0xc6f52b)
+  /// `--warn` in index.css: amber text and strokes, for a meter that is filling up.
+  static let warn = dyn(0xb45309, 0xf5b544)
   /// The done disc's edge: ink on white, none in dark.
   static let doneEdge = dyn(0x17181a, 0x17181a, alpha: 1, darkAlpha: 0)
 

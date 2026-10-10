@@ -54,6 +54,8 @@ public final class ThreadStore {
   public private(set) var toasts: [ShownToast] = []
   /// See `StatusLine.betweenTurns`.
   public private(set) var betweenTurns = true
+  /// The newest context reading the stream pushed, for the header's meter. nil until one comes.
+  public private(set) var context: ContextUsage?
   /// The last result event's id, 0 for none.
   public private(set) var lastResultID = 0
   private var sessionCwd: String?
@@ -357,7 +359,8 @@ public final class ThreadStore {
       case .artifact(let a): upsert(a)
       case .thread(let t, let p, let live): merge(t, pending: p, live: live, isReply: false)
       case .modToast(let t): show(t)
-      case .context, .unknown: break
+      case .context(let c): context = c
+      case .unknown: break
       }
     }
     add(rows)
