@@ -361,6 +361,19 @@ private let turn = [
     try await waitFor("the last times out") { store.toasts.isEmpty }
   }
 
+  @Test func keepsTheNewestContextReading() async throws {
+    let api = FakeThreadAPI(try detail(events: turn))
+    let (store, conn, _, _) = try await openStore(api)
+    defer { store.stop() }
+    #expect(store.context == nil)
+    for used in [30_000, 41_500] {
+      conn.send(sse(#"{"kind":"context","context":{"used":\#(used),"max":200000,"source":"claude-stream","updated_at":"2026-10-10T08:00:00.000Z"}}"#))
+    }
+    try await waitFor("the reading") { store.context?.used == 41_500 }
+    #expect(store.context?.source == "claude-stream")
+    #expect(store.events.count == 3, "a reading is not a transcript event")
+  }
+
   @Test func saysWhyItCouldNotInterrupt() async throws {
     let api = FakeThreadAPI(try detail(events: turn))
     api.stop = .failure(.http(status: 404, message: "not found"))
