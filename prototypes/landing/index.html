@@ -1,0 +1,781 @@
+<meta charset="utf-8">
+<title>Omni OS Landing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column of sections; a 6-col bento whose cells mirror Omni's own UI (dark chrome sidebar, white pane, status colors). */
+:root {
+  /* page */
+  --bg: #f2f2ef;
+  --cell: #ffffff;
+  --cell-edge: rgb(23 24 26 / 0.08);
+  --fg: #17181a;
+  --fg-2: #4a4945;
+  --fg-3: #77766f;
+  --volt: #c6f52b;
+  --ink: #17181a;
+  --grid-dot: rgb(23 24 26 / 0.07);
+  /* Omni app tokens (web/src/index.css) */
+  --o-bg: #ffffff;
+  --o-surface: #f7f7f6;
+  --o-surface-2: #f1f1f0;
+  --o-surface-3: #ecebe7;
+  --o-fg: #17181a;
+  --o-fg-2: #3c3b37;
+  --o-fg-3: #6f6e68;
+  --o-fg-4: #9d9c96;
+  --o-line: rgb(23 24 26 / 0.08);
+  --o-line-strong: rgb(23 24 26 / 0.16);
+  --o-live: #2b3bff;
+  --o-needs: #ff4420;
+  --o-done: #c6f52b;
+  --o-chrome: #0c0d0f;
+  --o-chrome-fg: #eceae5;
+  --o-chrome-fg-3: #908f89;
+  --o-chrome-fg-4: #6f6e69;
+  --o-chrome-live: #7280ff;
+  --o-chrome-wash: rgb(236 235 231 / 0.07);
+  --o-shadow: 0 0 0 0.5px rgb(23 24 26 / 0.08), 0 2px 4px rgb(23 24 26 / 0.04), 0 18px 44px -10px rgb(23 24 26 / 0.2);
+  --o-shadow-card: 0 0 0 0.5px rgb(23 24 26 / 0.07), 0 1px 2px rgb(23 24 26 / 0.05);
+
+  --f-display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Geist", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --f-app: "SF Pro Text", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+
+  --ease-spring: cubic-bezier(0.24, 1.34, 0.38, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a0b0c; --cell: #131417; --cell-edge: rgb(236 235 231 / 0.08);
+    --fg: #eceae5; --fg-2: #b8b7b1; --fg-3: #8a8983; --grid-dot: rgb(236 235 231 / 0.06);
+    --o-bg: #121316; --o-surface: #191b1e; --o-surface-2: #222428; --o-surface-3: #2a2c31;
+    --o-fg: #eceae5; --o-fg-2: #b8b7b1; --o-fg-3: #908f89; --o-fg-4: #6f6e69;
+    --o-line: rgb(236 235 231 / 0.08); --o-line-strong: rgb(236 235 231 / 0.16); --o-live: #7280ff;
+    --o-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.08), 0 2px 4px rgb(0 0 0 / 0.3), 0 18px 44px -10px rgb(0 0 0 / 0.65);
+    --o-shadow-card: 0 0 0 0.5px rgb(255 255 255 / 0.09), 0 1px 2px rgb(0 0 0 / 0.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a0b0c; --cell: #131417; --cell-edge: rgb(236 235 231 / 0.08);
+  --fg: #eceae5; --fg-2: #b8b7b1; --fg-3: #8a8983; --grid-dot: rgb(236 235 231 / 0.06);
+  --o-bg: #121316; --o-surface: #191b1e; --o-surface-2: #222428; --o-surface-3: #2a2c31;
+  --o-fg: #eceae5; --o-fg-2: #b8b7b1; --o-fg-3: #908f89; --o-fg-4: #6f6e69;
+  --o-line: rgb(236 235 231 / 0.08); --o-line-strong: rgb(236 235 231 / 0.16); --o-live: #7280ff;
+  --o-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.08), 0 2px 4px rgb(0 0 0 / 0.3), 0 18px 44px -10px rgb(0 0 0 / 0.65);
+  --o-shadow-card: 0 0 0 0.5px rgb(255 255 255 / 0.09), 0 1px 2px rgb(0 0 0 / 0.4);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 400 16px/1.55 var(--f-body); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 24px; }
+@media (max-width: 640px) { .wrap { padding-inline: 16px; } }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--o-live); outline-offset: 3px; border-radius: 8px; }
+
+/* nav */
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 22px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 19px/1 var(--f-display); letter-spacing: -0.01em; text-decoration: none; }
+.brand svg { width: 28px; height: 28px; border-radius: 8px; display: block; }
+.nav-links { display: flex; gap: 22px; font-size: 14px; color: var(--fg-2); }
+.nav-links a { text-decoration: none; }
+.nav-links a:hover { color: var(--fg); }
+@media (max-width: 640px) { .nav-links .hide-sm { display: none; } }
+
+/* hero */
+.hero { padding-block: 56px 40px; display: grid; gap: 48px; }
+.hero-copy { max-width: 760px; }
+.eyebrow { font: 500 12px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-3); display: flex; align-items: center; gap: 8px; }
+.eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--o-live); box-shadow: 0 0 0 0 var(--o-live); animation: ping 1.6s var(--ease-out) infinite; }
+h1 { font: 800 clamp(40px, 6.6vw, 76px)/0.98 var(--f-display); letter-spacing: -0.035em; margin: 18px 0 0; text-wrap: balance; }
+h1 .mark { background: var(--volt); color: var(--ink); padding: 0 0.14em; border-radius: 0.16em; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.lede { font-size: clamp(17px, 2vw, 19px); color: var(--fg-2); max-width: 600px; margin: 22px 0 0; text-wrap: pretty; }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 22px; border-radius: 999px; font: 600 15px/1 var(--f-body); text-decoration: none; transition: transform .3s var(--ease-spring), background .2s; }
+.btn:hover { transform: translateY(-2px); }
+.btn-primary { background: var(--ink); color: #fff; }
+.btn-primary .k { background: var(--volt); color: var(--ink); border-radius: 999px; width: 22px; height: 22px; display: grid; place-items: center; font-size: 13px; }
+.btn-ghost { box-shadow: inset 0 0 0 1px var(--cell-edge); color: var(--fg); background: var(--cell); }
+:root[data-theme="dark"] .btn-primary { background: var(--volt); color: var(--ink); }
+:root[data-theme="dark"] .btn-primary .k { background: var(--ink); color: var(--volt); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn-primary { background: var(--volt); color: var(--ink); } :root:not([data-theme="light"]) .btn-primary .k { background: var(--ink); color: var(--volt); } }
+.proof { margin-top: 20px; font-size: 14px; color: var(--fg-3); }
+
+/* app frame (hero visual) */
+.frame { border-radius: 22px; background: var(--o-chrome); padding: 8px; box-shadow: 0 40px 80px -30px rgb(12 13 15 / 0.45), 0 0 0 1px rgb(255 255 255 / 0.04); }
+.app { display: grid; grid-template-columns: 220px minmax(0, 1fr) 300px; height: 470px; font: 400 13px/1.45 var(--f-app); color: var(--o-fg); }
+.app .side { color: var(--o-chrome-fg); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.app .pane { background: var(--o-bg); border-radius: 14px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.app .panel { background: var(--o-bg); border-radius: 14px; margin-left: 8px; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+@media (max-width: 1020px) { .app { grid-template-columns: 200px minmax(0, 1fr); } .app .panel { display: none; } }
+@media (max-width: 640px) { .app { grid-template-columns: minmax(0, 1fr); height: 430px; } .app .side { display: none; } }
+
+/* shared mock UI */
+.ui { font: 400 12.5px/1.45 var(--f-app); color: var(--o-fg); }
+.sb-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 10px; font-weight: 600; font-size: 13px; }
+.sb-head svg { width: 18px; height: 18px; border-radius: 5px; }
+.sb-label { font-size: 11px; color: var(--o-chrome-fg-4); padding: 10px 10px 4px; }
+.sb-row { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 10px; border-radius: 999px; color: var(--o-chrome-fg); white-space: nowrap; min-width: 0; transition: background .3s; }
+.sb-row.on { background: var(--o-chrome-wash); }
+.sb-row .ic { width: 16px; text-align: center; font-size: 13px; flex: none; }
+.sb-row .nm { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.sb-row.sub { height: 26px; padding-left: 35px; color: var(--o-chrome-fg-3); font-size: 12px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font: 500 11px/1 var(--f-app); color: var(--o-chrome-live); font-variant-numeric: tabular-nums; transition: opacity .3s; }
+.badge.zero { opacity: 0; }
+.sdot { width: 6px; height: 6px; border-radius: 50%; flex: none; display: inline-block; position: relative; }
+.sdot.live { background: var(--o-live); }
+.side .sdot.live, .chrome .sdot.live { background: var(--o-chrome-live); }
+.sdot.live::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: inherit; animation: ping2 1.6s var(--ease-out) infinite; }
+.sdot.needs { background: var(--o-needs); }
+.sdot.done { background: var(--o-done); box-shadow: 0 0 0 1px var(--o-fg); }
+.side .sdot.done, .chrome .sdot.done { box-shadow: none; }
+@keyframes ping2 { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(2.8); opacity: 0; } }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 rgb(43 59 255 / .5); } 100% { box-shadow: 0 0 0 8px rgb(43 59 255 / 0); } }
+.sb-foot { margin-top: auto; font-size: 11px; color: var(--o-chrome-fg-4); padding: 8px 10px; font-variant-numeric: tabular-nums; }
+
+.top { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--o-line); font-weight: 600; font-size: 13px; min-width: 0; white-space: nowrap; }
+.top .meta { font-weight: 400; color: var(--o-fg-4); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tabs { display: flex; gap: 4px; margin-left: auto; }
+.tab { font-size: 11.5px; font-weight: 500; padding: 4px 9px; border-radius: 999px; color: var(--o-fg-3); }
+.tab.on { background: var(--o-surface-2); color: var(--o-fg); }
+.msgs { flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; min-height: 0; }
+.bubble { align-self: flex-end; max-width: 82%; background: var(--o-surface-2); border-radius: 18px 6px 18px 18px; padding: 8px 12px; }
+.agent { max-width: 96%; color: var(--o-fg); }
+.tool { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--o-fg-3); min-width: 0; }
+.tool b { font-weight: 500; color: var(--o-fg-2); }
+.tool code { font: 400 11.5px var(--f-mono); color: var(--o-fg-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tool .st { width: 14px; height: 14px; flex: none; display: grid; place-items: center; }
+.spin { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--o-line-strong); border-top-color: var(--o-live); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.check { width: 12px; height: 12px; border-radius: 50%; background: var(--o-done); position: relative; }
+.check::after { content: ""; position: absolute; left: 4px; top: 2.2px; width: 2.6px; height: 5.2px; border: solid var(--ink); border-width: 0 1.4px 1.4px 0; transform: rotate(45deg); }
+.composer { margin: 0 12px 12px; border-radius: 20px; background: var(--o-bg); box-shadow: var(--o-shadow-card), 0 0 0 1px var(--o-line); padding: 10px 12px 8px; }
+.composer .ph { color: var(--o-fg-4); min-height: 19px; }
+.composer .ph.typed { color: var(--o-fg); }
+.composer .row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; background: var(--o-surface-2); font-size: 11.5px; font-weight: 500; color: var(--o-fg-2); white-space: nowrap; }
+.send { margin-left: auto; width: 26px; height: 26px; border-radius: 50%; background: var(--o-fg); display: grid; place-items: center; transition: transform .25s var(--ease-spring); }
+.send::before { content: ""; width: 7px; height: 7px; border: solid var(--o-bg); border-width: 1.6px 0 0 1.6px; transform: translateY(2px) rotate(45deg); }
+.send.press { transform: scale(.82); }
+.caret::after { content: ""; display: inline-block; width: 1.5px; height: 1.05em; background: var(--o-fg); vertical-align: -2px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* reveal helpers */
+.pop { transition: opacity .45s var(--ease-out), transform .55s var(--ease-spring); }
+.pop.out { opacity: 0; transform: translateY(8px) scale(.98); }
+.scene { transition: opacity .35s ease; }
+.scene.fade { opacity: 0; }
+
+/* sections */
+section { padding-block: 40px; }
+.sec-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 32px; margin-bottom: 26px; }
+h2 { font: 700 clamp(28px, 4vw, 42px)/1.05 var(--f-display); letter-spacing: -0.03em; margin: 0; text-wrap: balance; max-width: 640px; }
+.sec-head p { margin: 0; color: var(--fg-2); max-width: 420px; }
+
+/* bento */
+.bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+.cell { grid-column: span 2; background: var(--cell); border-radius: 22px; box-shadow: 0 0 0 1px var(--cell-edge); display: flex; flex-direction: column; overflow: hidden; min-width: 0; position: relative; }
+.cell.w4 { grid-column: span 4; }
+.cell.w3 { grid-column: span 3; }
+.stage { position: relative; height: 330px; overflow: hidden; background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px); background-size: 14px 14px; -webkit-mask-image: linear-gradient(#000 80%, transparent); mask-image: linear-gradient(#000 80%, transparent); }
+.cell-copy { padding: 4px 24px 24px; }
+.cell-copy .tag { font: 500 11px/1 var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-3); }
+.cell-copy h3 { font: 600 18px/1.25 var(--f-body); letter-spacing: -0.01em; margin: 8px 0 6px; }
+.cell-copy p { margin: 0; color: var(--fg-2); font-size: 14.5px; line-height: 1.5; max-width: 52ch; }
+@media (max-width: 1000px) {
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cell, .cell.w3 { grid-column: span 1; }
+  .cell.w4 { grid-column: span 2; }
+}
+@media (max-width: 700px) {
+  .bento { grid-template-columns: minmax(0, 1fr); }
+  .cell, .cell.w3, .cell.w4 { grid-column: auto; }
+  .stage { height: 310px; }
+}
+.win { position: absolute; background: var(--o-bg); border-radius: 16px; box-shadow: var(--o-shadow); overflow: hidden; }
+
+/* cell: conductor */
+.cond .win.main { left: 24px; top: 24px; width: min(420px, calc(100% - 48px)); bottom: 0; display: flex; flex-direction: column; }
+.cond .win.crew { right: 24px; top: 56px; width: 230px; background: var(--o-chrome); color: var(--o-chrome-fg); padding: 8px 6px; }
+@media (max-width: 1000px) { .cond .win.crew { display: none; } }
+.deleg { background: var(--o-surface); border-radius: 20px; padding: 10px 10px 8px; }
+.deleg header { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 0 2px 6px; min-width: 0; }
+.deleg header > span:first-of-type { white-space: nowrap; }
+.deleg header .who { color: var(--o-fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deleg header svg { width: 14px; height: 14px; flex: none; }
+.drow { position: relative; padding-left: 22px; margin-left: 6px; border-left: 1.5px solid var(--o-line); }
+.drow::before { content: ""; position: absolute; left: -1.5px; top: 0; width: 16px; height: 22px; border-left: 1.5px solid var(--rail, var(--o-line-strong)); border-bottom: 1.5px solid var(--rail, var(--o-line-strong)); border-bottom-left-radius: 12px; transition: border-color .4s; }
+.drow .card { display: flex; align-items: center; gap: 10px; background: var(--o-bg); border-radius: 14px; padding: 8px 10px; box-shadow: var(--o-shadow-card); min-width: 0; }
+.drow .av { width: 26px; height: 26px; border-radius: 50%; background: var(--o-surface-2); display: grid; place-items: center; font-size: 12px; flex: none; }
+.drow .t { font-weight: 500; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drow .m { font-size: 11px; color: var(--o-fg-3); display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.drow .m code { font: 400 10.5px var(--f-mono); color: var(--o-fg-2); }
+.stat { margin-left: auto; font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 999px; white-space: nowrap; transition: background .4s, color .4s; }
+.stat.run { background: color-mix(in srgb, var(--o-live) 12%, transparent); color: var(--o-live); }
+.stat.ok { background: var(--o-done); color: var(--ink); }
+.report { border-radius: 16px; padding: 9px 12px; background: var(--o-surface); font-size: 12px; box-shadow: inset 3px 0 0 var(--o-done); }
+.report .h { font: 500 11px var(--f-mono); color: var(--o-fg-3); margin-bottom: 2px; }
+
+/* cell: channels */
+.chan .win { left: 50%; transform: translateX(-50%); top: 24px; width: 250px; bottom: -10px; background: var(--o-chrome); color: var(--o-chrome-fg); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
+.chan .sb-row.new { animation: rowIn .5s var(--ease-spring); }
+@keyframes rowIn { from { opacity: 0; transform: translateX(-8px); } }
+
+/* cell: thread */
+.thr .win { left: 18px; right: 18px; top: 22px; bottom: 0; display: flex; flex-direction: column; }
+.cond .msgs, .thr .msgs, .brow .msgs { justify-content: flex-end; }
+.cond .msgs > *, .thr .msgs > *, .brow .msgs > * { flex: none; }
+.steer { align-self: flex-end; font-size: 11px; color: var(--o-fg-3); display: flex; gap: 6px; align-items: center; }
+.steer .pill { height: 20px; background: color-mix(in srgb, var(--o-live) 12%, transparent); color: var(--o-live); }
+
+/* cell: harness */
+.harn .win { left: 18px; right: 18px; top: 22px; padding: 8px; }
+.harn .search { display: flex; align-items: center; gap: 8px; height: 34px; border-radius: 14px; background: var(--o-surface); padding: 0 10px; color: var(--o-fg-4); font-size: 12px; margin-bottom: 4px; }
+.harn .search svg { width: 13px; height: 13px; }
+.hrow { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 12px; position: relative; transition: background .35s; }
+.hrow.sel { background: var(--o-surface-2); }
+.hlogo { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font: 700 11px var(--f-app); flex: none; color: #fff; }
+.hrow .n { font-weight: 500; font-size: 12.5px; }
+.hrow .p { font-size: 11px; color: var(--o-fg-3); }
+.hrow .tick { margin-left: auto; opacity: 0; transition: opacity .3s; }
+.hrow.sel .tick { opacity: 1; }
+.harn .pills { position: absolute; left: 18px; right: 18px; bottom: 18px; display: flex; gap: 6px; flex-wrap: wrap; }
+.harn .pills .pill { background: var(--o-bg); box-shadow: var(--o-shadow-card); height: 28px; }
+.swap { display: inline-block; transition: opacity .25s, transform .35s var(--ease-spring); }
+.swap.out { opacity: 0; transform: translateY(-6px); }
+
+/* cell: artifacts */
+.art .win { left: 18px; right: 18px; top: 22px; bottom: 0; display: flex; flex-direction: column; }
+.acard { border-radius: 16px; box-shadow: var(--o-shadow-card), 0 0 0 1px var(--o-line); overflow: hidden; background: var(--o-bg); }
+.acard .bar { display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-size: 11.5px; border-bottom: 1px solid var(--o-line); min-width: 0; }
+.acard .bar code { font: 500 11px var(--f-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acard .pub { margin-left: auto; font-size: 10.5px; padding: 2px 7px; border-radius: 999px; background: var(--o-done); color: var(--ink); white-space: nowrap; }
+.doc { padding: 10px 12px 12px; display: grid; gap: 7px; }
+.doc .h { font: 700 13px var(--f-display); letter-spacing: -0.01em; }
+.sk { height: 6px; border-radius: 4px; background: var(--o-surface-3); }
+.bars { display: flex; align-items: end; gap: 6px; height: 56px; padding-top: 4px; }
+.bars i { flex: 1; border-radius: 4px 4px 2px 2px; background: var(--o-live); height: 4%; transition: height .8s var(--ease-spring); }
+.bars i.hl { background: var(--o-needs); }
+
+/* cell: team */
+.team .stage svg.links { position: absolute; inset: 0; width: 100%; height: 100%; }
+.team .node { position: absolute; transform: translate(-50%, -50%); background: var(--o-bg); border-radius: 14px; box-shadow: var(--o-shadow); padding: 7px 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; white-space: nowrap; transition: opacity .4s var(--ease-out), transform .55s var(--ease-spring); }
+.team .node .av { width: 22px; height: 22px; border-radius: 50%; background: var(--o-surface-2); display: grid; place-items: center; font-size: 11px; }
+.team .node.lead { font-weight: 600; }
+.team .node.out { opacity: 0; transform: translate(-50%, -50%) scale(.9); }
+.team .merge { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); width: min(270px, calc(100% - 36px)); }
+.links path { fill: none; stroke: var(--o-line-strong); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.links path.flow { stroke: var(--o-live); stroke-dasharray: 6 200; stroke-width: 2; stroke-linecap: round; opacity: 0; }
+.links path.flow.on { opacity: 1; animation: flow 1.4s linear infinite; }
+.links path.flow.back { stroke: #8fb800; }
+@keyframes flow { from { stroke-dashoffset: 206; } to { stroke-dashoffset: 0; } }
+
+/* cell: browser */
+.brow .win.th { left: 20px; top: 24px; width: 236px; bottom: 0; display: flex; flex-direction: column; }
+.brow .win.bp { left: 272px; right: 20px; top: 48px; bottom: 0; display: flex; flex-direction: column; }
+@media (max-width: 1000px) { .brow .win.th { display: none; } .brow .win.bp { left: 18px; right: 18px; top: 22px; } }
+.urlbar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--o-line); }
+.urlbar .dots { display: flex; gap: 5px; }
+.urlbar .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--o-surface-3); }
+.urlbar .u { flex: 1; height: 26px; border-radius: 999px; background: var(--o-surface); display: flex; align-items: center; padding: 0 12px; font: 400 11.5px var(--f-mono); color: var(--o-fg-2); white-space: nowrap; overflow: hidden; min-width: 0; }
+.live-tag { font-size: 10.5px; font-weight: 500; color: var(--o-live); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.site { flex: 1; position: relative; padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; overflow: hidden; }
+.site .img { border-radius: 10px; background: linear-gradient(135deg, var(--o-surface-3), var(--o-surface)); aspect-ratio: 1; max-width: 100%; }
+.site .info { display: grid; gap: 8px; align-content: start; }
+.site .ttl { font: 700 14px var(--f-display); }
+.site .price { font-size: 12px; color: var(--o-fg-2); }
+.atc { height: 32px; border-radius: 999px; background: var(--o-fg); color: var(--o-bg); font-size: 11.5px; font-weight: 600; display: grid; place-items: center; transition: transform .2s var(--ease-spring); }
+.atc.press { transform: scale(.94); }
+.drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 55%; background: var(--o-bg); box-shadow: -12px 0 30px -12px rgb(0 0 0 / .25); padding: 14px; display: grid; gap: 8px; align-content: start; transform: translateX(105%); transition: transform .6s var(--ease-spring); border-left: 1px solid var(--o-line); }
+.drawer.open { transform: none; }
+.drawer .ttl { font: 700 13px var(--f-display); }
+.drawer .line { display: flex; gap: 8px; align-items: center; font-size: 11.5px; }
+.drawer .line i { width: 30px; height: 30px; border-radius: 8px; background: var(--o-surface-3); }
+.cursor { position: absolute; width: 16px; height: 16px; left: 30%; top: 70%; transition: left .9s var(--ease-out), top .9s var(--ease-out); pointer-events: none; z-index: 3; }
+.cursor svg { width: 16px; height: 16px; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .3)); }
+
+/* how it works */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: s; }
+.step { padding: 22px 24px 24px; border-radius: 22px; box-shadow: 0 0 0 1px var(--cell-edge); background: var(--cell); }
+.step .n { font: 500 12px/1 var(--f-mono); color: var(--fg-3); }
+.step h3 { font: 600 18px/1.25 var(--f-body); margin: 12px 0 6px; }
+.step p { margin: 0; color: var(--fg-2); font-size: 14.5px; }
+@media (max-width: 800px) { .steps { grid-template-columns: minmax(0, 1fr); } }
+
+/* final cta */
+.final { background: var(--o-chrome); color: #eceae5; border-radius: 28px; padding: clamp(28px, 5vw, 56px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: center; }
+.final h2 { color: #eceae5; }
+.final p { color: #b8b7b1; margin: 14px 0 0; }
+.final .btn-primary { background: var(--volt); color: var(--ink); margin-top: 24px; }
+.final .btn-primary .k { background: var(--ink); color: var(--volt); }
+.term { background: #121316; border-radius: 16px; padding: 18px; font: 400 13px/1.8 var(--f-mono); color: #b8b7b1; box-shadow: 0 0 0 1px rgb(255 255 255 / .07); overflow-x: auto; min-width: 0; }
+.term .p { color: var(--volt); }
+.term .c { color: #6f6e69; }
+@media (max-width: 800px) { .final { grid-template-columns: minmax(0, 1fr); } }
+footer { padding-block: 36px 48px; color: var(--fg-3); font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="omni" viewBox="100 100 824 824"><rect x="100" y="100" width="824" height="824" fill="#C6F52B"/><g transform="translate(400 640) scale(8.2) translate(-4 3) scale(.92) skewX(-10)"><circle r="40" fill="none" stroke="#17181A" stroke-width="20"/><circle cx="49.5" cy="-49.5" r="12" fill="#17181A"/></g></symbol>
+    <symbol id="ring" viewBox="-60 -70 130 130"><g transform="skewX(-10)"><circle r="40" fill="none" stroke="currentColor" stroke-width="18"/><circle cx="49.5" cy="-49.5" r="12" fill="currentColor"/></g></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <nav class="nav" aria-label="Main">
+    <a class="brand" href="#top"><svg aria-hidden="true"><use href="#omni"/></svg>Omni OS</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a class="hide-sm" href="#how">How it works</a>
+      <a href="#run">Run it</a>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="hero-copy">
+      <div class="eyebrow"><span class="dot"></span>Local agent workspace for your Mac</div>
+      <h1>All your agents. <span class="mark">One window.</span></h1>
+      <p class="lede">Omni OS runs Claude Code, Codex, Cursor and Hermes threads side by side, sorted by client. A Conductor hands work to the crew while you watch it happen.</p>
+      <div class="ctas">
+        <a class="btn btn-primary" href="#run">Run it locally <span class="k" aria-hidden="true">&rarr;</span></a>
+        <a class="btn btn-ghost" href="#features">See what it does</a>
+      </div>
+      <p class="proof">Uses the plans you already pay for. Secrets stay in your Keychain.</p>
+    </div>
+
+    <div class="frame" aria-label="Omni OS app window" role="img">
+      <div class="app" id="hero">
+        <aside class="side chrome">
+          <div class="sb-head"><svg aria-hidden="true"><use href="#omni"/></svg>Omni</div>
+          <div class="sb-row on"><span class="ic"><svg width="15" height="15" style="color:#eceae5"><use href="#ring"/></svg></span><span class="nm">Conductor</span><span class="badge" data-hb="0"><span class="sdot live"></span><span>1</span></span></div>
+          <div class="sb-label">Channels</div>
+          <div class="sb-row"><span class="ic">🌿</span><span class="nm">Volero</span><span class="badge" data-hb="1"><span class="sdot live"></span><span>3</span></span></div>
+          <div class="sb-row sub"><span class="nm">Fix cart drawer upsell</span><span class="sdot live"></span></div>
+          <div class="sb-row sub"><span class="nm">Translate FAQ to German</span><span class="sdot live"></span></div>
+          <div class="sb-row"><span class="ic">💅</span><span class="nm">Pink Gellac</span><span class="badge" data-hb="2"><span class="sdot live"></span><span>1</span></span></div>
+          <div class="sb-row"><span class="ic">📸</span><span class="nm">Kamera Express</span><span class="badge zero"><span class="sdot live"></span><span>0</span></span></div>
+          <div class="sb-row"><span class="ic">🛠️</span><span class="nm">Internal</span><span class="badge zero"><span class="sdot live"></span><span>0</span></span></div>
+          <div class="sb-row"><span class="ic">🏠</span><span class="nm">Personal</span><span class="badge zero"><span class="sdot live"></span><span>0</span></span></div>
+          <div class="sb-foot" id="hero-foot">Claude Code 4/6 · Codex 1/4</div>
+        </aside>
+        <main class="pane">
+          <div class="top">PDP speed audit <span class="meta">#volero · Opus 5.5 · Claude Code</span><span class="tabs"><span class="stat run" style="margin-left:0">Running</span></span></div>
+          <div class="msgs">
+            <div class="bubble">Check the product page for layout shift and write up what you find.</div>
+            <div class="tool"><span class="st"><span class="check"></span></span><b>Read</b><code>sections/main-product.liquid</code></div>
+            <div class="tool"><span class="st"><span class="check"></span></span><b>Browser</b><code>volero-eu.myshopify.com/products/zermatt</code></div>
+            <div class="tool"><span class="st" id="hero-st"><span class="spin"></span></span><b>Write</b><code>artifacts/pdp-cls-audit.html</code></div>
+            <div class="agent" id="hero-stream">The gallery image has no height set, so the page jumps 0.21 when it loads.</div>
+          </div>
+          <div class="composer"><div class="ph">Steer the agent. It reads this at its next step.</div><div class="row"><span class="pill">Opus 5.5</span><span class="pill">high</span><span class="send"></span></div></div>
+        </main>
+        <aside class="panel">
+          <div class="top" style="border:0;padding-bottom:4px"><div class="tabs" style="margin-left:0"><span class="tab on">Artifacts</span><span class="tab">Browser</span><span class="tab">Terminal</span><span class="tab">Details</span></div></div>
+          <div style="padding:12px">
+            <div class="acard"><div class="bar"><code>pdp-cls-audit.html</code><span class="pub">Published</span></div>
+              <div class="doc"><div class="h">PDP layout shift</div><div class="sk" style="width:80%"></div><div class="sk" style="width:62%"></div>
+                <div class="bars" id="hero-bars"><i style="height:30%"></i><i style="height:52%"></i><i class="hl" style="height:90%"></i><i style="height:40%"></i><i style="height:22%"></i><i style="height:35%"></i></div>
+                <div class="sk" style="width:70%"></div><div class="sk" style="width:45%"></div></div></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </header>
+
+  <section id="features" aria-labelledby="f-h">
+    <div class="sec-head">
+      <h2 id="f-h">Built for running many agents at once</h2>
+      <p>Each card below is a working model of the real app. They play while you look at them.</p>
+    </div>
+
+    <div class="bento">
+      <!-- 1 Conductor -->
+      <article class="cell w4 cond">
+        <div class="stage" data-scene="cond" aria-hidden="true">
+          <div class="scene">
+            <div class="win main ui">
+              <div class="top"><svg width="14" height="14"><use href="#ring"/></svg>Conductor <span class="meta">Sonnet 5.5 · Claude Code</span></div>
+              <div class="msgs">
+                <div class="bubble pop out" data-k="ask"><span data-k="askt"></span></div>
+                <div class="agent pop out" data-k="say">Sending this to the builder in #volero.</div>
+                <div class="deleg pop out" data-k="card">
+                  <header><svg><use href="#ring"/></svg><span style="font-weight:500">Delegated 1 task</span><span class="who">Fix cart drawer upsell · #volero</span></header>
+                  <div class="drow" data-k="rail"><div class="card"><span class="av">🔧</span><div style="min-width:0"><div class="t">Fix cart drawer upsell</div><div class="m"><code>T-CART-2</code><span data-k="detail">starting</span></div></div><span class="stat run" data-k="stat">Running</span></div></div>
+                </div>
+                <div class="report pop out" data-k="report"><div class="h">Report from builder · T-CART-2 · #volero</div>PR #212 is open. The upsell shows after add to cart, screenshots attached.</div>
+              </div>
+            </div>
+            <div class="win crew chrome ui">
+              <div class="sb-label" style="padding-top:2px">Volero</div>
+              <div class="sb-row sub" style="padding-left:12px">Translate FAQ to German</div>
+              <div class="sb-row sub pop out" data-k="newrow" style="padding-left:12px;color:var(--o-chrome-fg)"><span class="nm">Fix cart drawer upsell</span><span class="sdot live" data-k="rowdot"></span></div>
+              <div class="sb-row sub" style="padding-left:12px">PDP speed audit</div>
+              <div style="padding:10px 12px 4px;display:grid;gap:7px" class="pop out" data-k="work">
+                <div class="tool" style="color:var(--o-chrome-fg-3)"><span class="st"><span class="check"></span></span>Read <code style="color:var(--o-chrome-fg-4)">cart-drawer.liquid</code></div>
+                <div class="tool pop out" data-k="w2" style="color:var(--o-chrome-fg-3)"><span class="st"><span class="check"></span></span>Edit <code style="color:var(--o-chrome-fg-4)">upsell.js</code></div>
+                <div class="tool pop out" data-k="w3" style="color:var(--o-chrome-fg-3)"><span class="st"><span class="check"></span></span>gh <code style="color:var(--o-chrome-fg-4)">pr create --draft</code></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cell-copy"><span class="tag">Conductor</span><h3>Ask once. The crew does the work.</h3><p>Tell the Conductor what you need. It opens a thread in the right client channel, picks a builder or researcher, and the report comes back to you when it is done.</p></div>
+      </article>
+
+      <!-- 2 Channels -->
+      <article class="cell chan">
+        <div class="stage" data-scene="chan" aria-hidden="true">
+          <div class="win chrome ui">
+            <div class="sb-row on"><span class="ic"><svg width="15" height="15" style="color:#eceae5"><use href="#ring"/></svg></span><span class="nm">Conductor</span><span class="badge" data-c="0"><span class="sdot live"></span><span>1</span></span></div>
+            <div class="sb-label">Channels</div>
+            <div class="sb-row"><span class="ic">🌿</span><span class="nm">Volero</span><span class="badge" data-c="1"><span class="sdot live"></span><span>2</span></span></div>
+            <div class="sb-row"><span class="ic">💅</span><span class="nm">Pink Gellac</span><span class="badge" data-c="2"><span class="sdot live"></span><span>1</span></span></div>
+            <div class="sb-row"><span class="ic">📸</span><span class="nm">Kamera Express</span><span class="badge zero" data-c="3"><span class="sdot live"></span><span>0</span></span></div>
+            <div class="sb-row"><span class="ic">⛵</span><span class="nm">North Sails</span><span class="badge zero" data-c="4"><span class="sdot live"></span><span>0</span></span></div>
+            <div class="sb-row"><span class="ic">🛠️</span><span class="nm">Internal</span><span class="badge" data-c="5"><span class="sdot live"></span><span>1</span></span></div>
+            <div class="sb-row"><span class="ic">🏠</span><span class="nm">Personal</span><span class="badge zero" data-c="6"><span class="sdot live"></span><span>0</span></span></div>
+            <div class="sb-foot" data-c="foot">Claude Code 4/6 · Codex 1/4</div>
+          </div>
+        </div>
+        <div class="cell-copy"><span class="tag">Channels</span><h3>One channel per client</h3><p>Each channel holds its own repo, store, default model and browser logins. The sidebar shows what is running right now.</p></div>
+      </article>
+
+      <!-- 3 Thread -->
+      <article class="cell thr">
+        <div class="stage" data-scene="thr" aria-hidden="true">
+          <div class="scene">
+            <div class="win ui">
+              <div class="top">Image audit <span class="meta">#pink-gellac</span></div>
+              <div class="msgs">
+                <div class="bubble pop out" data-k="ask">Find product images over 500 KB</div>
+                <div class="tool pop out" data-k="t1"><span class="st" data-k="s1"><span class="spin"></span></span><b>Bash</b><code>shopify store execute</code></div>
+                <div class="agent" data-k="stream"></div>
+                <div class="steer pop out" data-k="steer"><span class="pill">Steered</span>Skip the gift cards</div>
+              </div>
+              <div class="composer"><div class="ph" data-k="ph">Reply</div><div class="row"><span class="pill">Opus 5.5</span><span class="send" data-k="send"></span></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="cell-copy"><span class="tag">Threads</span><h3>Watch it work, steer mid run</h3><p>Replies stream in with every tool call shown. Type while it runs and the agent reads it at its next step.</p></div>
+      </article>
+
+      <!-- 4 Harness -->
+      <article class="cell harn">
+        <div class="stage" data-scene="harn" aria-hidden="true">
+          <div class="win ui">
+            <div class="search"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>Find a model or harness</div>
+            <div class="hrow sel" data-h="0"><span class="hlogo" style="background:#d97757">CC</span><div><div class="n">Claude Code</div><div class="p">Bills your Claude plan</div></div><span class="tick check"></span></div>
+            <div class="hrow" data-h="1"><span class="hlogo" style="background:#55544f">CX</span><div><div class="n">Codex</div><div class="p">Bills your ChatGPT plan</div></div><span class="tick check"></span></div>
+            <div class="hrow" data-h="2"><span class="hlogo" style="background:#3c3b37">CR</span><div><div class="n">Cursor Agent</div><div class="p">Bills your Cursor plan</div></div><span class="tick check"></span></div>
+            <div class="hrow" data-h="3"><span class="hlogo" style="background:#2b3bff">HE</span><div><div class="n">Hermes</div><div class="p">Anthropic API via Hermes</div></div><span class="tick check"></span></div>
+          </div>
+          <div class="pills ui"><span class="pill"><span class="swap" data-k="model">Opus 5.5</span></span><span class="pill"><span class="swap" data-k="eff">high</span></span></div>
+        </div>
+        <div class="cell-copy"><span class="tag">Harnesses</span><h3>Pick the agent per thread</h3><p>Claude Code, Codex, Cursor or Hermes, each through its own CLI and the plan you already have. Set a default per channel.</p></div>
+      </article>
+
+      <!-- 5 Artifacts -->
+      <article class="cell art">
+        <div class="stage" data-scene="art" aria-hidden="true">
+          <div class="scene">
+            <div class="win ui">
+              <div class="top">Q3 sales recap <span class="meta">#kamera-express</span></div>
+              <div class="msgs">
+                <div class="agent pop out" data-k="say">Here is the recap. Week 34 was the peak.</div>
+                <div class="acard pop out" data-k="card">
+                  <div class="bar"><code>q3-recap.html</code><span class="pub pop out" data-k="pub">Published on claude.ai</span></div>
+                  <div class="doc"><div class="h">Q3 by week</div><div class="sk" style="width:76%"></div>
+                    <div class="bars" data-k="bars"><i></i><i></i><i></i><i class="hl"></i><i></i><i></i><i></i></div>
+                    <div class="sk" style="width:58%"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cell-copy"><span class="tag">Artifacts</span><h3>Reports show up in the thread</h3><p>Pages, reports and files the agent writes render right in the conversation. Publish one and later threads update the same link.</p></div>
+      </article>
+
+      <!-- 6 Team -->
+      <article class="cell team">
+        <div class="stage" data-scene="team" aria-hidden="true">
+          <svg class="links" viewBox="0 0 300 330" preserveAspectRatio="none">
+            <path d="M150 60 C150 100 60 100 60 140"/><path d="M150 60 L150 140"/><path d="M150 60 C150 100 240 100 240 140"/>
+            <path class="flow" data-f="0" d="M150 60 C150 100 60 100 60 140"/><path class="flow" data-f="1" d="M150 60 L150 140"/><path class="flow" data-f="2" d="M150 60 C150 100 240 100 240 140"/>
+            <path d="M60 140 C60 190 150 190 150 236"/><path d="M150 140 L150 236"/><path d="M240 140 C240 190 150 190 150 236"/>
+            <path class="flow back" data-b="0" d="M60 140 C60 190 150 190 150 236"/><path class="flow back" data-b="1" d="M150 140 L150 236"/><path class="flow back" data-b="2" d="M240 140 C240 190 150 190 150 236"/>
+          </svg>
+          <div class="node lead ui" style="left:50%;top:18%"><span class="av">🔎</span>Lead · researcher</div>
+          <div class="node ui out" data-m="0" style="left:20%;top:42%"><span class="sdot live" data-d="0"></span>builder</div>
+          <div class="node ui out" data-m="1" style="left:50%;top:42%"><span class="sdot live" data-d="1"></span>researcher</div>
+          <div class="node ui out" data-m="2" style="left:80%;top:42%"><span class="sdot live" data-d="2"></span>store-ops</div>
+          <div class="merge report ui pop out" data-k="merge"><div class="h">Team of 3 · combined report</div>Theme fix, competitor scan and metafield cleanup merged into one answer.</div>
+        </div>
+        <div class="cell-copy"><span class="tag">Teams</span><h3>Fan out, merge back</h3><p>Big jobs go to a lead and a few members working in parallel. You get one combined report.</p></div>
+      </article>
+
+      <!-- 7 Browser -->
+      <article class="cell w4 brow">
+        <div class="stage" data-scene="brow" aria-hidden="true">
+          <div class="scene">
+            <div class="win th ui">
+              <div class="top">Cart QA <span class="meta">#volero</span></div>
+              <div class="msgs">
+                <div class="bubble">Add the Zermatt jacket to the cart and check the drawer</div>
+                <div class="tool pop out" data-k="t1"><span class="st"><span class="check"></span></span><b>navigate</b><code>/products/zermatt</code></div>
+                <div class="tool pop out" data-k="t2"><span class="st" data-k="s2"><span class="spin"></span></span><b>click</b><code>Add to cart</code></div>
+                <div class="agent pop out" data-k="say">Drawer opens with the upsell. Looks right.</div>
+              </div>
+            </div>
+            <div class="win bp ui">
+              <div class="urlbar"><div class="dots"><i></i><i></i><i></i></div><div class="u"><span data-k="url"></span></div><span class="live-tag"><span class="sdot live"></span>Live</span></div>
+              <div class="site">
+                <div class="img pop out" data-k="img"></div>
+                <div class="info pop out" data-k="info"><div class="ttl">Zermatt Shell Jacket</div><div class="price">€ 349,00</div><div class="sk" style="width:90%"></div><div class="sk" style="width:70%"></div><div class="atc" data-k="atc">Add to cart</div></div>
+                <div class="drawer" data-k="drawer"><div class="ttl">Your cart (1)</div><div class="line"><i></i>Zermatt Shell Jacket</div><div class="sk" style="width:80%"></div><div class="report" style="font-size:11px;margin-top:4px"><div class="h">Goes well with</div>Alpine Beanie · € 29</div></div>
+                <div class="cursor" data-k="cur"><svg viewBox="0 0 16 16"><path d="M2 1l11 7-5 1-2 5z" fill="#17181a" stroke="#fff" stroke-width="1"/></svg></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cell-copy"><span class="tag">Live browser</span><h3>See the browser the agent is using</h3><p>Each channel keeps its own browser with logins saved. It shows live next to the thread, and you can click in to take over for a login or a captcha.</p></div>
+      </article>
+    </div>
+  </section>
+
+  <section id="how" aria-labelledby="h-h">
+    <div class="sec-head"><h2 id="h-h">How it works</h2><p>One Node server on your Mac. Open it in the browser, the Mac app, or your phone.</p></div>
+    <div class="steps">
+      <div class="step"><span class="n">Step 1</span><h3>Add a channel per client</h3><p>Point it at the repo and the store, pick a default agent, and add the secrets it needs from your Keychain.</p></div>
+      <div class="step"><span class="n">Step 2</span><h3>Ask in a thread or the Conductor</h3><p>Start a thread yourself, or ask the Conductor and let it route the work to the right channel and role.</p></div>
+      <div class="step"><span class="n">Step 3</span><h3>Review what comes back</h3><p>Reports, pages, pull requests and screenshots land in the thread. Reply from your desk or your phone.</p></div>
+    </div>
+  </section>
+
+  <section id="run" aria-labelledby="r-h">
+    <div class="final">
+      <div>
+        <h2 id="r-h">Run it on your Mac today</h2>
+        <p>Needs Node 24 and the Claude CLI signed in. Codex, Cursor and Hermes are optional; the model picker tells you how to set each one up.</p>
+        <a class="btn btn-primary" href="https://github.com/ben-askphill/omni-os">Open the repo <span class="k" aria-hidden="true">&rarr;</span></a>
+      </div>
+      <pre class="term"><span class="c"># clone, then</span>
+<span class="p">$</span> npm install
+<span class="p">$</span> npm run dev
+<span class="c"># UI on http://localhost:4748</span></pre>
+    </div>
+  </section>
+
+  <footer><span>Omni OS · local agent workspace</span><span>Prototype landing page</span></footer>
+</div>
+
+<script>
+(() => {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const raf = () => new Promise(r => requestAnimationFrame(r));
+
+  // A scene plays only while its stage is on screen; its clock stops when hidden.
+  function makeScene(stage, def) {
+    const ctx = { visible: false, stage, q: k => stage.querySelector(`[data-k="${k}"]`) };
+    let waiters = [];
+    new IntersectionObserver(es => {
+      ctx.visible = es[0].isIntersecting;
+      if (ctx.visible) { waiters.forEach(w => w()); waiters = []; }
+    }, { threshold: 0.25 }).observe(stage);
+    const whenVisible = () => ctx.visible ? Promise.resolve() : new Promise(r => waiters.push(r));
+    ctx.sleep = async ms => {
+      let t = 0, last = performance.now();
+      while (t < ms) {
+        await whenVisible(); const now = await raf();
+        const dt = Math.min(now - last, 64); last = now; if (ctx.visible) t += dt;
+      }
+    };
+    ctx.show = (k, on = true) => { const el = typeof k === 'string' ? ctx.q(k) : k; el && el.classList.toggle('out', !on); };
+    ctx.type = async (el, text, speed = 32) => { el.textContent = ''; el.classList.add('caret'); for (const ch of text) { el.textContent += ch; await ctx.sleep(speed + Math.random() * 30); } el.classList.remove('caret'); };
+    ctx.stream = async (el, text, speed = 55) => { el.textContent = ''; for (const w of text.split(' ')) { el.textContent += (el.textContent ? ' ' : '') + w; await ctx.sleep(speed + Math.random() * 60); } };
+    const sceneEl = stage.querySelector('.scene');
+    if (reduced) { def.reset(ctx); def.final(ctx); return; }
+    (async () => {
+      def.reset(ctx);
+      for (;;) {
+        await whenVisible();
+        await def.run(ctx);
+        await ctx.sleep(def.hold ?? 2200);
+        if (sceneEl) { sceneEl.classList.add('fade'); await ctx.sleep(380); }
+        def.reset(ctx);
+        if (sceneEl) { await raf(); sceneEl.classList.remove('fade'); await ctx.sleep(300); }
+      }
+    })();
+  }
+
+  const scenes = {
+    cond: {
+      reset(c) {
+        ['ask', 'say', 'card', 'report', 'newrow', 'work', 'w2', 'w3'].forEach(k => c.show(k, false));
+        c.q('askt').textContent = '';
+        const s = c.q('stat'); s.className = 'stat run'; s.textContent = 'Running';
+        c.q('detail').textContent = 'starting'; c.q('rail').style.removeProperty('--rail');
+        c.q('rowdot').className = 'sdot live';
+      },
+      async run(c) {
+        await c.sleep(400); c.show('ask'); await c.type(c.q('askt'), 'Fix the cart drawer upsell on Volero and open a PR');
+        await c.sleep(500); c.show('say'); await c.sleep(600); c.show('card');
+        await c.sleep(500); c.show('newrow'); await c.sleep(500); c.show('work');
+        c.q('detail').textContent = 'reading the theme'; await c.sleep(1100);
+        c.show('w2'); c.q('detail').textContent = 'editing upsell.js'; await c.sleep(1100);
+        c.show('w3'); c.q('detail').textContent = 'opening a PR'; await c.sleep(1000);
+        const s = c.q('stat'); s.className = 'stat ok'; s.textContent = 'Done'; c.q('detail').textContent = 'PR #212';
+        c.q('rail').style.setProperty('--rail', 'var(--o-done)'); c.q('rowdot').className = 'sdot done';
+        await c.sleep(600); c.show('report');
+      },
+      final(c) { this.run.call(this, { ...c, sleep: async () => {}, type: async (el, t) => { el.textContent = t; } }); },
+      hold: 3200
+    },
+    thr: {
+      reset(c) { ['ask', 't1', 'steer'].forEach(k => c.show(k, false)); c.q('stream').textContent = ''; c.q('s1').innerHTML = '<span class="spin"></span>'; const p = c.q('ph'); p.textContent = 'Reply'; p.classList.remove('typed'); },
+      async run(c) {
+        await c.sleep(400); c.show('ask'); await c.sleep(600); c.show('t1'); await c.sleep(900);
+        const p = c.q('ph'); p.textContent = ''; p.classList.add('typed');
+        await c.type(p, 'Skip the gift cards', 45); await c.sleep(250);
+        c.q('send').classList.add('press'); await c.sleep(160); c.q('send').classList.remove('press');
+        p.textContent = 'Steer the agent. It reads this at its next step.'; p.classList.remove('typed'); c.show('steer');
+        await c.sleep(700); c.q('s1').innerHTML = '<span class="check"></span>';
+        await c.stream(c.q('stream'), 'Found 14 images over 500 KB. 9 are on the Gel Polish collection, gift cards skipped. Want me to convert them to AVIF?');
+        p.textContent = 'Reply';
+      },
+      final(c) { c.show('ask'); c.show('t1'); c.show('steer'); c.q('s1').innerHTML = '<span class="check"></span>'; c.q('stream').textContent = 'Found 14 images over 500 KB. 9 are on the Gel Polish collection, gift cards skipped. Want me to convert them to AVIF?'; }
+    },
+    art: {
+      reset(c) { ['say', 'card', 'pub'].forEach(k => c.show(k, false)); c.q('bars').querySelectorAll('i').forEach(i => i.style.height = '4%'); },
+      async run(c) {
+        await c.sleep(400); c.show('say'); await c.sleep(600); c.show('card'); await c.sleep(400);
+        const hs = [38, 52, 46, 92, 64, 58, 70];
+        for (const [n, i] of [...c.q('bars').querySelectorAll('i')].entries()) { i.style.height = hs[n] + '%'; await c.sleep(120); }
+        await c.sleep(900); c.show('pub');
+      },
+      final(c) { c.show('say'); c.show('card'); c.show('pub'); const hs = [38, 52, 46, 92, 64, 58, 70]; c.q('bars').querySelectorAll('i').forEach((i, n) => i.style.height = hs[n] + '%'); },
+      hold: 2800
+    },
+    brow: {
+      reset(c) {
+        ['t1', 't2', 'say', 'img', 'info'].forEach(k => c.show(k, false));
+        c.q('url').textContent = ''; c.q('drawer').classList.remove('open'); c.q('s2').innerHTML = '<span class="spin"></span>';
+        const cur = c.q('cur'); cur.style.left = '30%'; cur.style.top = '78%';
+      },
+      async run(c) {
+        await c.sleep(400); await c.type(c.q('url'), 'volero-eu.myshopify.com/products/zermatt', 22);
+        c.show('t1'); await c.sleep(300); c.show('img'); await c.sleep(200); c.show('info'); await c.sleep(700);
+        c.show('t2'); const cur = c.q('cur'), atc = c.q('atc'), site = atc.closest('.site');
+        const r = atc.getBoundingClientRect(), s = site.getBoundingClientRect();
+        cur.style.left = ((r.left - s.left + r.width * 0.5) / s.width * 100) + '%';
+        cur.style.top = ((r.top - s.top + r.height * 0.55) / s.height * 100) + '%';
+        await c.sleep(1000); atc.classList.add('press'); await c.sleep(180); atc.classList.remove('press');
+        c.q('drawer').classList.add('open'); await c.sleep(600); c.q('s2').innerHTML = '<span class="check"></span>';
+        await c.sleep(300); c.show('say');
+      },
+      final(c) { ['t1', 't2', 'say', 'img', 'info'].forEach(k => c.show(k)); c.q('url').textContent = 'volero-eu.myshopify.com/products/zermatt'; c.q('drawer').classList.add('open'); c.q('s2').innerHTML = '<span class="check"></span>'; },
+      hold: 2600
+    },
+    team: {
+      reset(c) {
+        const st = c.stage;
+        st.querySelectorAll('[data-m]').forEach(n => n.classList.add('out'));
+        st.querySelectorAll('.flow').forEach(f => f.classList.remove('on'));
+        st.querySelectorAll('[data-d]').forEach(d => d.className = 'sdot live');
+        c.show('merge', false);
+      },
+      async run(c) {
+        const st = c.stage; await c.sleep(500);
+        for (let i = 0; i < 3; i++) { st.querySelector(`[data-f="${i}"]`).classList.add('on'); await c.sleep(220); st.querySelector(`[data-m="${i}"]`).classList.remove('out'); }
+        await c.sleep(1000); st.querySelectorAll('[data-f]').forEach(f => f.classList.remove('on'));
+        for (const i of [1, 0, 2]) { await c.sleep(650); st.querySelector(`[data-d="${i}"]`).className = 'sdot done'; st.querySelector(`[data-b="${i}"]`).classList.add('on'); }
+        await c.sleep(900); c.show('merge'); await c.sleep(500); st.querySelectorAll('[data-b]').forEach(f => f.classList.remove('on'));
+      },
+      final(c) { const st = c.stage; st.querySelectorAll('[data-m]').forEach(n => n.classList.remove('out')); st.querySelectorAll('[data-d]').forEach(d => d.className = 'sdot done'); c.show('merge'); },
+      hold: 2600
+    }
+  };
+
+  // Conductor final state needs its own sync pass for reduced motion.
+  scenes.cond.final = function (c) {
+    ['ask', 'say', 'card', 'report', 'newrow', 'work', 'w2', 'w3'].forEach(k => c.show(k));
+    c.q('askt').textContent = 'Fix the cart drawer upsell on Volero and open a PR';
+    const s = c.q('stat'); s.className = 'stat ok'; s.textContent = 'Done'; c.q('detail').textContent = 'PR #212';
+    c.q('rail').style.setProperty('--rail', 'var(--o-done)'); c.q('rowdot').className = 'sdot done';
+  };
+
+  document.querySelectorAll('[data-scene]').forEach(st => { const d = scenes[st.dataset.scene]; if (d) makeScene(st, d); });
+
+  // Ticking channel counts: no reset needed, it drifts forever while visible.
+  function ticker(stage, sel, footSel, slots) {
+    const ctx = { visible: false };
+    new IntersectionObserver(es => ctx.visible = es[0].isIntersecting, { threshold: 0.2 }).observe(stage);
+    const badges = [...stage.querySelectorAll(sel)];
+    const foot = stage.querySelector(footSel);
+    const counts = badges.map(b => +b.lastElementChild.textContent);
+    const render = (i) => {
+      const b = badges[i];
+      b.classList.toggle('zero', counts[i] === 0);
+      b.lastElementChild.textContent = counts[i] || b.lastElementChild.textContent;
+      b.animate?.([{ transform: 'translateY(-3px)', opacity: .4 }, { transform: 'none', opacity: 1 }], { duration: 380, easing: 'cubic-bezier(0.24,1.34,0.38,1)' });
+      const total = counts.reduce((a, n) => a + n, 0);
+      if (foot) foot.textContent = `Claude Code ${Math.min(total, slots)}/6 · Codex ${Math.max(0, total - 4) % 5}/4`;
+    };
+    if (reduced) return;
+    setInterval(() => {
+      if (!ctx.visible || document.hidden) return;
+      const i = Math.floor(Math.random() * badges.length);
+      const up = counts[i] === 0 || (counts[i] < 3 && Math.random() > 0.45);
+      counts[i] = Math.max(0, counts[i] + (up ? 1 : -1));
+      render(i);
+    }, 1400);
+  }
+  ticker(document.querySelector('[data-scene="chan"]'), '.badge', '[data-c="foot"]', 6);
+  ticker(document.getElementById('hero'), '.side .badge', '#hero-foot', 6);
+
+  // Harness picker: cycle the selection.
+  (() => {
+    const stage = document.querySelector('[data-scene="harn"]');
+    const rows = [...stage.querySelectorAll('.hrow')];
+    const models = [['Opus 5.5', 'high'], ['Codex (default)', 'Default'], ['Auto', 'Auto effort'], ['Hermes default', 'Auto effort']];
+    const m = stage.querySelector('[data-k="model"]'), e = stage.querySelector('[data-k="eff"]');
+    let i = 0, vis = false;
+    new IntersectionObserver(es => vis = es[0].isIntersecting, { threshold: 0.25 }).observe(stage);
+    if (reduced) return;
+    setInterval(() => {
+      if (!vis || document.hidden) return;
+      i = (i + 1) % rows.length;
+      rows.forEach((r, n) => r.classList.toggle('sel', n === i));
+      [m, e].forEach(el => el.classList.add('out'));
+      setTimeout(() => { m.textContent = models[i][0]; e.textContent = models[i][1]; [m, e].forEach(el => el.classList.remove('out')); }, 250);
+    }, 2000);
+  })();
+
+  // Hero: the write step finishes, the answer streams, then it loops quietly.
+  (() => {
+    const hero = document.getElementById('hero'); let vis = false;
+    new IntersectionObserver(es => vis = es[0].isIntersecting).observe(hero);
+    if (reduced) return;
+    const out = document.getElementById('hero-stream'), st = document.getElementById('hero-st');
+    const text = out.textContent + ' Setting a fixed ratio on the media wrapper fixes it. Full write-up is in the artifact.';
+    const bars = [...document.querySelectorAll('#hero-bars i')]; const hs = bars.map(b => b.style.height);
+    (async () => {
+      for (;;) {
+        while (!vis) await new Promise(r => setTimeout(r, 300));
+        st.innerHTML = '<span class="spin"></span>'; out.textContent = ''; bars.forEach(b => b.style.height = '4%');
+        await new Promise(r => setTimeout(r, 1200)); st.innerHTML = '<span class="check"></span>';
+        for (const [n, b] of bars.entries()) { b.style.height = hs[n]; await new Promise(r => setTimeout(r, 90)); }
+        for (const w of text.split(' ')) { out.textContent += (out.textContent ? ' ' : '') + w; await new Promise(r => setTimeout(r, 70 + Math.random() * 70)); }
+        await new Promise(r => setTimeout(r, 5000));
+      }
+    })();
+  })();
+})();
+</script>
