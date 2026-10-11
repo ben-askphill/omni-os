@@ -145,9 +145,138 @@ struct ThreadDayList: View {
           .padding(.horizontal, z(10))
           .padding(.vertical, z(6))
           ForEach(group.threads) {
-            ThreadListRow(model: model, thread: $0, showChannel: showChannel, pr: $0.branch.flatMap { prs[$0] }).openInNewWindow($0.id, model: model, title: $0.title)
+            ThreadListRow(model: model, thread: $0, showChannel: showChannel, pr: $0.branch.flatMap { prs[$0] })
+              .openInNewWindow($0.id, model: model, title: $0.title, stub: ThreadStub($0))
           }
         }
+      }
+    }
+  }
+}
+
+/// A channel's threads under its sidebar folders, in the sidebar's order and with its open or closed state, then the
+/// threads in none under "No folder", as FolderGroups in ThreadList.tsx. Drop a thread on a folder to file it there,
+/// or on "No folder" to take it out.
+struct ThreadFolderList: View {
+  let model: AppModel
+  let channel: ChannelWithRunning
+  let threads: [OmniThread]
+  var prs: [String: BranchPRMark] = [:]
+
+  var body: some View {
+    let groups = ThreadListing.byFolder(threads, in: channel)
+    LazyVStack(alignment: .leading, spacing: z(12)) {
+      ForEach(groups.folders) { g in
+        VStack(alignment: .leading, spacing: 0) {
+          FolderSectionHeader(
+            model: model, channelID: channel.id, folder: g.folder, count: g.threads.count,
+            running: g.threads.contains { $0.status.isActive })
+          if !g.folder.collapsed {
+            if g.threads.isEmpty {
+              note("No threads yet. Drag one here or use Move to Folder.")
+            } else {
+              rows(g.threads)
+            }
+          }
+        }
+      }
+      VStack(alignment: .leading, spacing: 0) {
+        FolderSectionHeader(model: model, channelID: channel.id, folder: nil, count: groups.unfiled.count, running: false)
+        if groups.unfiled.isEmpty {
+          note("Every thread is in a folder.")
+        } else {
+          rows(groups.unfiled)
+        }
+      }
+    }
+  }
+
+  private func rows(_ list: [OmniThread]) -> some View {
+    ForEach(list) { t in
+      ThreadListRow(model: model, thread: t, pr: t.branch.flatMap { prs[$0] })
+        .onDrag {
+          model.folders.dragging = .thread(ThreadStub(t))
+          return NSItemProvider(object: (t.title.isEmpty ? "Untitled" : t.title) as NSString)
+        }
+        .openInNewWindow(t.id, model: model, title: t.title, stub: ThreadStub(t))
+    }
+  }
+
+  private func note(_ text: String) -> some View {
+    Text(text)
+      .font(.omni(size: 12.5))
+      .foregroundStyle(Tok.fg4)
+      .padding(.horizontal, z(10))
+      .padding(.vertical, z(6))
+  }
+}
+
+/// A folder's header in a channel's list: chevron, name and count, opening and closing it as its sidebar row does,
+/// with the folder's menu on a right-click. Without a folder, "No folder".
+private struct FolderSectionHeader: View {
+  let model: AppModel
+  let channelID: String
+  let folder: FolderWithThreads?
+  let count: Int
+  let running: Bool
+  @State private var ungroupOn = false
+  @State private var hover = false
+
+  private var name: String { folder?.name ?? "No folder" }
+  private var filing: Bool {
+    guard let folder else { return ungroupOn }
+    return model.folders.dropTarget == folder.id && model.folders.drop(on: folder) == .file
+  }
+
+  var body: some View {
+    Group {
+      if let folder {
+        Button {
+          withAnimation(Motion.settle) { Task { await model.folders.toggle(folder.id) } }
+        } label: {
+          label(open: !folder.collapsed)
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(folder.collapsed ? "Collapsed" : "Expanded")
+        .contextMenu { FolderMenuItems(model: model, folder: folder) }
+        .onDrop(of: [.plainText], delegate: FolderDrop(folders: model.folders, folder: folder))
+      } else {
+        label(open: nil)
+          .onDrop(of: [.plainText], delegate: UngroupDrop(folders: model.folders, channelID: channelID, on: $ungroupOn))
+      }
+    }
+    .onHover { hover = $0 }
+    .accessibilityLabel("\(name), \(Format.plural(count, "thread"))")
+  }
+
+  private func label(open: Bool?) -> some View {
+    HStack(spacing: z(6)) {
+      if let open {
+        OmniIcon(name: open ? "chevronDown" : "chevronRight", size: 12)
+          .foregroundStyle(Tok.fg4)
+          .frame(width: z(12))
+        OmniIcon(name: "folder", size: 13)
+          .foregroundStyle(Tok.fg3)
+      } else {
+        Color.clear.frame(width: z(12), height: z(12))
+      }
+      Text(name).lineLimit(1)
+      Text("\(count)")
+        .foregroundStyle(Tok.fg4)
+      if running {
+        Loader(size: 11).foregroundStyle(Tok.live)
+      }
+      Spacer(minLength: 0)
+    }
+    .omniCaption()
+    .padding(.horizontal, z(10))
+    .padding(.vertical, z(6))
+    .contentShape(Capsule())
+    .background {
+      if filing {
+        Capsule().fill(Tok.wash).overlay(Capsule().strokeBorder(Tok.lineStrong, lineWidth: 1))
+      } else if hover, open != nil {
+        Capsule().fill(Tok.surface)
       }
     }
   }

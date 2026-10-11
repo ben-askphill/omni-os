@@ -1,5 +1,6 @@
 import { Fragment, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import type { BackgroundTask, ChannelWithRunning, FolderWithThreads, HarnessId, ThreadStub, Usage, UsageWindow } from '../api.ts';
+import { folderOf } from '../folder-groups.ts';
 import { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, drag, draftKey, freeName, useFolders } from '../folders.tsx';
 import { openMenu } from './ContextMenu.tsx';
 import { duration, plural, toDate, untilLabel } from '../format.ts';
@@ -406,14 +407,6 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
   // The highlighted channel: the one open, or the one the open thread belongs to.
   const focused = activeChannel ?? (openThread && openThread.id === openId ? openThread.channel_id : null);
 
-  // The folder a thread sits in, as the list knows it now: a move shows before the open thread's own copy hears of it.
-  const folderOf = (c: ChannelWithRunning, t: ThreadStub) => {
-    const inFolder = c.folders?.find((f) => f.threads.some((x) => x.id === t.id));
-    if (inFolder) return inFolder.id;
-    const stub = [...(c.active ?? []), ...(c.recent ?? [])].find((x) => x.id === t.id);
-    const id = (stub ?? t).folder_id ?? null;
-    return id && c.folders?.some((f) => f.id === id) ? id : null;
-  };
   const openIn = (c: ChannelWithRunning) => (openThread && openThread.id === openId && openThread.channel_id === c.id ? openThread : null);
 
   // Running and queued threads, newest first. The open thread joins them with the page's fresher

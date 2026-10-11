@@ -13,6 +13,7 @@ function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
   const list = useLiveThreads(`/channels/${encodeURIComponent(id)}/threads`, accept);
   const prs = useThreadPRs(id);
   const presetSeq = usePresetSeq();
+  const { channel } = useApp();
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-16 md:px-8">
       <NewThreadComposer key={presetSeq} channelId={id} placeholder={isConductor ? 'Ask the Conductor. It delegates to the crew.' : undefined} />
@@ -23,6 +24,7 @@ function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
           error={list.error}
           onRetry={list.reload}
           prs={prs}
+          channel={channel(id)}
           empty={
             <Empty icon="message" title="No threads in this channel yet">
               Start one above. Crew threads delegated by the Conductor land here too.

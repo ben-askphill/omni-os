@@ -413,3 +413,43 @@ private final class FakeFolderAPI: FolderAPI {
     #expect(try bodyJSON(r[6]) == .object(["folder_id": .string("f/1")]))
   }
 }
+
+/// A whole thread, as GET /api/channels/:id/threads lists it.
+private func listedThread(_ id: String, folder: String? = nil) throws -> OmniThread {
+  let f = folder.map { #""\#($0)""# } ?? "null"
+  return try decode(OmniThread.self, #"""
+    {"id":"\#(id)","channel_id":"acme","title":"\#(id)","status":"done","role":null,"model":null,"harness":"claude-code","effort":"",
+     "session_id":null,"has_run":1,"cwd":"/tmp","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,
+     "last_text":null,"suggestion":null,"archived":0,"folder_id":\#(f),"created_at":"2026-10-10T08:00:00.000Z","updated_at":"2026-10-10T08:00:00.000Z"}
+    """#)
+}
+
+@Suite struct FolderGroupingTests {
+  @Test func keepsTheSidebarsFolderOrderWithEmptyFoldersAndTheListsOrderInEach() throws {
+    let c = try acme(folders: [
+      folderRow("z", name: "Zeta", position: "0"), folderRow("a", name: "Alpha", position: "1"), folderRow("e", name: "Empty", position: "2"),
+    ])
+    let list = try [listedThread("t1", folder: "a"), listedThread("t2"), listedThread("t3", folder: "z"), listedThread("t4", folder: "a"), listedThread("t5")]
+    let g = ThreadListing.byFolder(list, in: c)
+    #expect(g.folders.map(\.folder.name) == ["Zeta", "Alpha", "Empty"])
+    #expect(g.folders.map { $0.threads.map(\.id) } == [["t3"], ["t1", "t4"], []])
+    #expect(g.unfiled.map(\.id) == ["t2", "t5"])
+  }
+
+  @Test func putsAThreadWhereTheSidebarShowsIt() throws {
+    // t1 was just filed in A by the sidebar, t2 just taken out of B: the list's own copies have not heard yet.
+    // t3 sits in a folder that is gone.
+    let c = try acme(
+      recent: [stub("t2")],
+      folders: [folderRow("a", name: "A", threads: [stub("t1", folder: "a")]), folderRow("b", name: "B")])
+    let list = try [listedThread("t1"), listedThread("t2", folder: "b"), listedThread("t3", folder: "gone"), listedThread("t4", folder: "b")]
+    let g = ThreadListing.byFolder(list, in: c)
+    #expect(g.folders.map { $0.threads.map(\.id) } == [["t1"], ["t4"]])
+    #expect(g.unfiled.map(\.id) == ["t2", "t3"])
+  }
+
+  @Test func isAllUngroupedWithoutFolders() throws {
+    let g = ThreadListing.byFolder(try [listedThread("t1"), listedThread("t2", folder: "x")], in: try acme())
+    #expect(g.folders.isEmpty && g.unfiled.map(\.id) == ["t1", "t2"])
+  }
+}

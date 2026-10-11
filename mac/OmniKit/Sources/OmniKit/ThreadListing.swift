@@ -26,6 +26,13 @@ public enum ThreadFilter: String, CaseIterable, Hashable, Sendable {
   }
 }
 
+/// A sidebar folder and the threads of a channel's list that sit in it, as `groupByFolder` in web/src/folder-groups.ts.
+public struct FolderGroup: Hashable, Sendable, Identifiable {
+  public let folder: FolderWithThreads
+  public let threads: [OmniThread]
+  public var id: String { folder.id }
+}
+
 public struct DayGroup: Hashable, Sendable, Identifiable {
   public let label: String
   public let threads: [OmniThread]
@@ -58,6 +65,22 @@ public enum ThreadListing {
       }
     }
     return groups
+  }
+
+  /// Every folder of the channel in the sidebar's order, empty ones too, each with its threads from `threads`, then
+  /// the threads in none. A thread sits where the sidebar shows it (`SidebarSections.folder(of:in:)`), and each list
+  /// keeps the order `threads` came in.
+  public static func byFolder(_ threads: [OmniThread], in channel: ChannelWithRunning) -> (folders: [FolderGroup], unfiled: [OmniThread]) {
+    var filed: [String: [OmniThread]] = [:]
+    var unfiled: [OmniThread] = []
+    for t in threads {
+      if let id = SidebarSections.folder(of: ThreadStub(t), in: channel) {
+        filed[id, default: []].append(t)
+      } else {
+        unfiled.append(t)
+      }
+    }
+    return (channel.folders.map { FolderGroup(folder: $0, threads: filed[$0.id] ?? []) }, unfiled)
   }
 
   /// A fetched list with the feed's newer copies laid over it, most recently updated first. Only threads of

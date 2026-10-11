@@ -216,6 +216,8 @@ private struct ChannelThreads: View {
         ErrorNote(text: error) { Task { await load() } }
       } else if loaded == nil {
         LoadingNote()
+      } else if !channel.folders.isEmpty {
+        ThreadFolderList(model: model, channel: channel, threads: threads, prs: prs)
       } else if threads.isEmpty {
         EmptyNote(symbol: "message", title: "No threads in this channel yet", message: "Start one above. Crew threads delegated by the Conductor land here too.")
       } else {

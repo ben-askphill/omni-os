@@ -1,7 +1,9 @@
 import { Loader } from './brand.tsx';
-import { useCallback, useEffect, type CSSProperties, type ReactNode } from 'react';
-import { useApi, type BranchPRMark, type Thread } from '../api.ts';
-import { groupByDay, relTime } from '../format.ts';
+import { useCallback, useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
+import { useApi, type BranchPRMark, type ChannelWithRunning, type FolderWithThreads, type Thread } from '../api.ts';
+import { folderOf, groupByFolder } from '../folder-groups.ts';
+import { drag, useFolders } from '../folders.tsx';
+import { groupByDay, plural, relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useFeed, useNow } from '../store.tsx';
 import { Avatar, Chip, Empty, ErrorNote, Icon, Loading, StatusDot } from './ui.tsx';
@@ -107,6 +109,7 @@ export function ThreadGroups({
   showChannel,
   prs,
   empty,
+  channel,
 }: {
   threads: Thread[] | undefined;
   loading: boolean;
@@ -115,9 +118,12 @@ export function ThreadGroups({
   showChannel?: boolean;
   prs?: Record<string, BranchPRMark>;
   empty?: ReactNode;
+  /** One channel's list: grouped by its sidebar folders when it has any. */
+  channel?: ChannelWithRunning;
 }) {
   if (error && !threads) return <ErrorNote onRetry={onRetry}>{error}</ErrorNote>;
   if (!threads && loading) return <Loading label="Loading threads" />;
+  if (channel?.folders?.length) return <FolderGroups threads={threads ?? []} channel={channel} prs={prs} />;
   if (!threads?.length) return <>{empty ?? <Empty icon="message" title="No threads yet" />}</>;
   return (
     <div className="space-y-4">
@@ -127,15 +133,113 @@ export function ThreadGroups({
             {g.label}
             <span className="text-fg-4/70">{g.items.length}</span>
           </h3>
-          <div className="rise">
-            {g.items.map((t, i) => (
-              <div key={t.id} style={{ '--i': Math.min(i, 12) } as CSSProperties}>
-                <ThreadRow t={t} showChannel={showChannel} pr={t.branch ? prs?.[t.branch] : undefined} />
-              </div>
-            ))}
-          </div>
+          <Rows threads={g.items} showChannel={showChannel} prs={prs} />
         </section>
       ))}
     </div>
+  );
+}
+
+function Rows({ threads, showChannel, prs, draggable }: { threads: Thread[]; showChannel?: boolean; prs?: Record<string, BranchPRMark>; draggable?: boolean }) {
+  return (
+    <div className="rise">
+      {threads.map((t, i) => (
+        <div
+          key={t.id}
+          style={{ '--i': Math.min(i, 12) } as CSSProperties}
+          onDragStart={
+            draggable
+              ? (e) => {
+                  drag.start({ kind: 'thread', thread: t });
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', t.title || 'Untitled');
+                }
+              : undefined
+          }
+          onDragEnd={draggable ? drag.end : undefined}
+        >
+          <ThreadRow t={t} showChannel={showChannel} pr={t.branch ? prs?.[t.branch] : undefined} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A channel's threads under its sidebar folders, in the sidebar's order and with its open or closed state, then the
+ * threads in none under "No folder". Drop a thread on a folder to file it there, or on "No folder" to take it out.
+ */
+function FolderGroups({ threads, channel, prs }: { threads: Thread[]; channel: ChannelWithRunning; prs?: Record<string, BranchPRMark> }) {
+  const { folders: groups, unfiled } = groupByFolder(threads, channel);
+  return (
+    <div className="space-y-4">
+      {groups.map((g) => (
+        <section key={g.folder.id}>
+          <FolderHeader channel={channel} folder={g.folder} count={g.threads.length} running={g.threads.some((t) => t.status === 'running' || t.status === 'queued')} />
+          {!g.folder.collapsed &&
+            (g.threads.length ? (
+              <Rows threads={g.threads} prs={prs} draggable />
+            ) : (
+              <div className="px-3.5 pb-1 text-[12.5px] leading-7 text-fg-4">No threads yet. Drag one here or use Move to folder.</div>
+            ))}
+        </section>
+      ))}
+      <section>
+        <FolderHeader channel={channel} count={unfiled.length} running={false} />
+        {unfiled.length ? (
+          <Rows threads={unfiled} prs={prs} draggable />
+        ) : (
+          <div className="px-3.5 pb-1 text-[12.5px] leading-7 text-fg-4">Every thread is in a folder.</div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/** A folder's header: chevron, name and count, opening and closing it as its sidebar row does. Without a folder, "No folder". */
+function FolderHeader({ channel, folder, count, running }: { channel: ChannelWithRunning; folder?: FolderWithThreads; count: number; running: boolean }) {
+  const folders = useFolders();
+  const [over, setOver] = useState(false);
+  const target = folder?.id ?? null;
+  const accepts = () => {
+    const d = drag.get();
+    return d?.kind === 'thread' && d.thread.channel_id === channel.id && !target?.startsWith('tmp-') && folderOf(channel, d.thread) !== target;
+  };
+  const onOver = (e: DragEvent) => {
+    if (!accepts()) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setOver(true);
+  };
+  const onDrop = (e: DragEvent) => {
+    const d = drag.get();
+    setOver(false);
+    if (d?.kind !== 'thread' || !accepts()) return;
+    e.preventDefault();
+    drag.end();
+    void folders.moveThread({ ...d.thread, folder_id: folderOf(channel, d.thread) }, target);
+  };
+  const cls = `caption flex w-full items-center gap-2 rounded-full px-3.5 py-2 text-left transition-shadow ${
+    over ? 'bg-wash shadow-[inset_0_0_0_1px_var(--line-strong)]' : ''
+  }`;
+  const label = `${folder?.name ?? 'No folder'}, ${plural(count, 'thread')}`;
+  return (
+    <h3 className="sticky top-0 z-[2] bg-bg" onDragOver={onOver} onDragLeave={() => setOver(false)} onDrop={onDrop}>
+      {folder ? (
+        <button type="button" data-folder-id={folder.id} onClick={() => void folders.toggle(folder.id)} aria-expanded={!folder.collapsed} aria-label={label} title={label} className={`hov ${cls} [--hov:var(--surface)]`}>
+          <Icon name={folder.collapsed ? 'chevronRight' : 'chevronDown'} size={12} className="-ml-0.5 shrink-0 text-fg-4" />
+          <Icon name="folder" size={13} className="shrink-0 text-fg-3" />
+          <span className="min-w-0 truncate">{folder.name}</span>
+          <span className="text-fg-4/70">{count}</span>
+          {running && <Loader size={11} className="shrink-0 text-live-text" />}
+        </button>
+      ) : (
+        <div aria-label={label} className={cls}>
+          <span className="w-3 shrink-0" />
+          No folder
+          <span className="text-fg-4/70">{count}</span>
+        </div>
+      )}
+    </h3>
   );
 }

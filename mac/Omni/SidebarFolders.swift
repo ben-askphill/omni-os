@@ -185,7 +185,7 @@ enum QAFolderProbe {
 #endif
 
 /// A drop on a folder: a thread files there, another folder of the channel goes just above.
-private struct FolderDrop: DropDelegate {
+struct FolderDrop: DropDelegate {
   let folders: FolderModel
   let folder: FolderWithThreads
 
