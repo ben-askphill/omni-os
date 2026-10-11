@@ -162,6 +162,10 @@ final class QARunner {
           guard let open = QAProbe.openMeter else { throw QAScriptError("no context meter on screen") }
           open()
           try? await Task.sleep(for: .milliseconds(800))
+        case .imageZoom(let scale):
+          guard let zoom = QAProbe.imageZoom else { throw QAScriptError("no image preview on screen") }
+          if let scale { zoom.step(scale / zoom.scale) } else { zoom.fit() }
+          try? await Task.sleep(for: .milliseconds(400))
         case .sleep(let duration):
           try? await Task.sleep(for: duration)
         case .snapshot(let name):
@@ -408,6 +412,7 @@ final class QARunner {
     case .scroll(let scroll): "scroll \(scroll.rawValue)"
     case .expand: "expand"
     case .meter: "meter"
+    case .imageZoom(let scale): "imageZoom \(scale.map { "\($0)" } ?? "fit")"
     case .type(let text): "type \(text.prefix(40))"
     case .send(let mode): "send \(mode?.rawValue ?? "reply")"
     case .inspector(let command): "inspector \(command.rawValue)"

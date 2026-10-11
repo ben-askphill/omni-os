@@ -32,6 +32,7 @@ struct ArtifactViewer: View {
   @Environment(\.openURL) private var openURL
   @State private var saveError: String?
   @State private var comments = CommentsAsk.idle
+  @State private var zoom = ImageZoom()
 
   var body: some View {
     VStack(spacing: 0) {
@@ -49,6 +50,9 @@ struct ArtifactViewer: View {
             .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        if ["image", "screenshot"].contains(ref.kind) && zoom.ready {
+          ImageZoomControls(zoom: zoom)
+        }
         if let url = ref.url, let threadID = ref.threadID {
           Button {
             Task { comments = .sending; comments = await CommentsAsk.run(client: client, threadID: threadID, url: url) }
@@ -89,7 +93,7 @@ struct ArtifactViewer: View {
       if let saveError {
         ErrorNote(text: saveError).padding(z(8))
       }
-      ArtifactBody(client: client, ref: ref)
+      ArtifactBody(client: client, ref: ref, zoom: zoom)
     }
   }
 }
@@ -141,6 +145,7 @@ enum ArtifactSaver {
 struct ArtifactBody: View {
   let client: OmniClient
   let ref: ArtifactRef
+  let zoom: ImageZoom
   @State private var phase = Phase.loading
 
   private enum Phase {
@@ -164,7 +169,7 @@ struct ArtifactBody: View {
         case .failed(let message):
           VStack { ErrorNote(text: message) { phase = .loading; Task { await load() } }.padding(z(12)); Spacer() }
         case .loaded(let data):
-          NativeBody(ref: ref, data: data)
+          NativeBody(ref: ref, data: data, zoom: zoom)
         }
       }
       .task(id: ref) { await load() }
@@ -184,25 +189,14 @@ struct ArtifactBody: View {
 private struct NativeBody: View {
   let ref: ArtifactRef
   let data: Data
+  let zoom: ImageZoom
 
   var body: some View {
     switch ref.kind {
     case "pdf":
       PDFArtifactView(data: data)
     case "image", "screenshot":
-      if let image = NSImage(data: data) {
-        ScrollView([.horizontal, .vertical]) {
-          Image(nsImage: image)
-            .resizable()
-            .scaledToFit()
-            .clipShape(RoundedRectangle(cornerRadius: z(12), style: .continuous))
-            .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
-            .padding(z(12))
-            .frame(maxWidth: .infinity)
-        }
-      } else {
-        Text("This image could not be read.").font(.omni(size: 13)).foregroundStyle(Tok.fg3).padding(z(16))
-      }
+      ImageBody(data: data, zoom: zoom)
     case "markdown":
       ScrollView {
         MarkdownView(document: MarkdownDocument(parsing: String(decoding: data, as: UTF8.self)))
@@ -221,6 +215,30 @@ private struct NativeBody: View {
   private static func pretty(_ data: Data) -> String {
     let text = String(decoding: data, as: UTF8.self)
     return ThreadDetails.prettyJSON(text) ?? text
+  }
+}
+
+/// Decodes once per file, so the zoom survives redraws.
+private struct ImageBody: View {
+  let data: Data
+  let zoom: ImageZoom
+  @State private var image: NSImage?
+  @State private var decoded = false
+
+  var body: some View {
+    // A ZStack, not a Group: a Group with nothing in it yet would never run the task.
+    ZStack(alignment: .topLeading) {
+      if let image {
+        ZoomableImage(image: image, zoom: zoom)
+      } else if decoded {
+        Text("This image could not be read.").font(.omni(size: 13)).foregroundStyle(Tok.fg3).padding(z(16))
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .task(id: data) {
+      image = NSImage(data: data)
+      decoded = true
+    }
   }
 }
 

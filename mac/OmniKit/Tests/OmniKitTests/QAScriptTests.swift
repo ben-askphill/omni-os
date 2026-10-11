@@ -46,6 +46,8 @@ import OmniKit
         {"scroll": "through"},
         {"expand": true},
         {"meter": true},
+        {"imageZoom": 2},
+        {"imageZoom": "fit"},
         {"openThread": "t2"}
       ]
       """.utf8))
@@ -58,6 +60,8 @@ import OmniKit
       .scroll(.through),
       .expand,
       .meter,
+      .imageZoom(2),
+      .imageZoom(nil),
       .openThread("t2"),
     ])
   }

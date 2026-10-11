@@ -495,6 +495,8 @@ enum QAProbe {
   }
 
   static var shownThread: String?
+  /// The artifact image preview's zoom, while one shows.
+  static weak var imageZoom: ImageZoom?
   static var shownAt: ContinuousClock.Instant?
   static var scroller: Scroller?
   static var expand: (() -> Void)?

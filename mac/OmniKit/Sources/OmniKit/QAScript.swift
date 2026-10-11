@@ -59,6 +59,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
 /// `{"settings": "secrets"}` (or `connection`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
 /// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`), `{"expand": true}`, `{"meter": true}`,
+/// `{"imageZoom": 2}` (or `"fit"`),
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
 /// `browser`, `terminal`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
 /// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
@@ -85,6 +86,8 @@ public enum QAStep: Hashable, Sendable {
   case expand
   /// Opens the open thread's context meter panel.
   case meter
+  /// Zooms the artifact image preview to this scale, or back to fit with nil.
+  case imageZoom(Double?)
   /// Puts text in the reply box, as if typed.
   case type(String)
   /// Sends the reply box: nil is a plain reply, else the mode of the split button.
@@ -187,7 +190,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "type", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "imageZoom", "type", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -245,6 +248,10 @@ public struct QAScript: Hashable, Sendable {
       return .expand
     case "meter":
       return .meter
+    case "imageZoom":
+      if let name = value as? String, name == "fit" { return .imageZoom(nil) }
+      guard let scale = value as? Double, scale > 0 else { throw QAScriptError(#"imageZoom takes a scale like 2, or "fit""#) }
+      return .imageZoom(scale)
     case "type":
       guard let text = value as? String else { throw QAScriptError("type takes the text for the reply box") }
       return .type(text)
