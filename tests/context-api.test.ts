@@ -191,3 +191,41 @@ describe('readTranscript', () => {
     expect(ctx.toolLabel({ file_path: `/${'d'.repeat(2000)}/main.liquid` })).toMatch(/^…d{987}\/main\.liquid$/);
   });
 });
+
+describe('an autocompact window under the model window', () => {
+  it("keeps the model's own window from the stream across the CLI's readings", async () => {
+    const { bus } = await import('../server/bus.ts');
+    const id = 'ctx-window-test';
+    const seen: any[] = [];
+    const on = (e: any) => seen.push(e.context);
+    bus.on(`thread:${id}`, on);
+    const reading = (used: number) => ({
+      used,
+      max: 533_000,
+      autoCompactAt: 500_000,
+      model: 'claude-opus-5-5',
+      source: 'claude-cli' as const,
+      updated_at: new Date().toISOString(),
+    });
+    ctx.recordContext(id, reading(40_000));
+    expect(seen.at(-1).modelWindow).toBeUndefined();
+    ctx.recordContextHint(id, { windows: { 'claude-opus-5-5': 1_000_000 } });
+    expect(seen.at(-1)).toMatchObject({ max: 533_000, modelWindow: 1_000_000 });
+    ctx.recordContext(id, reading(60_000));
+    expect(seen.at(-1)).toMatchObject({ used: 60_000, max: 533_000, modelWindow: 1_000_000, autoCompactAt: 500_000 });
+    bus.off(`thread:${id}`, on);
+    ctx.forgetContext(id);
+  });
+});
+
+describe('compactEnv', () => {
+  it('compacts Opus 5.5 at 500K of its 1M window, and leaves other models to the CLI', async () => {
+    const { compactEnv } = await import('../server/harness/claude/adapter.ts');
+    const env = { CLAUDE_CODE_AUTO_COMPACT_WINDOW: '533000' };
+    expect(compactEnv('claude-opus-5-5')).toEqual(env);
+    expect(compactEnv('opus')).toEqual(env);
+    expect(compactEnv('claude-opus-5-5[1m]')).toEqual(env);
+    expect(compactEnv('claude-sonnet-5-5')).toEqual({});
+    expect(compactEnv('haiku')).toEqual({});
+  });
+});

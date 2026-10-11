@@ -39,7 +39,10 @@ function publish(threadId: string, c: ContextUsage) {
 export function recordContext(threadId: string, c: ContextUsage) {
   const prev = snapshots.get(threadId);
   // Codex may not name a window; keep the last one it did.
-  const next = { ...c, max: c.max ?? prev?.max ?? null };
+  const max = c.max ?? prev?.max ?? null;
+  // An autocompact window env makes the CLI report it as the model's too; the stream still names the real one.
+  const modelWindow = c.modelWindow ?? (prev?.modelWindow && max && prev.modelWindow > max ? prev.modelWindow : undefined);
+  const next = { ...c, max, ...(modelWindow ? { modelWindow } : {}) };
   if (c.source === 'claude-cli') rememberWindow(next);
   publish(threadId, next);
 }
@@ -66,6 +69,7 @@ export function recordContextHint(threadId: string, h: ContextHint, now = new Da
   const window = (model && h.windows[model]) || Math.max(...Object.values(h.windows));
   // Only a fallback: the CLI's own window (an autocompact window setting) is the one it compacts against.
   if (prev && prev.max === null) publish(threadId, { ...prev, max: window, modelWindow: window });
+  else if (prev?.max && window > prev.max && prev.modelWindow !== window) publish(threadId, { ...prev, modelWindow: window });
 }
 
 export function forgetContext(threadId: string) {

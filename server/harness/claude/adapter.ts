@@ -12,6 +12,7 @@ import { harnessEnv } from '../env-guard.ts';
 import { normalizeClaudeCommands } from './commands.ts';
 import { fromClaudeContext, type ContextUsage } from '../../../shared/context-meter.ts';
 import { CAPABILITIES } from '../types.ts';
+import { CLAUDE_ALIASES } from '../catalog.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
 
 /** Omni's own `initialize` request, whose answer lists the process's commands. */
@@ -55,6 +56,23 @@ export function modDirs(): string[] {
   return [paths.modProgress];
 }
 
+/**
+ * Opus 5.5 runs with its full 1M window and compacts at about half of it. The CLI compacts 33K below its
+ * autocompact window, so a 533K window compacts at 500K. Set here rather than left to Ben's global
+ * `autoCompactWindow` (270K), which would cut the window short for every model. The CLI's percent
+ * override does not move the threshold it reports, so the window is the knob.
+ */
+export const COMPACT_WINDOWS: Record<string, number> = {
+  'claude-opus-5-5': 533_000,
+};
+
+/** The autocompact env for a model id or alias, or nothing to keep the CLI's own setting. */
+export function compactEnv(model: string): Record<string, string> {
+  const id = (CLAUDE_ALIASES[model] ?? model).replace(/\[1m\]$/i, '');
+  const window = COMPACT_WINDOWS[id];
+  return window ? { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(window) } : {};
+}
+
 // A run killed before its result event may still have written the session file.
 const sessionOnDisk = (t: Thread) => existsSync(sessionFile(t));
 
@@ -66,6 +84,7 @@ export const claudeAdapter: HarnessAdapter = {
   spawn(ctx: AdapterContext, cb: AdapterCallbacks): HarnessSession {
     const { thread, mcpFile, secretEnv, systemPrompt } = ctx;
     const resume = ctx.resume || sessionOnDisk(thread);
+    const model = thread.model || ctx.role?.model || config.defaultModel;
 
     const args = [
       '-p',
@@ -73,7 +92,7 @@ export const claudeAdapter: HarnessAdapter = {
       '--output-format', 'stream-json',
       '--verbose',
       '--replay-user-messages',
-      '--model', thread.model || ctx.role?.model || config.defaultModel,
+      '--model', model,
       '--permission-mode', config.permissionMode,
       '--add-dir', threadDir(thread.id),
       '--append-system-prompt', systemPrompt,
@@ -94,6 +113,7 @@ export const claudeAdapter: HarnessAdapter = {
         OMNI_THREAD_DIR: threadDir(thread.id),
         OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),
         OMNI_CHANNEL: thread.channel_id,
+        ...compactEnv(model),
       }, secretEnv),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
