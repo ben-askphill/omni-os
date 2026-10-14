@@ -60,6 +60,7 @@ func bodyJSON(_ request: URLRequest) throws -> JSONValue {
     let client = OmniClient(port: 4799, transport: t)
     _ = try await client.channels(archived: true)
     _ = try await client.channelThreads("a b/c")
+    _ = try await client.channelThreads("acme", archived: true)
     _ = try await client.threads(channel: "acme", status: .running, limit: 5)
     _ = try await client.recent(limit: 10)
     _ = try await client.crew()
@@ -67,6 +68,7 @@ func bodyJSON(_ request: URLRequest) throws -> JSONValue {
     #expect(t.requests.map { $0.url!.absoluteString.replacingOccurrences(of: "http://127.0.0.1:4799", with: "") } == [
       "/api/channels?archived=1",
       "/api/channels/a%20b%2Fc/threads",
+      "/api/channels/acme/threads?archived=1",
       "/api/threads?channel=acme&status=running&limit=5",
       "/api/recent?limit=10",
       "/api/crew",

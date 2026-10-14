@@ -77,6 +77,9 @@ public final class WorkspaceStore {
   public private(set) var tasks: [BackgroundTask] = []
   /// Mod status lines pinned now, oldest first. One per plugin per thread.
   public private(set) var mods: [ModStatus] = []
+  /// Bumps when the feed archives a thread or shows one that is not in `recent`, which a restore does. A channel's
+  /// lists refetch on it, since `recent` holds no archived threads to lay over them.
+  public private(set) var archiveEpoch = 0
   public private(set) var loadState = LoadState.loading
   public private(set) var connection = ConnectionState.connecting
   /// How many times the feed has opened. The first is the initial connection; each later one is a reconnect.
@@ -217,6 +220,7 @@ public final class WorkspaceStore {
 
   private func upsertRecent(_ t: OmniThread) {
     recentSinceLoad?[t.id] = t
+    if t.archived || !recent.contains(where: { $0.id == t.id }) { archiveEpoch += 1 }
     if t.archived {
       recent.removeAll { $0.id == t.id }
       return

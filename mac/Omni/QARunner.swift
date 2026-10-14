@@ -155,7 +155,7 @@ final class QARunner {
         case .scroll(let scroll):
           result.note = try await self.scroll(scroll)
         case .expand:
-          guard let expand = QAProbe.expand else { throw QAScriptError("no thread on screen") }
+          guard let expand = QAProbe.expand else { throw QAScriptError("no thread or archived list on screen") }
           expand()
           try? await Task.sleep(for: .milliseconds(600))
         case .meter:

@@ -86,6 +86,7 @@ private struct ThreadHeader: View {
   let model: AppModel
   let store: ThreadStore
   let thread: OmniThread
+  @State private var restoring = false
 
   var body: some View {
     let channel = store.channel?.name ?? thread.channelID
@@ -138,6 +139,24 @@ private struct ThreadHeader: View {
       }
       if ContextMeter.metered.contains(thread.harness) {
         ContextMeterButton(model: model, store: store, thread: thread)
+      }
+      if thread.archived {
+        // Opened from its channel's Archived list or a search: put it back in the lists.
+        Button {
+          Task {
+            restoring = true
+            await model.setThreadArchived(thread.id, false)
+            restoring = false
+          }
+        } label: {
+          HStack(spacing: z(6)) {
+            if restoring { Loader(size: 12) } else { OmniIcon(name: "archive", size: 14) }
+            Text("Restore")
+          }
+        }
+        .buttonStyle(.pill(.secondary, height: 28))
+        .disabled(restoring)
+        .help("Archived. Restore it to its channel's thread list.")
       }
       StatusPill(status: thread.status)
     }

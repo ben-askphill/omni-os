@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { api, errorText, useApi, type ChannelWithRunning, type Thread } from '../api.ts';
 import { NewThreadComposer } from '../components/Composer.tsx';
-import { ThreadGroups, useLiveThreads, useThreadPRs } from '../components/ThreadList.tsx';
+import { ArchivedThreads, ThreadGroups, useLiveThreads, useThreadPRs } from '../components/ThreadList.tsx';
 import { Avatar, Button, Empty, StatusDot, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { href, usePresetSeq, type ChannelTab } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -31,6 +31,7 @@ function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
             </Empty>
           }
         />
+        <ArchivedThreads channelId={id} />
       </div>
     </div>
   );

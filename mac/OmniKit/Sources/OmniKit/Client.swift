@@ -133,9 +133,9 @@ public struct OmniClient: Sendable {
     try await send("GET", "/api/channels/\(uriComponent(id))")
   }
 
-  /// A channel's threads, most recently updated first.
-  public func channelThreads(_ id: String) async throws(OmniAPIError) -> [OmniThread] {
-    try await send("GET", "/api/channels/\(uriComponent(id))/threads")
+  /// A channel's threads, most recently updated first. With `archived`, only its archived ones.
+  public func channelThreads(_ id: String, archived: Bool = false) async throws(OmniAPIError) -> [OmniThread] {
+    try await send("GET", "/api/channels/\(uriComponent(id))/threads", query: archived ? [("archived", "1")] : [])
   }
 
   public func threads(channel: String? = nil, status: ThreadStatus? = nil, limit: Int? = nil) async throws(OmniAPIError) -> [OmniThread] {

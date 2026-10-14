@@ -26,11 +26,11 @@ func channelList(_ rows: String...) throws -> [ChannelWithRunning] {
   try decode([ChannelWithRunning].self, "[\(rows.joined(separator: ","))]")
 }
 
-private func thread(_ id: String, status: String = "running", updated: Int) throws -> OmniThread {
+private func thread(_ id: String, status: String = "running", updated: Int, archived: Bool = false) throws -> OmniThread {
   try decode(OmniThread.self, """
     {"id":"\(id)","channel_id":"acme","title":"\(id)","status":"\(status)","role":null,"model":null,"harness":"claude-code",
      "effort":"","session_id":null,"has_run":0,"cwd":null,"branch":null,"parent_id":null,"task_id":null,"source":"manual",
-     "automation":null,"last_text":null,"created_at":"\(iso(0))","updated_at":"\(iso(updated))"}
+     "automation":null,"last_text":null,"archived":\(archived ? 1 : 0),"created_at":"\(iso(0))","updated_at":"\(iso(updated))"}
     """)
 }
 
@@ -323,6 +323,28 @@ private func loaded(_ store: WorkspaceStore, _ api: FakeWorkspaceAPI) async thro
 
     feed.yield(.message(.thread(try thread("t3", updated: 1))))
     try await waitFor("t3 added") { store.snapshot.recent.map(\.id) == ["t2", "t1", "t3"] }
+  }
+
+  @Test func bumpsTheArchiveEpochWhenAThreadIsArchivedOrRestored() async throws {
+    let api = try FakeWorkspaceAPI.standard()
+    api.recent = [try thread("t1", updated: 10)]
+    let (store, feed, _) = makeStore(api)
+    defer { store.stop(); feed.finish() }
+    try await loaded(store, api)
+    let start = store.archiveEpoch
+
+    // An update to a listed thread leaves the channel lists alone.
+    feed.yield(.message(.thread(try thread("t1", status: "done", updated: 11))))
+    try await waitFor("t1 updated") { store.snapshot.recent.first?.status == .done }
+    #expect(store.archiveEpoch == start)
+
+    feed.yield(.message(.thread(try thread("t1", status: "done", updated: 11, archived: true))))
+    try await waitFor("t1 archived") { store.snapshot.recent.isEmpty }
+    #expect(store.archiveEpoch == start + 1)
+
+    feed.yield(.message(.thread(try thread("t1", status: "done", updated: 11))))
+    try await waitFor("t1 restored") { store.snapshot.recent.map(\.id) == ["t1"] }
+    #expect(store.archiveEpoch == start + 2)
   }
 
   @Test func keepsSixtyRecentThreads() async throws {

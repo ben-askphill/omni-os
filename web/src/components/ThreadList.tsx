@@ -1,15 +1,15 @@
 import { Loader } from './brand.tsx';
 import { useCallback, useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
-import { useApi, type BranchPRMark, type ChannelWithRunning, type FolderWithThreads, type Thread } from '../api.ts';
+import { api, errorText, useApi, type BranchPRMark, type ChannelWithRunning, type FolderWithThreads, type Thread } from '../api.ts';
 import { folderOf, groupByFolder } from '../folder-groups.ts';
 import { drag, useFolders } from '../folders.tsx';
 import { groupByDay, plural, relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useFeed, useNow } from '../store.tsx';
-import { Avatar, Chip, Empty, ErrorNote, Icon, Loading, StatusDot } from './ui.tsx';
+import { Avatar, Button, Chip, Empty, ErrorNote, Icon, Loading, StatusDot } from './ui.tsx';
 
-/** Loads a thread list and keeps it current from /feed. */
-export function useLiveThreads(path: string, accept: (t: Thread) => boolean, limit = 500) {
+/** Loads a thread list and keeps it current from /feed. With `archived`, the list holds archived threads only. */
+export function useLiveThreads(path: string, accept: (t: Thread) => boolean, limit = 500, archived = false) {
   const q = useApi<Thread[]>(path);
   const { setData, reload } = q;
   const acceptCb = useCallback(accept, [accept]);
@@ -18,8 +18,8 @@ export function useLiveThreads(path: string, accept: (t: Thread) => boolean, lim
     if (e.type !== 'thread' || !acceptCb(e.thread)) return;
     setData((prev) => {
       const list = (prev ?? []).filter((t) => t.id !== e.thread.id);
-      // Archived threads leave the list; they are not in it to begin with.
-      if (!e.thread.archived) list.push(e.thread);
+      // A thread archived or restored moves between the active list and the archived one.
+      if (!!e.thread.archived === archived) list.push(e.thread);
       list.sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : 0));
       return list.slice(0, limit);
     });
@@ -241,5 +241,72 @@ function FolderHeader({ channel, folder, count, running }: { channel: ChannelWit
         </div>
       )}
     </h3>
+  );
+}
+
+/**
+ * A channel's archived threads, under its list: a closed "Archived" header with the count, opening to the threads
+ * with Restore on each. Restoring puts the thread back in the list above, in its folder if it had one.
+ */
+export function ArchivedThreads({ channelId }: { channelId: string }) {
+  const accept = useCallback((t: Thread) => t.channel_id === channelId && t.source !== 'team', [channelId]);
+  const list = useLiveThreads(`/channels/${encodeURIComponent(channelId)}/threads?archived=1`, accept, 200, true);
+  const [open, setOpen] = useState(false);
+  const count = list.data?.length ?? 0;
+  if (!count) return null;
+  return (
+    <section className="mt-6">
+      <h3 className="sticky top-0 z-[2] bg-bg">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="hov caption flex w-full items-center gap-2 rounded-full px-3.5 py-2 text-left [--hov:var(--surface)]"
+        >
+          <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="-ml-0.5 shrink-0 text-fg-4" />
+          <Icon name="archive" size={13} className="shrink-0 text-fg-3" />
+          Archived
+          <span className="text-fg-4/70">{count}</span>
+        </button>
+      </h3>
+      {open && (
+        <div className="rise">
+          {list.data!.map((t, i) => (
+            <ArchivedRow key={t.id} t={t} i={i} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ArchivedRow({ t, i }: { t: Thread; i: number }) {
+  const { reloadChannels } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // The feed moves the row out of this list and into the active one.
+  const restore = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.patch<Thread>(`/threads/${encodeURIComponent(t.id)}`, { archived: false });
+      await reloadChannels();
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="flex items-center gap-1" style={{ '--i': Math.min(i, 12) } as CSSProperties}>
+      <div className="min-w-0 flex-1 opacity-80">
+        <ThreadRow t={t} />
+      </div>
+      <div className="flex shrink-0 flex-col items-end pr-1">
+        <Button size="sm" icon="archive" busy={busy} onClick={restore} aria-label={`Restore ${t.title || 'Untitled'}`}>
+          Restore
+        </Button>
+        {error && <span className="mt-1 max-w-[180px] truncate text-[11px] text-fg-3" title={error}>{error}</span>}
+      </div>
+    </div>
   );
 }

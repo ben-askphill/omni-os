@@ -36,7 +36,7 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
 }
 
 export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifact?: number }) {
-  const { setOpenThread, mods } = useApp();
+  const { setOpenThread, mods, reloadChannels } = useApp();
   const modLines = useMemo(() => mods.filter((m) => m.thread_id === id), [mods, id]);
   const isMobile = useIsMobile();
   // GET /api/harnesses, the same list the reply pills load. Until it arrives, canSteer uses the Cursor fallback.
@@ -84,6 +84,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     return typeof v === 'number' && Number.isFinite(v) ? v : null;
   });
   const [prBusy, setPrBusy] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootWidth, setRootWidth] = useState(0);
 
@@ -177,6 +178,20 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     }
   };
 
+  // An archived thread opened from its channel's Archived list or a search: put it back in the lists.
+  const restore = async () => {
+    setRestoring(true);
+    setActionError(null);
+    try {
+      applyThread(await api.patch<Thread>(`/threads/${encodeURIComponent(id)}`, { archived: false }), true);
+      await reloadChannels();
+    } catch (e) {
+      setActionError(errorText(e));
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   const togglePanel = () => {
     if (isMobile) setMobilePanel((v) => !v);
     else
@@ -263,6 +278,11 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                 pin();
               }}
             />
+            {!!thread.archived && (
+              <Button size="sm" variant="secondary" icon="archive" onClick={() => void restore()} busy={restoring} title="Archived. Restore it to its channel's thread list.">
+                Restore
+              </Button>
+            )}
             <StatusPill status={thread.status} />
             {slotBusy && (
               <Button

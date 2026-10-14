@@ -231,13 +231,16 @@ public final class AppModel {
     await store.reloadChannels()
   }
 
-  /// Archives a thread (or brings it back) from a right-click, then refreshes the lists. Archiving the
-  /// thread on screen moves to its channel.
-  public func setThreadArchived(_ id: String, _ archived: Bool) async {
+  /// Archives a thread (or brings it back) from a right-click or Restore, then refreshes the lists. Archiving the
+  /// thread on screen moves to its channel. False when the call failed.
+  @discardableResult
+  public func setThreadArchived(_ id: String, _ archived: Bool) async -> Bool {
     // A failed call leaves the thread where it is, which is the answer.
-    guard let t = try? await client.archiveThread(id, archived: archived) else { return }
+    guard let t = try? await client.archiveThread(id, archived: archived) else { return false }
+    threads.store(id)?.merge(t)
     await store.reloadChannels()
     if archived, case .thread(let open, _) = route, open == id { route = .channel(id: t.channelID) }
+    return true
   }
 
 
