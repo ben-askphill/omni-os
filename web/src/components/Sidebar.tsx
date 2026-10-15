@@ -1,5 +1,5 @@
 import { Fragment, useRef, useState, type DragEvent, type ReactNode } from 'react';
-import type { BackgroundTask, ChannelWithRunning, FolderWithThreads, HarnessId, ThreadStub, Usage, UsageWindow } from '../api.ts';
+import { taskHost, type BackgroundTask, type ChannelWithRunning, type FolderWithThreads, type HarnessId, type ThreadStub, type Usage, type UsageWindow } from '../api.ts';
 import { folderOf } from '../folder-groups.ts';
 import { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, drag, draftKey, freeName, useFolders } from '../folders.tsx';
 import { openMenu } from './ContextMenu.tsx';
@@ -153,49 +153,66 @@ function RunningBadge({ n }: { n: number }) {
 }
 
 /**
- * A thread nested under its channel, like a Claude Code session under its project, or one level deeper in a folder.
- * Dragged onto a folder it files there; onto its channel's name, back to the ungrouped list.
+ * A thread nested under its channel, like a Claude Code session under its project, or one level deeper in a folder,
+ * with its running sub-agents nested under it. Dragged onto a folder it files there; onto its channel's name, back
+ * to the ungrouped list.
  */
-function ThreadLink({ t, active, agents, onNavigate, nested }: { t: ThreadStub; active: boolean; agents: number; onNavigate?: () => void; nested?: boolean }) {
+function ThreadLink({ t, active, tasks, onNavigate, nested }: { t: ThreadStub; active: boolean; tasks: BackgroundTask[]; onNavigate?: () => void; nested?: boolean }) {
   const title = t.title || 'Untitled';
+  const agents = tasks.length;
   // A thread whose turn ended still works while its sub-agents run.
   const busy = t.status === 'running' || agents > 0;
   return (
-    <a
-      href={href.thread(t.id)}
-      onClick={onNavigate}
-      draggable
-      onDragStart={(e) => {
-        drag.start({ kind: 'thread', thread: t });
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', title);
-      }}
-      onDragEnd={drag.end}
-      title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : (STATUS_LABEL[t.status] ?? t.status)}`}
-      aria-current={active ? 'page' : undefined}
-      data-active={active || undefined}
-      className={`hov z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${nested ? 'ml-[43px]' : 'ml-[25px]'} ${
-        active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-3 hover:text-fg'
-      }`}
-    >
-      <span className="grid w-3 shrink-0 place-items-center">
-        {busy ? <Loader size={11} className="text-live-text" /> : <StatusDot status={t.status} size={7} />}
-      </span>
-      <span className="min-w-0 flex-1 truncate">{title}</span>
-    </a>
+    <>
+      <a
+        href={href.thread(t.id)}
+        onClick={onNavigate}
+        draggable
+        onDragStart={(e) => {
+          drag.start({ kind: 'thread', thread: t });
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', title);
+        }}
+        onDragEnd={drag.end}
+        title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : (STATUS_LABEL[t.status] ?? t.status)}`}
+        aria-current={active ? 'page' : undefined}
+        data-active={active || undefined}
+        className={`hov z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${nested ? 'ml-[43px]' : 'ml-[25px]'} ${
+          active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-3 hover:text-fg'
+        }`}
+      >
+        <span className="grid w-3 shrink-0 place-items-center">
+          {busy ? <Loader size={11} className="text-live-text" /> : <StatusDot status={t.status} size={7} />}
+        </span>
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+      </a>
+      {tasks.map((k, i) => (
+        <AgentLink key={k.task_id} t={k} nested={nested} last={i === agents - 1} onNavigate={onNavigate} />
+      ))}
+    </>
   );
 }
 
-/** A sub-agent running anywhere, linking to the thread that started it. */
-function AgentLink({ t, channel, onNavigate }: { t: BackgroundTask; channel?: string; onNavigate?: () => void }) {
+/**
+ * A sub-agent running in a thread, nested under it on a tree line from the thread's status dot, like a Claude Desktop
+ * task under its session. It links to the thread that started it.
+ */
+function AgentLink({ t, nested, last, onNavigate }: { t: BackgroundTask; nested?: boolean; last: boolean; onNavigate?: () => void }) {
   const now = useNow(1000);
-  const tip = [t.description, channel && `#${channel}`, t.tool_uses ? plural(t.tool_uses, 'tool') : null, t.last_tool && `last ${t.last_tool}`].filter(Boolean).join(' · ');
+  const tip = [t.description, t.tool_uses ? plural(t.tool_uses, 'tool') : null, t.last_tool && `last ${t.last_tool}`].filter(Boolean).join(' · ');
   return (
-    <a href={href.thread(t.thread_id)} onClick={onNavigate} title={tip} className="hov z-[1] flex h-9 items-center gap-2.5 rounded-full px-3 text-[13px] text-fg-2 transition-colors hover:text-fg md:h-8 md:text-[12.5px]">
-      <span className="grid w-[15px] shrink-0 place-items-center">
-        <Loader size={11} className="text-live-text" />
-      </span>
+    <a
+      href={href.thread(t.thread_id)}
+      onClick={onNavigate}
+      title={tip}
+      className={`hov relative z-[1] flex h-8 items-center gap-2 rounded-full pr-3 pl-4 text-[12.5px] text-fg-3 transition-colors hover:text-fg md:h-7 md:text-[12px] ${nested ? 'ml-[61px]' : 'ml-[43px]'}`}
+    >
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute top-0 left-0 w-2 border-l border-line-strong ${last ? 'h-1/2 rounded-bl-[6px] border-b' : 'h-full'}`}
+      />
       <span className="min-w-0 flex-1 truncate">{t.description}</span>
+      <Loader size={10} className="shrink-0 text-live-text" />
       <span className="shrink-0 font-num text-[11px] text-fg-4 tabular-nums">{duration(Math.max(0, now - toDate(t.started_at).getTime()))}</span>
     </a>
   );
@@ -253,11 +270,12 @@ function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThreads; ope
   const [all, setAll] = useState(false);
   const editing = folders.editing === f.id;
   const open = !f.collapsed;
-  const agents = (id: string) => tasks.filter((k) => k.thread_id === id).length;
-  const busy = f.running > 0 || f.threads.some((t) => agents(t.id) > 0);
+  const agents = (id: string) => tasks.filter((k) => taskHost(k) === id);
+  const busy = f.running > 0 || f.threads.some((t) => agents(t.id).length > 0);
   // Closed, it still shows the open thread, so the highlight never vanishes into it.
   const list = open ? f.threads : f.threads.filter((t) => t.id === openId);
-  const shown = all ? list : list.filter((t, i) => i < MAX_FOLDER_THREADS || t.id === openId);
+  // Past the limit it still shows the open thread and any with agents running, so they never hide behind "N more".
+  const shown = all ? list : list.filter((t, i) => i < MAX_FOLDER_THREADS || t.id === openId || agents(t.id).length > 0);
   const label = `${f.name}, ${plural(f.count, 'thread')}${f.running ? `, ${f.running} running` : ''}`;
 
   const onOver = (e: DragEvent) => {
@@ -344,7 +362,7 @@ function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThreads; ope
         </div>
       )}
       {shown.map((t) => (
-        <ThreadLink key={t.id} t={t} nested active={t.id === openId} agents={agents(t.id)} onNavigate={onNavigate} />
+        <ThreadLink key={t.id} t={t} nested active={t.id === openId} tasks={agents(t.id)} onNavigate={onNavigate} />
       ))}
       {open && !all && list.length > shown.length && (
         <button type="button" onClick={() => setAll(true)} className="hov z-[1] ml-[43px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
@@ -432,11 +450,14 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
   const rowsKey = channels
     .flatMap((c) => [...foldersOf(c).flatMap((f) => [f.id, f.collapsed, ...f.threads.map((t) => t.id)]), ...threadsOf(c).map((t) => t.id)])
     .join();
-  const box = useSlidingThumb(listRef, `${hash}:${channels.length}:${rowsKey}:${folders.editing}`, true, '[data-active="true"]');
+  // Agent rows nest under threads, so they move the rows below them too.
+  const agentsKey = tasks.map((k) => k.task_id).join();
+  const box = useSlidingThumb(listRef, `${hash}:${channels.length}:${rowsKey}:${agentsKey}:${folders.editing}`, true, '[data-active="true"]');
 
   const threadLinks = (c: ChannelWithRunning) => {
     const list = threadsOf(c);
-    const shown = list.filter((t, i) => i < MAX_THREADS || t.id === openId);
+    const agents = (id: string) => tasks.filter((k) => taskHost(k) === id);
+    const shown = list.filter((t, i) => i < MAX_THREADS || t.id === openId || agents(t.id).length > 0);
     return (
       <>
         {foldersOf(c).map((f) => (
@@ -450,7 +471,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
           />
         )}
         {shown.map((t) => (
-          <ThreadLink key={t.id} t={t} active={t.id === openId} agents={tasks.filter((k) => k.thread_id === t.id).length} onNavigate={onNavigate} />
+          <ThreadLink key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} onNavigate={onNavigate} />
         ))}
         {c.id === focused ? (
           <a href={href.channel(c.id)} onClick={onNavigate} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
@@ -586,20 +607,6 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
               </>
             )}
           </div>
-
-          {tasks.length > 0 && (
-            <div>
-              <div className="caption flex items-center justify-between px-3 pt-1 pb-2">
-                <span>Agents</span>
-                <span className="font-num text-live-text tabular-nums">{tasks.length}</span>
-              </div>
-              <div className="space-y-px">
-                {tasks.map((t) => (
-                  <AgentLink key={t.task_id} t={t} channel={channels.find((c) => c.id === t.channel_id)?.name} onNavigate={onNavigate} />
-                ))}
-              </div>
-            </div>
-          )}
 
           {channelsError && <ErrorNote>{channelsError}</ErrorNote>}
 

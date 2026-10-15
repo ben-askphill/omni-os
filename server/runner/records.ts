@@ -44,9 +44,11 @@ export function onTask(live: Live, u: TaskUpdate) {
   const id = live.threadId;
   const known = live.tasks.get(u.task_id);
   if (u.event === 'started') {
+    const t = threads.get(id);
     live.tasks.set(u.task_id, {
       thread_id: id,
       channel_id: live.channelId,
+      lead_id: t?.source === 'team' ? (t.parent_id ?? undefined) : undefined,
       task_id: u.task_id,
       tool_use_id: u.tool_use_id,
       description: u.description || 'Task',

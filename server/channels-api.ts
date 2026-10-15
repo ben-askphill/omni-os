@@ -7,6 +7,7 @@ import { readDesignSystem } from '../shared/design-system.ts';
 import { channels, folders as folderRepo, publicChannel, threads, type Channel, type Folder, type Thread } from './db.ts';
 import { detectRepo } from './github.ts';
 import { getCatalog } from './harness/catalog-service.ts';
+import { activeTasks } from './runner.ts';
 import { validateDefaults } from './harness/resolve.ts';
 
 export const channelsApi = new Hono();
@@ -97,14 +98,33 @@ function foldersByChannel(list: Folder[], filed: Thread[]) {
 }
 
 /**
- * A channel plus its running and queued threads, its latest ones, and its folders with their threads, so the sidebar
- * can list them under the name.
+ * Running and queued threads, plus any thread whose sub-agents still run after its turn ended, so the sidebar can
+ * nest those agents under it. A team member's agents count for its lead, the thread the sidebar lists.
+ */
+function busyThreads() {
+  const busy = threads.running();
+  const seen = new Set(busy.map((t) => t.id));
+  for (const task of activeTasks()) {
+    const id = task.lead_id ?? task.thread_id;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const t = threads.get(id);
+    if (t && !t.archived) busy.push(t);
+  }
+  return busy;
+}
+
+const isRunning = (t: Thread) => t.status === 'running' || t.status === 'queued';
+
+/**
+ * A channel plus its busy threads, its latest ones, and its folders with their threads, so the sidebar can list them
+ * under the name. `running` counts only the running and queued ones.
  */
 const withActive = (ch: Channel, busy: Thread[], recent: Thread[], folders: Map<string, unknown[]>) => {
   const mine = busy.filter((t) => t.channel_id === ch.id && t.source !== 'team');
   return {
     ...publicChannel(ch),
-    running: mine.length,
+    running: mine.filter(isRunning).length,
     active: mine.map(stub),
     recent: recent.filter((t) => t.channel_id === ch.id).map(stub),
     folders: folders.get(ch.id) ?? [],
@@ -112,7 +132,7 @@ const withActive = (ch: Channel, busy: Thread[], recent: Thread[], folders: Map<
 };
 
 channelsApi.get('/', (c) => {
-  const busy = threads.running();
+  const busy = busyThreads();
   const recent = threads.recentPerChannel(RECENT_PER_CHANNEL);
   const folders = foldersByChannel(folderRepo.all(), threads.filed());
   return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy, recent, folders)));
@@ -122,7 +142,7 @@ channelsApi.get('/:id', (c) => {
   const ch = channels.get(c.req.param('id'));
   if (!ch) return c.json({ error: 'not found' }, 404);
   const folders = foldersByChannel(folderRepo.byChannel(ch.id), threads.filed(ch.id));
-  return c.json(withActive(ch, threads.running(), threads.byChannel(ch.id, RECENT_PER_CHANNEL), folders));
+  return c.json(withActive(ch, busyThreads(), threads.byChannel(ch.id, RECENT_PER_CHANNEL), folders));
 });
 
 channelsApi.post('/', async (c) => {

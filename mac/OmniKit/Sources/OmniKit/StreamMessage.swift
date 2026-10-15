@@ -136,6 +136,8 @@ public struct BackgroundTask: Decodable, Hashable, Sendable, Identifiable {
   public var id: String { taskID }
   public let threadID: String
   public let channelID: String
+  /// The team lead a member thread runs under: the sidebar lists the lead, so the agent nests there.
+  public var leadID: String? = nil
   public let taskID: String
   public let toolUseID: String?
   public let description: String
@@ -144,10 +146,14 @@ public struct BackgroundTask: Decodable, Hashable, Sendable, Identifiable {
   public let lastTool: String?
   public let toolUses: Int?
 
+  /// The sidebar thread it nests under: its own, or for a team member, its lead.
+  public var hostID: String { leadID ?? threadID }
+
   enum CodingKeys: String, CodingKey {
     case description, background
     case threadID = "thread_id"
     case channelID = "channel_id"
+    case leadID = "lead_id"
     case taskID = "task_id"
     case toolUseID = "tool_use_id"
     case startedAt = "started_at"

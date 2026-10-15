@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, openSSE, errorText, type BackgroundTask, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type ModStatus, type Status, type ThreadStub } from './api.ts';
+import { api, openSSE, errorText, taskHost, type BackgroundTask, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type ModStatus, type Status, type ThreadStub } from './api.ts';
 
 interface AppState {
   channels: ChannelWithRunning[];
@@ -37,6 +37,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [mods, setMods] = useState<ModStatus[]>([]);
   const [openThread, setOpenThread] = useState<ThreadStub | null>(null);
   const listeners = useRef(new Set<(e: FeedEvent) => void>());
+  const taskHosts = useRef('');
 
   const reloadChannels = useCallback(async () => {
     try {
@@ -109,6 +110,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           scheduleRefresh();
         } else if (e.type === 'tasks') {
           setTasks(e.tasks);
+          // A thread stays listed while its agents run past its turn: the list changes when the set of hosts does.
+          const hosts = [...new Set(e.tasks.map(taskHost))].sort().join();
+          if (hosts !== taskHosts.current) {
+            taskHosts.current = hosts;
+            scheduleRefresh();
+          }
         } else if (e.type === 'mods') {
           setMods(e.mods);
         }

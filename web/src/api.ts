@@ -23,7 +23,7 @@ export type Channel = Omit<ChannelRow, 'design_system'> & { design_system_size: 
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> & { folder_id?: string | null };
 /** A sidebar folder with how many threads it holds, how many of them run, and its newest threads. */
 export type FolderWithThreads = Folder & { count: number; running: number; threads: ThreadStub[] };
-/** `active`: the channel's running and queued threads. `recent`: its latest threads of any status. `folders`: its sidebar folders, in order. */
+/** `active`: the channel's running and queued threads, and any whose sub-agents still run. `recent`: its latest threads of any status. `folders`: its sidebar folders, in order. */
 export type ChannelWithRunning = Channel & { running: number; active?: ThreadStub[]; recent?: ThreadStub[]; folders?: FolderWithThreads[] };
 export type ArtifactWithThread = Artifact & { thread_title: string; channel_id: string };
 
@@ -183,6 +183,8 @@ export type SyncSetupResult = { state: 'code_sent'; email: string } | { state: '
 export interface BackgroundTask {
   thread_id: string;
   channel_id: string;
+  /** The team lead a member thread runs under: the sidebar lists the lead, so the agent nests there. */
+  lead_id?: string;
   task_id: string;
   tool_use_id?: string;
   description: string;
@@ -196,6 +198,9 @@ export interface BackgroundTask {
   tokens?: number;
   summary?: string;
 }
+
+/** The sidebar thread a task nests under: its own, or for a team member, its lead. */
+export const taskHost = (t: BackgroundTask) => t.lead_id ?? t.thread_id;
 
 /** A mod's pinned status line in a running thread, as GET /api/mods and the feed's 'mods' event carry it. */
 export interface ModStatus {

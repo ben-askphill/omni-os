@@ -32,6 +32,23 @@ describe('runner: background tasks', () => {
     expect(h.byKind(t.id, 'error')).toEqual([]);
   });
 
+  it("keeps a thread in its channel's sidebar list while its agents run past the turn", T, async () => {
+    const { channelsApi } = await import('../server/channels-api.ts');
+    const listed = async () => {
+      const list: { id: string; running: number; active: { id: string }[] }[] = await (await channelsApi.request('/')).json();
+      return list.find((c) => c.id === 'scratch')!;
+    };
+    const t = await h.start('BG:2000 fan out');
+    await h.untilResults(t.id, 1);
+    expect(h.thread(t.id).status).toBe('done');
+    const busy = await listed();
+    expect(busy.active.map((x) => x.id)).toContain(t.id);
+    // Listed for its agents, not counted as running.
+    expect(busy.running).toBe(0);
+    await h.until('task ended', () => !r.activeTasks().some((x) => x.thread_id === t.id), 5000);
+    expect((await listed()).active.map((x) => x.id)).not.toContain(t.id);
+  });
+
   it('ends the tasks of a process that goes away', T, async () => {
     const t = await h.start('BG:8000 long');
     await h.untilResults(t.id, 1);

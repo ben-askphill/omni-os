@@ -124,6 +124,8 @@ export interface Live {
 export interface ActiveTask {
   thread_id: string;
   channel_id: string;
+  /** The team lead a member thread runs under: the sidebar lists the lead, so the agent nests there. */
+  lead_id?: string;
   task_id: string;
   tool_use_id?: string;
   description: string;

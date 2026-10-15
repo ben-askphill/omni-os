@@ -2,7 +2,8 @@ import OmniKit
 import SwiftUI
 
 /// The sidebar, as Sidebar.tsx (the design system's Rail): the wordmark, search and New thread, then Home and
-/// Conductor, the channels by kind with their running threads, Add channel, and the workspace pages. The
+/// Conductor, the channels by kind with their running threads (and those threads' sub-agents nested under them),
+/// Add channel, and the workspace pages. The
 /// selected row wears a white thumb that springs from row to row. Usage and the server's state sit at the bottom.
 struct SidebarView: View {
   let model: AppModel
@@ -58,7 +59,6 @@ struct SidebarView: View {
             }
           }
 
-          agents
 
           if let error = channelsError {
             ErrorNote(text: error)
@@ -134,32 +134,9 @@ struct SidebarView: View {
       .accessibilityAddTraits(on ? .isSelected : [])
   }
 
-  /// Agents in Sidebar.tsx: hidden when nothing is running. Each row is AgentLink: the task, its channel,
-  /// and a link to the thread that started it.
-  @ViewBuilder private var agents: some View {
-    let tasks = model.store.tasks
-    if !tasks.isEmpty {
-      VStack(alignment: .leading, spacing: 0) {
-        HStack {
-          Text("Agents").omniCaption()
-          Spacer(minLength: z(8))
-          Text("\(tasks.count)")
-            .font(.omni(size: 11).monospacedDigit())
-            .foregroundStyle(Tok.live)
-        }
-        .padding(.horizontal, z(12))
-        .padding(.top, z(4))
-        .padding(.bottom, z(8))
-        VStack(spacing: 1) {
-          ForEach(tasks) { task in
-            AgentRow(task: task, channel: model.store.channel(task.channelID)?.name) {
-              pick(.thread(task.threadID))
-            }
-            .openInNewWindow(task.threadID, model: model)
-          }
-        }
-      }
-    }
+  /// The threads with sub-agents running, keyed by the thread they nest under.
+  private var agents: [String: [OmniKit.BackgroundTask]] {
+    Dictionary(grouping: model.store.tasks, by: \.hostID)
   }
 
   /// The channel list failed to load while the server runs. With no server, the detail says so instead.
@@ -207,7 +184,8 @@ struct SidebarView: View {
         },
         onCancel: { model.folders.editing = nil })
     }
-    let links = SidebarSections.threads(of: channel, open: model.openThread, focused: model.focusedChannel == channel.id)
+    let links = SidebarSections.threads(
+      of: channel, open: model.openThread, focused: model.focusedChannel == channel.id, busy: Set(agents.keys))
     ForEach(links.shown) { thread in
       threadRow(thread, nested: false)
     }
@@ -225,24 +203,31 @@ struct SidebarView: View {
     }
   }
 
-  /// A thread under its channel, or one level deeper in a folder. Dragged onto a folder it files there; onto its
-  /// channel's name, back to the ungrouped list.
+  /// A thread under its channel, or one level deeper in a folder, with its running sub-agents nested under it.
+  /// Dragged onto a folder it files there; onto its channel's name, back to the ungrouped list.
+  @ViewBuilder
   private func threadRow(_ thread: ThreadStub, nested: Bool) -> some View {
     let item = SidebarItem.thread(thread.id)
-    return row(item) { ThreadRow(thread: thread, active: selected == item) }
+    let tasks = agents[thread.id] ?? []
+    row(item) { ThreadRow(thread: thread, active: selected == item, agents: tasks.count) }
       .onDrag {
         model.folders.dragging = .thread(thread)
         return NSItemProvider(object: (thread.title.isEmpty ? "Untitled" : thread.title) as NSString)
       }
       .padding(.leading, z(nested ? 43 : 25))
       .openInNewWindow(thread.id, model: model, title: thread.title, stub: thread)
+    ForEach(Array(tasks.enumerated()), id: \.element.id) { i, task in
+      AgentRow(task: task, last: i == tasks.count - 1) { pick(.thread(task.threadID)) }
+        .padding(.leading, z(nested ? 61 : 43))
+        .openInNewWindow(task.threadID, model: model)
+    }
   }
 
   /// A folder, its name field while it is renamed, and its threads while it is open.
   @ViewBuilder
   private func folderRows(_ folder: FolderWithThreads) -> some View {
-    let tasks = model.store.tasks
-    let busy = folder.running > 0 || folder.threads.contains { t in tasks.contains { $0.threadID == t.id } }
+    let hosts = Set(agents.keys)
+    let busy = folder.running > 0 || folder.threads.contains { hosts.contains($0.id) }
     if model.folders.editing == .rename(folder.id) {
       FolderNameField(
         initial: folder.name,
@@ -255,7 +240,7 @@ struct SidebarView: View {
       FolderRowView(model: model, folder: folder, busy: busy)
     }
     let all = expanded.contains(folder.id)
-    let links = SidebarSections.threads(in: folder, openID: model.openThread?.id, all: all)
+    let links = SidebarSections.threads(in: folder, openID: model.openThread?.id, all: all, busy: hosts)
     ForEach(links.shown) { thread in
       threadRow(thread, nested: true)
     }
@@ -352,14 +337,16 @@ extension NavRow where Lead == EmptyView {
   }
 }
 
-/// ThreadLink in Sidebar.tsx: a thread nested under its channel.
+/// ThreadLink in Sidebar.tsx: a thread nested under its channel. A thread whose turn ended still works while its
+/// sub-agents run.
 struct ThreadRow: View {
   let thread: ThreadStub
   var active = false
+  var agents = 0
 
   var body: some View {
     HStack(spacing: z(8)) {
-      ThreadStatusIcon(status: thread.status)
+      ThreadStatusIcon(status: agents > 0 ? .running : thread.status)
         .frame(width: z(12))
       Text(thread.title.isEmpty ? "Untitled" : thread.title)
         .lineLimit(1)
@@ -369,47 +356,43 @@ struct ThreadRow: View {
     .foregroundStyle(active ? Tok.fg : Tok.fg3)
     .padding(.horizontal, z(12))
     .frame(height: z(28))
-    .help("\(thread.title.isEmpty ? "Untitled" : thread.title) · \(thread.status.label)")
+    .help("\(thread.title.isEmpty ? "Untitled" : thread.title) · \(agents > 0 ? "\(Format.plural(agents, "agent")) running" : thread.status.label)")
   }
 }
 
-/// AgentLink in Sidebar.tsx: a running sub-agent, linked to the thread that started it. The channel name
-/// sits with the running time; the help text is the web's title.
+/// AgentLink in Sidebar.tsx: a sub-agent running in a thread, nested under it on a tree line from the thread's
+/// status dot, like a Claude Desktop task under its session. It opens the thread that started it.
 private struct AgentRow: View {
   let task: OmniKit.BackgroundTask
-  let channel: String?
+  /// The last agent under its thread: the tree line turns into it instead of running on.
+  let last: Bool
   let open: () -> Void
 
   var body: some View {
     Button(action: open) {
       TimelineView(.periodic(from: .now, by: 1)) { context in
-        HStack(spacing: z(10)) {
-          Loader(size: 11)
-            .foregroundStyle(Tok.live)
-            .frame(width: z(15))
-            .accessibilityHidden(true)
+        HStack(spacing: z(8)) {
           Text(task.description)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
-          if let channel {
-            Text("#\(channel)")
-              .lineLimit(1)
-              .font(.omni(size: 11))
-              .foregroundStyle(Tok.fg4)
-          }
+          Loader(size: 10)
+            .foregroundStyle(Tok.live)
+            .accessibilityHidden(true)
           Text(elapsed(now: context.date))
             .font(.omni(size: 11).monospacedDigit())
             .foregroundStyle(Tok.fg4)
         }
-        .font(.omni(size: 12.5))
-        .foregroundStyle(Tok.fg2)
-        .padding(.horizontal, z(12))
-        .frame(height: z(32))
+        .font(.omni(size: 12))
+        .foregroundStyle(Tok.fg3)
+        .padding(.leading, z(16))
+        .padding(.trailing, z(12))
+        .frame(height: z(28))
       }
     }
     .buttonStyle(RailRowStyle())
+    .background(alignment: .leading) { TreeLine(last: last).allowsHitTesting(false) }
     .help(tip)
-    .accessibilityLabel(channel.map { "\(task.description), #\($0)" } ?? task.description)
+    .accessibilityLabel("Agent: \(task.description)")
   }
 
   private func elapsed(now: Date) -> String {
@@ -418,10 +401,33 @@ private struct AgentRow: View {
 
   private var tip: String {
     var parts = [task.description]
-    if let channel { parts.append("#\(channel)") }
     if let uses = task.toolUses { parts.append(Format.plural(uses, "tool")) }
     if let last = task.lastTool { parts.append("last \(last)") }
     return parts.joined(separator: " · ")
+  }
+}
+
+/// The line from a thread down its agents: straight past each, curving into the last.
+private struct TreeLine: View {
+  let last: Bool
+
+  var body: some View {
+    GeometryReader { geo in
+      Path { p in
+        let mid = geo.size.height / 2
+        let r = z(6)
+        p.move(to: CGPoint(x: 0.5, y: 0))
+        if last {
+          p.addLine(to: CGPoint(x: 0.5, y: mid - r))
+          p.addQuadCurve(to: CGPoint(x: 0.5 + r, y: mid), control: CGPoint(x: 0.5, y: mid))
+          p.addLine(to: CGPoint(x: z(8), y: mid))
+        } else {
+          p.addLine(to: CGPoint(x: 0.5, y: geo.size.height))
+        }
+      }
+      .stroke(Tok.lineStrong, lineWidth: 1)
+    }
+    .frame(width: z(8))
   }
 }
 

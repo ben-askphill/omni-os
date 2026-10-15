@@ -150,6 +150,26 @@ private func threadStub(_ id: String, status: String = "done", minute: Int = 0, 
     #expect(SidebarSections.threads(in: f, openID: nil, all: true).shown.count == 11)
   }
 
+  @Test func threadsWithAgentsRunningShowPastTheLimit() throws {
+    let threads = (0..<11).map { stub("t\($0)", minute: 20 - $0, folder: "f1") }
+    let c = try acme(folders: [folderRow("f1", name: "A", threads: threads)])
+    let links = SidebarSections.threads(in: c.folders[0], openID: nil, busy: ["t9"])
+    #expect(links.shown.count == 9 && links.shown.last?.id == "t9" && links.more == 2)
+    let active = (0..<7).map { stub("a\($0)", status: "running", minute: 20 - $0) }
+    let ch = try acme(active: active)
+    let plain = SidebarSections.threads(of: ch)
+    #expect(plain.shown.count == 5 && plain.more == 2)
+    let busy = SidebarSections.threads(of: ch, busy: ["a6"])
+    #expect(busy.shown.last?.id == "a6" && busy.more == 1)
+  }
+
+  @Test func aTasksHostIsItsLeadForATeamMember() throws {
+    let own = try decode(BackgroundTask.self, #"{"thread_id":"t1","channel_id":"acme","task_id":"k1","description":"x","background":true,"started_at":"2026-10-10T08:00:00Z"}"#)
+    #expect(own.leadID == nil && own.hostID == "t1")
+    let member = try decode(BackgroundTask.self, #"{"thread_id":"m1","channel_id":"acme","lead_id":"t1","task_id":"k2","description":"x","background":true,"started_at":"2026-10-10T08:00:00Z"}"#)
+    #expect(member.hostID == "t1")
+  }
+
   @Test func anEmptyOpenFolderSaysSo() throws {
     let c = try acme(folders: [folderRow("f1", name: "A"), folderRow("f2", name: "B", collapsed: 1)])
     #expect(SidebarSections.threads(in: c.folders[0], openID: nil).empty)
