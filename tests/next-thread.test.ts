@@ -21,6 +21,8 @@ describe('parseNextThread', () => {
   });
 
   it('takes nothing from NONE or an answer in another shape', () => {
+    expect(parseNextThread(`TITLE: Long\nPROMPT: ${'a'.repeat(1201)}`)).toBeNull();
+    expect(parseNextThread(`TITLE: Long\nPROMPT: ${'a'.repeat(1200)}`)?.prompt).toHaveLength(1200);
     for (const out of ['NONE', 'none.', 'TITLE: only a title', 'PROMPT: only a prompt', 'Sure! Here is a card.']) expect(parseNextThread(out)).toBeNull();
   });
 });

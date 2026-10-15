@@ -34,9 +34,9 @@ struct NextThreadCard: View {
             .font(.omni(size: 13))
             .lineSpacing(3)
             .foregroundStyle(Tok.fg3)
-            .lineLimit(3)
+            .textSelection(.enabled)
+            // All of it, never clamped: Start runs exactly this.
             .fixedSize(horizontal: false, vertical: true)
-            .help(prompt)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         Button { run(.dismiss) } label: {

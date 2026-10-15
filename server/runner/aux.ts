@@ -67,13 +67,18 @@ export function suggestReply(threadId: string, runText: string) {
   });
 }
 
+export const NEXT_PROMPT_MAX = 1200;
+
 /** The title and prompt in Haiku's answer to `suggestNextThread`, or null for NONE or anything else. */
 export function parseNextThread(out: string): { title: string; prompt: string } | null {
   const m = /^\s*TITLE:\s*(.+?)\s*\n+\s*PROMPT:\s*([\s\S]+?)\s*$/i.exec(out.replace(/\r/g, ''));
   if (!m) return null;
   const unquote = (s: string) => s.replace(/^["'`]+|["'`]+$/g, '').trim();
   const title = unquote(m[1]).replace(/\.$/, '').slice(0, 90);
-  const prompt = unquote(m[2]).slice(0, 4000);
+  // Short enough for the card to show all of it: Start runs it with no other review, and Haiku wrote it from the
+  // agent's answer, which can quote web pages and files.
+  const prompt = unquote(m[2]);
+  if (prompt.length > NEXT_PROMPT_MAX) return null;
   return title && prompt ? { title, prompt } : null;
 }
 

@@ -48,7 +48,8 @@ export function NextThreadCard({ thread, onThread }: { thread: Thread; onThread:
       <div className="flex items-start gap-2 px-4 pt-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-[14.5px] leading-snug font-semibold break-words">{title}</h3>
-          <p className="mt-1 line-clamp-3 text-[13px] leading-[1.5] break-words whitespace-pre-wrap text-fg-3" title={prompt}>
+          {/* All of it, never clamped: Start runs exactly this. */}
+          <p className="mt-1 text-[13px] leading-[1.5] break-words whitespace-pre-wrap text-fg-3">
             {prompt}
           </p>
         </div>
