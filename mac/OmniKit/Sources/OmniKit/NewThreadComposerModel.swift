@@ -64,6 +64,7 @@ public final class NewThreadComposerModel {
   /// Starts from a preset (`/clear` and `/new` in a thread): its role, harness, model and effort. A preset without a
   /// model takes the harness's default.
   public func apply(_ preset: NewThreadPreset) {
+    if let prompt = preset.prompt { text = prompt }
     folder = preset.folder.map { ($0, preset.channel) }
     // "New thread here" only files the thread: the channel's own run stays.
     if preset.folder != nil, preset.harness == nil, preset.model == nil, preset.role.isEmpty, !preset.pickModel {

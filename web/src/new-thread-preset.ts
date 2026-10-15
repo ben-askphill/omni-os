@@ -23,6 +23,8 @@ export interface NewThreadPreset {
   pickModel?: boolean;
   /** The sidebar folder to file the new thread in: "New thread here" on a folder. */
   folder?: { id: string; name: string };
+  /** The first prompt to start with, in place of the channel's draft: Edit on a suggested new thread. */
+  prompt?: string;
 }
 
 /** `/clear` or `/new` on its own: this thread's settings, for a first prompt Ben types next. */

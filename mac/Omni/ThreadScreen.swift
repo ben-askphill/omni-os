@@ -431,6 +431,9 @@ private struct TranscriptRows: View {
       if !store.pending.isEmpty {
         QueuedMessagesView(items: store.pending, starting: store.betweenTurns)
       }
+      if store.pending.isEmpty, let t = store.thread, t.status == .done, let title = t.nextTitle, let prompt = t.nextPrompt {
+        NextThreadCard(model: model, store: store, thread: t, title: title, prompt: prompt)
+      }
     }
   }
 }

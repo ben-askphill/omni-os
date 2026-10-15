@@ -309,6 +309,16 @@ private final class FakeNewThreadAPI: NewThreadAPI {
     #expect(home.choice.harness == .codex && home.choice.model == "gpt-x")
   }
 
+  @Test func aPresetsPromptReplacesTheDraft() {
+    let dir = TempDir("drafts")
+    DraftStore(directory: dir.url).save("old draft", for: "new:acme")
+    let m = make(FakeNewThreadAPI(), dir, channel: "acme")
+    m.apply(NewThreadPreset(channel: "acme", role: "", prompt: "Fix the docs drift"))
+    #expect(m.text == "Fix the docs drift")
+    m.apply(.inFolder(FolderWithThreads(Folder(id: "f1", channelID: "acme", name: "Launch"))))
+    #expect(m.text == "Fix the docs drift")
+  }
+
   @Test func restoresTheDraftPerChannelKey() {
     let dir = TempDir("drafts")
     DraftStore(directory: dir.url).save("in acme", for: "new:acme")

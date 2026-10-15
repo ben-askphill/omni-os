@@ -42,4 +42,22 @@ private let thread = try! OmniJSON.decoder().decode(OmniThread.self, from: Data(
     #expect(t.requests.isEmpty)
     #expect(NewThreadPreset.otherModel(thread) == NewThreadPreset(channel: "acme", role: "", pickModel: true))
   }
+
+  @Test func aSuggestedThreadDecodesAndItsEditCarriesThePrompt() throws {
+    let t = try OmniJSON.decoder().decode(
+      OmniThread.self, from: Data(threadJSON(extra: #","next_title":"Fix the docs","next_prompt":"Update docs/skills.md.""#).utf8))
+    #expect(t.nextTitle == "Fix the docs" && t.nextPrompt == "Update docs/skills.md.")
+    #expect(thread.nextTitle == nil && thread.nextPrompt == nil)
+    #expect(
+      NewThreadPreset.suggested(thread, prompt: "go")
+        == NewThreadPreset(channel: "acme", role: "", harness: "claude-code", model: "sonnet", effort: "high", prompt: "go"))
+  }
+
+  @Test func dismissingASuggestedThreadSendsAnExplicitNull() async throws {
+    let t = StubTransport(body: threadJSON())
+    _ = try await OmniClient(port: 4799, transport: t).dismissNextThread("t/1")
+    let req = try #require(t.requests.first)
+    #expect(req.httpMethod == "PATCH" && req.url?.absoluteString.hasSuffix("/api/threads/t%2F1") == true)
+    #expect(try bodyJSON(req) == .object(["next_thread": .null]))
+  }
 }

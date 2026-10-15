@@ -6,6 +6,7 @@ import { ArtifactsTab } from '../components/thread/panel/ArtifactsTab.tsx';
 import { BrowserTab } from '../components/thread/panel/BrowserTab.tsx';
 import { DetailsTab } from '../components/thread/panel/DetailsTab.tsx';
 import { PANEL_MIN, THREAD_MIN, defaultPanelWidth, PanelResizeHandle } from '../components/thread/panel/PanelResizeHandle.tsx';
+import { NextThreadCard } from '../components/thread/NextThreadCard.tsx';
 import { OPEN_PR_PROMPT, ThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { Avatar, Button, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, StatusPill, Tabs } from '../components/ui.tsx';
@@ -318,6 +319,15 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
               {/* Queued means waiting for a slot: nothing is working yet. */}
               <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} />
               <QueuedMessages items={queued} starting={betweenTurns} />
+              {!queued.length && (
+                <NextThreadCard
+                  thread={thread}
+                  onThread={(t, reply) => {
+                    applyThread(t, reply);
+                    if (reply) pin();
+                  }}
+                />
+              )}
             </div>
           </div>
           {showJump && (

@@ -12,10 +12,12 @@ public struct NewThreadPreset: Hashable, Sendable {
   public var pickModel: Bool
   /// The sidebar folder to file the new thread in: "New thread here" on a folder.
   public var folder: FolderRef?
+  /// The first prompt to start with, in place of the channel's draft: Edit on a suggested new thread.
+  public var prompt: String?
 
   public init(
     channel: String, role: String, harness: HarnessID? = nil, model: String? = nil, effort: String? = nil, pickModel: Bool = false,
-    folder: FolderRef? = nil
+    folder: FolderRef? = nil, prompt: String? = nil
   ) {
     self.channel = channel
     self.role = role
@@ -24,6 +26,7 @@ public struct NewThreadPreset: Hashable, Sendable {
     self.effort = effort
     self.pickModel = pickModel
     self.folder = folder
+    self.prompt = prompt
   }
 
   /// "New thread here" on a folder: its channel, filed in it, the role and run left to the composer's defaults.
@@ -34,6 +37,13 @@ public struct NewThreadPreset: Hashable, Sendable {
   /// `/clear` or `/new` on its own: this thread's settings, for a first prompt Ben types next.
   public static func sameSettings(_ t: OmniThread) -> NewThreadPreset {
     NewThreadPreset(channel: t.channelID, role: t.role ?? "", harness: t.harness, model: t.model ?? "", effort: t.effort)
+  }
+
+  /// Edit on a suggested new thread: this thread's settings, with the suggestion's prompt in the box.
+  public static func suggested(_ t: OmniThread, prompt: String) -> NewThreadPreset {
+    var p = sameSettings(t)
+    p.prompt = prompt
+    return p
   }
 
   /// "New thread on another model": the channel and role, and nothing that picks a model.

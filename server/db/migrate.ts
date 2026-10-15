@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS threads (
   automation TEXT,
   last_text TEXT,
   suggestion TEXT,
+  next_title TEXT,
+  next_prompt TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -149,6 +151,9 @@ export function migrate() {
   // Sync: the machine id of the Mac running or queueing the thread, null otherwise. Synced, kept out of the API.
   ensureColumn('threads', 'run_machine', 'TEXT');
   ensureColumn('threads', 'suggestion', 'TEXT');
+  // A follow-up thread Haiku proposes once a turn is done: its title and first prompt. Local, not synced.
+  ensureColumn('threads', 'next_title', 'TEXT');
+  ensureColumn('threads', 'next_prompt', 'TEXT');
   ensureColumn('threads', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('channels', 'icon', 'TEXT');
   // The sidebar folder a thread sits in, null for ungrouped: every existing thread. Local, not synced.

@@ -27,6 +27,9 @@ export interface Thread {
   last_text: string | null;
   /** A guess at Ben's next reply once a turn is done, the reply box's placeholder. Local only, not synced. */
   suggestion: string | null;
+  /** A follow-up thread proposed once a turn is done, the card under the transcript: its title and first prompt. Local only, not synced. */
+  next_title: string | null;
+  next_prompt: string | null;
   /** 1 once Ben archived it: hidden from the lists, still found by search and by its link. */
   archived: number;
   /** The sidebar folder it sits in (db/repos/folders.ts), null for ungrouped. Local only, not synced. */
@@ -37,7 +40,7 @@ export interface Thread {
 
 /** The columns clients read, without sync's run_machine. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, archived, folder_id, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, created_at, updated_at';
 
 /** Who runs a thread with this status: this machine while it is running or queued here and sync is set up, else nobody. */
 const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? outbox.machineId() : null);
@@ -88,7 +91,7 @@ export const threads = {
       .all(...args) as unknown as Thread[];
   },
   create(
-    t: Omit<Thread, 'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'harness' | 'effort' | 'archived' | 'folder_id'> & {
+    t: Omit<Thread, 'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'archived' | 'folder_id'> & {
       has_run?: number; created_at?: string; harness?: string; effort?: string; folder_id?: string | null;
     },
   ) {
@@ -124,6 +127,16 @@ export const threads = {
    */
   setSuggestion(id: string, text: string | null) {
     return db.prepare('UPDATE threads SET suggestion = ? WHERE id = ? AND suggestion IS NOT ?').run(text, id, text).changes > 0;
+  },
+  /** The proposed follow-up thread, or null to drop it. Like the suggestion: updated_at stays and sync never hears of it. */
+  setNextThread(id: string, next: { title: string; prompt: string } | null) {
+    const title = next?.title ?? null;
+    const prompt = next?.prompt ?? null;
+    return (
+      db
+        .prepare('UPDATE threads SET next_title = ?, next_prompt = ? WHERE id = ? AND (next_title IS NOT ? OR next_prompt IS NOT ?)')
+        .run(title, prompt, id, title, prompt).changes > 0
+    );
   },
   /** Move a thread to another channel, keeping its place in the lists. import-history's --move-imported uses it. */
   setChannel(id: string, channelId: string) {

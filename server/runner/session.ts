@@ -5,7 +5,7 @@ import { config } from '../config.ts';
 import { events, threads, type ThreadStatus } from '../db.ts';
 import { detachThread } from '../browser.ts';
 import { turnFinished } from '../sync/files.ts';
-import { suggestReply } from './aux.ts';
+import { suggestNextThread, suggestReply } from './aux.ts';
 import {
   alive,
   browserHolder,
@@ -133,7 +133,10 @@ export function endTurn(live: Live, status: ThreadStatus) {
   });
   emitThread(id);
   if (t?.parent_id && !isShuttingDown()) reportToParent(id, status, runText);
-  if (status === 'done' && !t?.parent_id && runText && !isShuttingDown()) suggestReply(id, runText);
+  if (status === 'done' && !t?.parent_id && runText && !isShuttingDown()) {
+    suggestReply(id, runText);
+    suggestNextThread(id, runText);
+  }
   void turnFinished(id);
   armIdle(live);
   pump();

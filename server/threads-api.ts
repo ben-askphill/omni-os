@@ -19,10 +19,12 @@ const patchSchema = z
     archived: z.union([z.boolean(), z.literal(0), z.literal(1)]).optional(),
     /** The sidebar folder to put it in, from its own channel. Null takes it out, back to the ungrouped list. */
     folder_id: z.string().nullable().optional(),
+    /** Null dismisses the proposed follow-up thread, the card under the transcript. */
+    next_thread: z.null().optional(),
   })
-  .refine((b) => b.title !== undefined || b.archived !== undefined || b.folder_id !== undefined, 'a title is required');
+  .refine((b) => b.title !== undefined || b.archived !== undefined || b.folder_id !== undefined || b.next_thread !== undefined, 'a title is required');
 
-/** Rename, archive or file a thread. It keeps its place in the lists, since nothing happened in it. */
+/** Rename, archive or file a thread, or dismiss its proposed follow-up. It keeps its place in the lists, since nothing happened in it. */
 threadsApi.patch('/:id', async (c) => {
   const id = c.req.param('id');
   const t = threads.get(id);
@@ -40,6 +42,7 @@ threadsApi.patch('/:id', async (c) => {
       throw err;
     }
   }
+  if (body.data.next_thread === null) threads.setNextThread(id, null);
   const renamed = Object.keys(edit).length ? threads.update(id, { ...edit, updated_at: t.updated_at })! : threads.get(id)!;
   publishFeed({ type: 'thread', thread: renamed });
   return c.json(renamed);

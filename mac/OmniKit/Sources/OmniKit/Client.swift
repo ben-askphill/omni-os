@@ -99,6 +99,15 @@ private struct ArchivedBody: Encodable, Sendable {
   let archived: Bool
 }
 
+/// `{"next_thread": null}`: an explicit null, which a nil optional would leave out.
+private struct DismissNextBody: Encodable, Sendable {
+  enum CodingKeys: String, CodingKey { case nextThread = "next_thread" }
+  func encode(to encoder: any Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encodeNil(forKey: .nextThread)
+  }
+}
+
 private struct ErrorBody: Decodable {
   let error: String
 }
@@ -183,6 +192,11 @@ public struct OmniClient: Sendable {
 
   public func archiveThread(_ id: String, archived: Bool = true) async throws(OmniAPIError) -> OmniThread {
     try await send("PATCH", "/api/threads/\(uriComponent(id))", body: ArchivedBody(archived: archived))
+  }
+
+  /// Drops the thread's proposed follow-up thread, the card under its transcript.
+  public func dismissNextThread(_ id: String) async throws(OmniAPIError) -> OmniThread {
+    try await send("PATCH", "/api/threads/\(uriComponent(id))", body: DismissNextBody())
   }
 
   public func stopThread(_ id: String) async throws(OmniAPIError) -> OmniThread {

@@ -63,6 +63,9 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   public let lastText: String?
   /// The server's guess at Ben's next reply once a turn is done: the reply box's placeholder, Tab takes it.
   public let suggestion: String?
+  /// A follow-up thread the server proposed once a turn was done: the card under the transcript. Start runs it.
+  public let nextTitle: String?
+  public let nextPrompt: String?
   /// Archived by Ben: out of the lists, still reachable by search and by its link.
   public let archived: Bool
   /// The sidebar folder it sits in, nil for the channel's ungrouped list.
@@ -73,6 +76,8 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   enum CodingKeys: String, CodingKey {
     case id, title, status, role, model, harness, effort, cwd, branch, source, automation, suggestion, archived
     case folderID = "folder_id"
+    case nextTitle = "next_title"
+    case nextPrompt = "next_prompt"
     case channelID = "channel_id"
     case sessionID = "session_id"
     case hasRun = "has_run"
@@ -103,6 +108,8 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     automation = try c.decodeIfPresent(String.self, forKey: .automation)
     lastText = try c.decodeIfPresent(String.self, forKey: .lastText)
     suggestion = try c.decodeIfPresent(String.self, forKey: .suggestion)
+    nextTitle = try c.decodeIfPresent(String.self, forKey: .nextTitle)
+    nextPrompt = try c.decodeIfPresent(String.self, forKey: .nextPrompt)
     archived = (try? c.decodeFlag(.archived)) ?? false
     folderID = try c.decodeIfPresent(String.self, forKey: .folderID)
     createdAt = try c.decode(Date.self, forKey: .createdAt)

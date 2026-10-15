@@ -407,9 +407,13 @@ export function NewThreadComposer({
   // Set up from the thread Ben came from, when `/clear` or "New thread on another model" opened this.
   const [preset] = useState(() => (channelId ? peekNewThreadPreset(channelId) : null));
   useEffect(() => {
-    if (preset) dropNewThreadPreset(preset);
+    if (!preset) return;
+    dropNewThreadPreset(preset);
+    // A preset's prompt is the draft from here on, like text Ben typed.
+    if (preset.prompt) drafts.set(key, preset.prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset]);
-  const [text, setText] = useState(() => drafts.get(key) ?? '');
+  const [text, setText] = useState(() => preset?.prompt ?? drafts.get(key) ?? '');
   const [channel, setChannel] = useState(channelId ?? defaultChannel);
   const [role, setRole] = useState<string>(() => preset?.role ?? ((channelId ?? defaultChannel) === 'conductor' ? 'conductor' : ''));
   const [choice, setChoice] = useState<ModelChoice>(() => preset?.choice ?? { harness: 'claude-code', model: '' });
