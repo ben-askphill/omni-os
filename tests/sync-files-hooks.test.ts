@@ -86,11 +86,15 @@ describe('file sync hooks', () => {
     const get = relay.getObject.bind(relay);
     let release = () => {};
     const gate = new Promise<void>((res) => (release = res));
-    const slow = vi.spyOn(relay, 'getObject').mockImplementation(async (p) => (await gate, get(p)));
+    // Only the session body is slow, so the job is past the manifest and waiting on the download when the fence closes.
+    const slow = vi.spyOn(relay, 'getObject').mockImplementation(async (p) => {
+      if (p === `sessions/claude-code/${thread.session_id}.jsonl`) await gate;
+      return get(p);
+    });
     files.configureFileSync({ resumeTimeoutMs: 30 });
     try {
       // Times out: from here the harness owns the session file.
-      await files.beforeResume(thread);
+      expect(await files.beforeResume(thread)).toBe('timed-out');
       release();
       // The download finishes after that, and once the thread's queue is idle nothing it fetched was written.
       await files.threadFilesReady(t.id);
@@ -99,6 +103,57 @@ describe('file sync hooks', () => {
       slow.mockRestore();
       files.configureFileSync({ resumeTimeoutMs: 15_000 });
     }
+  });
+
+  it('never starts a session download that timed out while queued behind another job of the thread', async () => {
+    const t = await r.start('first', { title: 'Queued download' });
+    await r.untilResults(t.id, 1);
+    const thread = r.thread(t.id);
+    await waitFor(() => !r.runner.isLive(t.id), 'the first process to exit');
+    await new Promise((res) => setTimeout(res, 100));
+    fromOtherMac(t.id, { files: { 'uploads/queued.txt': 'queued' }, session: { sid: thread.session_id, body: '{"from":"mac-b"}\n' } });
+    const get = relay.getObject.bind(relay);
+    const asked: string[] = [];
+    let release = () => {};
+    const gate = new Promise<void>((res) => (release = res));
+    const slow = vi.spyOn(relay, 'getObject').mockImplementation(async (p) => (asked.push(p), await gate, get(p)));
+    files.configureFileSync({ resumeTimeoutMs: 30 });
+    try {
+      // Opening the thread starts a download that holds the thread's queue; the resume download waits behind it.
+      const opened = files.threadOpened(t.id);
+      expect(await files.beforeResume(thread)).toBe('timed-out');
+      release();
+      await opened;
+      await files.threadFilesReady(t.id);
+      // The opened download still lands; the resume job behind it never started, so it never even read the manifest:
+      // the two reads are the two opens.
+      expect(readFileSync(join(r.paths.threads, t.id, 'uploads', 'queued.txt'), 'utf8')).toBe('queued');
+      expect(asked.filter((p) => p === `manifests/${t.id}.json`)).toHaveLength(2);
+      expect(asked).not.toContain(`sessions/claude-code/${thread.session_id}.jsonl`);
+      expect(existsSync(sessionFile(thread))).toBe(false);
+    } finally {
+      slow.mockRestore();
+      files.configureFileSync({ resumeTimeoutMs: 15_000 });
+    }
+  });
+
+  it('reports a session download that failed, and the harness starts on what is here', async () => {
+    const t = await r.start('first', { title: 'Failed download' });
+    await r.untilResults(t.id, 1);
+    const thread = r.thread(t.id);
+    await waitFor(() => !r.runner.isLive(t.id), 'the first process to exit');
+    await new Promise((res) => setTimeout(res, 100));
+    fromOtherMac(t.id, { session: { sid: thread.session_id, body: '{"from":"mac-b"}\n' } });
+    const broken = vi.spyOn(relay, 'getObject').mockRejectedValue(new Error('relay down'));
+    try {
+      expect(await files.beforeResume(thread)).toBe('failed');
+      expect(existsSync(sessionFile(thread))).toBe(false);
+    } finally {
+      broken.mockRestore();
+    }
+    // Once the relay answers again, the next resume brings it.
+    expect(await files.beforeResume(thread)).toBe('ready');
+    expect(readFileSync(sessionFile(thread), 'utf8')).toBe('{"from":"mac-b"}\n');
   });
 
   it('fetches a thread\'s files in the background when it is opened', async () => {

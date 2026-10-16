@@ -301,6 +301,44 @@ describe('files that change here while the relay is slow', () => {
     expect(readFileSync(there, 'utf8')).toBe('turn 1\nlocal turn on B\n');
   });
 
+  it('writes none of a Cursor chat when one of its files changed here while the rest downloaded', async () => {
+    const sid = '06da61e9-a772-4ee1-9270-768dc1c8aaaa';
+    const md5 = (s: string) => createHash('md5').update(s).digest('hex');
+    const cwdA = join(a.home, 'race-cursor');
+    const cwdB = join(b.home, 'race-cursor');
+    const onA = thread('r5', cwdA, { harness: 'cursor', session_id: sid });
+    const onB = thread('r5', cwdB, { harness: 'cursor', session_id: sid });
+    const chatA = `home/.cursor/chats/${md5(cwdA)}/${sid}`;
+    a.put(`${chatA}/meta.json`, JSON.stringify({ schemaVersion: 1, cwd: cwdA }));
+    a.put(`${chatA}/store.db`, 'db 1');
+    a.put(`${chatA}/store.db-wal`, 'wal 1');
+    expect(await a.files.pushSession(onA, a.opts)).toBe(3);
+    expect(await b.files.pullSession(onB, b.opts)).toBe(3);
+    a.put(`${chatA}/store.db`, 'db 2');
+    a.put(`${chatA}/store.db-wal`, 'wal 2');
+    expect(await a.files.pushSession(onA, a.opts)).toBe(2);
+
+    // Cursor on B writes its database while B is still fetching the newer -wal: a db and -wal from two Macs would be
+    // a corrupt chat, so B keeps both of its own.
+    const chatB = join(b.home, '.cursor', 'chats', md5(cwdB), sid);
+    const get = relay.getObject.bind(relay);
+    const asked: string[] = [];
+    const slow = vi.spyOn(relay, 'getObject').mockImplementation(async (p) => {
+      asked.push(p);
+      if (p === `sessions/cursor/${sid}/store.db-wal`) writeFileSync(join(chatB, 'store.db'), 'db written on B');
+      return get(p);
+    });
+    try {
+      expect(await b.files.pullSession(onB, b.opts)).toBe(0);
+    } finally {
+      slow.mockRestore();
+    }
+    expect(asked).toContain(`sessions/cursor/${sid}/store.db`);
+    expect(readFileSync(join(chatB, 'store.db'), 'utf8')).toBe('db written on B');
+    expect(readFileSync(join(chatB, 'store.db-wal'), 'utf8')).toBe('wal 1');
+    expect(readdirSync(chatB).filter((n) => n.startsWith('.'))).toEqual([]);
+  });
+
   it('keeps a thread file made here while the other Mac\'s copy was downloading', async () => {
     const body = Buffer.from('from the other Mac');
     relay.objects.set(`blobs/${sha(body)}`, body);
