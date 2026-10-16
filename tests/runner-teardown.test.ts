@@ -2,7 +2,8 @@ import { afterAll, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
 import { fakeAlive } from './support.ts';
 
 // A runner test file must leave nothing behind: no fake CLI still running, no omni-runner-* tmp dir.
@@ -10,7 +11,8 @@ import { fakeAlive } from './support.ts';
 // config, and looks at what is left once that vitest has exited.
 
 const ROOT = resolve(import.meta.dirname, '..');
-const VITEST = join(ROOT, 'node_modules', 'vitest', 'vitest.mjs');
+// Resolved, not ROOT/node_modules: a worktree without its own install runs on an ancestor's.
+const VITEST = join(dirname(createRequire(import.meta.url).resolve('vitest/package.json')), 'vitest.mjs');
 const CONFIG = 'tests/fixtures/teardown/vitest.config.ts';
 
 type Report = { tmp: string; fakes: { pid: number; fixture: string }[] };

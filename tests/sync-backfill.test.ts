@@ -2,7 +2,8 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
 
 // Queueing every existing row again, for a new relay or history the relay lost.
 let db: typeof import('../server/db.ts');
@@ -10,6 +11,8 @@ let backfill: typeof import('../server/sync/backfill.ts');
 
 const dir = mkdtempSync(join(tmpdir(), 'omni-sync-backfill-'));
 const ROOT = resolve(import.meta.dirname, '..');
+// Resolved, not ROOT/node_modules/.bin: a worktree without its own install runs on an ancestor's.
+const TSX = join(dirname(createRequire(import.meta.url).resolve('tsx/package.json')), 'dist', 'cli.mjs');
 
 const outboxRows = () =>
   db.db.prepare('SELECT entity, entity_id, ts FROM sync_outbox ORDER BY id').all() as { entity: string; entity_id: string; ts: string }[];
@@ -64,7 +67,7 @@ describe('sync backfill', () => {
   });
 
   it('runs as npm run sync:backfill, with progress', () => {
-    const out = execFileSync(join(ROOT, 'node_modules', '.bin', 'tsx'), [join(ROOT, 'scripts', 'sync-backfill.ts')], {
+    const out = execFileSync(process.execPath, [TSX, join(ROOT, 'scripts', 'sync-backfill.ts')], {
       env: { ...process.env, OMNI_DATA_DIR: dir, NODE_OPTIONS: '--disable-warning=ExperimentalWarning' },
       encoding: 'utf8',
     });
