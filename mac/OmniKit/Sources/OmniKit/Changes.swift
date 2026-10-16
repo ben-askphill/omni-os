@@ -47,7 +47,7 @@ public struct ChangeBase: Decodable, Hashable, Sendable {
   }
 }
 
-/// `committed`, `staged`, `unstaged` or `untracked`.
+/// `committed`, `staged`, `unstaged` or `untracked`, or `turn`: what one turn changed between its saved snapshots.
 public struct ChangeKind: OpenEnum {
   public let rawValue: String
   public init(rawValue: String) { self.rawValue = rawValue }
@@ -55,6 +55,7 @@ public struct ChangeKind: OpenEnum {
   public static let staged: Self = "staged"
   public static let unstaged: Self = "unstaged"
   public static let untracked: Self = "untracked"
+  public static let turn: Self = "turn"
 
   public var title: String {
     switch self {
@@ -62,6 +63,7 @@ public struct ChangeKind: OpenEnum {
     case .staged: "Staged"
     case .unstaged: "Unstaged"
     case .untracked: "Untracked"
+    case .turn: "Changed in this turn"
     default: rawValue.capitalized
     }
   }
@@ -151,7 +153,12 @@ public struct ChangesView: Hashable, Sendable {
     guard changes.available, let base = changes.base else { return nil }
     self.base = base
     branch = changes.branch
-    groups = changes.groups.filter { !$0.files.isEmpty }.map { g in
+    groups = Self.groups(changes.groups)
+  }
+
+  /// The groups that have files, in the server's order, each file's lines numbered.
+  static func groups(_ list: [ChangeGroup]) -> [Group] {
+    list.filter { !$0.files.isEmpty }.map { g in
       Group(kind: g.kind, files: g.files.map { f in
         let parsed = f.diff.isEmpty ? nil : DiffParser.parse(f.diff).first
         let diff = FileDiff(
@@ -163,9 +170,105 @@ public struct ChangesView: Hashable, Sendable {
   }
 }
 
+// MARK: This turn
+
+/// One side of a saved turn (`TurnSide` in web/src/api.ts): a snapshot commit under a hidden ref, and HEAD then.
+public struct TurnSide: Decodable, Hashable, Sendable {
+  public let sha: String
+  public let ref: String
+  public let head: String
+}
+
+/// `running`, `capturing` (ended, its after snapshot being saved), `ready` or `failed`.
+public struct TurnState: OpenEnum {
+  public let rawValue: String
+  public init(rawValue: String) { self.rawValue = rawValue }
+  public static let running: Self = "running"
+  public static let capturing: Self = "capturing"
+  public static let ready: Self = "ready"
+  public static let failed: Self = "failed"
+}
+
+/// One turn's saved snapshots (`TurnView` in web/src/api.ts).
+public struct TurnView: Decodable, Hashable, Sendable, Identifiable {
+  public let id: String
+  public let n: Int
+  public let state: TurnState
+  public let error: String?
+  public let before: TurnSide?
+  public let after: TurnSide?
+  /// The Result the turn ended with, the same id as in Needs you.
+  public let completionUID: String?
+  public let startedAt: Date?
+  public let endedAt: Date?
+
+  enum CodingKeys: String, CodingKey {
+    case id, n, state, error, before, after
+    case completionUID = "completion_uid"
+    case startedAt = "started_at"
+    case endedAt = "ended_at"
+  }
+
+  /// "Turn 3", as `turnTitle` in web/src/changes.ts.
+  public var title: String { "Turn \(n)" }
+
+  /// Why the turn has no files to show yet, or ever. nil once both snapshots are saved. `turnStateNote` on the web.
+  public var stateNote: String? {
+    switch state {
+    case .running: "This turn is still running. Its changes show once it ends."
+    case .capturing: "Saving the worktree after this turn."
+    case .failed: error ?? "This turn could not be saved."
+    default: nil
+    }
+  }
+
+  /// HEAD moved during the turn (a commit, a pull, a reset): `abc1234 → def5678`. nil when it stayed put.
+  public var headMove: String? {
+    guard let before, let after, before.head != after.head else { return nil }
+    return "\(before.head.prefix(7)) → \(after.head.prefix(7))"
+  }
+}
+
+/// What GET /api/threads/:id/turns answers (`TurnChanges` in web/src/api.ts).
+public struct TurnChanges: Decodable, Hashable, Sendable {
+  public let available: Bool
+  public let reason: String?
+  /// Newest first.
+  public let turns: [TurnView]
+  /// The turn shown: the one asked for, else the newest.
+  public let turn: TurnView?
+  public let groups: [ChangeGroup]
+}
+
+/// The This turn view's model, as `turnChangesView` in web/src/changes.ts.
+public struct TurnChangesView: Hashable, Sendable {
+  /// What the diff is, said where it is shown: a snapshot, not authorship.
+  public static let note =
+    "The worktree saved before and after this turn. Commits, pulls and other git operations made during the turn are part of it; ignored files are not saved."
+
+  public let turn: TurnView
+  public let groups: [ChangesView.Group]
+
+  public var fileCount: Int { groups.reduce(0) { $0 + $1.files.count } }
+  public var additions: Int { groups.reduce(0) { $0 + $1.files.reduce(0) { $0 + $1.diff.add } } }
+  public var deletions: Int { groups.reduce(0) { $0 + $1.files.reduce(0) { $0 + $1.diff.del } } }
+
+  /// nil when no turn is saved, or none can be here.
+  public init?(_ changes: TurnChanges) {
+    guard changes.available, let turn = changes.turn else { return nil }
+    self.turn = turn
+    groups = ChangesView.groups(changes.groups)
+  }
+}
+
 extension OmniClient {
   /// The thread's branch changes since its base commit.
   public func changes(forThread id: String) async throws(OmniAPIError) -> BranchChanges {
     try await send("GET", "/api/threads/\(uriComponent(id))/changes")
+  }
+
+  /// The thread's saved turns and the diff of `turn`, the newest when nil.
+  public func turns(forThread id: String, turn: String? = nil) async throws(OmniAPIError) -> TurnChanges {
+    try await send("GET", "/api/threads/\(uriComponent(id))/turns", query: turn.map { [("turn", $0)] } ?? [])
   }
 }

@@ -1,0 +1,91 @@
+{
+  "available": true,
+  "reason": null,
+  "turns": [
+    {
+      "id": "00000000-0000-4000-8000-000000000033",
+      "n": 2,
+      "state": "ready",
+      "error": null,
+      "before": {
+        "sha": "ccccccccccccccccccccccccccccccccccccccc3",
+        "ref": "refs/omni/turns/00000000-0000-4000-8000-000000000015/00000000-0000-4000-8000-000000000033/before",
+        "head": "ccccccccccccccccccccccccccccccccccccccc1"
+      },
+      "after": {
+        "sha": "ccccccccccccccccccccccccccccccccccccccc4",
+        "ref": "refs/omni/turns/00000000-0000-4000-8000-000000000015/00000000-0000-4000-8000-000000000033/after",
+        "head": "ccccccccccccccccccccccccccccccccccccccc5"
+      },
+      "completion_uid": "00000000-0000-4000-8000-000000000034",
+      "started_at": "2026-01-05T09:00:00.000Z",
+      "ended_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000035",
+      "n": 1,
+      "state": "ready",
+      "error": null,
+      "before": {
+        "sha": "ccccccccccccccccccccccccccccccccccccccc6",
+        "ref": "refs/omni/turns/00000000-0000-4000-8000-000000000015/00000000-0000-4000-8000-000000000035/before",
+        "head": "ccccccccccccccccccccccccccccccccccccccc2"
+      },
+      "after": {
+        "sha": "ccccccccccccccccccccccccccccccccccccccc7",
+        "ref": "refs/omni/turns/00000000-0000-4000-8000-000000000015/00000000-0000-4000-8000-000000000035/after",
+        "head": "ccccccccccccccccccccccccccccccccccccccc1"
+      },
+      "completion_uid": "00000000-0000-4000-8000-000000000036",
+      "started_at": "2026-01-05T09:00:00.000Z",
+      "ended_at": "2026-01-05T09:00:00.000Z"
+    }
+  ],
+  "turn": {
+    "id": "00000000-0000-4000-8000-000000000033",
+    "n": 2,
+    "state": "ready",
+    "error": null,
+    "before": {
+      "sha": "ccccccccccccccccccccccccccccccccccccccc3",
+      "ref": "refs/omni/turns/00000000-0000-4000-8000-000000000015/00000000-0000-4000-8000-000000000033/before",
+      "head": "ccccccccccccccccccccccccccccccccccccccc1"
+    },
+    "after": {
+      "sha": "ccccccccccccccccccccccccccccccccccccccc4",
+      "ref": "refs/omni/turns/00000000-0000-4000-8000-000000000015/00000000-0000-4000-8000-000000000033/after",
+      "head": "ccccccccccccccccccccccccccccccccccccccc5"
+    },
+    "completion_uid": "00000000-0000-4000-8000-000000000034",
+    "started_at": "2026-01-05T09:00:00.000Z",
+    "ended_at": "2026-01-05T09:00:00.000Z"
+  },
+  "groups": [
+    {
+      "kind": "turn",
+      "truncated": false,
+      "files": [
+        {
+          "status": "modified",
+          "path": "src/cart.ts",
+          "old_path": null,
+          "additions": 1,
+          "deletions": 0,
+          "binary": false,
+          "diff": "diff --git a/src/cart.ts b/src/cart.ts\nindex a31fcc1..3004836 100644\n--- a/src/cart.ts\n+++ b/src/cart.ts\n@@ -1,3 +1,4 @@\n export function total(items: number[]) {\n   return items.reduce((sum, n) => sum + n, 0);\n }\n+export const round = (n: number) => Math.round(n * 100) / 100;\n",
+          "omitted": null
+        },
+        {
+          "status": "added",
+          "path": "todo.md",
+          "old_path": null,
+          "additions": 1,
+          "deletions": 0,
+          "binary": false,
+          "diff": "diff --git a/todo.md b/todo.md\nnew file mode 100644\nindex 0000000..52aed28\n--- /dev/null\n+++ b/todo.md\n@@ -0,0 +1 @@\n+Rounding is done.\n",
+          "omitted": null
+        }
+      ]
+    }
+  ]
+}

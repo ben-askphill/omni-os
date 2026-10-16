@@ -18,6 +18,7 @@ import { onExit, onRecord } from './records.ts';
 import { abortStart } from './session.ts';
 import { adapterFor, addEvent, browserHolder, cliLabel, crash, emitThread, lives, omniUrl, track, userLine, writeLine, type Live, type Msg } from './state.ts';
 import { failSetup } from './setup.ts';
+import { startTurnSnapshot } from './snapshots.ts';
 
 export function launch(threadId: string, first: Msg): Live | undefined {
   const thread = threads.get(threadId);
@@ -58,6 +59,7 @@ export function launch(threadId: string, first: Msg): Live | undefined {
   };
   lives.set(threadId, live);
   threads.update(threadId, { status: 'running' });
+  startTurnSnapshot(live);
   spawnLive(live, thread).catch((err) => {
     // Never let one broken thread take the whole server down.
     console.error(`[runner] ${threadId} crashed:`, err);
@@ -128,7 +130,9 @@ async function spawnLive(live: Live, thread: Thread) {
   }
   // With sync on, the other Mac's session file and uploads first, so the harness resumes where it left off.
   await beforeResume(thread);
-  // Interrupted or shut down while secrets or files were read.
+  // The checkout is saved before the harness can change it (runner/snapshots.ts).
+  if (live.gate) await live.gate;
+  // Interrupted or shut down while secrets or files were read, or the checkout saved.
   if (lives.get(thread.id) !== live) return;
 
   const ctx: AdapterContext = {

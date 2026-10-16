@@ -1,6 +1,7 @@
-// What a thread's Changes panel shows (components/thread/panel/ChangesTab.tsx), from GET /api/threads/:id/changes.
-// Pure, so tests run it on the recorded answers the Mac app decodes too (mac/OmniKit's Changes.swift is the same).
-import type { BranchChanges, ChangeBase, ChangeKind, ChangedFile, DiffOmitted } from './api.ts';
+// What a thread's Changes panel shows (components/thread/panel/ChangesTab.tsx), from GET /api/threads/:id/changes
+// (Since base) and GET /api/threads/:id/turns (This turn). Pure, so tests run it on the recorded answers the Mac app
+// decodes too (mac/OmniKit's Changes.swift is the same).
+import type { BranchChanges, ChangeBase, ChangeGroup, ChangeKind, ChangedFile, DiffOmitted, TurnChanges, TurnView } from './api.ts';
 import { parseDiff, type FileDiff } from './diff.ts';
 
 export const GROUP_TITLE: Record<ChangeKind, string> = {
@@ -8,6 +9,7 @@ export const GROUP_TITLE: Record<ChangeKind, string> = {
   staged: 'Staged',
   unstaged: 'Unstaged',
   untracked: 'Untracked',
+  turn: 'Changed in this turn',
 };
 
 const OMITTED: Record<DiffOmitted, string> = {
@@ -82,19 +84,60 @@ function fileView(kind: ChangeKind, f: ChangedFile): ChangeFileView {
   };
 }
 
-/** The groups that have files, in the server's order, and totals across them. Null when the answer has no changes to read. */
-export function changesView(c: BranchChanges): ChangesView | null {
-  if (!c.available) return null;
-  const groups = c.groups
+/** The groups that have files, in the server's order, and totals across them. */
+function groupsView(list: ChangeGroup[]) {
+  const groups = list
     .filter((g) => g.files.length)
     .map((g) => ({ kind: g.kind, title: GROUP_TITLE[g.kind], truncated: g.truncated, files: g.files.map((f) => fileView(g.kind, f)) }));
   const all = groups.flatMap((g) => g.files);
-  return {
-    base: c.base,
-    branch: c.branch,
-    groups,
-    files: all.length,
-    additions: all.reduce((n, f) => n + f.diff.add, 0),
-    deletions: all.reduce((n, f) => n + f.diff.del, 0),
-  };
+  return { groups, files: all.length, additions: all.reduce((n, f) => n + f.diff.add, 0), deletions: all.reduce((n, f) => n + f.diff.del, 0) };
 }
+
+/** Null when the answer has no changes to read. */
+export function changesView(c: BranchChanges): ChangesView | null {
+  if (!c.available) return null;
+  return { base: c.base, branch: c.branch, ...groupsView(c.groups) };
+}
+
+// ---------- This turn ----------
+
+/** What the This turn diff is, said where it is shown: a snapshot, not authorship. */
+export const TURN_NOTE =
+  'The worktree saved before and after this turn. Commits, pulls and other git operations made during the turn are part of it; ignored files are not saved.';
+
+export interface TurnChangesView {
+  turn: TurnView;
+  groups: ChangeGroupView[];
+  files: number;
+  additions: number;
+  deletions: number;
+}
+
+/** The turn shown and its files. Null when no turn is saved, or none can be here. */
+export function turnChangesView(c: TurnChanges): TurnChangesView | null {
+  if (!c.available || !c.turn) return null;
+  return { turn: c.turn, ...groupsView(c.groups) };
+}
+
+/** Why a turn has no files to show yet, or ever. Null once both snapshots are saved. */
+export function turnStateNote(t: TurnView): string | null {
+  switch (t.state) {
+    case 'running':
+      return 'This turn is still running. Its changes show once it ends.';
+    case 'capturing':
+      return 'Saving the worktree after this turn.';
+    case 'failed':
+      return t.error ?? 'This turn could not be saved.';
+    default:
+      return null;
+  }
+}
+
+/** HEAD moved during the turn (a commit, a pull, a reset): `abc1234 → def5678`. Null when it stayed put. */
+export function headMove(t: TurnView): string | null {
+  if (!t.before || !t.after || t.before.head === t.after.head) return null;
+  return `${shortSha(t.before.head)} → ${shortSha(t.after.head)}`;
+}
+
+/** "Turn 3", the picker's label for a turn. */
+export const turnTitle = (t: TurnView) => `Turn ${t.n}`;

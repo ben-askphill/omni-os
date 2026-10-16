@@ -185,6 +185,31 @@ CREATE TABLE IF NOT EXISTS thread_bases (
   recorded_at TEXT NOT NULL
 );
 
+-- A saved before/after snapshot of a worktree thread's checkout for each turn (server/turns.ts), so the turn's diff
+-- stays readable after later edits and restarts. The snapshots are commits under hidden refs named by the turn's id
+-- (refs/omni/turns/<thread>/<id>/before and /after), never on Ben's branch or index. completion_uid is the Result the
+-- turn ended with, when it left one. Local, not synced: the refs live in this Mac's repo.
+CREATE TABLE IF NOT EXISTS turn_snapshots (
+  id TEXT PRIMARY KEY,
+  thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  n INTEGER NOT NULL,
+  state TEXT NOT NULL,
+  error TEXT,
+  before_sha TEXT,
+  before_head TEXT,
+  before_skipped TEXT,
+  after_sha TEXT,
+  after_head TEXT,
+  after_skipped TEXT,
+  -- The n of the thread's newest Result when the turn started: the Result after it is this turn's.
+  prior_n INTEGER NOT NULL DEFAULT 0,
+  completion_uid TEXT,
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  settled_at TEXT
+);
+CREATE INDEX IF NOT EXISTS turn_snapshots_thread ON turn_snapshots(thread_id, n);
+
 -- A thread the other Mac filed in a folder that has not arrived here yet. The folder's arrival puts it there.
 CREATE TABLE IF NOT EXISTS sync_folder_wait (
   thread_id TEXT PRIMARY KEY,

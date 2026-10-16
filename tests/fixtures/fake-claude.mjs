@@ -28,6 +28,7 @@
 //   MODS              before the answer, what a mod's hooks send (Claude Code 2.1.287+): a ui_status, a ui_log, a
 //                     ui_toast, and a ui_render with no text that Omni ignores
 //   MOD_CLEAR         before the answer, a ui_status with null text, which clears that mod's status
+//   RUN:<path>        before the answer, run that shell script in the cwd, like a Bash call that edits files or runs git
 //   PUBLISH:<path>    an Artifact tool call that publishes that file, answered "Published <path> at <url>" like the real CLI
 //   ORPHAN            leave a child behind that holds our stdout until it is killed (two minutes at most), like a
 //                     daemon started without redirecting its output: once we exit, the runner never sees our pipes close
@@ -57,7 +58,7 @@
 // Without --strict-mcp-config the user's MCP servers connect a moment after startup, as in claude 2.1.282:
 // an initialize answered before that has no MCP prompts, and once they connect the CLI pushes the whole
 // list again, their prompts included, as system/commands_changed.
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -294,6 +295,7 @@ async function runTurn() {
   let limit = null;
   let fullMeter = false;
   const publishes = [];
+  const scripts = [];
   let steps = 0;
 
   emit({
@@ -329,6 +331,7 @@ async function runTurn() {
       if (lim) limit = { resetsAt: lim[1] ? Number(lim[1]) : null };
       if (m.text.includes('FULLMETER')) fullMeter = true;
       for (const x of m.text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
+      for (const x of m.text.matchAll(/RUN:(\S+)/g)) scripts.push(x[1]);
     }
     return true;
   };
@@ -392,6 +395,7 @@ async function runTurn() {
     ui('ui_render', { tree: { type: 'box' } });
   }
   if (modClear) emit({ type: 'system', subtype: 'ui_status', plugin: 'omni-tool', text: null });
+  for (const file of scripts.splice(0)) execFileSync('sh', [file], { cwd: process.cwd(), stdio: 'ignore' });
   for (const file of publishes.splice(0)) {
     const toolId = `toolu_fake_${++seq}`;
     steps++;

@@ -16,7 +16,7 @@ process.on('exit', () => releaseLock(paths.lock));
 
 // Loaded once the lock is held: db.ts opens the database as it loads.
 const { app } = await import('./app.ts');
-const { messageRequests, outbox, threads } = await import('./db.ts');
+const { messageRequests, outbox, threads, turnSnapshots } = await import('./db.ts');
 const { shutdownAll, startLimits } = await import('./runner.ts');
 const { closeAllBrowsers } = await import('./browser.ts');
 const { closeAllTerminals } = await import('./terminal.ts');
@@ -45,6 +45,9 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   // Messages a killed server still held wait for Resume; one it had written to a harness is marked uncertain.
   const parked = messageRequests.recover(outbox.machineId());
   if (parked) console.log(`[omni] kept ${parked} undelivered message(s) for Resume`);
+  // A turn whose checkout a killed server was still saving: its This turn diff says so instead of waiting forever.
+  const unsaved = turnSnapshots.failUnsettled("Omni stopped before this turn's snapshots were saved.");
+  if (unsaved) console.log(`[omni] ${unsaved} turn snapshot(s) were not saved`);
   // Continuations Ben scheduled for a usage limit's reset: one that came due while Omni was down runs now, once.
   startLimits();
   startArtifactWatcher();

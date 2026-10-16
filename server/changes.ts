@@ -10,7 +10,8 @@ import { plannedWorktree, worktreeProblem } from './sandbox.ts';
 
 const run = promisify(execFile);
 
-export type ChangeKind = 'committed' | 'staged' | 'unstaged' | 'untracked';
+/** `turn`: what one turn changed, between its before and after snapshots (server/turns.ts). */
+export type ChangeKind = 'committed' | 'staged' | 'unstaged' | 'untracked' | 'turn';
 export type ChangeStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed' | 'unmerged';
 /** Why a file's diff text was left out: binary, too big for one file, past the response's budget, a symlink, or git gave none. */
 export type DiffOmitted = 'binary' | 'too_large' | 'limit' | 'symlink' | 'unavailable';
@@ -58,7 +59,7 @@ export const MAX_TOTAL_CHARS = 2_000_000;
 /** An untracked file bigger than this is listed without reading it. */
 export const MAX_UNTRACKED_BYTES = 1_000_000;
 
-const real = (p: string) => {
+export const real = (p: string) => {
   try {
     return realpathSync(p);
   } catch {
@@ -67,14 +68,14 @@ const real = (p: string) => {
 };
 
 /** git in dir, with nothing that could prompt, take the index lock, run a repo's diff driver or rewrite paths. */
-function git(dir: string, args: string[], maxBuffer = 8 * 1024 * 1024) {
+export function git(dir: string, args: string[], maxBuffer = 8 * 1024 * 1024, env: Record<string, string> = {}) {
   return run('git', ['-C', dir, '-c', 'core.quotePath=false', '-c', 'diff.noprefix=false', '-c', 'diff.relative=false', ...args], {
     timeout: 30_000,
     maxBuffer,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0', GIT_PAGER: 'cat' },
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0', GIT_PAGER: 'cat', ...env },
   }).then((r) => r.stdout);
 }
-const gitOr = (dir: string, args: string[]) => git(dir, args).then((s) => s.trim(), () => null);
+export const gitOr = (dir: string, args: string[]) => git(dir, args).then((s) => s.trim(), () => null);
 
 /**
  * The checkout a thread's changes are read from, or why there is none here. A worktree thread reads only its own
@@ -227,7 +228,7 @@ async function trackedGroup(dir: string, kind: ChangeKind, args: string[], budge
 }
 
 /** Read at most max bytes of a file. */
-function head(file: string, max: number): Buffer {
+export function head(file: string, max: number): Buffer {
   const fd = openSync(file, 'r');
   try {
     const buf = Buffer.alloc(max);
@@ -249,6 +250,11 @@ export function addedFileDiff(path: string, text: string, mode = '100644'): { di
     diff: `${head}--- /dev/null\n+++ b/${path}\n@@ -0,0 +1${lines.length === 1 ? '' : `,${lines.length}`} @@\n${body}\n${endsInNewline ? '' : '\\ No newline at end of file\n'}`,
     additions: lines.length,
   };
+}
+
+/** The files that differ between two commits, as one group: a turn's before and after snapshots (server/turns.ts). */
+export function commitsGroup(dir: string, kind: ChangeKind, from: string, to: string): Promise<ChangeGroup> {
+  return trackedGroup(dir, kind, [from, to], { chars: MAX_TOTAL_CHARS });
 }
 
 /** Untracked files git does not ignore, each read only when it resolves inside the checkout. */

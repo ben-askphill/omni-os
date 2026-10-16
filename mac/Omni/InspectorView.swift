@@ -92,6 +92,10 @@ private struct ThreadInspector: ViewModifier {
           case .artifacts, .changes, .browser, .terminal, .details:
             isOpen.wrappedValue = true
             picked.wrappedValue.tab = InspectorSelection.Tab(rawValue: command.rawValue) ?? .details
+          case .turn:
+            isOpen.wrappedValue = true
+            picked.wrappedValue.tab = .changes
+            ChangesProbe.show(.turn)
           }
         }
         #endif
