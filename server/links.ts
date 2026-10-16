@@ -414,7 +414,8 @@ function getHead(url: URL): Promise<{ status: number; location?: string; html?: 
   return new Promise((resolve, reject) => {
     const req = (url.protocol === 'https:' ? httpsRequest : httpRequest)(
       url,
-      { method: 'GET', lookup: publicLookup, headers: { 'User-Agent': UA, Accept: 'text/html' }, timeout: 6000 },
+      // `timeout` is per idle gap; the signal caps the whole request, so a slow drip cannot hold it open.
+      { method: 'GET', lookup: publicLookup, headers: { 'User-Agent': UA, Accept: 'text/html' }, timeout: 6000, signal: AbortSignal.timeout(8000) },
       (res: IncomingMessage) => {
         const status = res.statusCode ?? 0;
         const type = String(res.headers['content-type'] ?? '');
