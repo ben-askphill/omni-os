@@ -7,7 +7,7 @@ import './runner/prompts.ts';
 import './runner/api.ts';
 
 export type { ActiveTask, ModStatus, PendingMsg, SendMode } from './runner/state.ts';
-export type { CreateThreadInput } from './runner/api.ts';
+export type { Acceptance, CreateThreadInput, PostedThread } from './runner/api.ts';
 
 export {
   activeMods,
@@ -23,6 +23,6 @@ export {
   threadCommands,
 } from './runner/state.ts';
 
-export { createTeam, createThread, postMessage, sendMessage } from './runner/api.ts';
+export { acceptedAgain, createTeam, createThread, discardRequests, postMessage, resumeRequests, sendMessage } from './runner/api.ts';
 export { interruptThread, shutdownAll, stopThread } from './runner/session.ts';
 export { buildSystemPrompt } from './runner/prompts.ts';

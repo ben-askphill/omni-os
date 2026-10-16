@@ -136,7 +136,9 @@
       "text": "then tidy up",
       "source": "ben",
       "mode": "queue",
-      "state": "held"
+      "state": "held",
+      "request_id": "00000000-0000-4000-8000-000000000003",
+      "delivery": "held"
     }
   ],
   "live": true,

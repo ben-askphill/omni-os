@@ -13,6 +13,7 @@ import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '
 import { menuCommands, newThreadHint, replySlash } from '../../../shared/composer-slash.ts';
 import { channelRun, newThreadBody, otherModel, runPreselect, sameSettings } from '../new-thread-preset.ts';
 import { parseSlash, type SlashCommand } from '../../../shared/slash.ts';
+import { requestIdFor, sendKey, type PendingRequest } from '../requests.ts';
 
 // Unsent text survives navigation (not reloads). Keyed by where the composer lives.
 const drafts = new Map<string, string>();
@@ -783,9 +784,12 @@ export function ReplyComposer({
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const att = useAttachments();
+  // The last send that failed: retrying the same message reuses its request id.
+  const lastRequest = useRef<PendingRequest | null>(null);
   useAutosize(ref, text, 240);
 
   useEffect(() => {
+    lastRequest.current = null;
     setText(drafts.get(key) ?? '');
     setError(null);
     att.clear();
@@ -816,8 +820,12 @@ export function ReplyComposer({
     if (!prompt || busy) return;
     setBusy(true);
     setError(null);
+    const request = requestIdFor(lastRequest.current, sendKey(prompt, mode, att.files));
+    lastRequest.current = request;
     try {
-      const t = await api.send<Thread>(`/threads/${encodeURIComponent(threadId)}/messages`, mode ? { prompt, mode } : { prompt }, att.files);
+      const body = { prompt, ...(mode && { mode }), request_id: request.id };
+      const t = await api.send<Thread>(`/threads/${encodeURIComponent(threadId)}/messages`, body, att.files);
+      lastRequest.current = null;
       // Keep anything typed while the send was in flight.
       if (drafts.get(key) === raw) drafts.delete(key);
       if (latest.current === raw) setText('');

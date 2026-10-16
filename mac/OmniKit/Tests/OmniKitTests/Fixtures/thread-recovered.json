@@ -1,0 +1,107 @@
+{
+  "thread": {
+    "id": "00000000-0000-4000-8000-000000000009",
+    "channel_id": "acme",
+    "title": "Audit the checkout",
+    "status": "failed",
+    "role": null,
+    "model": null,
+    "harness": "claude-code",
+    "effort": "",
+    "session_id": "00000000-0000-4000-8000-000000000009",
+    "has_run": 0,
+    "cwd": "/tmp/omni-fixtures/acme",
+    "branch": null,
+    "parent_id": null,
+    "task_id": null,
+    "source": "manual",
+    "automation": null,
+    "last_text": null,
+    "suggestion": null,
+    "next_title": null,
+    "next_prompt": null,
+    "archived": 0,
+    "folder_id": null,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "updated_at": "2026-01-05T09:00:00.000Z"
+  },
+  "channel": {
+    "id": "acme",
+    "name": "Acme",
+    "kind": "client",
+    "repo_path": null,
+    "github_repo": null,
+    "use_worktree": 0,
+    "base_dir": "/tmp/omni-fixtures/acme",
+    "store_domain": null,
+    "portal_slug": null,
+    "browser_headless": 1,
+    "notes": "Fixture",
+    "icon": null,
+    "design_system_name": null,
+    "archived": 0,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "default_harness": null,
+    "default_model": null,
+    "default_effort": null,
+    "design_system_size": 0
+  },
+  "events": [
+    {
+      "id": 58,
+      "thread_id": "00000000-0000-4000-8000-000000000009",
+      "kind": "init",
+      "payload": "{\"model\":\"sonnet\",\"cwd\":\"/tmp/omni-fixtures/acme\",\"tools\":10,\"mcp\":[]}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 59,
+      "thread_id": "00000000-0000-4000-8000-000000000009",
+      "kind": "user",
+      "payload": "{\"text\":\"TOOL:30000 audit the checkout\",\"source\":\"manual\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 60,
+      "thread_id": "00000000-0000-4000-8000-000000000009",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_1\",\"name\":\"Bash\",\"input\":{\"command\":\"sleep 30\",\"description\":\"Fake tool\"},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 61,
+      "thread_id": "00000000-0000-4000-8000-000000000009",
+      "kind": "task",
+      "payload": "{\"task_id\":\"toolu_fake_1\",\"event\":\"started\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    }
+  ],
+  "artifacts": [],
+  "children": [],
+  "team": [],
+  "parent": null,
+  "pending": [
+    {
+      "uuid": "00000000-0000-4000-8000-000000000010",
+      "kind": "user",
+      "text": "then write it up",
+      "source": "ben",
+      "mode": "queue",
+      "state": "held",
+      "request_id": "req-1",
+      "delivery": "recovered"
+    },
+    {
+      "uuid": "00000000-0000-4000-8000-000000000011",
+      "kind": "user",
+      "text": "and check the totals",
+      "source": "ben",
+      "mode": "steer",
+      "state": "held",
+      "request_id": "req-2",
+      "delivery": "uncertain"
+    }
+  ],
+  "live": false,
+  "mods": []
+}

@@ -1,0 +1,50 @@
+{
+  "thread": {
+    "id": "00000000-0000-4000-8000-000000000009",
+    "channel_id": "acme",
+    "title": "Audit the checkout",
+    "status": "running",
+    "role": null,
+    "model": null,
+    "harness": "claude-code",
+    "effort": "",
+    "session_id": "00000000-0000-4000-8000-000000000009",
+    "has_run": 0,
+    "cwd": "/tmp/omni-fixtures/acme",
+    "branch": null,
+    "parent_id": null,
+    "task_id": null,
+    "source": "manual",
+    "automation": null,
+    "last_text": null,
+    "suggestion": null,
+    "next_title": null,
+    "next_prompt": null,
+    "archived": 0,
+    "folder_id": null,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "updated_at": "2026-01-05T09:00:00.000Z"
+  },
+  "pending": [
+    {
+      "uuid": "00000000-0000-4000-8000-000000000010",
+      "kind": "user",
+      "text": "then write it up",
+      "source": "ben",
+      "mode": "queue",
+      "state": "sent",
+      "request_id": "req-1",
+      "delivery": "sent"
+    },
+    {
+      "uuid": "00000000-0000-4000-8000-000000000011",
+      "kind": "user",
+      "text": "and check the totals",
+      "source": "ben",
+      "mode": "steer",
+      "state": "held",
+      "request_id": "req-2",
+      "delivery": "uncertain"
+    }
+  ]
+}

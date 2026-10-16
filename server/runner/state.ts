@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import type { ChildProcess } from 'node:child_process';
 import type { DeliveryPhase } from '../delivery.ts';
 import { config } from '../config.ts';
-import { events, threads } from '../db.ts';
+import { events, messageRequests, threads, type DeliveryState } from '../db.ts';
 import { publishFeed, publishThread } from '../bus.ts';
 import { describeAttachments, inlinable, messageContent, type Attachment } from '../uploads.ts';
 import type { CommandList } from '../commands.ts';
@@ -45,7 +45,10 @@ export const cliLabel = (harness: string) => CLI_LABEL[harness] ?? harness;
 export type SendMode = 'steer' | 'queue' | 'interrupt';
 
 export interface Msg {
+  /** For a message sent through the API, also its message_requests row id (db/repos/requests.ts). */
   uuid: string;
+  /** The client's request id. Set only on messages with a durable row, whose delivery state is tracked. */
+  requestId?: string;
   text: string;
   mode: SendMode;
   /** Files Ben attached, already written into the thread's uploads folder. */
@@ -68,6 +71,10 @@ export interface PendingMsg {
   state: 'waiting' | 'sent' | 'held';
   task_id?: string;
   role?: string;
+  /** Messages sent through the API: the client's request id, and where the durable row says it is (db/repos/requests.ts). */
+  request_id?: string;
+  delivery?: DeliveryState;
+  attachments?: Attachment[];
 }
 
 /** One long-lived claude process per thread. It runs many turns and stays warm in between. */
@@ -254,24 +261,49 @@ export function threadCommands(threadId: string): CommandList | null {
 
 const pendingView = (m: Msg, state: PendingMsg['state']): PendingMsg => {
   const p = m.event.payload as { text?: string; source?: string; task_id?: string | null; role?: string | null };
-  return { uuid: m.uuid, kind: m.event.kind, text: p.text ?? m.text, source: p.source, mode: m.mode, state, task_id: p.task_id ?? undefined, role: p.role ?? undefined };
+  return {
+    uuid: m.uuid, kind: m.event.kind, text: p.text ?? m.text, source: p.source, mode: m.mode, state, task_id: p.task_id ?? undefined, role: p.role ?? undefined,
+    ...(m.requestId && { request_id: m.requestId, delivery: state }),
+    ...(m.attachments?.length && { attachments: m.attachments }),
+  };
 };
 
-/** Messages the agent has not seen yet. Not in the transcript until their replay arrives. */
+/**
+ * Messages the agent has not seen yet. Not in the transcript until their replay arrives. Last, the ones a restart
+ * parked: shown as held, with their delivery saying whether they wait for Resume or may already have been read.
+ */
 export function pendingFor(threadId: string): PendingMsg[] {
   const live = lives.get(threadId);
   return [
     ...(live?.inflight ?? []).map((m) => pendingView(m, 'sent')),
     ...(live?.held ?? []).map((m) => pendingView(m, 'held')),
     ...(waitingMsgs.get(threadId) ?? []).map((m) => pendingView(m, 'waiting')),
+    ...messageRequests.parked(threadId).map(
+      (r): PendingMsg => ({
+        uuid: r.id, kind: 'user', text: r.prompt, source: r.source, mode: r.mode, state: 'held', request_id: r.request_id, delivery: r.state,
+        ...(r.attachments?.length && { attachments: r.attachments }),
+      }),
+    ),
   ];
+}
+
+/** Record where a durable message is now. A message without a request row (a crew report) has nothing to track. */
+export function track(m: Msg, state: DeliveryState, eventId?: number) {
+  if (m.requestId) messageRequests.mark(m.uuid, state, eventId);
 }
 
 export const eventPayload = (m: Msg) => (m.event.kind === 'user' && m.midTurn ? { ...m.event.payload, mode: m.mode } : m.event.payload);
 
-/** Messages the agent never saw. Recorded so the text is never lost. */
+/**
+ * Messages the agent never saw. Recorded so the text is never lost. While Omni shuts down, a durable one is
+ * parked for after the restart instead (recovered, or uncertain once it was written to the harness).
+ */
 export function drop(threadId: string, msgs: Msg[]) {
-  for (const m of msgs) addEvent(threadId, m.event.kind, { ...eventPayload(m), dropped: true });
+  for (const m of msgs) {
+    if (m.requestId && shuttingDown && messageRequests.park(m.uuid)) continue;
+    track(m, 'dropped');
+    addEvent(threadId, m.event.kind, { ...eventPayload(m), dropped: true });
+  }
 }
 
 /** startup: no child yet, or init has not arrived. running: the CLI has begun a turn. */
@@ -314,7 +346,11 @@ export const userLine = (live: Live, m: Msg) => ({
 /** stdin is gone: kill it so the close handler fails the turn and records what was not delivered. */
 export const crash = (live: Live) => live.child && alive(live.child) && live.child.kill('SIGKILL');
 
+/** Write a message to the harness. Before the process exists it waits in inflight, and spawn writes it. */
 export function send(live: Live, m: Msg) {
   live.inflight.push(m);
-  if (live.child && !writeLine(live, userLine(live, m))) crash(live);
+  if (!live.child) return;
+  // Marked first: a write that fails can still have reached the harness.
+  track(m, 'sent');
+  if (!writeLine(live, userLine(live, m))) crash(live);
 }

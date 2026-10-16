@@ -17,6 +17,7 @@ import {
   lives,
   runningByHarness,
   send,
+  track,
   waiting,
   waitingMsgs,
   type Msg,
@@ -42,9 +43,11 @@ export function deliver(threadId: string, m: Msg) {
     switch (action) {
       case 'queue':
         live.held.push(m);
+        track(m, 'held');
         break;
       case 'kill':
         live.held.push(m);
+        track(m, 'held');
         hardKill(live);
         break;
       case 'steer':
@@ -66,6 +69,7 @@ export function deliver(threadId: string, m: Msg) {
     const list = waitingMsgs.get(threadId) ?? [];
     list.push(m);
     waitingMsgs.set(threadId, list);
+    track(m, 'waiting');
     if (!waiting.includes(threadId)) waiting.push(threadId);
     pump();
     if (waiting.includes(threadId)) threads.update(threadId, { status: 'queued' });

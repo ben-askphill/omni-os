@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import type { Thread, Channel as ChannelRow, EventRow, Artifact, Folder } from '../../server/db.ts';
+import type { Thread, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState } from '../../server/db.ts';
 import type { Attachment } from '../../server/uploads.ts';
 import type { HarnessInfo, ModelEntry, HarnessId } from '../../server/harness/types.ts';
 import type { CommandList as HarnessCommands } from '../../server/commands.ts';
 import type { ContextView } from '../../server/context.ts';
 import type { ContextUsage } from '../../shared/context-meter.ts';
 
-export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView };
+export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number };
@@ -84,6 +84,10 @@ export interface PendingMsg {
   task_id?: string | null;
   role?: string | null;
   attachments?: Attachment[];
+  /** Sent through the API: the client's request id, and where the server's saved copy is (server/db/repos/requests.ts). */
+  request_id?: string;
+  /** `recovered` and `uncertain` (shown with `state: 'held'`) wait on Ben after a restart. */
+  delivery?: DeliveryState;
 }
 
 export interface CrewRole {

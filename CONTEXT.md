@@ -31,6 +31,14 @@ The crew role Ben talks to, which delegates work to crew threads in other channe
 **Automation**:
 A cron schedule that starts a new thread on every run.
 
+**Request**:
+A message sent to a thread through the API, saved before the client hears it was accepted. It carries the client's request id, kept across retries: a retry with the same id gets the first acceptance back, and the same id with another message is refused. Local to the Mac that accepted it (`message_requests`, `server/db/repos/requests.ts`).
+_Avoid_: Job, task
+
+**Delivery state**:
+Where a **Request** is. `accepted` (saved), `waiting` (for a slot), `held` (runs after this turn), `sent` (written to the harness), then `delivered` (the harness read it; the transcript keeps it where it did), `dropped` (stopped first) or `discarded` (Ben chose not to send it). A restart parks the rest: `recovered` when no harness got it, held with Resume, and `uncertain` when one may have, sent again only when Ben says so.
+_Avoid_: Status (a thread's), queue state
+
 ### Harnesses
 
 **Harness**:
@@ -89,6 +97,8 @@ _Avoid_: Frontend, dashboard
 - A message starts with at most one **Slash command** and can carry many **Mentions**; built-ins, MCP prompts and **Omni commands** only work at the start
 - A Claude Code **Thread** lists its MCP prompts only while it is warm, once its MCP servers have connected; while warm, its `/` menu lists exactly what that session can run
 - In Claude Code a **Mention** is best effort (the model decides whether to load it); Codex and Cursor load every one
+- A **Request** belongs to one **Thread** and the Mac that accepted it; only that Mac resumes it, through the same slots as any message, so each **Harness**'s concurrency cap holds
+- Resume sends a **Thread**'s `recovered` **Requests** in the order they came; an `uncertain` one is never sent again on its own
 - **Harness commands** work in any message a **Thread** gets, whether Ben, an **Automation** or the **Conductor** sent it; **Omni commands** only work from a thread's reply box, and anywhere else reach the harness as plain text
 
 ## Example dialogue

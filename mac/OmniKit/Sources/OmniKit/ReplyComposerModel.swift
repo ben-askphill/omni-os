@@ -29,6 +29,8 @@ public final class ReplyComposerModel {
   @ObservationIgnored private let api: any ReplyAPI
   @ObservationIgnored private let drafts: DraftStore
   @ObservationIgnored private let readFile: @Sendable (StagedFile) throws -> UploadFile
+  /// The last send that failed: retrying the same message reuses its request id.
+  @ObservationIgnored public private(set) var lastRequest: PendingRequest?
   private var key: String { "reply:\(threadID)" }
 
   public init(
@@ -71,9 +73,12 @@ public final class ReplyComposerModel {
     sendError = nil
     defer { sending = false }
     let staged = files
+    let request = PendingRequest.next(after: lastRequest, key: PendingRequest.key(prompt: prompt, mode: mode, files: staged.map(\.url.path)))
+    lastRequest = request
     do {
       let uploads = try await Self.load(staged, with: readFile)
-      let thread = try await api.reply(to: threadID, prompt: prompt, mode: mode, files: uploads)
+      let thread = try await api.reply(to: threadID, prompt: prompt, mode: mode, files: uploads, requestID: request.id)
+      lastRequest = nil
       if text == raw { text = "" }
       files.removeAll { staged.contains($0) }
       staged.forEach(discard)

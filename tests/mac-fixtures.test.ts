@@ -53,6 +53,10 @@ const NAMES = [
   'automation-enabled.json',
   'automation-run.json',
   'automations.json',
+  // Last: the server restarts with messages still waiting.
+  'message-queued-request.json',
+  'thread-recovered.json',
+  'requests-resumed.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -111,10 +115,15 @@ function automations() {
   return dir;
 }
 
+let setUp: { bin: string; automationsDir: string } | undefined;
+
+/** Starts the server on the test's data dir. A second call is a restart on the same data. */
 async function boot(): Promise<number> {
-  mkdirSync(join(tmp, 'brain'));
-  const bin = fakeSecurity();
-  const automationsDir = automations();
+  if (!setUp) {
+    mkdirSync(join(tmp, 'brain'));
+    setUp = { bin: fakeSecurity(), automationsDir: automations() };
+  }
+  const { bin, automationsDir } = setUp;
   child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', 'tsx', 'server/index.ts'], {
     cwd: ROOT,
     // Only what the server needs: none of this shell's other variables, so no API key.
@@ -192,7 +201,7 @@ type Thread = { id: string; status: string };
 type Detail = { thread: Thread; events: { kind: string }[]; pending?: unknown[] };
 
 async function scenario() {
-  const base = `http://127.0.0.1:${await boot()}`;
+  let base = `http://127.0.0.1:${await boot()}`;
   const call = async (method: string, path: string, body?: unknown, ok = true) => {
     const res = await fetch(`${base}/api${path}`, {
       method,
@@ -305,6 +314,23 @@ async function scenario() {
   const broken = listed2.find((a) => a.id === 'broken')!;
   expect(broken.error).toMatch(/^invalid schedule/);
   expect(broken.next).toBeUndefined();
+
+  // Messages accepted before a forced restart: a queued one is held for Resume, a steer the CLI was given is uncertain.
+  const long = (await call('POST', '/threads', { channel: 'acme', prompt: 'TOOL:30000 audit the checkout', title: 'Audit the checkout' })) as Thread;
+  await eventually(async () => {
+    const d = await detail(long.id);
+    return d.thread.status === 'running' && count(d, 'tool_use') === 1;
+  }, 'the long thread to run its tool');
+  const queueBody = request('message-queued-request.json', { prompt: 'then write it up', mode: 'queue', request_id: 'req-1' });
+  await call('POST', `/threads/${long.id}/messages`, queueBody);
+  await call('POST', `/threads/${long.id}/messages`, { prompt: 'and check the totals', mode: 'steer', request_id: 'req-2' });
+  const killed = child!;
+  killed.kill('SIGKILL');
+  await eventually(async () => killed.exitCode !== null || killed.signalCode !== null, 'the killed server to exit');
+  base = `http://127.0.0.1:${await boot()}`;
+  const recovered = keep('thread-recovered.json', await detail(long.id)) as { pending: { delivery?: string }[] };
+  expect(recovered.pending.map((p) => p.delivery)).toEqual(['recovered', 'uncertain']);
+  keep('requests-resumed.json', await call('POST', `/threads/${long.id}/requests/resume`, {}));
 }
 
 /** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */

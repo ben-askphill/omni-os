@@ -92,11 +92,11 @@ private func file(_ name: String, size: Int = 10, modified: Double = 0) -> Stage
 @MainActor
 private final class FakeReplyAPI: ReplyAPI {
   var failWith: OmniAPIError?
-  var sent: [(id: String, prompt: String, mode: SendMode?, files: [String])] = []
-  nonisolated func reply(to id: String, prompt: String, mode: SendMode?, files: [UploadFile]) async throws(OmniAPIError) -> OmniThread {
+  var sent: [(id: String, prompt: String, mode: SendMode?, files: [String], requestID: String?)] = []
+  nonisolated func reply(to id: String, prompt: String, mode: SendMode?, files: [UploadFile], requestID: String?) async throws(OmniAPIError) -> OmniThread {
     let names = files.map(\.name)
     let fail = await MainActor.run { () -> OmniAPIError? in
-      self.sent.append((id, prompt, mode, names))
+      self.sent.append((id, prompt, mode, names, requestID))
       return self.failWith
     }
     if let fail { throw fail }
@@ -144,6 +144,30 @@ private final class FakeReplyAPI: ReplyAPI {
     #expect(DraftStore(directory: dir.url).text(for: "reply:t1") == "hello")
   }
 
+  @Test func aRetryOfTheSameMessageKeepsItsRequestID() async {
+    let dir = TempDir("drafts")
+    let api = FakeReplyAPI()
+    api.failWith = .unreachable("offline")
+    let m = make(api, dir)
+    m.text = "queue this"
+    #expect(await m.send(mode: .queue) == nil)
+    #expect(await m.send(mode: .queue) == nil)
+    // Another mode is another message.
+    #expect(await m.send(mode: .steer) == nil)
+    api.failWith = nil
+    #expect(await m.send(mode: .steer) != nil)
+    let ids = api.sent.map(\.requestID)
+    #expect(ids.allSatisfy { $0 != nil })
+    #expect(ids[0] == ids[1])
+    #expect(ids[2] != ids[1])
+    #expect(ids[3] == ids[2])
+    #expect(m.lastRequest == nil)
+    // Sent: the next message gets a new id, even with the same text.
+    m.text = "queue this"
+    _ = await m.send(mode: .steer)
+    #expect(api.sent.last?.requestID != ids[3])
+  }
+
   @Test func blankTextSendsNothing() async {
     let dir = TempDir("drafts")
     let api = FakeReplyAPI()
@@ -176,6 +200,14 @@ private final class FakeReplyAPI: ReplyAPI {
     #expect(r[0].value(forHTTPHeaderField: "Content-Type") == "application/json")
     #expect(try bodyJSON(r[0]) == .object(["prompt": .string("hi")]))
     #expect(try bodyJSON(r[1]) == .object(["prompt": .string("hi"), "mode": .string("interrupt")]))
+  }
+
+  @Test func aRequestIDGoesInTheBody() async throws {
+    let t = StubTransport(body: threadJSON())
+    let client = OmniClient(port: 4799, transport: t)
+    _ = try await client.reply(to: "t1", prompt: "then write it up", mode: .queue, files: [], requestID: "req-1")
+    let expected = try JSONDecoder().decode(JSONValue.self, from: Data(try fixture("message-queued-request.json").utf8))
+    #expect(try bodyJSON(t.requests[0]) == expected)
   }
 
   @Test func filesGoAsMultipartWithAPayloadField() async throws {

@@ -139,6 +139,24 @@ public struct PendingState: OpenEnum {
   public static let held: Self = "held"
 }
 
+/// Where a message sent through the API is, as the server's saved copy says (server/db/repos/requests.ts).
+public struct DeliveryState: OpenEnum {
+  public let rawValue: String
+  public init(rawValue: String) { self.rawValue = rawValue }
+
+  public static let accepted: Self = "accepted"
+  public static let waiting: Self = "waiting"
+  public static let held: Self = "held"
+  public static let sent: Self = "sent"
+  public static let delivered: Self = "delivered"
+  public static let dropped: Self = "dropped"
+  public static let discarded: Self = "discarded"
+  /// Accepted before a restart and never reached a harness: waits for Resume.
+  public static let recovered: Self = "recovered"
+  /// Written to a harness before a restart, so it may have been read: sent again only when Ben says so.
+  public static let uncertain: Self = "uncertain"
+}
+
 /// A message the agent has not seen yet. It enters the transcript when the CLI replays it.
 public struct PendingMsg: Decodable, Hashable, Sendable, Identifiable {
   public let uuid: String
@@ -151,12 +169,20 @@ public struct PendingMsg: Decodable, Hashable, Sendable, Identifiable {
   public let taskID: String?
   public let role: String?
   public let attachments: [Attachment]?
+  /// Sent through the API: the client's request id. Older servers leave it out.
+  public let requestID: String?
+  /// Where the server's saved copy is. `recovered` and `uncertain` come with `state` held and wait on Ben.
+  public let delivery: DeliveryState?
 
   public var id: String { uuid }
 
+  /// Accepted before a restart and waiting on Ben's decision.
+  public var isParked: Bool { delivery == .recovered || delivery == .uncertain }
+
   enum CodingKeys: String, CodingKey {
-    case uuid, kind, text, source, mode, state, role, attachments
+    case uuid, kind, text, source, mode, state, role, attachments, delivery
     case taskID = "task_id"
+    case requestID = "request_id"
   }
 }
 

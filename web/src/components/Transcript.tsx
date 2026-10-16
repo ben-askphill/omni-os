@@ -1,12 +1,13 @@
 import { createContext, Fragment, memo, useContext, useMemo, useState, type ReactNode } from 'react';
-import { uploadUrl, type Artifact, type Attachment, type EventRow, type PendingMsg, type Thread } from '../api.ts';
+import { api, errorText, uploadUrl, type Artifact, type Attachment, type EventRow, type PendingMsg, type Thread } from '../api.ts';
 import { bytes, clock, duration, plural, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { BranchFace, DelegationCard, RailItem, ROW_CARD } from './Delegation.tsx';
 import { PublishedCard } from './Published.tsx';
 import { Markdown } from './Markdown.tsx';
-import { CheckItem, copyText, Icon, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
+import { Button, CheckItem, copyText, Icon, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
+import { isParked, parkedLabel, parkedOf } from '../requests.ts';
 import { SOURCE_TAG } from '../../../shared/slash-menu.ts';
 import { slashPieces } from '../../../shared/slash-pills.ts';
 import { statusLabel } from '../status-line.ts';
@@ -422,13 +423,28 @@ function pendingLabel(m: PendingMsg, lead: boolean) {
 /**
  * Messages (and crew reports) the agent has not read yet; shown under the live output.
  * `starting`: no turn is under way yet, so the first sent message starts one instead of steering it.
+ * Messages a restart left waiting on Ben come last, with Resume, Send again and Discard (`ParkedMessages`).
  */
-export function QueuedMessages({ items, starting = false }: { items: PendingMsg[]; starting?: boolean }) {
+export function QueuedMessages({
+  items,
+  starting = false,
+  threadId,
+  onPending,
+}: {
+  items: PendingMsg[];
+  starting?: boolean;
+  /** Needed for the parked messages' actions. */
+  threadId?: string;
+  /** The pending list a resume or discard answered with, before the stream brings it. */
+  onPending?: (items: PendingMsg[]) => void;
+}) {
   if (!items.length) return null;
-  const lead = starting ? items.find((m) => m.state === 'sent') : undefined;
+  const live = items.filter((m) => !isParked(m));
+  const parked = items.filter(isParked);
+  const lead = starting ? live.find((m) => m.state === 'sent') : undefined;
   return (
     <div className="mt-5 flex flex-col gap-3">
-      {items.map((m, i) =>
+      {live.map((m, i) =>
         m.kind === 'crew_report' ? (
           <div key={m.uuid ?? i} className="flex items-center gap-1.5 text-[12px] text-fg-3">
             <Icon name={m.state === 'sent' ? 'send' : 'clock'} size={12} />
@@ -439,17 +455,78 @@ export function QueuedMessages({ items, starting = false }: { items: PendingMsg[
             </span>
           </div>
         ) : (
-          <div key={m.uuid ?? i} className="flex flex-col items-end opacity-70">
-            <div className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-fg-3">
-              <Icon name={m.state === 'sent' ? 'send' : 'clock'} size={12} /> {pendingLabel(m, m === lead)}
-              {m.attachments?.length ? <span className="text-fg-4">· {plural(m.attachments.length, 'file')}</span> : null}
-            </div>
-            <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
-              {m.text}
-            </div>
-          </div>
+          <PendingBubble key={m.uuid ?? i} m={m} label={pendingLabel(m, m === lead)} icon={m.state === 'sent' ? 'send' : 'clock'} />
         ),
       )}
+      {parked.length > 0 && threadId && <ParkedMessages threadId={threadId} items={parked} onPending={onPending} />}
+    </div>
+  );
+}
+
+function PendingBubble({ m, label, icon, children }: { m: PendingMsg; label: string; icon: 'send' | 'clock' | 'alert'; children?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-end">
+      <div className="flex w-full flex-col items-end opacity-70">
+        <div className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-fg-3">
+          <Icon name={icon} size={12} /> {label}
+          {m.attachments?.length ? <span className="text-fg-4">· {plural(m.attachments.length, 'file')}</span> : null}
+        </div>
+        <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
+          {m.text}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Messages Omni accepted before it restarted. A recovered one never reached the agent: Resume sends every one in
+ * the order it came. An uncertain one may have, so it is only sent again when Ben says so.
+ */
+function ParkedMessages({ threadId, items, onPending }: { threadId: string; items: PendingMsg[]; onPending?: (items: PendingMsg[]) => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { recovered } = parkedOf(items);
+  const act = async (what: 'resume' | 'discard', key: string, ids?: string[]) => {
+    setBusy(key);
+    setError(null);
+    try {
+      const res = await api.post<{ pending?: PendingMsg[] }>(`/threads/${encodeURIComponent(threadId)}/requests/${what}`, ids ? { ids } : {});
+      if (res.pending) onPending?.(res.pending);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <div className="flex flex-col gap-3 border-t border-line pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[12px] text-fg-3">
+          {plural(items.length, 'message')} {items.length === 1 ? 'was' : 'were'} waiting when Omni restarted
+        </span>
+        {recovered.length > 0 && (
+          <Button size="sm" variant="primary" icon="play" busy={busy === 'resume'} disabled={!!busy} onClick={() => void act('resume', 'resume')}>
+            Resume{recovered.length > 1 ? ` ${recovered.length}` : ''}
+          </Button>
+        )}
+      </div>
+      {items.map((m) => (
+        <PendingBubble key={m.uuid} m={m} label={parkedLabel(m) ?? ''} icon={m.delivery === 'uncertain' ? 'alert' : 'clock'}>
+          <div className="mt-1.5 flex gap-1.5">
+            {m.delivery === 'uncertain' && (
+              <Button size="sm" variant="secondary" icon="send" busy={busy === `again:${m.uuid}`} disabled={!!busy} onClick={() => void act('resume', `again:${m.uuid}`, [m.uuid])}>
+                Send again
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" icon="trash" busy={busy === `discard:${m.uuid}`} disabled={!!busy} onClick={() => void act('discard', `discard:${m.uuid}`, [m.uuid])}>
+              Discard
+            </Button>
+          </div>
+        </PendingBubble>
+      ))}
+      {error && <div className="text-right text-[12px] text-needs">{error}</div>}
     </div>
   );
 }

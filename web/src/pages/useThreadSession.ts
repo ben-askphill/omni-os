@@ -252,6 +252,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     notFound,
     ready,
     queued,
+    setQueued,
     warm,
     blocked,
     live,

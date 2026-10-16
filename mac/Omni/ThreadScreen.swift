@@ -428,8 +428,11 @@ private struct TranscriptRows: View {
       if let line = store.workingLine {
         WorkingLine(text: line)
       }
-      if !store.pending.isEmpty {
-        QueuedMessagesView(items: store.pending, starting: store.betweenTurns)
+      if store.pending.contains(where: { !$0.isParked }) {
+        QueuedMessagesView(items: store.pending.filter { !$0.isParked }, starting: store.betweenTurns)
+      }
+      if store.pending.contains(where: \.isParked) {
+        ParkedMessagesView(store: store, client: model.client, items: store.pending.filter(\.isParked))
       }
       if store.pending.isEmpty, let t = store.thread, t.status == .done, let title = t.nextTitle, let prompt = t.nextPrompt {
         NextThreadCard(model: model, store: store, thread: t, title: title, prompt: prompt)

@@ -16,7 +16,7 @@ process.on('exit', () => releaseLock(paths.lock));
 
 // Loaded once the lock is held: db.ts opens the database as it loads.
 const { app } = await import('./app.ts');
-const { threads } = await import('./db.ts');
+const { messageRequests, outbox, threads } = await import('./db.ts');
 const { shutdownAll } = await import('./runner.ts');
 const { closeAllBrowsers } = await import('./browser.ts');
 const { closeAllTerminals } = await import('./terminal.ts');
@@ -39,6 +39,9 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   about.port = info.port;
   const interrupted = threads.failInterrupted();
   if (interrupted) console.log(`[omni] marked ${interrupted} interrupted thread(s) as failed`);
+  // Messages a killed server still held wait for Resume; one it had written to a harness is marked uncertain.
+  const parked = messageRequests.recover(outbox.machineId());
+  if (parked) console.log(`[omni] kept ${parked} undelivered message(s) for Resume`);
   startArtifactWatcher();
   backfillPublished();
   startScheduler();

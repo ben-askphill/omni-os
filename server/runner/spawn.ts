@@ -16,7 +16,7 @@ import { runnableCommands } from '../../shared/slash.ts';
 import { buildSystemPrompt } from './prompts.ts';
 import { onExit, onRecord } from './records.ts';
 import { abortStart } from './session.ts';
-import { adapterFor, addEvent, browserHolder, cliLabel, crash, emitThread, lives, omniUrl, userLine, writeLine, type Live, type Msg } from './state.ts';
+import { adapterFor, addEvent, browserHolder, cliLabel, crash, emitThread, lives, omniUrl, track, userLine, writeLine, type Live, type Msg } from './state.ts';
 
 export function launch(threadId: string, first: Msg): Live | undefined {
   const thread = threads.get(threadId);
@@ -151,6 +151,7 @@ async function spawnLive(live: Live, thread: Thread) {
 
   // Messages go in as stream-json lines, so leading dashes or huge pastes never get parsed as flags.
   for (const m of live.inflight) {
+    track(m, 'sent');
     if (!writeLine(live, userLine(live, m))) {
       crash(live);
       break;

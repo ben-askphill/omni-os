@@ -1,6 +1,6 @@
 // createThread, sendMessage, and postMessage. Slash commands are resolved here, then delivered.
 import { randomUUID } from 'node:crypto';
-import { channels, folders, threads, type Thread, type ThreadSource } from '../db.ts';
+import { channels, folders, messageRequests, outbox, requestFingerprint, threads, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { commandsFolder, prepareWorkdir } from '../sandbox.ts';
 import { prepareTurn, turnBlocked } from '../sync/guard.ts';
@@ -15,7 +15,7 @@ import { resolveRun } from '../harness/resolve.ts';
 import type { CommandUse } from '../harness/adapter.ts';
 import { assembling, deliver, settleTeam } from './queue.ts';
 import { fallbackTitle, generateTitle } from './aux.ts';
-import { addEvent, emitThread, runsHere, threadCommands, type SendMode } from './state.ts';
+import { addEvent, emitThread, isShuttingDown, runsHere, threadCommands, type SendMode } from './state.ts';
 
 // ---------- slash commands ----------
 
@@ -220,7 +220,13 @@ export async function createTeam(input: CreateTeamInput): Promise<{ lead: Thread
 export function sendMessage(
   threadId: string,
   prompt: string,
-  opts: { from?: 'ben' | 'conductor'; mode?: SendMode; attachments?: Attachment[] } = {},
+  opts: {
+    from?: 'ben' | 'conductor';
+    mode?: SendMode;
+    attachments?: Attachment[];
+    /** A durable request (postMessage): its row id becomes the message uuid, and the runner tracks its state. */
+    request?: Pick<MessageRequest, 'id' | 'request_id'>;
+  } = {},
 ): Thread {
   const thread = threads.get(threadId);
   if (!thread) throw new Error('thread not found');
@@ -230,7 +236,8 @@ export function sendMessage(
   const attachments = opts.attachments?.length ? opts.attachments : undefined;
   const { text, slash, commands } = slashFor(prompt, () => (threadCommands(threadId) ?? peekCommands(thread.harness as HarnessId, thread.cwd)).commands);
   deliver(threadId, {
-    uuid: randomUUID(),
+    uuid: opts.request?.id ?? randomUUID(),
+    requestId: opts.request?.request_id,
     text: withMentions(text, { cwd: thread.cwd, threadId }),
     mode: opts.mode ?? 'steer',
     attachments,
@@ -246,24 +253,145 @@ export function sendMessage(
 /** Each thread's last posted message, until it is sent. */
 const posting = new Map<string, Promise<unknown>>();
 
-/**
- * `sendMessage` for the API: a message that names a command first waits, within a bound, for the
- * thread's command list. Messages to a thread still go in the order they were posted.
- */
-export async function postMessage(threadId: string, prompt: string, opts: Parameters<typeof sendMessage>[2] = {}): Promise<Thread> {
-  const thread = threads.get(threadId);
-  if (!thread) throw new Error('thread not found');
-  const next = (posting.get(threadId) ?? Promise.resolve())
-    .catch(() => {})
-    .then(async () => {
-      const ready = await prepareTurn(threads.get(threadId) ?? thread, runsHere(threadId));
-      await warmCommands(ready.harness, ready.cwd, prompt, threadId);
-      return sendMessage(threadId, prompt, opts);
-    });
+/** Run fn after every message posted to the thread before it, so they reach the runner in the order they came. */
+async function inOrder<T>(threadId: string, fn: () => Promise<T>): Promise<T> {
+  const next = (posting.get(threadId) ?? Promise.resolve()).catch(() => {}).then(fn);
   posting.set(threadId, next);
   try {
     return await next;
   } finally {
     if (posting.get(threadId) === next) posting.delete(threadId);
   }
+}
+
+/** What a client hears once its message is saved. A retry with the same request id hears the same id and time. */
+export interface Acceptance {
+  id: string;
+  request_id: string;
+  state: DeliveryState;
+  accepted_at: string;
+  /** This request id was accepted before: nothing new was saved or sent. */
+  duplicate?: boolean;
+}
+
+export type PostedThread = Thread & { request: Acceptance };
+
+const refusal = (message: string, status: number) => Object.assign(new Error(message), { status });
+
+function accepted(threadId: string, r: MessageRequest, duplicate = false): PostedThread {
+  const now = messageRequests.get(r.id) ?? r;
+  return {
+    ...threads.get(threadId)!,
+    request: { id: now.id, request_id: now.request_id, state: now.state, accepted_at: now.created_at, ...(duplicate && { duplicate: true }) },
+  };
+}
+
+/**
+ * A request id seen before: the same acceptance when the message matches, a 409 when the id was used for another
+ * message. The route calls this before it saves the files again.
+ */
+export function acceptedAgain(threadId: string, requestId: string, fingerprint: string): PostedThread | null {
+  const had = messageRequests.byRequestId(threadId, requestId);
+  if (!had) return null;
+  if (had.fingerprint !== fingerprint) throw refusal(`Request ${requestId} was already used for a different message.`, 409);
+  return accepted(threadId, had, true);
+}
+
+/**
+ * Hand a saved request to the runner, after the thread's folder is ready and, when the message names a command,
+ * its command list. If that fails, `undo` says what becomes of the row; a shutdown parks it for after the restart.
+ */
+async function deliverRequest(r: MessageRequest, undo: () => void) {
+  try {
+    const thread = threads.get(r.thread_id);
+    if (!thread) throw refusal('thread not found', 404);
+    const ready = await prepareTurn(thread, runsHere(r.thread_id));
+    await warmCommands(ready.harness, ready.cwd, r.prompt, r.thread_id);
+    sendMessage(r.thread_id, r.prompt, { from: r.source, mode: r.mode, attachments: r.attachments ?? undefined, request: r });
+  } catch (err) {
+    if (isShuttingDown()) messageRequests.park(r.id);
+    else undo();
+    emitThread(r.thread_id);
+    throw err;
+  }
+}
+
+/**
+ * `sendMessage` for the API. The message is saved first (db/repos/requests.ts), so once this returns it survives a
+ * restart. A message that names a command then waits, within a bound, for the thread's command list. Messages to
+ * a thread still go in the order they were posted. `requestId` is the client's: a retry with it is answered with
+ * the first acceptance and sends nothing again.
+ */
+export async function postMessage(
+  threadId: string,
+  prompt: string,
+  opts: Parameters<typeof sendMessage>[2] & { requestId?: string; fingerprint?: string } = {},
+): Promise<PostedThread> {
+  const thread = threads.get(threadId);
+  if (!thread) throw new Error('thread not found');
+  const mode = opts.mode ?? 'steer';
+  const source = opts.from ?? 'ben';
+  const files = (opts.attachments ?? []).map((a) => ({ name: a.name, size: a.size, sha256: '' }));
+  const fingerprint = opts.fingerprint ?? requestFingerprint({ prompt, mode, source, files });
+  if (opts.requestId) {
+    const again = acceptedAgain(threadId, opts.requestId, fingerprint);
+    if (again) return again;
+  }
+  // Refused before anything is saved: the other Mac runs it.
+  const blocked = turnBlocked(thread, runsHere(threadId));
+  if (blocked) throw refusal(blocked, 409);
+  const { row, fresh } = messageRequests.accept({
+    thread_id: threadId,
+    request_id: opts.requestId ?? randomUUID(),
+    prompt,
+    mode,
+    source,
+    attachments: opts.attachments ?? null,
+    fingerprint,
+    machine_id: outbox.machineId(),
+  });
+  // The same id posted twice at once: the second waits for nothing.
+  if (!fresh) return acceptedAgain(threadId, row.request_id, fingerprint)!;
+  await inOrder(threadId, () => deliverRequest(row, () => messageRequests.remove(row.id)));
+  return accepted(threadId, row);
+}
+
+/**
+ * Resume requests a restart parked, in the order they first arrived. Without `ids`, every recovered one; an
+ * uncertain one may already have reached the harness, so it goes only when named. Each goes through the runner
+ * like a new message, so the harness's concurrency cap holds. Only the Mac that accepted a request resumes it.
+ */
+export async function resumeRequests(threadId: string, ids?: string[]): Promise<Thread> {
+  const thread = threads.get(threadId);
+  if (!thread) throw refusal('thread not found', 404);
+  const parked = messageRequests.parked(threadId);
+  const chosen = ids ? parked.filter((r) => ids.includes(r.id)) : parked.filter((r) => r.state === 'recovered');
+  if (ids && chosen.length !== new Set(ids).size) throw refusal('Some of these messages are no longer waiting to be resumed.', 409);
+  const self = outbox.machineId();
+  if (chosen.some((r) => r.machine_id && r.machine_id !== self)) throw refusal('This message was queued on your other Mac. Resume it there.', 409);
+  const blocked = turnBlocked(thread, runsHere(threadId));
+  if (blocked) throw refusal(blocked, 409);
+  for (const r of chosen) messageRequests.mark(r.id, 'accepted');
+  emitThread(threadId);
+  const runs = chosen.map((r) => inOrder(threadId, () => deliverRequest({ ...r, state: 'accepted' }, () => messageRequests.mark(r.id, r.state))));
+  const failed = (await Promise.allSettled(runs)).find((x) => x.status === 'rejected');
+  if (failed) throw (failed as PromiseRejectedResult).reason;
+  return threads.get(threadId)!;
+}
+
+/**
+ * Ben decided not to send these parked requests. Each goes in the transcript marked dropped, like any message the
+ * agent never saw, so the text is not lost.
+ */
+export function discardRequests(threadId: string, ids: string[]): Thread {
+  const thread = threads.get(threadId);
+  if (!thread) throw refusal('thread not found', 404);
+  const chosen = messageRequests.parked(threadId).filter((r) => ids.includes(r.id));
+  if (chosen.length !== new Set(ids).size) throw refusal('Some of these messages are no longer waiting to be resumed.', 409);
+  for (const r of chosen) {
+    if (!messageRequests.mark(r.id, 'discarded')) continue;
+    addEvent(threadId, 'user', { text: r.prompt, source: r.source, ...(r.attachments?.length && { attachments: r.attachments }), dropped: true });
+  }
+  emitThread(threadId);
+  return threads.get(threadId)!;
 }

@@ -19,6 +19,7 @@ import {
   pump,
   reportToParent,
   send,
+  track,
   type Live,
 } from './state.ts';
 
@@ -163,7 +164,9 @@ export function onRecord(live: Live, rec: StreamRecord) {
       if (i < 0) return;
       const [m] = live.inflight.splice(i, 1);
       live.replayed = true;
-      addEvent(id, m.event.kind, eventPayload(m));
+      // The harness read it: the transcript records it here, where it did.
+      const row = addEvent(id, m.event.kind, eventPayload(m));
+      track(m, 'delivered', row.id);
       return emitThread(id);
     }
     case 'control':

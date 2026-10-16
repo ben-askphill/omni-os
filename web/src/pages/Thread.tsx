@@ -61,6 +61,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     notFound,
     ready,
     queued,
+    setQueued,
     warm,
     blocked,
     live,
@@ -318,7 +319,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
               )}
               {/* Queued means waiting for a slot: nothing is working yet. */}
               <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} />
-              <QueuedMessages items={queued} starting={betweenTurns} />
+              <QueuedMessages items={queued} starting={betweenTurns} threadId={id} onPending={setQueued} />
               {!queued.length && (
                 <NextThreadCard
                   thread={thread}

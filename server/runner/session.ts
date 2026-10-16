@@ -24,6 +24,7 @@ import {
   waitingMsgs,
   writeLine,
   hasBackground,
+  track,
   type Live,
 } from './state.ts';
 
@@ -52,6 +53,7 @@ export function hardKill(live: Live) {
   clearTimeout(live.idleTimer);
   const id = live.threadId;
   if (live.held.length) {
+    for (const m of live.held) track(m, 'waiting');
     waitingMsgs.set(id, [...live.held.splice(0), ...(waitingMsgs.get(id) ?? [])]);
     if (!waiting.includes(id)) waiting.push(id);
   }

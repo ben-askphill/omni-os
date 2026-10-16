@@ -84,6 +84,8 @@ extension PendingMsg {
 
   /// What the line over a message the agent has not read says, or the whole line for a crew report.
   public func label(lead: Bool) -> String {
+    if delivery == .recovered { return "Held after a restart, waiting for Resume" }
+    if delivery == .uncertain { return "May have reached the agent before the restart" }
     if kind == "crew_report" {
       var s = "Crew report"
       if let taskID, !taskID.isEmpty { s += " \(taskID)" }
@@ -103,4 +105,19 @@ extension PendingMsg {
       return mode == .interrupt ? "Interrupting, runs next" : "Steering, delivered at its next step"
     }
   }
+}
+
+/// A thread's messages a restart parked, split by the decision each needs, as `parkedOf` in web/src/requests.ts.
+public struct ParkedMessages: Hashable, Sendable {
+  /// Never reached a harness: Resume sends them in the order they came.
+  public let recovered: [PendingMsg]
+  /// May have reached one: sent again only one at a time, when Ben says so.
+  public let uncertain: [PendingMsg]
+
+  public init(_ pending: [PendingMsg]) {
+    recovered = pending.filter { $0.delivery == .recovered }
+    uncertain = pending.filter { $0.delivery == .uncertain }
+  }
+
+  public var isEmpty: Bool { recovered.isEmpty && uncertain.isEmpty }
 }

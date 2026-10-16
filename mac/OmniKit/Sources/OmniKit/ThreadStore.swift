@@ -182,6 +182,14 @@ public final class ThreadStore {
     merge(t, pending: nil, live: nil, isReply: isReply)
   }
 
+  /// What a resume or discard of parked messages answered: the thread, and its pending list before the stream
+  /// brings it.
+  public func apply(recovery a: RecoveryAnswer) {
+    guard a.thread.id == id else { return }
+    merge(a.thread, pending: nil, live: nil, isReply: false)
+    pending = a.pending
+  }
+
   /// Keeps children, their team members and the parent current.
   public func apply(feed: FeedEvent) {
     guard case .thread(let t) = feed else { return }

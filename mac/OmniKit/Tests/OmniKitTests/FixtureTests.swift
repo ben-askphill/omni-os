@@ -47,12 +47,16 @@ func sseData(_ text: String) -> [String] {
     "automations.json": { _ = try decodeFixture([Automation].self, "automations.json") },
     "automation-run.json": { _ = try decodeFixture(OmniThread.self, "automation-run.json") },
     "automation-enabled.json": { _ = try decodeFixture([String: Bool].self, "automation-enabled.json") },
+    "thread-recovered.json": { _ = try decodeFixture(ThreadDetail.self, "thread-recovered.json") },
+    "requests-resumed.json": { _ = try decodeFixture(RecoveryAnswer.self, "requests-resumed.json") },
     // Hand-made: tests/sync-setup.test.ts checks the server still sends its keys and types.
     "sync-status.json": { _ = try decodeFixture(SyncStatus.self, "sync-status.json") },
     // Request bodies the app sends. SecretsTests compares them with what the client encodes.
     "secret-set-request.json": { _ = try decodeFixture([String: String].self, "secret-set-request.json") },
     "secret-delete-request.json": { _ = try decodeFixture([String: String].self, "secret-delete-request.json") },
     "automation-enabled-request.json": { _ = try decodeFixture([String: Bool].self, "automation-enabled-request.json") },
+    // ReplyRequestTests compares it with what the client encodes.
+    "message-queued-request.json": { _ = try decodeFixture([String: String].self, "message-queued-request.json") },
   ]
 
   static func threadStream() throws -> [ThreadStreamMessage] {
@@ -104,6 +108,35 @@ func sseData(_ text: String) -> [String] {
       if case .unknown = e.content { Issue.record("event \(e.id) of kind \(e.kind) did not decode: \(e.payload)") }
     }
     #expect(Set(d.events.map(\.kind)).isSuperset(of: ["init", "user", "tool_use", "tool_result", "assistant_text", "result"]))
+  }
+
+  @Test func readsMessagesARestartParked() throws {
+    let d = try decodeFixture(ThreadDetail.self, "thread-recovered.json")
+    #expect(d.thread.status == .failed)
+    #expect(d.pending.map(\.state) == [.held, .held])
+    #expect(d.pending.map(\.delivery) == [.recovered, .uncertain])
+    #expect(d.pending.map(\.requestID) == ["req-1", "req-2"])
+    #expect(d.pending.allSatisfy { $0.isParked })
+    #expect(d.pending.map { $0.label(lead: false) } == [
+      "Held after a restart, waiting for Resume", "May have reached the agent before the restart",
+    ])
+    let parked = ParkedMessages(d.pending)
+    #expect(parked.recovered.map(\.requestID) == ["req-1"])
+    #expect(parked.uncertain.map(\.requestID) == ["req-2"])
+
+    let resumed = try decodeFixture(RecoveryAnswer.self, "requests-resumed.json")
+    #expect(resumed.thread.id == d.thread.id)
+    // The resumed one is the runner's again; the uncertain one still waits on Ben.
+    #expect(resumed.pending.first?.requestID == "req-1")
+    #expect(resumed.pending.first?.isParked == false)
+    #expect(resumed.pending.last?.delivery == .uncertain)
+  }
+
+  @Test func readsAThreadMidTurnWithItsRequestIDs() throws {
+    let d = try decodeFixture(ThreadDetail.self, "thread.json")
+    #expect(d.pending.first?.requestID != nil)
+    #expect(d.pending.first?.delivery == .held)
+    #expect(d.pending.first?.isParked == false)
   }
 
   @Test func readsEveryThreadStreamMessage() throws {

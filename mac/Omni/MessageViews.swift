@@ -520,3 +520,108 @@ struct QueuedMessagesView: View {
     .padding(.top, z(4))
   }
 }
+
+/// Messages Omni accepted before it restarted, as ParkedMessages in Transcript.tsx. A recovered one never reached
+/// the agent: Resume sends them all in the order they came. An uncertain one may have, so it is only sent again
+/// when Ben says so. Discard keeps it in the transcript as never sent.
+struct ParkedMessagesView: View {
+  let store: ThreadStore
+  let client: OmniClient
+  let items: [PendingMsg]
+  @State private var busy: String?
+  @State private var error: String?
+
+  var body: some View {
+    let parked = ParkedMessages(items)
+    VStack(alignment: .trailing, spacing: z(12)) {
+      Rectangle().fill(Tok.line).frame(height: 1)
+      HStack(spacing: z(8)) {
+        Text("\(Format.plural(items.count, "message")) \(items.count == 1 ? "was" : "were") waiting when Omni restarted")
+          .font(.omni(size: 12))
+          .foregroundStyle(Tok.fg3)
+          .frame(maxWidth: .infinity, alignment: .leading)
+        if !parked.recovered.isEmpty {
+          Button { run("resume", ids: nil, discard: false) } label: {
+            label(parked.recovered.count > 1 ? "Resume \(parked.recovered.count)" : "Resume", icon: "play", busy: busy == "resume")
+          }
+          .buttonStyle(.pill(.primary, height: 28))
+          .help("Send them in the order they came")
+          .disabled(busy != nil)
+        }
+      }
+      ForEach(items) { m in
+        VStack(alignment: .trailing, spacing: z(4)) {
+          IconLabel(m.label(lead: false), icon: m.delivery == .uncertain ? "alert" : "clock", size: 12)
+            .font(.omni(size: 11.5, weight: .medium))
+            .foregroundStyle(Tok.fg3)
+            .opacity(0.7)
+          Text(m.text)
+            .font(.omni(size: ThreadStyle.prose))
+            .lineSpacing(5)
+            .foregroundStyle(Tok.fg)
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, z(16))
+            .padding(.vertical, z(10))
+            .background(
+              UnevenRoundedRectangle(
+                topLeadingRadius: 22, bottomLeadingRadius: 22, bottomTrailingRadius: 22, topTrailingRadius: 8, style: .continuous)
+                .strokeBorder(Tok.lineStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            )
+            .frame(maxWidth: z(600), alignment: .trailing)
+            .opacity(0.7)
+          HStack(spacing: z(6)) {
+            if let files = m.attachments, !files.isEmpty {
+              Text(Format.plural(files.count, "file")).font(.omni(size: 11.5)).foregroundStyle(Tok.fg4)
+            }
+            if m.delivery == .uncertain {
+              Button { run("again:\(m.uuid)", ids: [m.uuid], discard: false) } label: {
+                label("Send again", icon: "send", busy: busy == "again:\(m.uuid)")
+              }
+              .buttonStyle(.pill(.secondary, height: 28))
+              .help("It may already have reached the agent. Send it once more.")
+              .disabled(busy != nil)
+            }
+            Button { run("discard:\(m.uuid)", ids: [m.uuid], discard: true) } label: {
+              label("Discard", icon: "trash", busy: busy == "discard:\(m.uuid)")
+            }
+            .buttonStyle(.pill(.ghost, height: 28))
+            .disabled(busy != nil)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+      }
+      if let error {
+        ErrorNote(text: error)
+      }
+    }
+    .padding(.top, z(4))
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Messages waiting since a restart")
+  }
+
+  private func label(_ text: String, icon: String, busy: Bool) -> some View {
+    HStack(spacing: z(6)) {
+      if busy { Loader(size: 12) } else { OmniIcon(name: icon, size: 13) }
+      Text(text)
+    }
+  }
+
+  private func run(_ key: String, ids: [String]?, discard: Bool) {
+    guard busy == nil else { return }
+    busy = key
+    error = nil
+    let id = store.id
+    Task {
+      defer { busy = nil }
+      do {
+        let answer = discard ? try await client.discardRequests(in: id, ids: ids ?? []) : try await client.resumeRequests(in: id, ids: ids)
+        store.apply(recovery: answer)
+      } catch let e as OmniAPIError {
+        error = e.message
+      } catch {
+        self.error = error.localizedDescription
+      }
+    }
+  }
+}

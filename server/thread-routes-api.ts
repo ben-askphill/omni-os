@@ -9,10 +9,23 @@ import { z } from 'zod';
 import { commentsPrompt, isArtifactUrl } from '../shared/published.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
-import { artifacts, channels, events, publicChannel, threads, type Thread } from './db.ts';
+import { artifacts, channels, events, fileDigests, publicChannel, requestFingerprint, threads, type Thread } from './db.ts';
 import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
-import { activeMods, createTeam, createThread, interruptThread, isLive, pendingFor, postMessage, refreshContext, runsHere } from './runner.ts';
+import {
+  acceptedAgain,
+  activeMods,
+  createTeam,
+  createThread,
+  discardRequests,
+  interruptThread,
+  isLive,
+  pendingFor,
+  postMessage,
+  refreshContext,
+  resumeRequests,
+  runsHere,
+} from './runner.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
 import { checkUploads, imageMime, safeName, saveUploads } from './uploads.ts';
@@ -123,18 +136,50 @@ threadRoutesApi.get('/:id/summary', (c) => {
 threadActionsApi.post('/:id/messages', async (c) => {
   const id = c.req.param('id');
   const { data, files } = await readBody(c);
-  const { prompt, from, mode } = z
+  const { prompt, from, mode, request_id } = z
     .object({
       prompt: z.string().min(1),
       from: z.enum(['ben', 'conductor']).default('ben'),
       // steer: read at the agent's next step. queue: after this turn. interrupt: stop the turn, then run it.
       mode: z.enum(['steer', 'queue', 'interrupt']).default('steer'),
+      // The client's id for this send, kept across its retries: a retry gets the first acceptance back.
+      request_id: z.string().min(1).max(200).optional(),
     })
     .parse(data);
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
   checkUploads(files);
+  const fingerprint = requestFingerprint({ prompt, mode, source: from, files: await fileDigests(files) });
+  // A retry: answered before its files are saved a second time.
+  const again = request_id ? acceptedAgain(id, request_id, fingerprint) : null;
+  if (again) return c.json(again);
   const attachments = await saveUploads(id, files);
-  return c.json(await postMessage(id, prompt, { from, mode, attachments }));
+  return c.json(await postMessage(id, prompt, { from, mode, attachments, requestId: request_id, fingerprint }));
+});
+
+const requestIds = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) });
+
+/** The thread and its pending messages, after a resume or discard. */
+const afterRecovery = (id: string) => ({ thread: threads.get(id), pending: pendingFor(id) });
+
+/**
+ * Resume messages a restart parked, in the order they came. No ids: every recovered one. An uncertain one (it may
+ * have reached the harness before the restart) is only sent again when named.
+ */
+threadActionsApi.post('/:id/requests/resume', async (c) => {
+  const id = c.req.param('id');
+  const { ids } = z.object({ ids: z.array(z.string().min(1)).max(200).optional() }).parse(await c.req.json().catch(() => ({})));
+  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  await resumeRequests(id, ids);
+  return c.json(afterRecovery(id));
+});
+
+/** Drop messages a restart parked. Each stays in the transcript, marked as never sent. */
+threadActionsApi.post('/:id/requests/discard', async (c) => {
+  const id = c.req.param('id');
+  const { ids } = requestIds.parse(await c.req.json().catch(() => ({})));
+  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  discardRequests(id, ids);
+  return c.json(afterRecovery(id));
 });
 
 /** Ask the thread to act on the comments on a page it published. Queued, so it never cuts into a running turn. */

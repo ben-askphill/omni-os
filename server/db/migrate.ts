@@ -127,6 +127,26 @@ CREATE TABLE IF NOT EXISTS sync_deferred (
   error TEXT NOT NULL,
   tries INTEGER NOT NULL DEFAULT 1
 );
+-- Messages accepted through the API (db/repos/requests.ts), saved before the client hears so. Local, not synced.
+CREATE TABLE IF NOT EXISTS message_requests (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT NOT NULL UNIQUE,
+  thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  request_id TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  source TEXT NOT NULL,
+  attachments TEXT,
+  fingerprint TEXT NOT NULL,
+  state TEXT NOT NULL,
+  machine_id TEXT,
+  event_id INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (thread_id, request_id)
+);
+CREATE INDEX IF NOT EXISTS message_requests_open ON message_requests(thread_id, seq) WHERE state NOT IN ('delivered','dropped','discarded');
+
 -- A thread the other Mac filed in a folder that has not arrived here yet. The folder's arrival puts it there.
 CREATE TABLE IF NOT EXISTS sync_folder_wait (
   thread_id TEXT PRIMARY KEY,
