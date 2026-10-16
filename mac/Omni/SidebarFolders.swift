@@ -226,6 +226,8 @@ struct UngroupDrop: DropDelegate {
 struct ChannelRowChrome<Content: View>: View {
   let model: AppModel
   let channel: ChannelWithRunning
+  /// Before the name field opens, so a closed channel opens to show it.
+  var onNewFolder: () -> Void = {}
   @ViewBuilder var content: (_ hover: Bool) -> Content
   @State private var hover = false
   @State private var dropOn = false
@@ -234,6 +236,7 @@ struct ChannelRowChrome<Content: View>: View {
     content(hover)
       .overlay(alignment: .trailing) {
         Button {
+          onNewFolder()
           model.folders.editing = .new(channel: channel.id)
         } label: {
           OmniIcon(name: "folderPlus", size: 14)

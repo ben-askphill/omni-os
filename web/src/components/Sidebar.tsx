@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import { taskHost, type BackgroundTask, type ChannelWithRunning, type FolderWithThreads, type HarnessId, type ThreadStub, type Usage, type UsageWindow } from '../api.ts';
 import { folderOf } from '../folder-groups.ts';
 import { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, drag, draftKey, freeName, useFolders } from '../folders.tsx';
@@ -122,13 +122,14 @@ function UsageCard() {
   );
 }
 
-function NavLink({ to, icon, lead, active, children, right, onNavigate, channelId }: { channelId?: string; to: string; icon?: IconName; lead?: ReactNode; active?: boolean; children: ReactNode; right?: ReactNode; onNavigate?: () => void }) {
+function NavLink({ to, icon, lead, active, children, right, onNavigate, channelId, expanded }: { channelId?: string; to: string; icon?: IconName; lead?: ReactNode; active?: boolean; children: ReactNode; right?: ReactNode; onNavigate?: (e: MouseEvent) => void; expanded?: boolean }) {
   return (
     <a
       href={to}
       data-channel-id={channelId}
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
+      aria-expanded={expanded}
       data-active={active || undefined}
       className={`hov z-[1] flex h-9 items-center gap-2.5 rounded-full px-3 text-[13.5px] transition-colors md:h-8 md:text-[13px] ${
         active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-2 hover:text-fg'
@@ -383,14 +384,14 @@ function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThreads; ope
 }
 
 /** The "+" beside a channel's name: a new folder under it, with its name field open. */
-function AddFolderButton({ c }: { c: ChannelWithRunning }) {
+function AddFolderButton({ c, onOpen }: { c: ChannelWithRunning; onOpen: () => void }) {
   const folders = useFolders();
   return (
     <button
       type="button"
       aria-label={`New folder in ${c.name}`}
       title="New folder"
-      onClick={() => folders.setEditing(draftKey(c.id))}
+      onClick={() => (onOpen(), folders.setEditing(draftKey(c.id)))}
       className="hov relative z-[2] -ml-8 mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-fg-3 transition-opacity hover:text-fg focus-visible:opacity-100 md:opacity-0 md:group-hover/ch:opacity-100 md:group-focus-within/ch:opacity-100"
     >
       <Icon name="folderPlus" size={14} />
@@ -420,6 +421,17 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
   const listRef = useRef<HTMLDivElement>(null);
   // The channel whose name a thread is being dragged over, to take it out of its folder.
   const [dropOn, setDropOn] = useState<string | null>(null);
+  // Channels whose folders and threads are hidden under their name, remembered on this device.
+  const [collapsed, setCollapsed] = useState(() => new Set(readPref<string[]>('sidebar.collapsedChannels', [])));
+  const setChannelOpen = (id: string, open: boolean) =>
+    setCollapsed((prev) => {
+      if (prev.has(id) === !open) return prev;
+      const next = new Set(prev);
+      if (open) next.delete(id);
+      else next.add(id);
+      writePref('sidebar.collapsedChannels', [...next]);
+      return next;
+    });
 
   const activeChannel = route.name === 'channel' ? route.id : null;
   const openId = route.name === 'thread' ? route.id : null;
@@ -453,7 +465,11 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
   };
   // Rows appearing or leaving above the highlighted one move it, so they re-measure the thumb too.
   const rowsKey = channels
-    .flatMap((c) => [...foldersOf(c).flatMap((f) => [f.id, f.collapsed, ...f.threads.map((t) => t.id)]), ...threadsOf(c).map((t) => t.id)])
+    .flatMap((c) =>
+      collapsed.has(c.id)
+        ? [`${c.id}:closed`]
+        : [...foldersOf(c).flatMap((f) => [f.id, f.collapsed, ...f.threads.map((t) => t.id)]), ...threadsOf(c).map((t) => t.id)],
+    )
     .join();
   // Agent rows nest under threads, so they move the rows below them too.
   const agentsKey = tasks.map((k) => k.task_id).join();
@@ -462,6 +478,11 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
   const threadLinks = (c: ChannelWithRunning) => {
     const list = threadsOf(c);
     const agents = (id: string) => tasks.filter((k) => taskHost(k) === id);
+    if (collapsed.has(c.id)) {
+      // Closed, it still shows the open thread, so the highlight never vanishes into it.
+      const open = openIn(c);
+      return open && <ThreadLink t={open} active tasks={agents(open.id)} onNavigate={onNavigate} />;
+    }
     const shown = list.filter((t, i) => i < MAX_THREADS || t.id === openId || agents(t.id).length > 0);
     return (
       <>
@@ -529,7 +550,17 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
           to={href.channel(c.id)}
           channelId={c.id}
           active={activeChannel === c.id}
-          onNavigate={onNavigate}
+          expanded={!collapsed.has(c.id)}
+          onNavigate={(e) => {
+            // Clicking the channel already open on its threads closes or opens what is under it; any other click goes there, opened.
+            if (route.name === 'channel' && route.id === c.id && route.tab === 'threads') {
+              e.preventDefault();
+              setChannelOpen(c.id, collapsed.has(c.id));
+              return;
+            }
+            setChannelOpen(c.id, true);
+            onNavigate?.();
+          }}
           right={
             <span className="mr-6 flex items-center md:mr-0 md:group-focus-within/ch:mr-6 md:group-hover/ch:mr-6">
               <RunningBadge n={c.running} />
@@ -540,7 +571,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
           {label}
         </NavLink>
       </div>
-      <AddFolderButton c={c} />
+      <AddFolderButton c={c} onOpen={() => setChannelOpen(c.id, true)} />
     </div>
   );
 

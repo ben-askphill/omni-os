@@ -15,6 +15,17 @@ struct SidebarView: View {
   static let width: CGFloat = 252
   /// As wide as Ben last dragged its right edge, in unzoomed points.
   @AppStorage(sidebarWidthKey) private var width = Double(Self.width)
+  /// Channels whose folders and threads are hidden under their name, one id per line.
+  @AppStorage("sidebar.collapsedChannels") private var collapsedIDs = ""
+
+  private var collapsed: Set<String> { Set(collapsedIDs.split(separator: "\n").map(String.init)) }
+
+  private func setChannel(_ id: String, open: Bool) {
+    var ids = collapsed
+    guard ids.contains(id) == open else { return }
+    if open { ids.remove(id) } else { ids.insert(id) }
+    withAnimation(Motion.spring) { collapsedIDs = ids.sorted().joined(separator: "\n") }
+  }
 
   private var selected: SidebarItem? { SidebarItem(route: model.route) }
 
@@ -122,9 +133,9 @@ struct SidebarView: View {
   }
 
   /// A row that picks `item`, with the thumb under it while it is the selection.
-  private func row(_ item: SidebarItem, @ViewBuilder label: () -> some View) -> some View {
+  private func row(_ item: SidebarItem, action: (() -> Void)? = nil, @ViewBuilder label: () -> some View) -> some View {
     let on = selected == item
-    return Button { pick(item) } label: { label() }
+    return Button { if let action { action() } else { pick(item) } } label: { label() }
       .buttonStyle(RailRowStyle())
       .background {
         if on {
@@ -151,8 +162,17 @@ struct SidebarView: View {
   @ViewBuilder
   private func channelRows(_ channel: ChannelWithRunning, title: String? = nil) -> some View {
     let item = SidebarItem.channel(channel.id)
-    ChannelRowChrome(model: model, channel: channel) { hover in
-      row(item) {
+    let closed = collapsed.contains(channel.id)
+    ChannelRowChrome(model: model, channel: channel, onNewFolder: { setChannel(channel.id, open: true) }) { hover in
+      // Clicking the channel already open on its threads closes or opens what is under it; any other click goes there, opened.
+      row(item, action: {
+        if model.route == .channel(id: channel.id) {
+          setChannel(channel.id, open: closed)
+        } else {
+          setChannel(channel.id, open: true)
+          pick(item)
+        }
+      }) {
         NavRow(title: title ?? channel.name, active: selected == item, running: channel.running, trailingInset: hover ? 24 : 0) {
           if title != nil {
             StaticMark(size: 17)
@@ -171,10 +191,26 @@ struct SidebarView: View {
         }
       }
     }
+    .accessibilityValue(closed ? "Collapsed" : "Expanded")
     .contextMenu {
-      Button("New Folder") { model.folders.editing = .new(channel: channel.id) }
+      Button(closed ? "Expand" : "Collapse") { setChannel(channel.id, open: closed) }
+      Button("New Folder") {
+        setChannel(channel.id, open: true)
+        model.folders.editing = .new(channel: channel.id)
+      }
       Button("Channel Settings") { model.route = .channel(id: channel.id, tab: .settings) }
     }
+    if closed {
+      // Closed, it still shows the open thread, so the highlight never vanishes into it.
+      if let open = model.openThread, open.channelID == channel.id { threadRow(open) }
+    } else {
+      channelContents(channel)
+    }
+  }
+
+  /// A channel's folders, its new folder's name field, and its threads.
+  @ViewBuilder
+  private func channelContents(_ channel: ChannelWithRunning) -> some View {
     ForEach(SidebarSections.folders(of: channel, open: model.openThread)) { folder in
       folderRows(folder)
     }
