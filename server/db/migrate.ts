@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS automation_runs (
 
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
--- Sidebar folders (db/repos/folders.ts). One channel each; parent_id stays null until nesting lands. Local, not synced.
+-- Sidebar folders (db/repos/folders.ts). One channel each; parent_id stays null until nesting lands. Synced, except collapsed.
 CREATE TABLE IF NOT EXISTS folders (
   id TEXT PRIMARY KEY,
   channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
@@ -127,6 +127,11 @@ CREATE TABLE IF NOT EXISTS sync_deferred (
   error TEXT NOT NULL,
   tries INTEGER NOT NULL DEFAULT 1
 );
+-- A thread the other Mac filed in a folder that has not arrived here yet. The folder's arrival puts it there.
+CREATE TABLE IF NOT EXISTS sync_folder_wait (
+  thread_id TEXT PRIMARY KEY,
+  folder_id TEXT NOT NULL
+);
 `;
 
 /** Add a column the current schema needs to a database created by an older version. Safe to run again. */
@@ -156,7 +161,7 @@ export function migrate() {
   ensureColumn('threads', 'next_prompt', 'TEXT');
   ensureColumn('threads', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('channels', 'icon', 'TEXT');
-  // The sidebar folder a thread sits in, null for ungrouped: every existing thread. Local, not synced.
+  // The sidebar folder a thread sits in, null for ungrouped: every existing thread. Synced with the thread row.
   ensureColumn('threads', 'folder_id', 'TEXT REFERENCES folders(id) ON DELETE SET NULL');
   db.exec('CREATE INDEX IF NOT EXISTS threads_folder ON threads(folder_id) WHERE folder_id IS NOT NULL');
   // What a new thread in the channel runs on when neither the thread nor its role picks (server/harness/resolve.ts).

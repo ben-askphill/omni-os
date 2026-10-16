@@ -10,6 +10,7 @@ import { backfill, type BackfillCount } from '../server/sync/backfill.ts';
 
 const LABEL: Record<BackfillCount['entity'], string> = {
   channel: 'channels',
+  folder: 'folders',
   thread: 'threads',
   event: 'events',
   artifact: 'artifacts',

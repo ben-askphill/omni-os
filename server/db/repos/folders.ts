@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { db, now, tx } from '../connection.ts';
+import { record } from '../sync.ts';
 
 /**
  * A folder groups a channel's threads in the sidebar. It belongs to exactly one channel; a thread sits in at most
  * one folder (threads.folder_id). One level for now: parent_id is always null, kept so nesting can come later.
- * Local to this Mac: folders and the folder a thread sits in are not synced.
+ * Synced (server/sync/handlers/folder.ts), all but collapsed, which is each Mac's own view. The folder a thread sits
+ * in travels with the thread's row.
  */
 export interface Folder {
   id: string;
@@ -61,6 +63,7 @@ const insert = (f: Omit<Folder, 'created_at' | 'updated_at'>) => {
   db.prepare(
     'INSERT INTO folders (id, channel_id, parent_id, name, position, collapsed, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
   ).run(f.id, f.channel_id, f.parent_id, f.name, f.position, f.collapsed, ts, ts);
+  record('folder', f.id);
   return folders.get(f.id)!;
 };
 
@@ -101,10 +104,12 @@ export const folders = {
       const name = folderName(raw);
       if (freeName(f.channel_id, name, id) !== name) throw new FolderError(`a folder named "${name}" already exists here`, 409);
       db.prepare('UPDATE folders SET name = ?, updated_at = ? WHERE id = ?').run(name, now(), id);
+      record('folder', id);
       return folders.get(id)!;
     });
   },
 
+  /** This Mac's view only: never synced. */
   setCollapsed(id: string, collapsed: boolean) {
     mustGet(id);
     db.prepare('UPDATE folders SET collapsed = ? WHERE id = ?').run(collapsed ? 1 : 0, id);
@@ -122,7 +127,10 @@ export const folders = {
       let position: number | null = null;
       if (f.position !== null) {
         position = f.position + 1;
-        db.prepare('UPDATE folders SET position = position + 1 WHERE channel_id = ? AND position >= ?').run(f.channel_id, position);
+        const shifted = db
+          .prepare('UPDATE folders SET position = position + 1 WHERE channel_id = ? AND position >= ? RETURNING id')
+          .all(f.channel_id, position) as { id: string }[];
+        for (const s of shifted) record('folder', s.id);
       }
       return insert({ id: randomUUID(), channel_id: f.channel_id, parent_id: f.parent_id, name: freeName(f.channel_id, base), position, collapsed: f.collapsed });
     });
@@ -134,6 +142,7 @@ export const folders = {
       mustGet(id);
       const moved = db.prepare('UPDATE threads SET folder_id = NULL WHERE folder_id = ?').run(id).changes;
       db.prepare('DELETE FROM folders WHERE id = ?').run(id);
+      record('folder', id, 'delete');
       return Number(moved);
     });
   },
@@ -145,14 +154,16 @@ export const folders = {
       if (ids.length !== mine.length || new Set(ids).size !== ids.length || !ids.every((id) => mine.includes(id)))
         throw new FolderError("the order has to list each of the channel's folders once");
       const set = db.prepare('UPDATE folders SET position = ? WHERE id = ?');
-      ids.forEach((id, i) => set.run(i, id));
+      ids.forEach((id, i) => {
+        if (set.run(i, id).changes) record('folder', id);
+      });
       return folders.byChannel(channelId);
     });
   },
 
   /**
    * Put a thread in a folder of its own channel, or back in the ungrouped list with null. Not an edit to the thread:
-   * updated_at stays, so lists keep their order, and sync never hears of it.
+   * updated_at stays, so lists keep their order. Sync sends the thread's row, which carries folder_id.
    */
   moveThread(threadId: string, folderId: string | null) {
     return tx(() => {
@@ -163,6 +174,9 @@ export const folders = {
         if (f.channel_id !== t.channel_id) throw new FolderError("a thread can only go in a folder of its own channel");
       }
       db.prepare('UPDATE threads SET folder_id = ? WHERE id = ?').run(folderId, threadId);
+      // A folder the other Mac named for it and that never came no longer matters: this move is newer.
+      db.prepare('DELETE FROM sync_folder_wait WHERE thread_id = ?').run(threadId);
+      record('thread', threadId);
     });
   },
 };

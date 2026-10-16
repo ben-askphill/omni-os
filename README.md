@@ -168,7 +168,7 @@ Stored in the macOS Keychain under service `omni-os` (account `<scope>/<NAME>`).
 
 ## Sync (two Macs)
 
-Optional. Each Mac keeps its own SQLite as the source of truth; a Supabase project you own relays the changes between them (channels, threads, events, artifacts, automation runs, settings) and holds thread files in a private bucket. With no credentials sync is off and Omni behaves as before. Why a relay and not a shared database: ADR 0004.
+Optional. Each Mac keeps its own SQLite as the source of truth; a Supabase project you own relays the changes between them (channels, sidebar folders, threads, events, artifacts, automation runs, settings) and holds thread files in a private bucket. With no credentials sync is off and Omni behaves as before. Why a relay and not a shared database: ADR 0004.
 
 One-time Supabase setup:
 
@@ -187,6 +187,7 @@ On each Mac: Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the UR
 - Files: after a Mac's first sync, Omni uploads the files and session files of every thread it wrote last, in the background (the log counts progress every 50 threads). After that, a thread's files go up after each turn. The bucket fills a few minutes after the rows.
 - `npm run sync:backfill`: queue every existing row again, for instance after restoring a database. It is idempotent and skips rows the other Mac wrote last.
 - Signing in to a different project or user starts that relay from the beginning and queues the history again.
+- Sidebar folders sync, along with which folder each thread sits in. Whether a folder shows open or closed stays per Mac. A relay set up before folders synced refuses them: paste `0001_changes.sql` in the SQL Editor again. Until then the rest keeps syncing and folders wait, counted as held.
 - A thread runs on one Mac at a time. Its row names the Mac running it (`run_machine`), so the other Mac shows it read-only until the run ends there, and an edit from the other Mac mid-run (a rename) never changes its status. After a crash, only the Mac that ran it marks it failed.
 - Scheduled automations run on one Mac: the Sync page says which, and "Run them here" moves them. The first Mac to finish a sync with no owner set takes them. Manual runs work on either Mac.
 - Copying `data/` to another Mac is fine: the folder remembers the Mac it was set up on (its hardware UUID), and on the next start the copy takes a new sync id and pulls the history again, logging one `[sync] this data folder was copied from another Mac` line. It never overwrites the Mac it came from, and scheduled automations stay there until you press "Run them here".

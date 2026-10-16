@@ -8,12 +8,18 @@ create table if not exists public.changes (
   seq bigserial primary key,
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   machine_id text not null,
-  entity text not null check (entity in ('channel', 'thread', 'event', 'artifact', 'automation_run', 'kv')),
+  entity text not null,
   entity_id text not null,
   op text not null check (op in ('upsert', 'delete')),
   data jsonb,
   ts timestamptz not null
 );
+
+-- The entities the relay takes. Set again on every run, so pasting this file again lets a relay made by an older
+-- version take the newer entities (folders came later). Keep it in step with SyncEntity in server/db/sync.ts.
+alter table public.changes drop constraint if exists changes_entity_check;
+alter table public.changes add constraint changes_entity_check
+  check (entity in ('channel', 'folder', 'thread', 'event', 'artifact', 'automation_run', 'kv'));
 
 create index if not exists changes_user_seq on public.changes (user_id, seq);
 

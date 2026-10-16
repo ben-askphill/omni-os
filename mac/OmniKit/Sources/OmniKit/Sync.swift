@@ -21,8 +21,10 @@ public struct SyncStatus: Decodable, Hashable, Sendable {
   public let nextSyncAt: Date?
   /// Local changes waiting to push.
   public let pending: Int
-  /// Changes for an entity with no handler yet. They push once one is registered.
+  /// Changes for an entity with no handler yet, or one the relay refuses. They push once it takes them.
   public let held: Int
+  /// Entities the relay refused: it was set up by an older 0001_changes.sql. Nil from an older server.
+  public let refused: [String]?
   /// Remote changes that could not apply yet, retried after each pull.
   public let deferred: Int
   /// The last relay change this Mac has.

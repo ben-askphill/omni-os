@@ -10,6 +10,7 @@
   "nextSyncAt": "2026-09-28T09:16:02.123Z",
   "pending": 2,
   "held": 0,
+  "refused": [],
   "deferred": 1,
   "cursor": 418,
   "automations": { "owner": "3f9c2a1e7b4d", "isThisMac": true }

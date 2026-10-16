@@ -19,6 +19,7 @@ export interface BackfillCount {
 /** Each table's rows as (k, o1, o2), k the sync entity id and o1, o2 the order: parents first, oldest first. */
 const SOURCES: [SyncEntity, string][] = [
   ['channel', 'SELECT id AS k, created_at AS o1, rowid AS o2 FROM channels'],
+  ['folder', 'SELECT id AS k, created_at AS o1, rowid AS o2 FROM folders'],
   ['thread', 'SELECT id AS k, created_at AS o1, rowid AS o2 FROM threads'],
   ['event', 'SELECT uid AS k, id AS o1, 0 AS o2 FROM events'],
   ['artifact', 'SELECT uid AS k, id AS o1, 0 AS o2 FROM artifacts'],
@@ -57,7 +58,7 @@ export function backfill(opts: { onProgress?: (count: BackfillCount) => void } =
       // A row no machine has claimed yet is this one's now, as a write through the repos would record.
       db.prepare(
         `INSERT OR IGNORE INTO sync_meta (entity, entity_id, ts, machine_id)
-         SELECT entity, entity_id, ts, :self FROM sync_outbox WHERE id > :last AND entity IN ('channel', 'thread', 'kv', 'artifact')`,
+         SELECT entity, entity_id, ts, :self FROM sync_outbox WHERE id > :last AND entity IN ('channel', 'folder', 'thread', 'kv', 'artifact')`,
       ).run({ self, last });
       return { entity, ...before, queued: Number(res.changes) };
     });

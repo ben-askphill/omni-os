@@ -85,6 +85,9 @@ export class MemoryTransport implements SyncTransport {
     for (const l of this.listeners) queueMicrotask(l.fn);
   }
 
+  /** Entities this relay refuses, as one made by an older 0001_changes.sql does. Tests set it. */
+  refuse = new Set<SyncEntity>();
+
   /** Make the next n calls throw, as an unreachable relay would. */
   failNext(n: number, message = 'relay unavailable') {
     this.failures = { left: n, message };
@@ -99,6 +102,8 @@ export class MemoryTransport implements SyncTransport {
 
   async push(changes: Change[]) {
     this.check();
+    const refused = changes.find((c) => this.refuse.has(c.entity));
+    if (refused) throw new RelayEntityRefusedError(`violates check constraint "changes_entity_check" (${refused.entity})`);
     this.pushCalls.push(changes);
     const machines = new Set<string>();
     for (const c of changes) {
@@ -162,6 +167,19 @@ export class SyncSignedOutError extends Error {
 }
 
 export const isSignedOut = (err: unknown) => (err as { code?: unknown } | null)?.code === 'signed_out';
+
+/**
+ * The relay's `changes` table refused an entity: it was set up by an older supabase/migrations/0001_changes.sql
+ * that did not list it. Pasting the file again in the SQL Editor fixes it. The worker holds that entity until then.
+ */
+export class RelayEntityRefusedError extends Error {
+  readonly code = 'entity_refused';
+  constructor(detail: string) {
+    super(`the relay does not take every kind of change yet (${detail}): run supabase/migrations/0001_changes.sql again in the Supabase SQL Editor`);
+  }
+}
+
+export const isEntityRefused = (err: unknown) => (err as { code?: unknown } | null)?.code === 'entity_refused';
 
 type AuthFailure = { name?: string; message: string; status?: number; code?: string };
 const SIGNED_OUT_CODES = new Set([
@@ -258,6 +276,8 @@ export function createSupabaseTransport(opts: SupabaseTransportOptions): SyncTra
   return {
     async push(changes) {
       const { error } = await call((c) => c.rpc('omni_push', { changes: pgJson(changes) }));
+      // 23514 check_violation on the entity check: a relay made before this entity existed.
+      if (error?.code === '23514' && error.message?.includes('changes_entity_check')) throw new RelayEntityRefusedError(error.message);
       if (error) throw new Error(`push failed: ${error.message}`);
     },
 

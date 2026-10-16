@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { db, now, tx } from './connection.ts';
 
 /** What the sync relay carries. Events, artifacts and automation runs are keyed by their uid, the rest by id or key. */
-export type SyncEntity = 'channel' | 'thread' | 'event' | 'artifact' | 'automation_run' | 'kv';
+export type SyncEntity = 'channel' | 'folder' | 'thread' | 'event' | 'artifact' | 'automation_run' | 'kv';
 export type SyncOp = 'upsert' | 'delete';
 
 export interface OutboxRow {
@@ -16,7 +16,7 @@ export interface OutboxRow {
 // ---------- sync outbox ----------
 
 /** Rows where the newest write wins. Events and automation runs are insert-only. */
-const LWW = new Set<SyncEntity>(['channel', 'thread', 'kv', 'artifact']);
+const LWW = new Set<SyncEntity>(['channel', 'folder', 'thread', 'kv', 'artifact']);
 /** kv keys that stay on this machine: the sync cursor, machine id, switches and path map. */
 export const localKey = (key: string) => key.startsWith('sync.');
 
@@ -59,6 +59,7 @@ function seed(machineId: string) {
       .prepare(`INSERT INTO sync_outbox (entity, entity_id, op, ts) SELECT '${entity}', k, 'upsert', ? FROM (${select})`)
       .run(LWW.has(entity) ? SEED_TS : ts);
   q('channel', 'SELECT id AS k FROM channels ORDER BY created_at, rowid');
+  q('folder', 'SELECT id AS k FROM folders ORDER BY created_at, rowid');
   q('thread', 'SELECT id AS k FROM threads ORDER BY created_at, rowid');
   q('event', 'SELECT uid AS k FROM events ORDER BY id');
   q('artifact', 'SELECT uid AS k FROM artifacts ORDER BY id');
@@ -66,8 +67,21 @@ function seed(machineId: string) {
   q('kv', `SELECT key AS k FROM kv WHERE key NOT LIKE 'sync.%' ORDER BY key`);
   db.prepare(
     `INSERT OR REPLACE INTO sync_meta (entity, entity_id, ts, machine_id)
-     SELECT entity, entity_id, ts, ? FROM sync_outbox WHERE entity IN ('channel', 'thread', 'kv', 'artifact')`,
+     SELECT entity, entity_id, ts, ? FROM sync_outbox WHERE entity IN ('channel', 'folder', 'thread', 'kv', 'artifact')`,
   ).run(machineId);
+}
+
+/**
+ * Folders synced from this build on. A Mac that armed before then queues its folders once, and the threads filed
+ * in them as new writes so the other Mac, which has those threads already, learns where they sit. Call it armed.
+ */
+function seedFolders(machineId: string) {
+  db.prepare(`INSERT INTO sync_outbox (entity, entity_id, op, ts) SELECT 'folder', id, 'upsert', ? FROM folders ORDER BY created_at, rowid`).run(SEED_TS);
+  db.prepare(
+    `INSERT OR REPLACE INTO sync_meta (entity, entity_id, ts, machine_id) SELECT 'folder', id, ?, ? FROM folders`,
+  ).run(SEED_TS, machineId);
+  const filed = db.prepare('SELECT id FROM threads WHERE folder_id IS NOT NULL ORDER BY created_at, rowid').all() as { id: string }[];
+  for (const t of filed) record('thread', t.id);
 }
 
 /** The same read as kv.get. Inlined so this module does not import kv, which records through here. */
@@ -92,7 +106,10 @@ export const outbox = {
         db.prepare(`INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, JSON.stringify(value));
       const stored = kvGet<string>('sync.hardware_id');
       if (hardware && stored !== hardware) setLocal('sync.hardware_id', hardware);
-      if (armedId && !(hardware && stored && stored !== hardware)) return armedId;
+      if (armedId && !(hardware && stored && stored !== hardware)) {
+        if (!kvGet<boolean>('sync.folders_seeded')) seedFolders(armedId), setLocal('sync.folders_seeded', true);
+        return armedId;
+      }
       const moved = !!armedId;
       const id = moved ? randomUUID() : (machineId ?? randomUUID());
       setLocal('sync.machine_id', id);
@@ -105,6 +122,7 @@ export const outbox = {
       // A thread mid-run as sync is set up is this machine's run, and its row should say so.
       db.prepare(`UPDATE threads SET run_machine = ? WHERE status IN ('running','queued') AND run_machine IS NULL`).run(id);
       seed(id);
+      setLocal('sync.folders_seeded', true);
       armedId = id;
       return id;
     });

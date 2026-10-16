@@ -2,6 +2,7 @@
 import './thread.ts';
 import './event.ts';
 import './channel.ts';
+import './folder.ts';
 import './artifact.ts';
 import './automation-run.ts';
 import './kv.ts';

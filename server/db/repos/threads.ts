@@ -32,7 +32,7 @@ export interface Thread {
   next_prompt: string | null;
   /** 1 once Ben archived it: hidden from the lists, still found by search and by its link. */
   archived: number;
-  /** The sidebar folder it sits in (db/repos/folders.ts), null for ungrouped. Local only, not synced. */
+  /** The sidebar folder it sits in (db/repos/folders.ts), null for ungrouped. Synced with the row. */
   folder_id: string | null;
   created_at: string;
   updated_at: string;

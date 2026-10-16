@@ -1,7 +1,7 @@
-import { kv, outbox, type OutboxRow } from '../db.ts';
+import { kv, outbox, type OutboxRow, type SyncEntity } from '../db.ts';
 import { globalSecret, listSecrets, setSecret, SYNC_SECRETS } from '../secrets.ts';
 import { applyBatch, deferredCount, getHandler, registeredEntities, retryDeferred, type ApplyContext } from './apply.ts';
-import { createSupabaseTransport, isoTs, isSignedOut, type Change, type SyncTransport } from './transport.ts';
+import { createSupabaseTransport, isEntityRefused, isoTs, isSignedOut, type Change, type SyncTransport } from './transport.ts';
 import { watchNetwork, type NetworkWatch } from './network.ts';
 import { automationsOwner, claimIfUnowned, type AutomationsOwner } from './owner.ts';
 import { hardwareId } from './hardware.ts';
@@ -53,8 +53,10 @@ export interface SyncStatus {
   nextSyncAt: string | null;
   /** Outbox rows waiting to push. */
   pending: number;
-  /** Outbox rows for an entity with no handler yet. They push once one is registered. */
+  /** Outbox rows for an entity with no handler yet, or one the relay refuses. They push once it takes them. */
   held: number;
+  /** Entities the relay refused (set up by an older 0001_changes.sql): held until the SQL runs again. */
+  refused: SyncEntity[];
   /** Remote changes that could not apply yet. */
   deferred: number;
   cursor: number;
@@ -81,6 +83,9 @@ export interface SyncWorker {
 /** Delay before the next try after `failures` failed syncs in a row: 5s, 10s, 20s … up to 15 min. */
 export const backoffMs = (failures: number, base = 5_000, max = 15 * 60_000) =>
   Math.min(max, base * 2 ** Math.max(0, failures - 1));
+
+/** Entities a relay set up by an older 0001_changes.sql may refuse, newest first. The rest it always took. */
+const NEWER: readonly SyncEntity[] = ['folder'];
 
 /**
  * One change per row in the batch, in the order each first appears. Repeat writes to a row become one change
@@ -135,14 +140,29 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   let inflight: Promise<SyncResult> | null = null;
   let queued: Promise<SyncResult> | null = null;
 
+  /**
+   * Entities the relay refused, from the newest down. Each sync tries them again first, so they flow as soon as
+   * the relay takes them; until then the rest syncs as before and these wait in the outbox.
+   */
+  const refused = new Set<SyncEntity>();
+  const pushable = () => registeredEntities().filter((e) => !refused.has(e));
+
   async function push(): Promise<number> {
     let pushed = 0;
     for (;;) {
       if (stopped) return pushed;
-      const rows = outbox.pending(batch, registeredEntities());
+      const rows = outbox.pending(batch, pushable());
       if (!rows.length) return pushed;
       const changes = toChanges(rows, machineId);
-      if (changes.length) await transport.push(changes);
+      try {
+        if (changes.length) await transport.push(changes);
+      } catch (err) {
+        const newest = NEWER.find((e) => !refused.has(e) && changes.some((c) => c.entity === e));
+        if (!isEntityRefused(err) || !newest) throw err;
+        refused.add(newest);
+        console.warn(`[sync] ${(err as Error).message}. ${newest} changes wait until it does.`);
+        continue;
+      }
       outbox.ack(rows.map((r) => r.id));
       pushed += changes.length;
       if (rows.length < batch) return pushed;
@@ -173,6 +193,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
 
   async function cycle(): Promise<SyncResult> {
     const result: SyncResult = { pushed: 0, pulled: 0, applied: 0, skipped: 0, deferred: 0 };
+    refused.clear();
     try {
       result.pushed = await push();
       await pull(result);
@@ -251,7 +272,8 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
     },
     status() {
       return {
-        ...baseStatus(),
+        ...baseStatus(pushable()),
+        refused: [...refused],
         configured: true,
         running: !!inflight,
         machineId,
@@ -295,8 +317,8 @@ export function syncConfigured(): boolean {
   return Object.values(SYNC_SECRETS).every((n) => names.has(n));
 }
 
-function baseStatus(): SyncStatus {
-  const counts = outbox.counts(registeredEntities());
+function baseStatus(entities = registeredEntities()): SyncStatus {
+  const counts = outbox.counts(entities);
   return {
     configured: syncConfigured(),
     enabled: kv.get<boolean>('sync.enabled') !== false,
@@ -309,6 +331,7 @@ function baseStatus(): SyncStatus {
     nextSyncAt: null,
     pending: counts.pending,
     held: counts.held,
+    refused: [],
     deferred: deferredCount(),
     cursor: kv.get<number>('sync.cursor') ?? 0,
     automations: automationsOwner(),
