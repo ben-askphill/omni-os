@@ -150,7 +150,7 @@ struct MarkdownFlow {
 
   private func style(indent: CGFloat, head: CGFloat? = nil, gap: CGFloat, before: CGFloat = 0) -> NSMutableParagraphStyle {
     let style = NSMutableParagraphStyle()
-    style.lineSpacing = size * 0.4
+    style.lineSpacing = size * 0.6
     style.paragraphSpacing = gap
     style.paragraphSpacingBefore = before
     style.firstLineHeadIndent = indent

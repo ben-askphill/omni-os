@@ -103,7 +103,7 @@ private struct MarkdownBlockView: View {
     let text = Self.underlined(text)
     return Text(text)
       .font(.omni(size: size))
-      .lineSpacing(size * 0.4)
+      .lineSpacing(size * 0.6)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)
   }
