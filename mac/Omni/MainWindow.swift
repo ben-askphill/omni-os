@@ -18,6 +18,8 @@ struct MainWindow: View {
       if sidebarShown {
         SidebarView(model: model)
           .transition(.move(edge: .leading).combined(with: .opacity))
+          // Above the pane, so the resize edge that overhangs it still takes the pointer.
+          .zIndex(1)
       }
       // The pane: a white card with a hairline edge, inset from the canvas, as the main in App.tsx.
       VStack(spacing: 0) {

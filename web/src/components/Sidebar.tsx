@@ -153,11 +153,11 @@ function RunningBadge({ n }: { n: number }) {
 }
 
 /**
- * A thread nested under its channel, like a Claude Code session under its project, or one level deeper in a folder,
- * with its running sub-agents nested under it. Dragged onto a folder it files there; onto its channel's name, back
- * to the ungrouped list.
+ * A thread nested under its channel, like a Claude Code session under its project, or under a folder (which sits flush
+ * with its channel), with its running sub-agents nested under it and its harness's logo after the title. Dragged onto
+ * a folder it files there; onto its channel's name, back to the ungrouped list.
  */
-function ThreadLink({ t, active, tasks, onNavigate, nested }: { t: ThreadStub; active: boolean; tasks: BackgroundTask[]; onNavigate?: () => void; nested?: boolean }) {
+function ThreadLink({ t, active, tasks, onNavigate }: { t: ThreadStub; active: boolean; tasks: BackgroundTask[]; onNavigate?: () => void }) {
   const title = t.title || 'Untitled';
   const agents = tasks.length;
   // A thread whose turn ended still works while its sub-agents run.
@@ -177,7 +177,7 @@ function ThreadLink({ t, active, tasks, onNavigate, nested }: { t: ThreadStub; a
         title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : (STATUS_LABEL[t.status] ?? t.status)}`}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
-        className={`hov z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${nested ? 'ml-[43px]' : 'ml-[25px]'} ${
+        className={`hov z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ml-[25px] ${
           active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-3 hover:text-fg'
         }`}
       >
@@ -185,9 +185,14 @@ function ThreadLink({ t, active, tasks, onNavigate, nested }: { t: ThreadStub; a
           {busy ? <Loader size={11} className="text-live-text" /> : <StatusDot status={t.status} size={7} />}
         </span>
         <span className="min-w-0 flex-1 truncate">{title}</span>
+        {t.harness && (
+          <span className={`shrink-0 ${active ? 'text-fg-3' : 'text-fg-4'}`}>
+            <HarnessLogo harness={t.harness} size={11} />
+          </span>
+        )}
       </a>
       {tasks.map((k, i) => (
-        <AgentLink key={k.task_id} t={k} nested={nested} last={i === agents - 1} onNavigate={onNavigate} />
+        <AgentLink key={k.task_id} t={k} last={i === agents - 1} onNavigate={onNavigate} />
       ))}
     </>
   );
@@ -197,7 +202,7 @@ function ThreadLink({ t, active, tasks, onNavigate, nested }: { t: ThreadStub; a
  * A sub-agent running in a thread, nested under it on a tree line from the thread's status dot, like a Claude Desktop
  * task under its session. It links to the thread that started it.
  */
-function AgentLink({ t, nested, last, onNavigate }: { t: BackgroundTask; nested?: boolean; last: boolean; onNavigate?: () => void }) {
+function AgentLink({ t, last, onNavigate }: { t: BackgroundTask; last: boolean; onNavigate?: () => void }) {
   const now = useNow(1000);
   const tip = [t.description, t.tool_uses ? plural(t.tool_uses, 'tool') : null, t.last_tool && `last ${t.last_tool}`].filter(Boolean).join(' · ');
   return (
@@ -205,7 +210,7 @@ function AgentLink({ t, nested, last, onNavigate }: { t: BackgroundTask; nested?
       href={href.thread(t.thread_id)}
       onClick={onNavigate}
       title={tip}
-      className={`hov relative z-[1] flex h-8 items-center gap-2 rounded-full pr-3 pl-4 text-[12.5px] text-fg-3 transition-colors hover:text-fg md:h-7 md:text-[12px] ${nested ? 'ml-[61px]' : 'ml-[43px]'}`}
+      className={`hov relative z-[1] flex h-8 items-center gap-2 rounded-full pr-3 pl-4 text-[12.5px] text-fg-3 transition-colors hover:text-fg md:h-7 md:text-[12px] ml-[43px]`}
     >
       <span
         aria-hidden
@@ -230,7 +235,7 @@ function FolderNameField({ initial, onSave, onCancel }: { initial: string; onSav
     else onCancel();
   };
   return (
-    <div className="ml-[25px] flex h-8 items-center gap-2 rounded-full pr-1.5 pl-3 md:h-7">
+    <div className="flex h-8 items-center gap-2 rounded-full pr-1.5 pl-3 md:h-7">
       <Icon name="folder" size={13} className="shrink-0 text-fg-3" />
       <input
         autoFocus
@@ -305,7 +310,7 @@ function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThreads; ope
       ) : (
         <div
           data-folder-id={f.id}
-          className={`group/folder ml-[25px] flex items-center rounded-full transition-shadow ${
+          className={`group/folder flex items-center rounded-full transition-shadow ${
             over === 'thread' ? 'bg-wash shadow-[inset_0_0_0_1px_var(--line-strong)]' : over === 'folder' ? 'shadow-[inset_0_2px_0_0_var(--fg-3)]' : ''
           }`}
           onDragOver={onOver}
@@ -362,17 +367,17 @@ function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThreads; ope
         </div>
       )}
       {shown.map((t) => (
-        <ThreadLink key={t.id} t={t} nested active={t.id === openId} tasks={agents(t.id)} onNavigate={onNavigate} />
+        <ThreadLink key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} onNavigate={onNavigate} />
       ))}
       {open && !all && list.length > shown.length && (
-        <button type="button" onClick={() => setAll(true)} className="hov z-[1] ml-[43px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
+        <button type="button" onClick={() => setAll(true)} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
           {list.length - shown.length} more
         </button>
       )}
       {open && f.count > f.threads.length && all && (
-        <span className="ml-[43px] flex h-7 items-center pr-3 pl-8 text-[12px] text-fg-4">{f.count - f.threads.length} older not shown</span>
+        <span className="ml-[25px] flex h-7 items-center pr-3 pl-8 text-[12px] text-fg-4">{f.count - f.threads.length} older not shown</span>
       )}
-      {open && f.count === 0 && <div className="ml-[43px] truncate pr-3 pl-8 text-[12px] leading-7 text-fg-4">No threads yet</div>}
+      {open && f.count === 0 && <div className="ml-[25px] truncate pr-3 pl-8 text-[12px] leading-7 text-fg-4">No threads yet</div>}
     </div>
   );
 }

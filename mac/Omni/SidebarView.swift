@@ -13,6 +13,8 @@ struct SidebarView: View {
   @State private var expanded: Set<String> = []
 
   static let width: CGFloat = 252
+  /// As wide as Ben last dragged its right edge, in unzoomed points.
+  @AppStorage(sidebarWidthKey) private var width = Double(Self.width)
 
   private var selected: SidebarItem? { SidebarItem(route: model.route) }
 
@@ -111,8 +113,9 @@ struct SidebarView: View {
       .padding(.top, z(4))
       .padding(.bottom, z(12))
     }
-    .frame(width: z(Self.width))
+    .frame(width: z(SidebarResizeHandle.clamp(width)))
     .background(Tok.chrome)
+    .overlay(alignment: .trailing) { SidebarResizeHandle(width: $width, initial: Self.width) }
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Sidebar")
     .folderAlerts(model)
@@ -187,7 +190,7 @@ struct SidebarView: View {
     let links = SidebarSections.threads(
       of: channel, open: model.openThread, focused: model.focusedChannel == channel.id, busy: Set(agents.keys))
     ForEach(links.shown) { thread in
-      threadRow(thread, nested: false)
+      threadRow(thread)
     }
     if links.seeAll || links.more > 0 {
       Button { pick(.more(channel.id)) } label: {
@@ -203,10 +206,10 @@ struct SidebarView: View {
     }
   }
 
-  /// A thread under its channel, or one level deeper in a folder, with its running sub-agents nested under it.
-  /// Dragged onto a folder it files there; onto its channel's name, back to the ungrouped list.
+  /// A thread under its channel, or under a folder (which sits flush with its channel), with its running sub-agents
+  /// nested under it. Dragged onto a folder it files there; onto its channel's name, back to the ungrouped list.
   @ViewBuilder
-  private func threadRow(_ thread: ThreadStub, nested: Bool) -> some View {
+  private func threadRow(_ thread: ThreadStub) -> some View {
     let item = SidebarItem.thread(thread.id)
     let tasks = agents[thread.id] ?? []
     row(item) { ThreadRow(thread: thread, active: selected == item, agents: tasks.count) }
@@ -214,11 +217,11 @@ struct SidebarView: View {
         model.folders.dragging = .thread(thread)
         return NSItemProvider(object: (thread.title.isEmpty ? "Untitled" : thread.title) as NSString)
       }
-      .padding(.leading, z(nested ? 43 : 25))
+      .padding(.leading, z(25))
       .openInNewWindow(thread.id, model: model, title: thread.title, stub: thread)
     ForEach(Array(tasks.enumerated()), id: \.element.id) { i, task in
       AgentRow(task: task, last: i == tasks.count - 1) { pick(.thread(task.threadID)) }
-        .padding(.leading, z(nested ? 61 : 43))
+        .padding(.leading, z(43))
         .openInNewWindow(task.threadID, model: model)
     }
   }
@@ -242,7 +245,7 @@ struct SidebarView: View {
     let all = expanded.contains(folder.id)
     let links = SidebarSections.threads(in: folder, openID: model.openThread?.id, all: all, busy: hosts)
     ForEach(links.shown) { thread in
-      threadRow(thread, nested: true)
+      threadRow(thread)
     }
     if links.more > 0 {
       Button { expanded.insert(folder.id) } label: {
@@ -254,14 +257,14 @@ struct SidebarView: View {
           .frame(height: z(28))
       }
       .buttonStyle(RailRowStyle())
-      .padding(.leading, z(43))
+      .padding(.leading, z(25))
     }
     if all, !folder.collapsed, folder.count > folder.threads.count {
       Text("\(folder.count - folder.threads.count) older not shown")
         .font(.omni(size: 12))
         .foregroundStyle(Tok.fg4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, z(43 + 32))
+        .padding(.leading, z(25 + 32))
         .frame(height: z(28))
     }
     if links.empty {
@@ -269,9 +272,57 @@ struct SidebarView: View {
         .font(.omni(size: 12))
         .foregroundStyle(Tok.fg4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, z(43 + 32))
+        .padding(.leading, z(25 + 32))
         .frame(height: z(28))
     }
+  }
+}
+
+let sidebarWidthKey = "sidebar.width"
+
+/// The sidebar's right edge: drag it to make the sidebar 200 to 420pt wide, double-click it to put it back.
+struct SidebarResizeHandle: View {
+  @Binding var width: Double
+  let initial: CGFloat
+  @State private var start: Double?
+  @State private var hover = false
+
+  static func clamp(_ w: Double) -> CGFloat { CGFloat(min(420, max(200, w))).rounded() }
+
+  var body: some View {
+    Rectangle()
+      .fill(.clear)
+      .frame(width: 8)
+      .overlay {
+        Capsule().fill(Tok.lineStrong)
+          .frame(width: 1)
+          .padding(.vertical, z(12))
+          .opacity(hover || start != nil ? 1 : 0)
+      }
+      .contentShape(Rectangle())
+      .offset(x: 4)
+      .pointerStyle(.columnResize)
+      .onHover { hover = $0 }
+      .gesture(
+        DragGesture(minimumDistance: 1, coordinateSpace: .global)
+          .onChanged { g in
+            let from = start ?? Double(Self.clamp(width))
+            start = from
+            width = Double(Self.clamp(from + g.translation.width / UIZoom.settings.scale))
+          }
+          .onEnded { _ in start = nil })
+      .onTapGesture(count: 2) { width = Double(initial) }
+      .help("Drag to resize. Double-click to reset.")
+      .accessibilityElement()
+      .accessibilityLabel("Resize sidebar")
+      .accessibilityValue("\(Int(Self.clamp(width))) points")
+      .accessibilityAdjustableAction { dir in
+        switch dir {
+        case .increment: width = Double(Self.clamp(width + 16))
+        case .decrement: width = Double(Self.clamp(width - 16))
+        @unknown default: break
+        }
+      }
   }
 }
 
@@ -351,6 +402,10 @@ struct ThreadRow: View {
       Text(thread.title.isEmpty ? "Untitled" : thread.title)
         .lineLimit(1)
         .frame(maxWidth: .infinity, alignment: .leading)
+      if let harness = thread.harness {
+        HarnessLogo(harness: harness.rawValue, size: 11)
+          .foregroundStyle(active ? Tok.fg3 : Tok.fg4)
+      }
     }
     .font(.omni(size: 12.5, weight: active ? .medium : .regular))
     .foregroundStyle(active ? Tok.fg : Tok.fg3)

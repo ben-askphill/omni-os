@@ -77,7 +77,7 @@ const RECENT_PER_CHANNEL = 5;
 /** A folder lists at most this many of its threads in the sidebar; its count still says how many there are. */
 const THREADS_PER_FOLDER = 50;
 
-const stub = ({ id, channel_id, title, status, created_at, folder_id }: Thread) => ({ id, channel_id, title, status, created_at, folder_id });
+const stub = ({ id, channel_id, title, status, created_at, folder_id, harness }: Thread) => ({ id, channel_id, title, status, created_at, folder_id, harness });
 
 /** Each folder with its count, how many of its threads run, and its newest threads, keyed by channel. */
 function foldersByChannel(list: Folder[], filed: Thread[]) {

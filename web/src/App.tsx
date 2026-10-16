@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { ContextMenuHost } from './components/ContextMenu.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
@@ -14,10 +14,76 @@ import { SecretsPage } from './pages/Secrets.tsx';
 import { SyncPage } from './pages/Sync.tsx';
 import { ThreadPage } from './pages/Thread.tsx';
 import { href, navigate, requestComposerFocus, useHash, useRoute, type Route } from './router.ts';
-import { AppProvider, useApp } from './store.tsx';
+import { AppProvider, readPref, useApp, writePref } from './store.tsx';
 import { FolderDeleteDialog, FolderProvider } from './folders.tsx';
 import { api } from './api.ts';
 import { createSyncNudge } from './sync-nudge.ts';
+
+const SIDEBAR_WIDTH = 252;
+const SIDEBAR_MIN = 200;
+const SIDEBAR_MAX = 420;
+const clampWidth = (w: number) => Math.round(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w)));
+
+/**
+ * The desktop sidebar, as wide as Ben last dragged its right edge (200 to 420px). Double-clicking the edge puts it
+ * back to 252px.
+ */
+function SidebarPane({ children }: { children: ReactNode }) {
+  const [width, setWidth] = useState(() => clampWidth(Number(readPref('sidebar.width', SIDEBAR_WIDTH)) || SIDEBAR_WIDTH));
+  const [dragging, setDragging] = useState(false);
+  const save = (w: number) => (setWidth(w), writePref('sidebar.width', w));
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const start = width;
+    let last = start;
+    setDragging(true);
+    const move = (ev: PointerEvent) => setWidth((last = clampWidth(start + ev.clientX - startX)));
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+      setDragging(false);
+      save(last);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  };
+
+  return (
+    <aside className="scheme-dark relative hidden shrink-0 md:block" style={{ width }}>
+      {children}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+        aria-valuenow={width}
+        aria-valuemin={SIDEBAR_MIN}
+        aria-valuemax={SIDEBAR_MAX}
+        tabIndex={0}
+        title="Drag to resize. Double-click to reset."
+        onPointerDown={onPointerDown}
+        onDoubleClick={() => save(SIDEBAR_WIDTH)}
+        onKeyDown={(e) => {
+          const step = e.shiftKey ? 32 : 8;
+          if (e.key === 'ArrowLeft') (e.preventDefault(), save(clampWidth(width - step)));
+          else if (e.key === 'ArrowRight') (e.preventDefault(), save(clampWidth(width + step)));
+        }}
+        className="group/resize absolute inset-y-0 -right-1.5 z-30 w-3 cursor-col-resize touch-none outline-none"
+      >
+        <span
+          className={`pointer-events-none absolute inset-y-3 left-1/2 w-px -translate-x-1/2 rounded-full bg-[var(--line-strong)] transition-opacity group-hover/resize:opacity-100 group-focus-visible/resize:opacity-100 ${dragging ? 'opacity-100' : 'opacity-0'}`}
+        />
+      </div>
+      {dragging && <div className="fixed inset-0 z-50 cursor-col-resize" />}
+    </aside>
+  );
+}
 
 function Page({ route }: { route: Route }) {
   switch (route.name) {
@@ -174,9 +240,9 @@ function Shell() {
       </header>
 
       {/* Desktop sidebar */}
-      <aside className="scheme-dark hidden w-[252px] shrink-0 md:block">
+      <SidebarPane>
         <Sidebar onSearch={openPalette} />
-      </aside>
+      </SidebarPane>
 
       {/* Mobile drawer */}
       {drawer && (

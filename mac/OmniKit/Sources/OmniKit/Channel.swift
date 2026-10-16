@@ -119,25 +119,33 @@ public struct ThreadStub: Decodable, Hashable, Sendable, Identifiable {
   public let createdAt: Date
   /// The sidebar folder it sits in, nil for the channel's ungrouped list.
   public internal(set) var folderID: String?
+  /// The agent CLI it runs in, for the logo after its title. nil from a server that does not send it.
+  public let harness: HarnessID?
 
   enum CodingKeys: String, CodingKey {
-    case id, title, status
+    case id, title, status, harness
     case channelID = "channel_id"
     case createdAt = "created_at"
     case folderID = "folder_id"
   }
 
-  public init(id: String, channelID: String, title: String, status: ThreadStatus, createdAt: Date, folderID: String? = nil) {
+  public init(
+    id: String, channelID: String, title: String, status: ThreadStatus, createdAt: Date, folderID: String? = nil,
+    harness: HarnessID? = nil
+  ) {
     self.id = id
     self.channelID = channelID
     self.title = title
     self.status = status
     self.createdAt = createdAt
     self.folderID = folderID
+    self.harness = harness
   }
 
   /// The sidebar's row for a thread it has the whole of.
   public init(_ t: OmniThread) {
-    self.init(id: t.id, channelID: t.channelID, title: t.title, status: t.status, createdAt: t.createdAt, folderID: t.folderID)
+    self.init(
+      id: t.id, channelID: t.channelID, title: t.title, status: t.status, createdAt: t.createdAt, folderID: t.folderID,
+      harness: t.harness)
   }
 }

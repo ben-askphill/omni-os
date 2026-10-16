@@ -88,6 +88,7 @@ func eventJSON(kind: String, payload: String, id: Int = 1) -> String {
     #expect(stub.title == "Fix cart")
     #expect(stub.status == .running)
     #expect(stub.createdAt == t.createdAt)
+    #expect(stub.harness == t.harness)
   }
 
   @Test func readsAChannelWithItsRunningThreads() throws {
@@ -98,6 +99,13 @@ func eventJSON(kind: String, payload: String, id: Int = 1) -> String {
     #expect(c.running == 1)
     #expect(c.active.map(\.id) == ["t1"])
     #expect(c.active.first?.status == .running)
+    #expect(c.active.first?.harness == nil)
+  }
+
+  @Test func readsTheHarnessOfASidebarThread() throws {
+    let json = channelJSON.dropLast() + #","running":1,"active":[{"id":"t1","channel_id":"acme","title":"Fix cart","status":"running","created_at":"2026-09-28T07:57:15.045Z","harness":"codex"}]}"#
+    let c = try decode(ChannelWithRunning.self, String(json))
+    #expect(c.active.first?.harness == .codex)
   }
 
   @Test func readsAChannelWithoutActiveThreads() throws {

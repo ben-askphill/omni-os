@@ -20,7 +20,7 @@ export type CommandList = HarnessCommands & { recent?: string[] };
 export type Channel = Omit<ChannelRow, 'design_system'> & { design_system_size: number };
 
 /** Just enough of a thread to list it under its channel in the sidebar. */
-export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> & { folder_id?: string | null };
+export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> & { folder_id?: string | null; harness?: string };
 /** A sidebar folder with how many threads it holds, how many of them run, and its newest threads. */
 export type FolderWithThreads = Folder & { count: number; running: number; threads: ThreadStub[] };
 /** `active`: the channel's running and queued threads, and any whose sub-agents still run. `recent`: its latest threads of any status. `folders`: its sidebar folders, in order. */

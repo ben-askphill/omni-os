@@ -26,7 +26,8 @@
       "title": "Fix the cart",
       "status": "running",
       "created_at": "2026-01-05T09:00:00.000Z",
-      "folder_id": null
+      "folder_id": null,
+      "harness": "claude-code"
     }
   ],
   "recent": [
@@ -36,7 +37,8 @@
       "title": "Fix the cart",
       "status": "running",
       "created_at": "2026-01-05T09:00:00.000Z",
-      "folder_id": null
+      "folder_id": null,
+      "harness": "claude-code"
     }
   ],
   "folders": []

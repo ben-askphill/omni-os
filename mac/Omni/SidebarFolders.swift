@@ -41,7 +41,6 @@ struct FolderNameField: View {
     .padding(.leading, z(12))
     .padding(.trailing, z(6))
     .frame(height: z(28))
-    .padding(.leading, z(25))
     .onAppear {
       text = initial
       DispatchQueue.main.async { focused = true }
@@ -171,7 +170,6 @@ struct FolderRowView: View {
     #if DEBUG
     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { QAFolderProbe.frames[folder.id] = $0 }
     #endif
-    .padding(.leading, z(25))
     .opacity(folder.isStandIn ? 0.6 : 1)
   }
 }
