@@ -44,6 +44,10 @@ export const config = {
   browserLive: (env.OMNI_BROWSER_LIVE ?? '1') !== '0',
   /** After a finished turn, ask Haiku for Ben's likely next reply: the reply box's placeholder, Tab fills it in. */
   suggestions: (env.OMNI_SUGGESTIONS ?? '1') !== '0',
+  /** Save a worktree thread's checkout before and after every turn, for its This turn diff (server/turns.ts). */
+  turnSnapshots: (env.OMNI_TURN_SNAPSHOTS ?? '1') !== '0',
+  /** How long a turn's first message waits for the checkout to be saved before it goes without that snapshot. */
+  turnSnapshotWaitMs: Number(env.OMNI_TURN_SNAPSHOT_WAIT_MS ?? 15_000),
   maxUploadMb: Number(env.OMNI_MAX_UPLOAD_MB ?? 25),
   /** Load the repo's Claude Code mods (mods/) into every Claude thread with --plugin-dir. Off until '1'. */
   mods: env.OMNI_MODS === '1',

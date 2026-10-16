@@ -131,6 +131,11 @@ export interface Live {
   stderr: string;
   exited: Promise<void>;
   done: () => void;
+  /** The turn whose snapshots are being saved (runner/snapshots.ts), until it ends. */
+  snap?: string | null;
+  /** Set while the checkout is saved before a turn: messages wait in `gated` until it is, so the harness edits nothing first. */
+  gate?: Promise<void> | null;
+  gated?: Msg[];
 }
 
 /** A sub-agent, background shell or workflow still running in some thread's process. */
@@ -389,6 +394,11 @@ export const crash = (live: Live) => live.child && alive(live.child) && live.chi
 export function send(live: Live, m: Msg) {
   live.inflight.push(m);
   if (!live.child) return;
+  // The checkout before this turn is still being saved: written once it is (runner/snapshots.ts).
+  if (live.gate) {
+    (live.gated ??= []).push(m);
+    return;
+  }
   // Marked first: a write that fails can still have reached the harness.
   track(m, 'sent');
   if (!writeLine(live, userLine(live, m))) crash(live);

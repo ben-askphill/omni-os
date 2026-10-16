@@ -1,0 +1,7 @@
+{
+  "available": false,
+  "reason": "Turns are saved only for a thread with a worktree of its own.",
+  "turns": [],
+  "turn": null,
+  "groups": []
+}
