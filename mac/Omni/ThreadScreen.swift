@@ -354,6 +354,7 @@ private struct TranscriptView: View {
       }
     }
     .modifier(ThreadLinks(model: model))
+    .environment(\.linkScope, LinkScope(store: model.links, channel: store.thread?.channelID))
     #if DEBUG
     .onAppear { QAProbe.scroller = scroller }
     .onDisappear { QAProbe.scroller = nil }

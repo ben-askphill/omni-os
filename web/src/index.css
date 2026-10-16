@@ -833,6 +833,34 @@
 .md a:hover {
   text-decoration-color: currentColor;
 }
+/* A link a source named (link-sources.ts): its mark, its id muted, then its title. */
+.link-mark {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  flex: none;
+  vertical-align: -0.17em;
+}
+.md a.link-chip {
+  text-decoration: none;
+}
+.md a.link-chip > .link-mark {
+  margin-right: 0.3em;
+}
+.md a.link-chip > span:last-child {
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.16s;
+}
+.md a.link-chip:hover > span:last-child {
+  text-decoration-color: currentColor;
+}
+.md a.link-chip > .link-ref {
+  color: var(--fg-3);
+  margin-right: 0.35em;
+  font-variant-numeric: tabular-nums;
+}
 .md strong {
   font-weight: 600;
   color: var(--fg);

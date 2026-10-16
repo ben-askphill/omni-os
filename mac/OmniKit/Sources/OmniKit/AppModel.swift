@@ -109,6 +109,8 @@ public final class AppModel {
   public let attention: AttentionCenter
   /// Sidebar folders: their edits, the name being typed and the delete being confirmed. Follows the connection.
   public let folders = FolderModel()
+  /// Titles and marks for the links in replies (`/api/links`). Follows the connection.
+  public let links = LinkPreviewStore()
 
   @ObservationIgnored private let connect: @MainActor (_ port: Int) -> Connection
   @ObservationIgnored private var config: ServerConfig
@@ -132,6 +134,7 @@ public final class AppModel {
     client = c.client
     store = c.store
     folders.connect(store: c.store, api: c.client)
+    links.connect(api: c.client)
     threads = c.threads
     feed = c.feed
     follow(c)
@@ -372,6 +375,7 @@ public final class AppModel {
       client = c.client
       store = c.store
       folders.connect(store: c.store, api: c.client)
+      links.connect(api: c.client)
       threads = c.threads
       feed = c.feed
       follow(c)

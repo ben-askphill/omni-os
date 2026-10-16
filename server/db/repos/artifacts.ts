@@ -58,6 +58,9 @@ export const artifacts = {
       )
       .all(channelId ?? null, channelId ?? null, limit) as unknown as (Artifact & { thread_title: string; channel_id: string })[];
   },
+  /** The newest file published at a claude.ai URL, for naming a link to it. */
+  byUrl: (url: string) =>
+    db.prepare(`SELECT ${ARTIFACT_COLUMNS} FROM artifacts WHERE url = ? ORDER BY updated_at DESC, id DESC LIMIT 1`).get(url) as unknown as Artifact | undefined,
   byThread: (threadId: string) =>
     db.prepare(`SELECT ${ARTIFACT_COLUMNS} FROM artifacts WHERE thread_id = ? ORDER BY created_at`).all(threadId) as unknown as Artifact[],
   get: (id: number) => db.prepare(`SELECT ${ARTIFACT_COLUMNS} FROM artifacts WHERE id = ?`).get(id) as unknown as Artifact | undefined,

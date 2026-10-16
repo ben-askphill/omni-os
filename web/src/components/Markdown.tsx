@@ -1,6 +1,7 @@
 import { memo, type ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ExternalLink } from './LinkChip.tsx';
 
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/g;
 const UUID_EXACT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -27,6 +28,7 @@ function linkThreadIds(md: string) {
 const components: Components = {
   a({ href, children }) {
     const internal = href?.startsWith('#');
+    if (href && /^https?:\/\//i.test(href)) return <ExternalLink href={href}>{children}</ExternalLink>;
     return (
       <a href={href} target={internal ? undefined : '_blank'} rel={internal ? undefined : 'noopener noreferrer'}>
         {children}

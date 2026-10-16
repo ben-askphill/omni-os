@@ -16,6 +16,7 @@ struct PullRequestsScreen: View {
       if let repo = channel.githubRepo {
         if let number {
           PullRequestDetailView(model: model, channelID: channelID, repo: repo, number: number)
+            .environment(\.linkScope, LinkScope(store: model.links, channel: channelID))
             .id(number)
         } else {
           PullRequestListView(model: model, channelID: channelID, repo: repo)

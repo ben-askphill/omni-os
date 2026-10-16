@@ -22,6 +22,8 @@ struct SelectableMarkdown: NSViewRepresentable {
   let size: CGFloat
   /// `UIZoom.settings.scale`, read in the parent's body so a zoom change redraws the text.
   let scale: CGFloat
+  /// Previews for the links in these blocks; a change redraws them as chips.
+  var chips = LinkChips.none
   @Environment(\.openURL) private var openURL
 
   func makeCoordinator() -> Coordinator { Coordinator() }
@@ -50,10 +52,10 @@ struct SelectableMarkdown: NSViewRepresentable {
 
   func updateNSView(_ view: FlowTextView, context: Context) {
     context.coordinator.openURL = openURL
-    let key = Key(blocks: blocks, size: size, scale: scale)
+    let key = Key(blocks: blocks, size: size, scale: scale, chips: chips)
     guard context.coordinator.key != key else { return }
     context.coordinator.key = key
-    view.textStorage?.setAttributedString(MarkdownFlow(size: size * scale, scale: scale).build(blocks))
+    view.textStorage?.setAttributedString(MarkdownFlow(size: size * scale, scale: scale, chips: chips).build(blocks))
     view.invalidateIntrinsicContentSize()
   }
 
@@ -66,6 +68,7 @@ struct SelectableMarkdown: NSViewRepresentable {
     let blocks: [MarkdownBlock]
     let size: CGFloat
     let scale: CGFloat
+    let chips: LinkChips
   }
 
   final class Coordinator: NSObject, NSTextViewDelegate {
@@ -115,6 +118,7 @@ struct MarkdownFlow {
   let size: CGFloat
   /// The zoom, for the fixed gaps, indents and code size. `size` is already at it.
   var scale: CGFloat = 1
+  var chips = LinkChips.none
 
   private var fg: NSColor { NSColor(Tok.fg) }
   private var quoteInk: NSColor { NSColor(Tok.fg2) }
@@ -163,6 +167,10 @@ struct MarkdownFlow {
     for run in text.runs {
       var attrs: [NSAttributedString.Key: Any] = [.font: Self.font(font, run.style), .foregroundColor: ink]
       if run.style.contains(.strikethrough) { attrs[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
+      if case .external(let url)? = run.link, let chip = chips.chip(text: run.text, url: url, font: font, ink: ink, attrs: attrs) {
+        out.append(chip)
+        continue
+      }
       switch run.link {
       case .route(let route)?: attrs[.link] = URL(string: route.hash)
       case .external(let url)?: attrs[.link] = url

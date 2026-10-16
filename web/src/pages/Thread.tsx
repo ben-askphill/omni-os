@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState }
 import { api, errorText, useApi, type HarnessWithRunning, type ModStatus, type SendMode, type Thread } from '../api.ts';
 import { ReplyComposer } from '../components/Composer.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
+import { LinkChannel } from '../link-previews.ts';
 import { ArtifactsTab } from '../components/thread/panel/ArtifactsTab.tsx';
 import { BrowserTab } from '../components/thread/panel/BrowserTab.tsx';
 import { DetailsTab } from '../components/thread/panel/DetailsTab.tsx';
@@ -342,7 +343,9 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                 </ErrorNote>
               )}
               {/* Queued means waiting for a slot: nothing is working yet. */}
-              <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} />
+              <LinkChannel.Provider value={thread.channel_id}>
+                <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} />
+              </LinkChannel.Provider>
               <SetupCard
                 thread={thread}
                 onRetried={(t, pending) => {

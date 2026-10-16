@@ -7,9 +7,12 @@ import SwiftUI
 struct MarkdownView: View {
   let document: MarkdownDocument
   var size = ThreadStyle.prose + 0.5
+  @Environment(\.linkScope) private var linkScope
 
   var body: some View {
-    MarkdownBlocks(blocks: document.blocks, size: size)
+    let urls = document.externalURLs
+    MarkdownBlocks(blocks: document.blocks, size: size, chips: LinkChips(scope: linkScope, urls: urls))
+      .task(id: urls) { linkScope?.store.want(urls, channel: linkScope?.channel) }
       .foregroundStyle(Tok.fg)
       .tint(Tok.fg)
       // One selection region for the whole reply: per-Text selection stops at each block edge.
@@ -21,6 +24,7 @@ private struct MarkdownBlocks: View {
   let blocks: [MarkdownBlock]
   let size: CGFloat
   var spacing: CGFloat = 9
+  var chips = LinkChips.none
 
   private enum Group {
     case flow([MarkdownBlock])
@@ -44,8 +48,8 @@ private struct MarkdownBlocks: View {
     VStack(alignment: .leading, spacing: spacing) {
       ForEach(Array(Self.groups(blocks).enumerated()), id: \.offset) { _, group in
         switch group {
-        case .flow(let run): SelectableMarkdown(blocks: run, size: size, scale: UIZoom.settings.scale)
-        case .block(let block): MarkdownBlockView(block: block, size: size)
+        case .flow(let run): SelectableMarkdown(blocks: run, size: size, scale: UIZoom.settings.scale, chips: chips)
+        case .block(let block): MarkdownBlockView(block: block, size: size, chips: chips)
         }
       }
     }
@@ -55,6 +59,7 @@ private struct MarkdownBlocks: View {
 private struct MarkdownBlockView: View {
   let block: MarkdownBlock
   let size: CGFloat
+  var chips = LinkChips.none
 
   var body: some View {
     switch block {
@@ -84,12 +89,12 @@ private struct MarkdownBlockView: View {
         Rectangle()
           .fill(Tok.lineStrong)
           .frame(width: z(2))
-        MarkdownBlocks(blocks: blocks, size: size)
+        MarkdownBlocks(blocks: blocks, size: size, chips: chips)
           .foregroundStyle(Tok.fg2)
       }
       .fixedSize(horizontal: false, vertical: true)
     case .list(let list):
-      MarkdownListView(list: list, size: size)
+      MarkdownListView(list: list, size: size, chips: chips)
     case .table(let table):
       MarkdownTableView(table: table, size: size)
     case .thematicBreak:
@@ -127,6 +132,7 @@ private struct MarkdownBlockView: View {
 private struct MarkdownListView: View {
   let list: MarkdownList
   let size: CGFloat
+  var chips = LinkChips.none
 
   var body: some View {
     VStack(alignment: .leading, spacing: list.isLoose ? 8 : 3) {
@@ -134,7 +140,7 @@ private struct MarkdownListView: View {
         HStack(alignment: .firstTextBaseline, spacing: z(8)) {
           marker(i, item)
             .frame(minWidth: list.isOrdered ? 18 : 10, alignment: .trailing)
-          MarkdownBlocks(blocks: item.blocks, size: size, spacing: list.isLoose ? 8 : 4)
+          MarkdownBlocks(blocks: item.blocks, size: size, spacing: list.isLoose ? 8 : 4, chips: chips)
         }
       }
     }

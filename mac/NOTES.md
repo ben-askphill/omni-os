@@ -35,6 +35,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `SSEClient.swift` | `SSEClient`, `SSEEvent`, `ConnectionState`, `SSETransport`, `URLSessionSSETransport`, and `feedEvents` and `threadEvents` on `OmniClient` |
 | `Ticker.swift` | Internal. A `Clock` with its instant type erased, so tests can inject one |
 | `WorkspaceStore.swift` | `WorkspaceStore`, `WorkspaceAPI`, `SidebarSections` |
+| `LinkPreviews.swift` | `LinkPreview`, `LinkIconLayer`, `LinkPreviewAPI` (`resolveLinks`, `linkIcons` on `OmniClient`), `LinkPreviewStore` (batched asks, `AppModel.links`), `MarkdownDocument.externalURLs`. The app draws them in `LinkChips.swift`: `SelectableMarkdown` swaps a link run for the mark, id and title (`ExternalLink` in `LinkChip.tsx`) |
 | `PublishedPage.swift` | `PublishedPage`: a page a thread published to claude.ai (`publishedFrom` in `shared/published.ts`), `byGroup` for the transcript cards, and `checkComments(threadID:url:)` on `OmniClient` |
 | `Client+Thread.swift` | `ThreadAPI` (the calls `ThreadStore` makes), `artifactURL` and `uploadURL` on `OmniClient` |
 | `ThreadStore.swift` | `ThreadStore` (one thread, live), `ThreadStoreRegistry` |
