@@ -151,6 +151,8 @@ export function endTurn(live: Live, status: ThreadStatus) {
  * or right away if the process has not started its first turn yet.
  */
 export function interruptThread(threadId: string) {
+  // Stop also means not now and not at the reset: a limit stop's continuation is dropped (limits.ts).
+  if (threads.get(threadId)?.limit_state) threads.setLimit(threadId, null);
   const live = lives.get(threadId);
   const w = waiting.indexOf(threadId);
   // A lead still waiting on its team has no process: stopping it stops the members it waits for.

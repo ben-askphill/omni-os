@@ -15,6 +15,7 @@ import { compactBlocked, contextView } from './context.ts';
 import {
   acceptedAgain,
   activeMods,
+  cancelLimitResume,
   cancelRequests,
   createTeam,
   createThread,
@@ -26,8 +27,10 @@ import {
   postMessage,
   refreshContext,
   reorderRequests,
+  resumeLimitNow,
   resumeRequests,
   retrySetup,
+  scheduleLimitResume,
   runsHere,
 } from './runner.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
@@ -185,6 +188,32 @@ threadActionsApi.post('/:id/setup/retry', (c) => {
   const id = c.req.param('id');
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
   retrySetup(id);
+  return c.json(afterRecovery(id));
+});
+
+/**
+ * A turn the harness stopped at its usage limit (server/runner/limits.ts). Schedule its one continuation for the
+ * reset time the harness reported (a 409 when it reported none), cancel that, or send it now. Scheduling or
+ * cancelling twice changes nothing; the continuation is sent at most once.
+ */
+threadActionsApi.post('/:id/limit/schedule', (c) => {
+  const id = c.req.param('id');
+  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  scheduleLimitResume(id);
+  return c.json(afterRecovery(id));
+});
+
+threadActionsApi.post('/:id/limit/cancel', (c) => {
+  const id = c.req.param('id');
+  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  cancelLimitResume(id);
+  return c.json(afterRecovery(id));
+});
+
+threadActionsApi.post('/:id/limit/resume', (c) => {
+  const id = c.req.param('id');
+  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  resumeLimitNow(id);
   return c.json(afterRecovery(id));
 });
 

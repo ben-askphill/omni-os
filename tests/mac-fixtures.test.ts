@@ -73,6 +73,11 @@ const NAMES = [
   'needs-you.json',
   'needs-you-read-request.json',
   'needs-you-read.json',
+  // A turn stopped at the plan's usage limit, with its reset time: scheduled to resume then, cancelled, resumed now.
+  'thread-limited.json',
+  'limit-scheduled.json',
+  'limit-cancelled.json',
+  'limit-resumed.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -388,11 +393,22 @@ async function scenario() {
   expect(failed.pending).toMatchObject([{ kind: 'user', delivery: 'recovered', request_id: 'thread-start' }]);
   keep('thread-setup-failed.json', failed);
 
-  // Needs you now holds every kind: done, failed and stopped results, failed Setup and parked requests.
+  // The plan's usage limit stops a turn and says when it resets: kept for Resume now or at that time, which Ben picks.
+  const resetsAt = Math.floor(Date.now() / 1000) + 3 * 3600;
+  const capped = (await call('POST', '/threads', { channel: 'acme', prompt: `LIMIT:${resetsAt} tidy the copy`, title: 'Tidy the copy' })) as Thread;
+  const limited = await eventually(async () => {
+    const d = (await detail(capped.id)) as Detail & { thread: { limit_state: string | null } };
+    return d.thread.limit_state === 'limited' && d;
+  }, 'the limit stop');
+  keep('thread-limited.json', limited);
+  const scheduled = keep('limit-scheduled.json', await call('POST', `/threads/${capped.id}/limit/schedule`, {})) as { thread: { limit_state: string } };
+  expect(scheduled.thread.limit_state).toBe('scheduled');
+
+  // Needs you now holds every kind: done, failed and stopped results, failed Setup, parked requests and a limit stop.
   type Item = { thread: Thread; result: { uid: string; status: string } | null; blockers: { kind: string }[] };
   const inbox = keep('needs-you.json', await get('/needs-you')) as { items: Item[] };
   expect(new Set(inbox.items.flatMap((i) => (i.result ? [i.result.status] : [])))).toEqual(new Set(['done', 'failed', 'stopped']));
-  expect(new Set(inbox.items.flatMap((i) => i.blockers.map((b) => b.kind)))).toEqual(new Set(['setup', 'recovered']));
+  expect(new Set(inbox.items.flatMap((i) => i.blockers.map((b) => b.kind)))).toEqual(new Set(['setup', 'recovered', 'limited']));
   // Ben reads the stopped parent's result: its held crew report still needs him. The uid is this run's.
   const stopped = inbox.items.find((i) => i.thread.id === boss.id)!;
   const readBody = request('needs-you-read-request.json', { uid: stopped.result!.uid }) as { uid: string };
@@ -401,6 +417,10 @@ async function scenario() {
   git('commit', '-q', '--allow-empty', '-m', 'first');
   keep('setup-retried.json', await call('POST', `/threads/${wt.id}/setup/retry`, {}));
   await eventually(async () => (await detail(wt.id)).thread.status === 'done', 'the retried thread to run');
+
+  keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
+  keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
+  await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
 }
 
 /** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */

@@ -26,7 +26,7 @@ private func withNewer(_ n: NeedsYou, _ title: String, uid: String) -> NeedsYou 
   @Test func readsEveryKindOfResultAndBlocker() throws {
     let n = try inbox()
     #expect(Set(n.items.compactMap { $0.result?.status }) == [.done, .failed, .stopped])
-    #expect(Set(n.items.flatMap { $0.blockers.map(\.kind) }) == [.setup, .recovered])
+    #expect(Set(n.items.flatMap { $0.blockers.map(\.kind) }) == [.setup, .recovered, .limited])
     #expect(n.unread == n.items.filter { $0.result != nil }.count)
     #expect(n.blocked == n.items.filter { !$0.blockers.isEmpty }.count)
     #expect(NeedsYou(items: n.items) == n, "the counts the server sent are the ones the app works out")
@@ -53,6 +53,19 @@ private func withNewer(_ n: NeedsYou, _ title: String, uid: String) -> NeedsYou 
     let stopped = NeedsYouItem(thread: base.thread, result: NeedsYouResult(uid: "u", status: .stopped, at: base.at), blockers: [], at: base.at)
     #expect(stopped.reason.tone == .settled)
     #expect(stopped.reason.label == "Stopped")
+
+    // A turn stopped at the usage limit, scheduled to resume at the reset.
+    let capped = try item(n, "Tidy the copy")
+    #expect(capped.blockers.first?.kind == .limited)
+    #expect(capped.blockers.first?.scheduled == true)
+    #expect(capped.blockers.first?.resetsAt != nil)
+    #expect(capped.reason.tone == .needs)
+    #expect(capped.reason.label == "Usage limit reached")
+    #expect(capped.reason.detail?.hasPrefix("Resumes at ") == true)
+    let noTime = NeedsYouItem(thread: base.thread, result: nil, blockers: [NeedsYouBlocker(kind: .limited)], at: base.at)
+    #expect(noTime.reason.detail == "No reset time given")
+    let notScheduled = NeedsYouItem(thread: base.thread, result: nil, blockers: [NeedsYouBlocker(kind: .limited, resetsAt: base.at)], at: base.at)
+    #expect(notScheduled.reason.detail?.hasPrefix("Resets at ") == true)
   }
 
   @Test func scopesToAChannel() throws {

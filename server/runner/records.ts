@@ -1,5 +1,6 @@
 // Stream records: tasks, results, and the process exit.
-import { events, threads, type ThreadStatus } from '../db.ts';
+import { randomUUID } from 'node:crypto';
+import { events, messageRequests, outbox, threads, type ThreadStatus } from '../db.ts';
 import { publishFeed, publishThread } from '../bus.ts';
 import { onToolResult } from '../published.ts';
 import { turnFinished } from '../sync/files.ts';
@@ -130,6 +131,8 @@ export function onResult(live: Live, p: ResultPayload) {
   const id = live.threadId;
   live.resultSeen = true;
   live.cliTurn = false;
+  const limit = live.limit;
+  live.limit = null;
   const answered = live.replayed;
   live.replayed = false;
   // On resume the CLI can flush a leftover background task as an empty zero-turn result, before it has
@@ -148,12 +151,30 @@ export function onResult(live: Live, p: ResultPayload) {
   if (stopped) clearInterrupt(live);
   // Steers the CLI has not replayed yet: it starts the next turn with them on its own.
   if (live.inflight.length) return emitThread(id);
+  if (limit && !p.ok && !stopped) return limitStop(live, limit.resets_at);
   const next = live.held.shift();
   if (next) {
     send(live, next);
     return emitThread(id);
   }
   endTurn(live, stopped ? 'stopped' : p.ok ? 'done' : 'failed');
+}
+
+/**
+ * The harness stopped this turn at its usage limit. The thread fails as any turn would, and keeps the stop with the
+ * reset time the harness gave, for Ben to resume now or at that time (limits.ts). Messages queued behind the turn
+ * wait for him as recovered rather than running ahead into the same limit; one with no saved request is dropped.
+ */
+function limitStop(live: Live, resetsAt: number | null) {
+  const id = live.threadId;
+  for (const m of live.held.splice(0)) if (!(m.requestId && messageRequests.park(m.uuid))) drop(id, [m]);
+  threads.setLimit(id, {
+    state: 'limited',
+    resets_at: resetsAt ? new Date(resetsAt * 1000).toISOString() : null,
+    id: randomUUID(),
+    machine: outbox.machineId(),
+  });
+  endTurn(live, 'failed');
 }
 
 export function onRecord(live: Live, rec: StreamRecord) {
@@ -189,6 +210,10 @@ export function onRecord(live: Live, rec: StreamRecord) {
       return onTask(live, rec.payload);
     case 'mod':
       return onMod(live, rec.payload);
+    case 'limit':
+      // Kept until the result says whether the turn failed. A later one with a reset time wins over one without.
+      live.limit = { resets_at: rec.payload.resets_at ?? live.limit?.resets_at ?? null };
+      return;
     default: {
       // The model is working with no turn of ours open: a background task finished and the CLI runs a turn
       // about it by itself. Track it like any other so status, last_text and the parent report follow.

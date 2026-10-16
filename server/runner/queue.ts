@@ -29,6 +29,8 @@ import {
 export function deliver(threadId: string, m: Msg) {
   if (isShuttingDown()) throw new Error('Omni is shutting down');
   clearSuggestion(threadId);
+  // The thread moves on: a limit stop it had, and the continuation scheduled for it, no longer apply (limits.ts).
+  if (threads.get(threadId)?.limit_state) threads.setLimit(threadId, null);
   let live = lives.get(threadId);
   const caps = { steer: harnessSteers(threadId) };
   // Interrupt and send while the process is still starting: stop it like Interrupt does and start fresh with this message.
@@ -120,7 +122,7 @@ function begin(threadId: string, [first, ...rest]: Msg[]) {
  * Save a message Omni writes to a thread itself (a crew report, a team's go) before anything is woken, keyed so the
  * same report or go is saved once whatever calls this again. Null when that key was saved before: it was handled.
  */
-function saveOwn(threadId: string, key: string, m: Pick<MessageRequest, 'prompt' | 'kind' | 'payload' | 'source'>): MessageRequest | null {
+export function saveOwn(threadId: string, key: string, m: Pick<MessageRequest, 'prompt' | 'kind' | 'payload' | 'source'>): MessageRequest | null {
   const { row, fresh } = messageRequests.accept({
     thread_id: threadId,
     request_id: key,
@@ -134,7 +136,7 @@ function saveOwn(threadId: string, key: string, m: Pick<MessageRequest, 'prompt'
 }
 
 /** Hand a saved message to the runner. While Omni shuts down it is parked for Resume after the restart instead. */
-function wake(r: MessageRequest) {
+export function wake(r: MessageRequest) {
   if (isShuttingDown()) {
     messageRequests.park(r.id);
     return emitThread(r.thread_id);

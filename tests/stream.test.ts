@@ -216,6 +216,35 @@ describe('parseEvent: rate limits and results', () => {
     expect(out.usage!.five_hour).toBeUndefined();
   });
 
+  it('says a rejected rate_limit_event refused the turn, with its reset time when it has one', () => {
+    const at = parseEvent({ type: 'rate_limit_event', rate_limit_info: { status: 'rejected', resetsAt: 1790328600, rateLimitType: 'five_hour' } });
+    expect(at.records).toEqual([{ kind: 'limit', payload: { resets_at: 1790328600 } }]);
+    expect(parseEvent({ type: 'rate_limit_event', rate_limit_info: { status: 'rejected' } }).records).toEqual([{ kind: 'limit', payload: { resets_at: null } }]);
+  });
+
+  it('never makes a limit of a full meter that is still allowed', () => {
+    for (const status of ['allowed', 'allowed_warning']) {
+      const out = parseEvent({
+        type: 'rate_limit_event',
+        rate_limit_info: { status, resetsAt: 1790328600, unifiedWindows: { five_hour: { utilization: 1, resetsAt: 1790328600 } } },
+      });
+      expect(out.records).toEqual([]);
+      expect(out.usage!.five_hour!.utilization).toBe(1);
+    }
+  });
+
+  it("reads the limit and its reset from a failed result's text, and not from a successful one", () => {
+    const failed = parseEvent({ type: 'result', subtype: 'success', is_error: true, num_turns: 1, result: 'Claude AI usage limit reached|1790328600' });
+    expect(failed.records.map((r) => r.kind)).toEqual(['limit', 'result']);
+    expect(failed.records[0]).toEqual({ kind: 'limit', payload: { resets_at: 1790328600 } });
+    const words = parseEvent({ type: 'result', subtype: 'success', is_error: true, num_turns: 1, result: "You've hit your limit · resets 5pm (Europe/Amsterdam)" });
+    expect(words.records[0]).toEqual({ kind: 'limit', payload: { resets_at: null } });
+    const ok = parseEvent({ type: 'result', subtype: 'success', is_error: false, num_turns: 1, result: 'The usage limit reached 90% last week.' });
+    expect(ok.records.map((r) => r.kind)).toEqual(['result']);
+    const other = parseEvent({ type: 'result', subtype: 'error_during_execution', is_error: true, num_turns: 1, result: 'API Error: 500' });
+    expect(other.records.map((r) => r.kind)).toEqual(['result']);
+  });
+
   it('maps a successful result', () => {
     const out = parseEvent({
       type: 'result',

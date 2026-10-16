@@ -7,6 +7,7 @@ import './runner/prompts.ts';
 import './runner/api.ts';
 import './runner/pending.ts';
 import './runner/setup.ts';
+import './runner/limits.ts';
 
 export type { ActiveTask, ModStatus, PendingMsg, SendMode } from './runner/state.ts';
 export type { Acceptance, CreateThreadInput, PostedThread } from './runner/api.ts';
@@ -29,5 +30,6 @@ export { acceptedAgain, createTeam, createThread, discardRequests, postMessage, 
 export { ALREADY_SENT, cancelRequests, editRequest, reorderRequests } from './runner/pending.ts';
 export { interruptThread, shutdownAll, stopThread } from './runner/session.ts';
 export { retrySetup } from './runner/setup.ts';
+export { cancelLimitResume, clearLimit, fireDue, limitClock, resumeLimitNow, scheduleLimitResume, startLimits } from './runner/limits.ts';
 export { reportToParent, settleTeam } from './runner/queue.ts';
 export { buildSystemPrompt } from './runner/prompts.ts';

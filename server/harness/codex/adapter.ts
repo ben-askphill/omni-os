@@ -20,7 +20,7 @@ import type { AdapterCallbacks, AdapterContext, CommandUse, HarnessAdapter, Harn
 import { CodexClient } from './client.ts';
 import { codexBin } from './bin.ts';
 import { CODEX_BUILTINS } from './commands.ts';
-import { PLAN_LIMIT_ID, normalizeItem, normalizePlan, normalizeRateLimits, normalizeStarted, turnErrorText } from './normalize.ts';
+import { PLAN_LIMIT_ID, codexLimit, normalizeItem, normalizePlan, normalizeRateLimits, normalizeStarted, turnErrorText } from './normalize.ts';
 import { reviewTarget } from './review.ts';
 import type {
   CodexInput,
@@ -31,6 +31,7 @@ import type {
   ReviewStartResponse,
   RpcNotification,
   ThreadStartResponse,
+  TurnError,
 } from './protocol.ts';
 
 interface Outgoing {
@@ -111,6 +112,8 @@ export const codexAdapter: HarnessAdapter = {
     let initSent = false;
     // A final error from this turn, in case its turn/completed carries none.
     let lastError = '';
+    /** The last final error's whole value, for its kind: the plan's usage limit is a limit stop. */
+    let lastFailure: TurnError | null = null;
     let plans = 0;
     const outbox: Outgoing[] = [];
 
@@ -155,12 +158,14 @@ export const codexAdapter: HarnessAdapter = {
           const text = turnErrorText(String(e.error?.message ?? ''));
           // A retry shows as progress; a final error ends the turn, below.
           if (e.willRetry) emit({ kind: 'status', payload: { text } });
-          else lastError = text;
+          else (lastError = text), (lastFailure = e.error ?? null);
           break;
         }
         case 'turn/completed': {
           const turn = p.turn as CodexTurn | undefined;
           const error = turn?.status === 'failed' ? turnErrorText(turn.error?.message ?? '') || lastError || 'Codex turn failed.' : '';
+          // Stopped at the plan's usage limit: said before the result, so the runner keeps it as a limit stop.
+          const limit = turn?.status === 'failed' ? (codexLimit(turn.error, usageFor('codex')) ?? codexLimit(lastFailure, usageFor('codex'))) : null;
           // Clear the active turn before emitting the result: the runner delivers the next queued
           // message synchronously, and it must start a new turn rather than steer this finished one.
           turnActive = false;
@@ -169,6 +174,8 @@ export const codexAdapter: HarnessAdapter = {
           builtin = null;
           initSent = false;
           lastError = '';
+          lastFailure = null;
+          if (limit) emit({ kind: 'limit', payload: limit });
           if (error) emit({ kind: 'error', payload: { text: error } });
           const subtype = turn?.status === 'completed' ? 'success' : turn?.status === 'interrupted' ? 'interrupted' : 'error';
           emit({ kind: 'result', payload: { ok: subtype === 'success', subtype, turns: 1 } });
@@ -234,6 +241,7 @@ export const codexAdapter: HarnessAdapter = {
       turnActive = true;
       builtin = use?.name ?? null;
       lastError = '';
+      lastFailure = null;
       // The runner moves the message from "pending" to the transcript when it sees the replay.
       emit({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
       const what = builtin === 'review' ? 'start the review' : builtin === 'compact' ? 'compact the conversation' : 'start the turn';

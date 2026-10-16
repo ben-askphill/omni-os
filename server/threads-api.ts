@@ -43,6 +43,8 @@ threadsApi.patch('/:id', async (c) => {
     }
   }
   if (body.data.next_thread === null) threads.setNextThread(id, null);
+  // Archived: a usage limit's continuation no longer runs by itself (server/runner/limits.ts).
+  if (edit.archived) threads.setLimit(id, null);
   const renamed = Object.keys(edit).length ? threads.update(id, { ...edit, updated_at: t.updated_at })! : threads.get(id)!;
   publishFeed({ type: 'thread', thread: renamed });
   return c.json(renamed);

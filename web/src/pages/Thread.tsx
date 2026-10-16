@@ -9,6 +9,7 @@ import { DetailsTab } from '../components/thread/panel/DetailsTab.tsx';
 import { PANEL_MIN, THREAD_MIN, defaultPanelWidth, PanelResizeHandle } from '../components/thread/panel/PanelResizeHandle.tsx';
 import { NextThreadCard } from '../components/thread/NextThreadCard.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
+import { LimitCard } from '../components/thread/LimitCard.tsx';
 import { OPEN_PR_PROMPT, ThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { Avatar, Button, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, StatusPill, Tabs } from '../components/ui.tsx';
@@ -350,6 +351,14 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                 thread={thread}
                 onRetried={(t, pending) => {
                   // Retry keeps updated_at, so it must win a tie, like a rename.
+                  applyThread(t);
+                  setQueued(pending);
+                }}
+              />
+              <LimitCard
+                thread={thread}
+                onChanged={(t, pending) => {
+                  // Scheduling keeps updated_at, so it must win a tie, like Retry.
                   applyThread(t);
                   setQueued(pending);
                 }}

@@ -37,17 +37,39 @@ public struct NeedsYouBlocker: Decodable, Hashable, Sendable {
     public static let recovered: Self = "recovered"
     /// A message a harness may have read before a restart, sent again only when Ben says so.
     public static let uncertain: Self = "uncertain"
+    /// Its harness stopped the turn at the plan's usage limit.
+    public static let limited: Self = "limited"
   }
 
   public let kind: Kind
   public let detail: String?
   /// How many messages, for recovered and uncertain.
   public let count: Int
+  /// Limited: when the harness said the limit resets. Nil when it did not say.
+  public let resetsAt: Date?
+  /// Limited: Ben scheduled the continuation for that time.
+  public let scheduled: Bool
 
-  public init(kind: Kind, detail: String? = nil, count: Int = 0) {
+  enum CodingKeys: String, CodingKey {
+    case kind, detail, count, scheduled
+    case resetsAt = "resets_at"
+  }
+
+  public init(kind: Kind, detail: String? = nil, count: Int = 0, resetsAt: Date? = nil, scheduled: Bool = false) {
     self.kind = kind
     self.detail = detail
     self.count = count
+    self.resetsAt = resetsAt
+    self.scheduled = scheduled
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    kind = try c.decode(Kind.self, forKey: .kind)
+    detail = try c.decodeIfPresent(String.self, forKey: .detail)
+    count = try c.decodeIfPresent(Int.self, forKey: .count) ?? 0
+    resetsAt = try c.decodeIfPresent(Date.self, forKey: .resetsAt)
+    scheduled = try c.decodeIfPresent(Bool.self, forKey: .scheduled) ?? false
   }
 }
 
@@ -83,6 +105,9 @@ public struct NeedsYouItem: Decodable, Hashable, Sendable, Identifiable {
       case .setup: return (.needs, "Worktree could not be prepared", b.detail)
       case .uncertain: return (.needs, many(b.count, "A message may not have been sent", "# messages may not have been sent"), preview)
       case .recovered: return (.needs, many(b.count, "A message waits for Resume", "# messages wait for Resume"), preview)
+      case .limited:
+        let at = b.resetsAt.map { LimitStop.resetLabel($0) }
+        return (.needs, "Usage limit reached", at.map { "\(b.scheduled ? "Resumes" : "Resets") at \($0)" } ?? "No reset time given")
       default: break
       }
     }

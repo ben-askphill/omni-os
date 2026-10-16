@@ -100,6 +100,8 @@ export interface Live {
   cliTurn: boolean;
   /** One of our messages was replayed since the last result, so a zero-turn result answers it. */
   replayed: boolean;
+  /** The harness refused this turn at its usage limit (and when it resets, if it said). A failed result makes it a limit stop. */
+  limit: { resets_at: number | null } | null;
   /** A turn the CLI opened by itself reports only the text written after this event id. */
   turnFrom: number;
   inflight: Msg[];

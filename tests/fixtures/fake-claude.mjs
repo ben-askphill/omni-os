@@ -31,6 +31,9 @@
 //   PUBLISH:<path>    an Artifact tool call that publishes that file, answered "Published <path> at <url>" like the real CLI
 //   ORPHAN            leave a child behind that holds our stdout until it is killed (two minutes at most), like a
 //                     daemon started without redirecting its output: once we exit, the runner never sees our pipes close
+//   LIMIT[:<epoch>]   the plan's usage limit refuses the turn: a rejected rate_limit_event (with resetsAt when an
+//                     epoch in seconds is given), the CLI's synthetic "You've hit your limit" reply, and an error result
+//   FULLMETER         a rate_limit_event at 100% that is still allowed, then the turn runs as usual
 //   CTX:<tokens>      set the context in use before the turn; each model call adds 1.5K, /compact sets it to 8K.
 //                     get_context_usage and the usage on each assistant message report it, in a 200K window
 // Env:
@@ -288,6 +291,8 @@ async function runTurn() {
   let rich = false;
   let mods = false;
   let modClear = false;
+  let limit = null;
+  let fullMeter = false;
   const publishes = [];
   let steps = 0;
 
@@ -320,6 +325,9 @@ async function runTurn() {
       if (m.text.includes('RICH')) rich = true;
       if (m.text.includes('MODS')) mods = true;
       if (m.text.includes('MOD_CLEAR')) modClear = true;
+      const lim = m.text.match(/LIMIT(?::(\d+))?/);
+      if (lim) limit = { resetsAt: lim[1] ? Number(lim[1]) : null };
+      if (m.text.includes('FULLMETER')) fullMeter = true;
       for (const x of m.text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
     }
     return true;
@@ -339,6 +347,37 @@ async function runTurn() {
     return;
   }
 
+  // The plan's limit refuses the first model call: the CLI says so in a reply of its own and fails the turn.
+  if (limit) {
+    // THINK:<ms> holds the refusal back, so a test can queue a message behind the turn.
+    await pause(t, LATENCY + think);
+    if (dead) return;
+    emit({
+      type: 'rate_limit_event',
+      rate_limit_info: {
+        status: 'rejected', rateLimitType: 'five_hour', ...(limit.resetsAt && { resetsAt: limit.resetsAt }),
+        unifiedWindows: { five_hour: { utilization: 1, resetsAt: limit.resetsAt ?? 1790328600 } },
+      },
+    });
+    const text = limit.resetsAt ? "You've hit your limit · resets 5pm (Europe/Amsterdam)" : "You've hit your limit";
+    emit({
+      type: 'assistant', message: { id: `msg_fake_${++seq}`, type: 'message', role: 'assistant', model: '<synthetic>', content: [{ type: 'text', text }], usage: { input_tokens: 0, output_tokens: 0 } },
+      parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID(), error: 'rate_limit',
+    });
+    emit({
+      type: 'result', subtype: 'success', is_error: true, duration_ms: Date.now() - started, duration_api_ms: 0, num_turns: 1,
+      result: text, stop_reason: 'stop_sequence', total_cost_usd: 0, usage: { input_tokens: 0, output_tokens: 0 }, permission_denials: [],
+      fake_pid: process.pid,
+    });
+    emit({ type: 'command_lifecycle', phase: 'turn_end' });
+    return;
+  }
+  if (fullMeter) {
+    emit({
+      type: 'rate_limit_event',
+      rate_limit_info: { status: 'allowed_warning', rateLimitType: 'five_hour', resetsAt: 1790328600, unifiedWindows: { five_hour: { utilization: 1, resetsAt: 1790328600 } } },
+    });
+  }
   let finalText = null;
   let toolRejected = false;
   if (rich) {

@@ -24,6 +24,7 @@
 //   HANG      never finish on its own; only turn/interrupt ends the turn
 //   RETRY     report an error Codex retries by itself, then carry on
 //   BADTURN   fail the turn on the plan limit, with the API's JSON error body as the message
+//   LIMITRESET:<epoch>  the same, with the reset time in the body (resets_at, epoch seconds)
 //   CRASH     exit(1) mid-turn, like the process dying
 //   SKILLS_EDITED  send skills/changed, as Codex does when a personal skill file changes
 // and in a review's custom instructions:
@@ -250,8 +251,10 @@ async function runTurn(turn, input) {
     notify('account/rateLimits/updated', { rateLimits: planLimits(12, 3) });
     notify('account/rateLimits/updated', { rateLimits: RESERVE_LIMITS });
   }
-  if (said.includes('BADTURN')) {
-    const body = { type: 'error', status: 429, error: { type: 'usage_limit_reached', message: "You've hit your usage limit. It resets at 5:00 PM." } };
+  if (said.includes('BADTURN') || said.includes('LIMITRESET')) {
+    // LIMITRESET:<epoch> carries the reset time in the body, as the API does; BADTURN says it only in words.
+    const at = Number(said.match(/LIMITRESET:(\d+)/)?.[1]);
+    const body = { type: 'error', status: 429, error: { type: 'usage_limit_reached', message: "You've hit your usage limit. It resets at 5:00 PM.", ...(at && { resets_at: at }) } };
     const error = turnError(JSON.stringify(body), 'usageLimitExceeded');
     notify('error', { error, willRetry: false, threadId, turnId: turn.id });
     return end(turn, 'failed', error);

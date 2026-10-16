@@ -5,6 +5,8 @@ export type ThreadStatus = 'queued' | 'running' | 'done' | 'failed' | 'stopped' 
 /** `team`: a member of a team, run under its lead thread and listed only there. */
 /** A worktree thread's preparation: `preparing` until its worktree is made and checked, `failed` (with why) until Ben retries. */
 export type ThreadSetup = 'preparing' | 'failed';
+/** A turn stopped at the harness's usage limit: `limited` until Ben acts, `scheduled` to resume at the reset time. */
+export type ThreadLimit = 'limited' | 'scheduled';
 export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team';
 
 export interface Thread {
@@ -40,13 +42,27 @@ export interface Thread {
   setup: ThreadSetup | null;
   /** Why the worktree could not be prepared, while setup is `failed`. */
   setup_error: string | null;
+  /** Its last turn stopped at the harness's usage limit (server/runner/limits.ts). Null once anything moves it on. Local only, not synced. */
+  limit_state: ThreadLimit | null;
+  /** When the harness said that limit resets, if it said. Without it, only a manual Resume is offered. */
+  limit_resets_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
-/** The columns clients read, without sync's run_machine. */
+/** A limit stop as the runner reads it (server/runner/limits.ts). */
+export interface LimitStop {
+  limit_state: ThreadLimit;
+  limit_resets_at: string | null;
+  /** Keys its one continuation request, so it is sent once. */
+  limit_id: string;
+  /** The Mac that ran the turn: only it resumes it. */
+  limit_machine: string | null;
+}
+
+/** The columns clients read, without sync's run_machine or the limit stop's id and owner. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, setup, setup_error, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, setup, setup_error, limit_state, limit_resets_at, created_at, updated_at';
 
 /** Who runs a thread with this status: this machine while it is running or queued here and sync is set up, else nobody. */
 const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? outbox.machineId() : null);
@@ -99,7 +115,7 @@ export const threads = {
   create(
     t: Omit<
       Thread,
-      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'archived' | 'folder_id' | 'setup' | 'setup_error'
+      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'archived' | 'folder_id' | 'setup' | 'setup_error' | 'limit_state' | 'limit_resets_at'
     > & {
       has_run?: number; created_at?: string; harness?: string; effort?: string; folder_id?: string | null; setup?: ThreadSetup | null;
     },
@@ -147,6 +163,51 @@ export const threads = {
         .run(title, prompt, id, title, prompt).changes > 0
     );
   },
+  /** A thread's limit stop with the columns clients never read: its id and the Mac that owns it. */
+  limit(id: string) {
+    return db.prepare('SELECT limit_state, limit_resets_at, limit_id, limit_machine FROM threads WHERE id = ? AND limit_state IS NOT NULL').get(id) as unknown as
+      | LimitStop
+      | undefined;
+  },
+  /**
+   * Record a limit stop, or move one on. Like the suggestion it is not a change to the thread: updated_at stays and
+   * sync never hears of it, so it stays on the Mac that ran the turn. True when it changed.
+   */
+  setLimit(id: string, l: { state: ThreadLimit; resets_at: string | null; id: string; machine: string | null } | null) {
+    return (
+      db
+        .prepare('UPDATE threads SET limit_state = ?, limit_resets_at = ?, limit_id = ?, limit_machine = ? WHERE id = ?')
+        .run(l?.state ?? null, l?.resets_at ?? null, l?.id ?? null, l?.machine ?? null, id).changes > 0
+    );
+  },
+  /** Move a limit stop from one state to another, only if it is still in `from` and this Mac's. False otherwise. */
+  moveLimit(id: string, from: ThreadLimit, to: ThreadLimit) {
+    return (
+      db
+        .prepare('UPDATE threads SET limit_state = ? WHERE id = ? AND limit_state = ? AND (limit_machine IS NULL OR limit_machine = ?)')
+        .run(to, id, from, outbox.machineId() ?? '').changes > 0
+    );
+  },
+  /**
+   * Take the limit stop away, to send its continuation: the row says so before anything is sent, so two callers (a
+   * timer and a click, or a restart) never both get it. Only this Mac's, only from `from`. Its id, or null.
+   */
+  takeLimit(id: string, from: readonly ThreadLimit[]): string | null {
+    return tx(() => {
+      const l = threads.limit(id);
+      if (!l || !from.includes(l.limit_state) || (l.limit_machine && l.limit_machine !== outbox.machineId())) return null;
+      threads.setLimit(id, null);
+      return l.limit_id;
+    });
+  },
+  /** Every continuation this Mac has scheduled, soonest first. */
+  scheduledLimits: () =>
+    db
+      .prepare(
+        `SELECT id, limit_resets_at FROM threads WHERE limit_state = 'scheduled' AND limit_resets_at IS NOT NULL
+         AND (limit_machine IS NULL OR limit_machine = ?) ORDER BY limit_resets_at`,
+      )
+      .all(outbox.machineId() ?? '') as unknown as { id: string; limit_resets_at: string }[],
   /** Move a thread to another channel, keeping its place in the lists. import-history's --move-imported uses it. */
   setChannel(id: string, channelId: string) {
     tx(() => {

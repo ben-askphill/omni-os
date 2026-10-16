@@ -121,6 +121,8 @@ export interface CodexTurn {
 /** The API's error, often its JSON response body as a string. */
 export interface TurnError {
   message: string;
+  /** What kind of failure: `usageLimitExceeded` when the plan's limit refused the turn. A string, or an object keyed by it. */
+  codexErrorInfo?: unknown;
 }
 
 /** The `error` notification. With `willRetry` false, a turn/completed with status "failed" follows. */

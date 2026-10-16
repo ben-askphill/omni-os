@@ -104,6 +104,20 @@ describe('Hermes through the runner', () => {
     expect(H.texts(t.id, 'user')).toEqual(['say hi', 'and this']);
   });
 
+  it('fails a run Hermes refuses at its concurrent run cap as an error, not a usage limit stop', async () => {
+    fake.failPosts = 99;
+    try {
+      const t = await H.runner.createThread({ channel: 'repo', prompt: 'busy now', harness: 'hermes', model: 'hermes' });
+      await H.untilStatus(t.id, 'failed', 12_000);
+      expect(H.texts(t.id, 'error').join('\n')).toContain('concurrent run cap');
+      expect(H.thread(t.id)).toMatchObject({ limit_state: null, limit_resets_at: null });
+      const item = H.db.needsYou(undefined, t.id).items[0];
+      expect(item?.blockers ?? []).toEqual([]);
+    } finally {
+      fake.failPosts = 0;
+    }
+  });
+
   it('rejects an effort Hermes does not have', async () => {
     await expect(H.runner.createThread({ channel: 'scratch', prompt: 'x', harness: 'hermes', model: 'hermes', effort: 'high' })).rejects.toThrow(/effort/);
   });

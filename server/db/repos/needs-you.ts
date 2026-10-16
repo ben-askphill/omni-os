@@ -38,13 +38,18 @@ export interface NeedsYouResult {
 
 /**
  * What holds a thread up until Ben acts: `setup` (its worktree could not be prepared, `detail` says why),
- * `recovered` (messages a restart kept for Resume) or `uncertain` (a message a harness may have read before a
- * restart, sent again only when Ben says so). `count` is how many messages, for the two request kinds.
+ * `recovered` (messages a restart kept for Resume), `uncertain` (a message a harness may have read before a
+ * restart, sent again only when Ben says so) or `limited` (its harness stopped the turn at the plan's usage limit,
+ * server/runner/limits.ts). `count` is how many messages, for the two request kinds.
  */
 export interface NeedsYouBlocker {
-  kind: 'setup' | 'recovered' | 'uncertain';
+  kind: 'setup' | 'recovered' | 'uncertain' | 'limited';
   detail: string | null;
   count: number;
+  /** limited: when the harness said the limit resets. Null when it did not say, so only a manual Resume works. */
+  resets_at?: string | null;
+  /** limited: Ben scheduled the continuation for that time. Still a blocker: nothing runs until then. */
+  scheduled?: boolean;
 }
 
 export interface NeedsYouItem {
@@ -157,6 +162,11 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
     )
     .all(...args, outbox.machineId() ?? '') as unknown as (Thread & { p_state: 'recovered' | 'uncertain'; p_count: number; p_at: string })[];
 
+  // A turn stopped at a usage limit, on the Mac that ran it: only that Mac resumes it.
+  const limited = db
+    .prepare(`SELECT ${prefixed} FROM threads t WHERE ${LISTED} ${scope} AND t.limit_state IS NOT NULL AND (t.limit_machine IS NULL OR t.limit_machine = ?)`)
+    .all(...args, outbox.machineId() ?? '') as unknown as Thread[];
+
   const items = new Map<string, NeedsYouItem>();
   const item = (t: Thread, at: string) => {
     const thread = pick(t);
@@ -174,13 +184,16 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
   }
   for (const t of setup) item(t, t.updated_at).blockers.unshift({ kind: 'setup', detail: t.setup_error, count: 0 });
   for (const p of parked) item(p, p.p_at).blockers.push({ kind: p.p_state, detail: null, count: Number(p.p_count) });
+  for (const t of limited) {
+    item(t, t.updated_at).blockers.push({ kind: 'limited', detail: null, count: 0, resets_at: t.limit_resets_at, scheduled: t.limit_state === 'scheduled' });
+  }
   for (const i of items.values()) i.blockers.sort((a, b) => BLOCKER_ORDER.indexOf(a.kind) - BLOCKER_ORDER.indexOf(b.kind));
 
   const list = [...items.values()].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   return { items: list, unread: list.filter((i) => i.result).length, blocked: list.filter((i) => i.blockers.length).length };
 }
 
-const BLOCKER_ORDER: NeedsYouBlocker['kind'][] = ['setup', 'uncertain', 'recovered'];
+const BLOCKER_ORDER: NeedsYouBlocker['kind'][] = ['setup', 'uncertain', 'limited', 'recovered'];
 
 /** Just the thread's own columns, without what the queries joined to it. */
 function pick(row: Thread): Thread {

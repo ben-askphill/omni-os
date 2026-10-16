@@ -3,7 +3,7 @@
 // existing transcript renderer shows them unchanged. Most items count once complete; a few
 // that take a while show a status as they start.
 import type { Record as StreamRecord } from '../../stream.ts';
-import type { CodexItem, PlanUpdate, RateLimitWindow, RateLimits } from './protocol.ts';
+import type { CodexItem, PlanUpdate, RateLimitWindow, RateLimits, TurnError } from './protocol.ts';
 import type { Usage } from '../../stream.ts';
 
 /** Codex plan statuses mapped to the TodoWrite ones the checklist renders. */
@@ -211,6 +211,34 @@ export function turnErrorText(message: string): string {
     /* plain text */
   }
   return message;
+}
+
+/** The kind Codex gives a turn the plan's usage limit refused. */
+const USAGE_LIMIT = 'usageLimitExceeded';
+
+/**
+ * A failed turn's error, when it is the plan's usage limit: the reset time the API's body gives (`resets_at`, or
+ * `resets_in_seconds` from now), else the latest reset among the plan's windows that are full. Null when it is some
+ * other failure. A full window alone never makes a limit: only an error that says so does.
+ */
+export function codexLimit(error: TurnError | null | undefined, usage: Usage | null, now = Date.now()): { resets_at: number | null } | null {
+  if (!error) return null;
+  const info = error.codexErrorInfo;
+  let body: any = null;
+  try {
+    body = JSON.parse(error.message);
+  } catch {
+    /* plain text */
+  }
+  const inner = body?.error ?? body;
+  const limited = info === USAGE_LIMIT || (!!info && typeof info === 'object' && USAGE_LIMIT in info) || inner?.type === 'usage_limit_reached';
+  if (!limited) return null;
+  const at = Number(inner?.resets_at);
+  if (Number.isFinite(at) && at > 0) return { resets_at: Math.round(at) };
+  const inSeconds = Number(inner?.resets_in_seconds);
+  if (Number.isFinite(inSeconds) && inSeconds >= 0) return { resets_at: Math.round(now / 1000 + inSeconds) };
+  const full = [usage?.five_hour, usage?.seven_day].filter((w) => w && w.utilization >= 1 && w.resetsAt * 1000 > now).map((w) => w!.resetsAt);
+  return { resets_at: full.length ? Math.max(...full) : null };
 }
 
 /** A turn/plan/updated checklist to a TodoWrite row, which drives the transcript's live checklist. */

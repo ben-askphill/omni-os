@@ -11,7 +11,7 @@ export { db, tx } from './db/connection.ts';
 export { migrate } from './db/migrate.ts';
 export type { ChannelKind, Channel } from './db/repos/channels.ts';
 export { channels, publicChannel } from './db/repos/channels.ts';
-export type { ThreadStatus, ThreadSource, ThreadSetup, Thread } from './db/repos/threads.ts';
+export type { ThreadStatus, ThreadSource, ThreadSetup, ThreadLimit, LimitStop, Thread } from './db/repos/threads.ts';
 export { THREAD_COLUMNS, threads } from './db/repos/threads.ts';
 export type { Folder } from './db/repos/folders.ts';
 export { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, FolderError, folderName, folders } from './db/repos/folders.ts';

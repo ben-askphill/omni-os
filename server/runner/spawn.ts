@@ -35,6 +35,7 @@ export function launch(threadId: string, first: Msg): Live | undefined {
     turn: true,
     cliTurn: false,
     replayed: false,
+    limit: null,
     turnFrom: 0,
     inflight: [first],
     held: [],

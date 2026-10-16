@@ -413,6 +413,7 @@ const SOURCE_LABEL: Record<string, string> = {
   automation: 'Automation',
   capture: 'Captured',
   import: 'Imported',
+  limit: 'After the usage limit',
 };
 
 /** A message that waits for the thread's worktree (SetupCard). */

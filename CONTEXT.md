@@ -51,8 +51,16 @@ _Avoid_: Provisioning, bootstrap
 How a **Turn** ended: `done`, `failed` or `stopped`. Each one is saved with an id of its own (`completions`), whatever ended the turn: the harness, Ben's stop, a restart or a failed **Setup**. Only the Mac that ran the turn saves it; the other Mac gets that same row by sync, so a **Result** has one id on both.
 _Avoid_: Completion (in UI text), outcome
 
+**Limit stop**:
+A **Turn** its **Harness** ended because the plan's usage limit refused it, as Claude Code or Codex reports it. A full usage meter is not one, and neither is any other failure or Hermes being at its run cap. The thread fails as usual and keeps the stop, with the reset time the harness gave if it gave one, on the Mac that ran the turn. Ben resumes it now, or, with a reset time, picks Resume at reset: one **Continuation** then, never automatic. A message, Stop or archiving the thread clears it.
+_Avoid_: Rate limit (the meter), quota error
+
+**Continuation**:
+What resuming a **Limit stop** sends: Omni's "continue where you left off", saved as a **Request** keyed by the stop before the thread is woken, so it goes once, through the slots, even when it came due while Omni was down.
+_Avoid_: Retry, auto-resume
+
 **Needs you**:
-One list across every thread not archived: each thread's newest unread **Result**, and what blocks a thread until Ben acts (a failed **Setup**, `recovered` or `uncertain` **Requests**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Read state is its own (`result_reads`): it never changes a thread's status, place in the lists or folder. It syncs, and only moves forward: each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock.
+One list across every thread not archived: each thread's newest unread **Result**, and what blocks a thread until Ben acts (a failed **Setup**, `recovered` or `uncertain` **Requests**, a **Limit stop**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Read state is its own (`result_reads`): it never changes a thread's status, place in the lists or folder. It syncs, and only moves forward: each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock.
 _Avoid_: Inbox (in UI text), notifications, unread thread
 
 ### Harnesses
@@ -118,6 +126,7 @@ _Avoid_: Frontend, dashboard
 - Resume sends a **Thread**'s `recovered` **Requests** in their saved order; an `uncertain` one is never sent again on its own
 - Ben can edit, reorder or remove a **Request** while it is `waiting`, `held`, `recovered` or `uncertain`; once the runner starts sending it, a change is refused and the client keeps his edited text. Editing or reordering never resumes anything
 - A **Crew report** for a parent Ben stopped waits as `recovered` with Resume instead of starting it again; a team lead still waits for every member's report before it runs
+- A **Thread** has at most one **Limit stop**, its last turn's. Messages queued behind that turn wait as `recovered` rather than running into the same limit, so the **Continuation** never has follow-ups ahead of it
 - A **Thread** has many **Results** and at most one unread one in **Needs you**: its newest, while the thread is not running again. A delegated thread's `done` **Result** went to its parent as a **Crew report**, so only its failures and stops are listed
 - **Harness commands** work in any message a **Thread** gets, whether Ben, an **Automation** or the **Conductor** sent it; **Omni commands** only work from a thread's reply box, and anywhere else reach the harness as plain text
 

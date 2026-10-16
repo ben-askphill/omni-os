@@ -59,6 +59,10 @@ func sseData(_ text: String) -> [String] {
     "setup-retried.json": { _ = try decodeFixture(RecoveryAnswer.self, "setup-retried.json") },
     "needs-you.json": { _ = try decodeFixture(NeedsYou.self, "needs-you.json") },
     "needs-you-read.json": { _ = try decodeFixture(NeedsYouRead.self, "needs-you-read.json") },
+    "thread-limited.json": { _ = try decodeFixture(ThreadDetail.self, "thread-limited.json") },
+    "limit-scheduled.json": { _ = try decodeFixture(RecoveryAnswer.self, "limit-scheduled.json") },
+    "limit-cancelled.json": { _ = try decodeFixture(RecoveryAnswer.self, "limit-cancelled.json") },
+    "limit-resumed.json": { _ = try decodeFixture(RecoveryAnswer.self, "limit-resumed.json") },
     // Hand-made: tests/sync-setup.test.ts checks the server still sends its keys and types.
     "sync-status.json": { _ = try decodeFixture(SyncStatus.self, "sync-status.json") },
     // Request bodies the app sends. SecretsTests compares them with what the client encodes.
@@ -187,6 +191,27 @@ func sseData(_ text: String) -> [String] {
     #expect(retried.pending.map(\.requestID) == ["thread-start"])
     // A thread that needs no worktree has none.
     #expect(try decodeFixture(ThreadDetail.self, "thread.json").thread.setup == nil)
+  }
+
+  @Test func readsAThreadStoppedAtItsUsageLimit() throws {
+    let d = try decodeFixture(ThreadDetail.self, "thread-limited.json")
+    #expect(d.thread.status == .failed)
+    #expect(d.thread.limit == .limited)
+    let resets = try #require(d.thread.limitResetsAt)
+    #expect(LimitStop.view(d.thread)?.actions == [.schedule, .resume])
+    let scheduled = try decodeFixture(RecoveryAnswer.self, "limit-scheduled.json")
+    #expect(scheduled.thread.limit == .scheduled)
+    #expect(scheduled.thread.limitResetsAt == resets)
+    #expect(LimitStop.view(scheduled.thread)?.actions == [.cancel, .resume])
+    #expect(try decodeFixture(RecoveryAnswer.self, "limit-cancelled.json").thread.limit == .limited)
+    // Resume now: the stop is gone, and Omni's continuation waits for its turn.
+    let resumed = try decodeFixture(RecoveryAnswer.self, "limit-resumed.json")
+    #expect(resumed.thread.limit == nil)
+    #expect(LimitStop.view(resumed.thread) == nil)
+    #expect(resumed.pending.map(\.text) == ["Continue where you left off."])
+    #expect(resumed.pending.first?.source == "limit")
+    // A thread no limit stopped has none.
+    #expect(try decodeFixture(ThreadDetail.self, "thread.json").thread.limit == nil)
   }
 
   @Test func readsTheKindOfASavedRequest() throws {

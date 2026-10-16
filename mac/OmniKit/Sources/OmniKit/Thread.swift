@@ -52,6 +52,17 @@ public struct ThreadSetup: OpenEnum {
   public static let failed: Self = "failed"
 }
 
+/// A turn the harness stopped at the plan's usage limit (server/runner/limits.ts). Nil once anything moves the thread on.
+public struct ThreadLimit: OpenEnum {
+  public let rawValue: String
+  public init(rawValue: String) { self.rawValue = rawValue }
+
+  /// Stopped; Ben resumes it now, or at the reset time when the harness gave one.
+  public static let limited: Self = "limited"
+  /// Omni continues it once, at the reset time.
+  public static let scheduled: Self = "scheduled"
+}
+
 /// A thread row. Field names follow `Thread` in server/db.ts; named OmniThread so it never clashes with Foundation.Thread.
 public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   public let id: String
@@ -85,12 +96,18 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   public let setup: ThreadSetup?
   /// Why the worktree could not be prepared, while `setup` is failed.
   public let setupError: String?
+  /// Its last turn stopped at the usage limit. Only on the Mac that ran it. Older servers leave it out.
+  public let limit: ThreadLimit?
+  /// When the harness said that limit resets. Nil when it did not say: only Resume now is offered.
+  public let limitResetsAt: Date?
   public let createdAt: Date
   public let updatedAt: Date
 
   enum CodingKeys: String, CodingKey {
     case id, title, status, role, model, harness, effort, cwd, branch, source, automation, suggestion, archived, setup
     case setupError = "setup_error"
+    case limit = "limit_state"
+    case limitResetsAt = "limit_resets_at"
     case folderID = "folder_id"
     case nextTitle = "next_title"
     case nextPrompt = "next_prompt"
@@ -130,6 +147,8 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     folderID = try c.decodeIfPresent(String.self, forKey: .folderID)
     setup = try c.decodeIfPresent(ThreadSetup.self, forKey: .setup)
     setupError = try c.decodeIfPresent(String.self, forKey: .setupError)
+    limit = try c.decodeIfPresent(ThreadLimit.self, forKey: .limit)
+    limitResetsAt = try c.decodeIfPresent(Date.self, forKey: .limitResetsAt)
     createdAt = try c.decode(Date.self, forKey: .createdAt)
     updatedAt = try c.decode(Date.self, forKey: .updatedAt)
   }

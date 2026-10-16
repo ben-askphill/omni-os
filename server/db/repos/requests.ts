@@ -48,8 +48,11 @@ export interface MessageRequest {
   /** The text the harness gets. */
   prompt: string;
   mode: 'steer' | 'queue' | 'interrupt';
-  /** crew: a child's report. team: the go a team's lead gets once its members have reported. */
-  source: 'ben' | 'conductor' | 'crew' | 'team';
+  /**
+   * crew: a child's report. team: the go a team's lead gets once its members have reported. limit: the continuation
+   * of a turn stopped at a usage limit (server/runner/limits.ts).
+   */
+  source: 'ben' | 'conductor' | 'crew' | 'team' | 'limit';
   attachments: Attachment[] | null;
   /** The transcript row it becomes: `user`, or `crew_report` for a child's report. */
   kind: 'user' | 'crew_report';

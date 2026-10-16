@@ -56,6 +56,7 @@ extension UserMessage {
     case "automation": "Automation"
     case "capture": "Captured"
     case "import": "Imported"
+    case "limit": "After the usage limit"
     default: nil
     }
   }

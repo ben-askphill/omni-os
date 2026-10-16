@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { normalizeItem, normalizeRateLimits, normalizeStarted, turnErrorText } from '../server/harness/codex/normalize.ts';
+import { codexLimit, normalizeItem, normalizeRateLimits, normalizeStarted, turnErrorText } from '../server/harness/codex/normalize.ts';
 import type { CodexItem, RateLimits } from '../server/harness/codex/protocol.ts';
 
 // codex-basic.jsonl is one real codex-cli 0.157 turn, with ids and paths shortened.
@@ -137,5 +137,35 @@ describe('codex turn errors', () => {
   it('keeps a plain message, or JSON without one, as it is', () => {
     expect(turnErrorText('stream disconnected before completion')).toBe('stream disconnected before completion');
     expect(turnErrorText('{"status":500}')).toBe('{"status":500}');
+  });
+
+  describe('the plan limit', () => {
+    const body = (extra: Record<string, unknown> = {}) =>
+      JSON.stringify({ type: 'error', status: 429, error: { type: 'usage_limit_reached', message: "You've hit your usage limit.", ...extra } });
+    const now = 1_790_000_000_000;
+
+    it('reads the reset from the error body, absolute or from now', () => {
+      expect(codexLimit({ message: body({ resets_at: 1790328600 }), codexErrorInfo: 'usageLimitExceeded' }, null, now)).toEqual({ resets_at: 1790328600 });
+      expect(codexLimit({ message: body({ resets_in_seconds: 600 }), codexErrorInfo: 'usageLimitExceeded' }, null, now)).toEqual({ resets_at: 1_790_000_600 });
+    });
+
+    it('falls back to the full window that resets last, else no time', () => {
+      const usage = {
+        updated_at: '',
+        five_hour: { utilization: 1, resetsAt: 1_790_003_000 },
+        seven_day: { utilization: 1, resetsAt: 1_790_400_000 },
+      };
+      expect(codexLimit({ message: body(), codexErrorInfo: 'usageLimitExceeded' }, usage, now)).toEqual({ resets_at: 1_790_400_000 });
+      const notFull = { ...usage, seven_day: { utilization: 0.4, resetsAt: 1_790_400_000 } };
+      expect(codexLimit({ message: body(), codexErrorInfo: { usageLimitExceeded: {} } }, notFull, now)).toEqual({ resets_at: 1_790_003_000 });
+      expect(codexLimit({ message: body() }, null, now)).toEqual({ resets_at: null });
+    });
+
+    it('is no limit for any other failure, even with a full meter', () => {
+      const full = { updated_at: '', five_hour: { utilization: 1, resetsAt: 1_790_003_000 } };
+      expect(codexLimit({ message: 'stream disconnected before completion', codexErrorInfo: 'other' }, full, now)).toBeNull();
+      expect(codexLimit({ message: JSON.stringify({ status: 429, error: { type: 'rate_limit_exceeded', message: 'slow down' } }) }, full, now)).toBeNull();
+      expect(codexLimit(null, full, now)).toBeNull();
+    });
   });
 });

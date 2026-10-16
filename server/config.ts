@@ -37,6 +37,8 @@ export const config = {
   taskKeepAliveSeconds: Number(env.OMNI_TASK_KEEPALIVE_SECONDS ?? 4 * 3600),
   /** After an interrupt, how long the turn gets to wind down before the process is killed. */
   interruptGraceMs: Number(env.OMNI_INTERRUPT_GRACE_MS ?? 8000),
+  /** How long after a usage limit's reported reset a scheduled continuation runs, so the reset has landed. */
+  limitGraceMs: Number(env.OMNI_LIMIT_GRACE_MS ?? 60_000),
   browser: (env.OMNI_BROWSER ?? '1') !== '0',
   /** Omni runs the channel's Chrome itself, so the thread panel can show it live. Off, Playwright MCP launches its own. */
   browserLive: (env.OMNI_BROWSER_LIVE ?? '1') !== '0',

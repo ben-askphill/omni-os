@@ -2,6 +2,7 @@
 // open thread has shown. NeedsYou.swift is the Mac app's copy.
 import type { NeedsYou, NeedsYouItem } from './api.ts';
 import type { Glyph } from './components/ui.tsx';
+import { resetLabel } from './limits.ts';
 
 export interface Reason {
   glyph: Glyph;
@@ -17,6 +18,10 @@ export function reasonOf(item: NeedsYouItem): Reason {
   const preview = item.thread.last_text ? item.thread.last_text.replace(/\s+/g, ' ').trim().slice(0, 240) : null;
   const b = item.blockers[0];
   if (b?.kind === 'setup') return { glyph: 'needs', label: 'Worktree could not be prepared', detail: b.detail };
+  if (b?.kind === 'limited') {
+    const at = b.resets_at ? resetLabel(b.resets_at) : null;
+    return { glyph: 'needs', label: 'Usage limit reached', detail: at ? `${b.scheduled ? 'Resumes' : 'Resets'} at ${at}` : 'No reset time given' };
+  }
   if (b?.kind === 'uncertain') return { glyph: 'needs', label: plural(b.count, 'A message may not have been sent', '# messages may not have been sent'), detail: preview };
   if (b?.kind === 'recovered') return { glyph: 'needs', label: plural(b.count, 'A message waits for Resume', '# messages wait for Resume'), detail: preview };
   switch (item.result?.status) {

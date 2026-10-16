@@ -15,6 +15,11 @@ export type Record =
   /** One of our own stdin messages, echoed when the CLI adds it to the conversation (--replay-user-messages). */
   | { kind: 'replay'; payload: { uuid: string; text: string } }
   | { kind: 'control'; payload: { request_id: string; subtype: string; still_queued: string[] } }
+  /**
+   * The harness refused the turn at its plan's usage limit, with the reset time it gave (epoch seconds) if it gave
+   * one. Only a turn that then fails counts as stopped by it (server/runner/records.ts); a full usage meter is not one.
+   */
+  | { kind: 'limit'; payload: { resets_at: number | null } }
   /** A mod (a Claude Code plugin with JS hooks) called $.ui.log, $.ui.toast or $.ui.status. */
   | { kind: 'mod'; payload: ModUi }
   | {
@@ -155,6 +160,16 @@ export interface Parsed {
 
 const MAX_RESULT = 16_000;
 
+/** Claude Code's text when a turn hits the plan limit. Older builds end it with `|<epoch seconds>` of the reset. */
+const LIMIT_TEXT = /usage limit reached|hit your (?:usage )?limit/i;
+
+/** A limit refusal in a failed result's text, with the reset time when the text carries one. */
+export function limitInText(text: string | undefined): { resets_at: number | null } | null {
+  if (!text || !LIMIT_TEXT.test(text)) return null;
+  const epoch = Number(text.match(/\|(\d{9,11})\s*$/)?.[1]);
+  return { resets_at: Number.isFinite(epoch) && epoch > 0 ? epoch : null };
+}
+
 type Block = { type: string; text?: string; id?: string; name?: string; input?: unknown; tool_use_id?: string; content?: unknown; is_error?: boolean };
 
 function blockText(content: unknown): string {
@@ -246,6 +261,12 @@ export function parseEvent(evt: any): Parsed {
         status: info.status,
         updated_at: new Date().toISOString(),
       };
+      // Rejected: this request is over the limit, and resetsAt is when the window that refused it resets. Allowed,
+      // even at 100%, only moves the meter.
+      if (info.status === 'rejected') {
+        const at = Number(info.resetsAt);
+        out.records.push({ kind: 'limit', payload: { resets_at: Number.isFinite(at) && at > 0 ? at : null } });
+      }
       break;
     }
     case 'control_response': {
@@ -268,10 +289,13 @@ export function parseEvent(evt: any): Parsed {
         if (typeof w === 'number' && w > 0) windows[m] = w;
       }
       if (Object.keys(windows).length) out.context = { windows };
+      const ok = evt.subtype === 'success' && !evt.is_error;
+      const limit = ok ? null : limitInText(typeof evt.result === 'string' ? evt.result : undefined);
+      if (limit) out.records.push({ kind: 'limit', payload: limit });
       out.records.push({
         kind: 'result',
         payload: {
-          ok: evt.subtype === 'success' && !evt.is_error,
+          ok,
           subtype: evt.subtype ?? 'unknown',
           duration_ms: evt.duration_ms,
           turns: evt.num_turns,

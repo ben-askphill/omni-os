@@ -1,0 +1,33 @@
+{
+  "thread": {
+    "id": "00000000-0000-4000-8000-000000000017",
+    "channel_id": "acme",
+    "title": "Tidy the copy",
+    "status": "failed",
+    "role": null,
+    "model": null,
+    "harness": "claude-code",
+    "effort": "",
+    "session_id": "00000000-0000-4000-8000-000000000017",
+    "has_run": 1,
+    "cwd": "/tmp/omni-fixtures/acme",
+    "branch": null,
+    "parent_id": null,
+    "task_id": null,
+    "source": "manual",
+    "automation": null,
+    "last_text": "You've hit your limit · resets 5pm (Europe/Amsterdam)",
+    "suggestion": null,
+    "next_title": null,
+    "next_prompt": null,
+    "archived": 0,
+    "folder_id": null,
+    "setup": null,
+    "setup_error": null,
+    "limit_state": "scheduled",
+    "limit_resets_at": "2026-01-05T09:00:00.000Z",
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "updated_at": "2026-01-05T09:00:00.000Z"
+  },
+  "pending": []
+}
