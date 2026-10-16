@@ -70,7 +70,7 @@
 <h2>Findings</h2>
 
 <div class="finding">
-<h3><span class="tag p1">P1 · Confirmed bug</span>1. A timed-out session download can overwrite a newly running session</h3>
+<h3><span class="tag p1">P1 · Confirmed bug</span>1. A timed-out session download can overwrite a newly running session · <a href="https://github.com/ben-askphill/omni-os/issues/192">#192</a></h3>
 <p><strong>Evidence (baseline).</strong> <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/sync/files.ts#L313-L331"><code>server/sync/files.ts:313-331</code></a>: <code>pullSession</code> checks the local session is unchanged, awaits <code>getObject</code> at line 326, then replaces the file at line 331 without checking again. <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/sync/files.ts#L452-L462"><code>beforeResume</code> (452-462)</a> stops waiting after 15 s but does not cancel or fence the download, running or still queued behind <code>serial()</code>. <code>spawnLive</code> then starts the harness.</p>
 <p><strong>Failure.</strong> A slow download passes the unchanged check; the timeout lets the harness resume and append a turn; the download lands and replaces that file with the remote copy. Per-thread serialization orders sync jobs only; it does not lock out the harness writing the same file.</p>
 <p><strong>Reproduction.</strong> Temp home and data dirs, <code>MemoryTransport</code>. <code>pushSession</code> an initial file (<code>previous turn</code>), change the relay manifest and session body to <code>remote turn</code>, override <code>relay.getObject</code> for the session object so it writes <code>new local turn while download pending</code> locally before returning the remote body, then <code>await pullSession</code>:</p>
@@ -83,11 +83,11 @@
   <li><code>pullThreadFiles</code> re-checks the fence and that the file is still absent right before its rename.</li>
   <li>A kept local file is not recorded as synced, so the next pull keeps it too and the next push uploads it.</li>
 </ul>
-<p><strong>Traced risk, not fixed here.</strong> <code>endTurn</code> marks the thread finished before <code>turnFinished</code> uploads its files in a delayed background job, so another Mac can see a finished row while only an older session manifest exists. Cross-Mac continuation needs an explicit session revision/readiness marker published after the upload, required before resuming. Not reproduced with two Macs. Tracked separately.</p>
+<p><strong>Traced risk, not fixed here.</strong> <code>endTurn</code> marks the thread finished before <code>turnFinished</code> uploads its files in a delayed background job, so another Mac can see a finished row while only an older session manifest exists. Cross-Mac continuation needs an explicit session revision/readiness marker published after the upload, required before resuming. Not reproduced with two Macs. Tracked separately in <a href="https://github.com/ben-askphill/omni-os/issues/194">#194</a>.</p>
 </div>
 
 <div class="finding">
-<h3><span class="tag p1">P1 · Confirmed bug</span>2. File sync hashes one version and uploads another</h3>
+<h3><span class="tag p1">P1 · Confirmed bug</span>2. File sync hashes one version and uploads another · <a href="https://github.com/ben-askphill/omni-os/issues/193">#193</a></h3>
 <p><strong>Evidence (baseline).</strong> <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/sync/files.ts#L155-L164"><code>server/sync/files.ts:155-164</code></a>: <code>pushThreadFiles</code> hashes the file (155), awaits <code>hasObject</code> (157), reads the file again for <code>putObject</code> (158), then <code>remember</code> records the post-await size and mtime against the earlier hash (164). <code>pushSession</code> has the same shape.</p>
 <p><strong>Failure.</strong> A file that changes during the await is stored under the wrong content address. The receiver's hash check rejects it, and the local cache keeps the false hash against the edited file's size and mtime, so a normal retry does not repair it.</p>
 <p><strong>Reproduction.</strong> Temp <code>OMNI_DATA_DIR</code> set before the dynamic imports; <code>artifacts/report.html</code> = <code>version-one</code>; <code>MemoryTransport.hasObject</code> overridden to rewrite the file to <code>version-two-with-edit</code> and return false; <code>pushThreadFiles</code>:</p>
@@ -96,20 +96,20 @@
 </div>
 
 <div class="finding">
-<h3><span class="tag p2">P2 · Architecture debt</span>3. The runner was split into files without splitting ownership</h3>
+<h3><span class="tag p2">P2 · Architecture debt</span>3. The runner was split into files without splitting ownership · <a href="https://github.com/ben-askphill/omni-os/issues/195">#195</a></h3>
 <p><strong>Evidence.</strong> <code>Live</code> holds process startup, turn state, CLI turn state, replay tracking, queue state, interrupt acknowledgement, shutdown, browser ownership, tasks, mods and exit bookkeeping, and several modules mutate it directly. <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/runner/state.ts#L163"><code>server/runner/state.ts:163</code></a> adds mutable callback slots and <code>bindPump</code>, <code>bindReportToParent</code>, <code>bindEndTasks</code> to work around module cycles; <code>runner.ts</code> imports modules for their registration side effects. The eight runner modules total 1,631 lines.</p>
 <p><strong>Why it matters.</strong> Lifecycle invariants live in the order of mutations across queue, records, session and spawn. Startup, active and closing states are combinations of nullable fields and booleans rather than a small set of valid states.</p>
 <p><strong>Remedy.</strong> One composition root owns the live-session registry and builds a per-thread controller. Keep process lifecycle and turn lifecycle as separate explicit models (a warm process can outlive a turn). Route start, replay, result, interrupt and exit through the owner, inject scheduler and reporting effects at construction, delete the bind registry. No generic event framework. Not a claim that the current import order fails. Not implemented here.</p>
 </div>
 
 <div class="finding">
-<h3><span class="tag p2">P2 · Architecture debt</span>4. The adapter boundary is Claude-shaped and untyped</h3>
+<h3><span class="tag p2">P2 · Architecture debt</span>4. The adapter boundary is Claude-shaped and untyped · <a href="https://github.com/ben-askphill/omni-os/issues/196">#196</a></h3>
 <p><strong>Evidence.</strong> <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/harness/adapter.ts#L64"><code>server/harness/adapter.ts:64</code></a>: <code>HarnessSession.write(obj: unknown)</code> is documented as receiving Claude-shaped messages. <code>messageBody</code>/<code>userLine</code> build Claude text/image blocks, read attachments synchronously as base64, and carry the original message again in <code>_omni</code>. <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/harness/codex/adapter.ts#L75"><code>codex/adapter.ts:75</code></a> <code>omniOf</code> accepts <code>any</code> and casts the side channel back.</p>
 <p><strong>Remedy.</strong> A typed <code>send(message)</code> and <code>interrupt(requestId)</code>, or a small discriminated command union. Encoding, image reads and wire envelopes move into each adapter. Delete <code>_omni</code> and <code>omniOf</code>. Not implemented here.</p>
 </div>
 
 <div class="finding">
-<h3><span class="tag p2">P2 · Architecture debt</span>5. A local prompt edit turns a renderer limitation into a global content contract</h3>
+<h3><span class="tag p2">P2 · Architecture debt</span>5. A local prompt edit turns a renderer limitation into a global content contract · <a href="https://github.com/ben-askphill/omni-os/issues/197">#197</a></h3>
 <p><strong>Where it actually is.</strong> This edit is <em>not on <code>main</code></em> and not on <code>origin</code>. At the time of this PR it is an uncommitted change to <code>server/runner/prompts.ts</code> in the canonical local checkout (<code>/Users/benrosenberg/omni-os</code>), so the locally running server already sends it to every agent. It is not part of this PR.</p>
 <ul>
   <li>Around line 52 it replaces "Prefer a self-contained .html file for anything visual" with: write guides, reports and any document with headings, tables or code blocks as self-contained HTML, "never as Markdown: Omni's Markdown renderer has layout bugs".</li>
@@ -131,12 +131,12 @@
 <table>
   <thead><tr><th style="width:36%">Item</th><th style="width:22%">Status</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td>1. Late session download</td><td><span class="tag ok">Fixed</span></td><td>Fence, explicit outcomes, all-or-none commit</td></tr>
-    <tr><td>2. Hash/upload mismatch</td><td><span class="tag ok">Fixed</span></td><td>One snapshot per upload</td></tr>
-    <tr><td>1b. Cross-Mac readiness</td><td>Tracked</td><td>Needs a session revision protocol</td></tr>
-    <tr><td>3. Runner ownership</td><td>Tracked</td><td>Refactor, separate PR</td></tr>
-    <tr><td>4. Adapter boundary</td><td>Tracked</td><td>Refactor, separate PR</td></tr>
-    <tr><td>5. Prompt workaround</td><td>Tracked</td><td>Local only; fix renderers first</td></tr>
+    <tr><td>1. Late session download (<a href="https://github.com/ben-askphill/omni-os/issues/192">#192</a>)</td><td><span class="tag ok">Fixed</span></td><td>Fence, explicit outcomes, all-or-none commit</td></tr>
+    <tr><td>2. Hash/upload mismatch (<a href="https://github.com/ben-askphill/omni-os/issues/193">#193</a>)</td><td><span class="tag ok">Fixed</span></td><td>One snapshot per upload</td></tr>
+    <tr><td>1b. Cross-Mac readiness (<a href="https://github.com/ben-askphill/omni-os/issues/194">#194</a>)</td><td>Tracked</td><td>Needs a session revision protocol</td></tr>
+    <tr><td>3. Runner ownership (<a href="https://github.com/ben-askphill/omni-os/issues/195">#195</a>)</td><td>Tracked</td><td>Refactor, separate PR</td></tr>
+    <tr><td>4. Adapter boundary (<a href="https://github.com/ben-askphill/omni-os/issues/196">#196</a>)</td><td>Tracked</td><td>Refactor, separate PR</td></tr>
+    <tr><td>5. Prompt workaround (<a href="https://github.com/ben-askphill/omni-os/issues/197">#197</a>)</td><td>Tracked</td><td>Local only; fix renderers first</td></tr>
   </tbody>
 </table>
 
