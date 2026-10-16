@@ -66,6 +66,12 @@ private func withNewer(_ n: NeedsYou, _ title: String, uid: String) -> NeedsYou 
     #expect(noTime.reason.detail == "No reset time given")
     let notScheduled = NeedsYouItem(thread: base.thread, result: nil, blockers: [NeedsYouBlocker(kind: .limited, resetsAt: base.at)], at: base.at)
     #expect(notScheduled.reason.detail?.hasPrefix("Resets at ") == true)
+    #expect(capped.blockers.first?.elsewhere == false)
+    // The other Mac's stop, as sync leaves it here: the same reset, and where it is.
+    let otherMac = NeedsYouItem(
+      thread: base.thread, result: nil, blockers: [NeedsYouBlocker(kind: .limited, resetsAt: base.at, elsewhere: true)], at: base.at)
+    #expect(otherMac.reason.label == "Usage limit reached on your other Mac")
+    #expect(otherMac.reason.detail?.hasPrefix("Resets at ") == true)
   }
 
   @Test func scopesToAChannel() throws {

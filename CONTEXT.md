@@ -52,7 +52,7 @@ How a **Turn** ended: `done`, `failed` or `stopped`. Each one is saved with an i
 _Avoid_: Completion (in UI text), outcome
 
 **Limit stop**:
-A **Turn** its **Harness** ended because the plan's usage limit refused it, as Claude Code or Codex reports it. A full usage meter is not one, and neither is any other failure or Hermes being at its run cap. The thread fails as usual and keeps the stop, with the reset time the harness gave if it gave one, on the Mac that ran the turn. Ben resumes it now, or, with a reset time, picks Resume at reset: one **Continuation** then, never automatic. A message, Stop or archiving the thread clears it.
+A **Turn** its **Harness** ended because the plan's usage limit refused it, as Claude Code or Codex reports it. A full usage meter is not one, and neither is any other failure or Hermes being at its run cap. The thread fails as usual and keeps the stop, with the reset time the harness gave if it gave one. The stop syncs, so both Macs list it in Needs you, but only the Mac that ran the turn resumes or schedules it. Ben resumes it now, or, with a reset time, picks Resume at reset: one **Continuation** then, never automatic. A message, Stop or archiving the thread clears it.
 _Avoid_: Rate limit (the meter), quota error
 
 **Continuation**:

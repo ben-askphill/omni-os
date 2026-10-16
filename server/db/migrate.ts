@@ -213,8 +213,10 @@ export function migrate() {
   ensureColumn('threads', 'setup_error', 'TEXT');
   // A turn the harness stopped at its usage limit (server/runner/limits.ts): limited, or scheduled to resume at the
   // reset time it reported. limit_id keys the one continuation; limit_machine is the Mac that ran the turn and the
-  // only one that resumes it. Local, not synced.
+  // only one that resumes it. Synced on its own (server/sync/handlers/limit-stop.ts), never with the thread row;
+  // limit_elsewhere is 1 on a Mac that holds the other Mac's stop, so clients show it without offering to act.
   for (const col of ['limit_state', 'limit_resets_at', 'limit_id', 'limit_machine']) ensureColumn('threads', col, 'TEXT');
+  ensureColumn('threads', 'limit_elsewhere', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('channels', 'icon', 'TEXT');
   // The sidebar folder a thread sits in, null for ungrouped: every existing thread. Synced with the thread row.
   ensureColumn('threads', 'folder_id', 'TEXT REFERENCES folders(id) ON DELETE SET NULL');

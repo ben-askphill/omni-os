@@ -27,10 +27,25 @@ export interface LimitView {
   actions: LimitAction[];
 }
 
-/** What the card says for a thread's limit stop, or null when it has none. */
-export function limitView(thread: Pick<Thread, 'limit_state' | 'limit_resets_at'>, harness: string, now = Date.now()): LimitView | null {
+/**
+ * What the card says for a thread's limit stop, or null when it has none. A stop from the other Mac (sync) is only
+ * shown: that Mac ran the turn and is the one that resumes it.
+ */
+export function limitView(
+  thread: Pick<Thread, 'limit_state' | 'limit_resets_at'> & { limit_elsewhere?: number },
+  harness: string,
+  now = Date.now(),
+): LimitView | null {
   if (!thread.limit_state) return null;
   const at = thread.limit_resets_at ? resetLabel(thread.limit_resets_at, now) : null;
+  if (thread.limit_elsewhere) {
+    const when = thread.limit_state === 'scheduled' && at ? `It resumes there at ${at}.` : at ? `It resets at ${at}.` : 'It did not say when it resets.';
+    return {
+      title: thread.limit_state === 'scheduled' && at ? `Resumes at ${at} on your other Mac` : 'Usage limit reached on your other Mac',
+      body: `${harness} stopped this turn at your plan's limit on your other Mac. ${when} Resume it there.`,
+      actions: [],
+    };
+  }
   if (thread.limit_state === 'scheduled' && at) {
     return {
       title: `Resumes at ${at}`,

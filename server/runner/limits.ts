@@ -1,8 +1,8 @@
 // Limit stops: a turn the harness ended at its plan's usage limit (records.ts keeps it on the thread, with the reset
 // time the harness gave), and the one continuation Ben can send for it, now or at that reset. Scheduling is his
-// choice per stopped turn, never automatic. The stop lives on the Mac that ran the turn and only that Mac sends its
-// continuation, saved as a Request before it is woken (queue.ts), so it goes through the slots like any message and
-// a restart can never send it twice. Anything that moves the thread on clears the stop: a message (queue.ts deliver),
+// choice per stopped turn, never automatic. The stop syncs to every Mac (server/sync/handlers/limit-stop.ts), so
+// each lists it, but only the Mac that ran the turn schedules or sends its continuation, saved as a Request before
+// it is woken (queue.ts), so it goes through the slots like any message and a restart can never send it twice. Anything that moves the thread on clears the stop: a message (queue.ts deliver),
 // Stop (session.ts) or archiving it.
 import { config } from '../config.ts';
 import { outbox, threads, tx, type Thread } from '../db.ts';
@@ -71,7 +71,8 @@ export function scheduleLimitResume(threadId: string): Thread {
 
 /** Ben no longer wants it resumed at the reset: back to limited, for him to schedule again or resume by hand. */
 export function cancelLimitResume(threadId: string): Thread {
-  thread(threadId);
+  const t = thread(threadId);
+  if (threads.limit(threadId)) ownStop(t);
   if (threads.moveLimit(threadId, 'scheduled', 'limited')) emitThread(threadId);
   armLimits();
   return threads.get(threadId)!;

@@ -47,7 +47,7 @@ describe('sync backfill', () => {
 
     const seen: string[] = [];
     const report = backfill.backfill({ onProgress: (r) => seen.push(r.entity) });
-    expect(seen).toEqual(['channel', 'folder', 'thread', 'event', 'artifact', 'automation_run', 'completion', 'result_read', 'kv']);
+    expect(seen).toEqual(['channel', 'folder', 'thread', 'event', 'artifact', 'automation_run', 'completion', 'result_read', 'limit_stop', 'kv']);
     const by = Object.fromEntries(report.map((r) => [r.entity, r]));
     expect(by.channel).toMatchObject({ queued: 3, alreadyQueued: 0, elsewhere: 0 });
     expect(by.thread).toMatchObject({ queued: 1, elsewhere: 1 });

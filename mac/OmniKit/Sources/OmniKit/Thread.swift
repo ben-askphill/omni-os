@@ -96,10 +96,12 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   public let setup: ThreadSetup?
   /// Why the worktree could not be prepared, while `setup` is failed.
   public let setupError: String?
-  /// Its last turn stopped at the usage limit. Only on the Mac that ran it. Older servers leave it out.
+  /// Its last turn stopped at the usage limit, on either Mac (it syncs). Older servers leave it out.
   public let limit: ThreadLimit?
   /// When the harness said that limit resets. Nil when it did not say: only Resume now is offered.
   public let limitResetsAt: Date?
+  /// The stop is the other Mac's: shown here, resumed or scheduled there.
+  public let limitElsewhere: Bool
   public let createdAt: Date
   public let updatedAt: Date
 
@@ -108,6 +110,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     case setupError = "setup_error"
     case limit = "limit_state"
     case limitResetsAt = "limit_resets_at"
+    case limitElsewhere = "limit_elsewhere"
     case folderID = "folder_id"
     case nextTitle = "next_title"
     case nextPrompt = "next_prompt"
@@ -149,6 +152,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     setupError = try c.decodeIfPresent(String.self, forKey: .setupError)
     limit = try c.decodeIfPresent(ThreadLimit.self, forKey: .limit)
     limitResetsAt = try c.decodeIfPresent(Date.self, forKey: .limitResetsAt)
+    limitElsewhere = (try? c.decodeFlag(.limitElsewhere)) ?? false
     createdAt = try c.decode(Date.self, forKey: .createdAt)
     updatedAt = try c.decode(Date.self, forKey: .updatedAt)
   }

@@ -50,6 +50,8 @@ export interface NeedsYouBlocker {
   resets_at?: string | null;
   /** limited: Ben scheduled the continuation for that time. Still a blocker: nothing runs until then. */
   scheduled?: boolean;
+  /** limited: the turn stopped on the other Mac, which is the one that resumes it. */
+  elsewhere?: boolean;
 }
 
 export interface NeedsYouItem {
@@ -162,10 +164,10 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
     )
     .all(...args, outbox.machineId() ?? '') as unknown as (Thread & { p_state: 'recovered' | 'uncertain'; p_count: number; p_at: string })[];
 
-  // A turn stopped at a usage limit, on the Mac that ran it: only that Mac resumes it.
+  // A turn stopped at a usage limit, on either Mac (the stop syncs): only the Mac that ran it resumes it.
   const limited = db
-    .prepare(`SELECT ${prefixed} FROM threads t WHERE ${LISTED} ${scope} AND t.limit_state IS NOT NULL AND (t.limit_machine IS NULL OR t.limit_machine = ?)`)
-    .all(...args, outbox.machineId() ?? '') as unknown as Thread[];
+    .prepare(`SELECT ${prefixed} FROM threads t WHERE ${LISTED} ${scope} AND t.limit_state IS NOT NULL`)
+    .all(...args) as unknown as Thread[];
 
   const items = new Map<string, NeedsYouItem>();
   const item = (t: Thread, at: string) => {
@@ -185,7 +187,9 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
   for (const t of setup) item(t, t.updated_at).blockers.unshift({ kind: 'setup', detail: t.setup_error, count: 0 });
   for (const p of parked) item(p, p.p_at).blockers.push({ kind: p.p_state, detail: null, count: Number(p.p_count) });
   for (const t of limited) {
-    item(t, t.updated_at).blockers.push({ kind: 'limited', detail: null, count: 0, resets_at: t.limit_resets_at, scheduled: t.limit_state === 'scheduled' });
+    item(t, t.updated_at).blockers.push({
+      kind: 'limited', detail: null, count: 0, resets_at: t.limit_resets_at, scheduled: t.limit_state === 'scheduled', elsewhere: !!t.limit_elsewhere,
+    });
   }
   for (const i of items.values()) i.blockers.sort((a, b) => BLOCKER_ORDER.indexOf(a.kind) - BLOCKER_ORDER.indexOf(b.kind));
 

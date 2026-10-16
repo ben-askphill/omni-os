@@ -11,7 +11,7 @@
     "session_id": "00000000-0000-4000-8000-000000000015",
     "has_run": 0,
     "cwd": "/tmp/omni-fixtures/data/worktrees/00000000-0000-4000-8000-000000000015",
-    "branch": "omni/46ddcbbd",
+    "branch": "omni/6529b87a",
     "parent_id": null,
     "task_id": null,
     "source": "manual",
@@ -26,6 +26,7 @@
     "setup_error": "git worktree add failed: fatal: invalid reference: HEAD",
     "limit_state": null,
     "limit_resets_at": null,
+    "limit_elsewhere": 0,
     "created_at": "2026-01-05T09:00:00.000Z",
     "updated_at": "2026-01-05T09:00:00.000Z"
   },

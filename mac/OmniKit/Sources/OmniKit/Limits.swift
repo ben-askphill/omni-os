@@ -55,12 +55,26 @@ public enum LimitStop {
 
   /// What the card says for a thread's limit stop, or nil when it has none.
   public static func view(_ thread: OmniThread, now: Date = .now, calendar: Calendar = Format.localCalendar) -> View? {
-    view(limit: thread.limit, resetsAt: thread.limitResetsAt, harness: ThreadDetails.harnessName(thread.harness), now: now, calendar: calendar)
+    view(
+      limit: thread.limit, resetsAt: thread.limitResetsAt, elsewhere: thread.limitElsewhere,
+      harness: ThreadDetails.harnessName(thread.harness), now: now, calendar: calendar)
   }
 
-  public static func view(limit: ThreadLimit?, resetsAt: Date?, harness: String, now: Date = .now, calendar: Calendar = Format.localCalendar) -> View? {
+  /// `elsewhere`: the other Mac's stop (sync). It is only shown here: that Mac ran the turn and resumes it.
+  public static func view(
+    limit: ThreadLimit?, resetsAt: Date?, elsewhere: Bool = false, harness: String, now: Date = .now,
+    calendar: Calendar = Format.localCalendar
+  ) -> View? {
     guard let limit else { return nil }
     let at = resetsAt.map { resetLabel($0, now: now, calendar: calendar) }
+    if elsewhere {
+      let scheduledAt = limit == .scheduled ? at : nil
+      let when = scheduledAt.map { "It resumes there at \($0)." } ?? at.map { "It resets at \($0)." } ?? "It did not say when it resets."
+      return View(
+        title: scheduledAt.map { "Resumes at \($0) on your other Mac" } ?? "Usage limit reached on your other Mac",
+        body: "\(harness) stopped this turn at your plan's limit on your other Mac. \(when) Resume it there.",
+        actions: [])
+    }
     if limit == .scheduled, let at {
       return View(
         title: "Resumes at \(at)",

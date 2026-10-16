@@ -42,10 +42,15 @@ export interface Thread {
   setup: ThreadSetup | null;
   /** Why the worktree could not be prepared, while setup is `failed`. */
   setup_error: string | null;
-  /** Its last turn stopped at the harness's usage limit (server/runner/limits.ts). Null once anything moves it on. Local only, not synced. */
+  /**
+   * Its last turn stopped at the harness's usage limit (server/runner/limits.ts). Null once anything moves it on.
+   * Synced to every Mac, so each lists it in Needs you; only the Mac that ran the turn resumes it.
+   */
   limit_state: ThreadLimit | null;
   /** When the harness said that limit resets, if it said. Without it, only a manual Resume is offered. */
   limit_resets_at: string | null;
+  /** 1 when the stop is the other Mac's: it shows here, and is resumed or scheduled there. */
+  limit_elsewhere: number;
   created_at: string;
   updated_at: string;
 }
@@ -62,7 +67,7 @@ export interface LimitStop {
 
 /** The columns clients read, without sync's run_machine or the limit stop's id and owner. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, setup, setup_error, limit_state, limit_resets_at, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, setup, setup_error, limit_state, limit_resets_at, limit_elsewhere, created_at, updated_at';
 
 /** Who runs a thread with this status: this machine while it is running or queued here and sync is set up, else nobody. */
 const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? outbox.machineId() : null);
@@ -115,7 +120,7 @@ export const threads = {
   create(
     t: Omit<
       Thread,
-      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'archived' | 'folder_id' | 'setup' | 'setup_error' | 'limit_state' | 'limit_resets_at'
+      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'archived' | 'folder_id' | 'setup' | 'setup_error' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere'
     > & {
       has_run?: number; created_at?: string; harness?: string; effort?: string; folder_id?: string | null; setup?: ThreadSetup | null;
     },
@@ -170,23 +175,33 @@ export const threads = {
       | undefined;
   },
   /**
-   * Record a limit stop, or move one on. Like the suggestion it is not a change to the thread: updated_at stays and
-   * sync never hears of it, so it stays on the Mac that ran the turn. True when it changed.
+   * Record a limit stop, or clear one. Like the suggestion it is not a change to the thread: updated_at stays and the
+   * thread row does not sync for it. The stop goes to the other Mac on its own (limit_stop), so both list it.
+   * True when it changed.
    */
   setLimit(id: string, l: { state: ThreadLimit; resets_at: string | null; id: string; machine: string | null } | null) {
-    return (
-      db
-        .prepare('UPDATE threads SET limit_state = ?, limit_resets_at = ?, limit_id = ?, limit_machine = ? WHERE id = ?')
-        .run(l?.state ?? null, l?.resets_at ?? null, l?.id ?? null, l?.machine ?? null, id).changes > 0
-    );
+    return tx(() => {
+      const changed =
+        db
+          .prepare(
+            `UPDATE threads SET limit_state = ?, limit_resets_at = ?, limit_id = ?, limit_machine = ?, limit_elsewhere = 0
+             WHERE id = ? AND (? IS NOT NULL OR limit_state IS NOT NULL)`,
+          )
+          .run(l?.state ?? null, l?.resets_at ?? null, l?.id ?? null, l?.machine ?? null, id, l?.state ?? null).changes > 0;
+      if (changed) record('limit_stop', id, l ? 'upsert' : 'delete');
+      return changed;
+    });
   },
   /** Move a limit stop from one state to another, only if it is still in `from` and this Mac's. False otherwise. */
   moveLimit(id: string, from: ThreadLimit, to: ThreadLimit) {
-    return (
-      db
-        .prepare('UPDATE threads SET limit_state = ? WHERE id = ? AND limit_state = ? AND (limit_machine IS NULL OR limit_machine = ?)')
-        .run(to, id, from, outbox.machineId() ?? '').changes > 0
-    );
+    return tx(() => {
+      const moved =
+        db
+          .prepare('UPDATE threads SET limit_state = ? WHERE id = ? AND limit_state = ? AND (limit_machine IS NULL OR limit_machine = ?)')
+          .run(to, id, from, outbox.machineId() ?? '').changes > 0;
+      if (moved) record('limit_stop', id);
+      return moved;
+    });
   },
   /**
    * Take the limit stop away, to send its continuation: the row says so before anything is sent, so two callers (a

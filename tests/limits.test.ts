@@ -46,7 +46,7 @@ describe('what counts as a limit stop', () => {
     const t = await limited(`LIMIT:${RESET} write the report`);
     expect(H.thread(t.id)).toMatchObject({ status: 'failed', limit_state: 'limited', limit_resets_at: iso(RESET) });
     expect(H.texts(t.id, 'assistant_text').at(-1)).toContain("You've hit your limit");
-    expect(blockers(t.id)).toEqual([{ kind: 'limited', detail: null, count: 0, resets_at: iso(RESET), scheduled: false }]);
+    expect(blockers(t.id)).toEqual([{ kind: 'limited', detail: null, count: 0, resets_at: iso(RESET), scheduled: false, elsewhere: false }]);
     // The result is still listed, behind the blocker.
     expect(H.db.needsYou(undefined, t.id).items[0].result?.status).toBe('failed');
   });
@@ -90,7 +90,7 @@ describe('the continuation', () => {
     // Scheduling twice is one continuation.
     H.runner.scheduleLimitResume(t.id);
     expect(H.thread(t.id).limit_state).toBe('scheduled');
-    expect(blockers(t.id)).toEqual([{ kind: 'limited', detail: null, count: 0, resets_at: iso(RESET), scheduled: true }]);
+    expect(blockers(t.id)).toEqual([{ kind: 'limited', detail: null, count: 0, resets_at: iso(RESET), scheduled: true, elsewhere: false }]);
 
     H.runner.limitClock.now = () => RESET * 1000 - 1;
     expect(H.runner.fireDue()).toEqual([]);
@@ -159,14 +159,17 @@ describe('the continuation', () => {
 
   it('is only this Mac’s to send', async () => {
     const t = await limited(`LIMIT:${RESET} other mac`);
-    H.db.db.prepare('UPDATE threads SET limit_machine = ? WHERE id = ?').run('other-mac', t.id);
+    // As sync leaves the other Mac's stop here (server/sync/handlers/limit-stop.ts).
+    H.db.db.prepare('UPDATE threads SET limit_machine = ?, limit_elsewhere = 1 WHERE id = ?').run('other-mac', t.id);
     expect(refused(() => H.runner.scheduleLimitResume(t.id))).toMatchObject({ status: 409, message: expect.stringMatching(/other Mac/) });
     expect(refused(() => H.runner.resumeLimitNow(t.id)).status).toBe(409);
     H.db.db.prepare(`UPDATE threads SET limit_state = 'scheduled' WHERE id = ?`).run(t.id);
+    expect(refused(() => H.runner.cancelLimitResume(t.id)).status).toBe(409);
     H.runner.limitClock.now = () => RESET * 1000 + 5_000;
     expect(H.runner.fireDue()).not.toContain(t.id);
-    expect(blockers(t.id).some((b) => b.kind === 'limited')).toBe(false);
-    H.db.db.prepare('UPDATE threads SET limit_state = NULL, limit_machine = NULL WHERE id = ?').run(t.id);
+    // Listed here too, as the other Mac's: Needs you shows the reset, that Mac resumes it.
+    expect(blockers(t.id).find((b) => b.kind === 'limited')).toMatchObject({ scheduled: true, elsewhere: true, resets_at: iso(RESET) });
+    H.db.db.prepare('UPDATE threads SET limit_state = NULL, limit_machine = NULL, limit_elsewhere = 0 WHERE id = ?').run(t.id);
   });
 });
 

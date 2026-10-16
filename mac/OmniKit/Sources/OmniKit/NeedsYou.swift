@@ -49,18 +49,21 @@ public struct NeedsYouBlocker: Decodable, Hashable, Sendable {
   public let resetsAt: Date?
   /// Limited: Ben scheduled the continuation for that time.
   public let scheduled: Bool
+  /// Limited: the turn stopped on the other Mac, which is the one that resumes it.
+  public let elsewhere: Bool
 
   enum CodingKeys: String, CodingKey {
-    case kind, detail, count, scheduled
+    case kind, detail, count, scheduled, elsewhere
     case resetsAt = "resets_at"
   }
 
-  public init(kind: Kind, detail: String? = nil, count: Int = 0, resetsAt: Date? = nil, scheduled: Bool = false) {
+  public init(kind: Kind, detail: String? = nil, count: Int = 0, resetsAt: Date? = nil, scheduled: Bool = false, elsewhere: Bool = false) {
     self.kind = kind
     self.detail = detail
     self.count = count
     self.resetsAt = resetsAt
     self.scheduled = scheduled
+    self.elsewhere = elsewhere
   }
 
   public init(from decoder: any Decoder) throws {
@@ -70,6 +73,7 @@ public struct NeedsYouBlocker: Decodable, Hashable, Sendable {
     count = try c.decodeIfPresent(Int.self, forKey: .count) ?? 0
     resetsAt = try c.decodeIfPresent(Date.self, forKey: .resetsAt)
     scheduled = try c.decodeIfPresent(Bool.self, forKey: .scheduled) ?? false
+    elsewhere = try c.decodeIfPresent(Bool.self, forKey: .elsewhere) ?? false
   }
 }
 
@@ -107,7 +111,7 @@ public struct NeedsYouItem: Decodable, Hashable, Sendable, Identifiable {
       case .recovered: return (.needs, many(b.count, "A message waits for Resume", "# messages wait for Resume"), preview)
       case .limited:
         let at = b.resetsAt.map { LimitStop.resetLabel($0) }
-        return (.needs, "Usage limit reached", at.map { "\(b.scheduled ? "Resumes" : "Resets") at \($0)" } ?? "No reset time given")
+        return (.needs, b.elsewhere ? "Usage limit reached on your other Mac" : "Usage limit reached", at.map { "\(b.scheduled ? "Resumes" : "Resets") at \($0)" } ?? "No reset time given")
       default: break
       }
     }

@@ -7,3 +7,4 @@ import './artifact.ts';
 import './automation-run.ts';
 import './kv.ts';
 import './needs-you.ts';
+import './limit-stop.ts';

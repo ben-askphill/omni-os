@@ -85,7 +85,7 @@ export const backoffMs = (failures: number, base = 5_000, max = 15 * 60_000) =>
   Math.min(max, base * 2 ** Math.max(0, failures - 1));
 
 /** Entities a relay set up by an older 0001_changes.sql may refuse, newest first. The rest it always took. */
-const NEWER: readonly SyncEntity[] = ['result_read', 'completion', 'folder'];
+const NEWER: readonly SyncEntity[] = ['limit_stop', 'result_read', 'completion', 'folder'];
 
 /**
  * One change per row in the batch, in the order each first appears. Repeat writes to a row become one change

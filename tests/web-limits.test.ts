@@ -35,6 +35,11 @@ describe('limit stop answers', () => {
     expect(reasonOf(item)).toMatchObject({ glyph: 'needs', label: 'Usage limit reached', detail: expect.stringMatching(/^Resumes at /) });
     expect(reasonOf({ ...item, blockers: [{ kind: 'limited', detail: null, count: 0, resets_at: at(17), scheduled: false }] }).detail).toMatch(/^Resets at /);
     expect(reasonOf({ ...item, blockers: [{ kind: 'limited', detail: null, count: 0, resets_at: null, scheduled: false }] }).detail).toBe('No reset time given');
+    // The other Mac's stop (sync): the same reset, and where it is.
+    expect(reasonOf({ ...item, blockers: [{ kind: 'limited', detail: null, count: 0, resets_at: at(17), scheduled: false, elsewhere: true }] })).toMatchObject({
+      label: 'Usage limit reached on your other Mac',
+      detail: expect.stringMatching(/^Resets at /),
+    });
   });
 });
 
@@ -51,6 +56,19 @@ describe('the card', () => {
       actions: ['cancel', 'resume'],
     });
     expect(limitView({ limit_state: null, limit_resets_at: null }, 'Codex', NOW)).toBeNull();
+  });
+
+  it("shows the other Mac's stop with its reset time and nothing to press", () => {
+    expect(limitView({ limit_state: 'limited', limit_resets_at: at(17), limit_elsewhere: 1 }, 'Claude Code', NOW)).toEqual({
+      title: 'Usage limit reached on your other Mac',
+      body: "Claude Code stopped this turn at your plan's limit on your other Mac. It resets at 17:00. Resume it there.",
+      actions: [],
+    });
+    expect(limitView({ limit_state: 'scheduled', limit_resets_at: at(9, 30, 1), limit_elsewhere: 1 }, 'Codex', NOW)).toMatchObject({
+      title: 'Resumes at tomorrow 09:30 on your other Mac',
+      actions: [],
+    });
+    expect(limitView({ limit_state: 'limited', limit_resets_at: null, limit_elsewhere: 1 }, 'Codex', NOW)?.body).toContain('did not say when it resets');
   });
 
   it('names the reset by time today, tomorrow, or the weekday', () => {

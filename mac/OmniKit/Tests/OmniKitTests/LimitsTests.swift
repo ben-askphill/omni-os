@@ -30,6 +30,17 @@ private func at(_ h: Int, _ m: Int = 0, days: Int = 0) -> Date {
     #expect(LimitStop.view(limit: nil, resetsAt: at(17), harness: "Codex", now: now, calendar: amsterdam) == nil)
   }
 
+  @Test func showsTheOtherMacsStopWithNothingToPress() {
+    let limited = LimitStop.view(limit: .limited, resetsAt: at(17), elsewhere: true, harness: "Claude Code", now: now, calendar: amsterdam)
+    #expect(limited == LimitStop.View(
+      title: "Usage limit reached on your other Mac",
+      body: "Claude Code stopped this turn at your plan's limit on your other Mac. It resets at 17:00. Resume it there.",
+      actions: []))
+    let scheduled = LimitStop.view(limit: .scheduled, resetsAt: at(9, 30, days: 1), elsewhere: true, harness: "Codex", now: now, calendar: amsterdam)
+    #expect(scheduled?.title == "Resumes at tomorrow 09:30 on your other Mac")
+    #expect(scheduled?.actions == [])
+  }
+
   @Test func namesTheResetByTimeTomorrowOrWeekday() {
     #expect(LimitStop.resetLabel(at(17, 5), now: now, calendar: amsterdam) == "17:05")
     #expect(LimitStop.resetLabel(at(8, days: 1), now: now, calendar: amsterdam) == "tomorrow 08:00")
