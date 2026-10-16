@@ -5,6 +5,7 @@ import { publishThread } from '../bus.ts';
 import { clearSuggestion } from './aux.ts';
 import { hardKill, requestInterrupt, stopStartup } from './session.ts';
 import { launch } from './spawn.ts';
+import { startTurnSnapshot } from './snapshots.ts';
 import {
   addEvent,
   bindPump,
@@ -112,6 +113,7 @@ function begin(threadId: string, [first, ...rest]: Msg[]) {
     clearTimeout(warm.idleTimer);
     warm.turn = true;
     threads.update(threadId, { status: 'running' });
+    startTurnSnapshot(warm);
     send(warm, first);
   } else if (!launch(threadId, first)) return;
   for (const m of rest) deliver(threadId, m);

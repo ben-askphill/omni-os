@@ -6,6 +6,7 @@ import { events, threads, type ThreadStatus } from '../db.ts';
 import { detachThread } from '../browser.ts';
 import { turnFinished } from '../sync/files.ts';
 import { suggestNextThread, suggestReply } from './aux.ts';
+import { finishTurnSnapshot, settleSnapshots } from './snapshots.ts';
 import {
   alive,
   browserHolder,
@@ -118,6 +119,7 @@ export function abortStart(live: Live, status: ThreadStatus) {
   drop(live.threadId, [...live.inflight, ...live.held]);
   teardown(live);
   threads.update(live.threadId, { status });
+  finishTurnSnapshot(live);
   emitThread(live.threadId);
   pump();
 }
@@ -133,6 +135,8 @@ export function endTurn(live: Live, status: ThreadStatus) {
     has_run: 1,
     last_text: runText ? runText.slice(0, 600) : threads.get(id)?.last_text ?? null,
   });
+  // Shown done at once; the checkout after the turn is saved behind it.
+  finishTurnSnapshot(live);
   emitThread(id);
   // Even while Omni shuts down: the report is saved and parked for Resume (queue.ts), not lost.
   if (t?.parent_id) reportToParent(id, status, runText);
@@ -233,6 +237,8 @@ export async function shutdownAll() {
       void live.exited.then(() => (clearTimeout(term), clearTimeout(kill)));
     }
     await Promise.all(all.map((l) => l.exited));
+    // The turns those processes ended are saved before the database closes.
+    await settleSnapshots();
   } finally {
     setShuttingDown(false);
   }

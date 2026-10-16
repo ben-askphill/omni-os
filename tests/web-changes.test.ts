@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import type { BranchChanges } from '../web/src/api.ts';
-import { baseLabel, changesView, shortSha } from '../web/src/changes.ts';
+import type { BranchChanges, TurnChanges, TurnView } from '../web/src/api.ts';
+import { baseLabel, changesView, headMove, shortSha, turnChangesView, turnStateNote, turnTitle } from '../web/src/changes.ts';
 import { parseDiff, startsOpen } from '../web/src/diff.ts';
 
 // The Web UI's Changes panel model (web/src/changes.ts, web/src/diff.ts) on the recorded server answers the Mac app's
@@ -58,5 +58,29 @@ describe('changes panel', () => {
     expect(startsOpen({ ...f, add: 200, del: 0 }, 13)).toBe(false);
     expect(startsOpen({ ...f, add: 199, del: 0 }, 13)).toBe(true);
     expect(startsOpen({ ...f, add: 900 }, 12)).toBe(true);
+  });
+
+  it("shows a saved turn's files, the turns to pick from, and HEAD moving during it", () => {
+    const answer = fixture<TurnChanges>('turns.json');
+    const view = turnChangesView(answer)!;
+    expect(answer.turns.map(turnTitle)).toEqual(['Turn 2', 'Turn 1']);
+    expect(view.turn.id).toBe(answer.turns[0].id);
+    expect(view.groups.map((g) => [g.title, g.files.map((f) => [f.file.status, f.label])])).toEqual([
+      ['Changed in this turn', [['modified', 'src/cart.ts'], ['added', 'todo.md']]],
+    ]);
+    expect([view.files, view.additions, view.deletions]).toEqual([2, 2, 0]);
+    expect(turnStateNote(view.turn)).toBeNull();
+    expect(headMove(view.turn)).toBe('ccccccc → ccccccc');
+    expect(headMove(answer.turns[1])).toBe('ccccccc → ccccccc');
+  });
+
+  it('says why a turn has no files yet, or none can be saved', () => {
+    const turn = fixture<TurnChanges>('turns.json').turns[0];
+    const as = (state: TurnView['state'], error: string | null = null) => turnStateNote({ ...turn, state, error });
+    expect(as('running')).toBe('This turn is still running. Its changes show once it ends.');
+    expect(as('capturing')).toBe('Saving the worktree after this turn.');
+    expect(as('failed', 'Could not save the checkout after this turn: boom')).toBe('Could not save the checkout after this turn: boom');
+    expect(headMove({ ...turn, after: { ...turn.after!, head: turn.before!.head } })).toBeNull();
+    expect(turnChangesView(fixture<TurnChanges>('turns-unavailable.json'))).toBeNull();
   });
 });

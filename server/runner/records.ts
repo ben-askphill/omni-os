@@ -6,6 +6,7 @@ import { onToolResult } from '../published.ts';
 import { turnFinished } from '../sync/files.ts';
 import { type ModUi, type Record as StreamRecord, type TaskUpdate } from '../stream.ts';
 import { armIdle, clearInterrupt, endTurn, teardown } from './session.ts';
+import { finishTurnSnapshot, startTurnSnapshot } from './snapshots.ts';
 import {
   activeTasks,
   addEvent,
@@ -231,6 +232,8 @@ export function openTurn(live: Live) {
   live.turn = true;
   clearTimeout(live.idleTimer);
   threads.update(live.threadId, { status: 'running' });
+  // Already under way, so nothing waits for this one: its before snapshot may hold the turn's first edits.
+  startTurnSnapshot(live);
   emitThread(live.threadId);
 }
 
@@ -261,6 +264,8 @@ export function onExit(live: Live, code: number | null, signal: NodeJS.Signals |
   } else if (thread && live.resultSeen && !thread.has_run) {
     threads.update(id, { has_run: 1, updated_at: thread.updated_at });
   }
+  // After the status write, so the turn's Result is there to link.
+  finishTurnSnapshot(live);
   if (thread && (wasTurn || live.resultSeen)) void turnFinished(id);
   emitThread(id);
   pump();

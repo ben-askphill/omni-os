@@ -577,3 +577,9 @@ Wired (both composers):
 - OmniKit: `Changes.swift` (`BranchChanges`, `ChangesView`, `OmniClient.changes(forThread:)`); `DiffParser.swift` now numbers lines (`DiffLine`, `FileDiff.rows`), the same model as `web/src/diff.ts`. `DiffFileView` in `DiffView.swift` draws one file for the PR page and the Changes tab (label, status badge, notice). Fixtures `changes.json`, `changes-unavailable.json`.
 - The inspector's tabs scroll sideways when the panel is too narrow for all five.
 - QA step: `{"inspector": "changes"}`.
+
+## This turn (#208)
+
+- The Changes tab has two views: Since base (#207) and This turn. This turn reads GET /api/threads/:id/turns (`server/turns.ts`): a worktree thread's saved turns, newest first, and one turn's diff between the snapshots Omni saved before and after it (hidden refs `refs/omni/turns/<thread>/<turn>/before|after`, rows in the local `turn_snapshots` table). A picker chooses the turn; the header shows HEAD moving during it and says the diff is a before/after snapshot (commits and pulls included, ignored files not saved). A turn still saving polls every 1.5s; a failed save shows its reason, never a failed Result.
+- OmniKit: `TurnChanges`, `TurnView`, `TurnSide`, `TurnState`, `TurnChangesView`, `OmniClient.turns(forThread:turn:)` in `Changes.swift`. Fixtures `turns.json`, `turns-unavailable.json`.
+- QA step: `{"inspector": "turn"}` opens the Changes tab on This turn.

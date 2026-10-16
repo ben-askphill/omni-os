@@ -152,7 +152,8 @@ export interface PRDetail extends PRSummary {
 }
 
 /** GET /api/threads/:id/changes (server/changes.ts): a thread's branch changes since its base commit, before any PR. */
-export type ChangeKind = 'committed' | 'staged' | 'unstaged' | 'untracked';
+/** `turn`: what one turn changed, between its saved before and after snapshots. */
+export type ChangeKind = 'committed' | 'staged' | 'unstaged' | 'untracked' | 'turn';
 export type ChangeStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed' | 'unmerged';
 /** Why a file's diff text was left out. */
 export type DiffOmitted = 'binary' | 'too_large' | 'limit' | 'symlink' | 'unavailable';
@@ -184,6 +185,39 @@ export interface ChangeBase {
 export type BranchChanges =
   | { available: false; reason: string }
   | { available: true; cwd: string; branch: string | null; head: string; base: ChangeBase; groups: ChangeGroup[] };
+
+/** GET /api/threads/:id/turns (server/turns.ts): a worktree thread's saved turns, and what one of them changed. */
+export type TurnState = 'running' | 'capturing' | 'ready' | 'failed';
+/** One side of a turn: a snapshot commit under a hidden ref, and HEAD when it was taken. */
+export interface TurnSide {
+  sha: string;
+  ref: string;
+  head: string;
+}
+export interface TurnView {
+  id: string;
+  n: number;
+  /** running: under way. capturing: ended, its after snapshot being saved. failed: `error` says why. */
+  state: TurnState;
+  error: string | null;
+  before: TurnSide | null;
+  after: TurnSide | null;
+  /** The Result the turn ended with, as in Needs you. */
+  completion_uid: string | null;
+  started_at: string;
+  ended_at: string | null;
+}
+export interface TurnChanges {
+  /** False when this thread's turns are not saved here; `reason` says why. */
+  available: boolean;
+  reason: string | null;
+  /** Newest first. */
+  turns: TurnView[];
+  /** The turn shown: the one asked for, else the newest. */
+  turn: TurnView | null;
+  /** Its files once both snapshots are saved: one `turn` group. */
+  groups: ChangeGroup[];
+}
 
 export interface AutomationRun {
   thread_id: string | null;

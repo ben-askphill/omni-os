@@ -59,4 +59,35 @@ import OmniKit
     #expect(!changes.available)
     #expect(t.requests.first?.url?.absoluteString == "http://127.0.0.1:4799/api/threads/a%20b/changes")
   }
+
+  @Test func showsASavedTurn() throws {
+    let changes = try decodeFixture(TurnChanges.self, "turns.json")
+    #expect(changes.turns.map(\.title) == ["Turn 2", "Turn 1"])
+    let view = try #require(TurnChangesView(changes))
+    #expect(view.turn.id == changes.turns[0].id)
+    #expect(view.turn.state == .ready && view.turn.stateNote == nil)
+    #expect(view.turn.completionUID != nil)
+    #expect(view.groups.map(\.kind.title) == ["Changed in this turn"])
+    #expect(view.groups[0].files.map { [$0.file.letter, $0.file.label] } == [["M", "src/cart.ts"], ["A", "todo.md"]])
+    #expect(view.fileCount == 2 && view.additions == 2 && view.deletions == 0)
+    #expect(view.turn.headMove == "ccccccc → ccccccc")
+    #expect(view.turn.before?.ref.hasPrefix("refs/omni/turns/") == true)
+  }
+
+  @Test func aTurnWithNothingToShowSaysWhy() throws {
+    let unavailable = try decodeFixture(TurnChanges.self, "turns-unavailable.json")
+    #expect(!unavailable.available && unavailable.reason?.contains("worktree") == true)
+    #expect(TurnChangesView(unavailable) == nil)
+  }
+
+  @Test func getsATurnByID() async throws {
+    let t = StubTransport(body: try fixture("turns-unavailable.json"))
+    let client = OmniClient(port: 4799, transport: t)
+    _ = try await client.turns(forThread: "a b")
+    _ = try await client.turns(forThread: "a b", turn: "t 1")
+    #expect(t.requests.map { $0.url?.absoluteString } == [
+      "http://127.0.0.1:4799/api/threads/a%20b/turns",
+      "http://127.0.0.1:4799/api/threads/a%20b/turns?turn=t%201",
+    ])
+  }
 }

@@ -81,6 +81,10 @@ const NAMES = [
   // The retried worktree thread's branch changes, every group, and a thread with no repo to read.
   'changes.json',
   'changes-unavailable.json',
+  // The same thread's saved turns, the newest one's diff (an edit, a commit and a new file during the turn), and a
+  // thread whose turns are not saved.
+  'turns.json',
+  'turns-unavailable.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -438,6 +442,25 @@ async function scenario() {
   const changed = keep('changes.json', await get(`/threads/${wt.id}/changes`)) as { available: boolean; groups: { kind: string; files: unknown[] }[] };
   expect(changed.groups.map((g) => [g.kind, g.files.length])).toEqual([['committed', 4], ['staged', 1], ['unstaged', 2], ['untracked', 1]]);
   keep('changes-unavailable.json', await get(`/threads/${id}/changes`));
+
+  const edit = join(tmp, 'turn-edit.sh');
+  writeFileSync(
+    edit,
+    [
+      'export GIT_AUTHOR_NAME=Fixture GIT_AUTHOR_EMAIL=fixture@example.com GIT_COMMITTER_NAME=Fixture GIT_COMMITTER_EMAIL=fixture@example.com',
+      `printf 'export const round = (n: number) => Math.round(n * 100) / 100;\\n' >> src/cart.ts`,
+      'git add -A && git commit -q -m "round the total"',
+      `printf 'Rounding is done.\\n' > todo.md`,
+    ].join('\n') + '\n',
+  );
+  await call('POST', `/threads/${wt.id}/messages`, { prompt: `RUN:${edit} round the total` });
+  const saved = await eventually(async () => {
+    const b = (await get(`/threads/${wt.id}/turns`)) as { turn: { n: number; state: string } | null; groups: { files: { path: string }[] }[] };
+    return b.turn?.n === 2 && b.turn.state === 'ready' && b;
+  }, 'the turn to be saved');
+  keep('turns.json', saved);
+  expect(saved.groups[0].files.map((f) => f.path)).toEqual(['src/cart.ts', 'todo.md']);
+  keep('turns-unavailable.json', await get(`/threads/${id}/turns`));
 
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
