@@ -476,18 +476,37 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
   const box = useSlidingThumb(listRef, `${hash}:${channels.length}:${rowsKey}:${agentsKey}:${folders.editing}`, true, '[data-active="true"]');
 
   const threadLinks = (c: ChannelWithRunning) => {
-    const list = threadsOf(c);
+    const closed = collapsed.has(c.id);
+    const open = openIn(c);
     const agents = (id: string) => tasks.filter((k) => taskHost(k) === id);
-    if (collapsed.has(c.id)) {
-      // Closed, it still shows the open thread, so the highlight never vanishes into it.
-      const open = openIn(c);
-      return open && <ThreadLink t={open} active tasks={agents(open.id)} onNavigate={onNavigate} />;
-    }
-    const shown = list.filter((t, i) => i < MAX_THREADS || t.id === openId || agents(t.id).length > 0);
+    // Closed, the rows stay mounted and fold to nothing, so opening and closing slide like the rest of the rail.
+    // The open thread stays out under the name, so the highlight never vanishes into the fold.
     return (
       <>
-        {foldersOf(c).map((f) => (
-          <FolderRow key={f.id} f={f} openId={openId} tasks={tasks} onNavigate={onNavigate} />
+        <div
+          inert={closed}
+          aria-hidden={closed || undefined}
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-(--ease-out) motion-reduce:transition-none ${
+            closed ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'
+          }`}
+        >
+          <div className="min-h-0 space-y-px overflow-hidden">{channelContents(c, closed)}</div>
+        </div>
+        {closed && open && <ThreadLink t={open} active tasks={agents(open.id)} onNavigate={onNavigate} />}
+      </>
+    );
+  };
+
+  /** A channel's folders, its new folder's name field and its threads. Closed, without the open thread, which shows outside. */
+  const channelContents = (c: ChannelWithRunning, closed: boolean) => {
+    const oid = closed ? null : openId;
+    const list = threadsOf(c).filter((t) => !closed || t.id !== openId);
+    const agents = (id: string) => tasks.filter((k) => taskHost(k) === id);
+    const shown = list.filter((t, i) => i < MAX_THREADS || t.id === oid || agents(t.id).length > 0);
+    return (
+      <>
+        {(closed ? (c.folders ?? []) : foldersOf(c)).map((f) => (
+          <FolderRow key={f.id} f={f} openId={oid} tasks={tasks} onNavigate={onNavigate} />
         ))}
         {folders.editing === draftKey(c.id) && (
           <FolderNameField
@@ -497,7 +516,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
           />
         )}
         {shown.map((t) => (
-          <ThreadLink key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} onNavigate={onNavigate} />
+          <ThreadLink key={t.id} t={t} active={t.id === oid} tasks={agents(t.id)} onNavigate={onNavigate} />
         ))}
         {c.id === focused ? (
           <a href={href.channel(c.id)} onClick={onNavigate} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
