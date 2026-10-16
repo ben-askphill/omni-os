@@ -13,6 +13,9 @@ const Resolve = z.object({
 });
 
 linksApi.post('/resolve', async (c) => {
+  // JSON only: a page on another site cannot send that without a CORS preflight, which Omni never answers, so it
+  // cannot make Omni spend Ben's credentials on lookups.
+  if (!/^application\/json\b/i.test(c.req.header('content-type') ?? '')) return c.json({ error: 'send JSON' }, 415);
   const { urls, channel_id } = Resolve.parse(await c.req.json());
   return c.json({ previews: await resolveLinks(urls.filter((u) => /^https?:\/\//i.test(u)), channel_id) });
 });

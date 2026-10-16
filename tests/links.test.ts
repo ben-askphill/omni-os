@@ -3,7 +3,7 @@ import { linkIconsSource } from '../scripts/build-link-icons.ts';
 import { readFileSync } from 'node:fs';
 import { LINK_ICONS } from '../shared/link-icons.ts';
 import { SOURCES } from '../shared/link-sources.ts';
-import { clearLinkCache, isPrivateAddress, resolveLink, resolveLinks, titleFromHtml, type LinkDeps } from '../server/links.ts';
+import { clearLinkCache, isApiHost, isPrivateAddress, publicLookup, resolveLink, resolveLinks, titleFromHtml, type LinkDeps } from '../server/links.ts';
 
 function deps(over: Partial<LinkDeps> = {}, secrets: Record<string, string> = {}) {
   const calls: string[] = [];
@@ -107,6 +107,44 @@ describe('resolveLinks', () => {
 });
 
 describe('safety', () => {
+  it('never sends a Shopify token to a host a link names', async () => {
+    const urls: string[] = [];
+    const { d } = deps({ json: async (url) => (urls.push(url), {}) }, { SHOPIFY_ACCESS_TOKEN: 't' });
+    await resolveLink('https://admin.shopify.com/store/evil.example%2Fx%23/products/1', d);
+    await resolveLink('https://admin.shopify.com/store/volero-dev/products/1', d);
+    expect(urls).toEqual(['https://volero-dev.myshopify.com/admin/api/2025-10/graphql.json']);
+  });
+
+  it('sends a GitLab token only to gitlab.com or GITLAB_HOST', async () => {
+    const urls: string[] = [];
+    const { d } = deps({ json: async (url) => (urls.push(url), { title: 'T', state: 'opened' }) }, { GITLAB_TOKEN: 't', GITLAB_HOST: 'gitlab.acme.dev' });
+    await resolveLink('https://gitlab.evil.example/a/b/-/issues/1', d);
+    await resolveLink('https://gitlab.acme.dev/a/b/-/issues/2', d);
+    await resolveLink('https://gitlab.com/a/b/-/merge_requests/3', d);
+    expect(urls.map((u) => new URL(u).host)).toEqual(['gitlab.acme.dev', 'gitlab.com']);
+  });
+
+  it('keeps ids that could move a request out of the API path', async () => {
+    const urls: string[] = [];
+    const { d } = deps({ json: async (url) => (urls.push(url), {}) }, { CLICKUP_TOKEN: 't' });
+    await resolveLink('https://app.clickup.com/t/..%2F..%2Fuser', d);
+    expect(urls).toEqual([]);
+  });
+
+  it('allows credentials only to known API hosts', () => {
+    expect(isApiHost('dev.azure.com')).toBe(true);
+    expect(isApiHost('volero-dev.myshopify.com')).toBe(true);
+    expect(isApiHost('askphill.atlassian.net')).toBe(true);
+    expect(isApiHost('evil.com.myshopify.com')).toBe(false);
+    expect(isApiHost('example.com')).toBe(false);
+    expect(isApiHost('gitlab.acme.dev', 'gitlab.acme.dev')).toBe(true);
+  });
+
+  it('refuses to connect to a name that resolves to a private address', async () => {
+    const err = await new Promise<NodeJS.ErrnoException | null>((r) => publicLookup('localhost', {}, (e) => r(e)));
+    expect(err?.code).toBe('EPRIVATE');
+  });
+
   it('treats private, loopback and link-local addresses as private', () => {
     for (const ip of ['127.0.0.1', '10.1.2.3', '172.16.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '::1', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1']) expect(isPrivateAddress(ip), ip).toBe(true);
     for (const ip of ['8.8.8.8', '140.82.112.3', '2606:4700::1111']) expect(isPrivateAddress(ip), ip).toBe(false);

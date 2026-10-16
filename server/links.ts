@@ -3,8 +3,11 @@
 // secrets (global, or the channel's own), and a public page that no API answers gives its <title>.
 // Every lookup is cached, failures included, so a transcript re-rendering asks nothing twice.
 import { execFile } from 'node:child_process';
+import { lookup as dnsLookup } from 'node:dns';
 import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import { request as httpRequest, type IncomingMessage } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+import { isIP, type LookupFunction } from 'node:net';
 import { promisify } from 'node:util';
 import { parseLink, previewOf, type LinkPreview, type LinkRef } from '../shared/link-sources.ts';
 import { artifacts } from './db.ts';
@@ -31,6 +34,11 @@ type Found = { title?: string; state?: string; context?: string; needs?: string 
 type Ref = LinkRef & { params: Record<string, string> };
 type Resolver = (ref: Ref, url: string, d: LinkDeps) => Promise<Found>;
 
+/** A URL path piece is only used when it is one plain token, so no slash, dot-dot or `#` can move a request elsewhere. */
+const TOKEN = /^[A-Za-z0-9_.-]{1,200}$/;
+const ok = (...vals: (string | undefined)[]) => vals.every((v) => v !== undefined && TOKEN.test(v) && v !== '.' && v !== '..');
+const enc = encodeURIComponent;
+
 const basic = (user: string, pass: string) => `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}`;
 const firstLine = (s: string | undefined) => s?.split('\n')[0]?.trim();
 /** The first secret of `names` that is set. */
@@ -46,6 +54,7 @@ async function anySecret(d: LinkDeps, ...names: string[]) {
 
 const github: Resolver = async (ref, _url, d) => {
   const { owner, repo, number, sha, tag, id } = ref.params;
+  if (ref.kind === 'gist' ? !ok(ref.params.id) : !ok(owner) || (ref.kind !== 'user' && !ok(repo))) return {};
   const r = `repos/${owner}/${repo}`;
   switch (ref.kind) {
     case 'pull':
@@ -64,10 +73,11 @@ const github: Resolver = async (ref, _url, d) => {
     case 'commit':
       return { title: firstLine((await d.gh(`${r}/commits/${sha}`)).commit?.message) };
     case 'release': {
-      const rel = await d.gh(`${r}/releases/tags/${encodeURIComponent(tag)}`);
+      const rel = await d.gh(`${r}/releases/tags/${enc(tag)}`);
       return { title: rel.name || rel.tag_name, state: rel.draft ? 'draft' : rel.prerelease ? 'prerelease' : undefined };
     }
     case 'run': {
+      if (!/^\d+$/.test(id)) return {};
       const w = await d.gh(`${r}/actions/runs/${id}`);
       return { title: w.display_title ?? w.name, state: w.conclusion ?? w.status };
     }
@@ -92,6 +102,7 @@ const azureDevops: Resolver = async (ref, _url, d) => {
   const pat = await anySecret(d, 'AZURE_DEVOPS_PAT', 'AZURE_DEVOPS_TOKEN', 'ADO_PAT');
   if (!pat) return { needs: 'AZURE_DEVOPS_PAT' };
   const { org, project, repo, id, sha } = ref.params;
+  if ((id && !/^\d+$/.test(id)) || (sha && !/^[0-9a-f]{7,40}$/i.test(sha))) return {};
   const base = `https://dev.azure.com/${encodeURIComponent(org)}`;
   const init = { headers: { Authorization: basic('', pat), Accept: 'application/json' } };
   const p = project ? `/${encodeURIComponent(project)}` : '';
@@ -110,7 +121,7 @@ const azureDevops: Resolver = async (ref, _url, d) => {
       return { title: `${b.definition?.name ?? 'Build'} ${b.buildNumber ?? ''}`.trim(), state: b.result ?? b.status };
     }
     case 'commit': {
-      const c = await d.json(`${base}${p}/_apis/git/repositories/${encodeURIComponent(repo)}/commits/${sha}?api-version=7.1`, init);
+      const c = await d.json(`${base}${p}/_apis/git/repositories/${enc(repo)}/commits/${sha}?api-version=7.1`, init);
       return { title: firstLine(c.comment) };
     }
   }
@@ -123,6 +134,7 @@ const atlassian: Resolver = async (ref, _url, d) => {
   const token = await anySecret(d, 'ATLASSIAN_API_TOKEN', 'JIRA_API_TOKEN', 'CONFLUENCE_API_TOKEN');
   if (!email || !token) return { needs: 'ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN' };
   const init = { headers: { Authorization: basic(email, token), Accept: 'application/json' } };
+  if (ref.source === 'jira' ? !/^[A-Z][A-Z0-9_]+-\d+$/.test(ref.params.key) : !/^\d+$/.test(ref.params.id)) return {};
   if (ref.source === 'jira') {
     const i = await d.json(`https://${ref.params.site}/rest/api/3/issue/${encodeURIComponent(ref.params.key)}?fields=summary,status,issuetype`, init);
     return { title: i.fields?.summary, state: i.fields?.status?.name, context: i.fields?.issuetype?.name };
@@ -145,7 +157,7 @@ const linear: Resolver = async (ref, _url, d) => {
 };
 
 const notion: Resolver = async (ref, _url, d) => {
-  if (!ref.params.id) return;
+  if (!/^[0-9a-f]{32}$/.test(ref.params.id ?? '')) return;
   const token = await anySecret(d, 'NOTION_TOKEN', 'NOTION_API_KEY');
   if (!token) return ref.title ? undefined : { needs: 'NOTION_TOKEN' };
   const init = { headers: { Authorization: `Bearer ${token}`, 'Notion-Version': '2022-06-28' } };
@@ -160,14 +172,15 @@ const figma: Resolver = async (ref, _url, d) => {
   if (!ref.params.key) return;
   const token = await anySecret(d, 'FIGMA_TOKEN', 'FIGMA_ACCESS_TOKEN', 'FIGMA_API_KEY');
   if (!token) return;
-  const f = await d.json(`https://api.figma.com/v1/files/${ref.params.key}?depth=1`, { headers: { 'X-Figma-Token': token } });
+  if (!ok(ref.params.key)) return {};
+  const f = await d.json(`https://api.figma.com/v1/files/${enc(ref.params.key)}?depth=1`, { headers: { 'X-Figma-Token': token } });
   return { title: f.name };
 };
 
 /** api.productive.io with PRODUCTIVE_API_KEY; the org id is in the URL. */
 const productive: Resolver = async (ref, _url, d) => {
   const { org, id } = ref.params;
-  if (!org || !id) return;
+  if (!/^\d+$/.test(org ?? '') || !/^\d+$/.test(id ?? '')) return;
   const token = await anySecret(d, 'PRODUCTIVE_API_KEY', 'PRODUCTIVE_API_TOKEN', 'PRODUCTIVE_TOKEN');
   if (!token) return { needs: 'PRODUCTIVE_API_KEY' };
   const path = { task: 'tasks', project: 'projects', deal: 'deals', page: 'pages' }[ref.kind];
@@ -199,7 +212,8 @@ const slack: Resolver = async (ref, _url, d) => {
 /** The store's Admin API with SHOPIFY_ACCESS_TOKEN (the channel's store). A token for another store just fails. */
 const shopify: Resolver = async (ref, url, d) => {
   const { store, id, type } = ref.params;
-  if (store && id && type) {
+  // The store names the API host the token goes to: one DNS label, nothing else.
+  if (store && id && type && /^[a-z0-9][a-z0-9-]{0,62}$/i.test(store) && /^\d+$/.test(id)) {
     const token = await anySecret(d, 'SHOPIFY_ACCESS_TOKEN', 'SHOPIFY_ADMIN_TOKEN', 'SHOPIFY_ADMIN_API_TOKEN');
     if (token) {
       const gid = `gid://shopify/${type}/${id}`;
@@ -238,16 +252,21 @@ const npm: Resolver = async (ref, _url, d) => {
 const gitlab: Resolver = async (ref, _url, d) => {
   const { host, project, number } = ref.params;
   if (!number || !project) return;
+  // gitlab.com, or the one self-hosted GitLab named in GITLAB_HOST: a token never goes to a host a link picked.
+  const own = await d.secret('GITLAB_HOST');
+  if (host !== 'gitlab.com' && host !== own?.toLowerCase()) return {};
+  if (!/^\d+$/.test(number)) return {};
   const token = await anySecret(d, 'GITLAB_TOKEN', 'GITLAB_PRIVATE_TOKEN');
   const kind = ref.kind === 'issue' ? 'issues' : 'merge_requests';
-  const r = await d.json(`https://${host}/api/v4/projects/${encodeURIComponent(project)}/${kind}/${number}`, token ? { headers: { 'PRIVATE-TOKEN': token } } : undefined);
+  const r = await d.json(`https://${host}/api/v4/projects/${enc(project)}/${kind}/${number}`, token ? { headers: { 'PRIVATE-TOKEN': token } } : undefined);
   return { title: r.title, state: r.draft ? 'draft' : r.state === 'opened' ? 'open' : r.state };
 };
 
 const bitbucket: Resolver = async (ref, _url, d) => {
   if (ref.kind !== 'pull') return;
   const { ws, repo, number } = ref.params;
-  const r = await d.json(`https://api.bitbucket.org/2.0/repositories/${ws}/${repo}/pullrequests/${number}`);
+  if (!ok(ws, repo) || !/^\d+$/.test(number)) return {};
+  const r = await d.json(`https://api.bitbucket.org/2.0/repositories/${enc(ws)}/${enc(repo)}/pullrequests/${number}`);
   return { title: r.title, state: r.state?.toLowerCase() };
 };
 
@@ -255,6 +274,7 @@ const sentry: Resolver = async (ref, _url, d) => {
   if (ref.kind !== 'issue') return;
   const token = await anySecret(d, 'SENTRY_AUTH_TOKEN', 'SENTRY_TOKEN');
   if (!token) return;
+  if (!/^\d+$/.test(ref.params.id)) return {};
   const i = await d.json(`https://sentry.io/api/0/issues/${ref.params.id}/`, { headers: { Authorization: `Bearer ${token}` } });
   return { title: i.title, state: i.status };
 };
@@ -263,6 +283,7 @@ const asana: Resolver = async (ref, _url, d) => {
   if (ref.kind !== 'task') return;
   const token = await anySecret(d, 'ASANA_TOKEN', 'ASANA_ACCESS_TOKEN');
   if (!token) return;
+  if (!/^\d+$/.test(ref.params.id)) return {};
   const t = await d.json(`https://app.asana.com/api/1.0/tasks/${ref.params.id}?opt_fields=name,completed`, { headers: { Authorization: `Bearer ${token}` } });
   return { title: t.data?.name, state: t.data?.completed ? 'done' : undefined };
 };
@@ -271,7 +292,8 @@ const clickup: Resolver = async (ref, _url, d) => {
   if (ref.kind !== 'task') return;
   const token = await anySecret(d, 'CLICKUP_TOKEN', 'CLICKUP_API_TOKEN');
   if (!token) return;
-  const t = await d.json(`https://api.clickup.com/api/v2/task/${ref.params.id}`, { headers: { Authorization: token } });
+  if (!ok(ref.params.id)) return {};
+  const t = await d.json(`https://api.clickup.com/api/v2/task/${enc(ref.params.id)}`, { headers: { Authorization: token } });
   return { title: t.name, state: t.status?.status };
 };
 
@@ -280,7 +302,8 @@ const trello: Resolver = async (ref, _url, d) => {
   const key = await d.secret('TRELLO_KEY');
   const token = await d.secret('TRELLO_TOKEN');
   if (!key || !token) return;
-  const r = await d.json(`https://api.trello.com/1/${ref.kind === 'card' ? 'cards' : 'boards'}/${ref.params.id}?fields=name,closed&key=${key}&token=${token}`);
+  if (!ok(ref.params.id)) return {};
+  const r = await d.json(`https://api.trello.com/1/${ref.kind === 'card' ? 'cards' : 'boards'}/${enc(ref.params.id)}?fields=name,closed&key=${enc(key)}&token=${enc(token)}`);
   return { title: r.name, state: r.closed ? 'closed' : undefined };
 };
 
@@ -371,38 +394,83 @@ export function titleFromHtml(html: string): { title?: string; site?: string } {
   return { ...(title && { title }), ...(site && { site: decodeEntities(site).trim() }) };
 }
 
-/** A public page's head, read with redirects followed by hand so each hop's host is checked. */
+/**
+ * Resolves like the system resolver, but refuses a private address. Used as the socket's lookup, so the address
+ * checked is the address connected to: a name that answers public once and private next (DNS rebinding) gets nowhere.
+ */
+export const publicLookup: LookupFunction = (hostname, options, callback) => {
+  dnsLookup(hostname, { ...options, all: true }, (err, addrs) => {
+    if (err) return callback(err, '', 4);
+    const list = addrs as unknown as { address: string; family: number }[];
+    const bad = list.find((a) => isPrivateAddress(a.address));
+    if (!list.length || bad) return callback(Object.assign(new Error(`refusing private address for ${hostname}`), { code: 'EPRIVATE' }), '', 4);
+    if ((options as { all?: boolean }).all) return (callback as unknown as (e: null, a: typeof list) => void)(null, list);
+    callback(null, list[0].address, list[0].family);
+  });
+};
+
+/** One GET with the checked lookup: status, location and the start of an HTML body. */
+function getHead(url: URL): Promise<{ status: number; location?: string; html?: string }> {
+  return new Promise((resolve, reject) => {
+    const req = (url.protocol === 'https:' ? httpsRequest : httpRequest)(
+      url,
+      { method: 'GET', lookup: publicLookup, headers: { 'User-Agent': UA, Accept: 'text/html' }, timeout: 6000 },
+      (res: IncomingMessage) => {
+        const status = res.statusCode ?? 0;
+        const type = String(res.headers['content-type'] ?? '');
+        if (status >= 300 && status < 400 && res.headers.location) {
+          res.destroy();
+          return resolve({ status, location: res.headers.location });
+        }
+        if (status < 200 || status >= 300 || !/text\/html|application\/xhtml/i.test(type)) {
+          res.destroy();
+          return resolve({ status });
+        }
+        let html = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk: string) => {
+          html += chunk;
+          if (html.length >= PAGE_MAX || /<\/head>/i.test(html)) {
+            res.destroy();
+            resolve({ status, html });
+          }
+        });
+        res.on('end', () => resolve({ status, html }));
+        res.on('error', () => resolve({ status, html }));
+      },
+    );
+    req.on('timeout', () => req.destroy(new Error('timed out')));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+/** A public page's head, with redirects followed by hand so every hop goes through the checked lookup. */
 async function fetchPageTitle(url: string) {
   let at = url;
   for (let hop = 0; hop < 4; hop++) {
     const u = new URL(at);
     if ((u.protocol !== 'http:' && u.protocol !== 'https:') || !(await publicHost(u.hostname))) return undefined;
-    const res = await fetch(at, { redirect: 'manual', signal: AbortSignal.timeout(6000), headers: { 'User-Agent': UA, Accept: 'text/html' } });
-    if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
-      await res.body?.cancel();
-      at = new URL(res.headers.get('location')!, at).toString();
+    const res = await getHead(u);
+    if (res.location) {
+      at = new URL(res.location, at).toString();
       // A sign-in wall is not the page's title.
       if (/accounts\.google\.com|login\.microsoftonline\.com|\/login|\/signin/i.test(at)) return undefined;
       continue;
     }
-    if (!res.ok || !/text\/html|application\/xhtml/i.test(res.headers.get('content-type') ?? '')) {
-      await res.body?.cancel();
-      return undefined;
-    }
-    const reader = res.body?.getReader();
-    if (!reader) return undefined;
-    let html = '';
-    const dec = new TextDecoder();
-    while (html.length < PAGE_MAX) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      html += dec.decode(value, { stream: true });
-      if (/<\/head>/i.test(html)) break;
-    }
-    await reader.cancel().catch(() => {});
-    return titleFromHtml(html);
+    return res.html ? titleFromHtml(res.html) : undefined;
   }
   return undefined;
+}
+
+/** The hosts an API call with a credential may go to. A self-hosted GitLab is added by GITLAB_HOST. */
+const API_HOSTS = new Set([
+  'dev.azure.com', 'api.linear.app', 'api.notion.com', 'api.figma.com', 'api.productive.io', 'slack.com', 'gitlab.com',
+  'api.bitbucket.org', 'sentry.io', 'app.asana.com', 'api.clickup.com', 'api.trello.com', 'registry.npmjs.org',
+  'www.loom.com', 'www.youtube.com', 'vimeo.com',
+]);
+export function isApiHost(host: string, extra?: string) {
+  return API_HOSTS.has(host) || host === extra?.toLowerCase() || /^[a-z0-9][a-z0-9-]{0,62}\.(myshopify\.com|atlassian\.net)$/.test(host);
 }
 
 const secretCache = new Map<string, { at: number; env: Promise<Record<string, string>> }>();
@@ -420,7 +488,11 @@ export function realDeps(channelId?: string): LinkDeps {
   return {
     secret: async (name) => (await channelSecrets(channelId))[name] || undefined,
     async json(url, init) {
-      const res = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
+      const u = new URL(url);
+      const own = (await channelSecrets(channelId)).GITLAB_HOST;
+      if (u.protocol !== 'https:' || !isApiHost(u.hostname, own)) throw new Error(`not an API host: ${u.hostname}`);
+      // No redirects: a credential must not follow one somewhere else.
+      const res = await fetch(u, { ...init, redirect: 'error', signal: AbortSignal.timeout(8000) });
       if (!res.ok) {
         await res.body?.cancel();
         throw new Error(`${new URL(url).host} answered ${res.status}`);
