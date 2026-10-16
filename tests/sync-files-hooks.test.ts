@@ -76,6 +76,31 @@ describe('file sync hooks', () => {
     expect(readFileSync(join(r.paths.threads, t.id, 'uploads', 'brief.txt'), 'utf8')).toBe('the brief');
   });
 
+  it('drops a session download that lands after the runner stopped waiting for it', async () => {
+    const t = await r.start('first', { title: 'Late download' });
+    await r.untilResults(t.id, 1);
+    const thread = r.thread(t.id);
+    await waitFor(() => !r.runner.isLive(t.id), 'the first process to exit');
+    await new Promise((res) => setTimeout(res, 100));
+    fromOtherMac(t.id, { files: { 'uploads/late.txt': 'late' }, session: { sid: thread.session_id, body: '{"from":"mac-b"}\n' } });
+    const get = relay.getObject.bind(relay);
+    let release = () => {};
+    const gate = new Promise<void>((res) => (release = res));
+    const slow = vi.spyOn(relay, 'getObject').mockImplementation(async (p) => (await gate, get(p)));
+    files.configureFileSync({ resumeTimeoutMs: 30 });
+    try {
+      // Times out: from here the harness owns the session file.
+      await files.beforeResume(thread);
+      release();
+      // The download finishes after that, and once the thread's queue is idle nothing it fetched was written.
+      await files.threadFilesReady(t.id);
+      expect(existsSync(sessionFile(thread))).toBe(false);
+    } finally {
+      slow.mockRestore();
+      files.configureFileSync({ resumeTimeoutMs: 15_000 });
+    }
+  });
+
   it('fetches a thread\'s files in the background when it is opened', async () => {
     const t = await r.start('first', { title: 'Opened' });
     await r.untilResults(t.id, 1);
