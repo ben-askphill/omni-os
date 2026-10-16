@@ -80,6 +80,8 @@ Each Claude Code thread gets one long-lived `claude -p --input-format stream-jso
 
 Codex threads run on `codex app-server` (ADR 0001) and Cursor threads on `cursor-agent`, each through an adapter in `server/harness/` that turns its stream into the same events. Hermes is below.
 
+The Codex and Cursor model lists are not in Omni's code: the server asks each CLI (`model/list`, `cursor-agent --list-models`) at start and every 15 minutes, and both clients show what it returns. A new GPT model reaches the picker when the CLI that knows it is installed (`brew upgrade codex`, then restart Omni). Check a Codex release first with `OMNI_CODEX_BIN=/path/to/new/codex OMNI_LIVE_CODEX=1 npx vitest run --config tests/vitest.config.ts tests/codex-live.test.ts`; it also fails when `~/.codex/config.toml` picks a model that CLI does not list.
+
 Every stream event is stored in SQLite (`data/omni.db`) and pushed to the UI over SSE. The usage meter is per harness: Claude's rate-limit events drive the 5h / 7d meter, Codex reports its own, Cursor reports none.
 
 Messages sent while a thread is busy:

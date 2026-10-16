@@ -10,8 +10,12 @@ import type { ThreadStartResponse } from '../server/harness/codex/protocol.ts';
 //   OMNI_LIVE_CODEX=1 npx vitest run --config tests/vitest.config.ts tests/codex-live.test.ts
 const LIVE = process.env.OMNI_LIVE_CODEX === '1';
 
+// startRunner points OMNI_CODEX_BIN at a missing file, so pass the real one: OMNI_CODEX_BIN when
+// set (to try a Codex release before `brew upgrade`), else `codex` on PATH.
+const CODEX_BIN = process.env.OMNI_CODEX_BIN || 'codex';
+
 // keepalive 0 closes the app-server after each turn, so the follow-up is a thread/resume.
-const H = LIVE ? await startRunner({ OMNI_KEEPALIVE_SECONDS: '0', OMNI_BROWSER: '1' }) : null!;
+const H = LIVE ? await startRunner({ OMNI_KEEPALIVE_SECONDS: '0', OMNI_BROWSER: '1', OMNI_CODEX_BIN: CODEX_BIN }) : null!;
 const svc = LIVE ? await import('../server/harness/catalog-service.ts') : null!;
 const usage = LIVE ? await import('../server/usage.ts') : null!;
 
@@ -21,6 +25,8 @@ describe.skipIf(!LIVE)('the real codex-cli', () => {
     expect(probe.available).toBe(true);
     expect(probe.models.length).toBeGreaterThan(0);
     for (const m of probe.models) expect(m.efforts).toContain(m.defaultEffort);
+    // A config.toml model this CLI does not list (gpt-6.1-sol on 0.157) fails every Codex turn: brew upgrade codex.
+    if (probe.defaultModel) expect(probe.models.map((m) => m.id)).toContain(probe.defaultModel);
     expect(probe.rateLimits).toMatchObject({ limitId: 'codex', primary: { usedPercent: expect.any(Number) } });
   }, 30_000);
 
