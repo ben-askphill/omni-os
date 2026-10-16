@@ -30,6 +30,9 @@ struct SelectableMarkdown: NSViewRepresentable {
 
   func makeNSView(context: Context) -> FlowTextView {
     let view = FlowTextView(usingTextLayoutManager: false)
+    view.textContainer?.replaceLayoutManager(CodeChipLayoutManager())
+    // A code chip that opens a line reaches its padding past the text's left edge.
+    view.clipsToBounds = false
     view.isEditable = false
     view.isSelectable = true
     view.drawsBackground = false
@@ -113,6 +116,48 @@ final class FlowTextView: NSTextView {
   override func scrollWheel(with event: NSEvent) { nextResponder?.scrollWheel(with: event) }
 }
 
+extension NSAttributedString.Key {
+  /// Inline code, drawn on a rounded chip by `CodeChipLayoutManager`.
+  static let codeChip = NSAttributedString.Key("omni.codeChip")
+}
+
+/// Draws `.md code` from index.css behind inline code: a surface-2 chip with a hairline edge, rounded, padded
+/// past the glyphs on each side (the kern `MarkdownFlow` adds leaves room) and hugging the code font, not the
+/// line's full height. A wrapped run gets one chip per line.
+final class CodeChipLayoutManager: NSLayoutManager {
+  static func pad(_ font: NSFont) -> CGFloat { (font.pointSize * 0.4).rounded() }
+
+  override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
+    if let storage = textStorage, let container = textContainers.first {
+      let chars = characterRange(forGlyphRange: glyphsToShow, actualGlyphRange: nil)
+      storage.enumerateAttribute(.codeChip, in: chars) { value, range, _ in
+        guard value != nil, let font = storage.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont else { return }
+        let glyphs = glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        enumerateLineFragments(forGlyphRange: glyphs) { line, _, _, lineGlyphs, _ in
+          let part = NSIntersectionRange(glyphs, lineGlyphs)
+          guard part.length > 0 else { return }
+          // The trailing kern is the chip's right padding, so it stays out of the glyph box.
+          var box = self.boundingRect(forGlyphRange: part, in: container)
+          if NSMaxRange(part) == NSMaxRange(glyphs) { box.size.width -= Self.pad(font) }
+          let baseline = line.minY + self.location(forGlyphAt: part.location).y
+          let pad = Self.pad(font)
+          let v = (font.pointSize * 0.18).rounded()
+          let rect = NSRect(x: box.minX - pad, y: baseline - font.ascender - v,
+                            width: box.width + pad * 2, height: font.ascender - font.descender + v * 2)
+            .offsetBy(dx: origin.x, dy: origin.y)
+          let path = NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5)
+          NSColor(Tok.surface2).setFill()
+          path.fill()
+          NSColor(Tok.line).setStroke()
+          path.lineWidth = 1
+          NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 4.5, yRadius: 4.5).stroke()
+        }
+      }
+    }
+    super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
+  }
+}
+
 /// A reply's blocks as attributed text, sized and spaced as `.md` in index.css.
 struct MarkdownFlow {
   let size: CGFloat
@@ -176,6 +221,16 @@ struct MarkdownFlow {
       case .external(let url)?: attrs[.link] = url
       case nil: break
       }
+      if run.style.contains(.code), !run.text.isEmpty {
+        let pad = CodeChipLayoutManager.pad(attrs[.font] as! NSFont)
+        attrs[.codeChip] = true
+        // Room for the chip's padding: kern after the character before it, and after its own last character.
+        if out.length > 0 { out.addAttribute(.kern, value: pad, range: NSRange(location: out.length - 1, length: 1)) }
+        let code = NSMutableAttributedString(string: run.text, attributes: attrs)
+        code.addAttribute(.kern, value: pad, range: NSRange(location: code.length - 1, length: 1))
+        out.append(code)
+        continue
+      }
       out.append(NSAttributedString(string: run.text, attributes: attrs))
     }
     return out
@@ -184,7 +239,7 @@ struct MarkdownFlow {
   private static func font(_ base: NSFont, _ style: MarkdownRun.Style) -> NSFont {
     var font = base
     if style.contains(.code) {
-      return .monospacedSystemFont(ofSize: base.pointSize * 0.92, weight: style.contains(.strong) ? .semibold : .regular)
+      return .monospacedSystemFont(ofSize: base.pointSize * 0.86, weight: style.contains(.strong) ? .semibold : .regular)
     }
     var traits: NSFontDescriptor.SymbolicTraits = []
     if style.contains(.strong) { traits.insert(.bold) }
