@@ -20,7 +20,7 @@ public enum QAAppearance: String, Hashable, Sendable {
 /// Where a scroll step takes the open thread's transcript. `through` scrolls from the bottom to the top half
 /// a screen per frame and reports how long the frames took.
 public enum QAInspector: String, Hashable, Sendable {
-  case open, close, artifacts, browser, terminal, details
+  case open, close, artifacts, changes, browser, terminal, details
 }
 
 public enum QAScroll: String, Hashable, Sendable {

@@ -3,7 +3,7 @@ import SwiftUI
 import WebKit
 
 extension View {
-  /// The thread's inspector: Artifacts, Browser, Terminal and Details in a side panel, its toggle in the toolbar.
+  /// The thread's inspector: Artifacts, Changes, Browser, Terminal and Details in a side panel, its toggle in the toolbar.
   func threadInspector(model: AppModel, store: ThreadStore) -> some View {
     modifier(ThreadInspector(model: model, store: store))
   }
@@ -63,7 +63,7 @@ private struct ThreadInspector: ViewModifier {
               if count > 0 { Text("\(count)").font(.omni(size: 11, weight: .medium).monospacedDigit()) }
             }
           }
-          .help(count > 0 ? "Artifacts, browser, terminal, details (\(count))" : "Artifacts, browser, terminal, details")
+          .help(count > 0 ? "Artifacts, changes, browser, terminal, details (\(count))" : "Artifacts, changes, browser, terminal, details")
         }
       }
       .onChange(of: store.arrivedHTML?.id) {
@@ -89,7 +89,7 @@ private struct ThreadInspector: ViewModifier {
           switch command {
           case .open: isOpen.wrappedValue = true
           case .close: isOpen.wrappedValue = false
-          case .artifacts, .browser, .terminal, .details:
+          case .artifacts, .changes, .browser, .terminal, .details:
             isOpen.wrappedValue = true
             picked.wrappedValue.tab = InspectorSelection.Tab(rawValue: command.rawValue) ?? .details
           }
@@ -127,10 +127,16 @@ private struct InspectorPanel: View {
     let files = store.files
     VStack(spacing: 0) {
       HStack(spacing: z(4)) {
-        SegmentedPill(
-          selection: $selection.tab,
-          counted: InspectorSelection.Tab.allCases.map { ($0, $0.title, count($0, files: files.count)) },
-          small: true)
+        // Five tabs do not fit a narrow panel: they scroll sideways, as the Web UI's Tabs do, rather than truncate.
+        ScrollView(.horizontal) {
+          SegmentedPill(
+            selection: $selection.tab,
+            counted: InspectorSelection.Tab.allCases.map { ($0, $0.title, count($0, files: files.count)) },
+            small: true)
+            .fixedSize()
+        }
+        .scrollIndicators(.never)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         Spacer(minLength: 0)
         Button("Close panel", systemImage: "xmark", action: close)
           .labelStyle(.iconOnly)
@@ -141,6 +147,8 @@ private struct InspectorPanel: View {
       switch selection.tab {
       case .artifacts:
         ArtifactsTab(client: model.client, files: files, selection: $selection)
+      case .changes:
+        ChangesTab(client: model.client, store: store)
       case .browser:
         BrowserTab(client: model.client, channel: store.thread?.channelID, shots: store.screenshots)
       case .terminal:

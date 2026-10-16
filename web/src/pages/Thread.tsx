@@ -5,6 +5,7 @@ import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
 import { LinkChannel } from '../link-previews.ts';
 import { ArtifactsTab } from '../components/thread/panel/ArtifactsTab.tsx';
 import { BrowserTab } from '../components/thread/panel/BrowserTab.tsx';
+import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
 import { DetailsTab } from '../components/thread/panel/DetailsTab.tsx';
 import { PANEL_MIN, THREAD_MIN, defaultPanelWidth, PanelResizeHandle } from '../components/thread/panel/PanelResizeHandle.tsx';
 import { NextThreadCard } from '../components/thread/NextThreadCard.tsx';
@@ -238,6 +239,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
           onChange={setPanelTab}
           tabs={[
             { id: 'artifacts', label: 'Artifacts', badge: files.length ? <span className="font-num text-[10.5px] text-fg-4">{files.length}</span> : undefined },
+            { id: 'changes', label: 'Changes' },
             { id: 'browser', label: 'Browser', badge: shots.length ? <span className="font-num text-[10.5px] text-fg-4">{shots.length}</span> : undefined },
             { id: 'terminal', label: 'Terminal' },
             { id: 'details', label: 'Details' },
@@ -247,6 +249,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
       </div>
       <div className="min-h-0 flex-1">
         {panelTab === 'artifacts' && <ArtifactsTab artifacts={files} selected={selectedArtifact} onSelect={setSelected} />}
+        {panelTab === 'changes' && <ChangesTab thread={thread} />}
         {panelTab === 'browser' && <BrowserTab channelId={thread.channel_id} shots={shots} />}
         {panelTab === 'terminal' && (
           <Suspense fallback={<Loading />}>
@@ -326,7 +329,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
               </Button>
             )}
             <span className="relative">
-              <IconButton icon="panel" label="Artifacts, browser, terminal, details" active={isMobile ? mobilePanel : panelOpen} onClick={togglePanel} />
+              <IconButton icon="panel" label="Artifacts, changes, browser, terminal, details" active={isMobile ? mobilePanel : panelOpen} onClick={togglePanel} />
               {artifactCount > 0 && (
                 <span className="pointer-events-none absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-fg px-1 font-num text-[9.5px] text-on-ink">{artifactCount}</span>
               )}

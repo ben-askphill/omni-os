@@ -1,53 +1,37 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo, useState, type ReactNode } from 'react';
+import { MAX_LINES, parseDiff, startsOpen, type DiffLine, type FileDiff } from '../diff.ts';
 import { Icon } from './ui.tsx';
 
-interface FileDiff {
-  path: string;
-  header: string[];
-  lines: string[];
-  add: number;
-  del: number;
-  binary: boolean;
-}
+const LINE_CLASS: Record<DiffLine['kind'], string> = {
+  hunk: 'bg-surface text-fg-3',
+  add: 'bg-[var(--diff-add)]',
+  del: 'bg-[var(--diff-del)]',
+  note: 'text-fg-4',
+  context: 'text-fg-2',
+};
 
-function parseDiff(src: string): FileDiff[] {
-  const files: FileDiff[] = [];
-  let cur: FileDiff | null = null;
-  let inHunk = false;
-  for (const line of src.split('\n')) {
-    if (line.startsWith('diff --git ')) {
-      const m = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
-      cur = { path: m ? m[2] : line.slice(11), header: [line], lines: [], add: 0, del: 0, binary: false };
-      files.push(cur);
-      inHunk = false;
-      continue;
-    }
-    if (!cur) {
-      if (line.trim()) {
-        cur = { path: '(diff)', header: [], lines: [], add: 0, del: 0, binary: false };
-        files.push(cur);
-      } else continue;
-    }
-    if (!inHunk && !line.startsWith('@@')) {
-      if (line.startsWith('Binary files')) cur.binary = true;
-      if (line.startsWith('rename to ')) cur.path = line.slice(10);
-      cur.header.push(line);
-      continue;
-    }
-    inHunk = true;
-    cur.lines.push(line);
-    if (line.startsWith('+')) cur.add++;
-    else if (line.startsWith('-')) cur.del++;
-  }
-  return files;
-}
-
-const MAX_LINES = 1500;
-
-const FileBlock = memo(function FileBlock({ f, defaultOpen }: { f: FileDiff; defaultOpen: boolean }) {
+/**
+ * One file of a diff: a header that opens and closes it, then its numbered lines. The PR page and a thread's
+ * Changes panel both use it. `label` replaces the path in the header, `badge` sits before it, and `notice` says why
+ * there are no lines (binary, too large).
+ */
+export const DiffFile = memo(function DiffFile({
+  file,
+  defaultOpen,
+  label,
+  badge,
+  notice,
+}: {
+  file: FileDiff;
+  defaultOpen: boolean;
+  label?: ReactNode;
+  badge?: ReactNode;
+  notice?: string | null;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   const [all, setAll] = useState(false);
-  const shown = all ? f.lines : f.lines.slice(0, MAX_LINES);
+  const shown = all ? file.lines : file.lines.slice(0, MAX_LINES);
+  const numbered = file.lines.some((l) => l.old !== null || l.new !== null);
   return (
     <div className="overflow-hidden rounded-[18px] shadow-[inset_0_0_0_1px_var(--line)]">
       <button
@@ -57,34 +41,36 @@ const FileBlock = memo(function FileBlock({ f, defaultOpen }: { f: FileDiff; def
         className="sticky top-0 z-[1] flex h-10 w-full min-w-0 items-center gap-2 bg-surface px-3.5 text-left text-[12.5px] transition-colors hover:bg-surface-2"
       >
         <Icon name="chevronRight" size={12} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
-        <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{f.path}</span>
-        <span className="shrink-0 font-num text-[11px] text-fg-2">+{f.add}</span>
-        <span className="shrink-0 font-num text-[11px] text-fg-3">-{f.del}</span>
+        {badge}
+        <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{label ?? file.path}</span>
+        <span className="shrink-0 font-num text-[11px] text-fg-2">+{file.add}</span>
+        <span className="shrink-0 font-num text-[11px] text-fg-3">-{file.del}</span>
       </button>
       {open && (
         <div className="scroll-thin overflow-x-auto bg-bg">
-          {f.binary && <div className="px-3 py-2 text-[12px] text-fg-3">Binary file</div>}
-          <pre className="min-w-max font-mono text-[11.5px] leading-[1.6]">
-            {shown.map((l, i) => {
-              const cls = l.startsWith('@@')
-                ? 'bg-surface text-fg-3'
-                : l.startsWith('+')
-                  ? 'bg-[var(--diff-add)]'
-                  : l.startsWith('-')
-                    ? 'bg-[var(--diff-del)]'
-                    : l.startsWith('\\')
-                      ? 'text-fg-4'
-                      : 'text-fg-2';
-              return (
-                <div key={i} className={`px-3 ${cls}`}>
-                  {l || ' '}
+          {(notice || (file.binary && notice === undefined)) && <div className="px-3 py-2 text-[12px] text-fg-3">{notice ?? 'Binary file'}</div>}
+          {shown.length > 0 && (
+            <pre className="min-w-max font-mono text-[11.5px] leading-[1.6]">
+              {shown.map((l, i) => (
+                <div key={i} className={`flex ${LINE_CLASS[l.kind]}`}>
+                  {numbered && (
+                    <>
+                      <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-4 select-none" aria-hidden>
+                        {l.old ?? ''}
+                      </span>
+                      <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-4 select-none" aria-hidden>
+                        {l.new ?? ''}
+                      </span>
+                    </>
+                  )}
+                  <span className={numbered ? 'pr-3 pl-1' : 'px-3'}>{l.text || ' '}</span>
                 </div>
-              );
-            })}
-          </pre>
-          {!all && f.lines.length > MAX_LINES && (
+              ))}
+            </pre>
+          )}
+          {!all && file.lines.length > MAX_LINES && (
             <button type="button" onClick={() => setAll(true)} className="h-9 w-full border-t border-line text-[12px] font-medium text-fg-3 transition-colors hover:bg-surface hover:text-fg">
-              Show {f.lines.length - MAX_LINES} more lines
+              Show {file.lines.length - MAX_LINES} more lines
             </button>
           )}
         </div>
@@ -93,15 +79,15 @@ const FileBlock = memo(function FileBlock({ f, defaultOpen }: { f: FileDiff; def
   );
 });
 
+/** A whole unified diff, file by file, as `gh pr diff` prints it. */
 export function DiffViewer({ diff }: { diff: string }) {
   const files = useMemo(() => parseDiff(diff), [diff]);
   if (!diff.trim()) return <div className="text-[13px] text-fg-3">No diff.</div>;
   if (!files.length) return <pre className="font-mono text-[12px] whitespace-pre-wrap">{diff}</pre>;
-  const big = files.length > 12;
   return (
     <div className="space-y-2">
       {files.map((f, i) => (
-        <FileBlock key={`${f.path}-${i}`} f={f} defaultOpen={!big || f.add + f.del < 200} />
+        <DiffFile key={`${f.path}-${i}`} file={f} defaultOpen={startsOpen(f, files.length)} />
       ))}
     </div>
   );

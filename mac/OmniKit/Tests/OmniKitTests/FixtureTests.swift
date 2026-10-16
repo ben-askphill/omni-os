@@ -63,6 +63,8 @@ func sseData(_ text: String) -> [String] {
     "limit-scheduled.json": { _ = try decodeFixture(RecoveryAnswer.self, "limit-scheduled.json") },
     "limit-cancelled.json": { _ = try decodeFixture(RecoveryAnswer.self, "limit-cancelled.json") },
     "limit-resumed.json": { _ = try decodeFixture(RecoveryAnswer.self, "limit-resumed.json") },
+    "changes.json": { _ = try decodeFixture(BranchChanges.self, "changes.json") },
+    "changes-unavailable.json": { _ = try decodeFixture(BranchChanges.self, "changes-unavailable.json") },
     // Hand-made: tests/sync-setup.test.ts checks the server still sends its keys and types.
     "sync-status.json": { _ = try decodeFixture(SyncStatus.self, "sync-status.json") },
     // Request bodies the app sends. SecretsTests compares them with what the client encodes.

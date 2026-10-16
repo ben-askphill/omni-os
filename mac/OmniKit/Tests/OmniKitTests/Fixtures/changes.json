@@ -1,0 +1,118 @@
+{
+  "available": true,
+  "cwd": "/tmp/omni-fixtures/data/worktrees/00000000-0000-4000-8000-000000000015",
+  "branch": "omni/00000000",
+  "head": "ccccccccccccccccccccccccccccccccccccccc1",
+  "base": {
+    "sha": "ccccccccccccccccccccccccccccccccccccccc2",
+    "ref": "main",
+    "how": "thread-start",
+    "recorded_at": "2026-01-05T09:00:00.000Z"
+  },
+  "groups": [
+    {
+      "kind": "committed",
+      "truncated": false,
+      "files": [
+        {
+          "status": "added",
+          "path": "README.md",
+          "old_path": null,
+          "additions": 1,
+          "deletions": 0,
+          "binary": false,
+          "diff": "diff --git a/README.md b/README.md\nnew file mode 100644\nindex 0000000..097bbee\n--- /dev/null\n+++ b/README.md\n@@ -0,0 +1 @@\n+# Widgets\n",
+          "omitted": null
+        },
+        {
+          "status": "added",
+          "path": "legacy.txt",
+          "old_path": null,
+          "additions": 1,
+          "deletions": 0,
+          "binary": false,
+          "diff": "diff --git a/legacy.txt b/legacy.txt\nnew file mode 100644\nindex 0000000..3367afd\n--- /dev/null\n+++ b/legacy.txt\n@@ -0,0 +1 @@\n+old\n",
+          "omitted": null
+        },
+        {
+          "status": "added",
+          "path": "logo.png",
+          "old_path": null,
+          "additions": null,
+          "deletions": null,
+          "binary": true,
+          "diff": "",
+          "omitted": "binary"
+        },
+        {
+          "status": "added",
+          "path": "src/cart.ts",
+          "old_path": null,
+          "additions": 3,
+          "deletions": 0,
+          "binary": false,
+          "diff": "diff --git a/src/cart.ts b/src/cart.ts\nnew file mode 100644\nindex 0000000..fa9fb2e\n--- /dev/null\n+++ b/src/cart.ts\n@@ -0,0 +1,3 @@\n+export function total(items: number[]) {\n+  return items.reduce((a, b) => a + b, 0);\n+}\n",
+          "omitted": null
+        }
+      ]
+    },
+    {
+      "kind": "staged",
+      "truncated": false,
+      "files": [
+        {
+          "status": "renamed",
+          "old_path": "README.md",
+          "path": "docs/README.md",
+          "additions": 0,
+          "deletions": 0,
+          "binary": false,
+          "diff": "diff --git a/README.md b/docs/README.md\nsimilarity index 100%\nrename from README.md\nrename to docs/README.md\n",
+          "omitted": null
+        }
+      ]
+    },
+    {
+      "kind": "unstaged",
+      "truncated": false,
+      "files": [
+        {
+          "status": "deleted",
+          "path": "legacy.txt",
+          "old_path": null,
+          "additions": 0,
+          "deletions": 1,
+          "binary": false,
+          "diff": "diff --git a/legacy.txt b/legacy.txt\ndeleted file mode 100644\nindex 3367afd..0000000\n--- a/legacy.txt\n+++ /dev/null\n@@ -1 +0,0 @@\n-old\n",
+          "omitted": null
+        },
+        {
+          "status": "modified",
+          "path": "src/cart.ts",
+          "old_path": null,
+          "additions": 1,
+          "deletions": 1,
+          "binary": false,
+          "diff": "diff --git a/src/cart.ts b/src/cart.ts\nindex fa9fb2e..a31fcc1 100644\n--- a/src/cart.ts\n+++ b/src/cart.ts\n@@ -1,3 +1,3 @@\n export function total(items: number[]) {\n-  return items.reduce((a, b) => a + b, 0);\n+  return items.reduce((sum, n) => sum + n, 0);\n }\n",
+          "omitted": null
+        }
+      ]
+    },
+    {
+      "kind": "untracked",
+      "files": [
+        {
+          "path": "notes.md",
+          "old_path": null,
+          "status": "added",
+          "deletions": 0,
+          "additions": 1,
+          "binary": false,
+          "diff": "diff --git a/notes.md b/notes.md\nnew file mode 100644\n--- /dev/null\n+++ b/notes.md\n@@ -0,0 +1 @@\n+Check rounding.\n",
+          "omitted": null
+        }
+      ],
+      "truncated": false
+    }
+  ]
+}

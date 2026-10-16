@@ -78,6 +78,9 @@ const NAMES = [
   'limit-scheduled.json',
   'limit-cancelled.json',
   'limit-resumed.json',
+  // The retried worktree thread's branch changes, every group, and a thread with no repo to read.
+  'changes.json',
+  'changes-unavailable.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -218,7 +221,7 @@ function capture(url: string) {
   };
 }
 
-type Thread = { id: string; status: string };
+type Thread = { id: string; status: string; cwd: string };
 type Detail = { thread: Thread; events: { kind: string }[]; pending?: { kind?: string }[] };
 
 async function scenario() {
@@ -418,6 +421,24 @@ async function scenario() {
   keep('setup-retried.json', await call('POST', `/threads/${wt.id}/setup/retry`, {}));
   await eventually(async () => (await detail(wt.id)).thread.status === 'done', 'the retried thread to run');
 
+  // Its branch changes before any PR: a commit, a staged rename, an unstaged edit and deletion, an untracked file.
+  const tree = (...args: string[]) => execFileSync('git', ['-C', wt.cwd, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', ...args]);
+  mkdirSync(join(wt.cwd, 'src'));
+  writeFileSync(join(wt.cwd, 'src', 'cart.ts'), 'export function total(items: number[]) {\n  return items.reduce((a, b) => a + b, 0);\n}\n');
+  writeFileSync(join(wt.cwd, 'README.md'), '# Widgets\n');
+  writeFileSync(join(wt.cwd, 'legacy.txt'), 'old\n');
+  writeFileSync(join(wt.cwd, 'logo.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 1, 2]));
+  tree('add', '.');
+  tree('commit', '-q', '-m', 'cart');
+  mkdirSync(join(wt.cwd, 'docs'));
+  tree('mv', 'README.md', 'docs/README.md');
+  writeFileSync(join(wt.cwd, 'src', 'cart.ts'), 'export function total(items: number[]) {\n  return items.reduce((sum, n) => sum + n, 0);\n}\n');
+  rmSync(join(wt.cwd, 'legacy.txt'));
+  writeFileSync(join(wt.cwd, 'notes.md'), 'Check rounding.\n');
+  const changed = keep('changes.json', await get(`/threads/${wt.id}/changes`)) as { available: boolean; groups: { kind: string; files: unknown[] }[] };
+  expect(changed.groups.map((g) => [g.kind, g.files.length])).toEqual([['committed', 4], ['staged', 1], ['unstaged', 2], ['untracked', 1]]);
+  keep('changes-unavailable.json', await get(`/threads/${id}/changes`));
+
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
@@ -546,6 +567,7 @@ function normalize(files: Map<Name, string>): Map<Name, string> {
   for (const dir of new Set([realpathSync(tmp), tmp])) places.push([dir, '/tmp/omni-fixtures']);
   places.push([ROOT, '/Users/omni/omni-os'], [homedir(), '/Users/omni']);
   const uuids = new Map<string, string>();
+  const shas = new Map<string, string>();
   const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
   // One fixed time for all: real times that tie in one run and not the next would otherwise churn the files.
   const TIME = /\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z/g;
@@ -562,6 +584,13 @@ function normalize(files: Map<Name, string>): Map<Name, string> {
       .replace(/("pid": )\d+/g, '$14242')
       .replace(/("port": )\d+/g, '$14799')
       .replace(/("gitHead": )"[0-9a-f]{40}"/g, `$1"${'0'.repeat(40)}"`)
+      // Commit ids (a thread's base and head), which carry the time they were made.
+      .replace(/\b(?!0{40})[0-9a-f]{40}\b/g, (sha) => {
+        if (!shas.has(sha)) shas.set(sha, String(shas.size + 1).padStart(40, 'c'));
+        return shas.get(sha)!;
+      })
+      // The worktree branch is named after the thread id, which is not a uuid.
+      .replace(/omni\/[0-9a-f]{8}\b/g, 'omni/00000000')
       .replace(/(\\*"duration_ms\\*":\s*)\d+/g, '$11000')
       // An automation run's title ends with the day it ran.
       .replace(/( · )\d{1,2} [A-Z][a-z]+/g, '$15 Jan');

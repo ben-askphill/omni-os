@@ -4,7 +4,7 @@ import type { InitP, ResultP } from '../components/thread/panel/DetailsTab.tsx';
 import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
 
-export type PanelTab = 'artifacts' | 'browser' | 'terminal' | 'details';
+export type PanelTab = 'artifacts' | 'changes' | 'browser' | 'terminal' | 'details';
 
 /**
  * The later of two snapshots of the thread. A send's reply can land after the stream has already
@@ -78,8 +78,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     artifactIds.current.add(a.id);
     if (isNew && a.kind === 'html') {
       setSelected(a.id);
-      // Never pull Ben out of the shell mid-command.
-      setPanelTab((t) => (t === 'terminal' ? t : 'artifacts'));
+      // Never pull Ben out of the shell mid-command, or out of the changes he is reading.
+      setPanelTab((t) => (t === 'terminal' || t === 'changes' ? t : 'artifacts'));
     }
     setArtifacts((prev) => (prev.some((x) => x.id === a.id) ? prev.map((x) => (x.id === a.id ? a : x)) : [...prev, a]));
   }, []);

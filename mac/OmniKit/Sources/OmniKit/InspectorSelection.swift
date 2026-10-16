@@ -4,11 +4,12 @@ import Foundation
 /// (ThreadPage in web/src/pages/Thread.tsx), with its first-artifact quirk fixed.
 public struct InspectorSelection: Equatable, Sendable {
   public enum Tab: String, CaseIterable, Sendable {
-    case artifacts, browser, terminal, details
+    case artifacts, changes, browser, terminal, details
 
     public var title: String {
       switch self {
       case .artifacts: "Artifacts"
+      case .changes: "Changes"
       case .browser: "Browser"
       case .terminal: "Terminal"
       case .details: "Details"
@@ -31,11 +32,11 @@ public struct InspectorSelection: Equatable, Sendable {
     return Self(tab: .details)
   }
 
-  /// A new HTML artifact is selected and shown, the first one too. The Terminal tab stays put, so a
-  /// page landing never pulls Ben out of the shell mid-command.
+  /// A new HTML artifact is selected and shown, the first one too. The Terminal and Changes tabs stay put, so a
+  /// page landing never pulls Ben out of the shell mid-command or out of the changes he is reading.
   public mutating func arrived(_ a: Artifact) {
     artifactID = a.id
-    if tab != .terminal { tab = .artifacts }
+    if tab != .terminal && tab != .changes { tab = .artifacts }
   }
 
   public mutating func open(artifact id: Int) {

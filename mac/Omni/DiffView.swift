@@ -1,7 +1,7 @@
 import OmniKit
 import SwiftUI
 
-/// A PR's diff, file by file. Which files start open and the line cap follow DiffViewer.tsx.
+/// A PR's diff, file by file. Which files start open and the line cap follow web/src/diff.ts.
 struct DiffView: View {
   let diff: String
 
@@ -23,14 +23,23 @@ struct DiffView: View {
   }
 }
 
-private struct DiffFileView: View {
+/// One file of a diff: a header that opens and closes it, then its numbered lines, as `DiffFile` in DiffViewer.tsx.
+/// The PR page and a thread's Changes tab both use it. `label` replaces the path in the header, `badge` sits before
+/// it, and `notice` says why there are no lines (binary, too large).
+struct DiffFileView: View {
   let file: FileDiff
+  var label: String?
+  var badge: String?
+  var notice: String?
   @State private var open: Bool
   @State private var showAll = false
   @State private var hover = false
 
-  init(file: FileDiff, startsOpen: Bool) {
+  init(file: FileDiff, startsOpen: Bool, label: String? = nil, badge: String? = nil, notice: String? = nil) {
     self.file = file
+    self.label = label
+    self.badge = badge
+    self.notice = notice
     _open = State(initialValue: startsOpen)
   }
 
@@ -41,7 +50,10 @@ private struct DiffFileView: View {
       } label: {
         HStack(spacing: z(8)) {
           Chevron(open: open, color: Tok.fg3)
-          Text(file.path)
+          if let badge {
+            Text(badge).font(.omni(size: 11, design: .monospaced)).foregroundStyle(Tok.fg3).frame(width: z(12))
+          }
+          Text(label ?? file.path)
             .font(.omni(size: 12, design: .monospaced))
             .foregroundStyle(Tok.fg)
             .lineLimit(1)
@@ -63,21 +75,30 @@ private struct DiffFileView: View {
       .accessibilityValue(open ? "Expanded" : "Collapsed")
 
       if open {
-        if file.binary {
-          Text("Binary file").font(.omni(size: 12)).foregroundStyle(Tok.fg3)
+        if let text = notice ?? (file.binary ? "Binary file" : nil) {
+          Text(text).font(.omni(size: 12)).foregroundStyle(Tok.fg3)
             .padding(.horizontal, z(12)).padding(.vertical, z(8))
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Tok.bg)
         }
+        let numbered = file.numbered
         LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(Array(file.shown(all: showAll).enumerated()), id: \.offset) { _, line in
-            Text(line.isEmpty ? " " : line)
-              .font(.omni(size: ThreadStyle.mono, design: .monospaced))
-              .lineSpacing(0)
-              .foregroundStyle(color(line))
-              .padding(.horizontal, z(12))
-              .padding(.vertical, z(2))
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .background(background(line))
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+              if numbered {
+                number(line.old)
+                number(line.new)
+              }
+              Text(line.text.isEmpty ? " " : line.text)
+                .foregroundStyle(color(line.kind))
+                .padding(.leading, numbered ? z(4) : z(12))
+                .padding(.trailing, z(12))
+            }
+            .font(.omni(size: ThreadStyle.mono, design: .monospaced))
+            .lineSpacing(0)
+            .padding(.vertical, z(2))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(background(line.kind))
           }
         }
         .textSelection(.enabled)
@@ -97,17 +118,30 @@ private struct DiffFileView: View {
     .overlay { RoundedRectangle(cornerRadius: z(18), style: .continuous).strokeBorder(Tok.line) }
   }
 
-  private func color(_ line: String) -> Color {
-    if line.hasPrefix("@@") { return Tok.fg3 }
-    if line.hasPrefix("\\") { return Tok.fg4 }
-    if line.hasPrefix("+") || line.hasPrefix("-") { return Tok.fg }
-    return Tok.fg2
+  private func number(_ n: Int?) -> some View {
+    Text(n.map(String.init) ?? "")
+      .foregroundStyle(Tok.fg4)
+      .monospacedDigit()
+      .frame(width: z(36), alignment: .trailing)
+      .padding(.trailing, z(4))
+      .accessibilityHidden(true)
   }
 
-  private func background(_ line: String) -> Color {
-    if line.hasPrefix("@@") { return Tok.surface }
-    if line.hasPrefix("+") { return Tok.diffAdd }
-    if line.hasPrefix("-") { return Tok.diffDelete }
-    return .clear
+  private func color(_ kind: DiffLine.Kind) -> Color {
+    switch kind {
+    case .hunk: Tok.fg3
+    case .note: Tok.fg4
+    case .add, .del: Tok.fg
+    case .context: Tok.fg2
+    }
+  }
+
+  private func background(_ kind: DiffLine.Kind) -> Color {
+    switch kind {
+    case .hunk: Tok.surface
+    case .add: Tok.diffAdd
+    case .del: Tok.diffDelete
+    default: .clear
+    }
   }
 }

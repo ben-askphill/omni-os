@@ -175,6 +175,16 @@ CREATE TABLE IF NOT EXISTS result_reads (
   read_at TEXT NOT NULL
 );
 
+-- The commit a thread's Changes panel compares its checkout to (server/changes.ts), recorded once so it stays put
+-- across refreshes: where its worktree was cut, else the merge base with the repo's default branch. Local, not synced.
+CREATE TABLE IF NOT EXISTS thread_bases (
+  thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+  sha TEXT NOT NULL,
+  ref TEXT NOT NULL,
+  how TEXT NOT NULL,
+  recorded_at TEXT NOT NULL
+);
+
 -- A thread the other Mac filed in a folder that has not arrived here yet. The folder's arrival puts it there.
 CREATE TABLE IF NOT EXISTS sync_folder_wait (
   thread_id TEXT PRIMARY KEY,

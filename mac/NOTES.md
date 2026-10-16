@@ -570,3 +570,10 @@ Wired (both composers):
 - Buttons and links inside a thread window still set `model.route`, so they navigate the main window; the thread window brings it forward when it changes the route while key.
 - QA: `{"openThread": "<id>"}` opens the window; snapshots write it as `<name>-window<n>.png`.
 - The composer and inspector show in the thread window once #64 puts them in `ThreadScreen`.
+
+## Changes tab (#207)
+
+- The inspector's Changes tab (`Omni/ChangesTab.swift`), as the Web UI's `ChangesTab.tsx`: GET /api/threads/:id/changes (`server/changes.ts`), the thread's checkout against the base commit Omni recorded (`thread_bases`, local), in committed, staged, unstaged and untracked groups. Loads when opened, when a turn ends and on Refresh. A thread with no checkout here (Hermes, no repo, another Mac) shows the server's reason.
+- OmniKit: `Changes.swift` (`BranchChanges`, `ChangesView`, `OmniClient.changes(forThread:)`); `DiffParser.swift` now numbers lines (`DiffLine`, `FileDiff.rows`), the same model as `web/src/diff.ts`. `DiffFileView` in `DiffView.swift` draws one file for the PR page and the Changes tab (label, status badge, notice). Fixtures `changes.json`, `changes-unavailable.json`.
+- The inspector's tabs scroll sideways when the panel is too narrow for all five.
+- QA step: `{"inspector": "changes"}`.

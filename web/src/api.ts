@@ -151,6 +151,40 @@ export interface PRDetail extends PRSummary {
   diff: string;
 }
 
+/** GET /api/threads/:id/changes (server/changes.ts): a thread's branch changes since its base commit, before any PR. */
+export type ChangeKind = 'committed' | 'staged' | 'unstaged' | 'untracked';
+export type ChangeStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed' | 'unmerged';
+/** Why a file's diff text was left out. */
+export type DiffOmitted = 'binary' | 'too_large' | 'limit' | 'symlink' | 'unavailable';
+export interface ChangedFile {
+  path: string;
+  old_path: string | null;
+  status: ChangeStatus;
+  /** Null when git cannot count them (binary) or the file was too big to read. */
+  additions: number | null;
+  deletions: number | null;
+  binary: boolean;
+  omitted: DiffOmitted | null;
+  /** This file's part of a unified diff. Empty when omitted. */
+  diff: string;
+}
+export interface ChangeGroup {
+  kind: ChangeKind;
+  files: ChangedFile[];
+  truncated: boolean;
+}
+export interface ChangeBase {
+  sha: string;
+  /** The branch it came from, or `HEAD`. */
+  ref: string;
+  /** `thread-start`: where the worktree was cut. `merge-base`: with the default branch, for a thread without one. */
+  how: 'thread-start' | 'merge-base';
+  recorded_at: string;
+}
+export type BranchChanges =
+  | { available: false; reason: string }
+  | { available: true; cwd: string; branch: string | null; head: string; base: ChangeBase; groups: ChangeGroup[] };
+
 export interface AutomationRun {
   thread_id: string | null;
   trigger: string;

@@ -27,5 +27,7 @@ export type { DeliveryState, FileDigest, MessageRequest } from './db/repos/reque
 export { EDITABLE, PARKED, fileDigests, messageRequests, requestFingerprint } from './db/repos/requests.ts';
 export type { Completion, CompletionStatus, NeedsYou, NeedsYouBlocker, NeedsYouItem, NeedsYouResult, ResultRead } from './db/repos/needs-you.ts';
 export { advanceRead, completions, needsYou, resultReads } from './db/repos/needs-you.ts';
+export type { BaseHow, ThreadBase } from './db/repos/thread-bases.ts';
+export { threadBases } from './db/repos/thread-bases.ts';
 export type { SyncEntity, SyncOp, OutboxRow } from './db/sync.ts';
 export { SEED_TS, outbox, syncMeta } from './db/sync.ts';
