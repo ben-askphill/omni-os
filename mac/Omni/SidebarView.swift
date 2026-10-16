@@ -15,16 +15,17 @@ struct SidebarView: View {
   static let width: CGFloat = 252
   /// As wide as Ben last dragged its right edge, in unzoomed points.
   @AppStorage(sidebarWidthKey) private var width = Double(Self.width)
-  /// Channels whose folders and threads are hidden under their name, one id per line.
-  @AppStorage("sidebar.collapsedChannels") private var collapsedIDs = ""
-
-  private var collapsed: Set<String> { Set(collapsedIDs.split(separator: "\n").map(String.init)) }
+  /// Channels whose folders and threads are hidden under their name. State, not AppStorage, so the change animates;
+  /// saved as `sidebar.collapsedChannels`, one id per line.
+  @State private var collapsed = Set(
+    (UserDefaults.standard.string(forKey: collapsedChannelsKey) ?? "").split(separator: "\n").map(String.init))
 
   private func setChannel(_ id: String, open: Bool) {
-    var ids = collapsed
-    guard ids.contains(id) == open else { return }
-    if open { ids.remove(id) } else { ids.insert(id) }
-    withAnimation(Motion.spring) { collapsedIDs = ids.sorted().joined(separator: "\n") }
+    guard collapsed.contains(id) == open else { return }
+    withAnimation(Motion.spring) {
+      if open { collapsed.remove(id) } else { collapsed.insert(id) }
+    }
+    UserDefaults.standard.set(collapsed.sorted().joined(separator: "\n"), forKey: collapsedChannelsKey)
   }
 
   private var selected: SidebarItem? { SidebarItem(route: model.route) }
@@ -315,6 +316,7 @@ struct SidebarView: View {
 }
 
 let sidebarWidthKey = "sidebar.width"
+let collapsedChannelsKey = "sidebar.collapsedChannels"
 
 /// The sidebar's right edge: drag it to make the sidebar 200 to 420pt wide, double-click it to put it back.
 struct SidebarResizeHandle: View {
