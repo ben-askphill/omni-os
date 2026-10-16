@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thermo Review 2026-10-16</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --fg: #1d1c1a; --muted: #6b6760; --line: #e3dfd6; --card: #ffffff;
+    --code: #f2efe8; --link: #2457c5;
+    --p1: #b42318; --p1-bg: #fdecea; --p2: #8a5a00; --p2-bg: #fdf3dc; --ok: #1f7a3a; --ok-bg: #e6f4ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614; --fg: #ecebe6; --muted: #a29e95; --line: #34322d; --card: #1e1d1a;
+      --code: #26241f; --link: #8fb0ff;
+      --p1: #ff8a7a; --p1-bg: #3a1a16; --p2: #f2c66d; --p2-bg: #352a12; --ok: #7fd49a; --ok-bg: #16301f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161614; --fg: #ecebe6; --muted: #a29e95; --line: #34322d; --card: #1e1d1a;
+    --code: #26241f; --link: #8fb0ff;
+    --p1: #ff8a7a; --p1-bg: #3a1a16; --p2: #f2c66d; --p2-bg: #352a12; --ok: #7fd49a; --ok-bg: #16301f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 26px; line-height: 1.25; margin: 0 0 4px; }
+  h2 { font-size: 19px; margin: 40px 0 10px; padding-top: 16px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 22px 0 6px; }
+  p, li { overflow-wrap: anywhere; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+  a { color: var(--link); }
+  code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+  pre { background: var(--code); padding: 10px 12px; border-radius: 6px; overflow-x: auto; font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  pre code { background: none; padding: 0; }
+  .finding { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 4px 18px 14px; margin: 18px 0; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; margin-right: 6px; vertical-align: 2px; }
+  .p1 { color: var(--p1); background: var(--p1-bg); }
+  .p2 { color: var(--p2); background: var(--p2-bg); }
+  .ok { color: var(--ok); background: var(--ok-bg); }
+  .kind { color: var(--muted); background: var(--code); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; word-break: break-word; }
+  th { color: var(--muted); font-weight: 600; }
+  .callout { border-left: 3px solid var(--line); padding: 2px 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Omni OS: thermo code-quality review</h1>
+<p class="meta">Review dated 16 October 2026 · audit baseline <code>main @ d4045555944e1b107d53e8f833d202857635a450</code> · committed with the fix PR for findings 1 and 2</p>
+
+<p>This is the durable record of a targeted code-quality audit of the runner, harness adapter boundary, sync file transfer and thread rendering paths. It keeps the original evidence and labels each finding by what kind of claim it is:</p>
+<ul>
+  <li><span class="tag p1">Confirmed bug</span> reproduced deterministically against temp data dirs and the in-memory relay.</li>
+  <li><span class="tag kind">Traced risk</span> supported by reading the code, not reproduced end to end.</li>
+  <li><span class="tag p2">Architecture debt</span> a structural problem, not a claim that anything fails today.</li>
+</ul>
+
+<h2>Scope and evidence</h2>
+<ul>
+  <li>Reviewed: runner lifecycle modules, the harness session contract and Codex input conversion, sync worker/apply/thread ownership/file transfer, the thread API, the Web composer and thread session state, and Markdown rendering in both clients.</li>
+  <li>Not reviewed: every harness internal, browser control, every Swift view, full history.</li>
+  <li>Baseline checks at the audit: <code>npm test</code> 111 files passed, 2 skipped; 1,045 tests passed, 7 skipped. <code>npm run typecheck</code> passed.</li>
+  <li>Two deterministic reproductions ran against temporary data and home dirs with <code>MemoryTransport</code>. No live database, Keychain, harness session or server was used.</li>
+  <li>Mac tests and browser rendering checks were not run at audit time. The renderer overlap in finding 5 was not reproduced.</li>
+</ul>
+
+<h2>Findings</h2>
+
+<div class="finding">
+<h3><span class="tag p1">P1 · Confirmed bug</span>1. A timed-out session download can overwrite a newly running session</h3>
+<p><strong>Evidence (baseline).</strong> <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/sync/files.ts#L313-L331"><code>server/sync/files.ts:313-331</code></a>: <code>pullSession</code> checks the local session is unchanged, awaits <code>getObject</code> at line 326, then replaces the file at line 331 without checking again. <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/sync/files.ts#L452-L462"><code>beforeResume</code> (452-462)</a> stops waiting after 15 s but does not cancel or fence the download, running or still queued behind <code>serial()</code>. <code>spawnLive</code> then starts the harness.</p>
+<p><strong>Failure.</strong> A slow download passes the unchanged check; the timeout lets the harness resume and append a turn; the download lands and replaces that file with the remote copy. Per-thread serialization orders sync jobs only; it does not lock out the harness writing the same file.</p>
+<p><strong>Reproduction.</strong> Temp home and data dirs, <code>MemoryTransport</code>. <code>pushSession</code> an initial file (<code>previous turn</code>), change the relay manifest and session body to <code>remote turn</code>, override <code>relay.getObject</code> for the session object so it writes <code>new local turn while download pending</code> locally before returning the remote body, then <code>await pullSession</code>:</p>
+<pre><code>{"reproduction":"local session changes while download pending","localEditPreserved":false,"finalBody":"remote turn"}</code></pre>
+<p><strong>Fixed in this PR (bounded).</strong></p>
+<ul>
+  <li><code>beforeResume</code> returns an explicit outcome: <code>ready</code>, <code>failed</code>, <code>timed-out</code> or <code>skipped</code>. Whatever the outcome, it closes an <code>AbortController</code> fence when it returns: ownership passes to the harness at that point.</li>
+  <li>A job still queued behind another job of the thread checks the fence before it starts and never touches the relay.</li>
+  <li><code>pullSession</code> records each file's size:mtime fingerprint before its download, fetches the whole set, then in one synchronous step with no await re-checks the fence and every fingerprint and either renames all files into place or none. A Cursor <code>store.db</code> and its <code>-wal</code> can no longer land from two different Macs on a timeout.</li>
+  <li><code>pullThreadFiles</code> re-checks the fence and that the file is still absent right before its rename.</li>
+  <li>A kept local file is not recorded as synced, so the next pull keeps it too and the next push uploads it.</li>
+</ul>
+<p><strong>Traced risk, not fixed here.</strong> <code>endTurn</code> marks the thread finished before <code>turnFinished</code> uploads its files in a delayed background job, so another Mac can see a finished row while only an older session manifest exists. Cross-Mac continuation needs an explicit session revision/readiness marker published after the upload, required before resuming. Not reproduced with two Macs. Tracked separately.</p>
+</div>
+
+<div class="finding">
+<h3><span class="tag p1">P1 · Confirmed bug</span>2. File sync hashes one version and uploads another</h3>
+<p><strong>Evidence (baseline).</strong> <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/sync/files.ts#L155-L164"><code>server/sync/files.ts:155-164</code></a>: <code>pushThreadFiles</code> hashes the file (155), awaits <code>hasObject</code> (157), reads the file again for <code>putObject</code> (158), then <code>remember</code> records the post-await size and mtime against the earlier hash (164). <code>pushSession</code> has the same shape.</p>
+<p><strong>Failure.</strong> A file that changes during the await is stored under the wrong content address. The receiver's hash check rejects it, and the local cache keeps the false hash against the edited file's size and mtime, so a normal retry does not repair it.</p>
+<p><strong>Reproduction.</strong> Temp <code>OMNI_DATA_DIR</code> set before the dynamic imports; <code>artifacts/report.html</code> = <code>version-one</code>; <code>MemoryTransport.hasObject</code> overridden to rewrite the file to <code>version-two-with-edit</code> and return false; <code>pushThreadFiles</code>:</p>
+<pre><code>{"reproduction":"file changes during hasObject","manifestHashMatchesStoredBlob":false,"storedBody":"version-two-with-edit"}</code></pre>
+<p><strong>Fixed in this PR.</strong> One immutable snapshot per upload: bytes, their sha, size and the mtime from just before the read. Those exact bytes are uploaded, the manifest lists that snapshot, and the file is only recorded as synced if its current size and mtime still match the snapshot. An edited file stays dirty and goes up on the next pass. <code>pushSession</code> uses the same snapshot.</p>
+</div>
+
+<div class="finding">
+<h3><span class="tag p2">P2 · Architecture debt</span>3. The runner was split into files without splitting ownership</h3>
+<p><strong>Evidence.</strong> <code>Live</code> holds process startup, turn state, CLI turn state, replay tracking, queue state, interrupt acknowledgement, shutdown, browser ownership, tasks, mods and exit bookkeeping, and several modules mutate it directly. <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/runner/state.ts#L163"><code>server/runner/state.ts:163</code></a> adds mutable callback slots and <code>bindPump</code>, <code>bindReportToParent</code>, <code>bindEndTasks</code> to work around module cycles; <code>runner.ts</code> imports modules for their registration side effects. The eight runner modules total 1,631 lines.</p>
+<p><strong>Why it matters.</strong> Lifecycle invariants live in the order of mutations across queue, records, session and spawn. Startup, active and closing states are combinations of nullable fields and booleans rather than a small set of valid states.</p>
+<p><strong>Remedy.</strong> One composition root owns the live-session registry and builds a per-thread controller. Keep process lifecycle and turn lifecycle as separate explicit models (a warm process can outlive a turn). Route start, replay, result, interrupt and exit through the owner, inject scheduler and reporting effects at construction, delete the bind registry. No generic event framework. Not a claim that the current import order fails. Not implemented here.</p>
+</div>
+
+<div class="finding">
+<h3><span class="tag p2">P2 · Architecture debt</span>4. The adapter boundary is Claude-shaped and untyped</h3>
+<p><strong>Evidence.</strong> <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/harness/adapter.ts#L64"><code>server/harness/adapter.ts:64</code></a>: <code>HarnessSession.write(obj: unknown)</code> is documented as receiving Claude-shaped messages. <code>messageBody</code>/<code>userLine</code> build Claude text/image blocks, read attachments synchronously as base64, and carry the original message again in <code>_omni</code>. <a href="https://github.com/ben-askphill/omni-os/blob/d4045555944e1b107d53e8f833d202857635a450/server/harness/codex/adapter.ts#L75"><code>codex/adapter.ts:75</code></a> <code>omniOf</code> accepts <code>any</code> and casts the side channel back.</p>
+<p><strong>Remedy.</strong> A typed <code>send(message)</code> and <code>interrupt(requestId)</code>, or a small discriminated command union. Encoding, image reads and wire envelopes move into each adapter. Delete <code>_omni</code> and <code>omniOf</code>. Not implemented here.</p>
+</div>
+
+<div class="finding">
+<h3><span class="tag p2">P2 · Architecture debt</span>5. A local prompt edit turns a renderer limitation into a global content contract</h3>
+<p><strong>Where it actually is.</strong> This edit is <em>not on <code>main</code></em> and not on <code>origin</code>. At the time of this PR it is an uncommitted change to <code>server/runner/prompts.ts</code> in the canonical local checkout (<code>/Users/benrosenberg/omni-os</code>), so the locally running server already sends it to every agent. It is not part of this PR.</p>
+<ul>
+  <li>Around line 52 it replaces "Prefer a self-contained .html file for anything visual" with: write guides, reports and any document with headings, tables or code blocks as self-contained HTML, "never as Markdown: Omni's Markdown renderer has layout bugs".</li>
+  <li>Around line 73 it adds: keep every table cell under about 40 characters and never put a sentence in a cell, because "Omni does not wrap long cells, so they overlap the next row".</li>
+</ul>
+<p><strong>Problem.</strong> Every harness and both clients inherit a content restriction to work around a layout defect. A character count is unrelated to rendered width, and it cannot fix historic replies or content from other sources. The Web renderer has its own table overflow styles; the Mac app has a separate table view (<code>mac/Omni/MarkdownView.swift</code>). Neither overlap was reproduced, so this is an ownership finding, not a diagnosis of which view is broken.</p>
+<p><strong>Remedy.</strong> Keep HTML as an artifact preference if wanted. Reproduce and fix wrapping in the affected renderer with a long-cell fixture shared by both clients, then remove the 40-character rule. Treat the prompt text as a temporary workaround with a removal issue. Not implemented here.</p>
+</div>
+
+<h2>Size and decomposition check</h2>
+<ul>
+  <li>No tracked local change pushes a file past 1,000 lines.</li>
+  <li><code>web/src/index.css</code> 1,141 lines; size alone is not a blocker.</li>
+  <li><code>Composer.tsx</code> 946, <code>Transcript.tsx</code> 762, <code>Sidebar.tsx</code> 658. The composer mixes attachments, menu coordination, new-thread defaults, submission and reply controls: extract a cohesive editor/input owner before it grows further.</li>
+  <li>Largest Swift file found: <code>QARunner.swift</code>, 687 lines.</li>
+</ul>
+
+<h2>What this PR ships and what it does not</h2>
+<table>
+  <thead><tr><th style="width:36%">Item</th><th style="width:22%">Status</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>1. Late session download</td><td><span class="tag ok">Fixed</span></td><td>Fence, explicit outcomes, all-or-none commit</td></tr>
+    <tr><td>2. Hash/upload mismatch</td><td><span class="tag ok">Fixed</span></td><td>One snapshot per upload</td></tr>
+    <tr><td>1b. Cross-Mac readiness</td><td>Tracked</td><td>Needs a session revision protocol</td></tr>
+    <tr><td>3. Runner ownership</td><td>Tracked</td><td>Refactor, separate PR</td></tr>
+    <tr><td>4. Adapter boundary</td><td>Tracked</td><td>Refactor, separate PR</td></tr>
+    <tr><td>5. Prompt workaround</td><td>Tracked</td><td>Local only; fix renderers first</td></tr>
+  </tbody>
+</table>
+
+<h3>Regression tests added</h3>
+<p>All drive the interleaving from inside the relay call, so they are deterministic. Each fails on the baseline <code>files.ts</code>, and each guard in the fix was removed in turn to confirm a test fails without it.</p>
+<ul>
+  <li><code>tests/sync-files.test.ts</code>: keeps a session the harness wrote while the newer one downloaded, and keeps it on the next pull; writes none of a Cursor chat when one file changed during the download; keeps a thread file made here during its download; stores an artifact edited during upload under the hash of the bytes sent, the other Mac accepts it, and the edit goes up on the retry; same for a session file.</li>
+  <li><code>tests/sync-files-hooks.test.ts</code> (real runner, fake CLI): a download that times out mid-transfer writes nothing; a download queued behind another job of the thread when it times out never starts (never reads the manifest); a failing download reports <code>failed</code> and the next resume reports <code>ready</code>.</li>
+</ul>
+
+<h3>Known residual limits of the fix</h3>
+<ul>
+  <li>There is still a sub-millisecond window between the final fingerprint check and <code>rename</code> in which another process can write. Closing it needs a cross-process file lock with the harness, which the CLIs do not offer.</li>
+  <li>The per-file "changed here since the last sync, keep it" rule that predates this fix can still keep one file of a multi-file Cursor chat while taking another. The new all-or-none step only covers changes during the download.</li>
+  <li>After a timeout the resume job keeps the thread's job queue until its relay call settles; transports have no per-call timeout.</li>
+  <li>When the resume times out, the harness runs on this Mac's older session and the next upload replaces the other Mac's newer one on the relay (last writer wins). Losing remote turns is preferable to clobbering a local turn on disk, but it is a real tradeoff, and the readiness protocol (1b) is the real fix.</li>
+</ul>
+</main>
+</body>
+</html>
