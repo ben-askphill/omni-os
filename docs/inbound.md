@@ -16,14 +16,16 @@ Content-Type: application/json
 | --- | --- | --- |
 | `text` | yes | The message, up to 20,000 characters |
 | `sender` | no | Who wrote it on the other side, shown to the agent |
-| `thread_id` | no | Post into this thread, queued after its current turn |
-| `channel` | no | A new thread's channel. The Conductor when unset |
+| `thread_id` | no | Post into a thread a bot started, queued after its current turn |
+| `channel` | no | A new thread's channel, one of `OMNI_INBOUND_CHANNELS`. The Conductor when unset |
 | `title` | no | A new thread's title. Generated when unset |
 | `request_id` | no | The sender's id for this message, so a retry into a thread is not sent twice |
 
-The answer is `202` with `{"thread_id", "created", ...}`. A missing or wrong token, and a name with no token set, all get `401`. An unknown thread or channel gets `404`.
+The answer is `202` with `{"thread_id", "created", ...}`. A missing or wrong token, and a name with no token set, all get `401`. A thread a bot did not start, and a channel outside the allowlist, get the same `404` as one that does not exist.
 
-The agent reads the text after a line naming the sender and the integration, saying it was not typed by Ben. The Web UI and the Mac app label the message "From a bot" and list the thread as Inbound.
+`OMNI_INBOUND_CHANNELS` (comma-separated, default `conductor`) is where a bot may start threads. The default leaves the Conductor to decide what runs where.
+
+The agent reads a line naming the sender and the integration, saying it was not typed by Ben, then the text between `--- message` and `--- end of message`. The sender name is kept to one line, and a fence line inside the text is broken up. `@` tokens in a bot's text stay text: they are not resolved to files, since the Mentions note says Ben wrote them. The Web UI and the Mac app label the message "From a bot" and list the thread as Inbound.
 
 ## Setup
 

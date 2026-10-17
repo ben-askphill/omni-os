@@ -156,7 +156,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const { text, slash, commands } = slashFor(input.prompt, () => peekCommands(harness as HarnessId, folder).commands);
   deliver(thread.id, {
     uuid: randomUUID(),
-    text: withMentions(text, { cwd: thread.cwd, threadId: thread.id }),
+    text: thread.source === 'inbound' ? text : withMentions(text, { cwd: thread.cwd, threadId: thread.id }),
     mode: 'steer',
     attachments,
     commands,
@@ -264,10 +264,12 @@ export function messageFor(
 ): Msg {
   const attachments = opts.attachments?.length ? opts.attachments : undefined;
   const { text, slash, commands } = slashFor(prompt, () => (threadCommands(thread.id) ?? peekCommands(thread.harness as HarnessId, thread.cwd)).commands);
+  // A bot's @ tokens are left as text: the Mentions note says Ben wrote them.
+  const fromBot = (opts.source ?? opts.from) === 'inbound';
   return {
     uuid: opts.uuid,
     requestId: opts.requestId,
-    text: withMentions(text, { cwd: thread.cwd, threadId: thread.id }),
+    text: fromBot ? text : withMentions(text, { cwd: thread.cwd, threadId: thread.id }),
     mode: opts.mode ?? 'steer',
     attachments,
     commands,
