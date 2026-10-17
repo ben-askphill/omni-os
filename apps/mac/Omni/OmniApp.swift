@@ -12,7 +12,7 @@ struct OmniApp: App {
     }
     .defaultSize(width: 1100, height: 720)
     .commands {
-      OmniCommands(model: delegate.model)
+      OmniCommands(model: delegate.model, quickPrompt: delegate.quickPrompt)
     }
 
     WindowGroup("Artifact", id: "artifact", for: ArtifactRef.self) { $ref in
@@ -25,7 +25,7 @@ struct OmniApp: App {
     .defaultSize(width: 780, height: 720)
 
     Settings {
-      SettingsView(model: delegate.model, appearance: delegate.appearance)
+      SettingsView(model: delegate.model, appearance: delegate.appearance, quickPrompt: delegate.quickPrompt)
     }
   }
 }
@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private(set) lazy var model: AppModel = makeModel()
   let appearance = AppearanceSettings()
   private(set) lazy var updater = Updater(model: model)
+  private(set) lazy var quickPrompt = QuickPromptController(model: model)
   private var quitting = false
   private var events: SystemEvents?
   private var notifications: SystemNotifications?
@@ -70,8 +71,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     model.attention.poster = notifications
     Task { await model.attention.refreshPermission() }
     #if DEBUG
-    if let qa { QARunner.start(qa, model: model) }
+    // A QA run leaves the shortcut to the real app.
+    if let qa {
+      QARunner.quickPrompt = quickPrompt
+      QARunner.start(qa, model: model)
+      return
+    }
     #endif
+    quickPrompt.start()
   }
 
   func applicationDidBecomeActive(_ notification: Notification) {
@@ -114,16 +121,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   /// The server keeps running after the app quits. It is not tied to the app.
-  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+  /// With the Quick Prompt on, the app stays to answer its shortcut.
+  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { !quickPrompt.settings.enabled }
 }
 
 struct OmniCommands: Commands {
   let model: AppModel
+  let quickPrompt: QuickPromptController
 
   var body: some Commands {
     CommandGroup(replacing: .newItem) {
       NewThreadButton(model: model)
         .keyboardShortcut("n")
+      Button("Quick Prompt") { quickPrompt.show(dictate: quickPrompt.settings.dictate) }
       OpenInNewWindowCommand()
     }
     CommandGroup(after: .pasteboard) {

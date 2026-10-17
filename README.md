@@ -226,6 +226,7 @@ On each Mac: Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the UR
 
 - `scripts/omni.sh "prompt" -c volero -r researcher`: start a thread from the shell (`OMNI_URL` points it at another server)
 - claude-bar hotkey prompt: set `"target": "omni"` in its config to send captures here
+- Mac app Quick Prompt: Ctrl-Option-Space in any app opens a floating prompt, starts Wispr Flow, and sends what you say to the Conductor. Settings, Quick Prompt changes the shortcut and opens Omni at login
 - `npm run import-history -- --days 30`: pull existing Claude Code sessions into Omni as resumable threads
 
 ## Web UI and Mac app

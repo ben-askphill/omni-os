@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsView: View {
   @Bindable var model: AppModel
   let appearance: AppearanceSettings
+  let quickPrompt: QuickPromptController
 
   var body: some View {
     TabView(selection: $model.settingsTab) {
@@ -27,6 +28,10 @@ struct SettingsView: View {
       Tab("Appearance", systemImage: "circle.lefthalf.filled", value: .appearance) {
         AppearanceSettingsView(appearance: appearance, zoom: UIZoom.settings)
           .frame(width: 560, height: 360)
+      }
+      Tab("Quick Prompt", systemImage: "command", value: .quickPrompt) {
+        QuickPromptSettingsView(controller: quickPrompt, settings: quickPrompt.settings)
+          .frame(width: z(560), height: 600)
       }
     }
   }
