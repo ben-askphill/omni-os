@@ -7,7 +7,7 @@ export type ThreadStatus = 'queued' | 'running' | 'done' | 'failed' | 'stopped' 
 export type ThreadSetup = 'preparing' | 'failed';
 /** A turn stopped at the harness's usage limit: `limited` until Ben acts, `scheduled` to resume at the reset time. */
 export type ThreadLimit = 'limited' | 'scheduled';
-export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team';
+export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team' | 'inbound';
 
 export interface Thread {
   id: string;

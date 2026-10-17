@@ -37,6 +37,8 @@ public struct ThreadSource: OpenEnum {
   public static let conductor: Self = "conductor"
   public static let `import`: Self = "import"
   public static let capture: Self = "capture"
+  /// Started by a bot outside this Mac through POST /api/inbound/:name.
+  public static let inbound: Self = "inbound"
   /// A member of a team, run under its lead thread and listed only there.
   public static let team: Self = "team"
 }

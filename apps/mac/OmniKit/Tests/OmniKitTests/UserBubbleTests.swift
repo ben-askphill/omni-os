@@ -89,6 +89,7 @@ private func pending(_ state: String, mode: String = "steer", kind: String = "us
     (#"{"text":"x","source":"automation"}"#, "Automation"),
     (#"{"text":"x","source":"capture"}"#, "Captured"),
     (#"{"text":"x","source":"import"}"#, "Imported"),
+    (#"{"text":"x","source":"inbound"}"#, "From a bot"),
     (#"{"text":"x","source":"ben"}"#, nil),
     (#"{"text":"x"}"#, nil),
   ] as [(String, String?)])

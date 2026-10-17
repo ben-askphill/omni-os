@@ -57,6 +57,7 @@ extension UserMessage {
     case "capture": "Captured"
     case "import": "Imported"
     case "limit": "After the usage limit"
+    case "inbound": "From a bot"
     default: nil
     }
   }

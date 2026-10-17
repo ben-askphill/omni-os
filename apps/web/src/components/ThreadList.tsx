@@ -32,6 +32,7 @@ const SOURCE_LABEL: Record<string, string> = {
   conductor: 'Conductor',
   import: 'Imported',
   capture: 'Capture',
+  inbound: 'Inbound',
 };
 
 /** Branch to PR for a channel's threads. Empty while loading, or when the channel has no repo. */

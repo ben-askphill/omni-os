@@ -67,6 +67,8 @@ Config is optional: copy `.env.example` to `.env` (gitignored) and uncomment wha
 
 The network is the auth. The server binds `OMNI_HOST`, or `127.0.0.1` when that is unset, and Omni does not check a token. Anyone who can open the port can read threads, write Keychain entries via `POST /api/secrets`, merge PRs, and type into a thread shell. `tailscale serve` (above) is the supported remote path: the server stays on loopback, and the tailnet is the door.
 
+The one exception is `POST /api/inbound/:name`, which takes a message from a bot elsewhere (Grok Bot, say) and needs that integration's bearer token. Set `OMNI_INBOUND_PORT` and Omni serves that route alone on a second loopback port, so a tunnel can point at it without exposing the rest. See [docs/inbound.md](docs/inbound.md).
+
 ## How a thread runs
 
 Each Claude Code thread gets one long-lived `claude -p --input-format stream-json --output-format stream-json` process. Messages go in on stdin, the process runs many turns and stays warm for `OMNI_KEEPALIVE_SECONDS` (default 10 minutes) after the last one, so a follow-up starts instantly. While background agents of that thread are still running, it stays up to `OMNI_TASK_KEEPALIVE_SECONDS` (default 4 hours). It is launched with:

@@ -238,7 +238,7 @@ export function sendMessage(
   threadId: string,
   prompt: string,
   opts: {
-    from?: 'ben' | 'conductor';
+    from?: 'ben' | 'conductor' | 'inbound';
     mode?: SendMode;
     attachments?: Attachment[];
     /** A durable request (postMessage): its row id becomes the message uuid, and the runner tracks its state. */
@@ -260,7 +260,7 @@ export function sendMessage(
 export function messageFor(
   thread: Thread,
   prompt: string,
-  opts: { uuid: string; requestId?: string; from?: 'ben' | 'conductor'; source?: string; mode?: SendMode; attachments?: Attachment[] },
+  opts: { uuid: string; requestId?: string; from?: 'ben' | 'conductor' | 'inbound'; source?: string; mode?: SendMode; attachments?: Attachment[] },
 ): Msg {
   const attachments = opts.attachments?.length ? opts.attachments : undefined;
   const { text, slash, commands } = slashFor(prompt, () => (threadCommands(thread.id) ?? peekCommands(thread.harness as HarnessId, thread.cwd)).commands);
@@ -342,9 +342,9 @@ async function deliverRequest(r: MessageRequest, undo: () => void) {
       return;
     }
     await warmCommands(ready.harness, ready.cwd, r.prompt, r.thread_id);
-    // Without a payload it came through the API, from Ben or the Conductor, or it is a worktree thread's first prompt.
+    // Without a payload it came through the API, from Ben, the Conductor or an inbound bot, or it is a worktree thread's first prompt.
     const source = r.request_id === START_REQUEST ? ready.source : undefined;
-    sendMessage(r.thread_id, r.prompt, { from: r.source as 'ben' | 'conductor', source, mode: r.mode, attachments: r.attachments ?? undefined, request: r });
+    sendMessage(r.thread_id, r.prompt, { from: r.source as 'ben' | 'conductor' | 'inbound', source, mode: r.mode, attachments: r.attachments ?? undefined, request: r });
   } catch (err) {
     if (isShuttingDown()) messageRequests.park(r.id);
     else undo();

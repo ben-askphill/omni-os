@@ -414,6 +414,7 @@ const SOURCE_LABEL: Record<string, string> = {
   capture: 'Captured',
   import: 'Imported',
   limit: 'After the usage limit',
+  inbound: 'From a bot',
 };
 
 /** A message that waits for the thread's worktree (SetupCard). */

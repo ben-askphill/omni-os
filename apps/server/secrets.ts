@@ -60,7 +60,7 @@ export async function globalSecret(name: string): Promise<string | null> {
   return readSecret('global', name);
 }
 
-/** Global secrets, overridden by channel-scoped ones with the same name. Omni's sync credentials stay out. */
+/** Global secrets, overridden by channel-scoped ones with the same name. Omni's sync credentials and inbound tokens stay out. */
 export async function secretsEnv(channelId: string): Promise<Record<string, string>> {
   const rows = db
     .prepare(`SELECT scope, name FROM secrets WHERE scope = 'global' OR scope = ? ORDER BY scope = 'global' DESC`)
@@ -68,6 +68,8 @@ export async function secretsEnv(channelId: string): Promise<Record<string, stri
   const env: Record<string, string> = {};
   for (const r of rows) {
     if (r.scope === 'global' && PRIVATE.has(r.name)) continue;
+    // An inbound integration's token stays with the server, so no agent can post as that bot.
+    if (r.name.startsWith('OMNI_INBOUND_')) continue;
     const v = await readSecret(r.scope, r.name);
     if (v != null) env[r.name] = v;
   }

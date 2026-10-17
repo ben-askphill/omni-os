@@ -63,6 +63,15 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
 });
 server.once('error', onBindError);
 
+// The inbound port serves /api/inbound only, on loopback, so a tunnel to it reaches nothing else of Omni.
+if (config.inboundPort) {
+  const { inboundApp } = await import('./inbound-api.ts');
+  const inbound = serve({ fetch: inboundApp.fetch, port: config.inboundPort, hostname: '127.0.0.1' }, (info) =>
+    console.log(`[omni] inbound only on http://127.0.0.1:${info.port}/api/inbound/:name`),
+  );
+  inbound.once('error', (err) => console.error(`[omni] inbound port ${config.inboundPort}:`, (err as Error).message));
+}
+
 // Close warm claude processes so none outlive the server. A second signal exits at once.
 let exiting = false;
 const shutdown = (sig: string) => {

@@ -8,6 +8,7 @@ import { browserApi } from './browser-api.ts';
 import { changesApi } from './changes-api.ts';
 import { channelsApi } from './channels-api.ts';
 import { foldersApi } from './folders-api.ts';
+import { inboundApi } from './inbound-api.ts';
 import { commandsApi } from './commands-api.ts';
 import { mentionsApi } from './mentions-api.ts';
 import { feedApi } from './feed-api.ts';
@@ -47,6 +48,7 @@ api.route('/commands', commandsApi);
 api.route('/mentions', mentionsApi);
 api.route('/links', linksApi);
 api.route('/sync', syncApi);
+api.route('/inbound', inboundApi);
 
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
 api.all('*', (c) => c.json({ error: 'Not found' }, 404));

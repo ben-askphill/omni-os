@@ -97,6 +97,7 @@ extension UserMessage {
     case "automation": "Automation"
     case "capture": "Captured"
     case "import": "Imported"
+    case "inbound": "Bot"
     default: "You"
     }
   }

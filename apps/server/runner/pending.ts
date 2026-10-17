@@ -62,7 +62,7 @@ export function editRequest(threadId: string, id: string, edit: { prompt: string
   if (!messageRequests.edit(id, { prompt: edit.prompt, attachments })) throw refusal(ALREADY_SENT, 409);
   if (at) {
     const was = at.list[at.i];
-    const next = messageFor(t, edit.prompt, { uuid: was.uuid, requestId: was.requestId, from: row.source as 'ben' | 'conductor', mode: was.mode, attachments });
+    const next = messageFor(t, edit.prompt, { uuid: was.uuid, requestId: was.requestId, from: row.source as 'ben' | 'conductor' | 'inbound', mode: was.mode, attachments });
     at.list[at.i] = { ...next, ...(was.midTurn && { midTurn: true }) };
   }
   emitThread(threadId);

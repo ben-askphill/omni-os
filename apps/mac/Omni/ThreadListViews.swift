@@ -26,7 +26,7 @@ struct ThreadListRow: View {
   @State private var hovering = false
 
   private static let sources: [ThreadSource: String] = [
-    .automation: "Automation", .conductor: "Conductor", .import: "Imported", .capture: "Capture",
+    .automation: "Automation", .conductor: "Conductor", .import: "Imported", .capture: "Capture", .inbound: "Inbound",
   ]
 
   var body: some View {
