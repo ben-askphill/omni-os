@@ -25,7 +25,7 @@ The answer is `202` with `{"thread_id", "created", ...}`. A missing or wrong tok
 
 `OMNI_INBOUND_CHANNELS` (comma-separated, default `conductor`) is where a bot may start threads. The default leaves the Conductor to decide what runs where.
 
-The agent reads a line naming the sender and the integration, saying it was not typed by Ben, then the text between `--- message` and `--- end of message`. The sender name is kept to one line, and a fence line inside the text is broken up. `@` tokens in a bot's text stay text: they are not resolved to files, since the Mentions note says Ben wrote them. The Web UI and the Mac app label the message "From a bot" and list the thread as Inbound.
+The agent reads a line naming the sender and the integration, saying it was not typed by Ben, then the text between `--- message <tag>` and `--- end of message <tag>`, where the tag is random per message so the text cannot close the fence early. The sender name is kept to one line. `@` tokens in a bot's text stay text: they are not resolved to files, since the Mentions note says Ben wrote them. The Web UI and the Mac app label the message "From a bot" and list the thread as Inbound.
 
 ## Setup
 
