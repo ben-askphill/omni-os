@@ -236,10 +236,22 @@ export interface AutomationRun {
   status: string | null;
   title: string | null;
 }
+export interface AutomationTrigger {
+  event: 'pr_opened' | 'pr_checks_failed' | 'pr_conflict' | 'pr_review' | (string & {});
+  repo?: string;
+  drafts: boolean;
+}
 export interface Automation {
   id: string;
   name: string;
+  /** Empty for an event automation. */
   cron: string;
+  /** Set for an event automation: it runs when this happens on GitHub instead of on a schedule. */
+  on?: AutomationTrigger;
+  /** The repo an event automation watches (its `on.repo`, else its channel's), null when there is none. */
+  repo?: string | null;
+  /** Why the last GitHub poll for an event automation failed. */
+  poll_error?: string | null;
   timezone: string;
   channel: string;
   role?: string;

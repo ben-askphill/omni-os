@@ -103,6 +103,20 @@ describe('parseAutomation', () => {
     expect(a.enabled).toBe(false);
   });
 
+  it('parses an event automation: on instead of cron, no next run', () => {
+    const a = parseAutomation('fix-ci', 'enabled: true\non: pr_checks_failed\nchannel: acme\nprompt: Fix it.');
+    expect(a.on).toEqual({ event: 'pr_checks_failed', drafts: false });
+    expect(a.cron).toBe('');
+    expect(a.next).toBeNull();
+    expect(a.error).toBeUndefined();
+  });
+
+  it('rejects an unknown event, and cron with on', () => {
+    expect(parseAutomation('x', 'on: push\nprompt: p').error).toMatch(/invalid "on": unknown event "push"/);
+    expect(parseAutomation('x', 'on: pr_opened\ncron: "0 8 * * *"\nprompt: p').error).toBe('set either cron or on, not both');
+    expect(parseAutomation('x', 'on: pr_opened').error).toBe('missing prompt');
+  });
+
   it('parses the shipped automation files', async () => {
     const { loadAutomations } = await import('../automations.ts');
     const all = loadAutomations();

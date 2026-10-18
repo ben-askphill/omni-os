@@ -23,6 +23,7 @@ const { closeAllTerminals } = await import('./terminal.ts');
 const { startArtifactWatcher } = await import('./artifacts.ts');
 const { backfillPublished } = await import('./published.ts');
 const { startScheduler } = await import('./automations.ts');
+const { startEventWatch } = await import('./automation-watch.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
 const { startSync } = await import('./sync/worker.ts');
 
@@ -53,6 +54,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startArtifactWatcher();
   backfillPublished();
   startScheduler();
+  startEventWatch();
   startCatalogRefresh();
   // Off unless the sync credentials are in the Keychain; then it runs alongside, and a failure only logs.
   startSync().catch((err) => console.error('[sync] could not start:', (err as Error).message));

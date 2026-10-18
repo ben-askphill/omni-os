@@ -115,6 +115,18 @@ function pad(n: string) {
   return n.padStart(2, '0');
 }
 
+const EVENT_LABELS: Record<string, string> = {
+  pr_opened: 'When a PR opens',
+  pr_checks_failed: 'When PR checks fail',
+  pr_conflict: 'When a PR has conflicts',
+  pr_review: 'When a PR gets review comments',
+};
+
+/** An event automation's trigger in words (server/automation-events.ts EVENT_LABELS). */
+export function describeEvent(event: string): string {
+  return EVENT_LABELS[event] ?? event;
+}
+
 /** Best effort human text for common 5-field crons; falls back to the raw expression. */
 export function describeCron(cron: string): string {
   const parts = cron.trim().split(/\s+/);

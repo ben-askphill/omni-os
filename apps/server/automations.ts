@@ -6,11 +6,15 @@ import { config, paths } from './config.ts';
 import { automationRuns, db } from './db.ts';
 import { createThread } from './runner.ts';
 import { runsAutomationsHere } from './sync/owner.ts';
+import { parseTrigger, type EventTrigger } from './automation-events.ts';
 
 export interface Automation {
   id: string;
   name: string;
+  /** Empty for an event automation. */
   cron: string;
+  /** Set for an event automation: it runs when this happens, not on a schedule. */
+  on?: EventTrigger;
   timezone: string;
   channel: string;
   role?: string;
@@ -49,9 +53,17 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
     file,
     catchup: y.catchup === true,
   };
+  if (!yamlError && y.on !== undefined) {
+    const t = parseTrigger(y.on);
+    if (typeof t === 'string') a.error = `invalid "on": ${t}`;
+    else a.on = t;
+  }
   if (yamlError) (a.error = yamlError), (a.enabled = false);
-  else if (!a.cron) a.error = 'missing cron';
+  else if (a.error) return a;
+  else if (a.on && a.cron) a.error = 'set either cron or on, not both';
+  else if (!a.on && !a.cron) a.error = 'missing cron';
   else if (!a.prompt) a.error = 'missing prompt';
+  else if (a.on) a.next = null;
   else {
     try {
       a.next = new Cron(a.cron, { timezone: a.timezone, paused: true }).nextRun()?.toISOString() ?? null;
@@ -74,7 +86,8 @@ export function loadAutomations(): Automation[] {
 
 const jobs = new Map<string, Cron>();
 
-export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 'catchup') {
+/** `event` runs pass their own prompt (the automation's plus what happened) and title. */
+export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 'catchup' | 'event', event?: { prompt: string; title: string }) {
   const date = new Date().toLocaleDateString('en-GB', { timeZone: a.timezone, day: 'numeric', month: 'short' });
   const thread = await createThread({
     channel: a.channel,
@@ -82,8 +95,8 @@ export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 
     harness: a.harness,
     model: a.model,
     effort: a.effort,
-    prompt: a.prompt,
-    title: `${a.name} · ${date}`,
+    prompt: event?.prompt ?? a.prompt,
+    title: event?.title ?? `${a.name} · ${date}`,
     source: 'automation',
     automation: a.id,
   });
@@ -110,7 +123,7 @@ const catchingUp = new Set<string>();
  * like a cron tick. Returns the thread, or null when nothing was missed.
  */
 export async function catchUp(a: Automation, now = new Date()) {
-  if (!a.catchup || !a.enabled || a.error || catchingUp.has(a.id)) return null;
+  if (!a.catchup || !a.enabled || a.error || a.on || catchingUp.has(a.id)) return null;
   const slot = new Cron(a.cron, { timezone: a.timezone, paused: true }).previousRuns(1, now)[0];
   if (!slot || now.getTime() - slot.getTime() < CATCHUP_GRACE_MS) return null;
   const ran = db
@@ -157,7 +170,7 @@ function scheduleAll() {
   for (const j of jobs.values()) j.stop();
   jobs.clear();
   for (const a of loadAutomations()) {
-    if (!a.enabled || a.error) continue;
+    if (!a.enabled || a.error || a.on) continue; // event automations are started by apps/server/automation-watch.ts
     jobs.set(
       a.id,
       new Cron(a.cron, { timezone: a.timezone, protect: true }, () => {

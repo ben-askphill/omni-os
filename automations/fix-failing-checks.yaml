@@ -1,0 +1,16 @@
+# Event automation: a run starts when a PR's checks fail, instead of on a schedule.
+# `on:` takes pr_opened, pr_checks_failed, pr_conflict or pr_review, or { event, repo, drafts }. Without `repo`,
+# it watches the channel's GitHub repo. Omni polls gh every OMNI_AUTOMATION_POLL_SECONDS (default 120); each
+# event fires once (per head commit for checks and conflicts), and nothing fires for what was already there
+# when the automation was turned on. The run's prompt is this prompt plus the event (repo, PR, failed checks).
+name: Fix failing PR checks
+enabled: false
+on: pr_checks_failed
+channel: omni-os
+role: builder
+prompt: |
+  A PR's checks failed. Check out its branch in your worktree, read the failing log
+  (`gh run view --log-failed`, or `gh pr checks <n>`), and fix the cause on that branch.
+  Run the repo's checks (its verify skill, if it has one), then push. Do not merge, do not open a new PR.
+  If the failure is flaky or outside the PR's change, rerun the job once with `gh run rerun --failed` and say so.
+  Reply in one or two lines: what failed, what you changed, and whether it is green now.

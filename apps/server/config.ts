@@ -55,6 +55,8 @@ export const config = {
   /** Load the repo's Claude Code mods (mods/) into every Claude thread with --plugin-dir. Off until '1'. */
   mods: env.OMNI_MODS === '1',
   timezone: env.OMNI_TZ ?? 'Europe/Amsterdam',
+  /** How often event automations (`on:` in automations/*.yaml) poll GitHub. */
+  automationPollSeconds: Math.max(15, Number(env.OMNI_AUTOMATION_POLL_SECONDS ?? 120)),
 };
 
 // OMNI_DATA_DIR moves all runtime state, so tests can run against a temp dir.

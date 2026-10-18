@@ -273,6 +273,32 @@ private final class AutomationsServer: HTTPTransport {
     let a = try automation()
     #expect(a.schedule == "Weekdays at 08:00")
     #expect(a.scheduleHelp == "0 8 * * 1-5 (Europe/Amsterdam)")
+    #expect(a.scheduleDetail == "0 8 * * 1-5")
+    #expect(!a.isEvent)
+    #expect(a.watching(enabled: true) == nil)
+  }
+
+  /// An event automation (`on:`) as GET /api/automations sends it: no cron, no next run, the watched repo.
+  @Test func saysTheEventAndTheRepoItWatches() throws {
+    let json = #"{"id":"fix-ci","name":"Fix CI","cron":"","on":{"event":"pr_checks_failed","drafts":false},"repo":"o/r","poll_error":null,"timezone":"Europe/Amsterdam","channel":"acme","prompt":"Go.","enabled":true,"next":null,"runs":[]}"#
+    let a = try decode(Automation.self, json)
+    #expect(a.isEvent)
+    #expect(a.schedule == "When PR checks fail")
+    #expect(a.scheduleHelp == "on: pr_checks_failed")
+    #expect(a.scheduleDetail == "o/r")
+    #expect(a.watching(enabled: true) == "Watching o/r, one run per event")
+    #expect(a.watching(enabled: false) == nil)
+    #expect(a.nextRun(enabled: true) == nil)
+
+    let failing = try decode(Automation.self, json.replacingOccurrences(of: #""poll_error":null"#, with: #""poll_error":"gh pr list o/r failed: HTTP 502""#))
+    #expect(failing.watching(enabled: true) == "gh pr list o/r failed: HTTP 502")
+  }
+
+  @Test func labelsEventAndManualRuns() throws {
+    let at = "2026-09-28T07:00:00.000Z"
+    #expect(try decode(AutomationRun.self, runJSON(id: 1, thread: "t", trigger: "event", at: at, status: "done", title: "x")).triggerLabel == "event")
+    #expect(try decode(AutomationRun.self, runJSON(id: 2, thread: "t", trigger: "manual", at: at, status: "done", title: "x")).triggerLabel == "manual")
+    #expect(try decode(AutomationRun.self, runJSON(id: 3, thread: "t", trigger: "cron", at: at, status: "done", title: "x")).triggerLabel == nil)
   }
 
   @Test func showsTheNextRunOnlyWhenItWillRun() throws {

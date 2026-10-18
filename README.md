@@ -21,7 +21,7 @@ Both show the same channels and threads. They never share code directly: see [We
 - **Artifacts page**: every artifact across channels in one list
 - **GitHub panel** per repo channel: PRs, checks, diff, merge (with confirm). Threads whose branch has an open or merged PR get a PR icon in the thread list
 - **Conductor**: one front agent that delegates to crew roles, alone or as a team (a lead plus members); reports come back to it automatically and show as delegation cards
-- **Automations**: cron YAML, every run is its own thread
+- **Automations**: YAML on a cron schedule or a GitHub PR event (checks failed, conflict, review, opened), every run is its own thread
 - Runs each thread on the harness you pick — **Claude Code** (Claude plan), **Codex** (ChatGPT plan), **Cursor Agent** (Cursor plan) or **Hermes** (Anthropic API, on a remote server) — through its official CLI, or over HTTP for Hermes.
 
 ## Run
@@ -132,7 +132,7 @@ The conductor's `omni` MCP (`apps/mcp/omni.ts`) exposes `list_channels`, `list_c
 
 ## Automations
 
-`automations/*.yaml` (shipped: `morning-coffee`, `weekly-review`, `artifact-comments`, all off until you enable them):
+`automations/*.yaml` (shipped: `morning-coffee`, `weekly-review`, `artifact-comments`, `fix-failing-checks`, all off until you enable them):
 
 ```yaml
 name: Morning coffee
@@ -148,6 +148,33 @@ prompt: |
 ```
 
 `timezone` defaults to `OMNI_TZ` (Europe/Amsterdam). The folder is watched; edits apply without a restart. The Mac has to be awake at the scheduled time.
+
+### Event automations
+
+Replace `cron` with `on` and the automation runs when something happens on a PR instead of on a schedule:
+
+```yaml
+name: Fix failing PR checks
+enabled: false
+on: pr_checks_failed    # or { event: pr_checks_failed, repo: owner/name, drafts: true }
+channel: omni-os        # without on.repo, the channel's GitHub repo is watched
+role: builder
+prompt: |
+  A PR's checks failed. Fix the cause on its branch, verify, push.
+```
+
+| Event | Fires |
+| --- | --- |
+| `pr_opened` | once per new open PR |
+| `pr_checks_failed` | once per head commit whose checks fail |
+| `pr_conflict` | once per head commit that conflicts with its base |
+| `pr_review` | when reviews or comments arrive from anyone but the `gh` account Omni uses (a bare approval does not count) |
+
+- Omni polls `gh pr list` every `OMNI_AUTOMATION_POLL_SECONDS` (default 120, 15 at least), one call per repo however many automations watch it. Polling, not webhooks: the server is on loopback, GitHub cannot reach it.
+- The first poll after an automation is turned on only records what is open, so it never fires for old failures.
+- Each run's prompt is the automation's prompt plus an `## Event` section (repo, PR number and title, what happened, branch and URL). Its title is `<name> · #<PR>`, and its trigger is `event` in the run list.
+- What each automation has seen lives in kv `automations.events.<id>`, so a restart does not fire again. With sync on, only the Mac that runs scheduled automations polls.
+- Drafts are skipped unless `drafts: true`. Run now still works and sends the plain prompt.
 
 ## Mods
 
@@ -255,7 +282,7 @@ packages/shared/            @omni/shared: pure TypeScript both clients use (slas
 packages/test-fixtures/     @omni/test-fixtures: fake CLIs and corpora the TS and Swift tests share
 packages/typescript-config/ @omni/typescript-config: the tsconfig bases every package extends
 crew/                       role charters
-automations/                cron YAML
+automations/                automation YAML (cron or PR events)
 mods/                       Claude Code mods loaded with OMNI_MODS=1 (omni-progress)
 scripts/                    shell shim, Mac build, QA stack, PR screenshots, launchd install
 docs/                       ADRs (adr/0001 to 0004) and the PR screenshot guide
