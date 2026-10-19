@@ -34,8 +34,9 @@ export const config = {
   /** Hermes API server on the server's Tailscale address, like http://100.x.y.z:8642. Unset means Hermes is off. The bearer token is the Keychain secret HERMES_API_KEY, not an env var. */
   hermesUrl: (env.OMNI_HERMES_URL ?? '').replace(/\/$/, ''),
   /**
-   * Claude Code cloud: the environment new sessions start in (`env_…` Anthropic-hosted, or `ccpool_…` self-hosted),
-   * passed as `claude -p --environment`. Find it with /remote-env. Either this or a routine URL turns the harness on.
+   * Claude Code cloud: the environment new sessions start in (`env_…` Anthropic-hosted, or `ccpool_…` self-hosted).
+   * A pool goes to `claude -p --environment`; an `env_…` id to `claude --cloud` (see dispatch.ts). Find it with
+   * /remote-env. Either this or a routine URL turns the harness on.
    */
   cloudEnvironment: env.OMNI_CLOUD_ENVIRONMENT ?? '',
   /** Or a routine's API trigger URL (…/routines/trig_…/fire). Its bearer token is the Keychain secret CLAUDE_ROUTINE_TOKEN. */

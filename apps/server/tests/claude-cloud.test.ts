@@ -4,7 +4,7 @@ import type { AdapterContext } from '../harness/adapter.ts';
 import type { Record as StreamRecord } from '../stream.ts';
 import { config } from '../config.ts';
 import { makeCloudAdapter, type CloudDeps } from '../harness/claude-cloud/adapter.ts';
-import { createArgs, fireRoutine, lastJson, normalizeSessionId, parseDispatch, ROUTINE_BETA, type Exec } from '../harness/claude-cloud/dispatch.ts';
+import { createCommand, fireRoutine, lastJson, normalizeSessionId, parseCloudCreate, parseDispatch, ROUTINE_BETA, type Exec } from '../harness/claude-cloud/dispatch.ts';
 import { awaitReply, deliverReply, isWaiting, resetReplies } from '../harness/claude-cloud/replies.ts';
 import { cloudHarness, CLOUD_FIX, resolveModel } from '../harness/catalog.ts';
 import { harnessEnv } from '../harness/env-guard.ts';
@@ -35,6 +35,12 @@ interface Call {
   env: NodeJS.ProcessEnv;
 }
 
+/** What `claude --cloud <brief>` draws on its terminal once the session exists. */
+const CLOUD_CREATED = '\x1b[?25l^D\x1b78Created cloud session: fix the bug\r\nView: https://claude.ai/code/session_01ABC?from=cli&m=0\r\nResume with: claude --teleport session_01ABC\r\n\x1b]0;\x07';
+
+/** A create call, through either the pool path or script(1). */
+const isCreate = (c: { bin: string; args: string[] }) => c.bin === '/bin/sh' || c.args.includes('--environment');
+
 /** A fake `claude` and `git`: creates answer with a new session, sends with the same one. */
 function fakeDeps(opts: { createOut?: Exec; sendOut?: Exec; hold?: boolean } = {}) {
   const calls: Call[] = [];
@@ -48,6 +54,7 @@ function fakeDeps(opts: { createOut?: Exec; sendOut?: Exec; hold?: boolean } = {
         o.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
       });
     }
+    if (bin === '/bin/sh') return opts.createOut ?? { code: 0, stdout: CLOUD_CREATED, stderr: '' };
     if (args.includes('--environment'))
       return opts.createOut ?? { code: 0, stdout: 'Starting…\n{"ok":true,"session_id":"session_01ABC","url":"https://claude.ai/code/session_01ABC"}\n', stderr: '' };
     const id = args[args.indexOf('--cloud') + 1];
@@ -117,14 +124,27 @@ const texts = (r: StreamRecord[]) => r.filter((x) => x.kind === 'assistant_text'
 
 describe('cloud dispatch', () => {
   it('builds the create command and reads the session from the last JSON line', () => {
-    expect(createArgs({ brief: 'do it', environment: 'env_x', ref: 'main', model: 'claude-opus-5-5' })).toEqual([
-      '-p', 'do it', '--environment', 'env_x', '--output-format', 'json', '--ref', 'main', '--model', 'claude-opus-5-5',
-    ]);
+    expect(createCommand({ bin: 'claude', brief: 'do it', environment: 'ccpool_x', ref: 'main', model: 'claude-opus-5-5' })).toEqual({
+      bin: 'claude',
+      args: ['-p', 'do it', '--environment', 'ccpool_x', '--output-format', 'json', '--ref', 'main', '--model', 'claude-opus-5-5'],
+    });
     expect(lastJson('noise\n{"ok":true}\n')).toEqual({ ok: true });
     expect(parseDispatch({ code: 0, stdout: '{"ok":true,"session_id":"cse_9"}', stderr: '' }, 'x')).toEqual({ id: 'session_9', url: 'https://claude.ai/code/session_9' });
     expect(() => parseDispatch({ code: 1, stdout: '{"ok":false,"error":"no env"}', stderr: '' }, 'Starting')).toThrow('Starting failed: no env');
     expect(() => parseDispatch({ code: 1, stdout: '', stderr: 'Cloud sessions are disabled by your organization' }, 'Starting')).toThrow('disabled by your organization');
     expect(normalizeSessionId('cse_abc')).toBe('session_abc');
+  });
+
+  it('starts an Anthropic-hosted environment with --cloud under a terminal, since --environment takes only pools', () => {
+    expect(createCommand({ bin: '/bin/claude', brief: 'do it', environment: ' env_x ', ref: 'main', model: null })).toEqual({
+      bin: '/bin/sh',
+      args: ['-c', 'exec script -q /dev/null "$@" < /dev/null', 'sh', '/bin/claude', '--cloud', 'do it', '--settings', '{"remote":{"defaultEnvironmentId":"env_x"}}', '--ref', 'main'],
+    });
+    expect(parseCloudCreate({ code: 0, stdout: CLOUD_CREATED, stderr: '' }, 'x')).toEqual({ id: 'session_01ABC', url: 'https://claude.ai/code/session_01ABC' });
+    expect(() => parseCloudCreate({ code: 1, stdout: '^D\x1b78Error: Cloud sessions are not enabled for your account.\r\n', stderr: '' }, 'Starting')).toThrow(
+      'Starting failed: Error: Cloud sessions are not enabled for your account.',
+    );
+    expect(() => parseCloudCreate({ code: 1, stdout: '', stderr: '' }, 'Starting')).toThrow('Starting failed: claude exited 1');
   });
 
   it('fires a routine with its token and beta header', async () => {
@@ -161,9 +181,9 @@ describe('cloud adapter', () => {
     const s = boot(f.deps);
     s.user('fix the bug', 'm1');
     await waitFor(() => results(s.records).length === 1, 'first result');
-    const create = f.calls.find((c) => c.args.includes('--environment'))!;
-    expect(create.args.slice(0, 2)).toEqual(['-p', 'SYS PROMPT\n\n---\n\nfix the bug']);
-    expect(create.args).toEqual(expect.arrayContaining(['--environment', 'env_test', '--ref', 'main', '--output-format', 'json']));
+    const create = f.calls.find(isCreate)!;
+    expect(create.args.slice(3, 6)).toEqual([config.claudeBin, '--cloud', 'SYS PROMPT\n\n---\n\nfix the bug']);
+    expect(create.args).toEqual(expect.arrayContaining(['--settings', '{"remote":{"defaultEnvironmentId":"env_test"}}', '--ref', 'main']));
     expect(create.cwd).toBe('/tmp/repo');
     expect(create.env.SOME_SECRET).toBeUndefined();
     expect(s.session()).toBe('session_01ABC');
@@ -173,10 +193,10 @@ describe('cloud adapter', () => {
 
     s.user('also add a test', 'm2');
     await waitFor(() => results(s.records).length === 2, 'second result');
-    const send = f.calls.filter((c) => c.args.includes('--cloud'));
+    const send = f.calls.filter((c) => !isCreate(c) && c.args.includes('--cloud'));
     expect(send).toHaveLength(1);
     expect(send[0].args).toEqual(['-p', 'also add a test', '--cloud', 'session_01ABC', '--output-format', 'json']);
-    expect(f.calls.filter((c) => c.args.includes('--environment'))).toHaveLength(1);
+    expect(f.calls.filter(isCreate)).toHaveLength(1);
   });
 
   it('picks up the thread session after a restart instead of starting a new one', async () => {
@@ -184,7 +204,7 @@ describe('cloud adapter', () => {
     const s = boot(f.deps, { sessionId: 'session_OLD' });
     s.user('next step', 'm1');
     await waitFor(() => results(s.records).length === 1, 'result');
-    expect(f.calls.some((c) => c.args.includes('--environment'))).toBe(false);
+    expect(f.calls.some(isCreate)).toBe(false);
     expect(f.calls[0].args).toContain('session_OLD');
     expect(s.session()).toBeNull();
   });
@@ -239,7 +259,7 @@ describe('cloud adapter', () => {
     await waitFor(() => isWaiting('session_01ABC'), 'waiting');
     s.user('focus on pricing', 'm2');
     await waitFor(() => s.records.filter((r) => r.kind === 'replay').length === 2, 'steer replayed');
-    expect(f.calls.find((c) => c.args.includes('--cloud'))?.args[1]).toBe('focus on pricing');
+    expect(f.calls.find((c) => !isCreate(c) && c.args.includes('--cloud'))?.args[1]).toBe('focus on pricing');
     deliverReply('session_01ABC', 'done');
     await waitFor(() => results(s.records).length === 1, 'result');
   });
@@ -261,7 +281,7 @@ describe('cloud adapter', () => {
     const f = fakeDeps({ hold: true });
     const s = boot(f.deps);
     s.user('go', 'm1');
-    await waitFor(() => f.calls.some((c) => c.args.includes('--environment')), 'dispatching');
+    await waitFor(() => f.calls.some(isCreate), 'dispatching');
     s.write({ type: 'control_request', request_id: 'int-2', request: { subtype: 'interrupt' } });
     await waitFor(() => results(s.records).length === 1, 'stopped');
     expect(results(s.records)[0].payload).toMatchObject({ ok: false, subtype: 'interrupted' });

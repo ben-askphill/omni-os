@@ -1,7 +1,10 @@
 // Starting and messaging Claude Code cloud sessions. Two ways in, both billed to the Claude plan:
-//   - the CLI: `claude -p <brief> --environment <id> --output-format json` creates a session and exits with its id,
-//     and `claude -p <msg> --cloud <id> --output-format json` queues a message into it. Both use the claude.ai login
-//     the CLI keeps in the Keychain, so Omni never handles that token.
+//   - the CLI. A self-hosted pool (`ccpool_…`) starts with `claude -p <brief> --environment <id> --output-format json`,
+//     which exits with the session id as JSON. An Anthropic-hosted environment (`env_…`) is not accepted there, so it
+//     starts with `claude --cloud <brief>` and the environment pinned through --settings. That form insists on a
+//     terminal, so it runs under script(1) and Omni reads the `session_…` id it prints. `claude -p <msg> --cloud <id>
+//     --output-format json` queues a message into either. All use the claude.ai login the CLI keeps in the Keychain,
+//     so Omni never handles that token.
 //   - a routine's API trigger: POST /fire with the routine's own bearer token (Keychain secret CLAUDE_ROUTINE_TOKEN).
 // See docs/adr/0005-claude-code-cloud-harness.md and code.claude.com/docs/en/claude-code-on-the-web.
 import { execFile } from 'node:child_process';
@@ -78,16 +81,39 @@ export interface CreateOpts {
   signal?: AbortSignal;
 }
 
-export function createArgs(o: Pick<CreateOpts, 'brief' | 'environment' | 'ref' | 'model'>): string[] {
-  const args = ['-p', o.brief, '--environment', o.environment, '--output-format', 'json'];
+/** A self-hosted environment pool, the only kind `claude --environment` takes. */
+export const isPoolId = (id: string) => id.trim().startsWith('ccpool_');
+
+/** The command that creates a session: `--environment` for a pool, `--cloud` under a pseudo-terminal otherwise. */
+export function createCommand(o: Pick<CreateOpts, 'bin' | 'brief' | 'environment' | 'ref' | 'model'>): { bin: string; args: string[] } {
+  const env = o.environment.trim();
+  const args = isPoolId(env)
+    ? ['-p', o.brief, '--environment', env, '--output-format', 'json']
+    : ['--cloud', o.brief, '--settings', JSON.stringify({ remote: { defaultEnvironmentId: env } })];
   if (o.ref) args.push('--ref', o.ref);
   if (o.model) args.push('--model', o.model);
-  return args;
+  if (isPoolId(env)) return { bin: o.bin, args };
+  // script(1) gives claude its terminal. Its own input has to be /dev/null: macOS script fails on the socket Node pipes in.
+  return { bin: '/bin/sh', args: ['-c', 'exec script -q /dev/null "$@" < /dev/null', 'sh', o.bin, ...args] };
+}
+
+/** Terminal escapes, so the text `claude --cloud` draws reads as plain lines. */
+const stripAnsi = (s: string) => s.replace(/\x1b\][^\x07]*\x07/g, '').replace(/\x1b\[[0-9;?<>]*[A-Za-z]/g, '').replace(/\x1b[()][A-Za-z0-9]/g, '');
+
+/** Read the session `claude --cloud` printed ("Created cloud session … View: https://claude.ai/code/session_…"). */
+export function parseCloudCreate(out: Exec, what: string): CloudSession {
+  const text = stripAnsi(out.stdout + '\n' + out.stderr);
+  const id = /\b(session_[A-Za-z0-9]+)\b/.exec(text)?.[1];
+  if (out.code === 0 && id) return { id, url: sessionUrl(id) };
+  const reason = /Error:[^\r\n]*/.exec(text)?.[0] || text.replace(/\s+/g, ' ').trim() || `claude exited ${out.code}`;
+  throw new Error(`${what} failed: ${reason.slice(0, 1000)}`);
 }
 
 /** Start a new cloud session from the CLI. It returns as soon as the session exists, not when Claude answers. */
 export async function createViaCli(o: CreateOpts, run: Runner = execRunner): Promise<CloudSession> {
-  return parseDispatch(await run(o.bin, createArgs(o), { cwd: o.cwd, env: o.env, signal: o.signal }), 'Starting the cloud session');
+  const cmd = createCommand(o);
+  const out = await run(cmd.bin, cmd.args, { cwd: o.cwd, env: o.env, signal: o.signal });
+  return isPoolId(o.environment) ? parseDispatch(out, 'Starting the cloud session') : parseCloudCreate(out, 'Starting the cloud session');
 }
 
 /** Queue a message into a running cloud session. */
