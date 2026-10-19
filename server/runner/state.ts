@@ -13,6 +13,7 @@ import { claudeAdapter } from '../harness/claude/adapter.ts';
 import { codexAdapter } from '../harness/codex/adapter.ts';
 import { cursorAdapter } from '../harness/cursor/adapter.ts';
 import { hermesAdapter } from '../harness/hermes/adapter.ts';
+import { cloudAdapter } from '../harness/claude-cloud/adapter.ts';
 
 export const omniUrl = () => `http://127.0.0.1:${config.port}`;
 
@@ -21,6 +22,7 @@ const ADAPTERS: Record<string, HarnessAdapter> = {
   codex: codexAdapter,
   cursor: cursorAdapter,
   hermes: hermesAdapter,
+  'claude-cloud': cloudAdapter,
 };
 export const adapterFor = (harness: string): HarnessAdapter => ADAPTERS[harness] ?? claudeAdapter;
 const capsOf = (harness: string) => CAPABILITIES[harness as HarnessId] ?? CAPABILITIES['claude-code'];
@@ -32,11 +34,12 @@ const CAPS: Record<string, number> = {
   codex: config.maxConcurrentCodex,
   cursor: config.maxConcurrentCursor,
   hermes: config.maxConcurrentHermes,
+  'claude-cloud': config.maxConcurrentCloud,
 };
 export const capFor = (harness: string) => CAPS[harness] ?? config.maxConcurrent;
 
 /** The CLI name a harness shows in errors and the resume command. */
-const CLI_LABEL: Record<string, string> = { 'claude-code': 'claude', codex: 'codex', cursor: 'cursor-agent', hermes: 'Hermes' };
+const CLI_LABEL: Record<string, string> = { 'claude-code': 'claude', codex: 'codex', cursor: 'cursor-agent', hermes: 'Hermes', 'claude-cloud': 'Claude Code cloud' };
 export const cliLabel = (harness: string) => CLI_LABEL[harness] ?? harness;
 
 // ---------- state ----------

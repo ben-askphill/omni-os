@@ -6,6 +6,7 @@ import { paths } from './config.ts';
 import { artifactsApi } from './artifacts-api.ts';
 import { browserApi } from './browser-api.ts';
 import { changesApi } from './changes-api.ts';
+import { cloudApi } from './cloud-api.ts';
 import { channelsApi } from './channels-api.ts';
 import { foldersApi } from './folders-api.ts';
 import { commandsApi } from './commands-api.ts';
@@ -47,6 +48,7 @@ api.route('/commands', commandsApi);
 api.route('/mentions', mentionsApi);
 api.route('/links', linksApi);
 api.route('/sync', syncApi);
+api.route('/cloud', cloudApi);
 
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
 api.all('*', (c) => c.json({ error: 'Not found' }, 404));

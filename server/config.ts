@@ -27,10 +27,23 @@ export const config = {
   maxConcurrentCodex: Number(env.OMNI_MAX_CONCURRENT_CODEX ?? 4),
   maxConcurrentCursor: Number(env.OMNI_MAX_CONCURRENT_CURSOR ?? 4),
   maxConcurrentHermes: Number(env.OMNI_MAX_CONCURRENT_HERMES ?? 4),
+  maxConcurrentCloud: Number(env.OMNI_MAX_CONCURRENT_CLOUD ?? 4),
   codexBin: env.OMNI_CODEX_BIN,
   cursorBin: env.OMNI_CURSOR_BIN,
   /** Hermes API server on the server's Tailscale address, like http://100.x.y.z:8642. Unset means Hermes is off. The bearer token is the Keychain secret HERMES_API_KEY, not an env var. */
   hermesUrl: (env.OMNI_HERMES_URL ?? '').replace(/\/$/, ''),
+  /**
+   * Claude Code cloud: the environment new sessions start in (`env_…` Anthropic-hosted, or `ccpool_…` self-hosted),
+   * passed as `claude -p --environment`. Find it with /remote-env. Either this or a routine URL turns the harness on.
+   */
+  cloudEnvironment: env.OMNI_CLOUD_ENVIRONMENT ?? '',
+  /** Or a routine's API trigger URL (…/routines/trig_…/fire). Its bearer token is the Keychain secret CLAUDE_ROUTINE_TOKEN. */
+  cloudRoutineUrl: env.OMNI_CLOUD_ROUTINE_URL ?? '',
+  /**
+   * How long a cloud turn waits for the session's reply, posted by its Stop hook to /api/cloud/reply. 0 ends the turn
+   * as soon as the session is started or the message is queued, with its claude.ai link as the reply.
+   */
+  cloudReplyWaitMinutes: Number(env.OMNI_CLOUD_REPLY_WAIT_MINUTES ?? 0),
   /** How long a thread's claude process stays warm after a turn. 0 closes it right away. */
   keepAliveSeconds: Number(env.OMNI_KEEPALIVE_SECONDS ?? 600),
   /** How long an idle process stays up for background agents that have not ended yet. */

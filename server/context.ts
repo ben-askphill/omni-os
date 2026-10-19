@@ -10,7 +10,7 @@ import type { ContextHint } from './stream.ts';
 
 const snapshots = new Map<string, ContextUsage>();
 
-/** The harnesses that report a context window. Cursor and Hermes don't. */
+/** The harnesses that report a context window. Cursor, Hermes and cloud sessions don't. */
 export const METERED = new Set(['claude-code', 'codex']);
 /** The harnesses Omni can compact: Claude Code's /compact, and Codex's, which takes no instructions. */
 export const COMPACTS = new Set(['claude-code', 'codex']);
@@ -191,7 +191,7 @@ export interface ContextView {
 
 /** Why the thread can't compact now, or null when it can. */
 export function compactBlocked(t: Thread): string | null {
-  if (!COMPACTS.has(t.harness)) return `${t.harness === 'cursor' ? 'Cursor Agent' : 'Hermes'} has no compact command.`;
+  if (!COMPACTS.has(t.harness)) return `${t.harness === 'cursor' ? 'Cursor Agent' : t.harness === 'claude-cloud' ? 'A cloud thread' : 'Hermes'} has no compact command${t.harness === 'claude-cloud' ? ' here; run /compact in the session on claude.ai' : ''}.`;
   if (t.status === 'running' || t.status === 'queued') return 'Wait for the current turn to finish.';
   if (!t.has_run) return 'Nothing to compact yet.';
   return null;

@@ -111,5 +111,21 @@
     "fix": "Set OMNI_HERMES_URL to the Hermes Tailscale address, set HERMES_API_KEY in Secrets, and connect this Mac to Tailscale",
     "models": [],
     "running": 0
+  },
+  {
+    "id": "claude-cloud",
+    "name": "Claude Code cloud",
+    "plan": "Claude plan",
+    "capabilities": {
+      "warmProcess": false,
+      "steer": true,
+      "inlineImages": false,
+      "usage": "none"
+    },
+    "cap": 4,
+    "available": false,
+    "fix": "Set OMNI_CLOUD_ENVIRONMENT to a cloud environment id (env_…, from /remote-env) and sign the claude CLI in with claude.ai (`claude auth login`), or set OMNI_CLOUD_ROUTINE_URL and the CLAUDE_ROUTINE_TOKEN secret",
+    "models": [],
+    "running": 0
   }
 ]

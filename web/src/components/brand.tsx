@@ -316,6 +316,7 @@ const HARNESS: Record<string, { logo?: keyof typeof LOGO; label: string }> = {
   codex: { logo: 'openai', label: 'Codex' },
   cursor: { logo: 'cursor', label: 'Cursor' },
   hermes: { label: 'Hermes' },
+  'claude-cloud': { logo: 'claude', label: 'Claude Code cloud' },
 };
 
 export const harnessLabel = (harness: string) => HARNESS[harness]?.label ?? harness;
@@ -323,6 +324,7 @@ export const harnessLabel = (harness: string) => HARNESS[harness]?.label ?? harn
 /** Resolve a harness id from free text ("Claude", "Codex", "Cursor", "Claude Code"). */
 export function harnessFor(name: string | null | undefined): string | null {
   const n = String(name ?? '').toLowerCase();
+  if (n.includes('claude') && n.includes('cloud')) return 'claude-cloud';
   if (n.includes('claude')) return 'claude-code';
   if (n.includes('codex') || n.includes('chatgpt') || n.includes('openai')) return 'codex';
   if (n.includes('cursor')) return 'cursor';

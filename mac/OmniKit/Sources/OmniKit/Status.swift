@@ -9,6 +9,7 @@ public struct HarnessID: OpenEnum, CodingKeyRepresentable {
   public static let codex: Self = "codex"
   public static let cursor: Self = "cursor"
   public static let hermes: Self = "hermes"
+  public static let claudeCloud: Self = "claude-cloud"
 
   public var codingKey: any CodingKey { Key(stringValue: rawValue) }
   public init?<T: CodingKey>(codingKey: T) { self.init(rawValue: codingKey.stringValue) }

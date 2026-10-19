@@ -34,7 +34,7 @@ export function plannedWorktree(threadId: string): { cwd: string; branch: string
 
 /**
  * Where a thread's agent runs, for a thread that needs no worktree (needsWorktree is false):
- * - Hermes: the thread's own data folder; it runs on its own server
+ * - Hermes or Claude Code cloud: the thread's own data folder; it runs off this Mac
  * - repo channel, worktrees off: the repo itself
  * - otherwise: the channel's base dir, falling back to the brain (phillbert) so skills and context load
  * A worktree thread gets plannedWorktree's folder, which prepareWorktree makes before anything runs there.
@@ -43,7 +43,7 @@ export async function prepareWorkdir(channel: Channel, threadId: string, opts?: 
   mkdirSync(artifactsDir(threadId), { recursive: true });
   mkdirSync(browserOutDir(threadId), { recursive: true });
 
-  // Hermes runs on its own server. A worktree here would pin a branch nothing on this Mac commits to.
+  // Hermes and cloud sessions run off this Mac. A worktree here would pin a branch nothing on this Mac commits to.
   if (opts?.remote) return { cwd: threadDir(threadId), branch: null };
   if (needsWorktree(channel)) return plannedWorktree(threadId);
 

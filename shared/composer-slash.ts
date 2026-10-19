@@ -4,7 +4,7 @@
 // Shared by the Web UI and the Mac app's slash engine, so it imports nothing from web/ or mac/.
 import { OMNI_COMMANDS, TITLE_MAX, mentionHits, midMessageCommands, resolveSlash, visibleCommands, type CommandList, type SlashCommand } from './slash.ts';
 
-const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent', hermes: 'Hermes' };
+const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent', hermes: 'Hermes', 'claude-cloud': 'Claude Code cloud' };
 export const harnessName = (id: string) => HARNESS_NAME[id] ?? id;
 
 /**

@@ -18,6 +18,7 @@ const HARNESS_ROWS: { id: HarnessId; name: string }[] = [
   { id: 'codex', name: 'Codex' },
   { id: 'cursor', name: 'Cursor' },
   { id: 'hermes', name: 'Hermes' },
+  { id: 'claude-cloud', name: 'Cloud' },
 ];
 
 const windowPct = (w?: UsageWindow) => {

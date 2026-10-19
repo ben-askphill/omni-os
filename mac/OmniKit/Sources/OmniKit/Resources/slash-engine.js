@@ -89,7 +89,7 @@
   }
 
   // shared/composer-slash.ts
-  var HARNESS_NAME = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor Agent", hermes: "Hermes" };
+  var HARNESS_NAME = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor Agent", hermes: "Hermes", "claude-cloud": "Claude Code cloud" };
   var harnessName = (id) => HARNESS_NAME[id] ?? id;
   var menuCommands = (list, where) => [
     ...visibleCommands(list ?? []),

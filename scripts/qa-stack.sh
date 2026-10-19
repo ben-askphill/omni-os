@@ -25,6 +25,9 @@ alive() { [ -f "$DIR/$1.pid" ] && kill -0 "$(cat "$DIR/$1.pid")" 2>/dev/null; }
 
 [ "$SERVER_PORT" != 4747 ] || die "refusing port 4747, that is the live server"
 
+# macOS has no setsid(1). Perl's POSIX::setsid does the same: a new session and process group, so down can kill it whole.
+command -v setsid >/dev/null 2>&1 || setsid() { perl -MPOSIX=setsid -e 'setsid() or die "setsid: $!"; exec @ARGV or die "exec: $!"' "$@"; }
+
 up() {
   local seed=3
   [ "${1:-}" = "--seed" ] && seed="${2:?--seed needs a number}"
@@ -37,6 +40,7 @@ up() {
   OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
     OMNI_CLAUDE_BIN="$fx/fake-claude.mjs" OMNI_CODEX_BIN="$fx/fake-codex.mjs" OMNI_CURSOR_BIN="$fx/fake-cursor.mjs" \
     OMNI_BROWSER=0 OMNI_SUGGESTIONS=0 OMNI_HERMES_URL= OMNI_AUTOMATIONS_DIR="$DIR/automations" \
+    OMNI_CLOUD_ENVIRONMENT="${OMNI_CLOUD_ENVIRONMENT:-env_qa}" OMNI_CLOUD_ROUTINE_URL= \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
     setsid npx tsx server/index.ts >"$DIR/server.log" 2>&1 &
   echo $! >"$DIR/server.pid"

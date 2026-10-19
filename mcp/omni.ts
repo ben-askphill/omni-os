@@ -51,16 +51,21 @@ server.registerTool(
       prompt: z.string().describe('Self-contained task brief. Include everything the crewmate needs; it cannot see your chat.'),
       task_id: z.string().optional().describe('Short id like T-12 to match the report. Generated if omitted.'),
       title: z.string().optional(),
-      harness: z.string().optional().describe('Override the role default harness: claude-code, codex, cursor or hermes. Use list_harnesses.'),
+      harness: z.string().optional().describe('Override the role default harness: claude-code, codex, cursor, hermes or claude-cloud (an Anthropic-hosted Claude Code cloud session on claude.ai/code, billed to the Claude plan; its report links the session). Use list_harnesses.'),
       model: z.string().optional().describe('Any catalog model id, or a Claude alias (opus, sonnet, haiku, fable). Use list_harnesses.'),
       effort: z.string().optional().describe('Reasoning effort supported by the model, e.g. high. Use list_harnesses.'),
       folder: z.string().optional().describe('Sidebar folder in the channel to file the thread in, by name or id. A new name creates the folder.'),
+      remote: z
+        .boolean()
+        .optional()
+        .describe('Run it as a Claude Code cloud session on claude.ai/code instead of on this Mac (same as harness "claude-cloud"). The session works on its own clone of the channel repo and cannot use Omni tools, files or secrets.'),
     },
   },
-  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder }) => {
+  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, remote }) => {
+    if (remote && harness && harness !== 'claude-cloud') throw new Error(`remote: true runs on claude-cloud; it can't be combined with harness "${harness}".`);
     const t = await call('/threads', {
       method: 'POST',
-      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, folder, parent_id: SELF, source: 'conductor' }),
+      body: JSON.stringify({ channel, role, prompt, task_id, title, harness: remote ? 'claude-cloud' : harness, model, effort, folder, parent_id: SELF, source: 'conductor' }),
     });
     return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, status: t.status, branch: t.branch });
   },
@@ -107,7 +112,7 @@ server.registerTool(
 
 server.registerTool(
   'list_harnesses',
-  { description: 'List the agent harnesses (Claude Code, Codex, Cursor, Hermes) with their availability, fix command, models and effort levels, so you can pass valid ids to delegate.' },
+  { description: 'List the agent harnesses (Claude Code, Codex, Cursor, Hermes, Claude Code cloud) with their availability, fix command, models and effort levels, so you can pass valid ids to delegate.' },
   async () => {
     const list = await call('/harnesses');
     return text(
