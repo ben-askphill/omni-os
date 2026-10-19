@@ -86,7 +86,13 @@ public final class Updater {
     let main = await RepoHead.main(repo: repo)
     var server: String?
     if case .running(_, let info) = model.supervisor.state { server = info?.gitHead }
-    notices = UpdateCheck.notices(serverHead: server, appCommit: appCommit, mainHead: main)
+    var containsMain: [String: Bool] = [:]
+    if let main {
+      for commit in Set([server, appCommit].compactMap { $0 }) {
+        containsMain[commit] = await RepoHead.contains(repo: repo, commit: commit, ancestor: main)
+      }
+    }
+    notices = UpdateCheck.notices(serverHead: server, appCommit: appCommit, mainHead: main, containsMain: containsMain)
   }
 
   /// Restart stops a server that was started outside the app: the window says so before the click counts.

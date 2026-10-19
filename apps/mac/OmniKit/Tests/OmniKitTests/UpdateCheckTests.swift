@@ -12,6 +12,14 @@ import OmniKit
     #expect(UpdateCheck.notices(serverHead: main, appCommit: main, mainHead: main).isEmpty)
   }
 
+  @Test func aCommitAheadOfMainIsNotBehind() {
+    let branch = "275f906bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    let ahead = UpdateCheck.notices(serverHead: branch, appCommit: branch, mainHead: main, containsMain: [branch: true])
+    #expect(ahead.isEmpty)
+    let lacking = UpdateCheck.notices(serverHead: branch, appCommit: branch, mainHead: main, containsMain: [branch: false])
+    #expect(lacking == UpdateNotices(serverBehind: true, appBehind: true))
+  }
+
   @Test func whatItCannotKnowNeverShows() {
     #expect(UpdateCheck.notices(serverHead: nil, appCommit: nil, mainHead: main).isEmpty)
     #expect(UpdateCheck.notices(serverHead: "", appCommit: "", mainHead: main).isEmpty)

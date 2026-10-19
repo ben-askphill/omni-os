@@ -23,13 +23,17 @@ public enum UpdateCheck {
     return short.count >= 7 && long.hasPrefix(short)
   }
 
-  /// A notice shows when a commit is known and differs from main's. A commit the check can't know (a server
-  /// older than #76, a build without a stamp, no main) never shows one.
-  public static func notices(serverHead: String?, appCommit: String?, mainHead: String?) -> UpdateNotices {
+  /// A notice shows when a commit is known, differs from main's and does not already contain main. A commit
+  /// the check can't know (a server older than #76, a build without a stamp, no main) never shows one.
+  /// `containsMain` says, per commit, whether main is among its ancestors: a branch ahead of main is not behind,
+  /// and Restart or Rebuild from that checkout could never clear it. A commit missing from it counts as not.
+  public static func notices(
+    serverHead: String?, appCommit: String?, mainHead: String?, containsMain: [String: Bool] = [:]
+  ) -> UpdateNotices {
     guard let main = mainHead, !main.isEmpty else { return UpdateNotices() }
     func behind(_ commit: String?) -> Bool {
       guard let commit, !commit.isEmpty else { return false }
-      return !same(commit, main)
+      return !same(commit, main) && containsMain[commit] != true
     }
     return UpdateNotices(serverBehind: behind(serverHead), appBehind: behind(appCommit))
   }
@@ -45,6 +49,19 @@ public enum RepoHead {
     guard let out, out.status == 0 else { return nil }
     let text = String(decoding: out.output, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
     return text.isEmpty ? nil : text
+  }
+
+  /// Whether `ancestor` is in `commit`'s history, nil when git can't say (an unknown commit, no repo).
+  public static func contains(repo: URL, commit: String, ancestor: String) async -> Bool? {
+    let out = await Spawn.capture(
+      "/usr/bin/git", ["-C", repo.path, "merge-base", "--is-ancestor", ancestor, commit],
+      environment: ["HOME": NSHomeDirectory(), "PATH": "/usr/bin:/bin"], timeout: .seconds(5)
+    )
+    switch out?.status {
+    case 0: return true
+    case 1: return false
+    default: return nil
+    }
   }
 }
 
