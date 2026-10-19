@@ -4,54 +4,32 @@
   "private": true,
   "type": "module",
   "description": "One local workspace for Claude agent work: channels, threads, sandboxes, artifacts, PRs, conductor, automations.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "concurrently -k -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
-    "dev:server": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx watch --clear-screen=false --exclude 'data/**' --exclude 'web/**' server/index.ts",
-    "dev:web": "vite",
-    "build": "vite build",
-    "start": "NODE_ENV=production NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx server/index.ts",
-    "test": "vitest run --config tests/vitest.config.ts",
-    "test:mac": "swift test --package-path mac/OmniKit",
-    "test:all": "npm test && npm run test:mac",
-    "typecheck": "tsc --noEmit",
-    "import-history": "tsx scripts/import-history.ts",
-    "build:slash": "tsx scripts/build-slash-engine.ts",
-    "sync:backfill": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/sync-backfill.ts"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "npm run start --workspace @omni/server",
+    "test": "turbo boundaries && turbo run test",
+    "test:mac": "turbo run test:mac",
+    "test:all": "turbo boundaries && turbo run test test:mac",
+    "typecheck": "turbo run typecheck",
+    "import-history": "npm run import-history --workspace @omni/server --",
+    "build:slash": "npm run build:slash --workspace @omni/mac",
+    "sync:backfill": "npm run sync:backfill --workspace @omni/server --"
   },
   "engines": {
     "node": ">=24"
   },
-  "dependencies": {
-    "@hono/node-server": "^2.1.1",
-    "@modelcontextprotocol/sdk": "^1.30.1",
-    "@supabase/supabase-js": "^2.117.2",
-    "@xterm/addon-fit": "^0.11.0",
-    "@xterm/addon-serialize": "^0.14.0",
-    "@xterm/headless": "^6.0.0",
-    "@xterm/xterm": "^6.0.0",
-    "croner": "^10.0.1",
-    "hono": "^4.13.9",
-    "node-pty": "^1.1.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
-    "yaml": "^2.9.1",
-    "zod": "^4.6.5"
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": "11.19.0"
+    }
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.6.2",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.1",
-    "concurrently": "^10.0.5",
-    "esbuild": "^0.28.2",
-    "simple-icons": "^15.22.0",
-    "tailwindcss": "^4.3.3",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.1",
-    "vitest": "^5.0.1"
+    "turbo": "^2.11.9"
   }
 }

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "ui": "stream",
+  "envMode": "loose",
+  "globalEnv": ["OMNI_*"],
+  "tasks": {
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["transit"]
+    },
+    "test": {
+      "dependsOn": ["transit"]
+    },
+    "test:mac": {
+      "dependsOn": ["transit"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  },
+  "boundaries": {
+    "tags": {
+      "lib": {
+        "dependencies": { "deny": ["app"] }
+      },
+      "mac": {
+        "dependencies": { "deny": ["@omni/web"] }
+      },
+      "web": {
+        "dependencies": { "deny": ["@omni/mac"] }
+      }
+    }
+  }
+}

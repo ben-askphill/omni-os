@@ -1,0 +1,9 @@
+{
+  "extends": ["//"],
+  "tags": ["app", "mac"],
+  "tasks": {
+    "test:mac": {
+      "inputs": ["$TURBO_DEFAULT$", "!OmniKit/.build/**", "!.xcode/**", "$TURBO_ROOT$/apps/web/src/components/**"]
+    }
+  }
+}

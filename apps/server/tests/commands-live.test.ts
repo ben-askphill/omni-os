@@ -1,0 +1,88 @@
+import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { startRunner } from './runner-boot.ts';
+
+// The command list against the Claude Code, Codex and Cursor Agent CLIs Ben really runs. The fakes in fixtures/
+// answer the way the CLIs did when the fixtures were captured, so only this catches an upgrade
+// that changed the answer. Listing starts no turn and spends nothing, but it needs the real CLIs
+// and their logins, so it only runs on request:
+//   OMNI_LIVE_COMMANDS=1 npx vitest run --config apps/server/vitest.config.ts apps/server/tests/commands-live.test.ts
+const LIVE = process.env.OMNI_LIVE_COMMANDS === '1';
+
+const r = LIVE ? await startRunner({ OMNI_CLAUDE_BIN: 'claude', OMNI_CODEX_BIN: 'codex', OMNI_CURSOR_BIN: 'cursor-agent' }) : null!;
+const svc = LIVE ? await import('../commands.ts') : null!;
+
+describe.skipIf(!LIVE)('the real Claude Code CLI', () => {
+  it("lists a folder's commands without leaving a session behind", async () => {
+    const dir = realpathSync(mkdtempSync(join(r.tmp, 'live-')));
+    mkdirSync(join(dir, '.claude', 'commands'), { recursive: true });
+    writeFileSync(join(dir, '.claude', 'commands', 'omni-live-check.md'), '---\ndescription: Omni live check\n---\nSay hi.\n');
+
+    const list = await svc.listCommands('claude-code', dir, { wait: true });
+    expect(list.status).toBe('ready');
+    expect(list.commands).toContainEqual({ name: 'omni-live-check', description: 'Omni live check', source: 'project', mentionable: true });
+    expect(list.commands).toContainEqual(expect.objectContaining({ name: 'compact', source: 'builtin', mentionable: false }));
+    const names = list.commands.map((c) => c.name);
+    for (const hidden of ['login', 'config', 'mcp']) expect(names).not.toContain(hidden);
+    // Omni runs these in their place, and keeps them so their other names (/reset, /name) resolve.
+    expect(names).toEqual(expect.arrayContaining(['clear', 'rename', 'model']));
+    for (const c of list.commands) expect(c.description).not.toMatch(/\n|\((user|project)\)$/);
+
+    // Claude Code keeps a folder's sessions under ~/.claude/projects/<folder with - for / and .>.
+    expect(existsSync(join(homedir(), '.claude', 'projects', dir.replace(/[^A-Za-z0-9]/g, '-')))).toBe(false);
+  }, 30_000);
+});
+
+describe.skipIf(!LIVE)('the real Codex CLI', () => {
+  it("lists a folder's skills with the file each one loads from", async () => {
+    const dir = realpathSync(mkdtempSync(join(r.tmp, 'live-codex-')));
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    const file = join(dir, '.agents', 'skills', 'omni-live-check', 'SKILL.md');
+    mkdirSync(join(file, '..'), { recursive: true });
+    writeFileSync(file, '---\nname: omni-live-check\ndescription: Omni live check\n---\nSay hi.\n');
+
+    const list = await svc.listCommands('codex', dir, { wait: true });
+    expect(list.status).toBe('ready');
+    expect(list.commands).toContainEqual({ name: 'omni-live-check', description: 'Omni live check', source: 'project', mentionable: true, path: file });
+    // Codex bundles a few system skills, such as skill-creator.
+    expect(list.commands).toContainEqual(expect.objectContaining({ source: 'builtin', mentionable: true }));
+    for (const c of list.commands) {
+      expect(c.path).toMatch(/\/SKILL\.md$/);
+      expect(c.description).not.toContain('\n');
+    }
+  }, 30_000);
+});
+
+describe.skipIf(!LIVE)('the real Cursor Agent CLI', () => {
+  it("lists a folder's commands and skills without leaving a session behind", async () => {
+    const dir = realpathSync(mkdtempSync(join(r.tmp, 'live-cursor-')));
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    mkdirSync(join(dir, '.cursor', 'commands'), { recursive: true });
+    writeFileSync(join(dir, '.cursor', 'commands', 'omni-live-check.md'), 'Omni live check\n\nSay hi.\n');
+    mkdirSync(join(dir, '.cursor', 'skills', 'omni-live-skill'), { recursive: true });
+    writeFileSync(join(dir, '.cursor', 'skills', 'omni-live-skill', 'SKILL.md'), '---\nname: omni-live-skill\ndescription: Omni live skill\n---\nSay hi.\n');
+
+    const list = await svc.listCommands('cursor', dir, { wait: true });
+    expect(list.status).toBe('ready');
+    expect(list.commands).toContainEqual({ name: 'omni-live-check', description: 'Omni live check', source: 'project', mentionable: true });
+    expect(list.commands).toContainEqual({ name: 'omni-live-skill', description: 'Omni live skill', source: 'project', mentionable: true });
+    expect(list.commands).toContainEqual(expect.objectContaining({ source: 'builtin' }));
+    const names = list.commands.map((c) => c.name);
+    for (const hidden of ['copy-request-id', 'rename-chat', 'statusline']) expect(names).not.toContain(hidden);
+    for (const c of list.commands) expect(c.description).not.toMatch(/\n|\((user|project|global|team|skill|user skill|project skill|builtin skill)\)$/);
+
+    // Cursor Agent keeps each ACP session in ~/.cursor/acp-sessions/<id>, with the folder in meta.json.
+    const sessions = join(homedir(), '.cursor', 'acp-sessions');
+    const left = readdirSync(sessions).filter((id) => {
+      try {
+        return JSON.parse(readFileSync(join(sessions, id, 'meta.json'), 'utf8')).cwd === dir;
+      } catch {
+        return false;
+      }
+    });
+    expect(left).toEqual([]);
+  }, 30_000);
+});

@@ -4,7 +4,7 @@
     {
       "name": "omni-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:web"],
+      "runtimeArgs": ["run", "dev", "--workspace", "@omni/web"],
       "port": 4748
     }
   ]

@@ -1,0 +1,9 @@
+{
+  "extends": "@omni/typescript-config/base.json",
+  "include": [
+    "*.ts",
+    "scripts",
+    "tests",
+    "vitest.config.ts"
+  ]
+}
