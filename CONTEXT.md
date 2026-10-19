@@ -32,7 +32,7 @@ The crew role Ben talks to, which delegates work to crew threads in other channe
 A cron schedule that starts a new thread on every run.
 
 **Request**:
-A message sent to a thread through the API, saved before the client hears it was accepted. It carries the client's request id, kept across retries: a retry with the same id gets the first acceptance back, and the same id with another message is refused. Local to the Mac that accepted it (`message_requests`, `server/db/repos/requests.ts`).
+A message sent to a thread through the API, saved before the client hears it was accepted. It carries the client's request id, kept across retries: a retry with the same id gets the first acceptance back, and the same id with another message is refused. Local to the Mac that accepted it (`message_requests`, `apps/server/db/repos/requests.ts`).
 _Avoid_: Job, task
 
 **Crew report**:

@@ -9,7 +9,7 @@
 #
 # QA_SERVER_PORT (default 4757) and QA_WEB_PORT (default 4768) move the ports, QA_DIR the state dir
 # (default $TMPDIR/omni-qa-<server port>). Threads run on fake-claude, so a prompt with directives such as
-# RICH, TOOL:<ms> or LIMIT drives a turn without spending a plan (see tests/fixtures/fake-claude.mjs).
+# RICH, TOOL:<ms> or LIMIT drives a turn without spending a plan (see packages/test-fixtures/fake-claude.mjs).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -35,16 +35,16 @@ up() {
   # The scheduler watches the automations dir and crashes the server when it is missing.
   mkdir -p "$DIR/data" "$DIR/brain" "$DIR/automations"
   STARTING=1
-  local fx="$ROOT/tests/fixtures"
+  local fx="$ROOT/packages/test-fixtures"
   # setsid puts each in its own process group, so down can stop tsx/vite and their children together.
   OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
     OMNI_CLAUDE_BIN="$fx/fake-claude.mjs" OMNI_CODEX_BIN="$fx/fake-codex.mjs" OMNI_CURSOR_BIN="$fx/fake-cursor.mjs" \
     OMNI_BROWSER=0 OMNI_SUGGESTIONS=0 OMNI_HERMES_URL= OMNI_AUTOMATIONS_DIR="$DIR/automations" \
     OMNI_CLOUD_ENVIRONMENT="${OMNI_CLOUD_ENVIRONMENT:-env_qa}" OMNI_CLOUD_ROUTINE_URL= \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
-    setsid npx tsx server/index.ts >"$DIR/server.log" 2>&1 &
+    setsid npx tsx apps/server/index.ts >"$DIR/server.log" 2>&1 &
   echo $! >"$DIR/server.pid"
-  OMNI_PORT="$SERVER_PORT" setsid npx vite --port "$WEB_PORT" --strictPort >"$DIR/web.log" 2>&1 &
+  OMNI_PORT="$SERVER_PORT" setsid npx vite --config apps/web/vite.config.ts --port "$WEB_PORT" --strictPort >"$DIR/web.log" 2>&1 &
   echo $! >"$DIR/web.pid"
 
   for _ in $(seq 1 60); do

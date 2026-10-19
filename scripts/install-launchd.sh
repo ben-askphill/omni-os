@@ -4,7 +4,7 @@
 #   scripts/install-launchd.sh              build the UI, write the plist, (re)load the agent
 #   scripts/install-launchd.sh --uninstall  stop the agent and remove the plist
 #
-# The agent runs `node_modules/.bin/tsx server/index.ts` with NODE_ENV=production under
+# The agent runs `node_modules/.bin/tsx apps/server/index.ts` with NODE_ENV=production under
 # `/usr/bin/caffeinate -i`, so the Mac does not idle-sleep while Omni is up.
 # PATH is captured from the shell that runs this script, so `claude`, `gh`, `npx` and nvm's node resolve.
 # Re-run it after changing node versions or moving the repo.
@@ -91,7 +91,7 @@ cat > "$PLIST" <<EOF
     <string>/usr/bin/caffeinate</string>
     <string>-i</string>
     <string>$R/node_modules/.bin/tsx</string>
-    <string>server/index.ts</string>
+    <string>apps/server/index.ts</string>
   </array>
   <key>WorkingDirectory</key>
   <string>$R</string>

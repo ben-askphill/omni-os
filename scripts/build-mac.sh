@@ -13,7 +13,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DERIVED="$ROOT/mac/.xcode"
+DERIVED="$ROOT/apps/mac/.xcode"
 BUILT="$DERIVED/Build/Products/Release/Omni.app"
 DEST="$HOME/Applications/Omni.app"
 BUNDLE_ID="com.omni-os.mac"
@@ -38,7 +38,7 @@ say() { printf '==> %s\n' "$*"; }
 say "Building Omni (Release)"
 log="$DERIVED/build-release.log"
 mkdir -p "$DERIVED"
-if ! xcodebuild -project "$ROOT/mac/Omni.xcodeproj" -scheme Omni -configuration Release \
+if ! xcodebuild -project "$ROOT/apps/mac/Omni.xcodeproj" -scheme Omni -configuration Release \
   -derivedDataPath "$DERIVED" build >"$log" 2>&1; then
   grep -E "error:|BUILD FAILED" "$log" >&2 || tail -n 40 "$log" >&2
   echo "build-mac: the build failed. Full log: $log" >&2

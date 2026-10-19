@@ -1,0 +1,27 @@
+{
+  "name": "@omni/mac",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:mac": "swift test --package-path OmniKit",
+    "build:slash": "tsx scripts/build-slash-engine.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@omni/shared": "*"
+  },
+  "devDependencies": {
+    "@omni/test-fixtures": "*",
+    "@omni/typescript-config": "*",
+    "@types/node": "^26.6.2",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}

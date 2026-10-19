@@ -1,0 +1,23 @@
+{
+  "name": "@omni/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build:link-icons": "tsx scripts/build-link-icons.ts"
+  },
+  "devDependencies": {
+    "@omni/test-fixtures": "*",
+    "@omni/typescript-config": "*",
+    "@types/node": "^26.6.2",
+    "simple-icons": "^15.22.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}

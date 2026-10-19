@@ -1,9 +1,10 @@
 node_modules/
+.turbo/
 data/
-web/dist/
+apps/web/dist/
 .env
 .DS_Store
-mac/.xcode*/
-mac/OmniKit/.build/
-mac/OmniKit/.swiftpm/
+apps/mac/.xcode*/
+apps/mac/OmniKit/.build/
+apps/mac/OmniKit/.swiftpm/
 xcuserdata/

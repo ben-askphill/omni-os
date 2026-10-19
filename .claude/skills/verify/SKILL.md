@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Use to check your own work in Omni OS whenever you change server/, web/, shared/, mac/ or mcp/ code, before you say it is done or open a PR. Runs the checks, starts a throwaway stack, drives it and proves the change. Use it aggressively.
+description: Use to check your own work in Omni OS whenever you change apps/server/, apps/web/, packages/shared/, apps/mac/ or apps/mcp/ code, before you say it is done or open a PR. Runs the checks, starts a throwaway stack, drives it and proves the change. Use it aggressively.
 ---
 
 # Verify your change in Omni OS
@@ -10,17 +10,17 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 ## 1. Static checks (every change)
 
 - `npm run typecheck`
-- `npm test`, or one file while iterating: `npx vitest run --config tests/vitest.config.ts tests/<file>.test.ts` (without `--config`, vitest finds nothing).
+- `npm test` (turbo boundaries, then every package's vitest), or one package: `npx turbo run test --filter=@omni/<server|web|shared|mac>`, or one file while iterating: `cd apps/server && npx vitest run tests/<file>.test.ts` (each package has its own `vitest.config.ts`).
 - A failing test: rerun it on `main` (`git stash; git checkout main; npx vitest run ...`) before treating it as yours. Lock, server-boot, sync-two-macs and mac-fixtures tests can fail on machines without a Mac setup.
 - `npm run build` for web changes. Run it alone, not chained after other commands.
-- Changed a slash module in `shared/`: `npm run build:slash`.
+- Changed a slash module in `packages/shared/`: `npm run build:slash`.
 - Mac code (macOS only): `npm run test:mac`.
 
 ## 2. Run it
 
 `scripts/qa-stack.sh up` starts a throwaway server (:4757) with its own data dir and the fake CLIs, vite in front (:4768), and seeds sample threads. It prints the thread URLs. `scripts/qa-stack.sh down` stops it and deletes its data. Never test against :4747 or `data/`: that is Ben's live workspace.
 
-- Threads run on `tests/fixtures/fake-claude.mjs`. Drive a turn with directives in the prompt: `RICH` (tools, plan, sub-agent), `TOOL:<ms>`, `BG:<ms>`, `LIMIT[:<epoch>]`, `CTX:<tokens>`, `PUBLISH:<path>`, and more listed at the top of that file.
+- Threads run on `packages/test-fixtures/fake-claude.mjs`. Drive a turn with directives in the prompt: `RICH` (tools, plan, sub-agent), `TOOL:<ms>`, `BG:<ms>`, `LIMIT[:<epoch>]`, `CTX:<tokens>`, `PUBLISH:<path>`, and more listed at the top of that file.
 - Create a thread: `curl -s -X POST localhost:4757/api/threads -H 'content-type: application/json' -d '{"channel":"inbox","prompt":"RICH"}'`
 - Need some other state (folders, channels, a stuck request)? Build it through the API first; reach into the sqlite db in the QA data dir only when no route exists.
 
@@ -28,7 +28,7 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 
 - Web: open the printed URL in a browser tool (the thread's `omni-browser` MCP, Claude in Chrome, or Playwright). Click through the actual flow you changed, not just the page load. Check desktop width and 390px phone width when layout could differ, and dark mode (`browser_emulate_media`) when colour changed.
 - Server: curl the route and read the response. Then check the side effect: the row in the QA db, the feed event (`curl -N localhost:4757/api/feed`), the line in `scripts/qa-stack.sh logs`.
-- Mac: the Debug app's QA harness (`-OmniQAScript`, see "QA harness" in `mac/NOTES.md`) points the app at :4757 and snapshots windows.
+- Mac: the Debug app's QA harness (`-OmniQAScript`, see "QA harness" in `apps/mac/NOTES.md`) points the app at :4757 and snapshots windows.
 
 ## 4. Prove it
 

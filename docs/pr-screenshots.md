@@ -13,9 +13,9 @@ Every PR for a feature or fix that changes what the Web UI or the Mac app looks 
 
 ## How to capture
 
-- Never screenshot against the live server on :4747 or its `data/`. Start a throwaway server on a spare port with its own `OMNI_DATA_DIR` and the fake CLIs (the command is under "QA harness" in `mac/NOTES.md`), seed it with sample threads, and point the client at it.
-- Web: run vite against it (`OMNI_PORT=4757 npx vite --port 4768`, any free port) and use the thread's browser (`omni-browser` MCP) or Playwright: `browser_resize` for phone width, `browser_emulate_media` for dark mode.
-- Mac: use the Debug app's QA harness (`-OmniQAScript` with `snapshot` steps, `-appearance light` or `dark`), described in `mac/NOTES.md`. It snapshots windows without screen recording permission.
+- Never screenshot against the live server on :4747 or its `data/`. Start a throwaway server on a spare port with its own `OMNI_DATA_DIR` and the fake CLIs (the command is under "QA harness" in `apps/mac/NOTES.md`), seed it with sample threads, and point the client at it.
+- Web: run vite against it (`OMNI_PORT=4757 npx vite --config apps/web/vite.config.ts --port 4768`, any free port) and use the thread's browser (`omni-browser` MCP) or Playwright: `browser_resize` for phone width, `browser_emulate_media` for dark mode.
+- Mac: use the Debug app's QA harness (`-OmniQAScript` with `snapshot` steps, `-appearance light` or `dark`), described in `apps/mac/NOTES.md`. It snapshots windows without screen recording permission.
 - Name files after what they show, like `composer-after-dark.png`. The name becomes the alt text.
 
 ## How to attach

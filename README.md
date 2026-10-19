@@ -6,8 +6,8 @@ One Node server runs everything (threads, harnesses, database, secrets, automati
 
 | Client | What | Where |
 | --- | --- | --- |
-| Web UI | React app, in any browser and on the phone over Tailscale | `web/` |
-| Mac app | Native SwiftUI app for the desk. Can start and stop the server itself | `mac/` |
+| Web UI | React app, in any browser and on the phone over Tailscale | `apps/web/` |
+| Mac app | Native SwiftUI app for the desk. Can start and stop the server itself | `apps/mac/` |
 
 Both show the same channels and threads. They never share code directly: see [Web UI and Mac app](#web-ui-and-mac-app).
 
@@ -17,7 +17,7 @@ Both show the same channels and threads. They never share code directly: see [We
 - **Terminal tab** per thread: a real shell (PTY) in the thread's cwd. Billing and sync keys are kept out of its env
 - **Sandbox per thread**: own git worktree in repo channels, a persistent browser per channel (logins survive) shown live in the thread's Browser panel, where you can click and type in it too, secrets from the Keychain injected as env
 - **Artifacts** rendered inline: anything the agent writes to its artifacts dir
-- **Published artifacts**: a page a Claude Code thread publishes to claude.ai with its Artifact tool shows as a card in the thread, linked to its local file. The channel's pages go into later threads' system prompt, so an update lands at the same URL, and "Check comments" (or the `artifact-comments` automation) hands a page's comments back to the thread that made it. There is no public Artifacts API, so Omni reads this from the CLI's own tool calls (`shared/published.ts`)
+- **Published artifacts**: a page a Claude Code thread publishes to claude.ai with its Artifact tool shows as a card in the thread, linked to its local file. The channel's pages go into later threads' system prompt, so an update lands at the same URL, and "Check comments" (or the `artifact-comments` automation) hands a page's comments back to the thread that made it. There is no public Artifacts API, so Omni reads this from the CLI's own tool calls (`packages/shared/published.ts`)
 - **Artifacts page**: every artifact across channels in one list
 - **GitHub panel** per repo channel: PRs, checks, diff, merge (with confirm). Threads whose branch has an open or merged PR get a PR icon in the thread list
 - **Conductor**: one front agent that delegates to crew roles, alone or as a team (a lead plus members); reports come back to it automatically and show as delegation cards
@@ -45,9 +45,11 @@ Optional: `./scripts/install-launchd.sh` installs a LaunchAgent that starts the 
 Checks:
 
 ```bash
-npm test             # vitest suite
-npm run typecheck
+npm test             # turbo boundaries, then every package's vitest suite
+npm run typecheck    # tsc in every package
 npm run test:all     # vitest plus the Mac app's Swift tests
+npx turbo run test --filter=@omni/web   # one package
+npx turbo run test --affected           # only what changed against main
 ```
 
 Mac app (needs Xcode, Node and this checkout on the Mac):
@@ -57,7 +59,7 @@ scripts/build-mac.sh              # Release build, installs to ~/Applications/Om
 npm run test:mac                  # OmniKit tests, headless
 ```
 
-Or open `mac/Omni.xcodeproj` in Xcode and run the `Omni` scheme. The app finds the server on :4747, or starts one from the repo. See `mac/NOTES.md`.
+Or open `apps/mac/Omni.xcodeproj` in Xcode and run the `Omni` scheme. The app finds the server on :4747, or starts one from the repo. See `apps/mac/NOTES.md`.
 
 Config is optional: copy `.env.example` to `.env` (gitignored) and uncomment what you need. It covers the brain dir (`~/phillbert` by default, the cwd and context for non-repo channels), default model, permission mode, concurrency per harness, keepalive, Hermes URL, browser flags, data and automations dirs, upload cap, reply suggestions and timezone.
 
@@ -78,7 +80,7 @@ Each Claude Code thread gets one long-lived `claude -p --input-format stream-jso
 | env | `OMNI_THREAD_ID`, `OMNI_ARTIFACTS_DIR`, `OMNI_URL`, plus global and channel secrets |
 | session | `--session-id` on the first run, `--resume` after, so every follow-up keeps full context |
 
-Codex threads run on `codex app-server` (ADR 0001) and Cursor threads on `cursor-agent`, each through an adapter in `server/harness/` that turns its stream into the same events. Hermes is below.
+Codex threads run on `codex app-server` (ADR 0001) and Cursor threads on `cursor-agent`, each through an adapter in `apps/server/harness/` that turns its stream into the same events. Hermes is below.
 
 Every stream event is stored in SQLite (`data/omni.db`) and pushed to the UI over SSE. The usage meter is per harness: Claude's rate-limit events drive the 5h / 7d meter, Codex reports its own, Cursor reports none.
 
@@ -126,7 +128,7 @@ Roles live in `crew/*.md` (frontmatter + charter, edit freely, read on every run
 
 The frontmatter sets each role's model (Opus for most, Sonnet for inbox) and, for conductor and inbox, its default channel.
 
-The conductor's `omni` MCP (`mcp/omni.ts`) exposes `list_channels`, `list_crew`, `list_harnesses`, `delegate`, `delegate_team`, `message_thread`, `get_thread`, `list_threads`, `search_history`, `list_published_artifacts`, `check_artifact_comments`. A delegated thread runs in the target channel; when it finishes, its reply is posted to the conductor as a crew report (tagged with the task id) and the conductor is woken to relay it.
+The conductor's `omni` MCP (`apps/mcp/omni.ts`) exposes `list_channels`, `list_crew`, `list_harnesses`, `delegate`, `delegate_team`, `message_thread`, `get_thread`, `list_threads`, `search_history`, `list_published_artifacts`, `check_artifact_comments`. A delegated thread runs in the target channel; when it finishes, its reply is posted to the conductor as a crew report (tagged with the task id) and the conductor is woken to relay it.
 
 ## Automations
 
@@ -170,7 +172,7 @@ Stored in the macOS Keychain under service `omni-os` (account `<scope>/<NAME>`).
 
 A link in a reply shows as its tool's mark, its id and the title the tool gives it (`#7723 Fix the cart`, `29549 Localization setup`), on the web and the Mac app. A link with its own words keeps them and gains the mark; hovering shows the source, state and URL.
 
-- `shared/link-sources.ts` reads what a URL points at, `server/links.ts` asks the source for the live title and state (`POST /api/links/resolve`, cached 10 minutes), and the marks come from `shared/link-icons.ts` (regenerate with `npx tsx scripts/build-link-icons.ts`).
+- `packages/shared/link-sources.ts` reads what a URL points at, `apps/server/links.ts` asks the source for the live title and state (`POST /api/links/resolve`, cached 10 minutes), and the marks come from `packages/shared/link-icons.ts` (regenerate with `npx tsx packages/shared/scripts/build-link-icons.ts`).
 - Sources with an API lookup, and the secret each needs (global, or the channel's own, which wins):
 
 | Source | Secret |
@@ -230,32 +232,36 @@ On each Mac: Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the UR
 
 The two clients are kept apart so a change to one cannot break the other:
 
-- `web/` imports only `web/`, `shared/` and server types. It never imports `mac/`.
-- `mac/` imports only `mac/` and `shared/`. Its Swift code talks to the server over HTTP and SSE, never to `web/`.
-- `shared/` holds the pure TypeScript both need (slash grammar, `/` menu ranking, command pills) and imports only itself. The Mac app runs it through JavaScriptCore from a checked-in bundle: run `npm run build:slash` after changing a slash module.
-- `tests/app-boundaries.test.ts` fails on any import that crosses these lines.
-- `tests/mac-fixtures.test.ts` pins the JSON the Mac app reads from the server, so a server change that would break the app fails `npm test`.
+- `apps/web/` imports only `apps/web/`, `packages/shared/` and server types. It never imports `apps/mac/`.
+- `apps/mac/` imports only `apps/mac/` and `packages/shared/`. Its Swift code talks to the server over HTTP and SSE, never to `apps/web/`.
+- `packages/shared/` holds the pure TypeScript both need (slash grammar, `/` menu ranking, command pills) and imports only itself. The Mac app runs it through JavaScriptCore from a checked-in bundle: run `npm run build:slash` after changing a slash module.
+- `turbo boundaries` (part of `npm test`) fails on any import that crosses these lines: a file outside its package, a package that is not a declared dependency, or a dependency the tags in `turbo.json` deny.
+- `apps/server/tests/mac-fixtures.test.ts` pins the JSON the Mac app reads from the server, so a server change that would break the app fails `npm test`.
 - Some screens copy a Web UI rule (transcript grouping, status line, format helpers). Those are ported to Swift with their own tests, not imported. A Web UI change to one of them should say whether the Mac app needs it too (ADR 0002).
 
 ## Layout
 
+An npm workspaces monorepo run with Turborepo (`turbo.json`). Each app and package has its own
+`package.json`, `tests/` and vitest config.
+
 ```
-server/      Hono API (*-api.ts), runner/, harness/ (claude, codex, cursor, hermes adapters),
-             db/, sync/, sandbox, secrets, terminal, browser, artifacts, GitHub, scheduler
-mcp/omni.ts  conductor tools
-web/         Web UI (React)
-mac/         Mac app: SwiftUI app (Omni/), OmniKit package, slash engine entry
-shared/      pure TypeScript both clients use (slash grammar, menu, pills)
-crew/        role charters
-automations/ cron YAML
-mods/        Claude Code mods loaded with OMNI_MODS=1 (omni-progress)
-scripts/     shell shim, history import, sync backfill, Mac build, slash bundle,
-             PR screenshots, launchd install
-tests/       vitest suite, including the Mac fixtures and the app boundary check
-docs/        ADRs (adr/0001 to 0004) and the PR screenshot guide
-supabase/    sync relay migration
-CONTEXT.md   domain glossary (channel, thread, harness, crew...)
-data/        gitignored: db, thread dirs, worktrees, browser profiles, logs
+apps/server/                @omni/server: Hono API (*-api.ts), runner/, harness/ (claude, codex, cursor,
+                            hermes adapters), db/, sync/, sandbox, secrets, terminal, browser, artifacts,
+                            GitHub, scheduler; scripts/ for history import and sync backfill
+apps/mcp/                   @omni/mcp: omni.ts, the conductor tools
+apps/web/                   @omni/web: Web UI (React, Vite)
+apps/mac/                   @omni/mac: SwiftUI app (Omni/), OmniKit package, slash engine entry and bundler
+packages/shared/            @omni/shared: pure TypeScript both clients use (slash grammar, menu, pills)
+packages/test-fixtures/     @omni/test-fixtures: fake CLIs and corpora the TS and Swift tests share
+packages/typescript-config/ @omni/typescript-config: the tsconfig bases every package extends
+crew/                       role charters
+automations/                cron YAML
+mods/                       Claude Code mods loaded with OMNI_MODS=1 (omni-progress)
+scripts/                    shell shim, Mac build, QA stack, PR screenshots, launchd install
+docs/                       ADRs (adr/0001 to 0004) and the PR screenshot guide
+supabase/                   sync relay migration
+CONTEXT.md                  domain glossary (channel, thread, harness, crew...)
+data/                       gitignored: db, thread dirs, worktrees, browser profiles, logs
 ```
 
 ## Contributing
@@ -268,7 +274,7 @@ data/        gitignored: db, thread dirs, worktrees, browser profiles, logs
 
 - Isolation is a worktree plus a browser profile, not a VM. Threads run with `bypassPermissions` because nobody can answer prompts headless; the write boundaries in phillbert's CLAUDE.md still apply.
 - Only one live thread per channel gets the persistent browser profile; parallel ones get an isolated browser.
-- The channel browser (`server/browser.ts`) is one Chrome per channel that Omni launches on first use (a thread's MCP or the Browser panel) and closes after 5 idle minutes. The panel streams it with a CDP screencast and sends mouse, wheel and keys back (`/api/channels/:id/browser/*`). While someone watches, the page lays out at the viewer's size (`Emulation.setDeviceMetricsOverride`, sharp at the display's scale), so it reads like a real browser window in the panel; the last viewer to report a size wins, and with none watching the agent gets the 1280-wide desktop page back. Input goes in batches: a client queues while a batch is on its way and merges moves and scrolls. The frame is Chrome-like: tabs with favicons, the address bar, a loading bar, and Chrome's Cmd shortcuts (L, T, W, R, [, ], C, X, V; A and Z go to the page).
+- The channel browser (`apps/server/browser.ts`) is one Chrome per channel that Omni launches on first use (a thread's MCP or the Browser panel) and closes after 5 idle minutes. The panel streams it with a CDP screencast and sends mouse, wheel and keys back (`/api/channels/:id/browser/*`). While someone watches, the page lays out at the viewer's size (`Emulation.setDeviceMetricsOverride`, sharp at the display's scale), so it reads like a real browser window in the panel; the last viewer to report a size wins, and with none watching the agent gets the 1280-wide desktop page back. Input goes in batches: a client queues while a batch is on its way and merges moves and scrolls. The frame is Chrome-like: tabs with favicons, the address bar, a loading bar, and Chrome's Cmd shortcuts (L, T, W, R, [, ], C, X, V; A and Z go to the page).
 - Worktrees are not cleaned up automatically yet (`git worktree prune` in the repo).
 - The run queue lives in memory. Restarting the server marks running threads failed and drops queued follow-ups; resend them.
 - Subscription limits still apply. Each harness has its own concurrency cap (4 by default): `OMNI_MAX_CONCURRENT` (Claude Code), `OMNI_MAX_CONCURRENT_CODEX`, `OMNI_MAX_CONCURRENT_CURSOR`, `OMNI_MAX_CONCURRENT_HERMES`. A full harness never holds up threads on another. Hermes also enforces its own concurrent-run cap; Omni backs off and retries on HTTP 429.
