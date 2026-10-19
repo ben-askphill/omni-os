@@ -193,12 +193,29 @@ private struct MarkdownTableView: View {
   }
 
   private func cell(_ text: MarkdownText) -> some View {
-    Text(MarkdownBlockView.underlined(text.attributed))
-      .font(.omni(size: 13))
-      .frame(maxWidth: z(360), alignment: .leading)
-      .fixedSize(horizontal: false, vertical: true)
-      .padding(.trailing, z(12))
-      .padding(.vertical, z(6))
+    CappedWidth(cap: z(360)) {
+      Text(MarkdownBlockView.underlined(text.attributed))
+        .font(.omni(size: 13))
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(.trailing, z(12))
+    .padding(.vertical, z(6))
+  }
+}
+
+/// Its view at its natural width, wrapping past `cap`, and as tall as the wrapped text. The table's `.fixedSize()`
+/// proposes no width, so a `.frame(maxWidth:)` cell measured one unwrapped line, then drew wrapped into the next row.
+private struct CappedWidth: Layout {
+  let cap: CGFloat
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    guard let view = subviews.first else { return .zero }
+    let width = min(view.sizeThatFits(.unspecified).width, cap, proposal.width ?? .infinity)
+    return view.sizeThatFits(ProposedViewSize(width: width, height: nil))
+  }
+
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(width: bounds.width, height: nil))
   }
 }
 
