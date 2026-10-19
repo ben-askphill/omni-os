@@ -12,3 +12,12 @@ Local agent workspace. See README.md for what it does.
 - Never store secret values outside the Keychain. The `secrets` table holds names only.
 - `data/` is runtime state (db, thread dirs, worktrees, browser profiles). Never commit it.
 - A feature or fix with a visible change to the Web UI or Mac app ships with screenshots in the PR description (before/after, both clients if both change). Take them against a throwaway server, never :4747, and upload with `scripts/pr-screenshots.sh`. See `docs/pr-screenshots.md`.
+
+## Unslop every message (always on)
+
+Before you send any message to Ben, run the `unslop` skill on it. This applies to every model and agent working in this repo: Claude, Codex, Cursor, Gemini and any other.
+
+- Claude Code: invoke `/unslop` (`.claude/skills/unslop/SKILL.md`).
+- Other agents: read `.agents/skills/unslop/SKILL.md` and apply its rules.
+- Scope: chat replies, summaries, plans, PR descriptions and any prose written for Ben. Leave code, command output and quoted text unchanged.
+- Run the pass silently. Send only the cleaned text, not a before/after or a list of fixes.
