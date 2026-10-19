@@ -192,12 +192,51 @@ public struct ModelGroup: Hashable, Sendable, Identifiable {
 
 public enum ModelSearch {
   /// Every harness with the models matching `query` in their label, id, or the harness's name or plan. A harness stays in the list when nothing matches.
-  public static func groups(_ harnesses: [HarnessInfo], query: String) -> [ModelGroup] {
+  /// Claude Code is one group, local or cloud by `current` (`ClaudeWhere.pickerHarnesses`).
+  public static func groups(_ harnesses: [HarnessInfo], query: String, current: HarnessID = .claudeCode) -> [ModelGroup] {
     let s = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    return harnesses.map { h in
+    return ClaudeWhere.pickerHarnesses(harnesses, current: current).map { h in
       ModelGroup(
         harness: h,
         models: s.isEmpty ? h.models : h.models.filter { "\($0.label) \($0.id) \(h.name) \(h.plan)".lowercased().contains(s) })
     }
   }
+}
+
+/// Where Claude Code runs: on this Mac, or as a cloud session on claude.ai/code. The server keeps them as two
+/// harnesses; the model picker shows one "Claude Code" group and a Local/Cloud toggle. apps/web/src/claude-where.ts is the same.
+public enum ClaudeWhere: String, Hashable, Sendable, CaseIterable {
+  case local, cloud
+
+  public var harness: HarnessID { self == .cloud ? .claudeCloud : .claudeCode }
+
+  /// Where a Claude Code choice runs, or nil for any other harness.
+  public init?(harness: HarnessID) {
+    switch harness {
+    case .claudeCode: self = .local
+    case .claudeCloud: self = .cloud
+    default: return nil
+    }
+  }
+
+  /// The picker's groups: one Claude Code group, local or cloud by the current choice, in Claude Code's place.
+  public static func pickerHarnesses(_ harnesses: [HarnessInfo], current: HarnessID) -> [HarnessInfo] {
+    let cloud = harnesses.first { $0.id == .claudeCloud }
+    return harnesses.filter { $0.id != .claudeCloud }.map { h in
+      if current == .claudeCloud, let cloud, h.id == .claudeCode { return cloud }
+      return h
+    }
+  }
+
+  /// The choice moved to `where`: the same model when that side has it, else that side's default. No model stays none.
+  public static func switching(to whereTo: ClaudeWhere, model: String, harnesses: [HarnessInfo]) -> (harness: HarnessID, model: String) {
+    let id = whereTo.harness
+    guard !model.isEmpty else { return (id, "") }
+    let models = harnesses.first { $0.id == id }?.models ?? []
+    if models.contains(where: { $0.id == model }) { return (id, model) }
+    return (id, (models.first { $0.isDefault } ?? models.first)?.id ?? "")
+  }
+
+  /// The group's name in the picker: the toggle says where it runs.
+  public static func groupName(_ h: HarnessInfo) -> String { h.id == .claudeCloud ? "Claude Code" : h.name }
 }
