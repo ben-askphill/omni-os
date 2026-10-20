@@ -51,13 +51,16 @@ export function turnBlocked(t: Thread, here = false): string | null {
 
 /**
  * Before a turn: refuse it with the reason turnBlocked gives, and make the thread's folder here when Omni can,
- * checking its branch out again for a worktree thread. Returns the thread, with its cwd moved when it was.
+ * checking its branch out again for a worktree thread (made on the other Mac, or removed by the worktree sweep).
+ * Returns the thread, with its cwd moved when it was.
  */
 export async function prepareTurn(t: Thread, here = false): Promise<Thread> {
   const blocked = turnBlocked(t, here);
   if (blocked) throw refused(blocked);
-  if (!outbox.machineId() || existsSync(t.cwd)) return t;
-  const target = rebuildable(t)!;
+  if (existsSync(t.cwd)) return t;
+  // A worktree the sweep removed (apps/server/worktree-sweep.ts) is cut again from its branch, synced or not.
+  const target = rebuildable(t);
+  if (!target) return t;
   if (!existsSync(target.cwd)) {
     if (!target.worktree) mkdirSync(target.cwd, { recursive: true });
     else {

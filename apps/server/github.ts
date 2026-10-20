@@ -46,6 +46,12 @@ export async function branchPRs(repo: string, branch: string) {
   return { pr: pickBranchPR(prs), prs };
 }
 
+/** The merged PR a branch was opened as, with its head commit, or null when none is merged. */
+export async function mergedBranchPR(repo: string, branch: string): Promise<{ number: number; headRefOid: string } | null> {
+  const prs = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--head', branch, '--state', 'merged', '--limit', '5', '--json', 'number,headRefOid']));
+  return prs[0] ?? null;
+}
+
 export async function getPR(repo: string, n: number) {
   const [view, diff] = await Promise.all([
     gh(['pr', 'view', String(n), '--repo', repo, '--json', `${PR_FIELDS},body,files,reviews,comments`]),

@@ -29,6 +29,9 @@ alive() { [ -f "$DIR/$1.pid" ] && kill -0 "$(cat "$DIR/$1.pid")" 2>/dev/null; }
 
 [ "$SERVER_PORT" != 4747 ] || die "refusing port 4747, that is the live server"
 
+# macOS has no setsid(1); perl's POSIX::setsid gives the process its own group the same way.
+command -v setsid >/dev/null || setsid() { perl -MPOSIX=setsid -e 'setsid(); exec @ARGV or die "exec $ARGV[0]: $!"' "$@"; }
+
 up() {
   local seed=3
   [ "${1:-}" = "--seed" ] && seed="${2:?--seed needs a number}"

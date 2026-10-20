@@ -55,6 +55,10 @@ export const config = {
   /** Load the repo's Claude Code mods (mods/) into every Claude thread with --plugin-dir. Off until '1'. */
   mods: env.OMNI_MODS === '1',
   timezone: env.OMNI_TZ ?? 'Europe/Amsterdam',
+  /** Remove thread worktrees once nothing in them can be lost (apps/server/worktree-sweep.ts). '0' turns it off. */
+  worktreeSweep: (env.OMNI_WORKTREE_SWEEP ?? '1') !== '0',
+  /** How long a thread on a merged branch sits idle before its worktree is removed. */
+  worktreeIdleDays: Number(env.OMNI_WORKTREE_IDLE_DAYS ?? 7),
 };
 
 // OMNI_DATA_DIR moves all runtime state, so tests can run against a temp dir.

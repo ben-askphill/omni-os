@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { TITLE_MAX } from '@omni/shared/slash.ts';
 import { publishFeed } from './bus.ts';
 import { FolderError, folders, threads, type Thread } from './db.ts';
+import { sweepArchived } from './worktree-sweep.ts';
 
 export const threadsApi = new Hono();
 
@@ -53,5 +54,7 @@ threadsApi.patch('/:id', async (c) => {
   if (edit.archived) threads.setLimit(id, null);
   const renamed = Object.keys(edit).length ? threads.update(id, { ...edit, updated_at: t.updated_at })! : threads.get(id)!;
   publishFeed({ type: 'thread', thread: renamed });
+  // Archived: its worktree goes once nothing in it can be lost. Reopening it checks the branch out again.
+  if (edit.archived && !t.archived) sweepArchived(id);
   return c.json(renamed);
 });
