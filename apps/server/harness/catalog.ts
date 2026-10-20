@@ -142,42 +142,10 @@ export function hermesHarness(probe: HermesProbe, cap: number): HarnessInfo {
   return { ...base, available: true, models: hermesModels() };
 }
 
-// ---------- Claude Code cloud ----------
-
-/** Shown when cloud sessions can't be started from this Mac. Kept in step with the adapter's CLOUD_FIX. */
-export const CLOUD_FIX =
-  'Set OMNI_CLOUD_ENVIRONMENT to a cloud environment id (env_…, from /remote-env) and sign the claude CLI in with claude.ai (`claude auth login`), or set OMNI_CLOUD_ROUTINE_URL and the CLAUDE_ROUTINE_TOKEN secret';
-
-const CLOUD_NOTE = 'Runs as a Claude Code cloud session on claude.ai/code. Bills your Claude plan.';
-
-/** The session's own default, then the Claude models. Effort can't be set on a cloud session from the CLI. */
-export function cloudModels(): ModelEntry[] {
-  return [
-    { id: 'default', label: 'Cloud default', note: CLOUD_NOTE, efforts: [], defaultEffort: '', default: true },
-    ...claudeModels().map((m) => ({ id: m.id, label: m.label, note: CLOUD_NOTE, efforts: [], defaultEffort: '' })),
-  ];
-}
-
-export interface CloudProbe {
-  available: boolean;
-}
-
-export function cloudHarness(probe: CloudProbe, cap: number): HarnessInfo {
-  const base: Omit<HarnessInfo, 'models' | 'available' | 'fix'> = {
-    id: 'claude-cloud',
-    ...HARNESS_META['claude-cloud'],
-    capabilities: CAPABILITIES['claude-cloud'],
-    cap,
-  };
-  if (!probe.available) return { ...base, available: false, fix: CLOUD_FIX, models: [] };
-  return { ...base, available: true, models: cloudModels() };
-}
-
 const UNAVAILABLE_FIX: Partial<Record<HarnessId, string>> = {
   codex: 'codex login',
   cursor: 'cursor-agent login',
   hermes: HERMES_FIX,
-  'claude-cloud': CLOUD_FIX,
 };
 
 // ---------- resolution & validation ----------
@@ -192,7 +160,7 @@ export const getHarness = (cat: Catalog, id: HarnessId) => cat.harnesses.find((h
 export function resolveModel(cat: Catalog, harness: HarnessId, model: string): ModelEntry | null {
   const h = getHarness(cat, harness);
   if (!h) return null;
-  const id = harness === 'claude-code' || harness === 'claude-cloud' ? CLAUDE_ALIASES[model] ?? model : model;
+  const id = harness === 'claude-code' ? CLAUDE_ALIASES[model] ?? model : model;
   return h.models.find((m) => m.id === id) ?? null;
 }
 
@@ -238,7 +206,7 @@ export function validateRun(
 
 /**
  * A short fix is a shell command (`codex login`). A sentence is the instruction itself,
- * which is what Hermes and Claude Code cloud need (a Keychain secret and a reachable URL, not one command).
+ * which is what Hermes needs (a Keychain secret and a reachable URL, not one command).
  */
 export function unavailableError(name: string, fix?: string): string {
   const text = (fix ?? '').trim();

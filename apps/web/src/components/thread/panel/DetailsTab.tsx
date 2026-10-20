@@ -90,9 +90,7 @@ export function DetailsTab({
   warm: boolean | undefined;
 }) {
   const cwd = init?.cwd || thread.cwd;
-  const remote = thread.harness === 'hermes' || thread.harness === 'claude-cloud';
-  const cloud = thread.harness === 'claude-cloud';
-  const cloudUrl = cloud && /^(session|cse)_/.test(thread.session_id) ? `https://claude.ai/code/${thread.session_id.replace(/^cse_/, 'session_')}` : '';
+  const remote = thread.harness === 'hermes';
   const resumeCmd: Record<string, string> = {
     'claude-code': `claude --resume ${thread.session_id}`,
     codex: `codex resume ${thread.session_id}`,
@@ -127,7 +125,7 @@ export function DetailsTab({
         )}
         <Row k="Working dir">
           {remote ? (
-            <span className="text-fg-3">{cloud ? 'Claude Code cloud session' : 'Hermes server'}, not an Omni worktree</span>
+            <span className="text-fg-3">Hermes server, not an Omni worktree</span>
           ) : (
             <span className="font-mono text-[12px]">{cwd}</span>
           )}
@@ -198,23 +196,7 @@ export function DetailsTab({
         <div className="mt-4 rounded-[20px] bg-bg p-3.5">
           <div className="caption mb-2">Remote session</div>
           <p className="text-[12.5px] leading-relaxed text-fg-2">
-            {cloud ? (
-              cloudUrl ? (
-                <>
-                  This thread runs as a Claude Code cloud session.{' '}
-                  <a href={cloudUrl} target="_blank" rel="noreferrer" className="font-medium hover:underline">
-                    Open it on claude.ai
-                  </a>{' '}
-                  to follow, steer or create a PR. Another message here is queued into it.
-                </>
-              ) : (
-                'This thread runs as a Claude Code cloud session. Its first message starts it.'
-              )
-            ) : (
-              <>
-                This thread runs on the Hermes server. Another message here resumes <span className="font-mono">{thread.session_id}</span>.
-              </>
-            )}
+            This thread runs on the Hermes server. Another message here resumes <span className="font-mono">{thread.session_id}</span>.
           </p>
         </div>
       ) : (

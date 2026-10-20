@@ -7,7 +7,6 @@ import { join, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { channels, threadBases, type Thread, type ThreadBase } from './db.ts';
 import { plannedWorktree, worktreeProblem } from './sandbox.ts';
-import { isRemoteHarness, remoteWhere } from './harness/types.ts';
 
 const run = promisify(execFile);
 
@@ -83,7 +82,7 @@ export const gitOr = (dir: string, args: string[]) => git(dir, args).then((s) =>
  * worktree, checked to be on its branch; a thread with worktrees off reads the channel's repo when it runs there.
  */
 export async function changesCheckout(t: Thread): Promise<{ dir: string } | { reason: string }> {
-  if (isRemoteHarness(t.harness)) return { reason: `This thread runs ${remoteWhere(t.harness)}, so its files are not on this Mac.` };
+  if (t.harness === 'hermes') return { reason: 'This thread runs on the Hermes server, so its files are not on this Mac.' };
   if (t.setup === 'preparing') return { reason: "Omni is still preparing this thread's worktree." };
   if (t.setup === 'failed') return { reason: "This thread's worktree could not be prepared, so there are no changes to show." };
   const repo = channels.get(t.channel_id)?.repo_path;

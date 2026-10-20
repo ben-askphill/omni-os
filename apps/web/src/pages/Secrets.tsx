@@ -10,8 +10,6 @@ const NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
 /** Names Omni looks up itself. Values still go to the Keychain; this only fills the form. */
 const KNOWN_GLOBALS: { name: string; blurb: string }[] = [
   { name: 'HERMES_API_KEY', blurb: 'Hermes API bearer token. Global. Sent on HTTP requests, not in a shell environment.' },
-  { name: 'CLAUDE_ROUTINE_TOKEN', blurb: 'Claude Code cloud: the API trigger token of the routine in OMNI_CLOUD_ROUTINE_URL. Global. Sent on HTTP requests only.' },
-  { name: 'OMNI_CLOUD_REPLY_SECRET', blurb: "Claude Code cloud: the bearer a session's Stop hook sends to /api/cloud/reply. Set the same value as a network secret on the cloud environment." },
 ];
 
 function scopeLabel(scope: string, name: (id: string) => string | undefined) {

@@ -63,34 +63,6 @@ import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Claude Code cloud (apps/server/harness/claude-cloud): answer the calls Omni makes, the way the real CLI does, then exit.
-//   claude auth status                                    -> signed in with claude.ai
-//   claude -p <brief> --environment <id> --output-format json -> {"ok":true,"session_id":"session_…","url":…}
-//   claude -p <msg> --cloud <id> --output-format json     -> {"ok":true,"session_id":<id>,"url":…}
-// FAKE_CLAUDE_CLOUD_FAIL=<text> answers a create with {"ok":false,"error":<text>} and exits 1.
-{
-  const argv = process.argv.slice(2);
-  const at = (flag) => (argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : undefined);
-  if (argv[0] === 'auth' && argv[1] === 'status') {
-    process.stdout.write(JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty' }) + '\n');
-    process.exit(0);
-  }
-  if (argv.includes('--environment')) {
-    if (process.env.FAKE_CLAUDE_CLOUD_FAIL) {
-      process.stdout.write(JSON.stringify({ ok: false, error: process.env.FAKE_CLAUDE_CLOUD_FAIL }) + '\n');
-      process.exit(1);
-    }
-    const id = `session_01FAKE${Date.now().toString(36).toUpperCase()}`;
-    process.stdout.write(JSON.stringify({ ok: true, session_id: id, title: 'fake', url: `https://claude.ai/code/${id}`, pool_id: at('--environment') }) + '\n');
-    process.exit(0);
-  }
-  if (argv.includes('--cloud') && argv.includes('-p')) {
-    const id = at('--cloud');
-    process.stdout.write(JSON.stringify({ ok: true, session_id: id, url: `https://claude.ai/code/${id}` }) + '\n');
-    process.exit(0);
-  }
-}
-
 const VERSION = '2.1.278';
 const TOOLS = ['Task', 'Bash', 'Glob', 'Grep', 'Read', 'Edit', 'Write', 'WebFetch', 'WebSearch', 'TodoWrite'];
 const REJECTED =

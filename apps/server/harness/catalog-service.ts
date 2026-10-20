@@ -1,4 +1,4 @@
-// The live catalog: it probes the CLIs (and the Hermes API, and the claude.ai login for cloud sessions) at server start and every 15 minutes.
+// The live catalog: it probes the CLIs (and the Hermes API) at server start and every 15 minutes.
 // A harness that is down is probed again on demand (freshCatalog, at most every 10 seconds), so a
 // `codex login` or the Mac joining the tailnet shows in the picker without a restart.
 // The pure assembly lives in catalog.ts; this file does the I/O.
@@ -18,7 +18,6 @@ import type {
 import { cursorBin } from './cursor/bin.ts';
 import { parseCursorModels } from './cursor/models.ts';
 import { probeHermes } from './hermes/client.ts';
-import { execRunner, type Runner } from './claude-cloud/dispatch.ts';
 import { harnessEnv } from './env-guard.ts';
 import { globalSecret } from '../secrets.ts';
 import { recordUsage } from '../usage.ts';
@@ -28,13 +27,11 @@ import {
   codexHarness,
   cursorHarness,
   hermesHarness,
-  cloudHarness,
   getHarness,
   type Catalog,
   type CodexProbe,
   type CursorProbe,
   type HermesProbe,
-  type CloudProbe,
 } from './catalog.ts';
 
 type Probe = CodexProbe & { rateLimits?: RateLimits };
@@ -52,7 +49,6 @@ const caps = (): Record<HarnessId, number> => ({
   codex: config.maxConcurrentCodex,
   cursor: config.maxConcurrentCursor,
   hermes: config.maxConcurrentHermes,
-  'claude-cloud': config.maxConcurrentCloud,
 });
 
 /** Probe `cursor-agent --list-models` for the model list. Success means installed and logged in. */
@@ -155,27 +151,6 @@ export async function probeHermesHarness(cap: number): Promise<HarnessInfo> {
 }
 
 /**
- * Cloud sessions start through the claude CLI's claude.ai login (an environment id is set), or through a routine's
- * API trigger (its URL is set and its token is in the Keychain). Either one is enough.
- */
-export async function probeCloud(run: Runner = execRunner, secret = globalSecret): Promise<CloudProbe> {
-  if (config.cloudRoutineUrl && (await secret('CLAUDE_ROUTINE_TOKEN').catch(() => null))) return { available: true };
-  if (!config.cloudEnvironment) return { available: false };
-  const out = await run(config.claudeBin, ['auth', 'status'], { env: harnessEnv('claude-cloud', {}) }).catch(() => null);
-  if (!out || out.code !== 0) return { available: false };
-  try {
-    const s = JSON.parse(out.stdout) as { loggedIn?: boolean; authMethod?: string };
-    return { available: !!s.loggedIn && s.authMethod === 'claude.ai' };
-  } catch {
-    return { available: false };
-  }
-}
-
-async function probeCloudHarness(cap: number): Promise<HarnessInfo> {
-  return cloudHarness(await probeCloud().catch((): CloudProbe => ({ available: false })), cap);
-}
-
-/**
  * Probe the harnesses in `only` (all by default) and keep the others as they are. A call while
  * a load is running joins that load.
  */
@@ -183,13 +158,12 @@ export function loadCatalog(only: HarnessId[] = HARNESS_IDS): Promise<Catalog> {
   loading ??= (async () => {
     const c = caps();
     const keep = (id: HarnessId) => getHarness(getCatalog(), id)!;
-    const [codex, cursor, hermes, cloud] = await Promise.all([
+    const [codex, cursor, hermes] = await Promise.all([
       only.includes('codex') ? probeCodexHarness(c.codex) : keep('codex'),
       only.includes('cursor') ? probeCursorHarness(c.cursor) : keep('cursor'),
       only.includes('hermes') ? probeHermesHarness(c.hermes) : keep('hermes'),
-      only.includes('claude-cloud') ? probeCloudHarness(c['claude-cloud']) : keep('claude-cloud'),
     ]);
-    current = { harnesses: [claudeHarness(c['claude-code'], config.defaultModel), codex, cursor, hermes, cloud] };
+    current = { harnesses: [claudeHarness(c['claude-code'], config.defaultModel), codex, cursor, hermes] };
     checkedAt = Date.now();
     return current;
   })().finally(() => {
@@ -208,7 +182,6 @@ export function getCatalog(): Catalog {
       codexHarness({ available: false, models: [] }, c.codex),
       cursorHarness({ available: false, models: [] }, c.cursor),
       hermesHarness({ available: false }, c.hermes),
-      cloudHarness({ available: false }, c['claude-cloud']),
     ],
   };
 }
