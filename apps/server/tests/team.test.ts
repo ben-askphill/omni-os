@@ -68,4 +68,18 @@ describe('delegate_team', () => {
     await H.until('stopped report shown', () => H.byKind(lead.id, 'crew_report').length === 1);
     expect(H.spawns(lead.id)).toHaveLength(0);
   });
+
+  it('files the lead in the folder it names, and leaves the members under the lead', T, async () => {
+    const folder = H.db.folders.create({ channel_id: 'scratch', name: 'Mics' });
+    const { lead, members } = await H.runner.createTeam({
+      channel: 'scratch',
+      title: 'Filed team',
+      prompt: 'Team in a folder',
+      folder: 'mics',
+      tasks: [{ prompt: 'find the price' }],
+    });
+    expect(lead.folder_id).toBe(folder.id);
+    expect(members[0].folder_id).toBeNull();
+    await H.untilResults(lead.id, 1);
+  });
 });

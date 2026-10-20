@@ -21,13 +21,46 @@ const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: typeof 
 
 const server = new McpServer({ name: 'omni', version: '0.1.0' });
 
+/** A channel's sidebar folders, with a few recent thread titles so you can tell what each one holds. */
+const folderSummary = (folders: any[] = []) =>
+  folders.map((f: any) => ({ id: f.id, name: f.name, threads: f.count, recent: (f.threads ?? []).slice(0, 3).map((t: any) => t.title) }));
+
+/**
+ * The folder `name` names in the channel, by id or name ignoring case. With `create` a name no folder has is fine:
+ * the server makes it. Without it, an unknown name is refused, so a new folder only ever comes after Ben agreed to it.
+ */
+async function checkFolder(channel: string, name: string, create?: boolean) {
+  const ch = await call(`/channels/${encodeURIComponent(channel)}`);
+  const want = name.replace(/\s+/g, ' ').trim().toLowerCase();
+  const hit = (ch.folders ?? []).find((f: any) => f.id === name || f.name.toLowerCase() === want);
+  if (hit || create) return hit ?? null;
+  const have = (ch.folders ?? []).map((f: any) => `"${f.name}"`).join(', ') || 'none yet';
+  throw new Error(
+    `#${channel} has no folder "${name}" (folders: ${have}). Suggest the new folder to Ben and leave the thread unfiled for now; ` +
+      'once he agrees, call file_thread with create: true. Pass create_folder: true on delegate only when Ben already asked for the folder.',
+  );
+}
+
 server.registerTool(
   'list_channels',
-  { description: 'List Omni channels (one per client or project) with repo, store and running thread count.' },
+  {
+    description:
+      'List Omni channels (one per client or project) with repo, store, running thread count and sidebar folders. ' +
+      'Each folder shows its thread count and a few recent thread titles, so you can pick the one a task belongs in.',
+  },
   async () => {
     const list = await call('/channels');
     return text(
-      list.map((c: any) => ({ id: c.id, name: c.name, kind: c.kind, store: c.store_domain, repo: c.github_repo, running: c.running, notes: c.notes })),
+      list.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        kind: c.kind,
+        store: c.store_domain,
+        repo: c.github_repo,
+        running: c.running,
+        notes: c.notes,
+        folders: folderSummary(c.folders),
+      })),
     );
   },
 );
@@ -54,20 +87,22 @@ server.registerTool(
       harness: z.string().optional().describe('Override the role default harness: claude-code, codex, cursor, hermes or claude-cloud (an Anthropic-hosted Claude Code cloud session on claude.ai/code, billed to the Claude plan; its report links the session). Use list_harnesses.'),
       model: z.string().optional().describe('Any catalog model id, or a Claude alias (opus, sonnet, haiku, fable). Use list_harnesses.'),
       effort: z.string().optional().describe('Reasoning effort supported by the model, e.g. high. Use list_harnesses.'),
-      folder: z.string().optional().describe('Sidebar folder in the channel to file the thread in, by name or id. A new name creates the folder.'),
+      folder: z.string().optional().describe('Sidebar folder in the channel to file the thread in, by name or id. Use list_channels. It must exist unless create_folder is true.'),
+      create_folder: z.boolean().optional().describe('Create `folder` when the channel has none by that name. Only when Ben asked for the folder or agreed to it.'),
       remote: z
         .boolean()
         .optional()
         .describe('Run it as a Claude Code cloud session on claude.ai/code instead of on this Mac (same as harness "claude-cloud"). The session works on its own clone of the channel repo and cannot use Omni tools, files or secrets.'),
     },
   },
-  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, remote }) => {
+  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, create_folder, remote }) => {
     if (remote && harness && harness !== 'claude-cloud') throw new Error(`remote: true runs on claude-cloud; it can't be combined with harness "${harness}".`);
+    if (folder?.trim()) await checkFolder(channel, folder, create_folder);
     const t = await call('/threads', {
       method: 'POST',
       body: JSON.stringify({ channel, role, prompt, task_id, title, harness: remote ? 'claude-cloud' : harness, model, effort, folder, parent_id: SELF, source: 'conductor' }),
     });
-    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, status: t.status, branch: t.branch });
+    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, status: t.status, branch: t.branch });
   },
 );
 
@@ -85,6 +120,8 @@ server.registerTool(
       prompt: z.string().describe('What the team is for and what the combined answer should look like. The lead gets this with every report.'),
       role: z.string().optional().describe('Crew role id for the lead, and for every task that names none. Use list_crew.'),
       task_id: z.string().optional().describe('Short id like T-12 for the team. Members get T-12.1, T-12.2 unless they name their own.'),
+      folder: z.string().optional().describe('Sidebar folder in the channel to file the lead thread in, by name or id. Same rules as delegate.'),
+      create_folder: z.boolean().optional().describe('Create `folder` when the channel has none by that name. Only when Ben asked for the folder or agreed to it.'),
       tasks: z
         .array(
           z.object({
@@ -100,13 +137,39 @@ server.registerTool(
         .min(1),
     },
   },
-  async ({ channel, title, prompt, role, task_id, tasks }) => {
+  async ({ channel, title, prompt, role, task_id, folder, create_folder, tasks }) => {
+    if (folder?.trim()) await checkFolder(channel, folder, create_folder);
     const { lead, members } = await call('/threads/team', {
       method: 'POST',
-      body: JSON.stringify({ channel, title, prompt, role, task_id, tasks, parent_id: SELF, source: 'conductor' }),
+      body: JSON.stringify({ channel, title, prompt, role, task_id, folder, tasks, parent_id: SELF, source: 'conductor' }),
     });
     const brief = (t: any) => ({ thread_id: t.id, task_id: t.task_id, title: t.title, channel: t.channel_id, role: t.role, harness: t.harness, status: t.status });
     return text({ lead: brief(lead), members: members.map(brief) });
+  },
+);
+
+server.registerTool(
+  'file_thread',
+  {
+    description:
+      'Put an existing thread in a sidebar folder of its own channel, by folder name or id. ' +
+      'Use it after Ben agrees to a folder you suggested, or to move a thread he says is filed wrong. ' +
+      'create: true makes the folder when the channel has none by that name. An empty folder takes the thread out of its folder.',
+    inputSchema: {
+      thread_id: z.string(),
+      folder: z.string().describe('Folder name or id in the thread\'s channel. Empty string: out of any folder.'),
+      create: z.boolean().optional().describe('Create the folder if the channel has none by that name. Only when Ben asked for it or agreed.'),
+    },
+  },
+  async ({ thread_id, folder, create }) => {
+    const { thread } = await call(`/threads/${thread_id}`);
+    let folder_id: string | null = null;
+    if (folder.trim()) {
+      const hit = await checkFolder(thread.channel_id, folder, create);
+      folder_id = hit?.id ?? (await call('/folders', { method: 'POST', body: JSON.stringify({ channel: thread.channel_id, name: folder }) })).id;
+    }
+    const t = await call(`/threads/${thread_id}`, { method: 'PATCH', body: JSON.stringify({ folder_id }) });
+    return text({ thread_id: t.id, channel: t.channel_id, folder_id: t.folder_id });
   },
 );
 

@@ -189,6 +189,8 @@ export interface CreateTeamInput {
   parent_id?: string | null;
   task_id?: string | null;
   source?: ThreadSource;
+  /** A sidebar folder of the channel for the lead, by id or name. Members sit under the lead, not in the folder. */
+  folder?: string | null;
   tasks: TeamTask[];
 }
 

@@ -83,6 +83,8 @@ const teamSchema = z.object({
   parent_id: z.string().nullish(),
   task_id: z.string().nullish(),
   source: z.enum(['manual', 'conductor']).default('conductor'),
+  /** A sidebar folder of the channel for the lead, by id or name. A name no folder has makes one. */
+  folder: z.string().max(200).nullish(),
   tasks: z
     .array(
       z.object({
