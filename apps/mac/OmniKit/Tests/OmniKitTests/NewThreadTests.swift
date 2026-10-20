@@ -196,41 +196,6 @@ private let channels: Set<String> = ["conductor", "acme", "inbox"]
   }
 }
 
-@Suite struct ClaudeWhereTests {
-  private func withCloud() -> [HarnessInfo] {
-    let cloud = """
-    [{"id":"claude-cloud","name":"Claude Code cloud","plan":"Claude plan","capabilities":{"warmProcess":false,"steer":true,"inlineImages":false,"usage":"none"},
-      "available":true,"cap":4,"running":0,"models":[
-       {"id":"default","label":"Cloud default","default":true,"efforts":[]},
-       {"id":"opus","label":"Opus","efforts":[]}]}]
-    """
-    return harnesses() + (try! OmniJSON.decoder().decode([HarnessInfo].self, from: Data(cloud.utf8)))
-  }
-
-  @Test func showsOneClaudeCodeGroupLocalUnlessTheChoiceIsCloud() {
-    let all = withCloud()
-    #expect(ModelSearch.groups(all, query: "").map(\.id) == [.claudeCode, .codex, .cursor])
-    #expect(ModelSearch.groups(all, query: "", current: .codex).map(\.id) == [.claudeCode, .codex, .cursor])
-    #expect(ModelSearch.groups(all, query: "", current: .claudeCloud).map(\.id) == [.claudeCloud, .codex, .cursor])
-    #expect(ClaudeWhere.pickerHarnesses(harnesses(), current: .claudeCloud).map(\.id) == [.claudeCode, .codex, .cursor])
-    #expect(ClaudeWhere.groupName(all[3]) == "Claude Code")
-  }
-
-  @Test func readsWhereFromTheHarness() {
-    #expect(ClaudeWhere(harness: .claudeCode) == .local)
-    #expect(ClaudeWhere(harness: .claudeCloud) == .cloud)
-    #expect(ClaudeWhere(harness: .codex) == nil)
-  }
-
-  @Test func switchingKeepsTheModelElseTakesThatSidesDefault() {
-    let all = withCloud()
-    #expect(ClaudeWhere.switching(to: .cloud, model: "opus", harnesses: all) == (.claudeCloud, "opus"))
-    #expect(ClaudeWhere.switching(to: .cloud, model: "sonnet", harnesses: all) == (.claudeCloud, "default"))
-    #expect(ClaudeWhere.switching(to: .local, model: "default", harnesses: all) == (.claudeCode, "sonnet"))
-    #expect(ClaudeWhere.switching(to: .cloud, model: "", harnesses: all) == (.claudeCloud, ""))
-  }
-}
-
 @Suite struct NewThreadRequestTests {
   @Test func bodyOmitsWhatIsDefault() {
     let c = NewThreadChoice(channel: "acme", role: "", harness: .claudeCode, model: "", effort: "")

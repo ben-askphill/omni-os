@@ -378,7 +378,6 @@ struct EffortMenu: View {
 
 /// The model pill and its list: models under each harness with its plan, one search, the default marked, and a
 /// harness that isn't installed or logged in shown disabled with the command that fixes it (`ModelPicker.tsx`).
-/// Claude Code is one group, with a Local/Cloud toggle beside the pill for where it runs.
 struct ModelPickerButton: View {
   let harnesses: [HarnessInfo]
   let harness: HarnessID
@@ -400,38 +399,29 @@ struct ModelPickerButton: View {
 
   var body: some View {
     let c = current
-    HStack(spacing: z(6)) {
-      Button {
-        query = ""
-        open.toggle()
-        if open { refresh() }
-      } label: {
-        ViewThatFits(in: .horizontal) {
-          pill(c, harness: true)
-          pill(c, harness: false)
-        }
+    Button {
+      query = ""
+      open.toggle()
+      if open { refresh() }
+    } label: {
+      ViewThatFits(in: .horizontal) {
+        pill(c, harness: true)
+        pill(c, harness: false)
       }
-      .buttonStyle(.plain)
-      .help("Model")
-      .accessibilityLabel("Model: \(c.model?.label ?? "none")\(c.harness.map { " on \($0.name)" } ?? "")")
-      .popover(isPresented: $open, arrowEdge: .bottom) { list }
-      .onChange(of: openRequest) {
-        query = ""
-        open = true
-        refresh()
-      }
-      if let w = ClaudeWhere(harness: harness), let cloud = harnesses.first(where: { $0.id == .claudeCloud }) {
-        WhereToggle(value: w, cloudFix: cloud.available ? nil : cloud.fix ?? "") { to in
-          guard to != w else { return }
-          let next = ClaudeWhere.switching(to: to, model: model, harnesses: harnesses)
-          pick(next.harness, next.model)
-        }
-      }
+    }
+    .buttonStyle(.plain)
+    .help("Model")
+    .accessibilityLabel("Model: \(c.model?.label ?? "none")\(c.harness.map { " on \($0.name)" } ?? "")")
+    .popover(isPresented: $open, arrowEdge: .bottom) { list }
+    .onChange(of: openRequest) {
+      query = ""
+      open = true
+      refresh()
     }
   }
 
   private func pill(_ c: (harness: HarnessInfo?, model: ModelEntry?), harness: Bool) -> some View {
-    PickerPill(text: c.model?.label ?? placeholder, secondary: harness && c.model != nil ? c.harness.map(ClaudeWhere.groupName) : nil) {
+    PickerPill(text: c.model?.label ?? placeholder, secondary: harness && c.model != nil ? c.harness?.name : nil) {
       if let h = c.harness {
         PillAvatar(fill: Tok.bg) { HarnessLogo(harness: h.id.rawValue, size: 13).foregroundStyle(Tok.fg) }
       } else {
@@ -441,7 +431,7 @@ struct ModelPickerButton: View {
   }
 
   private var list: some View {
-    let groups = ModelSearch.groups(harnesses, query: query, current: harness)
+    let groups = ModelSearch.groups(harnesses, query: query)
     return VStack(spacing: 0) {
       HStack(spacing: z(8)) {
         OmniIcon(name: "search", size: 15).foregroundStyle(Tok.fg4)
@@ -475,7 +465,7 @@ struct ModelPickerButton: View {
     HStack {
       HStack(spacing: z(6)) {
         HarnessLogo(harness: h.id.rawValue, size: 12)
-        Text(ClaudeWhere.groupName(h)).lineLimit(1)
+        Text(h.name).lineLimit(1)
       }
       .omniCaption()
       Spacer()
@@ -567,52 +557,5 @@ private struct FolderChip: View {
     .contentShape(Capsule())
     .onHover { hover = $0 }
     .fixedSize()
-  }
-}
-
-/// Where Claude Code runs: on this Mac, or as a cloud session on claude.ai/code (`WhereToggle` in ModelPicker.tsx).
-struct WhereToggle: View {
-  let value: ClaudeWhere
-  /// Set when cloud sessions can't start from this Mac: the Cloud side is disabled and says why.
-  let cloudFix: String?
-  let pick: (ClaudeWhere) -> Void
-
-  var body: some View {
-    HStack(spacing: z(2)) {
-      segment(.local, label: "Local", icon: "monitor", help: "Runs on this Mac")
-      segment(
-        .cloud, label: "Cloud", icon: "cloud",
-        help: cloudFix.map { "Not available. \($0)" } ?? "Runs as a Claude Code cloud session on claude.ai/code",
-        disabled: cloudFix != nil && value != .cloud)
-    }
-    .padding(z(4))
-    .frame(height: z(32))
-    .background(Tok.surface2, in: Capsule())
-    .fixedSize()
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel("Where Claude Code runs")
-  }
-
-  private func segment(_ w: ClaudeWhere, label: String, icon: String, help: String, disabled: Bool = false) -> some View {
-    let on = value == w
-    return Button {
-      pick(w)
-    } label: {
-      HStack(spacing: z(6)) {
-        OmniIcon(name: icon, size: 12)
-        Text(label)
-      }
-      .font(.omni(size: 12, weight: .medium))
-      .foregroundStyle(on ? Tok.fg : Tok.fg3)
-      .padding(.horizontal, z(10))
-      .frame(height: z(24))
-      .background(on ? Tok.bg : .clear, in: Capsule())
-      .contentShape(Capsule())
-    }
-    .buttonStyle(.plain)
-    .disabled(disabled)
-    .opacity(disabled ? 0.4 : 1)
-    .help(help)
-    .accessibilityAddTraits(on ? .isSelected : [])
   }
 }

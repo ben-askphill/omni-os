@@ -8,7 +8,7 @@ import { parseSlash, resolveSlash, slashRecord, type SlashCommand, type SlashRec
 import { listCommands, peekCommands } from '../commands.ts';
 import { withMentions } from '../mentions.ts';
 import { saveUploads, type Attachment } from '../uploads.ts';
-import { isRemoteHarness, type HarnessId } from '../harness/types.ts';
+import type { HarnessId } from '../harness/types.ts';
 import type { Catalog } from '../harness/catalog.ts';
 import { freshCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { resolveRun } from '../harness/resolve.ts';
@@ -117,7 +117,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
 
   const id = randomUUID();
-  const remote = isRemoteHarness(harness);
+  const remote = harness === 'hermes';
   const wd = await prepareWorkdir(channel, id, { remote });
   const thread = threads.create({
     id,

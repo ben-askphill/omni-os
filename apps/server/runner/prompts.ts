@@ -2,7 +2,6 @@
 import { config, artifactsDir, browserOutDir, designSystemFile } from '../config.ts';
 import { artifacts, type Channel, type Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
-import { isRemoteHarness } from '../harness/types.ts';
 
 /** Claude Code's Artifact tool publishes to claude.ai. Omni links a publish to its file and keeps the URL per channel. */
 function publishedLines(channelId: string) {
@@ -19,7 +18,7 @@ function publishedLines(channelId: string) {
 
 /** The channel's design system, as a file the agent reads before it writes a page. Local harnesses only. */
 function designSystemLines(thread: Thread, channel: Channel) {
-  if (!channel.design_system || isRemoteHarness(thread.harness)) return [];
+  if (!channel.design_system || thread.harness === 'hermes') return [];
   return [
     '',
     '## Design system',
@@ -29,12 +28,10 @@ function designSystemLines(thread: Thread, channel: Channel) {
 }
 
 export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false) {
-  const remote = isRemoteHarness(thread.harness);
+  const remote = thread.harness === 'hermes';
   const lines = [
     '# Omni OS context',
-    thread.harness === 'claude-cloud'
-      ? 'You are a Claude Code cloud session started by Omni OS, Ben\'s local agent workspace on his Mac. You run on claude.ai/code; Omni and its tools, files and secrets are not here. Nobody watches live, so finish the task or clearly state what is blocking you. Your final message is what Omni reports back.'
-      : remote
+    remote
       ? 'You are Hermes, running on your own server and reached by Omni OS over HTTP. Ben is on his Mac; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.'
       : "You are running headless inside Omni OS, Ben's local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.",
     `- Thread: ${thread.id}${thread.task_id ? ` (task ${thread.task_id})` : ''}`,

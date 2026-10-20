@@ -1,18 +1,11 @@
 // The harness abstraction: the agent a thread runs in, together with what it bills.
 // Claude Code (Claude plan), Codex (ChatGPT plan), Cursor Agent (Cursor plan) or
-// Hermes (Anthropic API on Ben's server — not his Claude, ChatGPT or Cursor plan), or
-// Claude Code cloud (an Anthropic-hosted session on claude.ai/code, Claude plan).
+// Hermes (Anthropic API on Ben's server — not his Claude, ChatGPT or Cursor plan).
 // See CONTEXT.md for the domain terms.
 
-export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes' | 'claude-cloud';
+export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes';
 
-export const HARNESS_IDS: HarnessId[] = ['claude-code', 'codex', 'cursor', 'hermes', 'claude-cloud'];
-
-/** Harnesses that run off this Mac: no worktree, browser, MCP config or local files. */
-export const REMOTE_HARNESSES = new Set<string>(['hermes', 'claude-cloud']);
-export const isRemoteHarness = (h: string | null | undefined) => !!h && REMOTE_HARNESSES.has(h);
-/** Where a remote harness runs, for "its files are not on this Mac" reasons. */
-export const remoteWhere = (h: string) => (h === 'claude-cloud' ? 'in a Claude Code cloud session' : 'on the Hermes server');
+export const HARNESS_IDS: HarnessId[] = ['claude-code', 'codex', 'cursor', 'hermes'];
 
 /** Claude Code is the default everywhere, and existing threads carry on as Claude Code threads. */
 export const DEFAULT_HARNESS: HarnessId = 'claude-code';
@@ -40,8 +33,6 @@ export const CAPABILITIES: Record<HarnessId, HarnessCapabilities> = {
   cursor: { warmProcess: false, steer: false, inlineImages: false, usage: 'none' },
   // No warm CLI. Steer is an HTTP call. Images stay on the Mac. Token counts are per run, not a plan window.
   hermes: { warmProcess: false, steer: true, inlineImages: false, usage: 'none' },
-  // A cloud session on claude.ai/code. Steer queues a message into it. Its usage draws on the Claude plan but is not reported here.
-  'claude-cloud': { warmProcess: false, steer: true, inlineImages: false, usage: 'none' },
 };
 
 /** One model a harness offers. */
@@ -82,5 +73,4 @@ export const HARNESS_META: Record<HarnessId, { name: string; plan: string }> = {
   codex: { name: 'Codex', plan: 'ChatGPT plan' },
   cursor: { name: 'Cursor Agent', plan: 'Cursor plan' },
   hermes: { name: 'Hermes', plan: 'Anthropic API via Hermes' },
-  'claude-cloud': { name: 'Claude Code cloud', plan: 'Claude plan' },
 };

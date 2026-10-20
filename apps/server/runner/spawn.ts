@@ -9,7 +9,7 @@ import { closePipesAfterExit } from '../child.ts';
 import { recordUsage } from '../usage.ts';
 import { recordContext, recordContextHint } from '../context.ts';
 import { beforeResume } from '../sync/files.ts';
-import { isRemoteHarness, type HarnessId } from '../harness/types.ts';
+import type { HarnessId } from '../harness/types.ts';
 import type { AdapterContext } from '../harness/adapter.ts';
 import { invalidateCommands } from '../commands.ts';
 import { runnableCommands } from '@omni/shared/slash.ts';
@@ -95,8 +95,8 @@ async function spawnLive(live: Live, thread: Thread) {
   const channel = channels.get(thread.channel_id)!;
   const role = getCrew(thread.role);
 
-  // Hermes and cloud sessions are not on this Mac: they must not take the channel's browser profile or see local MCP config.
-  const remote = isRemoteHarness(thread.harness);
+  // Hermes is not on this Mac: it must not take the channel's browser profile or see local MCP config.
+  const remote = thread.harness === 'hermes';
   // Every local harness starts here, so this is the one check that a worktree thread never runs anywhere else.
   const problem = remote ? null : await workdirProblem(thread, channel.repo_path);
   if (lives.get(thread.id) !== live) return;
@@ -121,7 +121,7 @@ async function spawnLive(live: Live, thread: Thread) {
   try {
     secretEnv = await secretsEnv(channel.id);
     // The catalog probe reads the same global key. A channel secret of the same name already won above.
-    if (thread.harness === 'hermes' && !secretEnv.HERMES_API_KEY) {
+    if (remote && !secretEnv.HERMES_API_KEY) {
       const key = await globalSecret('HERMES_API_KEY');
       if (key) secretEnv = { ...secretEnv, HERMES_API_KEY: key };
     }
