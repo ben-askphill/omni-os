@@ -133,11 +133,13 @@ describe('compactBlocked', () => {
     expect(ctx.compactBlocked(thread({ harness: 'codex' }))).toBeNull();
   });
   it('shows no meter for a harness that reports no context', () => {
-    expect(ctx.contextView(thread({ id: 'x', harness: 'cursor' }))).toEqual({
+    expect(ctx.contextView(thread({ id: 'x', harness: 'hermes' }))).toEqual({
       context: null,
       largest: [],
-      compact: { ok: false, reason: 'Cursor Agent has no compact command.', focus: false },
+      compact: { ok: false, reason: 'Hermes has no compact command.', focus: false },
     });
+    // Cursor is metered, but has nothing to show before its first turn.
+    expect(ctx.contextView(thread({ id: 'never-ran', harness: 'cursor' })).context).toBeNull();
   });
 });
 

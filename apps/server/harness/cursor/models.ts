@@ -80,3 +80,45 @@ export function parseCursorModels(listOutput: string): ModelEntry[] {
   // Auto first (the CLI default), then the other non-Claude families, then Claude last.
   return [...auto, ...nonClaude, ...claude];
 }
+
+// ---------- context windows ----------
+
+/**
+ * Cursor's default window when a model's name doesn't say. Auto and most families run at 200K in the agent;
+ * the long-context ones say so in their label ("Claude Opus 5 1M Thinking"). An estimate, and labelled one.
+ */
+export const CURSOR_DEFAULT_WINDOW = 200_000;
+
+const windows = new Map<string, number>();
+
+/** "1M" or "256K" in a model's label, as tokens. */
+export function windowInLabel(label: string): number | undefined {
+  const m = /(?:^|\s)(\d+(?:\.\d+)?)\s*([MK])(?=\s|$)/i.exec(label);
+  if (!m) return undefined;
+  return Math.round(Number(m[1]) * (m[2].toUpperCase() === 'M' ? 1_000_000 : 1_000));
+}
+
+/** Each family's window, read off the `--list-models` labels. A family without one in any label is left out. */
+export function parseCursorWindows(listOutput: string): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const line of listOutput.split('\n')) {
+    const [id, label] = line.trim().split(/\s+-\s+/);
+    if (!id || !label || !/^\S+$/.test(id)) continue;
+    const w = windowInLabel(label);
+    if (w) out.set(splitCursorId(id).base, Math.max(w, out.get(splitCursorId(id).base) ?? 0));
+  }
+  return out;
+}
+
+/** Keep the windows from the latest `--list-models`, for the meter. */
+export function rememberCursorWindows(listOutput: string) {
+  const next = parseCursorWindows(listOutput);
+  windows.clear();
+  for (const [k, v] of next) windows.set(k, v);
+}
+
+/** The window for a thread's model (a family id or a full CLI id): its label's, or the default. */
+export function cursorWindow(model: string | null | undefined): number {
+  if (!model) return CURSOR_DEFAULT_WINDOW;
+  return windows.get(model) ?? windows.get(splitCursorId(model).base) ?? CURSOR_DEFAULT_WINDOW;
+}

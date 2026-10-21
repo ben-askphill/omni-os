@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","apiKeySource":"env","cwd":"/w","session_id":"37d76c85-aaf4-4505-8daf-6ef312736139","model":"Auto","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Say just OK."}]},"session_id":"37d76c85-aaf4-4505-8daf-6ef312736139"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"OK"}]},"session_id":"37d76c85-aaf4-4505-8daf-6ef312736139"}
+{"type":"result","subtype":"success","duration_ms":4025,"duration_api_ms":4025,"is_error":false,"result":"OK","session_id":"37d76c85-aaf4-4505-8daf-6ef312736139","request_id":"31fc4bce-3442-4bd5-8ac7-9826010ca58c","usage":{"inputTokens":22876,"outputTokens":11,"cacheReadTokens":3968,"cacheWriteTokens":0}}

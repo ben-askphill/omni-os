@@ -80,3 +80,70 @@ describe('cursor tracer', () => {
     expect(turns(t.id).some((r: any) => r.resume === chatId)).toBe(true);
   });
 });
+
+describe('cursor usage', () => {
+  const PERIOD = { billingCycleStart: '1790233029000', billingCycleEnd: '1792825029000', planUsage: { totalPercentUsed: 43.08, autoPercentUsed: 39.49, apiPercentUsed: 82.31, totalSpend: 56_436, includedSpend: 7000, bonusSpend: 49_436 } };
+
+  it('meters each turn from its usage: exact for one call, an estimate with tools, tokens summed', async () => {
+    const ctx = await import('../context.ts');
+    const t = await H.start('plain hello', cursor);
+    await H.untilResults(t.id, 1);
+    const first = ctx.contextView(H.thread(t.id)).context!;
+    // The fake reports 24,000 input and 6,000 cache read; gpt-5.6-sol's label names no window, so 200K.
+    expect(first).toMatchObject({ used: 30_000, max: 200_000, source: 'cursor', calls: 1 });
+    expect(first.spend).toMatchObject({ turns: 1, input: 24_000, output: 120, cacheRead: 6000, cents: null });
+
+    H.runner.sendMessage(t.id, 'CMD now with a tool');
+    await H.untilResults(t.id, 2);
+    const second = ctx.contextView(H.thread(t.id)).context!;
+    // One tagged call ran the tool, one wrote the reply: 30,000 over two calls, but never below the last exact reading.
+    expect(second).toMatchObject({ used: 30_000, source: 'cursor-estimate', calls: 2 });
+    expect(second.spend).toMatchObject({ turns: 2, input: 48_000, cacheRead: 12_000 });
+  });
+
+  it("sets each thread's exact cost from the usage events that name its chat, and the plan's monthly cycle", async () => {
+    const usage = await import('../cursor-usage.ts');
+    const { usageFor } = await import('../usage.ts');
+    const ctx = await import('../context.ts');
+    const t = await H.start('plain cost me', cursor);
+    await H.untilResults(t.id, 1);
+    const chat = H.thread(t.id).session_id;
+    let since = 0;
+    usage.setCursorDashboard({
+      planUsage: async () => (await import('../harness/cursor/dashboard.ts')).mapPlanUsage(PERIOD),
+      usageEvents: async (s) => {
+        since = s;
+        const ev = (id: string, conversationId: string | null, cents: number) => ({ id, at: Date.now(), conversationId, model: 'default', cents, input: 1, output: 1, cacheRead: 0, cacheWrite: 0 });
+        return [ev('e1', chat, 2.78), ev('e2', chat, 1.5), ev('e2', chat, 1.5), ev('e3', 'someone-else', 99), ev('e4', null, 7)];
+      },
+    });
+    await usage.refreshCursorUsage();
+    expect(since).toBeLessThanOrEqual(Date.parse(H.thread(t.id).created_at));
+    // e2 came twice and counts once; other chats and chat-less events don't count.
+    expect(ctx.contextView(H.thread(t.id)).context!.spend).toMatchObject({ cents: 4.28, billedAt: expect.any(String) });
+    expect(usageFor('cursor')).toMatchObject({
+      monthly: { utilization: 0.4308, resetsAt: 1_792_825_029, startsAt: 1_790_233_029, auto: 0.3949, api: 0.8231, spendCents: 56_436, includedCents: 7000 },
+    });
+  });
+
+  it('keeps the last plan reading while the dashboard fails, then drops it to no data once stale', async () => {
+    const usage = await import('../cursor-usage.ts');
+    const { usageFor, recordUsage } = await import('../usage.ts');
+    usage.setCursorDashboard({ planUsage: async () => null, usageEvents: async () => null });
+    const fresh = new Date();
+    recordUsage('cursor', { monthly: { utilization: 0.4, resetsAt: 1 }, updated_at: fresh.toISOString() });
+    await usage.refreshCursorPlan(new Date(fresh.getTime() + 10 * 60_000));
+    expect(usageFor('cursor')?.monthly?.utilization).toBe(0.4);
+    await usage.refreshCursorPlan(new Date(fresh.getTime() + 2 * 3600_000));
+    expect(usageFor('cursor')).toBeNull();
+    // A throwing dashboard is the same as no data.
+    usage.setCursorDashboard({ planUsage: () => Promise.reject(new Error('x')), usageEvents: () => Promise.reject(new Error('x')) });
+    await expect(usage.refreshCursorUsage()).resolves.toBeUndefined();
+  });
+
+  it('caps the monthly window at 100% and keeps percents as 0 to 1', async () => {
+    const { planToUsage } = await import('../cursor-usage.ts');
+    const u = planToUsage({ totalPercent: 160, autoPercent: null, apiPercent: 5, spendCents: null, includedCents: null, bonusCents: null, cycleStart: null, cycleEnd: 99 });
+    expect(u.monthly).toEqual({ utilization: 1, resetsAt: 99, api: 0.05 });
+  });
+});

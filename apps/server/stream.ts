@@ -135,9 +135,25 @@ function taskUpdate(evt: any): TaskUpdate | null {
   return Object.fromEntries(Object.entries(u).filter(([, v]) => v !== undefined)) as TaskUpdate;
 }
 
+/** A monthly billing cycle (Cursor's): the share of the included usage used, 0 to 1, and when it resets. */
+export interface MonthlyUsage {
+  utilization: number;
+  /** Epoch seconds. */
+  resetsAt: number;
+  startsAt?: number;
+  /** Cursor's two buckets, 0 to 1: Auto and Composer, and named models. */
+  auto?: number;
+  api?: number;
+  /** Spent this cycle, included in the plan, and given as bonus, in cents. */
+  spendCents?: number;
+  includedCents?: number;
+  bonusCents?: number;
+}
+
 export interface Usage {
   five_hour?: { utilization: number; resetsAt: number };
   seven_day?: { utilization: number; resetsAt: number };
+  monthly?: MonthlyUsage;
   status?: string;
   updated_at: string;
 }

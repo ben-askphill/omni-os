@@ -2,6 +2,7 @@
 // records, so a Cursor turn renders in the same transcript as a Claude turn. Cursor's echo
 // of the user message and its thinking are dropped (Omni already stores Ben's own text).
 // Tool names follow Claude Code's so the transcript renders them unchanged.
+import { cursorTurnUsage, type CursorTurnUsage } from '@omni/shared/context-meter.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
 
 const MAX_RESULT = 16_000;
@@ -22,6 +23,31 @@ export interface CursorParsed {
   result?: { ok: boolean; text: string };
   /** The Cursor chat/session id, when the event carries one. */
   sessionId?: string;
+  /** The terminal result's token counts, summed over every model call in the turn. */
+  usage?: CursorTurnUsage;
+  /** The model call an assistant or tool event belongs to. The call that writes the final answer carries none. */
+  modelCallId?: string;
+  /** An assistant event with no model call id: the turn's last, tool-free call. */
+  untaggedReply?: boolean;
+}
+
+/**
+ * Counts the model calls in one turn, so the meter knows whether the result's summed usage is one prompt or
+ * several. Each call that ran tools tags its events with a model_call_id; the call that writes the final reply
+ * tags none, and a turn with no tools tags nothing at all.
+ */
+export class CursorCallCounter {
+  private ids = new Set<string>();
+  private untagged = false;
+
+  note(p: CursorParsed) {
+    if (p.modelCallId) this.ids.add(p.modelCallId);
+    if (p.untaggedReply) this.untagged = true;
+  }
+
+  get calls(): number {
+    return this.ids.size + (this.untagged || this.ids.size === 0 ? 1 : 0);
+  }
 }
 
 const textOf = (content: unknown): string => {
@@ -34,6 +60,7 @@ const textOf = (content: unknown): string => {
 export function normalizeCursor(evt: any): CursorParsed {
   const out: CursorParsed = { records: [] };
   if (!evt || typeof evt !== 'object') return out;
+  if (typeof evt.model_call_id === 'string' && evt.model_call_id) out.modelCallId = evt.model_call_id;
   switch (evt.type) {
     case 'system':
       if (evt.subtype === 'init') {
@@ -48,6 +75,7 @@ export function normalizeCursor(evt: any): CursorParsed {
     case 'assistant': {
       const text = textOf(evt.message?.content);
       if (text.trim()) out.records.push({ kind: 'assistant_text', payload: { text } });
+      if (!out.modelCallId) out.untaggedReply = true;
       break;
     }
     case 'tool_call':
@@ -56,6 +84,7 @@ export function normalizeCursor(evt: any): CursorParsed {
     case 'result':
       out.sessionId = evt.session_id ?? out.sessionId;
       out.result = { ok: evt.subtype === 'success' && !evt.is_error, text: typeof evt.result === 'string' ? evt.result : '' };
+      out.usage = cursorTurnUsage(evt.usage);
       break;
     default:
       break;

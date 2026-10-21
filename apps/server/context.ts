@@ -2,7 +2,7 @@
 // reports it on every call to the model and at the end of every turn, and a Claude thread with no process
 // reads its last call back from the session file. Published on the thread's stream so the ring moves live.
 import { readFileSync, statSync } from 'node:fs';
-import { estimateTokens, usageTokens, type ContextResult, type ContextUsage } from '@omni/shared/context-meter.ts';
+import { estimateTokens, usageTokens, type ContextResult, type ContextUsage, type ThreadSpend } from '@omni/shared/context-meter.ts';
 import { publishThread } from './bus.ts';
 import { kv, type Thread } from './db.ts';
 import { sessionFile } from './harness/claude/adapter.ts';
@@ -10,8 +10,8 @@ import type { ContextHint } from './stream.ts';
 
 const snapshots = new Map<string, ContextUsage>();
 
-/** The harnesses that report a context window. Cursor and Hermes don't. */
-export const METERED = new Set(['claude-code', 'codex']);
+/** The harnesses that report a context window. Cursor's is an estimate from its turn totals; Hermes reports none. */
+export const METERED = new Set(['claude-code', 'codex', 'cursor']);
 /** The harnesses Omni can compact: Claude Code's /compact, and Codex's, which takes no instructions. */
 export const COMPACTS = new Set(['claude-code', 'codex']);
 
@@ -30,9 +30,38 @@ function rememberWindow(c: ContextUsage) {
   if (prev?.max !== next.max || prev?.modelWindow !== next.modelWindow) kv.set(windowKey(c.model), next);
 }
 
+// Cursor has no session file to read back, so its last reading is kept, and so are its tokens and cost.
+const lastKey = (threadId: string) => `context-last:${threadId}`;
+const spendKey = (threadId: string) => `cursor-spend:${threadId}`;
+const kept = (c: ContextUsage) => c.source === 'cursor' || c.source === 'cursor-estimate';
+
 function publish(threadId: string, c: ContextUsage) {
+  if (kept(c)) {
+    const { spend: _, ...last } = c;
+    kv.set(lastKey(threadId), last);
+    c = { ...last, spend: threadSpend(threadId) };
+  }
   snapshots.set(threadId, c);
   publishThread(threadId, { kind: 'context', context: c });
+}
+
+/** The last reading: live, or kept from an earlier run (Cursor). */
+function lastContext(threadId: string): ContextUsage | null {
+  return snapshots.get(threadId) ?? kv.get<ContextUsage>(lastKey(threadId)) ?? null;
+}
+
+export function threadSpend(threadId: string): ThreadSpend | null {
+  return kv.get<ThreadSpend>(spendKey(threadId)) ?? null;
+}
+
+/** New tokens or a new cost for the thread: kept, and pushed with the last reading so the meter shows it live. */
+export function recordSpend(threadId: string, s: ThreadSpend) {
+  kv.set(spendKey(threadId), s);
+  const c = lastContext(threadId);
+  if (c) {
+    snapshots.set(threadId, { ...c, spend: s });
+    publishThread(threadId, { kind: 'context', context: { ...c, spend: s } });
+  }
 }
 
 /** A full reading replaces the last one. */
@@ -201,6 +230,11 @@ export function contextView(t: Thread): ContextView {
   const blocked = compactBlocked(t);
   const compact = { ok: !blocked, ...(blocked && { reason: blocked }), focus: t.harness === 'claude-code' };
   if (!METERED.has(t.harness)) return { context: null, largest: [], compact };
+  if (t.harness === 'cursor') {
+    const last = lastContext(t.id);
+    const spend = threadSpend(t.id);
+    return { context: last ? { ...last, spend } : null, largest: [], compact };
+  }
   const live = snapshots.get(t.id) ?? null;
   if (t.harness !== 'claude-code') return { context: live, largest: [], compact };
   const file = transcriptOf(t);

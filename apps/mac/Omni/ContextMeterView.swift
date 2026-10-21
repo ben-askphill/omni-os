@@ -22,7 +22,8 @@ struct ContextMeterButton: View {
   var body: some View {
     let context = meter.context(pushed: store.context)
     let percent = context?.percent
-    let tip = context.map { "Context: \($0.summary). Click for details." } ?? "Context: no reading yet. Click for details."
+    let cost = context?.spend?.cents.map { " Cost so far: \(ContextMeter.formatCents($0))." } ?? ""
+    let tip = context.map { "Context: \($0.summary).\(cost) Click for details." } ?? "Context: no reading yet. Click for details."
     Button {
       open.toggle()
       if open { Task { await meter.load(refresh: true) } }
@@ -30,7 +31,7 @@ struct ContextMeterButton: View {
       HStack(spacing: z(6)) {
         ContextRing(percent: percent)
         if let percent {
-          Text("\(Int(percent.rounded()))%")
+          Text("\(context?.tilde ?? "")\(Int(percent.rounded()))%")
             .font(.omni(size: 11.5))
             .monospacedDigit()
             .foregroundStyle(ContextRing.text(ContextMeter.level(percent)))
@@ -116,8 +117,11 @@ private struct ContextPanel: View {
       }
       .frame(maxHeight: z(520))
       .fixedSize(horizontal: false, vertical: true)
-      Rectangle().fill(Tok.line).frame(height: 1)
-      CompactAction(meter: meter, busy: thread.status.isActive) { store.merge($0, isReply: true) }
+      // Cursor has no compact command; the panel is the meter and the thread's spend.
+      if thread.harness != .cursor {
+        Rectangle().fill(Tok.line).frame(height: 1)
+        CompactAction(meter: meter, busy: thread.status.isActive) { store.merge($0, isReply: true) }
+      }
     }
     .frame(width: z(380))
     .background(Tok.elev)
@@ -130,7 +134,7 @@ private struct ContextPanel: View {
       ContextRing(percent: percent, size: 40)
       VStack(alignment: .leading, spacing: z(3)) {
         HStack(alignment: .firstTextBaseline, spacing: z(8)) {
-          Text(percent.map { "\(Int($0.rounded()))%" } ?? "?")
+          Text(percent.map { "\(context?.tilde ?? "")\(Int($0.rounded()))%" } ?? "?")
             .font(.omni(size: 20))
             .monospacedDigit()
             .foregroundStyle(level == .ok ? Tok.fg : ContextRing.stroke(level))
@@ -166,8 +170,8 @@ private struct ContextPanel: View {
 
   private var amount: String {
     guard let context else { return "No reading yet" }
-    guard let max = context.max else { return "\(ContextMeter.formatTokens(context.used)) tokens, window unknown" }
-    return "\(ContextMeter.formatTokens(context.used)) of \(ContextMeter.formatTokens(max)) tokens"
+    guard let max = context.max else { return "\(context.tilde)\(ContextMeter.formatTokens(context.used)) tokens, window unknown" }
+    return "\(context.tilde)\(ContextMeter.formatTokens(context.used)) of \(ContextMeter.formatTokens(max)) tokens"
   }
 
   @ViewBuilder private var details: some View {
@@ -203,6 +207,27 @@ private struct ContextPanel: View {
             Text(ContextMeter.shortTool(r.tool)).foregroundStyle(Tok.fg2).fixedSize()
             PathText(text: ContextMeter.shortPath(r.label, cwd: store.cwd), full: r.label, color: Tok.fg4)
             Text(ContextMeter.formatTokens(r.tokens)).monospacedDigit().foregroundStyle(Tok.fg3).fixedSize()
+          }
+          .font(.omni(size: 12))
+          .padding(.vertical, z(3))
+        }
+      }
+    }
+    if let spend = context?.spend {
+      PanelSection(title: "This thread", note: "\(Int(spend.turns)) \(spend.turns == 1 ? "turn" : "turns")") {
+        HStack(alignment: .firstTextBaseline, spacing: z(8)) {
+          Text("Cost").foregroundStyle(Tok.fg2).frame(maxWidth: .infinity, alignment: .leading)
+          Text(spend.cents.map(ContextMeter.formatCents) ?? "not billed yet")
+            .monospacedDigit()
+            .foregroundStyle(Tok.fg)
+            .help(spend.billedAt.map { "From Cursor's usage events, read \(Format.relTime($0))" } ?? "")
+        }
+        .font(.omni(size: 12))
+        .padding(.vertical, z(3))
+        ForEach(spend.rows, id: \.label) { row in
+          HStack(alignment: .firstTextBaseline, spacing: z(8)) {
+            Text(row.label).foregroundStyle(Tok.fg3).frame(maxWidth: .infinity, alignment: .leading)
+            Text(ContextMeter.formatTokens(row.tokens)).monospacedDigit().foregroundStyle(Tok.fg3)
           }
           .font(.omni(size: 12))
           .padding(.vertical, z(3))

@@ -1,7 +1,7 @@
 import OmniKit
 import SwiftUI
 
-/// Plan usage per harness, the 5 hour and the 7 day window, as UsageCard in Sidebar.tsx.
+/// Plan usage per harness, the 5 hour and the 7 day window or Cursor's month, as UsageCard in Sidebar.tsx.
 /// Collapsed by default to one row with the live dot and the busiest window; click to open.
 struct UsageCard: View {
   let model: AppModel
@@ -12,7 +12,7 @@ struct UsageCard: View {
     let slots = rows.compactMap { r in r.slot.map { "\(r.name) \($0.running)/\($0.cap)" } }
     let live = model.connectionNotice == nil && model.supervisor.isRunning
     let summary = slots.isEmpty ? (live ? "Connected" : "Connecting") : slots.joined(separator: " · ")
-    let peak = rows.flatMap { [$0.fiveHour, $0.week] }.compactMap { $0 }.max { $0.fraction < $1.fraction }
+    let peak = rows.flatMap { [$0.fiveHour, $0.week, $0.month?.meter] }.compactMap { $0 }.max { $0.fraction < $1.fraction }
     VStack(alignment: .leading, spacing: z(8)) {
       Button {
         withAnimation(.snappy(duration: 0.2)) { open.toggle() }
@@ -83,9 +83,11 @@ private struct UsageRow: View {
         .font(.omni(size: 12, weight: .medium))
         .foregroundStyle(Tok.fg2)
         .frame(width: z(66), alignment: .leading)
-        if row.hasData {
+        if row.hasWindows {
           Meter(meter: row.fiveHour, label: "\(row.name) 5 hour", now: context.date)
           Meter(meter: row.week, label: "\(row.name) week", now: context.date)
+        } else if let month = row.month {
+          MonthCell(month: month, name: row.name, now: context.date)
         } else {
           Text("no data")
             .font(.omni(size: 10.5))
@@ -97,6 +99,51 @@ private struct UsageRow: View {
   }
 }
 
+/// A monthly cycle across both columns, as MonthCell in Sidebar.tsx: twenty bars, the percent, and "mo".
+private struct MonthCell: View {
+  let month: MonthMeter
+  let name: String
+  let now: Date
+
+  var body: some View {
+    let meter = month.meter
+    HStack(spacing: z(6)) {
+      Bars(meter: meter, count: 20)
+      Text("\(meter.percent)%")
+        .font(.omni(size: 10))
+        .monospacedDigit()
+        .foregroundStyle(Tok.fg2)
+        .frame(width: z(28), alignment: .trailing)
+      Text("mo")
+        .font(.omni(size: 10))
+        .foregroundStyle(Tok.fg4)
+    }
+    .frame(maxWidth: .infinity)
+    .help(month.title(name, now: now))
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("\(name) month usage")
+    .accessibilityValue("\(meter.percent) percent")
+  }
+}
+
+/// The tick bars of a meter: the used ones full height in ink (vermilion past 90%), the rest short and faint.
+private struct Bars: View {
+  let meter: UsageMeter
+  var count = 10
+
+  var body: some View {
+    let on = meter.fraction > 0 ? max(1, Int((meter.fraction * Double(count)).rounded())) : 0
+    HStack(alignment: .bottom, spacing: z(2)) {
+      ForEach(0..<count, id: \.self) { i in
+        RoundedRectangle(cornerRadius: z(1.5))
+          .fill(i < on ? (meter.tone == .bad ? Tok.needs : Tok.fg) : Tok.fg.opacity(0.14))
+          .frame(height: i < on ? 10 : 5.5)
+      }
+    }
+    .frame(height: z(10), alignment: .bottom)
+  }
+}
+
 /// `Ticks` in ui.tsx: ten bars, the used ones full height in ink (vermilion past 90%), the rest short and faint.
 private struct Meter: View {
   let meter: UsageMeter?
@@ -105,16 +152,8 @@ private struct Meter: View {
 
   var body: some View {
     if let meter {
-      let on = meter.fraction > 0 ? max(1, Int((meter.fraction * 10).rounded())) : 0
       HStack(spacing: z(6)) {
-        HStack(alignment: .bottom, spacing: z(2)) {
-          ForEach(0..<10, id: \.self) { i in
-            RoundedRectangle(cornerRadius: z(1.5))
-              .fill(i < on ? (meter.tone == .bad ? Tok.needs : Tok.fg) : Tok.fg.opacity(0.14))
-              .frame(height: i < on ? 10 : 5.5)
-          }
-        }
-        .frame(height: z(10), alignment: .bottom)
+        Bars(meter: meter)
         Text("\(meter.percent)%")
           .font(.omni(size: 10))
           .monospacedDigit()

@@ -88,10 +88,12 @@ async function runTurn() {
   write({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: prompt }] } });
   write({ type: 'thinking', subtype: 'delta', text: 'considering' });
 
+  // A call that runs tools tags its events with a model_call_id; the final reply's call tags none.
   if (prompt.includes('CMD')) {
-    write({ type: 'tool_call', subtype: 'started', toolCallId: 'tc_1', tool: 'shell', input: { command: 'ls -a' } });
+    const model_call_id = 'req_1-0-abcd';
+    write({ type: 'tool_call', subtype: 'started', toolCallId: 'tc_1', tool: 'shell', input: { command: 'ls -a' }, model_call_id });
     await delay(3);
-    write({ type: 'tool_call', subtype: 'completed', toolCallId: 'tc_1', tool: 'shell', input: { command: 'ls -a' }, result: { output: 'a\nb\n', exitCode: 0 } });
+    write({ type: 'tool_call', subtype: 'completed', toolCallId: 'tc_1', tool: 'shell', input: { command: 'ls -a' }, result: { output: 'a\nb\n', exitCode: 0 }, model_call_id });
   }
   write({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: `ack: ${prompt}` }] } });
 
@@ -100,7 +102,7 @@ async function runTurn() {
     return;
   }
   await delay(3);
-  write({ type: 'result', subtype: 'success', is_error: false, result: `ack: ${prompt}`, session_id: sessionId, usage: { input_tokens: 24000, output_tokens: 120 } });
+  write({ type: 'result', subtype: 'success', is_error: false, result: `ack: ${prompt}`, session_id: sessionId, request_id: 'req_1', usage: { inputTokens: 24000, outputTokens: 120, cacheReadTokens: 6000, cacheWriteTokens: 0 } });
   process.exit(0);
 }
 

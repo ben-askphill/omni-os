@@ -31,9 +31,19 @@ export interface UsageWindow {
   utilization: number;
   resetsAt: number;
 }
+/** A monthly billing cycle (Cursor's). Fractions are 0 to 1, money in cents. */
+export interface MonthlyUsage extends UsageWindow {
+  startsAt?: number;
+  auto?: number;
+  api?: number;
+  spendCents?: number;
+  includedCents?: number;
+  bonusCents?: number;
+}
 export interface Usage {
   five_hour?: UsageWindow;
   seven_day?: UsageWindow;
+  monthly?: MonthlyUsage;
   status?: string;
   updated_at?: string;
 }

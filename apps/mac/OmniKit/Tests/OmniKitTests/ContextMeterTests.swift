@@ -161,3 +161,60 @@ private func view(ok: Bool = true, focus: Bool = true, used: Double = 100) throw
     #expect(!m.sending)
   }
 }
+
+@Suite struct CursorUsageTests {
+  @Test func decodesAMonthlyCycleAndShowsItAsTheOnlyMeterOfItsRow() throws {
+    let usage = try decode([HarnessID: Usage].self, #"""
+      {"cursor":{"monthly":{"utilization":0.4308,"resetsAt":1792825029,"startsAt":1790233029,"auto":0.3949,"api":0.8231,"spendCents":56436,"includedCents":7000,"bonusCents":49436},"updated_at":"2026-10-21T12:00:00.000Z"}}
+      """#)
+    let m = try #require(usage[.cursor]?.monthly)
+    #expect(m.window.utilization == 0.4308)
+    #expect(m.startsAt == Date(timeIntervalSince1970: 1_790_233_029))
+    #expect(m.spendCents == 56_436 && m.includedCents == 7000 && m.bonusCents == 49_436)
+    let rows = HarnessUsageRow.rows(usage: usage, slots: [:])
+    let cursor = try #require(rows.first { $0.id == .cursor })
+    #expect(cursor.hasData && !cursor.hasWindows)
+    #expect(cursor.month?.meter.percent == 43)
+  }
+
+  @Test func aMonthlyCycleInAShapeThisAppDoesNotKnowIsNoData() throws {
+    let usage = try decode(Usage.self, #"{"monthly":{"utilization":"lots"},"updated_at":"2026-10-21T12:00:00.000Z"}"#)
+    #expect(usage.monthly == nil)
+  }
+
+  @Test func theMonthTitleMatchesTheWebUI() {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "UTC")!
+    let now = Date(timeIntervalSince1970: 1_792_584_000)  // 2026-10-21 12:00 UTC
+    let m = MonthMeter(MonthlyUsage(
+      window: UsageWindow(utilization: 0.4308, resetsAt: Date(timeIntervalSince1970: 1_792_849_029)),
+      auto: 0.3949, api: 0.8231, spendCents: 56_436, includedCents: 7000))
+    #expect(m.title("Cursor", now: now, calendar: cal)
+      == "Cursor month: 43% of included usage (Auto 39%, API 82%). $564.36 spent, $70.00 included. Resets 24 Oct (in 3d).")
+    let bare = MonthMeter(MonthlyUsage(window: UsageWindow(utilization: 1, resetsAt: now.addingTimeInterval(5 * 3600))))
+    #expect(bare.title("Cursor", now: now, calendar: cal) == "Cursor month: 100% of included usage. Resets 21 Oct (in 5h 0m).")
+  }
+
+  @Test func cursorReadingsAreMarkedEstimatesAndCarryTheThreadsSpend() throws {
+    let c = try decode(ContextUsage.self, #"""
+      {"used":26034,"max":200000,"model":"Auto","source":"cursor-estimate","calls":6,
+       "spend":{"turns":2,"input":45958,"output":970,"cacheRead":137088,"cacheWrite":0,"cents":16.628,"billedAt":"2026-10-21T12:00:00.000Z"},
+       "updated_at":"2026-10-21T12:00:00.000Z"}
+      """#)
+    #expect(c.approx && c.tilde == "~")
+    #expect(c.summary == "~26K / 200K tokens (~13%)")
+    #expect(c.calls == 6)
+    #expect(c.spend?.cents == 16.628)
+    #expect(c.spend?.rows.map(\.label) == ["Input", "Cache read", "Output"])
+    #expect(!usage(1000, 10_000).approx)
+    #expect(ContextMeter.metered.contains(.cursor) && !ContextMeter.metered.contains(.hermes))
+    #expect(c.sourceNote.hasPrefix("Estimated."))
+  }
+
+  @Test func formatsCentsAsTheWebUIDoes() {
+    #expect(ContextMeter.formatCents(4.28) == "$0.04")
+    #expect(ContextMeter.formatCents(0.4) == "<$0.01")
+    #expect(ContextMeter.formatCents(0) == "$0.00")
+    #expect(ContextMeter.formatCents(56_436) == "$564.36")
+  }
+}

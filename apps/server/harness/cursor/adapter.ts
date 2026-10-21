@@ -15,8 +15,9 @@ import { spawnHolder } from '../holder.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
 import { cursorBin } from './bin.ts';
-import { cursorModelId } from './models.ts';
-import { normalizeCursor } from './normalize.ts';
+import { fromCursorTurn, type ContextUsage } from '@omni/shared/context-meter.ts';
+import { cursorModelId, cursorWindow } from './models.ts';
+import { CursorCallCounter, normalizeCursor } from './normalize.ts';
 
 interface Outgoing {
   text: string;
@@ -77,6 +78,9 @@ export const cursorAdapter: HarnessAdapter = {
     let stopping = false;
     let currentProc: ChildProcess | null = null;
     const outbox: Outgoing[] = [];
+    // The model's name as Cursor shows it ("Auto"), and the last reading, which an estimate never drops below.
+    let modelName: string | null = null;
+    let lastContext: ContextUsage | null = null;
 
     function pump() {
       if (!ready || currentProc || !outbox.length) return;
@@ -101,6 +105,7 @@ export const cursorAdapter: HarnessAdapter = {
       currentProc = proc;
       let resultSeen = false;
       let stderr = '';
+      const calls = new CursorCallCounter();
       // The runner records the user message when it sees this replay.
       cb.record({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
 
@@ -113,6 +118,9 @@ export const cursorAdapter: HarnessAdapter = {
           return;
         }
         const parsed = normalizeCursor(evt);
+        calls.note(parsed);
+        const init = parsed.records.find((r) => r.kind === 'init');
+        if (init && typeof (init.payload as { model?: unknown }).model === 'string') modelName = (init.payload as { model: string }).model || modelName;
         if (parsed.sessionId && parsed.sessionId !== chatId) {
           chatId = parsed.sessionId;
           if (chatId !== thread.session_id) cb.session(chatId);
@@ -120,6 +128,12 @@ export const cursorAdapter: HarnessAdapter = {
         for (const r of parsed.records) cb.record(r);
         if (parsed.result) {
           resultSeen = true;
+          if (parsed.usage) {
+            // Cursor's window isn't reported: it is read off the model's name, so the meter marks it an estimate.
+            lastContext = fromCursorTurn(parsed.usage, calls.calls, modelName ?? thread.model ?? 'Auto', cursorWindow(thread.model ?? 'auto'), lastContext);
+            cb.context?.(lastContext);
+            cb.turnTokens?.(parsed.usage);
+          }
           cb.record({ kind: 'result', payload: { ok: parsed.result.ok, subtype: parsed.result.ok ? 'success' : 'error', turns: 1 } });
         }
       };

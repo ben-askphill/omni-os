@@ -22,15 +22,16 @@ export interface HarnessCapabilities {
   steer: boolean;
   /** Images ride along inline. When false, attachments go as path notes only. */
   inlineImages: boolean;
-  /** Whether the harness reports plan usage windows. */
-  usage: 'five-hour-week' | 'none';
+  /** Which plan usage windows the harness reports. */
+  usage: 'five-hour-week' | 'monthly' | 'none';
 }
 
 export const CAPABILITIES: Record<HarnessId, HarnessCapabilities> = {
   'claude-code': { warmProcess: true, steer: true, inlineImages: true, usage: 'five-hour-week' },
   codex: { warmProcess: true, steer: true, inlineImages: true, usage: 'five-hour-week' },
   // (Codex steer/interrupt/images are wired in #11; capabilities above reflect the shipped behavior.)
-  cursor: { warmProcess: false, steer: false, inlineImages: false, usage: 'none' },
+  // Plan usage is Cursor's monthly cycle, read from its dashboard (cursor-usage.ts).
+  cursor: { warmProcess: false, steer: false, inlineImages: false, usage: 'monthly' },
   // No warm CLI. Steer is an HTTP call. Images stay on the Mac. Token counts are per run, not a plan window.
   hermes: { warmProcess: false, steer: true, inlineImages: false, usage: 'none' },
 };

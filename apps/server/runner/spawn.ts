@@ -8,6 +8,7 @@ import { globalSecret, secretsEnv } from '../secrets.ts';
 import { closePipesAfterExit } from '../child.ts';
 import { recordUsage } from '../usage.ts';
 import { recordContext, recordContextHint } from '../context.ts';
+import { addCursorTurn, afterCursorTurn } from '../cursor-usage.ts';
 import { beforeResume } from '../sync/files.ts';
 import type { HarnessId } from '../harness/types.ts';
 import type { AdapterContext } from '../harness/adapter.ts';
@@ -159,6 +160,10 @@ async function spawnLive(live: Live, thread: Thread) {
     commands: (list) => (live.commands = { status: 'ready', commands: runnableCommands(list), fetchedAt: Date.now() }),
     context: (c) => recordContext(thread.id, c),
     contextHint: (h) => recordContextHint(thread.id, h),
+    turnTokens: (u) => {
+      addCursorTurn(thread.id, u);
+      afterCursorTurn();
+    },
   });
   const child = session.child;
   live.child = child;

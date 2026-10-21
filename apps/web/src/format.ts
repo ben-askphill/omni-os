@@ -1,6 +1,9 @@
 // Dates from SQLite are ISO strings in UTC. Display uses the browser's locale timezone,
 // except automations, which use their own timezone (Europe/Amsterdam by default).
 
+import { formatCents } from '@omni/shared/context-meter.ts';
+import type { MonthlyUsage } from './api.ts';
+
 const DAY = 86_400_000;
 
 export const toDate = (iso: string) => new Date(iso);
@@ -80,6 +83,18 @@ export function untilLabel(unixSecs: number, now = Date.now()) {
   if (ms < 3_600_000) return `in ${Math.max(1, Math.round(ms / 60_000))}m`;
   if (ms < DAY) return `in ${Math.floor(ms / 3_600_000)}h ${Math.round((ms % 3_600_000) / 60_000)}m`;
   return d.toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+/** "Cursor month: 43% of included usage (Auto 39%, API 82%). $564.36 spent, $70.00 included. Resets 24 Oct (in 3d)." */
+export function monthlyTitle(name: string, m: MonthlyUsage, now = Date.now()): string {
+  const pct = (f: number) => `${Math.round(Math.max(0, Math.min(1, f)) * 100)}%`;
+  const buckets = [m.auto !== undefined && `Auto ${pct(m.auto)}`, m.api !== undefined && `API ${pct(m.api)}`].filter(Boolean).join(', ');
+  const money = [m.spendCents !== undefined && `${formatCents(m.spendCents)} spent`, m.includedCents !== undefined && `${formatCents(m.includedCents)} included`]
+    .filter(Boolean)
+    .join(', ');
+  const days = Math.round((m.resetsAt * 1000 - now) / DAY);
+  const date = new Date(m.resetsAt * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return `${name} month: ${pct(m.utilization)} of included usage${buckets ? ` (${buckets})` : ''}.${money ? ` ${money}.` : ''} Resets ${date} (${days >= 1 ? `in ${days}d` : untilLabel(m.resetsAt, now)}).`;
 }
 
 export function bytes(n: number) {

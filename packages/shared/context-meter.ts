@@ -1,6 +1,6 @@
 // A thread's context window: how full it is, what fills it, and the meter's colour. The server builds a
 // ContextUsage from the harness (Claude Code's own `get_context_usage` answer, the token counts on its stream,
-// or Codex's tokenUsage notification); the Web UI draws it as a ring. Pure, so both sides and the tests share it.
+// Codex's tokenUsage notification, or a Cursor turn's summed usage); the Web UI draws it as a ring. Pure, so both sides and the tests share it.
 
 /** Where the numbers came from, so the panel can say which ones are exact. */
 export type ContextSource =
@@ -11,7 +11,24 @@ export type ContextSource =
   /** The same counts read back from the session file, while no process runs. */
   | 'claude-transcript'
   /** Codex's thread/tokenUsage/updated notification. */
-  | 'codex';
+  | 'codex'
+  /** A Cursor turn with one model call: the total is exact, the window comes from the model's name. */
+  | 'cursor'
+  /** A Cursor turn with several model calls. Cursor sums them, so the total is an average per call. */
+  | 'cursor-estimate';
+
+/** A thread's tokens and billed cost, summed over its turns. Cursor only: it reports tokens per turn. */
+export interface ThreadSpend {
+  turns: number;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  /** The exact cost from the plan's usage events, in cents. Null until Omni has read them. */
+  cents: number | null;
+  /** When the cost was last read. */
+  billedAt?: string | null;
+}
 
 export interface ContextCategory {
   name: string;
@@ -52,8 +69,15 @@ export interface ContextUsage {
   tools?: ContextTool[];
   /** CLAUDE.md, rules and memory files, by path. */
   memoryFiles?: { path: string; tokens: number }[];
+  /** Model calls in the turn the reading came from, when the harness sums them (Cursor). */
+  calls?: number;
+  /** The thread's tokens and cost so far (Cursor). */
+  spend?: ThreadSpend | null;
   updated_at: string;
 }
+
+/** Whether the reading is an estimate the UI marks with "~": Cursor's window is read off the model's name. */
+export const contextApprox = (c: Pick<ContextUsage, 'source'> | null | undefined) => !!c && c.source.startsWith('cursor');
 
 /** Ring colour: normal, warning from 70%, critical from 90%. */
 export type ContextLevel = 'ok' | 'warn' | 'critical';
@@ -83,11 +107,18 @@ export function formatTokens(n: number): string {
   return String(Math.round(n));
 }
 
-/** "62.4K / 270K tokens (23%)", or "62.4K tokens" with no window. */
-export function contextSummary(c: Pick<ContextUsage, 'used' | 'max'>): string {
+/** "62.4K / 270K tokens (23%)", or "62.4K tokens" with no window. An estimate reads "~62.4K / 200K tokens (~31%)". */
+export function contextSummary(c: Pick<ContextUsage, 'used' | 'max'> & Partial<Pick<ContextUsage, 'source'>>): string {
   const pct = contextPercent(c.used, c.max);
-  if (pct === null) return `${formatTokens(c.used)} tokens`;
-  return `${formatTokens(c.used)} / ${formatTokens(c.max!)} tokens (${Math.round(pct)}%)`;
+  const t = c.source && contextApprox(c as Pick<ContextUsage, 'source'>) ? '~' : '';
+  if (pct === null) return `${t}${formatTokens(c.used)} tokens`;
+  return `${t}${formatTokens(c.used)} / ${formatTokens(c.max!)} tokens (${t}${Math.round(pct)}%)`;
+}
+
+/** "$0.03", "$1.24", "<$0.01". Cents may be fractional. */
+export function formatCents(cents: number): string {
+  if (cents > 0 && cents < 1) return '<$0.01';
+  return `$${(cents / 100).toFixed(2)}`;
 }
 
 /** Rough tokens for a run of text: about four characters each. Only for estimates the UI labels as such. */
@@ -157,4 +188,41 @@ export function fromCodexTokenUsage(params: unknown, model: string | null, now =
     source: 'codex',
     updated_at: now.toISOString(),
   };
+}
+
+/** One Cursor turn's `result.usage`, as cursor-agent reports it: every model call in the turn, added up. */
+export interface CursorTurnUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+}
+
+/** A Cursor result event's `usage`, or undefined when it has none or no input count. */
+export function cursorTurnUsage(usage: unknown): CursorTurnUsage | undefined {
+  if (!usage || typeof usage !== 'object') return undefined;
+  const u = usage as Record<string, unknown>;
+  const input = num(u.inputTokens);
+  if (input === undefined) return undefined;
+  return { inputTokens: input, outputTokens: num(u.outputTokens) ?? 0, cacheReadTokens: num(u.cacheReadTokens) ?? 0, cacheWriteTokens: num(u.cacheWriteTokens) ?? 0 };
+}
+
+/**
+ * A Cursor turn as a reading. With one model call, input plus cache read and write is the prompt the model saw.
+ * With more, Cursor adds every call's prompt together, which overstates the window several times over; the
+ * average per call is the estimate, never below the last exact reading (the window only grows between compactions).
+ */
+export function fromCursorTurn(
+  u: CursorTurnUsage,
+  calls: number,
+  model: string | null,
+  max: number | null,
+  prev: ContextUsage | null = null,
+  now = new Date(),
+): ContextUsage {
+  const total = u.inputTokens + u.cacheReadTokens + u.cacheWriteTokens;
+  const n = Math.max(1, Math.round(calls));
+  if (n === 1) return { used: total, max, model, source: 'cursor', calls: 1, updated_at: now.toISOString() };
+  const floor = prev?.source === 'cursor' ? prev.used : 0;
+  return { used: Math.max(floor, Math.round(total / n)), max, model, source: 'cursor-estimate', calls: n, updated_at: now.toISOString() };
 }

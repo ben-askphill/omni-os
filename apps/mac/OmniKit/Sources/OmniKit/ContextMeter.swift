@@ -13,7 +13,7 @@ public struct ContextUsage: Decodable, Hashable, Sendable {
   /// Where autocompact starts, when it is on.
   public let autoCompactAt: Double?
   public let model: String?
-  /// claude-cli, claude-stream, claude-transcript or codex.
+  /// claude-cli, claude-stream, claude-transcript, codex, cursor or cursor-estimate.
   public let source: String
   /// The CLI's split of `used`, plus free space and the autocompact buffer. Estimated by the CLI.
   public let categories: [Category]?
@@ -21,7 +21,38 @@ public struct ContextUsage: Decodable, Hashable, Sendable {
   public let tools: [Tool]?
   /// CLAUDE.md, rules and memory files, by path.
   public let memoryFiles: [MemoryFile]?
+  /// Model calls in the turn the reading came from, when the harness sums them (Cursor).
+  public let calls: Double?
+  /// The thread's tokens and cost so far (Cursor).
+  public let spend: Spend?
   public let updatedAt: Date
+
+  /// A thread's tokens over its turns, and its exact cost from the plan's usage events: ThreadSpend in context-meter.ts.
+  public struct Spend: Decodable, Hashable, Sendable {
+    public let turns: Double
+    public let input: Double
+    public let output: Double
+    public let cacheRead: Double
+    public let cacheWrite: Double
+    /// Cents, nil until Omni has read the usage events.
+    public let cents: Double?
+    public let billedAt: Date?
+
+    public init(turns: Double, input: Double, output: Double, cacheRead: Double, cacheWrite: Double, cents: Double?, billedAt: Date? = nil) {
+      self.turns = turns
+      self.input = input
+      self.output = output
+      self.cacheRead = cacheRead
+      self.cacheWrite = cacheWrite
+      self.cents = cents
+      self.billedAt = billedAt
+    }
+
+    /// Token kinds with any tokens, in the panel's order.
+    public var rows: [(label: String, tokens: Double)] {
+      [("Input", input), ("Cache read", cacheRead), ("Cache write", cacheWrite), ("Output", output)].filter { $0.tokens > 0 }
+    }
+  }
 
   public struct Category: Decodable, Hashable, Sendable {
     public let name: String
@@ -43,13 +74,14 @@ public struct ContextUsage: Decodable, Hashable, Sendable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case used, max, modelWindow, autoCompactAt, model, source, categories, tools, memoryFiles
+    case used, max, modelWindow, autoCompactAt, model, source, categories, tools, memoryFiles, calls, spend
     case updatedAt = "updated_at"
   }
 
   public init(
     used: Double, max: Double?, modelWindow: Double? = nil, autoCompactAt: Double? = nil, model: String? = nil,
-    source: String, categories: [Category]? = nil, tools: [Tool]? = nil, memoryFiles: [MemoryFile]? = nil, updatedAt: Date
+    source: String, categories: [Category]? = nil, tools: [Tool]? = nil, memoryFiles: [MemoryFile]? = nil,
+    calls: Double? = nil, spend: Spend? = nil, updatedAt: Date
   ) {
     self.used = used
     self.max = max
@@ -60,15 +92,21 @@ public struct ContextUsage: Decodable, Hashable, Sendable {
     self.categories = categories
     self.tools = tools
     self.memoryFiles = memoryFiles
+    self.calls = calls
+    self.spend = spend
     self.updatedAt = updatedAt
   }
 
   public var percent: Double? { ContextMeter.percent(used: used, max: max) }
   public var level: ContextMeter.Level { ContextMeter.level(percent) }
-  /// "62.4K / 270K tokens (23%)", or "62.4K tokens" with no window.
+  /// An estimate the UI marks with "~": Cursor's window is read off the model's name. `contextApprox` in context-meter.ts.
+  public var approx: Bool { source.hasPrefix("cursor") }
+  /// "~" for an estimate, else empty.
+  public var tilde: String { approx ? "~" : "" }
+  /// "62.4K / 270K tokens (23%)", or "62.4K tokens" with no window. An estimate reads "~26K / 200K tokens (~13%)".
   public var summary: String {
-    guard let p = percent, let max else { return "\(ContextMeter.formatTokens(used)) tokens" }
-    return "\(ContextMeter.formatTokens(used)) / \(ContextMeter.formatTokens(max)) tokens (\(Int(p.rounded()))%)"
+    guard let p = percent, let max else { return "\(tilde)\(ContextMeter.formatTokens(used)) tokens" }
+    return "\(tilde)\(ContextMeter.formatTokens(used)) / \(ContextMeter.formatTokens(max)) tokens (\(tilde)\(Int(p.rounded()))%)"
   }
   /// What fills the window, then the room left, each with tokens.
   public var usedCategories: [Category] { (categories ?? []).filter { $0.kind == "used" && $0.tokens > 0 } }
@@ -83,6 +121,9 @@ public struct ContextUsage: Decodable, Hashable, Sendable {
     case "claude-stream": "Total from the last model call. The split updates when the turn ends."
     case "claude-transcript": "Read from the session file. Open a turn for the full split."
     case "codex": "From Codex. Codex reports a total only."
+    case "cursor": "Estimated. From Cursor's last turn, one model call, so the total is exact; the window is read off the model's name."
+    case "cursor-estimate":
+      "Estimated. Cursor adds up every model call in a turn, so this is the average per call over the last turn's calls."
     default: "From the agent."
     }
   }
@@ -119,8 +160,8 @@ public enum ContextMeter {
   public static let warnAt = 70.0
   public static let criticalAt = 90.0
 
-  /// The harnesses that report their window. The meter stays out of Cursor and Hermes threads.
-  public static let metered: Set<HarnessID> = [.claudeCode, .codex]
+  /// The harnesses that report their window. Cursor's is an estimate; the meter stays out of Hermes threads.
+  public static let metered: Set<HarnessID> = [.claudeCode, .codex, .cursor]
 
   /// Percent of the window in use, 0 to 100, or nil with no window to measure against.
   public static func percent(used: Double, max: Double?) -> Double? {
@@ -141,6 +182,12 @@ public enum ContextMeter {
     if a >= 1_000_000 { return trim(n / 1_000_000, digits: 2) + "M" }
     if a >= 1_000 { return trim(n / 1_000, digits: a >= 100_000 ? 0 : 1) + "K" }
     return String(Int(n.rounded()))
+  }
+
+  /// "$0.03", "$1.24", "<$0.01". Cents may be fractional. `formatCents` in context-meter.ts.
+  public static func formatCents(_ cents: Double) -> String {
+    if cents > 0 && cents < 1 { return "<$0.01" }
+    return String(format: "$%.2f", cents / 100)
   }
 
   private static func trim(_ v: Double, digits: Int) -> String {

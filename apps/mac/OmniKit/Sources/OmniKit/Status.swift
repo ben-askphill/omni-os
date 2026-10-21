@@ -43,15 +43,54 @@ public struct UsageWindow: Decodable, Hashable, Sendable {
   }
 }
 
-/// A harness's plan usage: the five-hour and weekly windows.
+/// A monthly billing cycle (Cursor's): the share of the included usage used, its two buckets, and the money.
+public struct MonthlyUsage: Decodable, Hashable, Sendable {
+  public let window: UsageWindow
+  public let startsAt: Date?
+  /// Auto and Composer, and named models, 0 to 1.
+  public let auto: Double?
+  public let api: Double?
+  /// Cents.
+  public let spendCents: Double?
+  public let includedCents: Double?
+  public let bonusCents: Double?
+
+  enum CodingKeys: String, CodingKey {
+    case startsAt, auto, api, spendCents, includedCents, bonusCents
+  }
+
+  public init(window: UsageWindow, auto: Double? = nil, api: Double? = nil, spendCents: Double? = nil, includedCents: Double? = nil) {
+    self.window = window
+    startsAt = nil
+    self.auto = auto
+    self.api = api
+    self.spendCents = spendCents
+    self.includedCents = includedCents
+    bonusCents = nil
+  }
+
+  public init(from decoder: any Decoder) throws {
+    window = try UsageWindow(from: decoder)
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    startsAt = (try? c.decodeIfPresent(Double.self, forKey: .startsAt)).flatMap { $0 }.map { Date(timeIntervalSince1970: $0) }
+    auto = try? c.decodeIfPresent(Double.self, forKey: .auto)
+    api = try? c.decodeIfPresent(Double.self, forKey: .api)
+    spendCents = try? c.decodeIfPresent(Double.self, forKey: .spendCents)
+    includedCents = try? c.decodeIfPresent(Double.self, forKey: .includedCents)
+    bonusCents = try? c.decodeIfPresent(Double.self, forKey: .bonusCents)
+  }
+}
+
+/// A harness's plan usage: the five-hour and weekly windows, or a monthly cycle (Cursor).
 public struct Usage: Decodable, Hashable, Sendable {
   public let fiveHour: UsageWindow?
   public let sevenDay: UsageWindow?
+  public let monthly: MonthlyUsage?
   public let status: String?
   public let updatedAt: Date?
 
   enum CodingKeys: String, CodingKey {
-    case status
+    case status, monthly
     case fiveHour = "five_hour"
     case sevenDay = "seven_day"
     case updatedAt = "updated_at"
@@ -64,6 +103,7 @@ public struct Usage: Decodable, Hashable, Sendable {
     status = try? c.decodeIfPresent(String.self, forKey: .status)
     fiveHour = try? c.decodeIfPresent(UsageWindow.self, forKey: .fiveHour)
     sevenDay = try? c.decodeIfPresent(UsageWindow.self, forKey: .sevenDay)
+    monthly = try? c.decodeIfPresent(MonthlyUsage.self, forKey: .monthly)
     updatedAt = try? c.decodeIfPresent(Date.self, forKey: .updatedAt)
   }
 }
@@ -124,7 +164,7 @@ public struct HarnessCapabilities: Decodable, Hashable, Sendable {
   /// Can be steered mid-turn. When false a steer is handled as a queue.
   public let steer: Bool
   public let inlineImages: Bool
-  /// five-hour-week or none.
+  /// five-hour-week, monthly or none.
   public let usage: String
 }
 

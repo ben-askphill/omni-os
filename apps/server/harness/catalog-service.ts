@@ -16,11 +16,12 @@ import type {
   RateLimits,
 } from './codex/protocol.ts';
 import { cursorBin } from './cursor/bin.ts';
-import { parseCursorModels } from './cursor/models.ts';
+import { parseCursorModels, rememberCursorWindows } from './cursor/models.ts';
 import { probeHermes } from './hermes/client.ts';
 import { harnessEnv } from './env-guard.ts';
 import { globalSecret } from '../secrets.ts';
 import { recordUsage } from '../usage.ts';
+import { refreshCursorUsage } from '../cursor-usage.ts';
 import { HARNESS_IDS, type HarnessId, type HarnessInfo } from './types.ts';
 import {
   claudeHarness,
@@ -58,6 +59,7 @@ export async function probeCursor(bin = cursorBin()): Promise<CursorProbe> {
   return await new Promise<CursorProbe>((resolve) => {
     execFile(bin, ['--list-models'], { env: harnessEnv('cursor', {}), timeout: 5000 }, (err, stdout) => {
       if (err || !stdout?.trim()) return resolve(unavailable);
+      rememberCursorWindows(stdout);
       const models = parseCursorModels(stdout);
       resolve(models.length ? { available: true, models } : unavailable);
     });
@@ -134,6 +136,9 @@ async function probeCodexHarness(cap: number): Promise<HarnessInfo> {
 }
 
 async function probeCursorHarness(cap: number): Promise<HarnessInfo> {
+  // Cursor's plan usage and thread costs come from its dashboard, read on the same 15-minute refresh as Codex's.
+  // Not awaited: a slow dashboard never holds up the model picker.
+  void refreshCursorUsage();
   return cursorHarness(await probeCursor().catch((): CursorProbe => ({ available: false, models: [] })), cap);
 }
 

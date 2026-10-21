@@ -52,6 +52,8 @@ export async function startRunner(env: Record<string, string> = {}) {
     OMNI_INTERRUPT_GRACE_MS: '1000',
     // Off unless a file turns it on: it is one more CLI call after every turn.
     OMNI_SUGGESTIONS: '0',
+    // Never Cursor's real dashboard from a test.
+    OMNI_CURSOR_DASHBOARD: '0',
     FAKE_CLAUDE_LOG: log,
     FAKE_CLAUDE_STDIN_LOG: stdinLog,
     FAKE_CLAUDE_LATENCY_MS: '10',

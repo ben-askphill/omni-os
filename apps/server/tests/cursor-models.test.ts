@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseCursorModels, cursorModelId, splitCursorId } from '../harness/cursor/models.ts';
+import {
+  CURSOR_DEFAULT_WINDOW,
+  cursorModelId,
+  cursorWindow,
+  parseCursorModels,
+  parseCursorWindows,
+  rememberCursorWindows,
+  splitCursorId,
+  windowInLabel,
+} from '../harness/cursor/models.ts';
 
 const list = readFileSync(join(import.meta.dirname, 'fixtures', 'cursor-models.txt'), 'utf8');
 const models = parseCursorModels(list);
@@ -48,5 +57,33 @@ describe('cursor model list parser', () => {
   it('splits ids into base, effort and fast', () => {
     expect(splitCursorId('gpt-5.6-sol-high-fast')).toEqual({ base: 'gpt-5.6-sol', effort: 'high', fast: true });
     expect(splitCursorId('composer-2.5')).toEqual({ base: 'composer-2.5', effort: '', fast: false });
+  });
+});
+
+describe('cursor model windows', () => {
+  const live = [
+    'auto - Auto (default)',
+    'gpt-5.3-codex-high - Codex 5.3 High',
+    'claude-opus-5-thinking-high - Claude Opus 5 1M Thinking',
+    'gpt-5.6-sol-xhigh-fast - GPT-5.6 Sol 1M Extra High Fast',
+    'grok-4.7-medium - Grok 4.7  Medium',
+    'gemini-x-high - Gemini X 256K',
+  ].join('\n');
+
+  it('reads a window out of the label, not out of version numbers or effort words', () => {
+    expect(windowInLabel('Claude Opus 5 1M Thinking')).toBe(1_000_000);
+    expect(windowInLabel('Gemini X 256K')).toBe(256_000);
+    expect(windowInLabel('Codex 5.3 Medium')).toBeUndefined();
+    expect(windowInLabel('GPT-5.6 Sol Max')).toBeUndefined();
+  });
+
+  it('maps each family to its window and falls back to 200K', () => {
+    rememberCursorWindows(live);
+    expect(parseCursorWindows(live)).toEqual(new Map([['claude-opus-5-thinking', 1_000_000], ['gpt-5.6-sol', 1_000_000], ['gemini-x', 256_000]]));
+    expect(cursorWindow('claude-opus-5-thinking')).toBe(1_000_000);
+    expect(cursorWindow('claude-opus-5-thinking-high')).toBe(1_000_000);
+    expect(cursorWindow('auto')).toBe(CURSOR_DEFAULT_WINDOW);
+    expect(cursorWindow('gpt-5.3-codex')).toBe(200_000);
+    expect(cursorWindow(null)).toBe(200_000);
   });
 });

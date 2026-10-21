@@ -6,7 +6,7 @@ import type { ChildProcess } from 'node:child_process';
 import type { SlashCommand } from '@omni/shared/slash.ts';
 import type { Channel, Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
-import type { ContextUsage } from '@omni/shared/context-meter.ts';
+import type { ContextUsage, CursorTurnUsage } from '@omni/shared/context-meter.ts';
 import type { ContextHint, Record as StreamRecord, Usage } from '../stream.ts';
 import type { HarnessCapabilities, HarnessId } from './types.ts';
 
@@ -59,6 +59,8 @@ export interface AdapterCallbacks {
   context?: (c: ContextUsage) => void;
   /** A partial one from the stream: the tokens on the last call, or the model's window. */
   contextHint?: (h: ContextHint) => void;
+  /** A finished turn's token counts, for a harness that reports them per turn (Cursor). */
+  turnTokens?: (u: CursorTurnUsage) => void;
 }
 
 /** A running harness process, wired to the runner. */

@@ -1,11 +1,11 @@
 import { Fragment, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
-import { taskHost, type BackgroundTask, type ChannelWithRunning, type FolderWithThreads, type HarnessId, type ThreadStub, type Usage, type UsageWindow } from '../api.ts';
+import { taskHost, type BackgroundTask, type ChannelWithRunning, type FolderWithThreads, type HarnessId, type MonthlyUsage, type ThreadStub, type Usage, type UsageWindow } from '../api.ts';
 import { folderOf } from '../folder-groups.ts';
 import { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, drag, draftKey, freeName, useFolders } from '../folders.tsx';
 import { foldAllAction, openFolderIds } from '../sidebar-fold.ts';
 import { openMenu } from './ContextMenu.tsx';
 import { pinnedRows, type PinnedThread } from '../pins.ts';
-import { duration, plural, toDate, untilLabel } from '../format.ts';
+import { duration, monthlyTitle, plural, toDate, untilLabel } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { readPref, useApp, useNow, writePref } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
@@ -44,10 +44,23 @@ function WindowCell({ w, label }: { w?: UsageWindow; label: string }) {
   );
 }
 
-/** One plan's row: the 5-hour and weekly windows, or "no data" for a harness that reports none. */
+/** A monthly cycle across both columns: one tick bar, the percent, and "mo". */
+function MonthCell({ m, name }: { m: MonthlyUsage; name: string }) {
+  const pct = windowPct(m)!;
+  return (
+    <div className="flex flex-1 items-center gap-1.5" title={monthlyTitle(name, m)}>
+      <Ticks value={pct} count={20} height={10} tone={pct >= 0.9 ? 'needs' : undefined} className="flex-1" label={`${name} month usage`} />
+      <span className="w-7 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
+      <span className="text-[10px] text-fg-4">mo</span>
+    </div>
+  );
+}
+
+/** One plan's row: the 5-hour and weekly windows, a monthly cycle (Cursor), or "no data" for a harness that reports none. */
 function HarnessUsageRow({ id, name, usage }: { id: HarnessId; name: string; usage?: Usage | null }) {
   useNow(60_000);
-  const noData = !usage || (!usage.five_hour && !usage.seven_day);
+  const windows = !!usage && (!!usage.five_hour || !!usage.seven_day);
+  const noData = !windows && !usage?.monthly;
   return (
     <div className="flex items-center gap-2">
       <span className="caption inline-flex w-[66px] shrink-0 items-center gap-1.5 text-fg-2">
@@ -56,6 +69,8 @@ function HarnessUsageRow({ id, name, usage }: { id: HarnessId; name: string; usa
       </span>
       {noData ? (
         <span className="flex-1 text-[10.5px] text-fg-4">no data</span>
+      ) : !windows ? (
+        <MonthCell m={usage!.monthly!} name={name} />
       ) : (
         <>
           <WindowCell w={usage!.five_hour} label={`${name} 5h`} />
@@ -75,7 +90,7 @@ function UsageCard() {
   const footer = HARNESS_ROWS.filter((r) => slots[r.id]).map((r) => `${r.name} ${slots[r.id]!.running}/${slots[r.id]!.cap}`).join(' · ');
   const peak = HARNESS_ROWS.reduce<number | null>((max, r) => {
     const u = usage[r.id];
-    for (const p of [windowPct(u?.five_hour), windowPct(u?.seven_day)]) if (p !== null && (max === null || p > max)) max = p;
+    for (const p of [windowPct(u?.five_hour), windowPct(u?.seven_day), windowPct(u?.monthly)]) if (p !== null && (max === null || p > max)) max = p;
     return max;
   }, null);
   return (

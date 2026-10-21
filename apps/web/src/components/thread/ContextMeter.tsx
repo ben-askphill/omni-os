@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  contextApprox,
   contextLevel,
   contextPercent,
   contextSummary,
+  formatCents,
   formatTokens,
   type ContextLevel,
   type ContextUsage,
+  type ThreadSpend,
 } from '@omni/shared/context-meter.ts';
 import { api, errorText, type ContextView, type Thread } from '../../api.ts';
 import { relTime } from '../../format.ts';
@@ -15,8 +18,8 @@ import { useDismissable } from '../ui/use-dismissable.ts';
 const STROKE: Record<ContextLevel, string> = { ok: 'var(--fg-3)', warn: 'var(--warn)', critical: 'var(--needs)' };
 const TEXT: Record<ContextLevel, string> = { ok: 'text-fg-3', warn: 'text-warn', critical: 'text-needs' };
 
-/** The harnesses that report their window. The meter stays out of Cursor and Hermes threads. */
-const METERED = new Set(['claude-code', 'codex']);
+/** The harnesses that report their window. Cursor's is an estimate; the meter stays out of Hermes threads. */
+const METERED = new Set(['claude-code', 'codex', 'cursor']);
 
 /** The newer of two readings. The stream's push wins a tie: it is the live one. */
 function newest(a: ContextUsage | null | undefined, b: ContextUsage | null | undefined) {
@@ -74,7 +77,12 @@ const SOURCE_NOTE: Record<ContextUsage['source'], string> = {
   'claude-stream': 'Total from the last model call. The split updates when the turn ends.',
   'claude-transcript': 'Read from the session file. Open a turn for the full split.',
   codex: 'From Codex. Codex reports a total only.',
+  cursor: "Estimated. From Cursor's last turn, one model call, so the total is exact; the window is read off the model's name.",
+  'cursor-estimate': "Estimated. Cursor adds up every model call in a turn, so this is the average per call over the last turn's calls.",
 };
+
+/** The thread's billed cost for the hover, once Cursor has reported it. */
+const costTip = (s: ThreadSpend | null | undefined) => (s?.cents != null ? ` Cost so far: ${formatCents(s.cents)}.` : '');
 
 /**
  * The context meter next to the send button: a ring that fills as the thread's window does, with used,
@@ -113,7 +121,8 @@ export function ContextMeter({ thread, pushed, onCompacted }: { thread: Thread; 
   const context = newest(view?.context, pushed);
   const percent = context ? contextPercent(context.used, context.max) : null;
   const level = contextLevel(percent);
-  const tip = context ? `Context: ${contextSummary(context)}. Click for details.` : 'Context: no reading yet. Click for details.';
+  const approx = contextApprox(context) ? '~' : '';
+  const tip = context ? `Context: ${contextSummary(context)}.${costTip(context.spend)} Click for details.` : 'Context: no reading yet. Click for details.';
 
   return (
     <div ref={wrap} className="relative">
@@ -132,7 +141,12 @@ export function ContextMeter({ thread, pushed, onCompacted }: { thread: Thread; 
         <span role="meter" aria-label="Context used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent === null ? undefined : Math.round(percent)} className="inline-flex">
           <ContextRing percent={percent} />
         </span>
-        {percent !== null && <span className={`font-num text-[11.5px] tabular-nums ${level === 'ok' ? '' : TEXT[level]}`}>{Math.round(percent)}%</span>}
+        {percent !== null && (
+          <span className={`font-num text-[11.5px] tabular-nums ${level === 'ok' ? '' : TEXT[level]}`}>
+            {approx}
+            {Math.round(percent)}%
+          </span>
+        )}
       </button>
       {open && (
         <ContextPanel
@@ -168,6 +182,7 @@ function ContextPanel({
 }) {
   const percent = context ? contextPercent(context.used, context.max) : null;
   const level = contextLevel(percent);
+  const approx = contextApprox(context) ? '~' : '';
   const used = (context?.categories ?? []).filter((c) => c.kind === 'used' && c.tokens > 0);
   const room = (context?.categories ?? []).filter((c) => c.kind !== 'used' && c.tokens > 0);
   const tools = [...(context?.tools ?? [])].sort((a, b) => b.callTokens + b.resultTokens - (a.callTokens + a.resultTokens)).slice(0, 6);
@@ -183,12 +198,16 @@ function ContextPanel({
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
               <span className={`font-num text-[20px] leading-none tabular-nums ${level === 'ok' ? 'text-fg' : TEXT[level]}`}>
-                {percent === null ? '?' : `${Math.round(percent)}%`}
+                {percent === null ? '?' : `${approx}${Math.round(percent)}%`}
               </span>
               <span className="text-[12px] text-fg-3">of the context window</span>
             </div>
             <div className="mt-1 font-num text-[12px] text-fg-3 tabular-nums">
-              {context ? (context.max ? `${formatTokens(context.used)} of ${formatTokens(context.max)} tokens` : `${formatTokens(context.used)} tokens, window unknown`) : 'No reading yet'}
+              {context
+                ? context.max
+                  ? `${approx}${formatTokens(context.used)} of ${formatTokens(context.max)} tokens`
+                  : `${approx}${formatTokens(context.used)} tokens, window unknown`
+                : 'No reading yet'}
             </div>
             {context?.model && <div className="mt-0.5 truncate text-[11.5px] text-fg-4">{context.model}</div>}
           </div>
@@ -248,6 +267,8 @@ function ContextPanel({
           </Section>
         )}
 
+        {context?.spend && <SpendSection spend={context.spend} />}
+
         {(context?.memoryFiles?.length ?? 0) > 0 && (
           <Section title="Memory files">
             {context!.memoryFiles!.map((m) => (
@@ -265,8 +286,37 @@ function ContextPanel({
           </p>
         )}
       </div>
-      <CompactAction thread={thread} view={view} onCompacted={onCompacted} />
+      {/* Cursor has no compact command; the panel is the meter and the thread's spend. */}
+      {thread.harness !== 'cursor' && <CompactAction thread={thread} view={view} onCompacted={onCompacted} />}
     </div>
+  );
+}
+
+/** The thread's tokens over every turn, and its exact cost from the plan's usage events (Cursor). */
+function SpendSection({ spend }: { spend: ThreadSpend }) {
+  const rows: [string, number][] = [
+    ['Input', spend.input],
+    ['Cache read', spend.cacheRead],
+    ['Cache write', spend.cacheWrite],
+    ['Output', spend.output],
+  ];
+  return (
+    <Section title="This thread" note={`${spend.turns} ${spend.turns === 1 ? 'turn' : 'turns'}`}>
+      <div className="flex items-baseline gap-2 py-[3px] text-[12px]">
+        <span className="min-w-0 flex-1 text-fg-2">Cost</span>
+        <span className="shrink-0 font-num text-fg tabular-nums" title={spend.billedAt ? `From Cursor's usage events, read ${relTime(spend.billedAt)}` : undefined}>
+          {spend.cents != null ? formatCents(spend.cents) : 'not billed yet'}
+        </span>
+      </div>
+      {rows
+        .filter(([, n]) => n > 0)
+        .map(([label, n]) => (
+          <div key={label} className="flex items-baseline gap-2 py-[3px] text-[12px]">
+            <span className="min-w-0 flex-1 text-fg-3">{label}</span>
+            <span className="shrink-0 font-num text-fg-3 tabular-nums">{formatTokens(n)}</span>
+          </div>
+        ))}
+    </Section>
   );
 }
 
