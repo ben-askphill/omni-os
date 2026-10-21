@@ -48,8 +48,12 @@ const attr = (tag: string, name: string) => {
  * A PR body or comment with its images ready to show: `<img>` tags become `![alt](src)` and GitHub image URLs
  * point at `proxy` + the encoded URL. Code fences and inline code are left alone.
  */
-export function proxyPRImages(md: string, proxy: string): string {
-  const through = (src: string) => (githubImage(src) ? proxy + encodeURIComponent(src) : src);
+export function proxyPRImages(md: string, proxy: string, seen?: (src: string) => void): string {
+  const through = (src: string) => {
+    if (!githubImage(src)) return src;
+    seen?.(src);
+    return proxy + encodeURIComponent(src);
+  };
   return md
     .split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g)
     .map((block, i) => {
@@ -73,6 +77,13 @@ export function proxyPRImages(md: string, proxy: string): string {
         .join('');
     })
     .join('');
+}
+
+/** The GitHub image URLs a PR body or comment shows, the ones `proxyPRImages` points at the proxy. */
+export function githubImageSources(md: string): string[] {
+  const out: string[] = [];
+  proxyPRImages(md, '', (src) => out.push(src));
+  return out;
 }
 
 /** The signed, short-lived image URLs GitHub puts in rendered HTML (`body_html`) for uploads to a private repo. */
@@ -139,10 +150,29 @@ async function signedURLs(repo: string, n: number, fresh = false) {
   return urls;
 }
 
+const shownCache = new Map<string, { at: number; srcs: Set<string> }>();
+
+/**
+ * The GitHub image URLs PR `n` of `repo` shows in its description, reviews and comments. The proxy serves only
+ * these, so it cannot be used to read other files or uploads with gh's login.
+ */
+async function shownImages(repo: string, n: number, fresh = false) {
+  const key = `${repo}#${n}`;
+  const hit = shownCache.get(key);
+  if (hit && !fresh && Date.now() - hit.at < 5 * 60_000) return hit.srcs;
+  const pr = JSON.parse((await gh(['pr', 'view', String(n), '--repo', repo, '--json', 'body,comments,reviews'])).toString('utf8'));
+  const bodies: (string | undefined)[] = [pr.body, ...(pr.comments ?? []).map((c: { body?: string }) => c.body), ...(pr.reviews ?? []).map((r: { body?: string }) => r.body)];
+  const srcs = new Set(bodies.flatMap((b) => (b ? githubImageSources(b) : [])));
+  shownCache.set(key, { at: Date.now(), srcs });
+  return srcs;
+}
+
 /** The image behind a GitHub image URL in PR `n` of `repo`: as is when it is public, else with gh's login. */
 export async function fetchPRImage(repo: string, n: number, src: string): Promise<Fetched | null> {
   const img = githubImage(src);
   if (!img) return null;
+  // A miss on a cached list can be an edit or comment since: ask GitHub once more.
+  if (!(await shownImages(repo, n)).has(src) && !(await shownImages(repo, n, true)).has(src)) return null;
   const direct = await fetchImage(src);
   if (direct) return direct;
   if (img.kind === 'file') return repoFile(img.repo, img.rest);

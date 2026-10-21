@@ -4,7 +4,7 @@ vi.mock('../db.ts', () => {
   throw new Error('db.ts must not be imported by github image tests');
 });
 
-import { githubImage, proxyPRImages, signedImageURLs } from '../github-images.ts';
+import { githubImage, githubImageSources, proxyPRImages, signedImageURLs } from '../github-images.ts';
 
 const P = '/api/channels/c1/prs/7/image?src=';
 const via = (src: string) => P + encodeURIComponent(src);
@@ -62,6 +62,13 @@ describe('proxyPRImages', () => {
       '```',
     ].join('\n');
     expect(proxyPRImages(md, P)).toBe(md);
+  });
+});
+
+describe('githubImageSources', () => {
+  it('lists the GitHub images a body shows, the only ones the proxy will serve', () => {
+    const md = `![a](${BLOB})\n<img src="${ASSET}">\n![badge](https://img.shields.io/x)\n[link](https://github.com/o/r/blob/main/secret.png)\n\`![code](${ASSET}?x)\``;
+    expect(githubImageSources(md)).toEqual([ASSET, BLOB]);
   });
 });
 
