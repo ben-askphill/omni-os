@@ -424,6 +424,9 @@ describe('passwords in prose', () => {
     ['the password for the store is opensesame', 'the password for the store is [REDACTED]'],
     ['dev store (password `blueberry`)', 'dev store (password `[REDACTED]`)'],
     ['wachtwoord: geheim123', 'wachtwoord: [REDACTED]'],
+    ['The password is now hunter2! for the store.', 'The password is now [REDACTED]! for the store.'],
+    ['password is still `blue-sky-9`', 'password is still `[REDACTED]`'],
+    ['the password was changed to p4ss_word', 'the password was changed to [REDACTED]'],
   ])('redacts the value in %s', (input, out) => {
     expect(redact(input)).toBe(out);
   });

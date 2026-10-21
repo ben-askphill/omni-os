@@ -133,13 +133,36 @@ const NOT_A_PASSWORD = new Set(
   'now the a an in set stored saved not still also required correct wrong protected page field off on removed gone there here needed enabled disabled for from to and or so what which only being already changed rotated reset shared same different missing empty blank optional visible hidden known unknown'.split(' '),
 );
 
+/** A token after a filler word that still looks like a secret: quoted, or mixing in digits or symbols. */
+const LOOKS_SECRET = /^(?:`[^`\n]{3,}`|"[^"\n]{3,}"|(?=[^\s`"',;)]*[^A-Za-z\s`"',;).!?])[^\s`"',;).!?]{4,})/;
+const redacted = (value: string) => (value.startsWith('`') ? '`[REDACTED]`' : '[REDACTED]');
+
 /** Values of passwords spelled out in text. */
 export function redactPasswords(input: string): string {
-  return input.replace(PASSWORD_PHRASE, (m, word: string, between: string, value: string) => {
+  let out = '';
+  let pos = 0;
+  PASSWORD_PHRASE.lastIndex = 0;
+  for (let m = PASSWORD_PHRASE.exec(input); m; m = PASSWORD_PHRASE.exec(input)) {
+    const [whole, word, between, value] = m;
     const bare = value.replace(/^[`"]|[`"]$/g, '').replace(/[.!?]+$/, '');
-    if (bare === '[REDACTED]' || NOT_A_PASSWORD.has(bare.toLowerCase())) return m;
-    return `${word}${between}${value.startsWith('`') ? '`[REDACTED]`' : '[REDACTED]'}`;
-  });
+    let end = m.index + whole.length;
+    let replacement = whole;
+    if (bare !== '[REDACTED]' && !NOT_A_PASSWORD.has(bare.toLowerCase())) {
+      replacement = `${word}${between}${redacted(value)}`;
+    } else if (NOT_A_PASSWORD.has(bare.toLowerCase())) {
+      // "the password is now hunter2!": past up to one more filler word, a value that still looks like one goes.
+      const next = input.slice(end).match(/^(\s+(?:[A-Za-z]+\s+)?)(\S+)/);
+      const token = next?.[2].match(LOOKS_SECRET)?.[0];
+      if (next && token) {
+        replacement = `${whole}${next[1]}${redacted(token)}`;
+        end += next[1].length + token.length;
+        PASSWORD_PHRASE.lastIndex = end;
+      }
+    }
+    out += input.slice(pos, m.index) + replacement;
+    pos = end;
+  }
+  return out + input.slice(pos);
 }
 
 /** IP addresses and SSH details, replaced whole. URL hosts count; ids in URL paths are left to the other rules. */
