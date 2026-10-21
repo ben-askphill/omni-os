@@ -112,7 +112,7 @@
       "cwd": "/tmp/omni-fixtures/acme",
       "branch": null,
       "parent_id": "00000000-0000-4000-8000-000000000012",
-      "task_id": "T-E14D",
+      "task_id": "T-228E",
       "source": "manual",
       "automation": null,
       "last_text": "ack: TOOL:300 check the stock",
@@ -141,7 +141,7 @@
       "source": "crew",
       "mode": "steer",
       "state": "held",
-      "task_id": "T-E14D",
+      "task_id": "T-228E",
       "thread_id": "00000000-0000-4000-8000-000000000013",
       "request_id": "crew-report:00000000-0000-4000-8000-000000000013:79",
       "delivery": "recovered"

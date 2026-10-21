@@ -47,7 +47,7 @@ struct HomeScreen: View {
               .omniCaption()
               .padding(.top, z(16))
               .padding(.bottom, z(10))
-            Text(Greeting.text(hour: Calendar.current.component(.hour, from: context.date)))
+            Text(Greeting.text(hour: Calendar.current.component(.hour, from: context.date), name: model.store.status?.profile?.name))
               .font(.omni(size: 36, weight: .medium))
               .tracking(-0.36)
               .foregroundStyle(Tok.fg)
@@ -80,12 +80,6 @@ struct HomeScreen: View {
         EmptyNote(symbol: "checkmark", title: "Nothing failed", message: "Failed and stopped threads from the recent list show up here.")
       }
     }
-  }
-}
-
-enum Greeting {
-  static func text(hour: Int) -> String {
-    hour < 5 ? "Late one, Ben" : hour < 12 ? "Morning, Ben" : hour < 18 ? "Afternoon, Ben" : "Evening, Ben"
   }
 }
 

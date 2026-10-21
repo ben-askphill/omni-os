@@ -31,18 +31,12 @@ struct NewThreadScreen: View {
         .omniCaption()
         .padding(.top, z(16))
         .padding(.bottom, z(10))
-      Text(NewThreadText.greeting(hour: Calendar.current.component(.hour, from: .now)))
+      Text(Greeting.text(hour: Calendar.current.component(.hour, from: .now), name: model.store.status?.profile?.name))
         .font(.omni(size: 36, weight: .medium))
         .tracking(-0.36)
         .foregroundStyle(Tok.fg)
     }
     .padding(.horizontal, z(4))
-  }
-}
-
-enum NewThreadText {
-  static func greeting(hour h: Int) -> String {
-    h < 5 ? "Late one, Ben" : h < 12 ? "Morning, Ben" : h < 18 ? "Afternoon, Ben" : "Evening, Ben"
   }
 }
 

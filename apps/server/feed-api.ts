@@ -5,6 +5,7 @@ import { about } from './about.ts';
 import { bus, publishFeed } from './bus.ts';
 import { config } from './config.ts';
 import { needsYou, resultReads, search, threads } from './db.ts';
+import { getProfile } from './profile.ts';
 import { activeMods, activeTasks, queuedCount, runningCount, slotsByHarness } from './runner.ts';
 import { usageByHarness } from './usage.ts';
 
@@ -35,6 +36,7 @@ feedApi.get('/status', (c) =>
     queued: queuedCount(),
     maxConcurrent: config.maxConcurrent,
     maxUploadMb: config.maxUploadMb,
+    profile: getProfile(),
     server: about,
   }),
 );

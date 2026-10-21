@@ -142,6 +142,7 @@ struct SidebarView: View {
               row(.artifacts) { NavRow(title: "Artifacts", icon: "layers", active: selected == .artifacts) }
               row(.automations) { NavRow(title: "Automations", icon: "zap", active: selected == .automations) }
               row(.secrets) { NavRow(title: "Secrets", icon: "key", active: false) }
+              row(.settings) { NavRow(title: "Settings", icon: "sliders", active: false) }
             }
           }
         }

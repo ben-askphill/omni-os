@@ -52,6 +52,7 @@ public enum Palette {
       page("p:artifacts", .goTo, "Artifacts", nil, "square.stack.3d.up", .go(.artifacts)),
       page("p:automations", .goTo, "Automations", nil, "bolt", .go(.automations)),
       page("p:secrets", .goTo, "Secrets", nil, "key", .go(.secrets)),
+      page("p:settings", .goTo, "Settings", "Your name", "slider.horizontal.3", .go(.settings)),
       page("p:new-channel", .goTo, "Add channel", nil, "plus", .go(.newChannel)),
     ]
     for c in channels {
