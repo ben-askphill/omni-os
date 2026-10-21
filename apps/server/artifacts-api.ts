@@ -23,6 +23,8 @@ artifactsApi.get('/:id/raw', async (c) => {
   if (!a || !existsSync(a.path) || relative(paths.threads, a.path).startsWith('..')) return c.text('not found', 404);
   c.header('Content-Type', mimeFor(a.path, a.kind));
   c.header('Cache-Control', 'no-store');
+  // Opened in a tab of its own, an HTML or SVG artifact would run on Omni's origin and pass requestGuard. Sandboxed, its origin is opaque.
+  if (a.kind === 'html' || a.kind === 'svg') c.header('Content-Security-Policy', 'sandbox allow-scripts allow-popups');
   if (c.req.query('download')) c.header('Content-Disposition', `attachment; filename="${a.name}"`);
   return c.body(readFileSync(a.path));
 });

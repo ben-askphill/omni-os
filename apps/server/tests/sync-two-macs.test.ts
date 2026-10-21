@@ -103,6 +103,8 @@ describe('a thread started on one Mac, continued on the other', () => {
     const res = await b.app.request(`/api/artifacts/${art.id}/raw`);
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('<p>drawer fixed</p>');
+    // Opened in a tab of its own, the page must not run on Omni's origin, where requestGuard would let it through.
+    expect(res.headers.get('content-security-policy')).toBe('sandbox allow-scripts allow-popups');
   });
 
   it('B continues the thread, resuming A\'s session from its own Claude project folder', async () => {

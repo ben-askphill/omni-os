@@ -19,6 +19,7 @@ import { syncApi } from './sync-api.ts';
 import { terminalApi } from './terminal-api.ts';
 import { threadActionsApi, threadRoutesApi } from './thread-routes-api.ts';
 import { threadsApi } from './threads-api.ts';
+import { requestGuard } from './request-guard.ts';
 
 // Every /api route, and the Web UI. apps/server/index.ts boots it.
 export const app = new Hono();
@@ -29,6 +30,9 @@ app.onError((err, c) => {
   const status = err instanceof z.ZodError ? 400 : ((err as { status?: number }).status ?? 500);
   return c.json({ error: err.message }, status as 400);
 });
+
+// Ahead of every route: refuses requests other sites make through a browser (apps/server/request-guard.ts).
+api.use('*', requestGuard);
 
 // Mounted in the same order the handlers used to be registered. Hono runs the first match, so
 // threadsApi and terminalApi stay between the thread reads and the message, upload, stop, and stream routes.
