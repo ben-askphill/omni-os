@@ -423,6 +423,17 @@ public struct SidebarSections: Hashable, Sendable {
   /// Past this many threads an open folder shows "N more".
   public static let maxFolderThreads = 8
 
+  /// What the sidebar's fold-all button does, as foldAllAction in apps/web/src/sidebar-fold.ts: true while any channel
+  /// is open (it closes them all), false once every one is closed (it opens them).
+  public static func collapsesAll(_ channels: [ChannelWithRunning], collapsed: Set<String>) -> Bool {
+    channels.contains { !collapsed.contains($0.id) }
+  }
+
+  /// The open folders a collapse-all closes too. A folder the server has not saved yet is left alone.
+  public static func openFolderIDs(_ channels: [ChannelWithRunning]) -> [String] {
+    channels.flatMap { $0.folders.filter { !$0.collapsed && !$0.isStandIn }.map(\.id) }
+  }
+
   /// The folder a thread sits in, as the list knows it now: a move shows before the open thread's own copy hears of it.
   public static func folder(of thread: ThreadStub, in channel: ChannelWithRunning) -> String? {
     if let f = channel.folders.first(where: { f in f.threads.contains { $0.id == thread.id } }) { return f.id }

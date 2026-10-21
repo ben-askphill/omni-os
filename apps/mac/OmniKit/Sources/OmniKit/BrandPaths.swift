@@ -66,6 +66,8 @@ public enum BrandPaths {
     "more": "M5 12h.01M12 12h.01M19 12h.01",
     "folder": "M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z",
     "folderPlus": "M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5zM12 11v6M9 14h6",
+    "foldAll": "m7 20 5-5 5 5M7 4l5 5 5-5",
+    "unfoldAll": "m7 15 5 5 5-5M7 9l5-5 5 5",
   ]
 
   /// Simple Icons, verbatim. Never recolor them into a pop.

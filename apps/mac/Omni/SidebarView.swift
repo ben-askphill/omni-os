@@ -28,6 +28,18 @@ struct SidebarView: View {
     UserDefaults.standard.set(collapsed.sorted().joined(separator: "\n"), forKey: collapsedChannelsKey)
   }
 
+  /// One click closes every channel and its open folders; with all closed, it opens the channels again. The open
+  /// thread still shows under its channel's name, so the highlight stays put.
+  private func toggleAll() {
+    let channels = model.store.channels
+    let closing = SidebarSections.collapsesAll(channels, collapsed: collapsed)
+    withAnimation(Motion.spring) {
+      collapsed = closing ? Set(channels.map(\.id)) : []
+    }
+    UserDefaults.standard.set(collapsed.sorted().joined(separator: "\n"), forKey: collapsedChannelsKey)
+    if closing { Task { await model.folders.collapseAll(SidebarSections.openFolderIDs(channels)) } }
+  }
+
   private var selected: SidebarItem? { SidebarItem(route: model.route) }
 
   /// Secrets opens Settings on its tab and leaves the window where it was.
@@ -45,8 +57,25 @@ struct SidebarView: View {
           .buttonStyle(.plain)
           .help("Omni home")
         Spacer()
+        if !model.store.channels.isEmpty {
+          let closing = SidebarSections.collapsesAll(model.store.channels, collapsed: collapsed)
+          let label = closing ? "Collapse all channels" : "Expand all channels"
+          Button(action: toggleAll) {
+            OmniIcon(name: closing ? "foldAll" : "unfoldAll", size: 15)
+              .foregroundStyle(Tok.fg3)
+              .frame(width: z(28), height: z(28))
+          }
+          .buttonStyle(RailRowStyle())
+          .help(label)
+          .accessibilityLabel(label)
+          #if DEBUG
+            .onAppear { QAProbe.foldAll = toggleAll }
+            .onDisappear { QAProbe.foldAll = nil }
+          #endif
+        }
       }
       .padding(.leading, z(20))
+      .padding(.trailing, z(12))
       .frame(height: z(44))
 
       VStack(spacing: z(8)) {

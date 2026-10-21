@@ -2,6 +2,7 @@ import { Fragment, useRef, useState, type DragEvent, type MouseEvent, type React
 import { taskHost, type BackgroundTask, type ChannelWithRunning, type FolderWithThreads, type HarnessId, type ThreadStub, type Usage, type UsageWindow } from '../api.ts';
 import { folderOf } from '../folder-groups.ts';
 import { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, drag, draftKey, freeName, useFolders } from '../folders.tsx';
+import { foldAllAction, openFolderIds } from '../sidebar-fold.ts';
 import { openMenu } from './ContextMenu.tsx';
 import { duration, plural, toDate, untilLabel } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
@@ -432,6 +433,20 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
       writePref('sidebar.collapsedChannels', [...next]);
       return next;
     });
+  // One click closes every channel and its open folders; with all closed, it opens the channels again. The open
+  // thread still shows under its channel's name, so the highlight stays put.
+  const foldAll = foldAllAction(channels, collapsed);
+  const toggleAll = () => {
+    if (foldAll === 'expand') {
+      setCollapsed(new Set());
+      writePref('sidebar.collapsedChannels', []);
+      return;
+    }
+    const next = new Set(channels.map((c) => c.id));
+    setCollapsed(next);
+    writePref('sidebar.collapsedChannels', [...next]);
+    void folders.collapseAll(openFolderIds(channels));
+  };
 
   const activeChannel = route.name === 'channel' ? route.id : null;
   const openId = route.name === 'thread' ? route.id : null;
@@ -618,6 +633,17 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
         <a href={href.home()} onClick={onNavigate} aria-label="Omni home" className="wordmark-write">
           <Wordmark size={18} />
         </a>
+        {channels.length > 0 && (
+          <button
+            type="button"
+            onClick={toggleAll}
+            aria-label={foldAll === 'collapse' ? 'Collapse all channels' : 'Expand all channels'}
+            title={foldAll === 'collapse' ? 'Collapse all channels' : 'Expand all channels'}
+            className="hov grid h-7 w-7 shrink-0 place-items-center rounded-full text-fg-3 transition-colors hover:text-fg"
+          >
+            <Icon name={foldAll === 'collapse' ? 'foldAll' : 'unfoldAll'} size={15} />
+          </button>
+        )}
       </div>
 
       <div className="space-y-2 px-3">

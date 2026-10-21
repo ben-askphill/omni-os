@@ -555,6 +555,8 @@ enum QAProbe {
   static var scroller: Scroller?
   static var expand: (() -> Void)?
   static var openMeter: (() -> Void)?
+  /// Presses the sidebar's collapse-all (or expand-all) button.
+  static var foldAll: (() -> Void)?
   /// Opens the edit of the first editable unsent message with this text. false when there is none.
   static var editPending: ((String) -> Bool)?
 

@@ -60,6 +60,8 @@ interface FolderState {
   create: (channelId: string, name: string) => Promise<void>;
   rename: (id: string, name: string) => Promise<void>;
   toggle: (id: string) => Promise<void>;
+  /** Close these folders, all at once, as the sidebar's collapse-all does. */
+  collapseAll: (ids: string[]) => Promise<void>;
   duplicate: (id: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
   /** File a thread in a folder of its channel, or null for the ungrouped list. */
@@ -152,6 +154,25 @@ export function FolderProvider({ children }: { children: ReactNode }) {
     [find, optimistic],
   );
 
+  const collapseAll = useCallback(
+    async (ids: string[]) => {
+      const set = new Set(ids);
+      if (!set.size) return;
+      const before = latest.current;
+      updateChannels((list) =>
+        list.map((c) => (c.folders?.some((f) => set.has(f.id)) ? { ...c, folders: c.folders.map((f) => (set.has(f.id) ? { ...f, collapsed: 1 } : f)) } : c)),
+      );
+      const sent = await Promise.allSettled(ids.map((id) => api.patch<Folder>(`/folders/${encodeURIComponent(id)}`, { collapsed: true })));
+      const failed = sent.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+      if (!failed) return;
+      // Some may have saved: put the list back, then take the server's word for each.
+      updateChannels(() => before);
+      toast({ title: "Couldn't save the folders", body: errorText(failed.reason), icon: 'folder' });
+      void reloadChannels();
+    },
+    [updateChannels, reloadChannels, toast],
+  );
+
   const duplicate = useCallback(
     async (id: string) => {
       const f = find(id);
@@ -241,13 +262,14 @@ export function FolderProvider({ children }: { children: ReactNode }) {
       create,
       rename,
       toggle,
+      collapseAll,
       duplicate,
       remove,
       moveThread,
       reorder,
     }),
     // channels: `deleting` reads the latest list.
-    [editing, deletingId, channels, find, create, rename, toggle, duplicate, remove, moveThread, reorder],
+    [editing, deletingId, channels, find, create, rename, toggle, collapseAll, duplicate, remove, moveThread, reorder],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

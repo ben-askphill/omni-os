@@ -321,6 +321,35 @@ private final class FakeFolderAPI: FolderAPI {
     #expect(api.calls == ["update f1 - true"])
   }
 
+  @Test func collapseAllClosesEveryOpenFolderAtOnce() async throws {
+    let (m, store, api, _) = try await setup([folderRow("f1", name: "A"), folderRow("f2", name: "B", collapsed: 1), folderRow("f3", name: "C")])
+    let channels = store.channels
+    let open = SidebarSections.openFolderIDs(channels)
+    #expect(open == ["f1", "f3"])
+    await m.collapseAll(open)
+    #expect(store.channel("acme")?.folders.allSatisfy(\.collapsed) == true)
+    #expect(api.calls == ["update f1 - true", "update f3 - true"])
+  }
+
+  @Test func aRefusedCollapseAllPutsTheListBack() async throws {
+    let (m, store, api, _) = try await setup([folderRow("f1", name: "A"), folderRow("f2", name: "B")])
+    let before = store.channels
+    api.failNext(.http(status: 500, message: "boom"))
+    await m.collapseAll(["f1", "f2"])
+    #expect(store.channels == before)
+    #expect(m.failure?.title == "Couldn't save the folders")
+    #expect(api.calls == ["update f1 - true"])
+  }
+
+  @Test func foldAllClosesWhileAnyChannelIsOpen() throws {
+    let list = try [decode(ChannelWithRunning.self, channel("conductor")), decode(ChannelWithRunning.self, channel("acme"))]
+    #expect(SidebarSections.collapsesAll(list, collapsed: []))
+    #expect(SidebarSections.collapsesAll(list, collapsed: ["acme"]))
+    #expect(!SidebarSections.collapsesAll(list, collapsed: ["conductor", "acme"]))
+    // A channel that is gone does not keep it closing.
+    #expect(!SidebarSections.collapsesAll(list, collapsed: ["conductor", "acme", "gone"]))
+  }
+
   @Test func deleteMovesTheThreadsBack() async throws {
     let (m, store, api, _) = try await setup()
     m.deletingID = "f1"

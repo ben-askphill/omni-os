@@ -61,7 +61,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
 /// `{"settings": "secrets"}` (or `connection`, `sync`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
-/// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`), `{"expand": true}`, `{"meter": true}`,
+/// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`), `{"expand": true}`, `{"meter": true}`, `{"foldAll": true}`,
 /// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`,
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
 /// `changes`, `turn`, `browser`, `terminal`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
@@ -89,6 +89,8 @@ public enum QAStep: Hashable, Sendable {
   case expand
   /// Opens the open thread's context meter panel.
   case meter
+  /// Presses the sidebar's collapse-all (or expand-all) button.
+  case foldAll
   /// Opens the edit of the open thread's first editable unsent message, with this text in it.
   case editPending(String)
   /// Zooms the artifact image preview to this scale, or back to fit with nil.
@@ -195,7 +197,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "editPending", "imageZoom", "type", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "foldAll", "editPending", "imageZoom", "type", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -253,6 +255,8 @@ public struct QAScript: Hashable, Sendable {
       return .expand
     case "meter":
       return .meter
+    case "foldAll":
+      return .foldAll
     case "editPending":
       guard let text = value as? String else { throw QAScriptError("editPending takes the text to put in the edit") }
       return .editPending(text)

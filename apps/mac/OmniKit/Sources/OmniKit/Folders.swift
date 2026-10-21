@@ -490,6 +490,29 @@ public final class FolderModel {
     }
   }
 
+  /// Closes these folders all at once, as the sidebar's collapse-all does. A refusal puts the list back, reloads it
+  /// (the ones sent before it did save) and says why.
+  public func collapseAll(_ ids: [String]) async {
+    let ids = ids.filter { !FolderRules.isStandIn($0) }
+    guard !ids.isEmpty, let store, let api else { return }
+    let before = store.channels
+    let set = Set(ids)
+    for c in store.channels where c.folders.contains(where: { set.contains($0.id) }) {
+      store.editChannel(c.id) { ch in ids.reduce(ch) { FolderEdits.patching($1, in: $0) { $0.collapsed = true } } }
+    }
+    for id in ids {
+      do {
+        _ = try await api.updateFolder(id, name: nil, collapsed: true)
+      } catch {
+        store.restoreChannels(before)
+        nextFailure += 1
+        failure = Failure(id: nextFailure, title: "Couldn't save the folders", message: error.message)
+        await store.reloadChannels()
+        return
+      }
+    }
+  }
+
   /// "<name> copy", empty, right after the original: settings only, since a thread sits in one folder.
   public func duplicate(_ id: String) async {
     guard let f = find(id), !f.isStandIn, let c = store?.channel(f.channelID) else { return }
