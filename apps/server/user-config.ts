@@ -20,6 +20,14 @@ export const configPath = () => (process.env.OMNI_CONFIG ? resolve(ROOT, process
 
 export const NAME_MAX = 60;
 
+/** A folder as typed: `~/x`, `/abs/x` or relative to home. One line, no control characters, since prompts quote it. */
+const folder = z
+  .string()
+  .trim()
+  .max(1024)
+  .refine((p) => !/[\u0000-\u001f\u007f`$]/.test(p), 'A folder path cannot contain control characters, backticks or $.')
+  .default('');
+
 const automationOverride = z.object({ enabled: z.boolean().optional(), channel: z.string().optional() });
 
 export const userConfigSchema = z.object({
@@ -38,9 +46,9 @@ export const userConfigSchema = z.object({
   workspace: z
     .object({
       /** The folder non-repo threads run in, added to every Claude thread with its CLAUDE.md. Empty means ~/Omni. */
-      root: z.string().trim().default(''),
+      root: folder,
       /** Where the person keeps their git checkouts. Empty means ~/code. */
-      reposDir: z.string().trim().default(''),
+      reposDir: folder,
       /** GitHub user or org that owns their repos and their fork of Omni. */
       githubOwner: z.string().trim().default(''),
     })
@@ -50,7 +58,7 @@ export const userConfigSchema = z.object({
       /** Hermes API server, like http://100.x.y.z:8642. Empty means Hermes is off. */
       hermesUrl: z.string().trim().default(''),
       /** A second-brain git repo the brain-export automation writes digests into. Empty means off. */
-      centralBrainDir: z.string().trim().default(''),
+      centralBrainDir: folder,
     })
     .prefault({}),
   /** Per-machine overrides of the shared automation YAML (`enabled`, `channel`), so toggling one never edits the repo. */

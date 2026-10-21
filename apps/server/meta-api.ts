@@ -45,6 +45,7 @@ metaApi.delete('/secrets', async (c) => {
 // Who uses this Omni. The name is in GET /api/status too, so a client learns it with the rest of the workspace.
 metaApi.get('/profile', (c) => c.json(getProfile()));
 metaApi.put('/profile', async (c) => {
+  if (!/^application\/json\b/i.test(c.req.header('content-type') ?? '')) return c.json({ error: 'send JSON' }, 415);
   // The first issue's text, so a client can show "Enter a name." as it is.
   const parsed = profileInput.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid profile' }, 400);

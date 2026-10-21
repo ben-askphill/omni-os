@@ -40,6 +40,13 @@ describe('onboarding', () => {
     expect((await send('PUT', '/api/setup', { user: { timezone: 'Nowhere/Land' } })).status).toBe(400);
     expect((await send('PUT', '/api/setup', { workspace: { githubOwner: 'not an owner' } })).status).toBe(400);
     expect((await send('PUT', '/api/setup', { integrations: { hermesUrl: 'ftp://x' } })).status).toBe(400);
+    expect((await send('PUT', '/api/setup', { workspace: { root: '~/x\nrm -rf ~' } })).status).toBe(400);
+    // A form post from another page cannot change it.
+    const form = await app.request('/api/setup', { method: 'PUT', headers: { 'content-type': 'text/plain' }, body: '{"integrations":{"hermesUrl":"http://evil"}}' });
+    expect(form.status).toBe(415);
+    // Automation overrides go through their own endpoint.
+    await send('PUT', '/api/setup', { automations: { 'weekly-review': { enabled: true } } });
+    expect(userConfig().automations['weekly-review']).toBeUndefined();
   });
 
   it('complete marks it done, makes the workspace and leaves one welcome thread in #conductor', async () => {

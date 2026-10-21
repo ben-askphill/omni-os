@@ -3,7 +3,6 @@
 import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { schedule } from './automations.ts';
 import { getCrew } from './crew.ts';
 import { channels, threads } from './db.ts';
 import { prepareWorkdir } from './sandbox.ts';
@@ -42,7 +41,8 @@ export function setupState() {
   };
 }
 
-const patchInput = userConfigPatch.superRefine((p, ctx) => {
+// Automation overrides change through POST /api/automations/:id/enabled, not here.
+const patchInput = userConfigPatch.omit({ automations: true, onboardedAt: true }).superRefine((p, ctx) => {
   const tz = p.user?.timezone;
   if (tz && !isTimezone(tz)) ctx.addIssue({ code: 'custom', path: ['user', 'timezone'], message: 'Unknown timezone. Use an IANA name like Europe/Amsterdam.' });
   const email = p.user?.email;
@@ -55,12 +55,17 @@ const patchInput = userConfigPatch.superRefine((p, ctx) => {
 
 setupApi.get('/', (c) => c.json(setupState()));
 
+// JSON only, as links-api.ts: a page in a browser cannot send that cross-origin without a preflight, so it cannot
+// point the Hermes URL (and with it the Keychain token) or the workspace somewhere else.
+setupApi.use('*', async (c, next) => {
+  if (c.req.method !== 'GET' && !/^application\/json\b/i.test(c.req.header('content-type') ?? '')) return c.json({ error: 'send JSON' }, 415);
+  await next();
+});
+
 setupApi.put('/', async (c) => {
   const parsed = patchInput.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid settings' }, 400);
   updateUserConfig({ ...parsed.data, onboardedAt: undefined });
-  // An automation override may have changed.
-  if (parsed.data.automations) schedule();
   return c.json(setupState());
 });
 
@@ -69,8 +74,7 @@ setupApi.put('/', async (c) => {
  * welcome message in a new #conductor thread. Running setup again from Settings ends here too, without a second welcome.
  */
 setupApi.post('/complete', async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const parsed = patchInput.safeParse(body ?? {});
+  const parsed = patchInput.safeParse((await c.req.json().catch(() => ({}))) ?? {});
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid settings' }, 400);
   const first = !isOnboarded();
   updateUserConfig({ ...parsed.data, onboardedAt: new Date().toISOString() });
