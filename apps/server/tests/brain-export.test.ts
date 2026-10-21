@@ -262,6 +262,17 @@ describe('plan', () => {
     expect(by.get(ids[3])!.path).toBe('omni/imported/home/2026-10-14-eeeeeeee.md');
   });
 
+  it('files the old coldblackcoffee folder under the Cold Black Coffee channel', () => {
+    channel('cold-black-coffee', 'personal', '/Users/ben/coldblackcoffee-theme');
+    const id = 'ffffffff-0000-4000-8000-000000000001';
+    thread(id, { channel_id: 'imported', cwd: '/Users/ben/coldblackcoffee' });
+    ev(id, 'user', { text: 'hi', source: 'import' });
+    const [d] = digests(run());
+    expect(d.path).toBe('omni/cold-black-coffee/2026-10-14-ffffffff.md');
+    expect(d.content).toContain('channel_kind: "personal"');
+    expect(d.content).not.toContain('imported_project');
+  });
+
   it('exports only what is new after the cursor, as the next part', () => {
     thread(T1);
     ev(T1, 'user', { text: 'first ask', source: 'ben' });

@@ -422,6 +422,14 @@ export interface Route {
 }
 
 /** Throwaway working dirs: temp dirs, scratchpads and agent worktrees. */
+/**
+ * Old project folders whose channel's repo now lives under another name, by folder name. Imported sessions
+ * that ran in one go to that channel.
+ */
+export const IMPORTED_ALIASES: Record<string, string> = {
+  coldblackcoffee: 'cold-black-coffee',
+};
+
 export const SCRATCH_CWD = /^\/(?:private\/)?(?:tmp|var\/folders)\/|\/scratchpad(?:\/|$)|\/scratch-workspaces\/|\/\.claude\/worktrees\/|\/data\/worktrees\//;
 
 const lastSegment = (p: string) => p.replace(/\/+$/, '').split('/').pop()?.toLowerCase() ?? '';
@@ -429,7 +437,7 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
 
 /**
  * The channel a thread's digest goes to. Imported history has no real channel: route it by its cwd, then by a
- * repo with the same folder name (a checkout elsewhere), else to imported/<folder name>.
+ * repo with the same folder name (a checkout elsewhere) or an alias, else to imported/<folder name>.
  */
 export function routeChannel(thread: ThreadRow, channels: ChannelRow[], home = ''): Route {
   const own = channels.find((c) => c.id === thread.channel_id);
@@ -439,7 +447,9 @@ export function routeChannel(thread: ThreadRow, channels: ChannelRow[], home = '
   if (match) return match;
   if (SCRATCH_CWD.test(thread.cwd)) return { ...IMPORTED, scratch: true };
   const base = lastSegment(thread.cwd);
-  const sameName = candidates.find((c) => [c.repo_path, c.base_dir].some((p) => p && lastSegment(p) === base));
+  const sameName =
+    candidates.find((c) => [c.repo_path, c.base_dir].some((p) => p && lastSegment(p) === base)) ??
+    candidates.find((c) => c.id === IMPORTED_ALIASES[base]);
   if (sameName) return sameName;
   const atHome = home && thread.cwd.replace(/\/+$/, '') === home.replace(/\/+$/, '');
   return { ...IMPORTED, ...(own ?? {}), project: atHome ? 'home' : slug(base) };
