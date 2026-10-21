@@ -151,7 +151,7 @@ describe('plan', () => {
     expect(lead.content).not.toContain('HEAD_MARKER');
   });
 
-  it('skips the test channel, running threads, archived noise and Conductor threads that only delegated', () => {
+  it('skips the test channel, running threads and archived noise', () => {
     const ids = {
       test: 'aaaaaaaa-0000-4000-8000-000000000001',
       running: 'aaaaaaaa-0000-4000-8000-000000000002',
@@ -178,8 +178,39 @@ describe('plan', () => {
     expect(skipOf(p, ids.test)?.skip).toBe('test-channel');
     expect(skipOf(p, ids.running)?.skip).toBe('running');
     expect(skipOf(p, ids.noise)?.skip).toBe('archived-noise');
-    expect(skipOf(p, ids.conductor)?.skip).toBe('delegated-only');
-    expect(digests(p).map((d) => d.threadId).sort()).toEqual([ids.archivedDone, ids.child, ids.answered].sort());
+    expect(digests(p).map((d) => d.threadId).sort()).toEqual([ids.archivedDone, ids.conductor, ids.child, ids.answered].sort());
+  });
+
+  it('exports a Conductor thread that delegated as a stub: Ben\'s messages and where the work went, nothing it wrote', () => {
+    const lead = 'cccccccc-0000-4000-8000-000000000001';
+    const kid1 = 'cccccccc-0000-4000-8000-000000000002';
+    const kid2 = 'cccccccc-0000-4000-8000-000000000003';
+    thread(lead, { channel_id: 'conductor', role: 'conductor' });
+    thread(kid1, { parent_id: lead, title: 'Build the exporter' });
+    db.prepare(`UPDATE threads SET task_id = 'T-CB2' WHERE id = ?`).run(kid1);
+    ev(lead, 'user', { text: `Ben's whole original ask ${'w'.repeat(3000)}`, source: 'ben' });
+    ev(lead, 'assistant_text', { text: 'CONDUCTOR_TEXT_MARKER' });
+    ev(lead, 'crew_report', { text: 'CREW_REPORT_MARKER', thread_id: kid1, title: 'Build the exporter' });
+    ev(lead, 'result', { ok: true });
+
+    const [d] = digests(run()).filter((x) => x.threadId === lead);
+    expect(d.content).toContain('digest: "delegation-stub"');
+    expect(d.content).toContain(`Ben's whole original ask ${'w'.repeat(3000)}`);
+    expect(d.content).toContain(`### Delegated\n\n- "Build the exporter": thread ${kid1}, task T-CB2, #moby`);
+    expect(d.content).not.toContain('CONDUCTOR_TEXT_MARKER');
+    expect(d.content).not.toContain('CREW_REPORT_MARKER');
+    expect(d.content).not.toContain('#### Reply');
+
+    // A later part carries only the new ask and the thread delegated since.
+    const cursor: Cursor = { version: 1, threads: { [lead]: { uid: d.lastUid, part: 1 } } };
+    db.prepare(`UPDATE events SET created_at = '2026-10-14T09:00:00.000Z' WHERE thread_id = ?`).run(lead);
+    thread(kid2, { parent_id: lead, title: 'Second job', created_at: '2026-10-14T09:31:00.000Z' });
+    ev(lead, 'user', { text: 'and one more thing', source: 'ben' });
+    const [p2] = digests(run(cursor)).filter((x) => x.threadId === lead);
+    expect(p2.part).toBe(2);
+    expect(p2.content).toContain('and one more thing');
+    expect(p2.content).toContain('"Second job"');
+    expect(p2.content).not.toContain('"Build the exporter"');
   });
 
   it('routes imported history by its cwd, and to imported when nothing matches', () => {
@@ -193,8 +224,42 @@ describe('plan', () => {
     const m = all.find((d) => d.threadId === matched)!;
     expect(m.path).toBe('omni/volero/2026-10-14-bbbbbbbb.md');
     expect(m.content).toContain('channel_kind: "client"');
-    expect(all.find((d) => d.threadId === orphan)!.path.startsWith('omni/imported/')).toBe(true);
+    expect(all.find((d) => d.threadId === orphan)!.path).toBe('omni/imported/elsewhere/2026-10-14-bbbbbbbb.md');
     expect(digests(run(emptyCursor(), { channel: 'volero' })).map((d) => d.threadId)).toEqual([matched]);
+  });
+
+  it('skips imported history from temp dirs, scratchpads and worktrees', () => {
+    const cwds = [
+      '/private/tmp/claude-501/x/scratchpad',
+      '/tmp/work',
+      '/Users/ben/Library/Application Support/Claude/scratch-workspaces/a/b',
+      '/Users/ben/proj/.claude/worktrees/feature-1',
+      '/Users/ben/omni-os/data/worktrees/abc',
+    ];
+    cwds.forEach((cwd, i) => {
+      const id = `dddddddd-0000-4000-8000-00000000000${i}`;
+      thread(id, { channel_id: 'imported', cwd });
+      ev(id, 'user', { text: 'hi', source: 'import' });
+    });
+    const p = run();
+    expect(digests(p)).toEqual([]);
+    expect(p.every((x) => 'skip' in x && x.skip === 'scratch-cwd')).toBe(true);
+  });
+
+  it('files imported history with no channel under imported/<project folder>, or the repo with the same folder name', () => {
+    const ids = ['eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000002', 'eeeeeeee-0000-4000-8000-000000000003', 'eeeeeeee-0000-4000-8000-000000000004'];
+    thread(ids[0], { channel_id: 'imported', cwd: '/Users/ben/moneybot' });
+    thread(ids[1], { channel_id: 'imported', cwd: '/Users/ben/.treehouse/fit-check-71bbec/1/fit-check' });
+    thread(ids[2], { channel_id: 'imported', cwd: '/Users/ben/.treehouse/apa-volero-f1f1d5/1/apa-volero' });
+    thread(ids[3], { channel_id: 'imported', cwd: '/Users/ben' });
+    for (const id of ids) ev(id, 'user', { text: 'hi', source: 'import' });
+
+    const by = new Map(digests(plan(db, { cursor: emptyCursor(), redact: noRedact, home: '/Users/ben' })).map((d) => [d.threadId, d]));
+    expect(by.get(ids[0])!.path).toBe('omni/imported/moneybot/2026-10-14-eeeeeeee.md');
+    expect(by.get(ids[0])!.content).toContain('imported_project: "moneybot"');
+    expect(by.get(ids[1])!.path).toBe('omni/imported/fit-check/2026-10-14-eeeeeeee.md');
+    expect(by.get(ids[2])!.path).toBe('omni/volero/2026-10-14-eeeeeeee.md');
+    expect(by.get(ids[3])!.path).toBe('omni/imported/home/2026-10-14-eeeeeeee.md');
   });
 
   it('exports only what is new after the cursor, as the next part', () => {
@@ -289,6 +354,52 @@ describe('makeRedactor', () => {
     expect(redact('https://cdn.example.com/a.png?expires=1&signature=Zm9vYmFyQmF6UXV4MTIzNDU2Nzg5MEFiQ2RFZkdo')).toBe(
       'https://cdn.example.com/a.png?expires=1&signature=[REDACTED]',
     );
+  });
+});
+
+describe('IP addresses and SSH details', () => {
+  const redact = makeRedactor([]);
+
+  it.each([
+    ['public IPv4', 'server at 2.28.197.204 now', 'server at [REDACTED] now'],
+    ['Tailscale IPv4 in a URL host', 'dashboard at http://100.110.128.38:8790/ratings', 'dashboard at http://[REDACTED]:8790/ratings'],
+    ['private IPv4', 'router 192.168.1.20.', 'router [REDACTED].'],
+    ['full IPv6', 'addr 2001:0db8:85a3:0000:0000:8a2e:0370:7334 up', 'addr [REDACTED] up'],
+    ['compressed IPv6', 'tailnet fd7a:115c:a1e0::1234 ok', 'tailnet [REDACTED] ok'],
+    ['IPv6 in brackets', 'http://[2001:db8::1]:8080/', 'http://[[REDACTED]]:8080/'],
+  ])('redacts a %s', (_, input, out) => {
+    expect(redact(input)).toBe(out);
+  });
+
+  it('leaves loopback, the any-address and lookalikes alone', () => {
+    const keep = [
+      'http://127.0.0.1:4747/api and localhost:4748',
+      'listen on 0.0.0.0:8080',
+      'curl http://[::1]:4747',
+      'at 12:30:45 on 2026-10-14',
+      'mac aa:bb:cc:dd:ee:ff',
+      'python a[1::2]',
+      'version 1.2.3 and 24.14.1',
+      'std::vector<int>',
+    ];
+    for (const s of keep) expect(redact(s)).toBe(s);
+  });
+
+  it('redacts SSH key files, user@host targets, ssh URLs and host keys', () => {
+    expect(redact('ssh -i /Users/ben/.ssh/cloudroom_hetzner_16180409 hermes@box.example.com')).toBe('ssh -i [REDACTED] [REDACTED]');
+    expect(redact('ssh -i keys/deploy hermes@10.0.0.5 uptime')).toBe('ssh -i [REDACTED] [REDACTED] uptime');
+    expect(redact('scp report.csv deploy@vps:/srv/')).toBe('scp report.csv [REDACTED]:/srv/');
+    expect(redact('it lives in ~/.ssh/config')).toBe('it lives in [REDACTED]');
+    expect(redact('generate id_ed25519 and id_rsa.pub')).toBe('generate [REDACTED] and [REDACTED]');
+    expect(redact('use the server.pem key')).toBe('use the [REDACTED] key');
+    expect(redact('clone ssh://git@github.com/ben/repo.git')).toBe('clone [REDACTED]');
+    expect(redact('fingerprint SHA256:nThbg6kXUpJWGl7E1IGOCspRomTxdCARLviKw6E5SY8 ok')).toMatch(/^fingerprint (SHA256:)?\[REDACTED\] ok$/);
+    expect(redact('a\nbox.example.com,1.2.3.4 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\nb')).toBe('a\n[REDACTED]\nb');
+  });
+
+  it('keeps emails off SSH lines and ids in URL paths', () => {
+    const keep = ['mail ben@askphill.com today', 'https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd/edit'];
+    for (const s of keep) expect(redact(s)).toBe(s);
   });
 });
 

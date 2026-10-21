@@ -56,7 +56,7 @@ export interface EventRow {
   created_at: string;
 }
 
-export type SkipReason = 'test-channel' | 'running' | 'archived-noise' | 'delegated-only' | 'no-content' | 'up-to-date' | 'cursor-lost';
+export type SkipReason = 'test-channel' | 'running' | 'archived-noise' | 'scratch-cwd' | 'no-content' | 'up-to-date' | 'cursor-lost';
 
 export interface Digest {
   threadId: string;
@@ -74,6 +74,8 @@ export interface PlanOptions {
   channel?: string;
   /** ISO date; threads last updated before it are left out. */
   since?: string;
+  /** Ben's home dir: imported history that ran there goes to imported/home. */
+  home?: string;
   cursor: Cursor;
   redact: (s: string) => string;
   timezone?: string;
@@ -98,6 +100,46 @@ const TOKEN_PATTERNS: RegExp[] = [
   /\bhooks\.slack\.com\/services\/[A-Za-z0-9/]+/g,
   /\bdiscord(?:app)?\.com\/api\/webhooks\/[A-Za-z0-9/_-]+/g,
 ];
+
+// SSH details: key files, user@host targets on ssh/scp/rsync lines, ssh:// URLs, host keys and fingerprints.
+const SSH_PATTERNS: RegExp[] = [
+  /^.*\b(?:ssh-(?:rsa|ed25519|dss)|ecdsa-sha2-nistp\d+|sk-ssh-ed25519@openssh\.com)\s+(?:AAAA[A-Za-z0-9+/=]+|\[REDACTED\]).*$/gm,
+  /\bSHA256:[A-Za-z0-9+/]{43}=?/g,
+  /\bssh:\/\/[^\s"'`)>\]]+/g,
+  /[^\s"'`(=]*\/\.ssh\/[^\s"'`)]+/g,
+  /\bid_(?:rsa|ed25519|ecdsa|dsa)(?:_[\w-]+)?(?:\.pub)?\b/g,
+  /[\w.-]+\.(?:pem|ppk)\b/g,
+];
+const SSH_COMMAND = /\b(?:ssh|scp|sftp|rsync|mosh|ssh-copy-id|ssh-keyscan)\b/;
+
+const IPV4 = /(?<![\d.])(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}(?![\d]|\.\d)/g;
+const IPV6 = /(?<![\w:.])(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}(?![\w:])/g;
+
+/** Loopback and the any-address are not secrets, so they stay. */
+const keepIp = (ip: string) => ip.startsWith('127.') || ip === '0.0.0.0' || ip === '::1' || ip === '::';
+
+/** A real IPv6 address, not a clock time (12:30:45), a MAC address or a slice like a[1::2]. */
+function isIpv6(m: string) {
+  const groups = m.split(':').filter(Boolean);
+  if (m.includes('::')) return m.split('::').length === 2 && (groups.length >= 3 || groups.some((g) => g.length === 4));
+  return groups.length === 8;
+}
+
+/** IP addresses and SSH details, replaced whole. URL hosts count; ids in URL paths are left to the other rules. */
+export function redactNetwork(input: string): string {
+  let s = input;
+  for (const re of SSH_PATTERNS) s = s.replace(re, '[REDACTED]');
+  s = s.replace(/^.*$/gm, (line) =>
+    SSH_COMMAND.test(line)
+      ? line
+          .replace(/(\s-i\s+)(?!\[REDACTED\])[^\s'"`]+/g, '$1[REDACTED]')
+          .replace(/(?<![\w.+-])[\w.+-]+@(?:\[[0-9A-Fa-f:.]+\]|[\w.-]+)/g, '[REDACTED]')
+      : line,
+  );
+  s = s.replace(IPV4, (m) => (keepIp(m) ? m : '[REDACTED]'));
+  s = s.replace(IPV6, (m) => (isIpv6(m) && !keepIp(m) ? '[REDACTED]' : m));
+  return s;
+}
 
 /**
  * True when a match sits in a URL or file path (before any `?`), in a dotted key, or is a file name.
@@ -125,7 +167,7 @@ const looksRandom = (s: string) => /[A-Z]/.test(s) && /[a-z]/.test(s) && /\d/.te
 
 /**
  * Builds the redactor: exact secret values first (longest first, so one value inside another goes whole),
- * then token shapes, `NAME_KEY=value` assignments, Bearer headers and passwords in URLs.
+ * then token shapes, `NAME_KEY=value` assignments, Bearer headers, passwords in URLs, IP addresses and SSH details.
  */
 export function makeRedactor(secretValues: Iterable<string>): (s: string) => string {
   const values = [...new Set([...secretValues].map((v) => v.trim()).filter((v) => v.length >= 6))].sort((a, b) => b.length - a.length);
@@ -144,7 +186,7 @@ export function makeRedactor(secretValues: Iterable<string>): (s: string) => str
     s = s.replace(/(?<![A-Za-z0-9+_-])[A-Za-z0-9+_-]{32,}={0,2}(?![A-Za-z0-9+=_-])/g, (m, at: number, str: string) =>
       looksRandom(m) && !inPathOrName(str, at, m.length) ? '[REDACTED]' : m,
     );
-    return s;
+    return redactNetwork(s);
   };
 }
 
@@ -217,15 +259,17 @@ function userBody(p: Record<string, any>) {
 
 interface RenderContext {
   thread: ThreadRow;
-  channel: { id: string; name: string; kind: string };
+  channel: Route;
   folder: string | null;
   artifacts: { name: string; url: string | null; description: string | null }[];
-  children: { id: string; title: string; channel_id: string; role: string | null }[];
+  children: { id: string; title: string; channel_id: string; role: string | null; task_id: string | null }[];
   parent: { id: string; title: string } | null;
   events: EventRow[];
   part: number;
   previousUid: string | null;
   timezone: string;
+  /** A Conductor thread that delegated: Ben's own messages and what went where, nothing the Conductor wrote. */
+  stub?: boolean;
 }
 
 /** YAML scalar: JSON strings are valid YAML and escape everything that matters. */
@@ -253,6 +297,14 @@ export function renderDigest(ctx: RenderContext, redact: (s: string) => string):
 
   for (const e of ctx.events) {
     const p = parse(e.payload);
+    if (ctx.stub) {
+      const body = e.kind === 'user' && !['conductor', 'team', 'automation'].includes(p.source) ? userBody(p) : '';
+      if (body) {
+        out.push(`### ${userLabel(p)} · ${when(e.created_at, tz)}\n\n${body}`);
+        content++;
+      }
+      continue;
+    }
     switch (e.kind) {
       case 'user': {
         const body = userBody(p);
@@ -305,17 +357,27 @@ export function renderDigest(ctx: RenderContext, redact: (s: string) => string):
     }
   }
   flushNotes(true);
+  if (ctx.stub && ctx.children.length) {
+    out.push(
+      `### Delegated\n\n${ctx.children
+        .map((c) => `- "${c.title}": thread ${c.id}${c.task_id ? `, task ${c.task_id}` : ''}, #${c.channel_id}${c.role ? `, ${c.role}` : ''}`)
+        .join('\n')}`,
+    );
+    content++;
+  }
   if (!content) return null;
 
   const t = ctx.thread;
   const front = [
     '---',
     'source: omni',
+    `digest: ${ctx.stub ? '"delegation-stub"' : '"thread"'}`,
     `thread_id: ${y(t.id)}`,
     `title: ${y(t.title)}`,
     `channel_id: ${y(ctx.channel.id)}`,
     `channel_name: ${y(ctx.channel.name)}`,
     `channel_kind: ${y(ctx.channel.kind)}`,
+    ...(ctx.channel.project ? [`imported_project: ${y(ctx.channel.project)}`] : []),
     `folder: ${y(ctx.folder)}`,
     `role: ${y(t.role)}`,
     `task_id: ${y(t.task_id)}`,
@@ -338,7 +400,8 @@ export function renderDigest(ctx: RenderContext, redact: (s: string) => string):
 
   const about = [`Omni thread in #${ctx.channel.name} (${ctx.channel.kind}), started ${dateOnly(t.created_at, tz)}.`];
   if (ctx.parent) about.push(`Delegated from "${ctx.parent.title}" (${ctx.parent.id.slice(0, 8)}).`);
-  if (ctx.children.length)
+  if (ctx.stub) about.push('Conductor thread that delegated: only Ben\'s messages and the threads it handed work to; their digests carry the work.');
+  else if (ctx.children.length)
     about.push(`Delegated to: ${ctx.children.map((c) => `"${c.title}" (#${c.channel_id}, ${c.id.slice(0, 8)})`).join('; ')}.`);
   if (ctx.part > 1) about.push(`Part ${ctx.part}: only what happened after the previous export.`);
 
@@ -348,16 +411,42 @@ export function renderDigest(ctx: RenderContext, redact: (s: string) => string):
 
 // ---------- planning ----------
 
-/** The channel a thread's digest goes to. Imported history has no real channel: route it by its cwd. */
-export function routeChannel(thread: ThreadRow, channels: ChannelRow[]): { id: string; name: string; kind: string } {
-  const own = channels.find((c) => c.id === thread.channel_id);
-  if (thread.channel_id !== IMPORTED.id && own) return own;
-  const match = matchChannel(thread.cwd, channels.filter((c) => c.id !== IMPORTED.id && !SKIP_CHANNELS.has(c.id)));
-  return match ?? own ?? IMPORTED;
+export interface Route {
+  id: string;
+  name: string;
+  kind: string;
+  /** Imported history with no channel: the project folder it ran in, like moneybot. */
+  project?: string;
+  /** Imported history that ran in a temp dir, scratchpad or worktree: nothing for the brain. */
+  scratch?: boolean;
 }
 
-export const digestPath = (channelId: string, createdAt: string, threadId: string, part: number, timezone: string) =>
-  join('omni', channelId, `${dateOnly(createdAt, timezone)}-${threadId.slice(0, 8)}${part > 1 ? `-part${part}` : ''}.md`);
+/** Throwaway working dirs: temp dirs, scratchpads and agent worktrees. */
+export const SCRATCH_CWD = /^\/(?:private\/)?(?:tmp|var\/folders)\/|\/scratchpad(?:\/|$)|\/scratch-workspaces\/|\/\.claude\/worktrees\/|\/data\/worktrees\//;
+
+const lastSegment = (p: string) => p.replace(/\/+$/, '').split('/').pop()?.toLowerCase() ?? '';
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'home';
+
+/**
+ * The channel a thread's digest goes to. Imported history has no real channel: route it by its cwd, then by a
+ * repo with the same folder name (a checkout elsewhere), else to imported/<folder name>.
+ */
+export function routeChannel(thread: ThreadRow, channels: ChannelRow[], home = ''): Route {
+  const own = channels.find((c) => c.id === thread.channel_id);
+  if (thread.channel_id !== IMPORTED.id && own) return own;
+  const candidates = channels.filter((c) => c.id !== IMPORTED.id && !SKIP_CHANNELS.has(c.id));
+  const match = matchChannel(thread.cwd, candidates);
+  if (match) return match;
+  if (SCRATCH_CWD.test(thread.cwd)) return { ...IMPORTED, scratch: true };
+  const base = lastSegment(thread.cwd);
+  const sameName = candidates.find((c) => [c.repo_path, c.base_dir].some((p) => p && lastSegment(p) === base));
+  if (sameName) return sameName;
+  const atHome = home && thread.cwd.replace(/\/+$/, '') === home.replace(/\/+$/, '');
+  return { ...IMPORTED, ...(own ?? {}), project: atHome ? 'home' : slug(base) };
+}
+
+export const digestPath = (route: Route, createdAt: string, threadId: string, part: number, timezone: string) =>
+  join('omni', route.id, route.project ?? '', `${dateOnly(createdAt, timezone)}-${threadId.slice(0, 8)}${part > 1 ? `-part${part}` : ''}.md`);
 
 const THREAD_SQL = `SELECT id, channel_id, title, status, role, model, cwd, parent_id, task_id, source, harness, archived, folder_id,
   created_at, updated_at FROM threads`;
@@ -386,7 +475,7 @@ export function plan(ro: DatabaseSync, opts: PlanOptions): Planned[] {
 
   const out: Planned[] = [];
   for (const t of threads) {
-    const channel = routeChannel(t, channels);
+    const channel = routeChannel(t, channels, opts.home);
     if (opts.channel && channel.id !== opts.channel) continue;
     if (opts.since && t.updated_at < opts.since) continue;
 
@@ -403,11 +492,12 @@ export function plan(ro: DatabaseSync, opts: PlanOptions): Planned[] {
       skip('archived-noise');
       continue;
     }
-    // A Conductor thread that handed work out: the crew threads carry the substance and the brief.
-    if ((t.role === 'conductor' || t.channel_id === 'conductor') && kids.has(t.id)) {
-      skip('delegated-only');
+    if (channel.scratch) {
+      skip('scratch-cwd');
       continue;
     }
+    // A Conductor thread that handed work out: the crew threads carry the substance, so it gets a stub.
+    const stub = (t.role === 'conductor' || t.channel_id === 'conductor') && kids.has(t.id);
 
     const prev = opts.cursor.threads[t.id];
     let after = 0;
@@ -432,12 +522,16 @@ export function plan(ro: DatabaseSync, opts: PlanOptions): Planned[] {
         channel,
         folder: folderPath(t.folder_id),
         artifacts: artifacts.all(t.id) as any,
-        children: (kids.get(t.id) ?? []).map((c) => ({ id: c.id, title: c.title, channel_id: routeChannel(c, channels).id, role: c.role })),
+        // A later part lists only the threads delegated since the previous export.
+        children: (kids.get(t.id) ?? [])
+          .filter((c) => !prev || c.created_at >= events[0].created_at)
+          .map((c) => ({ id: c.id, title: c.title, channel_id: routeChannel(c, channels, opts.home).id, role: c.role, task_id: c.task_id })),
         parent: parent ? { id: parent.id, title: parent.title } : null,
         events,
         part,
         previousUid: prev?.uid ?? null,
         timezone: tz,
+        stub,
       },
       opts.redact,
     );
@@ -450,7 +544,7 @@ export function plan(ro: DatabaseSync, opts: PlanOptions): Planned[] {
       digest: {
         threadId: t.id,
         channelId: channel.id,
-        path: digestPath(channel.id, t.created_at, t.id, part, tz),
+        path: digestPath(channel, t.created_at, t.id, part, tz),
         content,
         part,
         lastUid: events[events.length - 1].uid,

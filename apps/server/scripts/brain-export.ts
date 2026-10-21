@@ -9,8 +9,10 @@
 //
 // One file per thread: <YYYY-MM-DD>-<thread id, 8 chars>.md. The kv key brain_export.cursor keeps the last exported
 // event uid per thread, so a rerun skips what it already wrote and a resumed thread gets only its new events,
-// as -part2, -part3. Tool calls and results never leave Omni; secret values and token-shaped strings become
-// [REDACTED] before anything is written. Secret values are never printed.
+// as -part2, -part3. Tool calls and results never leave Omni; secret values, token-shaped strings, IP addresses
+// and SSH details become [REDACTED] before anything is written. Secret values are never printed.
+// A Conductor thread that delegated gets a stub: Ben's messages and the threads it handed work to.
+// Imported history with no channel goes to imported/<project folder>; temp dirs, scratchpads and worktrees are skipped.
 //
 // Run it on one Mac only. The cursor syncs, so the follow-up automation should gate on the kv key
 // automations.owner like the other scheduled automations (docs/adr/0004-supabase-sync.md).
@@ -99,7 +101,7 @@ async function main() {
   const cursor: Cursor = stored ? JSON.parse(stored.value) : emptyCursor();
 
   const redact = makeRedactor([...(await keychainValues(ro)), ...envSecretValues(process.env)]);
-  const planned = plan(ro, { channel: args.channel, since: args.since, cursor, redact, timezone: config.timezone });
+  const planned = plan(ro, { channel: args.channel, since: args.since, cursor, redact, timezone: config.timezone, home: homedir() });
 
   const skips: Partial<Record<SkipReason, number>> = {};
   const perChannel = new Map<string, { files: number; bytes: number }>();
