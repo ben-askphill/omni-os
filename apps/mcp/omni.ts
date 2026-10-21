@@ -1,11 +1,13 @@
 // Stdio MCP server handed to conductor threads. It talks to the local Omni API,
-// so delegated threads are ordinary threads Ben can open, search and continue.
+// so delegated threads are ordinary threads the user can open, search and continue.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
 const BASE = process.env.OMNI_URL ?? 'http://127.0.0.1:4747';
 const SELF = process.env.OMNI_THREAD_ID ?? null;
+/** Who the conductor works for, from the user config (apps/server/user-config.ts). */
+const USER = process.env.OMNI_USER || 'the user';
 
 async function call(path: string, init?: RequestInit) {
   const res = await fetch(`${BASE}/api${path}`, {
@@ -27,7 +29,7 @@ const folderSummary = (folders: any[] = []) =>
 
 /**
  * The folder `name` names in the channel, by id or name ignoring case. With `create` a name no folder has is fine:
- * the server makes it. Without it, an unknown name is refused, so a new folder only ever comes after Ben agreed to it.
+ * the server makes it. Without it, an unknown name is refused, so a new folder only ever comes after the user agreed to it.
  */
 async function checkFolder(channel: string, name: string, create?: boolean) {
   const ch = await call(`/channels/${encodeURIComponent(channel)}`);
@@ -36,8 +38,8 @@ async function checkFolder(channel: string, name: string, create?: boolean) {
   if (hit || create) return hit ?? null;
   const have = (ch.folders ?? []).map((f: any) => `"${f.name}"`).join(', ') || 'none yet';
   throw new Error(
-    `#${channel} has no folder "${name}" (folders: ${have}). Suggest the new folder to Ben and leave the thread unfiled for now; ` +
-      'once he agrees, call file_thread with create: true. Pass create_folder: true on delegate only when Ben already asked for the folder.',
+    `#${channel} has no folder "${name}" (folders: ${have}). Suggest the new folder to ${USER} and leave the thread unfiled for now; ` +
+      `once ${USER} agrees, call file_thread with create: true. Pass create_folder: true on delegate only when ${USER} already asked for the folder.`,
   );
 }
 
@@ -79,7 +81,7 @@ server.registerTool(
       'Its final reply is reported back to you automatically as a [crew report] message; do not poll for it. ' +
       'Without a harness/model/effort it uses the role\'s defaults. Use list_harnesses for valid ids.',
     inputSchema: {
-      channel: z.string().describe('Channel id, e.g. "volero". Use list_channels.'),
+      channel: z.string().describe('Channel id, e.g. "acme". Use list_channels.'),
       role: z.string().describe('Crew role id, e.g. "researcher". Use list_crew.'),
       prompt: z.string().describe('Self-contained task brief. Include everything the crewmate needs; it cannot see your chat.'),
       task_id: z.string().optional().describe('Short id like T-12 to match the report. Generated if omitted.'),
@@ -88,7 +90,7 @@ server.registerTool(
       model: z.string().optional().describe('Any catalog model id, or a Claude alias (opus, sonnet, haiku, fable). Use list_harnesses.'),
       effort: z.string().optional().describe('Reasoning effort supported by the model, e.g. high. Use list_harnesses.'),
       folder: z.string().optional().describe('Sidebar folder in the channel to file the thread in, by name or id. Use list_channels. It must exist unless create_folder is true.'),
-      create_folder: z.boolean().optional().describe('Create `folder` when the channel has none by that name. Only when Ben asked for the folder or agreed to it.'),
+      create_folder: z.boolean().optional().describe(`Create \`folder\` when the channel has none by that name. Only when ${USER} asked for the folder or agreed to it.`),
     },
   },
   async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, create_folder }) => {
@@ -106,7 +108,7 @@ server.registerTool(
   {
     description:
       'Hand several parts of one job to a team: one lead thread in the channel with a member thread per task under it. ' +
-      'Use it when Ben asks for several agents on one topic (for example price, reviews and alternatives for one product). ' +
+      `Use it when ${USER} asks for several agents on one topic (for example price, reviews and alternatives for one product). ` +
       'The members run in parallel; once all have reported, the lead combines their replies into one answer, ' +
       'which comes back to you as a single [crew report]. Do not poll for it.',
     inputSchema: {
@@ -116,7 +118,7 @@ server.registerTool(
       role: z.string().optional().describe('Crew role id for the lead, and for every task that names none. Use list_crew.'),
       task_id: z.string().optional().describe('Short id like T-12 for the team. Members get T-12.1, T-12.2 unless they name their own.'),
       folder: z.string().optional().describe('Sidebar folder in the channel to file the lead thread in, by name or id. Same rules as delegate.'),
-      create_folder: z.boolean().optional().describe('Create `folder` when the channel has none by that name. Only when Ben asked for the folder or agreed to it.'),
+      create_folder: z.boolean().optional().describe(`Create \`folder\` when the channel has none by that name. Only when ${USER} asked for the folder or agreed to it.`),
       tasks: z
         .array(
           z.object({
@@ -148,12 +150,12 @@ server.registerTool(
   {
     description:
       'Put an existing thread in a sidebar folder of its own channel, by folder name or id. ' +
-      'Use it after Ben agrees to a folder you suggested, or to move a thread he says is filed wrong. ' +
+      `Use it after ${USER} agrees to a folder you suggested, or to move a thread ${USER} says is filed wrong. ` +
       'create: true makes the folder when the channel has none by that name. An empty folder takes the thread out of its folder.',
     inputSchema: {
       thread_id: z.string(),
       folder: z.string().describe('Folder name or id in the thread\'s channel. Empty string: out of any folder.'),
-      create: z.boolean().optional().describe('Create the folder if the channel has none by that name. Only when Ben asked for it or agreed.'),
+      create: z.boolean().optional().describe(`Create the folder if the channel has none by that name. Only when ${USER} asked for it or agreed.`),
     },
   },
   async ({ thread_id, folder, create }) => {
@@ -265,7 +267,7 @@ server.registerTool(
 
 server.registerTool(
   'search_history',
-  { description: 'Full-text search across every thread Ben has run.', inputSchema: { query: z.string() } },
+  { description: `Full-text search across every thread ${USER} has run.`, inputSchema: { query: z.string() } },
   async ({ query }) => text(await call(`/search?q=${encodeURIComponent(query)}`)),
 );
 

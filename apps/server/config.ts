@@ -1,6 +1,6 @@
-import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { configPath, resolved } from './user-config.ts';
 
 /** The repo root: data/, crew/, automations/ and mods/ live here, beside apps/ and packages/. */
 export const ROOT = resolve(import.meta.dirname, '../..');
@@ -19,7 +19,14 @@ const env = process.env;
 export const config = {
   port: Number(env.OMNI_PORT ?? 4747),
   host: env.OMNI_HOST ?? '127.0.0.1',
-  brainDir: env.OMNI_BRAIN_DIR ?? join(homedir(), 'phillbert'),
+  /**
+   * The workspace folder: cwd of non-repo threads, added to every Claude thread with its CLAUDE.md. From the user
+   * config (data/omni.config.json, apps/server/user-config.ts), OMNI_BRAIN_DIR still wins. Read live, so onboarding
+   * applies without a restart.
+   */
+  get brainDir() {
+    return resolved.workspaceRoot();
+  },
   claudeBin: env.OMNI_CLAUDE_BIN ?? 'claude',
   defaultModel: env.OMNI_DEFAULT_MODEL ?? 'claude-sonnet-5-5',
   permissionMode: env.OMNI_PERMISSION_MODE ?? 'bypassPermissions',
@@ -31,7 +38,9 @@ export const config = {
   codexBin: env.OMNI_CODEX_BIN,
   cursorBin: env.OMNI_CURSOR_BIN,
   /** Hermes API server on the server's Tailscale address, like http://100.x.y.z:8642. Unset means Hermes is off. The bearer token is the Keychain secret HERMES_API_KEY, not an env var. */
-  hermesUrl: (env.OMNI_HERMES_URL ?? '').replace(/\/$/, ''),
+  get hermesUrl() {
+    return resolved.hermesUrl();
+  },
   /** How long a thread's claude process stays warm after a turn. 0 closes it right away. */
   keepAliveSeconds: Number(env.OMNI_KEEPALIVE_SECONDS ?? 600),
   /** How long an idle process stays up for background agents that have not ended yet. */
@@ -43,7 +52,7 @@ export const config = {
   browser: (env.OMNI_BROWSER ?? '1') !== '0',
   /** Omni runs the channel's Chrome itself, so the thread panel can show it live. Off, Playwright MCP launches its own. */
   browserLive: (env.OMNI_BROWSER_LIVE ?? '1') !== '0',
-  /** After a finished turn, ask Haiku for Ben's likely next reply: the reply box's placeholder, Tab fills it in. */
+  /** After a finished turn, ask Haiku for the user's likely next reply: the reply box's placeholder, Tab fills it in. */
   suggestions: (env.OMNI_SUGGESTIONS ?? '1') !== '0',
   /** Save a worktree thread's checkout before and after every turn, for its This turn diff (apps/server/turns.ts). */
   turnSnapshots: (env.OMNI_TURN_SNAPSHOTS ?? '1') !== '0',
@@ -54,7 +63,10 @@ export const config = {
   cursorDashboard: (env.OMNI_CURSOR_DASHBOARD ?? '1') !== '0',
   /** Load the repo's Claude Code mods (mods/) into every Claude thread with --plugin-dir. Off until '1'. */
   mods: env.OMNI_MODS === '1',
-  timezone: env.OMNI_TZ ?? 'Europe/Amsterdam',
+  /** The user's timezone (user config), OMNI_TZ still wins, else the system's. Automations default to it. */
+  get timezone() {
+    return resolved.timezone();
+  },
 };
 
 // OMNI_DATA_DIR moves all runtime state, so tests can run against a temp dir.
@@ -69,8 +81,16 @@ export const paths = {
   worktrees: join(DATA, 'worktrees'),
   browsers: join(DATA, 'browsers'),
   crew: join(ROOT, 'crew'),
+  /** The user's own charters: a file here replaces the shared one in crew/ with the same name. Never in git. */
+  personalCrew: join(DATA, 'crew'),
   /** OMNI_AUTOMATIONS_DIR lets tests toggle automations without rewriting the repo's own. */
   automations: env.OMNI_AUTOMATIONS_DIR ? resolve(ROOT, env.OMNI_AUTOMATIONS_DIR) : join(ROOT, 'automations'),
+  /** The user's own automations, beside the shared ones in automations/. Same id here wins. */
+  personalAutomations: join(DATA, 'automations'),
+  /** Who the user is and where their work lives (apps/server/user-config.ts). */
+  get userConfig() {
+    return configPath();
+  },
   webDist: env.OMNI_WEB_DIST ? resolve(ROOT, env.OMNI_WEB_DIST) : join(ROOT, 'apps', 'web', 'dist'),
   mcpOmni: join(ROOT, 'apps', 'mcp', 'omni.ts'),
   /** Claude Code mods (plugins of function hooks) Omni loads when config.mods is on. */

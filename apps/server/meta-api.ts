@@ -1,11 +1,13 @@
-// /api/crew, /harnesses, /secrets, /automations.
+// /api/crew, /harnesses, /secrets, /automations, /profile.
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { lastRuns, loadAutomations, runAutomation, setEnabled } from './automations.ts';
 import { listCrew } from './crew.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
+import { HARNESS_INSTALL } from './harness/types.ts';
 import { runningByHarness } from './runner.ts';
+import { getProfile, profileInput, setProfile } from './profile.ts';
 import { deleteSecret, listSecrets, setSecret } from './secrets.ts';
 
 export const metaApi = new Hono();
@@ -25,7 +27,7 @@ metaApi.get('/crew', (c) => {
 metaApi.get('/harnesses', async (c) => {
   const cat = await freshCatalog();
   const running = runningByHarness();
-  return c.json(cat.harnesses.map((h) => ({ ...h, running: running[h.id] ?? 0 })));
+  return c.json(cat.harnesses.map((h) => ({ ...h, running: running[h.id] ?? 0, ...(!h.available && HARNESS_INSTALL[h.id] && { install: HARNESS_INSTALL[h.id] }) })));
 });
 
 metaApi.get('/secrets', (c) => c.json(listSecrets()));
@@ -38,6 +40,16 @@ metaApi.delete('/secrets', async (c) => {
   const { scope, name } = z.object({ scope: z.string(), name: z.string() }).parse(await c.req.json());
   await deleteSecret(scope, name);
   return c.json({ ok: true });
+});
+
+// Who uses this Omni. The name is in GET /api/status too, so a client learns it with the rest of the workspace.
+metaApi.get('/profile', (c) => c.json(getProfile()));
+metaApi.put('/profile', async (c) => {
+  if (!/^application\/json\b/i.test(c.req.header('content-type') ?? '')) return c.json({ error: 'send JSON' }, 415);
+  // The first issue's text, so a client can show "Enter a name." as it is.
+  const parsed = profileInput.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid profile' }, 400);
+  return c.json(setProfile(parsed.data));
 });
 
 metaApi.get('/automations', (c) => {

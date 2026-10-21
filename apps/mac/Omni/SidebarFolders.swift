@@ -94,7 +94,7 @@ struct FolderRowView: View {
     let open = !folder.collapsed
     HStack(spacing: 0) {
       Button {
-        withAnimation(Motion.settle) { Task { await model.folders.toggle(folder.id) } }
+        withAnimation(Motion.settle) { _ = Task { await model.folders.toggle(folder.id) } }
       } label: {
         HStack(spacing: z(8)) {
           OmniIcon(name: open ? "chevronDown" : "chevronRight", size: 12)

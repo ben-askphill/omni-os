@@ -133,7 +133,7 @@ describe('hermes catalog', () => {
     const h = hermesHarness({ available: false }, 4);
     expect(h.available).toBe(false);
     expect(h.fix).toBe(
-      'Set OMNI_HERMES_URL to the Hermes Tailscale address, set HERMES_API_KEY in Secrets, and connect this Mac to Tailscale',
+      'Set the Hermes URL in Settings (or OMNI_HERMES_URL) to its Tailscale address, set HERMES_API_KEY in Secrets, and connect this Mac to Tailscale',
     );
     expect(h.fix).toBe(HERMES_FIX);
     expect(h.models).toEqual([]);

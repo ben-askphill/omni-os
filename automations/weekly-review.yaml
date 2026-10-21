@@ -1,7 +1,6 @@
 name: Weekly review
 enabled: false
 cron: "0 16 * * 5"
-timezone: Europe/Amsterdam
 channel: inbox
 role: researcher
 prompt: |

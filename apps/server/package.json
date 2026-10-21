@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "import-history": "tsx scripts/import-history.ts",
     "sync:backfill": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/sync-backfill.ts",
-    "brain-export": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/brain-export.ts"
+    "brain-export": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/brain-export.ts",
+    "setup": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/setup.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",

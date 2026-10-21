@@ -138,11 +138,11 @@ struct ChannelSettingsForm: View {
     SettingsSection("Basics") {
       HStack(alignment: .top, spacing: z(16)) {
         SettingsField("Name") {
-          TextField("", text: Binding(get: { form.name }, set: { form.setName($0) }), prompt: Text("Volero"))
+          TextField("", text: Binding(get: { form.name }, set: { form.setName($0) }), prompt: Text("Acme"))
             .accessibilityLabel("Name")
         }
         SettingsField("Id", hint: isNew ? "Lowercase slug, used in URLs and by the Conductor. Cannot change later." : "Fixed after creation.") {
-          TextField("", text: Binding(get: { form.id }, set: { form.setID($0) }), prompt: Text("volero"))
+          TextField("", text: Binding(get: { form.id }, set: { form.setID($0) }), prompt: Text("acme"))
             .textFieldStyle(.omniMono)
             .disabled(!isNew)
             .accessibilityLabel("Id")
@@ -229,14 +229,14 @@ struct ChannelSettingsForm: View {
     SettingsSection("Code") {
       SettingsField("Repo path", hint: "Absolute path to a local git repo. Enables per-thread worktrees and the PRs tab.") {
         HStack(spacing: z(8)) {
-          TextField("", text: $form.repoPath, prompt: Text("/Users/benrosenberg/code/apa-volero"))
+          TextField("", text: $form.repoPath, prompt: Text("~/code/acme-theme"))
             .textFieldStyle(.omniMono)
             .accessibilityLabel("Repo path")
           FolderButton(title: "Choose repo folder", path: $form.repoPath)
         }
       }
       SettingsField("GitHub repo", hint: "owner/name. Auto-detected from the repo path when left empty.") {
-        TextField("", text: $form.githubRepo, prompt: Text("askphill/apa-volero"))
+        TextField("", text: $form.githubRepo, prompt: Text("acme/acme-theme"))
           .textFieldStyle(.omniMono)
           .accessibilityLabel("GitHub repo")
       }
@@ -246,9 +246,9 @@ struct ChannelSettingsForm: View {
         isOn: $form.useWorktree
       )
       .disabled(form.repoPath.trimmingCharacters(in: .whitespaces).isEmpty)
-      SettingsField("Base directory", hint: "Where threads run when there is no repo. Defaults to the brain folder (phillbert) so skills load.") {
+      SettingsField("Base directory", hint: "Where threads run when there is no repo. Defaults to your workspace folder (Settings), so its CLAUDE.md and skills load.") {
         HStack(spacing: z(8)) {
-          TextField("", text: $form.baseDir, prompt: Text("/Users/benrosenberg/phillbert"))
+          TextField("", text: $form.baseDir, prompt: Text("~/Omni"))
             .textFieldStyle(.omniMono)
             .accessibilityLabel("Base directory")
           FolderButton(title: "Choose base folder", path: $form.baseDir)
@@ -260,13 +260,13 @@ struct ChannelSettingsForm: View {
   private var storeAndBrowser: some View {
     SettingsSection("Store and browser") {
       HStack(alignment: .top, spacing: z(16)) {
-        SettingsField("Store domain", hint: "The myshopify domain, e.g. volero-eu.myshopify.com") {
-          TextField("", text: $form.storeDomain, prompt: Text("volero-eu.myshopify.com"))
+        SettingsField("Store domain", hint: "The myshopify domain, e.g. acme.myshopify.com") {
+          TextField("", text: $form.storeDomain, prompt: Text("acme.myshopify.com"))
             .textFieldStyle(.omniMono)
             .accessibilityLabel("Store domain")
         }
         SettingsField("Portal slug", hint: "Ask Phill Portal company slug, for client context.") {
-          TextField("", text: $form.portalSlug, prompt: Text("volero"))
+          TextField("", text: $form.portalSlug, prompt: Text("acme"))
             .textFieldStyle(.omniMono)
             .accessibilityLabel("Portal slug")
         }

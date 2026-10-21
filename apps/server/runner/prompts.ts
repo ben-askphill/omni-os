@@ -2,6 +2,7 @@
 import { config, artifactsDir, browserOutDir, designSystemFile } from '../config.ts';
 import { artifacts, type Channel, type Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
+import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
 
 /** Claude Code's Artifact tool publishes to claude.ai. Omni links a publish to its file and keeps the URL per channel. */
 function publishedLines(channelId: string) {
@@ -23,17 +24,19 @@ function designSystemLines(thread: Thread, channel: Channel) {
     '',
     '## Design system',
     `This channel has a design system${channel.design_system_name ? ` (${channel.design_system_name})` : ''}, a standalone HTML file at ${designSystemFile(thread.id)}.`,
-    'Read it before you write any HTML page, report, dashboard or diagram for this channel. Build the page on its tokens, type, spacing, components and tone, with the CSS inline so the page stays self-contained, and do not approximate or invent a style of your own. Skip it only when Ben names a different style. Never copy the file itself into the artifacts folder.',
+    `Read it before you write any HTML page, report, dashboard or diagram for this channel. Build the page on its tokens, type, spacing, components and tone, with the CSS inline so the page stays self-contained, and do not approximate or invent a style of your own. Skip it only when ${userName()} names a different style. Never copy the file itself into the artifacts folder.`,
   ];
 }
 
 export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false) {
   const remote = thread.harness === 'hermes';
+  const name = userName();
   const lines = [
     '# Omni OS context',
     remote
-      ? 'You are Hermes, running on your own server and reached by Omni OS over HTTP. Ben is on his Mac; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.'
-      : "You are running headless inside Omni OS, Ben's local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.",
+      ? `You are Hermes, running on your own server and reached by Omni OS over HTTP. ${name} is on their Mac; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`
+      : `You are running headless inside Omni OS, ${userPossessive()} local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`,
+    getProfile().name ? `- You work for ${name}. Charters and automations that say "the user" mean them.` : '',
     `- Thread: ${thread.id}${thread.task_id ? ` (task ${thread.task_id})` : ''}`,
     `- Channel: #${channel.id} (${channel.name}, ${channel.kind})`,
     channel.store_domain ? `- Shopify store: ${channel.store_domain}` : '',
@@ -49,7 +52,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     '## Artifacts',
     remote
       ? 'OMNI_ARTIFACTS_DIR does not exist on this machine. Return artifacts as links or as text in your reply.'
-      : `Write any HTML page, report, diagram, CSV or document meant for Ben into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).\nOmni renders files there inline in the thread. Prefer a self-contained .html file for anything visual. Mention the filename in your reply.`,
+      : `Write any HTML page, report, diagram, CSV or document meant for ${name} into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).\nOmni renders files there inline in the thread. Write guides, how-tos, reports, proposals and any document with headings, tables or code blocks as a self-contained .html file (inline CSS, readable in light and dark mode, table cells that wrap), never as Markdown: Omni's Markdown renderer has layout bugs. Use .md only for a short plain note ${name} will paste somewhere else. Mention the filename in your reply.`,
     ...designSystemLines(thread, channel),
     ...(thread.harness === 'claude-code' ? publishedLines(channel.id) : []),
     ...(remote
@@ -58,7 +61,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
           '',
           '## Browser',
           config.browser
-            ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? " Ben sees it live in the thread's Browser panel and can click and type in it too, so ask him to take over there when a page needs a login or a captcha." : ''} Screenshots land in ${browserOutDir(thread.id)} and show up in the thread.`
+            ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Screenshots land in ${browserOutDir(thread.id)} and show up in the thread.`
             : '',
         ]),
     '',
@@ -70,6 +73,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     '## Reply',
     'Your final message is what gets shown and reported. Lead with the outcome, keep it short, bullets over prose.',
     'Omni renders standard GitHub-flavored Markdown, not Slack mrkdwn. Bold is **double asterisks**, italics are _underscores_, section titles are ## headings, tables are pipe tables, links are [label](url). Start every numbered item on its own line. This overrides any Slack or terminal formatting rule from a project CLAUDE.md or rules file.',
+    'Tables, in replies and in Markdown artifacts: keep every cell to a few words (under about 40 characters) and never put a sentence in a cell. Omni does not wrap long cells, so they overlap the next row. Put reasons and explanations in bullets under the table, or use a bullet list instead of a table.',
   ];
   if (thread.source === 'team') {
     lines.push(

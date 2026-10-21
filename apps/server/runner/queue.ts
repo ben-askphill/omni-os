@@ -5,6 +5,7 @@ import { publishThread } from '../bus.ts';
 import { clearSuggestion } from './aux.ts';
 import { hardKill, requestInterrupt, stopStartup } from './session.ts';
 import { launch } from './spawn.ts';
+import { userName } from '../profile.ts';
 import { startTurnSnapshot } from './snapshots.ts';
 import {
   addEvent,
@@ -171,7 +172,7 @@ export function reportToParent(childId: string, status: string, text: string, co
   const prompt =
     `[crew report] task ${child.task_id ?? '(none)'} from ${child.role ?? 'crew'} in #${child.channel_id} ` +
     `(thread ${child.id}), status: ${status}\n\n${report.text}\n\n` +
-    'Relay what matters to Ben in one short update. Delegate follow-ups if needed. Do not redo the work.';
+    `Relay what matters to ${userName()} in one short update. Delegate follow-ups if needed. Do not redo the work.`;
   const key = `crew-report:${child.id}:${completion}`;
   if (waitingLead) return teamReported(parent.id, key, prompt, report);
   const row = saveOwn(parent.id, key, { prompt, kind: 'crew_report', payload: report, source: 'crew' });

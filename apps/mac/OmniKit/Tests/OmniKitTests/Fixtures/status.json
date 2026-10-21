@@ -34,6 +34,13 @@
   "queued": 0,
   "maxConcurrent": 4,
   "maxUploadMb": 25,
+  "profile": {
+    "name": "",
+    "pronouns": "they/them",
+    "email": "",
+    "timezone": "Europe/Amsterdam",
+    "onboarded": false
+  },
   "server": {
     "version": "0.1.0",
     "pid": 4242,

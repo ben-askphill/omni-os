@@ -13,6 +13,8 @@ public enum Route: Hashable, Sendable {
   case search(query: String)
   case automations
   case secrets
+  /// The workspace Settings page (`#/settings`): the user's name. A channel's own tab is `.channel(_, .settings)`.
+  case settings
   case artifacts
   case newChannel
   case notFound(path: String)
@@ -62,6 +64,7 @@ public enum Route: Hashable, Sendable {
     case ("search", _): self = .search(query: query.first("q") ?? "")
     case ("automations", nil): self = .automations
     case ("secrets", nil): self = .secrets
+    case ("settings", nil): self = .settings
     case ("artifacts", nil): self = .artifacts
     case ("new-channel", nil): self = .newChannel
     default: self = .notFound(path: pathPart)
@@ -81,6 +84,7 @@ public enum Route: Hashable, Sendable {
     case .search(let q): "#/search?q=\(uriComponent(q))"
     case .automations: "#/automations"
     case .secrets: "#/secrets"
+    case .settings: "#/settings"
     case .artifacts: "#/artifacts"
     case .newChannel: "#/new-channel"
     case .notFound(let path): "#\(path)"

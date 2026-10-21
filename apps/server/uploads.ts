@@ -4,6 +4,7 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { config, uploadsDir } from './config.ts';
+import { userName } from './profile.ts';
 
 export interface Attachment {
   /** Final name on disk, after sanitising and de-duplication. */
@@ -91,7 +92,7 @@ export const inlinable = (a: Attachment) => a.image && a.size <= MAX_INLINE_IMAG
 export function describeAttachments(attachments: Attachment[]) {
   const lines = [
     '## Attachments',
-    `Ben attached ${attachments.length === 1 ? 'this file' : `these ${attachments.length} files`} to the message above. ` +
+    `${userName()} attached ${attachments.length === 1 ? 'this file' : `these ${attachments.length} files`} to the message above. ` +
       'They are on disk in this thread\'s uploads folder; read one with Read or cat.',
   ];
   for (const a of attachments) {

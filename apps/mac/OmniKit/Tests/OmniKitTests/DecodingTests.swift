@@ -184,6 +184,16 @@ func eventJSON(kind: String, payload: String, id: Int = 1) -> String {
     #expect(s.usage[.claudeCode]?.sevenDay == nil)
     #expect(s.slots[.codex] == HarnessSlot(running: 0, cap: 4))
     #expect(s.server == nil)
+    #expect(s.profile == nil)
+  }
+
+  @Test func readsTheProfile() throws {
+    let json = """
+      {"usage":{},"slots":{},"running":0,"queued":0,"maxConcurrent":4,"maxUploadMb":25,"profile":{"name":"Tijs"}}
+      """
+    #expect(try decode(Status.self, json).profile == Profile(name: "Tijs"))
+    let unset = json.replacingOccurrences(of: "\"Tijs\"", with: "\"\"")
+    #expect(try decode(Status.self, unset).profile == Profile(name: ""))
   }
 
   @Test func readsTheServerThatAnswered() throws {

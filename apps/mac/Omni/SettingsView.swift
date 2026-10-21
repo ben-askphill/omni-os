@@ -12,6 +12,10 @@ struct SettingsView: View {
         ConnectionSettings(settings: model.settings, model: model)
           .frame(width: z(560), height: 520)
       }
+      Tab("Profile", systemImage: "person", value: .profile) {
+        ProfileSettings(model: model)
+          .frame(width: z(560), height: 420)
+      }
       Tab("Secrets", systemImage: "key", value: .secrets) {
         SecretsSettings(model: model)
           .frame(width: z(560), height: 680)

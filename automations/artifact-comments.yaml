@@ -3,7 +3,6 @@
 name: Artifact comments
 enabled: false
 cron: "0 9,14 * * 1-5"
-timezone: Europe/Amsterdam
 channel: conductor
 role: conductor
 prompt: |

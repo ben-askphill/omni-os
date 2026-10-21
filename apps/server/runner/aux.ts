@@ -5,6 +5,7 @@ import { closePipesAfterExit } from '../child.ts';
 import { config } from '../config.ts';
 import { events, threads, type Thread } from '../db.ts';
 import { harnessEnv } from '../harness/env-guard.ts';
+import { userName, userPossessive } from '../profile.ts';
 import { emitThread } from './state.ts';
 
 /** Each thread's latest suggestion calls. A message sent while one runs makes its answer stale. */
@@ -52,10 +53,10 @@ export function suggestReply(threadId: string, runText: string) {
   const call = ++suggestSeq;
   suggestCalls.set(threadId, call);
   const prompt =
-    'Ben is working with a coding agent. Predict the short reply Ben is most likely to send next, in his voice: ' +
+    `${userName()} is working with a coding agent. Predict the short reply ${userName()} is most likely to send next, in their voice: ` +
     'a direct instruction or answer of at most 12 words, e.g. "Yes, open a PR" or "Run the tests first". ' +
     'Plain text, no quotes, no em dashes. If there is no obvious next step, output NONE. Output the reply only.\n\n' +
-    "Ben's last message:\n" + events.lastUserText(threadId).slice(0, 1500) +
+    `${userPossessive()} last message:\n` + events.lastUserText(threadId).slice(0, 1500) +
     "\n\nThe agent's answer:\n" + runText.slice(-3000);
   haiku('omni-os-suggest', prompt, (out) => {
     if (suggestCalls.get(threadId) !== call) return;
@@ -92,16 +93,16 @@ export function suggestNextThread(threadId: string, runText: string) {
   nextCalls.set(threadId, call);
   const t = threads.get(threadId);
   const prompt =
-    'Ben is working with a coding agent. Read the agent\'s answer below. If it clearly leaves follow-up work that is separate ' +
-    'from this task and would run best as its own new thread (work it deferred or left for Ben to decide, a next phase, ' +
+    `${userName()} is working with a coding agent. Read the agent's answer below. If it clearly leaves follow-up work that is separate ` +
+    `from this task and would run best as its own new thread (work it deferred or left for ${userName()} to decide, a next phase, ` +
     'a problem it found but did not fix), write a task card for that new thread. Otherwise output NONE. Most answers ' +
     'get NONE: never propose one for answering a question, approving, running tests, opening a PR or carrying on the same task.\n\n' +
     'Answer in exactly this format, plain text, no quotes, no em dashes:\n' +
     'TITLE: <the new thread\'s title, at most 8 words>\n' +
-    'PROMPT: <its first message, written as Ben would ask: 1 to 4 sentences, self-contained since the new thread cannot ' +
+    `PROMPT: <its first message, written as ${userName()} would ask: 1 to 4 sentences, self-contained since the new thread cannot ` +
     'see this one, naming the repo, files, findings and constraints it needs>\n\n' +
     'Thread: ' + (t?.title ?? '') +
-    "\n\nBen's last message:\n" + events.lastUserText(threadId).slice(0, 1500) +
+    `\n\n${userPossessive()} last message:\n` + events.lastUserText(threadId).slice(0, 1500) +
     "\n\nThe agent's answer:\n" + runText.slice(-4000);
   haiku('omni-os-next-thread', prompt, (out) => {
     if (nextCalls.get(threadId) !== call) return;
