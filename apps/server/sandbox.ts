@@ -61,35 +61,88 @@ const real = (p: string) => {
   }
 };
 
+/** Why a folder is not a usable worktree. `branch` is the one fault prepareWorktree can mend on its own. */
+export type WorktreeProblem =
+  | { kind: 'missing' | 'own-checkout' | 'not-worktree' | 'other-repo'; message: string }
+  /** A worktree of this repo on another branch, or on a detached HEAD when `on` is null. */
+  | { kind: 'branch'; on: string | null; message: string };
+
 /**
  * Why dir is not a usable worktree of repo checked out on branch, or null when it is. Never the repo itself or the
  * brain: a harness started there would work on Ben's own checkout.
  */
-export async function worktreeProblem(repo: string, dir: string, branch: string): Promise<string | null> {
-  if (!existsSync(dir)) return `The worktree ${dir} does not exist.`;
+export async function checkWorktree(repo: string, dir: string, branch: string): Promise<WorktreeProblem | null> {
+  if (!existsSync(dir)) return { kind: 'missing', message: `The worktree ${dir} does not exist.` };
   const at = real(dir);
-  if (at === real(repo) || at === real(config.brainDir)) return `${dir} is the channel's own checkout, not a worktree.`;
+  if (at === real(repo) || at === real(config.brainDir)) return { kind: 'own-checkout', message: `${dir} is the channel's own checkout, not a worktree.` };
   const git = (...args: string[]) => run('git', ['-C', dir, ...args], { timeout: 30_000 }).then((r) => r.stdout.trim(), () => null);
   const top = await git('rev-parse', '--show-toplevel');
-  if (!top || real(top) !== at) return `${dir} is not a git worktree.`;
+  if (!top || real(top) !== at) return { kind: 'not-worktree', message: `${dir} is not a git worktree.` };
   const common = await git('rev-parse', '--path-format=absolute', '--git-common-dir');
   const repoCommon = await run('git', ['-C', repo, 'rev-parse', '--path-format=absolute', '--git-common-dir']).then((r) => r.stdout.trim(), () => null);
-  if (!common || !repoCommon || real(common) !== real(repoCommon)) return `${dir} is not a worktree of ${repo}.`;
-  const on = await git('branch', '--show-current');
-  if (on !== branch) return `${dir} is on ${on ? `branch ${on}` : 'a detached HEAD'}, not ${branch}.`;
+  if (!common || !repoCommon || real(common) !== real(repoCommon)) return { kind: 'other-repo', message: `${dir} is not a worktree of ${repo}.` };
+  const on = (await git('branch', '--show-current')) || null;
+  if (on !== branch) return { kind: 'branch', on, message: `${dir} is on ${on ? `branch ${on}` : 'a detached HEAD'}, not ${branch}.` };
   return null;
+}
+
+/** checkWorktree's reason as text, for a caller that only shows it. */
+export async function worktreeProblem(repo: string, dir: string, branch: string): Promise<string | null> {
+  return (await checkWorktree(repo, dir, branch))?.message ?? null;
+}
+
+/** How many changed files a dirty-worktree error lists before it says "and N more". */
+const LISTED_CHANGES = 10;
+
+/**
+ * Put this thread's worktree back on its branch after its agent checked out another one (or detached HEAD). Only a
+ * clean tree is switched; a dirty one is left exactly as it is and the error says how to fix it by hand.
+ */
+async function switchBack(dir: string, branch: string, on: string | null): Promise<void> {
+  const git = (...args: string[]) => run('git', ['-C', dir, ...args], { timeout: 60_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+  const where = on ? `branch ${on}` : 'a detached HEAD';
+  let status: string;
+  try {
+    status = (await git('status', '--porcelain', '--untracked-files=all')).stdout;
+  } catch (err) {
+    throw new Error(`${dir} is on ${where}, not ${branch}, and git status failed: ${gitMessage(err)}`);
+  }
+  const changed = status.split('\n').filter((l) => l.trim()).map((l) => l.slice(3));
+  if (changed.length) {
+    const listed = changed.slice(0, LISTED_CHANGES).join(', ');
+    const more = changed.length > LISTED_CHANGES ? ` and ${changed.length - LISTED_CHANGES} more` : '';
+    throw new Error(
+      `${dir} is on ${where}, not ${branch}, and has uncommitted changes, so Omni left it alone. ` +
+        `Changed: ${listed}${more}. To fix: commit or stash them, then run \`git -C ${dir} checkout ${branch}\` and retry.`,
+    );
+  }
+  const hasBranch = await git('rev-parse', '--verify', '--quiet', `refs/heads/${branch}`).then(() => true, () => false);
+  try {
+    await git('checkout', '-q', ...(hasBranch ? [branch] : ['-b', branch]));
+  } catch (err) {
+    throw new Error(`${dir} is on ${where}, not ${branch}, and switching back failed: ${gitMessage(err)}`);
+  }
+  console.log(`[setup] ${dir}: switched back to ${branch} from ${where}`);
 }
 
 /**
  * Make a thread's worktree at dir on branch and check it, or throw saying why. Safe to run again: a worktree an
- * earlier try made is checked and kept, a branch it made is checked out again, and a folder that is in the way is
- * never deleted.
+ * earlier try made is checked and kept, a branch it made is checked out again, a clean worktree its agent moved to
+ * another branch is switched back, and a folder that is in the way is never deleted.
  */
 export async function prepareWorktree(repo: string | null, dir: string, branch: string): Promise<void> {
   if (!repo) throw new Error('The channel has no repository set.');
   if (!existsSync(repo)) throw new Error(`The channel's repository is not on this Mac: ${repo}`);
   if (!(await isGitRepo(repo))) throw new Error(`${repo} is not a git repository. Turn off "Worktree per thread" in the channel's settings to run threads in it directly.`);
-  if (!(await worktreeProblem(repo, dir, branch))) return;
+  const found = await checkWorktree(repo, dir, branch);
+  if (!found) return;
+  // The thread's own agent checked out another branch in its worktree: switch back when nothing can be lost.
+  if (found.kind === 'branch') {
+    await switchBack(dir, branch, found.on);
+    const problem = await worktreeProblem(repo, dir, branch);
+    if (problem) throw new Error(problem);
+    return;
+  }
   // Never wait on a credential prompt or a pager.
   const git = (...args: string[]) => run('git', ['-C', repo, ...args], { timeout: 60_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
   if (existsSync(dir) && readdirSync(dir).length) throw new Error(`${dir} is in the way: it is not this thread's worktree on ${branch}. Move it, then retry.`);
