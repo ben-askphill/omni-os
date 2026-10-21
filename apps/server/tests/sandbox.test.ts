@@ -107,7 +107,7 @@ describe('buildMcpConfig: omni conductor server', () => {
     expect(cfg.mcpServers['omni']).toEqual({
       command: paths.tsx,
       args: [paths.mcpOmni],
-      env: { OMNI_URL, OMNI_THREAD_ID: THREAD },
+      env: { OMNI_URL, OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
     });
     expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-browser']);
   });

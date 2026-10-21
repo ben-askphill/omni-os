@@ -75,3 +75,13 @@ export const HARNESS_META: Record<HarnessId, { name: string; plan: string }> = {
   cursor: { name: 'Cursor Agent', plan: 'Cursor plan' },
   hermes: { name: 'Hermes', plan: 'Anthropic API via Hermes' },
 };
+
+/**
+ * How to install each local CLI, for onboarding (web, Mac, `npm run setup`). `fix` on HarnessInfo says how to sign
+ * in once it is installed. Hermes runs on its own server, so it has none.
+ */
+export const HARNESS_INSTALL: Partial<Record<HarnessId, string>> = {
+  'claude-code': 'npm install -g @anthropic-ai/claude-code',
+  codex: 'npm install -g @openai/codex',
+  cursor: 'curl https://cursor.com/install -fsS | bash',
+};

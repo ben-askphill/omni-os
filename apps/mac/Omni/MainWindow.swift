@@ -49,6 +49,7 @@ struct MainWindow: View {
     .toolbar { toolbar }
     .overlay { PaletteOverlay(model: model).environment(\.colorScheme, scheme) }
     .modifier(ThreadWindowSupport(model: model))
+    .modifier(OnboardingSupport(model: model, scheme: scheme))
     .frame(minWidth: 720, minHeight: 460)
     .environment(\.colorScheme, .dark)
     .onChange(of: model.route) { old, new in
@@ -58,6 +59,7 @@ struct MainWindow: View {
       model.settingsTab = tab
       openSettings()
     }
+    .onAppear { QuickPromptController.openMain = { openWindow(id: "main") } }
     #if DEBUG
     .onAppear { QARunner.openSettings = openSettings }
     #endif
@@ -233,6 +235,7 @@ extension Route {
     case .search: "magnifyingglass"
     case .automations: "bolt"
     case .secrets: "key"
+    case .settings: "slider.horizontal.3"
     case .artifacts: "square.stack.3d.up"
     case .newChannel: "plus"
     case .notFound: "questionmark.folder"

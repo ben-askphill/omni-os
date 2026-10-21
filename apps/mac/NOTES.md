@@ -56,6 +56,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `SVGPath.swift` | `SVGPath.cgPath`: SVG path data to a `CGPath` (every command, compact numbers, packed arc flags) |
 | `BrandPaths.swift` | `BrandPaths`: the Web UI's icon paths (`ui.tsx`), harness logos and wordmark (`brand.tsx`), generated from those files; `BrandPathsTests` keeps them in step |
 | `ContextMeter.swift` | `ContextUsage`, `ContextView`, `ContextMeter` (the math in `packages/shared/context-meter.ts`), `ContextAPI` (`threadContext`, `compactThread` on `OmniClient`), `ContextModel` (one thread's meter and its Compact) |
+| `QuickPrompt.swift` | `QuickPromptShortcut` (the fixed choices and their Carbon key code and modifiers), `QuickPromptSettings` (on, shortcut, Wispr Flow, in UserDefaults), `QuickPromptAPI`, `QuickPromptModel` (text, target channel, phase, `awaitDictation`) |
 | `QAScript.swift` | Debug only. `QAScript`, `QAStep`, `QACondition`, `QAFacts`, `QAServer`, `QASnapshot.looksBlank` |
 
 ## Build and test
@@ -347,6 +348,8 @@ Server screen (`ServerScreen`):
 
 Settings, Connection pane: Port, Repo (a field and a folder picker), Node (a field and a file picker; empty finds Node itself). The port and paths apply on Return, when the field loses focus or when Settings closes (closing a window does not end editing), and the paths on a pick too. Never per key: typing 4759 does not try 4, 47 and 475. A number that is not a port puts the current one back. A blank Repo is `~/omni-os` (`effectiveRepoPath`), in `config` and on the server screen. Everything applies at once, no relaunch. With launch arguments set, a note says changes last until the app quits. Status shows the server state, the feed, Open Log, and Build (the `OmniGitCommit` stamp) in an installed build.
 
+Settings, Profile tab, like the web's Settings page (`Settings.tsx`): the name Omni calls you by (`Status.profile`, `PUT /api/profile`), saved on Return or Save, then the store refreshes so the greeting follows. First run: `OnboardingSupport` on the main window shows `OnboardingSheet` while the status has a profile with no name (as `Onboarding.tsx`); Skip or closing it hides it on this Mac (`onboarding.skipped` in UserDefaults). The sidebar's Settings item and `#/settings` open this tab, as Secrets opens its own.
+
 Settings, Secrets tab (#72), like `Secrets.tsx`:
 
 - The Keychain note, then Add or replace: Scope (Global, then `#name` per channel), Name (upper-cased and `_` for anything else as it is typed, per UTF-16 unit like the Web UI), Value (a `SecureField`). "Save secret", or "Replace secret" with the hint when the name exists in that scope. The Web UI's messages for a bad name, no value and a value with a line break, checked before sending; the server's own error shows the same way. After a save: "Saved NAME (#Acme)" or "Updated ...", name and value cleared, the list loads again.
@@ -355,6 +358,15 @@ Settings, Secrets tab (#72), like `Secrets.tsx`:
 - The list loads when the tab shows, for a new port, and when the feed opens again.
 
 Settings, Appearance tab: Match system, Light, Dark (radio buttons), saved as `appearance` in UserDefaults. `AppDelegate` applies it in `applicationWillFinishLaunching`, before any window, and on every change in the same call (`AppearanceSettings.follow` sets `NSApp.appearance`), so every window follows at once. `-appearance dark` sets it for one run and saves nothing, with a note in the tab.
+
+Quick Prompt (`QuickPrompt.swift`, `QuickPromptSettingsView.swift` in the app): a system-wide shortcut (Ctrl-Option-Space by default) opens a floating panel over whatever app is in front, starts Wispr Flow hands-free in it, and starts a Conductor thread with what was said or typed. The Web UI has no counterpart: a browser tab cannot take a shortcut while it is in the background.
+
+- The shortcut is Carbon's `RegisterEventHotKey` (`GlobalHotKey`), which needs no Accessibility permission. The choices are fixed (`QuickPromptShortcut`), all Space with modifiers macOS does not keep for itself. When another app holds the keys, registering fails and the tab says so.
+- The panel is an `NSPanel` with `.nonactivatingPanel`, like Spotlight: it takes typing while the app you were in stays active, and Omni's windows stay behind. It opens on the screen under the pointer, grows downward with the text (`setContentSize` keeps the top edge), and keeps an unsent draft between opens.
+- Wispr Flow pastes into the focused field, so the field takes focus before `WisprFlow.setListening(true)`, one runloop turn later, as the composer's mic does. Flow pastes a moment after it stops, so Return while it listens stops it and `QuickPromptModel.awaitDictation` waits for the text to change and settle (600ms quiet, 5s at most) before sending. The shortcut again while it listens stops Flow; otherwise it closes the panel. Esc closes.
+- A send is `POST /api/threads` with `channel: conductor`, `role: conductor` and `source: capture` (typed by Ben outside Omni, as claude-bar's captures). The header's menu sends this one prompt to another channel instead, with no role. Return sends and closes after a moment; Cmd-Return (or Open) sends and opens the thread in the main window, reopening it if every window was closed (`QuickPromptController.openMain`, captured by `MainWindow`). A failed send keeps the text and shows the reason.
+- With the Quick Prompt on, closing the last window no longer quits the app (`applicationShouldTerminateAfterLastWindowClosed`). Settings, Quick Prompt: the switch, the shortcut, Wispr Flow, Try It, and Open Omni at login (`SMAppService.mainApp`). File > Quick Prompt opens it too.
+- A QA run never registers the shortcut, so it can't take it from the real app. `{"quickPrompt": "text"}` opens the panel with that text and Flow off, `{"quickPrompt": {"send": true}}` sends, `false` closes. Snapshots include the panel as `<name>-window<n>.png`.
 
 Automations page (#73), like `Automations.tsx`. The Web UI has no create or edit: an automation is a YAML file in `automations/` that the server reads again on save. So the app has neither; the empty state says where the files go.
 
@@ -451,6 +463,7 @@ Steps (a list, or an object with the list under `steps`):
 | `{"folder": "reset"}` | Ends any of the above |
 | `{"imageZoom": 2}`, `{"imageZoom": "fit"}` | Zooms the artifact image preview to that scale, or back to fit |
 | `{"screen": "name"}` | The main window with the app's windows over it (a sheet, a menu) drawn in place |
+| `{"quickPrompt": "text"}`, `{"quickPrompt": {"send": true}}`, `{"quickPrompt": false}` | Opens the Quick Prompt with this text (Wispr Flow off), sends it, or closes it |
 | `{"quit": true}` | Writes the report and exits |
 
 `qa.json` is written after every step: `{ok, error, steps: [{step, action, ok, ms, error, files}], facts: {serverState, connection, sidebarLoaded, channels, route, windows}}`. A failed wait says what the server, feed and sidebar were.

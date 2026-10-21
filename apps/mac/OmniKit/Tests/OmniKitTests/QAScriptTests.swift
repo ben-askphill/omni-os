@@ -82,8 +82,8 @@ import OmniKit
   }
 
   @Test func opensATabOfSettings() throws {
-    let script = try QAScript(json: Data(#"[{"settings": "secrets"}, {"settings": "sync"}, {"settings": "appearance"}, {"settings": "connection"}]"#.utf8))
-    #expect(script.steps == [.settings(.secrets), .settings(.sync), .settings(.appearance), .settings(.connection)])
+    let script = try QAScript(json: Data(#"[{"settings": "secrets"}, {"settings": "sync"}, {"settings": "appearance"}, {"settings": "connection"}, {"settings": "profile"}]"#.utf8))
+    #expect(script.steps == [.settings(.secrets), .settings(.sync), .settings(.appearance), .settings(.connection), .settings(.profile)])
     #expect(throws: QAScriptError.self) { try QAScript(json: Data(#"[{"settings": "garage"}]"#.utf8)) }
   }
 

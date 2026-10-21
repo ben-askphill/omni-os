@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync, existsSync, watch } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, mkdirSync, watch } from 'node:fs';
 import { join } from 'node:path';
 import { Cron } from 'croner';
 import YAML from 'yaml';
@@ -7,6 +7,7 @@ import { automationRuns, db } from './db.ts';
 import { createThread } from './runner.ts';
 import { runsAutomationsHere } from './sync/owner.ts';
 import { parseTrigger, type EventTrigger } from './automation-events.ts';
+import { fillPlaceholders, updateUserConfig, userConfig } from './user-config.ts';
 
 export interface Automation {
   id: string;
@@ -48,7 +49,7 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
     harness: y.harness,
     model: y.model,
     effort: y.effort,
-    prompt: String(y.prompt ?? '').trim(),
+    prompt: fillPlaceholders(String(y.prompt ?? '').trim()),
     enabled: y.enabled === true,
     file,
     catchup: y.catchup === true,
@@ -74,14 +75,24 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
   return a;
 }
 
+/**
+ * The shared automations in automations/ and the user's own in data/automations/ (same id there wins). The user
+ * config's per-automation overrides (`enabled`, `channel`) apply last, so turning one on never edits a repo file.
+ */
 export function loadAutomations(): Automation[] {
-  if (!existsSync(paths.automations)) return [];
-  return readdirSync(paths.automations)
-    .filter((f) => /\.ya?ml$/.test(f))
-    .map((f) => {
-      const file = join(paths.automations, f);
-      return parseAutomation(f.replace(/\.ya?ml$/, ''), readFileSync(file, 'utf8'), file);
-    });
+  const files = new Map<string, string>();
+  for (const dir of [paths.automations, paths.personalAutomations]) {
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir)) if (/\.ya?ml$/.test(f)) files.set(f.replace(/\.ya?ml$/, ''), join(dir, f));
+  }
+  const overrides = userConfig().automations;
+  return [...files].map(([id, file]) => {
+    const a = parseAutomation(id, readFileSync(file, 'utf8'), file);
+    const o = overrides[id];
+    if (o?.channel) a.channel = o.channel;
+    if (o?.enabled !== undefined && !a.error) a.enabled = o.enabled;
+    return a;
+  });
 }
 
 const jobs = new Map<string, Cron>();
@@ -182,12 +193,11 @@ function scheduleAll() {
   catchUpAll();
 }
 
+/** Turn one on or off for this user: an override in data/omni.config.json, never an edit to the YAML. */
 export function setEnabled(id: string, enabled: boolean) {
   const a = loadAutomations().find((x) => x.id === id);
   if (!a) throw new Error('automation not found');
-  const doc = YAML.parseDocument(readFileSync(a.file, 'utf8'));
-  doc.set('enabled', enabled);
-  writeFileSync(a.file, doc.toString());
+  updateUserConfig({ automations: { [id]: { enabled } } });
   schedule();
 }
 
@@ -198,8 +208,10 @@ export function startScheduler() {
   schedule();
   setInterval(catchUpAll, CATCHUP_EVERY_MS).unref();
   let t: NodeJS.Timeout | undefined;
-  watch(paths.automations, () => {
-    clearTimeout(t);
-    t = setTimeout(schedule, 300);
-  });
+  mkdirSync(paths.personalAutomations, { recursive: true });
+  for (const dir of [paths.automations, paths.personalAutomations])
+    watch(dir, () => {
+      clearTimeout(t);
+      t = setTimeout(schedule, 300);
+    });
 }

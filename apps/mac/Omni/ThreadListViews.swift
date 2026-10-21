@@ -232,7 +232,7 @@ private struct FolderSectionHeader: View {
     Group {
       if let folder {
         Button {
-          withAnimation(Motion.settle) { Task { await model.folders.toggle(folder.id) } }
+          withAnimation(Motion.settle) { _ = Task { await model.folders.toggle(folder.id) } }
         } label: {
           label(open: !folder.collapsed)
         }

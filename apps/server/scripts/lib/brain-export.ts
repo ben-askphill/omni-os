@@ -74,11 +74,13 @@ export interface PlanOptions {
   channel?: string;
   /** ISO date; threads last updated before it are left out. */
   since?: string;
-  /** Ben's home dir: imported history that ran there goes to imported/home. */
+  /** The user's home dir: imported history that ran there goes to imported/home. */
   home?: string;
   cursor: Cursor;
   redact: (s: string) => string;
   timezone?: string;
+  /** The user's name from the user config: the heading on their messages. Falls back to the old kv profile, then "User". */
+  user?: string;
 }
 
 // ---------- redaction ----------
@@ -253,7 +255,7 @@ function tail(text: string, max: number) {
 }
 
 /** Who wrote a user event. Briefs from the Conductor and team leads are labelled as such. */
-function userLabel(p: Record<string, any>) {
+function userLabel(p: Record<string, any>, user: string) {
   switch (p.source) {
     case 'conductor':
       return 'Task brief (from the Conductor)';
@@ -262,7 +264,7 @@ function userLabel(p: Record<string, any>) {
     case 'automation':
       return 'Automation prompt';
     default:
-      return p.mode === 'steer' ? 'Ben (steering mid-turn)' : 'Ben';
+      return p.mode === 'steer' ? `${user} (steering mid-turn)` : user;
   }
 }
 
@@ -285,7 +287,9 @@ interface RenderContext {
   part: number;
   previousUid: string | null;
   timezone: string;
-  /** A Conductor thread that delegated: Ben's own messages and what went where, nothing the Conductor wrote. */
+  /** The user's name from the profile, or "User": the heading on their messages. */
+  user: string;
+  /** A Conductor thread that delegated: the user's own messages and what went where, nothing the Conductor wrote. */
   stub?: boolean;
 }
 
@@ -293,7 +297,7 @@ interface RenderContext {
 const y = (v: unknown) => (v == null || v === '' ? 'null' : typeof v === 'number' ? String(v) : JSON.stringify(String(v)));
 
 /**
- * The digest body: Ben's messages and briefs in full, each turn's final reply in full, the working notes
+ * The digest body: the user's messages and briefs in full, each turn's final reply in full, the working notes
  * before it cut to NOTES_MAX, crew reports cut to their tail. Tool calls, init and status never appear.
  * Returns null when nothing in `events` is worth a file.
  */
@@ -317,7 +321,7 @@ export function renderDigest(ctx: RenderContext, redact: (s: string) => string):
     if (ctx.stub) {
       const body = e.kind === 'user' && !['conductor', 'team', 'automation'].includes(p.source) ? userBody(p) : '';
       if (body) {
-        out.push(`### ${userLabel(p)} · ${when(e.created_at, tz)}\n\n${body}`);
+        out.push(`### ${userLabel(p, ctx.user)} · ${when(e.created_at, tz)}\n\n${body}`);
         content++;
       }
       continue;
@@ -327,7 +331,7 @@ export function renderDigest(ctx: RenderContext, redact: (s: string) => string):
         const body = userBody(p);
         if (!body) break;
         flushNotes(true);
-        out.push(`### ${userLabel(p)} · ${when(e.created_at, tz)}\n\n${body}`);
+        out.push(`### ${userLabel(p, ctx.user)} · ${when(e.created_at, tz)}\n\n${body}`);
         content++;
         break;
       }
@@ -417,7 +421,7 @@ export function renderDigest(ctx: RenderContext, redact: (s: string) => string):
 
   const about = [`Omni thread in #${ctx.channel.name} (${ctx.channel.kind}), started ${dateOnly(t.created_at, tz)}.`];
   if (ctx.parent) about.push(`Delegated from "${ctx.parent.title}" (${ctx.parent.id.slice(0, 8)}).`);
-  if (ctx.stub) about.push('Conductor thread that delegated: only Ben\'s messages and the threads it handed work to; their digests carry the work.');
+  if (ctx.stub) about.push(`Conductor thread that delegated: only ${ctx.user}'s messages and the threads it handed work to; their digests carry the work.`);
   else if (ctx.children.length)
     about.push(`Delegated to: ${ctx.children.map((c) => `"${c.title}" (#${c.channel_id}, ${c.id.slice(0, 8)})`).join('; ')}.`);
   if (ctx.part > 1) about.push(`Part ${ctx.part}: only what happened after the previous export.`);
@@ -479,9 +483,21 @@ const THREAD_SQL = `SELECT id, channel_id, title, status, role, model, cwd, pare
   created_at, updated_at FROM threads`;
 
 /** Every thread in scope with its digest or why it has none. Pure apart from reading `ro`. */
+/** The name an older install kept in kv `profile`, or "User". The user config (apps/server/user-config.ts) replaced it. */
+export function profileName(ro: DatabaseSync): string {
+  try {
+    const row = ro.prepare(`SELECT value FROM kv WHERE key = 'profile'`).get() as { value: string } | undefined;
+    const name = row ? (JSON.parse(row.value) as { name?: unknown }).name : undefined;
+    return typeof name === 'string' && name.trim() ? name.trim() : 'User';
+  } catch {
+    return 'User';
+  }
+}
+
 export function plan(ro: DatabaseSync, opts: PlanOptions): Planned[] {
-  const tz = opts.timezone ?? 'Europe/Amsterdam';
+  const tz = opts.timezone ?? 'UTC';
   const channels = ro.prepare('SELECT id, name, kind, repo_path, base_dir FROM channels').all() as unknown as ChannelRow[];
+  const user = opts.user?.trim() || profileName(ro);
   const threads = ro.prepare(`${THREAD_SQL} ORDER BY created_at, id`).all() as unknown as ThreadRow[];
   const byId = new Map(threads.map((t) => [t.id, t]));
   const kids = new Map<string, ThreadRow[]>();
@@ -558,6 +574,7 @@ export function plan(ro: DatabaseSync, opts: PlanOptions): Planned[] {
         part,
         previousUid: prev?.uid ?? null,
         timezone: tz,
+        user,
         stub,
       },
       opts.redact,

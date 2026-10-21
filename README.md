@@ -24,13 +24,119 @@ Both show the same channels and threads. They never share code directly: see [We
 - **Automations**: YAML on a cron schedule or a GitHub PR event (checks failed, conflict, review, opened), every run is its own thread
 - Runs each thread on the harness you pick — **Claude Code** (Claude plan), **Codex** (ChatGPT plan), **Cursor Agent** (Cursor plan) or **Hermes** (Anthropic API, on a remote server) — through its official CLI, or over HTTP for Hermes.
 
-## Run
+## Getting started
 
-Needs Node 24+, the `claude` CLI signed in to your Claude plan, and `gh` signed in for the GitHub panel. Codex, Cursor Agent and Hermes are optional; the model picker shows each one's fix when it is not set up.
+Forking Omni for yourself? Read [FORKING.md](FORKING.md) too: it says what is yours and how to pull updates.
+
+### Let an agent set it up
+
+The quickest way in: open Claude Code, Codex or Cursor in an empty terminal and paste this. Swap `<you>` for your GitHub owner, or point it at an existing clone.
+
+```text
+Clone github.com/<you>/omni-os to ~/omni-os (skip if it is already there), then install and run its
+Mac app. Follow the "Agent instructions" in the README's Getting started section step by step, run
+every check it lists, and stop and tell me if a check fails. Ask me before running `npm run setup`
+without --yes, since it asks who I am.
+```
+
+#### Agent instructions
+
+For an agent doing the setup. Run each step, run its check, and stop on a failed check instead of working around it. Don't run `sudo`, don't install Xcode for the user, and never write secret values anywhere but the Keychain.
+
+1. **Prerequisites.** Check each one; on a miss, give the user the fix and wait.
+
+   | Check | Fix |
+   | --- | --- |
+   | `uname` prints `Darwin` | The Mac app is Mac-only; use the Web UI on Linux |
+   | `node -v` is 24 or later | `nvm install 24` or `brew install node` |
+   | `xcodebuild -version` prints a version | Install Xcode from the App Store, then `sudo xcode-select -s /Applications/Xcode.app` |
+   | `claude --version` works | `npm install -g @anthropic-ai/claude-code`, then the user runs `claude` and `/login` |
+   | `gh auth status` is signed in | `brew install gh && gh auth login` (the user does the login) |
+
+   Command Line Tools alone are not enough: `xcodebuild` needs full Xcode.
+
+2. **Clone.** Skip if the folder is a checkout already.
+
+   ```bash
+   git clone https://github.com/<you>/omni-os.git ~/omni-os
+   cd ~/omni-os
+   ```
+
+   The Mac app starts the server from `~/omni-os` by default. If you clone somewhere else, note the path for step 5.
+
+3. **Install.**
+
+   ```bash
+   npm install --include=dev
+   ```
+
+   `--include=dev` matters: with `NODE_ENV=production` in the shell (common in agent shells), a plain `npm install` skips dev dependencies like Turborepo and Vite, so `npm run dev` and `npm test` fail later. Check: `npx turbo --version` prints a version.
+
+4. **Set up.** Ask the user for their name and email, then:
+
+   ```bash
+   npm run setup -- --yes --name "<name>" --email "<email>"
+   ```
+
+   Check: `data/omni.config.json` exists. Skipping this is fine too; the app asks the same questions on first open.
+
+5. **Build and open the Mac app.**
+
+   ```bash
+   scripts/build-mac.sh
+   ```
+
+   It builds in Release, installs to `~/Applications/Omni.app` and opens it. The first build fetches Swift packages from GitHub, so it takes a few minutes. Check: the script ends with `==> Opened Omni`. On a failure it prints the errors and the log path (`apps/mac/.xcode/build-release.log`); read the log before retrying.
+
+   Cloned somewhere other than `~/omni-os`? Pass the path on the first open, then set it for good in the app under **Settings > Connection > Repo**:
+
+   ```bash
+   scripts/build-mac.sh -- -repoPath "$PWD"
+   ```
+
+6. **Confirm it runs.** The app starts the server itself. Check: `curl -s http://127.0.0.1:4747/api/status` returns JSON. If port 4747 is taken by something else, stop and tell the user rather than killing it.
+
+7. **Hand over.** Tell the user the app is open, that first-run setup (if step 4 was skipped) waits in the app, and that `scripts/build-mac.sh` again rebuilds it after a `git pull`.
+
+Prefer the browser? Steps 1 to 4 are the same; then `npm run dev` and open http://localhost:4748.
+
+### What you need
+
+- macOS (the Mac app and Keychain secrets are Mac-only; the server and Web UI also run on Linux without them)
+- Node 24+ and npm
+- The `claude` CLI (Claude Code), signed in to your Claude plan: `npm install -g @anthropic-ai/claude-code`, then `claude` and `/login`
+- `gh`, signed in, for the GitHub panel: `brew install gh && gh auth login`
+- Optional: Codex (`npm install -g @openai/codex && codex login`), Cursor Agent (`curl https://cursor.com/install -fsS | bash && cursor-agent login`), Xcode for the Mac app
+
+### Install and set up
 
 ```bash
+git clone git@github.com:<you>/omni-os.git ~/omni-os
+cd ~/omni-os
 npm install
+npm run setup        # asks who you are and where your work lives; Enter takes each default
+```
+
+`npm run setup` asks the same five things the first-run screens ask in the Web UI and the Mac app:
+
+1. **You**: your name (what Omni and its agents call you), email, timezone (prefilled from the system) and pronouns (default they/them)
+2. **Workspace**: the workspace folder (default `~/Omni`; threads without a repo run there and its CLAUDE.md and skills load in every Claude thread), your repos folder (default `~/code`) and your GitHub owner
+3. **Harnesses**: which of Claude Code, Codex and Cursor Agent are installed and signed in, with the command to fix each one
+4. **First channel**: a client or project with an optional repo and Shopify store, or skip
+5. **Done**: saves `data/omni.config.json` and, in the apps, opens #conductor with a welcome message
+
+It writes `data/omni.config.json`, which is gitignored with the rest of `data/`. Running it again is safe: every answer defaults to what is saved. `npm run setup -- --yes --name Ada --email ada@example.com` answers it without prompts (`--help` lists the flags). Skip it and the Web UI or Mac app asks on first open instead. Change anything later in **Settings** (web) or **Settings > Profile** (Mac), where **Run setup again** walks the screens once more.
+
+### Start it
+
+```bash
 npm run dev          # server on :4747, UI on http://localhost:4748
+```
+
+Or the Mac app, which starts and stops the server itself:
+
+```bash
+scripts/build-mac.sh              # Release build, installs to ~/Applications/Omni.app and opens it
 ```
 
 Production (one process, serves the built UI on http://127.0.0.1:4747):
@@ -40,7 +146,21 @@ npm run build && npm start
 tailscale serve --bg 4747         # reach it from your phone over the tailnet
 ```
 
-Optional: `./scripts/install-launchd.sh` installs a LaunchAgent that starts the server at login and keeps the Mac awake while it runs. Skip it when you use the Mac app, which starts and stops the server itself.
+Optional: `./scripts/install-launchd.sh` installs a LaunchAgent that starts the server at login and keeps the Mac awake while it runs. Skip it when you use the Mac app.
+
+### Your config
+
+| Where | What |
+| --- | --- |
+| `data/omni.config.json` | You, your folders, integrations (Hermes URL, central brain), automation on/off. Example: `omni.config.example.json` |
+| `data/crew/*.md` | Your own version of a crew charter; replaces the one in `crew/` with the same name |
+| `data/automations/*.yaml` | Your own automations; one with the same id as a shared one replaces it |
+| `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file |
+| Keychain | Secret values. The database keeps their names only |
+
+Crew charters and automation prompts can use `{{user}}`, `{{workspace}}`, `{{reposDir}}`, `{{githubOwner}}`, `{{omniRoot}}`, `{{omniRepo}}`, `{{centralBrain}}` and `{{timezone}}`, filled from your config, so the shared files name nobody.
+
+An install from before the config file existed writes one at its first boot from the old defaults and skips onboarding, so it keeps behaving as before.
 
 Checks:
 
@@ -55,13 +175,14 @@ npx turbo run test --affected           # only what changed against main
 Mac app (needs Xcode, Node and this checkout on the Mac):
 
 ```bash
-scripts/build-mac.sh              # Release build, installs to ~/Applications/Omni.app and opens it
 npm run test:mac                  # OmniKit tests, headless
 ```
 
 Or open `apps/mac/Omni.xcodeproj` in Xcode and run the `Omni` scheme. The app finds the server on :4747, or starts one from the repo. See `apps/mac/NOTES.md`.
 
-Config is optional: copy `.env.example` to `.env` (gitignored) and uncomment what you need. It covers the brain dir (`~/phillbert` by default, the cwd and context for non-repo channels), default model, permission mode, concurrency per harness, keepalive, Hermes URL, browser flags, data and automations dirs, upload cap, reply suggestions and timezone.
+On first open, both clients ask what to call you. The name goes into the Home greeting and into every agent's prompt, and lives in Settings (web `#/settings`, Mac Settings > Profile). It is one kv row, so it syncs with your other settings.
+
+Server options are optional: copy `.env.example` to `.env` (gitignored) and uncomment what you need. It covers the default model, permission mode, concurrency per harness, keepalive, browser flags, data and automations dirs, upload cap and reply suggestions. Who you are and where your work lives go in `data/omni.config.json` (above).
 
 ## Who can call the API
 
@@ -73,8 +194,8 @@ Each Claude Code thread gets one long-lived `claude -p --input-format stream-jso
 
 | Piece | What |
 | --- | --- |
-| cwd | worktree `data/worktrees/<thread>` on branch `omni/<id>` (repo channels), else the channel base dir, else `~/phillbert` |
-| context | `~/phillbert` added with `--add-dir`, its CLAUDE.md loaded, all your user skills and MCP servers |
+| cwd | worktree `data/worktrees/<thread>` on branch `omni/<id>` (repo channels), else the channel base dir, else your workspace folder |
+| context | your workspace folder added with `--add-dir`, its CLAUDE.md loaded, all your user skills and MCP servers |
 | system prompt | channel facts (store, Portal slug, repo, notes), artifacts and browser rules, the channel's design system file, the crew role charter |
 | MCP | `omni-browser` (Playwright, attached over CDP to the channel's Chrome that Omni runs, profile in `data/browsers/<channel>`); conductor also gets `omni` |
 | env | `OMNI_THREAD_ID`, `OMNI_ARTIFACTS_DIR`, `OMNI_URL`, plus global and channel secrets |
@@ -100,7 +221,7 @@ To continue a thread in a terminal or Claude Desktop: `cd <cwd> && claude --resu
 
 ## Hermes (remote)
 
-Hermes is Ben's always-on agent on a Linux server. Omni does not spawn it. The Hermes API server listens on the server's Tailscale address and is not public. A thread talks to it at `OMNI_HERMES_URL`, the server's Tailscale address and port (set it in `.env`; unset means Hermes is off). The Mac must be on the tailnet.
+Hermes is an always-on agent on your own Linux server. Omni does not spawn it. The Hermes API server listens on the server's Tailscale address and is not public. A thread talks to it at `OMNI_HERMES_URL`, the server's Tailscale address and port (set it in Settings or `npm run setup`; empty means Hermes is off). The Mac must be on the tailnet.
 
 The bearer token is the Keychain secret `HERMES_API_KEY` (global). It is not an env var, not a database column and not written to logs.
 
@@ -108,7 +229,7 @@ The bearer token is the Keychain secret `HERMES_API_KEY` (global). It is not an 
 | --- | --- |
 | Where it runs | On the Hermes server, in whatever clone Hermes already has. Omni does not create a worktree, browser profile or artifacts dir for the thread |
 | Session | `omni-<thread id>`. The same id continues the conversation, with Hermes' own context |
-| Prompt | Channel facts (repo, store, notes) go in `instructions` on the first run. The transcript shows only what Ben typed |
+| Prompt | Channel facts (repo, store, notes) go in `instructions` on the first run. The transcript shows only what you typed |
 | Steer / interrupt | `POST /v1/runs/{id}/steer` and `/stop`. A steer that arrives after the run finished is queued as the next run |
 | Attachments | Described in the message. The files stay on the Mac; Hermes cannot read those paths |
 | Usage | Token counts on the run, not the plan meter. It bills the Anthropic API, not the Claude, ChatGPT or Cursor plan |
@@ -132,13 +253,13 @@ The conductor's `omni` MCP (`apps/mcp/omni.ts`) exposes `list_channels`, `list_c
 
 ## Automations
 
-`automations/*.yaml` (shipped: `morning-coffee`, `weekly-review`, `artifact-comments`, `fix-failing-checks`, all off until you enable them):
+`automations/*.yaml` are shared examples (`morning-coffee`, `weekly-review`, `artifact-comments`, `brain-nightly`, `pr-babysitter`, `fix-failing-checks`), all off until you turn them on. Turning one on or off in the UI writes `automations.<id>.enabled` to `data/omni.config.json`, never the YAML, and `automations.<id>.channel` there moves it to another channel. Your own automations go in `data/automations/`.
 
 ```yaml
 name: Morning coffee
-enabled: false          # toggle here or in the UI
+enabled: false          # the default; the UI toggle overrides it per machine
 cron: "0 8 * * 1-5"
-timezone: Europe/Amsterdam
+timezone: Europe/Amsterdam  # optional, defaults to your timezone
 channel: inbox          # default inbox
 role: inbox
 harness: claude         # optional, like model and effort
@@ -147,7 +268,7 @@ prompt: |
   Run the morning-coffee skill for today.
 ```
 
-`timezone` defaults to `OMNI_TZ` (Europe/Amsterdam). The folder is watched; edits apply without a restart. The Mac has to be awake at the scheduled time.
+`timezone` defaults to your timezone from the config (`OMNI_TZ` wins, else the system's). Both folders are watched; edits apply without a restart. The Mac has to be awake at the scheduled time.
 
 ### Event automations
 
@@ -253,6 +374,7 @@ On each Mac: Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the UR
 
 - `scripts/omni.sh "prompt" -c volero -r researcher`: start a thread from the shell (`OMNI_URL` points it at another server)
 - claude-bar hotkey prompt: set `"target": "omni"` in its config to send captures here
+- Mac app Quick Prompt: Ctrl-Option-Space in any app opens a floating prompt, starts Wispr Flow, and sends what you say to the Conductor. Settings, Quick Prompt changes the shortcut and opens Omni at login
 - `npm run import-history -- --days 30`: pull existing Claude Code sessions into Omni as resumable threads
 
 ## Web UI and Mac app
@@ -281,14 +403,15 @@ apps/mac/                   @omni/mac: SwiftUI app (Omni/), OmniKit package, sla
 packages/shared/            @omni/shared: pure TypeScript both clients use (slash grammar, menu, pills)
 packages/test-fixtures/     @omni/test-fixtures: fake CLIs and corpora the TS and Swift tests share
 packages/typescript-config/ @omni/typescript-config: the tsconfig bases every package extends
-crew/                       role charters
-automations/                automation YAML (cron or PR events)
+crew/                       shared role charters (yours override them from data/crew/)
+automations/                shared automation YAML, cron or PR events (yours go in data/automations/)
+omni.config.example.json    every field of data/omni.config.json
 mods/                       Claude Code mods loaded with OMNI_MODS=1 (omni-progress)
 scripts/                    shell shim, Mac build, QA stack, PR screenshots, launchd install
 docs/                       ADRs (adr/0001 to 0004) and the PR screenshot guide
 supabase/                   sync relay migration
 CONTEXT.md                  domain glossary (channel, thread, harness, crew...)
-data/                       gitignored: db, thread dirs, worktrees, browser profiles, logs
+data/                       gitignored: your config, db, thread dirs, worktrees, browser profiles, logs
 ```
 
 ## Contributing
@@ -299,7 +422,7 @@ data/                       gitignored: db, thread dirs, worktrees, browser prof
 
 ## Limits
 
-- Isolation is a worktree plus a browser profile, not a VM. Threads run with `bypassPermissions` because nobody can answer prompts headless; the write boundaries in phillbert's CLAUDE.md still apply.
+- Isolation is a worktree plus a browser profile, not a VM. Threads run with `bypassPermissions` because nobody can answer prompts headless; the write boundaries in your workspace folder's CLAUDE.md still apply.
 - Only one live thread per channel gets the persistent browser profile; parallel ones get an isolated browser.
 - The channel browser (`apps/server/browser.ts`) is one Chrome per channel that Omni launches on first use (a thread's MCP or the Browser panel) and closes after 5 idle minutes. The panel streams it with a CDP screencast and sends mouse, wheel and keys back (`/api/channels/:id/browser/*`). While someone watches, the page lays out at the viewer's size (`Emulation.setDeviceMetricsOverride`, sharp at the display's scale), so it reads like a real browser window in the panel; the last viewer to report a size wins, and with none watching the agent gets the 1280-wide desktop page back. Input goes in batches: a client queues while a batch is on its way and merges moves and scrolls. The frame is Chrome-like: tabs with favicons, the address bar, a loading bar, and Chrome's Cmd shortcuts (L, T, W, R, [, ], C, X, V; A and Z go to the page).
 - Worktrees are not cleaned up automatically yet (`git worktree prune` in the repo).

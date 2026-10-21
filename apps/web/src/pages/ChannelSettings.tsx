@@ -308,7 +308,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
       <Section title="Basics">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Name" htmlFor="ch-name">
-            <input id="ch-name" className="field" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Volero" autoFocus={isNew} />
+            <input id="ch-name" className="field" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Acme" autoFocus={isNew} />
           </Field>
           <Field
             label="Id"
@@ -324,7 +324,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
                 setIdTouched(true);
                 set('id', e.target.value.toLowerCase());
               }}
-              placeholder="volero"
+              placeholder="acme"
               aria-invalid={isNew && !!f.id && !idValid}
             />
           </Field>
@@ -365,10 +365,10 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 
       <Section title="Code">
         <Field label="Repo path" htmlFor="ch-repo" hint="Absolute path to a local git repo. Enables per-thread worktrees and the PRs tab.">
-          <input id="ch-repo" className="field font-mono !text-[13px]" value={f.repo_path} onChange={(e) => set('repo_path', e.target.value)} placeholder="/Users/benrosenberg/code/apa-volero" spellCheck={false} />
+          <input id="ch-repo" className="field font-mono !text-[13px]" value={f.repo_path} onChange={(e) => set('repo_path', e.target.value)} placeholder="~/code/acme-theme" spellCheck={false} />
         </Field>
         <Field label="GitHub repo" htmlFor="ch-gh" hint="owner/name. Auto-detected from the repo path when left empty.">
-          <input id="ch-gh" className="field font-mono !text-[13px]" value={f.github_repo} onChange={(e) => set('github_repo', e.target.value)} placeholder="askphill/apa-volero" spellCheck={false} />
+          <input id="ch-gh" className="field font-mono !text-[13px]" value={f.github_repo} onChange={(e) => set('github_repo', e.target.value)} placeholder="acme/acme-theme" spellCheck={false} />
         </Field>
         <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
           <div>
@@ -377,18 +377,18 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
           </div>
           <Toggle checked={f.use_worktree} onChange={(v) => set('use_worktree', v)} label="Worktree per thread" disabled={!f.repo_path.trim()} />
         </div>
-        <Field label="Base directory" htmlFor="ch-base" hint="Where threads run when there is no repo. Defaults to the brain folder (phillbert) so skills load.">
-          <input id="ch-base" className="field font-mono !text-[13px]" value={f.base_dir} onChange={(e) => set('base_dir', e.target.value)} placeholder="/Users/benrosenberg/phillbert" spellCheck={false} />
+        <Field label="Base directory" htmlFor="ch-base" hint="Where threads run when there is no repo. Defaults to your workspace folder (Settings), so its CLAUDE.md and skills load.">
+          <input id="ch-base" className="field font-mono !text-[13px]" value={f.base_dir} onChange={(e) => set('base_dir', e.target.value)} placeholder="~/Omni" spellCheck={false} />
         </Field>
       </Section>
 
       <Section title="Store and browser">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Store domain" htmlFor="ch-store" hint="The myshopify domain, e.g. volero-eu.myshopify.com">
-            <input id="ch-store" className="field font-mono !text-[13px]" value={f.store_domain} onChange={(e) => set('store_domain', e.target.value)} placeholder="volero-eu.myshopify.com" spellCheck={false} />
+          <Field label="Store domain" htmlFor="ch-store" hint="The myshopify domain, e.g. acme.myshopify.com">
+            <input id="ch-store" className="field font-mono !text-[13px]" value={f.store_domain} onChange={(e) => set('store_domain', e.target.value)} placeholder="acme.myshopify.com" spellCheck={false} />
           </Field>
           <Field label="Portal slug" htmlFor="ch-portal" hint="Ask Phill Portal company slug, for client context.">
-            <input id="ch-portal" className="field font-mono !text-[13px]" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="volero" spellCheck={false} />
+            <input id="ch-portal" className="field font-mono !text-[13px]" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="acme" spellCheck={false} />
           </Field>
         </div>
         <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">

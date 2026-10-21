@@ -53,6 +53,13 @@ public enum QAFolderAction: Hashable, Sendable {
 }
 
 /// What the Server menu does, without the confirmation Stop asks for.
+/// The Quick Prompt panel: open with this text (Wispr Flow left off), send it, or close it.
+public enum QAQuickPrompt: Hashable, Sendable {
+  case open(String)
+  case send
+  case close
+}
+
 public enum QAServerAction: String, Hashable, Sendable {
   case start, stop, check
 }
@@ -60,14 +67,15 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// One step of a Debug QA run, from the JSON the app gets with `-OmniQAScript`:
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
-/// `{"settings": "secrets"}` (or `connection`, `sync`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
+/// `{"settings": "secrets"}` (or `connection`, `profile`, `sync`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
 /// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`), `{"expand": true}`, `{"meter": true}`, `{"foldAll": true}`,
 /// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`,
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
 /// `changes`, `turn`, `browser`, `terminal`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
 /// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
 /// `{"drag": "<thread title>", "over": "<folder>"}`, `{"file": "<thread title>", "into": "<folder>"}`,
-/// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"quit": true}`.
+/// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`,
+/// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -110,6 +118,7 @@ public enum QAStep: Hashable, Sendable {
   case folder(QAFolderAction)
   /// The main window to `<name>.png` with the app's windows over it drawn in, such as a sheet or an open menu.
   case screen(String)
+  case quickPrompt(QAQuickPrompt)
   case quit
 
   static let defaultTimeout = Duration.seconds(10)
@@ -197,7 +206,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "foldAll", "editPending", "imageZoom", "type", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "foldAll", "editPending", "imageZoom", "type", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "quickPrompt", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -234,7 +243,7 @@ public struct QAScript: Hashable, Sendable {
       return .open(window)
     case "settings":
       guard let name = value as? String, let tab = SettingsTab(rawValue: name) else {
-        throw QAScriptError("settings takes connection, secrets, sync, notifications or appearance")
+        throw QAScriptError("settings takes connection, profile, secrets, sync, notifications, appearance or quickPrompt")
       }
       return .settings(tab)
     case "openThread":
@@ -260,6 +269,11 @@ public struct QAScript: Hashable, Sendable {
     case "editPending":
       guard let text = value as? String else { throw QAScriptError("editPending takes the text to put in the edit") }
       return .editPending(text)
+    case "quickPrompt":
+      if let text = value as? String { return .quickPrompt(.open(text)) }
+      if let on = value as? Bool, !on { return .quickPrompt(.close) }
+      if let d = value as? [String: Any], d["send"] as? Bool == true { return .quickPrompt(.send) }
+      throw QAScriptError(#"quickPrompt takes the text to open it with, {"send": true}, or false"#)
     case "imageZoom":
       if let name = value as? String, name == "fit" { return .imageZoom(nil) }
       guard let scale = value as? Double, scale > 0 else { throw QAScriptError(#"imageZoom takes a scale like 2, or "fit""#) }

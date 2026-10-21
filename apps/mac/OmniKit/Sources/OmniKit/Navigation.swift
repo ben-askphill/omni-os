@@ -12,6 +12,7 @@ public enum SidebarItem: Hashable, Sendable {
   case artifacts
   case automations
   case secrets
+  case settings
 
   /// The row a route selects, nil for a route with none, like search.
   public init?(route: Route) {
@@ -23,6 +24,7 @@ public enum SidebarItem: Hashable, Sendable {
     case .artifacts: self = .artifacts
     case .automations: self = .automations
     case .secrets: self = .secrets
+    case .settings: self = .settings
     case .search, .notFound: return nil
     }
   }
@@ -36,6 +38,7 @@ public enum SidebarItem: Hashable, Sendable {
     case .artifacts: .artifacts
     case .automations: .automations
     case .secrets: .secrets
+    case .settings: .settings
     }
   }
 }
@@ -50,6 +53,7 @@ extension Route {
     case .search: "Search"
     case .automations: "Automations"
     case .secrets: "Secrets"
+    case .settings: "Settings"
     case .artifacts: "Artifacts"
     case .newChannel: "New channel"
     case .notFound: "Omni"

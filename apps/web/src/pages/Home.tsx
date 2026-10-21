@@ -5,6 +5,7 @@ import { NeedsYouSection } from '../components/NeedsYou.tsx';
 import { ThreadGroups, useLiveThreads } from '../components/ThreadList.tsx';
 import { OmniMark } from '../components/brand.tsx';
 import { Empty, Segmented, StatusDot, glyphFor } from '../components/ui.tsx';
+import { greeting } from '../greeting.ts';
 import { useApp } from '../store.tsx';
 
 const acceptAll = () => true;
@@ -15,11 +16,6 @@ const FILTERS: Record<Filter, (t: Thread) => boolean> = {
   active: (t) => t.status === 'running' || t.status === 'queued',
   failed: (t) => t.status === 'failed' || t.status === 'stopped',
 };
-
-function greeting() {
-  const h = new Date().getHours();
-  return h < 5 ? 'Late one, Ben' : h < 12 ? 'Morning, Ben' : h < 18 ? 'Afternoon, Ben' : 'Evening, Ben';
-}
 
 function Pulse() {
   const { status } = useApp();
@@ -40,7 +36,7 @@ export function HomePage() {
   const all = recent.data;
   const shown = all?.filter(FILTERS[filter]);
   const count = (f: Filter) => all?.filter(FILTERS[f]).length ?? 0;
-  const { status, needsYou } = useApp();
+  const { status, needsYou, profile } = useApp();
   const markState = needsYou?.items.length || all?.some((t) => glyphFor(t.status) === 'needs') ? 'attention' : status && status.running > 0 ? 'thinking' : 'idle';
   const badge = (n: number) => (n ? <span className="font-num text-[10.5px] text-fg-4 tabular-nums">{n}</span> : null);
 
@@ -51,7 +47,7 @@ export function HomePage() {
           <div>
             <OmniMark size={40} state={markState} />
             <div className="caption mt-4 mb-2.5">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-            <h1 className="font-display text-[30px] leading-[1.05] md:text-[38px]">{greeting()}</h1>
+            <h1 className="font-display text-[30px] leading-[1.05] md:text-[38px]">{greeting(new Date().getHours(), profile?.name ?? '')}</h1>
           </div>
           <Pulse />
         </div>
