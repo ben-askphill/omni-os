@@ -249,11 +249,8 @@ function Shell() {
         <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="scrim absolute inset-0" onClick={() => setDrawer(false)} />
           <div className="scheme-dark drawer-in absolute inset-y-0 left-0 flex w-[86%] max-w-[300px] flex-col overflow-hidden rounded-r-[28px] shadow-[var(--shadow-menu)]">
-            <div className="absolute top-3 right-2 z-10 pt-[env(safe-area-inset-top)]">
-              <IconButton icon="x" label="Close menu" onClick={() => setDrawer(false)} />
-            </div>
             <div className="h-full bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-              <Sidebar onNavigate={() => setDrawer(false)} onSearch={openPalette} />
+              <Sidebar onNavigate={() => setDrawer(false)} onSearch={openPalette} onClose={() => setDrawer(false)} />
             </div>
           </div>
         </div>
