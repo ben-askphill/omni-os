@@ -6,10 +6,11 @@ import SwiftUI
 /// one NSTextView. SwiftUI selection stops at each `Text`, so a drag from one paragraph into the next went nowhere;
 /// in a single text view it runs across all of them, as in the browser.
 extension MarkdownBlock {
-  /// Tables and rules keep their own views; everything else flows into the shared text view.
+  /// Tables, rules and paragraphs with images keep their own views; everything else flows into the shared text view.
   var flowsAsText: Bool {
     switch self {
     case .table, .thematicBreak: false
+    case .paragraph(let text): !text.hasImages
     case .quote(let inner): inner.allSatisfy(\.flowsAsText)
     case .list(let list): list.items.allSatisfy { $0.blocks.allSatisfy(\.flowsAsText) }
     default: true

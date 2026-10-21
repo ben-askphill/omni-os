@@ -63,6 +63,17 @@ private struct MarkdownBlockView: View {
 
   var body: some View {
     switch block {
+    case .paragraph(let text) where text.hasImages:
+      VStack(alignment: .leading, spacing: z(8)) {
+        ForEach(Array(text.segments.enumerated()), id: \.offset) { _, segment in
+          switch segment {
+          case .text(let piece):
+            if !String(piece.characters).allSatisfy(\.isWhitespace) { prose(piece) }
+          case .image(let image, let link):
+            MarkdownImageView(image: image, link: link)
+          }
+        }
+      }
     case .paragraph(let text):
       prose(text.attributed)
     case .heading(let level, let text):
@@ -125,6 +136,57 @@ private struct MarkdownBlockView: View {
     case 1: (base * 1.35).rounded()
     case 2: (base * 1.18).rounded()
     default: base
+    }
+  }
+}
+
+/// An image in markdown, as `.md img` in index.css: its natural size up to the column's width, rounded, with a
+/// hairline edge so a screenshot reads on either theme. A click opens it full size, or follows the link it is in.
+/// While loading it holds a short placeholder; when it cannot load it shows its alt text.
+private struct MarkdownImageView: View {
+  let image: MarkdownImage
+  let link: MarkdownLink?
+  @Environment(\.openURL) private var openURL
+  @State private var loaded: NSImage?
+  @State private var failed = false
+
+  var body: some View {
+    Group {
+      if let loaded {
+        Image(nsImage: loaded)
+          .resizable()
+          .aspectRatio(contentMode: .fit)
+          .frame(maxWidth: loaded.size.width, alignment: .leading)
+          .clipShape(RoundedRectangle(cornerRadius: z(12), style: .continuous))
+          .overlay(RoundedRectangle(cornerRadius: z(12), style: .continuous).strokeBorder(Tok.line))
+          .contentShape(Rectangle())
+          .onTapGesture { if let url = link?.url ?? image.source { openURL(url) } }
+          .pointerStyle(.link)
+          .help(image.title ?? image.alt)
+          .accessibilityLabel(image.alt)
+      } else if failed {
+        Text(image.alt.isEmpty ? "Image could not load" : image.alt)
+          .font(.omni(size: 13))
+          .foregroundStyle(Tok.fg3)
+      } else {
+        RoundedRectangle(cornerRadius: z(12), style: .continuous)
+          .fill(Tok.surface2)
+          .frame(maxWidth: z(320)).frame(height: z(120))
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .task(id: image.source) { await load() }
+  }
+
+  private func load() async {
+    guard let url = image.source else {
+      failed = true
+      return
+    }
+    if let data = try? await URLSession.shared.data(from: url).0, let img = NSImage(data: data) {
+      loaded = img
+    } else {
+      failed = true
     }
   }
 }

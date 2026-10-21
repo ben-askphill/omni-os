@@ -240,6 +240,27 @@ func plain(_ s: String) -> MarkdownText {
     #expect(inline("![x](/local.png)") == "![x]()")
   }
 
+  @Test func serverImagePathsLoadFromTheImageBase() {
+    let base = URL(string: "http://127.0.0.1:4747")!
+    let doc = MarkdownDocument(parsing: "**Before:** overlap.\n![drawer](/api/channels/c1/prs/7/image?src=https%3A%2F%2Fgithub.com%2Fa.png)", imageBase: base)
+    guard case .paragraph(let text) = doc.blocks.first else {
+      Issue.record("no paragraph")
+      return
+    }
+    #expect(text.hasImages)
+    #expect(text.runs.last?.image?.source == URL(string: "http://127.0.0.1:4747/api/channels/c1/prs/7/image?src=https%3A%2F%2Fgithub.com%2Fa.png"))
+    #expect(MarkdownDocument(parsing: "![x](//evil.com/a.png)", imageBase: base).blocks == MarkdownDocument(parsing: "![x](//evil.com/a.png)").blocks)
+  }
+
+  @Test func onlyLoadableImagesCount() {
+    guard case .paragraph(let none) = blocks("![x](/local.png) and text").first, case .paragraph(let some) = blocks("![x](https://i.png)").first else {
+      Issue.record("no paragraph")
+      return
+    }
+    #expect(!none.hasImages)
+    #expect(some.hasImages)
+  }
+
   @Test func textWithoutImagesIsOneSegment() {
     let text = MarkdownText([MarkdownRun("a "), MarkdownRun("b", style: .strong)])
     #expect(text.segments == [.text(text.attributed)])

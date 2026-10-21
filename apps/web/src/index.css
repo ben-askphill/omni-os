@@ -752,6 +752,10 @@
 .md > :is(p, ul, ol, blockquote, h1, h2) {
   max-width: 72ch;
 }
+/* Screenshots get the full column too. */
+.md > p:has(> img) {
+  max-width: none;
+}
 .md > :first-child {
   margin-top: 0;
 }
@@ -926,9 +930,16 @@
   vertical-align: -1px;
   accent-color: var(--fg);
 }
+/* Each image on its own line under its caption, as the Mac app lays them out. */
 .md img {
+  display: block;
   max-width: 100%;
+  height: auto;
+  margin: 0.5em 0;
   border-radius: 12px;
+  /* Keeps a white screenshot's edge visible on a light surface and a dark one's in dark mode. */
+  outline: 1px solid var(--line);
+  outline-offset: -1px;
 }
 
 @keyframes omni-pulse {

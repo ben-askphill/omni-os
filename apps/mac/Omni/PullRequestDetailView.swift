@@ -95,7 +95,7 @@ struct PullRequestDetailView: View {
       .padding(.bottom, z(16))
 
     switch tab {
-    case .conversation: ConversationTab(pr: pr)
+    case .conversation: ConversationTab(pr: pr, imageBase: model.client.baseURL)
     case .checks: ChecksTab(runs: pr.checkRuns)
     case .files: FilesTab(files: pr.files) { tab = .diff }
     case .diff: DiffView(diff: pr.diff)
@@ -290,6 +290,8 @@ private struct MergeSheet: View {
 
 private struct ConversationTab: View {
   let pr: PullRequestDetail
+  /// The server, for the image links it rewrites to `/api/.../image` so private GitHub images load.
+  let imageBase: URL
 
   var body: some View {
     let body = PullRequestDetail.cleanBody(pr.body)
@@ -298,7 +300,7 @@ private struct ConversationTab: View {
         if body.isEmpty {
           Text("No description.").font(.omni(size: 13)).foregroundStyle(Tok.fg3)
         } else {
-          MarkdownView(document: MarkdownDocument(parsing: body))
+          MarkdownView(document: MarkdownDocument(parsing: body, imageBase: imageBase))
         }
       }
       ForEach(pr.conversation) { item in
@@ -318,7 +320,7 @@ private struct ConversationTab: View {
           }
           .font(.omni(size: 12.5))
           .foregroundStyle(Tok.fg3)
-          if !item.body.isEmpty { MarkdownView(document: MarkdownDocument(parsing: item.body)) }
+          if !item.body.isEmpty { MarkdownView(document: MarkdownDocument(parsing: item.body, imageBase: imageBase)) }
         }
         .padding(.horizontal, z(16)).padding(.vertical, z(12))
         .frame(maxWidth: .infinity, alignment: .leading)

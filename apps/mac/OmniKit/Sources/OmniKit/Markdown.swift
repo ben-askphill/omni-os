@@ -11,8 +11,10 @@ public struct MarkdownDocument: Hashable, Sendable {
     self.blocks = blocks
   }
 
-  public init(parsing source: String) {
-    blocks = MarkdownConverter(source: SourceLines(source)).blocks(Document(parsing: source, options: [.disableSmartOpts]).children)
+  /// `imageBase` is the server an image path like `/api/...` is on, as the Web UI's page origin; without it such
+  /// an image does not load.
+  public init(parsing source: String, imageBase: URL? = nil) {
+    blocks = MarkdownConverter(source: SourceLines(source), imageBase: imageBase).blocks(Document(parsing: source, options: [.disableSmartOpts]).children)
   }
 }
 
@@ -110,6 +112,9 @@ public struct MarkdownText: Hashable, Sendable {
   }
 
   public var plain: String { runs.map(\.text).joined() }
+
+  /// Holds an image that can load, so a view lays it out rather than showing its alt text.
+  public var hasImages: Bool { runs.contains { $0.image?.source != nil } }
 
   public static func == (a: MarkdownText, b: MarkdownText) -> Bool { a.runs == b.runs }
   public func hash(into hasher: inout Hasher) { hasher.combine(runs) }
@@ -254,6 +259,7 @@ func isThreadID(_ s: String) -> Bool {
 
 private struct MarkdownConverter {
   let source: SourceLines
+  var imageBase: URL?
 
   func blocks(_ children: MarkupChildren) -> [MarkdownBlock] {
     children.compactMap(block)
@@ -327,7 +333,7 @@ private struct MarkdownConverter {
   }
 
   func text(_ container: Markup) -> MarkdownText {
-    var builder = InlineBuilder(source: source)
+    var builder = InlineBuilder(source: source, imageBase: imageBase)
     builder.walk(container.children, InlineBuilder.Context())
     return MarkdownText(builder.runs)
   }
@@ -348,12 +354,14 @@ private struct InlineBuilder {
   }
 
   let source: SourceLines
+  let imageBase: URL?
   var runs: [MarkdownRun] = []
   /// Brackets opened and not closed yet in this block or cell.
   var openBrackets = 0
 
-  init(source: SourceLines) {
+  init(source: SourceLines, imageBase: URL?) {
     self.source = source
+    self.imageBase = imageBase
   }
 
   mutating func walk(_ children: MarkupChildren, _ context: Context) {
@@ -402,7 +410,10 @@ private struct InlineBuilder {
       inner.inLink = true
       walk(l.children, inner)
     case let i as Markdown.Image:
-      let source = i.source.flatMap { URL(string: $0) }.flatMap { url in
+      let source = i.source.flatMap { src -> URL? in
+        if let imageBase, src.hasPrefix("/"), !src.hasPrefix("//") { return URL(string: src, relativeTo: imageBase)?.absoluteURL }
+        return URL(string: src)
+      }.flatMap { url in
         ["http", "https"].contains(url.scheme?.lowercased()) && url.host(percentEncoded: true)?.isEmpty == false ? url : nil
       }
       let image = MarkdownImage(source: source, alt: i.plainText, title: i.title.flatMap { $0.isEmpty ? nil : $0 })

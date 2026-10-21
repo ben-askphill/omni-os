@@ -46,6 +46,22 @@ const components: Components = {
     }
     return <code className={className}>{children as ReactNode}</code>;
   },
+  // Screenshots in PR bodies: fit the column, click for full size (unless the image is a link already).
+  img({ src, alt, title }) {
+    const open = typeof src === 'string' && /^(https?:\/\/|\/api\/)/i.test(src);
+    return (
+      <img
+        src={src}
+        alt={alt ?? ''}
+        title={title}
+        loading="lazy"
+        className={open ? 'cursor-zoom-in' : undefined}
+        onClick={(e) => {
+          if (open && !e.currentTarget.closest('a')) window.open(src as string, '_blank', 'noopener,noreferrer');
+        }}
+      />
+    );
+  },
 };
 
 export const Markdown = memo(function Markdown({ text, className = '' }: { text: string; className?: string }) {
