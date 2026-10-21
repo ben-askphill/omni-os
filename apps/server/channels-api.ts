@@ -2,6 +2,7 @@
 import { Hono } from 'hono';
 import { existsSync } from 'node:fs';
 import { z } from 'zod';
+import { expandHome } from './user-config.ts';
 import { parseChannelIcon, readSvgIcon, SVG_MAX, SVG_PREFIX } from '@omni/shared/channel-icon.ts';
 import { readDesignSystem } from '@omni/shared/design-system.ts';
 import { channels, folders as folderRepo, publicChannel, threads, type Channel, type Folder, type Thread } from './db.ts';
@@ -57,10 +58,11 @@ const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
   name: z.string().min(1),
   kind: z.enum(['client', 'internal', 'personal']).optional(),
-  repo_path: z.string().nullish(),
+  // `~/code/x` works as typed: the placeholder in both clients shows it that way.
+  repo_path: z.string().nullish().transform((p) => (p?.trim() ? expandHome(p.trim()) : p)),
   github_repo: z.string().nullish(),
   use_worktree: z.coerce.number().int().min(0).max(1).optional(),
-  base_dir: z.string().nullish(),
+  base_dir: z.string().nullish().transform((p) => (p?.trim() ? expandHome(p.trim()) : p)),
   store_domain: z.string().nullish(),
   portal_slug: z.string().nullish(),
   browser_headless: z.coerce.number().int().min(0).max(1).optional(),

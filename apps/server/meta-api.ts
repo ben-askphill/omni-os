@@ -5,6 +5,7 @@ import { lastRuns, loadAutomations, runAutomation, setEnabled } from './automati
 import { listCrew } from './crew.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
+import { HARNESS_INSTALL } from './harness/types.ts';
 import { runningByHarness } from './runner.ts';
 import { getProfile, profileInput, setProfile } from './profile.ts';
 import { deleteSecret, listSecrets, setSecret } from './secrets.ts';
@@ -26,7 +27,7 @@ metaApi.get('/crew', (c) => {
 metaApi.get('/harnesses', async (c) => {
   const cat = await freshCatalog();
   const running = runningByHarness();
-  return c.json(cat.harnesses.map((h) => ({ ...h, running: running[h.id] ?? 0 })));
+  return c.json(cat.harnesses.map((h) => ({ ...h, running: running[h.id] ?? 0, ...(!h.available && HARNESS_INSTALL[h.id] && { install: HARNESS_INSTALL[h.id] }) })));
 });
 
 metaApi.get('/secrets', (c) => c.json(listSecrets()));
@@ -46,8 +47,8 @@ metaApi.get('/profile', (c) => c.json(getProfile()));
 metaApi.put('/profile', async (c) => {
   // The first issue's text, so a client can show "Enter a name." as it is.
   const parsed = profileInput.safeParse(await c.req.json());
-  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid name' }, 400);
-  return c.json(setProfile(parsed.data.name));
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid profile' }, 400);
+  return c.json(setProfile(parsed.data));
 });
 
 metaApi.get('/automations', (c) => {

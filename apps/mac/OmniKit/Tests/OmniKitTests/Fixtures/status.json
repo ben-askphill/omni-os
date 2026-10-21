@@ -35,7 +35,11 @@
   "maxConcurrent": 4,
   "maxUploadMb": 25,
   "profile": {
-    "name": ""
+    "name": "",
+    "pronouns": "they/them",
+    "email": "",
+    "timezone": "Europe/Amsterdam",
+    "onboarded": false
   },
   "server": {
     "version": "0.1.0",

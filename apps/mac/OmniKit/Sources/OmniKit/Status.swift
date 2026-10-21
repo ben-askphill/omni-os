@@ -208,12 +208,14 @@ public struct HarnessInfo: Decodable, Hashable, Sendable, Identifiable {
   public let available: Bool
   /// The command that makes it available, e.g. "codex login".
   public let fix: String?
+  /// How to install the CLI when it is missing, for onboarding. Older servers leave it out.
+  public let install: String?
   public let models: [ModelEntry]
   public let cap: Int
   public let running: Int
 
   enum CodingKeys: String, CodingKey {
-    case id, name, plan, capabilities, available, fix, models, cap, running
+    case id, name, plan, capabilities, available, fix, install, models, cap, running
   }
 
   public init(from decoder: any Decoder) throws {
@@ -224,6 +226,7 @@ public struct HarnessInfo: Decodable, Hashable, Sendable, Identifiable {
     capabilities = try c.decode(HarnessCapabilities.self, forKey: .capabilities)
     available = try c.decode(Bool.self, forKey: .available)
     fix = try c.decodeIfPresent(String.self, forKey: .fix)
+    install = try c.decodeIfPresent(String.self, forKey: .install)
     models = try c.decode([ModelEntry].self, forKey: .models)
     cap = try c.decode(Int.self, forKey: .cap)
     running = try c.decodeIfPresent(Int.self, forKey: .running) ?? 0

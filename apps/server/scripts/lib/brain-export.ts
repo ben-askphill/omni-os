@@ -74,11 +74,13 @@ export interface PlanOptions {
   channel?: string;
   /** ISO date; threads last updated before it are left out. */
   since?: string;
-  /** Ben's home dir: imported history that ran there goes to imported/home. */
+  /** The user's home dir: imported history that ran there goes to imported/home. */
   home?: string;
   cursor: Cursor;
   redact: (s: string) => string;
   timezone?: string;
+  /** The user's name from the user config: the heading on their messages. Falls back to the old kv profile, then "User". */
+  user?: string;
 }
 
 // ---------- redaction ----------
@@ -481,7 +483,7 @@ const THREAD_SQL = `SELECT id, channel_id, title, status, role, model, cwd, pare
   created_at, updated_at FROM threads`;
 
 /** Every thread in scope with its digest or why it has none. Pure apart from reading `ro`. */
-/** The name set in Settings (kv `profile`), or "User" before the first-run step. apps/server/profile.ts is the writer. */
+/** The name an older install kept in kv `profile`, or "User". The user config (apps/server/user-config.ts) replaced it. */
 export function profileName(ro: DatabaseSync): string {
   try {
     const row = ro.prepare(`SELECT value FROM kv WHERE key = 'profile'`).get() as { value: string } | undefined;
@@ -493,9 +495,9 @@ export function profileName(ro: DatabaseSync): string {
 }
 
 export function plan(ro: DatabaseSync, opts: PlanOptions): Planned[] {
-  const tz = opts.timezone ?? 'Europe/Amsterdam';
+  const tz = opts.timezone ?? 'UTC';
   const channels = ro.prepare('SELECT id, name, kind, repo_path, base_dir FROM channels').all() as unknown as ChannelRow[];
-  const user = profileName(ro);
+  const user = opts.user?.trim() || profileName(ro);
   const threads = ro.prepare(`${THREAD_SQL} ORDER BY created_at, id`).all() as unknown as ThreadRow[];
   const byId = new Map(threads.map((t) => [t.id, t]));
   const kids = new Map<string, ThreadRow[]>();

@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { startRunner } from './runner-boot.ts';
 
 // Who uses this Omni: GET and PUT /api/profile, the name in /api/status, and the prompts that name the user
-// instead of a hardcoded one. Empty until the first-run step sets it.
+// instead of a hardcoded one. Empty until onboarding sets it; kept in the user config file, not the database.
 
 const r = await startRunner();
 const { app } = await import('../app.ts');
@@ -22,8 +24,8 @@ const thread = async () => {
 
 describe('profile', () => {
   it('starts empty, and status carries it', async () => {
-    expect(await json(await send('GET', '/api/profile'))).toEqual({ name: '' });
-    expect((await json(await send('GET', '/api/status'))).profile).toEqual({ name: '' });
+    expect(await json(await send('GET', '/api/profile'))).toMatchObject({ name: '', pronouns: 'they/them', onboarded: false });
+    expect((await json(await send('GET', '/api/status'))).profile).toMatchObject({ name: '', onboarded: false });
   });
 
   it('prompts say "the user" until a name is set', async () => {
@@ -39,14 +41,15 @@ describe('profile', () => {
   it('refuses an empty or too long name', async () => {
     expect((await send('PUT', '/api/profile', { name: '   ' })).status).toBe(400);
     expect((await send('PUT', '/api/profile', { name: 'x'.repeat(61) })).status).toBe(400);
-    expect((await send('PUT', '/api/profile', {})).status).toBe(400);
-    expect(await json(await send('GET', '/api/profile'))).toEqual({ name: '' });
+    expect((await send('PUT', '/api/profile', { email: 'not-an-email' })).status).toBe(400);
+    expect((await send('PUT', '/api/profile', { timezone: 'Mars/Olympus' })).status).toBe(400);
+    expect((await json(await send('GET', '/api/profile'))).name).toBe('');
   });
 
   it('saves a trimmed name and uses it everywhere', async () => {
-    expect(await json(await send('PUT', '/api/profile', { name: '  Tijs   Internet ' }))).toEqual({ name: 'Tijs Internet' });
-    expect(await json(await send('GET', '/api/profile'))).toEqual({ name: 'Tijs Internet' });
-    expect((await json(await send('GET', '/api/status'))).profile).toEqual({ name: 'Tijs Internet' });
+    expect((await json(await send('PUT', '/api/profile', { name: '  Tijs   Internet ' }))).name).toBe('Tijs Internet');
+    expect((await json(await send('GET', '/api/profile'))).name).toBe('Tijs Internet');
+    expect((await json(await send('GET', '/api/status'))).profile.name).toBe('Tijs Internet');
 
     const { thread: t, channel } = await thread();
     const prompt = buildSystemPrompt(t, channel);
@@ -57,7 +60,16 @@ describe('profile', () => {
     expect(describeMentions([])).toContain('Tijs Internet referred to these');
   });
 
-  it('keeps the name in the kv table, synced like other settings', async () => {
-    expect(r.db.kv.get('profile')).toEqual({ name: 'Tijs Internet' });
+  it('keeps the name in data/omni.config.json, not the database', async () => {
+    const file = JSON.parse(readFileSync(join(process.env.OMNI_DATA_DIR!, 'omni.config.json'), 'utf8'));
+    expect(file.user.name).toBe('Tijs Internet');
+    expect(r.db.kv.get('profile')).toBeUndefined();
+  });
+
+  it('asks the browser takeover in the configured pronoun', async () => {
+    await send('PUT', '/api/profile', { pronouns: 'she/her' });
+    const { thread: t, channel } = await thread();
+    expect(buildSystemPrompt(t, channel)).not.toMatch(/\bBen\b/);
+    await send('PUT', '/api/profile', { pronouns: 'they/them' });
   });
 });

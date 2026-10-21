@@ -19,8 +19,14 @@ interface AppState {
   status: Omit<Status, 'usage'> | null;
   /** The name Omni calls the user by, null until the first status load. Empty when nobody set it yet. */
   profile: Profile | null;
-  /** Save the name (PUT /api/profile) and show it at once. */
-  saveProfile: (p: Profile) => Promise<Profile>;
+  /** Save profile fields (PUT /api/profile) and show them at once. */
+  saveProfile: (p: Partial<Profile>) => Promise<Profile>;
+  /** Re-read the profile after onboarding or Settings wrote the user config. */
+  reloadProfile: () => Promise<void>;
+  /** The onboarding wizard: open on first run, or again from Settings. */
+  setupOpen: boolean;
+  openSetup: () => void;
+  closeSetup: () => void;
   feedLive: boolean;
   /** Every sub-agent running right now, across all threads. */
   tasks: BackgroundTask[];
@@ -48,6 +54,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [usage, setUsage] = useState<HarnessUsage>({});
   const [status, setStatus] = useState<Omit<Status, 'usage'> | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [setupWanted, setSetupWanted] = useState(false);
   const [feedLive, setFeedLive] = useState(false);
   const [tasks, setTasks] = useState<BackgroundTask[]>([]);
   const [mods, setMods] = useState<ModStatus[]>([]);
@@ -210,11 +217,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => h.close();
   }, [scheduleRefresh, reloadCrew, reloadTasks, needsYouChanged]);
 
-  const saveProfile = useCallback(async (p: Profile) => {
+  const saveProfile = useCallback(async (p: Partial<Profile>) => {
     const saved = await api.put<Profile>('/profile', p);
     setProfile(saved);
     return saved;
   }, []);
+  const reloadProfile = useCallback(async () => {
+    setProfile(await api.get<Profile>('/profile'));
+  }, []);
+  // An older server sends no `onboarded`: treat it as set up, as before.
+  const setupOpen = setupWanted || (!!profile && profile.onboarded === false);
+  const openSetup = useCallback(() => setSetupWanted(true), []);
+  const closeSetup = useCallback(() => setSetupWanted(false), []);
 
   const subscribe = useCallback((fn: (e: FeedEvent) => void) => {
     listeners.current.add(fn);
@@ -237,6 +251,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       status,
       profile,
       saveProfile,
+      reloadProfile,
+      setupOpen,
+      openSetup,
+      closeSetup,
       feedLive,
       tasks,
       mods,
@@ -247,7 +265,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openThread,
       setOpenThread,
     }),
-    [channels, channelsLoaded, channelsError, reloadChannels, pinned, setPinned, crew, usage, status, profile, saveProfile, feedLive, tasks, mods, subscribe, needsYou, readResult, openThread],
+    [channels, channelsLoaded, channelsError, reloadChannels, pinned, setPinned, crew, usage, status, profile, saveProfile, reloadProfile, setupOpen, openSetup, closeSetup, feedLive, tasks, mods, subscribe, needsYou, readResult, openThread],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

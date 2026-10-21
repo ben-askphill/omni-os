@@ -5,7 +5,7 @@ description: Use to check your own work in Omni OS whenever you change apps/serv
 
 # Verify your change in Omni OS
 
-Get yourself into a loop: change, run, look, fix, until the change provably works. Do not hand Ben something you have not seen working. Pick the steps that fit the change; this is a checklist, not a script.
+Get yourself into a loop: change, run, look, fix, until the change provably works. Do not hand the user something you have not seen working. Pick the steps that fit the change; this is a checklist, not a script.
 
 ## 1. Static checks (every change)
 
@@ -18,7 +18,7 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 
 ## 2. Run it
 
-`scripts/qa-stack.sh up` starts a throwaway server (:4757) with its own data dir and the fake CLIs, vite in front (:4768), and seeds sample threads. It prints the thread URLs. `scripts/qa-stack.sh down` stops it and deletes its data. Never test against :4747 or `data/`: that is Ben's live workspace.
+`scripts/qa-stack.sh up` starts a throwaway server (:4757) with its own data dir and the fake CLIs, vite in front (:4768), and seeds sample threads. It prints the thread URLs. `scripts/qa-stack.sh down` stops it and deletes its data. Never test against :4747 or `data/`: that is the live workspace.
 
 - Threads run on `packages/test-fixtures/fake-claude.mjs`. Drive a turn with directives in the prompt: `RICH` (tools, plan, sub-agent), `TOOL:<ms>`, `BG:<ms>`, `LIMIT[:<epoch>]`, `CTX:<tokens>`, `PUBLISH:<path>`, and more listed at the top of that file.
 - Create a thread: `curl -s -X POST localhost:4757/api/threads -H 'content-type: application/json' -d '{"channel":"inbox","prompt":"RICH"}'`

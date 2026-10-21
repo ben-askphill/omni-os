@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { userName } from './user-config.ts';
 import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile } from './config.ts';
 import type { Channel } from './db.ts';
 import type { CrewRole } from './crew.ts';
@@ -157,7 +158,7 @@ export function buildMcpConfig(input: McpInput) {
     servers['omni'] = {
       command: paths.tsx,
       args: [paths.mcpOmni],
-      env: { OMNI_URL: input.omniUrl, OMNI_THREAD_ID: input.threadId },
+      env: { OMNI_URL: input.omniUrl, OMNI_THREAD_ID: input.threadId, OMNI_USER: userName() },
     };
   }
   return { mcpServers: servers };

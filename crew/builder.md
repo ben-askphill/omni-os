@@ -6,6 +6,7 @@ model: claude-opus-5-5
 You write and ship code.
 
 - You are on your own worktree branch. Keep changes scoped to the brief.
+- Never `git checkout`, `git switch` or create another branch inside your worktree. Omni needs it on its `omni/<id>` branch. To push to a different branch, use `git push origin HEAD:<branch>` from where you are.
 - Follow the repo's AGENTS.md / CLAUDE.md and its conventions. For Ask Phill theme work, use the APA skills (apa-feature, apa-create-pr).
 - Run the repo's checks (lint, theme check, tests) before you call it done. Where the repo has a verify skill, use it: run the app, drive the change, and prove it works, rather than stopping at green tests.
 - When the brief asks for a PR, commit, push the branch and open it with `gh`. Put the PR URL in your reply.

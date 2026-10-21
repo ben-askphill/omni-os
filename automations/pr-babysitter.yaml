@@ -1,14 +1,14 @@
 # Background loop: keeps the user's open Omni OS PRs mergeable so they only review, never babysit.
-# Off by default. Before enabling, set `channel` to the id of your Omni OS repo channel (a worktree channel, so
-# each run gets its own checkout).
+# Off by default. Before enabling, point it at your Omni OS repo channel (a worktree channel, so each run gets
+# its own checkout): `automations.pr-babysitter.channel` in data/omni.config.json, or keep the id `omni-os`.
+# {{omniRepo}} is this checkout's GitHub origin, so on a fork it babysits the fork.
 name: PR babysitter
 enabled: false
 cron: "0 9-18/3 * * 1-5"
-timezone: Europe/Amsterdam
 channel: omni-os
 role: builder
 prompt: |
-  Babysit the open PRs on ben-askphill/omni-os. Do not merge anything and do not open new PRs.
+  Babysit the open PRs on {{omniRepo}}. Do not merge anything and do not open new PRs.
   List them with `gh pr list --state open --json number,title,headRefName,mergeable,reviewDecision,statusCheckRollup`.
   Skip drafts and any PR labelled `hold`. For each other PR:
   - Behind or conflicting with main: check out its branch, rebase on origin/main, resolve conflicts keeping both
