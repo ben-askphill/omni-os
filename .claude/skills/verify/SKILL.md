@@ -18,7 +18,7 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 
 ## 2. Run it
 
-`scripts/qa-stack.sh up` starts a throwaway server (:4757) with its own data dir and the fake CLIs, vite in front (:4768), and seeds sample threads. It prints the thread URLs. `scripts/qa-stack.sh down` stops it and deletes its data. Never test against :4747 or `data/`: that is the live workspace.
+`scripts/qa-stack.sh up` starts a throwaway server (:4757) with its own data dir and the fake CLIs, vite in front (:4768), and seeds sample threads. It prints the thread URLs. `QA_SERVER_PORT=<port> scripts/qa-stack.sh down` stops it and deletes its data. `down` refuses to run without the port, and refuses a stack whose processes run from another checkout, so it cannot stop another thread's stack. Never test against :4747 or `data/`: that is the live workspace.
 
 - Threads run on `packages/test-fixtures/fake-claude.mjs`. Drive a turn with directives in the prompt: `RICH` (tools, plan, sub-agent), `TOOL:<ms>`, `BG:<ms>`, `LIMIT[:<epoch>]`, `CTX:<tokens>`, `PUBLISH:<path>`, and more listed at the top of that file.
 - Create a thread: `curl -s -X POST localhost:4757/api/threads -H 'content-type: application/json' -d '{"channel":"inbox","prompt":"RICH"}'`
@@ -42,7 +42,7 @@ If something stopped you (a missing env var, a crash on boot, a step here that i
 
 Known blockers:
 - The server crashes on boot if `OMNI_AUTOMATIONS_DIR` points at a missing dir. `qa-stack.sh` creates it.
-- macOS has no `setsid`; `qa-stack.sh` falls back to perl's `setpgrp` so `down` still stops the process groups.
+- macOS has no `setsid`; `qa-stack.sh` falls back to perl's `setpgrp`. The PID file holds the subshell, so `down` stops the group its child leads.
 - Another worktree's QA stack can already hold :4757 (`up` then logs "port 4757 ... is in use" and your curls hit the wrong code). Check `lsof -nP -iTCP:4757 -sTCP:LISTEN` and move with `QA_SERVER_PORT`/`QA_WEB_PORT`.
 - With several agents running, 4757/4768 and the next obvious pairs (4791, 4801, 4811) are often all taken. Check with `lsof` and pick a pair that is free (for example 4893/4894), passing the same env `qa-stack.sh` uses.
 - A live Cursor turn needs the real CLI: point `OMNI_CURSOR_BIN` at it instead of `fake-cursor.mjs`. Cursor's dashboard calls (`harness/cursor/dashboard.ts`) run on a QA stack by default and are off in vitest (`OMNI_CURSOR_DASHBOARD=0`).
