@@ -28,6 +28,78 @@ Both show the same channels and threads. They never share code directly: see [We
 
 Forking Omni for yourself? Read [FORKING.md](FORKING.md) too: it says what is yours and how to pull updates.
 
+### Let an agent set it up
+
+The quickest way in: open Claude Code, Codex or Cursor in an empty terminal and paste this. Swap `<you>` for your GitHub owner, or point it at an existing clone.
+
+```text
+Clone github.com/<you>/omni-os to ~/omni-os (skip if it is already there), then install and run its
+Mac app. Follow the "Agent instructions" in the README's Getting started section step by step, run
+every check it lists, and stop and tell me if a check fails. Ask me before running `npm run setup`
+without --yes, since it asks who I am.
+```
+
+#### Agent instructions
+
+For an agent doing the setup. Run each step, run its check, and stop on a failed check instead of working around it. Don't run `sudo`, don't install Xcode for the user, and never write secret values anywhere but the Keychain.
+
+1. **Prerequisites.** Check each one; on a miss, give the user the fix and wait.
+
+   | Check | Fix |
+   | --- | --- |
+   | `uname` prints `Darwin` | The Mac app is Mac-only; use the Web UI on Linux |
+   | `node -v` is 24 or later | `nvm install 24` or `brew install node` |
+   | `xcodebuild -version` prints a version | Install Xcode from the App Store, then `sudo xcode-select -s /Applications/Xcode.app` |
+   | `claude --version` works | `npm install -g @anthropic-ai/claude-code`, then the user runs `claude` and `/login` |
+   | `gh auth status` is signed in | `brew install gh && gh auth login` (the user does the login) |
+
+   Command Line Tools alone are not enough: `xcodebuild` needs full Xcode.
+
+2. **Clone.** Skip if the folder is a checkout already.
+
+   ```bash
+   git clone https://github.com/<you>/omni-os.git ~/omni-os
+   cd ~/omni-os
+   ```
+
+   The Mac app starts the server from `~/omni-os` by default. If you clone somewhere else, note the path for step 5.
+
+3. **Install.**
+
+   ```bash
+   npm install --include=dev
+   ```
+
+   `--include=dev` matters: with `NODE_ENV=production` in the shell (common in agent shells), a plain `npm install` skips dev dependencies like Turborepo and Vite, so `npm run dev` and `npm test` fail later. Check: `npx turbo --version` prints a version.
+
+4. **Set up.** Ask the user for their name and email, then:
+
+   ```bash
+   npm run setup -- --yes --name "<name>" --email "<email>"
+   ```
+
+   Check: `data/omni.config.json` exists. Skipping this is fine too; the app asks the same questions on first open.
+
+5. **Build and open the Mac app.**
+
+   ```bash
+   scripts/build-mac.sh
+   ```
+
+   It builds in Release, installs to `~/Applications/Omni.app` and opens it. The first build fetches Swift packages from GitHub, so it takes a few minutes. Check: the script ends with `==> Opened Omni`. On a failure it prints the errors and the log path (`apps/mac/.xcode/build-release.log`); read the log before retrying.
+
+   Cloned somewhere other than `~/omni-os`? Pass the path on the first open, then set it for good in the app under **Settings > Connection > Repo**:
+
+   ```bash
+   scripts/build-mac.sh -- -repoPath "$PWD"
+   ```
+
+6. **Confirm it runs.** The app starts the server itself. Check: `curl -s http://127.0.0.1:4747/api/status` returns JSON. If port 4747 is taken by something else, stop and tell the user rather than killing it.
+
+7. **Hand over.** Tell the user the app is open, that first-run setup (if step 4 was skipped) waits in the app, and that `scripts/build-mac.sh` again rebuilds it after a `git pull`.
+
+Prefer the browser? Steps 1 to 4 are the same; then `npm run dev` and open http://localhost:4748.
+
 ### What you need
 
 - macOS (the Mac app and Keychain secrets are Mac-only; the server and Web UI also run on Linux without them)
