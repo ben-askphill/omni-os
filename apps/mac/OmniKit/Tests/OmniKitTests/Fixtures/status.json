@@ -34,6 +34,9 @@
   "queued": 0,
   "maxConcurrent": 4,
   "maxUploadMb": 25,
+  "profile": {
+    "name": ""
+  },
   "server": {
     "version": "0.1.0",
     "pid": 4242,

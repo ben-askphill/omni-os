@@ -9,6 +9,7 @@ import { emptyCursor, makeRedactor, plan, envSecretValues, NOTES_MAX, type Curso
 
 const SCHEMA = `
 CREATE TABLE channels (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, repo_path TEXT, base_dir TEXT);
+CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE folders (id TEXT PRIMARY KEY, channel_id TEXT, parent_id TEXT, name TEXT NOT NULL);
 CREATE TABLE threads (id TEXT PRIMARY KEY, channel_id TEXT NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, role TEXT,
   model TEXT, cwd TEXT NOT NULL, parent_id TEXT, task_id TEXT, source TEXT NOT NULL DEFAULT 'manual',
@@ -73,6 +74,7 @@ beforeEach(() => {
   channel('conductor', 'system');
   channel('testrepo', 'internal');
   channel('imported', 'internal');
+  db.prepare(`INSERT INTO kv (key, value) VALUES ('profile', '{"name":"Ben"}')`).run();
 });
 
 describe('plan', () => {

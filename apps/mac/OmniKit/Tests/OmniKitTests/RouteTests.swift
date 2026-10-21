@@ -16,6 +16,7 @@ import OmniKit
     .search(query: "fix the cart & checkout? 100%+"),
     .automations,
     .secrets,
+    .settings,
     .artifacts,
     .newChannel,
     .notFound(path: "/nope"),
@@ -38,6 +39,7 @@ import OmniKit
     #expect(Route.search(query: "a b&c").hash == "#/search?q=a%20b%26c")
     #expect(Route.automations.hash == "#/automations")
     #expect(Route.secrets.hash == "#/secrets")
+    #expect(Route.settings.hash == "#/settings")
     #expect(Route.artifacts.hash == "#/artifacts")
     #expect(Route.newChannel.hash == "#/new-channel")
   }

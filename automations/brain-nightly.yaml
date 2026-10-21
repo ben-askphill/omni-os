@@ -11,7 +11,7 @@ timezone: Europe/Amsterdam
 channel: phillbert
 role: builder
 prompt: |
-  Refresh Ben's central brain from Omni history since the last refresh. Work in ~/omni-os and ~/central-brain by absolute path;
+  Refresh the user's central brain from Omni history since the last refresh. Work in ~/omni-os and ~/central-brain by absolute path;
   this run's own worktree is not involved, and you open no PRs.
 
   1. Export: `cd ~/omni-os && npm run brain-export`. It writes redacted digests for new thread activity to

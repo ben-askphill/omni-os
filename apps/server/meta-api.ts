@@ -1,4 +1,4 @@
-// /api/crew, /harnesses, /secrets, /automations.
+// /api/crew, /harnesses, /secrets, /automations, /profile.
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { lastRuns, loadAutomations, runAutomation, setEnabled } from './automations.ts';
@@ -6,6 +6,7 @@ import { listCrew } from './crew.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { runningByHarness } from './runner.ts';
+import { getProfile, profileInput, setProfile } from './profile.ts';
 import { deleteSecret, listSecrets, setSecret } from './secrets.ts';
 
 export const metaApi = new Hono();
@@ -38,6 +39,15 @@ metaApi.delete('/secrets', async (c) => {
   const { scope, name } = z.object({ scope: z.string(), name: z.string() }).parse(await c.req.json());
   await deleteSecret(scope, name);
   return c.json({ ok: true });
+});
+
+// Who uses this Omni. The name is in GET /api/status too, so a client learns it with the rest of the workspace.
+metaApi.get('/profile', (c) => c.json(getProfile()));
+metaApi.put('/profile', async (c) => {
+  // The first issue's text, so a client can show "Enter a name." as it is.
+  const parsed = profileInput.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid name' }, 400);
+  return c.json(setProfile(parsed.data.name));
 });
 
 metaApi.get('/automations', (c) => {

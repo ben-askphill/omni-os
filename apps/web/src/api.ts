@@ -52,6 +52,11 @@ export interface HarnessSlot {
   running: number;
   cap: number;
 }
+/** Who uses this Omni (GET and PUT /api/profile). `name` is empty until the first-run step sets it. */
+export interface Profile {
+  name: string;
+}
+
 export interface Status {
   usage: HarnessUsage;
   slots: Partial<Record<HarnessId, HarnessSlot>>;
@@ -59,6 +64,8 @@ export interface Status {
   queued: number;
   maxConcurrent: number;
   maxUploadMb: number;
+  /** Older servers leave it out. */
+  profile?: Profile;
 }
 
 export interface ThreadDetail {

@@ -139,10 +139,12 @@ public struct Status: Decodable, Hashable, Sendable {
   public let queued: Int
   public let maxConcurrent: Int
   public let maxUploadMb: Double
+  /// Who uses this Omni. Older servers leave it out; a name that is empty means nobody set one yet.
+  public let profile: Profile?
   public let server: ServerInfo?
 
   enum CodingKeys: String, CodingKey {
-    case usage, slots, running, queued, maxConcurrent, maxUploadMb, server
+    case usage, slots, running, queued, maxConcurrent, maxUploadMb, profile, server
   }
 
   public init(from decoder: any Decoder) throws {
@@ -154,6 +156,7 @@ public struct Status: Decodable, Hashable, Sendable {
     queued = try c.decode(Int.self, forKey: .queued)
     maxConcurrent = try c.decode(Int.self, forKey: .maxConcurrent)
     maxUploadMb = try c.decode(Double.self, forKey: .maxUploadMb)
+    profile = try c.decodeIfPresent(Profile.self, forKey: .profile)
     server = try c.decodeIfPresent(ServerInfo.self, forKey: .server)
   }
 }

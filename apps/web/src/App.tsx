@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { ContextMenuHost } from './components/ContextMenu.tsx';
+import { Onboarding } from './components/Onboarding.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { ThreadNotifier, ToastProvider } from './components/Toaster.tsx';
@@ -11,6 +12,7 @@ import { HomePage } from './pages/Home.tsx';
 import { NewChannelPage } from './pages/ChannelSettings.tsx';
 import { SearchPage } from './pages/Search.tsx';
 import { SecretsPage } from './pages/Secrets.tsx';
+import { SettingsPage } from './pages/Settings.tsx';
 import { SyncPage } from './pages/Sync.tsx';
 import { ThreadPage } from './pages/Thread.tsx';
 import { href, navigate, requestComposerFocus, useHash, useRoute, type Route } from './router.ts';
@@ -101,6 +103,8 @@ function Page({ route }: { route: Route }) {
       return <SecretsPage />;
     case 'sync':
       return <SyncPage />;
+    case 'settings':
+      return <SettingsPage />;
     case 'artifacts':
       return <ArtifactsPage />;
     case 'new-channel':
@@ -132,6 +136,8 @@ function mobileTitle(route: Route, channelName: (id: string) => string | undefin
       return 'Secrets';
     case 'sync':
       return 'Sync';
+    case 'settings':
+      return 'Settings';
     case 'artifacts':
       return 'Artifacts';
     case 'new-channel':
@@ -265,6 +271,7 @@ function Shell() {
 
       {showNav && <MobileNav route={route} onMenu={() => setDrawer(true)} onSearch={openPalette} />}
       <CommandPalette open={palette} onClose={closePalette} />
+      <Onboarding />
       <ThreadNotifier />
       <ContextMenuHost />
       <FolderDeleteDialog />

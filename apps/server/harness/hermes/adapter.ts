@@ -14,6 +14,7 @@ import { spawnHolder } from '../holder.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
 import { HermesClient, HermesHttpError } from './client.ts';
+import { userName } from '../../profile.ts';
 import { applyHermesEvent, emptyHermesNorm, eventFromRun, type HermesNormState } from './normalize.ts';
 
 interface Outgoing {
@@ -35,7 +36,7 @@ function composeInput(m: Outgoing): string {
     m.text,
     '',
     '## Attachments',
-    'Ben attached files on his Mac. They were not transferred to this server, so you cannot read them.',
+    `${userName()} attached files on their Mac. They were not transferred to this server, so you cannot read them.`,
   ];
   for (const a of m.attachments) {
     lines.push(`- ${a.name} (${a.mime}, ${Math.max(1, Math.round(a.size / 1024))} KB) — not transferred`);

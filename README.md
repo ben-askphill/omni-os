@@ -61,6 +61,8 @@ npm run test:mac                  # OmniKit tests, headless
 
 Or open `apps/mac/Omni.xcodeproj` in Xcode and run the `Omni` scheme. The app finds the server on :4747, or starts one from the repo. See `apps/mac/NOTES.md`.
 
+On first open, both clients ask what to call you. The name goes into the Home greeting and into every agent's prompt, and lives in Settings (web `#/settings`, Mac Settings > Profile). It is one kv row, so it syncs with your other settings.
+
 Config is optional: copy `.env.example` to `.env` (gitignored) and uncomment what you need. It covers the brain dir (`~/phillbert` by default, the cwd and context for non-repo channels), default model, permission mode, concurrency per harness, keepalive, Hermes URL, browser flags, data and automations dirs, upload cap, reply suggestions and timezone.
 
 ## Who can call the API
