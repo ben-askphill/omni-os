@@ -19,6 +19,8 @@ export interface Automation {
   effort?: string;
   prompt: string;
   enabled: boolean;
+  /** Run a slot that was missed because the Mac was asleep or Omni was not running, once Omni is back. */
+  catchup?: boolean;
   file: string;
   error?: string;
   next?: string | null;
@@ -45,6 +47,7 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
     prompt: String(y.prompt ?? '').trim(),
     enabled: y.enabled === true,
     file,
+    catchup: y.catchup === true,
   };
   if (yamlError) (a.error = yamlError), (a.enabled = false);
   else if (!a.cron) a.error = 'missing cron';
@@ -71,7 +74,7 @@ export function loadAutomations(): Automation[] {
 
 const jobs = new Map<string, Cron>();
 
-export async function runAutomation(a: Automation, trigger: 'cron' | 'manual') {
+export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 'catchup') {
   const date = new Date().toLocaleDateString('en-GB', { timeZone: a.timezone, day: 'numeric', month: 'short' });
   const thread = await createThread({
     channel: a.channel,
@@ -95,6 +98,42 @@ export async function runAutomation(a: Automation, trigger: 'cron' | 'manual') {
 export async function fireScheduled(a: Automation) {
   if (!runsAutomationsHere()) return null;
   return runAutomation(a, 'cron');
+}
+
+/** Slots younger than this belong to the cron job itself, which may still be starting the run. */
+const CATCHUP_GRACE_MS = 2 * 60_000;
+const catchingUp = new Set<string>();
+
+/**
+ * Runs the most recent slot of a `catchup: true` automation when no run of any kind started at or after it,
+ * because the Mac slept through it or Omni was not running. Older missed slots fold into this one run. Gated
+ * like a cron tick. Returns the thread, or null when nothing was missed.
+ */
+export async function catchUp(a: Automation, now = new Date()) {
+  if (!a.catchup || !a.enabled || a.error || catchingUp.has(a.id)) return null;
+  const slot = new Cron(a.cron, { timezone: a.timezone, paused: true }).previousRuns(1, now)[0];
+  if (!slot || now.getTime() - slot.getTime() < CATCHUP_GRACE_MS) return null;
+  const ran = db
+    .prepare('SELECT 1 FROM automation_runs WHERE automation = ? AND created_at >= ? LIMIT 1')
+    .get(a.id, slot.toISOString());
+  if (ran || !runsAutomationsHere()) return null;
+  catchingUp.add(a.id);
+  console.log(`[automations] ${a.id} missed ${slot.toISOString()}, catching up`);
+  try {
+    return await runAutomation(a, 'catchup');
+  } finally {
+    catchingUp.delete(a.id);
+  }
+}
+
+function catchUpAll() {
+  let all: Automation[];
+  try {
+    all = loadAutomations();
+  } catch (err) {
+    return console.error('[automations] could not load automations:', err);
+  }
+  for (const a of all) catchUp(a).catch((err) => console.error(`[automations] ${a.id} catch-up failed:`, err));
 }
 
 export function lastRuns(id: string, limit = 10) {
@@ -127,6 +166,7 @@ function scheduleAll() {
     );
   }
   console.log(`[automations] ${jobs.size} scheduled`);
+  catchUpAll();
 }
 
 export function setEnabled(id: string, enabled: boolean) {
@@ -138,8 +178,12 @@ export function setEnabled(id: string, enabled: boolean) {
   schedule();
 }
 
+// Also how a catch-up notices the Mac woke up: timers sleep with it, so this fires soon after wake.
+const CATCHUP_EVERY_MS = 5 * 60_000;
+
 export function startScheduler() {
   schedule();
+  setInterval(catchUpAll, CATCHUP_EVERY_MS).unref();
   let t: NodeJS.Timeout | undefined;
   watch(paths.automations, () => {
     clearTimeout(t);

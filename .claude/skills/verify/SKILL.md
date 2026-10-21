@@ -43,3 +43,4 @@ If something stopped you (a missing env var, a crash on boot, a step here that i
 Known blockers:
 - The server crashes on boot if `OMNI_AUTOMATIONS_DIR` points at a missing dir. `qa-stack.sh` creates it.
 - macOS has no `setsid`; `qa-stack.sh` falls back to perl's `setpgrp` so `down` still stops the process groups.
+- Another worktree's QA stack can already hold :4757 (`up` then logs "port 4757 ... is in use" and your curls hit the wrong code). Check `lsof -nP -iTCP:4757 -sTCP:LISTEN` and move with `QA_SERVER_PORT`/`QA_WEB_PORT`.

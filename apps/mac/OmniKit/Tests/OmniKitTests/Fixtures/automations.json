@@ -8,6 +8,7 @@
     "prompt": "Never runs.",
     "enabled": true,
     "file": "/tmp/omni-fixtures/automations/broken.yaml",
+    "catchup": false,
     "error": "invalid schedule (cron \"61 8 * * *\", timezone \"Europe/Amsterdam\"): CronPattern: Invalid value for minute: 61",
     "runs": []
   },
@@ -22,6 +23,7 @@
     "prompt": "Summarize what changed in the cart since yesterday.",
     "enabled": true,
     "file": "/tmp/omni-fixtures/automations/daily-digest.yaml",
+    "catchup": false,
     "next": "2026-01-05T09:00:00.000Z",
     "runs": [
       {

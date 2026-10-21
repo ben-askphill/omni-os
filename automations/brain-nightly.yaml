@@ -1,14 +1,17 @@
-# Nightly central-brain refresh: exports new Omni thread history as digests, then ingests them into ~/central-brain.
+# Central-brain refresh: exports new Omni thread history as digests, then ingests them into ~/central-brain.
+# 16:30 on weekdays, while the laptop is usually open. `catchup: true` runs a missed slot once Omni is back
+# (Mac asleep, lid shut or server stopped); the export cursor makes a late run pick up everything since the last.
 # Scheduled runs fire only on the Mac named by kv `automations.owner` (apps/server/sync/owner.ts), so the export
 # cursor and the central-brain commits come from one Mac. A manual run is never gated, so run it by hand on the owner.
 name: Brain nightly
 enabled: true
-cron: "0 22 * * 1-5"
+cron: "30 16 * * 1-5"
+catchup: true
 timezone: Europe/Amsterdam
 channel: phillbert
 role: builder
 prompt: |
-  Refresh Ben's central brain from today's Omni history. Work in ~/omni-os and ~/central-brain by absolute path;
+  Refresh Ben's central brain from Omni history since the last refresh. Work in ~/omni-os and ~/central-brain by absolute path;
   this run's own worktree is not involved, and you open no PRs.
 
   1. Export: `cd ~/omni-os && npm run brain-export`. It writes redacted digests for new thread activity to
@@ -20,7 +23,7 @@ prompt: |
      (`channel_id`, `channel_kind`), merge into existing pages rather than overwriting, keep project hubs current,
      refresh index.md, and move each processed file to archive/ with the same path (never delete). If raw/ holds
      nothing new, skip to step 5.
-  4. Commit and push: `git add -A && git commit -m "ingest: <n> raw files processed (nightly)" && git push`.
+  4. Commit and push: `git add -A && git commit -m "ingest: <n> raw files processed (brain refresh)" && git push`.
   5. Reply in at most 6 bullets: export counts, pages created and updated per section (me, work, personal),
      anything you could not place, and the commit link.
 
