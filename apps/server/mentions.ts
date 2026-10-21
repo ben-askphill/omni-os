@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { artifacts } from './db.ts';
+import { userName } from './profile.ts';
 import { mentionTokens, type FileMention } from '@omni/shared/mention-menu.ts';
 
 const MAX_FILES = 20_000;
@@ -126,7 +127,7 @@ export function resolveMentions(text: string, opts: { cwd: string | null; thread
 export function describeMentions(found: Mentioned[]): string {
   const lines = [
     '## Mentioned files',
-    'Ben referred to these with @ in the message above. Read them with Read or cat.',
+    `${userName()} referred to these with @ in the message above. Read them with Read or cat.`,
     ...found.map((m) => `- @${m.token} (${m.kind === 'artifact' ? 'artifact in this thread' : m.kind}): ${m.path}`),
   ];
   return lines.join('\n');

@@ -22,6 +22,7 @@ import OmniKit
 
   @Test func secretsLiveInSettings() {
     #expect(Route.secrets.settingsTab == .secrets)
+    #expect(Route.settings.settingsTab == .profile)
     for route: Route in [.home, .artifacts, .automations, .newChannel, .channel(id: "acme"), .search(query: "x")] {
       #expect(route.settingsTab == nil, "\(route)")
     }

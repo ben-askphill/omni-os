@@ -11,6 +11,7 @@ export type Route =
   | { name: 'automations' }
   | { name: 'secrets' }
   | { name: 'sync' }
+  | { name: 'settings' }
   | { name: 'artifacts' }
   | { name: 'new-channel' }
   | { name: 'notfound'; path: string };
@@ -45,6 +46,7 @@ export function parseHash(hash: string): Route {
   if (a === 'automations' && !b) return { name: 'automations' };
   if (a === 'secrets' && !b) return { name: 'secrets' };
   if (a === 'sync' && !b) return { name: 'sync' };
+  if (a === 'settings' && !b) return { name: 'settings' };
   if (a === 'artifacts' && !b) return { name: 'artifacts' };
   if (a === 'new-channel' && !b) return { name: 'new-channel' };
   return { name: 'notfound', path: pathPart };
@@ -86,6 +88,8 @@ export const href = {
   automations: () => '#/automations',
   secrets: () => '#/secrets',
   sync: () => '#/sync',
+  /** The workspace Settings page (your name). A channel's own settings tab is `settings(id)`. */
+  settingsPage: () => '#/settings',
   artifacts: () => '#/artifacts',
   newChannel: () => '#/new-channel',
 };

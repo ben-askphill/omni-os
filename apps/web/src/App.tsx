@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { ContextMenuHost } from './components/ContextMenu.tsx';
+import { Onboarding } from './components/Onboarding.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
+import { BrowserNotifier } from './components/BrowserNotifier.tsx';
 import { ThreadNotifier, ToastProvider } from './components/Toaster.tsx';
 import { Empty, Icon, IconButton, LinkButton, Thumb, useSlidingThumb, Wordmark, type IconName } from './components/ui.tsx';
 import { AutomationsPage } from './pages/Automations.tsx';
@@ -11,6 +13,7 @@ import { HomePage } from './pages/Home.tsx';
 import { NewChannelPage } from './pages/ChannelSettings.tsx';
 import { SearchPage } from './pages/Search.tsx';
 import { SecretsPage } from './pages/Secrets.tsx';
+import { SettingsPage } from './pages/Settings.tsx';
 import { SyncPage } from './pages/Sync.tsx';
 import { ThreadPage } from './pages/Thread.tsx';
 import { href, navigate, requestComposerFocus, useHash, useRoute, type Route } from './router.ts';
@@ -101,6 +104,8 @@ function Page({ route }: { route: Route }) {
       return <SecretsPage />;
     case 'sync':
       return <SyncPage />;
+    case 'settings':
+      return <SettingsPage />;
     case 'artifacts':
       return <ArtifactsPage />;
     case 'new-channel':
@@ -132,6 +137,8 @@ function mobileTitle(route: Route, channelName: (id: string) => string | undefin
       return 'Secrets';
     case 'sync':
       return 'Sync';
+    case 'settings':
+      return 'Settings';
     case 'artifacts':
       return 'Artifacts';
     case 'new-channel':
@@ -249,11 +256,8 @@ function Shell() {
         <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="scrim absolute inset-0" onClick={() => setDrawer(false)} />
           <div className="scheme-dark drawer-in absolute inset-y-0 left-0 flex w-[86%] max-w-[300px] flex-col overflow-hidden rounded-r-[28px] shadow-[var(--shadow-menu)]">
-            <div className="absolute top-3 right-2 z-10 pt-[env(safe-area-inset-top)]">
-              <IconButton icon="x" label="Close menu" onClick={() => setDrawer(false)} />
-            </div>
             <div className="h-full bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-              <Sidebar onNavigate={() => setDrawer(false)} onSearch={openPalette} />
+              <Sidebar onNavigate={() => setDrawer(false)} onSearch={openPalette} onClose={() => setDrawer(false)} />
             </div>
           </div>
         </div>
@@ -265,7 +269,9 @@ function Shell() {
 
       {showNav && <MobileNav route={route} onMenu={() => setDrawer(true)} onSearch={openPalette} />}
       <CommandPalette open={palette} onClose={closePalette} />
+      <Onboarding />
       <ThreadNotifier />
+      <BrowserNotifier />
       <ContextMenuHost />
       <FolderDeleteDialog />
     </div>

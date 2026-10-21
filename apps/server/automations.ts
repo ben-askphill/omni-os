@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync, existsSync, watch } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, mkdirSync, watch } from 'node:fs';
 import { join } from 'node:path';
 import { Cron } from 'croner';
 import YAML from 'yaml';
@@ -6,11 +6,16 @@ import { config, paths } from './config.ts';
 import { automationRuns, db } from './db.ts';
 import { createThread } from './runner.ts';
 import { runsAutomationsHere } from './sync/owner.ts';
+import { parseTrigger, type EventTrigger } from './automation-events.ts';
+import { fillPlaceholders, updateUserConfig, userConfig } from './user-config.ts';
 
 export interface Automation {
   id: string;
   name: string;
+  /** Empty for an event automation. */
   cron: string;
+  /** Set for an event automation: it runs when this happens, not on a schedule. */
+  on?: EventTrigger;
   timezone: string;
   channel: string;
   role?: string;
@@ -44,14 +49,22 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
     harness: y.harness,
     model: y.model,
     effort: y.effort,
-    prompt: String(y.prompt ?? '').trim(),
+    prompt: fillPlaceholders(String(y.prompt ?? '').trim()),
     enabled: y.enabled === true,
     file,
     catchup: y.catchup === true,
   };
+  if (!yamlError && y.on !== undefined) {
+    const t = parseTrigger(y.on);
+    if (typeof t === 'string') a.error = `invalid "on": ${t}`;
+    else a.on = t;
+  }
   if (yamlError) (a.error = yamlError), (a.enabled = false);
-  else if (!a.cron) a.error = 'missing cron';
+  else if (a.error) return a;
+  else if (a.on && a.cron) a.error = 'set either cron or on, not both';
+  else if (!a.on && !a.cron) a.error = 'missing cron';
   else if (!a.prompt) a.error = 'missing prompt';
+  else if (a.on) a.next = null;
   else {
     try {
       a.next = new Cron(a.cron, { timezone: a.timezone, paused: true }).nextRun()?.toISOString() ?? null;
@@ -62,19 +75,30 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
   return a;
 }
 
+/**
+ * The shared automations in automations/ and the user's own in data/automations/ (same id there wins). The user
+ * config's per-automation overrides (`enabled`, `channel`) apply last, so turning one on never edits a repo file.
+ */
 export function loadAutomations(): Automation[] {
-  if (!existsSync(paths.automations)) return [];
-  return readdirSync(paths.automations)
-    .filter((f) => /\.ya?ml$/.test(f))
-    .map((f) => {
-      const file = join(paths.automations, f);
-      return parseAutomation(f.replace(/\.ya?ml$/, ''), readFileSync(file, 'utf8'), file);
-    });
+  const files = new Map<string, string>();
+  for (const dir of [paths.automations, paths.personalAutomations]) {
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir)) if (/\.ya?ml$/.test(f)) files.set(f.replace(/\.ya?ml$/, ''), join(dir, f));
+  }
+  const overrides = userConfig().automations;
+  return [...files].map(([id, file]) => {
+    const a = parseAutomation(id, readFileSync(file, 'utf8'), file);
+    const o = overrides[id];
+    if (o?.channel) a.channel = o.channel;
+    if (o?.enabled !== undefined && !a.error) a.enabled = o.enabled;
+    return a;
+  });
 }
 
 const jobs = new Map<string, Cron>();
 
-export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 'catchup') {
+/** `event` runs pass their own prompt (the automation's plus what happened) and title. */
+export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 'catchup' | 'event', event?: { prompt: string; title: string }) {
   const date = new Date().toLocaleDateString('en-GB', { timeZone: a.timezone, day: 'numeric', month: 'short' });
   const thread = await createThread({
     channel: a.channel,
@@ -82,8 +106,8 @@ export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 
     harness: a.harness,
     model: a.model,
     effort: a.effort,
-    prompt: a.prompt,
-    title: `${a.name} · ${date}`,
+    prompt: event?.prompt ?? a.prompt,
+    title: event?.title ?? `${a.name} · ${date}`,
     source: 'automation',
     automation: a.id,
   });
@@ -110,7 +134,7 @@ const catchingUp = new Set<string>();
  * like a cron tick. Returns the thread, or null when nothing was missed.
  */
 export async function catchUp(a: Automation, now = new Date()) {
-  if (!a.catchup || !a.enabled || a.error || catchingUp.has(a.id)) return null;
+  if (!a.catchup || !a.enabled || a.error || a.on || catchingUp.has(a.id)) return null;
   const slot = new Cron(a.cron, { timezone: a.timezone, paused: true }).previousRuns(1, now)[0];
   if (!slot || now.getTime() - slot.getTime() < CATCHUP_GRACE_MS) return null;
   const ran = db
@@ -157,7 +181,7 @@ function scheduleAll() {
   for (const j of jobs.values()) j.stop();
   jobs.clear();
   for (const a of loadAutomations()) {
-    if (!a.enabled || a.error) continue;
+    if (!a.enabled || a.error || a.on) continue; // event automations are started by apps/server/automation-watch.ts
     jobs.set(
       a.id,
       new Cron(a.cron, { timezone: a.timezone, protect: true }, () => {
@@ -169,12 +193,11 @@ function scheduleAll() {
   catchUpAll();
 }
 
+/** Turn one on or off for this user: an override in data/omni.config.json, never an edit to the YAML. */
 export function setEnabled(id: string, enabled: boolean) {
   const a = loadAutomations().find((x) => x.id === id);
   if (!a) throw new Error('automation not found');
-  const doc = YAML.parseDocument(readFileSync(a.file, 'utf8'));
-  doc.set('enabled', enabled);
-  writeFileSync(a.file, doc.toString());
+  updateUserConfig({ automations: { [id]: { enabled } } });
   schedule();
 }
 
@@ -185,8 +208,10 @@ export function startScheduler() {
   schedule();
   setInterval(catchUpAll, CATCHUP_EVERY_MS).unref();
   let t: NodeJS.Timeout | undefined;
-  watch(paths.automations, () => {
-    clearTimeout(t);
-    t = setTimeout(schedule, 300);
-  });
+  mkdirSync(paths.personalAutomations, { recursive: true });
+  for (const dir of [paths.automations, paths.personalAutomations])
+    watch(dir, () => {
+      clearTimeout(t);
+      t = setTimeout(schedule, 300);
+    });
 }

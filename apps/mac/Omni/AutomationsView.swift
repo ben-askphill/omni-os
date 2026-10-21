@@ -54,7 +54,7 @@ struct AutomationsList: View {
       VStack(alignment: .leading, spacing: 0) {
         OmniPageHeader(
           title: "Automations",
-          subtitle: "Scheduled prompts. Each run becomes a thread in its channel. Definitions live in automations/*.yaml and reload on save."
+          subtitle: "Scheduled or event-triggered prompts. Each run becomes a thread in its channel. Definitions live in automations/*.yaml and reload on save."
         ) {
           Button {
             Task { await automations.load() }
@@ -172,6 +172,12 @@ struct AutomationSection: View {
           if let badge = automation.badge(enabled: enabled) { Badge(badge: badge) }
         }
         details.padding(.top, z(8))
+        if let watching = automation.watching(enabled: enabled) {
+          Text(watching)
+            .font(.omni(size: 12.5))
+            .foregroundStyle(automation.pollError == nil ? Tok.fg3 : Tok.fg2)
+            .padding(.top, z(10))
+        }
         if automation.nextRun(enabled: enabled) != nil {
           TimelineView(.everyMinute) { context in
             if let next = automation.nextRun(enabled: enabled, now: context.date) {
@@ -217,12 +223,12 @@ struct AutomationSection: View {
   private var details: some View {
     FlowRow(spacing: 6, lineSpacing: 6) {
       HStack(spacing: z(6)) {
-        OmniIcon(name: "clock", size: 12).foregroundStyle(Tok.fg3)
+        OmniIcon(name: automation.isEvent ? "pr" : "clock", size: 12).foregroundStyle(Tok.fg3)
         Text(automation.schedule)
       }
       .chip()
       .help(automation.scheduleHelp)
-      Text(automation.cron)
+      Text(automation.scheduleDetail)
         .font(.omni(size: 11, design: .monospaced))
         .foregroundStyle(Tok.fg4)
         .padding(.horizontal, z(8))
@@ -320,8 +326,8 @@ private struct RunRow: View {
       GlyphView(glyph: Glyph(run.dotStatus), size: 7)
       Text(run.label).lineLimit(1).truncationMode(.tail)
       Spacer(minLength: z(8))
-      if run.isManual {
-        Text("manual").font(.omni(size: 10.5)).foregroundStyle(Tok.fg4)
+      if let label = run.triggerLabel {
+        Text(label).font(.omni(size: 10.5)).foregroundStyle(Tok.fg4)
       }
       TimelineView(.everyMinute) { context in
         Text(RelTime.label(run.createdAt, now: context.date))

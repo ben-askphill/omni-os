@@ -27,6 +27,7 @@ final class QARunner {
   /// Captured by the main window, since only a view can read it.
   static var openSettings: OpenSettingsAction?
   static var openThreadWindow: ((String) -> Void)?
+  static var quickPrompt: QuickPromptController?
   private static var current: QARunner?
 
   /// Read from the raw arguments: UserDefaults would parse a JSON value as an old-style property list.
@@ -215,6 +216,14 @@ final class QARunner {
           try? await Task.sleep(for: .milliseconds(400))
         case .webTitle(let title):
           try await InspectorProbe.waitForTitle(title)
+        case .quickPrompt(let action):
+          guard let quick = Self.quickPrompt else { throw QAScriptError("no Quick Prompt") }
+          switch action {
+          case .open(let text): quick.show(dictate: false, text: text)
+          case .send: await quick.submit(open: false)
+          case .close: quick.hide()
+          }
+          try? await Task.sleep(for: .milliseconds(500))
         case .quit:
           finish(result, started)
           await end()
@@ -430,6 +439,7 @@ final class QARunner {
     case .folder(let action): "folder \(action)"
     case .screen(let name): "screen \(name)"
     case .palette(let query): "palette \(query ?? "close")"
+    case .quickPrompt(let action): "quickPrompt \(action)"
     case .quit: "quit"
     }
   }
@@ -521,7 +531,7 @@ final class QARunner {
 
   private static var windows: [NSWindow] {
     NSApp.windows
-      .filter { $0.isVisible && $0.styleMask.contains(.titled) && !($0 is NSPanel) }
+      .filter { $0.isVisible && (($0.styleMask.contains(.titled) && !($0 is NSPanel)) || $0.identifier == QuickPromptPanel.identifier) }
       .sorted { $0.windowNumber < $1.windowNumber }
   }
 

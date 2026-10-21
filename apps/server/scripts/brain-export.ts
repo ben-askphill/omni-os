@@ -2,7 +2,7 @@
 //
 //   npm run brain-export -- [--channel <id>] [--since <YYYY-MM-DD>] [--dry-run] [--out <dir>]
 //
-//   --out       export root; files land in <out>/omni/<channel-id>/. Default $OMNI_BRAIN_EXPORT_DIR or ~/central-brain/raw.
+//   --out       export root; files land in <out>/omni/<channel-id>/. Default $OMNI_BRAIN_EXPORT_DIR, else <central brain>/raw from the user config.
 //   --channel   one channel, by id. Imported history counts as the channel its cwd matches.
 //   --since     only threads updated on or after this date.
 //   --dry-run   write nothing and leave the cursor alone; print what would be written and its size.
@@ -11,7 +11,7 @@
 // event uid per thread, so a rerun skips what it already wrote and a resumed thread gets only its new events,
 // as -part2, -part3. Tool calls and results never leave Omni; secret values, token-shaped strings, IP addresses
 // and SSH details become [REDACTED] before anything is written. Secret values are never printed.
-// A Conductor thread that delegated gets a stub: Ben's messages and the threads it handed work to.
+// A Conductor thread that delegated gets a stub: the user's messages and the threads it handed work to.
 // Imported history with no channel goes to imported/<project folder>; temp dirs, scratchpads and worktrees are skipped.
 //
 // Run it on one Mac only. The cursor syncs, so the follow-up automation should gate on the kv key
@@ -24,6 +24,7 @@ import { dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { promisify } from 'node:util';
 import { config, paths } from '../config.ts';
+import { resolved } from '../user-config.ts';
 import { CURSOR_KEY, emptyCursor, envSecretValues, makeRedactor, plan, type Cursor, type SkipReason } from './lib/brain-export.ts';
 
 const run = promisify(execFile);
@@ -36,7 +37,8 @@ interface Args {
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { out: process.env.OMNI_BRAIN_EXPORT_DIR || join(homedir(), 'central-brain', 'raw'), dryRun: false };
+  const brain = resolved.centralBrainDir();
+  const a: Args = { out: process.env.OMNI_BRAIN_EXPORT_DIR || (brain ? join(brain, 'raw') : ''), dryRun: false };
   const value = (i: number, flag: string) => {
     const v = argv[i];
     if (!v || v.startsWith('--')) {
@@ -64,6 +66,10 @@ function parseArgs(argv: string[]): Args {
   }
   if (a.since && Number.isNaN(Date.parse(a.since))) {
     console.error('--since must be a date like 2026-10-01');
+    process.exit(2);
+  }
+  if (!a.out) {
+    console.error('No export folder: set integrations.centralBrainDir with `npm run setup` (or in Settings), or pass --out <dir>.');
     process.exit(2);
   }
   a.out = resolve(a.out.replace(/^~(?=\/|$)/, homedir()));
@@ -101,7 +107,7 @@ async function main() {
   const cursor: Cursor = stored ? JSON.parse(stored.value) : emptyCursor();
 
   const redact = makeRedactor([...(await keychainValues(ro)), ...envSecretValues(process.env)]);
-  const planned = plan(ro, { channel: args.channel, since: args.since, cursor, redact, timezone: config.timezone, home: homedir() });
+  const planned = plan(ro, { channel: args.channel, since: args.since, cursor, redact, timezone: config.timezone, home: homedir(), user: resolved.name() });
 
   const skips: Partial<Record<SkipReason, number>> = {};
   const perChannel = new Map<string, { files: number; bytes: number }>();

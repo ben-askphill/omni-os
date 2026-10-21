@@ -3,7 +3,9 @@
 # dir and the fake CLIs, vite in front of it, and a few seeded threads. It never touches :4747 or data/.
 #
 #   scripts/qa-stack.sh up [--seed N]   start, wait until healthy, seed N sample threads (default 3), print URLs
-#   scripts/qa-stack.sh down            stop it and delete its data dir
+#   QA_SERVER_PORT=N scripts/qa-stack.sh down
+#                                       stop the stack on port N and delete its data dir. The port is required, and it
+#                                       only stops processes this checkout started (their PID file and working dir)
 #   scripts/qa-stack.sh status          print the URLs and whether each process is alive
 #   scripts/qa-stack.sh logs            tail the server and vite logs
 #
@@ -26,6 +28,9 @@ detach() {
   if command -v setsid >/dev/null; then setsid "$@"; else perl -e 'setpgrp(0, 0); exec @ARGV or die "exec: $!"' "$@"; fi
 }
 alive() { [ -f "$DIR/$1.pid" ] && kill -0 "$(cat "$DIR/$1.pid")" 2>/dev/null; }
+# up starts every process from $ROOT, so a recorded PID whose working dir is elsewhere belongs to another checkout's
+# stack on the same port (or is a reused PID), and down must leave it alone.
+cwd_of() { lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; }
 
 [ "$SERVER_PORT" != 4747 ] || die "refusing port 4747, that is the live server"
 
@@ -66,8 +71,26 @@ up() {
 }
 
 down() {
+  local p pid cwd
   for p in web server; do
-    if alive "$p"; then kill -- -"$(cat "$DIR/$p.pid")" 2>/dev/null || kill "$(cat "$DIR/$p.pid")" 2>/dev/null || true; fi
+    alive "$p" || continue
+    pid="$(cat "$DIR/$p.pid")"
+    cwd="$(cwd_of "$pid")"
+    if [ "$cwd" != "$(pwd -P)" ]; then
+      STARTING=0 die "$p pid $pid in $DIR runs from ${cwd:-an unknown dir}, not $(pwd -P); not ours, leaving the stack alone"
+    fi
+  done
+  # The recorded PID is the subshell that ran detach, so the process group to stop is led by it or by its child.
+  # Only kill groups led by one of those two, never the group this script or its caller runs in.
+  local c pg
+  for p in web server; do
+    alive "$p" || continue
+    pid="$(cat "$DIR/$p.pid")"
+    for c in "$pid" $(pgrep -P "$pid"); do
+      pg="$(ps -o pgid= -p "$c" | tr -d ' ')"
+      [ "$pg" = "$c" ] && kill -- -"$pg" 2>/dev/null || true
+    done
+    kill "$pid" 2>/dev/null || true
   done
   sleep 1
   rm -rf "$DIR"
@@ -88,8 +111,11 @@ status() {
 
 case "${1:-}" in
   up) shift; up "$@" ;;
-  down) down ;;
+  down)
+    # Without a port, down would pick the default stack, which may be another thread's.
+    [ -n "${QA_SERVER_PORT:-}" ] || { echo "qa-stack: down needs QA_SERVER_PORT, the port you started the stack on" >&2; exit 2; }
+    down ;;
   status) status ;;
   logs) tail -n 50 -f "$DIR/server.log" "$DIR/web.log" ;;
-  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

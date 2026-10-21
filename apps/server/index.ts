@@ -23,9 +23,14 @@ const { closeAllTerminals } = await import('./terminal.ts');
 const { startArtifactWatcher } = await import('./artifacts.ts');
 const { backfillPublished } = await import('./published.ts');
 const { startScheduler } = await import('./automations.ts');
+const { startEventWatch } = await import('./automation-watch.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
 const { startSync } = await import('./sync/worker.ts');
 const { startWorktreeSweep } = await import('./worktree-sweep.ts');
+const { migrateLegacyConfig } = await import('./config-migrate.ts');
+
+// An install from before data/omni.config.json keeps its old settings and skips onboarding.
+migrateLegacyConfig();
 
 const onBindError = (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') console.error(`[omni] port ${config.port} on ${config.host} is in use. Stopped before touching any thread.`);
@@ -54,6 +59,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startArtifactWatcher();
   backfillPublished();
   startScheduler();
+  startEventWatch();
   startCatalogRefresh();
   // Removes worktrees of archived, deleted and merged-and-idle threads that hold nothing unsaved, now and daily.
   startWorktreeSweep();
@@ -62,7 +68,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   if (!isLoopback(config.host)) {
     console.warn(`[omni] ${config.host} is not loopback. Anyone who can open the port can read threads, write Keychain entries via POST /api/secrets, merge PRs, and type into a thread shell.`);
   }
-  console.log(`[omni] listening on http://${config.host}:${info.port}  brain=${config.brainDir}`);
+  console.log(`[omni] listening on http://${config.host}:${info.port}  workspace=${config.brainDir}`);
 });
 server.once('error', onBindError);
 

@@ -7,6 +7,26 @@ public struct AutomationTrigger: OpenEnum {
   public static let cron: Self = "cron"
   /// Run now.
   public static let manual: Self = "manual"
+  /// Started by a GitHub event (`on:`), server/automation-watch.ts.
+  public static let event: Self = "event"
+}
+
+/// An event automation's `on:` block, as GET /api/automations sends it.
+public struct AutomationEvent: Decodable, Hashable, Sendable {
+  public let event: String
+  public let repo: String?
+  public let drafts: Bool
+
+  /// `describeEvent` in web/src/format.ts.
+  public var label: String {
+    switch event {
+    case "pr_opened": "When a PR opens"
+    case "pr_checks_failed": "When PR checks fail"
+    case "pr_conflict": "When a PR has conflicts"
+    case "pr_review": "When a PR gets review comments"
+    default: event
+    }
+  }
 }
 
 /// A row of `automation_runs`, with the status and title of the thread it started. Both are nil once the
@@ -31,6 +51,8 @@ public struct AutomationRun: Decodable, Hashable, Sendable, Identifiable {
   /// A run that has not started draws as a ring.
   public var dotIsHollow: Bool { dotStatus == .queued || dotStatus == .imported }
   public var isManual: Bool { trigger == .manual }
+  /// The small label after the title: "manual" or "event", nothing for a scheduled run.
+  public var triggerLabel: String? { trigger == .cron ? nil : trigger.rawValue }
   /// Finished runs stand full height in the strip, the rest lower.
   public var isTall: Bool { status == .done }
 
@@ -45,7 +67,14 @@ public struct AutomationRun: Decodable, Hashable, Sendable, Identifiable {
 public struct Automation: Decodable, Hashable, Sendable, Identifiable {
   public let id: String
   public let name: String
+  /// Empty for an event automation.
   public let cron: String
+  /// Set for an event automation: it runs when this happens on GitHub instead of on a schedule.
+  public let on: AutomationEvent?
+  /// The repo an event automation watches, nil when it has none.
+  public let repo: String?
+  /// Why the last GitHub poll for an event automation failed.
+  public let pollError: String?
   /// An IANA name, the server's OMNI_TZ unless the file says otherwise.
   public let timezone: String
   public let channel: String
@@ -60,11 +89,22 @@ public struct Automation: Decodable, Hashable, Sendable, Identifiable {
   public let runs: [AutomationRun]
 
   enum CodingKeys: String, CodingKey {
-    case id, name, cron, timezone, channel, role, model, prompt, enabled, file, error, next, runs
+    case id, name, cron, on, repo, timezone, channel, role, model, prompt, enabled, file, error, next, runs
+    case pollError = "poll_error"
   }
 
-  public var schedule: String { AutomationSchedule.describe(cron) }
-  public var scheduleHelp: String { "\(cron) (\(timezone))" }
+  public var isEvent: Bool { on != nil }
+  /// The first chip: the event in words, or the schedule.
+  public var schedule: String { on?.label ?? AutomationSchedule.describe(cron) }
+  public var scheduleHelp: String { on.map { "on: \($0.event)\($0.drafts ? " (drafts too)" : "")" } ?? "\(cron) (\(timezone))" }
+  /// The second chip: the watched repo, or the cron as written.
+  public var scheduleDetail: String { isEvent ? (repo ?? "no repo") : cron }
+
+  /// "Watching owner/name, one run per event", or the poll error. nil for a scheduled or paused automation.
+  public func watching(enabled: Bool) -> String? {
+    guard enabled, error == nil, isEvent else { return nil }
+    return pollError ?? "Watching \(repo ?? "no repo"), one run per event"
+  }
 
   public func badge(enabled: Bool) -> AutomationBadge? {
     if error != nil { return .invalid }

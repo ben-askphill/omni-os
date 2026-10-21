@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { api, errorText, useApi, type Automation, type Thread } from '../api.ts';
 import { Button, Chip, Empty, ErrorNote, Icon, Loading, PageHeader, StatusDot, Toggle } from '../components/ui.tsx';
-import { describeCron, nextRunLabel, relTime, shortPath } from '../format.ts';
+import { describeCron, describeEvent, nextRunLabel, relTime, shortPath } from '../format.ts';
 import { href, navigate } from '../router.ts';
 import { useApp, useFeed } from '../store.tsx';
 
@@ -83,17 +83,32 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
             {a.error && <Chip tone="needs">Invalid</Chip>}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-fg-2">
-            <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-bg px-2.5 whitespace-nowrap" title={`${a.cron} (${a.timezone})`}>
-              <Icon name="clock" size={12} className="text-fg-3" />
-              {describeCron(a.cron)}
-            </span>
-            <span className="inline-flex h-6 items-center rounded-full px-2 font-mono text-[11px] whitespace-nowrap text-fg-4 shadow-[inset_0_0_0_1px_var(--line)]">{a.cron}</span>
+            {a.on ? (
+              <>
+                <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-bg px-2.5 whitespace-nowrap" title={`on: ${a.on.event}${a.on.drafts ? ' (drafts too)' : ''}`}>
+                  <Icon name="pr" size={12} className="text-fg-3" />
+                  {describeEvent(a.on.event)}
+                </span>
+                <span className="inline-flex h-6 items-center rounded-full px-2 font-mono text-[11px] whitespace-nowrap text-fg-4 shadow-[inset_0_0_0_1px_var(--line)]">{a.repo ?? 'no repo'}</span>
+              </>
+            ) : (
+              <>
+                <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-bg px-2.5 whitespace-nowrap" title={`${a.cron} (${a.timezone})`}>
+                  <Icon name="clock" size={12} className="text-fg-3" />
+                  {describeCron(a.cron)}
+                </span>
+                <span className="inline-flex h-6 items-center rounded-full px-2 font-mono text-[11px] whitespace-nowrap text-fg-4 shadow-[inset_0_0_0_1px_var(--line)]">{a.cron}</span>
+              </>
+            )}
             <a href={href.channel(a.channel)} className="hov inline-flex h-6 items-center rounded-full bg-bg px-2.5 [--hov:var(--surface-2)]">
               #{ch?.name ?? a.channel}
             </a>
             {a.role && <span className="inline-flex h-6 items-center rounded-full bg-bg px-2.5">{a.role}</span>}
             {a.model && <span className="inline-flex h-6 items-center rounded-full bg-bg px-2.5 font-num text-[11px]">{a.model}</span>}
           </div>
+          {enabled && a.on && !a.error && (
+            <div className="mt-2.5 text-[12.5px] text-fg-3">{a.poll_error ? <span className="text-fg-2">{a.poll_error}</span> : <>Watching <span className="font-medium text-fg">{a.repo}</span>, one run per event</>}</div>
+          )}
           {enabled && a.next && !a.error && (
             <div className="mt-2.5 text-[12.5px] text-fg-3">
               Next run <span className="font-medium text-fg">{nextRunLabel(a.next, a.timezone)}</span>
@@ -143,7 +158,7 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
                 <>
                   <StatusDot status={r.status ?? 'failed'} size={7} />
                   <span className="min-w-0 flex-1 truncate">{r.title ?? 'Thread removed'}</span>
-                  {r.trigger === 'manual' && <span className="shrink-0 font-num text-[10.5px] text-fg-4">manual</span>}
+                  {r.trigger !== 'cron' && <span className="shrink-0 font-num text-[10.5px] text-fg-4">{r.trigger}</span>}
                   <span className="w-24 shrink-0 text-right font-num text-[11px] text-fg-4">{relTime(r.created_at)}</span>
                 </>
               );
@@ -187,7 +202,7 @@ export function AutomationsPage() {
         title="Automations"
         subtitle={
           <>
-            Scheduled prompts. Each run becomes a thread in its channel. Definitions live in <span className="font-mono text-[12px]">automations/*.yaml</span> and reload on save.
+            Scheduled or event-triggered prompts. Each run becomes a thread in its channel. Definitions live in <span className="font-mono text-[12px]">automations/*.yaml</span> and reload on save.
           </>
         }
         actions={<Button size="sm" variant="ghost" icon="refresh" onClick={reload} busy={res.loading && !!res.data} aria-label="Refresh" />}

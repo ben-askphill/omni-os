@@ -191,6 +191,89 @@ describe('a worktree thread', () => {
   });
 });
 
+describe('a worktree its agent moved to another branch', () => {
+  /** A thread that ran in its worktree, whose agent then ran `git checkout` there; its next message is refused. */
+  const moved = async (prompt: string) => {
+    const dir = repo();
+    const id = `moved-${++n}`;
+    const branch = `omni/${id.padEnd(8, '0').slice(0, 8)}`;
+    const cwd = join(r.paths.worktrees, id);
+    git(dir, 'worktree', 'add', '-q', '-b', branch, cwd, 'HEAD');
+    const t = r.db.threads.create({
+      id, channel_id: channel(dir), title: prompt, status: 'done', role: null, model: null, session_id: id, cwd, branch,
+      parent_id: null, task_id: null, source: 'manual', automation: null, has_run: 1,
+    });
+    return { dir, t };
+  };
+  const send = async (id: string, prompt: string) => {
+    expect((await request('POST', `/threads/${id}/messages`, { prompt })).status).toBe(200);
+    return failed(id);
+  };
+
+  it('switches a clean worktree back to its branch on Retry and sends the message', async () => {
+    const { t } = await moved('start');
+    git(t.cwd, 'checkout', '-q', '-b', 'chore/other');
+    expect((await send(t.id, 'carry on')).setup_error).toMatch(/is on branch chore\/other, not omni\//);
+    await retry(t.id);
+    await r.untilResults(t.id, 1);
+    expect(git(t.cwd, 'branch', '--show-current')).toBe(t.branch);
+    // The branch it was moved to is kept.
+    expect(git(t.cwd, 'branch', '--list', 'chore/other')).toMatch(/chore\/other/);
+    expect(r.thread(t.id).setup).toBeNull();
+  });
+
+  it('switches a clean detached HEAD back to its branch', async () => {
+    const { t } = await moved('start');
+    git(t.cwd, 'checkout', '-q', '--detach');
+    expect((await send(t.id, 'carry on')).setup_error).toMatch(/detached HEAD/);
+    await retry(t.id);
+    await r.untilResults(t.id, 1);
+    expect(git(t.cwd, 'branch', '--show-current')).toBe(t.branch);
+  });
+
+  it('leaves a dirty worktree alone and says what to do', async () => {
+    const { t } = await moved('start');
+    git(t.cwd, 'checkout', '-q', '-b', 'chore/dirty');
+    writeFileSync(join(t.cwd, 'README.md'), 'edited\n');
+    for (let i = 0; i < 12; i++) writeFileSync(join(t.cwd, `new-${i}.txt`), 'x\n');
+    await send(t.id, 'carry on');
+    await retry(t.id);
+    await r.until('the retry to fail', () => r.thread(t.id).setup === 'failed' && /uncommitted/.test(r.thread(t.id).setup_error ?? ''));
+    const error = r.thread(t.id).setup_error!;
+    expect(error).toContain(`is on branch chore/dirty, not ${t.branch}`);
+    expect(error).toContain('README.md');
+    expect(error).toContain('and 3 more');
+    expect(error).toContain(`git -C ${t.cwd} checkout ${t.branch}`);
+    // Nothing touched: same branch, same edits, nothing run.
+    expect(git(t.cwd, 'branch', '--show-current')).toBe('chore/dirty');
+    expect(git(t.cwd, 'status', '--porcelain', '--untracked-files=all').split('\n')).toHaveLength(13);
+    expect(r.spawns(t.id)).toEqual([]);
+  });
+
+  it('recreates its branch from HEAD when the branch was deleted', async () => {
+    const { t } = await moved('start');
+    git(t.cwd, 'checkout', '-q', '-b', 'chore/gone');
+    git(t.cwd, 'branch', '-q', '-D', t.branch!);
+    await send(t.id, 'carry on');
+    await retry(t.id);
+    await r.untilResults(t.id, 1);
+    expect(git(t.cwd, 'branch', '--show-current')).toBe(t.branch);
+  });
+
+  it('still blocks a worktree of another repository at its path', async () => {
+    const dir = repo({ empty: true });
+    const t = await r.runner.createThread({ channel: channel(dir), prompt: 'go' });
+    await failed(t.id);
+    commit(dir);
+    const other = repo();
+    git(other, 'worktree', 'add', '-q', '-b', 'elsewhere', t.cwd, 'HEAD');
+    await retry(t.id);
+    await r.until('the retry to fail', () => r.thread(t.id).setup === 'failed' && /in the way/.test(r.thread(t.id).setup_error ?? ''));
+    expect(git(t.cwd, 'branch', '--show-current')).toBe('elsewhere');
+    expect(r.spawns(t.id)).toEqual([]);
+  });
+});
+
 describe('the shared launch path', () => {
   /** A thread that ran before, on a branch, with its folder now somewhere it must not run. */
   const ranBefore = (ch: string, cwd: string, branch: string) => {

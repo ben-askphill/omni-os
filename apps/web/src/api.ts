@@ -52,6 +52,42 @@ export interface HarnessSlot {
   running: number;
   cap: number;
 }
+/** Who uses this Omni (GET and PUT /api/profile). `name` is empty until onboarding sets it. */
+export interface Profile {
+  name: string;
+  pronouns?: string;
+  email?: string;
+  timezone?: string;
+  /** False until onboarding finished (web, Mac or `npm run setup`). Older servers leave it out. */
+  onboarded?: boolean;
+}
+
+/** The user config (data/omni.config.json) behind onboarding and Settings: GET and PUT /api/setup. Empty strings mean the default. */
+export interface UserConfig {
+  onboardedAt?: string;
+  user: { name: string; pronouns: string; email: string; timezone: string };
+  workspace: { root: string; reposDir: string; githubOwner: string };
+  integrations: { hermesUrl: string; centralBrainDir: string };
+  automations: Record<string, { enabled?: boolean; channel?: string }>;
+}
+export type UserConfigPatch = {
+  user?: Partial<UserConfig['user']>;
+  workspace?: Partial<UserConfig['workspace']>;
+  integrations?: Partial<UserConfig['integrations']>;
+};
+export interface SetupState {
+  onboarded: boolean;
+  /** Where the file lives, with ~ for the home folder. */
+  path: string;
+  config: UserConfig;
+  /** What each value resolves to on the server's machine, defaults included. */
+  resolved: { timezone: string; workspaceRoot: string; reposDir: string; centralBrainDir: string; hermesUrl: string };
+  fallbacks: { timezone: string; workspaceRoot: string; reposDir: string; home: string };
+  omniRepo: string | null;
+  /** POST /api/setup/complete only: the #conductor thread holding the welcome message, on the first run. */
+  threadId?: string | null;
+}
+
 export interface Status {
   usage: HarnessUsage;
   slots: Partial<Record<HarnessId, HarnessSlot>>;
@@ -59,6 +95,8 @@ export interface Status {
   queued: number;
   maxConcurrent: number;
   maxUploadMb: number;
+  /** Older servers leave it out. */
+  profile?: Profile;
 }
 
 export interface ThreadDetail {
@@ -236,10 +274,22 @@ export interface AutomationRun {
   status: string | null;
   title: string | null;
 }
+export interface AutomationTrigger {
+  event: 'pr_opened' | 'pr_checks_failed' | 'pr_conflict' | 'pr_review' | (string & {});
+  repo?: string;
+  drafts: boolean;
+}
 export interface Automation {
   id: string;
   name: string;
+  /** Empty for an event automation. */
   cron: string;
+  /** Set for an event automation: it runs when this happens on GitHub instead of on a schedule. */
+  on?: AutomationTrigger;
+  /** The repo an event automation watches (its `on.repo`, else its channel's), null when there is none. */
+  repo?: string | null;
+  /** Why the last GitHub poll for an event automation failed. */
+  poll_error?: string | null;
   timezone: string;
   channel: string;
   role?: string;
