@@ -12,6 +12,7 @@ import OmniKit
     (.artifacts, .artifacts),
     (.automations, .automations),
     (.secrets, .secrets),
+    (.settings, .settings),
   ])
   func routesSelectTheirRow(route: Route, item: SidebarItem) {
     #expect(SidebarItem(route: route) == item)
@@ -31,6 +32,7 @@ import OmniKit
     (.artifacts, .artifacts),
     (.automations, .automations),
     (.secrets, .secrets),
+    (.settings, .settings),
   ])
   func rowsOpenTheirRoute(item: SidebarItem, route: Route) {
     #expect(item.route == route)
@@ -53,6 +55,7 @@ import OmniKit
     (.search(query: "x"), "Search"),
     (.automations, "Automations"),
     (.secrets, "Secrets"),
+    (.settings, "Settings"),
     (.artifacts, "Artifacts"),
     (.newChannel, "New channel"),
     (.notFound(path: "/x"), "Omni"),
@@ -67,5 +70,6 @@ import OmniKit
     #expect(Route.channel(id: "acme").newThreadRoute == .channel(id: "acme"))
     #expect(Route.thread(id: "t1").newThreadRoute == .home)
     #expect(Route.secrets.newThreadRoute == .home)
+    #expect(Route.settings.newThreadRoute == .home)
   }
 }

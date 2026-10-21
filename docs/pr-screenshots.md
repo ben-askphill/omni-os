@@ -28,6 +28,6 @@ scripts/pr-screenshots.sh shots/*.png
 
 It commits the images to the orphan `pr-screenshots` branch under a folder named after the current branch and prints one Markdown image line per file. Paste those under a `## Screenshots` heading in the PR body, grouped as before/after, with a line on what to look at. Re-running with the same file names replaces the images, so update them after review fixes.
 
-Copy the images to the thread's artifacts folder as well, so Ben sees them in the thread.
+Copy the images to the thread's artifacts folder as well, so you see them in the thread.
 
 If screenshots can't be taken (the app won't build, no display), say so under `## Screenshots` and why, rather than leaving the section out.

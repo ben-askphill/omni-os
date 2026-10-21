@@ -101,6 +101,8 @@ public final class AppModel {
   public let shell = ShellState()
   /// The tab the Settings window shows.
   public var settingsTab = SettingsTab.connection
+  /// The onboarding sheet was asked for again from Settings > Profile. On first run the status opens it instead.
+  public var setupRequested = false
   /// The last start that failed, until the server runs, Start is pressed again or the settings change.
   public private(set) var startFailure: StartFailure?
   /// Banners for threads that finish, fail or stop. The window shows them.

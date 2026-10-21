@@ -19,7 +19,8 @@
     "import-history": "npm run import-history --workspace @omni/server --",
     "build:slash": "npm run build:slash --workspace @omni/mac",
     "sync:backfill": "npm run sync:backfill --workspace @omni/server --",
-    "brain-export": "npm run brain-export --workspace @omni/server --"
+    "brain-export": "npm run brain-export --workspace @omni/server --",
+    "setup": "npm run setup --workspace @omni/server --"
   },
   "engines": {
     "node": ">=24"

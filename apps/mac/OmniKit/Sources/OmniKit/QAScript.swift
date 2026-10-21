@@ -67,7 +67,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// One step of a Debug QA run, from the JSON the app gets with `-OmniQAScript`:
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
-/// `{"settings": "secrets"}` (or `connection`, `sync`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
+/// `{"settings": "secrets"}` (or `connection`, `profile`, `sync`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
 /// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`), `{"expand": true}`, `{"meter": true}`, `{"foldAll": true}`,
 /// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`,
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
@@ -243,7 +243,7 @@ public struct QAScript: Hashable, Sendable {
       return .open(window)
     case "settings":
       guard let name = value as? String, let tab = SettingsTab(rawValue: name) else {
-        throw QAScriptError("settings takes connection, secrets, sync, notifications, appearance or quickPrompt")
+        throw QAScriptError("settings takes connection, profile, secrets, sync, notifications, appearance or quickPrompt")
       }
       return .settings(tab)
     case "openThread":

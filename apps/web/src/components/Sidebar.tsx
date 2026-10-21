@@ -11,7 +11,7 @@ import { readPref, useApp, useNow, writePref } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { ThemeSwitch } from './theme.tsx';
 import { HarnessLogo, Loader, OmniMark } from './brand.tsx';
-import { ChannelMark, ErrorNote, Icon, Kbd, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
+import { ChannelMark, ErrorNote, Icon, IconButton, Kbd, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -470,7 +470,8 @@ const GROUPS: { kind: string; label: string }[] = [
   { kind: 'personal', label: 'Personal' },
 ];
 
-export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onSearch: () => void }) {
+// onClose is the mobile drawer's: its X sits in the header beside collapse-all, both at a 44px touch size.
+export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => void; onSearch: () => void; onClose?: () => void }) {
   const route = useRoute();
   const hash = useHash();
   const { channels, channelsError, openThread, tasks, pinned } = useApp();
@@ -699,17 +700,20 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
         <a href={href.home()} onClick={onNavigate} aria-label="Omni home" className="wordmark-write">
           <Wordmark size={18} />
         </a>
-        {channels.length > 0 && (
-          <button
-            type="button"
-            onClick={toggleAll}
-            aria-label={foldAll === 'collapse' ? 'Collapse all channels' : 'Expand all channels'}
-            title={foldAll === 'collapse' ? 'Collapse all channels' : 'Expand all channels'}
-            className="hov grid h-7 w-7 shrink-0 place-items-center rounded-full text-fg-3 transition-colors hover:text-fg"
-          >
-            <Icon name={foldAll === 'collapse' ? 'foldAll' : 'unfoldAll'} size={15} />
-          </button>
-        )}
+        <div className={`flex items-center ${onClose ? '-mr-1' : ''}`}>
+          {channels.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleAll}
+              aria-label={foldAll === 'collapse' ? 'Collapse all channels' : 'Expand all channels'}
+              title={foldAll === 'collapse' ? 'Collapse all channels' : 'Expand all channels'}
+              className={`hov grid shrink-0 place-items-center rounded-full text-fg-3 transition-colors hover:text-fg ${onClose ? 'h-11 w-11' : 'h-7 w-7'}`}
+            >
+              <Icon name={foldAll === 'collapse' ? 'foldAll' : 'unfoldAll'} size={onClose ? 17 : 15} />
+            </button>
+          )}
+          {onClose && <IconButton icon="x" label="Close menu" onClick={onClose} className="h-11 w-11" />}
+        </div>
       </div>
 
       <div className="space-y-2 px-3">
@@ -817,6 +821,9 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
               </NavLink>
               <NavLink to={href.sync()} icon="refresh" active={route.name === 'sync'} onNavigate={onNavigate}>
                 Sync
+              </NavLink>
+              <NavLink to={href.settingsPage()} icon="sliders" active={route.name === 'settings'} onNavigate={onNavigate}>
+                Settings
               </NavLink>
             </div>
           </div>

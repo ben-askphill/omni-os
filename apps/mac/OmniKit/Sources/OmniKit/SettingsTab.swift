@@ -2,13 +2,17 @@ import Foundation
 
 /// A tab of the Settings window.
 public enum SettingsTab: String, CaseIterable, Hashable, Sendable {
-  case connection, secrets, sync, notifications, appearance, quickPrompt
+  case connection, profile, secrets, sync, notifications, appearance, quickPrompt
 }
 
 extension Route {
-  /// The Settings tab a route opens instead of a screen of the main window: the sidebar's Secrets item.
+  /// The Settings tab a route opens instead of a screen of the main window: the sidebar's Secrets and Settings items.
   public var settingsTab: SettingsTab? {
-    self == .secrets ? .secrets : nil
+    switch self {
+    case .secrets: .secrets
+    case .settings: .profile
+    default: nil
+    }
   }
 }
 

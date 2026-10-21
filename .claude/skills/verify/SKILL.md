@@ -5,7 +5,7 @@ description: Use to check your own work in Omni OS whenever you change apps/serv
 
 # Verify your change in Omni OS
 
-Get yourself into a loop: change, run, look, fix, until the change provably works. Do not hand Ben something you have not seen working. Pick the steps that fit the change; this is a checklist, not a script.
+Get yourself into a loop: change, run, look, fix, until the change provably works. Do not hand the user something you have not seen working. Pick the steps that fit the change; this is a checklist, not a script.
 
 ## 1. Static checks (every change)
 
@@ -18,7 +18,7 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 
 ## 2. Run it
 
-`scripts/qa-stack.sh up` starts a throwaway server (:4757) with its own data dir and the fake CLIs, vite in front (:4768), and seeds sample threads. It prints the thread URLs. `scripts/qa-stack.sh down` stops it and deletes its data. Never test against :4747 or `data/`: that is Ben's live workspace.
+`scripts/qa-stack.sh up` starts a throwaway server (:4757) with its own data dir and the fake CLIs, vite in front (:4768), and seeds sample threads. It prints the thread URLs. `scripts/qa-stack.sh down` stops it and deletes its data. Never test against :4747 or `data/`: that is the live workspace.
 
 - Threads run on `packages/test-fixtures/fake-claude.mjs`. Drive a turn with directives in the prompt: `RICH` (tools, plan, sub-agent), `TOOL:<ms>`, `BG:<ms>`, `LIMIT[:<epoch>]`, `CTX:<tokens>`, `PUBLISH:<path>`, and more listed at the top of that file.
 - Create a thread: `curl -s -X POST localhost:4757/api/threads -H 'content-type: application/json' -d '{"channel":"inbox","prompt":"RICH"}'`
@@ -46,4 +46,6 @@ Known blockers:
 - Another worktree's QA stack can already hold :4757 (`up` then logs "port 4757 ... is in use" and your curls hit the wrong code). Check `lsof -nP -iTCP:4757 -sTCP:LISTEN` and move with `QA_SERVER_PORT`/`QA_WEB_PORT`.
 - With several agents running, 4757/4768 and the next obvious pairs (4791, 4801, 4811) are often all taken. Check with `lsof` and pick a pair that is free (for example 4893/4894), passing the same env `qa-stack.sh` uses.
 - A live Cursor turn needs the real CLI: point `OMNI_CURSOR_BIN` at it instead of `fake-cursor.mjs`. Cursor's dashboard calls (`harness/cursor/dashboard.ts`) run on a QA stack by default and are off in vitest (`OMNI_CURSOR_DASHBOARD=0`).
+- `up` can print "up" for both ports while another worktree's stack holds them, so the browser shows that worktree's code. After `up`, check `lsof -t -iTCP:<web port> -sTCP:LISTEN | xargs -I{} lsof -p {} | grep cwd` points at your worktree.
+- A thread's fake CLI stays alive after its turn (and after `/stop`), so the next message skips the spawn-time worktree check. To test that check, kill the thread's process first: `kill $(ps -eo pid,command | grep fake-claude | grep <thread-id> | grep -v grep | awk '{print $1}')`.
 - A fresh worktree has no `node_modules`, so `@omni/server` types resolve to the main checkout's copy and typecheck misses (or invents) errors in your change. Run `npm ci --include=dev` in the worktree first (agent shells set `NODE_ENV=production`).

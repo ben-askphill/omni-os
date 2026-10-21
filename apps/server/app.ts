@@ -14,6 +14,7 @@ import { feedApi } from './feed-api.ts';
 import { githubApi } from './github-api.ts';
 import { linksApi } from './links-api.ts';
 import { metaApi } from './meta-api.ts';
+import { setupApi } from './setup-api.ts';
 import { syncApi } from './sync-api.ts';
 import { terminalApi } from './terminal-api.ts';
 import { threadActionsApi, threadRoutesApi } from './thread-routes-api.ts';
@@ -47,6 +48,7 @@ api.route('/commands', commandsApi);
 api.route('/mentions', mentionsApi);
 api.route('/links', linksApi);
 api.route('/sync', syncApi);
+api.route('/setup', setupApi);
 
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
 api.all('*', (c) => c.json({ error: 'Not found' }, 404));
