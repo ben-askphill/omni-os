@@ -1,0 +1,461 @@
+// Turns Omni threads into markdown digests for the central brain's ingest prompt (~/central-brain/raw/omni/).
+// Reads a DatabaseSync it is handed and never writes to it; no db.ts import, so tests run it on a temp DB.
+// The CLI (scripts/brain-export.ts) writes the files and keeps the cursor in kv.
+
+import type { DatabaseSync } from 'node:sqlite';
+import { join } from 'node:path';
+import { matchChannel } from './claude-session.ts';
+
+/** kv key holding what was exported per thread. Synced, so the cursor follows whichever Mac owns the export. */
+export const CURSOR_KEY = 'brain_export.cursor';
+export const IMPORTED = { id: 'imported', name: 'Imported history', kind: 'internal' } as const;
+/** Channels whose threads never go to the brain. */
+export const SKIP_CHANNELS = new Set(['testrepo']);
+
+/** Working notes before a turn's final reply are cut to this many characters. */
+export const NOTES_MAX = 1200;
+/** A crew report repeats the child's whole turn, which the child's own digest carries. Keep its tail. */
+export const CREW_REPORT_MAX = 2000;
+export const SUBAGENT_SUMMARY_MAX = 400;
+
+export interface Cursor {
+  version: 1;
+  threads: Record<string, { uid: string; part: number }>;
+}
+export const emptyCursor = (): Cursor => ({ version: 1, threads: {} });
+
+interface ChannelRow {
+  id: string;
+  name: string;
+  kind: string;
+  repo_path: string | null;
+  base_dir: string | null;
+}
+interface ThreadRow {
+  id: string;
+  channel_id: string;
+  title: string;
+  status: string;
+  role: string | null;
+  model: string | null;
+  cwd: string;
+  parent_id: string | null;
+  task_id: string | null;
+  source: string;
+  harness: string;
+  archived: number;
+  folder_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface EventRow {
+  id: number;
+  uid: string;
+  kind: string;
+  payload: string;
+  created_at: string;
+}
+
+export type SkipReason = 'test-channel' | 'running' | 'archived-noise' | 'delegated-only' | 'no-content' | 'up-to-date' | 'cursor-lost';
+
+export interface Digest {
+  threadId: string;
+  channelId: string;
+  /** Relative to the export root, like omni/moby/2026-10-14-c92f088b.md. */
+  path: string;
+  content: string;
+  part: number;
+  lastUid: string;
+}
+
+export type Planned = { thread: ThreadRow; digest: Digest } | { thread: ThreadRow; skip: SkipReason };
+
+export interface PlanOptions {
+  channel?: string;
+  /** ISO date; threads last updated before it are left out. */
+  since?: string;
+  cursor: Cursor;
+  redact: (s: string) => string;
+  timezone?: string;
+}
+
+// ---------- redaction ----------
+
+const SECRET_NAME = /(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|PWD|CREDENTIALS?)$/;
+
+/** Token shapes worth redacting even when Omni never stored them. Each match is replaced whole unless it has a `keep` group. */
+const TOKEN_PATTERNS: RegExp[] = [
+  /\bshp(?:at|ss|ca|pa)_[A-Fa-f0-9]{16,}/g,
+  /\bgh[pousr]_[A-Za-z0-9]{20,}/g,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}/g,
+  /\bsk-(?:ant-|proj-|live_|test_)?[A-Za-z0-9_-]{20,}/g,
+  /\b[rp]k_(?:live|test)_[A-Za-z0-9]{16,}/g,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/g,
+  /\bAKIA[0-9A-Z]{16}\b/g,
+  /\bAIza[0-9A-Za-z_-]{35}/g,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+  /\bhooks\.slack\.com\/services\/[A-Za-z0-9/]+/g,
+  /\bdiscord(?:app)?\.com\/api\/webhooks\/[A-Za-z0-9/_-]+/g,
+];
+
+/**
+ * True when a match sits in a URL or file path (before any `?`), in a dotted key, or is a file name.
+ * Doc, sheet and page ids and git SHAs live there; secrets go in query strings, headers and assignments.
+ */
+function inPathOrName(s: string, offset: number, length: number) {
+  let start = offset;
+  while (start > 0 && !/[\s"'`()<>\[\]]/.test(s[start - 1])) start--;
+  const before = s.slice(start, offset);
+  if (before.includes('/') && !/[?=&]/.test(before)) return true;
+  if (s[offset - 1] === '.') return true;
+  return /^\.[A-Za-z][A-Za-z0-9]{0,5}(?![A-Za-z0-9])/.test(s.slice(offset + length));
+}
+
+const entropy = (s: string) => {
+  const counts = new Map<string, number>();
+  for (const c of s) counts.set(c, (counts.get(c) ?? 0) + 1);
+  let h = 0;
+  for (const n of counts.values()) h -= (n / s.length) * Math.log2(n / s.length);
+  return h;
+};
+
+/** A long run of base64/url-safe characters mixing upper, lower and digits, random enough to be a key. */
+const looksRandom = (s: string) => /[A-Z]/.test(s) && /[a-z]/.test(s) && /\d/.test(s) && entropy(s) >= 4;
+
+/**
+ * Builds the redactor: exact secret values first (longest first, so one value inside another goes whole),
+ * then token shapes, `NAME_KEY=value` assignments, Bearer headers and passwords in URLs.
+ */
+export function makeRedactor(secretValues: Iterable<string>): (s: string) => string {
+  const values = [...new Set([...secretValues].map((v) => v.trim()).filter((v) => v.length >= 6))].sort((a, b) => b.length - a.length);
+  return (input: string) => {
+    let s = input;
+    for (const v of values) if (s.includes(v)) s = s.split(v).join('[REDACTED]');
+    for (const re of TOKEN_PATTERNS) s = s.replace(re, '[REDACTED]');
+    s = s.replace(/\b(Bearer|Basic|token)\s+(?!\[REDACTED\])[A-Za-z0-9._~+/=-]{16,}/g, '$1 [REDACTED]');
+    s = s.replace(
+      /\b([A-Z][A-Z0-9_]*)(\s*[=:]\s*["']?)(?!\[REDACTED\])([^\s"'`,;]{6,})/g,
+      (m, name: string, sep: string) => (SECRET_NAME.test(name) ? `${name}${sep}[REDACTED]` : m),
+    );
+    s = s.replace(/\b([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)([^\s@/]{3,})@/gi, '$1[REDACTED]@');
+    // Long hex (API secrets, webhook keys) and long random-looking runs, unless they are an id in a path or a file name.
+    s = s.replace(/\b[A-Fa-f0-9]{32,}\b/g, (m, at: number, str: string) => (inPathOrName(str, at, m.length) ? m : '[REDACTED]'));
+    s = s.replace(/(?<![A-Za-z0-9+_-])[A-Za-z0-9+_-]{32,}={0,2}(?![A-Za-z0-9+=_-])/g, (m, at: number, str: string) =>
+      looksRandom(m) && !inPathOrName(str, at, m.length) ? '[REDACTED]' : m,
+    );
+    return s;
+  };
+}
+
+/** Values of env vars whose names look like secrets (the .env file and the Keychain secrets the server injects). */
+export function envSecretValues(env: NodeJS.ProcessEnv): string[] {
+  return Object.entries(env)
+    .filter(([k, v]) => v && SECRET_NAME.test(k.toUpperCase()))
+    .map(([, v]) => v as string);
+}
+
+// ---------- rendering ----------
+
+const parse = (payload: string): Record<string, any> => {
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return {};
+  }
+};
+
+function when(iso: string, timezone: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+}
+
+const dateOnly = (iso: string, timezone: string) => when(iso, timezone).slice(0, 10);
+
+function head(text: string, max: number) {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max).trimEnd()}\n\n[… ${text.length - max} more characters left out]`;
+}
+
+function tail(text: string, max: number) {
+  if (text.length <= max) return text;
+  return `[… ${text.length - max} earlier characters left out]\n\n${text.slice(-max).trimStart()}`;
+}
+
+/** Who wrote a user event. Briefs from the Conductor and team leads are labelled as such. */
+function userLabel(p: Record<string, any>) {
+  switch (p.source) {
+    case 'conductor':
+      return 'Task brief (from the Conductor)';
+    case 'team':
+      return 'Message from the team lead';
+    case 'automation':
+      return 'Automation prompt';
+    default:
+      return p.mode === 'steer' ? 'Ben (steering mid-turn)' : 'Ben';
+  }
+}
+
+function userBody(p: Record<string, any>) {
+  let text = String(p.text ?? '').trim();
+  if (p.slash && !text.startsWith('/')) text = `/${p.slash} ${text}`.trim();
+  const files = Array.isArray(p.attachments) ? p.attachments.map((a: any) => a?.name ?? a?.path ?? a).filter(Boolean) : [];
+  if (files.length) text += `\n\n_Attached: ${files.map(String).join(', ')}_`;
+  return text;
+}
+
+interface RenderContext {
+  thread: ThreadRow;
+  channel: { id: string; name: string; kind: string };
+  folder: string | null;
+  artifacts: { name: string; url: string | null; description: string | null }[];
+  children: { id: string; title: string; channel_id: string; role: string | null }[];
+  parent: { id: string; title: string } | null;
+  events: EventRow[];
+  part: number;
+  previousUid: string | null;
+  timezone: string;
+}
+
+/** YAML scalar: JSON strings are valid YAML and escape everything that matters. */
+const y = (v: unknown) => (v == null || v === '' ? 'null' : typeof v === 'number' ? String(v) : JSON.stringify(String(v)));
+
+/**
+ * The digest body: Ben's messages and briefs in full, each turn's final reply in full, the working notes
+ * before it cut to NOTES_MAX, crew reports cut to their tail. Tool calls, init and status never appear.
+ * Returns null when nothing in `events` is worth a file.
+ */
+export function renderDigest(ctx: RenderContext, redact: (s: string) => string): string | null {
+  const tz = ctx.timezone;
+  const out: string[] = [];
+  let content = 0;
+  let notes: string[] = [];
+  const agentTasks = new Set<string>();
+
+  const flushNotes = (final: boolean) => {
+    if (!notes.length) return;
+    const last = final ? notes.pop()! : null;
+    if (notes.length) out.push(`_Working notes:_\n\n${head(notes.join('\n\n'), NOTES_MAX)}`);
+    if (last) out.push(`#### Reply\n\n${last}`);
+    notes = [];
+  };
+
+  for (const e of ctx.events) {
+    const p = parse(e.payload);
+    switch (e.kind) {
+      case 'user': {
+        const body = userBody(p);
+        if (!body) break;
+        flushNotes(true);
+        out.push(`### ${userLabel(p)} · ${when(e.created_at, tz)}\n\n${body}`);
+        content++;
+        break;
+      }
+      case 'assistant_text': {
+        const text = String(p.text ?? '').trim();
+        if (text) {
+          notes.push(text);
+          content++;
+        }
+        break;
+      }
+      case 'result': {
+        flushNotes(true);
+        const status = p.stopped ? 'stopped' : p.ok === false ? 'failed' : 'done';
+        out.push(`_Turn ${status}._`);
+        break;
+      }
+      case 'error': {
+        const text = String(p.text ?? '').trim();
+        if (text) out.push(`_Error: ${head(text, 300)}_`);
+        break;
+      }
+      case 'crew_report': {
+        flushNotes(true);
+        const who = [p.role, p.channel ? `#${p.channel}` : null].filter(Boolean).join(', ');
+        const title = p.title ? `"${p.title}"` : 'a crew thread';
+        out.push(
+          `### Crew report from ${title}${who ? ` (${who})` : ''} · ${p.status ?? 'done'} · ${when(e.created_at, tz)}\n\n` +
+            `_Full digest: thread ${String(p.thread_id ?? '').slice(0, 8)}._\n\n${tail(String(p.text ?? '').trim(), CREW_REPORT_MAX)}`,
+        );
+        content++;
+        break;
+      }
+      case 'task': {
+        // Background bash tasks are commands (noise, and a secrets risk). Subagents carry a brief worth a line.
+        if (p.task_type === 'local_agent' && p.event === 'started' && !agentTasks.has(p.task_id)) {
+          agentTasks.add(p.task_id);
+          out.push(`_Subagent${p.subagent_type ? ` (${p.subagent_type})` : ''}: ${String(p.description ?? '').trim()}_`);
+        } else if (p.event === 'ended' && agentTasks.has(p.task_id) && p.summary) {
+          out.push(`_Subagent finished (${p.status ?? 'done'}): ${head(String(p.summary).trim(), SUBAGENT_SUMMARY_MAX)}_`);
+        }
+        break;
+      }
+    }
+  }
+  flushNotes(true);
+  if (!content) return null;
+
+  const t = ctx.thread;
+  const front = [
+    '---',
+    'source: omni',
+    `thread_id: ${y(t.id)}`,
+    `title: ${y(t.title)}`,
+    `channel_id: ${y(ctx.channel.id)}`,
+    `channel_name: ${y(ctx.channel.name)}`,
+    `channel_kind: ${y(ctx.channel.kind)}`,
+    `folder: ${y(ctx.folder)}`,
+    `role: ${y(t.role)}`,
+    `task_id: ${y(t.task_id)}`,
+    `parent_thread_id: ${y(t.parent_id)}`,
+    `harness: ${y(t.harness)}`,
+    `model: ${y(t.model)}`,
+    `status: ${y(t.status)}`,
+    `created: ${y(t.created_at)}`,
+    `updated: ${y(t.updated_at)}`,
+    `part: ${ctx.part}`,
+    `previous_part_last_event_uid: ${y(ctx.previousUid)}`,
+    `last_event_uid: ${y(ctx.events[ctx.events.length - 1].uid)}`,
+    ctx.artifacts.length
+      ? `artifacts:\n${ctx.artifacts
+          .map((a) => `  - name: ${y(a.name)}\n    url: ${y(a.url)}${a.description ? `\n    description: ${y(a.description)}` : ''}`)
+          .join('\n')}`
+      : 'artifacts: []',
+    '---',
+  ];
+
+  const about = [`Omni thread in #${ctx.channel.name} (${ctx.channel.kind}), started ${dateOnly(t.created_at, tz)}.`];
+  if (ctx.parent) about.push(`Delegated from "${ctx.parent.title}" (${ctx.parent.id.slice(0, 8)}).`);
+  if (ctx.children.length)
+    about.push(`Delegated to: ${ctx.children.map((c) => `"${c.title}" (#${c.channel_id}, ${c.id.slice(0, 8)})`).join('; ')}.`);
+  if (ctx.part > 1) about.push(`Part ${ctx.part}: only what happened after the previous export.`);
+
+  const heading = `# ${t.title}${ctx.part > 1 ? ` (part ${ctx.part})` : ''}`;
+  return redact(`${front.join('\n')}\n\n${heading}\n\n${about.join(' ')}\n\n${out.join('\n\n')}\n`);
+}
+
+// ---------- planning ----------
+
+/** The channel a thread's digest goes to. Imported history has no real channel: route it by its cwd. */
+export function routeChannel(thread: ThreadRow, channels: ChannelRow[]): { id: string; name: string; kind: string } {
+  const own = channels.find((c) => c.id === thread.channel_id);
+  if (thread.channel_id !== IMPORTED.id && own) return own;
+  const match = matchChannel(thread.cwd, channels.filter((c) => c.id !== IMPORTED.id && !SKIP_CHANNELS.has(c.id)));
+  return match ?? own ?? IMPORTED;
+}
+
+export const digestPath = (channelId: string, createdAt: string, threadId: string, part: number, timezone: string) =>
+  join('omni', channelId, `${dateOnly(createdAt, timezone)}-${threadId.slice(0, 8)}${part > 1 ? `-part${part}` : ''}.md`);
+
+const THREAD_SQL = `SELECT id, channel_id, title, status, role, model, cwd, parent_id, task_id, source, harness, archived, folder_id,
+  created_at, updated_at FROM threads`;
+
+/** Every thread in scope with its digest or why it has none. Pure apart from reading `ro`. */
+export function plan(ro: DatabaseSync, opts: PlanOptions): Planned[] {
+  const tz = opts.timezone ?? 'Europe/Amsterdam';
+  const channels = ro.prepare('SELECT id, name, kind, repo_path, base_dir FROM channels').all() as unknown as ChannelRow[];
+  const threads = ro.prepare(`${THREAD_SQL} ORDER BY created_at, id`).all() as unknown as ThreadRow[];
+  const byId = new Map(threads.map((t) => [t.id, t]));
+  const kids = new Map<string, ThreadRow[]>();
+  for (const t of threads) if (t.parent_id) kids.set(t.parent_id, [...(kids.get(t.parent_id) ?? []), t]);
+  const folders = new Map(
+    (ro.prepare('SELECT id, parent_id, name FROM folders').all() as unknown as { id: string; parent_id: string | null; name: string }[]).map((f) => [f.id, f]),
+  );
+  const folderPath = (id: string | null) => {
+    const names: string[] = [];
+    for (let f = id ? folders.get(id) : undefined; f && names.length < 10; f = f.parent_id ? folders.get(f.parent_id) : undefined) names.unshift(f.name);
+    return names.length ? names.join(' / ') : null;
+  };
+
+  const eventsAfter = ro.prepare('SELECT id, uid, kind, payload, created_at FROM events WHERE thread_id = ? AND id > ? ORDER BY id');
+  const eventId = ro.prepare('SELECT id FROM events WHERE uid = ? AND thread_id = ?');
+  const hasResult = ro.prepare(`SELECT 1 FROM events WHERE thread_id = ? AND kind IN ('result', 'crew_report') LIMIT 1`);
+  const artifacts = ro.prepare('SELECT name, url, description FROM artifacts WHERE thread_id = ? ORDER BY created_at, id');
+
+  const out: Planned[] = [];
+  for (const t of threads) {
+    const channel = routeChannel(t, channels);
+    if (opts.channel && channel.id !== opts.channel) continue;
+    if (opts.since && t.updated_at < opts.since) continue;
+
+    const skip = (reason: SkipReason) => out.push({ thread: t, skip: reason });
+    if (SKIP_CHANNELS.has(t.channel_id)) {
+      skip('test-channel');
+      continue;
+    }
+    if (t.status === 'running' || t.status === 'queued') {
+      skip('running');
+      continue;
+    }
+    if (t.archived && !hasResult.get(t.id)) {
+      skip('archived-noise');
+      continue;
+    }
+    // A Conductor thread that handed work out: the crew threads carry the substance and the brief.
+    if ((t.role === 'conductor' || t.channel_id === 'conductor') && kids.has(t.id)) {
+      skip('delegated-only');
+      continue;
+    }
+
+    const prev = opts.cursor.threads[t.id];
+    let after = 0;
+    if (prev) {
+      const row = eventId.get(prev.uid, t.id) as { id: number } | undefined;
+      if (!row) {
+        skip('cursor-lost');
+        continue;
+      }
+      after = row.id;
+    }
+    const events = eventsAfter.all(t.id, after) as unknown as EventRow[];
+    if (!events.length) {
+      skip('up-to-date');
+      continue;
+    }
+    const part = prev ? prev.part + 1 : 1;
+    const parent = t.parent_id ? byId.get(t.parent_id) : undefined;
+    const content = renderDigest(
+      {
+        thread: t,
+        channel,
+        folder: folderPath(t.folder_id),
+        artifacts: artifacts.all(t.id) as any,
+        children: (kids.get(t.id) ?? []).map((c) => ({ id: c.id, title: c.title, channel_id: routeChannel(c, channels).id, role: c.role })),
+        parent: parent ? { id: parent.id, title: parent.title } : null,
+        events,
+        part,
+        previousUid: prev?.uid ?? null,
+        timezone: tz,
+      },
+      opts.redact,
+    );
+    if (!content) {
+      skip(prev ? 'up-to-date' : 'no-content');
+      continue;
+    }
+    out.push({
+      thread: t,
+      digest: {
+        threadId: t.id,
+        channelId: channel.id,
+        path: digestPath(channel.id, t.created_at, t.id, part, tz),
+        content,
+        part,
+        lastUid: events[events.length - 1].uid,
+      },
+    });
+  }
+  return out;
+}
