@@ -1,12 +1,15 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, type SetupState, type UserConfigPatch } from '../api.ts';
+import { PERMISSION_LABEL, permissionNow, setChannelAlerts, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { NAME_MAX, PronounsInput, TimezoneInput } from '../components/Onboarding.tsx';
-import { Button, ErrorNote, Icon, Label, Loading, PageHeader } from '../components/ui.tsx';
+import { useTheme } from '../components/theme.tsx';
+import { Button, ErrorNote, Icon, Label, Loading, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 
 // Settings: the user config (data/omni.config.json) that onboarding wrote. Who you are, where your work lives and
 // the optional integrations. The Mac app's Profile tab (apps/mac/Omni/ProfileSettingsView.swift) edits the same file.
+// Under it, what stays in this browser (the Mac's Appearance and Notifications tabs) and the connection's status.
 
 export { NAME_MAX };
 
@@ -30,6 +33,9 @@ export function SettingsPage() {
       <div className="mx-auto max-w-2xl space-y-5 px-4 pt-5 pb-16 md:px-8">
         {error && <ErrorNote>{error}</ErrorNote>}
         {state ? <SettingsForm state={state} onSaved={setState} /> : !error && <Loading />}
+        <AppearanceCard />
+        <NotificationsCard />
+        <ConnectionCard />
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-surface p-4 md:p-5">
           <div className="min-w-0">
             <div className="font-display text-[15px]">Setup</div>
@@ -42,7 +48,8 @@ export function SettingsPage() {
             <Icon name="info" size={15} />
           </span>
           <div>
-            These settings live in <code>{state?.path ?? 'data/omni.config.json'}</code> on this machine and never go into git, so a fork stays clean. Secrets,
+            Your profile, workspace and integrations live in <code>{state?.path ?? 'data/omni.config.json'}</code> on this machine and never go into git, so a fork
+            stays clean. Appearance and notifications stay in this browser. Secrets,
             sync and automations have their own pages: <a className="underline" href={href.secrets()}>Secrets</a>, <a className="underline" href={href.sync()}>Sync</a> and{' '}
             <a className="underline" href={href.automations()}>Automations</a>. Server options such as the port and model defaults live in <code>.env</code>.
           </div>
@@ -154,6 +161,131 @@ function SettingsForm({ state, onSaved }: { state: SetupState; onSaved: (s: Setu
       </div>
       {error && <ErrorNote>{error}</ErrorNote>}
     </form>
+  );
+}
+
+function AppearanceCard() {
+  const [theme, setTheme] = useTheme();
+  return (
+    <Card title="Appearance" subtitle="Stays in this browser. For bigger or smaller text, use the browser's zoom (Cmd + and Cmd -).">
+      <Segmented
+        radio
+        label="Theme"
+        value={theme}
+        onChange={setTheme}
+        options={[
+          { id: 'system', icon: 'monitor', label: 'Match system' },
+          { id: 'light', icon: 'sun', label: 'Light' },
+          { id: 'dark', icon: 'moon', label: 'Dark' },
+        ]}
+      />
+    </Card>
+  );
+}
+
+const PERMISSION_GLYPH: Record<Permission, string> = { granted: 'done', denied: 'needs', default: 'settled', unsupported: 'settled' };
+
+function NotificationsCard() {
+  const { channels } = useApp();
+  const prefs = useNotificationPrefs();
+  const [permission, setPermission] = useState<Permission>(permissionNow);
+  // Browser settings can change while the page is open; read again when Ben comes back to the tab.
+  useEffect(() => {
+    const check = () => setPermission(permissionNow());
+    window.addEventListener('focus', check);
+    return () => window.removeEventListener('focus', check);
+  }, []);
+  const toggle = async (on: boolean) => setPermission(await setNotificationsEnabled(on));
+  const listed = channels.filter((c) => !c.archived);
+
+  return (
+    <Card
+      title="Notifications"
+      subtitle="This browser can tell you when a thread finishes or fails while you are in another tab or app. Click one to open its thread. Nothing alerts for the thread you are looking at."
+    >
+      <SwitchRow
+        title="Notify in this browser"
+        detail="New finished and failed results, the ones Needs you lists. Turning this on asks the browser the first time. With the Mac app's notifications on too, you get both."
+        checked={prefs.enabled}
+        onChange={toggle}
+        disabled={permission === 'unsupported'}
+      />
+      <div className="flex items-center gap-2 text-[13px]">
+        <span className="w-20 shrink-0 text-fg-3">Browser</span>
+        <StatusDot status={PERMISSION_GLYPH[permission]} size={7} />
+        <span>{PERMISSION_LABEL[permission]}</span>
+        {permission === 'default' && prefs.enabled && (
+          <Button size="sm" className="ml-auto" onClick={() => void toggle(true)}>
+            Ask the browser
+          </Button>
+        )}
+      </div>
+      {prefs.enabled && permission === 'denied' && (
+        <ErrorNote>The browser blocks notifications for Omni. Allow them in the site settings (the icon left of the address), then come back.</ErrorNote>
+      )}
+      <div className={prefs.enabled ? '' : 'pointer-events-none opacity-55'}>
+        <div className="caption mb-2">Channels</div>
+        <p className="mb-2 text-[12.5px] text-fg-3">A channel turned off still lists its results in Needs you, without a notification.</p>
+        {listed.length === 0 && <p className="text-[12.5px] text-fg-3">No channels yet.</p>}
+        <div className="space-y-1.5">
+          {listed.map((c) => (
+            <div key={c.id} className="flex items-center gap-3 rounded-[16px] bg-bg px-4 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-medium">{c.name}</div>
+                <div className="truncate font-mono text-[11.5px] text-fg-3">#{c.id}</div>
+              </div>
+              <Toggle checked={!prefs.muted.includes(c.id)} onChange={(on) => setChannelAlerts(c.id, on)} label={`Notify for ${c.name}`} disabled={!prefs.enabled} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ConnectionCard() {
+  const { feedLive, status } = useApp();
+  return (
+    <Card title="Connection" subtitle="The server's port, repo and Node live in .env and the Mac app's Connection tab.">
+      <div className="space-y-2 text-[13px]">
+        <InfoRow label="Address">
+          <span className="truncate font-mono text-[12.5px]">{location.origin}</span>
+        </InfoRow>
+        <InfoRow label="Feed">
+          <StatusDot status={feedLive ? 'done' : 'needs'} size={7} />
+          <span>{feedLive ? 'Connected' : 'Reconnecting'}</span>
+        </InfoRow>
+        {status && (
+          <InfoRow label="Threads">
+            <span className="font-num">
+              {status.running} running, {status.queued} queued
+            </span>
+            <span className="text-fg-3">· up to {status.maxConcurrent} at once</span>
+          </InfoRow>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="w-20 shrink-0 text-fg-3">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function SwitchRow({ title, detail, checked, onChange, disabled }: { title: string; detail: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <div className="flex items-start gap-4">
+      <div className="min-w-0 flex-1">
+        <div className="text-[13.5px] font-medium">{title}</div>
+        <p className="mt-0.5 text-[12.5px] text-fg-3">{detail}</p>
+      </div>
+      <Toggle checked={checked} onChange={onChange} label={title} disabled={disabled} />
+    </div>
   );
 }
 

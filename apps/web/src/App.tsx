@@ -3,6 +3,7 @@ import { ContextMenuHost } from './components/ContextMenu.tsx';
 import { Onboarding } from './components/Onboarding.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
+import { BrowserNotifier } from './components/BrowserNotifier.tsx';
 import { ThreadNotifier, ToastProvider } from './components/Toaster.tsx';
 import { Empty, Icon, IconButton, LinkButton, Thumb, useSlidingThumb, Wordmark, type IconName } from './components/ui.tsx';
 import { AutomationsPage } from './pages/Automations.tsx';
@@ -270,6 +271,7 @@ function Shell() {
       <CommandPalette open={palette} onClose={closePalette} />
       <Onboarding />
       <ThreadNotifier />
+      <BrowserNotifier />
       <ContextMenuHost />
       <FolderDeleteDialog />
     </div>
