@@ -125,6 +125,23 @@ function isIpv6(m: string) {
   return groups.length === 8;
 }
 
+// Passwords written out in prose ("the storefront password is x", "**Password:** `x`"): only the value goes.
+const PASSWORD_PHRASE =
+  /\b(pass(?:word|code|wd)|wachtwoord)\b(\**(?:[^\n.:=`]{0,40}?\s(?:is|was|=)\s+|\s*\**\s*[:=]\s*\**\s*|\s+(?=`)))(`[^`\n]{3,}`|"[^"\n]{3,}"|[^\s`"',;)]{3,})/gi;
+/** Words that follow "password is" in prose without being the password. */
+const NOT_A_PASSWORD = new Set(
+  'now the a an in set stored saved not still also required correct wrong protected page field off on removed gone there here needed enabled disabled for from to and or so what which only being already changed rotated reset shared same different missing empty blank optional visible hidden known unknown'.split(' '),
+);
+
+/** Values of passwords spelled out in text. */
+export function redactPasswords(input: string): string {
+  return input.replace(PASSWORD_PHRASE, (m, word: string, between: string, value: string) => {
+    const bare = value.replace(/^[`"]|[`"]$/g, '').replace(/[.!?]+$/, '');
+    if (bare === '[REDACTED]' || NOT_A_PASSWORD.has(bare.toLowerCase())) return m;
+    return `${word}${between}${value.startsWith('`') ? '`[REDACTED]`' : '[REDACTED]'}`;
+  });
+}
+
 /** IP addresses and SSH details, replaced whole. URL hosts count; ids in URL paths are left to the other rules. */
 export function redactNetwork(input: string): string {
   let s = input;
@@ -167,7 +184,7 @@ const looksRandom = (s: string) => /[A-Z]/.test(s) && /[a-z]/.test(s) && /\d/.te
 
 /**
  * Builds the redactor: exact secret values first (longest first, so one value inside another goes whole),
- * then token shapes, `NAME_KEY=value` assignments, Bearer headers, passwords in URLs, IP addresses and SSH details.
+ * then token shapes, `NAME_KEY=value` assignments, Bearer headers, passwords in URLs and prose, IP addresses and SSH details.
  */
 export function makeRedactor(secretValues: Iterable<string>): (s: string) => string {
   const values = [...new Set([...secretValues].map((v) => v.trim()).filter((v) => v.length >= 6))].sort((a, b) => b.length - a.length);
@@ -186,7 +203,7 @@ export function makeRedactor(secretValues: Iterable<string>): (s: string) => str
     s = s.replace(/(?<![A-Za-z0-9+_-])[A-Za-z0-9+_-]{32,}={0,2}(?![A-Za-z0-9+=_-])/g, (m, at: number, str: string) =>
       looksRandom(m) && !inPathOrName(str, at, m.length) ? '[REDACTED]' : m,
     );
-    return redactNetwork(s);
+    return redactPasswords(redactNetwork(s));
   };
 }
 

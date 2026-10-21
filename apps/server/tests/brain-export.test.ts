@@ -414,6 +414,32 @@ describe('IP addresses and SSH details', () => {
   });
 });
 
+describe('passwords in prose', () => {
+  const redact = makeRedactor([]);
+
+  it.each([
+    ['The storefront password is hunter22 for now.', 'The storefront password is [REDACTED] for now.'],
+    ['Storefront password: `tiwhoo`', 'Storefront password: `[REDACTED]`'],
+    ['**Password:** `s3cret-map`', '**Password:** `[REDACTED]`'],
+    ['the password for the store is opensesame', 'the password for the store is [REDACTED]'],
+    ['dev store (password `blueberry`)', 'dev store (password `[REDACTED]`)'],
+    ['wachtwoord: geheim123', 'wachtwoord: [REDACTED]'],
+  ])('redacts the value in %s', (input, out) => {
+    expect(redact(input)).toBe(out);
+  });
+
+  it('leaves prose about passwords alone', () => {
+    const keep = [
+      'The store is password protected, so I can\'t render it.',
+      'The password is now in Omni secrets.',
+      'password is in `~/notes/store.md`',
+      'Enter the storefront password in the Online Store tab.',
+      'security find-generic-password -s omni-os -a global/X -w',
+    ];
+    for (const s of keep) expect(redact(s)).toBe(s);
+  });
+});
+
 describe('envSecretValues', () => {
   it('collects values of env vars named like secrets', () => {
     expect(envSecretValues({ GITHUB_TOKEN: 'a', HOME: '/Users/ben', DB_PASSWORD: 'b', EMPTY_KEY: '' }).sort()).toEqual(['a', 'b']);
