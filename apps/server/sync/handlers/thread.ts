@@ -7,7 +7,7 @@ import { fromPortable, safeSegment, toRemote } from '../paths.ts';
 // each Mac's path map. run_machine names the Mac running or queueing the thread (db.ts sets it with the status).
 // folder_id travels with the row. A folder that has not arrived yet waits in sync_folder_wait, and the folder's own
 // change files the thread (handlers/folder.ts). A change from an older build carries no folder_id: this Mac's stays,
-// unless the thread moved channel.
+// unless the thread moved channel. pinned_at travels the same way: a change without it keeps this Mac's pin.
 
 const COLUMNS = [
   'id', 'channel_id', 'title', 'status', 'role', 'model', 'harness', 'effort', 'session_id', 'has_run', 'cwd',
@@ -29,6 +29,7 @@ const wait = db.prepare(
   'INSERT INTO sync_folder_wait (thread_id, folder_id) VALUES (?, ?) ON CONFLICT(thread_id) DO UPDATE SET folder_id = excluded.folder_id',
 );
 const unwait = db.prepare('DELETE FROM sync_folder_wait WHERE thread_id = ?');
+const setPinned = db.prepare('UPDATE threads SET pinned_at = ? WHERE id = ?');
 
 /** Threads whose folder an applied change moved, so notify tells sidebars to regroup. */
 const regrouped = new Set<string>();
@@ -73,6 +74,7 @@ registerHandler('thread', {
       ...COLUMNS.map((c) => (c === 'cwd' ? fromPortable(t.cwd) : ((t[c] ?? null) as string | number | null))),
     );
     if (Object.prototype.hasOwnProperty.call(change.data ?? {}, 'folder_id')) file(change.entity_id, t.channel_id, t.folder_id ?? null);
+    if (Object.prototype.hasOwnProperty.call(change.data ?? {}, 'pinned_at')) setPinned.run(t.pinned_at ?? null, change.entity_id);
     const after = (folderOf.get(change.entity_id) as { folder_id: string | null }).folder_id;
     if (after !== before) regrouped.add(change.entity_id);
     if (differs) outbox.requeue('thread', change.entity_id);

@@ -51,6 +51,7 @@ final class FakeWorkspaceAPI: WorkspaceAPI {
     var recent: [OmniThread] = []
     var harnesses: [HarnessInfo] = []
     var tasks: [BackgroundTask] = []
+    var pinned: [ThreadStub] = []
     var calls: [String: Int] = [:]
     var recentLimits: [Int?] = []
     var channelsHold: Gate?
@@ -98,6 +99,10 @@ final class FakeWorkspaceAPI: WorkspaceAPI {
     set { state.withLock { $0.harnesses = newValue } }
   }
   var recentLimits: [Int?] { state.withLock { $0.recentLimits } }
+  var pinned: [ThreadStub] {
+    get { state.withLock { $0.pinned } }
+    set { state.withLock { $0.pinned = newValue } }
+  }
 
   func calls(_ endpoint: String) -> Int { state.withLock { $0.calls[endpoint, default: 0] } }
 
@@ -168,6 +173,13 @@ final class FakeWorkspaceAPI: WorkspaceAPI {
     }
   }
 
+  func pinned() async throws(OmniAPIError) -> [ThreadStub] {
+    state.withLock { s in
+      s.calls["pinned", default: 0] += 1
+      return s.pinned
+    }
+  }
+
   var needsYouAnswer: NeedsYou {
     get { state.withLock { $0.needsYou } }
     set { state.withLock { $0.needsYou = newValue } }
@@ -220,7 +232,7 @@ final class FakeWorkspaceAPI: WorkspaceAPI {
   }
 }
 
-private let endpoints = ["channels", "status", "crew", "recent", "harnesses", "tasks"]
+private let endpoints = ["channels", "pinned", "status", "crew", "recent", "harnesses", "tasks"]
 
 @MainActor
 private func makeStore(
@@ -622,5 +634,37 @@ private func loaded(_ store: WorkspaceStore, _ api: FakeWorkspaceAPI) async thro
     #expect(SidebarSections.threads(of: c, open: done).shown.last?.id == "z", "it stays after it stops")
     let elsewhere = try decode(ThreadStub.self, #"{"id":"y","channel_id":"ops","title":"y","status":"running","created_at":"2026-01-01T00:00:00Z"}"#)
     #expect(!SidebarSections.threads(of: c, open: elsewhere).shown.contains { $0.id == "y" })
+  }
+}
+
+@MainActor @Suite struct PinnedSidebarTests {
+  @Test func loadsThePinnedThreadsWithTheChannels() async throws {
+    let api = try FakeWorkspaceAPI.standard()
+    let stub = { (id: String) in
+      try decode(ThreadStub.self, #"{"id":"\#(id)","channel_id":"acme","title":"\#(id)","status":"done","created_at":"2026-01-01T00:00:00Z"}"#)
+    }
+    api.pinned = [try stub("p1")]
+    let (store, feed, _) = makeStore(api)
+    defer { store.stop(); feed.finish() }
+    try await loaded(store, api)
+    try await waitFor("the pins") { store.pinned.map(\.id) == ["p1"] }
+
+    // Pinned on another client: the next channel load brings it, the latest pin first.
+    api.pinned = [try stub("p2"), try stub("p1")]
+    await store.reloadChannels()
+    #expect(store.pinned.map(\.id) == ["p2", "p1"])
+    api.pinned = []
+    await store.reloadChannels()
+    #expect(store.pinned.isEmpty, "nothing pinned hides the section")
+  }
+
+  @Test func pinnedRowsTakeTheOpenThreadsFresherCopy() throws {
+    let row = { (id: String, status: String) in
+      try decode(ThreadStub.self, #"{"id":"\#(id)","channel_id":"acme","title":"\#(id)","status":"\#(status)","created_at":"2026-01-01T00:00:00Z"}"#)
+    }
+    let list = [try row("a", "done"), try row("b", "done")]
+    #expect(SidebarSections.pinned(list, open: try row("b", "running")).map(\.status) == [.done, .running])
+    #expect(SidebarSections.pinned(list, open: try row("x", "running")).map(\.id) == ["a", "b"], "never adds one that is not pinned")
+    #expect(SidebarSections.pinned(list, open: nil) == list)
   }
 }

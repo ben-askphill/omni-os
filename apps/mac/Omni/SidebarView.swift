@@ -19,6 +19,8 @@ struct SidebarView: View {
   /// saved as `sidebar.collapsedChannels`, one id per line.
   @State private var collapsed = Set(
     (UserDefaults.standard.string(forKey: collapsedChannelsKey) ?? "").split(separator: "\n").map(String.init))
+  /// The Pinned section folds on its own, apart from the channels.
+  @AppStorage(pinnedCollapsedKey) private var pinsClosed = false
 
   private func setChannel(_ id: String, open: Bool) {
     guard collapsed.contains(id) == open else { return }
@@ -102,6 +104,9 @@ struct SidebarView: View {
             }
           }
 
+          if !model.store.pinned.isEmpty {
+            pinnedSection
+          }
 
           if let error = channelsError {
             ErrorNote(text: error)
@@ -163,8 +168,9 @@ struct SidebarView: View {
   }
 
   /// A row that picks `item`, with the thumb under it while it is the selection.
-  private func row(_ item: SidebarItem, action: (() -> Void)? = nil, @ViewBuilder label: () -> some View) -> some View {
-    let on = selected == item
+  /// - Parameter thumb: false for a second copy of a row (a pinned thread), which shows the selection in its text only.
+  private func row(_ item: SidebarItem, thumb wearsThumb: Bool = true, action: (() -> Void)? = nil, @ViewBuilder label: () -> some View) -> some View {
+    let on = selected == item && wearsThumb
     return Button { if let action { action() } else { pick(item) } } label: { label() }
       .buttonStyle(RailRowStyle())
       .background {
@@ -176,6 +182,71 @@ struct SidebarView: View {
         }
       }
       .accessibilityAddTraits(on ? .isSelected : [])
+  }
+
+  /// Threads Ben pinned from any channel, the latest pin first, under a caption that folds them away. Hidden when
+  /// nothing is pinned. A pinned thread still shows under its own channel too.
+  private var pinnedSection: some View {
+    let pins = SidebarSections.pinned(model.store.pinned, open: model.openThread)
+    return VStack(alignment: .leading, spacing: 0) {
+      Button {
+        withAnimation(Motion.spring) { pinsClosed.toggle() }
+      } label: {
+        HStack(spacing: z(4)) {
+          Text("Pinned")
+            .omniCaption()
+          OmniIcon(name: pinsClosed ? "chevronRight" : "chevronDown", size: 11)
+            .foregroundStyle(Tok.fg4)
+          Spacer(minLength: 0)
+          if pinsClosed {
+            Text("\(pins.count)")
+              .omniCaption()
+              .monospacedDigit()
+          }
+        }
+        .padding(.horizontal, z(12))
+        .padding(.top, z(4))
+        .padding(.bottom, z(8))
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .help(pinsClosed ? "Show pinned threads" : "Hide pinned threads")
+      .accessibilityLabel("Pinned, \(Format.plural(pins.count, "thread"))")
+      .accessibilityValue(pinsClosed ? "Collapsed" : "Expanded")
+      if !pinsClosed {
+        VStack(spacing: 1) {
+          ForEach(pins) { pinnedRow($0) }
+        }
+      }
+    }
+  }
+
+  /// A pinned thread, flush with the channels: its status, title and channel, and the pin that unpins it on hover.
+  /// Open, it reads bold; the thumb stays on its row under its channel.
+  private func pinnedRow(_ thread: ThreadStub) -> some View {
+    let item = SidebarItem.thread(thread.id)
+    let channel = thread.channelID == SidebarSections.conductorID ? "Conductor" : (model.store.channel(thread.channelID)?.name ?? thread.channelID)
+    return HoverChrome { hover in
+      row(item, thumb: false) {
+        PinnedRow(thread: thread, channel: channel, active: selected == item, agents: agents[thread.id]?.count ?? 0, hover: hover)
+      }
+      .overlay(alignment: .trailing) {
+        Button {
+          Task { await model.setThreadPinned(thread, false) }
+        } label: {
+          OmniIcon(name: "pin", size: 13)
+            .foregroundStyle(Tok.fg3)
+            .frame(width: z(24), height: z(24))
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(.trailing, z(4))
+        .opacity(hover ? 1 : 0)
+        .help("Unpin")
+        .accessibilityLabel("Unpin \(thread.title.isEmpty ? "Untitled" : thread.title)")
+      }
+    }
+    .openInNewWindow(thread.id, model: model, title: thread.title, stub: thread)
   }
 
   /// The threads with sub-agents running, keyed by the thread they nest under.
@@ -346,6 +417,17 @@ struct SidebarView: View {
 
 let sidebarWidthKey = "sidebar.width"
 let collapsedChannelsKey = "sidebar.collapsedChannels"
+let pinnedCollapsedKey = "sidebar.pinnedCollapsed"
+
+/// Tracks the pointer over a row, for a button laid over it that shows on hover.
+private struct HoverChrome<Content: View>: View {
+  @ViewBuilder var content: (_ hover: Bool) -> Content
+  @State private var hover = false
+
+  var body: some View {
+    content(hover).onHover { hover = $0 }
+  }
+}
 
 /// The sidebar's right edge: drag it to make the sidebar 200 to 420pt wide, double-click it to put it back.
 struct SidebarResizeHandle: View {
@@ -479,6 +561,39 @@ struct ThreadRow: View {
     .padding(.horizontal, z(12))
     .frame(height: z(28))
     .help("\(thread.title.isEmpty ? "Untitled" : thread.title) · \(agents > 0 ? "\(Format.plural(agents, "agent")) running" : thread.status.label)")
+  }
+}
+
+/// PinnedLink in Sidebar.tsx: a pinned thread, flush with the channels. Its channel's name gives way on hover to the
+/// button that unpins it.
+private struct PinnedRow: View {
+  let thread: ThreadStub
+  let channel: String
+  let active: Bool
+  let agents: Int
+  let hover: Bool
+
+  var body: some View {
+    let title = thread.title.isEmpty ? "Untitled" : thread.title
+    HStack(spacing: z(10)) {
+      ThreadStatusIcon(status: agents > 0 ? .running : thread.status)
+        .frame(width: z(15))
+      Text(title)
+        .lineLimit(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Text(channel)
+        .font(.omni(size: 11))
+        .foregroundStyle(Tok.fg4)
+        .lineLimit(1)
+        .frame(maxWidth: z(90), alignment: .trailing)
+        .fixedSize(horizontal: true, vertical: false)
+        .opacity(hover ? 0 : 1)
+    }
+    .font(.omni(size: 13, weight: active ? .medium : .regular))
+    .foregroundStyle(active ? Tok.fg : Tok.fg2)
+    .padding(.horizontal, z(12))
+    .frame(height: z(32))
+    .help("\(title) · \(channel) · \(agents > 0 ? "\(Format.plural(agents, "agent")) running" : thread.status.label)")
   }
 }
 

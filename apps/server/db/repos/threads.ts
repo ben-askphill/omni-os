@@ -38,6 +38,8 @@ export interface Thread {
   archived: number;
   /** The sidebar folder it sits in (db/repos/folders.ts), null for ungrouped. Synced with the row. */
   folder_id: string | null;
+  /** When Ben pinned it to the sidebar's Pinned section, null when it is not pinned. Synced with the row. */
+  pinned_at: string | null;
   /** Null once the thread's folder is ready, which is always for a thread that needs no worktree. Local only, not synced. */
   setup: ThreadSetup | null;
   /** Why the worktree could not be prepared, while setup is `failed`. */
@@ -67,7 +69,7 @@ export interface LimitStop {
 
 /** The columns clients read, without sync's run_machine or the limit stop's id and owner. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, setup, setup_error, limit_state, limit_resets_at, limit_elsewhere, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, pinned_at, setup, setup_error, limit_state, limit_resets_at, limit_elsewhere, created_at, updated_at';
 
 /** Who runs a thread with this status: this machine while it is running or queued here and sync is set up, else nobody. */
 const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? outbox.machineId() : null);
@@ -103,6 +105,14 @@ export const threads = {
          WHERE t.archived = 0 AND t.source != 'team' ${channelId ? 'AND t.channel_id = ?' : ''} ORDER BY t.updated_at DESC`,
       )
       .all(...(channelId ? [channelId] : [])) as unknown as Thread[],
+  /** Pinned threads, the latest pin first, without archived ones or those of an archived channel. */
+  pinned: () =>
+    db
+      .prepare(
+        `SELECT ${THREAD_COLUMNS.split(', ').map((c) => `t.${c}`).join(', ')} FROM threads t JOIN channels c ON c.id = t.channel_id
+         WHERE t.pinned_at IS NOT NULL AND t.archived = 0 AND c.archived = 0 ORDER BY t.pinned_at DESC, t.id`,
+      )
+      .all() as unknown as Thread[],
   running: () => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],
   /** The machine id of the Mac that runs the thread (sync), or null when none does. */
   runMachine: (id: string) =>
@@ -120,7 +130,7 @@ export const threads = {
   create(
     t: Omit<
       Thread,
-      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'archived' | 'folder_id' | 'setup' | 'setup_error' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere'
+      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'archived' | 'folder_id' | 'pinned_at' | 'setup' | 'setup_error' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere'
     > & {
       has_run?: number; created_at?: string; harness?: string; effort?: string; folder_id?: string | null; setup?: ThreadSetup | null;
     },
@@ -150,6 +160,18 @@ export const threads = {
       if (db.prepare(`UPDATE threads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id).changes) record('thread', id);
     });
     return threads.get(id);
+  },
+  /**
+   * Pin it to the sidebar, or unpin it. Like a rename it keeps the thread's place in the lists: updated_at stays. The
+   * row syncs, so the other Mac pins it too. True when it changed.
+   */
+  setPinned(id: string, pinned: boolean) {
+    return tx(() => {
+      const changed =
+        db.prepare(`UPDATE threads SET pinned_at = ? WHERE id = ? AND (pinned_at IS NULL) = ?`).run(pinned ? now() : null, id, pinned ? 1 : 0).changes > 0;
+      if (changed) record('thread', id);
+      return changed;
+    });
   },
   /**
    * The reply box's suggestion. Not a change to the thread: updated_at stays, so lists keep their order,

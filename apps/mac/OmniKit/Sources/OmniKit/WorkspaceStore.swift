@@ -16,6 +16,8 @@ public protocol WorkspaceAPI: Sendable {
   func needsYou() async throws(OmniAPIError) -> NeedsYou
   /// Ben saw this result. `POST /api/needs-you/read`.
   func readResult(_ uid: String) async throws(OmniAPIError) -> NeedsYouRead
+  /// The sidebar's Pinned section, the latest pin first. `GET /api/pinned`.
+  func pinned() async throws(OmniAPIError) -> [ThreadStub]
 }
 
 extension WorkspaceAPI {
@@ -24,6 +26,8 @@ extension WorkspaceAPI {
   /// Nothing, for a fake that does not model Needs you.
   public func needsYou() async throws(OmniAPIError) -> NeedsYou { .empty }
   public func readResult(_ uid: String) async throws(OmniAPIError) -> NeedsYouRead { throw .unreachable("no Needs you") }
+  /// Nothing pinned, for a fake that does not model pins.
+  public func pinned() async throws(OmniAPIError) -> [ThreadStub] { [] }
 }
 
 extension OmniClient: WorkspaceAPI {}
@@ -40,6 +44,7 @@ extension OmniClient: WorkspaceAPI {}
 ///   one when the start load failed: the server came up. That refetch is immediate. The Web UI debounces
 ///   channels and status and lets each list reload itself (see apps/mac/NOTES.md).
 /// - After the app changes a channel itself, call `reloadChannels()`. The server sends no event for it.
+/// - Pinned threads (`pinned`) name threads in any channel, so they load whenever the channels do.
 /// - Needs you (`needsYou`) reloads with channels and status after thread events, and at once on a `needs_you`
 ///   event (a read or a result on another client, or from the other Mac's sync). Those come in bursts when a sync
 ///   applies many: one load runs at a time, and one more after it if events came meanwhile. `readResult(_:)`
@@ -80,6 +85,8 @@ public final class WorkspaceStore {
   static let refreshDelay = Duration.milliseconds(500)
 
   public private(set) var channels: [ChannelWithRunning] = []
+  /// The sidebar's Pinned section, the latest pin first. Empty hides it.
+  public private(set) var pinned: [ThreadStub] = []
   public private(set) var status: Status?
   public private(set) var usage: [HarnessID: Usage] = [:]
   public private(set) var crew: [CrewRole] = []
@@ -109,7 +116,7 @@ public final class WorkspaceStore {
   public func channel(_ id: String) -> ChannelWithRunning? { channels.first { $0.id == id } }
 
   private enum Part: CaseIterable {
-    case channels, status, crew, recent, harnesses, tasks, mods, needsYou
+    case channels, pinned, status, crew, recent, harnesses, tasks, mods, needsYou
   }
 
   @ObservationIgnored private let api: any WorkspaceAPI
@@ -186,7 +193,15 @@ public final class WorkspaceStore {
   }
 
   public func reloadChannels() async {
-    await load([.channels])
+    await load([.channels, .pinned])
+  }
+
+  /// A pin or unpin the app shows before the server has it. A pinned load already out is dropped, so it cannot put
+  /// back the list from before; the next load is the server's answer.
+  func editPinned(_ thread: ThreadStub, on: Bool) {
+    tokens[.pinned, default: 0] += 1
+    let rest = pinned.filter { $0.id != thread.id }
+    pinned = on ? (pinned.contains { $0.id == thread.id } ? pinned : [thread] + rest) : rest
   }
 
   /// An edit the app shows before the server has it (`FolderModel`). A channel load already out is dropped, so it
@@ -291,7 +306,7 @@ public final class WorkspaceStore {
       }
       guard let self else { return }
       self.refreshTimer = nil
-      await self.load([.channels, .status, .needsYou])
+      await self.load([.channels, .pinned, .status, .needsYou])
     }
   }
 
@@ -318,6 +333,9 @@ public final class WorkspaceStore {
         guard current(), error != .cancelled else { return }
         loadState = .failed(error)
       }
+    case .pinned:
+      guard let list = try? await api.pinned(), current(), pinned != list else { return }
+      pinned = list
     case .status:
       guard let s = try? await api.status(), current() else { return }
       if status != s { status = s }
@@ -440,6 +458,13 @@ public struct SidebarSections: Hashable, Sendable {
     let stub = (channel.active + channel.recent).first { $0.id == thread.id } ?? thread
     guard let id = stub.folderID, channel.folders.contains(where: { $0.id == id }) else { return nil }
     return id
+  }
+
+  /// The Pinned section's rows, as pinnedRows in apps/web/src/pins.ts: the open thread's fresher copy in its own
+  /// place, so its status follows the thread screen without a refetch. Never adds a thread that is not pinned.
+  public static func pinned(_ list: [ThreadStub], open: ThreadStub?) -> [ThreadStub] {
+    guard let open else { return list }
+    return list.map { $0.id == open.id ? open : $0 }
   }
 
   /// The channel's folders in order, with the open thread under its own folder even past the listed ones.

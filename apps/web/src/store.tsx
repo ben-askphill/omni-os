@@ -1,12 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, openSSE, errorText, taskHost, type BackgroundTask, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type ModStatus, type NeedsYou, type Status, type ThreadStub } from './api.ts';
+import { api, openSSE, errorText, taskHost, type BackgroundTask, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type ModStatus, type NeedsYou, type Status, type Thread, type ThreadStub } from './api.ts';
 import { coalesced, withoutResult } from './needs-you.ts';
+import { withPin, type PinnedThread } from './pins.ts';
 
 interface AppState {
   channels: ChannelWithRunning[];
   channelsLoaded: boolean;
   channelsError: string | null;
   reloadChannels: () => Promise<void>;
+  /** The sidebar's Pinned section (GET /api/pinned), the latest pin first. Reloads with the channel list. */
+  pinned: PinnedThread[];
+  /** Pin a thread or unpin it: the sidebar shows it at once, the server keeps it. The thread as it is now, or the server's error. */
+  setPinned: (t: ThreadStub, on: boolean) => Promise<Thread>;
   /** Change the channel list in place, ahead of the server: folder edits show at once (apps/web/src/folders.tsx). */
   updateChannels: (fn: (list: ChannelWithRunning[]) => ChannelWithRunning[]) => void;
   crew: CrewRole[];
@@ -34,6 +39,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [channels, setChannels] = useState<ChannelWithRunning[]>([]);
   const [channelsLoaded, setChannelsLoaded] = useState(false);
   const [channelsError, setChannelsError] = useState<string | null>(null);
+  const [pinned, setPinnedList] = useState<PinnedThread[]>([]);
   const [crew, setCrew] = useState<CrewRole[]>([]);
   const [usage, setUsage] = useState<HarnessUsage>({});
   const [status, setStatus] = useState<Omit<Status, 'usage'> | null>(null);
@@ -47,7 +53,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const listeners = useRef(new Set<(e: FeedEvent) => void>());
   const taskHosts = useRef('');
 
+  const reloadPinned = useCallback(
+    () =>
+      api
+        .get<PinnedThread[]>('/pinned')
+        .then(setPinnedList)
+        .catch(() => {}),
+    [],
+  );
+
   const reloadChannels = useCallback(async () => {
+    // Pins name threads in any channel, so they change whenever the channels' threads do.
+    const pins = reloadPinned();
     try {
       const list = await api.get<ChannelWithRunning[]>('/channels');
       setChannels(list);
@@ -57,7 +74,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setChannelsLoaded(true);
     }
-  }, []);
+    await pins;
+  }, [reloadPinned]);
+
+  const setPinned = useCallback(
+    async (t: ThreadStub, on: boolean) => {
+      setPinnedList((prev) => withPin(prev, t, on));
+      try {
+        return await api.patch<Thread>(`/threads/${encodeURIComponent(t.id)}`, { pinned: on });
+      } finally {
+        // Refused or not, the server's list is the truth.
+        void reloadPinned();
+      }
+    },
+    [reloadPinned],
+  );
 
   const reloadStatus = useCallback(async () => {
     try {
@@ -186,6 +217,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       channelsLoaded,
       channelsError,
       reloadChannels,
+      pinned,
+      setPinned,
       updateChannels: setChannels,
       crew,
       usage,
@@ -200,7 +233,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openThread,
       setOpenThread,
     }),
-    [channels, channelsLoaded, channelsError, reloadChannels, crew, usage, status, feedLive, tasks, mods, subscribe, needsYou, readResult, openThread],
+    [channels, channelsLoaded, channelsError, reloadChannels, pinned, setPinned, crew, usage, status, feedLive, tasks, mods, subscribe, needsYou, readResult, openThread],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -258,6 +258,16 @@ public final class AppModel {
     return true
   }
 
+  /// Pins a thread to the sidebar (or unpins it) from a right-click, the thread's header or the Pinned section. The
+  /// sidebar shows it at once; a refused call puts it back as the server has it. False when the call failed.
+  @discardableResult
+  public func setThreadPinned(_ thread: ThreadStub, _ pinned: Bool) async -> Bool {
+    store.editPinned(thread, on: pinned)
+    let t = try? await client.pinThread(thread.id, pinned: pinned)
+    if let t { threads.store(thread.id)?.merge(t) }
+    await store.reloadChannels()
+    return t != nil
+  }
 
   /// Starts the server, or attaches to one that answers, then reconnects the feed without waiting out its backoff.
   public func startServer() async {

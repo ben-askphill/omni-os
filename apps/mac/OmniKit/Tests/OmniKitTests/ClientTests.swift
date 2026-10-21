@@ -97,6 +97,24 @@ func bodyJSON(_ request: URLRequest) throws -> JSONValue {
     #expect(r[3].httpBody == nil)
   }
 
+  @Test func pinsAndListsPinnedThreads() async throws {
+    let t = StubTransport(body: threadJSON(extra: #","pinned_at":"2026-10-21T08:00:00Z""#))
+    let client = OmniClient(port: 4799, transport: t)
+    let pinned = try await client.pinThread("t1")
+    #expect(pinned.pinnedAt != nil)
+    _ = try await client.pinThread("t1", pinned: false)
+    let r = t.requests
+    #expect(r.map(\.httpMethod) == ["PATCH", "PATCH"])
+    #expect(r.map { $0.url!.path() } == ["/api/threads/t1", "/api/threads/t1"])
+    #expect(try bodyJSON(r[0]) == .object(["pinned": .bool(true)]))
+    #expect(try bodyJSON(r[1]) == .object(["pinned": .bool(false)]))
+
+    let list = StubTransport(body: "[\(threadJSON(extra: #","pinned_at":"2026-10-21T08:00:00Z""#))]")
+    let stubs = try await OmniClient(port: 4799, transport: list).pinned()
+    #expect(stubs.map(\.id) == ["t1"])
+    #expect(list.requests.first?.url?.path() == "/api/pinned")
+  }
+
   // The success path and a failing relay are in SyncTests. AppModel's wake and network nudges rely on this one.
   @Test func syncNowWhileSyncIsOffThrowsTheConflict() async throws {
     let off = StubTransport(status: 409, body: #"{"error":"sync is not configured"}"#)

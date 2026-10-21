@@ -92,6 +92,8 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   public let archived: Bool
   /// The sidebar folder it sits in, nil for the channel's ungrouped list.
   public let folderID: String?
+  /// When Ben pinned it to the sidebar's Pinned section, nil when it is not pinned. Older servers leave it out.
+  public let pinnedAt: Date?
   /// Nil once its folder is ready, which is always for a thread that needs no worktree. Older servers leave it out.
   public let setup: ThreadSetup?
   /// Why the worktree could not be prepared, while `setup` is failed.
@@ -112,6 +114,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     case limitResetsAt = "limit_resets_at"
     case limitElsewhere = "limit_elsewhere"
     case folderID = "folder_id"
+    case pinnedAt = "pinned_at"
     case nextTitle = "next_title"
     case nextPrompt = "next_prompt"
     case channelID = "channel_id"
@@ -148,6 +151,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     nextPrompt = try c.decodeIfPresent(String.self, forKey: .nextPrompt)
     archived = (try? c.decodeFlag(.archived)) ?? false
     folderID = try c.decodeIfPresent(String.self, forKey: .folderID)
+    pinnedAt = try c.decodeIfPresent(Date.self, forKey: .pinnedAt)
     setup = try c.decodeIfPresent(ThreadSetup.self, forKey: .setup)
     setupError = try c.decodeIfPresent(String.self, forKey: .setupError)
     limit = try c.decodeIfPresent(ThreadLimit.self, forKey: .limit)

@@ -140,6 +140,11 @@ private struct OpenInNewWindow: ViewModifier {
             draft = title
             renaming = true
           }
+          // Archived threads are out of the lists, so out of Pinned too. Pinning needs the row; unpinning only the id.
+          if !archived, let pin = model.store.pinned.first(where: { $0.id == threadID }) ?? stub {
+            let on = model.store.pinned.contains { $0.id == threadID }
+            Button(on ? "Unpin Thread" : "Pin Thread") { Task { await model.setThreadPinned(pin, !on) } }
+          }
           if let stub { MoveToFolderMenu(model: model, thread: stub) }
           Button(archived ? "Unarchive Thread" : "Archive Thread") { Task { await model.setThreadArchived(threadID, !archived) } }
         }

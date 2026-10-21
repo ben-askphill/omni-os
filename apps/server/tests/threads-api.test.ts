@@ -71,3 +71,60 @@ describe('PATCH /api/threads/:id', () => {
     expect(threads.byChannel(t.channel_id).some((x) => x.id === t.id)).toBe(true);
   });
 });
+
+describe('pinned threads', () => {
+  const pinnedIds = async () => {
+    const { feedApi } = await import('../feed-api.ts');
+    return ((await (await feedApi.request('/pinned')).json()) as { id: string }[]).map((t) => t.id);
+  };
+
+  it('pins and unpins a thread, latest pin first, keeping its place in the lists and telling the UI', async () => {
+    const a = await idle();
+    const b = await idle();
+    const seen: (string | null)[] = [];
+    const onFeed = (e: any) => e.type === 'thread' && e.thread.id === a.id && seen.push(e.thread.pinned_at);
+    r.bus.on('feed', onFeed);
+    const pinned = await patch(a.id, { pinned: true });
+    r.bus.off('feed', onFeed);
+    expect(pinned.status).toBe(200);
+    expect(pinned.body.pinned_at).toEqual(expect.any(String));
+    expect(seen.at(-1)).toBe(pinned.body.pinned_at);
+    expect(r.thread(a.id).updated_at).toBe(a.updated_at);
+    await new Promise((done) => setTimeout(done, 5));
+    await patch(b.id, { pinned: true });
+    expect((await pinnedIds()).slice(0, 2)).toEqual([b.id, a.id]);
+
+    // Pinning again keeps when it was pinned, so the order holds.
+    await patch(a.id, { pinned: true });
+    expect(r.thread(a.id).pinned_at).toBe(pinned.body.pinned_at);
+
+    expect((await patch(b.id, { pinned: false })).body.pinned_at).toBeNull();
+    expect(await pinnedIds()).not.toContain(b.id);
+    expect(await pinnedIds()).toContain(a.id);
+  });
+
+  it('drops a thread from Pinned when it is archived, and will not pin an archived one', async () => {
+    const t = await idle();
+    await patch(t.id, { pinned: true });
+    expect(await pinnedIds()).toContain(t.id);
+    expect((await patch(t.id, { archived: true })).body).toMatchObject({ archived: 1, pinned_at: null });
+    expect(await pinnedIds()).not.toContain(t.id);
+    expect(await patch(t.id, { pinned: true })).toEqual({ status: 409, body: { error: 'an archived thread cannot be pinned' } });
+    // Restored, it goes back to its channel, not to Pinned.
+    await patch(t.id, { archived: false });
+    expect(await pinnedIds()).not.toContain(t.id);
+  });
+
+  it("leaves out the pinned threads of an archived channel", async () => {
+    const t = await idle();
+    const { channels } = await import('../db.ts');
+    await patch(t.id, { pinned: true });
+    channels.update(t.channel_id, { archived: 1 });
+    try {
+      expect(await pinnedIds()).not.toContain(t.id);
+    } finally {
+      channels.update(t.channel_id, { archived: 0 });
+    }
+    expect(await pinnedIds()).toContain(t.id);
+  });
+});

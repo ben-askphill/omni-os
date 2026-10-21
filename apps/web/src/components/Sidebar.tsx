@@ -4,6 +4,7 @@ import { folderOf } from '../folder-groups.ts';
 import { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, drag, draftKey, freeName, useFolders } from '../folders.tsx';
 import { foldAllAction, openFolderIds } from '../sidebar-fold.ts';
 import { openMenu } from './ContextMenu.tsx';
+import { pinnedRows, type PinnedThread } from '../pins.ts';
 import { duration, plural, toDate, untilLabel } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { readPref, useApp, useNow, writePref } from '../store.tsx';
@@ -225,6 +226,46 @@ function AgentLink({ t, last, onNavigate }: { t: BackgroundTask; last: boolean; 
   );
 }
 
+/**
+ * A thread in the Pinned section, flush with the channels: its status, its title and its channel's name, which gives
+ * way on hover to the button that unpins it. It opens the thread as its row under its channel does, and a right-click
+ * gives the same menu. Open, it reads bold; the thumb stays on its row under its channel.
+ */
+function PinnedLink({ t, channel, active, agents, onNavigate }: { t: PinnedThread; channel: string; active: boolean; agents: number; onNavigate?: () => void }) {
+  const { setPinned } = useApp();
+  const title = t.title || 'Untitled';
+  const busy = t.status === 'running' || agents > 0;
+  return (
+    <div className="group/pin flex items-center rounded-full">
+      <a
+        href={href.thread(t.id)}
+        onClick={onNavigate}
+        title={`${title} · ${channel} · ${agents ? plural(agents, 'agent') + ' running' : (STATUS_LABEL[t.status] ?? t.status)}`}
+        className={`hov z-[1] flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 text-[13.5px] transition-colors md:h-8 md:text-[13px] ${
+          active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-2 hover:text-fg'
+        }`}
+      >
+        <span className="grid w-[15px] shrink-0 place-items-center">
+          {busy ? <Loader size={11} className="text-live-text" /> : <StatusDot status={t.status} size={7} />}
+        </span>
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+        <span className="mr-6 max-w-[45%] shrink-0 truncate text-[11px] font-normal text-fg-4 transition-opacity md:mr-0 md:group-focus-within/pin:opacity-0 md:group-hover/pin:opacity-0">
+          {channel}
+        </span>
+      </a>
+      <button
+        type="button"
+        aria-label={`Unpin ${title}`}
+        title="Unpin"
+        onClick={() => void setPinned(t, false).catch(() => {})}
+        className="hov relative z-[2] -ml-7 mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-fg-3 opacity-100 transition-opacity hover:text-fg focus-visible:opacity-100 md:opacity-0 md:group-hover/pin:opacity-100 md:group-focus-within/pin:opacity-100"
+      >
+        <Icon name="pin" size={13} />
+      </button>
+    </div>
+  );
+}
+
 /** A folder's name being typed: Enter or leaving the field saves, Escape cancels. */
 function FolderNameField({ initial, onSave, onCancel }: { initial: string; onSave: (name: string) => void; onCancel: () => void }) {
   const [value, setValue] = useState(initial);
@@ -417,7 +458,7 @@ const GROUPS: { kind: string; label: string }[] = [
 export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onSearch: () => void }) {
   const route = useRoute();
   const hash = useHash();
-  const { channels, channelsError, openThread, tasks } = useApp();
+  const { channels, channelsError, openThread, tasks, pinned } = useApp();
   const folders = useFolders();
   const listRef = useRef<HTMLDivElement>(null);
   // The channel whose name a thread is being dragged over, to take it out of its folder.
@@ -447,6 +488,14 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
     writePref('sidebar.collapsedChannels', [...next]);
     void folders.collapseAll(openFolderIds(channels));
   };
+
+  // The Pinned section folds on its own, apart from the channels, remembered on this device.
+  const [pinsClosed, setPinsClosed] = useState(() => readPref<boolean>('sidebar.pinnedCollapsed', false));
+  const togglePins = () =>
+    setPinsClosed((prev) => {
+      writePref('sidebar.pinnedCollapsed', !prev);
+      return !prev;
+    });
 
   const activeChannel = route.name === 'channel' ? route.id : null;
   const openId = route.name === 'thread' ? route.id : null;
@@ -479,6 +528,8 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
     );
   };
   // Rows appearing or leaving above the highlighted one move it, so they re-measure the thumb too.
+  const pins = pinnedRows(pinned, openThread && openThread.id === openId ? openThread : null);
+  const pinsKey = pinsClosed ? 'pins:closed' : pins.map((t) => t.id).join();
   const rowsKey = channels
     .flatMap((c) =>
       collapsed.has(c.id)
@@ -488,7 +539,7 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
     .join();
   // Agent rows nest under threads, so they move the rows below them too.
   const agentsKey = tasks.map((k) => k.task_id).join();
-  const box = useSlidingThumb(listRef, `${hash}:${channels.length}:${rowsKey}:${agentsKey}:${folders.editing}`, true, '[data-active="true"]');
+  const box = useSlidingThumb(listRef, `${hash}:${channels.length}:${pinsKey}:${rowsKey}:${agentsKey}:${folders.editing}`, true, '[data-active="true"]');
 
   const threadLinks = (c: ChannelWithRunning) => {
     const closed = collapsed.has(c.id);
@@ -688,6 +739,36 @@ export function Sidebar({ onNavigate, onSearch }: { onNavigate?: () => void; onS
               </>
             )}
           </div>
+
+          {pins.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={togglePins}
+                aria-expanded={!pinsClosed}
+                title={pinsClosed ? 'Show pinned threads' : 'Hide pinned threads'}
+                className="caption flex w-full items-center gap-1 px-3 pt-1 pb-2 text-left transition-colors hover:text-fg-2"
+              >
+                Pinned
+                <Icon name={pinsClosed ? 'chevronRight' : 'chevronDown'} size={11} className="text-fg-4" />
+                {pinsClosed && <span className="ml-auto font-num tabular-nums">{pins.length}</span>}
+              </button>
+              {!pinsClosed && (
+                <div className="space-y-px">
+                  {pins.map((t) => (
+                    <PinnedLink
+                      key={t.id}
+                      t={t}
+                      channel={t.channel_id === 'conductor' ? 'Conductor' : (channels.find((c) => c.id === t.channel_id)?.name ?? t.channel_id)}
+                      active={t.id === openId}
+                      agents={tasks.filter((k) => taskHost(k) === t.id).length}
+                      onNavigate={onNavigate}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {channelsError && <ErrorNote>{channelsError}</ErrorNote>}
 

@@ -60,6 +60,12 @@ func eventJSON(kind: String, payload: String, id: Int = 1) -> String {
     }
   }
 
+  @Test func readsWhenAThreadWasPinned() throws {
+    #expect(try decode(OmniThread.self, threadJSON()).pinnedAt == nil, "an older server leaves it out")
+    #expect(try decode(OmniThread.self, threadJSON(extra: #","pinned_at":null"#)).pinnedAt == nil)
+    #expect(try decode(OmniThread.self, threadJSON(extra: #","pinned_at":"2026-10-21T08:00:00.5Z""#)).pinnedAt != nil)
+  }
+
   @Test func readsAnEmptyEffortAsTheDefault() throws {
     #expect(try decode(OmniThread.self, threadJSON()).effort == nil)
     #expect(try decode(OmniThread.self, threadJSON(effort: "high")).effort == "high")

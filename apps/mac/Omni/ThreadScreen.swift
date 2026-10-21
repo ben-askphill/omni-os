@@ -152,6 +152,18 @@ private struct ThreadHeader: View {
       if ContextMeter.metered.contains(thread.harness) {
         ContextMeterButton(model: model, store: store, thread: thread)
       }
+      if !thread.archived {
+        let on = thread.pinnedAt != nil
+        Button {
+          Task { await model.setThreadPinned(ThreadStub(thread), !on) }
+        } label: {
+          OmniIcon(name: "pin", size: 15)
+        }
+        .buttonStyle(.icon(size: 28, active: on))
+        .help(on ? "Unpin from the sidebar" : "Pin to the sidebar")
+        .accessibilityLabel(on ? "Unpin thread" : "Pin thread")
+        .accessibilityAddTraits(on ? .isSelected : [])
+      }
       if thread.archived {
         // Opened from its channel's Archived list or a search: put it back in the lists.
         Button {

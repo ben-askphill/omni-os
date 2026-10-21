@@ -61,7 +61,7 @@ export function ContextMenuHost() {
 
 function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
   const { target } = open;
-  const { channel, reloadChannels } = useApp();
+  const { channel, reloadChannels, setPinned } = useApp();
   const route = useRoute();
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: open.x, y: open.y });
@@ -156,6 +156,16 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     }
   };
 
+  const togglePin = async () => {
+    if (!row) return;
+    try {
+      await setPinned(row, !row.pinned_at);
+      onClose();
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+
   const folder = target.kind === 'folder' ? folders.find(target.id) : undefined;
   // The folders the thread can move to: its channel's, once its row has come.
   const choices = row ? (channel(row.channel_id)?.folders ?? []).filter((f) => !f.id.startsWith('tmp-')) : [];
@@ -167,6 +177,8 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
   const items: { label: string; icon: IconName; run: () => void }[] =
     target.kind === 'thread'
       ? [
+          // Archived threads are out of the lists, so out of Pinned too.
+          ...(row && !archived ? [{ label: row.pinned_at ? 'Unpin thread' : 'Pin thread', icon: 'pin' as const, run: () => void togglePin() }] : []),
           { label: 'Rename thread', icon: 'pencil', run: () => setDraft(current ?? '') },
           ...(row && !row.parent_id ? [{ label: 'Move to folder', icon: 'folder' as const, run: () => setMoving(true) }] : []),
           { label: archived ? 'Unarchive thread' : 'Archive thread', icon: 'archive', run: toggleArchive },

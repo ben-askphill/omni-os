@@ -99,6 +99,10 @@ private struct ArchivedBody: Encodable, Sendable {
   let archived: Bool
 }
 
+private struct PinnedBody: Encodable, Sendable {
+  let pinned: Bool
+}
+
 /// `{"next_thread": null}`: an explicit null, which a nil optional would leave out.
 private struct DismissNextBody: Encodable, Sendable {
   enum CodingKeys: String, CodingKey { case nextThread = "next_thread" }
@@ -192,6 +196,16 @@ public struct OmniClient: Sendable {
 
   public func archiveThread(_ id: String, archived: Bool = true) async throws(OmniAPIError) -> OmniThread {
     try await send("PATCH", "/api/threads/\(uriComponent(id))", body: ArchivedBody(archived: archived))
+  }
+
+  /// Pins the thread to the sidebar's Pinned section, or unpins it. An archived thread is refused (409).
+  public func pinThread(_ id: String, pinned: Bool = true) async throws(OmniAPIError) -> OmniThread {
+    try await send("PATCH", "/api/threads/\(uriComponent(id))", body: PinnedBody(pinned: pinned))
+  }
+
+  /// The sidebar's Pinned section: pinned threads in every channel, the latest pin first, without archived ones.
+  public func pinned() async throws(OmniAPIError) -> [ThreadStub] {
+    try await send("GET", "/api/pinned")
   }
 
   /// Drops the thread's proposed follow-up thread, the card under its transcript.

@@ -46,6 +46,8 @@ feedApi.get('/tasks', (c) => c.json(activeTasks()));
 feedApi.get('/mods', (c) => c.json(activeMods()));
 
 feedApi.get('/recent', (c) => c.json(threads.recent(Number(c.req.query('limit') ?? 60))));
+/** The sidebar's Pinned section: pinned threads in every channel, the latest pin first. Archived ones drop out. */
+feedApi.get('/pinned', (c) => c.json(threads.pinned()));
 feedApi.get('/search', (c) => c.json(search(c.req.query('q') ?? '')));
 
 /**

@@ -54,7 +54,7 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
 }
 
 export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifact?: number }) {
-  const { setOpenThread, mods, reloadChannels, needsYou, readResult } = useApp();
+  const { setOpenThread, mods, reloadChannels, needsYou, readResult, setPinned } = useApp();
   const modLines = useMemo(() => mods.filter((m) => m.thread_id === id), [mods, id]);
   const isMobile = useIsMobile();
   // GET /api/harnesses, the same list the reply pills load. Until it arrives, canSteer uses the Cursor fallback.
@@ -220,6 +220,17 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     }
   };
 
+  // Pinned or not, from the header: the sidebar shows it at once, and the thread's copy follows the server's answer.
+  const togglePin = async () => {
+    setActionError(null);
+    const on = !thread?.pinned_at;
+    try {
+      applyThread(await setPinned(thread!, on), true);
+    } catch (e) {
+      setActionError(errorText(e));
+    }
+  };
+
   const togglePanel = () => {
     if (isMobile) setMobilePanel((v) => !v);
     else
@@ -308,6 +319,16 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                 pin();
               }}
             />
+            {!thread.archived && (
+              <IconButton
+                icon="pin"
+                label={thread.pinned_at ? 'Unpin thread' : 'Pin thread'}
+                title={thread.pinned_at ? 'Unpin from the sidebar' : 'Pin to the sidebar'}
+                active={!!thread.pinned_at}
+                aria-pressed={!!thread.pinned_at}
+                onClick={() => void togglePin()}
+              />
+            )}
             {!!thread.archived && (
               <Button size="sm" variant="secondary" icon="archive" onClick={() => void restore()} busy={restoring} title="Archived. Restore it to its channel's thread list.">
                 Restore
