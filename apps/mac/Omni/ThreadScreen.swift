@@ -373,7 +373,8 @@ private struct TranscriptView: View {
         guard let g = pin.geometry, g.offset > 0.5 else { return false }
         position.scrollTo(y: max(0, g.offset - g.viewportHeight / 2))
         return true
-      })
+      },
+      distanceFromBottom: { pin.geometry?.distanceFromBottom })
   }
   #endif
 }
@@ -543,6 +544,8 @@ enum QAProbe {
     let toBottom: () -> Void
     /// Up by half a screen. false once at the top.
     let pageUp: () -> Bool
+    /// How far the view is from the bottom of the transcript, once it is laid out.
+    let distanceFromBottom: () -> Double?
   }
 
   static var shownThread: String?

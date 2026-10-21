@@ -1,12 +1,13 @@
 import Foundation
 
-/// The transcript's auto scroll, with the Web UI's rules (apps/web/src/pages/Thread.tsx):
+/// The transcript's auto scroll, with the Web UI's rules (apps/web/src/pages/useTranscriptScroll.ts):
 /// - The first events go to the bottom wherever the view is.
-/// - Later events follow while the view is within 140pt of the bottom, and show the New activity pill otherwise.
+/// - Later events follow while the view follows the bottom, and show the New activity pill otherwise.
+/// - Any scroll up stops following, however small, so a resize cannot pull Ben back down while he reads. Only
+///   reaching the bottom again, or the pill, follows again.
 /// - Content that grows without new events (a row that expands, a resize) keeps the view at the bottom while
-///   it is pinned. Only a scroll, not a change of size, pins or unpins it.
-/// - A lazy stack measures rows as they scroll in, so the content height can change with any scroll. A move
-///   counts as a scroll, even with a new height, unless it is the way to the bottom this asked for.
+///   it follows. A lazy stack measures rows as they scroll in, so the content height can change with any scroll:
+///   that change never decides whether to follow, only the direction of the move does.
 public struct ScrollPin: Hashable, Sendable {
   public struct Geometry: Hashable, Sendable {
     public var offset: Double
@@ -22,13 +23,12 @@ public struct ScrollPin: Hashable, Sendable {
     public var distanceFromBottom: Double { contentHeight - offset - viewportHeight }
   }
 
-  public static let nearDistance = 140.0
+  /// How close to the bottom counts as at it.
+  public static let bottomSlack = 8.0
 
   public private(set) var isPinned = true
   public private(set) var showsJump = false
   private var scrolledOnce = false
-  /// On the way to the bottom: moves land there, and the height they measure is more to go.
-  private var settling = false
   private var last: Geometry?
 
   public init() {}
@@ -38,7 +38,6 @@ public struct ScrollPin: Hashable, Sendable {
     guard count > 0 else { return false }
     if !scrolledOnce || isPinned {
       scrolledOnce = true
-      settling = true
       return true
     }
     showsJump = true
@@ -50,21 +49,24 @@ public struct ScrollPin: Hashable, Sendable {
     defer { last = g }
     let moved = last.map { $0.offset != g.offset && $0.viewportHeight == g.viewportHeight } ?? false
     let resized = last.map { $0.contentHeight != g.contentHeight || $0.viewportHeight != g.viewportHeight } ?? true
-    if moved && !settling || moved && !resized {
-      isPinned = g.distanceFromBottom < Self.nearDistance
-      if isPinned { showsJump = false }
-      if settling { settling = g.distanceFromBottom > 0.5 }
+    if g.distanceFromBottom <= Self.bottomSlack {
+      isPinned = true
+      showsJump = false
+      // Content that grew a few points still lands exactly at the bottom.
+      return !moved && g.distanceFromBottom > 0.5
+    }
+    if moved, let last, g.offset < last.offset {
+      isPinned = false
       return false
     }
-    let go = isPinned && g.distanceFromBottom > 0.5
-    settling = go
-    return go
+    // A move down short of the bottom is Ben heading back, or the pill's scroll on its way: leave it be.
+    if moved && !resized { return false }
+    return isPinned
   }
 
   /// The pill was pressed: back to the bottom, and following again.
   public mutating func jump() {
     isPinned = true
     showsJump = false
-    settling = true
   }
 }

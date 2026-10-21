@@ -462,6 +462,30 @@ final class QARunner {
       try? await Task.sleep(for: .seconds(1))
       let gaps = await FrameClock().run(in: view, frames: 5000, scroller.pageUp)
       return QAFrameStats(gaps: gaps).summary
+    case .nudge:
+      guard let window = Self.windows.first(where: Self.isMain), let content = window.contentView,
+        let transcript = Self.scrollViews(in: content).max(by: { $0.frame.width < $1.frame.width })
+      else { throw QAScriptError("no transcript scroll view") }
+      scroller.toBottom()
+      try? await Task.sleep(for: .seconds(1))
+      // A short trackpad swipe up: began, a few changes, ended, as in Ben's recording.
+      let phases: [CGScrollPhase] = [.began, .changed, .changed, .changed, .ended]
+      for phase in phases {
+        guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: phase == .ended ? 0 : 12, wheel2: 0, wheel3: 0)
+        else { throw QAScriptError("can't make a scroll event") }
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: Int64(phase.rawValue))
+        cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        guard let event = NSEvent(cgEvent: cg) else { throw QAScriptError("can't make a scroll event") }
+        transcript.scrollWheel(with: event)
+        try? await Task.sleep(for: .milliseconds(16))
+      }
+      try? await Task.sleep(for: .milliseconds(300))
+      let soon = scroller.distanceFromBottom() ?? -1
+      // Then content that grows with no scroll, as a lazy row measured late: the tool groups open.
+      QAProbe.expand?()
+      try? await Task.sleep(for: .milliseconds(1500))
+      let later = scroller.distanceFromBottom() ?? -1
+      return "from the bottom \(Int(soon.rounded())) pt after the swipe, \(Int(later.rounded())) pt once the content grew"
     }
     try? await Task.sleep(for: .milliseconds(600))
     return nil
@@ -485,6 +509,10 @@ final class QARunner {
   }
 
   // MARK: Snapshots
+
+  private static func scrollViews(in view: NSView) -> [NSScrollView] {
+    (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap(scrollViews)
+  }
 
   private static var windows: [NSWindow] {
     NSApp.windows

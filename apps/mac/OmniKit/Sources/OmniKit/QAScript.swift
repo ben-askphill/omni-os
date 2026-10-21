@@ -25,7 +25,9 @@ public enum QAInspector: String, Hashable, Sendable {
 }
 
 public enum QAScroll: String, Hashable, Sendable {
-  case top, bottom, through
+  /// `nudge` goes to the bottom, then sends trackpad scroll events a few lines up, opens the tool groups so the
+  /// content grows, and notes how far from the bottom the view is after each.
+  case top, bottom, through, nudge
 }
 
 /// What a channel step does to the channel `qa-channel`, through the same client calls as the settings form.
@@ -59,7 +61,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
 /// `{"settings": "secrets"}` (or `connection`, `sync`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
-/// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`), `{"expand": true}`, `{"meter": true}`,
+/// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`), `{"expand": true}`, `{"meter": true}`,
 /// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`,
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
 /// `changes`, `turn`, `browser`, `terminal`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
@@ -245,7 +247,7 @@ public struct QAScript: Hashable, Sendable {
       guard let name = value as? String, let a = QAAppearance(rawValue: name) else { throw QAScriptError("appearance takes light or dark") }
       return .appearance(a)
     case "scroll":
-      guard let name = value as? String, let to = QAScroll(rawValue: name) else { throw QAScriptError("scroll takes top, bottom or through") }
+      guard let name = value as? String, let to = QAScroll(rawValue: name) else { throw QAScriptError("scroll takes top, bottom, through or nudge") }
       return .scroll(to)
     case "expand":
       return .expand

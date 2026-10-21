@@ -21,6 +21,10 @@ API="http://127.0.0.1:$SERVER_PORT/api"
 WEB="http://localhost:$WEB_PORT"
 
 die() { echo "qa-stack: $*" >&2; [ "${STARTING:-0}" = 1 ] && down >/dev/null; exit 1; }
+# Runs a command in its own process group, so down can stop it and its children together. macOS has no setsid.
+detach() {
+  if command -v setsid >/dev/null; then setsid "$@"; else perl -e 'setpgrp(0, 0); exec @ARGV or die "exec: $!"' "$@"; fi
+}
 alive() { [ -f "$DIR/$1.pid" ] && kill -0 "$(cat "$DIR/$1.pid")" 2>/dev/null; }
 
 [ "$SERVER_PORT" != 4747 ] || die "refusing port 4747, that is the live server"
@@ -33,14 +37,13 @@ up() {
   mkdir -p "$DIR/data" "$DIR/brain" "$DIR/automations"
   STARTING=1
   local fx="$ROOT/packages/test-fixtures"
-  # setsid puts each in its own process group, so down can stop tsx/vite and their children together.
   OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
     OMNI_CLAUDE_BIN="$fx/fake-claude.mjs" OMNI_CODEX_BIN="$fx/fake-codex.mjs" OMNI_CURSOR_BIN="$fx/fake-cursor.mjs" \
     OMNI_BROWSER=0 OMNI_SUGGESTIONS=0 OMNI_HERMES_URL= OMNI_AUTOMATIONS_DIR="$DIR/automations" \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
-    setsid npx tsx apps/server/index.ts >"$DIR/server.log" 2>&1 &
+    detach npx tsx apps/server/index.ts >"$DIR/server.log" 2>&1 &
   echo $! >"$DIR/server.pid"
-  OMNI_PORT="$SERVER_PORT" setsid npx vite --config apps/web/vite.config.ts --port "$WEB_PORT" --strictPort >"$DIR/web.log" 2>&1 &
+  OMNI_PORT="$SERVER_PORT" detach npx vite --config apps/web/vite.config.ts --port "$WEB_PORT" --strictPort >"$DIR/web.log" 2>&1 &
   echo $! >"$DIR/web.pid"
 
   for _ in $(seq 1 60); do

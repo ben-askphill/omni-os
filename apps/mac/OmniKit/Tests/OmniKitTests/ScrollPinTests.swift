@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import OmniKit
 
-// The transcript's auto scroll, as in apps/web/src/pages/Thread.tsx: near the bottom is under 140pt from it.
+// The transcript's auto scroll, as in apps/web/src/pages/useTranscriptScroll.ts: any scroll up stops following.
 
 private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500) -> ScrollPin.Geometry {
   ScrollPin.Geometry(offset: offset, contentHeight: content, viewportHeight: viewport)
@@ -13,7 +13,7 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
     var pin = ScrollPin()
     let go1 = pin.eventsChanged(count: 0)
     #expect(!go1, "nothing to show yet")
-    _ = pin.geometryChanged(at(0))
+    _ = pin.geometryChanged(at(500))
     _ = pin.geometryChanged(at(10))
     #expect(!pin.isPinned)
     let go2 = pin.eventsChanged(count: 5)
@@ -21,13 +21,11 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
     #expect(!pin.showsJump)
   }
 
-  @Test func followsNewEventsWhileNearTheBottom() {
+  @Test func followsNewEventsAtTheBottom() {
     var pin = ScrollPin()
     let go3 = pin.eventsChanged(count: 5)
     #expect(go3)
     _ = pin.geometryChanged(at(1500))
-    _ = pin.geometryChanged(at(1400))
-    #expect(pin.isPinned, "100pt up is still near")
     let go4 = pin.eventsChanged(count: 6)
     #expect(go4)
     #expect(!pin.showsJump)
@@ -37,14 +35,38 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
     var pin = ScrollPin()
     _ = pin.eventsChanged(count: 5)
     _ = pin.geometryChanged(at(1500))
-    _ = pin.geometryChanged(at(1360))
-    #expect(!pin.isPinned, "140pt up is not near")
+    _ = pin.geometryChanged(at(1470))
+    #expect(!pin.isPinned, "30pt up already stops following")
     let go5 = pin.eventsChanged(count: 6)
     #expect(!go5)
     #expect(pin.showsJump)
-    _ = pin.geometryChanged(at(1450))
+    _ = pin.geometryChanged(at(1480))
+    #expect(!pin.isPinned, "heading back, not there yet")
+    _ = pin.geometryChanged(at(1500))
     #expect(pin.isPinned)
-    #expect(!pin.showsJump, "back near the bottom")
+    #expect(!pin.showsJump, "back at the bottom")
+  }
+
+  /// Ben's recording: a few lines up on an idle thread, the lazy stack measures a row, and the view jumped back.
+  @Test func aRowMeasuredAfterAShortScrollUpDoesNotPullBack() {
+    var pin = ScrollPin()
+    _ = pin.eventsChanged(count: 5)
+    _ = pin.geometryChanged(at(1500))
+    _ = pin.geometryChanged(at(1450))
+    let measured = pin.geometryChanged(at(1450, content: 2012))
+    #expect(!measured)
+    let again = pin.geometryChanged(at(1450, content: 1996))
+    #expect(!again)
+    #expect(!pin.isPinned)
+  }
+
+  @Test func overscrollAtTheBottomKeepsFollowing() {
+    var pin = ScrollPin()
+    _ = pin.eventsChanged(count: 5)
+    _ = pin.geometryChanged(at(1500))
+    _ = pin.geometryChanged(at(1530))
+    _ = pin.geometryChanged(at(1500))
+    #expect(pin.isPinned, "the bounce back is not a scroll up")
   }
 
   @Test func jumpPinsAgain() {
@@ -100,9 +122,9 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
     _ = pin.geometryChanged(at(1500))
     let up = pin.geometryChanged(at(1440, content: 2030))
     #expect(!up, "no pull back to the bottom")
-    #expect(pin.isPinned, "90pt up is still near")
-    let further = pin.geometryChanged(at(1100, content: 2080))
-    #expect(!further)
+    #expect(!pin.isPinned)
+    let down = pin.geometryChanged(at(1480, content: 2060))
+    #expect(!down, "heading back down measures rows too")
     #expect(!pin.isPinned)
   }
 
