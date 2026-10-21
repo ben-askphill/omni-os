@@ -3,16 +3,20 @@
 #
 #   scripts/pr-screenshots.sh <image>...
 #
-# GitHub has no API for attaching images to a PR, so the images are committed to the orphan
-# branch `pr-screenshots` under a folder named after the current branch (omni/abc -> omni-abc),
-# and linked with blob ?raw=true URLs, which render in a private repo for anyone who can see it.
+# GitHub has no API for attaching images to a PR, so the images are committed under a folder named
+# after the current branch (omni/abc -> omni-abc) to the hidden ref `refs/screenshots/pr-screenshots`,
+# and linked with blob ?raw=true URLs pinned to that commit, which render in a private repo for
+# anyone who can see it. A ref outside refs/heads keeps GitHub's "had recent pushes, Compare & pull
+# request" banner off the repo page. The first run seeds it from the old `pr-screenshots` branch,
+# which stays so links in older PRs keep working.
 # It uses a temporary index, so the working tree, the index and the current branch are untouched.
-# A file with the same name in the same folder is replaced, so re-running after a fix updates the PR.
+# A file with the same name in the same folder is replaced; re-running prints new links to paste.
 set -euo pipefail
 
 [ $# -gt 0 ] || { echo "usage: scripts/pr-screenshots.sh <image>..." >&2; exit 2; }
 
-BRANCH="pr-screenshots"
+REF="refs/screenshots/pr-screenshots"
+LEGACY_BRANCH="refs/heads/pr-screenshots"
 REMOTE="${PR_SCREENSHOTS_REMOTE:-origin}"
 REPO="${PR_SCREENSHOTS_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
 FOLDER="$(git rev-parse --abbrev-ref HEAD | tr '/' '-')"
@@ -28,7 +32,7 @@ trap 'rm -f "$INDEX"' EXIT
 for attempt in 1 2 3 4 5; do
   rm -f "$INDEX"
   PARENT=()
-  if git fetch --quiet "$REMOTE" "$BRANCH" 2>/dev/null; then
+  if git fetch --quiet "$REMOTE" "$REF" 2>/dev/null || git fetch --quiet "$REMOTE" "$LEGACY_BRANCH" 2>/dev/null; then
     TIP="$(git rev-parse FETCH_HEAD)"
     PARENT=(-p "$TIP")
     GIT_INDEX_FILE="$INDEX" git read-tree "$TIP"
@@ -43,15 +47,15 @@ for attempt in 1 2 3 4 5; do
 
   TREE="$(GIT_INDEX_FILE="$INDEX" git write-tree)"
   COMMIT="$(git commit-tree "$TREE" ${PARENT[@]+"${PARENT[@]}"} -m "Screenshots for $FOLDER")"
-  if git push --quiet "$REMOTE" "$COMMIT:refs/heads/$BRANCH" 2>/dev/null; then
+  if git push --quiet "$REMOTE" "$COMMIT:$REF" 2>/dev/null; then
     break
   fi
-  [ "$attempt" -lt 5 ] || { echo "push to $BRANCH failed after 5 attempts" >&2; exit 1; }
+  [ "$attempt" -lt 5 ] || { echo "push to $REF failed after 5 attempts" >&2; exit 1; }
   sleep "$attempt"
 done
 
 for f in "$@"; do
   NAME="$(basename "$f")"
   ALT="${NAME%.*}"
-  echo "![${ALT//-/ }](https://github.com/$REPO/blob/$BRANCH/$FOLDER/$NAME?raw=true)"
+  echo "![${ALT//-/ }](https://github.com/$REPO/blob/$COMMIT/$FOLDER/$NAME?raw=true)"
 done

@@ -26,7 +26,9 @@ GitHub has no API for uploading images to a PR, so upload them with:
 scripts/pr-screenshots.sh shots/*.png
 ```
 
-It commits the images to the orphan `pr-screenshots` branch under a folder named after the current branch and prints one Markdown image line per file. Paste those under a `## Screenshots` heading in the PR body, grouped as before/after, with a line on what to look at. Re-running with the same file names replaces the images, so update them after review fixes.
+It commits the images to the hidden ref `refs/screenshots/pr-screenshots` under a folder named after the current branch and prints one Markdown image line per file, pinned to that commit. Paste those under a `## Screenshots` heading in the PR body, grouped as before/after, with a line on what to look at. After review fixes, re-run it and replace the old lines with the new ones: the links point at a commit, so the old ones keep showing the old images.
+
+The ref sits outside `refs/heads` on purpose. Pushing to a branch made GitHub show a "pr-screenshots had recent pushes, Compare & pull request" banner on the repo page after every upload. The old `pr-screenshots` branch stays so images in older PRs keep loading; nothing pushes to it any more.
 
 Copy the images to the thread's artifacts folder as well, so you see them in the thread.
 
