@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thermo Bloat Review</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --bg: #ffffff; --surface: #f7f7f6; --surface-2: #f1f1f0;
+    --fg: #17181a; --fg-2: #3c3b37; --fg-3: #6f6e68;
+    --line: rgb(23 24 26 / 0.08); --line-strong: rgb(23 24 26 / 0.16);
+    --live: #2B3BFF; --done: #C6F52B; --warn: #b45309;
+    --r-xs: 6px; --r-sm: 12px; --r-md: 14px; --r-pill: 999px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121316; --surface: #191b1e; --surface-2: #222428;
+      --fg: #eceae5; --fg-2: #b8b7b1; --fg-3: #908f89;
+      --line: rgb(236 235 231 / 0.08); --line-strong: rgb(236 235 231 / 0.16);
+      --live: #7280FF; --warn: #f5b544;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121316; --surface: #191b1e; --surface-2: #222428;
+    --fg: #eceae5; --fg-2: #b8b7b1; --fg-3: #908f89;
+    --line: rgb(236 235 231 / 0.08); --line-strong: rgb(236 235 231 / 0.16);
+    --live: #7280FF; --warn: #f5b544;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14.5px/1.6 var(--font-sans); }
+  main { max-width: 860px; margin: 0 auto; padding: 40px 16px 72px; }
+  h1 { font-size: 26px; line-height: 1.25; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 17px; margin: 40px 0 12px; padding-top: 18px; border-top: 1px solid var(--line); }
+  h3 { font-size: 15px; margin: 22px 0 6px; }
+  p, li { overflow-wrap: anywhere; color: var(--fg-2); }
+  strong { color: var(--fg); }
+  .meta { color: var(--fg-3); font-size: 12.5px; margin: 0 0 24px; }
+  a { color: var(--live); }
+  code { font: 11.5px/1.4 var(--font-mono); background: var(--surface-2); padding: 1px 5px; border-radius: var(--r-xs); overflow-wrap: anywhere; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 20px 0; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
+  .stat b { display: block; font-size: 24px; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--fg-3); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  th, td { text-align: left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; word-break: break-word; }
+  th { color: var(--fg-3); font-weight: 600; font-size: 12px; }
+  td { color: var(--fg-2); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 18px 12px; margin: 14px 0; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: var(--r-pill); background: var(--surface-2); color: var(--fg-2); margin-right: 6px; }
+  .tag.ben { color: var(--warn); }
+</style>
+</head>
+<body>
+<main>
+<h1>Thermo review: bloat and dead code</h1>
+<p class="meta">22 October 2026 · baseline <code>main</code> @ <code>1007f0a</code> (after #283 to #288 merged) · PR <a href="https://github.com/ben-askphill/omni-os/pull/289">#289</a></p>
+
+<p>A whole-repo pass with the thermo-nuclear code-quality skill, aimed at removing code nothing needs. Every cut was proven unused or redundant by grep across the server, Web UI, Mac app, MCP and tests, then by typecheck and the full test suites. Nothing touches auth, the <code>/api</code> token, the PR-author gate, the pinned browser MCP, validation, size caps or path checks.</p>
+
+<p>The headline finding: <strong>the codebase is already lean.</strong> <code>tsc --noUnusedLocals --noUnusedParameters</code> found 3 unused names across every TS package, knip found 5 truly unreferenced exports, and no workspace has an unused dependency. The real bloat was duplicated helpers, props no caller passes, one late-binding hook layer, and dead Mac UI.</p>
+
+<div class="stats">
+  <div class="stat"><b>306</b><span>net source lines removed</span></div>
+  <div class="stat"><b>373 / 67</b><span>lines deleted / added</span></div>
+  <div class="stat"><b>41</b><span>files touched</span></div>
+  <div class="stat"><b>1</b><span>file deleted (151 KB PNG)</span></div>
+  <div class="stat"><b>0</b><span>dependencies removed</span></div>
+</div>
+
+<h2>Previous review (16 October)</h2>
+<p>All five findings from <a href="2026-10-16-thermo-review.html">the previous thermo review</a> are closed: #192 and #193 were fixed in that PR, and #194 to #197 are closed. One piece of #195 was still in the code: the <code>bindPump</code>, <code>bindReportToParent</code> and <code>bindEndTasks</code> callback slots in <code>runner/state.ts</code>. This PR removes them (see Runner below). The larger "one owner per live session" refactor is out of scope for a no-behaviour-change PR.</p>
+
+<h2>What was cut</h2>
+
+<div class="card">
+<h3>Dead code, TypeScript</h3>
+<ul>
+  <li>Unused imports <code>addEvent</code> (runner/queue.ts) and <code>TextP</code> (Transcript.tsx).</li>
+  <li><code>harnessFor</code> in brand.tsx and the Codex protocol types <code>RpcRequest</code>, <code>RpcResponse</code>, <code>CommandExecutionItem</code>, <code>AgentMessageItem</code>: referenced nowhere.</li>
+  <li><code>MODELS</code> in web api.ts, the <code>.shimmer</code> class and its keyframes in index.css.</li>
+  <li><code>config.codexBin</code> and <code>config.cursorBin</code>: never read; the bin lookups read the env themselves.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>Dead code, Mac app</h3>
+<ul>
+  <li>Views and helpers nothing calls: <code>Spinner</code>, <code>NewThreadScreen</code>, <code>artifactSymbol</code>, <code>omniGroup</code>, <code>pillPrimary</code>, eight unused <code>ThreadStyle</code> status colors.</li>
+  <li>OmniKit methods with no caller: <code>ReplyComposerModel.clearError</code>, <code>ChannelBrowser.claimSize</code>.</li>
+  <li>OmniKit API only its own tests called: <code>openThreadMarkdown</code>, <code>Attachment.thumbnailSize</code>, <code>dotIsHollow</code>, <code>isManual</code>. Their 3 tests and 3 assertions went with them.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>Duplicate helpers</h3>
+<ul>
+  <li><code>parsePayload</code> (api.ts and transcript/fold.ts) now lives once in format.ts.</li>
+  <li><code>optionId</code> (FileMenu.tsx copy of SlashMenu.tsx) and <code>TASK_END</code> (Transcript.tsx copy of delegation.ts).</li>
+  <li><code>refusal()</code> was defined four times in the runner; now once in runner/state.ts.</li>
+  <li>The Hermes adapter's <code>sleep</code> duplicated the client's.</li>
+  <li>Mac: Automation's private <code>shortPath</code> matched <code>Format.shortPath</code> (checked on <code>/Users/x</code>, <code>/Users/x/</code>, <code>/Users//x</code> and long paths); four views inlined <code>Pasteboard.copy</code>; the thumbnail frame repeated <code>thumbnailBox</code>.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>Over-abstraction</h3>
+<ul>
+  <li><strong>Runner bind hooks.</strong> <code>state.ts</code> held throwing stubs that queue.ts and records.ts filled in at import time, so session.ts could call <code>pump</code>, <code>reportToParent</code> and <code>endTasks</code> without importing their owners. The targets are hoisted function declarations only called at runtime, and the import cycle already existed, so session.ts and records.ts now import them directly.</li>
+  <li><strong>Brand components.</strong> <code>OmniLogo</code> had a mark variant and a live variant nobody rendered; it is now <code>OmniWordmark</code>. <code>Loader</code> lost <code>label</code>, <code>OmniMark</code> lost <code>droplets</code>, <code>interactive</code>, <code>className</code> and <code>style</code>, <code>StaticMark</code> lost <code>ring</code> and <code>style</code>, <code>HarnessMark</code> lost <code>size</code> and <code>className</code>. No caller passed any of them, so every rendered output is the same.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>Stray files and stale docs</h3>
+<ul>
+  <li><code>csrf-guard-webui.png</code> at the repo root: a PR screenshot committed in #280, linked from nowhere.</li>
+  <li>apps/mac/NOTES.md: lines about <code>NewThreadScreen</code>, <code>QuickComposer</code>, <code>recentChanged</code>, <code>ContentUnavailableView</code> and placeholder screens described code that no longer exists.</li>
+</ul>
+</div>
+
+<h2>Candidates left alone</h2>
+<table>
+  <thead><tr><th style="width:34%">Candidate</th><th style="width:16%">Saves</th><th>Why it stays</th></tr></thead>
+  <tbody>
+    <tr><td>Tool-result builders copied in 4 normalizers (<code>clip</code>, <code>toolResult</code>, <code>MAX_RESULT</code>)</td><td>~15 lines</td><td>Moves the 16k result size cap, which the brief excludes. <span class="tag ben">Ben</span></td></tr>
+    <tr><td><code>Outgoing</code> and <code>omniOf</code> copied in Cursor, Hermes and Codex adapters</td><td>~10 lines</td><td>Belongs with a typed adapter command boundary (old #196), not a mechanical move.</td></tr>
+    <tr><td><code>onPath()</code> in codex/bin.ts and cursor/bin.ts</td><td>~8 lines</td><td>Sharing it means one harness importing another, or a new file. Not worth the coupling.</td></tr>
+    <tr><td><code>real()</code> copies in worktree-sweep.ts and sandbox.ts</td><td>~7 lines</td><td>Guards path checks before worktree deletion. Excluded.</td></tr>
+    <tr><td>Redundant apiKey branch in Hermes <code>failText</code></td><td>1 line</td><td>Key-redaction logic. Excluded. <span class="tag ben">Ben</span></td></tr>
+    <tr><td><code>db.ts</code> and <code>runner.ts</code> barrels</td><td>n/a</td><td>Importing them runs migrations and seeds; removing them changes init order.</td></tr>
+    <tr><td><code>components/ui.tsx</code> barrel</td><td>~0 lines</td><td>45 importers take 3 to 5 names each; direct imports would add lines.</td></tr>
+    <tr><td>OmniKit <code>profile()</code>, <code>setProfile</code>, <code>sendMessage</code>, <code>openNotification</code>, <code>hasData</code></td><td>~28 lines</td><td>Only tests call them, but live-server tests use them as drivers, and <code>openNotification</code> needs a Sendable hop to reuse. <span class="tag ben">Ben</span></td></tr>
+    <tr><td>Mac <code>RoutePlaceholder</code> and <code>Route.symbol</code></td><td>~25 lines</td><td>Reachable for one frame on <code>.secrets</code> and <code>.settings</code>; removing it could change that frame.</td></tr>
+    <tr><td><code>packages/test-fixtures/fake-gh.mjs</code></td><td>4.8 KB</td><td>NOTES.md documents it as the way to re-record the Mac PR fixtures.</td></tr>
+    <tr><td><code>build:link-icons</code> npm script</td><td>1 line</td><td>Unused, but harmless; the script header says to call tsx directly.</td></tr>
+    <tr><td>Composer.tsx (954), Transcript.tsx (1,101)</td><td>n/a</td><td>Transcript.tsx is past 1k lines. Splitting it is decomposition, not bloat removal; worth its own PR.</td></tr>
+    <tr><td>~60 exports used only in their own file</td><td>0 lines</td><td>Dropping <code>export</code> saves nothing.</td></tr>
+  </tbody>
+</table>
+
+<h2>Checks</h2>
+<table>
+  <thead><tr><th style="width:34%">Check</th><th style="width:33%">Before</th><th>After</th></tr></thead>
+  <tbody>
+    <tr><td><code>npm run typecheck</code></td><td>pass</td><td>pass</td></tr>
+    <tr><td>Server (vitest)</td><td>1,206 pass, 7 skipped</td><td>1,206 pass, 7 skipped</td></tr>
+    <tr><td>Web (vitest)</td><td>161 pass</td><td>161 pass</td></tr>
+    <tr><td>Shared (vitest)</td><td>104 pass</td><td>104 pass</td></tr>
+    <tr><td>Mac bundle (vitest)</td><td>1 pass</td><td>1 pass</td></tr>
+    <tr><td><code>swift test</code> (OmniKit)</td><td>801 pass</td><td>798 pass</td></tr>
+    <tr><td>Mac app <code>xcodebuild</code> Debug</td><td>succeeds</td><td>succeeds</td></tr>
+  </tbody>
+</table>
+<p>The Swift count drops by 3 because the tests for the removed test-only API went with it. Screenshots were not taken: no change renders differently.</p>
+
+<h2>Method</h2>
+<ul>
+  <li><code>tsc --noUnusedLocals --noUnusedParameters</code> on every TS package, and knip across the workspaces.</li>
+  <li>A whole-word reference count for every Swift declaration in apps/mac.</li>
+  <li>Four read-only scans (server, web and shared, Mac, repo-level files), each candidate checked by grep against both clients, the MCP and URL strings the Mac app calls.</li>
+</ul>
+</main>
+</body>
+</html>
