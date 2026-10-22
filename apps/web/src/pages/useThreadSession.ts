@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, errorText, parsePayload, useThreadStream, type Artifact, type Channel, type ContextUsage, type EventRow, type PendingMsg, type Thread, type ThreadDetail } from '../api.ts';
+import { api, errorText, useThreadStream, type Artifact, type Channel, type ContextUsage, type EventRow, type PendingMsg, type Thread, type ThreadDetail } from '../api.ts';
 import type { InitP, ResultP } from '../components/thread/panel/DetailsTab.tsx';
 import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
+import { parsePayload } from '../format.ts';
 
 export type PanelTab = 'artifacts' | 'changes' | 'browser' | 'terminal' | 'details';
 

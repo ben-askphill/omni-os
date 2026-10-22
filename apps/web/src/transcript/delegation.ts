@@ -27,7 +27,7 @@ export const isDelegation = (name: string) => name === 'mcp__omni__delegate' || 
 /** A sub-agent the harness runs inside this thread's process: Claude Code's Agent (Task before it), Hermes's subagent. */
 export const isSubagent = (name: string) => name === 'Agent' || name === 'Task';
 
-const TASK_END: Record<string, string> = { completed: 'done', failed: 'failed', killed: 'stopped', stopped: 'stopped' };
+export const TASK_END: Record<string, string> = { completed: 'done', failed: 'failed', killed: 'stopped', stopped: 'stopped' };
 
 /**
  * A sub-agent's state as a thread status. Its task says while it has one: a background agent's result comes

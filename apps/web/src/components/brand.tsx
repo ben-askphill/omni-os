@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 // ---------- the Omni mark ----------
 
@@ -6,6 +6,8 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode 
    Units: ring centerline R=40, stroke W=20, the o of the wordmark. The mark leans 10° with the wordmark;
    physics run unskewed and MARK_TRANSFORM fits the lean into the -64..64 viewBox. */
 const R = 40;
+/** Droplets the live mark sheds when delegating. */
+const DROPLETS = 3;
 const W = 20;
 export const MARK_TRANSFORM = 'translate(-4 3) scale(.92) skewX(-10)';
 const N = 104;
@@ -110,13 +112,13 @@ export function useReducedMotion() {
   return rm;
 }
 
-/** The mark without motion: ring plus satellite (or ring alone). Used for reduced motion and favicons. */
-export function StaticMark({ size = 32, title = 'Omni', ring = false, className = '', style }: { size?: number; title?: string; ring?: boolean; className?: string; style?: CSSProperties }) {
+/** The mark without motion: ring plus satellite. Used for reduced motion and favicons. */
+export function StaticMark({ size = 32, title = 'Omni', className = '' }: { size?: number; title?: string; className?: string }) {
   return (
-    <svg className={`mark ${className}`} width={size} height={size} viewBox="-64 -64 128 128" role={title ? 'img' : undefined} aria-label={title || undefined} aria-hidden={title ? undefined : true} style={style}>
+    <svg className={`mark ${className}`} width={size} height={size} viewBox="-64 -64 128 128" role={title ? 'img' : undefined} aria-label={title || undefined} aria-hidden={title ? undefined : true}>
       <g transform={MARK_TRANSFORM}>
         <circle cx="0" cy="0" r={R} fill="none" stroke="currentColor" strokeWidth={W} />
-        {!ring && <circle cx="49.5" cy="-49.5" r="12" fill="currentColor" />}
+        <circle cx="49.5" cy="-49.5" r="12" fill="currentColor" />
       </g>
     </svg>
   );
@@ -124,34 +126,17 @@ export function StaticMark({ size = 32, title = 'Omni', ring = false, className 
 
 /**
  * The live mark. `thinking` ripples, `delegating` sheds droplets, `report` catches one coming back,
- * `attention` pulls the satellite in and turns vermilion. It leans toward the pointer when `interactive`.
+ * `attention` pulls the satellite in and turns vermilion. It leans toward the pointer.
  */
-export function OmniMark({
-  state = 'idle',
-  size = 48,
-  droplets = 3,
-  interactive = true,
-  title = 'Omni',
-  className = '',
-  style,
-}: {
-  state?: MarkState;
-  size?: number;
-  droplets?: number;
-  interactive?: boolean;
-  title?: string;
-  className?: string;
-  style?: CSSProperties;
-}) {
+export function OmniMark({ state = 'idle', size = 48, title = 'Omni' }: { state?: MarkState; size?: number; title?: string }) {
   const reduced = useReducedMotion();
   const id = `goo${useId().replace(/:/g, '')}`;
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
   const dropRefs = useRef<(SVGCircleElement | null)[]>([]);
-  const live = useRef({ w: { breath: 1, sat: 1, ripple: 0, drops: 0, report: 0, tension: 0 } as Weights, k: 0, phi: -2.4, pk: 0, pphi: -2.4, state, n: droplets });
+  const live = useRef({ w: { breath: 1, sat: 1, ripple: 0, drops: 0, report: 0, tension: 0 } as Weights, k: 0, phi: -2.4, pk: 0, pphi: -2.4, state, n: DROPLETS });
   live.current.state = state;
-  live.current.n = droplets;
-  const maxDrops = 2 + Math.max(droplets, 1);
+  const maxDrops = 2 + DROPLETS;
 
   useEffect(() => {
     if (reduced) return;
@@ -184,10 +169,8 @@ export function OmniMark({
     const onLeave = () => {
       live.current.pk = 0;
     };
-    if (interactive) {
-      window.addEventListener('pointermove', onMove);
-      document.addEventListener('pointerleave', onLeave);
-    }
+    window.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerleave', onLeave);
     const loop = (now: number) => {
       const L = live.current;
       const dt = Math.min(0.05, (now - last) / 1000);
@@ -207,13 +190,13 @@ export function OmniMark({
       window.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerleave', onLeave);
     };
-  }, [reduced, interactive, maxDrops]);
+  }, [reduced, maxDrops]);
 
-  const cls = `mark ${state === 'attention' ? 'mark-needs' : ''} ${className}`;
+  const cls = `mark ${state === 'attention' ? 'mark-needs' : ''}`;
   const label = title ? title + (state !== 'idle' && state !== 'hover' ? `, ${state}` : '') : undefined;
-  if (reduced) return <StaticMark size={size} title={label ?? ''} className={cls} style={style} />;
+  if (reduced) return <StaticMark size={size} title={label ?? ''} className={cls} />;
   return (
-    <svg ref={svgRef} className={cls} width={size} height={size} viewBox="-64 -64 128 128" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true} style={style}>
+    <svg ref={svgRef} className={cls} width={size} height={size} viewBox="-64 -64 128 128" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
       <defs>
         <filter id={id} x="-140" y="-140" width="280" height="280" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
           <feGaussianBlur in="SourceGraphic" stdDeviation="4.5" result="b" />
@@ -249,31 +232,23 @@ const VB = { x: -15, y: -1, w: 391, h: 102 };
 const LINE =
   'M46 90A40 40 0 0 0 86 50A40 40 0 0 0 46 10A40 40 0 0 0 6 50A40 40 0 0 0 46 90L92 90A26 26 0 0 0 118 64L118 34A24 24 0 0 1 166 34L166 74A16 16 0 0 0 198 74L198 34A24 24 0 0 1 246 34L246 74A16 16 0 0 0 278 74L278 38A28 28 0 0 1 334 38L334 74A16 16 0 0 0 366 74L366 10';
 
-/** `wordmark` is the line "omni"; `mark` is the fluid mark alone; `live` puts the moving mark beside the word. */
-export function OmniLogo({ variant = 'wordmark', height = 32, live = false, markState = 'idle', title = 'omni' }: { variant?: 'wordmark' | 'mark'; height?: number; live?: boolean; markState?: MarkState; title?: string }) {
-  if (variant === 'mark') return <OmniMark size={height} state={markState} title={title} />;
-  const word = (
-    <svg width={VB.w * (height / VB.h)} height={height} viewBox={`${VB.x} ${VB.y} ${VB.w} ${VB.h}`} role="img" aria-label={title} className="block shrink-0 text-fg">
+/** The line "omni". */
+export function OmniWordmark({ height = 32 }: { height?: number }) {
+  return (
+    <svg width={VB.w * (height / VB.h)} height={height} viewBox={`${VB.x} ${VB.y} ${VB.w} ${VB.h}`} role="img" aria-label="omni" className="block shrink-0 text-fg">
       <path className="wordmark-line" transform="skewX(-10)" d={LINE} pathLength={1} fill="none" stroke="currentColor" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-  if (!live) return word;
-  return (
-    <span className="inline-flex items-center text-fg" style={{ gap: height * 0.28 }}>
-      <OmniMark size={height * 1.2} state={markState} title="" />
-      {word}
-    </span>
   );
 }
 
 // ---------- loader ----------
 
 /** A bead of the ring's own liquid travels around it: a bulge, not a spinner. */
-export function Loader({ size = 14, label, className = '' }: { size?: number; label?: ReactNode; className?: string }) {
+export function Loader({ size = 14, className = '' }: { size?: number; className?: string }) {
   const id = `lgoo${useId().replace(/:/g, '')}`;
   const reduced = useReducedMotion();
-  const svg = (
-    <svg width={size} height={size} viewBox="-64 -64 128 128" className={`block shrink-0 overflow-visible ${label ? '' : className}`} role={label ? undefined : 'status'} aria-label={label ? undefined : 'Loading'} aria-hidden={label ? true : undefined}>
+  return (
+    <svg width={size} height={size} viewBox="-64 -64 128 128" className={`block shrink-0 overflow-visible ${className}`} role="status" aria-label="Loading">
       <defs>
         <filter id={id} x="-120" y="-120" width="240" height="240" filterUnits="userSpaceOnUse">
           <feGaussianBlur stdDeviation="5" />
@@ -288,13 +263,6 @@ export function Loader({ size = 14, label, className = '' }: { size?: number; la
         </g>
       </g>
     </svg>
-  );
-  if (!label) return svg;
-  return (
-    <span role="status" className={`inline-flex items-center gap-2 text-[12.5px] text-fg-3 ${className}`}>
-      {svg}
-      <span>{label}</span>
-    </span>
   );
 }
 
@@ -338,17 +306,16 @@ export function HarnessLogo({ harness, size = 14, title }: { harness: string; si
 }
 
 /** The logo on a small surface disc, for rows and meta lines. */
-export function HarnessMark({ harness, size = 'md', withLabel = false, className = '' }: { harness: string; size?: 'md' | 'lg'; withLabel?: boolean; className?: string }) {
+export function HarnessMark({ harness, withLabel = false }: { harness: string; withLabel?: boolean }) {
   const label = harnessLabel(harness);
-  const box = size === 'lg' ? 26 : 20;
   const tag = (
-    <span title={label} className={`inline-grid shrink-0 place-items-center rounded-full bg-surface-2 text-fg ${withLabel ? '' : className}`} style={{ width: box, height: box }}>
-      <HarnessLogo harness={harness} size={size === 'lg' ? 16 : 13} title={label} />
+    <span title={label} className="inline-grid shrink-0 place-items-center rounded-full bg-surface-2 text-fg" style={{ width: 20, height: 20 }}>
+      <HarnessLogo harness={harness} size={13} title={label} />
     </span>
   );
   if (!withLabel) return tag;
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[12.5px] text-fg-2 ${className}`}>
+    <span className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-2">
       {tag}
       {label}
     </span>

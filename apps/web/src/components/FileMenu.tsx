@@ -2,8 +2,8 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent, 
 import { api } from '../api.ts';
 import { fileQuery, pickFile, type FileMention } from '@omni/shared/mention-menu.ts';
 import { Icon } from './ui.tsx';
+import { optionId } from './SlashMenu.tsx';
 
-const optionId = (menuId: string, i: number) => `${menuId}-${i}`;
 
 /**
  * The `@` menu over a composer's textarea: the files a message can name, from this thread's

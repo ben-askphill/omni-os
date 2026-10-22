@@ -1,5 +1,5 @@
 import type { SlashRecord } from '@omni/shared/slash.ts';
-import { shortPath } from '../format.ts';
+import { parsePayload, shortPath } from '../format.ts';
 
 // The transcript fold. Pure: events in, rows out. Transcript.tsx renders the rows.
 // Swift cannot import this; packages/test-fixtures/transcript is the shared artifact.
@@ -126,14 +126,6 @@ export interface Todo {
 export interface FoldPlan {
   todos: Todo[];
   after: number;
-}
-
-function parsePayload<T = Record<string, unknown>>(e: TranscriptEvent): T {
-  try {
-    return JSON.parse(e.payload) as T;
-  } catch {
-    return {} as T;
-  }
 }
 
 /** Stored task rows folded per Agent call. One with no end row reads as running; the live list decides. */

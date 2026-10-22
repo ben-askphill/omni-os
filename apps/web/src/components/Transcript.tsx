@@ -29,7 +29,7 @@ import {
   type ToolCall,
   type UserP,
 } from '../transcript/fold.ts';
-import { agentStatus, delegations, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
+import { agentStatus, delegations, splitGroup, TASK_END, withLive, type Branch } from '../transcript/delegation.ts';
 
 export { toolLabel, toolSummary, type ToolCall };
 
@@ -132,8 +132,6 @@ function Elapsed({ since }: { since: string }) {
   const now = useNow(1000);
   return <>{duration(Math.max(0, now - toDate(since).getTime()))}</>;
 }
-
-const TASK_END: Record<string, string> = { completed: 'done', failed: 'failed', killed: 'stopped', stopped: 'stopped' };
 
 /** Every call a sub-agent made, however deep. */
 const countCalls = (c: ToolCall): number => c.children.reduce((n, ch) => n + 1 + countCalls(ch), 0);

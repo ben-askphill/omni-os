@@ -213,3 +213,12 @@ export function shortPath(p: string, cwd?: string | null) {
   const parts = rel.split('/');
   return parts.length > 4 ? '.../' + parts.slice(-3).join('/') : rel;
 }
+
+/** An event's JSON payload; a payload that does not parse reads as empty. */
+export function parsePayload<T = Record<string, unknown>>(e: { payload: string }): T {
+  try {
+    return JSON.parse(e.payload) as T;
+  } catch {
+    return {} as T;
+  }
+}

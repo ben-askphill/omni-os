@@ -659,14 +659,3 @@ export function useThreadStream(
   return live;
 }
 
-// ---------- model helpers ----------
-
-export const MODELS = ['opus', 'sonnet', 'haiku', 'fable'] as const;
-
-export function parsePayload<T = Record<string, unknown>>(e: EventRow): T {
-  try {
-    return JSON.parse(e.payload) as T;
-  } catch {
-    return {} as T;
-  }
-}

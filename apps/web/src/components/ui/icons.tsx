@@ -1,4 +1,4 @@
-import { OmniLogo } from '../brand.tsx';
+import { OmniWordmark } from '../brand.tsx';
 
 // ---------- icons (hand-drawn, 24px grid, 1.75 stroke, round caps and joins) ----------
 
@@ -95,5 +95,5 @@ export function Icon({ name, size = 16, className = '', strokeWidth = 1.75 }: { 
 
 /** The continuous-line "omni" wordmark. */
 export function Wordmark({ size = 18 }: { size?: number }) {
-  return <OmniLogo height={size} />;
+  return <OmniWordmark height={size} />;
 }
