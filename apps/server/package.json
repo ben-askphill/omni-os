@@ -19,6 +19,7 @@
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@omni/shared": "*",
+    "@playwright/mcp": "0.0.83",
     "@supabase/supabase-js": "^2.117.2",
     "@xterm/addon-serialize": "^0.14.0",
     "@xterm/headless": "^6.0.0",

@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { userName } from './user-config.ts';
 import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile } from './config.ts';
@@ -191,12 +192,27 @@ export interface McpInput {
   omniUrl: string;
 }
 
+let playwrightMcp: string | undefined;
+
+/**
+ * The browser MCP's entry script, from the exact @playwright/mcp version pinned in apps/server/package.json.
+ * Run from Omni's own install so no registry, `latest` tag or repo .npmrc decides what code gets the browser profile.
+ */
+export function playwrightMcpBin() {
+  if (!playwrightMcp) {
+    const pkg = createRequire(import.meta.url).resolve('@playwright/mcp/package.json');
+    const { bin } = JSON.parse(readFileSync(pkg, 'utf8')) as { bin: string | Record<string, string> };
+    playwrightMcp = join(dirname(pkg), typeof bin === 'string' ? bin : bin['playwright-mcp']);
+  }
+  return playwrightMcp;
+}
+
 /** Per-thread MCP servers, layered on top of the user's normal Claude Code MCP config. */
 export function buildMcpConfig(input: McpInput) {
   const servers: Record<string, { command: string; args: string[]; env?: Record<string, string> }> = {};
 
   if (config.browser) {
-    const args = ['-y', '@playwright/mcp@latest', '--output-dir', browserOutDir(input.threadId)];
+    const args = [playwrightMcpBin(), '--output-dir', browserOutDir(input.threadId)];
     // Chrome locks a profile dir, so only one live thread per channel gets the persistent logins.
     if (input.cdpEndpoint && !input.browserBusy) args.push('--cdp-endpoint', input.cdpEndpoint);
     else {
@@ -204,7 +220,7 @@ export function buildMcpConfig(input: McpInput) {
       if (input.browserBusy) args.push('--isolated');
       else args.push('--user-data-dir', join(paths.browsers, input.channel.id));
     }
-    servers['omni-browser'] = { command: 'npx', args };
+    servers['omni-browser'] = { command: process.execPath, args };
   }
 
   if (input.role?.mcp.includes('omni')) {

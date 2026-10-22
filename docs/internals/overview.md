@@ -11,7 +11,7 @@ Each Claude Code thread gets one long-lived `claude -p --input-format stream-jso
 | cwd | worktree `data/worktrees/<thread>` on branch `omni/<id>` (repo channels), else the channel base dir, else your workspace folder |
 | context | your workspace folder added with `--add-dir`, its CLAUDE.md loaded, all your user skills and MCP servers |
 | system prompt | channel facts (store, Portal slug, repo, notes), artifacts and browser rules, the channel's design system file, the crew role charter |
-| MCP | `omni-browser` (Playwright, attached over CDP to the channel's Chrome that Omni runs, profile in `data/browsers/<channel>`); conductor also gets `omni` |
+| MCP | `omni-browser` (`@playwright/mcp` at the exact version in `apps/server/package.json`, run by `node` from Omni's install, never `npx`; attached over CDP to the channel's Chrome that Omni runs, profile in `data/browsers/<channel>`); conductor also gets `omni` |
 | env | `OMNI_THREAD_ID`, `OMNI_ARTIFACTS_DIR`, `OMNI_URL`, plus global and channel secrets |
 | session | `--session-id` on the first run, `--resume` after, so every follow-up keeps full context |
 

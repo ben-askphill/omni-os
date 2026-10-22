@@ -19,7 +19,7 @@ describe('codex tools, secrets and crew reports', () => {
     const cfg = start.params.config;
     // Dotted keys merge into Ben's config.toml; a whole mcp_servers table would replace his servers.
     expect(cfg['mcp_servers.omni']).toMatchObject({ command: expect.any(String), args: expect.any(Array) }); // the conductor tools
-    expect(cfg['mcp_servers.omni-browser']).toMatchObject({ command: 'npx' });
+    expect(cfg['mcp_servers.omni-browser']).toMatchObject({ command: process.execPath, args: expect.arrayContaining([expect.stringMatching(/@playwright\/mcp\/cli\.js$/)]) });
     expect(cfg.mcp_servers).toBeUndefined();
     expect(cfg['shell_environment_policy.inherit']).toBe('all');
     expect(cfg.forced_login_method).toBe('chatgpt');

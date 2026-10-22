@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -9,7 +9,7 @@ vi.mock('../db.ts', () => {
   throw new Error('db.ts must not be imported by sandbox tests');
 });
 
-import { buildMcpConfig, needsWorktree, plannedWorktree, prepareWorkdir } from '../sandbox.ts';
+import { buildMcpConfig, needsWorktree, playwrightMcpBin, plannedWorktree, prepareWorkdir } from '../sandbox.ts';
 import { config, paths, browserOutDir, threadDir } from '../config.ts';
 import type { Channel } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
@@ -54,8 +54,10 @@ describe('buildMcpConfig: browser', () => {
   it('adds a headless playwright server with a persistent per-channel profile', () => {
     const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), browserBusy: false, omniUrl: OMNI_URL });
     const b = cfg.mcpServers['omni-browser'];
-    expect(b.command).toBe('npx');
-    expect(b.args.slice(0, 2)).toEqual(['-y', '@playwright/mcp@latest']);
+    // The pinned install by absolute path, run by node: never npx and a registry tag.
+    expect(b.command).toBe(process.execPath);
+    expect(b.args[0]).toBe(playwrightMcpBin());
+    expect(b.args.join(' ')).not.toMatch(/npx|@latest/);
     expect(b.args).toContain('--headless');
     expect(b.args).not.toContain('--isolated');
     const out = b.args.indexOf('--output-dir');
@@ -63,6 +65,15 @@ describe('buildMcpConfig: browser', () => {
     const udd = b.args.indexOf('--user-data-dir');
     expect(udd).toBeGreaterThan(-1);
     expect(b.args[udd + 1]).toBe(join(paths.browsers, 'volero'));
+  });
+
+  it('runs @playwright/mcp from an exact version pinned in the server package', () => {
+    const { dependencies } = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8'));
+    expect(dependencies['@playwright/mcp']).toMatch(/^\d+\.\d+\.\d+$/);
+    const bin = playwrightMcpBin();
+    expect(existsSync(bin)).toBe(true);
+    const installed = JSON.parse(readFileSync(join(bin, '..', 'package.json'), 'utf8'));
+    expect(installed.version).toBe(dependencies['@playwright/mcp']);
   });
 
   it('omits --headless when the channel wants a visible browser', () => {
