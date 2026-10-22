@@ -11,7 +11,11 @@ import { loadAutomations, runAutomation, type Automation } from './automations.t
 import { runsAutomationsHere } from './sync/owner.ts';
 
 const run = promisify(execFile);
-const PR_FIELDS = 'number,title,url,headRefName,headRefOid,isDraft,mergeable,author,statusCheckRollup,reviews,comments';
+// Reviews and comments carry authorAssociation; the PR's own does not come from gh pr list, so ASSOCIATIONS fetches it.
+const PR_FIELDS = 'number,title,url,headRefName,headRefOid,isDraft,isCrossRepository,mergeable,author,statusCheckRollup,reviews,comments';
+const ASSOCIATIONS = `query($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) { pullRequests(states: OPEN, first: 100, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { number authorAssociation } } }
+}`;
 const stateKey = (id: string) => `automations.events.${id}`;
 
 export interface WatchDeps {
@@ -23,10 +27,14 @@ export interface WatchDeps {
 
 const ghDeps: WatchDeps = {
   async listPRs(repo) {
-    const { stdout } = await run('gh', ['pr', 'list', '--repo', repo, '--state', 'open', '--limit', '30', '--json', PR_FIELDS], {
-      maxBuffer: 32 * 1024 * 1024,
-    });
-    return JSON.parse(stdout);
+    const [owner, name] = repo.split('/');
+    const [list, assoc] = await Promise.all([
+      run('gh', ['pr', 'list', '--repo', repo, '--state', 'open', '--limit', '30', '--json', PR_FIELDS], { maxBuffer: 32 * 1024 * 1024 }),
+      run('gh', ['api', 'graphql', '-f', `owner=${owner}`, '-f', `name=${name}`, '-f', `query=${ASSOCIATIONS}`, '--jq', '.data.repository.pullRequests.nodes']),
+    ]);
+    // A PR missing from the second list keeps no association, so detect() treats its author as untrusted.
+    const byNumber = new Map<number, string>((JSON.parse(assoc.stdout) as { number: number; authorAssociation: string }[]).map((n) => [n.number, n.authorAssociation]));
+    return (JSON.parse(list.stdout) as PRInfo[]).map((pr) => ({ ...pr, authorAssociation: byNumber.get(pr.number) }));
   },
   self: (() => {
     let login: Promise<string | null> | undefined;

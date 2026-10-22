@@ -34,14 +34,17 @@ const deps: import('../automation-watch.ts').WatchDeps = {
     return runAutomation(a, 'event', { prompt, title });
   },
 };
-const pr = (sha: string, failed: boolean): PRInfo => ({
+const pr = (sha: string, failed: boolean, over: Partial<PRInfo> = {}): PRInfo => ({
   number: 12,
   title: 'Add thing',
   url: 'https://github.com/o/r/pull/12',
   headRefName: 'add-thing',
   headRefOid: sha,
   isDraft: false,
+  isCrossRepository: false,
+  authorAssociation: 'COLLABORATOR',
   statusCheckRollup: [{ name: 'test', conclusion: failed ? 'FAILURE' : 'SUCCESS' }],
+  ...over,
 });
 const runs = () =>
   r.db.db.prepare(`SELECT r.trigger, t.title FROM automation_runs r JOIN threads t ON t.id = r.thread_id WHERE r.automation = 'fix-ci' ORDER BY r.id`).all();
@@ -67,12 +70,19 @@ describe('event automations', () => {
     expect(await watch.pollOnce(deps)).toBe(1);
     expect(runs()).toEqual([{ trigger: 'event', title: 'Fix CI · #12' }]);
     expect(started[0].prompt).toMatch(/^Fix the failing checks\.\n/);
-    expect(started[0].prompt).toContain('When PR checks fail: o/r#12 "Add thing"');
+    expect(started[0].prompt).toContain('When PR checks fail: o/r#12, https://github.com/o/r/pull/12');
   });
 
   it('the same failure does not start it again', async () => {
     expect(await watch.pollOnce(deps)).toBe(0);
     expect(runs()).toHaveLength(1);
+  });
+
+  it('a failing PR from an outsider or a fork starts nothing', async () => {
+    prs = [pr('sha2', true), pr('sha3', true, { number: 13, authorAssociation: 'CONTRIBUTOR' }), pr('sha4', true, { number: 14, authorAssociation: 'OWNER', isCrossRepository: true })];
+    expect(await watch.pollOnce(deps)).toBe(0);
+    expect(runs()).toHaveLength(1);
+    prs = [pr('sha2', true)];
   });
 
   it('shows why a poll failed, and clears it on the next good poll', async () => {

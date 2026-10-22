@@ -1,6 +1,7 @@
 # Event automation: a run starts when a PR's checks fail, instead of on a schedule.
-# `on:` takes pr_opened, pr_checks_failed, pr_conflict or pr_review, or { event, repo, drafts }. Without `repo`,
-# it watches the channel's GitHub repo. Omni polls gh every OMNI_AUTOMATION_POLL_SECONDS (default 120); each
+# `on:` takes pr_opened, pr_checks_failed, pr_conflict or pr_review, or { event, repo, drafts, trust }. Without `repo`,
+# it watches the channel's GitHub repo. Only PRs and comments from the repo's owners, members and collaborators fire,
+# never a fork PR: `trust: any` lets anyone's in, and runs their code here. Omni polls gh every OMNI_AUTOMATION_POLL_SECONDS (default 120); each
 # event fires once (per head commit for checks and conflicts), and nothing fires for what was already there
 # when the automation was turned on. The run's prompt is this prompt plus the event (repo, PR, failed checks).
 name: Fix failing PR checks

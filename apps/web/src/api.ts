@@ -278,6 +278,8 @@ export interface AutomationTrigger {
   event: 'pr_opened' | 'pr_checks_failed' | 'pr_conflict' | 'pr_review' | (string & {});
   repo?: string;
   drafts: boolean;
+  /** `any`: outside authors and fork PRs fire too. Unset, only the repo's owners, members and collaborators. */
+  trust?: 'any';
 }
 export interface Automation {
   id: string;
