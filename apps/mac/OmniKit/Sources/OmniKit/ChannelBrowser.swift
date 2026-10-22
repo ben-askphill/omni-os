@@ -390,13 +390,6 @@ public final class ChannelBrowserModel {
     perform(.resize(width: width, height: height, scale: scale))
   }
 
-  /// Claims the page size for this view again, after another viewer (the web panel) changed it.
-  public func claimSize() {
-    guard let s = size, state.running else { return }
-    if let v = state.viewport, abs(v.width - s.width.rounded()) <= 1, abs(v.height - s.height.rounded()) <= 1 { return }
-    perform(.resize(width: s.width, height: s.height, scale: s.scale))
-  }
-
   /// The page's selected text, for Cmd-C.
   public func copySelection() async -> String {
     (try? await client.browserCopy(channel: channel)) ?? ""

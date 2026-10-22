@@ -3,43 +3,6 @@ import OmniKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The new-thread screen, where New Thread lands: the composer alone on a channel (`channelID`), with a greeting
-/// on Home (nil). Home and Channel embed `NewThreadComposerView` the same way when they are built.
-struct NewThreadScreen: View {
-  let model: AppModel
-  let channelID: String?
-
-  var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: z(20)) {
-        if channelID == nil { greeting }
-        NewThreadComposerView(model: model, channelID: channelID, big: channelID == nil)
-      }
-      .frame(maxWidth: ThreadStyle.column)
-      .padding(.horizontal, z(24))
-      .padding(.top, channelID == nil ? 56 : 24)
-      .padding(.bottom, z(48))
-      .frame(maxWidth: .infinity)
-    }
-    .id(channelID)
-  }
-
-  private var greeting: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      StaticMark(size: 40).foregroundStyle(Tok.fg)
-      Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "en_GB"))))
-        .omniCaption()
-        .padding(.top, z(16))
-        .padding(.bottom, z(10))
-      Text(Greeting.text(hour: Calendar.current.component(.hour, from: .now), name: model.store.status?.profile?.name))
-        .font(.omni(size: 36, weight: .medium))
-        .tracking(-0.36)
-        .foregroundStyle(Tok.fg)
-    }
-    .padding(.horizontal, z(4))
-  }
-}
-
 /// The composer with channel, role, model and effort pickers; `NewThreadComposer` in Composer.tsx is the behavior.
 /// Creating the thread opens it.
 struct NewThreadComposerView: View {

@@ -161,7 +161,6 @@ struct IconButtonStyle: ButtonStyle {
 
 extension ButtonStyle where Self == PillButtonStyle {
   static var pill: PillButtonStyle { PillButtonStyle() }
-  static var pillPrimary: PillButtonStyle { PillButtonStyle(variant: .primary) }
   static func pill(_ variant: PillButtonStyle.Variant, height: CGFloat = 32) -> PillButtonStyle {
     PillButtonStyle(variant: variant, height: height)
   }

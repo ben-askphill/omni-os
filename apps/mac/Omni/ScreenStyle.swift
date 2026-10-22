@@ -88,14 +88,6 @@ extension View {
   func hoverWash(_ radius: CGFloat = 18, fill: Color = Tok.surface, active: Bool = false) -> some View {
     modifier(HoverWash(radius: radius, fill: fill, active: active))
   }
-
-  /// A settings group: rows on the surface at 20pt corners.
-  func omniGroup() -> some View {
-    padding(.horizontal, 18)
-      .padding(.vertical, z(14))
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .omniCard(20)
-  }
 }
 
 /// Label in ui.tsx: a 12.5 medium fg-2 label with an optional fg-3 hint under it.

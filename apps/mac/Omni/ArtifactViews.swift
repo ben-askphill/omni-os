@@ -4,16 +4,6 @@ import PDFKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-func artifactSymbol(_ kind: String) -> String {
-  switch kind {
-  case "image", "screenshot": "photo"
-  case "html", "svg": "globe"
-  case "pdf": "doc.richtext"
-  case "csv": "tablecells"
-  default: "doc.text"
-  }
-}
-
 /// The web's kindIcon: the OmniIcon for an artifact kind.
 func artifactIcon(_ kind: String) -> String {
   switch kind {

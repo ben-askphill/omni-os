@@ -57,11 +57,6 @@ public final class ReplyComposerModel {
     discard(f)
   }
 
-  public func clearError() {
-    sendError = nil
-    attachError = nil
-  }
-
   /// Sends the text and files. On success the text is cleared unless Ben typed more meanwhile, the files go,
   /// and the answer is returned. On failure everything stays and `sendError` says why.
   @discardableResult

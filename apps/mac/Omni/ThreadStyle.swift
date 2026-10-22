@@ -16,15 +16,6 @@ enum ThreadStyle {
   static let bubble = Tok.surface2
   static let code = Tok.surface
   static let line = Tok.line
-  /// Status colors. Vermilion is never text on white, so `bad` text is ink and the glyph carries the pop.
-  static let info = Tok.live
-  static let infoBackground = Tok.live.opacity(0.1)
-  static let ok = Tok.fg2
-  static let okBackground = Tok.done
-  static let bad = Tok.fg
-  static let badBackground = Tok.surface
-  static let warn = Tok.fg2
-  static let warnBackground = Tok.surface2
   static let add = Tok.diffAdd
   static let delete = Tok.diffDelete
 }
@@ -169,15 +160,6 @@ struct Pre: View {
     case .delete: ThreadStyle.delete
     default: ThreadStyle.code
     }
-  }
-}
-
-/// A small spinner the size of the text next to it.
-struct Spinner: View {
-  var body: some View {
-    Loader(size: 12)
-      .foregroundStyle(Tok.live)
-      .frame(width: z(12), height: z(12))
   }
 }
 
