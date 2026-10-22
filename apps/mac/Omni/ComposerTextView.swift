@@ -53,6 +53,13 @@ struct ComposerTextView: NSViewRepresentable {
 
   static func font(_ size: CGFloat) -> NSFont { size == 14.5 ? font : NSFont.systemFont(ofSize: size) }
 
+  /// The line height of a message's prose (`.md` in index.css, `MarkdownView.prose`).
+  static func paragraph(_ size: CGFloat) -> NSParagraphStyle {
+    let style = NSMutableParagraphStyle()
+    style.lineSpacing = size * 0.6
+    return style
+  }
+
   func makeCoordinator() -> Coordinator { Coordinator() }
 
   func makeNSView(context: Context) -> NSScrollView {
@@ -118,8 +125,11 @@ struct ComposerTextView: NSViewRepresentable {
   /// The font and inset at the zoom.
   private func zoom(_ tv: ComposerNSTextView) {
     let font = Self.font(fontSize * scale)
+    let paragraph = Self.paragraph(fontSize * scale)
     tv.font = font
-    tv.typingAttributes = [.font: font, .foregroundColor: Self.ink]
+    tv.defaultParagraphStyle = paragraph
+    tv.typingAttributes = [.font: font, .foregroundColor: Self.ink, .paragraphStyle: paragraph]
+    if let storage = tv.textStorage { storage.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: storage.length)) }
     tv.placeholderFont = font
     tv.textContainerInset = NSSize(width: Self.inset.width * scale, height: Self.inset.height * scale)
   }
@@ -136,7 +146,7 @@ struct ComposerTextView: NSViewRepresentable {
     let measured = text.hasSuffix("\n") || text.isEmpty ? text + " " : text
     let box = CGSize(width: max(1, width - inset.width * 2), height: .greatestFiniteMagnitude)
     let rect = (measured as NSString).boundingRect(
-      with: box, options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font(fontSize)])
+      with: box, options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font(fontSize), .paragraphStyle: paragraph(fontSize)])
     return min(range.upperBound, max(range.lowerBound, ceil(rect.height) + inset.height * 2))
   }
 
@@ -221,7 +231,8 @@ final class ComposerNSTextView: NSTextView {
     let origin = textContainerOrigin
     (placeholder as NSString).draw(
       at: NSPoint(x: origin.x + (textContainer?.lineFragmentPadding ?? 0), y: origin.y),
-      withAttributes: [.font: placeholderFont, .foregroundColor: ComposerTextView.quiet])
+      withAttributes: [.font: placeholderFont, .foregroundColor: ComposerTextView.quiet,
+                       .paragraphStyle: ComposerTextView.paragraph(placeholderFont.pointSize)])
   }
 
   // Cmd-Return inserts a newline and Shift-Cmd-Return interrupts. Nothing while an input method composes.
