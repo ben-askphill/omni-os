@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero/hero-dark.png">
+    <img src="docs/assets/hero/hero-light.png" alt="The Omni OS Mac app: a channel sidebar with folders, a Conductor thread that delegated three tasks and got a researcher's report back, and an artifact open in the side panel" width="100%">
+  </picture>
+</p>
+
 # Omni OS
 
 One local workspace for all agent work. Channels per client or project, a thread per task, a Conductor that hands work to a crew, and automations on a schedule or on GitHub PR events. Replaces hopping between Claude Desktop, Cursor cloud agents and a separate conductor bot.
