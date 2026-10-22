@@ -52,7 +52,10 @@ private struct ThreadInspector: ViewModifier {
         ToolbarSpacer(.flexible, placement: .primaryAction)
         // Nothing runs while the worktree is prepared, so there is nothing to interrupt.
         if store.running && store.thread?.setup == nil {
-          ToolbarItem(placement: .primaryAction) { InterruptButton(store: store) }
+          ToolbarItem(placement: .primaryAction) {
+            InterruptButton(store: store).buttonStyle(.icon(size: 28, wide: store.interrupting))
+          }
+          .sharedBackgroundVisibility(.hidden)
         }
         ToolbarItem(placement: .primaryAction) {
           Button {
@@ -63,8 +66,10 @@ private struct ThreadInspector: ViewModifier {
               if count > 0 { Text("\(count)").font(.omni(size: 11, weight: .medium).monospacedDigit()) }
             }
           }
+          .buttonStyle(.icon(size: 28, wide: count > 0))
           .help(count > 0 ? "Artifacts, changes, browser, terminal, details (\(count))" : "Artifacts, changes, browser, terminal, details")
         }
+        .sharedBackgroundVisibility(.hidden)
       }
       .onChange(of: store.arrivedHTML?.id) {
         guard let page = store.arrivedHTML else { return }

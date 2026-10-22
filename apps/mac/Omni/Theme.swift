@@ -129,10 +129,12 @@ struct PillButtonStyle: ButtonStyle {
   }
 }
 
-/// IconButton in ui.tsx: a round button whose wash scales in on hover.
+/// IconButton in ui.tsx: a round button whose wash scales in on hover. `wide` lets a label with text,
+/// such as a count, stretch it into a pill instead of clipping.
 struct IconButtonStyle: ButtonStyle {
   var size: CGFloat = 30
   var active = false
+  var wide = false
   @State private var hover = false
   @Environment(\.isEnabled) private var enabled
 
@@ -141,13 +143,14 @@ struct IconButtonStyle: ButtonStyle {
       .labelStyle(.iconOnly)
       .font(.omni(size: size * 0.48))
       .foregroundStyle(active || hover ? Tok.fg : Tok.fg3)
-      .frame(width: z(size), height: z(size))
+      .padding(.horizontal, wide ? z(size * 0.3) : 0)
+      .frame(minWidth: z(size), maxWidth: wide ? nil : z(size), minHeight: z(size), maxHeight: z(size))
       .background {
-        Circle().fill(Tok.wash)
+        Capsule().fill(Tok.wash)
           .opacity(hover || active || configuration.isPressed ? 1 : 0)
           .scaleEffect(hover || active || configuration.isPressed ? 1 : 0.72)
       }
-      .contentShape(Circle())
+      .contentShape(Capsule())
       .opacity(enabled ? 1 : 0.4)
       .scaleEffect(configuration.isPressed ? 0.94 : 1)
       .onHover { hover = $0 }
@@ -166,7 +169,9 @@ extension ButtonStyle where Self == PillButtonStyle {
 
 extension ButtonStyle where Self == IconButtonStyle {
   static var icon: IconButtonStyle { IconButtonStyle() }
-  static func icon(size: CGFloat = 30, active: Bool = false) -> IconButtonStyle { IconButtonStyle(size: size, active: active) }
+  static func icon(size: CGFloat = 30, active: Bool = false, wide: Bool = false) -> IconButtonStyle {
+    IconButtonStyle(size: size, active: active, wide: wide)
+  }
 }
 
 // MARK: - Segmented
