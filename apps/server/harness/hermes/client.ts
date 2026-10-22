@@ -52,7 +52,7 @@ export interface HermesRunCreated {
 
 const trimBase = (base: string) => base.replace(/\/$/, '');
 
-const sleep = (ms: number, signal?: AbortSignal) =>
+export const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     if (signal?.aborted) return reject(new DOMException('aborted', 'AbortError'));
     const t = setTimeout(resolve, ms);

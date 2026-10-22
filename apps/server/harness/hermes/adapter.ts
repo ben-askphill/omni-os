@@ -13,7 +13,7 @@ import { harnessEnv } from '../env-guard.ts';
 import { spawnHolder } from '../holder.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
-import { HermesClient, HermesHttpError } from './client.ts';
+import { HermesClient, HermesHttpError, sleep } from './client.ts';
 import { userName } from '../../profile.ts';
 import { applyHermesEvent, emptyHermesNorm, eventFromRun, type HermesNormState } from './normalize.ts';
 
@@ -54,20 +54,6 @@ function failText(e: unknown, baseUrl: string, apiKey: string): string {
   if (e instanceof Error && apiKey && e.message.includes(apiKey)) return `Could not reach Hermes at ${baseUrl}. ${HERMES_FIX}`;
   return `Could not reach Hermes at ${baseUrl}. ${HERMES_FIX}`;
 }
-
-const sleep = (ms: number, signal: AbortSignal) =>
-  new Promise<void>((resolve, reject) => {
-    if (signal.aborted) return reject(new DOMException('aborted', 'AbortError'));
-    const t = setTimeout(resolve, ms);
-    signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(t);
-        reject(new DOMException('aborted', 'AbortError'));
-      },
-      { once: true },
-    );
-  });
 
 export const hermesAdapter: HarnessAdapter = {
   id: 'hermes',

@@ -35,8 +35,6 @@ export const config = {
   maxConcurrentCodex: Number(env.OMNI_MAX_CONCURRENT_CODEX ?? 4),
   maxConcurrentCursor: Number(env.OMNI_MAX_CONCURRENT_CURSOR ?? 4),
   maxConcurrentHermes: Number(env.OMNI_MAX_CONCURRENT_HERMES ?? 4),
-  codexBin: env.OMNI_CODEX_BIN,
-  cursorBin: env.OMNI_CURSOR_BIN,
   /** Hermes API server on the server's Tailscale address, like http://100.x.y.z:8642. Unset means Hermes is off. The bearer token is the Keychain secret HERMES_API_KEY, not an env var. */
   get hermesUrl() {
     return resolved.hermesUrl();
