@@ -2,7 +2,8 @@
 
 Besides the two clients:
 
-- `scripts/omni.sh "prompt" -c volero -r researcher`: start a thread from the shell (`OMNI_URL` points it at another server)
+- `scripts/omni.sh "prompt" -c volero -r researcher`: start a thread from the shell (`OMNI_URL` points it at another server, `OMNI_TOKEN` or `data/api-token` is the API token)
+- `scripts/omni.sh --pair`: print a link that pairs a browser, such as your phone, with this Omni
 - claude-bar hotkey prompt: set `"target": "omni"` in its config to send captures here
 - Mac app Quick Prompt: Ctrl-Option-Space in any app opens a floating prompt, starts Wispr Flow, and sends what you say to the Conductor. Settings, Quick Prompt changes the shortcut and opens Omni at login
 - `npm run import-history -- --days 30`: pull existing Claude Code sessions into Omni as resumable threads

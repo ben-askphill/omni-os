@@ -160,6 +160,7 @@ async function boot(): Promise<number> {
       HOME: process.env.HOME,
       TMPDIR: tmpdir(),
       OMNI_DATA_DIR: data,
+      OMNI_TOKEN: process.env.OMNI_TOKEN,
       OMNI_PORT: '0',
       OMNI_HOST: '127.0.0.1',
       OMNI_CLAUDE_BIN: FAKE_CLAUDE,
@@ -202,7 +203,7 @@ function capture(url: string) {
   let text = '';
   let failed: unknown;
   const done = (async () => {
-    const res = await fetch(url, { signal: ac.signal });
+    const res = await fetch(url, { signal: ac.signal, headers: { authorization: `Bearer ${process.env.OMNI_TOKEN}` } });
     const reader = res.body!.getReader();
     const dec = new TextDecoder();
     for (;;) {
@@ -233,7 +234,7 @@ async function scenario() {
   const call = async (method: string, path: string, body?: unknown, ok = true) => {
     const res = await fetch(`${base}/api${path}`, {
       method,
-      headers: body ? { 'content-type': 'application/json' } : undefined,
+      headers: { authorization: `Bearer ${process.env.OMNI_TOKEN}`, ...(body ? { 'content-type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     });
     const text = await res.text();

@@ -20,6 +20,7 @@ afterAll(() => rmSync(web, { recursive: true, force: true }));
 const r = await startRunner({ OMNI_WEB_DIST: web });
 const { app } = await import('../app.ts');
 const { gitHead } = await import('../about.ts');
+const { cookieName, proofFor } = await import('../api-token.ts');
 
 const call = async (path: string, init?: RequestInit) => {
   const res = await app.request(path, init);
@@ -103,6 +104,53 @@ describe('the Web UI', () => {
     expect(await call('/c/inbox')).toMatchObject({ status: 200, type: expect.stringContaining('text/html'), text: INDEX });
     expect(await call('/apiary')).toMatchObject({ status: 200, text: INDEX });
   });
+
+  it('needs no token, and never sets or carries one', async () => {
+    const TOKEN = process.env.OMNI_TOKEN!;
+    for (const path of ['/', '/assets/app.js', '/c/inbox']) {
+      const res = await app.request(path, { headers: { authorization: '' } });
+      expect(res.status, path).toBe(200);
+      expect(res.headers.get('set-cookie'), path).toBeNull();
+      expect(await res.text(), path).not.toContain(TOKEN);
+    }
+  });
+});
+
+describe('/api/auth', () => {
+  const TOKEN = process.env.OMNI_TOKEN!;
+
+  it('pairs a browser: the token, sent as a bearer header, comes back as an HttpOnly SameSite=Strict cookie on /api', async () => {
+    const res = await app.request('/api/auth/pair', { method: 'POST' });
+    expect(res.status).toBe(200);
+    const cookie = res.headers.get('set-cookie') ?? '';
+    expect(cookie).toContain(`${cookieName()}=${TOKEN}`);
+    expect(cookie).toMatch(/; Path=\/api(;|$)/);
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('SameSite=Strict');
+    expect(cookie).not.toContain('Secure');
+    const viaServe = await app.request('/api/auth/pair', { method: 'POST', headers: { 'x-forwarded-proto': 'https' } });
+    expect(viaServe.headers.get('set-cookie')).toContain('Secure');
+    // The cookie alone is enough after that, for GET /api/auth and everything else.
+    const after = await app.request('/api/auth', { headers: { authorization: '', cookie: `${cookieName()}=${TOKEN}` } });
+    expect(after.status).toBe(200);
+  });
+
+  it('will not pair without the token', async () => {
+    const res = await app.request('/api/auth/pair', { method: 'POST', headers: { authorization: 'Bearer wrong' } });
+    expect(res.status).toBe(401);
+    expect(res.headers.get('set-cookie')).toBeNull();
+    expect((await app.request('/api/auth', { headers: { authorization: '' } })).status).toBe(401);
+  });
+
+  it('proves the server holds the token to a caller that sends none', async () => {
+    const nonce = 'ab'.repeat(16);
+    const res = await app.request(`/api/auth/proof?nonce=${nonce}`, { headers: { authorization: '' } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { proof: string };
+    expect(body).toEqual({ proof: proofFor(nonce, TOKEN) });
+    expect(JSON.stringify(body)).not.toContain(TOKEN);
+    expect((await app.request('/api/auth/proof?nonce=xyz', { headers: { authorization: '' } })).status).toBe(400);
+  });
 });
 
 describe('channel icon', () => {
@@ -150,5 +198,17 @@ describe('requests other sites make through a browser', () => {
     expect(cross.status).toBe(403);
     const rebound = await app.request('http://rebind.evil.example:4747/api/threads', { headers: { host: 'rebind.evil.example:4747' } });
     expect(rebound.status).toBe(403);
+  });
+});
+
+describe('requests without the token', () => {
+  it('reach no route: no thread, no secret, no shell', async () => {
+    const before = JSON.parse((await call('/api/threads')).text).length;
+    const anon = { authorization: '', 'content-type': 'application/json' };
+    const made = await app.request('/api/threads', { method: 'POST', headers: anon, body: JSON.stringify({ channel: 'scratch', prompt: 'x' }) });
+    expect(made.status).toBe(401);
+    expect((await app.request('/api/secrets', { method: 'POST', headers: anon, body: JSON.stringify({ scope: 'global', name: 'X', value: 'y' }) })).status).toBe(401);
+    expect((await app.request('/api/threads', { headers: anon })).status).toBe(401);
+    expect(JSON.parse((await call('/api/threads')).text).length).toBe(before);
   });
 });

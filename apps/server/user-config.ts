@@ -59,6 +59,11 @@ export const userConfigSchema = z.object({
       hermesUrl: z.string().trim().default(''),
       /** A second-brain git repo the brain-export automation writes digests into. Empty means off. */
       centralBrainDir: folder,
+      /**
+       * Tailscale logins allowed in through `tailscale serve`, comma separated, like ada@example.com. Set, a request on
+       * a *.ts.net or 100.64.0.0/10 Host needs a matching Tailscale-User-Login header as well as the token. Empty skips it.
+       */
+      tailscaleLogin: z.string().trim().max(500).default(''),
     })
     .prefault({}),
   /** Per-machine overrides of the shared automation YAML (`enabled`, `channel`), so toggling one never edits the repo. */
@@ -204,6 +209,11 @@ export const resolved = {
   githubOwner: () => userConfig().workspace.githubOwner,
   hermesUrl: () => (process.env.OMNI_HERMES_URL ?? userConfig().integrations.hermesUrl ?? '').replace(/\/$/, ''),
   centralBrainDir: () => expandHome(process.env.OMNI_CENTRAL_BRAIN_DIR || userConfig().integrations.centralBrainDir),
+  tailscaleLogins: () =>
+    (process.env.OMNI_TAILSCALE_LOGIN ?? userConfig().integrations.tailscaleLogin)
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
 };
 
 /** How prompts refer to the person: their name, or "the user" until one is set. */

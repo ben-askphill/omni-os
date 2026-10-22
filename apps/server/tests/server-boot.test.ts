@@ -49,6 +49,7 @@ function boot(data: string, port = 0) {
       HOME: process.env.HOME,
       TMPDIR: tmpdir(),
       OMNI_DATA_DIR: data,
+      OMNI_TOKEN: process.env.OMNI_TOKEN,
       OMNI_PORT: String(port),
       OMNI_HOST: '127.0.0.1',
       OMNI_CLAUDE_BIN: FAKE_CLAUDE,
@@ -88,7 +89,7 @@ function boot(data: string, port = 0) {
 }
 
 const api = async (port: number, path: string, init?: RequestInit) => {
-  const res = await fetch(`http://127.0.0.1:${port}/api${path}`, init);
+  const res = await fetch(`http://127.0.0.1:${port}/api${path}`, { ...init, headers: { authorization: `Bearer ${process.env.OMNI_TOKEN}`, ...(init?.headers as Record<string, string>) } });
   if (!res.ok) throw new Error(`${path}: ${res.status} ${await res.text()}`);
   return res.json();
 };

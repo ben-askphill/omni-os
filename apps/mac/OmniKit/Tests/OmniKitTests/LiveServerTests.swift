@@ -10,7 +10,7 @@ private let livePort = ProcessInfo.processInfo.environment["OMNI_LIVE_PORT"].fla
 
 @Suite(.enabled(if: livePort != nil && livePort != 4747, "set OMNI_LIVE_PORT to a test server's port"))
 struct LiveServerTests {
-  let client = OmniClient(port: livePort ?? 0)
+  let client = OmniClient(port: livePort ?? 0, token: .fixed(ProcessInfo.processInfo.environment["OMNI_TOKEN"]))
 
   private func finished(_ id: String) async throws {
     try await eventually("the turn to end", within: .seconds(20)) {

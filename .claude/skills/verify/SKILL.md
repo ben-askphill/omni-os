@@ -21,7 +21,9 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 `scripts/qa-stack.sh up` starts a throwaway server (:4757) with its own data dir and the fake CLIs, vite in front (:4768), and seeds sample threads. It prints the thread URLs. `QA_SERVER_PORT=<port> scripts/qa-stack.sh down` stops it and deletes its data. `down` refuses to run without the port, and refuses a stack whose processes run from another checkout, so it cannot stop another thread's stack. Never test against :4747 or `data/`: that is the live workspace.
 
 - Threads run on `packages/test-fixtures/fake-claude.mjs`. Drive a turn with directives in the prompt: `RICH` (tools, plan, sub-agent), `TOOL:<ms>`, `BG:<ms>`, `LIMIT[:<epoch>]`, `CTX:<tokens>`, `PUBLISH:<path>`, and more listed at the top of that file.
-- Create a thread: `curl -s -X POST localhost:4757/api/threads -H 'content-type: application/json' -d '{"channel":"inbox","prompt":"RICH"}'`
+- Every `/api` call needs the stack's own token (`status` prints it; it is `$QA_DIR/data/api-token`, default `$TMPDIR/omni-qa-<port>/data/api-token`). Your shell's `OMNI_TOKEN` is the live server's, so never use it here. `T=$(cat "${TMPDIR:-/tmp}/omni-qa-4757/data/api-token")`
+- Create a thread: `curl -s -X POST localhost:4757/api/threads -H "Authorization: Bearer $T" -H 'content-type: application/json' -d '{"channel":"inbox","prompt":"RICH"}'`
+- The web URLs `up` and `status` print end in `?pair=<token>`, which pairs the browser. A bare URL shows the pairing screen.
 - Need some other state (folders, channels, a stuck request)? Build it through the API first; reach into the sqlite db in the QA data dir only when no route exists.
 
 ## 3. Drive it

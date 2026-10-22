@@ -9,16 +9,36 @@ npm run build && npm start
 tailscale serve --bg 4747
 ```
 
-Then open the `.ts.net` address Tailscale prints, on any device signed in to the same tailnet. The server itself stays on loopback; Tailscale is the door. The Mac has to be awake: `scripts/install-launchd.sh` keeps it from idle-sleeping while the server runs.
+Then pair the phone once. On the Mac, print a pairing link with the `.ts.net` address:
+
+```bash
+OMNI_URL=https://<your-mac>.<tailnet>.ts.net scripts/omni.sh --pair
+```
+
+Open that link on the phone (AirDrop it, or paste it). Or open the `.ts.net` address and paste the token from `data/api-token` into the pairing screen. The server itself stays on loopback; Tailscale is the door. The Mac has to be awake: `scripts/install-launchd.sh` keeps it from idle-sleeping while the server runs.
 
 ## Who can call the API
 
-The network is the auth. The server binds `OMNI_HOST`, or `127.0.0.1` when that is unset, and Omni does not check a token. Anyone who can open the port can read threads, write Keychain entries via `POST /api/secrets`, merge PRs, and type into a thread shell. `tailscale serve` (above) is the supported remote path: the server stays on loopback, and the tailnet is the door.
+Every `/api` request needs this install's token. The server makes it on first start: 32 random bytes in `data/api-token`, mode 0600, so only your macOS account can read it (`OMNI_TOKEN` in the server's environment replaces it, for tests and throwaway servers). A file rather than the Keychain: the Mac app and shell scripts read it without a Keychain prompt, and the Keychain would guard it from the same account the file mode already lets in. Delete the file and restart the server to rotate it; every browser then pairs again.
 
-The network being the auth only holds if a web page cannot use your browser as its way in. `apps/server/request-guard.ts` sits in front of every `/api` route and refuses:
+| Client | How it sends the token |
+| --- | --- |
+| Mac app | Reads `data/api-token` (or `OMNI_DATA_DIR`'s) and sends `Authorization: Bearer`. Before it attaches to whatever answers on the port, it asks `GET /api/auth/proof?nonce=` for an HMAC of a fresh nonce keyed with the token, so a program squatting on the port never gets the token or your secrets |
+| `scripts/omni.sh`, `npm run setup` | `OMNI_TOKEN`, else `data/api-token` |
+| Threads | `OMNI_TOKEN` in their environment, next to `OMNI_URL`. The conductor MCP (`apps/mcp/omni.ts`) gets `OMNI_TOKEN_FILE`, a path, so no token is written into `mcp.json` |
+| Web UI | Pairs once (below), then holds the token in a cookie |
+
+The Web UI and its assets are served without the token and never contain it, so opening the page gets you only the pairing screen. Pairing sends the token once to `POST /api/auth/pair`, which answers with an `HttpOnly`, `SameSite=Strict` cookie on `/api` (`Secure` behind HTTPS). Page scripts never see it, and `EventSource` streams and images carry it. The token gets to a browser one of two ways:
+
+- Paste it from `data/api-token` into the pairing screen.
+- Open a link with `?pair=<token>` after the route, like `http://127.0.0.1:4747/#/?pair=...`. `scripts/omni.sh --pair` prints one. The page swaps it for the cookie and drops it from the address bar. The link holds the token itself, so share it only with your own devices.
+
+Through `tailscale serve` (a `.ts.net` or 100.64.0.0/10 `Host`), set `integrations.tailscaleLogin` in `data/omni.config.json` to your Tailscale login (comma-separate several) and requests must also carry a matching `Tailscale-User-Login` header, which `tailscale serve` sets from the peer's identity. Tagged nodes and other users then get a 403 even with the token. That is defense in depth: the token is the main control.
+
+The token stops other macOS accounts, other tailnet devices and anything else that reaches the port. It does not stop a web page from using a paired browser's cookie, so `apps/server/request-guard.ts` also refuses:
 
 - a `Host` that is not loopback, a `.ts.net` name, a 100.64.0.0/10 address, `OMNI_HOST` or one listed in `OMNI_ALLOWED_HOSTS` (comma-separated). This stops DNS rebinding.
 - `Sec-Fetch-Site: cross-site`, and any `Origin` (`null` included) that is not the host the request came in on.
 - `text/plain` and form-urlencoded bodies (415), the types a page can send without a CORS preflight.
 
-The Mac app, `apps/mcp/omni.ts`, `scripts/omni.sh` and curl send no `Origin`, so only the `Host` check applies to them. HTML and SVG artifacts are served with `Content-Security-Policy: sandbox`, so a page opened in its own tab does not run on Omni's origin.
+The Mac app, `apps/mcp/omni.ts`, `scripts/omni.sh` and curl send no `Origin`, so the `Host` and token checks apply to them. Without the token every route answers 401, except `GET /api/auth/proof`. HTML and SVG artifacts are served with `Content-Security-Policy: sandbox`, so a page opened in its own tab does not run on Omni's origin.

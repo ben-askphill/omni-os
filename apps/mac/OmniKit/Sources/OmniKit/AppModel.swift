@@ -122,14 +122,16 @@ public final class AppModel {
   /// The workspace's subscription on `feed`. Dropped before the feed is replaced.
   @ObservationIgnored private var feedTicket: UUID?
 
-  /// - Parameter connect: makes the client and store for a port. `liveConnection` by default.
+  /// - Parameter connect: makes the client and store for a port. `liveConnection` with the supervisor's token by default.
   public init(
     settings: ServerSettings, supervisor: ServerSupervisor? = nil, attention: AttentionCenter? = nil,
-    connect: @escaping @MainActor (_ port: Int) -> Connection = AppModel.liveConnection
+    connect: (@MainActor (_ port: Int) -> Connection)? = nil
   ) {
     self.settings = settings
     self.attention = attention ?? AttentionCenter()
-    self.supervisor = supervisor ?? ServerSupervisor(settings: settings)
+    let supervisor = supervisor ?? ServerSupervisor(settings: settings)
+    self.supervisor = supervisor
+    let connect = connect ?? { [token = supervisor.token] port in AppModel.liveConnection(port: port, token: token) }
     self.connect = connect
     config = settings.config
     let c = connect(settings.port)
@@ -150,11 +152,11 @@ public final class AppModel {
   }
 
   /// A client with its own ephemeral session, so nothing is cached or proxied, and the one feed.
-  public static func liveConnection(port: Int) -> Connection {
+  public static func liveConnection(port: Int, token: ServerToken) -> Connection {
     let c = URLSessionConfiguration.ephemeral
     c.requestCachePolicy = .reloadIgnoringLocalCacheData
     c.connectionProxyDictionary = [:]
-    let client = OmniClient(port: port, transport: URLSessionTransport(session: URLSession(configuration: c)))
+    let client = OmniClient(port: port, token: token, transport: URLSessionTransport(session: URLSession(configuration: c)))
     let feed = AppFeed(source: client.feedEvents())
     return Connection(client: client, store: WorkspaceStore(api: client), feed: feed)
   }
@@ -422,7 +424,11 @@ public final class AppModel {
   private func connectionChanged(_ state: ConnectionState) {
     let previous = lastConnection
     lastConnection = state
-    if state == .open { Task { await seedBanners() } }
+    if state == .open {
+      // The feed only opens for a request with the token, so the server took it: images can carry it too.
+      client.shareTokenCookie()
+      Task { await seedBanners() }
+    }
     switch state {
     case .open where !supervisor.isRunning:
       checkServer()

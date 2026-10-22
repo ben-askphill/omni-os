@@ -62,7 +62,7 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 > Omni is early and built for one person's daily use on their own Mac. Expect rough edges.
 >
 > - Threads run with `bypassPermissions`, since nobody can answer a prompt headless. Isolation is a git worktree plus a browser profile, not a VM.
-> - The network is the auth. The server binds to `127.0.0.1` and checks no token, so keep it on loopback and reach it remotely only over your tailnet. See [Remote access and security](docs/user/remote-access.md).
+> - Every API request needs the install's token from `data/api-token`. A browser pairs once to get it. Keep the server on loopback and reach it remotely only over your tailnet. See [Remote access and security](docs/user/remote-access.md).
 
 ## What you get
 

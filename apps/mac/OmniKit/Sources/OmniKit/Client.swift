@@ -119,17 +119,37 @@ private struct ErrorBody: Decodable {
 /// The Omni server's HTTP API, one method per endpoint. Every method throws `OmniAPIError`.
 public struct OmniClient: Sendable {
   public let baseURL: URL
+  /// Sent as `Authorization: Bearer` on every request (apps/server/request-guard.ts).
+  public let token: ServerToken
   private let transport: any HTTPTransport
 
-  public init(baseURL: URL, transport: any HTTPTransport = URLSessionTransport()) {
+  public init(baseURL: URL, token: ServerToken = .none, transport: any HTTPTransport = URLSessionTransport()) {
     self.baseURL = baseURL
+    self.token = token
     self.transport = transport
   }
 
-  public init(host: String = "127.0.0.1", port: Int = 4747, transport: any HTTPTransport = URLSessionTransport()) {
+  public init(host: String = "127.0.0.1", port: Int = 4747, token: ServerToken = .none, transport: any HTTPTransport = URLSessionTransport()) {
     let h = host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
     guard let url = URL(string: "http://\(h):\(port)") else { preconditionFailure("Not a host: \(host)") }
-    self.init(baseURL: url, transport: transport)
+    self.init(baseURL: url, token: token, transport: transport)
+  }
+
+  /// A request for `url` that carries the token. For the event streams, which build their own.
+  public func authorized(_ url: URL) -> URLRequest {
+    var req = URLRequest(url: url)
+    if let t = token.value { req.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
+    return req
+  }
+
+  /// Puts the token in the shared cookie store as the cookie a paired browser holds, for what loads server URLs
+  /// through `URLSession.shared` and sets no header: `AsyncImage` and the markdown image loader.
+  public func shareTokenCookie(in storage: HTTPCookieStorage = .shared) {
+    guard let t = token.value, let host = baseURL.host(), let port = baseURL.port else { return }
+    let cookie = HTTPCookie(properties: [
+      .domain: host, .path: "/api", .name: "omni_token_\(port)", .value: t, .discard: "TRUE",
+    ])
+    if let cookie { storage.setCookie(cookie) }
   }
 
   // MARK: Endpoints
@@ -240,7 +260,7 @@ public struct OmniClient: Sendable {
     _ method: String, _ path: String, query: [(String, String)] = [], body: (any Encodable & Sendable)? = nil,
     raw: (data: Data, contentType: String)? = nil
   ) async throws(OmniAPIError) -> T {
-    var req = URLRequest(url: url(path, query: query))
+    var req = authorized(url(path, query: query))
     req.httpMethod = method
     req.cachePolicy = .reloadIgnoringLocalCacheData
     req.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -268,7 +288,7 @@ public struct OmniClient: Sendable {
 
   /// A file the server serves, such as an upload, as it is.
   public func file(_ url: URL) async throws(OmniAPIError) -> Data {
-    var req = URLRequest(url: url)
+    var req = authorized(url)
     req.cachePolicy = .reloadIgnoringLocalCacheData
     return try await exchange(req).0
   }

@@ -45,8 +45,8 @@ public struct ServerRecord: Codable, Hashable, Sendable {
 }
 
 /// Finds, starts and stops the Omni server on the port in the settings. It attaches to a server that
-/// already answers there, whoever started it, and never starts a second one. A server it starts outlives
-/// the app, and the next launch knows it by its record.
+/// already answers there, whoever started it, once that server proves it holds this install's token, and never
+/// starts a second one. A server it starts outlives the app, and the next launch knows it by its record.
 @MainActor @Observable public final class ServerSupervisor {
   public enum State: Hashable, Sendable {
     case unknown
@@ -71,11 +71,15 @@ public struct ServerRecord: Codable, Hashable, Sendable {
     public var startTimeout: Duration
     /// From SIGTERM to SIGKILL.
     public var stopTimeout: Duration
+    /// nil for the file the server writes in its data dir (`ServerToken.file(repo:environment:)`).
+    public var token: ServerToken?
 
     public init(
       launcher: ServerLauncher = ServerLauncher(), logURL: URL = Self.defaultLog, recordURL: URL = Self.defaultRecord,
-      probeTimeout: Duration = .milliseconds(1500), startTimeout: Duration = .seconds(20), stopTimeout: Duration = .seconds(8)
+      probeTimeout: Duration = .milliseconds(1500), startTimeout: Duration = .seconds(20), stopTimeout: Duration = .seconds(8),
+      token: ServerToken? = nil
     ) {
+      self.token = token
       self.launcher = launcher
       self.logURL = logURL
       self.recordURL = recordURL
@@ -98,6 +102,9 @@ public struct ServerRecord: Codable, Hashable, Sendable {
   /// Where a server the app starts writes its output.
   public var logURL: URL { options.logURL }
 
+  /// The token of the server on the configured repo and port. Clients send it; the probe checks the server knows it.
+  public nonisolated let token: ServerToken
+
   @ObservationIgnored private let config: @MainActor () -> ServerConfig
   @ObservationIgnored private let options: Options
   @ObservationIgnored private let session: URLSession
@@ -105,6 +112,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
   @ObservationIgnored private var queue: Task<Void, Never>?
   @ObservationIgnored private var watcher: (any DispatchSourceProcess)?
   @ObservationIgnored private var watched: Int32?
+  @ObservationIgnored private let tokenFile: TokenLocation
 
   private enum Target {
     /// Started by the app: its whole group goes.
@@ -124,6 +132,10 @@ public struct ServerRecord: Codable, Hashable, Sendable {
     self.config = config
     self.options = options
     port = config().port
+    let location = TokenLocation()
+    tokenFile = location
+    location.current = ServerToken.file(repo: config().repo, environment: options.launcher.extraEnvironment)
+    token = options.token ?? ServerToken { location.current.flatMap { try? String(contentsOf: $0, encoding: .utf8) } }
     let c = URLSessionConfiguration.ephemeral
     let seconds = Double(options.probeTimeout.components.seconds) + Double(options.probeTimeout.components.attoseconds) / 1e18
     c.timeoutIntervalForRequest = seconds
@@ -308,9 +320,24 @@ public struct ServerRecord: Codable, Hashable, Sendable {
     return record
   }
 
+  /// Omni, once the listener proves it holds the token: the HMAC of a fresh nonce, so a program squatting on the
+  /// port learns nothing it could use. Only then does the token go to it, for /api/status.
   private func probe(_ port: Int) async -> Probe {
-    let client = OmniClient(port: port, transport: URLSessionTransport(session: session))
+    tokenFile.current = ServerToken.file(repo: config().repo, environment: options.launcher.extraEnvironment)
+    let anonymous = OmniClient(port: port, transport: URLSessionTransport(session: session))
+    let client = OmniClient(port: port, token: token, transport: URLSessionTransport(session: session))
     do throws(OmniAPIError) {
+      let nonce = ServerToken.nonce()
+      let answer: ProofAnswer
+      do throws(OmniAPIError) {
+        answer = try await anonymous.send("GET", "/api/auth/proof", query: [("nonce", nonce)])
+      } catch {
+        switch error {
+        case .unreachable, .cancelled: throw error
+        default: return .busy(.notThisInstall(port: port))
+        }
+      }
+      guard let t = token.value, answer.proof == ServerToken.proof(token: t, nonce: nonce) else { return .busy(.notThisInstall(port: port)) }
       return .omni(try await client.status())
     } catch {
       switch error {
@@ -320,6 +347,8 @@ public struct ServerRecord: Codable, Hashable, Sendable {
       }
     }
   }
+
+  private struct ProofAnswer: Decodable { let proof: String }
 
   /// Something holds the port on 127.0.0.1, the way the server would bind it.
   private static func portIsTaken(_ port: Int) -> Bool {

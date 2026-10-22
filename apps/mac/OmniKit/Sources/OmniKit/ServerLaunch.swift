@@ -13,6 +13,9 @@ public enum ServerStartError: Error, Hashable, Sendable, LocalizedError {
   case portInUse(port: Int)
   /// Something answers on the port, but not as an Omni server.
   case notOmni(port: Int, detail: String)
+  /// Something answers on the port and cannot show it holds this install's token: an Omni from before the token,
+  /// another checkout's or another account's server, or a program squatting on the port.
+  case notThisInstall(port: Int)
   case spawnFailed(String)
   /// The server exited before it answered. nil when a signal ended it.
   case exited(code: Int32?)
@@ -31,6 +34,7 @@ public enum ServerStartError: Error, Hashable, Sendable, LocalizedError {
     case .nodeTooOld(let path, let version): "Omni needs Node 24 or later, and \(path) is \(version)."
     case .portInUse(let port): "Port \(port) is in use by another program. Stop it, or pick another port in Settings."
     case .notOmni(let port, let detail): "Port \(port) answers, but not as an Omni server: \(sentence(detail)) Stop that program, or pick another port in Settings."
+    case .notThisInstall(let port): "Port \(port) answers, but not as this install's Omni: it does not know the token in data/api-token. Restart the server from this checkout, or pick another port in Settings."
     case .spawnFailed(let why): "Could not start the server: \(why)."
     case .exited(let code?): "The server stopped while starting, with exit code \(code)."
     case .exited(nil): "The server was killed while starting."

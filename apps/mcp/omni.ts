@@ -2,9 +2,20 @@
 // so delegated threads are ordinary threads the user can open, search and continue.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
 const BASE = process.env.OMNI_URL ?? 'http://127.0.0.1:4747';
+/** The API token: OMNI_TOKEN from the thread's env, else the file Omni named in OMNI_TOKEN_FILE (data/api-token). */
+const TOKEN = process.env.OMNI_TOKEN || readToken(process.env.OMNI_TOKEN_FILE);
+
+function readToken(file?: string) {
+  try {
+    return file ? readFileSync(file, 'utf8').trim() : '';
+  } catch {
+    return '';
+  }
+}
 const SELF = process.env.OMNI_THREAD_ID ?? null;
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
 const USER = process.env.OMNI_USER || 'the user';
@@ -12,7 +23,7 @@ const USER = process.env.OMNI_USER || 'the user';
 async function call(path: string, init?: RequestInit) {
   const res = await fetch(`${BASE}/api${path}`, {
     ...init,
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}`, ...(init?.headers ?? {}) },
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);

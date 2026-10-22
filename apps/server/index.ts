@@ -14,6 +14,10 @@ if (holder) {
 }
 process.on('exit', () => releaseLock(paths.lock));
 
+// Made before the port opens, so the Mac app and scripts find it as soon as the server answers.
+const { apiToken, tokenPath } = await import('./api-token.ts');
+apiToken();
+
 // Loaded once the lock is held: db.ts opens the database as it loads.
 const { app } = await import('./app.ts');
 const { messageRequests, outbox, threads, turnSnapshots } = await import('./db.ts');
@@ -66,9 +70,9 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   // Off unless the sync credentials are in the Keychain; then it runs alongside, and a failure only logs.
   startSync().catch((err) => console.error('[sync] could not start:', (err as Error).message));
   if (!isLoopback(config.host)) {
-    console.warn(`[omni] ${config.host} is not loopback. Anyone who can open the port can read threads, write Keychain entries via POST /api/secrets, merge PRs, and type into a thread shell.`);
+    console.warn(`[omni] ${config.host} is not loopback. Anyone who can open the port can try the token; it, and the bodies, cross the network in plain HTTP.`);
   }
-  console.log(`[omni] listening on http://${config.host}:${info.port}  workspace=${config.brainDir}`);
+  console.log(`[omni] listening on http://${config.host}:${info.port}  workspace=${config.brainDir}  token=${process.env.OMNI_TOKEN ? 'OMNI_TOKEN' : tokenPath()}`);
 });
 server.once('error', onBindError);
 

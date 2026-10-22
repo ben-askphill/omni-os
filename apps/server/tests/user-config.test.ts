@@ -52,7 +52,7 @@ describe('user config', () => {
       onboardedAt: '2026-10-21T00:00:00.000Z',
       user: { name: 'Ada', pronouns: 'she/her', email: 'ada@example.com', timezone: 'Europe/London' },
       workspace: { root: '~/work', reposDir: '~/src', githubOwner: 'ada' },
-      integrations: { hermesUrl: 'http://100.1.2.3:8642/', centralBrainDir: '~/brain' },
+      integrations: { hermesUrl: 'http://100.1.2.3:8642/', centralBrainDir: '~/brain', tailscaleLogin: 'Ada@Example.com, ' },
     });
     expect(isOnboarded()).toBe(true);
     expect(userName()).toBe('Ada');
@@ -60,6 +60,7 @@ describe('user config', () => {
     expect(resolved.workspaceRoot()).toBe(join(homedir(), 'work'));
     expect(resolved.hermesUrl()).toBe('http://100.1.2.3:8642');
     expect(resolved.centralBrainDir()).toBe(join(homedir(), 'brain'));
+    expect(resolved.tailscaleLogins()).toEqual(['ada@example.com']);
     process.env.OMNI_TZ = 'Asia/Tokyo';
     process.env.OMNI_BRAIN_DIR = '/elsewhere';
     expect(resolved.timezone()).toBe('Asia/Tokyo');

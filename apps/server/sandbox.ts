@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync,
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+import { tokenPath } from './api-token.ts';
 import { userName } from './user-config.ts';
 import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile } from './config.ts';
 import type { Channel } from './db.ts';
@@ -227,7 +228,7 @@ export function buildMcpConfig(input: McpInput) {
     servers['omni'] = {
       command: paths.tsx,
       args: [paths.mcpOmni],
-      env: { OMNI_URL: input.omniUrl, OMNI_THREAD_ID: input.threadId, OMNI_USER: userName() },
+      env: { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: tokenPath(), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName() },
     };
   }
   return { mcpServers: servers };

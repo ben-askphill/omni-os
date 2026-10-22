@@ -34,7 +34,9 @@ private final class Rig {
   private(set) lazy var model: AppModel = {
     let supervisor = ServerSupervisor(
       settings: settings,
-      options: .init(logURL: dir.path("logs/server.log"), recordURL: dir.path("support/server.json"), probeTimeout: .milliseconds(500))
+      options: .init(
+        logURL: dir.path("logs/server.log"), recordURL: dir.path("support/server.json"), probeTimeout: .milliseconds(500),
+        token: .fixed(testToken))
     )
     let http = self.http, sse = self.sse, clock = self.clock
     return AppModel(settings: settings, supervisor: supervisor) { port in
@@ -80,7 +82,7 @@ struct AppModelTests {
   }
 
   @Test func showsTheRouteWhenAServerAnswers() async throws {
-    let server = HTTPResponder(contentType: "application/json", body: oldStatus)
+    let server = HTTPResponder(contentType: "application/json", body: oldStatus, token: testToken)
     defer { server.close() }
     let rig = Rig(port: server.port)
     let model = rig.model
@@ -132,7 +134,7 @@ struct AppModelTests {
     try await waitFor("not running", within: .seconds(3)) { model.supervisor.state == .notRunning }
 
     // The server came up some other way: Start attaches instead of starting a second one.
-    let server = HTTPResponder(port: port, contentType: "application/json", body: oldStatus)
+    let server = HTTPResponder(port: port, contentType: "application/json", body: oldStatus, token: testToken)
     defer { server.close() }
     await model.startServer()
     #expect(model.supervisor.state == .running(startedByApp: false, server: nil))
@@ -152,7 +154,7 @@ struct AppModelTests {
     let oldThreads = model.threads
     try await waitFor("not running", within: .seconds(3)) { model.supervisor.state == .notRunning }
 
-    let server = HTTPResponder(contentType: "application/json", body: oldStatus)
+    let server = HTTPResponder(contentType: "application/json", body: oldStatus, token: testToken)
     defer { server.close() }
     rig.settings.port = server.port
     let feed = try await rig.sse.next()
@@ -167,7 +169,7 @@ struct AppModelTests {
   }
 
   @Test func comingBackToTheAppReconnectsOnlyAQuietFeed() async throws {
-    let server = HTTPResponder(contentType: "application/json", body: oldStatus)
+    let server = HTTPResponder(contentType: "application/json", body: oldStatus, token: testToken)
     defer { server.close() }
     let rig = Rig(port: server.port)
     let model = rig.model
@@ -189,7 +191,7 @@ struct AppModelTests {
   }
 
   @Test func aNetworkChangeOrAWakeReconnectsAtOnce() async throws {
-    let server = HTTPResponder(contentType: "application/json", body: oldStatus)
+    let server = HTTPResponder(contentType: "application/json", body: oldStatus, token: testToken)
     defer { server.close() }
     let rig = Rig(port: server.port)
     let model = rig.model
@@ -227,7 +229,7 @@ struct AppModelTests {
   }
 
   @Test func aDroppedFeedChecksTheServerAgain() async throws {
-    let server = HTTPResponder(contentType: "application/json", body: oldStatus)
+    let server = HTTPResponder(contentType: "application/json", body: oldStatus, token: testToken)
     let rig = Rig(port: server.port)
     let model = rig.model
     model.launch()
@@ -294,7 +296,7 @@ struct AppModelTests {
     try await waitFor("not running", within: .seconds(3)) { model.supervisor.state == .notRunning }
 
     // Ben starts the server in a terminal; the feed gets through first.
-    let server = HTTPResponder(port: port, contentType: "application/json", body: oldStatus)
+    let server = HTTPResponder(port: port, contentType: "application/json", body: oldStatus, token: testToken)
     defer { server.close() }
     model.networkChanged()
     try await rig.sse.next().accept()

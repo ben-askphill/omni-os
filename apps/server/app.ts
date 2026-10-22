@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { paths } from './config.ts';
 import { artifactsApi } from './artifacts-api.ts';
+import { authApi } from './auth-api.ts';
 import { browserApi } from './browser-api.ts';
 import { changesApi } from './changes-api.ts';
 import { channelsApi } from './channels-api.ts';
@@ -31,11 +32,13 @@ app.onError((err, c) => {
   return c.json({ error: err.message }, status as 400);
 });
 
-// Ahead of every route: refuses requests other sites make through a browser (apps/server/request-guard.ts).
+// Ahead of every route: refuses requests without this install's token, and those other sites make through a browser
+// (apps/server/request-guard.ts). The Web UI below is served without either: it holds no secret, and pairs to get one.
 api.use('*', requestGuard);
 
 // Mounted in the same order the handlers used to be registered. Hono runs the first match, so
 // threadsApi and terminalApi stay between the thread reads and the message, upload, stop, and stream routes.
+api.route('/auth', authApi);
 api.route('/channels', channelsApi);
 api.route('/channels', browserApi);
 api.route('/folders', foldersApi);

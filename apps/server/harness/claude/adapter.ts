@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { apiToken } from '../../api-token.ts';
 import { config, paths, artifactsDir, threadDir } from '../../config.ts';
 import type { Thread } from '../../db.ts';
 import { parseEvent, LineSplitter } from '../../stream.ts';
@@ -109,6 +110,7 @@ export const claudeAdapter: HarnessAdapter = {
         CLAUDE_CODE_ENTRYPOINT: 'omni-os',
         CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
         OMNI_URL: ctx.omniUrl,
+        OMNI_TOKEN: apiToken(),
         OMNI_THREAD_ID: thread.id,
         OMNI_THREAD_DIR: threadDir(thread.id),
         OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),

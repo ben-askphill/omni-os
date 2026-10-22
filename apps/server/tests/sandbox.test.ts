@@ -118,7 +118,8 @@ describe('buildMcpConfig: omni conductor server', () => {
     expect(cfg.mcpServers['omni']).toEqual({
       command: paths.tsx,
       args: [paths.mcpOmni],
-      env: { OMNI_URL, OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
+      // The token file's path, never the token: mcp.json and Cursor's plugin folder hold no secret value.
+      env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
     });
     expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-browser']);
   });

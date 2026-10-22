@@ -6,12 +6,14 @@
 #   QA_SERVER_PORT=N scripts/qa-stack.sh down
 #                                       stop the stack on port N and delete its data dir. The port is required, and it
 #                                       only stops processes this checkout started (their PID file and working dir)
-#   scripts/qa-stack.sh status          print the URLs and whether each process is alive
+#   scripts/qa-stack.sh status          print the URLs, the API token, and whether each process is alive
 #   scripts/qa-stack.sh logs            tail the server and vite logs
 #
 # QA_SERVER_PORT (default 4757) and QA_WEB_PORT (default 4768) move the ports, QA_DIR the state dir
 # (default $TMPDIR/omni-qa-<server port>). Threads run on fake-claude, so a prompt with directives such as
 # RICH, TOOL:<ms> or LIMIT drives a turn without spending a plan (see packages/test-fixtures/fake-claude.mjs).
+# The stack has its own API token in its data dir: curl it with -H "Authorization: Bearer $(cat <data>/data/api-token)",
+# and open the printed web URLs, which pair the browser.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -28,6 +30,9 @@ detach() {
   if command -v setsid >/dev/null; then setsid "$@"; else perl -e 'setpgrp(0, 0); exec @ARGV or die "exec: $!"' "$@"; fi
 }
 alive() { [ -f "$DIR/$1.pid" ] && kill -0 "$(cat "$DIR/$1.pid")" 2>/dev/null; }
+# The server makes its token on boot. curl with it: api /channels.
+tok() { tr -d '[:space:]' <"$DIR/data/api-token" 2>/dev/null || true; }
+api() { local p="$1"; shift; curl -fsS -H "Authorization: Bearer $(tok)" "$@" "$API$p"; }
 # up starts every process from $ROOT, so a recorded PID whose working dir is elsewhere belongs to another checkout's
 # stack on the same port (or is a reused PID), and down must leave it alone.
 cwd_of() { lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; }
@@ -42,7 +47,8 @@ up() {
   mkdir -p "$DIR/data" "$DIR/brain" "$DIR/automations"
   STARTING=1
   local fx="$ROOT/packages/test-fixtures"
-  OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
+  # OMNI_TOKEN cleared: an agent's shell carries the live server's, and this stack makes its own.
+  OMNI_TOKEN= OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
     OMNI_CLAUDE_BIN="$fx/fake-claude.mjs" OMNI_CODEX_BIN="$fx/fake-codex.mjs" OMNI_CURSOR_BIN="$fx/fake-cursor.mjs" \
     OMNI_BROWSER=0 OMNI_SUGGESTIONS=0 OMNI_HERMES_URL= OMNI_AUTOMATIONS_DIR="$DIR/automations" \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
@@ -52,17 +58,17 @@ up() {
   echo $! >"$DIR/web.pid"
 
   for _ in $(seq 1 60); do
-    curl -fsS "$API/channels" >/dev/null 2>&1 && curl -fsS "$WEB" >/dev/null 2>&1 && break
+    api /channels >/dev/null 2>&1 && curl -fsS "$WEB" >/dev/null 2>&1 && break
     alive server || { tail -20 "$DIR/server.log" >&2; die "server exited, log above"; }
     sleep 0.5
   done
-  curl -fsS "$API/channels" >/dev/null 2>&1 || { tail -20 "$DIR/server.log" >&2; die "server not healthy after 30s"; }
+  api /channels >/dev/null 2>&1 || { tail -20 "$DIR/server.log" >&2; die "server not healthy after 30s"; }
   curl -fsS "$WEB" >/dev/null 2>&1 || { tail -20 "$DIR/web.log" >&2; die "vite not up after 30s"; }
 
   for i in $(seq 1 "$seed"); do
     local prompt="Sample thread $i"
     [ "$i" = 1 ] && prompt="Sample thread 1 RICH"
-    curl -fsS -X POST "$API/threads" -H 'content-type: application/json' \
+    api /threads -X POST -H 'content-type: application/json' \
       -d "{\"channel\":\"inbox\",\"title\":\"Sample thread $i\",\"prompt\":\"$prompt\"}" >/dev/null \
       || die "seeding thread $i failed"
   done
@@ -102,10 +108,12 @@ status() {
   echo "web     $WEB  $(alive web && echo up || echo down)"
   echo "data    $DIR"
   if alive server; then
-    curl -fsS "$API/threads" 2>/dev/null | node -e '
+    echo "token   $(tok)"
+    echo "pair    $WEB/#/?pair=$(tok)"
+    api /threads 2>/dev/null | node -e '
       let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
-        for (const t of JSON.parse(s)) console.log(`thread  ${process.argv[1]}/#/t/${t.id}  ${t.status}  ${t.title ?? ""}`);
-      });' "$WEB" || true
+        for (const t of JSON.parse(s)) console.log(`thread  ${process.argv[1]}/#/t/${t.id}?pair=${process.argv[2]}  ${t.status}  ${t.title ?? ""}`);
+      });' "$WEB" "$(tok)" || true
   fi
 }
 

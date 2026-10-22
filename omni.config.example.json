@@ -14,7 +14,8 @@
   },
   "integrations": {
     "hermesUrl": "",
-    "centralBrainDir": ""
+    "centralBrainDir": "",
+    "tailscaleLogin": "ada@example.com"
   },
   "automations": {
     "weekly-review": { "enabled": true },

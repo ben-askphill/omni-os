@@ -26,6 +26,7 @@ import {
   userConfig,
   type UserConfigPatch,
 } from '../user-config.ts';
+import { apiToken } from '../api-token.ts';
 import { HARNESS_INSTALL, HARNESS_META, type HarnessId } from '../harness/types.ts';
 
 const argv = process.argv.slice(2);
@@ -68,10 +69,13 @@ async function ask(label: string, current: string, opts: { flag?: string; check?
 
 const say = (s = '') => console.log(s);
 
+/** The running server takes only requests with this install's token (apps/server/api-token.ts). */
+const authed = (headers: Record<string, string> = {}) => ({ ...headers, authorization: `Bearer ${apiToken()}` });
+
 async function serverUrl() {
   const url = process.env.OMNI_URL ?? `http://127.0.0.1:${process.env.OMNI_PORT ?? 4747}`;
   try {
-    const res = await fetch(`${url}/api/setup`, { signal: AbortSignal.timeout(1500) });
+    const res = await fetch(`${url}/api/setup`, { headers: authed(), signal: AbortSignal.timeout(1500) });
     return res.ok ? url : null;
   } catch {
     return null;
@@ -128,7 +132,7 @@ async function main() {
 
   // Saved last, so Ctrl-C halfway leaves the file as it was.
   if (server) {
-    const res = await fetch(`${server}/api/setup/complete`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
+    const res = await fetch(`${server}/api/setup/complete`, { method: 'POST', headers: authed({ 'content-type': 'application/json' }), body: JSON.stringify(patch) });
     const body = (await res.json()) as { error?: string; threadId?: string | null };
     if (!res.ok) throw new Error(body.error ?? `server said ${res.status}`);
     if (body.threadId) say(`A welcome message is waiting in #conductor.`);
@@ -147,7 +151,7 @@ async function harnesses(server: string | null) {
   let list: H[] | null = null;
   if (server) {
     try {
-      list = (await (await fetch(`${server}/api/harnesses`)).json()) as H[];
+      list = (await (await fetch(`${server}/api/harnesses`, { headers: authed() })).json()) as H[];
     } catch {
       list = null;
     }
@@ -184,7 +188,7 @@ async function createChannel(server: string | null, name: string, repo: string, 
     store_domain: store || null,
   };
   if (server) {
-    const res = await fetch(`${server}/api/channels`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const res = await fetch(`${server}/api/channels`, { method: 'POST', headers: authed({ 'content-type': 'application/json' }), body: JSON.stringify(body) });
     const out = (await res.json()) as { error?: string };
     if (res.status === 409) return say(`   #${id} already exists, kept it.`);
     if (!res.ok) throw new Error(out.error ?? `could not create #${id}`);

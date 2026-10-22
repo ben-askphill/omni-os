@@ -6,7 +6,7 @@ Everything personal lives in `data/` (gitignored) or the Keychain. Tracked files
 
 | Where | What |
 | --- | --- |
-| `data/omni.config.json` | You, your folders, integrations (Hermes URL, central brain), automation on/off. Every field: `omni.config.example.json` |
+| `data/omni.config.json` | You, your folders, integrations (Hermes URL, central brain, the Tailscale login allowed through `tailscale serve`), automation on/off. Every field: `omni.config.example.json` |
 | `data/crew/*.md` | Your own version of a crew charter; replaces the one in `crew/` with the same name |
 | `data/automations/*.yaml` | Your own automations; one with the same id as a shared one replaces it |
 | `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file |

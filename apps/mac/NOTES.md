@@ -291,12 +291,15 @@ In `TestSupport.swift`:
 
 ```sh
 T=$(mktemp -d)
-env -i PATH="$PATH" HOME="$HOME" TMPDIR="$T" OMNI_DATA_DIR="$T/data" OMNI_PORT=4791 OMNI_HOST=127.0.0.1 \
+export OMNI_TOKEN=$(openssl rand -hex 32)
+env -i PATH="$PATH" HOME="$HOME" TMPDIR="$T" OMNI_TOKEN="$OMNI_TOKEN" OMNI_DATA_DIR="$T/data" OMNI_PORT=4791 OMNI_HOST=127.0.0.1 \
   OMNI_CLAUDE_BIN="$PWD/tests/fixtures/fake-claude.mjs" OMNI_CODEX_BIN="$T/none" OMNI_CURSOR_BIN="$T/none" \
   OMNI_BROWSER=0 OMNI_BRAIN_DIR="$T/brain" OMNI_WEB_DIST="$T/none" \
   node --disable-warning=ExperimentalWarning --import tsx apps/server/index.ts
 OMNI_LIVE_PORT=4791 swift test --package-path apps/mac/OmniKit --filter LiveServerTests
 ```
+
+The live tests send `OMNI_TOKEN` as the API token, so run them in the shell that exported it.
 
 `LiveSecretsTests` saves and deletes a secret through `SecretsModel`, so it also needs `OMNI_LIVE_SECRETS=1`, and the server a `security` that stores nothing first on PATH, so it never writes to the Keychain: `mkdir "$T/bin"; printf '#!/bin/sh\n[ "$1" = "-i" ] && cat > /dev/null\nexit 0\n' > "$T/bin/security"; chmod +x "$T/bin/security"`, then boot with `PATH="$T/bin:$PATH"`.
 

@@ -215,7 +215,7 @@ extension OmniClient {
     channel: String, transport: any SSETransport = URLSessionSSETransport.shared, clock: any Clock<Duration> = ContinuousClock()
   ) -> SSEClient<BrowserStreamMessage> {
     let url = browserStreamURL(channel: channel)
-    return SSEClient(transport: transport, clock: clock, request: { _ in URLRequest(url: url) }, decode: Self.json(BrowserStreamMessage.self))
+    return SSEClient(transport: transport, clock: clock, request: { [self] _ in authorized(url) }, decode: Self.json(BrowserStreamMessage.self))
   }
 
   public func browserInput(channel: String, _ input: BrowserInput) async throws(OmniAPIError) {

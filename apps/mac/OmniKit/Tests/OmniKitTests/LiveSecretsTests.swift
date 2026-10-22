@@ -12,7 +12,7 @@ private let livePort = env["OMNI_LIVE_PORT"].flatMap { Int($0) }
 @MainActor
 @Suite(.enabled(if: livePort != nil && livePort != 4747 && env["OMNI_LIVE_SECRETS"] == "1", "set OMNI_LIVE_PORT and OMNI_LIVE_SECRETS=1"))
 struct LiveSecretsTests {
-  let client = OmniClient(port: livePort ?? 0)
+  let client = OmniClient(port: livePort ?? 0, token: .fixed(env["OMNI_TOKEN"]))
 
   @Test func savesListsAndDeletesASecret() async throws {
     let name = "OMNI_LIVE_TEST_\(UUID().uuidString.prefix(8))"

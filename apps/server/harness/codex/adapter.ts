@@ -8,6 +8,7 @@
 //
 // `/review` and `/compact` are Codex's own and run as turns too, started by review/start and
 // thread/compact/start instead of turn/start. Codex steers neither of them.
+import { apiToken } from '../../api-token.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
 import { buildMcpConfig } from '../../sandbox.ts';
 import { describeAttachments, type Attachment } from '../../uploads.ts';
@@ -121,6 +122,7 @@ export const codexAdapter: HarnessAdapter = {
 
     const client = new CodexClient({ bin, cwd: thread.cwd, env: harnessEnv('codex', {
       OMNI_URL: ctx.omniUrl,
+      OMNI_TOKEN: apiToken(),
       OMNI_THREAD_ID: thread.id,
       OMNI_THREAD_DIR: threadDir(thread.id),
       OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),

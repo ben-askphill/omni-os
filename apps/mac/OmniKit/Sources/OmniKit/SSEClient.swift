@@ -345,7 +345,7 @@ extension OmniClient {
     transport: any SSETransport = URLSessionSSETransport.shared, clock: any Clock<Duration> = ContinuousClock()
   ) -> SSEClient<FeedEvent> {
     let url = feedURL
-    return SSEClient(transport: transport, clock: clock, request: { _ in URLRequest(url: url) }, decode: Self.json(FeedEvent.self))
+    return SSEClient(transport: transport, clock: clock, request: { [self] _ in authorized(url) }, decode: Self.json(FeedEvent.self))
   }
 
   /// A thread's stream from after event `after`, resuming after the last event it sent.
@@ -355,7 +355,7 @@ extension OmniClient {
   ) -> SSEClient<ThreadStreamMessage> {
     let client = self
     return SSEClient(lastEventID: String(after), transport: transport, clock: clock, request: { cursor in
-      URLRequest(url: client.threadStreamURL(id, after: cursor.flatMap { Int($0) } ?? after))
+      client.authorized(client.threadStreamURL(id, after: cursor.flatMap { Int($0) } ?? after))
     }, decode: Self.json(ThreadStreamMessage.self))
   }
 

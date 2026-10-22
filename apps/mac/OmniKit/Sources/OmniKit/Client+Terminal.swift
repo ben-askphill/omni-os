@@ -89,7 +89,7 @@ extension OmniClient {
     let decoder = OmniJSON.decoder()
     return SSEClient(transport: transport, clock: clock, request: { _ in
       let s = size()
-      return URLRequest(url: client.terminalStreamURL(id, cols: s.cols, rows: s.rows))
+      return client.authorized(client.terminalStreamURL(id, cols: s.cols, rows: s.rows))
     }, decode: { m in
       guard m.event == "message" else { return nil }
       return try? decoder.decode(TerminalMessage.self, from: Data(m.data.utf8))

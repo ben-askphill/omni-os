@@ -45,7 +45,10 @@ private struct Rig {
     )
   }
 
+  /// The supervisor reads the token from the data dir, as the app does. A real server keeps the one written here,
+  /// and the fakes prove they hold it.
   func supervisor(record: URL? = nil) -> ServerSupervisor {
+    if !FileManager.default.fileExists(atPath: dataDir.appending(path: "api-token").path) { dir.write("data/api-token", testToken) }
     let config = self.config
     return ServerSupervisor(
       config: { config },
@@ -75,10 +78,14 @@ private func realNode() async throws -> URL {
   try await NodeResolver().resolve(path: loginPath).binary
 }
 
-/// A Node stand-in that serves /api/status the way servers before #76 did, with no `server` object.
+/// A Node stand-in that serves /api/status the way servers before #76 did, with no `server` object. It proves it
+/// holds the token in its data dir, as every server since the token does.
 private func oldServer(in dir: TempDir, node: URL) -> URL {
   let js = """
+    const t = require('fs').readFileSync(process.env.OMNI_DATA_DIR + '/api-token', 'utf8').trim(); \
     require('http').createServer((q, s) => { s.setHeader('content-type', 'application/json'); \
+    const n = q.url.match(/^[/]api[/]auth[/]proof[?]nonce=([0-9a-f]+)/); \
+    if (n) return s.end(JSON.stringify({ proof: require('crypto').createHmac('sha256', t).update('omni-proof:' + n[1]).digest('hex') })); \
     s.end(JSON.stringify({ usage: {}, slots: {}, running: 0, queued: 0, maxConcurrent: 4, maxUploadMb: 25 })) })\
     .listen(+process.env.OMNI_PORT, '127.0.0.1', () => console.log('old server up'))
     """
@@ -321,8 +328,27 @@ struct ServerSupervisorTests {
       Issue.record("not failed: \(supervisor.state)")
       return
     }
-    #expect(message.hasPrefix("Port \(web.port) answers, but not as an Omni server"))
+    #expect(message == ServerStartError.notThisInstall(port: web.port).message)
     #expect(rig.starts() == 0)
+  }
+
+  @Test func aListenerThatCannotProveTheTokenIsNotAttached() async throws {
+    let status = #"{"usage":{},"slots":{},"running":0,"queued":0,"maxConcurrent":4,"maxUploadMb":25}"#
+    // Answers /api/status like Omni, and the proof with nothing or with another install's token.
+    for token in [nil, "another-install-0123456789abcdef0123456789"] {
+      let squatter = HTTPResponder(contentType: "application/json", body: status, token: token)
+      let rig = Rig(port: squatter.port)
+      defer {
+        squatter.close()
+        rig.cleanUp()
+      }
+      let supervisor = rig.supervisor()
+      await supervisor.start()
+      #expect(supervisor.state == .failed(message: ServerStartError.notThisInstall(port: squatter.port).message, logTail: []))
+      #expect(!supervisor.isRunning)
+      #expect(!supervisor.canStop)
+      #expect(rig.starts() == 0)
+    }
   }
 
   @Test func aServerThatExitsWhileStartingShowsTheEndOfTheLog() async throws {
@@ -415,7 +441,7 @@ struct ServerSupervisorTests {
 
   @Test func anOlderServerWithoutTheServerObjectStillCounts() async throws {
     let status = #"{"usage":{},"slots":{},"running":0,"queued":0,"maxConcurrent":4,"maxUploadMb":25}"#
-    let old = HTTPResponder(contentType: "application/json", body: status)
+    let old = HTTPResponder(contentType: "application/json", body: status, token: testToken)
     let rig = Rig(port: old.port)
     defer {
       old.close()
@@ -434,7 +460,7 @@ struct ServerSupervisorTests {
   @Test func aPidThatCannotBeAProcessIsNotStopped() async throws {
     let server = #"{"version":"0.1.0","pid":4294967296,"root":"/x","dataDir":"/x/data","startedAt":"2026-09-28T10:00:00.000Z","port":1}"#
     let status = #"{"usage":{},"slots":{},"running":0,"queued":0,"maxConcurrent":4,"maxUploadMb":25,"server":\#(server)}"#
-    let odd = HTTPResponder(contentType: "application/json", body: status)
+    let odd = HTTPResponder(contentType: "application/json", body: status, token: testToken)
     let rig = Rig(port: odd.port)
     defer {
       odd.close()
@@ -481,6 +507,7 @@ struct ServerSupervisorTests {
     settings.port = rig.port
     settings.repoPath = rig.repo.path
     settings.nodePath = rig.node?.path ?? ""
+    rig.dir.write("data/api-token", testToken)
     let supervisor = ServerSupervisor(
       settings: settings,
       options: .init(launcher: rig.launcher, logURL: rig.log, recordURL: rig.record, probeTimeout: .milliseconds(500))
@@ -503,7 +530,7 @@ struct ServerSupervisorTests {
 
   @Test func followsTheSettings() async throws {
     let status = #"{"usage":{},"slots":{},"running":0,"queued":0,"maxConcurrent":4,"maxUploadMb":25}"#
-    let old = HTTPResponder(contentType: "application/json", body: status)
+    let old = HTTPResponder(contentType: "application/json", body: status, token: testToken)
     let rig = Rig()
     let suite = "omnikit-supervisor-\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suite))
@@ -515,6 +542,7 @@ struct ServerSupervisorTests {
     let settings = ServerSettings(defaults: defaults, arguments: [:])
     settings.port = rig.port
     settings.repoPath = rig.repo.path
+    rig.dir.write("data/api-token", testToken)
     let supervisor = ServerSupervisor(
       settings: settings,
       options: .init(launcher: rig.launcher, logURL: rig.log, recordURL: rig.record, probeTimeout: .milliseconds(500))

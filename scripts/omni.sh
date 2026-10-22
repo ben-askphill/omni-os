@@ -8,20 +8,37 @@
 #   -r, --role     crew role id (builder, researcher, ...)
 #   -m, --model    model override (opus, sonnet, haiku)
 #   -o, --open     open the new thread in the browser
+#   omni --pair    print a link that pairs a browser (your phone, over Tailscale) with this Omni
 #
-# OMNI_URL overrides the server (default http://127.0.0.1:4747).
+# OMNI_URL overrides the server (default http://127.0.0.1:4747). The API token is OMNI_TOKEN, else
+# data/api-token in this checkout (OMNI_DATA_DIR moves it). The pairing link holds the token: keep it private.
 # Install: ln -s "$PWD/scripts/omni.sh" /usr/local/bin/omni   (or any dir on your PATH)
 set -euo pipefail
 
 BASE="${OMNI_URL:-http://127.0.0.1:4747}"
 BASE="${BASE%/}"
+
+# The checkout this script lives in, through the symlink the install line makes.
+self="$0"
+while [[ -L "$self" ]]; do
+  link="$(readlink "$self")"
+  [[ "$link" == /* ]] && self="$link" || self="$(dirname "$self")/$link"
+done
+REPO="$(cd "$(dirname "$self")/.." && pwd)"
+token() {
+  if [[ -n "${OMNI_TOKEN:-}" ]]; then printf '%s' "$OMNI_TOKEN"; return; fi
+  local data="${OMNI_DATA_DIR:-data}"
+  [[ "$data" == /* ]] || data="$REPO/$data"
+  [[ -r "$data/api-token" ]] || { printf 'omni: no token in %s/api-token (start the server once, or set OMNI_TOKEN)\n' "$data" >&2; exit 1; }
+  tr -d '[:space:]' <"$data/api-token"
+}
 channel=""
 role=""
 model=""
 open_it=0
 prompt_parts=()
 
-usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while (($#)); do
   case "$1" in
@@ -29,6 +46,7 @@ while (($#)); do
     -r|--role) role="${2:?missing role}"; shift 2 ;;
     -m|--model) model="${2:?missing model}"; shift 2 ;;
     -o|--open) open_it=1; shift ;;
+    --pair) TOKEN="$(token)"; printf '%s/#/?pair=%s\n' "$BASE" "$TOKEN"; exit 0 ;;
     -h|--help) usage; exit 0 ;;
     --) shift; prompt_parts+=("$@"); break ;;
     -*) printf 'omni: unknown option %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -98,9 +116,10 @@ print(j["id"], end="")'
   fi
 }
 
+TOKEN="$(token)"
 body="$(OMNI_PROMPT="$prompt" OMNI_CH="$channel" OMNI_ROLE="$role" OMNI_MODEL="$model" encode)"
 
-if ! resp="$(printf '%s' "$body" | curl -sS --max-time 30 -X POST -H 'Content-Type: application/json' --data-binary @- "$BASE/api/threads")"; then
+if ! resp="$(printf '%s' "$body" | curl -sS --max-time 30 -X POST -H 'Content-Type: application/json' -K <(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN") --data-binary @- "$BASE/api/threads")"; then
   printf 'omni: could not reach %s (is the server running?)\n' "$BASE" >&2
   exit 1
 fi

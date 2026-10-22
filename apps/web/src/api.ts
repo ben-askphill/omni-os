@@ -67,7 +67,7 @@ export interface UserConfig {
   onboardedAt?: string;
   user: { name: string; pronouns: string; email: string; timezone: string };
   workspace: { root: string; reposDir: string; githubOwner: string };
-  integrations: { hermesUrl: string; centralBrainDir: string };
+  integrations: { hermesUrl: string; centralBrainDir: string; tailscaleLogin?: string };
   automations: Record<string, { enabled?: boolean; channel?: string }>;
 }
 export type UserConfigPatch = {
@@ -377,6 +377,25 @@ export class ApiError extends Error {
   }
 }
 
+/** Fired on window when the server says this browser holds no valid token. */
+export const UNPAIRED = 'omni:unpaired';
+
+/** Whether this browser holds the server's token, in its HttpOnly cookie. */
+export async function isPaired(): Promise<boolean> {
+  const res = await fetch('/api/auth');
+  if (res.status === 401) return false;
+  if (!res.ok) throw new ApiError(`Request failed (${res.status})`, res.status);
+  return true;
+}
+
+/** Trades the token for the cookie (POST /api/auth/pair). The page never keeps the token itself. */
+export async function pairBrowser(token: string): Promise<boolean> {
+  const res = await fetch('/api/auth/pair', { method: 'POST', headers: { authorization: `Bearer ${token.trim()}` } });
+  if (res.status === 401) return false;
+  if (!res.ok) throw new ApiError(`Request failed (${res.status})`, res.status);
+  return true;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   // FormData carries its own multipart content type, so never set one for it.
   const form = body instanceof FormData;
@@ -390,6 +409,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } catch {
     throw new ApiError('Cannot reach the Omni server. Is it running?', 0);
   }
+  // The cookie is gone or the token changed: the pairing screen takes over (main.tsx).
+  if (res.status === 401) window.dispatchEvent(new Event(UNPAIRED));
   const text = await res.text();
   let data: unknown = null;
   if (text) {

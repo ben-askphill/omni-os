@@ -5,6 +5,7 @@
 // only; the transcript shows only what Ben typed. Cursor can't steer, so the runner queues
 // a steer and stops the thread by killing the holder (the next message resumes the chat).
 import { spawn, type ChildProcess } from 'node:child_process';
+import { apiToken } from '../../api-token.ts';
 import { closePipesAfterExit } from '../../child.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
 import { writeCursorPlugin } from '../../sandbox.ts';
@@ -59,6 +60,7 @@ export const cursorAdapter: HarnessAdapter = {
     const bin = cursorBin() ?? 'cursor-agent';
     const env = harnessEnv('cursor', {
       OMNI_URL: ctx.omniUrl,
+      OMNI_TOKEN: apiToken(),
       OMNI_THREAD_ID: thread.id,
       OMNI_THREAD_DIR: threadDir(thread.id),
       OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),

@@ -40,6 +40,7 @@ function boot(data: string, extra: Record<string, string> = {}) {
       HOME: process.env.HOME,
       TMPDIR: tmpdir(),
       OMNI_DATA_DIR: data,
+      OMNI_TOKEN: process.env.OMNI_TOKEN,
       OMNI_PORT: '0',
       OMNI_HOST: '127.0.0.1',
       OMNI_CLAUDE_BIN: FAKE_CLAUDE,
@@ -95,7 +96,7 @@ function client(port: number) {
     const form = body instanceof FormData;
     const res = await fetch(`http://127.0.0.1:${port}/api${path}`, {
       method,
-      headers: body && !form ? { 'content-type': 'application/json' } : undefined,
+      headers: { authorization: `Bearer ${process.env.OMNI_TOKEN}`, ...(body && !form ? { 'content-type': 'application/json' } : {}) },
       body: form ? body : body ? JSON.stringify(body) : undefined,
     });
     const text = await res.text();

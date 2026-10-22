@@ -141,16 +141,29 @@ func environmentOf(_ pid: Int32) -> String {
   return String(decoding: data, as: UTF8.self)
 }
 
-/// A one-trick HTTP server on 127.0.0.1: every request gets the same answer.
+/// The token test servers that stand in for Omni prove they hold (`HTTPResponder(token:)`, `Rig` in the tests).
+let testToken = "test-token-0123456789abcdef0123456789abcdef"
+
+/// A one-trick HTTP server on 127.0.0.1: every request gets the same answer. With `token` it answers
+/// GET /api/auth/proof as an Omni holding that token would, and the rest as before.
 final class HTTPResponder: Sendable {
   let port: Int
   private let fd: Int32
 
-  init(port: Int = 0, status: Int = 200, contentType: String, body: String) {
+  init(port: Int = 0, status: Int = 200, contentType: String, body: String, token: String? = nil) {
     let listener = SilentListener(port: port)
     self.port = listener.port
     fd = listener.descriptor
-    let response = "HTTP/1.1 \(status) OK\r\nContent-Type: \(contentType)\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
+    @Sendable func reply(_ status: Int, _ contentType: String, _ body: String) -> String {
+      "HTTP/1.1 \(status) OK\r\nContent-Type: \(contentType)\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
+    }
+    let fixed = reply(status, contentType, body)
+    let respond: @Sendable (String) -> String = { head in
+      guard let token, let line = head.split(separator: "\r\n").first, line.hasPrefix("GET /api/auth/proof?nonce="),
+        let nonce = line.dropFirst("GET /api/auth/proof?nonce=".count).split(separator: " ").first
+      else { return fixed }
+      return reply(200, "application/json", #"{"proof":"\#(ServerToken.proof(token: token, nonce: String(nonce)))"}"#)
+    }
     let fd = self.fd
     Thread.detachNewThread {
       while true {
@@ -163,7 +176,7 @@ final class HTTPResponder: Sendable {
           guard n > 0 else { break }
           request += buffer[0..<n]
         }
-        _ = response.withCString { write(conn, $0, strlen($0)) }
+        _ = respond(String(decoding: request, as: UTF8.self)).withCString { write(conn, $0, strlen($0)) }
         Darwin.close(conn)
       }
     }
