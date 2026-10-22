@@ -48,9 +48,6 @@ public struct AutomationRun: Decodable, Hashable, Sendable, Identifiable {
   public var label: String { title ?? "Thread removed" }
   /// A removed thread shows as failed, as in the Web UI.
   public var dotStatus: ThreadStatus { status ?? .failed }
-  /// A run that has not started draws as a ring.
-  public var dotIsHollow: Bool { dotStatus == .queued || dotStatus == .imported }
-  public var isManual: Bool { trigger == .manual }
   /// The small label after the title: "manual" or "event", nothing for a scheduled run.
   public var triggerLabel: String? { trigger == .cron ? nil : trigger.rawValue }
   /// Finished runs stand full height in the strip, the rest lower.
@@ -122,7 +119,7 @@ public struct Automation: Decodable, Hashable, Sendable, Identifiable {
   }
 
   /// The file, shortened as the Web UI does.
-  public var fileLabel: String { shortPath(file ?? "automations/\(id).yaml") }
+  public var fileLabel: String { Format.shortPath(file ?? "automations/\(id).yaml") }
 
   public var errorNote: String? { error.map { "\($0). Fix it in \(fileLabel)." } }
 
@@ -213,17 +210,4 @@ public enum AutomationSchedule {
   private static func pad(_ s: String) -> String {
     s.count < 2 ? String(repeating: "0", count: 2 - s.count) + s : s
   }
-}
-
-/// `shortPath` in apps/web/src/format.ts, without a cwd: the home folder as `~`, and only the last three parts of a
-/// longer path.
-private func shortPath(_ path: String) -> String {
-  guard !path.isEmpty else { return "" }
-  var rel = path
-  let parts = path.split(separator: "/", omittingEmptySubsequences: false)
-  if path.hasPrefix("/Users/"), parts.count > 3, !parts[2].isEmpty {
-    rel = "~/" + parts.dropFirst(3).joined(separator: "/")
-  }
-  let relParts = rel.split(separator: "/", omittingEmptySubsequences: false)
-  return relParts.count > 4 ? ".../" + relParts.suffix(3).joined(separator: "/") : rel
 }

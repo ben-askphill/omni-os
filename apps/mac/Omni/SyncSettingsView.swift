@@ -112,8 +112,7 @@ struct SyncForm: View {
               Text(id).font(.omni(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.middle)
                 .textSelection(.enabled)
               Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(id, forType: .string)
+                Pasteboard.copy(id)
               } label: {
                 OmniIcon(name: "copy", size: 13)
               }

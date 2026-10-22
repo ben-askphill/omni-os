@@ -136,11 +136,4 @@ private func pending(_ state: String, mode: String = "steer", kind: String = "us
     #expect(PendingMsg.lead(in: list, starting: false) == nil)
     #expect(PendingMsg.lead(in: [try pending("held")], starting: true) == nil)
   }
-
-  @Test func aThumbnailKeepsItsShapeInsideTheBox() {
-    #expect(Attachment.thumbnailSize(CGSize(width: 320, height: 200)) == CGSize(width: 224, height: 140))
-    #expect(Attachment.thumbnailSize(CGSize(width: 100, height: 400)) == CGSize(width: 44, height: 176))
-    #expect(Attachment.thumbnailSize(CGSize(width: 80, height: 60)) == CGSize(width: 80, height: 60), "never scaled up")
-    #expect(Attachment.thumbnailSize(.zero) == .zero)
-  }
 }

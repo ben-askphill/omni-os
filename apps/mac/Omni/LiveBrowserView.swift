@@ -134,8 +134,7 @@ struct LiveBrowserView: View {
       Task {
         let text = await model.copySelection()
         guard !text.isEmpty else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        Pasteboard.copy(text)
         if key == "x" { model.send(.key(.keyDown, key: "Backspace", code: "Backspace", text: nil, keyCode: 8, modifiers: 0)) }
       }
     case "v":

@@ -380,8 +380,7 @@ private struct CommandLine: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Tok.surface2, in: RoundedRectangle(cornerRadius: z(8), style: .continuous))
       Button(copied ? "Copied" : "Copy") {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(command, forType: .string)
+        Pasteboard.copy(command)
         copied = true
       }
       .buttonStyle(.pill(.ghost, height: 26))

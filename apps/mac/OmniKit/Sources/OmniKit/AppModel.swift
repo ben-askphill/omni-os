@@ -230,12 +230,6 @@ public final class AppModel {
     return route.title { store.channel($0)?.name }
   }
 
-  /// The thread on screen as Markdown, for Copy Thread as Markdown. nil until it loads.
-  public var openThreadMarkdown: String? {
-    guard case .thread(let id, _) = route else { return nil }
-    return threadMarkdown(id)
-  }
-
   /// A thread as Markdown, once its store has it. For the window that has focus, whichever it is.
   public func threadMarkdown(_ id: String) -> String? {
     guard let s = threads.store(id), let t = s.thread, s.loadState == .loaded else { return nil }

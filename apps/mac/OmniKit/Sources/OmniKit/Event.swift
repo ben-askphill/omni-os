@@ -127,13 +127,6 @@ public struct Attachment: Decodable, Hashable, Sendable {
 
   /// The largest a thumbnail shows, as `max-h-44 max-w-[14rem]` in Transcript.tsx.
   public static let thumbnailBox = CGSize(width: 224, height: 176)
-
-  /// An image's size shrunk to fit `thumbnailBox` with its shape kept. Small images stay as they are.
-  public static func thumbnailSize(_ natural: CGSize) -> CGSize {
-    guard natural.width > 0, natural.height > 0 else { return .zero }
-    let scale = min(1, thumbnailBox.width / natural.width, thumbnailBox.height / natural.height)
-    return CGSize(width: (natural.width * scale).rounded(), height: (natural.height * scale).rounded())
-  }
 }
 
 /// A command or Mention the message names, with its place in the text.

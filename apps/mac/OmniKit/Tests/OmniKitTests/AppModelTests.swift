@@ -271,21 +271,6 @@ struct AppModelTests {
     #expect(model.title == "Home")
   }
 
-  @Test func copiesTheThreadOnScreenAsMarkdownOnceItLoads() async throws {
-    let rig = Rig(port: freePort())
-    let model = rig.model
-    model.route = .thread(id: "p1")
-    #expect(model.openThreadMarkdown == nil, "no store yet")
-    let store = model.threads.acquire("p1")
-    defer { model.threads.release("p1") }
-    #expect(model.openThreadMarkdown == nil, "not loaded yet")
-    try await waitFor("the thread") { store.loadState == .loaded }
-    #expect(model.openThreadMarkdown == "# Fix the cart\n")
-
-    model.route = .home
-    #expect(model.openThreadMarkdown == nil)
-  }
-
   @Test func anOpenFeedChecksTheServerAgain() async throws {
     let port = freePort()
     let rig = Rig(port: port)

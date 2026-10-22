@@ -172,7 +172,7 @@ struct AttachmentsView: View {
         ProgressView().controlSize(.small).frame(width: z(80), height: z(60))
       }
     }
-    .frame(maxWidth: z(224), maxHeight: z(176))
+    .frame(maxWidth: z(Attachment.thumbnailBox.width), maxHeight: z(Attachment.thumbnailBox.height))
     .clipShape(RoundedRectangle(cornerRadius: z(12), style: .continuous))
     .overlay(RoundedRectangle(cornerRadius: z(12), style: .continuous).strokeBorder(Tok.line))
     .padding(z(4))
@@ -720,8 +720,7 @@ struct StaleEditsView: View {
             .frame(maxWidth: z(600), alignment: .trailing)
           HStack(spacing: z(6)) {
             Button {
-              NSPasteboard.general.clearContents()
-              NSPasteboard.general.setString(d.prompt, forType: .string)
+              Pasteboard.copy(d.prompt)
             } label: {
               PendingLabel(text: "Copy", icon: "copy", busy: false)
             }

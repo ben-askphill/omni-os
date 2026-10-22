@@ -336,7 +336,7 @@ Main window:
 - The selection is `SidebarItem(route: model.route)`; picking a row sets `model.route`. Routes without a row (search) select nothing. Secrets is the exception: it opens Settings on the Secrets tab (`model.show`) and the window stays where it was. Any other write of `#/secrets` to the route does the same (`MainWindow`'s `onChange`), going back to the route last drawn.
 - An error note under Home when the channel list fails to load while the server runs. With no server, the server screen says so instead.
 - Under the usage card, the footer: a dot (volt running, grey while the feed retries, vermilion not running or failed), `State.label` ("Started by the app", "Started outside the app", "Not running"), the port and "Reconnecting". It opens the Server menu.
-- The detail is the server screen while `model.serverScreen` is set, else the screen for the route. Automations has its screen (below). The other routes show a `ContentUnavailableView` with their title and hash. Unknown routes show "Nothing here" and Go Home.
+- The detail is the server screen while `model.serverScreen` is set, else the screen for the route. Automations has its screen (below). Unknown routes show "Nothing here" and Go Home.
 - The title follows the route (`#acme` on a channel), "Omni" while the server screen shows.
 - Toolbar (transparent, no title): the sidebar toggle, back and forward, "Reconnecting" while the feed retries, Open in New Window on a thread. New thread and search are in the sidebar, as on the web. Menus: File > New Thread (Cmd-N, in place of New Window), a Server menu (Check Again is Cmd-R), View > Hide Sidebar (Ctrl-Cmd-S, `SidebarToggleCommand`).
 - The look is the Web UI's, not the stock macOS one: the design system's tokens (`apps/web/src/index.css`) are `Tok` in `Theme.swift`, with its pill buttons, `SegmentedPill`, fields, chips and card shadows. `Brand.swift` draws the web's icons, wordmark, mark, Loader and harness logos from `BrandPaths`. The window is a white canvas with a custom sidebar (not a `List`), 252pt by default and 200 to 420pt by dragging its right edge (`SidebarResizeHandle`, saved as `sidebar.width`; double-click resets), as the web's `SidebarPane`, and the screen in a card inset 8pt, as the web's pane, its corners concentric with the window's (`ConcentricRectangle`, 8pt at least; the web uses 22px). Status is the only color: ultramarine running, vermilion needs you, volt done; vermilion is never text.
@@ -378,7 +378,7 @@ Automations page (#73), like `Automations.tsx`. The Web UI has no create or edit
 - An invalid automation shows the server's error and "Fix it in <file>" (`shortPath`), and its Run now and switch are off, as in the Web UI.
 - Run now opens the new thread. The switch shows its new value at once, turns back with the server's error if it refuses, and loads the list again when it takes it. Errors show on the automation until its next action.
 - Prompt is a disclosure group. Last runs: the strip (oldest left, finished runs full height, colors of `RUN_TONE`, the running one pulses, "done · 5m ago" tooltips), then a row per run: the status dot (a ring for queued), the title or "Thread removed", "manual", `RelTime`. A row with a thread opens it.
-- It loads when it shows and for a new port. The Web UI reloads a second after a feed event for an automation's thread; the app has no raw feed events, so `recentChanged` watches `store.recent` for automation threads that are new or changed, and reloads once, a second later. It also reloads a second after the feed opens again. Refresh in the toolbar, a spinner there while a reload runs.
+- It loads when it shows and for a new port. The Web UI reloads a second after a feed event for an automation's thread; the screen subscribes to the feed and hands each message to `AutomationsModel.feed`. It also reloads a second after the feed opens again. Refresh in the toolbar, a spinner there while a reload runs.
 ## Thread inspector (#67)
 
 `.inspector` on the thread screen (`ThreadScreen` adds `.threadInspector(model:store:)`), 340 to 760pt, toggled in the toolbar and View > Show Inspector (Opt-Cmd-I, with the artifact count). Open state is `@AppStorage("threadInspector.open")`, shared by all threads.
@@ -524,9 +524,8 @@ Wired (both composers):
 - Screens: `HomeScreen`, `ChannelScreen`, `SearchScreen`, `PaletteView` (⌘K overlay in `MainWindow`), `UsageCard` (sidebar footer). Shared rows and day groups in `ThreadListViews.swift`.
 - Pure logic in OmniKit: `NavigationHistory` and `ShellState` (history, palette open, composer focus; `AppModel.shell`, `goBack`, `goForward`, `startNewThread`), `ThreadFilter` and `ThreadListing` (filter rules, day groups, channel list merge), `Palette` (items and ranking), `SearchHit` and `Snippet` (`<mark>` runs), `UsageMeter` (thresholds 70% warn, 90% bad).
 - `AppModel.route` has a `didSet` that records history; Back and Forward set the route, which the history ignores as already current.
-- `QuickComposer` is a stand-in: prompt, channel picker, send with ⌘↩. Swap it for the #65 new-thread composer in `HomeScreen` and `ChannelScreen`.
 - Search opens the thread, not the match: `/api/search` returns no event id.
-- Channel Settings and PRs tabs are placeholders. Go menu: Back ⌘[, Forward ⌘], Go to ⌘K.
+- Go menu: Back ⌘[, Forward ⌘], Go to ⌘K.
 - QA step `{"palette": "query"}` opens the palette (`false` closes). Close it before opening with a new query.
 
 ## Needs you (#203)
@@ -551,7 +550,6 @@ Wired (both composers):
 
 ## Next
 
-- No screen is built past the placeholders. `ThreadStore` and the markdown model are ready for the thread screen; see the handoff above.
 - While the server is down the sidebar keeps the last channel list it had.
 - The quit dialog (#74) can call `stopServer()` when `state` is `.running(startedByApp: true, _)`. Threads in their own windows are #75.
 - `Route(hash:)` and `route.hash` mirror `parseHash` and `href` in the Web UI. Use them for deep links, open in browser and window restoration. PR and artifact numbers parse as `Int` only.

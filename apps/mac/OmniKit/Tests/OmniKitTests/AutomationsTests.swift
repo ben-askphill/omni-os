@@ -329,16 +329,6 @@ private final class AutomationsServer: HTTPTransport {
     #expect(try automation(file: file).fileLabel == label)
   }
 
-  /// StatusDot in the Web UI draws queued and imported as a ring.
-  @Test func ringsARunThatHasNotStarted() throws {
-    let runs = [
-      runJSON(id: 2, thread: "t2", at: "2026-09-28T09:55:00Z", status: "queued", title: "Daily"),
-      runJSON(id: 1, thread: "t1", at: "2026-09-27T06:00:00Z", status: "imported", title: "Daily"),
-    ]
-    let a = try automation(runs: "[\(runs.joined(separator: ","))]")
-    #expect(a.runs.map(\.dotIsHollow) == [true, true])
-  }
-
   @Test func describesRuns() throws {
     let now = date("2026-09-28T10:00:00Z")
     let runs = [
@@ -349,8 +339,6 @@ private final class AutomationsServer: HTTPTransport {
     let a = try automation(runs: "[\(runs.joined(separator: ","))]")
     #expect(a.runs.map(\.label) == ["Daily · 28 Sept", "Thread removed", "Daily · 27 Sept"])
     #expect(a.runs.map(\.dotStatus) == [.running, .failed, .done])
-    #expect(a.runs.map(\.isManual) == [true, false, false])
-    #expect(a.runs.map(\.dotIsHollow) == [false, false, false])
     // The strip reads oldest first, and only finished runs stand full height.
     #expect(a.strip.map(\.id) == [1, 2, 3])
     #expect(a.strip.map(\.isTall) == [true, false, false])
