@@ -19,7 +19,7 @@ export function SearchPage({ q }: { q: string }) {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    navigate(href.search(value.trim()).slice(1), { replace: true });
+    navigate(href.search(value.trim()), { replace: true });
   };
 
   const hits = res.data ?? [];

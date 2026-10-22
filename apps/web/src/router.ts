@@ -66,9 +66,10 @@ export function useRoute(): Route {
   return parseHash(useHash());
 }
 
-/** `to` is a path like "/t/abc" (no leading #). */
+/** `to` is a path like "/t/abc", or an `href` like "#/t/abc". */
 export function navigate(to: string, opts: { replace?: boolean } = {}) {
-  const hash = `#${to.startsWith('/') ? to : `/${to}`}`;
+  const path = to.replace(/^#/, '');
+  const hash = `#${path.startsWith('/') ? path : `/${path}`}`;
   if (opts.replace) {
     history.replaceState(null, '', hash);
     window.dispatchEvent(new HashChangeEvent('hashchange'));

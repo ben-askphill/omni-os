@@ -70,8 +70,8 @@ function Wizard() {
     await reloadProfile();
     reloadChannels();
     closeSetup();
-    if (done.threadId) navigate(href.thread(done.threadId).slice(1));
-    else if (!rerun) navigate(href.channel('conductor').slice(1));
+    if (done.threadId) navigate(href.thread(done.threadId));
+    else if (!rerun) navigate(href.channel('conductor'));
   };
 
   const next = async (e?: FormEvent) => {
