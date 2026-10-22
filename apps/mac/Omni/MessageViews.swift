@@ -473,8 +473,8 @@ struct WorkingLine: View {
 }
 
 /// Messages and crew reports the agent has not read yet, under the live output, as QueuedMessages in
-/// Transcript.tsx. Ben's own queued and held ones can be edited, moved and removed until the runner sends them
-/// (`PendingEditsModel`).
+/// Transcript.tsx. Ben's own queued and held ones can be edited, moved and removed until the runner sends them,
+/// and a held one steered into the running turn (`PendingEditsModel`).
 struct QueuedMessagesView: View {
   let store: ThreadStore
   let client: OmniClient
@@ -482,6 +482,8 @@ struct QueuedMessagesView: View {
   let starting: Bool
   /// The thread's worktree is not ready: what waits sends once it is (SetupCard).
   var setup: ThreadSetup? = nil
+  /// The harness takes messages mid-turn, so a held one offers Steer now.
+  var canSteer = false
 
   var body: some View {
     let lead = PendingMsg.lead(in: items, starting: starting)
@@ -493,7 +495,7 @@ struct QueuedMessagesView: View {
             .foregroundStyle(Tok.fg3)
             .frame(maxWidth: .infinity, alignment: .leading)
         } else if m.isEditable {
-          PendingRow(store: store, client: client, m: m, label: m.label(lead: false, setup: setup), icon: "clock") { EmptyView() }
+          PendingRow(store: store, client: client, m: m, label: m.label(lead: false, setup: setup), icon: "clock", canSteer: canSteer) { EmptyView() }
         } else {
           PendingBubble(m: m, label: m.label(lead: i == lead, setup: setup), icon: m.state == .sent ? "send" : "clock")
         }
@@ -542,14 +544,15 @@ struct PendingBubble: View {
   }
 }
 
-/// One of Ben's unsent messages: its bubble with up, down, Edit and Remove under it, or the edit box while he
-/// edits it. `extra` goes before the actions (Send again on an uncertain one).
+/// One of Ben's unsent messages: its bubble with up, down, Edit and Remove under it (and Steer now under a held
+/// one), or the edit box while he edits it. `extra` goes before the actions (Send again on an uncertain one).
 struct PendingRow<Extra: View>: View {
   let store: ThreadStore
   let client: OmniClient
   let m: PendingMsg
   let label: String
   let icon: String
+  var canSteer = false
   @ViewBuilder let extra: Extra
 
   var body: some View {
@@ -584,6 +587,16 @@ struct PendingRow<Extra: View>: View {
           .buttonStyle(.pill(.ghost, height: 28))
           .help("Take it out of the queue. It is never sent.")
           .disabled(off)
+          if canSteer && m.canSteerNow {
+            Button {
+              Task { if let a = await edits.steer(m, using: client) { store.apply(recovery: a) } }
+            } label: {
+              PendingLabel(text: "Steer now", icon: "send", busy: edits.busy == "steer:\(m.uuid)")
+            }
+            .buttonStyle(.pill(.ghost, height: 28))
+            .help("Send it into this turn now. The agent reads it at its next step.")
+            .disabled(off)
+          }
         }
       }
       .frame(maxWidth: .infinity, alignment: .trailing)

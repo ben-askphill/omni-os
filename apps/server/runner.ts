@@ -27,7 +27,7 @@ export {
 } from './runner/state.ts';
 
 export { acceptedAgain, createTeam, createThread, discardRequests, postMessage, resumeRequests, sendMessage } from './runner/api.ts';
-export { ALREADY_SENT, cancelRequests, editRequest, reorderRequests } from './runner/pending.ts';
+export { ALREADY_SENT, cancelRequests, editRequest, reorderRequests, steerRequests } from './runner/pending.ts';
 export { interruptThread, shutdownAll, stopThread } from './runner/session.ts';
 export { retrySetup } from './runner/setup.ts';
 export { cancelLimitResume, clearLimit, fireDue, limitClock, resumeLimitNow, scheduleLimitResume, startLimits } from './runner/limits.ts';

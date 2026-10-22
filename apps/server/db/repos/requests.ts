@@ -155,6 +155,9 @@ export const messageRequests = {
         .run(r.prompt, r.attachments?.length ? JSON.stringify(r.attachments) : null, now(), id).changes > 0
     );
   },
+  /** Ben sent a held request now instead of after the turn: it goes out as a steer. Only while it is still editable. */
+  steer: (id: string) =>
+    db.prepare(`UPDATE message_requests SET mode = 'steer', updated_at = ? WHERE id = ? AND state IN (${marks(EDITABLE)})`).run(now(), id).changes > 0,
   /** New queue positions, as `id -> pos`. Only for requests still editable; returns false, changing nothing, otherwise. */
   reposition(order: { id: string; pos: number }[]) {
     return tx(() => {

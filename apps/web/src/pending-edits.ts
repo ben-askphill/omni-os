@@ -1,4 +1,4 @@
-// Editing, removing and reordering messages that are accepted but not sent (apps/server/runner/pending.ts), from the
+// Editing, removing, reordering and steering messages that are accepted but not sent (apps/server/runner/pending.ts), from the
 // Web UI's side. An edit lives here, apart from the composer's draft. The server checks each change against where
 // the message is when it arrives; when the message was sent first, the edit turns stale and keeps Ben's text so he
 // can copy it or send it as a new message. PendingEdits.swift is the Mac app's copy.
@@ -12,6 +12,12 @@ import { isOmnis, isParked } from './requests.ts';
 // A worktree thread's first prompt is only `accepted` while its worktree is made: the runner has not queued it yet.
 export const isEditable = (m: PendingMsg) =>
   !isOmnis(m) && !!m.request_id && m.delivery !== 'accepted' && (m.state === 'waiting' || m.state === 'held');
+
+/**
+ * Held for after a running turn, so Steer now can send it into that turn instead. Not one waiting for a slot (no
+ * turn of its own is running) or parked by a restart.
+ */
+export const canSteerNow = (m: PendingMsg) => isEditable(m) && m.state === 'held' && !isParked(m);
 
 /** What a message is reordered within: held for after this turn, waiting for a slot, or parked by a restart. */
 const group = (m: PendingMsg) => (isParked(m) ? 'parked' : m.state);

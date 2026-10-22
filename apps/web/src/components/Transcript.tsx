@@ -8,7 +8,7 @@ import { PublishedCard } from './Published.tsx';
 import { Markdown } from './Markdown.tsx';
 import { Button, CheckItem, copyText, Icon, IconButton, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
 import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf, requestIdFor } from '../requests.ts';
-import { canMove, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE, type EditDraft } from '../pending-edits.ts';
+import { canMove, canSteerNow, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE, type EditDraft } from '../pending-edits.ts';
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
 import { statusLabel } from '../status-line.ts';
@@ -426,7 +426,8 @@ function pendingLabel(m: PendingMsg, lead: boolean) {
 /**
  * Messages (and crew reports) the agent has not read yet; shown under the live output.
  * `starting`: no turn is under way yet, so the first sent message starts one instead of steering it.
- * Queued and held messages Ben sent can be edited, moved and removed until the runner sends them
+ * Queued and held messages Ben sent can be edited, moved and removed until the runner sends them, and a held one
+ * can be steered into the running turn now instead of waiting for it to end
  * (apps/web/src/pending-edits.ts). Messages a restart left waiting on Ben come last, with Resume and Send again
  * (`ParkedMessages`). An edit whose message went first stays below, with Ben's text.
  */
@@ -436,6 +437,7 @@ export function QueuedMessages({
   threadId,
   onPending,
   setup = null,
+  canSteer = true,
 }: {
   items: PendingMsg[];
   starting?: boolean;
@@ -445,6 +447,8 @@ export function QueuedMessages({
   threadId?: string;
   /** The pending list an action answered with, before the stream brings it. */
   onPending?: (items: PendingMsg[]) => void;
+  /** The harness takes messages mid-turn, so a held message offers Steer now. */
+  canSteer?: boolean;
 }) {
   const [drafts, setDrafts] = useState<EditDraft[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -492,6 +496,7 @@ export function QueuedMessages({
     close: (uuid: string) => update(uuid, () => null),
     save,
     remove: (m: PendingMsg) => void act(`remove:${m.uuid}`, () => api.post(path('/cancel'), { ids: [m.uuid] })),
+    steer: canSteer ? (m: PendingMsg) => void act(`steer:${m.uuid}`, () => api.post(path('/steer'), { ids: [m.uuid] })) : undefined,
     move: (m: PendingMsg, step: -1 | 1) => {
       const ids = movedOrder(items, m.uuid, step);
       if (ids) void act(`move:${m.uuid}`, () => api.post(path('/reorder'), { ids }));
@@ -544,9 +549,11 @@ interface PendingActionsApi {
   save: (d: EditDraft) => Promise<void>;
   remove: (m: PendingMsg) => void;
   move: (m: PendingMsg, step: -1 | 1) => void;
+  /** Absent when the harness cannot steer. */
+  steer?: (m: PendingMsg) => void;
 }
 
-/** Up, down, Edit and Remove under one of Ben's unsent messages, plus whatever else the row offers. */
+/** Up, down, Edit and Remove under one of Ben's unsent messages, Steer now under a held one, plus whatever else the row offers. */
 function PendingActions({ m, actions: a, children }: { m: PendingMsg; actions: PendingActionsApi; children?: ReactNode }) {
   const off = !!a.busy;
   return (
@@ -560,6 +567,11 @@ function PendingActions({ m, actions: a, children }: { m: PendingMsg; actions: P
       <Button size="sm" variant="ghost" icon="trash" busy={a.busy === `remove:${m.uuid}`} disabled={off} onClick={() => a.remove(m)}>
         Remove
       </Button>
+      {a.steer && canSteerNow(m) && (
+        <Button size="sm" variant="ghost" icon="send" busy={a.busy === `steer:${m.uuid}`} disabled={off} title="The agent reads it at its next step" onClick={() => a.steer?.(m)}>
+          Steer now
+        </Button>
+      )}
     </div>
   );
 }

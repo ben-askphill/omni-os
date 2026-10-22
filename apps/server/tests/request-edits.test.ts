@@ -35,6 +35,7 @@ const post = (id: string, prompt: string, extra: Record<string, unknown> = {}, f
 const edit = (id: string, rid: string, body: Record<string, unknown>, files: File[] = []) => call('PATCH', `/threads/${id}/requests/${rid}`, body, files);
 const cancel = (id: string, ids: string[]) => call('POST', `/threads/${id}/requests/cancel`, { ids });
 const reorder = (id: string, ids: string[]) => call('POST', `/threads/${id}/requests/reorder`, { ids });
+const steer = (id: string, ids: string[]) => call('POST', `/threads/${id}/requests/steer`, { ids });
 const row = (id: string) => h.db.messageRequests.get(id)!;
 const userTexts = (id: string) => h.texts(id, 'user').filter((x) => !x.startsWith('TOOL'));
 
@@ -155,6 +156,49 @@ describe('reordering', () => {
     expect([ids[2], ids[0], ids[1]].map((id) => row(id).pos)).toEqual([...ids.map((id) => row(id).pos)].sort((a, b) => a - b));
     await h.untilResults(t.id, 4);
     expect(userTexts(t.id)).toEqual(['C', 'A', 'B']);
+  });
+});
+
+describe('steering a held message now', () => {
+  it('sends it into the running turn and leaves the rest held for after it', T, async () => {
+    const t = await h.start('TOOL:2500 work');
+    await h.untilTool(t.id);
+    const a = await post(t.id, 'later', { request_id: 'st-a' });
+    const b = await post(t.id, 'right now', { request_id: 'st-b' });
+    const id = b.body.request.id;
+
+    const res = await steer(t.id, [id]);
+    expect(res.status).toBe(200);
+    expect(res.body.pending.map((m: any) => [m.text, m.state, m.mode])).toEqual([
+      ['right now', 'sent', 'steer'],
+      ['later', 'held', 'queue'],
+    ]);
+    expect(row(id)).toMatchObject({ mode: 'steer', state: 'sent' });
+    // Once sent it is past steering, editing or removing.
+    expect((await steer(t.id, [id])).status).toBe(409);
+    expect((await edit(t.id, id, { prompt: 'changed' })).status).toBe(409);
+
+    // The steer lands in the first turn; the held one runs as the second.
+    await h.untilResults(t.id, 2);
+    expect(userTexts(t.id)).toEqual(['right now', 'later']);
+    expect(h.byKind(t.id, 'user').find((e) => e.p.text === 'right now')!.p.mode).toBe('steer');
+    expect(row(a.body.request.id).state).toBe('delivered');
+  });
+
+  it('refuses a message waiting for a slot, since no turn of its own is running', T, async () => {
+    const t = await h.start('hello');
+    await h.untilResults(t.id, 1);
+    const busy = await h.start('TOOL:2000 hold the slot');
+    await h.untilTool(busy.id);
+    const w = await post(t.id, 'waiting', { request_id: 'st-w' });
+    expect(row(w.body.request.id).state).toBe('waiting');
+    const res = await steer(t.id, [w.body.request.id]);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/No turn is running/);
+    expect(row(w.body.request.id)).toMatchObject({ state: 'waiting', mode: 'queue' });
+    await h.untilResults(busy.id, 1);
+    await h.untilResults(t.id, 2);
+    expect(userTexts(t.id)).toEqual(['hello', 'waiting']);
   });
 });
 

@@ -387,7 +387,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                   setQueued(pending);
                 }}
               />
-              <QueuedMessages items={queued} starting={betweenTurns} threadId={id} onPending={setQueued} setup={thread.setup} />
+              <QueuedMessages items={queued} starting={betweenTurns} threadId={id} onPending={setQueued} setup={thread.setup} canSteer={canSteer(thread.harness, harnesses)} />
               {!queued.length && (
                 <NextThreadCard
                   thread={thread}

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// Editing, removing and reordering messages that are accepted but not sent (apps/server/runner/pending.ts), as
+// Editing, removing, reordering and steering messages that are accepted but not sent (apps/server/runner/pending.ts), as
 // apps/web/src/pending-edits.ts. An edit lives here, apart from the reply box's draft. The server checks each change
 // against where the message is when it arrives; when the message was sent first, the edit turns stale and keeps
 // Ben's text so he can copy it or send it as a new message.
@@ -11,6 +11,10 @@ extension PendingMsg {
   /// Ben's own messages only: a crew report or a team's go can be resumed or discarded, never edited or moved.
   /// A worktree thread's first prompt is only `accepted` while its worktree is made: the runner has not queued it yet.
   public var isEditable: Bool { !isOmnis && requestID != nil && delivery != .accepted && (state == .waiting || state == .held) }
+
+  /// Held for after a running turn, so Steer now can send it into that turn instead. Not one waiting for a slot
+  /// (no turn of its own is running) or parked by a restart.
+  public var canSteerNow: Bool { isEditable && state == .held && !isParked }
 
   /// What it is reordered within: held for after this turn, waiting for a slot, or parked by a restart.
   var orderGroup: String { isParked ? "parked" : state.rawValue }
@@ -104,6 +108,7 @@ public protocol PendingRequestsAPI: Sendable {
   func editRequest(in id: String, request: String, prompt: String, keep: [String], files: [UploadFile]) async throws(OmniAPIError) -> EditAnswer
   func cancelRequests(in id: String, ids: [String]) async throws(OmniAPIError) -> RecoveryAnswer
   func reorderRequests(in id: String, ids: [String]) async throws(OmniAPIError) -> RecoveryAnswer
+  func steerRequests(in id: String, ids: [String]) async throws(OmniAPIError) -> RecoveryAnswer
   func reply(to id: String, prompt: String, mode: SendMode?, files: [UploadFile], requestID: String?) async throws(OmniAPIError) -> OmniThread
 }
 
@@ -115,7 +120,7 @@ extension OmniClient: PendingRequestsAPI {}
 public final class PendingEditsModel {
   public nonisolated let threadID: String
   public private(set) var drafts: [PendingEditDraft] = []
-  /// The action under way: `move:<uuid>`, `remove:<uuid>` or `send:<uuid>`.
+  /// The action under way: `move:<uuid>`, `remove:<uuid>`, `steer:<uuid>` or `send:<uuid>`.
   public private(set) var busy: String?
   /// The last move or remove that failed.
   public private(set) var error: String?
@@ -183,6 +188,11 @@ public final class PendingEditsModel {
   /// Takes one out of the queue. It leaves a cancelled record on the server, nothing in the transcript.
   public func remove(_ m: PendingMsg, using api: any PendingRequestsAPI) async -> RecoveryAnswer? {
     await run("remove:\(m.uuid)") { try await api.cancelRequests(in: self.threadID, ids: [m.uuid]) }
+  }
+
+  /// Sends a held one into the running turn now, as a steer, instead of after it.
+  public func steer(_ m: PendingMsg, using api: any PendingRequestsAPI) async -> RecoveryAnswer? {
+    await run("steer:\(m.uuid)") { try await api.steerRequests(in: self.threadID, ids: [m.uuid]) }
   }
 
   /// Moves one a step up (-1) or down (+1) within its group. Never resumes anything.

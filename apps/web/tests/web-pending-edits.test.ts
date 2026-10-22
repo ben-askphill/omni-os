@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { PendingMsg, ThreadDetail } from '../src/api.ts';
-import { canMove, changed, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE } from '../src/pending-edits.ts';
+import { canMove, canSteerNow, changed, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE } from '../src/pending-edits.ts';
 
 // The Web UI's model for editing, removing and reordering unsent messages (apps/web/src/pending-edits.ts), against the
 // recorded server answers the Mac app's Swift tests decode too (apps/server/tests/mac-fixtures.test.ts records them).
@@ -38,6 +38,16 @@ describe('which messages Ben can change', () => {
     expect(fixture<{ pending: PendingMsg[] }>('requests-cancelled.json').pending.some((m) => m.request_id === 'req-2')).toBe(false);
     expect(fixture<{ request_id: string; state: string }[]>('requests-record.json').find((r) => r.request_id === 'req-2')?.state).toBe('cancelled');
     expect(fixture<Record<string, unknown>>('request-edit-request.json')).toEqual({ prompt: 'and check the totals twice', keep: [] });
+  });
+});
+
+describe('steering a held message now', () => {
+  it('is offered only for a held one: not one waiting for a slot, parked, sent or Omni\'s own', () => {
+    expect(canSteerNow(msg('a', 'held'))).toBe(true);
+    expect(canSteerNow(msg('b', 'waiting'))).toBe(false);
+    expect(canSteerNow(msg('c', 'held', { delivery: 'recovered' }))).toBe(false);
+    expect(canSteerNow(msg('d', 'sent'))).toBe(false);
+    expect(canSteerNow(msg('e', 'held', { kind: 'crew_report' }))).toBe(false);
   });
 });
 

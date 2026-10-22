@@ -38,6 +38,22 @@ private func msg(_ uuid: String, _ state: String, delivery: String? = nil, kind:
     #expect(PendingMsg.reportNotes(items) == ["c": "report held for Resume"])
   }
 
+  @Test func steerNowIsOfferedOnlyForAHeldMessageAndPostsItsID() async throws {
+    let items = try pending(
+      "[\(msg("a", "held")),\(msg("b", "waiting")),\(msg("c", "held", delivery: "recovered")),\(msg("d", "sent")),"
+        + "\(msg("e", "held", kind: "crew_report"))]")
+    #expect(items.map(\.canSteerNow) == [true, false, false, false, false])
+
+    let t = StubTransport(body: try fixture("requests-cancelled.json"))
+    let model = PendingEditsModel(threadID: "t 1")
+    let answer = await model.steer(items[0], using: OmniClient(port: 4799, transport: t))
+    #expect(answer != nil)
+    let req = try #require(t.requests.first)
+    #expect(req.httpMethod == "POST")
+    #expect(req.url?.absoluteString == "http://127.0.0.1:4799/api/threads/t%201/requests/steer")
+    #expect(try bodyJSON(req) == .object(["ids": .array([.string("a")])]))
+  }
+
   @Test func movesWithinItsGroupOnly() throws {
     let items = try pending(
       "[\(msg("sent", "sent")),\(msg("a", "held")),\(msg("b", "held")),\(msg("w", "waiting")),"

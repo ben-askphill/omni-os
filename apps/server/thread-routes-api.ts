@@ -32,6 +32,7 @@ import {
   retrySetup,
   scheduleLimitResume,
   runsHere,
+  steerRequests,
 } from './runner.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
@@ -167,7 +168,7 @@ threadActionsApi.post('/:id/messages', async (c) => {
 
 const requestIds = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) });
 
-/** The thread and its pending messages, after a resume, discard, edit, cancel or reorder. */
+/** The thread and its pending messages, after a resume, discard, edit, cancel, reorder or steer. */
 const afterRecovery = (id: string) => ({ thread: threads.get(id), pending: pendingFor(id) });
 
 /**
@@ -265,6 +266,18 @@ threadActionsApi.post('/:id/requests/reorder', async (c) => {
   const { ids } = requestIds.parse(await c.req.json().catch(() => ({})));
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
   reorderRequests(id, ids);
+  return c.json(afterRecovery(id));
+});
+
+/**
+ * Send messages held for after this turn now, as steers: the agent reads them at its next step. A 409 when one is
+ * not held for a running turn (sent already, waiting for a slot, parked) or the harness cannot steer.
+ */
+threadActionsApi.post('/:id/requests/steer', async (c) => {
+  const id = c.req.param('id');
+  const { ids } = requestIds.parse(await c.req.json().catch(() => ({})));
+  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  steerRequests(id, ids);
   return c.json(afterRecovery(id));
 });
 

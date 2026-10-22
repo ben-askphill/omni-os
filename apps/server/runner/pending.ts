@@ -1,15 +1,21 @@
-// Ben's changes to messages that are accepted but not sent: edit, remove and reorder. A message is editable while
+// Ben's changes to messages that are accepted but not sent: edit, remove, reorder and steer now. A message is editable while
 // the runner holds it (waiting for a slot, or held for after this turn) or a restart parked it. Every change is
 // checked against where the message is at that moment, synchronously, so one the runner has started to send can
 // no longer change: that edit is refused with a 409 and the client keeps Ben's text.
 import { EDITABLE, messageRequests, PARKED, threads, type MessageRequest, type Thread } from '../db.ts';
 import type { Attachment } from '../uploads.ts';
 import { messageFor } from './api.ts';
-import { emitThread, lives, refusal, waiting, waitingMsgs, type Msg } from './state.ts';
+import { emitThread, harnessSteers, lives, refusal, send, waiting, waitingMsgs, type Msg } from './state.ts';
 
 
 /** Said when a message left the queue before Ben's change reached the server. */
 export const ALREADY_SENT = 'This message has already been sent, so it can no longer be changed.';
+
+/** Said when Ben steers a message that waits for a turn to start, not for this one to end. */
+export const NOTHING_TO_STEER = 'No turn is running, so this message goes out as soon as the thread starts.';
+
+/** Said when Ben steers on a harness that cannot take a message mid-turn. */
+export const CANNOT_STEER = 'This harness cannot take a message mid-turn, so it runs after this turn.';
 
 /** Said when Ben tries to edit a crew report or a team's go. */
 export const OWN = 'Omni wrote this message, so it can be resumed or discarded but not edited.';
@@ -113,6 +119,30 @@ export function reorderRequests(threadId: string, ids: string[]): Thread {
     const slots = list.flatMap((m, i) => (mine(m) ? [i] : []));
     const sorted = slots.map((i) => list[i]).sort((a, b) => rank.get(a.uuid)! - rank.get(b.uuid)!);
     slots.forEach((i, k) => (list[i] = sorted[k]));
+  }
+  emitThread(threadId);
+  return threads.get(threadId)!;
+}
+
+/**
+ * Send held requests now, as steers, instead of after this turn: the agent reads them at its next step. In the order
+ * they were held, whatever order `ids` names them in. All or none: a message that is not held for this turn (sent,
+ * waiting for a slot, parked) refuses the lot, and so does a harness that cannot steer.
+ */
+export function steerRequests(threadId: string, ids: string[]): Thread {
+  thread(threadId);
+  const live = lives.get(threadId);
+  const found = [...new Set(ids)].map((id) => editable(threadId, id));
+  if (!live?.turn || live.closing || found.some((f) => f.at?.list !== live.held)) throw refusal(NOTHING_TO_STEER, 409);
+  if (!harnessSteers(threadId)) throw refusal(CANNOT_STEER, 409);
+  const go = new Set(found.map((f) => f.row.id));
+  const steered = live.held.filter((m) => go.has(m.uuid));
+  live.held = live.held.filter((m) => !go.has(m.uuid));
+  for (const m of steered) {
+    messageRequests.steer(m.uuid);
+    m.mode = 'steer';
+    m.midTurn = true;
+    send(live, m);
   }
   emitThread(threadId);
   return threads.get(threadId)!;

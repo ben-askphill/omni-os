@@ -180,6 +180,12 @@ extension OmniClient {
     try await send("POST", "/api/threads/\(uriComponent(id))/requests/reorder", body: RequestIDs(ids: ids))
   }
 
+  /// Sends messages held for after this turn into it now, as steers. A 409 when one is no longer held for a
+  /// running turn or the harness cannot steer.
+  public func steerRequests(in id: String, ids: [String]) async throws(OmniAPIError) -> RecoveryAnswer {
+    try await send("POST", "/api/threads/\(uriComponent(id))/requests/steer", body: RequestIDs(ids: ids))
+  }
+
   /// The thread's saved requests, newest first, with where each one went.
   public func requests(in id: String) async throws(OmniAPIError) -> [SavedRequest] {
     try await send("GET", "/api/threads/\(uriComponent(id))/requests")
