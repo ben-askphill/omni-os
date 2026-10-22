@@ -14,6 +14,25 @@ Local agent workspace. See README.md for what it does.
 - `data/` is runtime state (db, thread dirs, worktrees, browser profiles). Never commit it.
 - A feature or fix with a visible change to the Web UI or Mac app ships with screenshots in the PR description (before/after, both clients if both change). Take them against a throwaway server, never :4747, and upload with `scripts/pr-screenshots.sh`. See `docs/pr-screenshots.md`.
 
+## Don't hurt the live install
+
+You most likely run inside Omni itself, served from :4747 on the user's Mac.
+
+1. **Never touch :4747 or the main checkout's `data/`.** Don't restart, kill, test against or write to them. Use `scripts/qa-stack.sh up` for a throwaway server with its own data dir and fake CLIs.
+2. **Never kill by pattern.** No `pkill -f`, and no `kill` of a PID found by matching a name or path: other threads run their own stacks and fake CLIs. Stop what you started by its port and PID file (`QA_SERVER_PORT=<port> scripts/qa-stack.sh down`).
+3. **Install with dev deps.** Agent shells often set `NODE_ENV=production`, so use `npm install --include=dev`.
+
+## Hit every surface
+
+Most misses are a change that works where it was tested and is missing elsewhere. Before calling a change done, say which of these applied:
+
+- **Clients**: Web UI and Mac app, in the same PR. The Mac app is never a follow-up.
+- **Harnesses**: Claude Code, Codex, Cursor Agent and Hermes each have an adapter in `apps/server/harness/`. Decide per harness, even if the answer is "not supported".
+- **Agents**: something a user can do is usually something the Conductor should reach through `apps/mcp/omni.ts`.
+- **Sync**: new state that should reach the other Mac needs a handler in `apps/server/sync/handlers/`, and a new entity also needs adding to the check in `supabase/migrations/0001_changes.sql`.
+- **Mac contract**: a change to JSON the Mac app reads updates `apps/server/tests/mac-fixtures.test.ts`.
+- **Docs**: if the change makes a page in `docs/` wrong, fix it in the same PR. Where a new doc goes: `docs/README.md`. Don't document what the code already says.
+
 ## Unslop every message (always on)
 
 Before you send any message to the user, run the `unslop` skill on it. This applies to every model and agent working in this repo: Claude, Codex, Cursor, Gemini and any other.

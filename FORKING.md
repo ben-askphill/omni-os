@@ -13,8 +13,8 @@ npm install
 npm run setup
 ```
 
-Or skip `npm run setup` and answer the same questions in the Web UI or the Mac app on first open. See the README's
-[Getting started](README.md#getting-started) for prerequisites.
+Or skip `npm run setup` and answer the same questions in the Web UI or the Mac app on first open. See
+[Install](docs/user/install.md) for prerequisites and [Configuration](docs/user/configuration.md) for every file.
 
 ## What is yours and what is shared
 
@@ -51,10 +51,11 @@ PR upstream instead of carrying the change.
 ```bash
 git fetch upstream
 git merge upstream/main          # or: git rebase upstream/main
-npm install
+npm install --include=dev
+scripts/build-mac.sh             # if you use the Mac app
 ```
 
-Restart the server (or the Mac app). Since none of your settings live in tracked files, this merges cleanly unless
+Restart the server if you run it yourself; the Mac app restarts its own. Since none of your settings live in tracked files, this merges cleanly unless
 you changed shared code yourself. `git status` should be clean before you pull; if it shows `crew/` or
 `automations/` changes, move them into `data/crew/` or `data/automations/` and run `git checkout -- crew automations`.
 
@@ -66,5 +67,5 @@ first name from `git config user.name`) and skips onboarding. Check it afterward
 
 ## Contributing back
 
-Shared changes go upstream as PRs against `ben-askphill/omni-os`. See the README's
-[Contributing](README.md#contributing) section and `CLAUDE.md`. Never commit `data/` or `.env`.
+Shared changes go upstream as PRs against `ben-askphill/omni-os`. See [CONTRIBUTING.md](CONTRIBUTING.md) and
+`CLAUDE.md`. Never commit `data/` or `.env`.
