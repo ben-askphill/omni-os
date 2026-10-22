@@ -24,7 +24,6 @@ import {
   type ReportP,
   type ResultP,
   type TaskView,
-  type TextP,
   type Todo,
   type ModLine,
   type ToolCall,

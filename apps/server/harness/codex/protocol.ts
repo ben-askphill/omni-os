@@ -4,17 +4,7 @@
 // about a real Codex: after a `brew upgrade`, regenerate the bindings, diff them against
 // this file, and run `OMNI_LIVE_CODEX=1 npm test` (apps/server/tests/codex-live.test.ts).
 
-/** JSON-RPC request/response envelopes over stdio, one JSON object per line. */
-export interface RpcRequest {
-  id: number;
-  method: string;
-  params?: unknown;
-}
-export interface RpcResponse {
-  id: number;
-  result?: unknown;
-  error?: { code: number; message: string };
-}
+/** A JSON-RPC notification over stdio, one JSON object per line. */
 export interface RpcNotification {
   method: string;
   params?: unknown;
@@ -40,19 +30,6 @@ export interface CodexItem {
     | 'exitedReviewMode'
     | string;
   [k: string]: unknown;
-}
-
-export interface CommandExecutionItem extends CodexItem {
-  type: 'commandExecution';
-  command: string | string[];
-  aggregatedOutput?: string;
-  output?: string;
-  exitCode?: number;
-}
-
-export interface AgentMessageItem extends CodexItem {
-  type: 'agentMessage';
-  text: string;
 }
 
 // ---------- the catalog probe ----------

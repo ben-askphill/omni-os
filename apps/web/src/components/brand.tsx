@@ -320,16 +320,6 @@ const HARNESS: Record<string, { logo?: keyof typeof LOGO; label: string }> = {
 
 export const harnessLabel = (harness: string) => HARNESS[harness]?.label ?? harness;
 
-/** Resolve a harness id from free text ("Claude", "Codex", "Cursor", "Claude Code"). */
-export function harnessFor(name: string | null | undefined): string | null {
-  const n = String(name ?? '').toLowerCase();
-  if (n.includes('claude')) return 'claude-code';
-  if (n.includes('codex') || n.includes('chatgpt') || n.includes('openai')) return 'codex';
-  if (n.includes('cursor')) return 'cursor';
-  if (n.includes('hermes')) return 'hermes';
-  return null;
-}
-
 /** The bare logo. Harnesses without one (Hermes) get their two-letter label. */
 export function HarnessLogo({ harness, size = 14, title }: { harness: string; size?: number; title?: string }) {
   const h = HARNESS[harness];

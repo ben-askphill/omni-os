@@ -8,7 +8,6 @@ import { launch } from './spawn.ts';
 import { userName } from '../profile.ts';
 import { startTurnSnapshot } from './snapshots.ts';
 import {
-  addEvent,
   bindPump,
   bindReportToParent,
   capFor,
