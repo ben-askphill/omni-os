@@ -15,7 +15,7 @@ import { resolveRun } from '../harness/resolve.ts';
 import type { CommandUse } from '../harness/adapter.ts';
 import { assembling, deliver, settleTeam } from './queue.ts';
 import { fallbackTitle, generateTitle } from './aux.ts';
-import { addEvent, emitThread, isShuttingDown, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
+import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
 import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
 
 // ---------- slash commands ----------
@@ -304,7 +304,6 @@ export interface Acceptance {
 
 export type PostedThread = Thread & { request: Acceptance };
 
-const refusal = (message: string, status: number) => Object.assign(new Error(message), { status });
 
 function accepted(threadId: string, r: MessageRequest, duplicate = false): PostedThread {
   const now = messageRequests.get(r.id) ?? r;

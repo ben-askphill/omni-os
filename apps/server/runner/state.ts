@@ -178,25 +178,8 @@ export const setShuttingDown = (on: boolean) => {
   shuttingDown = on;
 };
 
-// Queue and records own these. Session and the exit path call them without importing those modules back.
-function unready(name: string): never {
-  throw new Error(`runner ${name} is not ready`);
-}
-let pumpImpl: () => void = () => unready('pump');
-let reportImpl: (childId: string, status: string, text: string) => void = () => unready('reportToParent');
-let endTasksImpl: (live: Live) => void = () => unready('endTasks');
-export const pump = () => pumpImpl();
-export const reportToParent = (childId: string, status: string, text: string) => reportImpl(childId, status, text);
-export const endTasks = (live: Live) => endTasksImpl(live);
-export const bindPump = (fn: () => void) => {
-  pumpImpl = fn;
-};
-export const bindReportToParent = (fn: (childId: string, status: string, text: string) => void) => {
-  reportImpl = fn;
-};
-export const bindEndTasks = (fn: (live: Live) => void) => {
-  endTasksImpl = fn;
-};
+/** An error the API answers with `status`. */
+export const refusal = (message: string, status: number) => Object.assign(new Error(message), { status });
 
 export function emitThread(id: string) {
   const t = threads.get(id);

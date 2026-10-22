@@ -7,10 +7,10 @@ import { turnFinished } from '../sync/files.ts';
 import { type ModUi, type Record as StreamRecord, type TaskUpdate } from '../stream.ts';
 import { armIdle, clearInterrupt, endTurn, teardown } from './session.ts';
 import { finishTurnSnapshot, startTurnSnapshot } from './snapshots.ts';
+import { pump, reportToParent } from './queue.ts';
 import {
   activeTasks,
   addEvent,
-  bindEndTasks,
   cliLabel,
   drop,
   emitThread,
@@ -18,8 +18,6 @@ import {
   hasBackground,
   isShuttingDown,
   publishMods,
-  pump,
-  reportToParent,
   send,
   track,
   type Live,
@@ -100,8 +98,6 @@ export function endTasks(live: Live) {
   live.taskSaved.clear();
   publishTasks(true);
 }
-
-bindEndTasks(endTasks);
 
 /**
  * A mod's UI call. A log is a transcript row like any other. A toast is only for whoever watches the thread

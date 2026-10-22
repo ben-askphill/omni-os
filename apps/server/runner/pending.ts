@@ -5,9 +5,8 @@
 import { EDITABLE, messageRequests, PARKED, threads, type MessageRequest, type Thread } from '../db.ts';
 import type { Attachment } from '../uploads.ts';
 import { messageFor } from './api.ts';
-import { emitThread, lives, waiting, waitingMsgs, type Msg } from './state.ts';
+import { emitThread, lives, refusal, waiting, waitingMsgs, type Msg } from './state.ts';
 
-const refusal = (message: string, status: number) => Object.assign(new Error(message), { status });
 
 /** Said when a message left the queue before Ben's change reached the server. */
 export const ALREADY_SENT = 'This message has already been sent, so it can no longer be changed.';

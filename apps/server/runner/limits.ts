@@ -9,7 +9,7 @@ import { outbox, threads, tx, type Thread } from '../db.ts';
 import { HARNESS_META, isHarnessId } from '../harness/types.ts';
 import { turnBlocked } from '../sync/guard.ts';
 import { saveOwn, wake } from './queue.ts';
-import { emitThread, isShuttingDown, runsHere } from './state.ts';
+import { emitThread, isShuttingDown, refusal, runsHere } from './state.ts';
 
 /** What the harness gets. */
 export const CONTINUE_PROMPT = 'Your usage limit has reset. Continue where you left off.';
@@ -22,7 +22,6 @@ export const limitClock = { now: () => Date.now() };
 /** How often scheduled continuations are checked besides their own timer: a Mac asleep at the reset catches up. */
 const SWEEP_MS = 30_000;
 
-const refusal = (message: string, status: number) => Object.assign(new Error(message), { status });
 
 function thread(threadId: string): Thread {
   const t = threads.get(threadId);

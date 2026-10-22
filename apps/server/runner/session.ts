@@ -7,6 +7,8 @@ import { detachThread } from '../browser.ts';
 import { turnFinished } from '../sync/files.ts';
 import { suggestNextThread, suggestReply } from './aux.ts';
 import { finishTurnSnapshot, settleSnapshots } from './snapshots.ts';
+import { pump, reportToParent } from './queue.ts';
+import { endTasks } from './records.ts';
 import {
   alive,
   browserHolder,
@@ -14,12 +16,9 @@ import {
   deliveryPhase,
   drop,
   emitThread,
-  endTasks,
   harnessSteers,
   isShuttingDown,
   lives,
-  pump,
-  reportToParent,
   setShuttingDown,
   waiting,
   waitingMsgs,

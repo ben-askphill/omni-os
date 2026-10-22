@@ -5,12 +5,11 @@ import { prepareWorktree } from '../sandbox.ts';
 import { recordStartBase } from '../changes.ts';
 import type { Attachment } from '../uploads.ts';
 import { reportToParent, settleTeam } from './queue.ts';
-import { emitThread, runsHere } from './state.ts';
+import { emitThread, refusal, runsHere } from './state.ts';
 
 /** The request id a worktree thread's first prompt is saved under. One per thread, so it is saved once. */
 export const START_REQUEST = 'thread-start';
 
-const refusal = (message: string, status: number) => Object.assign(new Error(message), { status });
 
 /**
  * Save a new worktree thread's first prompt and files as its first request before the worktree is made, so a
