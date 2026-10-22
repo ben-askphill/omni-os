@@ -136,6 +136,7 @@ public final class AppModel {
     config = settings.config
     let c = connect(settings.port)
     client = c.client
+    ImageSource.client = c.client
     store = c.store
     folders.connect(store: c.store, api: c.client)
     links.connect(api: c.client)
@@ -387,6 +388,7 @@ public final class AppModel {
       attention.reset()
       let c = connect(new.port)
       client = c.client
+      ImageSource.client = c.client
       store = c.store
       folders.connect(store: c.store, api: c.client)
       links.connect(api: c.client)
@@ -424,11 +426,7 @@ public final class AppModel {
   private func connectionChanged(_ state: ConnectionState) {
     let previous = lastConnection
     lastConnection = state
-    if state == .open {
-      // The feed only opens for a request with the token, so the server took it: images can carry it too.
-      client.shareTokenCookie()
-      Task { await seedBanners() }
-    }
+    if state == .open { Task { await seedBanners() } }
     switch state {
     case .open where !supervisor.isRunning:
       checkServer()

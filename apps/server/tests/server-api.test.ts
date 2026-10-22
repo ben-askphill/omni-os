@@ -21,6 +21,7 @@ const r = await startRunner({ OMNI_WEB_DIST: web });
 const { app } = await import('../app.ts');
 const { gitHead } = await import('../about.ts');
 const { cookieName, proofFor } = await import('../api-token.ts');
+const { config } = await import('../config.ts');
 
 const call = async (path: string, init?: RequestInit) => {
   const res = await app.request(path, init);
@@ -147,7 +148,7 @@ describe('/api/auth', () => {
     const res = await app.request(`/api/auth/proof?nonce=${nonce}`, { headers: { authorization: '' } });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { proof: string };
-    expect(body).toEqual({ proof: proofFor(nonce, TOKEN) });
+    expect(body).toEqual({ proof: proofFor(nonce, config.port, TOKEN) });
     expect(JSON.stringify(body)).not.toContain(TOKEN);
     expect((await app.request('/api/auth/proof?nonce=xyz', { headers: { authorization: '' } })).status).toBe(400);
   });

@@ -23,7 +23,7 @@ Every `/api` request needs this install's token. The server makes it on first st
 
 | Client | How it sends the token |
 | --- | --- |
-| Mac app | Reads `data/api-token` (or `OMNI_DATA_DIR`'s) and sends `Authorization: Bearer`. Before it attaches to whatever answers on the port, it asks `GET /api/auth/proof?nonce=` for an HMAC of a fresh nonce keyed with the token, so a program squatting on the port never gets the token or your secrets |
+| Mac app | Reads `data/api-token` (or `OMNI_DATA_DIR`'s) and sends `Authorization: Bearer`. Before it attaches to whatever answers on the port, it asks `GET /api/auth/proof?nonce=` for an HMAC of the port and a fresh nonce, keyed with the token, so a program squatting on the port never gets the token or your secrets, even by relaying the nonce to an Omni on another port. It sends the token only to that server's exact host and port: images on any other URL load without it, and it never goes in a shared cookie store |
 | `scripts/omni.sh`, `npm run setup` | `OMNI_TOKEN`, else `data/api-token` |
 | Threads | `OMNI_TOKEN` in their environment, next to `OMNI_URL`. The conductor MCP (`apps/mcp/omni.ts`) gets `OMNI_TOKEN_FILE`, a path, so no token is written into `mcp.json` |
 | Web UI | Pairs once (below), then holds the token in a cookie |
@@ -33,7 +33,7 @@ The Web UI and its assets are served without the token and never contain it, so 
 - Paste it from `data/api-token` into the pairing screen.
 - Open a link with `?pair=<token>` after the route, like `http://127.0.0.1:4747/#/?pair=...`. `scripts/omni.sh --pair` prints one. The page swaps it for the cookie and drops it from the address bar. The link holds the token itself, so share it only with your own devices.
 
-Through `tailscale serve` (a `.ts.net` or 100.64.0.0/10 `Host`), set `integrations.tailscaleLogin` in `data/omni.config.json` to your Tailscale login (comma-separate several) and requests must also carry a matching `Tailscale-User-Login` header, which `tailscale serve` sets from the peer's identity. Tagged nodes and other users then get a 403 even with the token. That is defense in depth: the token is the main control.
+Through `tailscale serve`, set `integrations.tailscaleLogin` in `data/omni.config.json` to your Tailscale login (comma-separate several) and requests must also carry a matching `Tailscale-User-Login` header, which `tailscale serve` sets from the peer's identity. A request counts as coming through it when its `Host` is a `.ts.net` or 100.64.0.0/10 name, or when it carries any proxy header (`X-Forwarded-Host`, `X-Forwarded-For`, `X-Forwarded-Proto`, `Forwarded`, `Tailscale-User-Login`, `Tailscale-Funnel-Request`). `tailscale serve` always sets `X-Forwarded-Host` (`addProxyForwardedHeaders` in its `ipn/ipnlocal/serve.go`) and strips client-sent identity headers, so a peer that sends `Host: 127.0.0.1` is still asked for the login. Tagged nodes and other users then get a 403 even with the token. That is defense in depth: the token is the main control.
 
 The token stops other macOS accounts, other tailnet devices and anything else that reaches the port. It does not stop a web page from using a paired browser's cookie, so `apps/server/request-guard.ts` also refuses:
 

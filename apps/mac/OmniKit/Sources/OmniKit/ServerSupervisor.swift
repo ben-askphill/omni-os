@@ -337,7 +337,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
         default: return .busy(.notThisInstall(port: port))
         }
       }
-      guard let t = token.value, answer.proof == ServerToken.proof(token: t, nonce: nonce) else { return .busy(.notThisInstall(port: port)) }
+      guard let t = token.value, answer.proof == ServerToken.proof(token: t, port: port, nonce: nonce) else { return .busy(.notThisInstall(port: port)) }
       return .omni(try await client.status())
     } catch {
       switch error {

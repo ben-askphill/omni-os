@@ -55,5 +55,10 @@ export function tokenMatches(given: string | undefined | null): boolean {
 /** The browser's copy. Named per port: cookies ignore the port, and a QA server on 127.0.0.1 has its own token. */
 export const cookieName = () => `omni_token_${config.port}`;
 
-/** What the server answers to `nonce`, so the Mac app can tell it is this install's Omni without sending the token. */
-export const proofFor = (nonce: string, token = apiToken()) => createHmac('sha256', token).update(`omni-proof:${nonce}`).digest('hex');
+/**
+ * What the server answers to `nonce`, so the Mac app can tell it is this install's Omni without sending the token.
+ * Bound to the port the server listens on: a program squatting on the app's port that relays the nonce to an Omni
+ * on another port (a QA stack, a moved server) gets a proof for that port, which the app refuses.
+ */
+export const proofFor = (nonce: string, port = config.port, token = apiToken()) =>
+  createHmac('sha256', token).update(`omni-proof:${port}:${nonce}`).digest('hex');

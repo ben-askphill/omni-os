@@ -162,7 +162,7 @@ struct AttachmentsView: View {
   }
 
   private func thumbnail(_ a: Attachment) -> some View {
-    AsyncImage(url: client.uploadURL(threadID: threadID, name: a.name)) { phase in
+    ClientImage(client: client, url: client.uploadURL(threadID: threadID, name: a.name)) { phase in
       switch phase {
       case .success(let image):
         image.resizable().scaledToFit()

@@ -150,9 +150,12 @@ final class HTTPResponder: Sendable {
   let port: Int
   private let fd: Int32
 
-  init(port: Int = 0, status: Int = 200, contentType: String, body: String, token: String? = nil) {
+  /// - Parameter proofPort: the port the proof is for, its own by default. Another one stands in for a squatter
+  ///   relaying the nonce to an Omni on that port.
+  init(port: Int = 0, status: Int = 200, contentType: String, body: String, token: String? = nil, proofPort: Int? = nil) {
     let listener = SilentListener(port: port)
     self.port = listener.port
+    let proofPort = proofPort ?? listener.port
     fd = listener.descriptor
     @Sendable func reply(_ status: Int, _ contentType: String, _ body: String) -> String {
       "HTTP/1.1 \(status) OK\r\nContent-Type: \(contentType)\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
@@ -162,7 +165,7 @@ final class HTTPResponder: Sendable {
       guard let token, let line = head.split(separator: "\r\n").first, line.hasPrefix("GET /api/auth/proof?nonce="),
         let nonce = line.dropFirst("GET /api/auth/proof?nonce=".count).split(separator: " ").first
       else { return fixed }
-      return reply(200, "application/json", #"{"proof":"\#(ServerToken.proof(token: token, nonce: String(nonce)))"}"#)
+      return reply(200, "application/json", #"{"proof":"\#(ServerToken.proof(token: token, port: proofPort, nonce: String(nonce)))"}"#)
     }
     let fd = self.fd
     Thread.detachNewThread {

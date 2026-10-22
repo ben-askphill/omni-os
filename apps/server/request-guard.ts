@@ -51,6 +51,17 @@ export function viaTailnet(hostname: string): boolean {
   return !!cgnat && Number(cgnat[1]) >= 64 && Number(cgnat[1]) <= 127;
 }
 
+/**
+ * Headers a proxy in front of the server adds. tailscale serve always sets X-Forwarded-Host from the incoming Host,
+ * and X-Forwarded-For and the Tailscale-* identity headers when it knows them (ipn/ipnlocal/serve.go,
+ * `addProxyForwardedHeaders` and `addTailscaleIdentityHeaders`). A client behind it can pick its Host, but it cannot
+ * take a header off the request the proxy sends on. Omni's own loopback clients and the vite dev proxy send none.
+ */
+const PROXY_HEADERS = ['x-forwarded-host', 'x-forwarded-for', 'x-forwarded-proto', 'forwarded', 'tailscale-user-login', 'tailscale-funnel-request'];
+
+/** The request came in through tailscale serve (or another proxy), whatever Host it names. */
+const cameThroughProxy = (c: Context, host: string) => viaTailnet(hostnameOf(host)) || PROXY_HEADERS.some((h) => c.req.header(h) !== undefined);
+
 /** Body types a cross-site page can send without a CORS preflight. JSON routes never take them. */
 const SIMPLE_TYPES = ['text/plain', 'application/x-www-form-urlencoded'];
 
@@ -61,7 +72,8 @@ const SIMPLE_TYPES = ['text/plain', 'application/x-www-form-urlencoded'];
  * - an Origin, `null` included, that is not the Host the request came in on;
  * - a text/plain or form-urlencoded body, the content types that skip the preflight;
  * - no token, or the wrong one (401), in the Authorization header or the paired browser's cookie;
- * - through tailscale serve, a Tailscale-User-Login that is not in `integrations.tailscaleLogin`, when that is set.
+ * - through tailscale serve (a tailnet Host, or any proxy header), a Tailscale-User-Login that is not in
+ *   `integrations.tailscaleLogin`, when that is set.
  * The Mac app, apps/mcp/omni.ts, scripts and curl send no Origin or Sec-Fetch-Site, so the Host and token checks apply to them.
  */
 export const requestGuard: MiddlewareHandler = async (c, next) => {
@@ -86,7 +98,7 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
     if (!tokenMatches(bearer(c) ?? getCookie(c, cookieName()))) return refuse("Unauthorized: send this install's token (data/api-token), or pair this browser", 401);
   }
   const owners = resolved.tailscaleLogins();
-  if (owners.length && viaTailnet(hostnameOf(host)) && !owners.includes((c.req.header('tailscale-user-login') ?? '').trim().toLowerCase())) {
+  if (owners.length && cameThroughProxy(c, host) && !owners.includes((c.req.header('tailscale-user-login') ?? '').trim().toLowerCase())) {
     return refuse('this Tailscale login is not the owner');
   }
   await next();

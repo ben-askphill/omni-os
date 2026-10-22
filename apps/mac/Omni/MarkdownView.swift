@@ -183,7 +183,8 @@ private struct MarkdownImageView: View {
       failed = true
       return
     }
-    if let data = try? await URLSession.shared.data(from: url).0, let img = NSImage(data: data) {
+    // The token goes only to the connected server, never to a URL a model wrote with another port or host.
+    if let data = await ImageSource.data(url), let img = NSImage(data: data) {
       loaded = img
     } else {
       failed = true

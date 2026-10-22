@@ -19,7 +19,7 @@ authApi.post('/pair', (c) => {
   return c.json({ ok: true });
 });
 
-/** HMAC-SHA256 of `omni-proof:<nonce>` keyed with the token. Proves the server holds the token without revealing it. */
+/** HMAC-SHA256 of `omni-proof:<port>:<nonce>` keyed with the token: proves this server, on this port, holds it, without revealing it. */
 authApi.get('/proof', (c) => {
   const nonce = c.req.query('nonce') ?? '';
   if (!/^[0-9a-f]{32,128}$/i.test(nonce)) return c.json({ error: 'nonce: 32 to 128 hex characters' }, 400);

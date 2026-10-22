@@ -83,6 +83,19 @@ describe('requestGuard: through tailscale serve', () => {
     expect((await get('/api/threads', AUTH)).status).toBe(200);
   });
 
+  it('needs the login when tailscale serve forwards the request, whatever Host the client names', async () => {
+    process.env.OMNI_TAILSCALE_LOGIN = 'ben@example.com';
+    // tailscale serve always sets X-Forwarded-Host; a client behind it picked Host: 127.0.0.1.
+    const proxies: Record<string, string>[] = [{ 'x-forwarded-host': '127.0.0.1:4747' }, { 'x-forwarded-for': '100.101.1.2' }, { 'tailscale-funnel-request': '?1' }];
+    for (const proxied of proxies) {
+      expect((await get('/api/threads', { ...AUTH, ...proxied })).status, JSON.stringify(proxied)).toBe(403);
+      expect((await get('/api/threads', { ...AUTH, ...proxied, 'tailscale-user-login': 'mallory@example.com' })).status).toBe(403);
+      expect((await get('/api/threads', { ...AUTH, ...proxied, 'tailscale-user-login': 'ben@example.com' })).status).toBe(200);
+    }
+    // A plain loopback client with no proxy headers is not asked for one.
+    expect((await get('/api/threads', AUTH)).status).toBe(200);
+  });
+
   it('knows the tailnet by its Host', () => {
     for (const h of ['bens-mac.tail1234.ts.net', 'BENS-MAC.tail1234.ts.net.', '100.64.0.1', '100.127.1.1']) expect(viaTailnet(h), h).toBe(true);
     for (const h of ['127.0.0.1', 'localhost', '100.128.0.1', 'ts.net.evil.example']) expect(viaTailnet(h), h).toBe(false);
@@ -117,10 +130,12 @@ describe('loadToken', () => {
   });
 
   it('proves the token with an HMAC of the nonce, never the token itself', () => {
-    const proof = proofFor('00ff', 'c'.repeat(64));
+    const proof = proofFor('00ff', 4747, 'c'.repeat(64));
     expect(proof).toMatch(/^[0-9a-f]{64}$/);
     expect(proof).not.toContain('c'.repeat(8));
-    expect(proofFor('00ff', 'd'.repeat(64))).not.toBe(proof);
+    expect(proofFor('00ff', 4747, 'd'.repeat(64))).not.toBe(proof);
+    // A server on another port, relayed to by a squatter, proves a different value.
+    expect(proofFor('00ff', 4757, 'c'.repeat(64))).not.toBe(proof);
   });
 });
 

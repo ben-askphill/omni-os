@@ -6,8 +6,11 @@ import OmniKit
 // checks before it attaches, and the header and cookie every request carries.
 @Suite struct ServerTokenTests {
   @Test func provesTheWayTheServerDoes() {
-    // proofFor('00ff', 'c'.repeat(64)) in apps/server/api-token.ts.
-    #expect(ServerToken.proof(token: String(repeating: "c", count: 64), nonce: "00ff") == "c24c449c25cf6cbba0828ad98b462e42617db1722c7ace003c7e1cc9e9758b73")
+    // proofFor('00ff', 4747, 'c'.repeat(64)) in apps/server/api-token.ts.
+    let token = String(repeating: "c", count: 64)
+    #expect(ServerToken.proof(token: token, port: 4747, nonce: "00ff") == "ce09bc17bdf57ca5e899397d43439043234cff4dca5a73489b91c743800465de")
+    // An Omni on another port proves that port, so a squatter on 4747 cannot relay to it.
+    #expect(ServerToken.proof(token: token, port: 4757, nonce: "00ff") != ServerToken.proof(token: token, port: 4747, nonce: "00ff"))
     #expect(ServerToken.nonce().count == 64)
     #expect(ServerToken.nonce() != ServerToken.nonce())
   }
@@ -39,14 +42,29 @@ import OmniKit
     #expect(none.requests.first?.value(forHTTPHeaderField: "Authorization") == nil)
   }
 
-  @Test func sharesItAsTheCookieForImagesOnThatPortOnly() throws {
-    let storage = HTTPCookieStorage.shared
+  @Test func sendsItOnlyToThisServersHostAndPort() async throws {
     let client = OmniClient(port: 4791, token: .fixed("abc123"))
-    client.shareTokenCookie(in: storage)
-    defer { storage.cookies?.filter { $0.name == "omni_token_4791" }.forEach(storage.deleteCookie) }
-    let sent = storage.cookies(for: try #require(URL(string: "http://127.0.0.1:4791/api/artifacts/1/raw"))) ?? []
-    #expect(sent.contains { $0.name == "omni_token_4791" && $0.value == "abc123" })
-    #expect(!(storage.cookies(for: try #require(URL(string: "http://127.0.0.1:4791/"))) ?? []).contains { $0.name == "omni_token_4791" })
-    #expect(!(storage.cookies(for: try #require(URL(string: "http://example.com/api/x"))) ?? []).contains { $0.name == "omni_token_4791" })
+    let own = try #require(URL(string: "http://127.0.0.1:4791/api/artifacts/1/raw"))
+    #expect(client.authorized(own).value(forHTTPHeaderField: "Authorization") == "Bearer abc123")
+    // A model can write an image URL for any port or host into markdown.
+    for other in ["http://127.0.0.1:4792/api/artifacts/1/raw", "http://localhost:4791/api/x", "https://127.0.0.1:4791/api/x", "http://example.com/api/x"] {
+      let url = try #require(URL(string: other))
+      #expect(!client.isOwn(url), "\(other)")
+      #expect(client.authorized(url).value(forHTTPHeaderField: "Authorization") == nil, "\(other)")
+    }
+  }
+
+  @Test func loadsImagesOnAnotherPortWithoutTheToken() async throws {
+    let own = StubTransport(body: "png")
+    let external = StubTransport(body: "png")
+    let client = OmniClient(port: 4791, token: .fixed("abc123"), transport: own)
+    _ = try await client.imageData(try #require(URL(string: "http://127.0.0.1:4791/api/threads/t/uploads/a.png")))
+    _ = try await client.imageData(try #require(URL(string: "http://127.0.0.1:4792/api/threads/t/uploads/a.png")), external: external)
+    #expect(own.requests.map { $0.url?.port } == [4791])
+    #expect(own.requests.first?.value(forHTTPHeaderField: "Authorization") == "Bearer abc123")
+    #expect(external.requests.map { $0.url?.port } == [4792])
+    #expect(external.requests.first?.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(external.requests.first?.value(forHTTPHeaderField: "Cookie") == nil)
+    #expect((HTTPCookieStorage.shared.cookies ?? []).allSatisfy { !$0.name.hasPrefix("omni_token_") }, "the token never goes in the shared cookie store")
   }
 }

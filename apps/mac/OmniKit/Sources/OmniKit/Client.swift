@@ -135,21 +135,33 @@ public struct OmniClient: Sendable {
     self.init(baseURL: url, token: token, transport: transport)
   }
 
-  /// A request for `url` that carries the token. For the event streams, which build their own.
+  /// `url` is on this server: the same scheme, host and port as `baseURL`. Only those requests get the token.
+  public func isOwn(_ url: URL) -> Bool {
+    url.scheme?.lowercased() == baseURL.scheme?.lowercased() && url.host()?.lowercased() == baseURL.host()?.lowercased()
+      && (url.port ?? 80) == (baseURL.port ?? 80)
+  }
+
+  /// A request for `url`, with the token when `url` is on this server and without it anywhere else. For the event
+  /// streams, which build their own, and for images, whose URLs can come from a model's markdown.
   public func authorized(_ url: URL) -> URLRequest {
     var req = URLRequest(url: url)
-    if let t = token.value { req.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
+    if isOwn(url), let t = token.value { req.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
     return req
   }
 
-  /// Puts the token in the shared cookie store as the cookie a paired browser holds, for what loads server URLs
-  /// through `URLSession.shared` and sets no header: `AsyncImage` and the markdown image loader.
-  public func shareTokenCookie(in storage: HTTPCookieStorage = .shared) {
-    guard let t = token.value, let host = baseURL.host(), let port = baseURL.port else { return }
-    let cookie = HTTPCookie(properties: [
-      .domain: host, .path: "/api", .name: "omni_token_\(port)", .value: t, .discard: "TRUE",
-    ])
-    if let cookie { storage.setCookie(cookie) }
+  /// An image's bytes. One on this server goes through this client, with the token; any other URL (another port
+  /// included) goes through `external`, with no token and no cookie. Nothing puts the token in a shared cookie store.
+  public func imageData(_ url: URL, external: any HTTPTransport = URLSessionTransport()) async throws(OmniAPIError) -> Data {
+    if isOwn(url) { return try await file(url) }
+    do {
+      let (data, response) = try await external.send(URLRequest(url: url))
+      guard (200..<300).contains(response.statusCode) else { throw OmniAPIError.http(status: response.statusCode, message: "Request failed (\(response.statusCode))") }
+      return data
+    } catch let e as OmniAPIError {
+      throw e
+    } catch {
+      throw .unreachable(error.localizedDescription)
+    }
   }
 
   // MARK: Endpoints

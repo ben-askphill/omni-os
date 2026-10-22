@@ -85,7 +85,7 @@ private func oldServer(in dir: TempDir, node: URL) -> URL {
     const t = require('fs').readFileSync(process.env.OMNI_DATA_DIR + '/api-token', 'utf8').trim(); \
     require('http').createServer((q, s) => { s.setHeader('content-type', 'application/json'); \
     const n = q.url.match(/^[/]api[/]auth[/]proof[?]nonce=([0-9a-f]+)/); \
-    if (n) return s.end(JSON.stringify({ proof: require('crypto').createHmac('sha256', t).update('omni-proof:' + n[1]).digest('hex') })); \
+    if (n) return s.end(JSON.stringify({ proof: require('crypto').createHmac('sha256', t).update('omni-proof:' + process.env.OMNI_PORT + ':' + n[1]).digest('hex') })); \
     s.end(JSON.stringify({ usage: {}, slots: {}, running: 0, queued: 0, maxConcurrent: 4, maxUploadMb: 25 })) })\
     .listen(+process.env.OMNI_PORT, '127.0.0.1', () => console.log('old server up'))
     """
@@ -334,9 +334,11 @@ struct ServerSupervisorTests {
 
   @Test func aListenerThatCannotProveTheTokenIsNotAttached() async throws {
     let status = #"{"usage":{},"slots":{},"running":0,"queued":0,"maxConcurrent":4,"maxUploadMb":25}"#
-    // Answers /api/status like Omni, and the proof with nothing or with another install's token.
-    for token in [nil, "another-install-0123456789abcdef0123456789"] {
-      let squatter = HTTPResponder(contentType: "application/json", body: status, token: token)
+    // Answers /api/status like Omni, and the proof with nothing, with another install's token, or with this install's
+    // token for another port: a squatter relaying the nonce to a real Omni elsewhere (a QA stack, a moved server).
+    let elsewhere = freePort()
+    for (token, proofPort) in [(nil, nil), ("another-install-0123456789abcdef0123456789", nil), (testToken, elsewhere)] as [(String?, Int?)] {
+      let squatter = HTTPResponder(contentType: "application/json", body: status, token: token, proofPort: proofPort)
       let rig = Rig(port: squatter.port)
       defer {
         squatter.close()

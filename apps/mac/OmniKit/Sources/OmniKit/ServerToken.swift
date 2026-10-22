@@ -30,10 +30,13 @@ public struct ServerToken: Sendable {
     return data.appending(path: "api-token")
   }
 
-  /// What the server answers to GET /api/auth/proof?nonce=: HMAC-SHA256 of `omni-proof:<nonce>`, keyed with the
-  /// token. Lets the app check who holds the port without sending the token to it.
-  public static func proof(token: String, nonce: String) -> String {
-    let mac = HMAC<SHA256>.authenticationCode(for: Data("omni-proof:\(nonce)".utf8), using: SymmetricKey(data: Data(token.utf8)))
+  /// What the server listening on `port` answers to GET /api/auth/proof?nonce=: HMAC-SHA256 of
+  /// `omni-proof:<port>:<nonce>`, keyed with the token. Lets the app check who holds the port without sending the
+  /// token to it. The port is the one the app dialed, so a squatter that relays the nonce to an Omni on another port
+  /// gets back a proof for that port, which does not match. Two servers that share a token file (the same data dir,
+  /// or one `OMNI_TOKEN`) can each still prove only their own port.
+  public static func proof(token: String, port: Int, nonce: String) -> String {
+    let mac = HMAC<SHA256>.authenticationCode(for: Data("omni-proof:\(port):\(nonce)".utf8), using: SymmetricKey(data: Data(token.utf8)))
     return mac.map { String(format: "%02x", $0) }.joined()
   }
 
@@ -52,5 +55,17 @@ final class TokenLocation: @unchecked Sendable {
   var current: URL? {
     get { lock.withLock { url } }
     set { lock.withLock { url = newValue } }
+  }
+}
+
+/// The client the app's views load images through (`OmniClient.imageData`), for views that hold no client, like
+/// markdown images. `AppModel` sets it whenever it connects. nil means images load with no token.
+@MainActor public enum ImageSource {
+  public static var client: OmniClient?
+
+  /// The image at `url`: with the token only when it is on the connected server.
+  public static func data(_ url: URL) async -> Data? {
+    if let client { return try? await client.imageData(url) }
+    return try? await URLSessionTransport().send(URLRequest(url: url)).0
   }
 }

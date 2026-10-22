@@ -67,7 +67,7 @@ struct ScreenshotGrid: View {
                 Color.clear
                   .aspectRatio(4 / 3, contentMode: .fit)
                   .overlay(alignment: .top) {
-                    AsyncImage(url: client.artifactURL(shot)) { image in
+                    ClientImage(client: client, url: client.artifactURL(shot)) { image in
                       image.resizable().scaledToFill()
                     } placeholder: {
                       Loader(size: 14).foregroundStyle(Tok.fg3)
@@ -130,7 +130,7 @@ private struct ShotViewer: View {
       .padding(z(12))
       Hairline()
       if let index {
-        AsyncImage(url: client.artifactURL(list[index])) { image in
+        ClientImage(client: client, url: client.artifactURL(list[index])) { image in
           image.resizable().scaledToFit()
         } placeholder: {
           Loader(size: 14).foregroundStyle(Tok.fg3)
