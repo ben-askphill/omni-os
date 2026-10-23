@@ -1,0 +1,9 @@
+[
+  {
+    "id": "mac-b",
+    "name": "Mac B",
+    "reachability": "online",
+    "dnsName": "mac-b.tail1234.ts.net",
+    "lastSeen": null
+  }
+]

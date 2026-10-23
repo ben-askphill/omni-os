@@ -3,6 +3,7 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { diff, shapeOf, tagOf } from './fixture-shape.ts';
 import { FAKE_CLAUDE, fakeAlive } from './support.ts';
 
 // Golden fixtures for the Mac app's Swift types (apps/mac/OmniKit). Boots the real server with the fake claude CLI,
@@ -25,7 +26,10 @@ const RECORDING =
   'then run npm run test:mac and fix the Swift types it breaks.';
 const HINT = `The server JSON the Mac app reads changed shape. If that is on purpose, record the fixtures again with ${RECORDING}`;
 
-/** Every fixture this test owns. The Swift tests decode each one. */
+/**
+ * Every fixture this test owns. The Swift tests decode each one. A few come from elsewhere: sync-status.json is checked
+ * by sync-setup.test.ts, and devices.json and thread-handoff.json, which take two Macs, by handoff-two-macs.test.ts.
+ */
 const NAMES = [
   'harnesses.json',
   'crew.json',
@@ -482,57 +486,6 @@ function request(name: Name, fresh: Record<string, unknown>): unknown {
 
 // ---------- shapes ----------
 
-type Kind = 'null' | 'boolean' | 'number' | 'string' | 'array' | 'object';
-
-/** The keys and value types seen across values, merged. Array items are kept apart by their kind or type. */
-interface Shape {
-  kinds: Set<Kind>;
-  objects: number;
-  fields: Map<string, { shape: Shape; seen: number }>;
-  items: Map<string, Shape>;
-}
-
-const blank = (): Shape => ({ kinds: new Set(), objects: 0, fields: new Map(), items: new Map() });
-
-/** What tells array items apart: an event's kind, a stream message's kind or type, an SSE frame's event. */
-function tagOf(v: unknown): string {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return '';
-  const o = v as Record<string, unknown>;
-  if (typeof o.kind === 'string') return o.kind;
-  if (typeof o.type === 'string') return o.type;
-  if (typeof o.event === 'string') return `event:${o.event}`;
-  return 'data' in o ? tagOf(o.data) : '';
-}
-
-function add(s: Shape, v: unknown) {
-  if (v === null) s.kinds.add('null');
-  else if (Array.isArray(v)) {
-    s.kinds.add('array');
-    for (const x of v) {
-      const tag = tagOf(x);
-      if (!s.items.has(tag)) s.items.set(tag, blank());
-      add(s.items.get(tag)!, x);
-    }
-  } else if (typeof v === 'object') {
-    s.kinds.add('object');
-    s.objects++;
-    const o = v as Record<string, unknown>;
-    for (const [k, x] of Object.entries(o)) {
-      const f = s.fields.get(k) ?? { shape: blank(), seen: 0 };
-      f.seen++;
-      // An event row's payload is JSON inside the JSON.
-      add(f.shape, k === 'payload' && typeof x === 'string' && typeof o.kind === 'string' ? JSON.parse(x) : x);
-      s.fields.set(k, f);
-    }
-  } else s.kinds.add(typeof v as Kind);
-}
-
-function shapeOf(values: unknown[]): Shape {
-  const s = blank();
-  for (const v of values) add(s, v);
-  return s;
-}
-
 /** An SSE text as frames: `{event?, id?, data}`, with the data parsed. */
 function frames(text: string) {
   return text
@@ -553,35 +506,6 @@ function frames(text: string) {
 }
 
 const parse = (name: Name, text: string): unknown => (name.endsWith('.sse') ? frames(text) : JSON.parse(text));
-
-/**
- * The differences between a recorded and a fresh shape. Null counts as any type, so a field that is sometimes
- * null only fails when its other type changes. A key found on only one side fails unless that side has it on
- * some items only, since optional keys come and go with the data.
- */
-function diff(want: Shape, have: Shape, path: string, out: string[]) {
-  const strip = (k: Set<Kind>) => [...k].filter((x) => x !== 'null' || k.size === 1).sort().join('|');
-  if (strip(want.kinds) !== strip(have.kinds)) {
-    out.push(`${path}: recorded ${[...want.kinds].sort().join('|')}, now ${[...have.kinds].sort().join('|')}`);
-    return;
-  }
-  for (const k of new Set([...want.fields.keys(), ...have.fields.keys()])) {
-    const a = want.fields.get(k);
-    const b = have.fields.get(k);
-    if (a && b) diff(a.shape, b.shape, `${path}.${k}`, out);
-    else if (a && a.seen === want.objects) out.push(`${path}.${k}: no longer sent`);
-    else if (b && b.seen === have.objects) out.push(`${path}.${k}: new`);
-  }
-  // An empty array says nothing about its items.
-  if (!want.items.size || !have.items.size) return;
-  for (const tag of new Set([...want.items.keys(), ...have.items.keys()])) {
-    const a = want.items.get(tag);
-    const b = have.items.get(tag);
-    const p = `${path}[${tag || '*'}]`;
-    if (a && b) diff(a, b, p, out);
-    else out.push(`${p}: ${a ? 'no longer sent' : 'new'}`);
-  }
-}
 
 // ---------- recording ----------
 

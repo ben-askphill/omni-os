@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { MemoryTransport } from '../sync/transport.ts';
+import { macFixture } from './fixture-shape.ts';
 import { tailscaleStatus, waitFor } from './support.ts';
 import { bootMac, type Mac } from './two-macs.ts';
 
@@ -24,6 +25,8 @@ let a: Mac;
 let b: Mac;
 let id: string;
 let offerId: string;
+/** What the Mac app decodes from a handoff, kept as the tests get it. */
+const fixtures = new Map<string, unknown>();
 
 const sessionFile = (m: Mac, t: { cwd: string; session_id: string }) =>
   join(m.home, '.claude', 'projects', m.files.claudeProjectDir(t.cwd), `${t.session_id}.jsonl`);
@@ -79,7 +82,9 @@ beforeAll(async () => {
 
 describe('handing a running thread to the other Mac', () => {
   it('lists the other Mac as up', async () => {
-    expect((await a.json('/devices')).body).toEqual([{ id: 'mac-b', name: 'Mac B', reachability: 'online', dnsName: NODE_B.dns, lastSeen: null }]);
+    const { body } = await a.json('/devices');
+    expect(body).toEqual([{ id: 'mac-b', name: 'Mac B', reachability: 'online', dnsName: NODE_B.dns, lastSeen: null }]);
+    fixtures.set('devices.json', body);
   });
 
   it('refuses this Mac, an unknown or offline Mac, a thread not running here, and a session not reported yet', async () => {
@@ -115,7 +120,9 @@ describe('handing a running thread to the other Mac', () => {
     expect(res.body.handoff.state).toEqual({ phase: 'preparing', step: 'stopping' });
     offerId = res.body.handoff.id;
 
-    expect((await offered(a, id)).blocked).toBe('Waiting for Mac B to pick it up.');
+    const waiting = await offered(a, id);
+    expect(waiting.blocked).toBe('Waiting for Mac B to pick it up.');
+    fixtures.set('thread-handoff.json', waiting);
     expect(a.thread(id).status).toBe('stopped');
     expect(a.runner.isLive(id)).toBe(false);
     expect(a.fakeAlive(spawn.pid)).toBe(false);
@@ -172,6 +179,12 @@ describe('handing a running thread to the other Mac', () => {
     expect(b.db.resultReads.get(id)).toMatchObject({ uid: stop.uid, n: stop.n });
     // A's queued message went with the thread; it is not waiting on A.
     expect(a.db.messageRequests.forThread(id).map((r) => r.state)).toEqual(['cancelled']);
+  });
+
+  it('sends the Mac app the shapes its fixtures hold', () => {
+    const places = [a.tmp, b.tmp, shared].flatMap((p) => [realpathSync(p), p]);
+    expect([...fixtures.keys()].sort()).toEqual(['devices.json', 'thread-handoff.json']);
+    for (const [name, value] of fixtures) macFixture(name, value, places);
   });
 });
 
