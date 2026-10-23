@@ -33,9 +33,10 @@ export function useThreadPR(thread: Pick<Thread, 'id' | 'branch'> | null, slotBu
   useEffect(() => {
     if (!slotBusy) void load();
   }, [load, slotBusy, thread?.branch]);
+  // Idle, the effect above already asked.
   useEffect(() => {
-    if (eager) void load();
-  }, [eager, load]);
+    if (eager && slotBusy) void load();
+  }, [eager, load]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const tick = setInterval(() => {
       if (document.visibilityState === 'visible') void load();
