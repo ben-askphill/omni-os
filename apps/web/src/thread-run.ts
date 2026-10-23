@@ -1,3 +1,16 @@
+/** The model that asks for Auto, which picks the harness, model and effort from the prompt (apps/server/harness/auto.ts). */
+export const AUTO = 'auto';
+
+/** Auto as a model picker choice. */
+export const AUTO_CHOICE = { harness: AUTO, model: AUTO } as const;
+
+/**
+ * Whether a run choice or default asks for Auto. Mirrors asksAuto in apps/server/harness/auto.ts: Cursor has a model of
+ * its own called "auto", and `{ harness: 'cursor', model: 'auto' }` stays that.
+ */
+export const asksAuto = (d: { harness?: string | null; model?: string | null } | undefined | null) =>
+  !!d && (d.harness === AUTO || (d.model === AUTO && !d.harness));
+
 /** Enough of the harness catalog to name a thread's model and effort. */
 export interface RunCatalogModel {
   id: string;
@@ -15,7 +28,7 @@ export interface RunCatalogHarness {
 }
 
 export interface ThreadRunLabels {
-  /** The model's display name, the stored id, or "default". */
+  /** The model's display name, the stored id, or "default". Prefixed "Auto · " when Auto picked it. */
   model: string;
   /** The harness's display name. Empty until the catalog names it. */
   harnessName: string;
@@ -28,14 +41,15 @@ export interface ThreadRunLabels {
  * so this only names them. An empty model is the harness default. An empty effort is that model's default.
  */
 export function threadRunLabels(
-  thread: { harness: string; model: string | null; effort: string },
+  thread: { harness: string; model: string | null; effort: string; auto_reason?: string | null },
   harnesses: RunCatalogHarness[] | null | undefined,
 ): ThreadRunLabels {
   const harness = harnesses?.find((h) => h.id === thread.harness);
   const picked = thread.model ? harness?.models.find((m) => m.id === thread.model) : undefined;
   const model = picked ?? (thread.model ? undefined : harness?.models.find((m) => m.default) ?? harness?.models[0]);
+  const label = model?.label || thread.model || 'default';
   return {
-    model: model?.label || thread.model || 'default',
+    model: thread.auto_reason ? `Auto · ${label}` : label,
     harnessName: harness?.name ?? '',
     effort: effortLabel(thread.effort, model, !!harness),
   };

@@ -1,15 +1,14 @@
 // What a composer opens with when it starts from a thread. Web UI only; the slash rules are in
 // packages/shared/composer-slash.ts.
 import type { Channel, HarnessInfo, Thread } from './api.ts';
+import { AUTO, AUTO_CHOICE, asksAuto } from './thread-run.ts';
 
-/** The body that starts a thread with this one's channel, harness, model, effort and role. */
+/** The body that starts a thread with this one's channel, harness, model, effort and role. A thread Auto picked for starts on Auto. */
 export const newThreadBody = (t: Thread, prompt: string) => ({
   channel: t.channel_id,
   prompt,
   role: t.role || undefined,
-  harness: t.harness,
-  model: t.model || undefined,
-  effort: t.effort || undefined,
+  ...(t.auto_reason ? { model: AUTO } : { harness: t.harness, model: t.model || undefined, effort: t.effort || undefined }),
 });
 
 /** What the new-thread composer starts with when it opens from a thread. */
@@ -27,12 +26,11 @@ export interface NewThreadPreset {
   prompt?: string;
 }
 
-/** `/clear` or `/new` on its own: this thread's settings, for a first prompt Ben types next. */
+/** `/clear` or `/new` on its own: this thread's settings, for a first prompt Ben types next. Auto stays Auto. */
 export const sameSettings = (t: Thread): NewThreadPreset => ({
   channel: t.channel_id,
   role: t.role ?? '',
-  choice: { harness: t.harness, model: t.model ?? '' },
-  effort: t.effort,
+  ...(t.auto_reason ? { choice: AUTO_CHOICE, effort: '' } : { choice: { harness: t.harness, model: t.model ?? '' }, effort: t.effort }),
 });
 
 /** "New thread on another model": the channel and role, and nothing that picks a model. */
@@ -54,14 +52,15 @@ export const channelRun = (c: Channel | undefined): RunDefaults | undefined =>
 
 /**
  * The model and effort the new-thread composer preselects: the role's defaults when it sets any, else the
- * channel's, else Claude Code's default model. A harness it can't show falls back to Claude Code.
+ * channel's, else Auto. Either can ask for Auto too. A harness it can't show falls back to Claude Code.
  */
 export function runPreselect(
   role: RunDefaults | undefined,
   channel: RunDefaults | undefined,
   harnesses: Pick<HarnessInfo, 'id' | 'models'>[],
 ): { choice: { harness: string; model: string }; effort: string } {
-  const d = setsRun(role) ? role! : setsRun(channel) ? channel! : {};
+  const d = setsRun(role) ? role! : setsRun(channel) ? channel! : undefined;
+  if (!d || asksAuto(d)) return { choice: AUTO_CHOICE, effort: '' };
   const harness = d.harness && harnesses.some((x) => x.id === d.harness) ? d.harness : 'claude-code';
   const info = harnesses.find((x) => x.id === harness);
   const model = (harness === (d.harness || 'claude-code') && d.model) || info?.models.find((m) => m.default)?.id || info?.models[0]?.id || '';

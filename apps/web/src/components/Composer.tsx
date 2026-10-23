@@ -12,6 +12,7 @@ import { FileMenu, useFileMenu } from './FileMenu.tsx';
 import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '@omni/shared/slash-menu.ts';
 import { menuCommands, newThreadHint, replySlash } from '@omni/shared/composer-slash.ts';
 import { channelRun, newThreadBody, otherModel, runPreselect, sameSettings } from '../new-thread-preset.ts';
+import { AUTO, asksAuto } from '../thread-run.ts';
 import { parseSlash, type SlashCommand } from '@omni/shared/slash.ts';
 import { requestIdFor, sendKey, type PendingRequest } from '../requests.ts';
 
@@ -436,7 +437,7 @@ export function NewThreadComposer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
 
-  // Preselect the role's run defaults, else the channel's, else Claude Code's default model.
+  // Preselect the role's run defaults, else the channel's, else Auto.
   const preselect = (r: string, c: string) => {
     if (!harnesses) return;
     const ro = crew.find((x) => x.id === r);
@@ -488,11 +489,14 @@ export function NewThreadComposer({
   };
 
   // ----- the `/` menu: the harness in the picker, for the folder a thread in this channel reads its commands from -----
-  const commands = useCommands(`harness=${encodeURIComponent(choice.harness)}&channel=${encodeURIComponent(channel)}`);
+  // Auto picks the harness only once the prompt is sent, so its menu is Claude Code's.
+  const auto = asksAuto(choice);
+  const menuHarness = auto ? 'claude-code' : choice.harness;
+  const commands = useCommands(`harness=${encodeURIComponent(menuHarness)}&channel=${encodeURIComponent(channel)}`);
   const slashMenu = useSlashMenu({ ref, text, onText: update, commands, where: 'new-thread' });
   const fileMenu = useFileMenu({ ref, text, onText: update, scope: `channel=${encodeURIComponent(channel)}` });
   const menus = joinMenus(slashMenu, fileMenu);
-  const hint = useMemo(() => newThreadHint(text, commands.list, choice.harness), [text, commands.list, choice.harness]);
+  const hint = useMemo(() => newThreadHint(text, commands.list, menuHarness), [text, commands.list, menuHarness]);
   // Another harness or channel has its own list: fetch it for what is typed, so the hint re-checks it.
   const latest = useRef(text);
   latest.current = text;
@@ -514,9 +518,7 @@ export function NewThreadComposer({
           channel,
           prompt,
           role: role || undefined,
-          harness: choice.harness,
-          model: choice.model || undefined,
-          effort: effort || undefined,
+          ...(auto ? { model: AUTO } : { harness: choice.harness, model: choice.model || undefined, effort: effort || undefined }),
           folder: folder && channel === preset?.channel ? folder.id : undefined,
         },
         att.files,
@@ -744,7 +746,7 @@ function ThreadRunPills({ thread }: { thread: Thread }) {
   const harnessName = labels.harnessName || harnessLabel(thread.harness);
   return (
     <>
-      <span title="Fixed for this thread" aria-label={`Model: ${labels.model} on ${harnessName}`} className={pillCls}>
+      <span title={thread.auto_reason ?? 'Fixed for this thread'} aria-label={`Model: ${labels.model} on ${harnessName}`} className={pillCls}>
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg text-fg">
           <HarnessLogo harness={thread.harness} size={13} />
         </span>

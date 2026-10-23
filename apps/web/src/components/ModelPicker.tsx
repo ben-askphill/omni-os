@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { HarnessWithRunning, ModelEntry } from '../api.ts';
+import type { HarnessWithRunning } from '../api.ts';
 import { Icon, Picker, type PickerOption } from './ui.tsx';
 import { HarnessLogo } from './brand.tsx';
+import { AUTO_CHOICE, asksAuto } from '../thread-run.ts';
 
 export interface ModelChoice {
   harness: string;
   model: string;
 }
 
+const AUTO_NOTE = 'Picks a model for each task';
+
 /**
- * One model pill whose list groups models under each harness, with a sticky header naming the
+ * One model pill whose list starts with Auto, then groups models under each harness, with a sticky header naming the
  * plan, one search across all groups, and the harness default marked "(default)". A harness that
  * isn't installed or logged in shows disabled with the command that fixes it. `onOpen` fires as
  * the list opens, so the caller can refetch and a fresh login shows up without a reload.
@@ -36,6 +39,7 @@ export function ModelPicker({
   const wrap = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
 
+  const auto = asksAuto(value);
   const current = useMemo(() => {
     const h = harnesses.find((x) => x.id === value.harness);
     const m = h?.models.find((x) => x.id === value.model);
@@ -51,6 +55,7 @@ export function ModelPicker({
         : h.models,
     }));
   }, [harnesses, q]);
+  const showAuto = 'auto'.includes(q.trim().toLowerCase());
 
   useEffect(() => {
     if (defaultOpen) onOpen?.();
@@ -66,13 +71,13 @@ export function ModelPicker({
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
-  const pick = (harness: string, m: ModelEntry) => {
-    onChange({ harness, model: m.id });
+  const pick = (v: ModelChoice) => {
+    onChange(v);
     setOpen(false);
     btn.current?.focus();
   };
 
-  const buttonLabel = current.m ? current.m.label : placeholder;
+  const buttonLabel = auto ? 'Auto' : current.m ? current.m.label : placeholder;
 
   return (
     <div ref={wrap} className="relative">
@@ -81,7 +86,7 @@ export function ModelPicker({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`Model: ${current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}`}
+        aria-label={auto ? 'Model: Auto' : `Model: ${current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}`}
         onClick={() => {
           if (!open) onOpen?.();
           setOpen(!open);
@@ -115,6 +120,18 @@ export function ModelPicker({
             />
           </label>
           <div role="listbox" aria-label="Model" className="scroll-thin max-h-[320px] overflow-y-auto outline-none">
+            {showAuto && (
+              <button type="button" role="option" aria-selected={auto} onClick={() => pick(AUTO_CHOICE)} className="pik-row">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">
+                  <Icon name="zap" size={13} />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[13px] text-fg">Auto</span>
+                  <span className="truncate text-[11.5px] text-fg-4">{AUTO_NOTE}</span>
+                </span>
+                <span className="pik-mark">{auto && <Icon name="check" size={12} strokeWidth={2.6} />}</span>
+              </button>
+            )}
             {groups.map(({ harness, models }) => (
               <div key={harness.id}>
                 <div className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-elev px-3 pt-2 pb-1">
@@ -143,7 +160,7 @@ export function ModelPicker({
                       type="button"
                       role="option"
                       aria-selected={harness.id === value.harness && m.id === value.model}
-                      onClick={() => pick(harness.id, m)}
+                      onClick={() => pick({ harness: harness.id, model: m.id })}
                       className="pik-row"
                     >
                       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">
@@ -175,7 +192,7 @@ export function ModelPicker({
 
 /**
  * The effort pill for a model choice: "Default" plus the model's levels, or a disabled "Auto effort" when it has
- * none. With no model picked, the levels are the harness default model's.
+ * none or Auto is picked. With no model picked, the levels are the harness default model's.
  */
 export function EffortPicker({ harnesses, choice, value, onChange }: { harnesses: HarnessWithRunning[]; choice: ModelChoice; value: string; onChange: (v: string) => void }) {
   const h = harnesses.find((x) => x.id === choice.harness);

@@ -46,4 +46,12 @@ describe('threadRunLabels', () => {
       effort: 'default',
     });
   });
+
+  it('marks a model Auto picked, keeping its name', () => {
+    expect(threadRunLabels({ harness: 'claude-code', model: 'opus', effort: 'high', auto_reason: 'Hard code task: Opus, high effort' }, catalog)).toEqual({
+      model: 'Auto · Opus',
+      harnessName: 'Claude Code',
+      effort: 'high',
+    });
+  });
 });

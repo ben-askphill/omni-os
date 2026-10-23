@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
+import { AUTO, AUTO_CHOICE, asksAuto } from '../thread-run.ts';
 import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { CHANNEL_GLYPHS, glyphIcon, parseChannelIcon, readSvgIcon } from '@omni/shared/channel-icon.ts';
 import { readDesignSystem } from '@omni/shared/design-system.ts';
@@ -21,7 +22,7 @@ interface FormState {
   showBrowser: boolean;
   notes: string;
   icon: string;
-  /** The default model as a picker choice: model '' is the harness default. Harness '' is no default at all. */
+  /** The default model as a picker choice: model '' is the harness default, model "auto" is Auto. All '' is no default, which runs Auto too. */
   run: { harness: string; model: string; effort: string };
 }
 
@@ -138,18 +139,19 @@ function IconPicker({ value, name, onChange }: { value: string; name: string; on
 function RunDefaultsField({ value, onChange }: { value: FormState['run']; onChange: (v: FormState['run']) => void }) {
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>('/harnesses');
   if (!harnesses) return null;
-  const choice = { harness: value.harness || 'claude-code', model: value.model };
+  const unset = !(value.harness || value.model || value.effort);
+  const choice = unset || asksAuto(value) ? AUTO_CHOICE : { harness: value.harness || 'claude-code', model: value.model };
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <ModelPicker
         harnesses={harnesses}
         onOpen={reload}
-        placeholder="Claude Code default"
+        placeholder="Default"
         value={choice}
-        onChange={(c) => onChange({ harness: c.harness, model: c.model, effort: '' })}
+        onChange={(c) => onChange(asksAuto(c) ? { harness: '', model: AUTO, effort: '' } : { harness: c.harness, model: c.model, effort: '' })}
       />
       <EffortPicker harnesses={harnesses} choice={choice} value={value.effort} onChange={(effort) => onChange({ ...choice, effort })} />
-      {(value.harness || value.model || value.effort) && (
+      {!unset && (
         <Button type="button" onClick={() => onChange({ harness: '', model: '', effort: '' })}>
           Reset
         </Button>

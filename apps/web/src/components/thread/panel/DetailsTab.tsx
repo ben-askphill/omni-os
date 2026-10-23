@@ -114,6 +114,7 @@ export function DetailsTab({
           {thread.model && init?.model && init.model !== thread.model && <span className="ml-1 text-fg-3">({init.model})</span>}
         </Row>
         <Row k="Effort">{thread.effort || <span className="text-fg-3">default</span>}</Row>
+        {thread.auto_reason && <Row k="Auto">{thread.auto_reason}</Row>}
         <Row k="Source">
           {thread.source}
           {thread.automation && <span className="text-fg-3"> · {thread.automation}</span>}
