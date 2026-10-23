@@ -16,7 +16,7 @@ import { SecretsPage } from './pages/Secrets.tsx';
 import { SettingsPage } from './pages/Settings.tsx';
 import { SyncPage } from './pages/Sync.tsx';
 import { ThreadPage } from './pages/Thread.tsx';
-import { href, navigate, requestComposerFocus, useHash, useRoute, type Route } from './router.ts';
+import { href, navigate, pageTitle, requestComposerFocus, useHash, useRoute, type Route } from './router.ts';
 import { AppProvider, readPref, useApp, writePref } from './store.tsx';
 import { FolderDeleteDialog, FolderProvider } from './folders.tsx';
 import { api } from './api.ts';
@@ -91,6 +91,7 @@ function SidebarPane({ children }: { children: ReactNode }) {
 function Page({ route }: { route: Route }) {
   switch (route.name) {
     case 'home':
+    case 'channels':
       return <HomePage />;
     case 'channel':
       return <ChannelPage key={route.id} id={route.id} tab={route.tab} pr={route.pr} />;
@@ -118,33 +119,6 @@ function Page({ route }: { route: Route }) {
           </Empty>
         </div>
       );
-  }
-}
-
-function mobileTitle(route: Route, channelName: (id: string) => string | undefined) {
-  switch (route.name) {
-    case 'home':
-      return 'Home';
-    case 'channel':
-      return `#${channelName(route.id) ?? route.id}`;
-    case 'thread':
-      return 'Thread';
-    case 'search':
-      return 'Search';
-    case 'automations':
-      return 'Automations';
-    case 'secrets':
-      return 'Secrets';
-    case 'sync':
-      return 'Sync';
-    case 'settings':
-      return 'Settings';
-    case 'artifacts':
-      return 'Artifacts';
-    case 'new-channel':
-      return 'New channel';
-    default:
-      return 'Omni';
   }
 }
 
@@ -227,7 +201,7 @@ function Shell() {
   }, []);
 
   useEffect(() => {
-    const t = mobileTitle(route, (id) => channel(id)?.name);
+    const t = pageTitle(route, (id) => channel(id)?.name);
     document.title = t === 'Home' ? 'Omni' : `${t} · Omni`;
   }, [route, channel]);
 
@@ -242,7 +216,7 @@ function Shell() {
         <a href={href.home()} className="px-1" aria-label="Omni home">
           <Wordmark size={16} />
         </a>
-        <span className="ml-1 min-w-0 flex-1 truncate text-[13px] text-fg-3">{mobileTitle(route, (id) => channel(id)?.name)}</span>
+        <span className="ml-1 min-w-0 flex-1 truncate text-[13px] text-fg-3">{pageTitle(route, (id) => channel(id)?.name)}</span>
         <IconButton icon="search" label="Search or jump to" onClick={openPalette} size={17} />
       </header>
 

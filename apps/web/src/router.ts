@@ -3,15 +3,24 @@ import type { NewThreadPreset } from './new-thread-preset.ts';
 
 export type ChannelTab = 'threads' | 'prs' | 'settings';
 
+/** What a thread link can open on its own screen in the phone layout. The desktop shows the thread itself. */
+export const THREAD_VIEWS = ['steps', 'changes', 'pr', 'browser', 'terminal', 'details'] as const;
+export type ThreadView = (typeof THREAD_VIEWS)[number];
+const isThreadView = (s: string | undefined): s is ThreadView => (THREAD_VIEWS as readonly string[]).includes(s ?? '');
+
 export type Route =
   | { name: 'home' }
+  /** The phone layout's Channels tab. The desktop lists channels in the sidebar and shows Home here. */
+  | { name: 'channels' }
   | { name: 'channel'; id: string; tab: ChannelTab; pr?: number }
-  | { name: 'thread'; id: string; artifact?: number }
+  /** `turn`: the steps view's turn, the event id of the message that started it. */
+  | { name: 'thread'; id: string; artifact?: number; view?: ThreadView; turn?: number }
   | { name: 'search'; q: string }
   | { name: 'automations' }
   | { name: 'secrets' }
   | { name: 'sync' }
-  | { name: 'settings' }
+  /** `workspace`: the full workspace settings, which the phone layout keeps behind its own Settings screen. */
+  | { name: 'settings'; page?: 'workspace' }
   | { name: 'artifacts' }
   | { name: 'new-channel' }
   | { name: 'notfound'; path: string };
@@ -40,16 +49,55 @@ export function parseHash(hash: string): Route {
   }
   if (a === 't' && b) {
     const art = Number(q.get('artifact'));
-    return { name: 'thread', id: b, artifact: Number.isFinite(art) && art > 0 ? art : undefined };
+    const turn = Number(q.get('turn'));
+    return {
+      name: 'thread',
+      id: b,
+      artifact: Number.isFinite(art) && art > 0 ? art : undefined,
+      view: isThreadView(c) ? c : undefined,
+      turn: Number.isFinite(turn) && turn > 0 ? turn : undefined,
+    };
   }
+  if (a === 'channels' && !b) return { name: 'channels' };
   if (a === 'search') return { name: 'search', q: q.get('q') ?? '' };
   if (a === 'automations' && !b) return { name: 'automations' };
   if (a === 'secrets' && !b) return { name: 'secrets' };
   if (a === 'sync' && !b) return { name: 'sync' };
   if (a === 'settings' && !b) return { name: 'settings' };
+  if (a === 'settings' && b === 'workspace' && !c) return { name: 'settings', page: 'workspace' };
   if (a === 'artifacts' && !b) return { name: 'artifacts' };
   if (a === 'new-channel' && !b) return { name: 'new-channel' };
   return { name: 'notfound', path: pathPart };
+}
+
+/** The window title's page name: "Home" shows as plain "Omni". */
+export function pageTitle(route: Route, channelName: (id: string) => string | undefined) {
+  switch (route.name) {
+    case 'home':
+      return 'Home';
+    case 'channels':
+      return 'Channels';
+    case 'channel':
+      return `#${channelName(route.id) ?? route.id}`;
+    case 'thread':
+      return 'Thread';
+    case 'search':
+      return 'Search';
+    case 'automations':
+      return 'Automations';
+    case 'secrets':
+      return 'Secrets';
+    case 'sync':
+      return 'Sync';
+    case 'settings':
+      return 'Settings';
+    case 'artifacts':
+      return 'Artifacts';
+    case 'new-channel':
+      return 'New channel';
+    default:
+      return 'Omni';
+  }
 }
 
 const subscribe = (cb: () => void) => {
@@ -71,7 +119,8 @@ export function navigate(to: string, opts: { replace?: boolean } = {}) {
   const path = to.replace(/^#/, '');
   const hash = `#${path.startsWith('/') ? path : `/${path}`}`;
   if (opts.replace) {
-    history.replaceState(null, '', hash);
+    // The phone layout keeps its place in history in the entry's state; a replace stays at that place.
+    history.replaceState(history.state, '', hash);
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   } else {
     window.location.hash = hash;
@@ -85,12 +134,15 @@ export const href = {
   pr: (id: string, n: number) => `#/c/${encodeURIComponent(id)}/prs/${n}`,
   settings: (id: string) => `#/c/${encodeURIComponent(id)}/settings`,
   thread: (id: string, artifact?: number) => `#/t/${encodeURIComponent(id)}${artifact ? `?artifact=${artifact}` : ''}`,
+  threadView: (id: string, view: ThreadView, turn?: number) => `#/t/${encodeURIComponent(id)}/${view}${turn ? `?turn=${turn}` : ''}`,
+  channels: () => '#/channels',
   search: (q: string) => `#/search?q=${encodeURIComponent(q)}`,
   automations: () => '#/automations',
   secrets: () => '#/secrets',
   sync: () => '#/sync',
   /** The workspace Settings page (your name). A channel's own settings tab is `settings(id)`. */
   settingsPage: () => '#/settings',
+  workspaceSettings: () => '#/settings/workspace',
   artifacts: () => '#/artifacts',
   newChannel: () => '#/new-channel',
 };
