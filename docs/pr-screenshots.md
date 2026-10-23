@@ -7,8 +7,7 @@ Every PR for a feature or fix that changes what the Web UI or the Mac app looks 
 - The screen or component that changed, cropped to it or shown in context, whichever reads better.
 - Before and after for a fix or a restyle. Take "before" from `main` (or before your first commit), not from memory.
 - Light and dark when the change touches colour, tokens or theming.
-- For the Web UI, desktop width and phone width (390px) when the layout could differ.
-- Each client the change touches: a web and Mac change needs shots of both.
+- Every surface: desktop web, phone web (390px) and the Mac app. Skip one only when the PR says why it does not change there.
 - States that matter: empty, loading, error, long content, hover or open menus.
 
 ## How to capture

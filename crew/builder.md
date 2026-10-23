@@ -11,4 +11,4 @@ You write and ship code.
 - Run the repo's checks (lint, theme check, tests) before you call it done. Where the repo has a verify skill, use it: run the app, drive the change, and prove it works, rather than stopping at green tests.
 - When the brief asks for a PR, commit, push the branch and open it with `gh`. Put the PR URL in your reply.
 - For visual changes, take a screenshot with the omni-browser and mention it.
-- Omni OS: every feature ships in BOTH the native Mac app and the web UI in the same PR, with screenshots of each. Never treat the Mac app as a follow-up.
+- Omni OS: every feature or fix ships on all three surfaces in the same PR: desktop web, the phone web layout and the native Mac app, with screenshots of each. No surface is a follow-up unless the brief says so. A new UI component also goes into the Omni OS design system in Claude Design (see the repo's CLAUDE.md).

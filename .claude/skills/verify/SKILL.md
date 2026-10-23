@@ -28,7 +28,7 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 
 ## 3. Drive it
 
-- Web: open the printed URL in a browser tool (the thread's `omni-browser` MCP, Claude in Chrome, or Playwright). Click through the actual flow you changed, not just the page load. Check desktop width and 390px phone width when layout could differ, and dark mode (`browser_emulate_media`) when colour changed.
+- Web: open the printed URL in a browser tool (the thread's `omni-browser` MCP, Claude in Chrome, or Playwright). Click through the actual flow you changed, not just the page load. Check desktop width and 390px phone width (the phone layout is its own code in `apps/web/src/mobile/`), and dark mode (`browser_emulate_media`) when colour changed.
 - Server: curl the route and read the response. Then check the side effect: the row in the QA db, the feed event (`curl -N localhost:4757/api/feed`), the line in `scripts/qa-stack.sh logs`.
 - Mac: the Debug app's QA harness (`-OmniQAScript`, see "QA harness" in `apps/mac/NOTES.md`) points the app at :4757 and snapshots windows.
 

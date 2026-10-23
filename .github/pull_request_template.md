@@ -6,7 +6,7 @@ Say what is out of scope or left for later. Delete these comments.
 
 ## Screenshots
 
-<!-- Visible change: before and after, Web UI and Mac app if both change. Taken against a throwaway
+<!-- Visible change: before and after, on desktop web, phone web and the Mac app. Taken against a throwaway
 server, never :4747. Upload with scripts/pr-screenshots.sh (docs/pr-screenshots.md). Otherwise: n/a -->
 
 ## Testing
