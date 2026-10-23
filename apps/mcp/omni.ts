@@ -272,6 +272,40 @@ server.registerTool(
 );
 
 server.registerTool(
+  'list_devices',
+  {
+    description:
+      `The other Macs ${USER} syncs Omni with, each with its id, name and whether Tailscale sees it up: online, offline or unknown ` +
+      '(no Tailscale to ask). A thread can be handed to any that is not offline. Empty while sync is off.',
+  },
+  async () => text(await call('/devices')),
+);
+
+server.registerTool(
+  'hand_off_thread',
+  {
+    description:
+      `Move a running thread to another of ${USER}'s Macs, only when ${USER} asks: it stops here and the other Mac resumes the same ` +
+      'session, then runs the messages that were queued for it. A worktree thread takes its commits and uncommitted changes along. ' +
+      'It runs in the background after this answers; the thread shows where it is.',
+    inputSchema: {
+      thread_id: z.string(),
+      to: z.string().describe('The Mac, by id or name (ignoring case), from list_devices.'),
+    },
+  },
+  async ({ thread_id, to }) => {
+    const devices: any[] = await call('/devices');
+    const want = to.trim().toLowerCase();
+    const named = devices.filter((d) => d.name.toLowerCase() === want);
+    const hit = devices.find((d) => d.id === to) ?? (named.length === 1 ? named[0] : null);
+    if (named.length > 1 && !hit) throw new Error(`${named.length} Macs are called "${to}". Pass the id instead: ${named.map((d) => d.id).join(', ')}.`);
+    if (!hit) throw new Error(`No synced Mac is called "${to}". Macs: ${devices.map((d) => `${d.name} (${d.id})`).join(', ') || 'none, sync is off or no other Mac has synced'}.`);
+    const res = await call(`/threads/${thread_id}/handoff`, { method: 'POST', body: JSON.stringify({ to: hit.id }) });
+    return text({ thread_id, to: { id: hit.id, name: hit.name }, handoff: res.handoff?.state ?? null });
+  },
+);
+
+server.registerTool(
   'list_published_artifacts',
   {
     description:

@@ -27,3 +27,14 @@ Open the Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the URL an
 - Scheduled automations run on one Mac: the Sync page says which, and "Run them here" moves them. The first Mac to finish a sync with no owner set takes them. Manual runs work on either Mac.
 - Copying `data/` to another Mac is fine: the folder remembers the Mac it was set up on (its hardware UUID), and on the next start the copy takes a new sync id and pulls the history again, logging one `[sync] this data folder was copied from another Mac` line. It never overwrites the Mac it came from, and scheduled automations stay there until you press "Run them here".
 
+
+## Hand off a running thread
+
+Move a thread that is running on this Mac to your other Mac, which carries on where it was. Omni stops the turn here, uploads the session and the thread's files, and the other Mac resumes the same session with a note that the last turn was cut off, then sends the messages that were queued for it. This Mac shows the thread read-only while it runs there. The Conductor can do it too (`hand_off_thread`).
+
+- Both Macs need sync on and Omni running. Tailscale is optional: Omni reads `tailscale status` to show whether the other Mac is up, and refuses one Tailscale sees as offline. The handoff itself goes through the relay, so without Tailscale the Mac shows as unknown and picks the thread up when it next syncs. Until then you can cancel, and the thread stays stopped here.
+- What travels: the session, the thread's files, and queued messages (their text, not their attachments).
+- A worktree thread also takes its branch's commits that are on no remote, and its uncommitted and untracked files, which arrive uncommitted. Files `.gitignore` covers stay on each Mac. The other Mac's own worktree for the thread must not have changes of its own, and the whole bundle must fit in 50 MB.
+- A thread in a shared folder (a repo without a worktree per thread, or your workspace) runs in that folder on the other Mac. Uncommitted changes in it stay on this Mac; the other Mac's agent is told so.
+- Claude Code and Hermes threads can always go. Codex and Cursor threads can go once they have reported their session, after their first reply.
+- If the other Mac cannot pick it up, or you cancel, the thread stays stopped here with its queued messages waiting for Resume, and the banner says why.
