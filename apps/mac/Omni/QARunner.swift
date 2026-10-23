@@ -156,6 +156,10 @@ final class QARunner {
         case .handoffMenu(let name):
           try await handoffMenu(shot: name)
           result.files = [name + ".png"]
+        case .handOff(let device):
+          guard let handOff = QAHandoffProbe.handOff else { throw QAScriptError("no thread that can be handed off on screen") }
+          await handOff(device)
+          try? await Task.sleep(for: .milliseconds(600))
         case .scroll(let scroll):
           result.note = try await self.scroll(scroll)
         case .expand:
@@ -461,6 +465,7 @@ final class QARunner {
     case .folder(let action): "folder \(action)"
     case .screen(let name): "screen \(name)"
     case .handoffMenu(let name): "handoffMenu \(name)"
+    case .handOff(let device): "handOff \(device)"
     case .palette(let query): "palette \(query ?? "close")"
     case .quickPrompt(let action): "quickPrompt \(action)"
     case .quit: "quit"

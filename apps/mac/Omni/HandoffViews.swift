@@ -57,7 +57,11 @@ struct HandOffButton: View {
         .accessibilityLabel("Hand off to another Mac")
         #if DEBUG
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { QAHandoffProbe.button = $0 }
-        .onDisappear { QAHandoffProbe.button = nil }
+        .onAppear { QAHandoffProbe.handOff = { [store] in await store.handOff(to: $0) } }
+        .onDisappear {
+          QAHandoffProbe.button = nil
+          QAHandoffProbe.handOff = nil
+        }
         #endif
       }
     }
@@ -73,10 +77,11 @@ struct HandOffButton: View {
 }
 
 #if DEBUG
-/// Where the header's Hand Off button is, for the QA harness to click it.
+/// Where the header's Hand Off button is, for the QA harness to click it, and the pick its menu makes.
 @MainActor
 enum QAHandoffProbe {
   static var button: CGRect?
+  static var handOff: ((String) async -> Void)?
 }
 #endif
 

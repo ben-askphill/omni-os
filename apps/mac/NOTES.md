@@ -470,6 +470,7 @@ Steps (a list, or an object with the list under `steps`):
 | `{"screen": "name"}` | The main window with the app's windows over it (a sheet, a menu) drawn in place |
 | `{"quickPrompt": "text"}`, `{"quickPrompt": {"send": true}}`, `{"quickPrompt": false}` | Opens the Quick Prompt with this text (Wispr Flow off), sends it, or closes it |
 | `{"handoffMenu": "name"}` | Clicks the open thread's Hand Off button and writes `name.png` while its menu is open |
+| `{"handOff": "<device id>"}` | Hands the open thread to that Mac, as picking it in Hand Off to does |
 | `{"quit": true}` | Writes the report and exits |
 
 `qa.json` is written after every step: `{ok, error, steps: [{step, action, ok, ms, error, files}], facts: {serverState, connection, sidebarLoaded, channels, route, windows}}`. A failed wait says what the server, feed and sidebar were.
