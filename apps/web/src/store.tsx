@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api, openSSE, errorText, taskHost, type BackgroundTask, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type ModStatus, type NeedsYou, type Profile, type Status, type Thread, type ThreadStub } from './api.ts';
 import { coalesced, withoutResult } from './needs-you.ts';
 import { withPin, type PinnedThread } from './pins.ts';
+import { pageTitle, type Route } from './router.ts';
+import { createSyncNudge } from './sync-nudge.ts';
 
 interface AppState {
   channels: ChannelWithRunning[];
@@ -326,4 +328,40 @@ export function useNow(ms = 30_000) {
     return () => clearInterval(t);
   }, [ms]);
   return now;
+}
+
+/** The window title: the page's name, or the one given, then Omni. */
+export function usePageTitle(route: Route, name?: string) {
+  const { channel } = useApp();
+  useEffect(() => {
+    const t = name ?? pageTitle(route, (id) => channel(id)?.name);
+    document.title = t === 'Home' ? 'Omni' : `${t} · Omni`;
+  }, [route, channel, name]);
+}
+
+/** Back on the tab: ask the server to sync, so the other Mac's work shows up now rather than on its timer. */
+export function useSyncOnReturn() {
+  useEffect(() => {
+    const sync = createSyncNudge({ post: () => api.post('/sync/now') });
+    const onFocus = () => sync.nudge();
+    const onVisible = () => document.visibilityState === 'visible' && sync.nudge();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+      sync.cancel();
+    };
+  }, []);
+}
+
+/** True while the tab is on screen. */
+export function usePageVisible() {
+  const [visible, setVisible] = useState(() => document.visibilityState === 'visible');
+  useEffect(() => {
+    const on = () => setVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', on);
+    return () => document.removeEventListener('visibilitychange', on);
+  }, []);
+  return visible;
 }

@@ -19,21 +19,10 @@ import { shownResult } from '../needs-you.ts';
 import { reportNotes } from '../requests.ts';
 import { canSteer } from '../steer.ts';
 import { teamOf } from '../transcript/delegation.ts';
-import { readPref, useApp, useIsMobile, writePref } from '../store.tsx';
+import { readPref, useApp, usePageVisible, writePref } from '../store.tsx';
 import { useThreadInterruptKey } from './useThreadInterruptKey.ts';
 import { useThreadSession } from './useThreadSession.ts';
 import { useTranscriptScroll } from './useTranscriptScroll.ts';
-
-/** True while the tab is on screen. */
-function usePageVisible() {
-  const [visible, setVisible] = useState(() => document.visibilityState === 'visible');
-  useEffect(() => {
-    const on = () => setVisible(document.visibilityState === 'visible');
-    document.addEventListener('visibilitychange', on);
-    return () => document.removeEventListener('visibilitychange', on);
-  }, []);
-  return visible;
-}
 
 // xterm.js is large; load it the first time the tab opens.
 const TerminalView = lazy(() => import('../components/TerminalView.tsx').then((m) => ({ default: m.TerminalView })));
@@ -56,7 +45,6 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
 export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifact?: number }) {
   const { setOpenThread, mods, reloadChannels, needsYou, readResult, setPinned } = useApp();
   const modLines = useMemo(() => mods.filter((m) => m.thread_id === id), [mods, id]);
-  const isMobile = useIsMobile();
   // GET /api/harnesses, the same list the reply pills load. Until it arrives, canSteer uses the Cursor fallback.
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   const {
@@ -98,7 +86,6 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
   const members = useMemo(() => teamOf(children), [children]);
   const reports = useMemo(() => reportNotes(queued), [queued]);
   const [panelOpen, setPanelOpen] = useState<boolean>(() => readPref('threadPanel', true));
-  const [mobilePanel, setMobilePanel] = useState(!!artifactParam);
   const [panelWidth, setPanelWidth] = useState<number | null>(() => {
     const v = readPref<unknown>('threadPanelWidth', null);
     return typeof v === 'number' && Number.isFinite(v) ? v : null;
@@ -113,7 +100,6 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
       setSelected(artifactParam);
       setPanelTab('artifacts');
       setPanelOpen(true);
-      setMobilePanel(true);
     }
   }, [artifactParam, setSelected, setPanelTab]);
 
@@ -131,30 +117,16 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     if (shown && visible) readResult(shown);
   }, [shown, visible, readResult]);
 
-  // The mobile sheet only exists on mobile; a desktop ?artifact= link sets mobilePanel too.
-  const sheetOpen = isMobile && mobilePanel;
-  useThreadInterruptKey({ slotBusy, interrupting, sheetOpen, interrupt });
+  useThreadInterruptKey({ slotBusy, interrupting, interrupt });
 
-  // Escape closes the mobile sheet, unless a modal (lightbox, full-screen artifact) is on top.
-  useEffect(() => {
-    if (!sheetOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      // Esc in the terminal is for the shell (vim, less).
-      if (e.target instanceof HTMLElement && e.target.closest('.xterm')) return;
-      if (e.key === 'Escape' && !document.querySelector('[aria-modal="true"]:not([data-sheet])')) setMobilePanel(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [sheetOpen]);
-
-  // Open the panel when a new HTML artifact lands on desktop.
+  // Open the panel when a new HTML artifact lands.
   const prevFiles = useRef(0);
   useEffect(() => {
-    if (ready && files.length > prevFiles.current && prevFiles.current > 0 && !isMobile && files[files.length - 1]?.kind === 'html') {
+    if (ready && files.length > prevFiles.current && prevFiles.current > 0 && files[files.length - 1]?.kind === 'html') {
       setPanelOpen(true);
     }
     prevFiles.current = files.length;
-  }, [files, ready, isMobile]);
+  }, [files, ready]);
 
   // Track the thread view width so a wide panel never squeezes the transcript below THREAD_MIN.
   useLayoutEffect(() => {
@@ -231,14 +203,11 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     }
   };
 
-  const togglePanel = () => {
-    if (isMobile) setMobilePanel((v) => !v);
-    else
-      setPanelOpen((v) => {
-        writePref('threadPanel', !v);
-        return !v;
-      });
-  };
+  const togglePanel = () =>
+    setPanelOpen((v) => {
+      writePref('threadPanel', !v);
+      return !v;
+    });
 
   const panel = (
     <div className="flex h-full min-h-0 flex-col">
@@ -350,7 +319,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
               </Button>
             )}
             <span className="relative">
-              <IconButton icon="panel" label="Artifacts, changes, browser, terminal, details" active={isMobile ? mobilePanel : panelOpen} onClick={togglePanel} />
+              <IconButton icon="panel" label="Artifacts, changes, browser, terminal, details" active={panelOpen} onClick={togglePanel} />
               {artifactCount > 0 && (
                 <span className="pointer-events-none absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-fg px-1 font-num text-[9.5px] text-on-ink">{artifactCount}</span>
               )}
@@ -433,8 +402,8 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
         </div>
       </div>
 
-      {/* desktop panel */}
-      {!isMobile && panelOpen && (
+      {/* panel */}
+      {panelOpen && (
         <aside className="relative shrink-0 py-2 pr-2" style={{ width: shownPanelWidth }}>
           <PanelResizeHandle
             width={shownPanelWidth}
@@ -450,17 +419,6 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
           />
           <div className="panel-in h-full overflow-hidden rounded-[18px] bg-surface">{panel}</div>
         </aside>
-      )}
-
-      {/* mobile sheet */}
-      {isMobile && mobilePanel && (
-        <div className="fixed inset-0 z-30" role="dialog" aria-modal="true" aria-label="Thread panel" data-sheet>
-          <div className="scrim absolute inset-0" onClick={() => setMobilePanel(false)} />
-          <div className="sheet-in absolute inset-x-0 top-[calc(env(safe-area-inset-top)+12px)] bottom-0 flex flex-col overflow-hidden rounded-t-[28px] bg-surface pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-menu)]">
-            <div className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-line-strong" />
-            {panel}
-          </div>
-        </div>
       )}
     </div>
   );

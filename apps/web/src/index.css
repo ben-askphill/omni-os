@@ -29,7 +29,8 @@
   --live: light-dark(#2b3bff, #7280ff);
   --live-text: var(--live);
   --on-live: light-dark(#ffffff, #101114);
-  --needs: #ff4420;
+  --vermilion: #ff4420;
+  --needs: var(--vermilion);
   --on-needs: var(--ink);
   --done: #c6f52b;
   --on-done: var(--ink);
@@ -1030,7 +1031,6 @@
     opacity: 1;
   }
 }
-.sheet-in,
 .modal-in {
   animation: omni-sheet 0.42s var(--ease-out);
 }
@@ -1047,15 +1047,6 @@
 .scrim {
   background: var(--scrim);
   animation: omni-scrim 0.24s var(--ease-out);
-}
-@keyframes omni-drawer {
-  from {
-    transform: translateX(-24px);
-    opacity: 0;
-  }
-}
-.drawer-in {
-  animation: omni-drawer 0.36s var(--ease-out);
 }
 @keyframes omni-panel {
   from {
@@ -1154,4 +1145,69 @@ body.col-resizing {
 }
 body.col-resizing iframe {
   pointer-events: none;
+}
+
+/* ---- the phone layout (apps/web/src/mobile): the Omni mobile design system's motion and touch states ---- */
+@layer components {
+  .mo-scroll {
+    scrollbar-width: none;
+    overscroll-behavior: contain;
+  }
+  .mo-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .mo-press {
+    transition: transform 220ms var(--ease-settle);
+  }
+  .mo-press:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+  .mo-row {
+    border-radius: 14px;
+  }
+  .mo-row:active {
+    background: var(--wash);
+  }
+}
+/* The shell scrolls only inside its screens: no rubber band on the page itself. */
+html:has(.mo-app),
+html:has(.mo-app) body {
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+@keyframes mo-push {
+  from {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes mo-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes mo-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes mo-toast {
+  from {
+    transform: translate(-50%, 12px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
 }

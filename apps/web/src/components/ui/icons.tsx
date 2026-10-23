@@ -69,6 +69,8 @@ const PATHS = {
   foldAll: 'm7 20 5-5 5 5M7 4l5 5 5-5',
   unfoldAll: 'm7 15 5 5 5-5M7 9l5-5 5 5',
   pin: 'M9 4h6M10 4v5.5L7 13v2h10v-2l-3-3.5V4M12 15v6',
+  mic: 'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3',
+  share: 'M12 15V3M7 8l5-5 5 5M5 13v7h14v-7',
 } as const;
 
 export type IconName = keyof typeof PATHS;

@@ -7,16 +7,14 @@ import { useEffect } from 'react';
 export function useThreadInterruptKey({
   slotBusy,
   interrupting,
-  sheetOpen,
   interrupt,
 }: {
   slotBusy: boolean;
   interrupting: boolean;
-  sheetOpen: boolean;
   interrupt: () => void;
 }) {
   useEffect(() => {
-    if (!slotBusy || interrupting || sheetOpen) return;
+    if (!slotBusy || interrupting) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.repeat || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
@@ -30,5 +28,5 @@ export function useThreadInterruptKey({
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [slotBusy, interrupting, sheetOpen, interrupt]);
+  }, [slotBusy, interrupting, interrupt]);
 }
