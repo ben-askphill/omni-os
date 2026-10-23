@@ -90,7 +90,8 @@ server.registerTool(
     description:
       'Hand a task to a crew role in a channel. Creates a new thread that runs in the background. ' +
       'Its final reply is reported back to you automatically as a [crew report] message; do not poll for it. ' +
-      'Without a harness/model/effort it uses the role\'s defaults. Use list_harnesses for valid ids.',
+      'Without a harness/model/effort it uses the role\'s defaults, and with none set anywhere, Auto: Omni reads the brief and ' +
+      'picks the harness, model and effort for it, and the result says why in auto_reason. Use list_harnesses for valid ids.',
     inputSchema: {
       channel: z.string().describe('Channel id, e.g. "acme". Use list_channels.'),
       role: z.string().describe('Crew role id, e.g. "researcher". Use list_crew.'),
@@ -98,7 +99,10 @@ server.registerTool(
       task_id: z.string().optional().describe('Short id like T-12 to match the report. Generated if omitted.'),
       title: z.string().optional(),
       harness: z.string().optional().describe('Override the role default harness: claude-code, codex, cursor or hermes. Use list_harnesses.'),
-      model: z.string().optional().describe('Any catalog model id, or a Claude alias (opus, sonnet, haiku, fable). Use list_harnesses.'),
+      model: z
+        .string()
+        .optional()
+        .describe('Any catalog model id, a Claude alias (opus, sonnet, haiku, fable), or "auto" (with no harness) to let Omni pick for this brief. Use list_harnesses.'),
       effort: z.string().optional().describe('Reasoning effort supported by the model, e.g. high. Use list_harnesses.'),
       folder: z.string().optional().describe('Sidebar folder in the channel to file the thread in, by name or id. Use list_channels. It must exist unless create_folder is true.'),
       create_folder: z.boolean().optional().describe(`Create \`folder\` when the channel has none by that name. Only when ${USER} asked for the folder or agreed to it.`),
@@ -110,7 +114,7 @@ server.registerTool(
       method: 'POST',
       body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, folder, parent_id: SELF, source: 'conductor' }),
     });
-    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, status: t.status, branch: t.branch });
+    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch });
   },
 );
 
@@ -183,7 +187,11 @@ server.registerTool(
 
 server.registerTool(
   'list_harnesses',
-  { description: 'List the agent harnesses (Claude Code, Codex, Cursor, Hermes) with their availability, fix command, models and effort levels, so you can pass valid ids to delegate.' },
+  {
+    description:
+      'List the agent harnesses (Claude Code, Codex, Cursor, Hermes) with their availability, fix command, models and effort levels, so you can pass valid ids to delegate. ' +
+      'Model "auto" is not listed: it is Omni picking among these per brief.',
+  },
   async () => {
     const list = await call('/harnesses');
     return text(

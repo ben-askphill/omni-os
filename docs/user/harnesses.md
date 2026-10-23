@@ -1,10 +1,10 @@
 # Harnesses
 
-A harness is the agent CLI a thread runs on. Pick one per channel (its default) or per thread in the model picker. Each runs through its official CLI and bills the plan it is signed in to.
+A harness is the agent CLI a thread runs on. Pick one per channel (its default) or per thread in the model picker, or leave it to [Auto](#auto). Each runs through its official CLI and bills the plan it is signed in to.
 
 | Harness | Bills | Install and sign in | Runs as |
 | --- | --- | --- | --- |
-| Claude Code (default) | Claude plan | `npm install -g @anthropic-ai/claude-code`, then `claude` and `/login` | `claude -p` with stream-json |
+| Claude Code | Claude plan | `npm install -g @anthropic-ai/claude-code`, then `claude` and `/login` | `claude -p` with stream-json |
 | Codex | ChatGPT plan | `npm install -g @openai/codex && codex login` | `codex app-server` ([ADR 0001](../adr/0001-codex-app-server.md)) |
 | Cursor Agent | Cursor plan | `curl https://cursor.com/install -fsS \| bash && cursor-agent login` | `cursor-agent` |
 | Hermes | Anthropic API | On your own Linux server, see [below](#hermes-remote) | HTTP over Tailscale ([ADR 0003](../adr/0003-hermes-remote-harness.md)) |
@@ -13,6 +13,16 @@ A harness is the agent CLI a thread runs on. Pick one per channel (its default) 
 - The usage meter is per harness: Claude's rate-limit events drive the 5h / 7d meter, Codex reports its own, Cursor reports none.
 - Each harness has its own concurrency cap (4 by default): `OMNI_MAX_CONCURRENT` (Claude Code), `OMNI_MAX_CONCURRENT_CODEX`, `OMNI_MAX_CONCURRENT_CURSOR`, `OMNI_MAX_CONCURRENT_HERMES`. A full harness never holds up threads on another.
 - Some features are Claude Code only: published artifact cards and [mods](mods.md).
+
+## Auto
+
+Auto is the first entry in the model picker and the default for a new thread. Omni reads the first prompt and picks the harness, model and effort for it. The thread's model pill then reads "Auto · <model>", and hovering it shows why, for example "Hard code task: Opus 5.5, high effort". Once picked, the run is fixed for the thread like any other.
+
+- It sorts the prompt into a kind (code, math, research, writing, ops, quick) and scores how much it asks: its length, the code it names, and cues such as a migration, a race, a typo or a lookup. Light work runs on Haiku, standard on Sonnet, hard on Opus at high effort, the hardest on Opus at xhigh. Code and math never start below Sonnet.
+- It stays on Claude Code unless the Claude plan's 5h or 7d window is 90% used and Codex has room; then it moves the thread to Codex's default model. Store and admin (ops) work always stays on Claude Code.
+- It never picks Cursor Agent or Hermes: both bill outside your Claude and ChatGPT plans.
+- A model picked on the thread, a crew role's or a channel's default all win over Auto. Set a channel's default to Auto in its settings, or `model: auto` in a crew role's frontmatter.
+- How well it picks, and how to check that again: [Auto routing](../internals/auto-routing.md).
 
 ## Hermes (remote)
 

@@ -77,6 +77,10 @@ _Avoid_: Provider
 How hard the **Model** reasons on each step, picked from the levels that model supports in its harness.
 _Avoid_: Thinking, reasoning level
 
+**Auto**:
+The model picker's default: Omni reads a new thread's first prompt and picks its **Harness**, **Model** and **Effort**, among Claude Code and Codex only, and keeps one line saying why (`auto_reason`). Cursor Agent has a model of its own called `auto`; that one stays Cursor's.
+_Avoid_: Router, smart model
+
 **Session**:
 The harness's own record of a thread's conversation, which Omni resumes on every follow-up.
 _Avoid_: Codex "thread", Cursor "chat" (their names for the same thing)
@@ -112,10 +116,10 @@ _Avoid_: Frontend, dashboard
 - A **Thread** runs on one **Harness** and one **Model**, and has one **Session** in that harness
 - A **Harness** offers many **Models**; the same model family can appear in several harnesses (Claude Opus runs in Claude Code and in Cursor Agent)
 - A Hermes **Thread** runs on the Hermes server, reached over Tailscale. The API listens on the server's tailnet address and is not public. The thread has no Omni worktree, browser profile or artifacts directory. Its **Session** id is `omni-<thread id>`. Artifacts come back as links or text
-- The user picks the **Harness** per thread; Omni never switches it on its own
+- The user picks the **Harness** per thread, or leaves it to **Auto**; Omni never switches a thread's harness once it is set
 - A thread's **Harness**, **Model** and **Effort** are fixed once it starts; carrying work to another harness means starting a new thread
-- A **Crew role** or **Automation** can set a default **Harness**, **Model** and **Effort**; a choice made on the thread wins, and Claude Code is the fallback
-- The **Conductor** delegates on the crew role's default **Harness** unless the user names another one
+- A **Crew role**, **Channel** or **Automation** can set a default **Harness**, **Model** and **Effort**, or **Auto**; a choice made on the thread wins, and **Auto** is the fallback
+- The **Conductor** delegates on the crew role's defaults, which for most roles is **Auto**, unless the user names a harness or model
 - A **Harness** offers many **Harness commands**; a thread's `/` menu lists its own **Harness**'s **Harness commands** plus the **Omni commands**
 - An **Omni command** behaves the same on every **Harness**; `/clear` starts a new **Thread** rather than wiping the **Session**
 - A message starts with at most one **Slash command** and can carry many **Mentions**; built-ins, MCP prompts and **Omni commands** only work at the start
