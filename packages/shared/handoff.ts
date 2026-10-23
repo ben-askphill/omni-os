@@ -110,6 +110,7 @@ export function handoffText(h: Pick<HandoffView, 'from' | 'to' | 'outgoing' | 's
   const other = h.outgoing ? h.to.name : h.from.name;
   switch (s.phase) {
     case 'preparing':
+      if (!h.outgoing) return `${other} is handing this thread to this Mac.`;
       return `Handing off to ${h.to.name}: ${{ stopping: 'stopping the turn here', uploading: 'uploading the session', packing: 'packing the worktree' }[s.step]}.`;
     case 'offered':
       if (!h.outgoing) return `Picking this thread up from ${other}.`;
