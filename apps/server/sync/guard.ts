@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path';
 import { paths, threadDir } from '../config.ts';
 import { channels, outbox, threads, type Thread } from '../db.ts';
 import { restoreWorktree } from '../sandbox.ts';
+import { deviceName } from './devices.ts';
 
 // Whether this machine may start a turn in a thread: its worktree is ready, and for a synced thread, it runs here.
 
@@ -44,7 +45,7 @@ export function turnBlocked(t: Thread, here = false): string | null {
   // A worktree thread runs only in its own worktree, once Omni has made and checked it (apps/server/runner/setup.ts).
   if (t.setup === 'preparing') return "Omni is still preparing this thread's worktree.";
   if (t.setup === 'failed') return `This thread's worktree could not be prepared: ${(t.setup_error ?? 'unknown error').replace(/\.?$/, '.')} Retry to try again.`;
-  if (!here && runningElsewhere(t)) return 'This thread is running on your other Mac. Wait for it to finish there, or reply there.';
+  if (!here && runningElsewhere(t)) return `This thread is running on ${deviceName(threads.runMachine(t.id)!) ?? 'your other Mac'}.`;
   if (!outbox.machineId() || existsSync(t.cwd) || rebuildable(t)) return null;
   return `This thread's folder is not on this Mac: ${t.cwd}. Continue it on the Mac that has it, or map the folder to one here in sync.path_map.`;
 }

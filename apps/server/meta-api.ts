@@ -1,4 +1,4 @@
-// /api/crew, /harnesses, /secrets, /automations, /profile.
+// /api/crew, /harnesses, /secrets, /automations, /profile, /devices.
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { lastRuns, loadAutomations, runAutomation, setEnabled } from './automations.ts';
@@ -10,6 +10,7 @@ import { HARNESS_INSTALL } from './harness/types.ts';
 import { runningByHarness } from './runner.ts';
 import { getProfile, profileInput, setProfile } from './profile.ts';
 import { deleteSecret, listSecrets, setSecret } from './secrets.ts';
+import { listDevices } from './sync/devices.ts';
 
 export const metaApi = new Hono();
 
@@ -30,6 +31,9 @@ metaApi.get('/harnesses', async (c) => {
   const running = runningByHarness();
   return c.json(cat.harnesses.map((h) => ({ ...h, running: running[h.id] ?? 0, ...(!h.available && HARNESS_INSTALL[h.id] && { install: HARNESS_INSTALL[h.id] }) })));
 });
+
+/** The other synced Macs a thread can be handed to, with whether Tailscale sees each up. Empty while sync is off. */
+metaApi.get('/devices', async (c) => c.json(await listDevices()));
 
 metaApi.get('/secrets', (c) => c.json(listSecrets()));
 metaApi.post('/secrets', async (c) => {

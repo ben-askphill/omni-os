@@ -6,6 +6,11 @@ export const kv = {
     const row = db.prepare('SELECT value FROM kv WHERE key = ?').get(key) as { value: string } | undefined;
     return row ? (JSON.parse(row.value) as T) : undefined;
   },
+  /** Every key that starts with prefix, with its value, in key order. */
+  list: <T>(prefix: string): [string, T][] =>
+    (db.prepare('SELECT key, value FROM kv WHERE substr(key, 1, ?) = ? ORDER BY key').all(prefix.length, prefix) as { key: string; value: string }[]).map(
+      (r) => [r.key, JSON.parse(r.value) as T],
+    ),
   set: (key: string, value: unknown) =>
     tx(() => {
       const res = db
