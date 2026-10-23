@@ -20,6 +20,13 @@ export function resetLabel(iso: string, now = Date.now()): string {
 
 export type LimitAction = 'schedule' | 'cancel' | 'resume';
 
+/** Each action's button and its route under /threads/:id/limit/. */
+export const LIMIT_ACTION: Record<LimitAction, { label: string; icon: 'clock' | 'play' | 'x'; path: string }> = {
+  schedule: { label: 'Resume at reset', icon: 'clock', path: 'schedule' },
+  cancel: { label: 'Cancel', icon: 'x', path: 'cancel' },
+  resume: { label: 'Resume now', icon: 'play', path: 'resume' },
+};
+
 export interface LimitView {
   title: string;
   body: string;

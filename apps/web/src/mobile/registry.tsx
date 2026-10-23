@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Route } from '../router.ts';
 import { MoHeader, MoScroll, MoTitle } from './parts.tsx';
 import type { ScreenKey } from './screens.ts';
+import { ActivityScreen } from './ActivityScreen.tsx';
 import { useShell, type ShellSheet } from './shell.tsx';
 
 function Placeholder({ title, root }: { title: string; root?: boolean }) {
@@ -16,7 +17,7 @@ function Placeholder({ title, root }: { title: string; root?: boolean }) {
 }
 
 export const RENDER: Record<ScreenKey, (r: Route) => ReactNode> = {
-  activity: () => <Placeholder title="Activity" root />,
+  activity: () => <ActivityScreen />,
   channels: () => <Placeholder title="Channels" root />,
   library: () => <Placeholder title="Library" root />,
   channel: () => <Placeholder title="Channel" />,

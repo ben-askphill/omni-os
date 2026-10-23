@@ -1,15 +1,9 @@
 import { useState } from 'react';
 import { api, errorText, type PendingMsg, type Thread } from '../../api.ts';
-import { limitView, type LimitAction } from '../../limits.ts';
+import { LIMIT_ACTION as ACTION, limitView, type LimitAction } from '../../limits.ts';
 import { useNow } from '../../store.tsx';
 import { harnessLabel } from '../brand.tsx';
 import { Button, ErrorNote, Icon } from '../ui.tsx';
-
-const ACTION: Record<LimitAction, { label: string; icon: 'clock' | 'play' | 'x'; path: string }> = {
-  schedule: { label: 'Resume at reset', icon: 'clock', path: 'schedule' },
-  cancel: { label: 'Cancel', icon: 'x', path: 'cancel' },
-  resume: { label: 'Resume now', icon: 'play', path: 'resume' },
-};
 
 /**
  * A turn the harness stopped at the plan's usage limit (apps/server/runner/limits.ts). With the reset time it reported,

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CrewMark, isCrewRole } from '../components/brand.tsx';
 import { Avatar, Icon, StatusDot, type Glyph, type IconName } from '../components/ui.tsx';
+import type { RowItem } from './rows.ts';
 
 /** Safe-area insets: a home-screen app draws under the status bar and the home indicator. */
 export const SAFE_TOP = 'env(safe-area-inset-top)';
@@ -131,23 +132,6 @@ export function MoDiff({ add, del }: { add: number; del: number }) {
 }
 
 /** One thread in a list: Activity, a channel, search. */
-export interface RowItem {
-  id: string;
-  title: string;
-  /** The channel's name, shown as #name. */
-  channel: string;
-  channelId: string;
-  channelIcon?: string | null;
-  role: string | null;
-  /** The thread's status, drawn as its glyph. */
-  status: string;
-  /** Finished: the title drops to fg-2. */
-  settled: boolean;
-  time: string;
-  /** What follows the channel on the second line. */
-  meta: string | null;
-}
-
 export function MoRow({ it, onOpen, last }: { it: RowItem; onOpen: () => void; last?: boolean }) {
   return (
     <button type="button" onClick={onOpen} className="mo-row flex w-full items-center gap-3 px-1 py-2.5 text-left">
