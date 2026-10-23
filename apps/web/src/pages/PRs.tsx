@@ -102,7 +102,8 @@ export function PRList({ channel }: { channel: Channel }) {
   );
 }
 
-function checkTone(state: string) {
+/** A check run's state as a glyph: done, needs (failed) or running. */
+export function checkTone(state: string) {
   if (['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(state)) return 'done';
   if (['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(state)) return 'needs';
   return 'running';

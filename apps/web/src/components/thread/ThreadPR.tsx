@@ -14,32 +14,46 @@ function prBadge(p: PRSummary) {
 }
 
 /**
- * The composer's PR slot: Open PR until the branch has a PR, then that PR and whether it merged.
- * It opens a list of every PR from the branch, and offers Open PR there while none is open.
+ * A thread branch's PR and every PR from it, from GET /threads/:id/pr: again when a turn ends (it may have opened the
+ * PR), and every minute to catch a merge. Undefined until the first answer, and for a thread with no branch. `eager`
+ * also asks once mid-turn, for a screen that has nothing else to show.
  */
-export function ThreadPR({ thread, slotBusy, busy, onOpen }: { thread: Thread; slotBusy: boolean; busy: boolean; onOpen: () => void }) {
-  // undefined until the first answer, so the button does not flash before the PR shows.
+export function useThreadPR(thread: Pick<Thread, 'id' | 'branch'> | null, slotBusy: boolean, eager = false) {
   const [data, setData] = useState<{ pr: PRSummary | null; prs: PRSummary[] } | undefined>(undefined);
-  const [open, setOpen] = useState(false);
-  const wrap = useRef<HTMLDivElement>(null);
+  const id = thread?.branch ? thread.id : null;
   const load = useCallback(async () => {
+    if (!id) return;
     try {
-      const r = await api.get<{ pr: PRSummary | null; prs?: PRSummary[] }>(`/threads/${encodeURIComponent(thread.id)}/pr`);
+      const r = await api.get<{ pr: PRSummary | null; prs?: PRSummary[] }>(`/threads/${encodeURIComponent(id)}/pr`);
       setData({ pr: r.pr, prs: r.prs ?? (r.pr ? [r.pr] : []) });
     } catch {
       setData((prev) => prev ?? { pr: null, prs: [] });
     }
-  }, [thread.id]);
-  // Again when a turn ends (it may have opened the PR), and every minute to catch a merge.
+  }, [id]);
   useEffect(() => {
     if (!slotBusy) void load();
-  }, [load, slotBusy, thread.branch]);
+  }, [load, slotBusy, thread?.branch]);
+  useEffect(() => {
+    if (eager) void load();
+  }, [eager, load]);
   useEffect(() => {
     const tick = setInterval(() => {
       if (document.visibilityState === 'visible') void load();
     }, 60_000);
     return () => clearInterval(tick);
   }, [load]);
+  return data;
+}
+
+/**
+ * The composer's PR slot: Open PR until the branch has a PR, then that PR and whether it merged.
+ * It opens a list of every PR from the branch, and offers Open PR there while none is open.
+ */
+export function ThreadPR({ thread, slotBusy, busy, onOpen }: { thread: Thread; slotBusy: boolean; busy: boolean; onOpen: () => void }) {
+  const data = useThreadPR(thread, slotBusy);
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => !wrap.current?.contains(e.target as Node) && setOpen(false);

@@ -760,6 +760,29 @@ function ThreadRunPills({ thread }: { thread: Thread }) {
 }
 
 /** Follow-up composer pinned under a thread. On a busy thread it steers by default. */
+/**
+ * Sends a reply to a thread. A message keeps its request id until it goes through, so retrying one whose answer was
+ * lost is not delivered twice.
+ */
+export function useReplySend(threadId: string) {
+  // The last send that failed: retrying the same message reuses its request id.
+  const lastRequest = useRef<PendingRequest | null>(null);
+  useEffect(() => {
+    lastRequest.current = null;
+  }, [threadId]);
+  return useCallback(
+    async (prompt: string, mode: SendMode | undefined, files: File[]) => {
+      const request = requestIdFor(lastRequest.current, sendKey(prompt, mode, files));
+      lastRequest.current = request;
+      const body = { prompt, ...(mode && { mode }), request_id: request.id };
+      const t = await api.send<Thread>(`/threads/${encodeURIComponent(threadId)}/messages`, body, files);
+      lastRequest.current = null;
+      return t;
+    },
+    [threadId],
+  );
+}
+
 export function ReplyComposer({
   thread,
   canSteer = true,
@@ -782,12 +805,10 @@ export function ReplyComposer({
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const att = useAttachments();
-  // The last send that failed: retrying the same message reuses its request id.
-  const lastRequest = useRef<PendingRequest | null>(null);
+  const sendReply = useReplySend(threadId);
   useAutosize(ref, text, 240);
 
   useEffect(() => {
-    lastRequest.current = null;
     setText(drafts.get(key) ?? '');
     setError(null);
     att.clear();
@@ -818,12 +839,8 @@ export function ReplyComposer({
     if (!prompt || busy) return;
     setBusy(true);
     setError(null);
-    const request = requestIdFor(lastRequest.current, sendKey(prompt, mode, att.files));
-    lastRequest.current = request;
     try {
-      const body = { prompt, ...(mode && { mode }), request_id: request.id };
-      const t = await api.send<Thread>(`/threads/${encodeURIComponent(threadId)}/messages`, body, att.files);
-      lastRequest.current = null;
+      const t = await sendReply(prompt, mode, att.files);
       // Keep anything typed while the send was in flight.
       if (drafts.get(key) === raw) drafts.delete(key);
       if (latest.current === raw) setText('');

@@ -40,9 +40,10 @@ const exitLine = (code: number | null) => `\r\n\x1b[2m[process exited${code != n
 
 /**
  * The thread's shell, in its working directory. The shell lives on the server: switching tabs or
- * reloading reattaches to it and replays its recent output.
+ * reloading reattaches to it and replays its recent output. `readOnly` (the phone) only watches: no keys, and it
+ * keeps the shell's own size instead of reflowing it to a phone's width, scrolling sideways when it is wider.
  */
-export function TerminalView({ threadId, cwd }: { threadId: string; cwd: string }) {
+export function TerminalView({ threadId, cwd, readOnly }: { threadId: string; cwd: string; readOnly?: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<{ running: boolean; code: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,9 +56,10 @@ export function TerminalView({ threadId, cwd }: { threadId: string; cwd: string 
     const term = new Terminal({
       theme: THEME,
       fontFamily: '"SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
-      fontSize: 12,
+      fontSize: readOnly ? 11 : 12,
       lineHeight: 1.2,
-      cursorBlink: true,
+      cursorBlink: !readOnly,
+      disableStdin: readOnly,
       scrollback: 5000,
       allowProposedApi: false,
       macOptionIsMeta: true,
@@ -65,14 +67,46 @@ export function TerminalView({ threadId, cwd }: { threadId: string; cwd: string 
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(el);
+    const base = `/threads/${encodeURIComponent(threadId)}/terminal`;
+    let closed = false;
+
+    if (readOnly) {
+      const sse = openSSE(
+        () => `/api${base}/stream`,
+        (d) => {
+          const m = d as TerminalMessage & { cols?: number; rows?: number };
+          if (m.kind === 'snapshot') {
+            term.reset();
+            term.write(m.data);
+            if (!m.running) term.write(exitLine(m.code));
+            setState({ running: m.running, code: m.code });
+            setError(null);
+          } else if (m.kind === 'data') term.write(m.data);
+          else if (m.kind === 'exit') {
+            setState({ running: false, code: m.code });
+            term.write(exitLine(m.code));
+          }
+        },
+        { onDown: () => setError('Terminal disconnected. Reconnecting.') },
+      );
+      void api
+        .get<{ open: boolean; cols?: number; rows?: number }>(base)
+        .then((info) => {
+          if (!closed && info.cols && info.rows) term.resize(info.cols, info.rows);
+        })
+        .catch(() => {});
+      return () => {
+        closed = true;
+        sse.close();
+        term.dispose();
+      };
+    }
+
     try {
       fit.fit();
     } catch {
       // Not laid out yet; the observer below fits it.
     }
-
-    const base = `/threads/${encodeURIComponent(threadId)}/terminal`;
-    let closed = false;
 
     // Keystrokes go out in order, batched while a request is in flight.
     let pending = '';
@@ -143,7 +177,7 @@ export function TerminalView({ threadId, cwd }: { threadId: string; cwd: string 
       resize.dispose();
       term.dispose();
     };
-  }, [threadId, generation]);
+  }, [threadId, generation, readOnly]);
 
   const restart = async () => {
     setError(null);
@@ -164,6 +198,17 @@ export function TerminalView({ threadId, cwd }: { threadId: string; cwd: string 
   };
 
   const exited = state && !state.running;
+
+  if (readOnly) {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        {error && <ErrorNote className="mb-2">{error}</ErrorNote>}
+        <div className="min-h-0 flex-1 overflow-auto rounded-[20px] bg-[#141518] p-3">
+          <div ref={host} className="inline-block" data-terminal />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col px-2.5 pb-2.5">

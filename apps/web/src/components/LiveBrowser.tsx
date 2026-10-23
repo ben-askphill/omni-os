@@ -178,7 +178,45 @@ export function useChannelBrowser(channelId: string) {
   return { state, hasFrame, frame, draw, error, input, action, restart, copy, opened };
 }
 
-type Browser = ReturnType<typeof useChannelBrowser>;
+export type Browser = ReturnType<typeof useChannelBrowser>;
+
+/** Draws the newest frame on the canvas, full width and top aligned, at `scale` CSS pixels per page pixel. */
+function usePaint(b: Browser, box: RefObject<HTMLDivElement | null>, canvas: RefObject<HTMLCanvasElement | null>) {
+  const scale = useRef(1);
+  const { frame } = b;
+  const paint = useCallback(() => {
+    const c = canvas.current;
+    const el = box.current;
+    const f = frame.current;
+    if (!c || !el) return;
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+      c.width = Math.round(w * dpr);
+      c.height = Math.round(h * dpr);
+    }
+    const ctx = c.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (!f) return;
+    // Full width, top aligned. Once the page follows the panel size, this is 1:1.
+    const s = w / f.width;
+    scale.current = s;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(f.bitmap, 0, 0, f.width * s, f.height * s);
+  }, [frame, box, canvas]);
+
+  useEffect(() => {
+    b.draw.current = paint;
+    paint();
+    return () => {
+      b.draw.current = null;
+    };
+  }, [b.draw, paint]);
+  return { paint, scale };
+}
 
 function Favicon({ tab, loading }: { tab: BrowserTabInfo; loading?: boolean }) {
   const [failed, setFailed] = useState<string | null>(null);
@@ -302,42 +340,9 @@ function Viewport({ b, address }: { b: Browser; address: RefObject<HTMLInputElem
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const down = useRef(0);
-  /** Where the frame is drawn: CSS pixels per page pixel. */
-  const scale = useRef(1);
   const { input, action, frame, copy } = b;
   const running = !!b.state?.running;
-
-  const paint = useCallback(() => {
-    const c = canvas.current;
-    const el = box.current;
-    const f = frame.current;
-    if (!c || !el) return;
-    const w = el.clientWidth;
-    const h = el.clientHeight;
-    const dpr = window.devicePixelRatio || 1;
-    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
-      c.width = Math.round(w * dpr);
-      c.height = Math.round(h * dpr);
-    }
-    const ctx = c.getContext('2d');
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    if (!f) return;
-    // Full width, top aligned. Once the page follows the panel size, this is 1:1.
-    const s = w / f.width;
-    scale.current = s;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(f.bitmap, 0, 0, f.width * s, f.height * s);
-  }, [frame]);
-
-  useEffect(() => {
-    b.draw.current = paint;
-    paint();
-    return () => {
-      b.draw.current = null;
-    };
-  }, [b.draw, paint]);
+  const { paint, scale } = usePaint(b, box, canvas);
 
   // The page follows the panel: report its size (debounced) whenever it changes, when the stream
   // (re)opens, and when this view is used, so with two viewers the one in use wins.
@@ -461,6 +466,33 @@ function Viewport({ b, address }: { b: Browser; address: RefObject<HTMLInputElem
           <span className="flex items-center gap-2">
             <span className="pulse h-1.5 w-1.5 rounded-full bg-fg-4" /> {running ? 'Waiting for the page' : 'Starting the browser'}
           </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The channel browser to watch, on a phone: the frames and nothing else. It sends no input and no size, so the page
+ * keeps the size its viewer on the Mac gave it.
+ */
+export function BrowserWatch({ b }: { b: Browser }) {
+  const box = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const { paint } = usePaint(b, box, canvas);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(paint);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [paint]);
+  return (
+    <div ref={box} className="relative min-h-0 flex-1 overflow-hidden">
+      <canvas ref={canvas} className="absolute inset-0 block h-full w-full select-none" role="img" aria-label={b.state?.title || 'Browser page'} />
+      {!b.hasFrame && (
+        <div className="absolute inset-0 grid place-items-center p-6 text-center text-[13px] text-fg-3">
+          {b.error ?? (b.state?.running ? 'Waiting for the page' : 'Starting the browser')}
         </div>
       )}
     </div>
