@@ -381,6 +381,15 @@ final class QARunner {
     defer { NotificationCenter.default.removeObserver(observer) }
     // Returns once the menu closes.
     window.sendEvent(event)
+    // A button menu opens on the click's release, not its press.
+    if button == .leftMouseDown, !FileManager.default.fileExists(atPath: out.appending(path: shot + ".png").path),
+      let up = NSEvent.mouseEvent(
+        with: .leftMouseUp, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+        windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)
+    {
+      window.sendEvent(up)
+      try? await Task.sleep(for: .milliseconds(1500))
+    }
     if let failure = outcome.failure { throw failure }
     guard FileManager.default.fileExists(atPath: out.appending(path: shot + ".png").path) else {
       throw QAScriptError("no menu opened on \(what)")
