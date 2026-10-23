@@ -57,6 +57,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `BrandPaths.swift` | `BrandPaths`: the Web UI's icon paths (`ui.tsx`), harness logos and wordmark (`brand.tsx`), generated from those files; `BrandPathsTests` keeps them in step |
 | `ContextMeter.swift` | `ContextUsage`, `ContextView`, `ContextMeter` (the math in `packages/shared/context-meter.ts`), `ContextAPI` (`threadContext`, `compactThread` on `OmniClient`), `ContextModel` (one thread's meter and its Compact) |
 | `QuickPrompt.swift` | `QuickPromptShortcut` (the fixed choices and their Carbon key code and modifiers), `QuickPromptSettings` (on, shortcut, Wispr Flow, in UserDefaults), `QuickPromptAPI`, `QuickPromptModel` (text, target channel, phase, `awaitDictation`) |
+| `Handoff.swift` | `Device`, `Reachability`, `HandoffView`, `HandoffPhase`, `PrepareStep`, `HandoffBanner`, `HandoffAnswer`, `DevicesAPI`, `DevicesModel` (`AppModel.devices`), and `devices`, `handOff`, `cancelHandoff` on `OmniClient`. The shapes and text are `packages/shared/handoff.ts`; when to offer it, the picker and the banner follow `apps/web/src/handoff.ts` |
 | `QAScript.swift` | Debug only. `QAScript`, `QAStep`, `QACondition`, `QAFacts`, `QAServer`, `QASnapshot.looksBlank` |
 
 ## Build and test
@@ -468,6 +469,7 @@ Steps (a list, or an object with the list under `steps`):
 | `{"imageZoom": 2}`, `{"imageZoom": "fit"}` | Zooms the artifact image preview to that scale, or back to fit |
 | `{"screen": "name"}` | The main window with the app's windows over it (a sheet, a menu) drawn in place |
 | `{"quickPrompt": "text"}`, `{"quickPrompt": {"send": true}}`, `{"quickPrompt": false}` | Opens the Quick Prompt with this text (Wispr Flow off), sends it, or closes it |
+| `{"handoffMenu": "name"}` | Clicks the open thread's Hand Off button and writes `name.png` while its menu is open |
 | `{"quit": true}` | Writes the report and exits |
 
 `qa.json` is written after every step: `{ok, error, steps: [{step, action, ok, ms, error, files}], facts: {serverState, connection, sidebarLoaded, channels, route, windows}}`. A failed wait says what the server, feed and sidebar were.
@@ -602,3 +604,11 @@ Wired (both composers):
 - The Changes tab has two views: Since base (#207) and This turn. This turn reads GET /api/threads/:id/turns (`apps/server/turns.ts`): a worktree thread's saved turns, newest first, and one turn's diff between the snapshots Omni saved before and after it (hidden refs `refs/omni/turns/<thread>/<turn>/before|after`, rows in the local `turn_snapshots` table). A picker chooses the turn; the header shows HEAD moving during it and says the diff is a before/after snapshot (commits and pulls included, ignored files not saved). A turn still saving polls every 1.5s; a failed save shows its reason, never a failed Result.
 - OmniKit: `TurnChanges`, `TurnView`, `TurnSide`, `TurnState`, `TurnChangesView`, `OmniClient.turns(forThread:turn:)` in `Changes.swift`. Fixtures `turns.json`, `turns-unavailable.json`.
 - QA step: `{"inspector": "turn"}` opens the Changes tab on This turn.
+
+## Hand off to another Mac
+
+- A running thread moves to another synced Mac over synced kv (the shapes in `packages/shared/handoff.ts`). The Mac app offers it in three places, all from `Omni/HandoffViews.swift`: the Hand Off button in the thread header, Hand Off to in the thread's right-click, and Hand Off to in the Thread menu. Each lists GET /api/devices in picker order with Tailscale's reachability under the name; an asleep Mac is disabled.
+- It shows only while `DevicesModel.targets(store)` is non-nil: the thread's store is open, the turn runs here (`ThreadStore.canHandOff`: running or queued, no `blocked`, no handoff under way), sync can carry the offer and there is another Mac. A sidebar row whose thread is not open has no store, so its right-click leaves it out: only the thread's detail says where it runs.
+- The header button refreshes the device list every 30s while the thread could go.
+- `ThreadDetail` and the thread stream's thread message carry `blocked` and `handoff`; the server leaves each out when there is none. `blocked` shows above the reply box as in the Web UI. The handoff is a card at the end of the transcript (`HandoffCard`), with Cancel on the giving Mac while it prepares or is offered, and one quiet line once taken or cancelled. A failed handoff hides once the thread runs again. An offer goes stale on screen 90s after `at` without waiting for the server.
+- A refused handoff or cancel (409 with the server's sentence) shows as `store.actionError` above the reply box, like a failed interrupt.
