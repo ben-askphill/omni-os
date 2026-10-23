@@ -153,6 +153,9 @@ final class QARunner {
         case .screen(let name):
           try await screen(name)
           result.files = [name + ".png"]
+        case .handoffMenu(let name):
+          try await handoffMenu(shot: name)
+          result.files = [name + ".png"]
         case .scroll(let scroll):
           result.note = try await self.scroll(scroll)
         case .expand:
@@ -339,17 +342,27 @@ final class QARunner {
 
   /// Right-clicks the folder's row, shoots the screen while its menu is open, then closes the menu.
   private func menu(on folder: FolderWithThreads, shot: String) async throws(QAScriptError) {
+    guard let frame = QAFolderProbe.frames[folder.id] else { throw QAScriptError("the folder \(folder.name) is not on screen") }
+    try await shootMenu(at: NSPoint(x: frame.minX + 60, y: frame.midY), button: .rightMouseDown, shot: shot, what: folder.name)
+  }
+
+  /// Clicks the thread header's Hand Off button and shoots the screen while its menu is open.
+  private func handoffMenu(shot: String) async throws(QAScriptError) {
+    guard let frame = QAHandoffProbe.button else { throw QAScriptError("no Hand Off button on screen") }
+    try await shootMenu(at: NSPoint(x: frame.midX, y: frame.midY), button: .leftMouseDown, shot: shot, what: "the Hand Off button")
+  }
+
+  /// Clicks `spot` (global, top-left origin) in the main window, shoots the screen once a menu opens, then closes it.
+  private func shootMenu(at spot: NSPoint, button: NSEvent.EventType, shot: String, what: String) async throws(QAScriptError) {
     guard let window = Self.windows.first(where: Self.isMain), let content = window.contentView else {
       throw QAScriptError("no main window")
     }
-    guard let frame = QAFolderProbe.frames[folder.id] else { throw QAScriptError("the folder \(folder.name) is not on screen") }
-    let mid = NSPoint(x: frame.minX + 60, y: frame.midY)
-    let point = content.convert(content.isFlipped ? mid : NSPoint(x: mid.x, y: content.bounds.height - mid.y), to: nil)
+    let point = content.convert(content.isFlipped ? spot : NSPoint(x: spot.x, y: content.bounds.height - spot.y), to: nil)
     guard
       let event = NSEvent.mouseEvent(
-        with: .rightMouseDown, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+        with: button, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
         windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
-    else { throw QAScriptError("can't make the right-click") }
+    else { throw QAScriptError("can't make the click") }
     final class Outcome: @unchecked Sendable { var failure: QAScriptError? }
     let outcome = Outcome()
     let observer = NotificationCenter.default.addObserver(
@@ -370,7 +383,7 @@ final class QARunner {
     window.sendEvent(event)
     if let failure = outcome.failure { throw failure }
     guard FileManager.default.fileExists(atPath: out.appending(path: shot + ".png").path) else {
-      throw QAScriptError("no menu opened on \(folder.name)")
+      throw QAScriptError("no menu opened on \(what)")
     }
   }
 
@@ -438,6 +451,7 @@ final class QARunner {
     case .channel(let action): "channel \(action.rawValue)"
     case .folder(let action): "folder \(action)"
     case .screen(let name): "screen \(name)"
+    case .handoffMenu(let name): "handoffMenu \(name)"
     case .palette(let query): "palette \(query ?? "close")"
     case .quickPrompt(let action): "quickPrompt \(action)"
     case .quit: "quit"

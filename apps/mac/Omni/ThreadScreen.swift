@@ -152,6 +152,7 @@ private struct ThreadHeader: View {
       if ContextMeter.metered.contains(thread.harness) {
         ContextMeterButton(model: model, store: store, thread: thread)
       }
+      HandOffButton(model: model, store: store)
       if !thread.archived {
         let on = thread.pinnedAt != nil
         Button {

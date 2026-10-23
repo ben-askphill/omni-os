@@ -151,6 +151,7 @@ private struct OpenInNewWindow: ViewModifier {
             Button(done ? "Mark as Not Done" : "Mark as Done") { Task { await model.setThreadDone(threadID, !done) } }
           }
           if let stub { MoveToFolderMenu(model: model, thread: stub) }
+          HandOffMenu(model: model, threadID: threadID)
           Button(archived ? "Unarchive Thread" : "Archive Thread") { Task { await model.setThreadArchived(threadID, !archived) } }
         }
       }
