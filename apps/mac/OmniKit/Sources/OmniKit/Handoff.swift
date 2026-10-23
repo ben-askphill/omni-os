@@ -2,7 +2,8 @@ import Foundation
 import Observation
 
 // Handing a running thread to another synced Mac. The shapes and the banner text are packages/shared/handoff.ts;
-// apps/server/tests/mac-fixtures.test.ts holds both clients to the same JSON.
+// apps/server/tests/mac-fixtures.test.ts holds both clients to the same JSON. When to offer it, the picker's rows and
+// the banner per phase follow apps/web/src/handoff.ts.
 
 /// Whether a Mac can take a thread now, as this Mac's Tailscale sees it. `unknown`: no Tailscale here or there to ask.
 public struct Reachability: OpenEnum {
@@ -28,15 +29,22 @@ public struct Device: Decodable, Hashable, Sendable, Identifiable {
   /// `canTake` in handoff.ts: only a Mac Tailscale knows is away is refused.
   public var canTake: Bool { reachability != .offline }
 
-  /// The second line of its row in Hand Off to.
+  /// The second line of its row in Hand Off to, as `deviceRow` in apps/web/src/handoff.ts.
   public func reachabilityLabel(now: Date = .now, calendar: Calendar = Format.localCalendar) -> String {
     switch reachability {
-    case .online: return "Online"
+    case .online: return "Online on Tailscale"
     case .offline:
-      guard let lastSeen else { return "Offline" }
-      let when = Format.relTime(lastSeen, now: now, calendar: calendar)
-      return "Offline, last seen \(when.prefix(1).lowercased() + when.dropFirst())"
+      guard let lastSeen else { return "Asleep or offline" }
+      return "Asleep or offline, last seen \(Format.relTime(lastSeen, now: now, calendar: calendar))"
     default: return "Can't check Tailscale"
+    }
+  }
+
+  /// Online Macs first, then the ones Tailscale cannot vouch for, then the asleep ones; by name within each.
+  public static func picker(_ devices: [Device]) -> [Device] {
+    func rank(_ d: Device) -> Int { d.reachability == .online ? 0 : d.reachability == .offline ? 2 : 1 }
+    return devices.sorted { a, b in
+      rank(a) != rank(b) ? rank(a) < rank(b) : a.name.localizedStandardCompare(b.name) == .orderedAscending
     }
   }
 
@@ -146,6 +154,7 @@ public struct HandoffView: Decodable, Hashable, Sendable {
     let other = outgoing ? to.name : from.name
     switch state {
     case .preparing(let step):
+      if !outgoing { return "\(other) is handing this thread to this Mac." }
       return "Handing off to \(to.name): \(step.doing)."
     case .offered(let stale):
       if !outgoing { return "Picking this thread up from \(other)." }
@@ -163,6 +172,46 @@ public struct HandoffView: Decodable, Hashable, Sendable {
 
   /// The error with one full stop at the end, as `replace(/\.?$/, '.')`.
   private static func sentence(_ s: String) -> String { s.hasSuffix(".") ? s : s + "." }
+}
+
+/// The thread's handoff banner, as `handoffBanner` in apps/web/src/handoff.ts. A card while it is under way or went
+/// wrong, with Cancel on the giving Mac while the other has not taken it; one quiet line once it settled.
+public enum HandoffBanner: Hashable, Sendable {
+  public enum Tone: Hashable, Sendable {
+    /// A card: the giving Mac is preparing, or the taking Mac is picking it up.
+    case working
+    /// A card: the offer is out and the other Mac has not answered yet.
+    case waiting
+    /// A card: the offer went stale or the handoff failed.
+    case alert
+    /// A line: the other Mac took it.
+    case done
+    /// A line: it was called off.
+    case cancelled
+  }
+
+  case card(tone: Tone, text: String, cancel: Bool)
+  case line(tone: Tone, text: String)
+
+  /// Nil once there is nothing to say: no handoff, or a failed one the thread has since moved past (Ben replied and
+  /// it runs again).
+  public init?(_ h: HandoffView?, status: ThreadStatus?, now: Date = .now) {
+    guard let h else { return nil }
+    let text = h.text(now: now)
+    switch h.phase(now: now) {
+    case .preparing:
+      self = .card(tone: .working, text: text, cancel: h.outgoing)
+    case .offered(let stale):
+      self = h.outgoing ? .card(tone: stale ? .alert : .waiting, text: text, cancel: true) : .card(tone: .working, text: text, cancel: false)
+    case .failed:
+      if status?.isActive == true { return nil }
+      self = .card(tone: .alert, text: text, cancel: false)
+    case .accepted:
+      self = .line(tone: .done, text: text)
+    case .cancelled:
+      self = .line(tone: .cancelled, text: text)
+    }
+  }
 }
 
 /// What POST /api/threads/:id/handoff and its cancel answer.
@@ -208,7 +257,7 @@ extension OmniClient: DevicesAPI {
 /// go is on screen: Tailscale's view of the other Mac changes as it sleeps and wakes.
 @MainActor @Observable
 public final class DevicesModel {
-  /// Empty while sync is off or paused here, since an offer could not travel.
+  /// In picker order. Empty while sync cannot carry an offer: signed out, never set up or paused here.
   public private(set) var devices: [Device] = []
 
   @ObservationIgnored private var api: (any DevicesAPI)?
@@ -229,9 +278,9 @@ public final class DevicesModel {
     let load = loads
     do throws(OmniAPIError) {
       let status = try await api.syncStatus()
-      let list = status.configured && status.enabled ? try await api.devices() : []
+      let list = status.configured && status.enabled && !status.signedOut ? try await api.devices() : []
       guard load == loads else { return }
-      devices = list
+      devices = Device.picker(list)
     } catch {
       return
     }

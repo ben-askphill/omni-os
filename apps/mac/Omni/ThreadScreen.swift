@@ -474,6 +474,9 @@ private struct TranscriptRows: View {
       if let t = store.thread, t.limit != nil {
         LimitCard(model: model, store: store, thread: t)
       }
+      if let h = store.handoff {
+        HandoffCard(store: store, handoff: h)
+      }
       if store.pending.contains(where: { !$0.isParked }) {
         QueuedMessagesView(
           store: store, client: model.client, items: store.pending.filter { !$0.isParked }, starting: store.betweenTurns, setup: store.thread?.setup,

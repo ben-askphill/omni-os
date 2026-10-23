@@ -47,14 +47,13 @@ struct HandOffButton: View {
             HandOffItems(store: store, devices: devices)
           }
         } label: {
-          Image(systemName: "laptopcomputer.and.arrow.down")
-            .font(.omni(size: 14))
+          OmniIcon(name: "share", size: 15)
         }
         .menuStyle(.button)
         .buttonStyle(.icon(size: 28))
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Hand off to another Mac")
+        .help("Hand off to another Mac: stop the turn here and keep it running there")
         .accessibilityLabel("Hand off to another Mac")
         #if DEBUG
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { QAHandoffProbe.button = $0 }
@@ -81,39 +80,41 @@ enum QAHandoffProbe {
 }
 #endif
 
-/// The thread's handoff above the reply box: a card with Cancel while it is under way, the error when it failed,
-/// and one quiet line once it is over.
-struct HandoffBanner: View {
+/// Handoff.tsx: the thread's handoff at the end of the transcript, as `HandoffBanner` words it. A card with Cancel on
+/// the giving Mac while it is under way, and one quiet line once it settled.
+struct HandoffCard: View {
   let store: ThreadStore
   let handoff: HandoffView
 
   var body: some View {
-    // An offer goes stale on screen 90 seconds in; the line says so within a few seconds of that.
+    // An offer goes stale on screen 90 seconds in; the card says so within a few seconds of that.
     TimelineView(.periodic(from: .now, by: 5)) { context in
-      let phase = handoff.phase(now: context.date)
-      let text = handoff.text(now: context.date)
-      switch phase {
-      case .preparing, .offered: card(text, stale: phase == .offered(stale: true))
-      case .failed: ErrorNote(text: text)
-      case .accepted, .cancelled: quiet(text)
+      switch HandoffBanner(handoff, status: store.thread?.status, now: context.date) {
+      case .card(let tone, let text, let cancel)?: card(tone, text, cancel: cancel)
+      case .line(let tone, let text)?: line(tone, text)
+      case nil: EmptyView()
       }
     }
   }
 
-  private func card(_ text: String, stale: Bool) -> some View {
-    HStack(alignment: .center, spacing: z(10)) {
-      if stale {
-        OmniIcon(name: "clock", size: 14).foregroundStyle(Tok.needs)
-      } else {
-        Loader(size: 13)
+  private func card(_ tone: HandoffBanner.Tone, _ text: String, cancel: Bool) -> some View {
+    HStack(alignment: .center, spacing: z(12)) {
+      ZStack {
+        Circle().fill(tone == .alert ? Tok.needs.opacity(0.12) : Tok.surface2)
+        if tone == .working {
+          Loader(size: 14)
+        } else {
+          OmniIcon(name: tone == .alert ? "alert" : "clock", size: 15).foregroundStyle(tone == .alert ? Tok.needs : Tok.fg2)
+        }
       }
-      lines(text, tone: Tok.fg2)
-      if handoff.outgoing {
+      .frame(width: z(28), height: z(28))
+      lines(text, size: 13.5, tone: Tok.fg)
+      if cancel {
         Button {
           Task { await store.cancelHandoff() }
         } label: {
           HStack(spacing: z(6)) {
-            if store.handingOff { Loader(size: 12) }
+            if store.handingOff { Loader(size: 12) } else { OmniIcon(name: "x", size: 13) }
             Text("Cancel")
           }
         }
@@ -123,28 +124,32 @@ struct HandoffBanner: View {
       }
     }
     .padding(.horizontal, z(16))
-    .padding(.vertical, z(10))
-    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: z(16), style: .continuous).strokeBorder(Tok.line))
+    .padding(.vertical, z(12))
+    .background(Tok.surface)
+    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Tok.line))
+    .padding(.top, z(8))
     .accessibilityElement(children: .contain)
+    .accessibilityLabel("Handoff")
   }
 
-  private func quiet(_ text: String) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: z(6)) {
-      Image(systemName: "laptopcomputer")
-        .font(.omni(size: 11))
-        .foregroundStyle(Tok.fg3)
-      lines(text, tone: Tok.fg3)
+  private func line(_ tone: HandoffBanner.Tone, _ text: String) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: z(8)) {
+      OmniIcon(name: tone == .done ? "share" : "x", size: 13)
+        .foregroundStyle(Tok.fg4)
+        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 2 }
+      lines(text, size: 12.5, tone: Tok.fg3)
     }
     .padding(.horizontal, z(4))
     .accessibilityElement(children: .combine)
   }
 
-  private func lines(_ text: String, tone: Color) -> some View {
+  private func lines(_ text: String, size: CGFloat, tone: Color) -> some View {
     VStack(alignment: .leading, spacing: z(2)) {
       Text(text)
-        .font(.omni(size: 12.5))
+        .font(.omni(size: size))
         .foregroundStyle(tone)
+        .fixedSize(horizontal: false, vertical: true)
       if let left = handoff.leftBehind {
         Text(left.hasSuffix(".") ? left : left + ".")
           .font(.omni(size: 11.5))

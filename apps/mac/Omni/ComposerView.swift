@@ -166,7 +166,6 @@ private struct ReplyComposerView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: z(8)) {
-      if let h = store.handoff { HandoffBanner(store: store, handoff: h) }
       // The setup card in the transcript says why while the worktree is not ready.
       if let b = store.blocked, thread.setup == nil { ErrorNote(text: b) }
       if let e = store.actionError { ErrorNote(text: e.message) }

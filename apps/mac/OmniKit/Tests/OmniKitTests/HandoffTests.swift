@@ -20,18 +20,19 @@ private func text(_ state: String, outgoing: Bool = true) throws -> String {
   return HandoffView.text(from: v.from, to: v.to, outgoing: v.outgoing, state: v.state)
 }
 
-private func device(_ reachability: String, lastSeen: String? = nil) throws -> Device {
+private func device(_ reachability: String, lastSeen: String? = nil, name: String = "Ben's MacBook Pro") throws -> Device {
   let seen = lastSeen.map { #""\#($0)""# } ?? "null"
   return try decode(
-    Device.self, #"{"id":"m-pro","name":"Ben's MacBook Pro","reachability":"\#(reachability)","dnsName":"pro.tail.ts.net","lastSeen":\#(seen)}"#)
+    Device.self, #"{"id":"\#(name)","name":"\#(name)","reachability":"\#(reachability)","dnsName":"pro.tail.ts.net","lastSeen":\#(seen)}"#)
 }
 
 /// handoffText in packages/shared/handoff.ts, case by case.
 @Suite struct HandoffTextTests {
-  @Test func saysEachPrepareStepFromEitherMac() throws {
+  @Test func saysEachPrepareStepOnTheGivingMac() throws {
     #expect(try text(#"{"phase":"preparing","step":"stopping"}"#) == "Handing off to Ben's MacBook Pro: stopping the turn here.")
     #expect(try text(#"{"phase":"preparing","step":"uploading"}"#) == "Handing off to Ben's MacBook Pro: uploading the session.")
-    #expect(try text(#"{"phase":"preparing","step":"packing"}"#, outgoing: false) == "Handing off to Ben's MacBook Pro: packing the worktree.")
+    #expect(try text(#"{"phase":"preparing","step":"packing"}"#) == "Handing off to Ben's MacBook Pro: packing the worktree.")
+    #expect(try text(#"{"phase":"preparing","step":"packing"}"#, outgoing: false) == "Ben's MacBook Air is handing this thread to this Mac.")
   }
 
   @Test func saysWhoIsWaitingOnWhom() throws {
@@ -121,6 +122,36 @@ private func device(_ reachability: String, lastSeen: String? = nil) throws -> D
   }
 }
 
+/// handoffBanner in apps/web/src/handoff.ts.
+@Suite struct HandoffBannerTests {
+  private func banner(_ state: String, outgoing: Bool = true, status: ThreadStatus = .running) throws -> HandoffBanner? {
+    let v = try view(state, outgoing: outgoing)
+    return HandoffBanner(v, status: status, now: v.at)
+  }
+
+  @Test func aCardWithCancelOnlyOnTheGivingMacWhileTheOtherHasNotTakenIt() throws {
+    #expect(try banner(#"{"phase":"preparing","step":"stopping"}"#) == .card(tone: .working, text: "Handing off to Ben's MacBook Pro: stopping the turn here.", cancel: true))
+    #expect(try banner(#"{"phase":"preparing","step":"stopping"}"#, outgoing: false) == .card(tone: .working, text: "Ben's MacBook Air is handing this thread to this Mac.", cancel: false))
+    #expect(try banner(#"{"phase":"offered","stale":false}"#) == .card(tone: .waiting, text: "Waiting for Ben's MacBook Pro to pick it up.", cancel: true))
+    guard case .card(.alert, _, true)? = try banner(#"{"phase":"offered","stale":true}"#) else { Issue.record("a stale offer alerts"); return }
+    #expect(try banner(#"{"phase":"offered","stale":false}"#, outgoing: false, status: .stopped) == .card(tone: .working, text: "Picking this thread up from Ben's MacBook Air.", cancel: false))
+  }
+
+  @Test func aFailureShowsUntilTheThreadRunsAgain() throws {
+    guard case .card(.alert, _, false)? = try banner(#"{"phase":"failed","error":"x","where":"here"}"#, status: .stopped) else {
+      Issue.record("a failure is an alert card"); return
+    }
+    #expect(try banner(#"{"phase":"failed","error":"x","where":"here"}"#, status: .running) == nil)
+    #expect(try banner(#"{"phase":"failed","error":"x","where":"here"}"#, status: .queued) == nil)
+  }
+
+  @Test func oneQuietLineOnceSettled() throws {
+    #expect(try banner(#"{"phase":"accepted"}"#, status: .stopped) == .line(tone: .done, text: "Running on Ben's MacBook Pro. Handed off from this Mac."))
+    #expect(try banner(#"{"phase":"cancelled"}"#, status: .running) == .line(tone: .cancelled, text: "The handoff to Ben's MacBook Pro was cancelled."))
+    #expect(HandoffBanner(nil, status: .running) == nil)
+  }
+}
+
 @Suite struct DeviceTests {
   @Test func refusesOnlyAMacTailscaleKnowsIsAway() throws {
     #expect(try device("online").canTake)
@@ -133,15 +164,23 @@ private func device(_ reachability: String, lastSeen: String? = nil) throws -> D
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(identifier: "Europe/Amsterdam")!
     let now = try #require(OmniJSON.parseDate("2026-10-23T12:00:00.000Z"))
-    #expect(try device("online").reachabilityLabel(now: now, calendar: calendar) == "Online")
+    #expect(try device("online").reachabilityLabel(now: now, calendar: calendar) == "Online on Tailscale")
     #expect(try device("unknown").reachabilityLabel(now: now, calendar: calendar) == "Can't check Tailscale")
-    #expect(try device("offline").reachabilityLabel(now: now, calendar: calendar) == "Offline")
+    #expect(try device("offline").reachabilityLabel(now: now, calendar: calendar) == "Asleep or offline")
     #expect(
       try device("offline", lastSeen: "2026-10-23T11:40:00.000Z").reachabilityLabel(now: now, calendar: calendar)
-        == "Offline, last seen 20m ago")
+        == "Asleep or offline, last seen 20m ago")
     #expect(
       try device("offline", lastSeen: "2026-10-22T16:05:00.000Z").reachabilityLabel(now: now, calendar: calendar)
-        == "Offline, last seen yesterday 18:05")
+        == "Asleep or offline, last seen Yesterday 18:05")
+  }
+
+  @Test func listsOnlineMacsFirstThenUnknownThenAsleep() throws {
+    let list = try [
+      device("offline", name: "Attic Mini"), device("unknown", name: "Studio"), device("online", name: "Pro"),
+      device("unknown", name: "Air"), device("online", name: "iMac"),
+    ]
+    #expect(Device.picker(list).map(\.name) == ["iMac", "Pro", "Air", "Studio", "Attic Mini"])
   }
 }
 
@@ -169,14 +208,14 @@ private func device(_ reachability: String, lastSeen: String? = nil) throws -> D
 /// GET /api/sync/status and /api/devices, answering with whatever the test set last.
 private final class FakeDevicesAPI: DevicesAPI {
   private struct State {
-    var sync = (configured: true, enabled: true)
+    var sync = (configured: true, enabled: true, signedOut: false)
     var devices: Result<[Device], OmniAPIError> = .success([])
   }
   private let state = Mutex(State())
 
-  func set(configured: Bool = true, enabled: Bool = true, devices: Result<[Device], OmniAPIError>) {
+  func set(configured: Bool = true, enabled: Bool = true, signedOut: Bool = false, devices: Result<[Device], OmniAPIError>) {
     state.withLock {
-      $0.sync = (configured, enabled)
+      $0.sync = (configured, enabled, signedOut)
       $0.devices = devices
     }
   }
@@ -185,7 +224,7 @@ private final class FakeDevicesAPI: DevicesAPI {
     let s = state.withLock { $0.sync }
     return try! decode(
       SyncStatus.self,
-      #"{"configured":\#(s.configured),"enabled":\#(s.enabled),"running":false,"machineId":"m-air","lastSyncAt":null,"lastError":null,"signedOut":false,"failures":0,"nextSyncAt":null,"pending":0,"held":0,"deferred":0,"cursor":0}"#)
+      #"{"configured":\#(s.configured),"enabled":\#(s.enabled),"running":false,"machineId":"m-air","lastSyncAt":null,"lastError":null,"signedOut":\#(s.signedOut),"failures":0,"nextSyncAt":null,"pending":0,"held":0,"deferred":0,"cursor":0}"#)
   }
 
   func devices() async throws(OmniAPIError) -> [Device] {
@@ -213,6 +252,10 @@ private final class FakeDevicesAPI: DevicesAPI {
     api.set(configured: false, devices: .success([try device("online")]))
     await model.refresh()
     #expect(model.devices.isEmpty)
+
+    api.set(signedOut: true, devices: .success([try device("online")]))
+    await model.refresh()
+    #expect(model.devices.isEmpty, "a Mac the relay signed out cannot send an offer")
   }
 
   @Test func offersNothingWithoutAThreadThatCanGo() async throws {
