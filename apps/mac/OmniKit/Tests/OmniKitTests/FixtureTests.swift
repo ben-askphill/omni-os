@@ -67,6 +67,9 @@ func sseData(_ text: String) -> [String] {
     "changes-unavailable.json": { _ = try decodeFixture(BranchChanges.self, "changes-unavailable.json") },
     "turns.json": { _ = try decodeFixture(TurnChanges.self, "turns.json") },
     "turns-unavailable.json": { _ = try decodeFixture(TurnChanges.self, "turns-unavailable.json") },
+    // Recorded by apps/server/tests/handoff-two-macs.test.ts, which needs two Macs.
+    "devices.json": { _ = try decodeFixture([Device].self, "devices.json") },
+    "thread-handoff.json": { _ = try decodeFixture(ThreadDetail.self, "thread-handoff.json") },
     // Hand-made: apps/server/tests/sync-setup.test.ts checks the server still sends its keys and types.
     "sync-status.json": { _ = try decodeFixture(SyncStatus.self, "sync-status.json") },
     // Request bodies the app sends. SecretsTests compares them with what the client encodes.
@@ -117,6 +120,21 @@ func sseData(_ text: String) -> [String] {
     let harnesses = try decodeFixture([HarnessInfo].self, "harnesses.json")
     #expect(harnesses.map(\.id) == [.claudeCode, .codex, .cursor, .hermes])
     #expect(harnesses.first?.models.contains { $0.isDefault } == true)
+  }
+
+  @Test func readsAThreadBeingHandedOff() throws {
+    let devices = try decodeFixture([Device].self, "devices.json")
+    #expect(devices.map(\.name) == ["Mac B"])
+    #expect(devices.first?.reachability == .online)
+    #expect(devices.first?.canTake == true)
+
+    let d = try decodeFixture(ThreadDetail.self, "thread-handoff.json")
+    let h = try #require(d.handoff, "the handoff decodes")
+    #expect(h.outgoing)
+    #expect((h.from.name, h.to.name) == ("Mac A", "Mac B"))
+    #expect(h.state == .offered(stale: false))
+    #expect(d.blocked == h.text(now: h.at), "the server's block while it waits is the card's line")
+    #expect(HandoffBanner(h, status: d.thread.status, now: h.at) == .card(tone: .waiting, text: "Waiting for Mac B to pick it up.", cancel: true))
   }
 
   @Test func readsAThreadMidTurn() throws {
