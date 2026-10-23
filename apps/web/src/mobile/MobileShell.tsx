@@ -71,7 +71,8 @@ function groupByThread(layers: Layer[]): { thread: string | null; layers: Layer[
   return out;
 }
 
-const layerCls = 'absolute inset-0 flex flex-col overflow-hidden bg-bg';
+// `isolate`: a layer's own z-indexes (its header, a segmented thumb) must not reach over the layer pushed above it.
+const layerCls = 'absolute inset-0 isolate flex flex-col overflow-hidden bg-bg';
 
 export function MobileShell() {
   const hash = useHash();

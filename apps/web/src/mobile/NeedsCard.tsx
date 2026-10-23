@@ -59,7 +59,7 @@ export function NeedsCardView({ card, inThread, onRecovered }: { card: NeedsCard
         <span className="text-[16px] leading-[1.3] font-medium text-pretty">{card.label}</span>
       ) : (
         <button type="button" onClick={() => shell.open(href.thread(t.id))} className="flex items-start gap-3 text-left">
-          <MoAvatar role={t.role} channel={t.channel_id} state={card.glyph} />
+          <MoAvatar role={t.role} channel={t.channel_id} channelIcon={card.channelIcon} state={card.glyph} />
           <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
             <span className="truncate text-[12px] leading-[1.3] text-fg-3">{card.meta}</span>
             <span className="text-[16px] leading-[1.3] font-medium text-pretty">{t.title || 'Untitled'}</span>

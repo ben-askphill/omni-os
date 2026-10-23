@@ -1,27 +1,58 @@
 // Each phone screen's component, by the key screens.ts gives its route, and the shell's sheets.
 import type { ReactNode } from 'react';
-import type { Route } from '../router.ts';
-import { MoHeader, MoScroll, MoTitle } from './parts.tsx';
-import type { ScreenKey } from './screens.ts';
+import { Page } from '../pages/Page.tsx';
+import { pageTitle, type Route } from '../router.ts';
+import { useApp } from '../store.tsx';
 import { ActivityScreen } from './ActivityScreen.tsx';
+import { ChannelScreen, ChannelsScreen } from './ChannelsScreen.tsx';
+import { LibraryScreen } from './LibraryScreen.tsx';
+import { NewSheet } from './NewSheet.tsx';
+import { MoEmpty, MoHeader, MoScroll } from './parts.tsx';
+import type { ScreenKey } from './screens.ts';
+import { SearchSheet } from './SearchSheet.tsx';
+import { SettingsScreen } from './SettingsScreen.tsx';
 import { useShell, type ShellSheet } from './shell.tsx';
 
-function Placeholder({ title, root }: { title: string; root?: boolean }) {
+function Placeholder({ title }: { title: string }) {
   const shell = useShell();
   return (
     <>
-      <MoHeader onBack={root ? undefined : shell.back} title={root ? undefined : title} left={root ? <span className="w-10" /> : undefined} />
-      <MoScroll tabBar={root}>{root && <MoTitle title={title} />}</MoScroll>
+      <MoHeader onBack={shell.back} title={title} />
+      <MoScroll>{null}</MoScroll>
+    </>
+  );
+}
+
+/** A desktop page the phone has no screen of its own for, under a back bar. Those pages already fit a phone. */
+function PageScreen({ route }: { route: Route }) {
+  const shell = useShell();
+  const { channel } = useApp();
+  return (
+    <>
+      <MoHeader onBack={shell.back} title={pageTitle(route, (id) => channel(id)?.name)} />
+      <div className="relative min-h-0 flex-1 overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <Page route={route} />
+      </div>
+    </>
+  );
+}
+
+function NotFound({ path }: { path: string }) {
+  const shell = useShell();
+  return (
+    <>
+      <MoHeader onBack={shell.back} title="Not found" />
+      <MoEmpty>Nothing lives at {path}.</MoEmpty>
     </>
   );
 }
 
 export const RENDER: Record<ScreenKey, (r: Route) => ReactNode> = {
   activity: () => <ActivityScreen />,
-  channels: () => <Placeholder title="Channels" root />,
-  library: () => <Placeholder title="Library" root />,
-  channel: () => <Placeholder title="Channel" />,
-  'channel-pr': () => <Placeholder title="Pull request" />,
+  channels: () => <ChannelsScreen />,
+  library: () => <LibraryScreen />,
+  channel: (r) => r.name === 'channel' && <ChannelScreen key={r.id} id={r.id} />,
+  'channel-pr': (r) => <PageScreen route={r} />,
   thread: () => <Placeholder title="Thread" />,
   steps: () => <Placeholder title="Steps" />,
   changes: () => <Placeholder title="Changes" />,
@@ -30,13 +61,17 @@ export const RENDER: Record<ScreenKey, (r: Route) => ReactNode> = {
   terminal: () => <Placeholder title="Terminal" />,
   details: () => <Placeholder title="Details" />,
   viewer: () => <Placeholder title="Viewer" />,
-  settings: () => <Placeholder title="Settings" />,
-  search: () => <Placeholder title="Search" />,
-  page: () => <Placeholder title="Page" />,
-  notfound: () => <Placeholder title="Not found" />,
+  settings: () => <SettingsScreen />,
+  search: (r) => <PageScreen route={r} />,
+  page: (r) => <PageScreen route={r} />,
+  notfound: (r) => <NotFound path={r.name === 'notfound' ? r.path : ''} />,
 };
 
 export function SheetView({ sheet }: { sheet: ShellSheet }) {
-  void sheet;
-  return null;
+  switch (sheet.name) {
+    case 'new':
+      return <NewSheet channel={sheet.channel} />;
+    case 'search':
+      return <SearchSheet />;
+  }
 }

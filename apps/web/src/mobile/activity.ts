@@ -30,6 +30,7 @@ export interface NeedsCard {
   detail: string | null;
   /** "#Volero · builder · via Conductor". */
   meta: string;
+  channelIcon: string | null;
   time: string;
   /** The first is the main one: vermilion when the card's glyph says it needs Ben, ink otherwise. At most two. */
   actions: NeedsAction[];
@@ -81,6 +82,7 @@ export function needsCard(item: NeedsYouItem, channel: ChannelInfo | undefined, 
     label: reason.label,
     detail: reason.detail,
     meta,
+    channelIcon: channel?.icon ?? null,
     time: shortTime(item.at, now),
     actions: actionsOf(item, harness, now),
   };
