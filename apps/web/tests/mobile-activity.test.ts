@@ -38,6 +38,13 @@ describe('Activity', () => {
     ]);
   });
 
+  it('puts what waits on a decision before results to read', () => {
+    const cards = view([], inbox()).needs;
+    const first = cards.findIndex((c) => c.glyph !== 'needs');
+    expect(first).toBeGreaterThan(0);
+    expect(cards.slice(first).every((c) => c.glyph !== 'needs')).toBe(true);
+  });
+
   it('opens an unread result, or marks it read', () => {
     const n = inbox();
     const card = view([], n).needs.find((c) => c.thread.title === 'Audit the checkout')!;

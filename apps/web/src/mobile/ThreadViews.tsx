@@ -193,7 +193,7 @@ export function PRScreen() {
           <MoSection title="Checks" count={p.checkRuns.length} pad={false}>
             <MoGroup>
               {p.checkRuns.map((c, i) => (
-                <MoListRow key={`${c.name}:${i}`} icon={<StatusDot status={checkTone(c.state)} size={9} />} label={c.name} right={c.state.toLowerCase()} chevron={false} last={i === p.checkRuns.length - 1} />
+                <MoListRow key={`${c.name}:${i}`} icon={<StatusDot status={checkTone(c.state)} size={9} />} label={c.name} right={c.state.toLowerCase().replace(/_/g, ' ')} chevron={false} last={i === p.checkRuns.length - 1} />
               ))}
             </MoGroup>
           </MoSection>

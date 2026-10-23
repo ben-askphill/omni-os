@@ -113,7 +113,8 @@ export function activityOf({
   harness: (id: string) => string;
   now: number;
 }): Activity {
-  const needs = (needsYou?.items ?? []).map((i) => needsCard(i, channel(i.thread.channel_id), harness, now));
+  // What waits on a decision comes before results to read; each keeps the inbox's order.
+  const needs = (needsYou?.items ?? []).map((i) => needsCard(i, channel(i.thread.channel_id), harness, now)).sort((a, b) => Number(b.glyph === 'needs') - Number(a.glyph === 'needs'));
   const inNeeds = new Set(needs.map((n) => n.id));
   const listed = (recent ?? []).filter((t) => !inNeeds.has(t.id) && t.source !== 'team' && !t.archived);
   const today = startOfDay(now);

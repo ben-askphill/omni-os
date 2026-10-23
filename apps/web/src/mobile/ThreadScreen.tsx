@@ -7,6 +7,7 @@ import { Button, ErrorNote, Icon, StatusDot, StatusPill } from '../components/ui
 import { changesView } from '../changes.ts';
 import { duration, plural } from '../format.ts';
 import { ArtifactThumb } from '../pages/Artifacts.tsx';
+import { reasonOf } from '../needs-you.ts';
 import { isOmnis, parkedLabel } from '../requests.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
@@ -368,7 +369,9 @@ export function ThreadScreen() {
   if (!slotBusy && !conductor) chips.push({ label: 'Ask the Conductor', icon: 'delegate', onClick: () => shell.sheet({ name: 'new' }) });
 
   const sub = conductor ? `Conductor · ${plural(crew.length, 'crew thread')}` : [`#${ch?.name ?? thread.channel_id}`, thread.role, harnessLabel(thread.harness)].filter(Boolean).join(' · ');
-  const needs = card?.glyph === 'needs';
+  // A Conductor thread needs Ben while any thread it delegated does.
+  const kidIds = new Set(crew.map((c) => c.id));
+  const needs = card?.glyph === 'needs' || (conductor && !!needsYou?.items.some((i) => kidIds.has(i.thread.id) && reasonOf(i).glyph === 'needs'));
   const sinceStart = (t: TurnView) => shortTime(t.at || thread.created_at, now);
 
   const turnBody = (t: TurnView, last: boolean): ReactNode => {
