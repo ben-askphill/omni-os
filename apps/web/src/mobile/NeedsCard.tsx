@@ -45,13 +45,33 @@ export function useNeedsAction(onRecovered?: (r: Recovered) => void) {
   return { run, busy };
 }
 
+/** A card's buttons on their own: under a delegated thread's row, whose pill already says why it waits. */
+export function NeedsActions({ card, size = 'lg', onRecovered }: { card: NeedsCard; size?: 'md' | 'lg'; onRecovered?: (r: Recovered) => void }) {
+  const { run, busy } = useNeedsAction(onRecovered);
+  return (
+    <div className="flex flex-wrap gap-2">
+      {card.actions.map((a, i) => (
+        <Button
+          key={a.label}
+          size={size}
+          variant={i ? 'secondary' : card.glyph === 'needs' ? 'needs' : 'primary'}
+          busy={busy === a}
+          disabled={!!busy}
+          onClick={() => void run(card, a)}
+        >
+          {a.label}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 /**
  * The decision card (MoDecision): why a thread waits on Ben and the buttons that answer it, the same in Activity and
  * in the thread. In the thread it drops the header, which would only repeat the thread's own.
  */
 export function NeedsCardView({ card, inThread, onRecovered }: { card: NeedsCard; inThread?: boolean; onRecovered?: (r: Recovered) => void }) {
   const shell = useShell();
-  const { run, busy } = useNeedsAction(onRecovered);
   const t = card.thread;
   return (
     <div className="flex flex-col gap-3 rounded-[20px] bg-surface p-3.5">
@@ -74,20 +94,7 @@ export function NeedsCardView({ card, inThread, onRecovered }: { card: NeedsCard
           {card.detail}
         </p>
       )}
-      <div className="flex flex-wrap gap-2">
-        {card.actions.map((a, i) => (
-          <Button
-            key={a.label}
-            size="lg"
-            variant={i ? 'secondary' : card.glyph === 'needs' ? 'needs' : 'primary'}
-            busy={busy === a}
-            disabled={!!busy}
-            onClick={() => void run(card, a)}
-          >
-            {a.label}
-          </Button>
-        ))}
-      </div>
+      <NeedsActions card={card} onRecovered={onRecovered} />
     </div>
   );
 }

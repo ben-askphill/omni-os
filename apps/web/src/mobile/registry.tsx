@@ -7,21 +7,13 @@ import { ActivityScreen } from './ActivityScreen.tsx';
 import { ChannelScreen, ChannelsScreen } from './ChannelsScreen.tsx';
 import { LibraryScreen } from './LibraryScreen.tsx';
 import { NewSheet } from './NewSheet.tsx';
-import { MoEmpty, MoHeader, MoScroll } from './parts.tsx';
+import { MoEmpty, MoHeader } from './parts.tsx';
 import type { ScreenKey } from './screens.ts';
 import { SearchSheet } from './SearchSheet.tsx';
 import { SettingsScreen } from './SettingsScreen.tsx';
+import { ThreadScreen } from './ThreadScreen.tsx';
+import { BrowserScreen, ChangesScreen, DetailsScreen, PRScreen, StepsScreen, TerminalScreen, ViewerScreen } from './ThreadViews.tsx';
 import { useShell, type ShellSheet } from './shell.tsx';
-
-function Placeholder({ title }: { title: string }) {
-  const shell = useShell();
-  return (
-    <>
-      <MoHeader onBack={shell.back} title={title} />
-      <MoScroll>{null}</MoScroll>
-    </>
-  );
-}
 
 /** A desktop page the phone has no screen of its own for, under a back bar. Those pages already fit a phone. */
 function PageScreen({ route }: { route: Route }) {
@@ -53,14 +45,14 @@ export const RENDER: Record<ScreenKey, (r: Route) => ReactNode> = {
   library: () => <LibraryScreen />,
   channel: (r) => r.name === 'channel' && <ChannelScreen key={r.id} id={r.id} />,
   'channel-pr': (r) => <PageScreen route={r} />,
-  thread: () => <Placeholder title="Thread" />,
-  steps: () => <Placeholder title="Steps" />,
-  changes: () => <Placeholder title="Changes" />,
-  pr: () => <Placeholder title="Pull request" />,
-  browser: () => <Placeholder title="Browser" />,
-  terminal: () => <Placeholder title="Terminal" />,
-  details: () => <Placeholder title="Details" />,
-  viewer: () => <Placeholder title="Viewer" />,
+  thread: () => <ThreadScreen />,
+  steps: (r) => <StepsScreen turn={r.name === 'thread' ? r.turn : undefined} />,
+  changes: () => <ChangesScreen />,
+  pr: () => <PRScreen />,
+  browser: () => <BrowserScreen />,
+  terminal: () => <TerminalScreen />,
+  details: () => <DetailsScreen />,
+  viewer: (r) => <ViewerScreen route={r} />,
   settings: () => <SettingsScreen />,
   search: (r) => <PageScreen route={r} />,
   page: (r) => <PageScreen route={r} />,
