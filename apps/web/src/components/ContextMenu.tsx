@@ -1,19 +1,23 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { HandoffView } from '@omni/shared/handoff.ts';
 import { api, errorText, type Thread, type ThreadDetail } from '../api.ts';
 import { draftKey, useFolders } from '../folders.tsx';
+import { deviceRows } from '../handoff.ts';
 import { canMarkDone } from '../needs-you.ts';
 import { navigate, href, openNewThread, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
-import { Icon, type IconName } from './ui.tsx';
+import { handOff, useHandoffTargets } from './thread/Handoff.tsx';
+import { Icon, Loader, StatusDot, type IconName } from './ui.tsx';
 
 type Target = { kind: 'thread'; id: string } | { kind: 'channel'; id: string } | { kind: 'folder'; id: string };
-type Open = { target: Target; x: number; y: number };
+/** `handoff`: open straight on the list of Macs the thread can go to, as the thread header's button does. */
+type Open = { target: Target; x: number; y: number; handoff?: boolean };
 
 const OPEN_EVENT = 'omni:context-menu';
 
 /** Open the menu for `target` at a point, as a right-click there would: the "…" button on a folder, or a key. */
-export function openMenu(target: Target, x: number, y: number) {
-  window.dispatchEvent(new CustomEvent<Open>(OPEN_EVENT, { detail: { target, x, y } }));
+export function openMenu(target: Target, x: number, y: number, handoff?: boolean) {
+  window.dispatchEvent(new CustomEvent<Open>(OPEN_EVENT, { detail: { target, x, y, handoff } }));
 }
 
 const THREAD_HREF = /^#\/t\/([^/?]+)/;
@@ -57,7 +61,8 @@ export function ContextMenuHost() {
     };
   }, []);
   if (!open) return null;
-  return <Menu open={open} onClose={() => setOpen(null)} />;
+  // A new open starts fresh, even over one already showing.
+  return <Menu key={`${open.target.kind}:${open.target.id}:${open.x}:${open.y}:${!!open.handoff}`} open={open} onClose={() => setOpen(null)} />;
 }
 
 function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
@@ -74,6 +79,12 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
   const [draft, setDraft] = useState<string | null>(null);
   // Set while the menu lists the folders a thread can move to.
   const [moving, setMoving] = useState(false);
+  // Set while the menu lists the Macs a running thread can be handed to.
+  const [handingOff, setHandingOff] = useState(!!open.handoff);
+  const [sending, setSending] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<string | null>(null);
+  const [handoff, setHandoff] = useState<HandoffView | null>(null);
+  const targets = useHandoffTargets(row, blocked, handoff);
   const folders = useFolders();
 
   // Ask for the thread's state so the item reads "Unarchive" on one that is.
@@ -86,6 +97,8 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
         if (!live) return;
         setArchived(!!d.thread.archived);
         setCurrent(d.thread.title);
+        setBlocked(d.blocked ?? null);
+        setHandoff(d.handoff ?? null);
         setRow(d.thread);
       })
       .catch(() => {});
@@ -99,12 +112,12 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     const r = ref.current?.getBoundingClientRect();
     if (!r) return;
     setPos({ x: Math.max(8, Math.min(open.x, window.innerWidth - r.width - 8)), y: Math.max(8, Math.min(open.y, window.innerHeight - r.height - 8)) });
-  }, [open.x, open.y, archived, error, moving]);
+  }, [open.x, open.y, archived, error, moving, handingOff, targets.state]);
 
   // Keyboard: the first item takes the focus, arrows move it.
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>('[role="menuitem"], [role="menuitemradio"]')?.focus();
-  }, [moving, row]);
+  }, [moving, row, handingOff, targets.state]);
   const onKey = (e: ReactKeyboardEvent) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     const items = [...(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]') ?? [])];
@@ -185,6 +198,19 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     onClose();
   };
 
+  const sendTo = async (to: string) => {
+    if (!row) return;
+    setSending(to);
+    setError('');
+    try {
+      await handOff(row.id, to);
+      onClose();
+    } catch (e) {
+      setError(errorText(e));
+      setSending(null);
+    }
+  };
+
   const items: { label: string; icon: IconName; run: () => void }[] =
     target.kind === 'thread'
       ? [
@@ -196,6 +222,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
             : []),
           { label: 'Rename thread', icon: 'pencil', run: () => setDraft(current ?? '') },
           ...(row && !row.parent_id ? [{ label: 'Move to folder', icon: 'folder' as const, run: () => setMoving(true) }] : []),
+          ...(targets.state === 'ready' ? [{ label: 'Hand off to…', icon: 'share' as const, run: () => setHandingOff(true) }] : []),
           { label: archived ? 'Unarchive thread' : 'Archive thread', icon: 'archive', run: toggleArchive },
         ]
       : target.kind === 'folder'
@@ -217,13 +244,42 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     <div
       ref={ref}
       role="menu"
-      aria-label={target.kind === 'thread' ? (moving ? 'Move to folder' : 'Thread actions') : target.kind === 'folder' ? 'Folder actions' : 'Channel actions'}
+      aria-label={target.kind === 'thread' ? (moving ? 'Move to folder' : handingOff ? 'Hand off to' : 'Thread actions') : target.kind === 'folder' ? 'Folder actions' : 'Channel actions'}
       style={{ left: pos.x, top: pos.y }}
       onKeyDown={onKey}
       className="pop-in fixed z-[60] min-w-[190px] max-w-[280px] rounded-[16px] bg-elev p-1.5 shadow-[var(--shadow-menu)]"
     >
       {title && <div className="caption truncate px-2.5 pt-1 pb-1.5 text-fg-4">{title}</div>}
-      {moving && row ? (
+      {handingOff ? (
+        <>
+          <div className="caption truncate px-2.5 pt-1 pb-1.5 text-fg-4">Hand off to</div>
+          {!row || targets.state === 'loading' ? (
+            <div className="flex h-8 items-center gap-2 px-2.5 text-[12px] text-fg-4">
+              <Loader size={12} /> Looking for your other Macs
+            </div>
+          ) : targets.state === 'none' ? (
+            <div className="px-2.5 py-1.5 text-[12px] text-fg-4">{targets.reason}</div>
+          ) : (
+            deviceRows(targets.devices).map((d) => (
+              <button
+                key={d.id}
+                role="menuitem"
+                disabled={!d.pickable || !!sending}
+                aria-disabled={!d.pickable || undefined}
+                onClick={() => void sendTo(d.id)}
+                title={d.pickable ? `Stop the turn here and keep it running on ${d.name}` : `${d.name} is asleep or offline`}
+                className="hov flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-left text-fg-2 hover:text-fg disabled:pointer-events-none disabled:opacity-45"
+              >
+                {sending === d.id ? <Loader size={12} /> : <StatusDot status={d.dot} size={8} className="mx-[3px]" />}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[13px] leading-snug">{d.name}</span>
+                  <span className="truncate text-[11.5px] leading-snug text-fg-4">{d.label}</span>
+                </span>
+              </button>
+            ))
+          )}
+        </>
+      ) : moving && row ? (
         <>
           <div className="caption truncate px-2.5 pt-1 pb-1.5 text-fg-4">Move to folder</div>
           {[{ id: null as string | null, name: 'No folder' }, ...choices].map((f) => {

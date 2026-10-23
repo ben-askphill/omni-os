@@ -11,6 +11,8 @@ import { PANEL_MIN, THREAD_MIN, defaultPanelWidth, PanelResizeHandle } from '../
 import { NextThreadCard } from '../components/thread/NextThreadCard.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { LimitCard } from '../components/thread/LimitCard.tsx';
+import { HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx';
+import { openMenu } from '../components/ContextMenu.tsx';
 import { OPEN_PR_PROMPT, ThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { Avatar, Button, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, StatusPill, Tabs } from '../components/ui.tsx';
@@ -69,6 +71,8 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     setQueued,
     warm,
     blocked,
+    handoff,
+    setHandoff,
     live,
     load,
     applyThread,
@@ -82,6 +86,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     context,
   } = useThreadSession(id, artifactParam);
   const { scrollRef, contentRef, onScroll, showJump, jump, pin } = useTranscriptScroll(events, thread !== null);
+  const handoffTargets = useHandoffTargets(thread, blocked, handoff);
   const known = useMemo(() => [...children, ...team], [children, team]);
   const members = useMemo(() => teamOf(children), [children]);
   const reports = useMemo(() => reportNotes(queued), [queued]);
@@ -324,6 +329,18 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
               </Button>
             )}
             <StatusPill status={thread.status} />
+            {handoffTargets.state === 'ready' && (
+              <IconButton
+                icon="share"
+                label="Hand off to another Mac"
+                title="Hand off to another Mac: stop the turn here and keep it running there"
+                aria-haspopup="menu"
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  openMenu({ kind: 'thread', id: thread.id }, r.left, r.bottom + 6, true);
+                }}
+              />
+            )}
             {/* Nothing runs while the worktree is prepared, so there is nothing to interrupt. */}
             {slotBusy && !thread.setup && (
               <Button
@@ -374,6 +391,14 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                   // Scheduling keeps updated_at, so it must win a tie, like Retry.
                   applyThread(t);
                   setQueued(pending);
+                }}
+              />
+              <HandoffCard
+                thread={thread}
+                handoff={handoff}
+                onChanged={(a) => {
+                  applyThread(a.thread, true);
+                  setHandoff(a.handoff);
                 }}
               />
               <QueuedMessages items={queued} starting={betweenTurns} threadId={id} onPending={setQueued} setup={thread.setup} canSteer={canSteer(thread.harness, harnesses)} />

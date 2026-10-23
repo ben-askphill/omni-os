@@ -4,6 +4,7 @@ import type { InitP, ResultP } from '../components/thread/panel/DetailsTab.tsx';
 import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
 import { parsePayload } from '../format.ts';
+import type { HandoffView } from '@omni/shared/handoff.ts';
 
 export type PanelTab = 'artifacts' | 'changes' | 'browser' | 'terminal' | 'details';
 
@@ -35,6 +36,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
   const [warm, setWarm] = useState<boolean | undefined>(undefined);
   const [actionError, setActionError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
+  const [handoff, setHandoff] = useState<HandoffView | null>(null);
   // The newest context reading the stream pushed. The meter loads its first one itself.
   const [context, setContext] = useState<ContextUsage | null>(null);
 
@@ -94,6 +96,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
         setQueued(d.pending ?? []);
         if (d.live !== undefined) setWarm(d.live);
         setBlocked(d.blocked ?? null);
+        setHandoff(d.handoff ?? null);
         setChannel(d.channel);
         setParent(d.parent);
         setChildren(d.children);
@@ -146,6 +149,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
           if (m.pending) setQueued(m.pending);
           if (m.live !== undefined) setWarm(m.live);
           setBlocked(m.blocked ?? null);
+          setHandoff(m.handoff ?? null);
           break;
         case 'context':
           setContext(m.context);
@@ -256,6 +260,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     setQueued,
     warm,
     blocked,
+    handoff,
+    setHandoff,
     live,
     load,
     applyThread,

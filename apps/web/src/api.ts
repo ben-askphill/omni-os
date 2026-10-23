@@ -5,6 +5,7 @@ import type { HarnessInfo, ModelEntry, HarnessId } from '@omni/server/harness/ty
 import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
 import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
+import type { HandoffView } from '@omni/shared/handoff.ts';
 
 export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult };
 
@@ -113,6 +114,8 @@ export interface ThreadDetail {
   live?: boolean;
   /** Why this Mac cannot start a turn in the thread (sync: it runs on the other Mac, or its folder is not here). */
   blocked?: string;
+  /** A handoff to or from another synced Mac that is under way or just settled. Older servers leave it out. */
+  handoff?: HandoffView | null;
 }
 
 /** How a message reaches a busy thread: read at its next step, run after the turn, or interrupt then run. */
@@ -597,7 +600,7 @@ export function openSSE(
 export type StreamMessage =
   | { type: 'event'; event: EventRow }
   | { type: 'artifact'; artifact: Artifact }
-  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string }
+  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string; handoff?: HandoffView | null }
   /** A new reading of the thread's context window. */
   | { type: 'context'; context: ContextUsage }
   | { type: 'mod_toast'; toast: ModToast };
@@ -610,6 +613,7 @@ function classifyStream(d: unknown): StreamMessage | null {
     return {
       type: 'thread', thread: o.thread as Thread, pending: o.pending as PendingMsg[] | undefined, live: typeof o.live === 'boolean' ? o.live : undefined,
       blocked: typeof o.blocked === 'string' ? o.blocked : undefined,
+      handoff: o.handoff && typeof o.handoff === 'object' ? (o.handoff as HandoffView) : null,
     };
   if (o.kind === 'context' && o.context) return { type: 'context', context: o.context as ContextUsage };
   if (o.kind === 'mod_toast' && typeof o.text === 'string')
