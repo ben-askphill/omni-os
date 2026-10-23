@@ -5,9 +5,29 @@ Auto picks a new thread's harness, model and effort from its first prompt (`apps
 ## Shape
 
 - `profileTask(prompt)` gives a kind (code, math, research, writing, ops, chat), a score from the brief's size and cues, and a tier: light (Haiku, low), standard (Sonnet, medium), heavy (Opus, high), max (Opus, xhigh).
-- `routeTask(profile, catalog, usage)` maps the tier onto the catalog. Claude Code unless its 5h or 7d window is at 90% or refusing and Codex has room; ops stays on Claude Code. Never Cursor or Hermes: they bill outside the subscriptions.
+- `profileTask` also reads `needs` (`detectNeeds`): image generation, connectors, review, bulk, speed.
+- `routeTask(profile, { catalog, usage, images })` walks `LANES`, first match wins, else Claude Code's tier model. See [Lanes](#lanes). Speed lowers the effort a step wherever the thread lands.
 - `resolveRun` returns `{ auto: true }` for model `"auto"` with no harness, or when the thread, role and channel set nothing. `openThread` then routes and stores `auto_reason`. `{ harness: 'cursor', model: 'auto' }` is Cursor's own model and is not Auto.
 - The weights are data: `harness/auto-weights.json`, written by `scripts/route-eval/fit.ts`.
+
+## Lanes
+
+Each lane is a reason to leave Claude Code's tier model. A lane whose harness is signed out or at 90% of a plan window yields, and the next is tried.
+
+1. **Image generation: Codex**, busy or not, since nothing else here makes images. Codex's `imageGeneration` item carries the PNG as base64; `codex/images.ts` writes it to the thread's artifacts and the transcript row keeps only the file name.
+2. **Connectors: Claude Code**, busy or not. Gmail, Calendar, Notion, Slack, Productive and the Portal are claude.ai connectors, which only Claude Code loads. Omni's own MCP servers reach every harness.
+3. **Review: Codex.** A second model family catches what the first misses in its own work.
+4. **Claude plan busy: Codex.**
+5. **Both plans busy, code: Composer.**
+6. **Quick or bulk code: Composer**, below the max tier, and never with images in the first message (Cursor Agent only gets their paths). Composer 2.5 ranks third on Artificial Analysis's Coding Agent Index at a few cents a task and is among the fastest agents it times, and a mechanical change across files gains little from a frontier model.
+
+Composer draws on Cursor's Auto and Composer usage bucket (`monthly.auto`), so that is the one checked.
+
+Not given a lane:
+
+- **Grok and Gemini on Cursor.** Grok 4.7 sits mid-pack on coding benchmarks, below Composer at a higher price, and the named models draw on Cursor's API bucket, which runs out first (82% used when this was written, against 40% for Auto and Composer). Nothing in a brief says Grok would do better.
+- **Hermes.** It bills the Anthropic API per token, for the same Claude models Claude Code runs on the plan.
+- **Long context.** Every harness here runs a model with a context window larger than a first prompt; it matters later in a thread, after the pick is fixed.
 
 ## What the benchmarks say
 

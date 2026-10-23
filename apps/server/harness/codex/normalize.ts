@@ -61,8 +61,9 @@ const result = (id: string, text: string, isError: boolean): StreamRecord => ({
 /**
  * One completed Codex item to zero or more Omni records. Reasoning items drop out, the same
  * as for Claude. Unknown item kinds pass through as a tool row under their own name.
+ * `savedImage` is the artifact file an imageGeneration item's image was written to (saveGeneratedImage).
  */
-export function normalizeItem(item: CodexItem): StreamRecord[] {
+export function normalizeItem(item: CodexItem, savedImage?: string | null): StreamRecord[] {
   switch (item.type) {
     case 'reasoning':
     case 'userMessage':
@@ -121,6 +122,21 @@ export function normalizeItem(item: CodexItem): StreamRecord[] {
       return [
         { kind: 'tool_use', payload: { id: item.id, name: 'WebSearch', input: { query: query || action?.url || '' }, parent: null } },
         result(item.id, results == null ? '' : typeof results === 'string' ? results : JSON.stringify(results), false),
+      ];
+    }
+
+    case 'imageGeneration': {
+      // The image itself is base64 in `result`; the adapter saved it as an artifact, so only its name goes in the row.
+      const { revisedPrompt, status, failure } = item as { revisedPrompt?: string | null; status?: string; failure?: unknown };
+      const failed = status === 'failed' || !!failure;
+      const why = typeof failure === 'string' ? failure : (failure as { message?: string } | null)?.message;
+      return [
+        { kind: 'tool_use', payload: { id: item.id, name: 'ImageGeneration', input: { prompt: revisedPrompt ?? '' }, parent: null } },
+        result(
+          item.id,
+          failed ? why || 'Image generation failed.' : savedImage ? `Saved as ${savedImage} in this thread's artifacts.` : 'Generated an image, but Omni could not save it.',
+          failed || !savedImage,
+        ),
       ];
     }
 

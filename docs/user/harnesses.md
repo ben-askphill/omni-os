@@ -19,8 +19,23 @@ A harness is the agent CLI a thread runs on. Pick one per channel (its default) 
 Auto is the first entry in the model picker and the default for a new thread. Omni reads the first prompt and picks the harness, model and effort for it. The thread's model pill then reads "Auto · <model>", and hovering it shows why, for example "Hard code task: Opus 5.5, high effort". Once picked, the run is fixed for the thread like any other.
 
 - It sorts the prompt into a kind (code, math, research, writing, ops, quick) and scores how much it asks: its length, the code it names, and cues such as a migration, a race, a typo or a lookup. Light work runs on Haiku, standard on Sonnet, hard on Opus at high effort, the hardest on Opus at xhigh. Code and math never start below Sonnet.
-- It stays on Claude Code unless the Claude plan's 5h or 7d window is 90% used and Codex has room; then it moves the thread to Codex's default model. Store and admin (ops) work always stays on Claude Code.
-- It never picks Cursor Agent or Hermes: both bill outside your Claude and ChatGPT plans.
+- It also reads what the brief needs, and that can pick the harness. First match wins:
+
+| Brief | Runs on |
+| --- | --- |
+| Make an image | Codex |
+| Mail, calendar, Notion, Slack | Claude Code |
+| Review a PR or code | Codex |
+| Claude plan 90% used | Codex |
+| Both plans 90% used, code | Cursor Composer |
+| Quick or bulk code change | Cursor Composer |
+| Anything else | Claude Code |
+
+- Image generation goes to Codex because it is the only harness here that makes images; the image shows in the thread's artifacts. If Codex is not signed in, the thread runs on Claude Code and the Auto note says there is no image generation.
+- Your claude.ai connectors (Gmail, Calendar, Notion, Slack, Productive, the Portal) exist only in Claude Code, so that work stays there even when the plan is busy.
+- A review goes to Codex so a different model family checks work Claude most likely wrote.
+- "Quick", "fast", "asap" and the like lower the effort a step on any harness. For code, they also move the thread to Cursor's Composer, a fast and cheap coding model, as does a mechanical change across many files ("rename X across the repo"). Not for the hardest tasks, and not when the first message has images, which Cursor Agent cannot see.
+- Composer only runs while Cursor's Auto and Composer usage is under 90%. Auto never picks Grok, Gemini or Cursor's other named models, or Hermes: see [Auto routing](../internals/auto-routing.md#lanes) for why.
 - A model picked on the thread, a crew role's or a channel's default all win over Auto. Set a channel's default to Auto in its settings, or `model: auto` in a crew role's frontmatter.
 - How well it picks, and how to check that again: [Auto routing](../internals/auto-routing.md).
 

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { saveGeneratedImage } from '../harness/codex/images.ts';
 import { codexLimit, normalizeItem, normalizeRateLimits, normalizeStarted, turnErrorText } from '../harness/codex/normalize.ts';
 import type { CodexItem, RateLimits } from '../harness/codex/protocol.ts';
 
@@ -167,5 +169,28 @@ describe('codex turn errors', () => {
       expect(codexLimit({ message: JSON.stringify({ status: 429, error: { type: 'rate_limit_exceeded', message: 'slow down' } }) }, full, now)).toBeNull();
       expect(codexLimit(null, full, now)).toBeNull();
     });
+  });
+});
+
+describe('codex image generation', () => {
+  // The shape codex app-server sends for its built-in image tool; `result` is the PNG as base64.
+  const png = Buffer.from('89504e470d0a1a0a', 'hex').toString('base64');
+  const item = { type: 'imageGeneration', id: 'ig_1', status: 'completed', revisedPrompt: 'A red bicycle', result: png } as unknown as CodexItem;
+
+  it('saves the image as an artifact and keeps the bytes out of the transcript', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omni-codex-img-'));
+    const name = saveGeneratedImage(item as any, dir);
+    expect(name).toBe('image-ig_1.png');
+    expect(readFileSync(join(dir, name!)).toString('base64')).toBe(png);
+    const recs = normalizeItem(item, name);
+    expect(recs[0].payload).toMatchObject({ name: 'ImageGeneration', input: { prompt: 'A red bicycle' } });
+    expect(recs[1].payload).toMatchObject({ is_error: false, text: expect.stringContaining('image-ig_1.png') });
+    expect(JSON.stringify(recs)).not.toContain(png);
+  });
+
+  it('shows a failed generation, or one Omni could not save, as an error', () => {
+    expect(normalizeItem({ ...item, status: 'failed', failure: 'Blocked by policy' } as CodexItem)[1].payload).toMatchObject({ is_error: true, text: 'Blocked by policy' });
+    expect(normalizeItem(item, null)[1].payload).toMatchObject({ is_error: true });
+    expect(saveGeneratedImage({ id: 'x' }, tmpdir())).toBeNull();
   });
 });

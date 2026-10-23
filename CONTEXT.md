@@ -78,7 +78,7 @@ How hard the **Model** reasons on each step, picked from the levels that model s
 _Avoid_: Thinking, reasoning level
 
 **Auto**:
-The model picker's default: Omni reads a new thread's first prompt and picks its **Harness**, **Model** and **Effort**, among Claude Code and Codex only, and keeps one line saying why (`auto_reason`). Cursor Agent has a model of its own called `auto`; that one stays Cursor's.
+The model picker's default: Omni reads a new thread's first prompt and picks its **Harness**, **Model** and **Effort**, among Claude Code, Codex and Cursor's Composer, and keeps one line saying why (`auto_reason`). Cursor Agent has a model of its own called `auto`; that one stays Cursor's.
 _Avoid_: Router, smart model
 
 **Session**:

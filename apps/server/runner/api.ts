@@ -113,7 +113,8 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   // A channel default the catalog no longer has (a retired model) never blocks a thread: drop it.
   if (!run.ok) run = resolve(getCatalog(), false);
   if (!run.ok) throw new Error(run.error);
-  const auto = 'auto' in run ? routeTask(profileTask(input.prompt), getCatalog(), usageByHarness()) : null;
+  const images = (input.files ?? []).some((f) => f.type.startsWith('image/'));
+  const auto = 'auto' in run ? routeTask(profileTask(input.prompt), { catalog: getCatalog(), usage: usageByHarness(), images }) : null;
   const { harness, model, effort } = auto ?? (run as Resolved);
 
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;

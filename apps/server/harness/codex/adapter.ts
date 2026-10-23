@@ -21,6 +21,7 @@ import type { AdapterCallbacks, AdapterContext, CommandUse, HarnessAdapter, Harn
 import { CodexClient } from './client.ts';
 import { codexBin } from './bin.ts';
 import { CODEX_BUILTINS } from './commands.ts';
+import { saveGeneratedImage } from './images.ts';
 import { PLAN_LIMIT_ID, codexLimit, normalizeItem, normalizePlan, normalizeRateLimits, normalizeStarted, turnErrorText } from './normalize.ts';
 import { reviewTarget } from './review.ts';
 import type {
@@ -149,9 +150,11 @@ export const codexAdapter: HarnessAdapter = {
         case 'item/started':
           for (const rec of normalizeStarted(p.item)) emit(rec);
           break;
-        case 'item/completed':
-          for (const rec of normalizeItem(p.item)) emit(rec);
+        case 'item/completed': {
+          const saved = p.item?.type === 'imageGeneration' ? saveGeneratedImage(p.item, artifactsDir(thread.id)) : null;
+          for (const rec of normalizeItem(p.item, saved)) emit(rec);
           break;
+        }
         case 'turn/plan/updated':
           for (const rec of normalizePlan(p as PlanUpdate, `plan-${p.turnId ?? currentTurnId}-${++plans}`)) emit(rec);
           break;

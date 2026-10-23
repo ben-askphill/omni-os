@@ -1,6 +1,7 @@
 // Auto: pick a thread's harness, model and effort from its first prompt. Two pure steps:
-//   profileTask reads the prompt into a TaskProfile (what kind of work, how hard);
-//   routeTask maps that profile onto the live catalog and plan usage through the TIERS table.
+//   profileTask reads the prompt into a TaskProfile (what kind of work, how hard, and what it needs);
+//   routeTask walks the LANES table, each a reason to leave Claude Code, and maps the first that fits onto the live
+//   catalog and plan usage.
 // The weights are fitted on SWE-bench Verified's dev half and scored on its test half and on RouterBench by
 // scripts/route-eval (see docs/internals/auto-routing.md).
 import type { Usage } from '../stream.ts';
@@ -21,6 +22,28 @@ export type TaskKind = 'code' | 'math' | 'research' | 'writing' | 'ops' | 'chat'
 export type Tier = 'light' | 'standard' | 'heavy' | 'max';
 export const TIERS_ORDER: Tier[] = ['light', 'standard', 'heavy', 'max'];
 
+/**
+ * What a brief asks of the run beyond its kind and difficulty. Each one can decide the harness (see LANES).
+ * - `image-generation`: make an image. Only Codex generates images here.
+ * - `connectors`: Ben's mail, calendar, Notion, Slack, Productive or Portal, which are claude.ai connectors in Claude Code.
+ * - `review`: a second look at code or a PR, best from another model family than the one that wrote it.
+ * - `bulk`: one mechanical change applied everywhere, which a fast cheap coding model does as well as a big one.
+ * - `speed`: Ben asked for it fast. Lowers the effort a step and prefers the fastest model that can do the kind.
+ */
+export type Need = 'image-generation' | 'connectors' | 'review' | 'bulk' | 'speed';
+
+const NEED_CUES: Record<Need, RegExp> = {
+  'image-generation':
+    /^\s*\/imagegen\b|\b(image generation|text-to-image|gpt-image)\b|\b(generate|create|draw|design|render|produce|paint|make me)\s+(me\s+)?((an?|some|the|new|\d+|two|three|a few)\s+)?([\w-]+\s+){0,3}(images?|pictures?|photos?|illustrations?|logos?|icons?|banners?|graphics?|artwork|mock-?ups?|thumbnails?|avatars?|posters?|wallpapers?)\b(?!\s+(component|class|font|button|prop|file|set|library|sprite sheet))/i,
+  connectors:
+    /\b(gmail|my (e-?mail|mail|inbox)|calendar|meetings?|notion|slack|productive|log (my )?(time|hours)|time entr(y|ies)|portal|granola|google (drive|docs|sheets))\b/i,
+  review: /\bcode review\b|\b(review|audit|critique|second opinion on)\b[^.\n]{0,30}\b(pr|pull request|diff|changes|branch|commits?|code|implementation)\b/i,
+  bulk: /\b(codemod|find and replace|search and replace|bulk|mass|sweep)\b|\b(rename|replace|bump|update|change|migrate|convert)\b[^.\n]{0,40}\b(across|everywhere|in (all|every))\b|\bfix (all )?(the )?lint\b/i,
+  speed: /\b(quick(ly)?|fast|asap|right (now|away)|urgent(ly)?|in a hurry|hurry|speedy|real quick|no need to be thorough|as soon as possible)\b/i,
+};
+
+export const detectNeeds = (prompt: string): Need[] => (Object.keys(NEED_CUES) as Need[]).filter((n) => NEED_CUES[n].test(prompt));
+
 export interface TaskProfile {
   kind: TaskKind;
   /** 0 (trivial) to 1 (as hard as tasks get). */
@@ -28,6 +51,7 @@ export interface TaskProfile {
   tier: Tier;
   /** The cues that moved the score, for the reason Omni shows. */
   signals: string[];
+  needs: Need[];
 }
 
 export interface AutoPick {
@@ -69,7 +93,7 @@ const CUES: Cue[] = [
   { name: 'security', prior: 0.1, re: /\b(security|vulnerab|auth(entication|orization)?|encrypt|exploit|pentest|csrf|xss)\b/i },
   { name: 'multi-step', prior: 0.08, re: /(^|\n)\s*(\d+[.)]|[-*•])\s+\S[\s\S]*\n\s*(\d+[.)]|[-*•])\s+\S|\b(then|after that|step \d|first,|finally)\b/i },
   { name: 'reasoning', prior: 0.06, re: /\b(explain why|reason|trade-?offs?|step by step|think)\b/i },
-  { name: 'small change', prior: -0.15, re: /\b(typo|rename|bump|tweak|small|tiny|quick(ly)?|simple|minor|one[- ]liner|just)\b/i },
+  { name: 'small change', prior: -0.15, re: /\b(typo|rename|bump|tweak|small|tiny|simple|minor|one[- ]liner|just)\b/i },
   { name: 'lookup', prior: -0.1, re: /^\s*(what|who|when|where|which) (is|are|was|were)\b/i },
   { name: 'listing', prior: -0.08, re: /\b(list|show me|remind me|what time|status of)\b/i },
 ];
@@ -158,7 +182,7 @@ export function baseScore(prompt: string): { score: number; signals: string[] } 
 export function profileTask(prompt: string): TaskProfile {
   const kind = detectKind(prompt);
   const { score, signals } = baseScore(prompt);
-  return { kind, difficulty: clamp01(score + KIND_LIFT[kind]), tier: tierFor(score, kind), signals };
+  return { kind, difficulty: clamp01(score + KIND_LIFT[kind]), tier: tierFor(score, kind), signals, needs: detectNeeds(prompt) };
 }
 
 // ---------- policy ----------
@@ -171,10 +195,7 @@ export const TIERS: Record<Tier, { claudeModel: string; effort: string }> = {
   max: { claudeModel: 'claude-opus-5-5', effort: 'xhigh' },
 };
 
-/** Kinds that need tools only Claude Code threads get here (the channel browser, store MCPs), so never leave it. */
-const CLAUDE_ONLY: TaskKind[] = ['ops'];
-
-/** At or above this share of a plan window, Auto moves work to the other plan when it can. */
+/** At or above this share of a plan window, Auto moves work to another plan when it can. */
 export const HEADROOM_LIMIT = 0.9;
 
 const EFFORT_SCALE = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
@@ -187,42 +208,114 @@ export function nearestEffort(m: ModelEntry, want: string): string {
   return [...m.efforts].sort((a, b) => Math.abs(at(a) - at(want)) - Math.abs(at(b) - at(want)) || at(a) - at(b))[0];
 }
 
+/** One step less effort, for a brief that asks for speed. Never below low: minimal skips the reasoning a tool loop needs. */
+const lessEffort = (e: string) => (e === 'low' || e === 'minimal' ? e : EFFORT_SCALE[EFFORT_SCALE.indexOf(e) - 1]);
+
 const busy = (u: Usage | null | undefined) =>
-  !!u && (u.status === 'rejected' || (u.five_hour?.utilization ?? 0) >= HEADROOM_LIMIT || (u.seven_day?.utilization ?? 0) >= HEADROOM_LIMIT);
+  !!u &&
+  (u.status === 'rejected' ||
+    (u.five_hour?.utilization ?? 0) >= HEADROOM_LIMIT ||
+    (u.seven_day?.utilization ?? 0) >= HEADROOM_LIMIT ||
+    // Cursor: Composer draws on the Auto and Composer bucket, not the named-model one.
+    (u.monthly?.auto ?? u.monthly?.utilization ?? 0) >= HEADROOM_LIMIT);
+
+/** What routeTask reads besides the profile. */
+export interface RouteContext {
+  catalog: Catalog;
+  usage?: Partial<Record<HarnessId, Usage | null>>;
+  /** The first message carries images. Cursor Agent only gets their paths, so it is left out. */
+  images?: boolean;
+}
+
+interface Run {
+  harness: HarnessId;
+  model: ModelEntry;
+  effort: string;
+}
+
+const free = (ctx: RouteContext, h: HarnessId) => {
+  const info = getHarness(ctx.catalog, h);
+  return info?.available && !busy(ctx.usage?.[h]) ? info : undefined;
+};
+
+/** Claude Code's model for the tier, regardless of its plan: the fallback every lane ends at. */
+function claudeRun(p: TaskProfile, ctx: RouteContext, effort: string): Run | null {
+  const h = getHarness(ctx.catalog, 'claude-code');
+  const m = h?.models.find((x) => x.id === TIERS[p.tier].claudeModel) ?? h?.models.find((x) => x.default) ?? h?.models[0];
+  return m ? { harness: 'claude-code', model: m, effort: nearestEffort(m, effort) } : null;
+}
+
+/** Codex's default model, which is the user's own pick in its config. */
+function codexRun(ctx: RouteContext, effort: string, mustBeFree = true): Run | null {
+  const h = mustBeFree ? free(ctx, 'codex') : getHarness(ctx.catalog, 'codex');
+  const m = h?.available ? (h.models.find((x) => x.default) ?? h.models[0]) : undefined;
+  return m ? { harness: 'codex', model: m, effort: nearestEffort(m, effort) } : null;
+}
+
+/**
+ * Cursor's Composer: third on Artificial Analysis's Coding Agent Index at a few cents a task, and among its fastest
+ * agents. Never with images in the message, since Cursor Agent only gets their paths.
+ */
+function composerRun(ctx: RouteContext): Run | null {
+  if (ctx.images) return null;
+  const m = free(ctx, 'cursor')?.models.find((x) => x.id.startsWith('composer'));
+  return m ? { harness: 'cursor', model: m, effort: '' } : null;
+}
+
+const coding = (p: TaskProfile) => p.kind === 'code';
+
+/**
+ * Reasons to run somewhere other than Claude Code's tier model, first match wins. A lane whose harness is down or out
+ * of headroom yields null and the next one is tried. Grok, Gemini and the rest of Cursor's list have no lane: for
+ * coding Composer is stronger and cheaper, and the named models draw on Cursor's pricier bucket (docs/internals/auto-routing.md).
+ */
+const LANES: { why: string; run: (p: TaskProfile, ctx: RouteContext, effort: string) => Run | null }[] = [
+  { why: 'Codex is the harness here that generates images', run: (p, ctx, e) => (p.needs.includes('image-generation') ? codexRun(ctx, e, false) : null) },
+  { why: 'your mail, calendar, Notion and Slack connectors are in Claude Code', run: (p, ctx, e) => (p.needs.includes('connectors') ? claudeRun(p, ctx, e) : null) },
+  { why: 'a second model family reviews it', run: (p, ctx, e) => (p.needs.includes('review') ? codexRun(ctx, e) : null) },
+  { why: 'the Claude plan is near its limit', run: (_, ctx, e) => (busy(ctx.usage?.['claude-code']) ? codexRun(ctx, e) : null) },
+  {
+    why: 'the Claude and ChatGPT plans are near their limits',
+    run: (p, ctx) => (coding(p) && busy(ctx.usage?.['claude-code']) ? composerRun(ctx) : null),
+  },
+  {
+    why: 'it is fast and cheap for a quick or mechanical code change',
+    run: (p, ctx) => (coding(p) && (p.needs.includes('speed') || p.needs.includes('bulk')) && p.tier !== 'max' ? composerRun(ctx) : null),
+  },
+];
 
 const KIND_LABEL: Record<TaskKind, string> = { code: 'code', math: 'math', research: 'research', writing: 'writing', ops: 'ops', chat: 'quick' };
 const TIER_LABEL: Record<Tier, string> = { light: 'Light', standard: 'Standard', heavy: 'Hard', max: 'Very hard' };
+const HARNESS_LABEL: Record<HarnessId, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor', hermes: 'Hermes' };
 
 /**
- * Map a profile onto the catalog. Claude Code is the home harness; Codex takes over when the Claude plan is near its
- * limit and Codex has headroom. Cursor and Hermes bill outside the user's subscriptions, so Auto never picks them.
+ * Map a profile onto the catalog through LANES, else Claude Code's tier model. Hermes bills the Anthropic API, so Auto
+ * never picks it.
  */
-export function routeTask(profile: TaskProfile, cat: Catalog, usage: Partial<Record<HarnessId, Usage | null>> = {}): AutoPick {
-  const tier = TIERS[profile.tier];
-  const codex = getHarness(cat, 'codex');
-  const codexModel = codex?.models.find((m) => m.default) ?? codex?.models[0];
-  const moveToCodex =
-    busy(usage['claude-code']) && !CLAUDE_ONLY.includes(profile.kind) && !!codex?.available && !!codexModel && !busy(usage.codex);
-
-  const label = `${TIER_LABEL[profile.tier]} ${KIND_LABEL[profile.kind]} task`;
-  if (moveToCodex) {
-    const effort = nearestEffort(codexModel!, tier.effort);
-    return {
-      harness: 'codex',
-      model: codexModel!.id,
-      effort,
-      profile,
-      reason: `${label}: ${codexModel!.label}${effort ? `, ${effort} effort` : ''} on Codex, since the Claude plan is near its limit`,
-    };
+export function routeTask(profile: TaskProfile, ctx: RouteContext): AutoPick {
+  const speed = profile.needs.includes('speed');
+  const effort = speed ? lessEffort(TIERS[profile.tier].effort) : TIERS[profile.tier].effort;
+  let why = '';
+  let run: Run | null = null;
+  for (const lane of LANES) {
+    run = lane.run(profile, ctx, effort);
+    if (run) {
+      why = lane.why;
+      break;
+    }
   }
-  const claude = getHarness(cat, 'claude-code');
-  const m = claude?.models.find((x) => x.id === tier.claudeModel) ?? claude?.models.find((x) => x.default) ?? claude?.models[0];
-  const effort = m ? nearestEffort(m, tier.effort) : tier.effort;
+  run ??= claudeRun(profile, ctx, effort);
+  if (!run) throw new Error('Auto found no harness to run on.');
+  // A chat task already reads "quick task".
+  const quick = speed && profile.kind !== 'chat';
+  const label = `${quick ? `Quick ${TIER_LABEL[profile.tier].toLowerCase()}` : TIER_LABEL[profile.tier]} ${KIND_LABEL[profile.kind]} task`;
+  const on = run.harness === 'claude-code' ? '' : ` on ${HARNESS_LABEL[run.harness]}`;
+  const missed = profile.needs.includes('image-generation') && run.harness !== 'codex' ? ', and no image generation: Codex is not signed in' : '';
   return {
-    harness: 'claude-code',
-    model: m?.id ?? tier.claudeModel,
-    effort,
+    harness: run.harness,
+    model: run.model.id,
+    effort: run.effort,
     profile,
-    reason: `${label}: ${m?.label ?? tier.claudeModel}, ${effort} effort`,
+    reason: `${label}: ${run.model.label}${run.effort ? `, ${run.effort} effort` : ''}${on}${why ? `, since ${why}` : ''}${missed}`,
   };
 }
