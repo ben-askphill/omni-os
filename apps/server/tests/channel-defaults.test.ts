@@ -46,10 +46,10 @@ describe('channel run defaults', () => {
     expect(H.thread(t.id)).toMatchObject({ model: 'claude-haiku-4-5', effort: '' });
   });
 
-  it('a default the catalog no longer has does not block a thread', async () => {
+  it('a default the catalog no longer has does not block a thread, which goes to Auto', async () => {
     H.db.channels.update('tuned', { default_model: 'claude-retired-1' });
     const t = await H.runner.createThread({ channel: 'tuned', prompt: 'hi' });
-    expect(H.thread(t.id)).toMatchObject({ harness: 'claude-code', model: null, effort: '' });
+    expect(H.thread(t.id)).toMatchObject({ harness: 'claude-code', auto_reason: expect.any(String) });
   });
 
   it('a retired default does not block a save that leaves it alone', async () => {
@@ -58,5 +58,22 @@ describe('channel run defaults', () => {
     expect((await patch({ archived: 0, notes: 'y' })).status).toBe(200);
     // Touching the defaults still checks them.
     expect((await patch({ default_effort: 'low' })).status).toBe(400);
+  });
+});
+
+describe('Auto', () => {
+  it('picks the run for a thread that sets nothing, and says why', async () => {
+    H.db.channels.create({ id: 'plain', name: 'Plain', kind: 'internal', use_worktree: 0, base_dir: H.tmp });
+    const t = await H.runner.createThread({ channel: 'plain', prompt: 'What is the capital of the Netherlands?' });
+    expect(H.thread(t.id)).toMatchObject({ harness: 'claude-code', model: 'claude-haiku-4-5', effort: 'low' });
+    expect(H.thread(t.id).auto_reason).toMatch(/Haiku 4\.5, low effort/);
+  });
+
+  it('is a channel default, and a thread that names a model leaves it', async () => {
+    expect((await patch({ default_harness: '', default_model: 'auto', default_effort: '' })).status).toBe(200);
+    const auto = await H.runner.createThread({ channel: 'tuned', prompt: 'Fix the typo in README.md' });
+    expect(H.thread(auto.id)).toMatchObject({ model: 'claude-sonnet-5-5', auto_reason: expect.any(String) });
+    const picked = await H.runner.createThread({ channel: 'tuned', prompt: 'Fix the typo in README.md', model: 'opus' });
+    expect(H.thread(picked.id)).toMatchObject({ model: 'opus', auto_reason: null });
   });
 });

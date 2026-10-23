@@ -1,0 +1,25 @@
+{
+  "source": "SWE-bench Verified, dev half, fitted by scripts/route-eval/fit.ts",
+  "rows": 257,
+  "bias": 0.3837,
+  "weights": {
+    "architecture": 0.15,
+    "breadth": 0.08,
+    "concurrency": 0.12,
+    "debugging": 0.1,
+    "identifiers": 0.1371,
+    "length": 0.3503,
+    "listing": -0.08,
+    "lookup": -0.1,
+    "multi-step": 0.08,
+    "proof": 0.1,
+    "reasoning": 0.06,
+    "security": 0.1,
+    "small change": -0.15
+  },
+  "scale": {
+    "lo": 0.3837,
+    "hi": 0.9844
+  },
+  "maxCut": 0.8475
+}

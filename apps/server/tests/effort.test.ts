@@ -30,7 +30,7 @@ describe('effort reaches the Claude CLI', () => {
   });
 
   it('passes nothing when effort is the default', async () => {
-    const t = await H.start('do the other thing');
+    const t = await H.start('do the other thing', { harness: 'claude-code' });
     await H.untilResults(t.id, 1);
     const inv = H.invocations().find((i) => i.thread_id === t.id && i.mode === 'stream');
     expect(inv.effort).toBeNull();

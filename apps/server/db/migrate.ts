@@ -236,6 +236,7 @@ export function migrate() {
   db.exec(SCHEMA);
   ensureColumn('threads', 'harness', `TEXT NOT NULL DEFAULT 'claude-code'`);
   ensureColumn('threads', 'effort', `TEXT NOT NULL DEFAULT ''`);
+  ensureColumn('threads', 'auto_reason', 'TEXT');
   // Sync: the machine id of the Mac running or queueing the thread, null otherwise. Synced, kept out of the API.
   ensureColumn('threads', 'run_machine', 'TEXT');
   ensureColumn('threads', 'suggestion', 'TEXT');

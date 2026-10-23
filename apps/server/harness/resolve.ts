@@ -2,12 +2,14 @@
 //   1. the thread's own choice (composer, automation or conductor);
 //   2. the crew role's default;
 //   3. the channel's default;
-//   4. Claude Code with its default model.
+//   4. Auto, which picks from the prompt (harness/auto.ts).
+// Any of 1 to 3 can ask for Auto too, with model "auto".
 // A role that sets any of harness, model or effort replaces the channel's default whole; the two never mix.
 // The defaults' model and effort only apply when the thread runs on their harness, and their effort
 // only when their model is the one picked (or, when they name no model, the harness default is). Pure, so it is testable.
 import { isHarnessId, DEFAULT_HARNESS, HARNESS_META, type HarnessId } from './types.ts';
 import { getHarness, unavailableError, validateRun, type Catalog, type Resolved, type ResolveError } from './catalog.ts';
+import { asksAuto } from './auto.ts';
 
 export interface RunChoice {
   harness?: string | null;
@@ -23,9 +25,20 @@ export interface RoleDefaults {
 /** Whether a role or channel sets anything about the run. */
 export const setsRun = (d: RoleDefaults | undefined): d is RoleDefaults => !!(d?.harness || d?.model || d?.effort);
 
-export function resolveRun(choice: RunChoice, roleDefaults: RoleDefaults | undefined, cat: Catalog, channel?: RoleDefaults): Resolved | ResolveError {
+/** Auto picks the harness, model and effort once the prompt is known. */
+export interface AutoRun {
+  ok: true;
+  auto: true;
+}
+const AUTO_RUN: AutoRun = { ok: true, auto: true };
+
+export function resolveRun(choice: RunChoice, roleDefaults: RoleDefaults | undefined, cat: Catalog, channel?: RoleDefaults): Resolved | AutoRun | ResolveError {
   // The role's defaults when it sets any, else the channel's. Below, "role" is whichever applies.
-  const role = setsRun(roleDefaults) ? roleDefaults : setsRun(channel) ? channel : roleDefaults;
+  const layer = setsRun(roleDefaults) ? roleDefaults : setsRun(channel) ? channel : undefined;
+  if (asksAuto(choice)) return AUTO_RUN;
+  if (!(choice.harness || choice.model || choice.effort) && (!layer || asksAuto(layer))) return AUTO_RUN;
+  // A choice that names a harness or model replaces an Auto default, which then sets nothing.
+  const role = asksAuto(layer) ? undefined : (layer ?? roleDefaults);
   if (choice.harness && !isHarnessId(choice.harness)) return { ok: false, error: `Unknown harness "${choice.harness}".` };
   if (role?.harness && !isHarnessId(role.harness)) return { ok: false, error: `Unknown harness "${role.harness}".` };
 
@@ -54,6 +67,7 @@ export function resolveRun(choice: RunChoice, roleDefaults: RoleDefaults | undef
 
 /** Validate a role, channel or automation's declared defaults against the catalog, for the settings pages. */
 export function validateDefaults(defaults: RoleDefaults, cat: Catalog): string | undefined {
+  if (asksAuto(defaults)) return defaults.effort ? `Auto picks the effort, so leave it empty (got "${defaults.effort}")` : undefined;
   if (defaults.harness && !isHarnessId(defaults.harness)) {
     return `unknown harness "${defaults.harness}" (valid: ${Object.keys(HARNESS_META).join(', ')})`;
   }

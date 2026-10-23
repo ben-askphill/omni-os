@@ -30,10 +30,16 @@ describe('conductor delegates on any harness', () => {
     expect(t.parent_id).toBe(parent.id);
   });
 
-  it('uses the role defaults when no harness is named', async () => {
-    const t = await H.runner.createThread({ channel: 'scratch', prompt: 'build it', role: 'builder', source: 'conductor' });
-    expect(t.harness).toBe('claude-code'); // builder sets only a model, so it stays on Claude Code
-    expect(t.model).toBe('claude-opus-5-5');
+  it("uses the role's default, Auto for the builder, when no harness is named", async () => {
+    const small = await H.runner.createThread({ channel: 'scratch', prompt: 'Fix the typo in README.md', role: 'builder', source: 'conductor' });
+    expect(small).toMatchObject({ harness: 'claude-code', model: 'claude-sonnet-5-5', auto_reason: expect.any(String) });
+    const big = await H.runner.createThread({
+      channel: 'scratch',
+      prompt: 'Debug the flaky race in the sync outbox, find the root cause and redesign the locking across every handler',
+      role: 'builder',
+      source: 'conductor',
+    });
+    expect(big).toMatchObject({ harness: 'claude-code', model: 'claude-opus-5-5' });
   });
 
   it('rejects an unknown model with the valid options', async () => {

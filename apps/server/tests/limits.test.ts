@@ -32,8 +32,9 @@ const refused = (fn: () => unknown) => {
   throw new Error('expected a refusal');
 };
 
+// Pinned to Claude Code: once a stop marks the Claude plan as refusing, Auto would move the next thread to Codex.
 const limited = async (prompt: string, extra: Record<string, unknown> = {}) => {
-  const t = await H.start(prompt, extra);
+  const t = await H.start(prompt, { harness: 'claude-code', ...extra });
   await H.until(`a limit stop: ${prompt}`, () => H.thread(t.id).limit_state === 'limited' && H.thread(t.id).status === 'failed', 12_000);
   return t;
 };
@@ -59,7 +60,7 @@ describe('what counts as a limit stop', () => {
   });
 
   it('never makes one of a full usage meter on a turn that runs', async () => {
-    const t = await H.start('FULLMETER busy turn');
+    const t = await H.start('FULLMETER busy turn', { harness: 'claude-code' });
     await H.untilResults(t.id, 1);
     expect(H.thread(t.id)).toMatchObject({ status: 'done', limit_state: null });
     const { usageFor } = await import('../usage.ts');
@@ -214,7 +215,7 @@ describe('what clears it', () => {
 
 describe('follow-ups queued behind a limited turn', () => {
   it('wait for Ben instead of running ahead of the continuation', async () => {
-    const t = await H.start(`THINK:600 LIMIT:${RESET} long one`);
+    const t = await H.start(`THINK:600 LIMIT:${RESET} long one`, { harness: 'claude-code' });
     await H.untilStatus(t.id, 'running');
     await H.until('the CLI to read the first message', () => H.byKind(t.id, 'user').length === 1);
     const posted = await H.runner.postMessage(t.id, 'and then this', { mode: 'queue', requestId: 'later-1' });

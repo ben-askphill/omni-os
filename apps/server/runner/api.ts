@@ -9,7 +9,9 @@ import { listCommands, peekCommands } from '../commands.ts';
 import { withMentions } from '../mentions.ts';
 import { saveUploads, type Attachment } from '../uploads.ts';
 import type { HarnessId } from '../harness/types.ts';
-import type { Catalog } from '../harness/catalog.ts';
+import type { Catalog, Resolved } from '../harness/catalog.ts';
+import { profileTask, routeTask } from '../harness/auto.ts';
+import { usageByHarness } from '../usage.ts';
 import { freshCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { resolveRun } from '../harness/resolve.ts';
 import type { CommandUse } from '../harness/adapter.ts';
@@ -96,7 +98,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const channel = channels.get(channelId);
   if (!channel) throw new Error(`unknown channel "${channelId}"`);
 
-  // Resolve harness/model/effort: the thread's own choice, then the role's default, then the channel's, then Claude Code.
+  // Resolve harness/model/effort: the thread's own choice, then the role's default, then the channel's, then Auto.
   // On a miss, probe the harnesses that are down and try again: Ben may have just logged in.
   const channelDefaults = { harness: channel.default_harness ?? undefined, model: channel.default_model ?? undefined, effort: channel.default_effort ?? undefined };
   const resolve = (cat: Catalog, withChannel = true) =>
@@ -111,8 +113,8 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   // A channel default the catalog no longer has (a retired model) never blocks a thread: drop it.
   if (!run.ok) run = resolve(getCatalog(), false);
   if (!run.ok) throw new Error(run.error);
-  const harness = run.harness;
-  const effort = run.effort;
+  const auto = 'auto' in run ? routeTask(profileTask(input.prompt), getCatalog(), usageByHarness()) : null;
+  const { harness, model, effort } = auto ?? (run as Resolved);
 
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
 
@@ -125,9 +127,10 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
     title: input.title?.trim() || fallbackTitle(input.prompt),
     status,
     role: role?.id ?? null,
-    model: run.model || null,
+    model: model || null,
     harness,
     effort,
+    auto_reason: auto?.reason ?? null,
     session_id: id,
     cwd: wd.cwd,
     branch: wd.branch,

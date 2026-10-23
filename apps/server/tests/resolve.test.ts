@@ -24,6 +24,7 @@ const cat: Catalog = {
 
 const ok = (r: ReturnType<typeof resolveRun>) => {
   if (!r.ok) throw new Error(r.error);
+  if ('auto' in r) throw new Error('resolved to Auto');
   return r;
 };
 
@@ -41,8 +42,9 @@ describe('run resolver precedence', () => {
     expect(ok(resolveRun({}, { harness: 'codex', model: 'gpt-5.6-sol', effort: 'high' }, cat))).toMatchObject({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'high' });
   });
 
-  it('falls back to Claude Code with no model when nothing is set', () => {
-    expect(ok(resolveRun({}, undefined, cat))).toEqual({ ok: true, harness: 'claude-code', model: '', effort: '' });
+  it('falls back to Auto when nothing is set', () => {
+    expect(resolveRun({}, undefined, cat)).toEqual({ ok: true, auto: true });
+    expect(resolveRun({}, {}, cat, {})).toEqual({ ok: true, auto: true });
   });
 
   it('keeps a role that only sets a model on Claude Code, applying its effort', () => {
@@ -101,6 +103,29 @@ describe('run resolver precedence', () => {
   it('passes values through when the catalog for the harness has no models', () => {
     const bare: Catalog = { harnesses: [{ ...codexHarness({ available: true, models: [] }, 4), available: true }] };
     expect(ok(resolveRun({ harness: 'codex', model: 'whatever', effort: 'odd' }, undefined, bare))).toMatchObject({ model: 'whatever', effort: 'odd' });
+  });
+});
+
+describe('Auto', () => {
+  it('is picked by the thread, the role or the channel', () => {
+    expect(resolveRun({ model: 'auto' }, { model: 'opus' }, cat)).toEqual({ ok: true, auto: true });
+    expect(resolveRun({ harness: 'auto' }, undefined, cat)).toEqual({ ok: true, auto: true });
+    expect(resolveRun({}, { model: 'auto' }, cat)).toEqual({ ok: true, auto: true });
+    expect(resolveRun({}, undefined, cat, { model: 'auto' })).toEqual({ ok: true, auto: true });
+  });
+
+  it("leaves Cursor's own auto model alone", () => {
+    expect(ok(resolveRun({ harness: 'cursor', model: 'auto' }, undefined, cat))).toMatchObject({ harness: 'cursor', model: 'auto' });
+  });
+
+  it('gives way to a thread that names a harness or model, with nothing left of the Auto default', () => {
+    expect(ok(resolveRun({ model: 'sonnet' }, { model: 'auto' }, cat))).toEqual({ ok: true, harness: 'claude-code', model: 'sonnet', effort: '' });
+    expect(ok(resolveRun({ harness: 'codex' }, undefined, cat, { model: 'auto' }))).toEqual({ ok: true, harness: 'codex', model: '', effort: '' });
+  });
+
+  it('is a valid role or channel default, without an effort', () => {
+    expect(validateDefaults({ model: 'auto' }, cat)).toBeUndefined();
+    expect(validateDefaults({ model: 'auto', effort: 'high' }, cat)).toContain('Auto picks the effort');
   });
 });
 

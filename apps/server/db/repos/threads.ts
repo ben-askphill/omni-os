@@ -20,6 +20,8 @@ export interface Thread {
   harness: string;
   /** Reasoning effort for the model. Empty means the model's default (nothing passed to the CLI). */
   effort: string;
+  /** Why Auto picked this harness, model and effort (harness/auto.ts), null when the thread was not on Auto. Synced. */
+  auto_reason: string | null;
   session_id: string;
   has_run: number;
   cwd: string;
@@ -69,7 +71,7 @@ export interface LimitStop {
 
 /** The columns clients read, without sync's run_machine or the limit stop's id and owner. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, pinned_at, setup, setup_error, limit_state, limit_resets_at, limit_elsewhere, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, auto_reason, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, pinned_at, setup, setup_error, limit_state, limit_resets_at, limit_elsewhere, created_at, updated_at';
 
 /** Who runs a thread with this status: this machine while it is running or queued here and sync is set up, else nobody. */
 const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? outbox.machineId() : null);
@@ -130,18 +132,18 @@ export const threads = {
   create(
     t: Omit<
       Thread,
-      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'archived' | 'folder_id' | 'pinned_at' | 'setup' | 'setup_error' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere'
+      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'auto_reason' | 'archived' | 'folder_id' | 'pinned_at' | 'setup' | 'setup_error' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere'
     > & {
-      has_run?: number; created_at?: string; harness?: string; effort?: string; folder_id?: string | null; setup?: ThreadSetup | null;
+      has_run?: number; created_at?: string; harness?: string; effort?: string; auto_reason?: string | null; folder_id?: string | null; setup?: ThreadSetup | null;
     },
   ) {
     const ts = t.created_at ?? now();
     return tx(() => {
       db.prepare(
-        `INSERT INTO threads (id, channel_id, title, status, role, model, harness, effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, run_machine, folder_id, setup, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO threads (id, channel_id, title, status, role, model, harness, effort, auto_reason, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, run_machine, folder_id, setup, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
-        t.id, t.channel_id, t.title, t.status, t.role, t.model, t.harness ?? 'claude-code', t.effort ?? '', t.session_id, t.has_run ?? 0, t.cwd,
+        t.id, t.channel_id, t.title, t.status, t.role, t.model, t.harness ?? 'claude-code', t.effort ?? '', t.auto_reason ?? null, t.session_id, t.has_run ?? 0, t.cwd,
         t.branch, t.parent_id, t.task_id, t.source, t.automation, runMachine(t.status), t.folder_id ?? null, t.setup ?? null, ts, ts,
       );
       record('thread', t.id);
