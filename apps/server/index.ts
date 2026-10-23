@@ -30,6 +30,7 @@ const { startScheduler } = await import('./automations.ts');
 const { startEventWatch } = await import('./automation-watch.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
 const { startSync } = await import('./sync/worker.ts');
+const { recoverHandoffs } = await import('./handoff.ts');
 const { startWorktreeSweep } = await import('./worktree-sweep.ts');
 const { migrateLegacyConfig } = await import('./config-migrate.ts');
 
@@ -52,6 +53,9 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   if (unprepared) console.log(`[omni] ${unprepared} thread(s) were mid-setup: kept for Retry`);
   const interrupted = threads.failInterrupted();
   if (interrupted) console.log(`[omni] marked ${interrupted} interrupted thread(s) as failed`);
+  // A handoff to another Mac the last server was still preparing never went out: its thread stays here.
+  const handoffs = recoverHandoffs();
+  if (handoffs) console.log(`[omni] ${handoffs} handoff(s) were mid-way: marked failed`);
   // Messages a killed server still held wait for Resume; one it had written to a harness is marked uncertain.
   const parked = messageRequests.recover(outbox.machineId());
   if (parked) console.log(`[omni] kept ${parked} undelivered message(s) for Resume`);

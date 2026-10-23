@@ -1,4 +1,5 @@
-import { db } from '../../db.ts';
+import { db, threads } from '../../db.ts';
+import { publishFeed } from '../../bus.ts';
 import { claim, registerHandler } from '../apply.ts';
 
 // kv: last writer wins per key, the value as JSON. sync.* keys (machine id, cursor, switches, path map) belong to
@@ -22,5 +23,11 @@ registerHandler('kv', {
       JSON.stringify(value),
     );
     return true;
+  },
+  notify(change) {
+    // A handoff record (apps/server/handoff/records.ts): the thread's banner, and whether a turn may start, follow it.
+    const thread = /^handoff\.(?:offer|reply)\.(.+)$/.exec(change.entity_id)?.[1];
+    const t = thread && threads.get(thread);
+    if (t) publishFeed({ type: 'thread', thread: t });
   },
 });

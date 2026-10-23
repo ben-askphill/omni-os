@@ -34,6 +34,8 @@ import {
   runsHere,
   steerRequests,
 } from './runner.ts';
+import { cancelHandoff, handOff } from './handoff.ts';
+import { handoffView } from './handoff/records.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
 import { checkUploads, imageMime, removeUploads, safeName, saveUploads } from './uploads.ts';
@@ -126,6 +128,8 @@ threadRoutesApi.get('/:id', (c) => {
     live: isLive(t.id),
     // The status lines its mods pinned, while its process runs. The feed's mods event keeps them current.
     mods: activeMods().filter((m) => m.thread_id === t.id),
+    // On its way to or from another Mac (apps/server/handoff.ts), null otherwise.
+    handoff: handoffView(t),
   };
   // Only when a turn cannot start here (a synced thread): why, for the composer to show.
   const blocked = turnBlocked(t, runsHere(t.id));
@@ -219,6 +223,18 @@ threadActionsApi.post('/:id/limit/resume', (c) => {
   resumeLimitNow(id);
   return c.json(afterRecovery(id));
 });
+
+/**
+ * Hand the running thread to another synced Mac: `{to}`, that Mac's id from GET /api/devices. Answered as soon as the
+ * offer is written; the thread's `handoff` then follows it, here and on the other Mac. A 409 says why it cannot go.
+ */
+threadActionsApi.post('/:id/handoff', async (c) => {
+  const { to } = z.object({ to: z.string().min(1).max(200) }).parse(await c.req.json().catch(() => ({})));
+  return c.json(await handOff(c.req.param('id'), to));
+});
+
+/** Cancel a handoff from this Mac before the other one picks the thread up. Its queued messages wait here for Resume. */
+threadActionsApi.post('/:id/handoff/cancel', (c) => c.json(cancelHandoff(c.req.param('id'))));
 
 /** Drop messages a restart parked. Each stays in the transcript, marked as never sent. */
 threadActionsApi.post('/:id/requests/discard', async (c) => {
@@ -371,7 +387,7 @@ threadActionsApi.get('/:id/stream', (c) => {
     const onFeed = (e: any) => {
       if (e.type !== 'thread' || (e.thread as Thread).id !== id) return;
       const blocked = turnBlocked(e.thread as Thread, runsHere(id));
-      onEvent({ kind: 'thread', thread: e.thread, pending: pendingFor(id), live: isLive(id), ...(blocked && { blocked }) });
+      onEvent({ kind: 'thread', thread: e.thread, pending: pendingFor(id), live: isLive(id), handoff: handoffView(e.thread as Thread), ...(blocked && { blocked }) });
     };
     bus.on('feed', onFeed);
     stream.onAbort(() => {

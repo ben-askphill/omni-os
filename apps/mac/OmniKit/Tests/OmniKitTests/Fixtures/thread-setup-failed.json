@@ -73,5 +73,6 @@
   ],
   "live": false,
   "mods": [],
+  "handoff": null,
   "blocked": "This thread's worktree could not be prepared: git worktree add failed: fatal: invalid reference: HEAD. Retry to try again."
 }

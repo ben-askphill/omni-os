@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path';
 import { paths, threadDir } from '../config.ts';
 import { channels, outbox, threads, type Thread } from '../db.ts';
 import { restoreWorktree } from '../sandbox.ts';
+import { handoffBlock } from '../handoff/records.ts';
 import { deviceName } from './devices.ts';
 
 // Whether this machine may start a turn in a thread: its worktree is ready, and for a synced thread, it runs here.
@@ -40,12 +41,15 @@ function rebuildable(t: Thread): { cwd: string; worktree?: { repo: string; branc
  * message to the thread is refused with it. A worktree thread is blocked while its worktree is prepared or after
  * that failed; otherwise, with sync never set up here, this is always null.
  * `here`: the runner has the thread (live or waiting for a slot), so a remote write that says running is about this Mac's run.
+ * `taking`: this Mac is picking the thread up from a handoff (apps/server/handoff.ts), which its own wait must not block.
  */
-export function turnBlocked(t: Thread, here = false): string | null {
+export function turnBlocked(t: Thread, here = false, taking = false): string | null {
   // A worktree thread runs only in its own worktree, once Omni has made and checked it (apps/server/runner/setup.ts).
   if (t.setup === 'preparing') return "Omni is still preparing this thread's worktree.";
   if (t.setup === 'failed') return `This thread's worktree could not be prepared: ${(t.setup_error ?? 'unknown error').replace(/\.?$/, '.')} Retry to try again.`;
   if (!here && runningElsewhere(t)) return `This thread is running on ${deviceName(threads.runMachine(t.id)!) ?? 'your other Mac'}.`;
+  const handoff = handoffBlock(t, taking);
+  if (handoff) return handoff;
   if (!outbox.machineId() || existsSync(t.cwd) || rebuildable(t)) return null;
   return `This thread's folder is not on this Mac: ${t.cwd}. Continue it on the Mac that has it, or map the folder to one here in sync.path_map.`;
 }
@@ -55,8 +59,8 @@ export function turnBlocked(t: Thread, here = false): string | null {
  * checking its branch out again for a worktree thread (made on the other Mac, or removed by the worktree sweep).
  * Returns the thread, with its cwd moved when it was.
  */
-export async function prepareTurn(t: Thread, here = false): Promise<Thread> {
-  const blocked = turnBlocked(t, here);
+export async function prepareTurn(t: Thread, here = false, taking = false): Promise<Thread> {
+  const blocked = turnBlocked(t, here, taking);
   if (blocked) throw refused(blocked);
   if (existsSync(t.cwd)) return t;
   // A worktree the sweep removed (apps/server/worktree-sweep.ts) is cut again from its branch, synced or not.

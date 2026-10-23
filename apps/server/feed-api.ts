@@ -2,9 +2,10 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { about } from './about.ts';
-import { bus, publishFeed } from './bus.ts';
+import { bus, publishFeed, type FeedEvent } from './bus.ts';
 import { config } from './config.ts';
-import { needsYou, resultReads, search, threads } from './db.ts';
+import { needsYou, resultReads, search, threads, type Thread } from './db.ts';
+import { handoffView } from './handoff/records.ts';
 import { getProfile } from './profile.ts';
 import { activeMods, activeTasks, queuedCount, runningCount, slotsByHarness } from './runner.ts';
 import { usageByHarness } from './usage.ts';
@@ -13,7 +14,9 @@ export const feedApi = new Hono();
 
 feedApi.get('/feed', (c) =>
   streamSSE(c, async (stream) => {
-    const onFeed = (e: unknown) => void stream.writeSSE({ data: JSON.stringify(e) });
+    // A thread carries its handoff on every update, as its own stream and GET do.
+    const onFeed = (e: FeedEvent) =>
+      void stream.writeSSE({ data: JSON.stringify(e.type === 'thread' ? { ...e, handoff: handoffView(e.thread as Thread) } : e) });
     bus.on('feed', onFeed);
     stream.onAbort(() => {
       bus.off('feed', onFeed);

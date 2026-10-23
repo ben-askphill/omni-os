@@ -90,5 +90,6 @@
   "parent": null,
   "pending": [],
   "live": true,
-  "mods": []
+  "mods": [],
+  "handoff": null
 }

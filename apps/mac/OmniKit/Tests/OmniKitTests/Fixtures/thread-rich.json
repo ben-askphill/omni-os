@@ -314,5 +314,6 @@
   "parent": null,
   "pending": [],
   "live": false,
-  "mods": []
+  "mods": [],
+  "handoff": null
 }
