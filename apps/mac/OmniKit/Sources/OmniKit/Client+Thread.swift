@@ -4,6 +4,8 @@ import Foundation
 public protocol ThreadAPI: Sendable {
   func thread(_ id: String) async throws(OmniAPIError) -> ThreadDetail
   func stopThread(_ id: String) async throws(OmniAPIError) -> OmniThread
+  func handOff(_ id: String, to: String) async throws(OmniAPIError) -> HandoffAnswer
+  func cancelHandoff(_ id: String) async throws(OmniAPIError) -> HandoffAnswer
 }
 
 extension OmniClient: ThreadAPI {}

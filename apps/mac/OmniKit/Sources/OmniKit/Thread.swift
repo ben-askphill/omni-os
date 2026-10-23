@@ -258,9 +258,14 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
   public let pending: [PendingMsg]
   /// A warm CLI process is attached, so the next message starts at once.
   public let live: Bool
+  /// Why a turn cannot start here (a synced thread running on the other Mac, a worktree not ready), for the
+  /// composer to show. Nil when one can.
+  public let blocked: String?
+  /// A handoff of the thread to or from another Mac. Older servers leave it out; a phase this app does not know is nil.
+  public let handoff: HandoffView?
 
   enum CodingKeys: String, CodingKey {
-    case thread, channel, events, artifacts, children, team, parent, pending, live
+    case thread, channel, events, artifacts, children, team, parent, pending, live, blocked, handoff
   }
 
   public init(from decoder: any Decoder) throws {
@@ -274,5 +279,7 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
     parent = try c.decodeIfPresent(OmniThread.self, forKey: .parent)
     pending = try c.decodeIfPresent([PendingMsg].self, forKey: .pending) ?? []
     live = try c.decodeIfPresent(Bool.self, forKey: .live) ?? false
+    blocked = try c.decodeIfPresent(String.self, forKey: .blocked)
+    handoff = (try? c.decodeIfPresent(HandoffView.self, forKey: .handoff)) ?? nil
   }
 }

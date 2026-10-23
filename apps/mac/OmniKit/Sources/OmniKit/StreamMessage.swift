@@ -5,8 +5,9 @@ public enum ThreadStreamMessage: Decodable, Hashable, Sendable {
   /// A new transcript entry. Its id is also the SSE id, the `after` to resume from.
   case event(EventRow)
   case artifact(Artifact)
-  /// The thread row changed. `pending` and `live` come with it when the server sends them.
-  case thread(OmniThread, pending: [PendingMsg]?, live: Bool?)
+  /// The thread row changed. `pending` and `live` come with it when the server sends them. `blocked` and `handoff`
+  /// are the thread's now: the server leaves each out when there is none.
+  case thread(OmniThread, pending: [PendingMsg]?, live: Bool?, blocked: String?, handoff: HandoffView?)
   /// How full the thread's context window is, after each model call and turn. The thread header's meter.
   case context(ContextUsage)
   /// A mod's `$.ui.toast`, for whoever has the thread open. Never stored.
@@ -14,7 +15,7 @@ public enum ThreadStreamMessage: Decodable, Hashable, Sendable {
   case unknown(JSONValue)
 
   private enum CodingKeys: String, CodingKey {
-    case kind, artifact, thread, pending, live, id, payload, text, context
+    case kind, artifact, thread, pending, live, id, payload, text, context, blocked, handoff
   }
 
   public init(from decoder: any Decoder) throws {
@@ -29,7 +30,9 @@ public enum ThreadStreamMessage: Decodable, Hashable, Sendable {
       self = .thread(
         try c.decode(OmniThread.self, forKey: .thread),
         pending: try c.decodeIfPresent([PendingMsg].self, forKey: .pending),
-        live: try? c.decodeIfPresent(Bool.self, forKey: .live)
+        live: try? c.decodeIfPresent(Bool.self, forKey: .live),
+        blocked: try c.decodeIfPresent(String.self, forKey: .blocked),
+        handoff: (try? c.decodeIfPresent(HandoffView.self, forKey: .handoff)) ?? nil
       )
     } else if kind == "context", let usage = try? c.decode(ContextUsage.self, forKey: .context) {
       self = .context(usage)

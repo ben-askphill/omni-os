@@ -48,8 +48,14 @@ public final class ThreadStore {
   public private(set) var connection = ConnectionState.connecting
   /// An interrupt was asked for and the turn has not ended yet.
   public private(set) var stopping = false
-  /// The last interrupt failed.
+  /// The last interrupt, handoff or cancel of one failed.
   public private(set) var actionError: OmniAPIError?
+  /// Why a turn cannot start here, from the server. Nil when one can.
+  public private(set) var blocked: String?
+  /// A handoff of the thread to or from another Mac, kept current by its stream.
+  public private(set) var handoff: HandoffView?
+  /// A handoff or its cancel was asked for and the server has not answered yet.
+  public private(set) var handingOff = false
   /// The newest HTML artifact the stream brought that was not there before, for the viewer to show.
   public private(set) var arrivedHTML: Artifact?
   /// See `StatusLine.label`.
@@ -68,6 +74,8 @@ public final class ThreadStore {
   public var cwd: String? { sessionCwd.flatMap { $0.isEmpty ? nil : $0 } ?? thread?.cwd }
   /// Running or waiting for a slot.
   public var running: Bool { thread?.status.isActive ?? false }
+  /// Its turn runs on this Mac and nothing is moving it yet, so it can be handed to another.
+  public var canHandOff: Bool { running && blocked == nil && !(handoff?.inFlight ?? false) && !handingOff }
   public var interrupting: Bool { stopping || pending.contains { $0.state == .sent && $0.mode == .interrupt } }
   /// The stream dropped and is not back yet.
   public var isReconnecting: Bool {
@@ -229,6 +237,30 @@ public final class ThreadStore {
     }
   }
 
+  /// Hands the thread to the Mac `device`. The banner follows the stream from the answer on.
+  public func handOff(to device: String) async {
+    await handoffCall { api, id throws(OmniAPIError) in try await api.handOff(id, to: device) }
+  }
+
+  /// Calls off a handoff this Mac started, while the other Mac has not taken it.
+  public func cancelHandoff() async {
+    await handoffCall { api, id throws(OmniAPIError) in try await api.cancelHandoff(id) }
+  }
+
+  private func handoffCall(_ call: (any ThreadAPI, String) async throws(OmniAPIError) -> HandoffAnswer) async {
+    guard !handingOff else { return }
+    handingOff = true
+    actionError = nil
+    defer { handingOff = false }
+    do throws(OmniAPIError) {
+      let a = try await call(api, id)
+      merge(a.thread, isReply: true)
+      handoff = a.handoff
+    } catch {
+      actionError = error
+    }
+  }
+
   // MARK: Loading
 
   private var isLoaded: Bool { loadState == .loaded }
@@ -286,6 +318,8 @@ public final class ThreadStore {
 
   private func take(_ d: ThreadDetail) {
     merge(d.thread, pending: d.pending, live: d.live, isReply: false)
+    blocked = d.blocked
+    handoff = d.handoff
     channel = d.channel
     parent = d.parent
     children = d.children
@@ -375,7 +409,11 @@ public final class ThreadStore {
       switch m {
       case .event(let e): rows.append(e)
       case .artifact(let a): upsert(a)
-      case .thread(let t, let p, let live): merge(t, pending: p, live: live, isReply: false)
+      case .thread(let t, let p, let live, let blocked, let handoff):
+        if merge(t, pending: p, live: live, isReply: false) {
+          self.blocked = blocked
+          self.handoff = handoff
+        }
       case .modToast(let t): show(t)
       case .context(let c): context = c
       case .unknown: break

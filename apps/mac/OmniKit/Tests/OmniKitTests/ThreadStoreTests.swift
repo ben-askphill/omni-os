@@ -59,6 +59,8 @@ final class FakeThreadAPI: ThreadAPI {
     var stop: Result<Void, OmniAPIError> = .success(())
     var calls: [String: Int] = [:]
     var hold: Gate?
+    var handoff: Result<HandoffAnswer, OmniAPIError> = .failure(.unreachable("not set"))
+    var handoffs: [String] = []
   }
   private let state = Mutex(State())
 
@@ -98,6 +100,24 @@ final class FakeThreadAPI: ThreadAPI {
     state.withLock { $0.calls["stop", default: 0] += 1 }
     try stop.get()
     return try! decode(OmniThread.self, row())
+  }
+
+  var handoff: Result<HandoffAnswer, OmniAPIError> {
+    get { state.withLock { $0.handoff } }
+    set { state.withLock { $0.handoff = newValue } }
+  }
+
+  /// The Macs the store asked to hand to, then "cancel" for each cancel.
+  var handoffs: [String] { state.withLock { $0.handoffs } }
+
+  func handOff(_ id: String, to: String) async throws(OmniAPIError) -> HandoffAnswer {
+    state.withLock { $0.handoffs.append(to) }
+    return try handoff.get()
+  }
+
+  func cancelHandoff(_ id: String) async throws(OmniAPIError) -> HandoffAnswer {
+    state.withLock { $0.handoffs.append("cancel") }
+    return try handoff.get()
   }
 }
 
@@ -517,5 +537,70 @@ private let turn = [
     #expect(made == ["t1", "t1"])
     registry.release("t1")
     registry.release("t1")
+  }
+}
+
+private func blockedDetail(_ thread: String = row(), handoff: String? = nil) throws -> ThreadDetail {
+  try decode(ThreadDetail.self, #"{"thread":\#(thread),"events":[],"pending":[],"live":true,"handoff":\#(handoff ?? "null")}"#)
+}
+
+private func handoffAnswer(_ thread: String, _ state: String) throws -> HandoffAnswer {
+  try decode(HandoffAnswer.self, #"{"thread":\#(thread),"handoff":\#(handoffJSON(state))}"#)
+}
+
+@MainActor @Suite struct ThreadStoreHandoffTests {
+  @Test func canHandOffOnlyATurnRunningHere() async throws {
+    let api = FakeThreadAPI(try blockedDetail())
+    let (store, conn, _, _) = try await openStore(api)
+    defer { store.stop() }
+    #expect(store.canHandOff)
+
+    conn.send(sse(#"{"kind":"thread","thread":\#(row(updated: 1)),"blocked":"This thread is running on Ben's MacBook Pro."}"#))
+    try await waitFor("the block") { store.blocked != nil }
+    #expect(!store.canHandOff)
+
+    conn.send(sse(#"{"kind":"thread","thread":\#(row(updated: 2)),"handoff":\#(handoffJSON(#"{"phase":"preparing","step":"stopping"}"#))}"#))
+    try await waitFor("the handoff") { store.handoff != nil }
+    #expect(store.blocked == nil, "a thread message says the block is gone by leaving it out")
+    #expect(!store.canHandOff, "not while one is under way")
+
+    conn.send(sse(threadMessage(row("stopped", updated: 3))))
+    try await waitFor("the stop") { store.thread?.status == .stopped }
+    #expect(store.handoff == nil)
+    #expect(!store.canHandOff)
+  }
+
+  @Test func anOlderThreadRowLeavesTheHandoffAsItWas() async throws {
+    let api = FakeThreadAPI(try blockedDetail(row(updated: 10), handoff: handoffJSON(#"{"phase":"offered","stale":false}"#)))
+    let (store, conn, _, _) = try await openStore(api)
+    defer { store.stop() }
+    conn.send(sse(threadMessage(row(updated: 5))))
+    conn.send(sse(event: ev(1), id: 1))
+    try await waitFor("the stream read") { store.events.count == 1 }
+    #expect(store.handoff?.state == .offered(stale: false))
+  }
+
+  @Test func showsTheAnswerAtOnceAndTheRefusalAboveTheComposer() async throws {
+    let api = FakeThreadAPI(try blockedDetail())
+    let (store, _, _, _) = try await openStore(api)
+    defer { store.stop() }
+
+    api.handoff = .failure(.http(status: 409, message: "Ben's MacBook Pro is offline."))
+    await store.handOff(to: "m-pro")
+    #expect(store.actionError?.message == "Ben's MacBook Pro is offline.")
+    #expect(store.handoff == nil)
+    #expect(!store.handingOff)
+
+    api.handoff = .success(try handoffAnswer(row(updated: 1), #"{"phase":"preparing","step":"stopping"}"#))
+    await store.handOff(to: "m-pro")
+    #expect(store.actionError == nil)
+    #expect(store.handoff?.state == .preparing(.stopping))
+    #expect(!store.canHandOff)
+
+    api.handoff = .success(try handoffAnswer(row("stopped", updated: 2), #"{"phase":"cancelled"}"#))
+    await store.cancelHandoff()
+    #expect(store.handoff?.state == .cancelled)
+    #expect(store.thread?.status == .stopped)
+    #expect(api.handoffs == ["m-pro", "m-pro", "cancel"])
   }
 }

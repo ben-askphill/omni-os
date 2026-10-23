@@ -113,6 +113,8 @@ public final class AppModel {
   public let folders = FolderModel()
   /// Titles and marks for the links in replies (`/api/links`). Follows the connection.
   public let links = LinkPreviewStore()
+  /// The other synced Macs a running thread can be handed to. Follows the connection.
+  public let devices = DevicesModel()
 
   @ObservationIgnored private let connect: @MainActor (_ port: Int) -> Connection
   @ObservationIgnored private var config: ServerConfig
@@ -140,6 +142,7 @@ public final class AppModel {
     store = c.store
     folders.connect(store: c.store, api: c.client)
     links.connect(api: c.client)
+    devices.connect(api: c.client)
     threads = c.threads
     feed = c.feed
     follow(c)
@@ -398,6 +401,7 @@ public final class AppModel {
       store = c.store
       folders.connect(store: c.store, api: c.client)
       links.connect(api: c.client)
+      devices.connect(api: c.client)
       threads = c.threads
       feed = c.feed
       follow(c)

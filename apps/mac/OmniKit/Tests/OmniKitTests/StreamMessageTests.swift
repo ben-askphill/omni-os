@@ -24,12 +24,12 @@ let artifactJSON = """
 
   @Test func readsAThreadChange() throws {
     let m = try decode(ThreadStreamMessage.self, #"{"kind":"thread","thread":\#(threadJSON()),"pending":[],"live":false}"#)
-    guard case .thread(let t, let pending, let live) = m else { Issue.record("not a thread: \(m)"); return }
+    guard case .thread(let t, let pending, let live, nil, nil) = m else { Issue.record("not a thread: \(m)"); return }
     #expect(t.id == "t1")
     #expect(pending == [])
     #expect(live == false)
     let bare = try decode(ThreadStreamMessage.self, #"{"kind":"thread","thread":\#(threadJSON())}"#)
-    guard case .thread(_, nil, nil) = bare else { Issue.record("expected no pending or live: \(bare)"); return }
+    guard case .thread(_, nil, nil, nil, nil) = bare else { Issue.record("expected no pending or live: \(bare)"); return }
   }
 
   @Test func readsContextReadings() throws {
