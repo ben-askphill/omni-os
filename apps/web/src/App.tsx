@@ -5,18 +5,8 @@ import { CommandPalette } from './components/CommandPalette.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { BrowserNotifier } from './components/BrowserNotifier.tsx';
 import { ThreadNotifier, ToastProvider } from './components/Toaster.tsx';
-import { Empty, LinkButton } from './components/ui.tsx';
-import { AutomationsPage } from './pages/Automations.tsx';
-import { ArtifactsPage } from './pages/Artifacts.tsx';
-import { ChannelPage } from './pages/Channel.tsx';
-import { HomePage } from './pages/Home.tsx';
-import { NewChannelPage } from './pages/ChannelSettings.tsx';
-import { SearchPage } from './pages/Search.tsx';
-import { SecretsPage } from './pages/Secrets.tsx';
-import { SettingsPage } from './pages/Settings.tsx';
-import { SyncPage } from './pages/Sync.tsx';
-import { ThreadPage } from './pages/Thread.tsx';
-import { href, useRoute, type Route } from './router.ts';
+import { useRoute } from './router.ts';
+import { Page } from './pages/Page.tsx';
 import { AppProvider, readPref, useIsMobile, usePageTitle, useSyncOnReturn, writePref } from './store.tsx';
 import { FolderDeleteDialog, FolderProvider } from './folders.tsx';
 import { MobileShell } from './mobile/MobileShell.tsx';
@@ -85,40 +75,6 @@ function SidebarPane({ children }: { children: ReactNode }) {
       {dragging && <div className="fixed inset-0 z-50 cursor-col-resize" />}
     </aside>
   );
-}
-
-function Page({ route }: { route: Route }) {
-  switch (route.name) {
-    case 'home':
-    case 'channels':
-      return <HomePage />;
-    case 'channel':
-      return <ChannelPage key={route.id} id={route.id} tab={route.tab} pr={route.pr} />;
-    case 'thread':
-      return <ThreadPage key={route.id} id={route.id} artifact={route.artifact} />;
-    case 'search':
-      return <SearchPage q={route.q} />;
-    case 'automations':
-      return <AutomationsPage />;
-    case 'secrets':
-      return <SecretsPage />;
-    case 'sync':
-      return <SyncPage />;
-    case 'settings':
-      return <SettingsPage />;
-    case 'artifacts':
-      return <ArtifactsPage />;
-    case 'new-channel':
-      return <NewChannelPage />;
-    default:
-      return (
-        <div className="h-full overflow-y-auto">
-          <Empty icon="alert" title="Page not found" action={<LinkButton href={href.home()}>Go home</LinkButton>}>
-            Nothing lives at {route.path}.
-          </Empty>
-        </div>
-      );
-  }
 }
 
 function Shell() {

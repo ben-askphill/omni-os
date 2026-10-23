@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { api, errorText, useApi, type ChannelWithRunning, type Thread } from '../api.ts';
+import { CHANNEL_KIND } from '../format.ts';
 import { NewThreadComposer } from '../components/Composer.tsx';
 import { NeedsYouSection } from '../components/NeedsYou.tsx';
 import { inChannel } from '../needs-you.ts';
@@ -89,8 +90,6 @@ function MissingChannel({ id }: { id: string }) {
   );
 }
 
-const KIND_LABEL: Record<string, string> = { client: 'Client', internal: 'Internal', personal: 'Personal', system: 'System' };
-
 export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?: number }) {
   const { channel, channelsLoaded } = useApp();
   const ch = channel(id);
@@ -116,7 +115,7 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
           <Avatar name={ch.name} channelIcon={ch.icon} icon={isConductor ? 'target' : undefined} size={44} />
           <div className="min-w-0 flex-1">
             <div className="caption mb-1 flex items-center gap-2">
-              {KIND_LABEL[ch.kind] ?? ch.kind}
+              {CHANNEL_KIND[ch.kind] ?? ch.kind}
               {ch.running > 0 && (
                 <span className="flex items-center gap-1.5 text-live-text">
                   <StatusDot status="running" size={7} />

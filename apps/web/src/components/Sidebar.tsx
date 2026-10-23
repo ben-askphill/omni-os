@@ -5,28 +5,15 @@ import { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, drag, draftKey, freeName, useFold
 import { foldAllAction, openFolderIds } from '../sidebar-fold.ts';
 import { openMenu } from './ContextMenu.tsx';
 import { pinnedRows, type PinnedThread } from '../pins.ts';
-import { duration, monthlyTitle, plural, toDate, untilLabel } from '../format.ts';
+import { duration, monthlyTitle, plural, toDate, untilLabel, windowPct } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { readPref, useApp, useNow, writePref } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { ThemeSwitch } from './theme.tsx';
-import { HarnessLogo, Loader, OmniMark } from './brand.tsx';
+import { HARNESS_ROWS, HarnessLogo, Loader, OmniMark } from './brand.tsx';
 import { ChannelMark, ErrorNote, Icon, IconButton, Kbd, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
-
-const HARNESS_ROWS: { id: HarnessId; name: string }[] = [
-  { id: 'claude-code', name: 'Claude' },
-  { id: 'codex', name: 'Codex' },
-  { id: 'cursor', name: 'Cursor' },
-  { id: 'hermes', name: 'Hermes' },
-];
-
-const windowPct = (w?: UsageWindow) => {
-  if (!w) return null;
-  const raw = w.utilization > 1.5 ? w.utilization / 100 : w.utilization;
-  return Math.max(0, Math.min(1, raw));
-};
 
 /** One window's tick bar and percentage, with the reset time on hover. */
 function WindowCell({ w, label }: { w?: UsageWindow; label: string }) {

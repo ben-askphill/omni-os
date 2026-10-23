@@ -76,6 +76,16 @@ export function duration(ms: number | undefined) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
+/** How full a usage window is, 0 to 1, whether the harness reports a fraction or a percent. Null without one. */
+export const windowPct = (w?: { utilization: number }) => {
+  if (!w) return null;
+  const raw = w.utilization > 1.5 ? w.utilization / 100 : w.utilization;
+  return Math.max(0, Math.min(1, raw));
+};
+
+/** A channel kind as people read it. */
+export const CHANNEL_KIND: Record<string, string> = { client: 'Client', internal: 'Internal', personal: 'Personal', system: 'System' };
+
 export function untilLabel(unixSecs: number, now = Date.now()) {
   const ms = unixSecs * 1000 - now;
   const d = new Date(unixSecs * 1000);

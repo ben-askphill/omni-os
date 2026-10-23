@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import type { HarnessId } from '../api.ts';
 
 // ---------- the Omni mark ----------
 
@@ -287,6 +288,14 @@ const HARNESS: Record<string, { logo?: keyof typeof LOGO; label: string }> = {
 };
 
 export const harnessLabel = (harness: string) => HARNESS[harness]?.label ?? harness;
+
+/** Each harness with the short name usage rows give it, in the order they list. */
+export const HARNESS_ROWS: { id: HarnessId; name: string }[] = [
+  { id: 'claude-code', name: 'Claude' },
+  { id: 'codex', name: 'Codex' },
+  { id: 'cursor', name: 'Cursor' },
+  { id: 'hermes', name: 'Hermes' },
+];
 
 /** The bare logo. Harnesses without one (Hermes) get their two-letter label. */
 export function HarnessLogo({ harness, size = 14, title }: { harness: string; size?: number; title?: string }) {

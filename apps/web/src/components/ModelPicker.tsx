@@ -173,14 +173,19 @@ export function ModelPicker({
   );
 }
 
+/** The harness and model a choice runs, the harness default when none is picked, and that model's effort levels. */
+export function modelOf(harnesses: HarnessWithRunning[], choice: ModelChoice) {
+  const harness = harnesses.find((x) => x.id === choice.harness);
+  const model = harness?.models.find((x) => x.id === choice.model) ?? (choice.model ? undefined : harness?.models.find((x) => x.default) ?? harness?.models[0]);
+  return { harness, model, efforts: model?.efforts ?? [] };
+}
+
 /**
  * The effort pill for a model choice: "Default" plus the model's levels, or a disabled "Auto effort" when it has
  * none. With no model picked, the levels are the harness default model's.
  */
 export function EffortPicker({ harnesses, choice, value, onChange }: { harnesses: HarnessWithRunning[]; choice: ModelChoice; value: string; onChange: (v: string) => void }) {
-  const h = harnesses.find((x) => x.id === choice.harness);
-  const m = h?.models.find((x) => x.id === choice.model) ?? (choice.model ? undefined : h?.models.find((x) => x.default) ?? h?.models[0]);
-  const efforts = m?.efforts ?? [];
+  const { model: m, efforts } = modelOf(harnesses, choice);
   if (!efforts.length) {
     return <Picker label="Effort" value="" options={[{ value: '', label: 'Auto effort', avatar: false, icon: 'sliders' }]} onChange={() => {}} disabled />;
   }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type SyntheticEvent } from 'react';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
-import { bytes } from '../format.ts';
+import { bytes, CHANNEL_KIND } from '../format.ts';
 import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset, takeComposerFocus } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { ErrorNote, Icon, IconButton, Kbd, Loader, Picker, type IconName, type PickerOption } from './ui.tsx';
@@ -67,7 +67,7 @@ const isImage = (f: File) => f.type.startsWith('image/');
 const sameFile = (a: File, b: File) => a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
 
 /** Files staged for the next message: paperclip, drag-and-drop and paste all land here. */
-function useAttachments() {
+export function useAttachments() {
   const { status } = useApp();
   const maxMb = status?.maxUploadMb ?? 25;
   const [files, setFiles] = useState<File[]>([]);
@@ -145,7 +145,7 @@ function Thumb({ file }: { file: File }) {
 }
 
 /** Staged attachments, above the input, each removable until the message is sent. */
-function AttachmentStrip({ files, onRemove }: { files: File[]; onRemove: (f: File) => void }) {
+export function AttachmentStrip({ files, onRemove }: { files: File[]; onRemove: (f: File) => void }) {
   if (!files.length) return null;
   return (
     <div className="flex flex-wrap gap-1.5 px-3 pt-3 pb-0.5">
@@ -187,8 +187,6 @@ function AttachButton({ onPick, disabled }: { onPick: (files: File[]) => void; d
     </>
   );
 }
-
-const KIND: Record<string, string> = { client: 'Client', internal: 'Internal', personal: 'Personal', system: 'System' };
 
 /** Bencho "cmd" go button: quiet until there is something to send, then ink. */
 function SendButton({ armed, busy, onClick, children }: { armed: boolean; busy: boolean; onClick: () => void; children: ReactNode }) {
@@ -535,7 +533,7 @@ export function NewThreadComposer({
   const channelOptions: PickerOption<string>[] = visibleChannels.map((c) => ({
     value: c.id,
     label: c.id === 'conductor' ? 'Conductor' : c.name,
-    sub: KIND[c.kind] ?? c.kind,
+    sub: CHANNEL_KIND[c.kind] ?? c.kind,
     avatar: c.name,
     icon: c.id === 'conductor' ? 'target' : undefined,
   }));

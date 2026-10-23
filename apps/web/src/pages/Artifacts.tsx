@@ -6,23 +6,27 @@ import { relTime, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { readPref, useApp, useFeed, writePref } from '../store.tsx';
 
-const FILTERS = [
+export const ARTIFACT_FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'html', label: 'Pages' },
   { id: 'image', label: 'Images' },
   { id: 'doc', label: 'Docs' },
   { id: 'data', label: 'Data' },
 ] as const;
-type Filter = (typeof FILTERS)[number]['id'];
+export type ArtifactFilter = (typeof ARTIFACT_FILTERS)[number]['id'];
 
-const matches = (f: Filter, kind: string) =>
+export const matchesArtifactFilter = (f: ArtifactFilter, kind: string) =>
   f === 'all' ||
   (f === 'html' && (kind === 'html' || kind === 'svg')) ||
   (f === 'image' && kind === 'image') ||
   (f === 'doc' && (kind === 'markdown' || kind === 'pdf' || kind === 'text')) ||
   (f === 'data' && (kind === 'csv' || kind === 'json'));
 
-function Thumb({ a }: { a: ArtifactWithThread }) {
+/**
+ * A file's preview: images as they are, pages live and scaled down (to a quarter, or `scale`), anything else its
+ * kind's icon.
+ */
+export function ArtifactThumb({ a, scale }: { a: Pick<ArtifactWithThread, 'id' | 'kind' | 'updated_at'>; scale?: number }) {
   if (a.kind === 'image' || a.kind === 'svg') {
     return <img src={artifactUrl(a)} alt="" loading="lazy" className="h-full w-full object-cover object-top" />;
   }
@@ -36,7 +40,8 @@ function Thumb({ a }: { a: ArtifactWithThread }) {
           tabIndex={-1}
           loading="lazy"
           sandbox="allow-scripts"
-          className="absolute top-0 left-0 h-[400%] w-[400%] origin-top-left scale-25 border-0"
+          className={`absolute top-0 left-0 origin-top-left border-0 ${scale ? '' : 'h-[400%] w-[400%] scale-25'}`}
+          style={scale ? { width: `${100 / scale}%`, height: `${100 / scale}%`, transform: `scale(${scale})` } : undefined}
         />
       </div>
     );
@@ -48,11 +53,9 @@ function Thumb({ a }: { a: ArtifactWithThread }) {
   );
 }
 
-export function ArtifactsPage() {
-  const { channel } = useApp();
+/** Every artifact across channels, newest first, kept current from the feed. */
+export function useArtifacts() {
   const res = useApi<ArtifactWithThread[]>('/artifacts');
-  const [filter, setFilter] = useState<Filter>('all');
-
   // Agents often rewrite a file several times in a row; one refetch per burst is enough.
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const { reload } = res;
@@ -65,9 +68,16 @@ export function ArtifactsPage() {
     }, 1500);
   });
   useEffect(() => () => clearTimeout(timer.current), []);
+  return res;
+}
 
-  const list = useMemo(() => (res.data ?? []).filter((a) => matches(filter, a.kind)), [res.data, filter]);
-  const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.id, (res.data ?? []).filter((a) => matches(f.id, a.kind)).length])) as Record<Filter, number>, [res.data]);
+export function ArtifactsPage() {
+  const { channel } = useApp();
+  const res = useArtifacts();
+  const [filter, setFilter] = useState<ArtifactFilter>('all');
+
+  const list = useMemo(() => (res.data ?? []).filter((a) => matchesArtifactFilter(filter, a.kind)), [res.data, filter]);
+  const counts = useMemo(() => Object.fromEntries(ARTIFACT_FILTERS.map((f) => [f.id, (res.data ?? []).filter((a) => matchesArtifactFilter(f.id, a.kind)).length])) as Record<ArtifactFilter, number>, [res.data]);
 
   // "New" means changed since the previous visit to this page. The first visit marks nothing.
   const [seenAt] = useState(() => readPref<number | null>('artifacts.seen', null));
@@ -84,7 +94,7 @@ export function ArtifactsPage() {
             value={filter}
             onChange={setFilter}
             size="sm"
-            options={FILTERS.map((f) => ({
+            options={ARTIFACT_FILTERS.map((f) => ({
               id: f.id,
               label: f.label,
               badge: counts[f.id] ? <span className="font-num text-[10.5px] text-fg-4 tabular-nums">{counts[f.id]}</span> : undefined,
@@ -110,7 +120,7 @@ export function ArtifactsPage() {
                 className="group flex flex-col rounded-[22px] bg-surface p-1.5 transition-[transform,box-shadow,background-color] duration-300 [transition-timing-function:var(--ease-spring)] hover:-translate-y-0.5 hover:bg-elev hover:shadow-[var(--shadow-card)]"
               >
                 <div className="relative aspect-[16/10] overflow-hidden rounded-[16px] bg-surface-2 shadow-[inset_0_0_0_1px_var(--line)]">
-                  <Thumb a={a} />
+                  <ArtifactThumb a={a} />
                   {isNew(a) && (
                     <span className="pop-in absolute top-2 left-2 inline-flex h-5 items-center gap-1 rounded-full bg-fg px-2 text-[10.5px] font-medium text-on-ink">
                       <span className="h-1 w-1 rounded-full bg-done" /> New
