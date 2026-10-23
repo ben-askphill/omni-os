@@ -2,6 +2,7 @@
 
 uv run --with pandas python -I export_routerbench.py routerbench_0shot.pkl routerbench.jsonl
 Source: https://huggingface.co/datasets/withmartian/routerbench (Hu et al. 2024, arXiv:2403.12031).
+A pickle runs code when loaded: only open the file fetch.sh downloaded and checked against its pinned checksum.
 """
 import ast
 import json
