@@ -179,6 +179,7 @@ export function MoListRow({
   onClick,
   chevron = true,
   last,
+  disabled,
 }: {
   icon?: IconName | ReactNode;
   label: ReactNode;
@@ -187,6 +188,7 @@ export function MoListRow({
   onClick?: () => void;
   chevron?: boolean;
   last?: boolean;
+  disabled?: boolean;
 }) {
   const inner = (
     <>
@@ -207,7 +209,7 @@ export function MoListRow({
   );
   const cls = 'flex min-h-[52px] w-full items-center gap-3.5 px-4 text-left';
   return onClick ? (
-    <button type="button" onClick={onClick} className={`${cls} active:bg-[var(--wash)]`}>
+    <button type="button" onClick={onClick} disabled={disabled} className={`${cls} active:bg-[var(--wash)] disabled:opacity-45`}>
       {inner}
     </button>
   ) : (

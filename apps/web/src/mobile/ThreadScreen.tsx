@@ -3,7 +3,9 @@ import { api, errorText, useApi, type Artifact, type BranchChanges, type Pending
 import { harnessLabel, OmniMark } from '../components/brand.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
-import { Button, ErrorNote, Icon, StatusDot, StatusPill } from '../components/ui.tsx';
+import { handOff, HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx';
+import { deviceRows } from '../handoff.ts';
+import { Button, ErrorNote, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';
 import { changesView } from '../changes.ts';
 import { duration, plural } from '../format.ts';
 import { ArtifactThumb } from '../pages/Artifacts.tsx';
@@ -240,7 +242,11 @@ function Pending({ thread, items, onPending }: { thread: Thread; items: PendingM
 function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: string | null; onClose: () => void }) {
   const shell = useShell();
   const { setPinned, setDone, reloadChannels } = useApp();
-  const { applyThread } = useThread();
+  const { applyThread, blocked, handoff, setHandoff } = useThread();
+  const targets = useHandoffTargets(thread, blocked, handoff);
+  // Set while the sheet lists the Macs the thread can go to.
+  const [handingOff, setHandingOff] = useState(false);
+  const [sending, setSending] = useState<string | null>(null);
   const go = (to: string) => {
     onClose();
     shell.open(to);
@@ -277,6 +283,43 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
       shell.toast(errorText(e));
     }
   };
+  const sendTo = async (to: { id: string; name: string }) => {
+    setSending(to.id);
+    try {
+      const a = await handOff(thread.id, to.id);
+      applyThread(a.thread, true);
+      setHandoff(a.handoff);
+      onClose();
+      shell.toast(`Handing off to ${to.name}`);
+    } catch (e) {
+      setSending(null);
+      shell.toast(errorText(e));
+    }
+  };
+  if (handingOff && targets.state === 'ready') {
+    return (
+      <MoSheet onClose={onClose} label="Hand off to">
+        <div className="px-5 pt-2.5 pb-0.5 text-[15px] leading-[1.3] font-medium">Hand off to</div>
+        <p className="px-5 pb-2.5 text-[12.5px] leading-[1.4] text-fg-3">The turn stops here and keeps running on the Mac you pick.</p>
+        <div className="flex flex-col gap-2.5 px-3">
+          <MoGroup>
+            {deviceRows(targets.devices).map((d, i, all) => (
+              <MoListRow
+                key={d.id}
+                icon={sending === d.id ? <Loader size={14} /> : <StatusDot status={d.dot} size={9} className="mx-[4.5px]" />}
+                label={d.name}
+                sub={d.label}
+                chevron={false}
+                disabled={!d.pickable || !!sending}
+                onClick={() => void sendTo(d)}
+                last={i === all.length - 1}
+              />
+            ))}
+          </MoGroup>
+        </div>
+      </MoSheet>
+    );
+  }
   return (
     <MoSheet onClose={onClose} label="Thread options">
       <div className="truncate px-5 pt-2.5 pb-2 text-[15px] leading-[1.3] font-medium">{thread.title || 'Untitled'}</div>
@@ -288,6 +331,7 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
           <MoListRow icon="info" label="Details" sub="Harness, model, session" onClick={() => go(href.threadView(thread.id, 'details'))} last />
         </MoGroup>
         <MoGroup>
+          {targets.state === 'ready' && <MoListRow icon="share" label="Hand off to…" sub="Keep it running on another Mac" onClick={() => setHandingOff(true)} />}
           <MoListRow icon="pin" label={thread.pinned_at ? 'Unpin from Activity' : 'Pin to Activity'} chevron={false} onClick={() => void pin()} />
           {(thread.done_at || canMarkDone(thread.status)) && (
             <MoListRow icon="check" label={thread.done_at ? 'Mark as not done' : 'Mark as done'} chevron={false} onClick={() => void done()} />
@@ -318,7 +362,7 @@ function useBranchChanges(thread: Thread | null, busy: boolean) {
 export function ThreadScreen() {
   const shell = useShell();
   const s = useThread();
-  const { thread, children, events, files, queued, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready } = s;
+  const { thread, children, events, files, queued, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff } = s;
   const { needsYou, channel } = useApp();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
@@ -457,6 +501,15 @@ export function ThreadScreen() {
             </div>
           );
         })}
+        <HandoffCard
+          thread={thread}
+          handoff={handoff}
+          mobile
+          onChanged={(a) => {
+            applyThread(a.thread, true);
+            setHandoff(a.handoff);
+          }}
+        />
         {!view.turns.length && <MoEmpty>{thread.setup ? 'Preparing the worktree.' : 'Nothing here yet.'}</MoEmpty>}
         {card && <NeedsCardView card={card} inThread onRecovered={(r) => {
               applyThread(r.thread, true);
