@@ -162,7 +162,7 @@ private struct NewThreadBox: View {
       ModelPickerButton(
         harnesses: composer.harnesses, harness: composer.choice.harness, model: composer.choice.model,
         pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest)
-      EffortMenu(options: composer.effortOptions, value: composer.choice.effort, pick: composer.selectEffort)
+      EffortMenu(options: composer.effortOptions, value: composer.choice.effort, auto: composer.choice.isAuto, pick: composer.selectEffort)
       AttachButton(disabled: composer.sending) { picking = true }
       if let folder = composer.folderChip {
         // "New thread here" on a sidebar folder files the thread in it, until Ben takes it out.
@@ -304,17 +304,18 @@ private extension View {
   }
 }
 
-/// The effort pill: Default and the model's levels, or a disabled "Auto effort" when the model has none.
+/// The effort pill: Default and the model's levels, or a disabled "Auto effort" when the model has none or Auto picks it.
 struct EffortMenu: View {
   let options: [EffortOption]
   let value: String
+  var auto = false
   let pick: (String) -> Void
 
   var body: some View {
-    if options.isEmpty {
+    if auto || options.isEmpty {
       PickerPill(text: "Auto effort") { PillIcon(name: "sliders") }
         .opacity(0.45)
-        .help("This model has no effort levels")
+        .help(auto ? "Auto picks the effort for each task" : "This model has no effort levels")
     } else {
       let label = options.first { $0.value == value }?.label ?? options[0].label
       Menu {
@@ -333,12 +334,12 @@ struct EffortMenu: View {
   }
 }
 
-/// The model pill and its list: models under each harness with its plan, one search, the default marked, and a
-/// harness that isn't installed or logged in shown disabled with the command that fixes it (`ModelPicker.tsx`).
+/// The model pill and its list: Auto first, then models under each harness with its plan, one search, the default
+/// marked, and a harness that isn't installed or logged in shown disabled with the command that fixes it (`ModelPicker.tsx`).
 struct ModelPickerButton: View {
   let harnesses: [HarnessInfo]
   let harness: HarnessID
-  /// "" when none is picked: the pill reads `placeholder`.
+  /// "" when none is picked: the pill reads `placeholder`. `AutoRun.model` for Auto.
   let model: String
   /// The pill's label when no model is picked.
   var placeholder = "Model"
@@ -368,7 +369,7 @@ struct ModelPickerButton: View {
     }
     .buttonStyle(.plain)
     .help("Model")
-    .accessibilityLabel("Model: \(c.model?.label ?? "none")\(c.harness.map { " on \($0.name)" } ?? "")")
+    .accessibilityLabel(AutoRun.isAuto(model) ? "Model: Auto" : "Model: \(c.model?.label ?? "none")\(c.harness.map { " on \($0.name)" } ?? "")")
     .popover(isPresented: $open, arrowEdge: .bottom) { list }
     .onChange(of: openRequest) {
       query = ""
@@ -378,8 +379,9 @@ struct ModelPickerButton: View {
   }
 
   private func pill(_ c: (harness: HarnessInfo?, model: ModelEntry?), harness: Bool) -> some View {
-    PickerPill(text: c.model?.label ?? placeholder, secondary: harness && c.model != nil ? c.harness?.name : nil) {
-      if let h = c.harness {
+    let auto = AutoRun.isAuto(model)
+    return PickerPill(text: auto ? "Auto" : c.model?.label ?? placeholder, secondary: harness && c.model != nil ? c.harness?.name : nil) {
+      if !auto, let h = c.harness {
         PillAvatar(fill: Tok.bg) { HarnessLogo(harness: h.id.rawValue, size: 13).foregroundStyle(Tok.fg) }
       } else {
         PillIcon(name: "zap")
@@ -401,6 +403,7 @@ struct ModelPickerButton: View {
       .padding(.bottom, z(4))
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+          if "auto".hasPrefix(query.trimmingCharacters(in: .whitespaces).lowercased()) { autoRow }
           ForEach(groups) { group in
             Section {
               rows(group)
@@ -435,6 +438,40 @@ struct ModelPickerButton: View {
     .background(Tok.elev)
   }
 
+  private var autoRow: some View {
+    let selected = AutoRun.isAuto(model)
+    return Button {
+      pick(AutoRun.harness, AutoRun.model)
+      open = false
+    } label: {
+      row(selected: selected, title: Text("Auto").foregroundStyle(Tok.fg), note: "Picks a model for each task") {
+        OmniIcon(name: "zap", size: 13)
+      }
+    }
+    .buttonStyle(.plain)
+    .padding(.top, z(4))
+    .accessibilityAddTraits(selected ? .isSelected : [])
+  }
+
+  private func row(selected: Bool, title: Text, note: String?, @ViewBuilder mark: () -> some View) -> some View {
+    HStack(spacing: z(10)) {
+      mark()
+        .foregroundStyle(Tok.fg)
+        .frame(width: z(28), height: z(28))
+        .background(Tok.surface2, in: Circle())
+      VStack(alignment: .leading, spacing: 1) {
+        title.font(.omni(size: 13)).lineLimit(1)
+        if let note { Text(note).font(.omni(size: 11.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
+      }
+      Spacer(minLength: z(4))
+      PickMark(on: selected)
+    }
+    .padding(.horizontal, z(8))
+    .padding(.vertical, z(6))
+    .frame(minHeight: z(40))
+    .contentShape(RoundedRectangle(cornerRadius: z(16), style: .continuous))
+  }
+
   @ViewBuilder private func rows(_ group: ModelGroup) -> some View {
     let h = group.harness
     if !h.available {
@@ -454,22 +491,9 @@ struct ModelPickerButton: View {
           pick(h.id, m.id)
           open = false
         } label: {
-          HStack(spacing: z(10)) {
+          row(selected: selected, title: Text(m.label).foregroundStyle(Tok.fg) + Text(m.isDefault ? " (default)" : "").foregroundStyle(Tok.fg4), note: m.note) {
             HarnessLogo(harness: h.id.rawValue, size: 13)
-              .foregroundStyle(Tok.fg)
-              .frame(width: z(28), height: z(28))
-              .background(Tok.surface2, in: Circle())
-            VStack(alignment: .leading, spacing: 1) {
-              (Text(m.label).foregroundStyle(Tok.fg) + Text(m.isDefault ? " (default)" : "").foregroundStyle(Tok.fg4)).font(.omni(size: 13)).lineLimit(1)
-              if let note = m.note { Text(note).font(.omni(size: 11.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
-            }
-            Spacer(minLength: z(4))
-            PickMark(on: selected)
           }
-          .padding(.horizontal, z(8))
-          .padding(.vertical, z(6))
-          .frame(minHeight: z(40))
-          .contentShape(RoundedRectangle(cornerRadius: z(16), style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])

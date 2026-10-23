@@ -1,7 +1,17 @@
 import Foundation
 
+/// Auto: the server picks a new thread's harness, model and effort from its first prompt (apps/server/harness/auto.ts).
+/// A thread, crew role or channel asks for it with this model and no harness or effort.
+public enum AutoRun {
+  public static let model = "auto"
+  /// The harness an Auto composer reads its slash commands from: nothing is picked until the prompt is sent.
+  public static let harness = HarnessID.claudeCode
+
+  public static func isAuto(_ model: String?) -> Bool { model == Self.model }
+}
+
 /// What the new-thread composer will start: the pickers' state. `role` and `effort` are "" for none and default,
-/// `model` is "" until the harness's default is filled in.
+/// `model` is "" until the harness's default is filled in, or `AutoRun.model` on Auto.
 public struct NewThreadChoice: Hashable, Sendable {
   public var channel: String
   public var role: String
@@ -16,6 +26,8 @@ public struct NewThreadChoice: Hashable, Sendable {
     self.model = model
     self.effort = effort
   }
+
+  public var isAuto: Bool { AutoRun.isAuto(model) }
 }
 
 /// What a crew role or a channel picks for a new thread's run. nil fields leave it to the harness default.
@@ -32,6 +44,8 @@ public struct RunDefaults: Hashable, Sendable {
 
   /// Whether it picks anything. `setsRun` in apps/server/harness/resolve.ts.
   public var setsRun: Bool { harness != nil || model?.isEmpty == false || effort?.isEmpty == false }
+
+  public var isAuto: Bool { AutoRun.isAuto(model) }
 }
 
 extension CrewRole {
@@ -42,10 +56,11 @@ extension CrewRole {
 public enum NewThreadRules {
   public static let conductor = "conductor"
 
-  /// A new composer: the channel's own, else Conductor, on Claude Code. Role and model come once crew and harnesses load.
+  /// A new composer: the channel's own, else Conductor, on Auto. The role, and the run it or the channel sets, come
+  /// once crew and harnesses load.
   public static func initial(fixedChannel: String?, defaultChannel: String = conductor) -> NewThreadChoice {
     let channel = fixedChannel ?? defaultChannel
-    return NewThreadChoice(channel: channel, role: channel == conductor ? conductor : "", harness: .claudeCode, model: "", effort: "")
+    return NewThreadChoice(channel: channel, role: channel == conductor ? conductor : "", harness: AutoRun.harness, model: AutoRun.model, effort: "")
   }
 
   /// The harness's default model, else its first.
@@ -89,13 +104,14 @@ public enum NewThreadRules {
 
   /// The harness, model and effort a new thread starts on, as `runPreselect` in apps/web/src/new-thread-preset.ts: the role's
   /// defaults when it sets any (they replace the channel's whole, as the server resolves), else the channel's, else
-  /// Claude Code's default model. A harness the catalog lacks falls back to Claude Code, on its default model.
+  /// Auto. Either can ask for Auto too. A harness the catalog lacks falls back to Claude Code, on its default model.
   public static func preselecting(
     _ choice: NewThreadChoice, crew: [CrewRole], harnesses: [HarnessInfo], defaults: [String: RunDefaults]
   ) -> NewThreadChoice {
     let role = crew.first { $0.id == choice.role }?.runDefaults
     let channel = defaults[choice.channel]
-    let d = role?.setsRun == true ? role! : channel?.setsRun == true ? channel! : RunDefaults()
+    let applying = role?.setsRun == true ? role : channel?.setsRun == true ? channel : nil
+    guard let d = applying, !d.isAuto else { return selectingModel(harness: AutoRun.harness, model: AutoRun.model, from: choice) }
     var c = choice
     let named = d.harness ?? .claudeCode
     c.harness = harnesses.contains { $0.id == named } ? named : .claudeCode
@@ -114,11 +130,14 @@ public enum NewThreadRules {
   }
 
   /// The POST /api/threads body: role, model and effort left out when default. An effort the model does not take is left out.
+  /// Auto sends its model alone: the server picks the harness and effort.
   public static func request(_ choice: NewThreadChoice, prompt: String, harnesses: [HarnessInfo]) -> NewThread {
+    let role = choice.role.isEmpty ? nil : choice.role
+    if choice.isAuto { return NewThread(channel: choice.channel, prompt: prompt, role: role, model: AutoRun.model) }
     let model = harnesses.first { $0.id == choice.harness }?.models.first { $0.id == choice.model }
     let effort = model.map { EffortRules.resolved(choice.effort, for: $0) } ?? choice.effort
     return NewThread(
-      channel: choice.channel, prompt: prompt, role: choice.role.isEmpty ? nil : choice.role,
+      channel: choice.channel, prompt: prompt, role: role,
       model: choice.model.isEmpty ? nil : choice.model, harness: choice.harness, effort: effort.isEmpty ? nil : effort)
   }
 }
@@ -158,21 +177,29 @@ public struct ThreadRunLabels: Hashable, Sendable {
   public let model: String
   public let harnessName: String
   public let effort: String
+  /// Why Auto picked this run, nil when the thread was not on Auto.
+  public let autoReason: String?
 
-  public init(model: String, harnessName: String, effort: String) {
+  public init(model: String, harnessName: String, effort: String, autoReason: String? = nil) {
     self.model = model
     self.harnessName = harnessName
     self.effort = effort
+    self.autoReason = autoReason
   }
 
-  public static func make(harness: HarnessID, model: String?, effort: String?, harnesses: [HarnessInfo]) -> ThreadRunLabels {
+  /// The model pill's text: "Auto · Opus" when Auto picked it.
+  public var modelTitle: String { autoReason == nil ? model : "Auto · \(model)" }
+
+  public static func make(
+    harness: HarnessID, model: String?, effort: String?, autoReason: String? = nil, harnesses: [HarnessInfo]
+  ) -> ThreadRunLabels {
     let info = harnesses.first { $0.id == harness }
     let picked = model.flatMap { id in info?.models.first { $0.id == id } }
     let entry = picked ?? (model == nil ? info?.models.first { $0.isDefault } ?? info?.models.first : nil)
     return ThreadRunLabels(
       model: entry?.label ?? model ?? "default",
       harnessName: info?.name ?? ThreadDetails.harnessName(harness),
-      effort: effortText(effort, model: entry, catalog: info != nil))
+      effort: effortText(effort, model: entry, catalog: info != nil), autoReason: autoReason)
   }
 
   private static func effortText(_ effort: String?, model: ModelEntry?, catalog: Bool) -> String {

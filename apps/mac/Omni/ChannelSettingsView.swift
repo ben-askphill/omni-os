@@ -208,11 +208,11 @@ struct ChannelSettingsForm: View {
           pick: { form.setDefaultModel(harness: $0, model: $1) }, refresh: refreshHarnesses)
         EffortMenu(
           options: EffortRules.options(for: EffortRules.model(harness: run.harness, model: run.model, in: harnesses)),
-          value: form.defaultEffort, pick: { form.setDefaultEffort($0) })
-        if form.hasDefaultRun {
+          value: form.defaultEffort, auto: form.defaultIsAuto, pick: { form.setDefaultEffort($0) })
+        if !form.defaultIsAuto {
           Button("Reset") { form.clearDefaultRun() }
             .buttonStyle(.pill(.secondary, height: 30))
-            .help("Back to Claude Code's default model")
+            .help("Back to Auto")
         }
         Spacer(minLength: 0)
       }

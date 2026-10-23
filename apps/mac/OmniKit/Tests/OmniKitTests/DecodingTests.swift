@@ -66,6 +66,12 @@ func eventJSON(kind: String, payload: String, id: Int = 1) -> String {
     #expect(try decode(OmniThread.self, threadJSON(extra: #","pinned_at":"2026-10-21T08:00:00.5Z""#)).pinnedAt != nil)
   }
 
+  @Test func readsWhyAutoPickedTheRun() throws {
+    #expect(try decode(OmniThread.self, threadJSON()).autoReason == nil, "an older server leaves it out")
+    #expect(try decode(OmniThread.self, threadJSON(extra: #","auto_reason":null"#)).autoReason == nil)
+    #expect(try decode(OmniThread.self, threadJSON(extra: #","auto_reason":"Hard code task: Opus 5.5, high effort""#)).autoReason == "Hard code task: Opus 5.5, high effort")
+  }
+
   @Test func readsAnEmptyEffortAsTheDefault() throws {
     #expect(try decode(OmniThread.self, threadJSON()).effort == nil)
     #expect(try decode(OmniThread.self, threadJSON(effort: "high")).effort == "high")

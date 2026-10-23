@@ -25,6 +25,15 @@ private let thread = try! OmniJSON.decoder().decode(OmniThread.self, from: Data(
     #expect(try bodyJSON(req) == .object(["channel": .string("acme"), "prompt": .string("fix cart"), "harness": .string("claude-code"), "model": .string("sonnet"), "effort": .string("high")]))
   }
 
+  @Test func aThreadAutoPickedForContinuesOnAuto() async throws {
+    let auto = try OmniJSON.decoder().decode(OmniThread.self, from: Data(threadJSON(effort: "high", extra: #","auto_reason":"Hard code task""#).utf8))
+    #expect(NewThreadPreset.sameSettings(auto) == NewThreadPreset(channel: auto.channelID, role: "", model: "auto"))
+    let t = StubTransport(body: try fixture("thread-created.json"))
+    _ = try await OmniCommands.run(.newThread(prompt: "next"), in: auto, client: OmniClient(port: 4799, transport: t))
+    let req = try #require(t.requests.first)
+    #expect(try bodyJSON(req) == .object(["channel": .string(auto.channelID), "prompt": .string("next"), "model": .string("auto")]))
+  }
+
   @Test func renamePatchesTheTitle() async throws {
     let t = StubTransport(body: try fixture("thread-created.json"))
     let result = try await OmniCommands.run(.rename(title: "New name"), in: thread, client: OmniClient(port: 4799, transport: t))

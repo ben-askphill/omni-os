@@ -35,12 +35,12 @@ private func crew(_ extra: String = "") -> [CrewRole] {
 private let channels: Set<String> = ["conductor", "acme", "inbox"]
 
 @Suite struct NewThreadRulesTests {
-  @Test func startsOnClaudeCodeWithTheConductorRoleInTheConductorChannel() {
+  @Test func startsOnAutoWithTheConductorRoleInTheConductorChannel() {
     var c = NewThreadRules.initial(fixedChannel: nil)
-    #expect(c == NewThreadChoice(channel: "conductor", role: "conductor", harness: .claudeCode, model: "", effort: ""))
+    #expect(c == NewThreadChoice(channel: "conductor", role: "conductor", harness: .claudeCode, model: "auto", effort: ""))
     c = NewThreadRules.settled(c, crew: crew(), harnesses: harnesses())
     #expect(c.role == "conductor")
-    #expect(c.model == "sonnet")
+    #expect(c.isAuto, "settling never swaps Auto for the harness's default model")
     let fixed = NewThreadRules.settled(NewThreadRules.initial(fixedChannel: "acme"), crew: crew(), harnesses: harnesses())
     #expect(fixed.channel == "acme" && fixed.role == "")
   }
@@ -51,10 +51,10 @@ private let channels: Set<String> = ["conductor", "acme", "inbox"]
     #expect(c == NewThreadChoice(channel: "acme", role: "builder", harness: .codex, model: "gpt-x", effort: "high"))
   }
 
-  @Test func aRoleWithoutSettingsUsesClaudeCodesDefaultAndAFixedChannelStays() {
+  @Test func aRoleWithoutSettingsGoesToAutoAndAFixedChannelStays() {
     let start = NewThreadChoice(channel: "acme", role: "", harness: .codex, model: "gpt-x", effort: "high")
     let c = NewThreadRules.selectingRole("plain", from: start, crew: crew(), channels: channels, harnesses: harnesses(), channelFixed: true)
-    #expect(c == NewThreadChoice(channel: "acme", role: "plain", harness: .claudeCode, model: "sonnet", effort: ""))
+    #expect(c == NewThreadChoice(channel: "acme", role: "plain", harness: .claudeCode, model: "auto", effort: ""))
     let onAcme = NewThreadRules.selectingRole("builder", from: start, crew: crew(), channels: channels, harnesses: harnesses(), channelFixed: true)
     #expect(onAcme.channel == "acme")
   }
@@ -69,7 +69,7 @@ private let channels: Set<String> = ["conductor", "acme", "inbox"]
     var c = NewThreadRules.selectingRole(
       "builder", from: NewThreadRules.initial(fixedChannel: nil), crew: crew(), channels: channels, harnesses: harnesses(), channelFixed: false)
     let none = NewThreadRules.selectingRole("", from: c, crew: crew(), channels: channels, harnesses: harnesses(), channelFixed: false)
-    #expect(none == NewThreadChoice(channel: "acme", role: "", harness: .claudeCode, model: "sonnet", effort: ""))
+    #expect(none == NewThreadChoice(channel: "acme", role: "", harness: .claudeCode, model: "auto", effort: ""))
     let acme = ["acme": RunDefaults(harness: .codex, effort: "high")]
     let back = NewThreadRules.selectingRole(
       "", from: c, crew: crew(), channels: channels, harnesses: harnesses(), channelFixed: false, defaults: acme)
@@ -106,14 +106,30 @@ private let channels: Set<String> = ["conductor", "acme", "inbox"]
     #expect(pre("inbox").harness == .codex && pre("inbox").model == "gpt-y" && pre("inbox").effort == "")
     // Only an effort: Claude Code's default model at that effort.
     #expect(pre("solo") == NewThreadChoice(channel: "solo", role: "", harness: .claudeCode, model: "sonnet", effort: "low"))
-    // Nothing set: Claude Code's default.
-    #expect(pre("other") == NewThreadChoice(channel: "other", role: "", harness: .claudeCode, model: "sonnet", effort: ""))
+    // Nothing set: Auto, with no effort of its own.
+    #expect(pre("other") == NewThreadChoice(channel: "other", role: "", harness: .claudeCode, model: "auto", effort: ""))
     // A harness the catalog lacks: Claude Code on its default model, not the stale model id.
     #expect(pre("gone").harness == .claudeCode && pre("gone").model == "sonnet")
     // A role without run defaults leaves the channel's; one with any replaces them whole.
     #expect(pre("acme", role: "plain").model == "gpt-x")
     #expect(pre("acme", role: "builder") == NewThreadChoice(channel: "acme", role: "builder", harness: .codex, model: "gpt-x", effort: "high"))
     #expect(pre("inbox", role: "conductor") == NewThreadChoice(channel: "inbox", role: "conductor", harness: .claudeCode, model: "opus", effort: ""))
+  }
+
+  @Test func aRoleOrChannelSetToAutoPreselectsAuto() {
+    let roles = crew(#",{"id":"router","name":"Router","description":"","model":"auto"}"#)
+    let d = ["acme": RunDefaults(harness: .codex, model: "gpt-x"), "robot": RunDefaults(model: "auto")]
+    func pre(_ channel: String, role: String = "") -> NewThreadChoice {
+      NewThreadRules.preselecting(
+        NewThreadChoice(channel: channel, role: role, harness: .codex, model: "gpt-x", effort: "high"),
+        crew: roles, harnesses: harnesses(), defaults: d)
+    }
+    let auto = NewThreadChoice(channel: "robot", role: "", harness: .claudeCode, model: "auto", effort: "")
+    #expect(pre("robot") == auto)
+    #expect(pre("acme", role: "router") == NewThreadChoice(channel: "acme", role: "router", harness: .claudeCode, model: "auto", effort: ""))
+    // A role that sets a run replaces the channel's Auto.
+    #expect(pre("robot", role: "builder").model == "gpt-x")
+    #expect(RunDefaults(model: "auto").isAuto && !RunDefaults(harness: .codex).isAuto)
   }
 
   @Test func changingChannelPreselectsItsRunUnlessTheRoleSetsOne() {
@@ -177,6 +193,12 @@ private let channels: Set<String> = ["conductor", "acme", "inbox"]
     #expect(labels.effort == "Default (medium)")
   }
 
+  @Test func namesWhatAutoPickedAndKeepsItsReason() {
+    let labels = ThreadRunLabels.make(harness: .claudeCode, model: "opus", effort: "high", autoReason: "Hard code task", harnesses: harnesses())
+    #expect(labels.modelTitle == "Auto · Opus" && labels.autoReason == "Hard code task" && labels.effort == "high")
+    #expect(ThreadRunLabels.make(harness: .claudeCode, model: "opus", effort: "high", harnesses: harnesses()).modelTitle == "Opus")
+  }
+
   @Test func keepsTheStoredIdWhenTheCatalogHasNotArrived() {
     let labels = ThreadRunLabels.make(harness: .claudeCode, model: "opus", effort: "high", harnesses: [])
     #expect(labels == ThreadRunLabels(model: "opus", harnessName: "Claude Code", effort: "high"))
@@ -206,6 +228,13 @@ private let channels: Set<String> = ["conductor", "acme", "inbox"]
         == NewThread(channel: "acme", prompt: "Fix it", role: "builder", model: "gpt-x", harness: .codex, effort: "high"))
     let stale = NewThreadChoice(channel: "acme", role: "", harness: .claudeCode, model: "haiku", effort: "high")
     #expect(NewThreadRules.request(stale, prompt: "x", harnesses: harnesses()).effort == nil)
+  }
+
+  @Test func autoSendsItsModelAloneForTheServerToPick() throws {
+    let c = NewThreadChoice(channel: "acme", role: "builder", harness: .claudeCode, model: "auto", effort: "high")
+    let body = NewThreadRules.request(c, prompt: "Fix it", harnesses: harnesses())
+    let json = try JSONDecoder().decode(JSONValue.self, from: try OmniJSON.encoder().encode(body))
+    #expect(json == .object(["channel": .string("acme"), "prompt": .string("Fix it"), "role": .string("builder"), "model": .string("auto")]))
   }
 
   @Test func postsTheRecordedContractAsJSONOrMultipart() async throws {
@@ -307,6 +336,31 @@ private final class FakeNewThreadAPI: NewThreadAPI {
     home.apply(NewThreadPreset(channel: "inbox", role: "", harness: .codex, model: "gpt-x"))
     home.update(crew: crew(), channels: channels, harnesses: harnesses(), defaults: d)
     #expect(home.choice.harness == .codex && home.choice.model == "gpt-x")
+  }
+
+  @Test func opensOnAutoAndSendsAuto() async {
+    let dir = TempDir("drafts")
+    let api = FakeNewThreadAPI()
+    let m = make(api, dir, channel: "acme")
+    #expect(m.choice.isAuto && m.effortOptions.isEmpty)
+    // The slash menu still has a harness to read commands from.
+    #expect(m.choice.harness == .claudeCode)
+    m.selectModel(harness: .codex, model: "gpt-x")
+    m.selectEffort("high")
+    m.selectModel(harness: .claudeCode, model: "auto")
+    #expect(m.choice == NewThreadChoice(channel: "acme", role: "", harness: .claudeCode, model: "auto", effort: ""))
+    m.text = "go"
+    _ = await m.send()
+    #expect(api.sent.last?.0 == NewThread(channel: "acme", prompt: "go", model: "auto"))
+  }
+
+  @Test func sameSettingsFromAnAutoThreadStartsOnAuto() throws {
+    let dir = TempDir("drafts")
+    let m = make(FakeNewThreadAPI(), dir, channel: "acme")
+    m.selectModel(harness: .codex, model: "gpt-x")
+    let t = try OmniJSON.decoder().decode(OmniThread.self, from: Data(threadJSON(effort: "high", extra: #","auto_reason":"Hard code task""#).utf8))
+    m.apply(.sameSettings(t))
+    #expect(m.choice.isAuto && m.choice.effort == "")
   }
 
   @Test func aPresetsPromptReplacesTheDraft() {

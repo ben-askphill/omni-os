@@ -12,6 +12,19 @@
     "available": true,
     "models": [
       {
+        "id": "claude-sonnet-5-5",
+        "label": "Sonnet 5.5",
+        "efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "defaultEffort": "high",
+        "default": true
+      },
+      {
         "id": "claude-opus-5-5",
         "label": "Opus 5.5",
         "efforts": [
@@ -33,8 +46,7 @@
           "xhigh",
           "max"
         ],
-        "defaultEffort": "high",
-        "default": true
+        "defaultEffort": "high"
       },
       {
         "id": "claude-fable-5-1",
@@ -78,7 +90,8 @@
     "available": false,
     "fix": "codex login",
     "models": [],
-    "running": 0
+    "running": 0,
+    "install": "npm install -g @openai/codex"
   },
   {
     "id": "cursor",
@@ -88,13 +101,14 @@
       "warmProcess": false,
       "steer": false,
       "inlineImages": false,
-      "usage": "none"
+      "usage": "monthly"
     },
     "cap": 4,
     "available": false,
     "fix": "cursor-agent login",
     "models": [],
-    "running": 0
+    "running": 0,
+    "install": "curl https://cursor.com/install -fsS | bash"
   },
   {
     "id": "hermes",

@@ -356,14 +356,18 @@ private struct ThreadRunPills: View {
   let harnesses: [HarnessInfo]
 
   var body: some View {
-    let labels = ThreadRunLabels.make(harness: thread.harness, model: thread.model, effort: thread.effort, harnesses: harnesses)
+    let labels = ThreadRunLabels.make(
+      harness: thread.harness, model: thread.model, effort: thread.effort, autoReason: thread.autoReason, harnesses: harnesses)
     HStack(spacing: z(6)) {
-      pill(symbol: "bolt", text: labels.model, detail: labels.harnessName, label: "Model: \(labels.model) on \(labels.harnessName)")
+      pill(
+        symbol: "bolt", text: labels.modelTitle, detail: labels.harnessName, help: labels.autoReason,
+        label: "Model: \(labels.modelTitle) on \(labels.harnessName)")
       pill(symbol: "slider.horizontal.3", text: labels.effort, detail: nil, label: "Effort: \(labels.effort)")
     }
   }
 
-  private func pill(symbol: String, text: String, detail: String?, label: String) -> some View {
+  /// `help` is Auto's reason, else the pills say they are fixed.
+  private func pill(symbol: String, text: String, detail: String?, help: String? = nil, label: String) -> some View {
     HStack(spacing: z(6)) {
       Image(systemName: symbol).font(.omni(size: 11.5)).foregroundStyle(Tok.fg3)
       Text(text).font(.omni(size: 12.5, weight: .medium)).lineLimit(1)
@@ -374,7 +378,7 @@ private struct ThreadRunPills: View {
     .frame(maxWidth: z(220))
     .foregroundStyle(Tok.fg)
     .background(Tok.surface2, in: Capsule())
-    .help("Fixed for this thread")
+    .help(help ?? "Fixed for this thread")
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(label)
     .fixedSize()

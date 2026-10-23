@@ -74,6 +74,9 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   public let harness: HarnessID
   /// nil means the model's default (the server stores an empty string).
   public let effort: String?
+  /// Why Auto picked the harness, model and effort above (apps/server/harness/auto.ts). Nil when the thread was not
+  /// on Auto, and from older servers.
+  public let autoReason: String?
   public let sessionID: String?
   public let hasRun: Bool
   public let cwd: String?
@@ -109,6 +112,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
 
   enum CodingKeys: String, CodingKey {
     case id, title, status, role, model, harness, effort, cwd, branch, source, automation, suggestion, archived, setup
+    case autoReason = "auto_reason"
     case setupError = "setup_error"
     case limit = "limit_state"
     case limitResetsAt = "limit_resets_at"
@@ -137,6 +141,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     model = try c.decodeIfPresent(String.self, forKey: .model)
     harness = try c.decodeIfPresent(HarnessID.self, forKey: .harness) ?? .claudeCode
     effort = try c.decodeEffort(.effort)
+    autoReason = try c.decodeIfPresent(String.self, forKey: .autoReason)
     sessionID = try c.decodeIfPresent(String.self, forKey: .sessionID)
     hasRun = try c.decodeFlag(.hasRun)
     cwd = try c.decodeIfPresent(String.self, forKey: .cwd)

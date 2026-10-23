@@ -34,9 +34,11 @@ public struct NewThreadPreset: Hashable, Sendable {
     NewThreadPreset(channel: f.channelID, role: "", folder: FolderRef(id: f.id, name: f.name))
   }
 
-  /// `/clear` or `/new` on its own: this thread's settings, for a first prompt Ben types next.
+  /// `/clear` or `/new` on its own: this thread's settings, for a first prompt Ben types next. A thread Auto picked for
+  /// starts on Auto, which picks again for the new prompt.
   public static func sameSettings(_ t: OmniThread) -> NewThreadPreset {
-    NewThreadPreset(channel: t.channelID, role: t.role ?? "", harness: t.harness, model: t.model ?? "", effort: t.effort)
+    if t.autoReason != nil { return NewThreadPreset(channel: t.channelID, role: t.role ?? "", model: AutoRun.model) }
+    return NewThreadPreset(channel: t.channelID, role: t.role ?? "", harness: t.harness, model: t.model ?? "", effort: t.effort)
   }
 
   /// Edit on a suggested new thread: this thread's settings, with the suggestion's prompt in the box.
@@ -64,10 +66,15 @@ public struct FolderRef: Hashable, Sendable {
 }
 
 extension NewThread {
-  /// A thread that starts in the same channel with the same harness, model, effort and role as `t`.
+  /// A thread that starts in the same channel with the same harness, model, effort and role as `t`, or on Auto when
+  /// Auto picked `t`'s.
   public init(continuing t: OmniThread, prompt: String) {
     func some(_ s: String?) -> String? { s?.isEmpty == false ? s : nil }
-    self.init(channel: t.channelID, prompt: prompt, role: some(t.role), model: some(t.model), harness: t.harness, effort: some(t.effort))
+    if t.autoReason != nil {
+      self.init(channel: t.channelID, prompt: prompt, role: some(t.role), model: AutoRun.model)
+    } else {
+      self.init(channel: t.channelID, prompt: prompt, role: some(t.role), model: some(t.model), harness: t.harness, effort: some(t.effort))
+    }
   }
 }
 

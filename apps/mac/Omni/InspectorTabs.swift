@@ -180,6 +180,7 @@ struct DetailsTab: View {
               }
             }
             row("Effort") { muted(thread.effort, or: "default") }
+            if let reason = thread.autoReason { row("Auto") { Text(reason) } }
             row("Source") {
               Text(thread.source.rawValue) + Text(thread.automation.map { " · \($0)" } ?? "").foregroundStyle(Tok.fg3)
             }

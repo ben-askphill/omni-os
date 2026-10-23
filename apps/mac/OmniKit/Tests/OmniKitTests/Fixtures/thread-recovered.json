@@ -5,9 +5,10 @@
     "title": "Audit the checkout",
     "status": "failed",
     "role": null,
-    "model": null,
+    "model": "claude-haiku-4-5",
     "harness": "claude-code",
-    "effort": "",
+    "effort": "low",
+    "auto_reason": "Light research task: Haiku 4.5, low effort",
     "session_id": "00000000-0000-4000-8000-000000000009",
     "has_run": 0,
     "cwd": "/tmp/omni-fixtures/acme",
@@ -57,7 +58,7 @@
       "id": 58,
       "thread_id": "00000000-0000-4000-8000-000000000009",
       "kind": "init",
-      "payload": "{\"model\":\"sonnet\",\"cwd\":\"/tmp/omni-fixtures/acme\",\"tools\":10,\"mcp\":[]}",
+      "payload": "{\"model\":\"claude-haiku-4-5\",\"cwd\":\"/tmp/omni-fixtures/acme\",\"tools\":10,\"mcp\":[]}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {

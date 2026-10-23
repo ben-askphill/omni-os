@@ -45,16 +45,20 @@ public struct ChannelForm: Hashable, Sendable {
     idTouched = true
   }
 
-  /// The default model as the pickers show it: Claude Code when no harness is set.
+  /// The default model as the pickers show it: Auto when nothing is set, as the server falls back to it, and Claude
+  /// Code when only an effort is.
   public var defaultRun: (harness: HarnessID, model: String) {
-    (defaultHarness.isEmpty ? .claudeCode : HarnessID(rawValue: defaultHarness), defaultModel)
+    if !hasDefaultRun { return (AutoRun.harness, AutoRun.model) }
+    return (defaultHarness.isEmpty ? .claudeCode : HarnessID(rawValue: defaultHarness), defaultModel)
   }
 
   public var hasDefaultRun: Bool { !(defaultHarness.isEmpty && defaultModel.isEmpty && defaultEffort.isEmpty) }
 
-  /// A new default model resets its effort to the model's default.
+  public var defaultIsAuto: Bool { AutoRun.isAuto(defaultRun.model) }
+
+  /// A new default model resets its effort to the model's default. Auto saves its model alone.
   public mutating func setDefaultModel(harness: HarnessID, model: String) {
-    defaultHarness = harness.rawValue
+    defaultHarness = AutoRun.isAuto(model) ? "" : harness.rawValue
     defaultModel = model
     defaultEffort = ""
   }
@@ -65,7 +69,7 @@ public struct ChannelForm: Hashable, Sendable {
     defaultEffort = effort
   }
 
-  /// Back to Claude Code's default: clears all three.
+  /// Back to no default, which is Auto: clears all three.
   public mutating func clearDefaultRun() {
     defaultHarness = ""
     defaultModel = ""

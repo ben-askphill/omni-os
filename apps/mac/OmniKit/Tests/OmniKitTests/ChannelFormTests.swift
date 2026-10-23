@@ -112,7 +112,8 @@ import OmniKit
 
   @Test func defaultModelPicksResetEffortAndResetClearsAll() throws {
     var f = ChannelForm()
-    #expect(!f.hasDefaultRun && f.defaultRun.harness == .claudeCode && f.defaultRun.model == "")
+    // No default is Auto, as the server falls back to it.
+    #expect(!f.hasDefaultRun && f.defaultIsAuto && f.defaultRun.harness == .claudeCode && f.defaultRun.model == "auto")
     // An effort alone sits on Claude Code's default model.
     f.setDefaultEffort("low")
     #expect(f.defaultHarness == "claude-code" && f.defaultModel == "" && f.defaultEffort == "low")
@@ -125,6 +126,17 @@ import OmniKit
     #expect(!f.hasDefaultRun)
     json = try encoded(f.body(system: false))
     #expect(json["default_harness"] == .null && json["default_model"] == .null && json["default_effort"] == .null)
+  }
+
+  @Test func anAutoDefaultSavesItsModelAlone() throws {
+    var f = ChannelForm()
+    f.setDefaultModel(harness: .codex, model: "gpt-x")
+    f.setDefaultEffort("high")
+    #expect(!f.defaultIsAuto)
+    f.setDefaultModel(harness: .claudeCode, model: "auto")
+    #expect(f.hasDefaultRun && f.defaultIsAuto)
+    let json = try encoded(f.body(system: false))
+    #expect(json["default_harness"] == .null && json["default_model"] == .string("auto") && json["default_effort"] == .null)
   }
 
   @Test func createBodyAddsTheID() throws {

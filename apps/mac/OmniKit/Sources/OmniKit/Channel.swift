@@ -30,7 +30,7 @@ public struct Channel: Decodable, Hashable, Sendable, Identifiable {
   public let designSystemSize: Int
   public let archived: Bool
   public let createdAt: Date
-  /// What a new thread here runs on unless the thread or its crew role picks. nil is Claude Code's default.
+  /// What a new thread here runs on unless the thread or its crew role picks. All nil is Auto, and so is a model of `AutoRun.model`.
   public let defaultHarness: HarnessID?
   public let defaultModel: String?
   public let defaultEffort: String?
