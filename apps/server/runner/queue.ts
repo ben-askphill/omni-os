@@ -122,14 +122,19 @@ function begin(threadId: string, [first, ...rest]: Msg[]) {
  * Save a message Omni writes to a thread itself (a crew report, a team's go) before anything is woken, keyed so the
  * same report or go is saved once whatever calls this again. Null when that key was saved before: it was handled.
  */
-export function saveOwn(threadId: string, key: string, m: Pick<MessageRequest, 'prompt' | 'kind' | 'payload' | 'source'>): MessageRequest | null {
+export function saveOwn(
+  threadId: string,
+  key: string,
+  m: Pick<MessageRequest, 'prompt' | 'kind' | 'payload' | 'source'> & { mode?: MessageRequest['mode'] },
+): MessageRequest | null {
+  const mode = m.mode ?? 'steer';
   const { row, fresh } = messageRequests.accept({
     thread_id: threadId,
     request_id: key,
     ...m,
-    mode: 'steer',
+    mode,
     attachments: null,
-    fingerprint: requestFingerprint({ prompt: m.prompt, mode: 'steer', source: m.source, files: [] }),
+    fingerprint: requestFingerprint({ prompt: m.prompt, mode, source: m.source, files: [] }),
     machine_id: outbox.machineId(),
   });
   return fresh ? row : null;

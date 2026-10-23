@@ -310,8 +310,11 @@ export const sessionObject = (harness: string, sessionId: string, rel: string) =
 
 const sessionKey = (t: Thread) => `${t.harness}:${t.session_id}`;
 
-/** Upload the thread's session file when it changed. Returns the number of files uploaded. */
-export async function pushSession(t: Thread, opts: FileSyncOptions): Promise<number> {
+/**
+ * Upload the thread's session file when it changed. Returns the number of files uploaded. One over the size cap stays
+ * on this Mac, or with `strict` fails the upload: a handoff cannot leave the session behind.
+ */
+export async function pushSession(t: Thread, opts: FileSyncOptions & { strict?: boolean }): Promise<number> {
   const root = sessionRoot(t, opts.home, opts.env);
   if (!root) return 0;
   const state = readState(t.id);
@@ -322,7 +325,11 @@ export async function pushSession(t: Thread, opts: FileSyncOptions): Promise<num
   let uploaded = 0;
   for (const rel of rels) {
     const path = join(root, rel);
-    if (statSync(path).size > MAX_FILE_BYTES) continue;
+    const size = statSync(path).size;
+    if (size > MAX_FILE_BYTES) {
+      if (opts.strict) throw new Error(`the session is ${Math.ceil(size / 1024 / 1024)} MB, over the ${MAX_FILE_BYTES / 1024 / 1024} MB sync can carry`);
+      continue;
+    }
     const skey = `s:${key}:${rel}`;
     let f = hashOf(state, skey, path);
     if (entry.files[rel]?.sha !== f.sha) {
@@ -508,6 +515,27 @@ export function turnFinished(threadId: string): Promise<void> {
   timer.unref();
   turnTimers.set(threadId, timer);
   return done;
+}
+
+/**
+ * Upload the thread's files and session file now, behind any upload already running for it, and fail when it does:
+ * a handoff waits on it before the other Mac is told to resume. Rejects while sync is off.
+ */
+export function uploadNow(threadId: string): Promise<void> {
+  const opts = hookOpts();
+  if (!opts) return Promise.reject(new Error('sync is off'));
+  return serial(threadId, async () => {
+    const t = threads.get(threadId);
+    if (!t) return;
+    await pushThreadFiles(threadId, opts);
+    await pushSession(t, { ...opts, strict: true });
+  });
+}
+
+/** Whether the thread's harness has written a session file for it on this Mac. */
+export function sessionOnThisMac(t: Thread): boolean {
+  const root = sessionRoot(t, hookDefaults.home, hookDefaults.env);
+  return !!root && localSessionFiles(t, root, undefined).length > 0;
 }
 
 /**

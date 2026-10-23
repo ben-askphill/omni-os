@@ -25,7 +25,9 @@ import {
   writeLine,
   hasBackground,
   track,
+  unread,
   type Live,
+  type Msg,
 } from './state.ts';
 
 export function requestInterrupt(live: Live) {
@@ -115,7 +117,7 @@ export function teardown(live: Live) {
 
 /** Interrupted or shut down before the process was spawned. */
 export function abortStart(live: Live, status: ThreadStatus) {
-  drop(live.threadId, [...live.inflight, ...live.held]);
+  unread(live, [...live.inflight, ...live.held]);
   teardown(live);
   threads.update(live.threadId, { status });
   finishTurnSnapshot(live);
@@ -206,6 +208,31 @@ export function interruptThread(threadId: string) {
 }
 
 export const stopThread = interruptThread;
+
+/**
+ * Give the thread up to another Mac: stop its turn, end its process and wait until it has exited, so nothing more
+ * writes its session here, not even a turn the CLI would open by itself when a background task ends. The messages it
+ * never read (steers not replayed yet, then held ones, then those waiting for a slot) come back instead of being
+ * dropped; their requests stay as they are for the caller to settle. The thread ends stopped.
+ */
+export async function releaseForHandoff(threadId: string): Promise<Msg[]> {
+  const live = lives.get(threadId);
+  const held = live ? live.held.splice(0) : [];
+  const w = waiting.indexOf(threadId);
+  const queued = w >= 0 ? (waiting.splice(w, 1), waitingMsgs.get(threadId) ?? []) : [];
+  waitingMsgs.delete(threadId);
+  const read: Msg[] = [];
+  if (live) {
+    live.released = read;
+    if (!live.child) abortStart(live, 'stopped');
+    else if (!live.closing) hardKill(live);
+    await live.exited;
+  }
+  const t = threads.get(threadId);
+  if (t && (t.status === 'running' || t.status === 'queued')) threads.update(threadId, { status: 'stopped' });
+  emitThread(threadId);
+  return [...read, ...held, ...queued];
+}
 
 /** Close every live process (end stdin, SIGTERM after 3s) and resolve once all have exited. */
 export async function shutdownAll() {
