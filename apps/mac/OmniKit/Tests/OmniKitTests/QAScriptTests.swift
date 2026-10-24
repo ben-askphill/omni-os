@@ -97,6 +97,12 @@ import OmniKit
     #expect(throws: QAScriptError.self) { try QAScript(json: Data(#"[{"settings": "garage"}]"#.utf8)) }
   }
 
+  @Test func signsInAndOutOfTheAccount() throws {
+    let script = try QAScript(json: Data(#"[{"settings": "account"}, {"account": "signIn"}, {"account": "signOut"}]"#.utf8))
+    #expect(script.steps == [.settings(.account), .account(.signIn), .account(.signOut)])
+    #expect(throws: QAScriptError.self) { try QAScript(json: Data(#"[{"account": "google"}]"#.utf8)) }
+  }
+
   @Test func takesTheStepsUnderAKeyToo() throws {
     let script = try QAScript(json: Data(##"{"steps": [{"route": "#/"}, {"quit": true}]}"##.utf8))
     #expect(script.steps == [.route(.home), .quit])

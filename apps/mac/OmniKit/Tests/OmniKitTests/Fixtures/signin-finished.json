@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "user": {
+    "email": "ada@example.com",
+    "name": "Ada Lovelace"
+  },
+  "device": {
+    "id": "00000000-0000-4000-8000-000000000037",
+    "name": "Ada's MacBook Pro",
+    "kind": "mac"
+  },
+  "claimed": true,
+  "credential": "omni_s1.session-id.session-secret",
+  "expiresAt": "2026-01-05T09:00:00.000Z"
+}

@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "via": "session",
+  "user": {
+    "email": "ada@example.com",
+    "name": "Ada Lovelace"
+  },
+  "device": {
+    "id": "00000000-0000-4000-8000-000000000037",
+    "name": "Ada's MacBook Pro",
+    "kind": "mac"
+  },
+  "google": {
+    "loopback": true,
+    "broker": false,
+    "allowedEmails": [
+      "ada@example.com"
+    ],
+    "allowedHd": null
+  }
+}

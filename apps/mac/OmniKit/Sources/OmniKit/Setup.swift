@@ -87,12 +87,13 @@ public struct SetupState: Decodable, Hashable, Sendable {
   public let threadId: String?
 }
 
-/// The five onboarding screens, as Onboarding.tsx.
+/// The onboarding screens, as Onboarding.tsx. Sign in shows only when `AccountModel.offersSignIn` (`shown`).
 public enum OnboardingStep: Int, CaseIterable, Sendable {
-  case you, workspace, harnesses, channel, done
+  case signIn, you, workspace, harnesses, channel, done
 
   public var title: String {
     switch self {
+    case .signIn: "Sign in"
     case .you: "You"
     case .workspace: "Workspace"
     case .harnesses: "Harnesses"
@@ -103,6 +104,9 @@ public enum OnboardingStep: Int, CaseIterable, Sendable {
 
   public var next: OnboardingStep? { OnboardingStep(rawValue: rawValue + 1) }
   public var previous: OnboardingStep? { OnboardingStep(rawValue: rawValue - 1) }
+
+  /// The screens this run walks through, for the step dots.
+  public static func shown(signIn: Bool) -> [OnboardingStep] { signIn ? allCases : allCases.filter { $0 != .signIn } }
 
   /// The pronoun choices offered before "Other".
   public static let pronouns = ["they/them", "she/her", "he/him"]

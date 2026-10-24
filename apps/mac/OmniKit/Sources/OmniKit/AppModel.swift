@@ -115,6 +115,8 @@ public final class AppModel {
   public let links = LinkPreviewStore()
   /// The other synced Macs a running thread can be handed to. Follows the connection.
   public let devices = DevicesModel()
+  /// This Mac's Google sign-in on the server. Follows the connection; refreshed when the feed opens and on activation.
+  public let account: AccountModel
 
   @ObservationIgnored private let connect: @MainActor (_ port: Int) -> Connection
   @ObservationIgnored private var config: ServerConfig
@@ -124,13 +126,17 @@ public final class AppModel {
   /// The workspace's subscription on `feed`. Dropped before the feed is replaced.
   @ObservationIgnored private var feedTicket: UUID?
 
-  /// - Parameter connect: makes the client and store for a port. `liveConnection` with the supervisor's token by default.
+  /// - Parameters:
+  ///   - sessions: where the sign-in session is kept. In memory by default, so tests never touch the login Keychain;
+  ///     the app passes `KeychainSessionStore`.
+  ///   - connect: makes the client and store for a port. `liveConnection` with the supervisor's token by default.
   public init(
     settings: ServerSettings, supervisor: ServerSupervisor? = nil, attention: AttentionCenter? = nil,
-    connect: (@MainActor (_ port: Int) -> Connection)? = nil
+    sessions: (any SessionStore)? = nil, connect: (@MainActor (_ port: Int) -> Connection)? = nil
   ) {
     self.settings = settings
     self.attention = attention ?? AttentionCenter()
+    account = AccountModel(sessions: sessions ?? MemorySessionStore())
     let supervisor = supervisor ?? ServerSupervisor(settings: settings)
     self.supervisor = supervisor
     let connect = connect ?? { [token = supervisor.token] port in AppModel.liveConnection(port: port, token: token) }
@@ -143,6 +149,7 @@ public final class AppModel {
     folders.connect(store: c.store, api: c.client)
     links.connect(api: c.client)
     devices.connect(api: c.client)
+    account.connect(api: c.client, key: Self.sessionKey(c.client.baseURL))
     threads = c.threads
     feed = c.feed
     follow(c)
@@ -309,6 +316,7 @@ public final class AppModel {
   public func didBecomeActive() {
     reconnectStreams(ifQuietFor: .seconds(25))
     checkServer()
+    Task { await account.refresh() }
   }
 
   /// The Mac woke from sleep. Connections from before rarely survive it, and the other Mac may have moved on.
@@ -402,6 +410,7 @@ public final class AppModel {
       folders.connect(store: c.store, api: c.client)
       links.connect(api: c.client)
       devices.connect(api: c.client)
+      account.connect(api: c.client, key: Self.sessionKey(c.client.baseURL))
       threads = c.threads
       feed = c.feed
       follow(c)
@@ -411,6 +420,9 @@ public final class AppModel {
     }
     checkServer()
   }
+
+  /// The Keychain account a server's session is kept under, like `127.0.0.1:4747`.
+  private static func sessionKey(_ url: URL) -> String { "\(url.host() ?? ""):\(url.port ?? 80)" }
 
   private func feedArrived(_ event: FeedEvent) {
     var viewing: String?
@@ -436,7 +448,10 @@ public final class AppModel {
   private func connectionChanged(_ state: ConnectionState) {
     let previous = lastConnection
     lastConnection = state
-    if state == .open { Task { await seedBanners() } }
+    if state == .open {
+      Task { await seedBanners() }
+      Task { await account.refresh() }
+    }
     switch state {
     case .open where !supervisor.isRunning:
       checkServer()

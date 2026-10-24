@@ -28,6 +28,7 @@ private final class Rig {
     case "/api/status": StubTransport.Reply(body: oldStatus)
     case "/api/threads/p1": StubTransport.Reply(body: #"{"thread":\#(parentThread),"events":[]}"#)
     case "/api/sync/now": StubTransport.Reply(status: 409, body: #"{"error":"sync is not configured"}"#)
+    case "/api/auth": StubTransport.Reply(body: try fixture("auth-token.json"))
     default: StubTransport.Reply(body: "[]")
     }
   }
@@ -188,6 +189,22 @@ struct AppModelTests {
     try await waitFor("dropped") { first.isDropped }
     let second = try await rig.sse.next()
     #expect(second.request.url == rig.feedURL(server.port))
+  }
+
+  @Test func asksWhoThisMacIsWhenTheFeedOpensAndOnActivation() async throws {
+    let server = HTTPResponder(contentType: "application/json", body: oldStatus, token: testToken)
+    defer { server.close() }
+    let rig = Rig(port: server.port)
+    let model = rig.model
+    func asked() -> Int { rig.http.requests.filter { $0.url?.path() == "/api/auth" }.count }
+    model.launch()
+    try await rig.sse.next().accept()
+    try await waitFor("the feed's check") { model.account.google != nil }
+    let before = asked()
+    model.didBecomeActive()
+    try await waitFor("the activation's check") { asked() > before }
+    #expect(model.account.state == .signedOut)
+    #expect(model.account.google?.loopback == true)
   }
 
   @Test func aNetworkChangeOrAWakeReconnectsAtOnce() async throws {

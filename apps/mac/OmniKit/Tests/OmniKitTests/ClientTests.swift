@@ -9,6 +9,8 @@ final class StubTransport: HTTPTransport {
     var status = 200
     var contentType: String? = "application/json"
     var body = "{}"
+    /// A redirect's target.
+    var location: String?
   }
 
   private let reply: @Sendable (URLRequest) throws -> Reply
@@ -27,7 +29,8 @@ final class StubTransport: HTTPTransport {
   func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
     seen.withLock { $0.append(request) }
     let r = try reply(request)
-    let headers = r.contentType.map { ["Content-Type": $0] } ?? [:]
+    var headers = r.contentType.map { ["Content-Type": $0] } ?? [:]
+    headers["Location"] = r.location
     let response = HTTPURLResponse(url: request.url!, statusCode: r.status, httpVersion: "HTTP/1.1", headerFields: headers)!
     return (Data(r.body.utf8), response)
   }

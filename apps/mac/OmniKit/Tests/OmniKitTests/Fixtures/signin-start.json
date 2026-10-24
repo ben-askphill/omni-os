@@ -1,0 +1,6 @@
+{
+  "attempt": "attempt-id",
+  "url": "https://accounts.google.com/o/oauth2/v2/auth?response_type=code",
+  "mode": "loopback",
+  "claim": "claim-secret"
+}

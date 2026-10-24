@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "via": "token",
+  "user": null,
+  "device": null,
+  "google": {
+    "loopback": true,
+    "broker": false,
+    "allowedEmails": [],
+    "allowedHd": null
+  }
+}

@@ -64,10 +64,15 @@ public enum QAServerAction: String, Hashable, Sendable {
   case start, stop, check
 }
 
+/// What the Sign in with Google and Sign out buttons do. Sign-in needs `-OmniQASignInHint <email>` (`QASignIn`).
+public enum QAAccountAction: String, Hashable, Sendable {
+  case signIn, signOut
+}
+
 /// One step of a Debug QA run, from the JSON the app gets with `-OmniQAScript`:
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
-/// `{"settings": "secrets"}` (or `connection`, `profile`, `sync`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
+/// `{"settings": "secrets"}` (or `connection`, `profile`, `account`, `sync`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
 /// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`), `{"expand": true}`, `{"meter": true}`, `{"modelPicker": true}` (or a search, `"cursor"`), `{"foldAll": true}`,
 /// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`,
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
@@ -75,7 +80,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
 /// `{"drag": "<thread title>", "over": "<folder>"}`, `{"file": "<thread title>", "into": "<folder>"}`,
 /// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"handOff": "<device id>"}`,
-/// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"quit": true}`.
+/// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"account": "signIn"}` (or `signOut`), `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -127,6 +132,8 @@ public enum QAStep: Hashable, Sendable {
   /// Hands the open thread to this device, as picking it in Hand Off to does.
   case handOff(String)
   case quickPrompt(QAQuickPrompt)
+  /// Signs this Mac in with Google, or out, as Settings > Account's buttons do.
+  case account(QAAccountAction)
   case quit
 
   static let defaultTimeout = Duration.seconds(10)
@@ -214,7 +221,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "account", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -251,7 +258,7 @@ public struct QAScript: Hashable, Sendable {
       return .open(window)
     case "settings":
       guard let name = value as? String, let tab = SettingsTab(rawValue: name) else {
-        throw QAScriptError("settings takes connection, profile, secrets, sync, notifications, appearance or quickPrompt")
+        throw QAScriptError("settings takes connection, profile, account, secrets, sync, notifications, appearance or quickPrompt")
       }
       return .settings(tab)
     case "openThread":
@@ -281,6 +288,11 @@ public struct QAScript: Hashable, Sendable {
     case "editPending":
       guard let text = value as? String else { throw QAScriptError("editPending takes the text to put in the edit") }
       return .editPending(text)
+    case "account":
+      guard let name = value as? String, let action = QAAccountAction(rawValue: name) else {
+        throw QAScriptError("account takes signIn or signOut")
+      }
+      return .account(action)
     case "quickPrompt":
       if let text = value as? String { return .quickPrompt(.open(text)) }
       if let on = value as? Bool, !on { return .quickPrompt(.close) }
