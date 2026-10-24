@@ -9,6 +9,7 @@ import { suggestNextThread, suggestReply } from './aux.ts';
 import { finishTurnSnapshot, settleSnapshots } from './snapshots.ts';
 import { pump, reportToParent } from './queue.ts';
 import { endTasks } from './records.ts';
+import { stopPreparation } from './setup-action.ts';
 import { applyQueued } from './switch.ts';
 import {
   alive,
@@ -168,6 +169,8 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
  * or right away if the process has not started its first turn yet.
  */
 export function interruptThread(threadId: string) {
+  // A worktree still being prepared has no agent yet: Stop ends the preparation, its setup run included.
+  if (stopPreparation(threadId)) return threads.get(threadId);
   // Stop also means not now and not at the reset: a limit stop's continuation is dropped (limits.ts).
   if (threads.get(threadId)?.limit_state) threads.setLimit(threadId, null);
   const live = lives.get(threadId);

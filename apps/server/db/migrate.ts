@@ -368,4 +368,12 @@ export function migrate() {
     ended_at TEXT
   );
   CREATE INDEX IF NOT EXISTS action_runs_thread ON action_runs(thread_id, started_at DESC);`);
+  // #211: the one action a channel runs to set up each new worktree, and how (blocking or background), and the setup
+  // run of each thread's latest preparation attempt, so its card shows that run's output after a restart. Local, not synced.
+  ensureColumn('channel_actions', 'setup', 'TEXT');
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS channel_actions_setup ON channel_actions(channel_id) WHERE setup IS NOT NULL;
+  CREATE TABLE IF NOT EXISTS thread_setup_runs (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+    run_id TEXT NOT NULL
+  );`);
 }

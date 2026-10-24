@@ -12,21 +12,28 @@ export const channelActions = {
   get: (id: string) => action(db.prepare('SELECT * FROM channel_actions WHERE id = ?').get(id) as unknown as ActionRow | undefined),
   byName: (channelId: string, name: string) =>
     action(db.prepare('SELECT * FROM channel_actions WHERE channel_id = ? AND name = ?').get(channelId, name) as unknown as ActionRow | undefined),
+  /** The action the channel runs to set up each new worktree, if it has one. */
+  setupFor: (channelId: string) =>
+    action(db.prepare('SELECT * FROM channel_actions WHERE channel_id = ? AND setup IS NOT NULL').get(channelId) as unknown as ActionRow | undefined),
   create(channelId: string, input: Required<ChannelActionInput>): ChannelAction {
     const id = randomUUID();
     const ts = now();
     const { n } = db.prepare('SELECT COALESCE(MAX(position) + 1, 0) AS n FROM channel_actions WHERE channel_id = ?').get(channelId) as { n: number };
+    if (input.setup) clearSetup(channelId);
     db.prepare(
-      'INSERT INTO channel_actions (id, channel_id, name, command, secrets, port, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    ).run(id, channelId, input.name, input.command, JSON.stringify(input.secrets), input.port, n, ts, ts);
+      'INSERT INTO channel_actions (id, channel_id, name, command, secrets, port, setup, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(id, channelId, input.name, input.command, JSON.stringify(input.secrets), input.port, input.setup, n, ts, ts);
     return channelActions.get(id)!;
   },
   update(id: string, input: Required<ChannelActionInput>): ChannelAction | undefined {
-    db.prepare('UPDATE channel_actions SET name = ?, command = ?, secrets = ?, port = ?, updated_at = ? WHERE id = ?').run(
+    const channelId = channelActions.get(id)?.channel_id;
+    if (input.setup && channelId) clearSetup(channelId, id);
+    db.prepare('UPDATE channel_actions SET name = ?, command = ?, secrets = ?, port = ?, setup = ?, updated_at = ? WHERE id = ?').run(
       input.name,
       input.command,
       JSON.stringify(input.secrets),
       input.port,
+      input.setup,
       now(),
       id,
     );
@@ -34,6 +41,10 @@ export const channelActions = {
   },
   delete: (id: string) => db.prepare('DELETE FROM channel_actions WHERE id = ?').run(id).changes > 0,
 };
+
+/** A channel has one setup action at most: making another one it takes the role off the rest. */
+const clearSetup = (channelId: string, except = '') =>
+  db.prepare('UPDATE channel_actions SET setup = NULL, updated_at = ? WHERE channel_id = ? AND setup IS NOT NULL AND id != ?').run(now(), channelId, except);
 
 /** Runs kept per thread. Older ones are dropped when a new one starts. */
 const KEPT_RUNS = 20;
@@ -67,4 +78,14 @@ export const actionRuns = {
     );
     return actionRuns.get(id)!;
   },
+};
+
+/**
+ * The setup action's run in each thread's latest worktree preparation (apps/server/runner/setup-action.ts). A new
+ * attempt clears it, so a thread's card never shows an earlier attempt's run as the current one.
+ */
+export const threadSetupRuns = {
+  get: (threadId: string) => (db.prepare('SELECT run_id FROM thread_setup_runs WHERE thread_id = ?').get(threadId) as { run_id: string } | undefined)?.run_id,
+  set: (threadId: string, runId: string) => db.prepare('INSERT OR REPLACE INTO thread_setup_runs (thread_id, run_id) VALUES (?, ?)').run(threadId, runId),
+  clear: (threadId: string) => db.prepare('DELETE FROM thread_setup_runs WHERE thread_id = ?').run(threadId),
 };

@@ -2,5 +2,6 @@
   "name": "Theme check",
   "command": "echo \"Theme check passed\"",
   "secrets": [],
-  "port": null
+  "port": null,
+  "setup": "background"
 }

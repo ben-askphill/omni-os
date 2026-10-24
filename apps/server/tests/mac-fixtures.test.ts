@@ -512,7 +512,7 @@ async function scenario() {
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
 
-  const actionBody = request('channel-action-request.json', { name: 'Theme check', command: 'echo "Theme check passed"', secrets: [], port: null });
+  const actionBody = request('channel-action-request.json', { name: 'Theme check', command: 'echo "Theme check passed"', secrets: [], port: null, setup: 'background' });
   const check = keep('channel-action.json', await call('POST', '/channels/acme/actions', actionBody)) as { id: string };
   const preview = (await call('POST', '/channels/acme/actions', { name: 'Theme preview', command: 'echo "Previewing on $OMNI_PORT"; sleep 30', port: 0 })) as { id: string };
   const tests = (await call('POST', '/channels/acme/actions', { name: 'Tests', command: 'echo "1 failing" >&2; exit 1' })) as { id: string };

@@ -20,10 +20,23 @@ export interface ChannelAction {
    * never share it. A number: always that one, and a second run while it is taken is refused.
    */
   port: number | null;
+  /**
+   * Set on the one action the channel runs in each new worktree, once per preparation attempt: `blocking` before the
+   * agent starts, which waits for it to succeed, or `background` alongside the agent. Null on every other action.
+   */
+  setup: SetupMode | null;
   position: number;
   created_at: string;
   updated_at: string;
 }
+
+/** How a channel's setup action runs in a new worktree: before the agent starts, or alongside it. */
+export type SetupMode = 'blocking' | 'background';
+
+export const SETUP_MODE_LABEL: Record<SetupMode, string> = {
+  blocking: 'Before the agent starts',
+  background: 'Alongside the agent',
+};
 
 /** What a client sends to create or change an action. */
 export interface ChannelActionInput {
@@ -31,6 +44,8 @@ export interface ChannelActionInput {
   command: string;
   secrets?: string[];
   port?: number | null;
+  /** Make it the channel's setup action, or not. Setting it on one action takes it off any other. */
+  setup?: SetupMode | null;
 }
 
 export type ActionRunState = 'running' | 'succeeded' | 'failed' | 'stopped';
@@ -65,6 +80,11 @@ export interface ThreadActions {
   runs: ActionRun[];
   /** Set while the thread cannot run one: its worktree is being prepared, failed, or it runs off this Mac. */
   blocked: string | null;
+  /**
+   * The setup action's run in the thread's latest worktree preparation, null before it starts or when the channel
+   * has none. While the thread is preparing it is the step between the checkout and the agent.
+   */
+  setup_run: ActionRun | null;
 }
 
 /** How many characters of a run's output are kept: the end, where a failure says why. */

@@ -8,7 +8,7 @@ import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { StringDecoder } from 'node:string_decoder';
 import { OUTPUT_LIMIT, type ActionRun, type ChannelAction, type ThreadActions } from '@omni/shared/channel-actions.ts';
-import { actionRuns, channelActions, channels, threads, type Thread } from './db.ts';
+import { actionRuns, channelActions, channels, threadSetupRuns, threads, type Thread } from './db.ts';
 import { artifactsDir } from './config.ts';
 import { isRemoteHarness } from './harness/types.ts';
 import { worktreeProblem } from './sandbox.ts';
@@ -238,7 +238,13 @@ export function runsFor(threadId: string): ActionRun[] {
 
 /** GET /api/threads/:id/actions. Reads only: a client that reconnects never starts anything. */
 export function threadActions(t: Thread): ThreadActions {
-  return { actions: channelActions.list(t.channel_id), runs: runsFor(t.id), blocked: blockedReason(t) };
+  const setupRun = threadSetupRuns.get(t.id);
+  return {
+    actions: channelActions.list(t.channel_id),
+    runs: runsFor(t.id),
+    blocked: blockedReason(t),
+    setup_run: (setupRun && settleOrphan(setupRun)) || null,
+  };
 }
 
 /** Run the action a run ran, again, with the action's current command. */
