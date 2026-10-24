@@ -107,6 +107,12 @@ describe('context chips', () => {
       expect(inspector).toContain(c.expect.label || NEWER_LABEL);
       expect(inspector).toContain(cantShowText(reading.record));
       expect(inspector).toContain('Update Omni to see it.');
+    } else if ((c.raw as { kind: string }).kind === 'terminal_excerpt') {
+      expect(inspector).toContain('~/code/shop');
+      expect(inspector).toContain('3 lines selected');
+      expect(inspector).toContain('shell pid 48213');
+      expect(inspector).toContain('✕ totals an empty cart (4 ms)');
+      expect(inspector).not.toContain('Update Omni');
     } else {
       expect(inspector).toContain('src/cart.ts');
       expect(inspector).toContain('new lines 1–3');
@@ -142,7 +148,7 @@ describe('the recorded thread', () => {
     const user = d.events.map((e) => (e.kind === 'user' ? parsePayload<UserP>(e) : null)).find((p) => p?.context);
     const [r] = readContexts(user?.context);
     expect(r?.as).toBe('known');
-    if (r?.as !== 'known') return;
+    if (r?.as !== 'known' || r.kind !== 'diff_selection') throw new Error('the recorded message carries a diff selection');
     const b = r.body;
     const html = textOf(renderToStaticMarkup(createElement(ContextChips, { records: user?.context })));
     expect(html).toContain(diffSelection.label(b));

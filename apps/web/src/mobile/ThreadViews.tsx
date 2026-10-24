@@ -252,7 +252,7 @@ export function TerminalScreen() {
   const { thread } = useThread();
   return (
     <>
-      <MoHeader onBack={shell.back} title="Terminal" sub="Read only · take over on the Mac" />
+      <MoHeader onBack={shell.back} title="Terminal" sub="Read only · tap lines to add them to a message" />
       <div className="flex min-h-0 flex-1 flex-col px-3 pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
         {thread ? <TerminalView threadId={thread.id} cwd={thread.cwd} readOnly /> : <MoEmpty>Loading</MoEmpty>}
       </div>
