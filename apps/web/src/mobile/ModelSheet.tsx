@@ -23,12 +23,15 @@ export function ModelSheet({
   effort,
   onChange,
   onClose,
+  offerAuto = true,
 }: {
   harnesses: HarnessWithRunning[];
   choice: ModelChoice;
   effort: string;
   onChange: (choice: ModelChoice, effort: string) => void;
   onClose: () => void;
+  /** List Auto first. A continued thread's run leaves it out, as the desktop ModelPicker does. */
+  offerAuto?: boolean;
 }) {
   const { model, efforts } = modelOf(harnesses, choice);
   return (
@@ -41,19 +44,21 @@ export function ModelSheet({
         </button>
       </div>
       <div className="mo-scroll flex min-h-0 flex-1 flex-col gap-[22px] overflow-y-auto pb-3">
-        <MoSection title="Auto">
-          <MoGroup>
-            <MoListRow
-              icon={<OmniMark size={20} />}
-              label="Auto"
-              sub="Picks the model and effort for your task"
-              right={<MoRadio on={asksAuto(choice)} />}
-              onClick={() => onChange(AUTO_CHOICE, '')}
-              chevron={false}
-              last
-            />
-          </MoGroup>
-        </MoSection>
+        {offerAuto && (
+          <MoSection title="Auto">
+            <MoGroup>
+              <MoListRow
+                icon={<OmniMark size={20} />}
+                label="Auto"
+                sub="Picks the model and effort for your task"
+                right={<MoRadio on={asksAuto(choice)} />}
+                onClick={() => onChange(AUTO_CHOICE, '')}
+                chevron={false}
+                last
+              />
+            </MoGroup>
+          </MoSection>
+        )}
         {!asksAuto(choice) && efforts.length > 0 && (
           <MoSection title={`Effort for ${model?.label ?? 'this model'}`}>
             <MoGroup>

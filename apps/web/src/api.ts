@@ -6,6 +6,7 @@ import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
 import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
+import type { ContinueLink } from '@omni/shared/continue.ts';
 
 export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult };
 
@@ -116,6 +117,9 @@ export interface ThreadDetail {
   blocked?: string;
   /** A handoff to or from another synced Mac that is under way or just settled. Older servers leave it out. */
   handoff?: HandoffView | null;
+  /** The thread this one continues on another harness, and the threads that continue it. Older servers leave them out. */
+  continued_from?: ContinueLink | null;
+  continued_in?: ContinueLink[];
 }
 
 /** How a message reaches a busy thread: read at its next step, run after the turn, or interrupt then run. */
@@ -374,9 +378,12 @@ export type FeedEvent =
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** The answer's parsed body, for errors that carry more than a message (a 409's `code`). */
+  data: unknown;
+  constructor(message: string, status: number, data: unknown = null) {
     super(message);
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -430,7 +437,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
         : typeof data === 'string' && data
           ? data.slice(0, 300)
           : `Request failed (${res.status})`;
-    throw new ApiError(msg, res.status);
+    throw new ApiError(msg, res.status, data);
   }
   return data as T;
 }

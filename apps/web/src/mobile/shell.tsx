@@ -2,10 +2,11 @@
 // thread's screens share.
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { useThreadSession } from '../pages/useThreadSession.ts';
+import type { ContinueSource } from '../continue.ts';
 import { shownResult } from '../needs-you.ts';
 import { useApp, usePageVisible } from '../store.tsx';
 
-export type ShellSheet = { name: 'new'; channel?: string } | { name: 'search' };
+export type ShellSheet = { name: 'new'; channel?: string } | { name: 'search' } | { name: 'continue'; source: ContinueSource };
 
 export interface MobileShellApi {
   /** Back to the screen under this one: the previous history entry when it is the app's, else the parent route. */

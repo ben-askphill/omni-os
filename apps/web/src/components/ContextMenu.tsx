@@ -9,6 +9,8 @@ import { canMarkDone } from '../needs-you.ts';
 import { navigate, href, openNewThread, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { handOff, useHandoffTargets } from './thread/Handoff.tsx';
+import { openContinue } from './ContinueSheet.tsx';
+import { sourceRefusal } from '../continue.ts';
 import { Icon, Loader, StatusDot, type IconName } from './ui.tsx';
 
 type Target = { kind: 'thread'; id: string } | { kind: 'channel'; id: string } | { kind: 'folder'; id: string };
@@ -229,7 +231,8 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     }
   };
 
-  const items: { label: string; icon: IconName; run: () => void }[] =
+  // `off`: why the item cannot run here, shown under it.
+  const items: { label: string; icon: IconName; run: () => void; off?: string | null }[] =
     target.kind === 'thread'
       ? [
           // Archived threads are out of the lists, so out of Pinned too.
@@ -241,6 +244,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
           { label: 'Rename thread', icon: 'pencil', run: () => setDraft(current ?? '') },
           ...(row && !row.parent_id ? [{ label: 'Move to folder', icon: 'folder' as const, run: () => setMoving(true) }] : []),
           ...(targets.state === 'ready' ? [{ label: 'Hand off to…', icon: 'share' as const, run: () => setHandingOff(true) }] : []),
+          ...(row ? [{ label: 'Continue with another harness…', icon: 'branch' as const, run: () => (openContinue(row), onClose()), off: sourceRefusal(row.harness) }] : []),
           { label: 'Send to Grok Bot', icon: 'external', run: () => void sendGrok() },
           { label: archived ? 'Unarchive thread' : 'Archive thread', icon: 'archive', run: toggleArchive },
         ]
@@ -332,9 +336,22 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
         />
       ) : (
       items.map((it) => (
-        <button key={it.label} role="menuitem" onClick={it.run} className="hov flex h-8 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[13px] text-fg-2 hover:text-fg">
+        <button
+          key={it.label}
+          role="menuitem"
+          aria-disabled={!!it.off || undefined}
+          onClick={it.off ? undefined : it.run}
+          className={`${it.off ? 'opacity-45' : 'hov hover:text-fg'} flex min-h-8 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[13px] text-fg-2`}
+        >
           <Icon name={it.icon} size={14} className="text-fg-3" />
-          {it.label}
+          {it.off ? (
+            <span className="flex min-w-0 flex-col py-1.5">
+              <span>{it.label}</span>
+              <span className="text-[11.5px] leading-snug text-fg-4">{it.off}</span>
+            </span>
+          ) : (
+            it.label
+          )}
         </button>
       )))}
       {error && <div className="px-2.5 py-1.5 text-[12px] leading-snug break-words text-pretty text-fg-3">{error}</div>}
