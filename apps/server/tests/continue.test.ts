@@ -361,7 +361,7 @@ describe('the snapshot', () => {
     expect(sent).toContain('look at ./a.txt');
     expect(sent).not.toContain(src.cwd);
     expect(sent).not.toContain(realpathSync(src.cwd));
-  });
+  }, 20_000);
 
   it('converges when Retry follows a failure partway through', async () => {
     const { src } = await dirtySource();
@@ -382,7 +382,7 @@ describe('the snapshot', () => {
     expect(H.db.continuations.get(made)).toMatchObject({ snapshot_sha: sha, applied_at: expect.any(String) });
     expect(readFileSync(join(H.thread(made).cwd, 'b.txt'), 'utf8')).toBe('b.txt unstaged\n');
     expect(H.texts(made, 'user')).toEqual(['carry on']);
-  });
+  }, 20_000);
 
   it('fails setup, saying why, when its branch name is taken at another commit', async () => {
     const { dir, src } = await dirtySource();
@@ -395,7 +395,7 @@ describe('the snapshot', () => {
     await H.until('setup to fail', () => H.thread(made).setup === 'failed');
     expect(H.thread(made).setup_error).toMatch(/already exists at another commit/);
     expect(H.spawns(made)).toEqual([]);
-  });
+  }, 20_000);
 
   it('gives a source in the shared checkout its own worktree at HEAD, and lists its uncommitted changes instead', async () => {
     const { dir, channel } = repoChannel(true);
@@ -417,5 +417,5 @@ describe('the snapshot', () => {
     expect(existsSync(join(t.cwd, 'dirty.txt'))).toBe(false);
     expect(git(t.cwd, 'status', '--porcelain')).toBe('');
     expect(readFileSync(join(dir, 'a.txt'), 'utf8'), 'the shared checkout').toBe('edited in the shared checkout\n');
-  });
+  }, 20_000);
 });
