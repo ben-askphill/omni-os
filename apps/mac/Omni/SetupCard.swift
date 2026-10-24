@@ -10,6 +10,8 @@ struct SetupCard: View {
   let thread: OmniThread
   @State private var busy = false
   @State private var error: String?
+  /// Where the branch starts. Resolved during setup (a remote default fetches first), so it is read again as setup moves.
+  @State private var base: ThreadBaseView?
 
   var body: some View {
     let failed = thread.setup == .failed
@@ -34,6 +36,13 @@ struct SetupCard: View {
             .font(.omni(size: 12.5))
             .foregroundStyle(Tok.fg3)
             .fixedSize(horizontal: false, vertical: true)
+          if let base {
+            Text(base.line)
+              .font(.omni(size: 12.5))
+              .foregroundStyle(Tok.fg2)
+              .fixedSize(horizontal: false, vertical: true)
+              .padding(.top, z(4))
+          }
           if failed, let reason = thread.setupError {
             Text(reason)
               .font(.omni(size: 11.5, design: .monospaced))
@@ -82,6 +91,9 @@ struct SetupCard: View {
     .padding(.top, z(8))
     .accessibilityElement(children: .contain)
     .accessibilityLabel(failed ? "Setup failed" : "Preparing worktree")
+    .task(id: thread.setup) {
+      if let view = try? await model.client.threadBase(thread.id) { base = view }
+    }
   }
 
   private func retry() {

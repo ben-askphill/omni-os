@@ -60,6 +60,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `ContextMeter.swift` | `ContextUsage`, `ContextView`, `ContextMeter` (the math in `packages/shared/context-meter.ts`), `ContextAPI` (`threadContext`, `compactThread` on `OmniClient`), `ContextModel` (one thread's meter and its Compact) |
 | `QuickPrompt.swift` | `QuickPromptShortcut` (the fixed choices and their Carbon key code and modifiers), `QuickPromptSettings` (on, shortcut, Wispr Flow, in UserDefaults), `QuickPromptAPI`, `QuickPromptModel` (text, target channel, phase, `awaitDictation`) |
 | `Handoff.swift` | `Device`, `Reachability`, `HandoffView`, `HandoffPhase`, `PrepareStep`, `HandoffBanner`, `HandoffAnswer`, `DevicesAPI`, `DevicesModel` (`AppModel.devices`), and `devices`, `handOff`, `cancelHandoff` on `OmniClient`. The shapes and text are `packages/shared/handoff.ts`; when to offer it, the picker and the banner follow `apps/web/src/handoff.ts` |
+| `WorktreeBase.swift` | `BasePick`, `BaseOptions`, `ThreadBaseView` (`packages/shared/worktree-base.ts`), `BaseRules` (the Base picker's rows, pill text, when it shows, what `base` is sent), `BaseOptionsModel`. `Client+WorktreeBase.swift` has `channelBases`, `threadBase`; the app draws the picker in `BasePicker.swift` and the setup card's "Branching from" line in `SetupCard.swift` |
 | `QAScript.swift` | Debug only. `QAScript`, `QAStep`, `QACondition`, `QAFacts`, `QAServer`, `QASnapshot.looksBlank` |
 
 ## Build and test
