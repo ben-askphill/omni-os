@@ -853,6 +853,9 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
               <NavLink to={href.sync()} icon="refresh" active={route.name === 'sync'} onNavigate={onNavigate}>
                 Sync
               </NavLink>
+              <NavLink to={href.storage()} icon="archive" active={route.name === 'storage'} onNavigate={onNavigate}>
+                Storage
+              </NavLink>
               <NavLink to={href.settingsPage()} icon="sliders" active={route.name === 'settings'} onNavigate={onNavigate}>
                 Settings
               </NavLink>

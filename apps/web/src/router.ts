@@ -19,6 +19,7 @@ export type Route =
   | { name: 'automations' }
   | { name: 'secrets' }
   | { name: 'sync' }
+  | { name: 'storage' }
   /** `workspace`: the full workspace settings, which the phone layout keeps behind its own Settings screen. */
   | { name: 'settings'; page?: 'workspace' }
   | { name: 'artifacts' }
@@ -63,6 +64,7 @@ export function parseHash(hash: string): Route {
   if (a === 'automations' && !b) return { name: 'automations' };
   if (a === 'secrets' && !b) return { name: 'secrets' };
   if (a === 'sync' && !b) return { name: 'sync' };
+  if (a === 'storage' && !b) return { name: 'storage' };
   if (a === 'settings' && !b) return { name: 'settings' };
   if (a === 'settings' && b === 'workspace' && !c) return { name: 'settings', page: 'workspace' };
   if (a === 'artifacts' && !b) return { name: 'artifacts' };
@@ -89,6 +91,8 @@ export function pageTitle(route: Route, channelName: (id: string) => string | un
       return 'Secrets';
     case 'sync':
       return 'Sync';
+    case 'storage':
+      return 'Storage';
     case 'settings':
       return 'Settings';
     case 'artifacts':
@@ -140,6 +144,7 @@ export const href = {
   automations: () => '#/automations',
   secrets: () => '#/secrets',
   sync: () => '#/sync',
+  storage: () => '#/storage',
   /** The workspace Settings page (your name). A channel's own settings tab is `settings(id)`. */
   settingsPage: () => '#/settings',
   workspaceSettings: () => '#/settings/workspace',

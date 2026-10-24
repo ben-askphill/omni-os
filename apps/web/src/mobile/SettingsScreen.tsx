@@ -115,6 +115,7 @@ export function SettingsScreen() {
           <MoGroup>
             <MoListRow icon="monitor" label={host || 'Omni'} sub={syncSub(sync.data, now)} onClick={() => shell.open(href.sync())} />
             <MoListRow icon="key" label="Secrets" sub="Names only; values stay in the Mac's Keychain" onClick={() => shell.open(href.secrets())} />
+            <MoListRow icon="archive" label="Storage" sub="Worktrees on this Mac and what can be cleaned up" onClick={() => shell.open(href.storage())} />
             <MoListRow
               icon="bell"
               label="Notifications"

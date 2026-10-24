@@ -24,6 +24,7 @@ import { questionsApi } from './questions-api.ts';
 import { threadsApi } from './threads-api.ts';
 import { requestGuard } from './request-guard.ts';
 import { toolFailuresApi } from './tool-failures-api.ts';
+import { worktreesApi } from './worktrees-api.ts';
 
 // Every /api route, and the Web UI. apps/server/index.ts boots it.
 export const app = new Hono();
@@ -62,6 +63,7 @@ api.route('/grokbot', grokbotApi);
 api.route('/sync', syncApi);
 api.route('/setup', setupApi);
 api.route('/tool-failures', toolFailuresApi);
+api.route('/worktrees', worktreesApi);
 
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
 api.all('*', (c) => c.json({ error: 'Not found' }, 404));

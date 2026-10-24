@@ -89,6 +89,8 @@ const NAMES = [
   // thread whose turns are not saved.
   'turns.json',
   'turns-unavailable.json',
+  // The storage scan over the worktrees above, once it has finished.
+  'worktree-scan.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -485,6 +487,14 @@ async function scenario() {
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
+
+  await call('POST', '/worktrees/scan');
+  const scanned = await eventually(async () => {
+    const b = (await get('/worktrees/scan')) as { scan: { state: string; items: { id: string }[] } };
+    return b.scan.state === 'done' && b;
+  }, 'the storage scan to finish');
+  keep('worktree-scan.json', scanned);
+  expect(scanned.scan.items.map((i) => i.id)).toContain(wt.id);
 }
 
 /** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */
