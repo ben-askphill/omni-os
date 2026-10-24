@@ -29,6 +29,8 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 ## 3. Drive it
 
 - Web: open the printed URL in a browser tool (the thread's `omni-browser` MCP, Claude in Chrome, or Playwright). Click through the actual flow you changed, not just the page load. Check desktop width and 390px phone width (the phone layout is its own code in `apps/web/src/mobile/`), and dark mode (`browser_emulate_media`) when colour changed.
+- With `omni-browser`, take a `browser_snapshot` before clicking. Pass the exact snapshot reference as `target` to `browser_click`; `element` is only a description, and `ref` is not a supported argument. For a selector, pass a valid unique CSS selector as `target`.
+- Save `omni-browser` screenshots with its default filename or a relative path inside the worktree. Do not pass an absolute path in `/tmp` or another directory outside the thread's browser folder and worktree. Use the returned screenshot path when you need to read or copy it; then put a copy in `shots/` for `scripts/pr-screenshots.sh`.
 - Server: curl the route and read the response. Then check the side effect: the row in the QA db, the feed event (`curl -N localhost:4757/api/feed`), the line in `scripts/qa-stack.sh logs`.
 - Mac: the Debug app's QA harness (`-OmniQAScript`, see "QA harness" in `apps/mac/NOTES.md`) points the app at :4757 and snapshots windows.
 
