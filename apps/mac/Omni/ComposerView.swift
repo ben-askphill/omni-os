@@ -67,6 +67,8 @@ private struct ThreadPRSlot: View {
   /// nil until the first answer, so the button does not flash before the PR shows.
   @State private var prs: ThreadPullRequests?
   @State private var failed = false
+  @State private var watch: PRWatch?
+  @State private var watchError: String?
 
   var body: some View {
     // A ZStack, not a Group: a Group spreads its modifiers over its children, and before the first
@@ -85,12 +87,14 @@ private struct ThreadPRSlot: View {
             Divider()
             Button("Open a new PR", action: open).disabled(opening)
           }
+          PRWatchSection(client: model.client, threadID: thread.id, open: pr.isOpen, watch: $watch, error: $watchError)
         } label: {
           HStack(spacing: z(5)) {
             if opening { ProgressView().controlSize(.mini) } else { Image(systemName: "arrow.triangle.pull") }
             Text("#\(pr.number)")
             PRChip(text: pr.badge, tone: pr.badge == "open" ? .ok : pr.badge == "merged" ? .info : .outline)
             if prs.prs.count > 1 { Text("+\(prs.prs.count - 1)").foregroundStyle(Tok.fg4) }
+            PRWatchGlyph(watch: watch)
           }
           .font(.omni(size: 12.5))
         }
@@ -102,6 +106,9 @@ private struct ThreadPRSlot: View {
         .frame(height: z(26))
         .foregroundStyle(Tok.fg3)
         .help(pr.title)
+        #if DEBUG
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { QAPRProbe.button = $0 }
+        #endif
       } else if prs != nil || failed {
         openButton
       } else {
@@ -135,6 +142,12 @@ private struct ThreadPRSlot: View {
       prs = try await model.client.pullRequests(forThread: thread.id)
     } catch {
       failed = true
+    }
+    guard prs?.pr != nil else { return }
+    do {
+      watch = try await model.client.prWatch(forThread: thread.id)
+    } catch {
+      // A failed read keeps the last answer.
     }
   }
 }

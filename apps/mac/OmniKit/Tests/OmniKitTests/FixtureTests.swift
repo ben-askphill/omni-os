@@ -67,6 +67,9 @@ func sseData(_ text: String) -> [String] {
     "changes-unavailable.json": { _ = try decodeFixture(BranchChanges.self, "changes-unavailable.json") },
     "turns.json": { _ = try decodeFixture(TurnChanges.self, "turns.json") },
     "turns-unavailable.json": { _ = try decodeFixture(TurnChanges.self, "turns-unavailable.json") },
+    "pr-watch-none.json": { _ = try decodeFixture(PRWatch?.self, "pr-watch-none.json") },
+    "pr-watch.json": { _ = try decodeFixture(PRWatch.self, "pr-watch.json") },
+    "pr-watch-stopped.json": { _ = try decodeFixture(PRWatch.self, "pr-watch-stopped.json") },
     // Recorded by apps/server/tests/handoff-two-macs.test.ts, which needs two Macs.
     "devices.json": { _ = try decodeFixture([Device].self, "devices.json") },
     "thread-handoff.json": { _ = try decodeFixture(ThreadDetail.self, "thread-handoff.json") },

@@ -89,6 +89,10 @@ const NAMES = [
   // thread whose turns are not saved.
   'turns.json',
   'turns-unavailable.json',
+  // A thread with no PR watch, then one polled through the fake gh, then stopped.
+  'pr-watch-none.json',
+  'pr-watch.json',
+  'pr-watch-stopped.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -134,6 +138,25 @@ function fakeSecurity() {
   return bin;
 }
 
+/**
+ * A `gh` that answers only the PR watch's poll, with an open PR whose checks are one passed and one running, so the
+ * watch records counts and wakes no one. Every other call fails, as gh does in a repo without a remote, and nothing
+ * reaches GitHub.
+ */
+function fakeGh(bin: string) {
+  const pr = {
+    number: 7,
+    state: 'OPEN',
+    headRefOid: 'a'.repeat(40),
+    statusCheckRollup: [
+      { __typename: 'CheckRun', name: 'lint', conclusion: 'SUCCESS', status: 'COMPLETED' },
+      { __typename: 'CheckRun', name: 'e2e', conclusion: '', status: 'IN_PROGRESS' },
+    ],
+  };
+  writeFileSync(join(bin, 'gh'), `#!/bin/sh\nif [ "$1 $2" = "pr view" ]; then echo '${JSON.stringify(pr)}'; exit 0; fi\necho "fake gh: $*" >&2\nexit 1\n`);
+  chmodSync(join(bin, 'gh'), 0o755);
+}
+
 /** One automation to toggle and run, and one the server can't schedule. */
 function automations() {
   const dir = join(tmp, 'automations');
@@ -154,6 +177,7 @@ async function boot(): Promise<number> {
   if (!setUp) {
     mkdirSync(join(tmp, 'brain'));
     setUp = { bin: fakeSecurity(), automationsDir: automations() };
+    fakeGh(setUp.bin);
   }
   const { bin, automationsDir } = setUp;
   child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', 'tsx', 'apps/server/index.ts'], {
@@ -485,6 +509,20 @@ async function scenario() {
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
+
+  // Last, since it gives acme a GitHub repo. The app sends {} for the branch's PR; acme threads have no branch, so
+  // this one names the PR.
+  keep('pr-watch-none.json', await get(`/threads/${id}/pr-watch`));
+  await call('PATCH', '/channels/acme', { github_repo: 'acme/shop' });
+  await call('PUT', `/threads/${id}/pr-watch`, { number: 7 });
+  const polled = await eventually(async () => {
+    const w = (await get(`/threads/${id}/pr-watch`)) as { last_polled_at: string | null };
+    return w.last_polled_at && w;
+  }, 'the PR watch to poll');
+  expect(polled).toMatchObject({ state: 'watching', error: null, checks: { passed: 1, failed: 0, pending: 1 } });
+  keep('pr-watch.json', polled);
+  const ended = keep('pr-watch-stopped.json', await call('DELETE', `/threads/${id}/pr-watch`));
+  expect(ended).toMatchObject({ state: 'stopped', stop_reason: 'stopped' });
 }
 
 /** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */

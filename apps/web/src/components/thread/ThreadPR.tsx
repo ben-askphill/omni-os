@@ -3,6 +3,7 @@ import { api, type PRSummary, type Thread } from '../../api.ts';
 import { Button, Chip, Icon } from '../ui.tsx';
 import { plural, relTime } from '../../format.ts';
 import { href } from '../../router.ts';
+import { PRWatchMark, PRWatchRow, usePRWatch } from './PRWatch.tsx';
 
 export const OPEN_PR_PROMPT = 'Commit your work, push the branch and open a PR with gh. Reply with the PR URL.';
 
@@ -52,6 +53,7 @@ export function useThreadPR(thread: Pick<Thread, 'id' | 'branch'> | null, slotBu
  */
 export function ThreadPR({ thread, slotBusy, busy, onOpen }: { thread: Thread; slotBusy: boolean; busy: boolean; onOpen: () => void }) {
   const data = useThreadPR(thread, slotBusy);
+  const watch = usePRWatch(thread.id, data);
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
 
@@ -93,6 +95,7 @@ export function ThreadPR({ thread, slotBusy, busy, onOpen }: { thread: Thread; s
         #{pr.number}
         <Chip tone={badge.tone}>{badge.label}</Chip>
         {prs.length > 1 && <span className="text-fg-4">+{prs.length - 1}</span>}
+        <PRWatchMark w={watch} />
         <Icon name="chevronDown" size={13} className="text-fg-4" />
       </Button>
       {open && (
@@ -121,6 +124,7 @@ export function ThreadPR({ thread, slotBusy, busy, onOpen }: { thread: Thread; s
               );
             })}
           </div>
+          <PRWatchRow w={watch} open={(pr.state ?? 'OPEN') === 'OPEN'} />
           {canOpen && (
             <button
               type="button"

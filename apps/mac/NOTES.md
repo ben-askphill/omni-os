@@ -38,6 +38,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `WorkspaceStore.swift` | `WorkspaceStore`, `WorkspaceAPI`, `SidebarSections` |
 | `LinkPreviews.swift` | `LinkPreview`, `LinkIconLayer`, `LinkPreviewAPI` (`resolveLinks`, `linkIcons` on `OmniClient`), `LinkPreviewStore` (batched asks, `AppModel.links`), `MarkdownDocument.externalURLs`. The app draws them in `LinkChips.swift`: `SelectableMarkdown` swaps a link run for the mark, id and title (`ExternalLink` in `LinkChip.tsx`) |
 | `PublishedPage.swift` | `PublishedPage`: a page a thread published to claude.ai (`publishedFrom` in `packages/shared/published.ts`), `byGroup` for the transcript cards, and `checkComments(threadID:url:)` on `OmniClient` |
+| `PRWatch.swift` | `PRWatch` (`PRWatchView` in `packages/shared/pr-watch.ts`), `watchLine`, `PRWatch.copy` (the menu row, `watchCopy` in apps/web), and `prWatch`, `startPRWatch`, `stopPRWatch` on `OmniClient`. The reply box's PR menu draws it (`PRWatchMenu.swift`). Fixtures `pr-watch.json`, `pr-watch-stopped.json`, `pr-watch-none.json` |
 | `Client+Thread.swift` | `ThreadAPI` (the calls `ThreadStore` makes), `artifactURL` and `uploadURL` on `OmniClient` |
 | `ThreadStore.swift` | `ThreadStore` (one thread, live), `ThreadStoreRegistry` |
 | `Transcript.swift` | `Transcript` (the Web UI's `buildItems`, incremental), `TranscriptItem`, `ToolGroup`, `ToolCall`, `Plan`, `Todo`, `TurnResult.line` |
@@ -474,6 +475,7 @@ Steps (a list, or an object with the list under `steps`):
 | `{"screen": "name"}` | The main window with the app's windows over it (a sheet, a menu) drawn in place |
 | `{"quickPrompt": "text"}`, `{"quickPrompt": {"send": true}}`, `{"quickPrompt": false}` | Opens the Quick Prompt with this text (Wispr Flow off), sends it, or closes it |
 | `{"handoffMenu": "name"}` | Clicks the open thread's Hand Off button and writes `name.png` while its menu is open |
+| `{"prMenu": "name"}` | Clicks the reply box's PR button and writes `name.png` while its menu is open |
 | `{"handOff": "<device id>"}` | Hands the open thread to that Mac, as picking it in Hand Off to does |
 | `{"quit": true}` | Writes the report and exits |
 

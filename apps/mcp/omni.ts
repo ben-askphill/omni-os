@@ -258,6 +258,32 @@ server.registerTool(
 );
 
 server.registerTool(
+  'watch_pr',
+  {
+    description:
+      "Watch a thread's PR checks. Omni polls GitHub itself and wakes the thread once per new failing check on a head, " +
+      'with the failing checks and a log tail; unchanged polls cost no turn. A watch ends on its own when the PR merges or ' +
+      'closes, the thread is archived, or after its wake limit. action: start (the branch\'s open PR, or `number`), stop, ' +
+      'or status. Without thread_id, status lists every watch on this Mac.',
+    inputSchema: {
+      thread_id: z.string().optional(),
+      action: z.enum(['start', 'stop', 'status']),
+      number: z.number().int().positive().optional().describe("The PR to watch. Omit for the thread branch's open PR."),
+    },
+  },
+  async ({ thread_id, action, number }) => {
+    if (!thread_id) {
+      if (action !== 'status') throw new Error('start and stop need a thread_id.');
+      return text(await call('/pr-watches'));
+    }
+    const path = `/threads/${encodeURIComponent(thread_id)}/pr-watch`;
+    if (action === 'start') return text(await call(path, { method: 'PUT', body: JSON.stringify(number ? { number } : {}) }));
+    if (action === 'stop') return text(await call(path, { method: 'DELETE' }));
+    return text(await call(path));
+  },
+);
+
+server.registerTool(
   'get_thread',
   { description: 'Status, last reply and artifacts of a thread.', inputSchema: { thread_id: z.string() } },
   async ({ thread_id }) => text(await call(`/threads/${thread_id}/summary`)),

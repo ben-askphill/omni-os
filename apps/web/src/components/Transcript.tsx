@@ -415,6 +415,7 @@ const SOURCE_LABEL: Record<string, string> = {
   capture: 'Captured',
   import: 'Imported',
   limit: 'After the usage limit',
+  'pr-watch': 'PR watch',
 };
 
 /** A message that waits for the thread's worktree (SetupCard). */
