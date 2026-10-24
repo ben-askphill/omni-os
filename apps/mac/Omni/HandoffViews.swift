@@ -107,7 +107,7 @@ struct HandoffCard: View {
       ZStack {
         Circle().fill(tone == .alert ? Tok.needs.opacity(0.12) : Tok.surface2)
         if tone == .working {
-          Loader(size: 14)
+          Loader(size: 14, color: Tok.fg2)
         } else {
           OmniIcon(name: tone == .alert ? "alert" : "clock", size: 15).foregroundStyle(tone == .alert ? Tok.needs : Tok.fg2)
         }

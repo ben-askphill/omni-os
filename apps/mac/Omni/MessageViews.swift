@@ -315,7 +315,7 @@ struct SwitchLineView: View {
         HStack(spacing: z(8)) {
           Image(systemName: "arrow.triangle.2.circlepath").font(.omni(size: 11))
           Text(row.text).multilineTextAlignment(.center)
-          if row.isPending && running { Loader(size: 11) }
+          if row.isPending && running { Loader(size: 11, color: Tok.fg3) }
         }
         .font(.omni(size: 12, weight: .medium))
         .foregroundStyle(Tok.fg3)
@@ -499,7 +499,7 @@ struct WorkingLine: View {
 
   var body: some View {
     HStack(spacing: z(8)) {
-      Loader(size: 13).foregroundStyle(Tok.fg3)
+      Loader(size: 13, color: Tok.fg3)
       Text(text).lineLimit(1).truncationMode(.tail)
     }
     .font(.omni(size: ThreadStyle.small))

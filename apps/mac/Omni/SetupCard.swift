@@ -20,7 +20,7 @@ struct SetupCard: View {
           if failed {
             OmniIcon(name: "alert", size: 15).foregroundStyle(Tok.needs)
           } else {
-            Loader(size: 14)
+            Loader(size: 14, color: Tok.fg2)
           }
         }
         .frame(width: z(28), height: z(28))

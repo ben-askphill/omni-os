@@ -86,7 +86,7 @@ struct ToolGroupView: View {
               .foregroundStyle(Tok.live)
               .fixedSize()
           }
-          if live || !working.isEmpty { Loader(size: 11).foregroundStyle(working.isEmpty ? Tok.fg3 : Tok.live) }
+          if live || !working.isEmpty { Loader(size: 11, color: working.isEmpty ? Tok.fg3 : Tok.live) }
         }
         .font(.omni(size: ThreadStyle.small))
         .padding(.horizontal, z(14))
@@ -162,9 +162,9 @@ struct ToolRowView: View {
               .fixedSize()
           }
           if agent {
-            Loader(size: 11).foregroundStyle(Tok.live)
+            Loader(size: 11, color: Tok.live)
           } else if pending && running {
-            Loader(size: 11).foregroundStyle(Tok.fg3)
+            Loader(size: 11, color: Tok.fg3)
           } else if call.isFailed {
             HStack(spacing: z(4)) {
               GlyphView(glyph: .needs, size: 7)
@@ -313,8 +313,6 @@ struct CheckItem: View {
 private struct CheckBox: View {
   let done: Bool
   let active: Bool
-  @State private var pulse = false
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     let shape = RoundedRectangle(cornerRadius: z(6), style: .continuous)
@@ -326,14 +324,8 @@ private struct CheckBox: View {
         .stroke(Tok.onInk, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         .frame(width: z(12.6), height: z(12.6))
       if active {
-        Circle().fill(Tok.live)
+        LayerAnimation<PulseLayers>(color: Tok.live)
           .frame(width: z(7), height: z(7))
-          .opacity(pulse ? 0.45 : 1)
-          .scaleEffect(pulse ? 0.82 : 1)
-          .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { pulse = true }
-          }
       }
     }
     .frame(width: z(18), height: z(18))

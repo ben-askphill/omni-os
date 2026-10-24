@@ -631,8 +631,7 @@ private struct AgentRow: View {
           Text(task.description)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
-          Loader(size: 10)
-            .foregroundStyle(Tok.live)
+          Loader(size: 10, color: Tok.live)
             .accessibilityHidden(true)
           Text(elapsed(now: context.date))
             .font(.omni(size: 11).monospacedDigit())
@@ -693,8 +692,7 @@ struct ThreadStatusIcon: View {
 
   var body: some View {
     if status == .running {
-      Loader(size: 11)
-        .foregroundStyle(Tok.live)
+      Loader(size: 11, color: Tok.live)
         .accessibilityLabel("Running")
     } else {
       StatusDot(status: status, size: 7, done: done)

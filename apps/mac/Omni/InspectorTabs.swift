@@ -70,7 +70,7 @@ struct ScreenshotGrid: View {
                     ClientImage(client: client, url: client.artifactURL(shot)) { image in
                       image.resizable().scaledToFill()
                     } placeholder: {
-                      Loader(size: 14).foregroundStyle(Tok.fg3)
+                      Loader(size: 14, color: Tok.fg3)
                     }
                   }
                   .clipShape(RoundedRectangle(cornerRadius: z(12), style: .continuous))
@@ -133,7 +133,7 @@ private struct ShotViewer: View {
         ClientImage(client: client, url: client.artifactURL(list[index])) { image in
           image.resizable().scaledToFit()
         } placeholder: {
-          Loader(size: 14).foregroundStyle(Tok.fg3)
+          Loader(size: 14, color: Tok.fg3)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Tok.surface2)

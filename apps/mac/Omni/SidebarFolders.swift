@@ -104,8 +104,7 @@ struct FolderRowView: View {
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
           if busy {
-            Loader(size: 11)
-              .foregroundStyle(Tok.live)
+            Loader(size: 11, color: Tok.live)
           }
           Text("\(folder.count)")
             .font(.omni(size: 11).monospacedDigit())

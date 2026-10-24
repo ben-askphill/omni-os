@@ -45,7 +45,7 @@ struct LiveBrowserView: View {
               .accessibilityLabel(s.title.isEmpty ? "Browser page" : s.title)
             if model.frame == nil, model.error == nil {
               HStack(spacing: z(8)) {
-                Loader(size: 12)
+                Loader(size: 12, color: Tok.fg3)
                 Text(s.running ? "Waiting for the page" : "Starting the browser")
               }
               .font(.omni(size: 12.5))

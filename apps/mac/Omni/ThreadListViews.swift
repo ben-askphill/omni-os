@@ -265,7 +265,7 @@ private struct FolderSectionHeader: View {
       Text("\(count)")
         .foregroundStyle(Tok.fg4)
       if running {
-        Loader(size: 11).foregroundStyle(Tok.live)
+        Loader(size: 11, color: Tok.live)
       }
       Spacer(minLength: 0)
     }
