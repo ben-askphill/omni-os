@@ -10,7 +10,12 @@ public final class NewThreadComposerModel {
   public var text: String {
     didSet { if text != oldValue { drafts.save(text, for: key) } }
   }
-  public private(set) var choice: NewThreadChoice
+  public private(set) var choice: NewThreadChoice {
+    // A base names a ref of one channel's repo.
+    didSet { if choice.channel != oldValue.channel { basePick = .head } }
+  }
+  /// Where a worktree thread's branch starts. Back to the current checkout when the channel changes.
+  public private(set) var basePick = BasePick.head
   public private(set) var harnesses: [HarnessInfo] = []
   public private(set) var crew: [CrewRole] = []
   public private(set) var files: [StagedFile] = []
@@ -108,6 +113,10 @@ public final class NewThreadComposerModel {
     choice.effort = EffortRules.resolved(effort, for: model)
   }
 
+  public func selectBase(_ pick: BasePick) {
+    basePick = pick
+  }
+
   public func addFiles(_ incoming: [StagedFile]) {
     guard !incoming.isEmpty else { return }
     let result = AttachmentRules.add(files, incoming: incoming, maxMB: maxUploadMB)
@@ -139,6 +148,7 @@ public final class NewThreadComposerModel {
         ? NewThread(channel: choice.channel, prompt: prompt, role: choice.role.isEmpty ? nil : choice.role)
         : NewThreadRules.request(choice, prompt: prompt, harnesses: harnesses)
       request.folder = folderChip?.id
+      request.base = BaseRules.sent(basePick, harness: choice.harness)
       let thread = try await api.createThread(request, files: uploads)
       if text == raw { text = "" }
       folder = nil

@@ -67,6 +67,8 @@ func sseData(_ text: String) -> [String] {
     "changes-unavailable.json": { _ = try decodeFixture(BranchChanges.self, "changes-unavailable.json") },
     "turns.json": { _ = try decodeFixture(TurnChanges.self, "turns.json") },
     "turns-unavailable.json": { _ = try decodeFixture(TurnChanges.self, "turns-unavailable.json") },
+    "bases.json": { _ = try decodeFixture(BaseOptions.self, "bases.json") },
+    "thread-base.json": { _ = try decodeFixture(ThreadBaseView.self, "thread-base.json") },
     // Recorded by apps/server/tests/handoff-two-macs.test.ts, which needs two Macs.
     "devices.json": { _ = try decodeFixture([Device].self, "devices.json") },
     "thread-handoff.json": { _ = try decodeFixture(ThreadDetail.self, "thread-handoff.json") },
@@ -82,6 +84,8 @@ func sseData(_ text: String) -> [String] {
     "request-edit-request.json": { _ = try decodeFixture(JSONValue.self, "request-edit-request.json") },
     // NeedsYouTests compares it with what the client encodes.
     "needs-you-read-request.json": { _ = try decodeFixture([String: String].self, "needs-you-read-request.json") },
+    // WorktreeBaseTests compares it with what the client encodes.
+    "thread-create-base-request.json": { _ = try decodeFixture(JSONValue.self, "thread-create-base-request.json") },
   ]
 
   static func threadStream() throws -> [ThreadStreamMessage] {
