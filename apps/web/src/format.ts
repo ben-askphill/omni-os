@@ -2,7 +2,7 @@
 // except automations, which use their own timezone (Europe/Amsterdam by default).
 
 import { formatCents } from '@omni/shared/context-meter.ts';
-import type { MonthlyUsage } from './api.ts';
+import type { ArtifactTrigger, MonthlyUsage } from './api.ts';
 
 const DAY = 86_400_000;
 
@@ -130,11 +130,22 @@ const EVENT_LABELS: Record<string, string> = {
   pr_checks_failed: 'When PR checks fail',
   pr_conflict: 'When a PR has conflicts',
   pr_review: 'When a PR gets review comments',
+  artifact_published: 'When a page is published',
 };
 
 /** An event automation's trigger in words (server/automation-events.ts EVENT_LABELS). */
 export function describeEvent(event: string): string {
   return EVENT_LABELS[event] ?? event;
+}
+
+/** The channels an artifact automation listens to, as `#name`s, or null for any channel. */
+export function artifactChannels(on: ArtifactTrigger, name: (id: string) => string): string | null {
+  return on.channels ? on.channels.map((id) => `#${name(id)}`).join(', ') : null;
+}
+
+/** Which publishes an artifact automation takes, for its filter chip: `#acme, #ops · updates too`. */
+export function describeArtifactSource(on: ArtifactTrigger, name: (id: string) => string): string {
+  return `${artifactChannels(on, name) ?? 'any channel'}${on.updates ? ' · updates too' : ''}`;
 }
 
 /** Best effort human text for common 5-field crons; falls back to the raw expression. */
