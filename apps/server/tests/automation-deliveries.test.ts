@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -124,7 +124,24 @@ describe('retry', () => {
     expect(runsOf(a)).toHaveLength(1);
   });
 
-  it('a failed delivery whose thread exists is not retried: what it did is unknown, so it links to the thread', async () => {
+  it('an error after the thread was made counts as started, not failed: it links to the thread and is never retried', async () => {
+    const a = make();
+    const d = add(a);
+    const spy = vi.spyOn(r.db.automationRuns, 'add').mockImplementationOnce(() => {
+      throw new Error('disk full');
+    });
+    await triggers.admitPending();
+    spy.mockRestore();
+    expect(row(d.id)).toMatchObject({ state: 'started', attempt: 1, thread_id: deliveryThreadId(d.id), reason: 'Reported an error after the thread was made: disk full' });
+    expect(threadsOf(a)).toHaveLength(1);
+    expect(runsOf(a)).toEqual([{ thread_id: deliveryThreadId(d.id) }]);
+    expect((await get(`/deliveries/${d.id}`)).body).toMatchObject({ can_retry: false, can_skip: false, thread_status: expect.any(String) });
+    expect((await retry(d.id, 1)).status).toBe(409);
+    await triggers.admitPending();
+    expect(threadsOf(a)).toHaveLength(1);
+  });
+
+  it('a failed delivery that an older build saved with its thread is not retried either: it links to the thread', async () => {
     const a = make();
     const d = add(a);
     const id = deliveryThreadId(d.id);

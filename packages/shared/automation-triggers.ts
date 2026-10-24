@@ -111,7 +111,8 @@ const EXECUTION: Record<string, Pick<DeliveryStage, 'label' | 'tone'>> = {
 /**
  * The three things a delivery went through. Trigger: it was taken in, held or skipped. Run: its thread was made, or
  * could not be. Execution: what that thread did, the thread's own status. A delivery whose thread exists is never
- * called a failure of the run, whatever it reported: its thread says, and a follow-up goes there.
+ * called a failure of the run, whatever it reported: its thread says, and a follow-up goes there. (A failed one with a
+ * thread, which only older builds saved, is shown as started and then errored.)
  * apps/mac/OmniKit/Sources/OmniKit/Automation.swift ports it.
  */
 export function deliveryStages(d: Pick<DeliveryView, 'state' | 'reason' | 'thread_id' | 'thread_status' | 'waiting'>): DeliveryStage[] {
@@ -126,7 +127,7 @@ export function deliveryStages(d: Pick<DeliveryView, 'state' | 'reason' | 'threa
   const run: DeliveryStage = isPendingDelivery(d.state)
     ? { name: 'Run', label: 'Waiting to start', tone: 'plain', note: d.waiting }
     : d.state === 'started'
-      ? { name: 'Run', label: 'Thread created', tone: 'done', note: null }
+      ? { name: 'Run', label: 'Thread created', tone: 'done', note: d.reason }
       : d.state === 'failed'
         ? { name: 'Run', label: d.thread_id ? 'Started, then reported an error' : 'Could not start', tone: 'needs', note: d.reason }
         : { name: 'Run', label: 'Never started', tone: 'quiet', note: null };

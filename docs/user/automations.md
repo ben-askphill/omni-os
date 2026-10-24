@@ -99,7 +99,7 @@ prompt: |
 Both event triggers save every event as a delivery, and the card for an event automation lists them: the latest five, then Show older for the rest. Open a delivery to see how far it got in three steps.
 
 - **Trigger.** Received, Accepted, Held for owner (saved on the other Mac, waiting for the one that runs automations) or Skipped, with the reason.
-- **Run.** Whether its thread was made. Waiting to start (with why), Thread created, Could not start, or Never started.
+- **Run.** Whether its thread was made. Waiting to start (with why), Thread created (with the error, if Omni hit one afterwards), Could not start, or Never started.
 - **Execution.** What the thread did, its own status: Running, Finished, Failed or Stopped. A run that failed is still a created run. Its delivery says Started, and the thread has the failure.
 
 The detail also shows when the event arrived, which attempt this is, when it expires, and the fields that came with the event. It never shows a signature, a header or the raw request. A delivery that has a thread links to it.
@@ -108,7 +108,7 @@ What you can do:
 
 - **Retry** goes again for a delivery that failed before any thread was made, for example because the channel was gone and you have fixed it. It runs as the next attempt, with a thread of its own, and starts at once, on the Mac that runs automations. Clicking twice makes one attempt.
 - **Skip** is final: the event never starts, here or on the other Mac, and cannot be retried. It works on a delivery that has not started, including a failed one. If the run is already being made when you skip, the skip is refused and the run goes ahead.
-- **A failed delivery whose thread exists is never retried.** The thread was made, so what it did is unknown. Open it and send a follow-up there. Retry is hidden and the card says why.
+- **A run that was made is never retried.** If Omni errors after it made the thread, the delivery shows Started with the error, linked to the thread. What the run did is unknown, so open the thread and send a follow-up there. Failed always means no thread was made.
 
 Limits, set in the `on:` block of a published-page or webhook automation:
 

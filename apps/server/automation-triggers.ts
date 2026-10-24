@@ -138,10 +138,14 @@ async function admit(listed: TriggerDelivery, automations: Automation[]): Promis
       return settle('started', { thread_id: t.id });
     } catch (err) {
       recordFailedStart(a.id);
-      // A thread of this attempt exists: it was made before the error, so what it did is unknown and nothing is retried.
-      const made = threads.get(id) ? id : null;
-      if (made) adopt(a, made);
-      return settle('failed', { reason: clip((err as Error).message.split('\n')[0] ?? 'failed'), thread_id: made });
+      const why = clip((err as Error).message.split('\n')[0] ?? 'failed');
+      // The error came after the thread was made, so the run was admitted and what it did is unknown: it counts as
+      // started, linked to its thread, and is never retried. Failed always means no thread, which is what makes a retry safe.
+      if (threads.get(id)) {
+        adopt(a, id);
+        return settle('started', { thread_id: id, reason: `Reported an error after the thread was made: ${why}` });
+      }
+      return settle('failed', { reason: why });
     }
   } finally {
     triggerDeliveries.release(d.id);
