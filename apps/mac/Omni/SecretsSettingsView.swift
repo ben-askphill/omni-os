@@ -56,7 +56,7 @@ struct SecretsForm: View {
     SettingsPage {
       SettingsIntro(
         icon: "lock",
-        text: Text("Values live in the Keychain under the service \(Text("omni-os").monospaced()). A thread gets them as environment variables when it runs. A channel secret overrides a global one with the same name. Sync credentials and the Grok Bot webhook stay on the server, so a thread never sees them. Omni never shows a value again after you save it. To change one, save it again with the same name.")
+        text: Text("Values live in the Keychain under the service \(Text("omni-os").monospaced()). A thread gets them as environment variables when it runs. A channel secret overrides a global one with the same name. Sync credentials, the Grok Bot webhook and the Google sign-in client secrets stay on the server, so a thread never sees them. Omni never shows a value again after you save it. To change one, save it again with the same name.")
       )
 
       SettingsCard(title: "Add or replace") {
