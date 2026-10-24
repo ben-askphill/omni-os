@@ -1,12 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { FAKE_CLAUDE, fakeAlive, waitFor } from './support.ts';
 
 // Boots the real runner against a throwaway data dir and the fake claude CLI.
 // Env must be set before the first import of server modules, so each test file calls this once, at the
 // top or in beforeAll. apps/server/tests/setup.ts stops it once the file's tests are done.
-// No Keychain (fresh db has no secrets), no browser MCP, no network, no real claude, codex or cursor-agent.
+// No Keychain (a stub `security` finds nothing), no browser MCP, no network, no real claude, codex or cursor-agent.
 
 export type Ev = { id: number; kind: string; p: any };
 
@@ -38,7 +38,12 @@ export async function startRunner(env: Record<string, string> = {}) {
   const brain = join(tmp, 'brain');
   mkdirSync(scratch);
   mkdirSync(brain);
+  // The Keychain of the Mac running the tests holds real secrets (the Grok Bot webhook). A `security` that finds nothing keeps them out.
+  const bin = join(tmp, 'bin');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'security'), '#!/bin/sh\nexit 44\n', { mode: 0o755 });
   Object.assign(process.env, {
+    PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
     OMNI_DATA_DIR: join(tmp, 'data'),
     OMNI_CLAUDE_BIN: FAKE_CLAUDE,
     // Not installed, unless the file passes the fake.

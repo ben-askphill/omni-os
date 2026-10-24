@@ -113,6 +113,8 @@ describe('Codex', () => {
     expect(first.body.compact).toEqual({ ok: true, focus: false });
 
     expect((await compact(t.id, { focus: 'ignored' })).status).toBe(200);
+    // Codex's /compact is a message queued behind the idle thread: its user event lands just after the reply.
+    await poll('the /compact message', async () => userTexts(t.id).includes('/compact'));
     expect(userTexts(t.id)).toContain('/compact');
     await poll('the reading after compacting', async () => (await get(t.id)).body.context?.used === 5000);
   });

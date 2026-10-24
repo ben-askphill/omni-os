@@ -12,7 +12,7 @@
 //
 // Directives in the prompt:
 //   CMD     emit a shell tool_call before the reply
-//   CRASH   exit(1) after init, like the process dying
+//   CRASH   exit(1) once the prompt is echoed, like the process dying mid-turn
 //   HANG    emit init + assistant but no result, and stay alive until killed
 //   ORPHAN  first leave a child behind that holds our stdout until it is killed (two minutes at most), like a
 //           daemon started without redirecting its output: once we exit, our stdout never closes. The child
@@ -91,12 +91,13 @@ async function runTurn() {
     process.stderr.write('fake-cursor: input rejected after session init\n');
     process.exit(1);
   }
+  // Cursor echoes the user message and its thinking; Omni drops both.
+  write({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: prompt }] } });
+  // After the echo: Omni has seen the prompt read, so this is a crash mid-turn, not a rejected message (FAKE_CURSOR_INPUT_FAIL).
   if (prompt.includes('CRASH')) {
     process.stderr.write('fake-cursor: crashing on purpose\n');
     process.exit(1);
   }
-  // Cursor echoes the user message and its thinking; Omni drops both.
-  write({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: prompt }] } });
   write({ type: 'thinking', subtype: 'delta', text: 'considering' });
 
   // A call that runs tools tags its events with a model_call_id; the final reply's call tags none.
