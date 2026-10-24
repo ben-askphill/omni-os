@@ -36,10 +36,15 @@ export function useContinue(source: ContinueSource, offered: HarnessWithRunning[
   const { run, asked } = s;
   useEffect(() => {
     if (!run) return;
+    // A later ask replaces this one: its answer, if it comes last, is stale.
+    let alive = true;
     api
       .post<ContinuePreview>(`/threads/${encodeURIComponent(source.id)}/continue/preview`, run)
-      .then((preview) => dispatch({ type: 'previewed', run, preview }))
-      .catch((e) => dispatch({ type: 'previewFailed', run, error: errorText(e) }));
+      .then((preview) => alive && dispatch({ type: 'previewed', run, preview }))
+      .catch((e) => alive && dispatch({ type: 'previewFailed', run, error: errorText(e) }));
+    return () => {
+      alive = false;
+    };
   }, [source.id, run, asked]);
 
   const [closing, setClosing] = useState(false);
