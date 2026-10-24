@@ -40,7 +40,7 @@ const message = (e: unknown): SSEMessage => ({ id: isRow(e) ? String(e.id) : und
  * The messages a connection opens with. `queue` holds what the bus sent since the stream subscribed, which is before
  * this read: rows in it that the catch-up carries are dropped (`sent` remembers them for later), and so are thread,
  * artifact and context messages, which the sync and the context sent here supersede.
- * A snapshot's sync takes the newest row's id as its SSE id, so a client resumes after the page it just got.
+ * A snapshot's sync takes the page's newest row id as its SSE id, so a client resumes after the page it just got.
  */
 export function openingMessages(threadId: string, after: number | null, detailOf: DetailOf, queue: unknown[], sent: Set<number>): SSEMessage[] {
   const up = catchUp(threadId, after);
@@ -57,7 +57,8 @@ export function openingMessages(threadId: string, after: number | null, detailOf
     for (const r of up.events) sent.add(r.id);
     sync = detailOf({ events: up.events, history: up.history });
     const tail = up.events.length ? up.events[up.events.length - 1].id : 0;
-    if (tail) id = String(tail);
+    // Not when it is at or below `after` (the client's newest row was deleted): a client that saw that id drops it.
+    if (tail && (after === null || tail > after)) id = String(tail);
   }
   if (sync) out.push({ id, data: JSON.stringify({ kind: 'sync', catch_up: up.mode, ...sync }) });
   const context = lastContext(threadId);

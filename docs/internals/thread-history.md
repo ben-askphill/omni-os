@@ -16,7 +16,7 @@ A thread opens with its newest page of events. Older pages load as Ben scrolls u
 `GET /api/threads/:id/stream?after=<id>` opens with a catch-up (`apps/server/stream-catch-up.ts`), on the first connect and every reconnect alike:
 
 - **Replay.** When the rows after `after` fit one page (`readAfter`: the oldest page after the cursor reaches the live end), they come one by one with their SSE ids. Then one `sync`: the detail `GET /api/threads/:id` answers with, with `events: []`.
-- **Snapshot.** When they do not fit, or `after` is stale (not an id, or past the thread's newest row), no rows come. The `sync` carries the newest page in `events` and `history`, like `?history=recent`, and its SSE id is that page's newest row.
+- **Snapshot.** When they do not fit, or `after` is stale (not an id, or past the thread's newest row), no rows come. The `sync` carries the newest page in `events` and `history`, like `?history=recent`, and its SSE id is that page's newest row, unless that row is at or below `after` (a stale cursor), which a client may already have seen.
 - Then the thread's last context reading, then live messages.
 
 A client applies the sync in place of fetching the detail again: thread, pending, live, blocked, handoff, artifacts, children and team are the server's now. On a snapshot it calls `detachHead`, so the rows it held become an island with their cursors intact, then joins the page with `applyHead`, and moves its `after` to the page's newest row. Rows it batched before the sync go in first.

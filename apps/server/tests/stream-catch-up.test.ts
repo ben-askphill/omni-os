@@ -198,7 +198,8 @@ describe('a stale cursor', () => {
       expect(before(s.frames, isSync), cursor).toEqual([]);
       expect(sync.data.catch_up, cursor).toBe('snapshot');
       expect(sync.data.events.map((e: any) => e.id), cursor).toEqual(short);
-      expect(sync.id, cursor).toBe(String(short.at(-1)));
+      // Past the end, the client may have seen that id already, and would drop the sync.
+      expect(sync.id, cursor).toBe(/^\d+$/.test(cursor) ? undefined : String(short.at(-1)));
     }
   });
 
