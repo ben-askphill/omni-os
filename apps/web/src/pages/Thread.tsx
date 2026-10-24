@@ -3,6 +3,7 @@ import { api, errorText, useApi, type HarnessWithRunning, type ModStatus, type S
 import { ReplyComposer } from '../components/Composer.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
 import { LinkChannel } from '../link-previews.ts';
+import { ThreadIdCtx } from '../components/thread/ToolOutput.tsx';
 import { ArtifactsTab } from '../components/thread/panel/ArtifactsTab.tsx';
 import { BrowserTab } from '../components/thread/panel/BrowserTab.tsx';
 import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
@@ -353,7 +354,9 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
             <div ref={contentRef} className="mx-auto max-w-4xl px-4 pt-4 pb-10 md:px-6">
               {/* Queued means waiting for a slot: nothing is working yet. */}
               <LinkChannel.Provider value={thread.channel_id}>
-                <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} />
+                <ThreadIdCtx.Provider value={id}>
+                  <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} />
+                </ThreadIdCtx.Provider>
               </LinkChannel.Provider>
               <SetupCard
                 thread={thread}

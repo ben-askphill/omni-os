@@ -2,6 +2,7 @@ import type { HandoverP, SwitchP } from '@omni/shared/run-switch.ts';
 import { isQuestionTool, QUESTION_EVENT, questionsIn, type ThreadQuestion } from '@omni/shared/question.ts';
 import type { SlashRecord } from '@omni/shared/slash.ts';
 import { spanIndex, type Clipped, type Span } from '@omni/shared/history.ts';
+import type { OutputMeta } from '@omni/shared/tool-output.ts';
 import { parsePayload, shortPath } from '../format.ts';
 
 // The transcript fold. Pure: events in, rows out. Transcript.tsx renders the rows.
@@ -51,9 +52,11 @@ interface ToolResultP {
   text: string;
   is_error: boolean;
   truncated: boolean;
+  /** A compact result (#225): `text` is only its preview, and this says how much the saved output holds. */
+  output?: OutputMeta;
 }
 
-/** A call's result, with the row it came in so a clipped one can be loaded whole. */
+/** A call's result, with the row it came in so a clipped one can be loaded whole and a compact one's output read. */
 export type ToolResult = ToolResultP & { event: number; clipped?: Clipped };
 export interface ResultP {
   ok: boolean;

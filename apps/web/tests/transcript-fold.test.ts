@@ -78,6 +78,28 @@ describe('transcript fold', () => {
     expect(tasks.get('agent')).toMatchObject({ running: false, background: true, status: 'completed', tool_uses: 4, started: events[0].created_at });
   });
 
+  describe('compact tool results', () => {
+    const at = '2026-10-25T09:00:00.000Z';
+    const use = { id: 1, kind: 'tool_use', payload: JSON.stringify({ id: 'c1', name: 'Bash', input: { command: 'ls' }, parent: null }), created_at: at };
+    const result = (payload: unknown) => ({ id: 2, kind: 'tool_result', payload: JSON.stringify(payload), created_at: at });
+    const callOf = (events: TranscriptEvent[]) => {
+      const group = buildItems(events).items[0];
+      if (group.type !== 'tools') throw new Error('no tool group');
+      return group.calls[0];
+    };
+
+    it('keeps the output meta on the call result', () => {
+      const output = { chars: 5000, lines: 40, exit_code: 1 };
+      const c = callOf([use, result({ tool_use_id: 'c1', text: 'Exit code 1\nboom', is_error: true, truncated: true, output })]);
+      expect(c.result).toMatchObject({ event: 2, text: 'Exit code 1\nboom', is_error: true, output });
+    });
+
+    it('leaves a whole result without one', () => {
+      const c = callOf([use, result({ tool_use_id: 'c1', text: 'ok', is_error: false, truncated: false })]);
+      expect(c.result?.output).toBeUndefined();
+    });
+  });
+
   describe('run switches', () => {
     const claude: RunName = { harness: 'claude', model: '', effort: '', harnessName: 'Claude Code', modelLabel: 'default model' };
     const codex: RunName = { harness: 'codex', model: '', effort: '', harnessName: 'Codex', modelLabel: 'default model' };

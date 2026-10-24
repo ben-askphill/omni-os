@@ -7,6 +7,7 @@ import { BranchFace, DelegationCard, RailItem, ROW_CARD } from './Delegation.tsx
 import { PublishedCard } from './Published.tsx';
 import { CloudAgentCard } from './thread/CloudAgentCard.tsx';
 import { ClippedNote, HistoryCtx, HistoryEdgeRow } from './thread/HistoryEdgeRow.tsx';
+import { ToolOutput } from './thread/ToolOutput.tsx';
 import { QuestionCard } from './thread/QuestionCard.tsx';
 import { Markdown } from './Markdown.tsx';
 import { Button, CheckItem, copyText, Icon, IconButton, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
@@ -36,6 +37,7 @@ import {
 } from '../transcript/fold.ts';
 import { agentStatus, delegations, splitGroup, TASK_END, withLive, type Branch } from '../transcript/delegation.ts';
 import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
+import { exitCodeOf, outputMeta } from '@omni/shared/tool-output.ts';
 import type { ThreadHistory } from '../pages/useThreadHistory.ts';
 
 export { toolLabel, toolSummary, type ToolCall };
@@ -67,6 +69,9 @@ function Pre({ children, tone, className = '' }: { children: ReactNode; tone?: '
     </pre>
   );
 }
+
+/** A call's output in the box a tool row shows it in. */
+const outputBox = (err?: boolean) => (text: string) => <Pre tone={err ? 'bad' : undefined}>{text || '(no output)'}</Pre>;
 
 function ToolInput({ c }: { c: ToolCall }) {
   const i = c.input;
@@ -173,6 +178,7 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
   const pending = task ? task.running : !c.result;
   const stopped = interruptedTool(c);
   const err = c.result?.is_error && !stopped;
+  const exit = c.result && (c.result.output?.exit_code ?? exitCodeOf(c.result.text));
   const summary = toolSummary(c, cwd);
   const mono = ['Bash', 'Read', 'Edit', 'Write', 'MultiEdit', 'Glob', 'Grep'].includes(c.name);
   const indent = depth > 0 || c.orphan;
@@ -195,7 +201,7 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
           <Loader size={11} className="text-fg-3" />
         ) : err ? (
           <span className="inline-flex shrink-0 items-center gap-1 font-num text-[11px] text-fg">
-            <StatusDot status="needs" size={7} /> error
+            <StatusDot status="needs" size={7} /> error{exit !== undefined && ` · exit ${exit}`}
           </span>
         ) : stopped ? (
           <span className="shrink-0 font-num text-[11px] text-fg-4">stopped</span>
@@ -205,18 +211,7 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
         <div className="fade-in mt-1 mb-2.5 ml-7 space-y-1.5">
           <ToolInput c={c} />
           <ClippedNote event={c.event} clipped={c.clipped} />
-          {c.result ? (
-            <>
-              <Pre tone={err ? 'bad' : undefined}>{c.result.text || '(no output)'}</Pre>
-              {c.result.clipped ? (
-                <ClippedNote event={c.result.event} clipped={c.result.clipped} />
-              ) : (
-                c.result.truncated && <div className="text-[11px] text-fg-4">Output truncated</div>
-              )}
-            </>
-          ) : (
-            <div className="text-[11.5px] text-fg-4">{running ? 'Waiting for result' : 'No result recorded'}</div>
-          )}
+          <ToolOutput call={c} running={running} box={outputBox(err)} />
         </div>
       )}
       {c.children.length > 0 && (open || (pending && (running || !!task))) && (
@@ -262,7 +257,7 @@ function AgentRow({ c, cwd, running }: { c: ToolCall; cwd?: string | null; runni
         <div className="fade-in mt-2 space-y-1.5 px-1">
           <ToolInput c={c} />
           <ClippedNote event={c.event} clipped={c.clipped} />
-          {c.result ? <Pre tone={err ? 'bad' : undefined}>{c.result.text || '(no output)'}</Pre> : null}
+          {c.result && outputMeta(c.result) ? <ToolOutput call={c} running={running} box={outputBox(err)} /> : c.result ? <Pre tone={err ? 'bad' : undefined}>{c.result.text || '(no output)'}</Pre> : null}
           {c.result && <ClippedNote event={c.result.event} clipped={c.result.clipped} />}
         </div>
       )}

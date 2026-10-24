@@ -7,6 +7,7 @@ import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
 import type { Clipped, HistoryHead } from '@omni/shared/history.ts';
+import { outputQuery, type OutputChunk } from '@omni/shared/tool-output.ts';
 
 export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult };
 
@@ -411,7 +412,7 @@ export async function pairBrowser(token: string): Promise<boolean> {
   return true;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   // FormData carries its own multipart content type, so never set one for it.
   const form = body instanceof FormData;
   let res: Response;
@@ -420,6 +421,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       method,
       headers: body !== undefined && !form ? { 'Content-Type': 'application/json' } : undefined,
       body: body === undefined ? undefined : form ? body : JSON.stringify(body),
+      signal,
     });
   } catch {
     throw new ApiError('Cannot reach the Omni server. Is it running?', 0);
@@ -448,7 +450,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>('GET', path),
+  get: <T>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, signal),
   post: <T>(path: string, body: unknown = {}) => request<T>('POST', path, body),
   /** Same body as `post` (or `patch`), plus attachments. Falls back to plain JSON when there are none. */
   send: <T>(path: string, body: Record<string, unknown>, files: File[], method: 'POST' | 'PATCH' = 'POST') => {
@@ -473,6 +475,14 @@ export const artifactUrl = (a: Pick<Artifact, 'id' | 'updated_at'>, download = f
 
 export const uploadUrl = (threadId: string, a: Pick<Attachment, 'name'>, download = false) =>
   `/api/threads/${encodeURIComponent(threadId)}/uploads/${encodeURIComponent(a.name)}${download ? '?download=1' : ''}`;
+
+/** GET /threads/:id/events/:eventId/output: the chunk of a tool_result's saved text that starts at `offset` (#225). */
+export const getToolOutput = (threadId: string, eventId: number, offset: number, signal: AbortSignal) =>
+  api.get<OutputChunk>(`/threads/${encodeURIComponent(threadId)}/events/${eventId}/output?${outputQuery(offset)}`, signal);
+
+/** GET /threads/:id/tools/:toolUseId/tail: a running call's output. The stream ends with an `end` message, and the caller closes on it. */
+export const openToolTail = (threadId: string, toolUseId: string, onData: (data: unknown) => void) =>
+  openSSE(() => `/api/threads/${encodeURIComponent(threadId)}/tools/${encodeURIComponent(toolUseId)}/tail`, onData);
 
 // ---------- hooks ----------
 
