@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { DELIVERY_STATE_LABELS, type TriggerDeliveryState } from '@omni/shared/automation-triggers.ts';
 import { api, errorText, useApi, type Automation, type Thread } from '../api.ts';
-import { Button, Chip, Empty, ErrorNote, Icon, Loading, PageHeader, StatusDot, Toggle } from '../components/ui.tsx';
-import { describeCron, describeEvent, nextRunLabel, relTime, shortPath } from '../format.ts';
+import { Button, Chip, Empty, ErrorNote, Icon, Loading, PageHeader, StatusDot, Toggle, type ChipTone } from '../components/ui.tsx';
+import { artifactChannels, describeArtifactSource, describeCron, describeEvent, nextRunLabel, relTime, shortPath } from '../format.ts';
 import { href, navigate } from '../router.ts';
 import { useApp, useFeed } from '../store.tsx';
 
@@ -11,6 +12,15 @@ const RUN_TONE: Record<string, string> = {
   stopped: 'var(--fg-4)',
   running: 'var(--live)',
   queued: 'var(--fg-4)',
+};
+
+const DELIVERY_TONE: Record<TriggerDeliveryState, ChipTone> = {
+  received: 'default',
+  accepted: 'default',
+  queued: 'default',
+  started: 'done',
+  failed: 'needs',
+  skipped: 'outline',
 };
 
 /** Recent runs as a row of bars, oldest left: a glance at reliability. */
@@ -69,6 +79,7 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
   };
 
   const ch = channel(a.channel);
+  const channelName = (id: string) => channel(id)?.name ?? id;
 
   return (
     <div className={`rounded-[24px] bg-surface transition-opacity ${a.error ? 'shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--bad)_35%,transparent)]' : ''}`}>
@@ -83,7 +94,17 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
             {a.error && <Chip tone="needs">Invalid</Chip>}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-fg-2">
-            {a.on ? (
+            {a.on?.event === 'artifact_published' ? (
+              <>
+                <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-bg px-2.5 whitespace-nowrap" title={`on: ${a.on.event}${a.on.updates ? ' (updates too)' : ''}`}>
+                  <Icon name="globe" size={12} className="text-fg-3" />
+                  {describeEvent(a.on.event)}
+                </span>
+                <span className="inline-flex h-6 max-w-full items-center rounded-full px-2 font-mono text-[11px] whitespace-nowrap text-fg-4 shadow-[inset_0_0_0_1px_var(--line)]" title={describeArtifactSource(a.on, channelName)}>
+                  <span className="truncate">{describeArtifactSource(a.on, channelName)}</span>
+                </span>
+              </>
+            ) : a.on ? (
               <>
                 <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-bg px-2.5 whitespace-nowrap" title={`on: ${a.on.event}${a.on.drafts ? ' (drafts too)' : ''}`}>
                   <Icon name="pr" size={12} className="text-fg-3" />
@@ -106,7 +127,18 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
             {a.role && <span className="inline-flex h-6 items-center rounded-full bg-bg px-2.5">{a.role}</span>}
             {a.model && <span className="inline-flex h-6 items-center rounded-full bg-bg px-2.5 font-num text-[11px]">{a.model}</span>}
           </div>
-          {enabled && a.on && !a.error && (
+          {enabled && a.on?.event === 'artifact_published' && !a.error && (
+            <div className="mt-2.5 text-[12.5px] text-fg-3">
+              {a.on.channels ? (
+                <>
+                  Runs once per page published in <span className="font-medium text-fg">{artifactChannels(a.on, channelName)}</span>
+                </>
+              ) : (
+                'Runs once per published page'
+              )}
+            </div>
+          )}
+          {enabled && a.on && a.on.event !== 'artifact_published' && !a.error && (
             <div className="mt-2.5 text-[12.5px] text-fg-3">{a.poll_error ? <span className="text-fg-2">{a.poll_error}</span> : <>Watching <span className="font-medium text-fg">{a.repo}</span>, one run per event</>}</div>
           )}
           {enabled && a.next && !a.error && (
@@ -143,6 +175,49 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
         </button>
         {showPrompt && <pre className="fade-in mx-2.5 mt-1 mb-2 rounded-2xl bg-bg px-3.5 py-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap text-fg-2">{a.prompt || '(empty)'}</pre>}
       </div>
+
+      {(a.on?.event === 'artifact_published' || a.deliveries.length > 0) && (
+        <div className="px-4 pt-2 pb-2 md:px-5">
+          <div className="mb-2 flex items-center gap-3">
+            <span className="caption">Deliveries</span>
+          </div>
+          {a.deliveries.length === 0 ? (
+            <div className="text-[12.5px] text-fg-4">No pages published since it was turned on.</div>
+          ) : (
+            <ul className="-mx-2">
+              {a.deliveries.map((d) => {
+                const inner = (
+                  <>
+                    <Chip tone={DELIVERY_TONE[d.state]}>{DELIVERY_STATE_LABELS[d.state]}</Chip>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate" title={d.summary}>
+                        {d.summary}
+                      </span>
+                      {d.reason && (
+                        <span className="block truncate text-[11.5px] text-fg-3" title={d.reason}>
+                          {d.reason}
+                        </span>
+                      )}
+                    </span>
+                    <span className="w-24 shrink-0 text-right font-num text-[11px] text-fg-4">{relTime(d.created_at)}</span>
+                  </>
+                );
+                return (
+                  <li key={d.id}>
+                    {d.thread_id ? (
+                      <a href={href.thread(d.thread_id)} className="hov flex min-h-8 min-w-0 items-center gap-2.5 rounded-full px-2 py-1 text-[12.5px] [--hov:var(--surface-2)]">
+                        {inner}
+                      </a>
+                    ) : (
+                      <div className="flex min-h-8 min-w-0 items-center gap-2.5 px-2 py-1 text-[12.5px]">{inner}</div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="px-4 pt-2 pb-4 md:px-5">
         <div className="mb-2 flex items-center gap-3">
@@ -184,10 +259,10 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
 export function AutomationsPage() {
   const res = useApi<Automation[]>('/automations');
   const { reload } = res;
-  // Keep run statuses fresh when an automation thread changes state (debounced, threads update often).
+  // Keep run and delivery statuses fresh when an automation thread or delivery changes state (debounced, threads update often).
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useFeed((e) => {
-    if (e.type !== 'reconnect' && !(e.type === 'thread' && e.thread.automation)) return;
+    if (e.type !== 'reconnect' && e.type !== 'automation_delivery' && !(e.type === 'thread' && e.thread.automation)) return;
     if (timer.current) return;
     timer.current = setTimeout(() => {
       timer.current = undefined;

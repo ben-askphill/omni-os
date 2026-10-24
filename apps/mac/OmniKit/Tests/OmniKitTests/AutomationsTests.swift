@@ -33,6 +33,19 @@ private func automation(
   try decode(Automation.self, automationJSON(id: id, enabled: enabled, timezone: timezone, error: error, next: next, file: file, runs: runs))
 }
 
+/// An automation that runs when a page is published, as GET /api/automations sends it: no cron, no repo, no
+/// `drafts`. `on` and `deliveries` are raw JSON.
+private func artifactAutomationJSON(
+  on: String = #"{"event":"artifact_published","updates":false}"#, deliveries: String = "[]"
+) -> String {
+  #"{"id":"on-publish","name":"On publish","cron":"","on":\#(on),"timezone":"Europe/Amsterdam","channel":"acme","prompt":"Review it.","enabled":true,"error":null,"next":null,"runs":[],"deliveries":\#(deliveries)}"#
+}
+
+private func deliveryJSON(id: String, state: String, thread: String? = nil, reason: String? = nil, at: String = "2026-09-28T09:55:00.000Z") -> String {
+  func quoted(_ s: String?) -> String { s.map { "\"\($0)\"" } ?? "null" }
+  return #"{"id":"\#(id)","automation":"on-publish","source":"artifact_published","source_id":"src:\#(id)","summary":"report.html in #acme","context":{"url":"https://claude.ai/artifact/abc","title":"Report","file":"report.html","update":"false","thread":"src","thread_title":"Write the report","channel":"acme"},"state":"\#(state)","reason":\#(quoted(reason)),"owner":null,"source_thread":"src","thread_id":\#(quoted(thread)),"created_at":"\#(at)","updated_at":"2026-09-28T09:56:00Z"}"#
+}
+
 private func runJSON(id: Int, thread: String?, trigger: String = "cron", at: String, status: String?, title: String?) -> String {
   func quoted(_ s: String?) -> String { s.map { "\"\($0)\"" } ?? "null" }
   return #"{"id":\#(id),"automation":"daily","thread_id":\#(quoted(thread)),"trigger":"\#(trigger)","created_at":"\#(at)","status":\#(quoted(status)),"title":\#(quoted(title))}"#
@@ -110,7 +123,7 @@ private final class AutomationsServer: HTTPTransport {
   @Test func listsAutomations() async throws {
     let t = StubTransport(body: try fixture("automations.json"))
     let list = try await OmniClient(port: 4799, transport: t).automations()
-    #expect(list.map(\.id) == ["broken", "daily-digest"])
+    #expect(list.map(\.id) == ["broken", "daily-digest", "page-review"])
 
     let broken = list[0]
     #expect(broken.name == "Broken")
@@ -180,6 +193,65 @@ private final class AutomationsServer: HTTPTransport {
     try await OmniClient(port: 4799, transport: t).setAutomationEnabled("a b/c", false)
     #expect(t.requests.first?.url?.absoluteString == "http://127.0.0.1:4799/api/automations/a%20b%2Fc/enabled")
     #expect(try bodyJSON(try #require(t.requests.first)) == .object(["enabled": .bool(false)]))
+  }
+
+  @Test func readsAnAutomationThatRunsWhenAPageIsPublished() throws {
+    let deliveries = [
+      deliveryJSON(id: "d2", state: "started", thread: "run1"),
+      deliveryJSON(id: "d1", state: "skipped", reason: "the automation was paused", at: "2026-09-28 09:00:00"),
+    ]
+    let a = try decode(Automation.self, artifactAutomationJSON(deliveries: "[\(deliveries.joined(separator: ","))]"))
+    let on = try #require(a.on)
+    #expect(on.event == "artifact_published")
+    #expect(on.isArtifact)
+    #expect(!on.drafts, "no drafts key reads as false")
+    #expect(!on.updates)
+    #expect(on.channels == nil)
+    #expect(on.repo == nil)
+    #expect(a.repo == nil)
+    #expect(a.pollError == nil)
+
+    #expect(a.deliveries.map(\.id) == ["d2", "d1"])
+    let started = a.deliveries[0]
+    #expect(started.automation == "on-publish")
+    #expect(started.source == "artifact_published")
+    #expect(started.sourceID == "src:d2")
+    #expect(started.summary == "report.html in #acme")
+    #expect(started.context["url"] == "https://claude.ai/artifact/abc")
+    #expect(started.context["description"] == nil)
+    #expect(started.state == .started)
+    #expect(started.reason == nil)
+    #expect(started.owner == nil)
+    #expect(started.sourceThread == "src")
+    #expect(started.threadID == "run1")
+    #expect(started.createdAt == date("2026-09-28T09:55:00.000Z"))
+    #expect(started.updatedAt == date("2026-09-28T09:56:00Z"))
+    let skipped = a.deliveries[1]
+    #expect(skipped.state == .skipped)
+    #expect(skipped.reason == "the automation was paused")
+    #expect(skipped.threadID == nil)
+    #expect(skipped.createdAt == date("2026-09-28T09:00:00Z"), "SQLite's format, as UTC")
+
+    // A drafts key is fine too, and a state the app does not know still decodes.
+    let other = try decode(Automation.self, artifactAutomationJSON(
+      on: #"{"event":"artifact_published","drafts":false,"channels":["acme"],"updates":true}"#,
+      deliveries: "[\(deliveryJSON(id: "d3", state: "rerouted"))]"
+    ))
+    #expect(other.on?.drafts == false)
+    #expect(other.on?.channels == ["acme"])
+    #expect(other.on?.updates == true)
+    #expect(other.deliveries.first?.state == "rerouted")
+  }
+
+  /// An older server sends no `deliveries`.
+  @Test func readsNoDeliveriesAsNone() throws {
+    #expect(try automation().deliveries.isEmpty)
+    let prEvent = #"{"id":"fix-ci","name":"Fix CI","cron":"","on":{"event":"pr_opened","drafts":true},"repo":"o/r","timezone":"Europe/Amsterdam","channel":"acme","prompt":"Go.","enabled":true,"runs":[]}"#
+    let a = try decode(Automation.self, prEvent)
+    #expect(a.deliveries.isEmpty)
+    #expect(a.on?.drafts == true)
+    #expect(a.on?.updates == false)
+    #expect(a.on?.channels == nil)
   }
 
   @Test func passesOnTheServersError() async throws {
@@ -273,9 +345,11 @@ private final class AutomationsServer: HTTPTransport {
     let a = try automation()
     #expect(a.schedule == "Weekdays at 08:00")
     #expect(a.scheduleHelp == "0 8 * * 1-5 (Europe/Amsterdam)")
-    #expect(a.scheduleDetail == "0 8 * * 1-5")
+    #expect(a.scheduleDetail() == "0 8 * * 1-5")
     #expect(!a.isEvent)
     #expect(a.watching(enabled: true) == nil)
+    #expect(!a.isArtifact)
+    #expect(!a.showsDeliveries)
   }
 
   /// An event automation (`on:`) as GET /api/automations sends it: no cron, no next run, the watched repo.
@@ -285,13 +359,50 @@ private final class AutomationsServer: HTTPTransport {
     #expect(a.isEvent)
     #expect(a.schedule == "When PR checks fail")
     #expect(a.scheduleHelp == "on: pr_checks_failed")
-    #expect(a.scheduleDetail == "o/r")
+    #expect(a.scheduleDetail() == "o/r")
     #expect(a.watching(enabled: true) == "Watching o/r, one run per event")
     #expect(a.watching(enabled: false) == nil)
     #expect(a.nextRun(enabled: true) == nil)
 
     let failing = try decode(Automation.self, json.replacingOccurrences(of: #""poll_error":null"#, with: #""poll_error":"gh pr list o/r failed: HTTP 502""#))
     #expect(failing.watching(enabled: true) == "gh pr list o/r failed: HTTP 502")
+  }
+
+  @Test func saysWhichPublishedPagesItRunsFor() throws {
+    let any = try decode(Automation.self, artifactAutomationJSON())
+    #expect(any.isEvent)
+    #expect(any.isArtifact)
+    #expect(any.schedule == "When a page is published")
+    #expect(any.scheduleHelp == "on: artifact_published")
+    #expect(any.scheduleDetail() == "any channel")
+    #expect(any.watching(enabled: true) == "Runs once per published page")
+    #expect(any.watching(enabled: false) == nil)
+    #expect(any.nextRun(enabled: true) == nil)
+    #expect(any.showsDeliveries, "an empty list still shows, with its empty text")
+
+    let one = try decode(Automation.self, artifactAutomationJSON(on: #"{"event":"artifact_published","channels":["acme"],"updates":false}"#))
+    #expect(one.scheduleDetail() == "#acme")
+    #expect(one.scheduleDetail { $0 == "acme" ? "Acme" : nil } == "#Acme")
+    #expect(one.watching(enabled: true) == "Runs once per page published in #acme")
+    #expect(one.watching(enabled: true) { _ in "Acme" } == "Runs once per page published in #Acme")
+
+    let two = try decode(Automation.self, artifactAutomationJSON(on: #"{"event":"artifact_published","channels":["acme","ops"],"updates":true}"#))
+    #expect(two.on?.updates == true)
+    #expect(two.scheduleHelp == "on: artifact_published (updates too)")
+    #expect(two.scheduleDetail { $0 == "acme" ? "Acme" : nil } == "#Acme, #ops · updates too")
+    #expect(two.watching(enabled: true) { $0 == "acme" ? "Acme" : nil } == "Runs once per page published in #Acme, #ops")
+
+    let anyWithUpdates = try decode(Automation.self, artifactAutomationJSON(on: #"{"event":"artifact_published","channels":[],"updates":true}"#))
+    #expect(anyWithUpdates.scheduleDetail() == "any channel · updates too")
+    #expect(anyWithUpdates.watching(enabled: true) == "Runs once per published page")
+
+    let broken = try decode(Automation.self, artifactAutomationJSON().replacingOccurrences(of: #""error":null"#, with: #""error":"unknown channel ghost""#))
+    #expect(broken.watching(enabled: true) == nil)
+  }
+
+  @Test func labelsDeliveryStates() throws {
+    let states: [TriggerDeliveryState] = [.received, .accepted, .queued, .started, .failed, .skipped, "later"]
+    #expect(states.map(\.label) == ["Received", "Accepted", "Held for owner", "Started", "Failed", "Skipped", "later"])
   }
 
   @Test func labelsEventAndManualRuns() throws {
@@ -368,7 +479,7 @@ private final class AutomationsServer: HTTPTransport {
     #expect(m.loadState == .loading)
     await m.load()
     #expect(m.loadState == .loaded)
-    #expect(m.automations.map(\.id) == ["broken", "daily-digest"])
+    #expect(m.automations.map(\.id) == ["broken", "daily-digest", "page-review"])
     #expect(!m.isRefreshing)
   }
 
@@ -381,7 +492,7 @@ private final class AutomationsServer: HTTPTransport {
     server.recover("GET /api/automations")
     await m.load()
     #expect(m.loadState == .loaded)
-    #expect(m.automations.count == 2)
+    #expect(m.automations.count == 3)
   }
 
   @Test func marksARefreshWhileItLoads() async throws {
@@ -516,6 +627,25 @@ private final class AutomationsServer: HTTPTransport {
     m.feed(.thread(try thread("r1", automation: "daily-digest", updated: "2026-09-28T08:00:00Z", status: "done")))
     clock.advance(by: .seconds(1))
     try await waitFor("the next reload") { server.reads == 3 }
+  }
+
+  @Test func readsTheDeliveryFeedEvent() throws {
+    #expect(try decode(FeedEvent.self, #"{"type":"automation_delivery","automation":"on-publish"}"#) == .automationDelivery(automation: "on-publish"))
+  }
+
+  @Test func reloadsASecondAfterADelivery() async throws {
+    let server = try AutomationsServer(), clock = TestClock()
+    let m = model(server, clock: clock)
+    await m.load()
+    m.feed(.automationDelivery(automation: "on-publish"))
+    m.feed(.automationDelivery(automation: "daily-digest"))
+    clock.advance(by: .milliseconds(999))
+    await settle()
+    #expect(server.reads == 1)
+    clock.advance(by: .milliseconds(1))
+    try await waitFor("the reload") { server.reads == 2 }
+    await settle()
+    #expect(server.reads == 2)
   }
 
   @Test func ignoresThreadsThatAreNotAutomations() async throws {

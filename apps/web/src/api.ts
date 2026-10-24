@@ -6,8 +6,10 @@ import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
 import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
+import type { TriggerDelivery } from '@omni/shared/automation-triggers.ts';
+import type { ArtifactTrigger, PrTrigger } from '@omni/server/automation-events.ts';
 
-export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult };
+export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, TriggerDelivery };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number };
@@ -277,23 +279,18 @@ export interface AutomationRun {
   status: string | null;
   title: string | null;
 }
-export interface AutomationTrigger {
-  event: 'pr_opened' | 'pr_checks_failed' | 'pr_conflict' | 'pr_review' | (string & {});
-  repo?: string;
-  drafts: boolean;
-  /** `any`: outside authors and fork PRs fire too. Unset, only the repo's owners, members and collaborators. */
-  trust?: 'any';
-}
+/** A PR change on GitHub, or a page a thread published (`artifact_published`). */
+export type AutomationTrigger = PrTrigger | ArtifactTrigger;
 export interface Automation {
   id: string;
   name: string;
   /** Empty for an event automation. */
   cron: string;
-  /** Set for an event automation: it runs when this happens on GitHub instead of on a schedule. */
+  /** Set for an event automation: it runs when this happens instead of on a schedule. */
   on?: AutomationTrigger;
-  /** The repo an event automation watches (its `on.repo`, else its channel's), null when there is none. */
+  /** The repo a PR automation watches (its `on.repo`, else its channel's), null when there is none. */
   repo?: string | null;
-  /** Why the last GitHub poll for an event automation failed. */
+  /** Why the last GitHub poll for a PR automation failed. */
   poll_error?: string | null;
   timezone: string;
   channel: string;
@@ -305,6 +302,8 @@ export interface Automation {
   error?: string;
   next?: string | null;
   runs: AutomationRun[];
+  /** Pages delivered to an artifact automation, newest first, at most 5. Empty for the rest. */
+  deliveries: TriggerDelivery[];
 }
 
 export interface SecretRow {
@@ -368,6 +367,8 @@ export type FeedEvent =
   | { type: 'channel'; id: string }
   /** Ben read a thread's result, here or in the Mac app: Needs you changed, nothing else did. */
   | { type: 'needs_you'; thread_id: string }
+  /** A delivery to this automation was saved or changed state. */
+  | { type: 'automation_delivery'; automation: string }
   | { type: 'reconnect' };
 
 // ---------- fetch helpers ----------

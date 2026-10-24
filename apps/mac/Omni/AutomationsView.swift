@@ -114,6 +114,10 @@ struct AutomationSection: View {
         ErrorNote(text: error).padding(.horizontal, z(20)).padding(.bottom, z(16))
       }
       prompt.padding(.horizontal, z(10)).padding(.bottom, z(4))
+      // Above the runs: a delivery is what starts one.
+      if automation.showsDeliveries {
+        deliveries.padding(.horizontal, z(20)).padding(.top, z(8)).padding(.bottom, z(8))
+      }
       runs.padding(.horizontal, z(20)).padding(.top, z(8)).padding(.bottom, z(16))
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -172,7 +176,7 @@ struct AutomationSection: View {
           if let badge = automation.badge(enabled: enabled) { Badge(badge: badge) }
         }
         details.padding(.top, z(8))
-        if let watching = automation.watching(enabled: enabled) {
+        if let watching = automation.watching(enabled: enabled, channelName: channelName) {
           Text(watching)
             .font(.omni(size: 12.5))
             .foregroundStyle(automation.pollError == nil ? Tok.fg3 : Tok.fg2)
@@ -220,15 +224,17 @@ struct AutomationSection: View {
     }
   }
 
+  private func channelName(_ id: String) -> String? { model.store.channel(id)?.name }
+
   private var details: some View {
     FlowRow(spacing: 6, lineSpacing: 6) {
       HStack(spacing: z(6)) {
-        OmniIcon(name: automation.isEvent ? "pr" : "clock", size: 12).foregroundStyle(Tok.fg3)
+        OmniIcon(name: automation.isArtifact ? "globe" : automation.isEvent ? "pr" : "clock", size: 12).foregroundStyle(Tok.fg3)
         Text(automation.schedule)
       }
       .chip()
       .help(automation.scheduleHelp)
-      Text(automation.scheduleDetail)
+      Text(automation.scheduleDetail(channelName: channelName))
         .font(.omni(size: 11, design: .monospaced))
         .foregroundStyle(Tok.fg4)
         .padding(.horizontal, z(8))
@@ -259,6 +265,22 @@ struct AutomationSection: View {
         VStack(spacing: 0) {
           ForEach(Array(automation.runs.enumerated()), id: \.offset) { _, run in
             RunRow(run: run) { id in model.route = .thread(id: id) }
+          }
+        }
+        .padding(.horizontal, z(-8))
+      }
+    }
+  }
+
+  @ViewBuilder private var deliveries: some View {
+    VStack(alignment: .leading, spacing: z(8)) {
+      Text("Deliveries").omniCaption()
+      if automation.deliveries.isEmpty {
+        Text("No pages published since it was turned on.").font(.omni(size: 12.5)).foregroundStyle(Tok.fg4)
+      } else {
+        VStack(spacing: 0) {
+          ForEach(automation.deliveries) { delivery in
+            DeliveryRow(delivery: delivery) { id in model.route = .thread(id: id) }
           }
         }
         .padding(.horizontal, z(-8))
@@ -340,6 +362,58 @@ private struct RunRow: View {
     .font(.omni(size: 12.5))
     .padding(.horizontal, z(8))
     .frame(height: z(32))
+  }
+}
+
+/// An event handed to the automation: its state, what happened, why it was skipped or failed and, once it ran, a
+/// link to the thread it started. A row with no thread is not dimmed: skipped or waiting is a normal state here.
+private struct DeliveryRow: View {
+  let delivery: TriggerDelivery
+  let open: (String) -> Void
+
+  var body: some View {
+    if let id = delivery.threadID {
+      Button { open(id) } label: { content.hoverWash(16, fill: Tok.surface2) }
+        .buttonStyle(.plain)
+        .help("Open the thread")
+    } else {
+      content
+    }
+  }
+
+  private var content: some View {
+    HStack(spacing: z(10)) {
+      Chip(text: delivery.state.label, tone: tone)
+      VStack(alignment: .leading, spacing: z(2)) {
+        Text(delivery.summary).lineLimit(1).truncationMode(.tail).foregroundStyle(Tok.fg)
+        if let reason = delivery.reason {
+          Text(reason).font(.omni(size: 11.5)).foregroundStyle(Tok.fg3).help(reason)
+        }
+      }
+      Spacer(minLength: z(8))
+      TimelineView(.everyMinute) { context in
+        Text(RelTime.label(delivery.createdAt, now: context.date))
+          .font(.omni(size: 11).monospacedDigit())
+          .foregroundStyle(Tok.fg4)
+          .frame(width: z(96), alignment: .trailing)
+      }
+      .help(delivery.createdAt.formatted(date: .complete, time: .standard))
+    }
+    .font(.omni(size: 12.5))
+    .padding(.horizontal, z(8))
+    .padding(.vertical, z(6))
+    .frame(minHeight: z(32))
+    .contentShape(Rectangle())
+  }
+
+  /// Started reads as done, failed as needs you, skipped as quiet, and anything still on its way as plain.
+  private var tone: Chip.Tone {
+    switch delivery.state {
+    case .started: .done
+    case .failed: .needs
+    case .skipped: .outline
+    default: .plain
+    }
   }
 }
 

@@ -97,10 +97,14 @@ export function loadAutomations(): Automation[] {
 
 const jobs = new Map<string, Cron>();
 
-/** `event` runs pass their own prompt (the automation's plus what happened) and title. */
-export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 'catchup' | 'event', event?: { prompt: string; title: string }) {
+/**
+ * `event` runs pass their own prompt (the automation's plus what happened) and title, and a delivery its thread's id
+ * (automation-triggers.ts), fixed in advance so a restart never makes the thread twice.
+ */
+export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 'catchup' | 'event', event?: { prompt: string; title: string; id?: string }) {
   const date = new Date().toLocaleDateString('en-GB', { timeZone: a.timezone, day: 'numeric', month: 'short' });
   const thread = await createThread({
+    id: event?.id,
     channel: a.channel,
     role: a.role,
     harness: a.harness,

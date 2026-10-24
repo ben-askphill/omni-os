@@ -4,7 +4,7 @@ vi.mock('../db.ts', () => {
   throw new Error('automation-events must not import the db');
 });
 
-import { detect, eventPrompt, feedback, parseTrigger, type EventTrigger, type PRInfo } from '../automation-events.ts';
+import { detect, eventPrompt, feedback, parseTrigger, type PrTrigger, type PRInfo } from '../automation-events.ts';
 
 const pr = (over: Partial<PRInfo> = {}): PRInfo => ({
   number: 7,
@@ -22,11 +22,11 @@ const pr = (over: Partial<PRInfo> = {}): PRInfo => ({
   comments: [],
   ...over,
 });
-const t = (event: EventTrigger['event'], drafts = false, trust?: 'any'): EventTrigger => ({ event, drafts, ...(trust ? { trust } : {}) });
+const t = (event: PrTrigger['event'], drafts = false, trust?: 'any'): PrTrigger => ({ event, drafts, ...(trust ? { trust } : {}) });
 const failing = [{ name: 'test', status: 'COMPLETED', conclusion: 'FAILURE' }, { name: 'lint', conclusion: 'SUCCESS' }];
 
 /** Baseline with `first`, then poll `then`; return what fired on the second poll. */
-const after = (trigger: EventTrigger, first: PRInfo[], then: PRInfo[], self: string | null = 'omni-bot') =>
+const after = (trigger: PrTrigger, first: PRInfo[], then: PRInfo[], self: string | null = 'omni-bot') =>
   detect(trigger, detect(trigger, undefined, first, self).state, then, self);
 
 describe('parseTrigger', () => {
@@ -43,6 +43,17 @@ describe('parseTrigger', () => {
     expect(parseTrigger({ event: 'pr_opened', drafts: 'yes' })).toMatch(/drafts/);
     expect(parseTrigger(['pr_opened'])).toMatch(/event name/);
     expect(parseTrigger({ event: 'pr_opened', trust: 'everyone' })).toMatch(/trust must be members or any/);
+  });
+
+  it('takes artifact_published with a channel filter and updates', () => {
+    expect(parseTrigger('artifact_published')).toEqual({ event: 'artifact_published', updates: false });
+    expect(parseTrigger({ event: 'artifact_published', channels: 'omni-os' })).toEqual({ event: 'artifact_published', channels: ['omni-os'], updates: false });
+    expect(parseTrigger({ event: 'artifact_published', channels: ['a', 'b'], updates: true })).toEqual({ event: 'artifact_published', channels: ['a', 'b'], updates: true });
+    expect(parseTrigger({ event: 'artifact_published', repo: 'o/r' })).toMatch(/for PR events/);
+    expect(parseTrigger({ event: 'artifact_published', channels: [] })).toMatch(/channels must be/);
+    expect(parseTrigger({ event: 'artifact_published', channels: ['#bad name'] })).toMatch(/channels must be/);
+    expect(parseTrigger({ event: 'artifact_published', updates: 'yes' })).toMatch(/updates must be/);
+    expect(parseTrigger({ event: 'pr_opened', channels: ['a'] })).toMatch(/for artifact_published/);
   });
 });
 
