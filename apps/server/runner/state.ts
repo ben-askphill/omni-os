@@ -9,7 +9,7 @@ import { config } from '../config.ts';
 import { events, messageRequests, threads, type DeliveryState, type MessageRequest } from '../db.ts';
 import { publishFeed, publishThread } from '../bus.ts';
 import { describeAttachments, inlinable, messageContent, type Attachment } from '../uploads.ts';
-import { harnessText } from '../message-context/project.ts';
+import { contextAttachments, harnessText } from '../message-context/project.ts';
 import type { CommandList } from '../commands.ts';
 import { handOverWith } from './switch.ts';
 import { CAPABILITIES, type HarnessId } from '../harness/types.ts';
@@ -394,16 +394,18 @@ export const userLine = (live: Live, m: Msg) => {
   // deleted meanwhile (by sync, from the other Mac) has no checkout to place it in; never throw on the write path.
   const thread = threads.get(live.threadId);
   const text = thread ? harnessText(m.text, m.contexts, thread) : m.text;
+  // The images its context items name travel as attachments, so each harness takes them its own way.
+  const attachments = [...(m.attachments ?? []), ...contextAttachments(m.contexts)];
   return {
     type: 'user',
-    message: { role: 'user', content: messageBody(text, m.attachments ?? []) },
+    message: { role: 'user', content: messageBody(text, attachments) },
     parent_tool_use_id: null,
     session_id: live.sessionId,
     uuid: m.uuid,
     // Side channel for adapters that need the raw text, attachment paths and commands (Codex sends
     // images as localImage paths and skills as skill items). The Claude adapter strips this before
     // writing to its stdin.
-    _omni: { text, attachments: m.attachments ?? [], commands: m.commands ?? [] },
+    _omni: { text, attachments, commands: m.commands ?? [] },
   };
 };
 

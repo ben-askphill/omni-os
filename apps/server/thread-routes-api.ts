@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
+import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
@@ -168,6 +169,8 @@ threadActionsApi.post('/:id/messages', async (c) => {
   const context = parseContexts(raw);
   if (!context.ok) return c.json({ error: context.error }, 400);
   if (!prompt && !context.value.length) return c.json({ error: 'Write a message or add context to send.' }, 400);
+  const unsendable = checkAnnotations(id, context.value);
+  if (unsendable) return c.json({ error: unsendable }, 400);
   checkUploads(files);
   const fingerprint = requestFingerprint({ prompt, mode, source: from, files: await fileDigests(files), context: context.value });
   // A retry: answered before its files are saved a second time.

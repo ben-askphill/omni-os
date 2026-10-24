@@ -8,6 +8,7 @@ import { isAbsolute, join, relative, sep } from 'node:path';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { readContexts, type BodyOf, type ContextReading, type KindName, type KnownContext } from '@omni/shared/message-context-kinds.ts';
 import type { Thread } from '../db.ts';
+import type { Attachment } from '../uploads.ts';
 import { isRemoteHarness, remoteWhere } from '../harness/types.ts';
 import { userName, userPossessive } from '../profile.ts';
 import { defang } from './defang.ts';
@@ -29,6 +30,8 @@ export interface Projection {
   check?: { stale: boolean; text: string };
   /** Quoted in a fence. */
   excerpt?: { lang: string; text: string };
+  /** An image it travels with. `attachment` is its file as the harness gets it (contextAttachments), null when the file is gone. */
+  image?: { name: string; width: number; height: number; attachment: Attachment | null };
 }
 
 /** `read` is null when nothing may be read: a remote harness, or text that is read later on another Mac. */
@@ -86,6 +89,15 @@ const project = <K extends KindName>(k: KnownContext<K>, read: Reader | null): P
   return projector(k.body, read);
 };
 
+/** The sentence about an item's image: that it came, where, or that it did not. Written here so no kind can promise one a harness cannot open. */
+function imageLine(img: NonNullable<Projection['image']>, place: Place): string {
+  const what = `${defang(img.name)}, ${img.width}×${img.height} px`;
+  if (!img.attachment) return `Screenshot: ${what}, is unavailable: its file is no longer saved on ${userPossessive()} Mac. Work from the description above.`;
+  if (place.remote)
+    return `Screenshot: ${what}, is a file on ${userPossessive()} Mac. You run ${place.where} and cannot open it. It comes with this message as an image only where your harness takes images; if there is none, you do not have it.`;
+  return `Screenshot: ${what}, is attached to this message: as an image where your harness takes images, and otherwise as the file ${defang(img.attachment.path)}.`;
+}
+
 function item(n: number, r: ContextReading, place: Place): string {
   const note = r.record.note ? [`${userPossessive()} note: ${defang(r.record.note)}`] : [];
   if (r.as === 'fallback') return [`[${n}] ${defang(r.record.label || r.record.kind || 'Context')}`, ...note, '(Omni could not include its contents.)'].join('\n');
@@ -94,12 +106,21 @@ function item(n: number, r: ContextReading, place: Place): string {
   if (p.file && place.remote) lines.push(`File: ${defang(p.file)}, in ${userPossessive()} checkout on the Mac. You run ${place.where} and cannot open it; work from the excerpt.`);
   else if (p.file) lines.push(`File: ${defang(p.file)}, relative to your working directory.`);
   if (p.check && !place.remote) lines.push(`Check: ${p.check.stale ? 'STALE: ' : ''}${p.check.text}.`);
+  if (p.image) lines.push(imageLine(p.image, place));
   lines.push(...note);
   if (p.excerpt) {
     const f = fence(p.excerpt.text);
     lines.push(`${f}${p.excerpt.lang}`, p.excerpt.text, f);
   }
   return lines.join('\n');
+}
+
+/** The files the records' items travel with, as attachments of the message: the images their kinds name that are still on disk. */
+export function contextAttachments(records: readonly MessageContext[] | undefined): Attachment[] {
+  return readContexts(records ?? []).flatMap((r) => {
+    const a = r.as === 'known' ? project(r, null).image?.attachment : null;
+    return a ? [a] : [];
+  });
 }
 
 /** The records as one bounded block. Items that would take it past CONTEXT_BLOCK_MAX give way to one line saying so. */
