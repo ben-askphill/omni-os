@@ -31,7 +31,7 @@
     "kind": "user",
     "payload": null,
     "fingerprint": "2e83bd8a226e86e980591bce108f23482ea8351ee827917586b00db9b453a185",
-    "state": "waiting",
+    "state": "sent",
     "machine_id": null,
     "event_id": null,
     "created_at": "2026-01-05T09:00:00.000Z",
