@@ -1,0 +1,2465 @@
+{
+  "kinds": ["diff_selection"],
+  "records": [
+    {
+      "name": "a diff selection",
+      "raw": {
+        "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+        "kind": "diff_selection",
+        "v": 1,
+        "label": "src/cart.ts:1-3",
+        "note": "this reduce reads better with names",
+        "body": {
+          "path": "src/cart.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 3,
+          "rows": [
+            {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+            {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+            {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+            {"kind":"context","text":"}","old":3,"new":3}
+          ],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "fa9fb2e",
+            "blob_new": "a31fcc1"
+          }
+        }
+      },
+      "expect": {"as":"known","id":"3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a","label":"src/cart.ts:1-3","note":"this reduce reads better with names"}
+    },
+    {
+      "name": "the stored label is shown as it is",
+      "raw": {
+        "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+        "kind": "diff_selection",
+        "v": 1,
+        "label": "cart total",
+        "note": "",
+        "body": {
+          "path": "src/cart.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 3,
+          "rows": [
+            {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+            {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+            {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+            {"kind":"context","text":"}","old":3,"new":3}
+          ],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "fa9fb2e",
+            "blob_new": "a31fcc1"
+          }
+        }
+      },
+      "expect": {"as":"known","id":"3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a","label":"cart total","note":""}
+    },
+    {
+      "name": "no note",
+      "raw": {
+        "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+        "kind": "diff_selection",
+        "v": 1,
+        "label": "src/cart.ts:1-3",
+        "body": {
+          "path": "src/cart.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 3,
+          "rows": [
+            {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+            {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+            {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+            {"kind":"context","text":"}","old":3,"new":3}
+          ],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "fa9fb2e",
+            "blob_new": "a31fcc1"
+          }
+        }
+      },
+      "expect": {"as":"known","id":"3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a","label":"src/cart.ts:1-3","note":""}
+    },
+    {
+      "name": "mistyped envelope fields read as empty",
+      "raw": {
+        "id": 7,
+        "kind": "diff_selection",
+        "v": 1,
+        "label": 42,
+        "note": ["x"],
+        "body": {
+          "path": "src/cart.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 3,
+          "rows": [
+            {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+            {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+            {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+            {"kind":"context","text":"}","old":3,"new":3}
+          ],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "fa9fb2e",
+            "blob_new": "a31fcc1"
+          }
+        }
+      },
+      "expect": {"as":"known","id":"context-0","label":"","note":""}
+    },
+    {
+      "name": "a kind this Omni does not know",
+      "raw": {
+        "id": "8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e",
+        "kind": "terminal_excerpt",
+        "v": 1,
+        "label": "npm test (exit 1)",
+        "note": "why does this fail",
+        "body": {"command":"npm test","exit":1,"text":"FAIL tests/cart.test.ts"}
+      },
+      "expect": {"as":"fallback","why":"unknown_kind","id":"8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e","label":"npm test (exit 1)","note":"why does this fail"}
+    },
+    {
+      "name": "a kind named like an Object method",
+      "raw": {"id":"8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e","kind":"toString","v":1,"label":"x","note":"","body":{}},
+      "expect": {"as":"fallback","why":"unknown_kind","id":"8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e","label":"x","note":""}
+    },
+    {
+      "name": "a newer version of a known kind",
+      "raw": {
+        "id": "8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e",
+        "kind": "diff_selection",
+        "v": 2,
+        "label": "src/cart.ts:1-3, 9",
+        "note": "both spots",
+        "body": {"path":"src/cart.ts","ranges":[[1,3],[9,9]]}
+      },
+      "expect": {"as":"fallback","why":"newer_version","id":"8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e","label":"src/cart.ts:1-3, 9","note":"both spots"}
+    },
+    {
+      "name": "a body that does not parse",
+      "raw": {
+        "id": "8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e",
+        "kind": "diff_selection",
+        "v": 1,
+        "label": "src/cart.ts:1-3",
+        "note": "",
+        "body": {
+          "path": "src/cart.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 3,
+          "rows": [],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "fa9fb2e",
+            "blob_new": "a31fcc1"
+          }
+        }
+      },
+      "expect": {"as":"fallback","why":"unreadable","id":"8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e","label":"src/cart.ts:1-3","note":""}
+    },
+    {
+      "name": "no body",
+      "raw": {"id":"8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e","kind":"diff_selection","v":1,"label":"src/cart.ts:1-3","note":""},
+      "expect": {"as":"fallback","why":"unreadable","id":"8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e","label":"src/cart.ts:1-3","note":""}
+    },
+    {
+      "name": "a version that is not a number",
+      "raw": {
+        "id": "8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e",
+        "kind": "diff_selection",
+        "v": "1",
+        "label": "src/cart.ts:1-3",
+        "note": "",
+        "body": {
+          "path": "src/cart.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 3,
+          "rows": [
+            {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+            {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+            {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+            {"kind":"context","text":"}","old":3,"new":3}
+          ],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "fa9fb2e",
+            "blob_new": "a31fcc1"
+          }
+        }
+      },
+      "expect": {"as":"fallback","why":"unreadable","id":"8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e","label":"src/cart.ts:1-3","note":""}
+    },
+    {"name":"a string element","raw":"src/cart.ts:1-3","expect":{"as":"fallback","why":"unreadable","id":"context-0","label":"","note":""}},
+    {"name":"a null element","raw":null,"expect":{"as":"fallback","why":"unreadable","id":"context-0","label":"","note":""}}
+  ],
+  "selections": [
+    {
+      "name": "mixed add, del and context rows",
+      "file": {
+        "path": "src/cart.ts",
+        "old_path": null,
+        "header": ["diff --git a/src/cart.ts b/src/cart.ts","index fa9fb2e..a31fcc1 100644","--- a/src/cart.ts","+++ b/src/cart.ts"],
+        "lines": [
+          {"kind":"hunk","text":"@@ -1,3 +1,3 @@","old":null,"new":null},
+          {"kind":"context","text":" export function total(items: number[]) {","old":1,"new":1},
+          {"kind":"del","text":"-  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+          {"kind":"add","text":"+  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+          {"kind":"context","text":" }","old":3,"new":3}
+        ]
+      },
+      "from": 1,
+      "to": 4,
+      "source": {"group":"unstaged","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "src/cart.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 3,
+          "rows": [
+            {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+            {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+            {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+            {"kind":"context","text":"}","old":3,"new":3}
+          ],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "fa9fb2e",
+            "blob_new": "a31fcc1"
+          }
+        },
+        "label": "src/cart.ts:1-3"
+      }
+    },
+    {
+      "name": "from and to in either order",
+      "file": {
+        "path": "src/cart.ts",
+        "old_path": null,
+        "header": ["diff --git a/src/cart.ts b/src/cart.ts","index fa9fb2e..a31fcc1 100644","--- a/src/cart.ts","+++ b/src/cart.ts"],
+        "lines": [
+          {"kind":"hunk","text":"@@ -1,3 +1,3 @@","old":null,"new":null},
+          {"kind":"context","text":" export function total(items: number[]) {","old":1,"new":1},
+          {"kind":"del","text":"-  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+          {"kind":"add","text":"+  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+          {"kind":"context","text":" }","old":3,"new":3}
+        ]
+      },
+      "from": 4,
+      "to": 1,
+      "source": {"group":"unstaged","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "src/cart.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 3,
+          "rows": [
+            {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+            {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+            {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+            {"kind":"context","text":"}","old":3,"new":3}
+          ],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "fa9fb2e",
+            "blob_new": "a31fcc1"
+          }
+        },
+        "label": "src/cart.ts:1-3"
+      }
+    },
+    {
+      "name": "one added line",
+      "file": {
+        "path": "src/cart.ts",
+        "old_path": null,
+        "header": ["diff --git a/src/cart.ts b/src/cart.ts","index fa9fb2e..a31fcc1 100644","--- a/src/cart.ts","+++ b/src/cart.ts"],
+        "lines": [
+          {"kind":"hunk","text":"@@ -1,3 +1,3 @@","old":null,"new":null},
+          {"kind":"context","text":" export function total(items: number[]) {","old":1,"new":1},
+          {"kind":"del","text":"-  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+          {"kind":"add","text":"+  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+          {"kind":"context","text":" }","old":3,"new":3}
+        ]
+      },
+      "from": 3,
+      "to": 3,
+      "source": {"group":"unstaged","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "src/cart.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 2,
+          "end": 2,
+          "rows": [{"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2}],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "fa9fb2e",
+            "blob_new": "a31fcc1"
+          }
+        },
+        "label": "src/cart.ts:2"
+      }
+    },
+    {
+      "name": "one removed line is on the old side",
+      "file": {
+        "path": "src/cart.ts",
+        "old_path": null,
+        "header": ["diff --git a/src/cart.ts b/src/cart.ts","index fa9fb2e..a31fcc1 100644","--- a/src/cart.ts","+++ b/src/cart.ts"],
+        "lines": [
+          {"kind":"hunk","text":"@@ -1,3 +1,3 @@","old":null,"new":null},
+          {"kind":"context","text":" export function total(items: number[]) {","old":1,"new":1},
+          {"kind":"del","text":"-  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+          {"kind":"add","text":"+  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+          {"kind":"context","text":" }","old":3,"new":3}
+        ]
+      },
+      "from": 2,
+      "to": 2,
+      "source": {"group":"unstaged","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "src/cart.ts",
+          "old_path": null,
+          "side": "old",
+          "start": 2,
+          "end": 2,
+          "rows": [{"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null}],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "fa9fb2e",
+            "blob_new": "a31fcc1"
+          }
+        },
+        "label": "src/cart.ts:2 (removed)"
+      }
+    },
+    {
+      "name": "the hunk row is left out and a removed row does not count on the new side",
+      "file": {
+        "path": "src/cart.ts",
+        "old_path": null,
+        "header": ["diff --git a/src/cart.ts b/src/cart.ts","index fa9fb2e..a31fcc1 100644","--- a/src/cart.ts","+++ b/src/cart.ts"],
+        "lines": [
+          {"kind":"hunk","text":"@@ -1,3 +1,3 @@","old":null,"new":null},
+          {"kind":"context","text":" export function total(items: number[]) {","old":1,"new":1},
+          {"kind":"del","text":"-  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+          {"kind":"add","text":"+  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+          {"kind":"context","text":" }","old":3,"new":3}
+        ]
+      },
+      "from": 0,
+      "to": 2,
+      "source": {"group":"unstaged","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "src/cart.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 1,
+          "rows": [
+            {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+            {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null}
+          ],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "fa9fb2e",
+            "blob_new": "a31fcc1"
+          }
+        },
+        "label": "src/cart.ts:1"
+      }
+    },
+    {
+      "name": "a blank context row",
+      "file": {
+        "path": "src/checkout.ts",
+        "old_path": null,
+        "header": ["diff --git a/src/checkout.ts b/src/checkout.ts","index 3b18e51..9c2d4f7 100644","--- a/src/checkout.ts","+++ b/src/checkout.ts"],
+        "lines": [
+          {"kind":"hunk","text":"@@ -1,5 +1,6 @@","old":null,"new":null},
+          {"kind":"context","text":" import { total } from './cart';","old":1,"new":1},
+          {"kind":"add","text":"+import { round } from './money';","old":null,"new":2},
+          {"kind":"context","text":"","old":2,"new":3},
+          {"kind":"context","text":" export function checkout(items: number[]) {","old":3,"new":4},
+          {"kind":"del","text":"-  const sum = total(items);","old":4,"new":null},
+          {"kind":"add","text":"+  const sum = round(total(items));","old":null,"new":5},
+          {"kind":"context","text":"   return { sum };","old":5,"new":6},
+          {"kind":"hunk","text":"@@ -20,4 +21,4 @@ export function refund(sum: number) {","old":null,"new":null},
+          {"kind":"context","text":"   if (sum < 0) {","old":20,"new":21},
+          {"kind":"del","text":"-    throw new Error('negative');","old":21,"new":null},
+          {"kind":"add","text":"+    throw new Error('refund must be positive');","old":null,"new":22},
+          {"kind":"context","text":"   }","old":22,"new":23},
+          {"kind":"context","text":" }","old":23,"new":24}
+        ]
+      },
+      "from": 2,
+      "to": 4,
+      "source": {"group":"committed","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "src/checkout.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 2,
+          "end": 4,
+          "rows": [
+            {"kind":"add","text":"import { round } from './money';","old":null,"new":2},
+            {"kind":"context","text":"","old":2,"new":3},
+            {"kind":"context","text":"export function checkout(items: number[]) {","old":3,"new":4}
+          ],
+          "source": {
+            "group": "committed",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "3b18e51",
+            "blob_new": "9c2d4f7"
+          }
+        },
+        "label": "src/checkout.ts:2-4"
+      }
+    },
+    {
+      "name": "a pick across two hunks stops at the end of the hunk it started in",
+      "file": {
+        "path": "src/checkout.ts",
+        "old_path": null,
+        "header": ["diff --git a/src/checkout.ts b/src/checkout.ts","index 3b18e51..9c2d4f7 100644","--- a/src/checkout.ts","+++ b/src/checkout.ts"],
+        "lines": [
+          {"kind":"hunk","text":"@@ -1,5 +1,6 @@","old":null,"new":null},
+          {"kind":"context","text":" import { total } from './cart';","old":1,"new":1},
+          {"kind":"add","text":"+import { round } from './money';","old":null,"new":2},
+          {"kind":"context","text":"","old":2,"new":3},
+          {"kind":"context","text":" export function checkout(items: number[]) {","old":3,"new":4},
+          {"kind":"del","text":"-  const sum = total(items);","old":4,"new":null},
+          {"kind":"add","text":"+  const sum = round(total(items));","old":null,"new":5},
+          {"kind":"context","text":"   return { sum };","old":5,"new":6},
+          {"kind":"hunk","text":"@@ -20,4 +21,4 @@ export function refund(sum: number) {","old":null,"new":null},
+          {"kind":"context","text":"   if (sum < 0) {","old":20,"new":21},
+          {"kind":"del","text":"-    throw new Error('negative');","old":21,"new":null},
+          {"kind":"add","text":"+    throw new Error('refund must be positive');","old":null,"new":22},
+          {"kind":"context","text":"   }","old":22,"new":23},
+          {"kind":"context","text":" }","old":23,"new":24}
+        ]
+      },
+      "from": 5,
+      "to": 11,
+      "source": {"group":"committed","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "src/checkout.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 5,
+          "end": 6,
+          "rows": [
+            {"kind":"del","text":"  const sum = total(items);","old":4,"new":null},
+            {"kind":"add","text":"  const sum = round(total(items));","old":null,"new":5},
+            {"kind":"context","text":"  return { sum };","old":5,"new":6}
+          ],
+          "source": {
+            "group": "committed",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "3b18e51",
+            "blob_new": "9c2d4f7"
+          }
+        },
+        "label": "src/checkout.ts:5-6"
+      }
+    },
+    {
+      "name": "a pick back across two hunks stops at the start of the hunk it started in",
+      "file": {
+        "path": "src/checkout.ts",
+        "old_path": null,
+        "header": ["diff --git a/src/checkout.ts b/src/checkout.ts","index 3b18e51..9c2d4f7 100644","--- a/src/checkout.ts","+++ b/src/checkout.ts"],
+        "lines": [
+          {"kind":"hunk","text":"@@ -1,5 +1,6 @@","old":null,"new":null},
+          {"kind":"context","text":" import { total } from './cart';","old":1,"new":1},
+          {"kind":"add","text":"+import { round } from './money';","old":null,"new":2},
+          {"kind":"context","text":"","old":2,"new":3},
+          {"kind":"context","text":" export function checkout(items: number[]) {","old":3,"new":4},
+          {"kind":"del","text":"-  const sum = total(items);","old":4,"new":null},
+          {"kind":"add","text":"+  const sum = round(total(items));","old":null,"new":5},
+          {"kind":"context","text":"   return { sum };","old":5,"new":6},
+          {"kind":"hunk","text":"@@ -20,4 +21,4 @@ export function refund(sum: number) {","old":null,"new":null},
+          {"kind":"context","text":"   if (sum < 0) {","old":20,"new":21},
+          {"kind":"del","text":"-    throw new Error('negative');","old":21,"new":null},
+          {"kind":"add","text":"+    throw new Error('refund must be positive');","old":null,"new":22},
+          {"kind":"context","text":"   }","old":22,"new":23},
+          {"kind":"context","text":" }","old":23,"new":24}
+        ]
+      },
+      "from": 11,
+      "to": 2,
+      "source": {"group":"committed","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "src/checkout.ts",
+          "old_path": null,
+          "side": "new",
+          "start": 21,
+          "end": 22,
+          "rows": [
+            {"kind":"context","text":"  if (sum < 0) {","old":20,"new":21},
+            {"kind":"del","text":"    throw new Error('negative');","old":21,"new":null},
+            {"kind":"add","text":"    throw new Error('refund must be positive');","old":null,"new":22}
+          ],
+          "source": {
+            "group": "committed",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "3b18e51",
+            "blob_new": "9c2d4f7"
+          }
+        },
+        "label": "src/checkout.ts:21-22"
+      }
+    },
+    {
+      "name": "a deleted file has no new blob",
+      "file": {
+        "path": "legacy.txt",
+        "old_path": null,
+        "header": ["diff --git a/legacy.txt b/legacy.txt","deleted file mode 100644","index 3367afd..0000000","--- a/legacy.txt","+++ /dev/null"],
+        "lines": [{"kind":"hunk","text":"@@ -1 +0,0 @@","old":null,"new":null},{"kind":"del","text":"-old","old":1,"new":null}]
+      },
+      "from": 1,
+      "to": 1,
+      "source": {"group":"unstaged","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "legacy.txt",
+          "old_path": null,
+          "side": "old",
+          "start": 1,
+          "end": 1,
+          "rows": [{"kind":"del","text":"old","old":1,"new":null}],
+          "source": {
+            "group": "unstaged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "3367afd",
+            "blob_new": null
+          }
+        },
+        "label": "legacy.txt:1 (removed)"
+      }
+    },
+    {
+      "name": "an untracked file has no blobs and its no-newline note is left out",
+      "file": {
+        "path": "notes.md",
+        "old_path": null,
+        "header": ["diff --git a/notes.md b/notes.md","new file mode 100644","--- /dev/null","+++ b/notes.md"],
+        "lines": [
+          {"kind":"hunk","text":"@@ -0,0 +1,2 @@","old":null,"new":null},
+          {"kind":"add","text":"+Check rounding.","old":null,"new":1},
+          {"kind":"add","text":"+Ask about refunds.","old":null,"new":2},
+          {"kind":"note","text":"\\ No newline at end of file","old":null,"new":null}
+        ]
+      },
+      "from": 0,
+      "to": 3,
+      "source": {"group":"untracked","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "notes.md",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 2,
+          "rows": [{"kind":"add","text":"Check rounding.","old":null,"new":1},{"kind":"add","text":"Ask about refunds.","old":null,"new":2}],
+          "source": {
+            "group": "untracked",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": null,
+            "blob_new": null
+          }
+        },
+        "label": "notes.md:1-2"
+      }
+    },
+    {
+      "name": "only the no-newline note",
+      "file": {
+        "path": "notes.md",
+        "old_path": null,
+        "header": ["diff --git a/notes.md b/notes.md","new file mode 100644","--- /dev/null","+++ b/notes.md"],
+        "lines": [
+          {"kind":"hunk","text":"@@ -0,0 +1,2 @@","old":null,"new":null},
+          {"kind":"add","text":"+Check rounding.","old":null,"new":1},
+          {"kind":"add","text":"+Ask about refunds.","old":null,"new":2},
+          {"kind":"note","text":"\\ No newline at end of file","old":null,"new":null}
+        ]
+      },
+      "from": 3,
+      "to": 3,
+      "source": {"group":"untracked","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {"ok":false,"error":"Pick at least one line."}
+    },
+    {
+      "name": "a line past the end of the file",
+      "file": {
+        "path": "src/cart.ts",
+        "old_path": null,
+        "header": ["diff --git a/src/cart.ts b/src/cart.ts","index fa9fb2e..a31fcc1 100644","--- a/src/cart.ts","+++ b/src/cart.ts"],
+        "lines": [
+          {"kind":"hunk","text":"@@ -1,3 +1,3 @@","old":null,"new":null},
+          {"kind":"context","text":" export function total(items: number[]) {","old":1,"new":1},
+          {"kind":"del","text":"-  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+          {"kind":"add","text":"+  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+          {"kind":"context","text":" }","old":3,"new":3}
+        ]
+      },
+      "from": 9,
+      "to": 9,
+      "source": {"group":"unstaged","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {"ok":false,"error":"Pick at least one line."}
+    },
+    {
+      "name": "CRLF lines lose their carriage return, in a turn",
+      "file": {
+        "path": "scripts/release.cmd",
+        "old_path": null,
+        "header": [
+          "diff --git a/scripts/release.cmd b/scripts/release.cmd",
+          "index 5d1e0a2..e83b7c4 100644",
+          "--- a/scripts/release.cmd",
+          "+++ b/scripts/release.cmd"
+        ],
+        "lines": [
+          {"kind":"hunk","text":"@@ -1,3 +1,3 @@","old":null,"new":null},
+          {"kind":"context","text":" @echo off\r","old":1,"new":1},
+          {"kind":"del","text":"-npm run build\r","old":2,"new":null},
+          {"kind":"add","text":"+npm run build --workspaces\r","old":null,"new":2},
+          {"kind":"context","text":" npm publish\r","old":3,"new":3}
+        ]
+      },
+      "from": 1,
+      "to": 4,
+      "source": {
+        "group": "turn",
+        "from": "e1d2c3b4a5f60718293a4b5c6d7e8f9012345678",
+        "to": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+        "turn": "5b0e8f3a-2c4d-4e6f-8a1b-3c5d7e9f1a2b"
+      },
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "scripts/release.cmd",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 3,
+          "rows": [
+            {"kind":"context","text":"@echo off","old":1,"new":1},
+            {"kind":"del","text":"npm run build","old":2,"new":null},
+            {"kind":"add","text":"npm run build --workspaces","old":null,"new":2},
+            {"kind":"context","text":"npm publish","old":3,"new":3}
+          ],
+          "source": {
+            "group": "turn",
+            "from": "e1d2c3b4a5f60718293a4b5c6d7e8f9012345678",
+            "to": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+            "turn": "5b0e8f3a-2c4d-4e6f-8a1b-3c5d7e9f1a2b",
+            "blob_old": "5d1e0a2",
+            "blob_new": "e83b7c4"
+          }
+        },
+        "label": "scripts/release.cmd:1-3"
+      }
+    },
+    {
+      "name": "a renamed file keeps where it came from",
+      "file": {
+        "path": "src/lib/money.ts",
+        "old_path": "src/money.ts",
+        "header": [
+          "diff --git a/src/money.ts b/src/lib/money.ts",
+          "similarity index 88%",
+          "rename from src/money.ts",
+          "rename to src/lib/money.ts",
+          "index 1c9e3b0..7aa5d21 100644",
+          "--- a/src/money.ts",
+          "+++ b/src/lib/money.ts"
+        ],
+        "lines": [
+          {"kind":"hunk","text":"@@ -1,3 +1,3 @@","old":null,"new":null},
+          {"kind":"context","text":" export function round(n: number) {","old":1,"new":1},
+          {"kind":"del","text":"-  return Math.round(n);","old":2,"new":null},
+          {"kind":"add","text":"+  return Math.round(n * 100) / 100;","old":null,"new":2},
+          {"kind":"context","text":" }","old":3,"new":3}
+        ]
+      },
+      "from": 2,
+      "to": 3,
+      "source": {"group":"staged","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "src/lib/money.ts",
+          "old_path": "src/money.ts",
+          "side": "new",
+          "start": 2,
+          "end": 2,
+          "rows": [
+            {"kind":"del","text":"  return Math.round(n);","old":2,"new":null},
+            {"kind":"add","text":"  return Math.round(n * 100) / 100;","old":null,"new":2}
+          ],
+          "source": {
+            "group": "staged",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": "1c9e3b0",
+            "blob_new": "7aa5d21"
+          }
+        },
+        "label": "src/lib/money.ts:2"
+      }
+    },
+    {
+      "name": "a row over 500 characters is cut at 500 code points",
+      "file": {
+        "path": "public/icons.min.js",
+        "old_path": null,
+        "header": [
+          "diff --git a/public/icons.min.js b/public/icons.min.js",
+          "new file mode 100644",
+          "index 0000000..b5e1f39",
+          "--- /dev/null",
+          "+++ b/public/icons.min.js"
+        ],
+        "lines": [
+          {"kind":"hunk","text":"@@ -0,0 +1,2 @@","old":null,"new":null},
+          {"kind":"add","text":"+/*! icons v2 */","old":null,"new":1},
+          {
+            "kind": "add",
+            "text": "+export const ICONS={cart0:\"🛒\",bag1:\"🛒\",gift2:\"🛒\",card3:\"🛒\",box4:\"🛒\",tag5:\"🛒\",star6:\"🛒\",bell7:\"🛒\",home8:\"🛒\",user9:\"🛒\",lock10:\"🛒\",mail11:\"🛒\",pin12:\"🛒\",gear13:\"🛒\",help14:\"🛒\",info15:\"🛒\",cart16:\"🛒\",bag17:\"🛒\",gift18:\"🛒\",card19:\"🛒\",box20:\"🛒\",tag21:\"🛒\",star22:\"🛒\",bell23:\"🛒\",home24:\"🛒\",user25:\"🛒\",lock26:\"🛒\",mail27:\"🛒\",pin28:\"🛒\",gear29:\"🛒\",help30:\"🛒\",info31:\"🛒\",cart32:\"🛒\",bag33:\"🛒\",gift34:\"🛒\",card35:\"🛒\",box36:\"🛒\",tag37:\"🛒\",star38:\"🛒\",bell39:\"🛒\",home40:\"🛒\",user41:\"🛒\",lock42:\"🛒\",mail43:\"🛒\",pin44:\"🛒\",gear45:\"🛒\",help46:\"🛒\",info47:\"🛒\"};",
+            "old": null,
+            "new": 2
+          }
+        ]
+      },
+      "from": 1,
+      "to": 2,
+      "source": {"group":"committed","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "public/icons.min.js",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 2,
+          "rows": [
+            {"kind":"add","text":"/*! icons v2 */","old":null,"new":1},
+            {
+              "kind": "add",
+              "text": "export const ICONS={cart0:\"🛒\",bag1:\"🛒\",gift2:\"🛒\",card3:\"🛒\",box4:\"🛒\",tag5:\"🛒\",star6:\"🛒\",bell7:\"🛒\",home8:\"🛒\",user9:\"🛒\",lock10:\"🛒\",mail11:\"🛒\",pin12:\"🛒\",gear13:\"🛒\",help14:\"🛒\",info15:\"🛒\",cart16:\"🛒\",bag17:\"🛒\",gift18:\"🛒\",card19:\"🛒\",box20:\"🛒\",tag21:\"🛒\",star22:\"🛒\",bell23:\"🛒\",home24:\"🛒\",user25:\"🛒\",lock26:\"🛒\",mail27:\"🛒\",pin28:\"🛒\",gear29:\"🛒\",help30:\"🛒\",info31:\"🛒\",cart32:\"🛒\",bag33:\"🛒\",gift34:\"🛒\",card35:\"🛒\",box36:\"🛒\",tag37:\"🛒\",star38:\"🛒\",bell39:\"🛒\",home40:\"🛒\",user41:\"🛒\",lock42:\"🛒\",mail43:\"🛒\",pin44:\"🛒\",gear45:",
+              "old": null,
+              "new": 2,
+              "cut": true
+            }
+          ],
+          "source": {
+            "group": "committed",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": null,
+            "blob_new": "b5e1f39"
+          }
+        },
+        "label": "public/icons.min.js:1-2"
+      }
+    },
+    {
+      "name": "200 rows is the most",
+      "file": {
+        "path": "data/zipcodes.txt",
+        "old_path": null,
+        "header": [
+          "diff --git a/data/zipcodes.txt b/data/zipcodes.txt",
+          "new file mode 100644",
+          "index 0000000..6e0f3d2",
+          "--- /dev/null",
+          "+++ b/data/zipcodes.txt"
+        ],
+        "lines": [
+          {"kind":"hunk","text":"@@ -0,0 +1,201 @@","old":null,"new":null},
+          {"kind":"add","text":"+1000","old":null,"new":1},
+          {"kind":"add","text":"+1001","old":null,"new":2},
+          {"kind":"add","text":"+1002","old":null,"new":3},
+          {"kind":"add","text":"+1003","old":null,"new":4},
+          {"kind":"add","text":"+1004","old":null,"new":5},
+          {"kind":"add","text":"+1005","old":null,"new":6},
+          {"kind":"add","text":"+1006","old":null,"new":7},
+          {"kind":"add","text":"+1007","old":null,"new":8},
+          {"kind":"add","text":"+1008","old":null,"new":9},
+          {"kind":"add","text":"+1009","old":null,"new":10},
+          {"kind":"add","text":"+1010","old":null,"new":11},
+          {"kind":"add","text":"+1011","old":null,"new":12},
+          {"kind":"add","text":"+1012","old":null,"new":13},
+          {"kind":"add","text":"+1013","old":null,"new":14},
+          {"kind":"add","text":"+1014","old":null,"new":15},
+          {"kind":"add","text":"+1015","old":null,"new":16},
+          {"kind":"add","text":"+1016","old":null,"new":17},
+          {"kind":"add","text":"+1017","old":null,"new":18},
+          {"kind":"add","text":"+1018","old":null,"new":19},
+          {"kind":"add","text":"+1019","old":null,"new":20},
+          {"kind":"add","text":"+1020","old":null,"new":21},
+          {"kind":"add","text":"+1021","old":null,"new":22},
+          {"kind":"add","text":"+1022","old":null,"new":23},
+          {"kind":"add","text":"+1023","old":null,"new":24},
+          {"kind":"add","text":"+1024","old":null,"new":25},
+          {"kind":"add","text":"+1025","old":null,"new":26},
+          {"kind":"add","text":"+1026","old":null,"new":27},
+          {"kind":"add","text":"+1027","old":null,"new":28},
+          {"kind":"add","text":"+1028","old":null,"new":29},
+          {"kind":"add","text":"+1029","old":null,"new":30},
+          {"kind":"add","text":"+1030","old":null,"new":31},
+          {"kind":"add","text":"+1031","old":null,"new":32},
+          {"kind":"add","text":"+1032","old":null,"new":33},
+          {"kind":"add","text":"+1033","old":null,"new":34},
+          {"kind":"add","text":"+1034","old":null,"new":35},
+          {"kind":"add","text":"+1035","old":null,"new":36},
+          {"kind":"add","text":"+1036","old":null,"new":37},
+          {"kind":"add","text":"+1037","old":null,"new":38},
+          {"kind":"add","text":"+1038","old":null,"new":39},
+          {"kind":"add","text":"+1039","old":null,"new":40},
+          {"kind":"add","text":"+1040","old":null,"new":41},
+          {"kind":"add","text":"+1041","old":null,"new":42},
+          {"kind":"add","text":"+1042","old":null,"new":43},
+          {"kind":"add","text":"+1043","old":null,"new":44},
+          {"kind":"add","text":"+1044","old":null,"new":45},
+          {"kind":"add","text":"+1045","old":null,"new":46},
+          {"kind":"add","text":"+1046","old":null,"new":47},
+          {"kind":"add","text":"+1047","old":null,"new":48},
+          {"kind":"add","text":"+1048","old":null,"new":49},
+          {"kind":"add","text":"+1049","old":null,"new":50},
+          {"kind":"add","text":"+1050","old":null,"new":51},
+          {"kind":"add","text":"+1051","old":null,"new":52},
+          {"kind":"add","text":"+1052","old":null,"new":53},
+          {"kind":"add","text":"+1053","old":null,"new":54},
+          {"kind":"add","text":"+1054","old":null,"new":55},
+          {"kind":"add","text":"+1055","old":null,"new":56},
+          {"kind":"add","text":"+1056","old":null,"new":57},
+          {"kind":"add","text":"+1057","old":null,"new":58},
+          {"kind":"add","text":"+1058","old":null,"new":59},
+          {"kind":"add","text":"+1059","old":null,"new":60},
+          {"kind":"add","text":"+1060","old":null,"new":61},
+          {"kind":"add","text":"+1061","old":null,"new":62},
+          {"kind":"add","text":"+1062","old":null,"new":63},
+          {"kind":"add","text":"+1063","old":null,"new":64},
+          {"kind":"add","text":"+1064","old":null,"new":65},
+          {"kind":"add","text":"+1065","old":null,"new":66},
+          {"kind":"add","text":"+1066","old":null,"new":67},
+          {"kind":"add","text":"+1067","old":null,"new":68},
+          {"kind":"add","text":"+1068","old":null,"new":69},
+          {"kind":"add","text":"+1069","old":null,"new":70},
+          {"kind":"add","text":"+1070","old":null,"new":71},
+          {"kind":"add","text":"+1071","old":null,"new":72},
+          {"kind":"add","text":"+1072","old":null,"new":73},
+          {"kind":"add","text":"+1073","old":null,"new":74},
+          {"kind":"add","text":"+1074","old":null,"new":75},
+          {"kind":"add","text":"+1075","old":null,"new":76},
+          {"kind":"add","text":"+1076","old":null,"new":77},
+          {"kind":"add","text":"+1077","old":null,"new":78},
+          {"kind":"add","text":"+1078","old":null,"new":79},
+          {"kind":"add","text":"+1079","old":null,"new":80},
+          {"kind":"add","text":"+1080","old":null,"new":81},
+          {"kind":"add","text":"+1081","old":null,"new":82},
+          {"kind":"add","text":"+1082","old":null,"new":83},
+          {"kind":"add","text":"+1083","old":null,"new":84},
+          {"kind":"add","text":"+1084","old":null,"new":85},
+          {"kind":"add","text":"+1085","old":null,"new":86},
+          {"kind":"add","text":"+1086","old":null,"new":87},
+          {"kind":"add","text":"+1087","old":null,"new":88},
+          {"kind":"add","text":"+1088","old":null,"new":89},
+          {"kind":"add","text":"+1089","old":null,"new":90},
+          {"kind":"add","text":"+1090","old":null,"new":91},
+          {"kind":"add","text":"+1091","old":null,"new":92},
+          {"kind":"add","text":"+1092","old":null,"new":93},
+          {"kind":"add","text":"+1093","old":null,"new":94},
+          {"kind":"add","text":"+1094","old":null,"new":95},
+          {"kind":"add","text":"+1095","old":null,"new":96},
+          {"kind":"add","text":"+1096","old":null,"new":97},
+          {"kind":"add","text":"+1097","old":null,"new":98},
+          {"kind":"add","text":"+1098","old":null,"new":99},
+          {"kind":"add","text":"+1099","old":null,"new":100},
+          {"kind":"add","text":"+1100","old":null,"new":101},
+          {"kind":"add","text":"+1101","old":null,"new":102},
+          {"kind":"add","text":"+1102","old":null,"new":103},
+          {"kind":"add","text":"+1103","old":null,"new":104},
+          {"kind":"add","text":"+1104","old":null,"new":105},
+          {"kind":"add","text":"+1105","old":null,"new":106},
+          {"kind":"add","text":"+1106","old":null,"new":107},
+          {"kind":"add","text":"+1107","old":null,"new":108},
+          {"kind":"add","text":"+1108","old":null,"new":109},
+          {"kind":"add","text":"+1109","old":null,"new":110},
+          {"kind":"add","text":"+1110","old":null,"new":111},
+          {"kind":"add","text":"+1111","old":null,"new":112},
+          {"kind":"add","text":"+1112","old":null,"new":113},
+          {"kind":"add","text":"+1113","old":null,"new":114},
+          {"kind":"add","text":"+1114","old":null,"new":115},
+          {"kind":"add","text":"+1115","old":null,"new":116},
+          {"kind":"add","text":"+1116","old":null,"new":117},
+          {"kind":"add","text":"+1117","old":null,"new":118},
+          {"kind":"add","text":"+1118","old":null,"new":119},
+          {"kind":"add","text":"+1119","old":null,"new":120},
+          {"kind":"add","text":"+1120","old":null,"new":121},
+          {"kind":"add","text":"+1121","old":null,"new":122},
+          {"kind":"add","text":"+1122","old":null,"new":123},
+          {"kind":"add","text":"+1123","old":null,"new":124},
+          {"kind":"add","text":"+1124","old":null,"new":125},
+          {"kind":"add","text":"+1125","old":null,"new":126},
+          {"kind":"add","text":"+1126","old":null,"new":127},
+          {"kind":"add","text":"+1127","old":null,"new":128},
+          {"kind":"add","text":"+1128","old":null,"new":129},
+          {"kind":"add","text":"+1129","old":null,"new":130},
+          {"kind":"add","text":"+1130","old":null,"new":131},
+          {"kind":"add","text":"+1131","old":null,"new":132},
+          {"kind":"add","text":"+1132","old":null,"new":133},
+          {"kind":"add","text":"+1133","old":null,"new":134},
+          {"kind":"add","text":"+1134","old":null,"new":135},
+          {"kind":"add","text":"+1135","old":null,"new":136},
+          {"kind":"add","text":"+1136","old":null,"new":137},
+          {"kind":"add","text":"+1137","old":null,"new":138},
+          {"kind":"add","text":"+1138","old":null,"new":139},
+          {"kind":"add","text":"+1139","old":null,"new":140},
+          {"kind":"add","text":"+1140","old":null,"new":141},
+          {"kind":"add","text":"+1141","old":null,"new":142},
+          {"kind":"add","text":"+1142","old":null,"new":143},
+          {"kind":"add","text":"+1143","old":null,"new":144},
+          {"kind":"add","text":"+1144","old":null,"new":145},
+          {"kind":"add","text":"+1145","old":null,"new":146},
+          {"kind":"add","text":"+1146","old":null,"new":147},
+          {"kind":"add","text":"+1147","old":null,"new":148},
+          {"kind":"add","text":"+1148","old":null,"new":149},
+          {"kind":"add","text":"+1149","old":null,"new":150},
+          {"kind":"add","text":"+1150","old":null,"new":151},
+          {"kind":"add","text":"+1151","old":null,"new":152},
+          {"kind":"add","text":"+1152","old":null,"new":153},
+          {"kind":"add","text":"+1153","old":null,"new":154},
+          {"kind":"add","text":"+1154","old":null,"new":155},
+          {"kind":"add","text":"+1155","old":null,"new":156},
+          {"kind":"add","text":"+1156","old":null,"new":157},
+          {"kind":"add","text":"+1157","old":null,"new":158},
+          {"kind":"add","text":"+1158","old":null,"new":159},
+          {"kind":"add","text":"+1159","old":null,"new":160},
+          {"kind":"add","text":"+1160","old":null,"new":161},
+          {"kind":"add","text":"+1161","old":null,"new":162},
+          {"kind":"add","text":"+1162","old":null,"new":163},
+          {"kind":"add","text":"+1163","old":null,"new":164},
+          {"kind":"add","text":"+1164","old":null,"new":165},
+          {"kind":"add","text":"+1165","old":null,"new":166},
+          {"kind":"add","text":"+1166","old":null,"new":167},
+          {"kind":"add","text":"+1167","old":null,"new":168},
+          {"kind":"add","text":"+1168","old":null,"new":169},
+          {"kind":"add","text":"+1169","old":null,"new":170},
+          {"kind":"add","text":"+1170","old":null,"new":171},
+          {"kind":"add","text":"+1171","old":null,"new":172},
+          {"kind":"add","text":"+1172","old":null,"new":173},
+          {"kind":"add","text":"+1173","old":null,"new":174},
+          {"kind":"add","text":"+1174","old":null,"new":175},
+          {"kind":"add","text":"+1175","old":null,"new":176},
+          {"kind":"add","text":"+1176","old":null,"new":177},
+          {"kind":"add","text":"+1177","old":null,"new":178},
+          {"kind":"add","text":"+1178","old":null,"new":179},
+          {"kind":"add","text":"+1179","old":null,"new":180},
+          {"kind":"add","text":"+1180","old":null,"new":181},
+          {"kind":"add","text":"+1181","old":null,"new":182},
+          {"kind":"add","text":"+1182","old":null,"new":183},
+          {"kind":"add","text":"+1183","old":null,"new":184},
+          {"kind":"add","text":"+1184","old":null,"new":185},
+          {"kind":"add","text":"+1185","old":null,"new":186},
+          {"kind":"add","text":"+1186","old":null,"new":187},
+          {"kind":"add","text":"+1187","old":null,"new":188},
+          {"kind":"add","text":"+1188","old":null,"new":189},
+          {"kind":"add","text":"+1189","old":null,"new":190},
+          {"kind":"add","text":"+1190","old":null,"new":191},
+          {"kind":"add","text":"+1191","old":null,"new":192},
+          {"kind":"add","text":"+1192","old":null,"new":193},
+          {"kind":"add","text":"+1193","old":null,"new":194},
+          {"kind":"add","text":"+1194","old":null,"new":195},
+          {"kind":"add","text":"+1195","old":null,"new":196},
+          {"kind":"add","text":"+1196","old":null,"new":197},
+          {"kind":"add","text":"+1197","old":null,"new":198},
+          {"kind":"add","text":"+1198","old":null,"new":199},
+          {"kind":"add","text":"+1199","old":null,"new":200},
+          {"kind":"add","text":"+1200","old":null,"new":201}
+        ]
+      },
+      "from": 1,
+      "to": 200,
+      "source": {"group":"committed","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {
+        "ok": true,
+        "body": {
+          "path": "data/zipcodes.txt",
+          "old_path": null,
+          "side": "new",
+          "start": 1,
+          "end": 200,
+          "rows": [
+            {"kind":"add","text":"1000","old":null,"new":1},
+            {"kind":"add","text":"1001","old":null,"new":2},
+            {"kind":"add","text":"1002","old":null,"new":3},
+            {"kind":"add","text":"1003","old":null,"new":4},
+            {"kind":"add","text":"1004","old":null,"new":5},
+            {"kind":"add","text":"1005","old":null,"new":6},
+            {"kind":"add","text":"1006","old":null,"new":7},
+            {"kind":"add","text":"1007","old":null,"new":8},
+            {"kind":"add","text":"1008","old":null,"new":9},
+            {"kind":"add","text":"1009","old":null,"new":10},
+            {"kind":"add","text":"1010","old":null,"new":11},
+            {"kind":"add","text":"1011","old":null,"new":12},
+            {"kind":"add","text":"1012","old":null,"new":13},
+            {"kind":"add","text":"1013","old":null,"new":14},
+            {"kind":"add","text":"1014","old":null,"new":15},
+            {"kind":"add","text":"1015","old":null,"new":16},
+            {"kind":"add","text":"1016","old":null,"new":17},
+            {"kind":"add","text":"1017","old":null,"new":18},
+            {"kind":"add","text":"1018","old":null,"new":19},
+            {"kind":"add","text":"1019","old":null,"new":20},
+            {"kind":"add","text":"1020","old":null,"new":21},
+            {"kind":"add","text":"1021","old":null,"new":22},
+            {"kind":"add","text":"1022","old":null,"new":23},
+            {"kind":"add","text":"1023","old":null,"new":24},
+            {"kind":"add","text":"1024","old":null,"new":25},
+            {"kind":"add","text":"1025","old":null,"new":26},
+            {"kind":"add","text":"1026","old":null,"new":27},
+            {"kind":"add","text":"1027","old":null,"new":28},
+            {"kind":"add","text":"1028","old":null,"new":29},
+            {"kind":"add","text":"1029","old":null,"new":30},
+            {"kind":"add","text":"1030","old":null,"new":31},
+            {"kind":"add","text":"1031","old":null,"new":32},
+            {"kind":"add","text":"1032","old":null,"new":33},
+            {"kind":"add","text":"1033","old":null,"new":34},
+            {"kind":"add","text":"1034","old":null,"new":35},
+            {"kind":"add","text":"1035","old":null,"new":36},
+            {"kind":"add","text":"1036","old":null,"new":37},
+            {"kind":"add","text":"1037","old":null,"new":38},
+            {"kind":"add","text":"1038","old":null,"new":39},
+            {"kind":"add","text":"1039","old":null,"new":40},
+            {"kind":"add","text":"1040","old":null,"new":41},
+            {"kind":"add","text":"1041","old":null,"new":42},
+            {"kind":"add","text":"1042","old":null,"new":43},
+            {"kind":"add","text":"1043","old":null,"new":44},
+            {"kind":"add","text":"1044","old":null,"new":45},
+            {"kind":"add","text":"1045","old":null,"new":46},
+            {"kind":"add","text":"1046","old":null,"new":47},
+            {"kind":"add","text":"1047","old":null,"new":48},
+            {"kind":"add","text":"1048","old":null,"new":49},
+            {"kind":"add","text":"1049","old":null,"new":50},
+            {"kind":"add","text":"1050","old":null,"new":51},
+            {"kind":"add","text":"1051","old":null,"new":52},
+            {"kind":"add","text":"1052","old":null,"new":53},
+            {"kind":"add","text":"1053","old":null,"new":54},
+            {"kind":"add","text":"1054","old":null,"new":55},
+            {"kind":"add","text":"1055","old":null,"new":56},
+            {"kind":"add","text":"1056","old":null,"new":57},
+            {"kind":"add","text":"1057","old":null,"new":58},
+            {"kind":"add","text":"1058","old":null,"new":59},
+            {"kind":"add","text":"1059","old":null,"new":60},
+            {"kind":"add","text":"1060","old":null,"new":61},
+            {"kind":"add","text":"1061","old":null,"new":62},
+            {"kind":"add","text":"1062","old":null,"new":63},
+            {"kind":"add","text":"1063","old":null,"new":64},
+            {"kind":"add","text":"1064","old":null,"new":65},
+            {"kind":"add","text":"1065","old":null,"new":66},
+            {"kind":"add","text":"1066","old":null,"new":67},
+            {"kind":"add","text":"1067","old":null,"new":68},
+            {"kind":"add","text":"1068","old":null,"new":69},
+            {"kind":"add","text":"1069","old":null,"new":70},
+            {"kind":"add","text":"1070","old":null,"new":71},
+            {"kind":"add","text":"1071","old":null,"new":72},
+            {"kind":"add","text":"1072","old":null,"new":73},
+            {"kind":"add","text":"1073","old":null,"new":74},
+            {"kind":"add","text":"1074","old":null,"new":75},
+            {"kind":"add","text":"1075","old":null,"new":76},
+            {"kind":"add","text":"1076","old":null,"new":77},
+            {"kind":"add","text":"1077","old":null,"new":78},
+            {"kind":"add","text":"1078","old":null,"new":79},
+            {"kind":"add","text":"1079","old":null,"new":80},
+            {"kind":"add","text":"1080","old":null,"new":81},
+            {"kind":"add","text":"1081","old":null,"new":82},
+            {"kind":"add","text":"1082","old":null,"new":83},
+            {"kind":"add","text":"1083","old":null,"new":84},
+            {"kind":"add","text":"1084","old":null,"new":85},
+            {"kind":"add","text":"1085","old":null,"new":86},
+            {"kind":"add","text":"1086","old":null,"new":87},
+            {"kind":"add","text":"1087","old":null,"new":88},
+            {"kind":"add","text":"1088","old":null,"new":89},
+            {"kind":"add","text":"1089","old":null,"new":90},
+            {"kind":"add","text":"1090","old":null,"new":91},
+            {"kind":"add","text":"1091","old":null,"new":92},
+            {"kind":"add","text":"1092","old":null,"new":93},
+            {"kind":"add","text":"1093","old":null,"new":94},
+            {"kind":"add","text":"1094","old":null,"new":95},
+            {"kind":"add","text":"1095","old":null,"new":96},
+            {"kind":"add","text":"1096","old":null,"new":97},
+            {"kind":"add","text":"1097","old":null,"new":98},
+            {"kind":"add","text":"1098","old":null,"new":99},
+            {"kind":"add","text":"1099","old":null,"new":100},
+            {"kind":"add","text":"1100","old":null,"new":101},
+            {"kind":"add","text":"1101","old":null,"new":102},
+            {"kind":"add","text":"1102","old":null,"new":103},
+            {"kind":"add","text":"1103","old":null,"new":104},
+            {"kind":"add","text":"1104","old":null,"new":105},
+            {"kind":"add","text":"1105","old":null,"new":106},
+            {"kind":"add","text":"1106","old":null,"new":107},
+            {"kind":"add","text":"1107","old":null,"new":108},
+            {"kind":"add","text":"1108","old":null,"new":109},
+            {"kind":"add","text":"1109","old":null,"new":110},
+            {"kind":"add","text":"1110","old":null,"new":111},
+            {"kind":"add","text":"1111","old":null,"new":112},
+            {"kind":"add","text":"1112","old":null,"new":113},
+            {"kind":"add","text":"1113","old":null,"new":114},
+            {"kind":"add","text":"1114","old":null,"new":115},
+            {"kind":"add","text":"1115","old":null,"new":116},
+            {"kind":"add","text":"1116","old":null,"new":117},
+            {"kind":"add","text":"1117","old":null,"new":118},
+            {"kind":"add","text":"1118","old":null,"new":119},
+            {"kind":"add","text":"1119","old":null,"new":120},
+            {"kind":"add","text":"1120","old":null,"new":121},
+            {"kind":"add","text":"1121","old":null,"new":122},
+            {"kind":"add","text":"1122","old":null,"new":123},
+            {"kind":"add","text":"1123","old":null,"new":124},
+            {"kind":"add","text":"1124","old":null,"new":125},
+            {"kind":"add","text":"1125","old":null,"new":126},
+            {"kind":"add","text":"1126","old":null,"new":127},
+            {"kind":"add","text":"1127","old":null,"new":128},
+            {"kind":"add","text":"1128","old":null,"new":129},
+            {"kind":"add","text":"1129","old":null,"new":130},
+            {"kind":"add","text":"1130","old":null,"new":131},
+            {"kind":"add","text":"1131","old":null,"new":132},
+            {"kind":"add","text":"1132","old":null,"new":133},
+            {"kind":"add","text":"1133","old":null,"new":134},
+            {"kind":"add","text":"1134","old":null,"new":135},
+            {"kind":"add","text":"1135","old":null,"new":136},
+            {"kind":"add","text":"1136","old":null,"new":137},
+            {"kind":"add","text":"1137","old":null,"new":138},
+            {"kind":"add","text":"1138","old":null,"new":139},
+            {"kind":"add","text":"1139","old":null,"new":140},
+            {"kind":"add","text":"1140","old":null,"new":141},
+            {"kind":"add","text":"1141","old":null,"new":142},
+            {"kind":"add","text":"1142","old":null,"new":143},
+            {"kind":"add","text":"1143","old":null,"new":144},
+            {"kind":"add","text":"1144","old":null,"new":145},
+            {"kind":"add","text":"1145","old":null,"new":146},
+            {"kind":"add","text":"1146","old":null,"new":147},
+            {"kind":"add","text":"1147","old":null,"new":148},
+            {"kind":"add","text":"1148","old":null,"new":149},
+            {"kind":"add","text":"1149","old":null,"new":150},
+            {"kind":"add","text":"1150","old":null,"new":151},
+            {"kind":"add","text":"1151","old":null,"new":152},
+            {"kind":"add","text":"1152","old":null,"new":153},
+            {"kind":"add","text":"1153","old":null,"new":154},
+            {"kind":"add","text":"1154","old":null,"new":155},
+            {"kind":"add","text":"1155","old":null,"new":156},
+            {"kind":"add","text":"1156","old":null,"new":157},
+            {"kind":"add","text":"1157","old":null,"new":158},
+            {"kind":"add","text":"1158","old":null,"new":159},
+            {"kind":"add","text":"1159","old":null,"new":160},
+            {"kind":"add","text":"1160","old":null,"new":161},
+            {"kind":"add","text":"1161","old":null,"new":162},
+            {"kind":"add","text":"1162","old":null,"new":163},
+            {"kind":"add","text":"1163","old":null,"new":164},
+            {"kind":"add","text":"1164","old":null,"new":165},
+            {"kind":"add","text":"1165","old":null,"new":166},
+            {"kind":"add","text":"1166","old":null,"new":167},
+            {"kind":"add","text":"1167","old":null,"new":168},
+            {"kind":"add","text":"1168","old":null,"new":169},
+            {"kind":"add","text":"1169","old":null,"new":170},
+            {"kind":"add","text":"1170","old":null,"new":171},
+            {"kind":"add","text":"1171","old":null,"new":172},
+            {"kind":"add","text":"1172","old":null,"new":173},
+            {"kind":"add","text":"1173","old":null,"new":174},
+            {"kind":"add","text":"1174","old":null,"new":175},
+            {"kind":"add","text":"1175","old":null,"new":176},
+            {"kind":"add","text":"1176","old":null,"new":177},
+            {"kind":"add","text":"1177","old":null,"new":178},
+            {"kind":"add","text":"1178","old":null,"new":179},
+            {"kind":"add","text":"1179","old":null,"new":180},
+            {"kind":"add","text":"1180","old":null,"new":181},
+            {"kind":"add","text":"1181","old":null,"new":182},
+            {"kind":"add","text":"1182","old":null,"new":183},
+            {"kind":"add","text":"1183","old":null,"new":184},
+            {"kind":"add","text":"1184","old":null,"new":185},
+            {"kind":"add","text":"1185","old":null,"new":186},
+            {"kind":"add","text":"1186","old":null,"new":187},
+            {"kind":"add","text":"1187","old":null,"new":188},
+            {"kind":"add","text":"1188","old":null,"new":189},
+            {"kind":"add","text":"1189","old":null,"new":190},
+            {"kind":"add","text":"1190","old":null,"new":191},
+            {"kind":"add","text":"1191","old":null,"new":192},
+            {"kind":"add","text":"1192","old":null,"new":193},
+            {"kind":"add","text":"1193","old":null,"new":194},
+            {"kind":"add","text":"1194","old":null,"new":195},
+            {"kind":"add","text":"1195","old":null,"new":196},
+            {"kind":"add","text":"1196","old":null,"new":197},
+            {"kind":"add","text":"1197","old":null,"new":198},
+            {"kind":"add","text":"1198","old":null,"new":199},
+            {"kind":"add","text":"1199","old":null,"new":200}
+          ],
+          "source": {
+            "group": "committed",
+            "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+            "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+            "turn": null,
+            "blob_old": null,
+            "blob_new": "6e0f3d2"
+          }
+        },
+        "label": "data/zipcodes.txt:1-200"
+      }
+    },
+    {
+      "name": "201 rows is too many",
+      "file": {
+        "path": "data/zipcodes.txt",
+        "old_path": null,
+        "header": [
+          "diff --git a/data/zipcodes.txt b/data/zipcodes.txt",
+          "new file mode 100644",
+          "index 0000000..6e0f3d2",
+          "--- /dev/null",
+          "+++ b/data/zipcodes.txt"
+        ],
+        "lines": [
+          {"kind":"hunk","text":"@@ -0,0 +1,201 @@","old":null,"new":null},
+          {"kind":"add","text":"+1000","old":null,"new":1},
+          {"kind":"add","text":"+1001","old":null,"new":2},
+          {"kind":"add","text":"+1002","old":null,"new":3},
+          {"kind":"add","text":"+1003","old":null,"new":4},
+          {"kind":"add","text":"+1004","old":null,"new":5},
+          {"kind":"add","text":"+1005","old":null,"new":6},
+          {"kind":"add","text":"+1006","old":null,"new":7},
+          {"kind":"add","text":"+1007","old":null,"new":8},
+          {"kind":"add","text":"+1008","old":null,"new":9},
+          {"kind":"add","text":"+1009","old":null,"new":10},
+          {"kind":"add","text":"+1010","old":null,"new":11},
+          {"kind":"add","text":"+1011","old":null,"new":12},
+          {"kind":"add","text":"+1012","old":null,"new":13},
+          {"kind":"add","text":"+1013","old":null,"new":14},
+          {"kind":"add","text":"+1014","old":null,"new":15},
+          {"kind":"add","text":"+1015","old":null,"new":16},
+          {"kind":"add","text":"+1016","old":null,"new":17},
+          {"kind":"add","text":"+1017","old":null,"new":18},
+          {"kind":"add","text":"+1018","old":null,"new":19},
+          {"kind":"add","text":"+1019","old":null,"new":20},
+          {"kind":"add","text":"+1020","old":null,"new":21},
+          {"kind":"add","text":"+1021","old":null,"new":22},
+          {"kind":"add","text":"+1022","old":null,"new":23},
+          {"kind":"add","text":"+1023","old":null,"new":24},
+          {"kind":"add","text":"+1024","old":null,"new":25},
+          {"kind":"add","text":"+1025","old":null,"new":26},
+          {"kind":"add","text":"+1026","old":null,"new":27},
+          {"kind":"add","text":"+1027","old":null,"new":28},
+          {"kind":"add","text":"+1028","old":null,"new":29},
+          {"kind":"add","text":"+1029","old":null,"new":30},
+          {"kind":"add","text":"+1030","old":null,"new":31},
+          {"kind":"add","text":"+1031","old":null,"new":32},
+          {"kind":"add","text":"+1032","old":null,"new":33},
+          {"kind":"add","text":"+1033","old":null,"new":34},
+          {"kind":"add","text":"+1034","old":null,"new":35},
+          {"kind":"add","text":"+1035","old":null,"new":36},
+          {"kind":"add","text":"+1036","old":null,"new":37},
+          {"kind":"add","text":"+1037","old":null,"new":38},
+          {"kind":"add","text":"+1038","old":null,"new":39},
+          {"kind":"add","text":"+1039","old":null,"new":40},
+          {"kind":"add","text":"+1040","old":null,"new":41},
+          {"kind":"add","text":"+1041","old":null,"new":42},
+          {"kind":"add","text":"+1042","old":null,"new":43},
+          {"kind":"add","text":"+1043","old":null,"new":44},
+          {"kind":"add","text":"+1044","old":null,"new":45},
+          {"kind":"add","text":"+1045","old":null,"new":46},
+          {"kind":"add","text":"+1046","old":null,"new":47},
+          {"kind":"add","text":"+1047","old":null,"new":48},
+          {"kind":"add","text":"+1048","old":null,"new":49},
+          {"kind":"add","text":"+1049","old":null,"new":50},
+          {"kind":"add","text":"+1050","old":null,"new":51},
+          {"kind":"add","text":"+1051","old":null,"new":52},
+          {"kind":"add","text":"+1052","old":null,"new":53},
+          {"kind":"add","text":"+1053","old":null,"new":54},
+          {"kind":"add","text":"+1054","old":null,"new":55},
+          {"kind":"add","text":"+1055","old":null,"new":56},
+          {"kind":"add","text":"+1056","old":null,"new":57},
+          {"kind":"add","text":"+1057","old":null,"new":58},
+          {"kind":"add","text":"+1058","old":null,"new":59},
+          {"kind":"add","text":"+1059","old":null,"new":60},
+          {"kind":"add","text":"+1060","old":null,"new":61},
+          {"kind":"add","text":"+1061","old":null,"new":62},
+          {"kind":"add","text":"+1062","old":null,"new":63},
+          {"kind":"add","text":"+1063","old":null,"new":64},
+          {"kind":"add","text":"+1064","old":null,"new":65},
+          {"kind":"add","text":"+1065","old":null,"new":66},
+          {"kind":"add","text":"+1066","old":null,"new":67},
+          {"kind":"add","text":"+1067","old":null,"new":68},
+          {"kind":"add","text":"+1068","old":null,"new":69},
+          {"kind":"add","text":"+1069","old":null,"new":70},
+          {"kind":"add","text":"+1070","old":null,"new":71},
+          {"kind":"add","text":"+1071","old":null,"new":72},
+          {"kind":"add","text":"+1072","old":null,"new":73},
+          {"kind":"add","text":"+1073","old":null,"new":74},
+          {"kind":"add","text":"+1074","old":null,"new":75},
+          {"kind":"add","text":"+1075","old":null,"new":76},
+          {"kind":"add","text":"+1076","old":null,"new":77},
+          {"kind":"add","text":"+1077","old":null,"new":78},
+          {"kind":"add","text":"+1078","old":null,"new":79},
+          {"kind":"add","text":"+1079","old":null,"new":80},
+          {"kind":"add","text":"+1080","old":null,"new":81},
+          {"kind":"add","text":"+1081","old":null,"new":82},
+          {"kind":"add","text":"+1082","old":null,"new":83},
+          {"kind":"add","text":"+1083","old":null,"new":84},
+          {"kind":"add","text":"+1084","old":null,"new":85},
+          {"kind":"add","text":"+1085","old":null,"new":86},
+          {"kind":"add","text":"+1086","old":null,"new":87},
+          {"kind":"add","text":"+1087","old":null,"new":88},
+          {"kind":"add","text":"+1088","old":null,"new":89},
+          {"kind":"add","text":"+1089","old":null,"new":90},
+          {"kind":"add","text":"+1090","old":null,"new":91},
+          {"kind":"add","text":"+1091","old":null,"new":92},
+          {"kind":"add","text":"+1092","old":null,"new":93},
+          {"kind":"add","text":"+1093","old":null,"new":94},
+          {"kind":"add","text":"+1094","old":null,"new":95},
+          {"kind":"add","text":"+1095","old":null,"new":96},
+          {"kind":"add","text":"+1096","old":null,"new":97},
+          {"kind":"add","text":"+1097","old":null,"new":98},
+          {"kind":"add","text":"+1098","old":null,"new":99},
+          {"kind":"add","text":"+1099","old":null,"new":100},
+          {"kind":"add","text":"+1100","old":null,"new":101},
+          {"kind":"add","text":"+1101","old":null,"new":102},
+          {"kind":"add","text":"+1102","old":null,"new":103},
+          {"kind":"add","text":"+1103","old":null,"new":104},
+          {"kind":"add","text":"+1104","old":null,"new":105},
+          {"kind":"add","text":"+1105","old":null,"new":106},
+          {"kind":"add","text":"+1106","old":null,"new":107},
+          {"kind":"add","text":"+1107","old":null,"new":108},
+          {"kind":"add","text":"+1108","old":null,"new":109},
+          {"kind":"add","text":"+1109","old":null,"new":110},
+          {"kind":"add","text":"+1110","old":null,"new":111},
+          {"kind":"add","text":"+1111","old":null,"new":112},
+          {"kind":"add","text":"+1112","old":null,"new":113},
+          {"kind":"add","text":"+1113","old":null,"new":114},
+          {"kind":"add","text":"+1114","old":null,"new":115},
+          {"kind":"add","text":"+1115","old":null,"new":116},
+          {"kind":"add","text":"+1116","old":null,"new":117},
+          {"kind":"add","text":"+1117","old":null,"new":118},
+          {"kind":"add","text":"+1118","old":null,"new":119},
+          {"kind":"add","text":"+1119","old":null,"new":120},
+          {"kind":"add","text":"+1120","old":null,"new":121},
+          {"kind":"add","text":"+1121","old":null,"new":122},
+          {"kind":"add","text":"+1122","old":null,"new":123},
+          {"kind":"add","text":"+1123","old":null,"new":124},
+          {"kind":"add","text":"+1124","old":null,"new":125},
+          {"kind":"add","text":"+1125","old":null,"new":126},
+          {"kind":"add","text":"+1126","old":null,"new":127},
+          {"kind":"add","text":"+1127","old":null,"new":128},
+          {"kind":"add","text":"+1128","old":null,"new":129},
+          {"kind":"add","text":"+1129","old":null,"new":130},
+          {"kind":"add","text":"+1130","old":null,"new":131},
+          {"kind":"add","text":"+1131","old":null,"new":132},
+          {"kind":"add","text":"+1132","old":null,"new":133},
+          {"kind":"add","text":"+1133","old":null,"new":134},
+          {"kind":"add","text":"+1134","old":null,"new":135},
+          {"kind":"add","text":"+1135","old":null,"new":136},
+          {"kind":"add","text":"+1136","old":null,"new":137},
+          {"kind":"add","text":"+1137","old":null,"new":138},
+          {"kind":"add","text":"+1138","old":null,"new":139},
+          {"kind":"add","text":"+1139","old":null,"new":140},
+          {"kind":"add","text":"+1140","old":null,"new":141},
+          {"kind":"add","text":"+1141","old":null,"new":142},
+          {"kind":"add","text":"+1142","old":null,"new":143},
+          {"kind":"add","text":"+1143","old":null,"new":144},
+          {"kind":"add","text":"+1144","old":null,"new":145},
+          {"kind":"add","text":"+1145","old":null,"new":146},
+          {"kind":"add","text":"+1146","old":null,"new":147},
+          {"kind":"add","text":"+1147","old":null,"new":148},
+          {"kind":"add","text":"+1148","old":null,"new":149},
+          {"kind":"add","text":"+1149","old":null,"new":150},
+          {"kind":"add","text":"+1150","old":null,"new":151},
+          {"kind":"add","text":"+1151","old":null,"new":152},
+          {"kind":"add","text":"+1152","old":null,"new":153},
+          {"kind":"add","text":"+1153","old":null,"new":154},
+          {"kind":"add","text":"+1154","old":null,"new":155},
+          {"kind":"add","text":"+1155","old":null,"new":156},
+          {"kind":"add","text":"+1156","old":null,"new":157},
+          {"kind":"add","text":"+1157","old":null,"new":158},
+          {"kind":"add","text":"+1158","old":null,"new":159},
+          {"kind":"add","text":"+1159","old":null,"new":160},
+          {"kind":"add","text":"+1160","old":null,"new":161},
+          {"kind":"add","text":"+1161","old":null,"new":162},
+          {"kind":"add","text":"+1162","old":null,"new":163},
+          {"kind":"add","text":"+1163","old":null,"new":164},
+          {"kind":"add","text":"+1164","old":null,"new":165},
+          {"kind":"add","text":"+1165","old":null,"new":166},
+          {"kind":"add","text":"+1166","old":null,"new":167},
+          {"kind":"add","text":"+1167","old":null,"new":168},
+          {"kind":"add","text":"+1168","old":null,"new":169},
+          {"kind":"add","text":"+1169","old":null,"new":170},
+          {"kind":"add","text":"+1170","old":null,"new":171},
+          {"kind":"add","text":"+1171","old":null,"new":172},
+          {"kind":"add","text":"+1172","old":null,"new":173},
+          {"kind":"add","text":"+1173","old":null,"new":174},
+          {"kind":"add","text":"+1174","old":null,"new":175},
+          {"kind":"add","text":"+1175","old":null,"new":176},
+          {"kind":"add","text":"+1176","old":null,"new":177},
+          {"kind":"add","text":"+1177","old":null,"new":178},
+          {"kind":"add","text":"+1178","old":null,"new":179},
+          {"kind":"add","text":"+1179","old":null,"new":180},
+          {"kind":"add","text":"+1180","old":null,"new":181},
+          {"kind":"add","text":"+1181","old":null,"new":182},
+          {"kind":"add","text":"+1182","old":null,"new":183},
+          {"kind":"add","text":"+1183","old":null,"new":184},
+          {"kind":"add","text":"+1184","old":null,"new":185},
+          {"kind":"add","text":"+1185","old":null,"new":186},
+          {"kind":"add","text":"+1186","old":null,"new":187},
+          {"kind":"add","text":"+1187","old":null,"new":188},
+          {"kind":"add","text":"+1188","old":null,"new":189},
+          {"kind":"add","text":"+1189","old":null,"new":190},
+          {"kind":"add","text":"+1190","old":null,"new":191},
+          {"kind":"add","text":"+1191","old":null,"new":192},
+          {"kind":"add","text":"+1192","old":null,"new":193},
+          {"kind":"add","text":"+1193","old":null,"new":194},
+          {"kind":"add","text":"+1194","old":null,"new":195},
+          {"kind":"add","text":"+1195","old":null,"new":196},
+          {"kind":"add","text":"+1196","old":null,"new":197},
+          {"kind":"add","text":"+1197","old":null,"new":198},
+          {"kind":"add","text":"+1198","old":null,"new":199},
+          {"kind":"add","text":"+1199","old":null,"new":200},
+          {"kind":"add","text":"+1200","old":null,"new":201}
+        ]
+      },
+      "from": 0,
+      "to": 201,
+      "source": {"group":"committed","from":"9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f","to":"3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b","turn":null},
+      "expect": {"ok":false,"error":"Pick at most 200 lines."}
+    }
+  ],
+  "parse": [
+    {
+      "name": "a record is rebuilt in key order, its label recomputed and its range derived",
+      "raw": [
+        {
+          "note": "  names read better  ",
+          "body": {
+            "source": {
+              "blob_new": "a31fcc1",
+              "blob_old": "fa9fb2e",
+              "turn": null,
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "group": "unstaged"
+            },
+            "rows": [
+              {"new":1,"old":1,"text":"export function total(items: number[]) {","kind":"context"},
+              {"new":null,"old":2,"text":"  return items.reduce((a, b) => a + b, 0);","kind":"del"},
+              {"new":2,"old":null,"text":"  return items.reduce((sum, n) => sum + n, 0);","kind":"add"},
+              {"new":3,"old":3,"text":"}","kind":"context"}
+            ],
+            "end": 1,
+            "start": 99,
+            "side": "old",
+            "old_path": null,
+            "path": "src/cart.ts",
+            "extra": "left out"
+          },
+          "label": "a label the client made up",
+          "v": 1,
+          "kind": "diff_selection",
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a"
+        }
+      ],
+      "expect": {
+        "ok": true,
+        "records": [
+          {
+            "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+            "kind": "diff_selection",
+            "v": 1,
+            "label": "src/cart.ts:1-3",
+            "note": "names read better",
+            "body": {
+              "path": "src/cart.ts",
+              "old_path": null,
+              "side": "new",
+              "start": 1,
+              "end": 3,
+              "rows": [
+                {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+                {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+                {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+                {"kind":"context","text":"}","old":3,"new":3}
+              ],
+              "source": {
+                "group": "unstaged",
+                "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+                "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+                "turn": null,
+                "blob_old": "fa9fb2e",
+                "blob_new": "a31fcc1"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "keys Swift leaves out for nil read as null",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {
+        "ok": true,
+        "records": [
+          {
+            "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+            "kind": "diff_selection",
+            "v": 1,
+            "label": "src/cart.ts:1-3",
+            "note": "",
+            "body": {
+              "path": "src/cart.ts",
+              "old_path": null,
+              "side": "new",
+              "start": 1,
+              "end": 3,
+              "rows": [
+                {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+                {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+                {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+                {"kind":"context","text":"}","old":3,"new":3}
+              ],
+              "source": {
+                "group": "unstaged",
+                "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+                "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+                "turn": null,
+                "blob_old": "fa9fb2e",
+                "blob_new": "a31fcc1"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a long path is cut from the left of the label",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "packages/a-rather-long-directory-name/a-rather-long-directory-name/a-rather-long-directory-name/a-rather-long-directory-name/a-rather-long-directory-name/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {
+        "ok": true,
+        "records": [
+          {
+            "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+            "kind": "diff_selection",
+            "v": 1,
+            "label": "…-long-directory-name/a-rather-long-directory-name/a-rather-long-directory-name/a-rather-long-directory-name/cart.ts:1-3",
+            "note": "",
+            "body": {
+              "path": "packages/a-rather-long-directory-name/a-rather-long-directory-name/a-rather-long-directory-name/a-rather-long-directory-name/a-rather-long-directory-name/cart.ts",
+              "old_path": null,
+              "side": "new",
+              "start": 1,
+              "end": 3,
+              "rows": [
+                {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+                {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+                {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+                {"kind":"context","text":"}","old":3,"new":3}
+              ],
+              "source": {
+                "group": "unstaged",
+                "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+                "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+                "turn": null,
+                "blob_old": "fa9fb2e",
+                "blob_new": "a31fcc1"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {"name":"no records","raw":[],"expect":{"ok":true,"records":[]}},
+    {"name":"no context field","raw":null,"expect":{"ok":true,"records":[]}},
+    {
+      "name": "not a list",
+      "raw": {
+        "0": {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      },
+      "expect": {"ok":false,"error":"context must be a list of at most 8 records"}
+    },
+    {
+      "name": "more than 8 records",
+      "raw": [
+        {
+          "id": "id-0",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        },
+        {
+          "id": "id-1",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        },
+        {
+          "id": "id-2",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        },
+        {
+          "id": "id-3",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        },
+        {
+          "id": "id-4",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        },
+        {
+          "id": "id-5",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        },
+        {
+          "id": "id-6",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        },
+        {
+          "id": "id-7",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        },
+        {
+          "id": "id-8",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context must be a list of at most 8 records"}
+    },
+    {
+      "name": "a kind this Omni does not know",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        },
+        {
+          "id": "8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e",
+          "kind": "terminal_excerpt",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {"command":"npm test"}
+        }
+      ],
+      "expect": {"ok":false,"error":"context[1].kind \"terminal_excerpt\" is not one this Omni knows"}
+    },
+    {
+      "name": "a kind named like an Object method",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "__proto__",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[0].kind \"__proto__\" is not one this Omni knows"}
+    },
+    {
+      "name": "no kind",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[0].kind must be a string"}
+    },
+    {
+      "name": "a repeated id",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        },
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[1].id repeats an earlier record's id"}
+    },
+    {
+      "name": "an id over 64 characters",
+      "raw": [
+        {
+          "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[0].id must be a string of 1 to 64 characters"}
+    },
+    {
+      "name": "a note over 2000 characters",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[0].note is longer than 2000 characters"}
+    },
+    {
+      "name": "a newer version",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 2,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[0].v 2 is newer than this Omni reads (diff_selection v1)"}
+    },
+    {
+      "name": "version 0",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 0,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[0].v must be a whole number of 1 or more"}
+    },
+    {
+      "name": "an add row with an old number",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [{"kind":"add","text":"x","old":2,"new":2}],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[0].body: rows[0]: an add row has a new number and no old one"}
+    },
+    {
+      "name": "a gap between rows",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [{"kind":"add","text":"x","old":null,"new":1},{"kind":"add","text":"y","old":null,"new":3}],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[0].body: rows[1].new must be 2, the line after the row before"}
+    },
+    {
+      "name": "a path out of the checkout",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/../../.ssh/id_rsa",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[0].body: path must be relative to the checkout, with no \"..\" segment or NUL"}
+    },
+    {
+      "name": "a turn group without its turn id",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1},
+              {"kind":"del","text":"  return items.reduce((a, b) => a + b, 0);","old":2,"new":null},
+              {"kind":"add","text":"  return items.reduce((sum, n) => sum + n, 0);","old":null,"new":2},
+              {"kind":"context","text":"}","old":3,"new":3}
+            ],
+            "source": {
+              "group": "turn",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[0].body: source.turn must be the turn's id for group turn, and null for any other group"}
+    },
+    {
+      "name": "cut set to false",
+      "raw": [
+        {
+          "id": "3d6f9a2e-1b4c-4e7d-9f0a-2c5e8b1d4f7a",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [{"kind":"context","text":"export function total(items: number[]) {","old":1,"new":1,"cut":false}],
+            "source": {
+              "group": "unstaged",
+              "from": "9f2c1e4b7a0d3f6e8c5b2a1d4e7f0a3b6c9d2e5f",
+              "to": "3f2a1c9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ],
+      "expect": {"ok":false,"error":"context[0].body: rows[0].cut must be true or left out"}
+    }
+  ]
+}
