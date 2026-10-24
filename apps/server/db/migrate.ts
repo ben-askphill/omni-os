@@ -230,6 +230,38 @@ CREATE TABLE IF NOT EXISTS sync_folder_wait (
   thread_id TEXT PRIMARY KEY,
   folder_id TEXT NOT NULL
 );
+
+-- #219 Watch PR (server/pr-watch/): one watch per thread, polled by the Mac that started it, and every event it has
+-- woken the thread for, keyed by source and identity (a failing check on one head), so an event wakes it once.
+-- Local, not synced: the wake is a durable request on this Mac (db/repos/requests.ts).
+CREATE TABLE IF NOT EXISTS pr_watches (
+  thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+  repo TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  state TEXT NOT NULL,
+  stop_reason TEXT,
+  head_sha TEXT,
+  checks TEXT,
+  wakes INTEGER NOT NULL DEFAULT 0,
+  failures INTEGER NOT NULL DEFAULT 0,
+  interval_s INTEGER NOT NULL,
+  error TEXT,
+  machine_id TEXT,
+  last_wake_at TEXT,
+  last_polled_at TEXT,
+  next_poll_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS pr_watches_due ON pr_watches(next_poll_at) WHERE state = 'watching';
+CREATE TABLE IF NOT EXISTS pr_watch_events (
+  thread_id TEXT NOT NULL REFERENCES pr_watches(thread_id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  source TEXT NOT NULL,
+  request_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (thread_id, key)
+);
 `;
 
 /** Add a column the current schema needs to a database created by an older version. Safe to run again. */
@@ -296,6 +328,8 @@ export function migrate() {
   // Queue order for durable requests (db/repos/requests.ts); a row saved before reordering existed keeps its arrival order.
   ensureColumn('message_requests', 'pos', 'INTEGER');
   db.exec('UPDATE message_requests SET pos = seq WHERE pos IS NULL');
+  // #220: wakes a PR watch spent on review comments alone, against its own budget (server/pr-watch/store.ts).
+  ensureColumn('pr_watches', 'comment_wakes', 'INTEGER NOT NULL DEFAULT 0');
   // Crew reports and a team's go to its lead are durable requests too, with the transcript payload Omni wrote.
   ensureColumn('message_requests', 'kind', `TEXT NOT NULL DEFAULT 'user'`);
   ensureColumn('message_requests', 'payload', 'TEXT');

@@ -90,7 +90,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `changes`, `turn`, `browser`, `terminal`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
 /// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
 /// `{"drag": "<thread title>", "over": "<folder>"}`, `{"file": "<thread title>", "into": "<folder>"}`,
-/// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"handOff": "<device id>"}`,
+/// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"prMenu": "name"}`, `{"handOff": "<device id>"}`,
 /// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
@@ -144,6 +144,8 @@ public enum QAStep: Hashable, Sendable {
   case screen(String)
   /// Clicks the open thread's Hand Off button and writes `<name>.png` while its menu is open.
   case handoffMenu(String)
+  /// Clicks the reply box's PR button and writes `<name>.png` while its menu is open.
+  case prMenu(String)
   /// Hands the open thread to this device, as picking it in Hand Off to does.
   case handOff(String)
   case quickPrompt(QAQuickPrompt)
@@ -234,7 +236,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "prMenu", "handOff", "quickPrompt", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -362,6 +364,11 @@ public struct QAScript: Hashable, Sendable {
         throw QAScriptError("handoffMenu takes a file name of letters, digits, dots, dashes and underscores")
       }
       return .handoffMenu(name)
+    case "prMenu":
+      guard let name = value as? String, validName(name) else {
+        throw QAScriptError("prMenu takes a file name of letters, digits, dots, dashes and underscores")
+      }
+      return .prMenu(name)
     case "handOff":
       guard let id = value as? String, !id.isEmpty else { throw QAScriptError("handOff takes a device id") }
       return .handOff(id)

@@ -7,9 +7,10 @@ import { BrowserWatch, displayUrl, useChannelBrowser } from '../components/LiveB
 import { Markdown } from '../components/Markdown.tsx';
 import { modelOf } from '../components/ModelPicker.tsx';
 import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
+import { usePRWatch, watchCopy } from '../components/thread/PRWatch.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { TerminalView } from '../components/TerminalView.tsx';
-import { Button, Chip, copyText, ErrorNote, SlideToConfirm, StatusDot } from '../components/ui.tsx';
+import { Button, Chip, copyText, ErrorNote, Icon, SlideToConfirm, StatusDot } from '../components/ui.tsx';
 import { cloudAgentUrl } from '../cloud-agent.ts';
 import { fullDate, plural } from '../format.ts';
 import { checkTone } from '../pages/PRs.tsx';
@@ -101,6 +102,7 @@ export function PRScreen() {
   const { thread, slotBusy, applyThread } = useThread();
   const { channel } = useApp();
   const mark = useThreadPR(thread, slotBusy, true);
+  const watch = usePRWatch(thread?.id, mark);
   const ch = thread ? channel(thread.channel_id) : undefined;
   const n = mark?.pr?.number;
   const q = useApi<PRDetail>(n && ch?.github_repo ? `/channels/${encodeURIComponent(ch.id)}/prs/${n}` : null);
@@ -171,6 +173,8 @@ export function PRScreen() {
   const note = [failing && `${plural(failing, 'check')} failing.`, pending && `${plural(pending, 'check')} still running. Merging now skips them.`, p.mergeable === 'CONFLICTING' && 'It conflicts with the base branch.']
     .filter(Boolean)
     .join(' ');
+  const canWatch = open || watch.watching;
+  const { action, line } = watchCopy(watch.watch);
   return (
     <>
       <MoHeader
@@ -190,6 +194,22 @@ export function PRScreen() {
             {p.headRefName} → {p.baseRefName}
           </span>
         </div>
+        {(canWatch || watch.watch) && (
+          <div className="flex flex-col gap-2">
+            <MoGroup>
+              <MoListRow
+                icon={<Icon name="bell" size={18} className={watch.watching ? 'text-live-text' : ''} />}
+                label={canWatch ? action : line}
+                sub={canWatch ? line : undefined}
+                onClick={canWatch ? () => void (watch.watching ? watch.stop() : watch.start()) : undefined}
+                chevron={false}
+                disabled={watch.busy}
+                last
+              />
+            </MoGroup>
+            {watch.error && <ErrorNote>{watch.error}</ErrorNote>}
+          </div>
+        )}
         {p.checkRuns.length > 0 && (
           <MoSection title="Checks" count={p.checkRuns.length} pad={false}>
             <MoGroup>

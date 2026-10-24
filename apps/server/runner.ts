@@ -17,6 +17,7 @@ export type { Acceptance, CreateThreadInput, PostedThread } from './runner/api.t
 export {
   activeMods,
   activeTasks,
+  emitThread,
   isLive,
   pendingFor,
   queuedCount,
