@@ -88,6 +88,8 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   public let branch: String?
   public let parentID: String?
   public let taskID: String?
+  /// The thread this one continues on another harness (packages/shared/continue.ts). Older servers leave it out.
+  public let continuedFrom: String?
   public let source: ThreadSource
   public let automation: String?
   public let lastText: String?
@@ -137,6 +139,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     case hasRun = "has_run"
     case parentID = "parent_id"
     case taskID = "task_id"
+    case continuedFrom = "continued_from"
     case lastText = "last_text"
     case createdAt = "created_at"
     case updatedAt = "updated_at"
@@ -162,6 +165,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     branch = try c.decodeIfPresent(String.self, forKey: .branch)
     parentID = try c.decodeIfPresent(String.self, forKey: .parentID)
     taskID = try c.decodeIfPresent(String.self, forKey: .taskID)
+    continuedFrom = try c.decodeIfPresent(String.self, forKey: .continuedFrom)
     source = try c.decode(ThreadSource.self, forKey: .source)
     automation = try c.decodeIfPresent(String.self, forKey: .automation)
     lastText = try c.decodeIfPresent(String.self, forKey: .lastText)
@@ -274,9 +278,14 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
   public let blocked: String?
   /// A handoff of the thread to or from another Mac. Older servers leave it out; a phase this app does not know is nil.
   public let handoff: HandoffView?
+  /// The thread this one continues, and the threads that continue it. Older servers leave them out.
+  public let continuedFrom: ContinueLink?
+  public let continuedIn: [ContinueLink]
 
   enum CodingKeys: String, CodingKey {
     case thread, channel, events, artifacts, children, team, parent, pending, live, blocked, handoff
+    case continuedFrom = "continued_from"
+    case continuedIn = "continued_in"
   }
 
   public init(from decoder: any Decoder) throws {
@@ -292,5 +301,7 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
     live = try c.decodeIfPresent(Bool.self, forKey: .live) ?? false
     blocked = try c.decodeIfPresent(String.self, forKey: .blocked)
     handoff = (try? c.decodeIfPresent(HandoffView.self, forKey: .handoff)) ?? nil
+    continuedFrom = try c.decodeIfPresent(ContinueLink.self, forKey: .continuedFrom)
+    continuedIn = try c.decodeIfPresent([ContinueLink].self, forKey: .continuedIn) ?? []
   }
 }

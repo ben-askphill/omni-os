@@ -56,6 +56,9 @@ public final class ThreadStore {
   public private(set) var handoff: HandoffView?
   /// A handoff or its cancel was asked for and the server has not answered yet.
   public private(set) var handingOff = false
+  /// The thread this one continues on another harness, and the threads that continue it. Kept current by the feed.
+  public private(set) var continuedFrom: ContinueLink?
+  public private(set) var continuedIn: [ContinueLink] = []
   /// The newest HTML artifact the stream brought that was not there before, for the viewer to show.
   public private(set) var arrivedHTML: Artifact?
   /// See `StatusLine.label`.
@@ -208,12 +211,14 @@ public final class ThreadStore {
     apply(recovery: RecoveryAnswer(thread: a.thread, pending: a.pending))
   }
 
-  /// Keeps children, their team members and the parent current.
+  /// Keeps children, their team members, the parent and the continuation links current.
   public func apply(feed: FeedEvent) {
     guard case .thread(let t) = feed else { return }
     if t.parentID == id { Self.upsert(t, into: &children) }
     if t.source == .team, children.contains(where: { $0.id == t.parentID }) { Self.upsert(t, into: &team) }
     if let parent, parent.id == t.id { self.parent = t }
+    if t.continuedFrom == id { ContinueLink.upsert(t, into: &continuedIn) }
+    if let from = continuedFrom, from.id == t.id { continuedFrom = ContinueLink(t, carried: from.carried) }
   }
 
   private static func upsert(_ t: OmniThread, into list: inout [OmniThread]) {
@@ -322,6 +327,8 @@ public final class ThreadStore {
     handoff = d.handoff
     channel = d.channel
     parent = d.parent
+    continuedFrom = d.continuedFrom
+    continuedIn = d.continuedIn
     children = d.children
     team = d.team
     var list = d.artifacts

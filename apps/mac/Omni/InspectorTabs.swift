@@ -218,6 +218,12 @@ struct DetailsTab: View {
                 .buttonStyle(.plain)
               }
             }
+            if let from = store.continuedFrom { row("Continued from") { ContinueLinkRow(model: model, link: from) } }
+            if !store.continuedIn.isEmpty {
+              row("Continued in") {
+                VStack(alignment: .leading, spacing: z(6)) { ForEach(store.continuedIn) { ContinueLinkRow(model: model, link: $0) } }
+              }
+            }
             if let mcp = session?.mcp, !mcp.isEmpty { row("MCP") { mcpList(mcp.map(MCPServer.init)) } }
             row("Created") { Text(ThreadDetails.fullDate(thread.createdAt)) }
             row("Updated") { Text(ThreadDetails.fullDate(thread.updatedAt)) }
