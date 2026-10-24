@@ -94,6 +94,14 @@ const NAMES = [
   // thread whose turns are not saved.
   'turns.json',
   'turns-unavailable.json',
+  // A channel's named actions: the body the editor sends, the action it makes and the list, then a thread's runs of
+  // them (succeeded, failed, stopped and one still running), a run as it starts and as Stop returns it.
+  'channel-action-request.json',
+  'channel-action.json',
+  'channel-actions.json',
+  'action-run.json',
+  'action-run-stopped.json',
+  'thread-actions.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -503,6 +511,25 @@ async function scenario() {
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
+
+  const actionBody = request('channel-action-request.json', { name: 'Theme check', command: 'echo "Theme check passed"', secrets: [], port: null });
+  const check = keep('channel-action.json', await call('POST', '/channels/acme/actions', actionBody)) as { id: string };
+  const preview = (await call('POST', '/channels/acme/actions', { name: 'Theme preview', command: 'echo "Previewing on $OMNI_PORT"; sleep 30', port: 0 })) as { id: string };
+  const tests = (await call('POST', '/channels/acme/actions', { name: 'Tests', command: 'echo "1 failing" >&2; exit 1' })) as { id: string };
+  keep('channel-actions.json', await get('/channels/acme/actions'));
+  type Run = { id: string; state: string; output: string };
+  const settle = async (actionId: string, state: string) => {
+    const run = (await call('POST', `/threads/${id}/actions/${actionId}/run`)) as Run;
+    return eventually(async () => ((await get(`/threads/${id}/actions`)) as { runs: Run[] }).runs.find((r) => r.id === run.id && r.state === state), `a run to be ${state}`);
+  };
+  await settle(check.id, 'succeeded');
+  await settle(tests.id, 'failed');
+  const previewing = keep('action-run.json', await call('POST', `/threads/${id}/actions/${preview.id}/run`)) as Run;
+  await eventually(async () => ((await get(`/threads/${id}/actions`)) as { runs: Run[] }).runs.find((r) => r.id === previewing.id && r.output.includes('Previewing')), 'the preview to print');
+  keep('action-run-stopped.json', await call('POST', `/threads/${id}/action-runs/${previewing.id}/stop`, {}));
+  const again = (await call('POST', `/threads/${id}/action-runs/${previewing.id}/retry`, {})) as Run;
+  keep('thread-actions.json', await get(`/threads/${id}/actions`));
+  await call('POST', `/threads/${id}/action-runs/${again.id}/stop`, {});
 }
 
 /** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */
@@ -563,7 +590,8 @@ function normalize(files: Map<Name, string>): Map<Name, string> {
     t = t.replace(TIME, (s) => (s.includes('.') ? '2026-01-05T09:00:00.000Z' : '2026-01-05T09:00:00Z'));
     t = t
       .replace(/("pid": )\d+/g, '$14242')
-      .replace(/("port": )\d+/g, '$14799')
+      // A port that is set; an action's 0 ("pick a free one") means something.
+      .replace(/("port": )[1-9]\d*/g, '$14799')
       .replace(/("gitHead": )"[0-9a-f]{40}"/g, `$1"${'0'.repeat(40)}"`)
       // Commit ids (a thread's base and head), which carry the time they were made.
       .replace(/\b(?!0{40})[0-9a-f]{40}\b/g, (sha) => {

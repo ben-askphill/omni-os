@@ -33,13 +33,19 @@ private func list(_ items: [(Int, String)]) throws -> [Artifact] { try items.map
     var s = InspectorSelection(tab: .terminal)
     s.arrived(try art(4))
     #expect(s == .init(tab: .terminal, artifactID: 4))
-    #expect(InspectorSelection.Tab.allCases.map(\.title) == ["Artifacts", "Changes", "Browser", "Terminal", "Details"])
+    #expect(InspectorSelection.Tab.allCases.map(\.title) == ["Artifacts", "Changes", "Browser", "Terminal", "Actions", "Details"])
   }
 
   @Test func aNewPageLeavesTheChangesOpen() throws {
     var s = InspectorSelection(tab: .changes)
     s.arrived(try art(5))
     #expect(s == .init(tab: .changes, artifactID: 5))
+  }
+
+  @Test func aNewPageLeavesARunsOutputOpen() throws {
+    var s = InspectorSelection(tab: .actions)
+    s.arrived(try art(6))
+    #expect(s == .init(tab: .actions, artifactID: 6))
   }
 
   @Test func aMissingSelectionFallsBackToTheNewestFile() throws {

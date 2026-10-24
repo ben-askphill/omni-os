@@ -4,6 +4,7 @@ import { ReplyComposer } from '../components/Composer.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
 import { LinkChannel } from '../link-previews.ts';
 import { ArtifactsTab } from '../components/thread/panel/ArtifactsTab.tsx';
+import { ActionsTab } from '../components/thread/panel/ActionsTab.tsx';
 import { BrowserTab } from '../components/thread/panel/BrowserTab.tsx';
 import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
 import { DetailsTab } from '../components/thread/panel/DetailsTab.tsx';
@@ -258,6 +259,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
             { id: 'changes', label: 'Changes' },
             { id: 'browser', label: 'Browser', badge: shots.length ? <span className="font-num text-[10.5px] text-fg-4">{shots.length}</span> : undefined },
             { id: 'terminal', label: 'Terminal' },
+            { id: 'actions', label: 'Actions' },
             { id: 'details', label: 'Details' },
           ]}
         />
@@ -272,6 +274,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
             <TerminalView threadId={thread.id} cwd={thread.cwd} />
           </Suspense>
         )}
+        {panelTab === 'actions' && <ActionsTab thread={thread} />}
         {panelTab === 'details' && <DetailsTab thread={thread} channel={channel} parent={parent} children={children} init={init} lastResult={lastResult} warm={warm} />}
       </div>
     </div>

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Page } from '../pages/Page.tsx';
 import { pageTitle, type Route } from '../router.ts';
 import { useApp } from '../store.tsx';
+import { ActionsScreen } from './ActionsScreen.tsx';
 import { ActivityScreen } from './ActivityScreen.tsx';
 import { ChannelScreen, ChannelsScreen } from './ChannelsScreen.tsx';
 import { LibraryScreen } from './LibraryScreen.tsx';
@@ -51,6 +52,7 @@ export const RENDER: Record<ScreenKey, (r: Route) => ReactNode> = {
   pr: () => <PRScreen />,
   browser: () => <BrowserScreen />,
   terminal: () => <TerminalScreen />,
+  actions: () => <ActionsScreen />,
   details: () => <DetailsScreen />,
   viewer: (r) => <ViewerScreen route={r} />,
   settings: () => <SettingsScreen />,

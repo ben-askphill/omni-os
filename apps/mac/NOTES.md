@@ -61,6 +61,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `QuickPrompt.swift` | `QuickPromptShortcut` (the fixed choices and their Carbon key code and modifiers), `QuickPromptSettings` (on, shortcut, Wispr Flow, in UserDefaults), `QuickPromptAPI`, `QuickPromptModel` (text, target channel, phase, `awaitDictation`) |
 | `Handoff.swift` | `Device`, `Reachability`, `HandoffView`, `HandoffPhase`, `PrepareStep`, `HandoffBanner`, `HandoffAnswer`, `DevicesAPI`, `DevicesModel` (`AppModel.devices`), and `devices`, `handOff`, `cancelHandoff` on `OmniClient`. The shapes and text are `packages/shared/handoff.ts`; when to offer it, the picker and the banner follow `apps/web/src/handoff.ts` |
 | `WorktreeBase.swift` | `BasePick`, `BaseOptions`, `ThreadBaseView` (`packages/shared/worktree-base.ts`), `BaseRules` (the Base picker's rows, pill text, when it shows, what `base` is sent), `BaseOptionsModel`. `Client+WorktreeBase.swift` has `channelBases`, `threadBase`; the app draws the picker in `BasePicker.swift` and the setup card's "Branching from" line in `SetupCard.swift` |
+| `ChannelActions.swift` | `ChannelAction`, `ChannelActionInput`, `ActionRun`, `ActionRunState`, `ThreadActions` (`packages/shared/channel-actions.ts`), `ChannelActions.portLabel`, a run's `summary` and `outputNote`, `keepPolling`, and `ChannelActionDraft` (the settings form). `Client+ChannelActions.swift` has the channel CRUD and a thread's run, stop and retry |
 | `QAScript.swift` | Debug only. `QAScript`, `QAStep`, `QACondition`, `QAFacts`, `QAServer`, `QASnapshot.looksBlank` |
 
 ## Build and test
@@ -392,7 +393,7 @@ Automations page (#73), like `Automations.tsx`. The Web UI has no create or edit
 - OmniKit, all pure: `InspectorSelection` (initial pick: `?artifact`, else newest HTML, else newest file, else Details; `arrived` selects a new HTML even the first), `RequestPolicy` (blocks loopback, 100.64.0.0/10, `.ts.net` and the Omni port; `ruleListJSON` is the same policy as a WebKit content rule list, a test keeps them equal), `CSV`, `ThreadDetails` (resume command, MCP list, dates), `ArtifactRef` (Codable, the value of the artifact window) and `OmniClient.artifactData`.
 - `apps/mac/Omni`: `InspectorView` (modifier, panel, Artifacts tab), `InspectorTabs` (Browser, Details), `LiveBrowserView` (the live channel browser in a Chrome-like frame: `BrowserTabStrip` with favicons, toolbar, loading bar, and `BrowserCanvas`, an NSView that decodes frames off the main thread into a layer and sends mouse, scroll, keys and Chrome's Cmd shortcuts; the view reports its size so the page lays out to fit; model in OmniKit's `ChannelBrowser.swift`, which batches input and merges moves and scrolls), `ArtifactViews` (viewer, native PDF/image/CSV/JSON/markdown/text, save panel, `ArtifactWindowView`), `ImageZoom` (an image preview's zoom, as `ImageZoom.tsx`: fit to the pane's width by default, click, pinch or Cmd-scroll to zoom up to 800%, drag to pan, Esc to fit, and the header's minus, level, plus and Fit; an `NSScrollView` with magnification does the zooming), `ArtifactWebView` (HTML and SVG).
 - The web view: non-persistent data store, page served by the `omni-artifact` scheme (only its own artifact), rule list on, no script message handlers, links and window.open go to the default browser (http, https, mailto, never a blocked host). The window scene is `WindowGroup(id: "artifact", for: ArtifactRef.self)` in `OmniApp`.
-- QA steps: `{"inspector": "open|close|artifacts|browser|terminal|details"}` and `{"webTitle": "BLOCKED"}` (waits for the inspector web view's document.title). The check used an HTML artifact that no-cors fetches the local API and reports `BLOCKED` only when every local fetch failed and a control fetch to the internet worked.
+- QA steps: `{"inspector": "open|close|artifacts|browser|terminal|actions|details"}` and `{"webTitle": "BLOCKED"}` (waits for the inspector web view's document.title). The check used an HTML artifact that no-cors fetches the local API and reports `BLOCKED` only when every local fetch failed and a control fetch to the internet worked.
 - To seed a QA thread: write files into `<data>/threads/<id>/artifacts/` (and `browser/*.png` for screenshots); the server's watcher picks them up.
 
 ### Terminal tab
@@ -400,6 +401,10 @@ Automations page (#73), like `Automations.tsx`. The Web UI has no create or edit
 The inspector's fourth tab, like the Web UI's `TerminalView.tsx`: the thread's shell (`apps/server/terminal.ts`), in its cwd. `Client+Terminal.swift` has the API (`TerminalMessage`, `terminalEvents`, `TerminalInputQueue` for ordered keystrokes); `Omni/TerminalTab.swift` hosts a SwiftTerm `TerminalView` in a plain container NSView (handed to SwiftUI directly it keeps its first frame). Every (re)connection starts with a snapshot the server serialized from a headless xterm at this client's size, so the view resets and feeds it. A new artifact does not pull the inspector off the Terminal tab (`InspectorSelection.arrived`).
 
 - `cacheDisplay` draws a SwiftTerm view shifted and clipped, so the QA snapshot draws each one on its own and lays it over the capture. On screen it is fine.
+
+### Actions tab (#210)
+
+The inspector's Actions tab (`Omni/ActionsTab.swift`): the channel's actions with Run (Stop while one runs in this thread), the server's `blocked` reason, and the thread's runs newest first with their bounded output, the newest open. Run, Stop and Retry refusals (a taken fixed port is a 409) show inline. No push events: it polls GET /api/threads/:id/actions every second while a run runs, from a `.task` that ends when the tab leaves the screen. A new HTML artifact does not pull the inspector off it.
 
 ## Artifacts page (#69)
 
@@ -557,6 +562,7 @@ Wired (both composers):
 - `ChannelSettingsView.swift`: `ChannelSettingsForm` (create and edit, folder pickers for repo path and base dir, inline Archive confirm), `NewChannelScreen` (`#/new-channel`, a page as in the Web UI, not a sheet) and `MissingChannelView` (archived channel: Unarchive). The channel's Settings tab shows the form. After a save the store reloads channels.
 - `snapshot` leaves out sheets and menus; `screen` and the folder `menu` step draw them in from the app's own windows, so neither needs screen recording or an unlocked screen.
 - QA step `{"channel": "create"}` (or `edit`, `archive`, `unarchive`) runs the same client calls on channel `qa-channel`.
+- An existing channel's settings have an Actions card (`ChannelActionsView.swift`) after Code: add, edit and delete (inline confirm) save each action at once, not with the form's Save. Debug launch arg `-OmniActionForm new` (or an action's name) opens its form for a snapshot.
 
 ## Next
 
