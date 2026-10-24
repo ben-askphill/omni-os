@@ -19,7 +19,7 @@ struct SettingsView: View {
       }
       Tab("Account", systemImage: "person.badge.key", value: .account) {
         AccountSettings(model: model)
-          .frame(width: z(560), height: 360)
+          .frame(width: z(560), height: 640)
       }
       Tab("Secrets", systemImage: "key", value: .secrets) {
         SecretsSettings(model: model)

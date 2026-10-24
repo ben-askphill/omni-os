@@ -90,6 +90,8 @@ func sseData(_ text: String) -> [String] {
     "signin-finished.json": { _ = try decodeFixture(SignInFinished.self, "signin-finished.json") },
     "signout.json": { _ = try decodeFixture([String: Bool].self, "signout.json") },
     "signin-start-request.json": { _ = try decodeFixture([String: String].self, "signin-start-request.json") },
+    "devices-signed-in.json": { _ = try decodeFixture([SignedInDevice].self, "devices-signed-in.json") },
+    "device-revoked.json": { _ = try decodeFixture([String: Bool].self, "device-revoked.json") },
   ]
 
   static func threadStream() throws -> [ThreadStreamMessage] {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useApi, type Automation, type SyncStatus } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
-import { GoogleButton, SignOutButton, useAccount } from '../components/Account.tsx';
+import { DevicesBody, GoogleButton, SignOutButton, useAccount } from '../components/Account.tsx';
 import { HARNESS_ROWS } from '../components/brand.tsx';
 import { useTheme } from '../components/theme.tsx';
 import { ErrorNote, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
@@ -54,24 +54,31 @@ function AccountSection() {
   if (!view) return loadError ? <ErrorNote className="mx-4">{loadError}</ErrorNote> : null;
   const { identity } = view;
   return (
-    <MoSection title="Account">
-      <MoGroup>
-        <div className="flex flex-col gap-3 px-4 py-3.5">
-          {identity.kind === 'session' ? (
-            <div className="flex min-w-0 flex-col gap-px">
-              <span className="truncate text-[15px] leading-[1.3]">Signed in as {identity.email}</span>
-              <span className="truncate text-[12.5px] leading-[1.35] text-fg-3">{identity.device}</span>
-            </div>
-          ) : (
-            <span className="text-[15px] leading-[1.3]">This browser uses the install token.</span>
-          )}
-          {identity.kind === 'session' ? <SignOutButton size="lg" className="w-full" onError={setError} /> : view.canSignIn && <GoogleButton size="lg" className="w-full" onError={setError} />}
-          {error && <ErrorNote>{error}</ErrorNote>}
-          {view.note && <p className="m-0 text-[12.5px] leading-[1.4] text-fg-3">{view.note}</p>}
-          {view.allowed && <p className="m-0 text-[12.5px] leading-[1.4] text-fg-3">{view.allowed}</p>}
-        </div>
-      </MoGroup>
-    </MoSection>
+    <>
+      <MoSection title="Account">
+        <MoGroup>
+          <div className="flex flex-col gap-3 px-4 py-3.5">
+            {identity.kind === 'session' ? (
+              <div className="flex min-w-0 flex-col gap-px">
+                <span className="truncate text-[15px] leading-[1.3]">Signed in as {identity.email}</span>
+                <span className="truncate text-[12.5px] leading-[1.35] text-fg-3">{identity.device}</span>
+              </div>
+            ) : (
+              <span className="text-[15px] leading-[1.3]">This browser uses the install token.</span>
+            )}
+            {identity.kind === 'session' ? <SignOutButton size="lg" className="w-full" onError={setError} /> : view.canSignIn && <GoogleButton size="lg" className="w-full" onError={setError} />}
+            {error && <ErrorNote>{error}</ErrorNote>}
+            {view.note && <p className="m-0 text-[12.5px] leading-[1.4] text-fg-3">{view.note}</p>}
+            {view.allowed && <p className="m-0 text-[12.5px] leading-[1.4] text-fg-3">{view.allowed}</p>}
+          </div>
+        </MoGroup>
+      </MoSection>
+      {view.listDevices && (
+        <MoSection title="Devices">
+          <DevicesBody phone />
+        </MoSection>
+      )}
+    </>
   );
 }
 

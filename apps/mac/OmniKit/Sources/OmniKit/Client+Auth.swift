@@ -125,6 +125,27 @@ public struct SignInFinished: Decodable, Hashable, Sendable {
   enum CodingKeys: String, CodingKey { case user, device, claimed, credential, expiresAt }
 }
 
+/// A browser or Mac signed in with Google: a row of Settings > Account > Devices (GET /api/auth/devices).
+public struct SignedInDevice: Decodable, Hashable, Sendable, Identifiable {
+  public let id: String
+  public let name: String
+  public let kind: AuthDeviceKind
+  /// The Google account it signed in with.
+  public let email: String
+  public let createdAt: Date
+  public let lastSeenAt: Date
+  public let expiresAt: Date
+  /// The device whose session asked. Never set for the install token.
+  public let current: Bool
+
+  enum CodingKeys: String, CodingKey { case id, name, kind, email, createdAt, lastSeenAt, expiresAt, current }
+
+  /// The row's second line: "ada@example.com · last seen 5m ago", or "· This device" for the one asking.
+  public func detail(now: Date = .now, timeZone: TimeZone = .current) -> String {
+    "\(email) · " + (current ? "This device" : "last seen \(RelTime.label(lastSeenAt, now: now, timeZone: timeZone))")
+  }
+}
+
 /// The body of POST /api/auth/google/start. `signin-start-request.json` is the recorded one.
 private struct SignInStartRequest: Encodable, Sendable {
   let client = "mac"
@@ -155,6 +176,11 @@ private struct SignedOut: Decodable {
   let ok: Bool
 }
 
+/// DELETE /api/auth/devices/:id.
+private struct DeviceRevoked: Decodable {
+  let current: Bool
+}
+
 /// The calls `AccountModel` makes.
 public protocol AccountAPI: Sendable {
   func authState() async throws(OmniAPIError) -> AuthState
@@ -162,6 +188,8 @@ public protocol AccountAPI: Sendable {
   func startSignIn(deviceName: String) async throws(OmniAPIError) -> SignInStart
   func finishSignIn(attempt: String, claim: String) async throws(OmniAPIError) -> SignInFinished?
   func signOut(session: SessionCredential) async throws(OmniAPIError)
+  func signedInDevices(session: SessionCredential?) async throws(OmniAPIError) -> [SignedInDevice]
+  func revokeDevice(id: String, session: SessionCredential?) async throws(OmniAPIError) -> Bool
 }
 
 extension OmniClient: AccountAPI {
@@ -191,8 +219,22 @@ extension OmniClient: AccountAPI {
     let _: SignedOut = try await bearing(session).send("POST", "/api/auth/signout", body: [String: String]())
   }
 
-  /// This client sending `session` as its Bearer in place of the install token.
-  private func bearing(_ session: SessionCredential) -> OmniClient {
-    OmniClient(baseURL: baseURL, token: .fixed(session.value), transport: transport)
+  /// Every device signed in with Google, most recently seen first. With this Mac's session, its own row is `current`;
+  /// with nil, the install token asks and no row is.
+  public func signedInDevices(session: SessionCredential?) async throws(OmniAPIError) -> [SignedInDevice] {
+    try await bearing(session).send("GET", "/api/auth/devices")
+  }
+
+  /// Revokes the device: its session stops working at once. True when it was the asking session's own device.
+  /// 404 when it is not a live device.
+  public func revokeDevice(id: String, session: SessionCredential?) async throws(OmniAPIError) -> Bool {
+    let answer: DeviceRevoked = try await bearing(session).send("DELETE", "/api/auth/devices/\(uriComponent(id))")
+    return answer.current
+  }
+
+  /// This client sending `session` as its Bearer in place of the install token. nil keeps the install token.
+  private func bearing(_ session: SessionCredential?) -> OmniClient {
+    guard let session else { return self }
+    return OmniClient(baseURL: baseURL, token: .fixed(session.value), transport: transport)
   }
 }

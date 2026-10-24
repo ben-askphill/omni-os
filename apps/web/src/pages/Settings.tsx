@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, type SetupState, type UserConfigPatch } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setChannelAlerts, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
-import { GoogleButton, SignOutButton, useAccount } from '../components/Account.tsx';
+import { DevicesBody, GoogleButton, SignOutButton, useAccount } from '../components/Account.tsx';
 import { NAME_MAX, PronounsInput, TimezoneInput } from '../components/Onboarding.tsx';
 import { useTheme } from '../components/theme.tsx';
 import { Button, ErrorNote, Icon, Label, Loading, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
@@ -172,24 +172,31 @@ function AccountCard() {
   if (!view) return loadError ? <ErrorNote>{loadError}</ErrorNote> : null;
   const { identity } = view;
   return (
-    <Card title="Account">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1">
-          {identity.kind === 'session' ? (
-            <>
-              <div className="truncate text-[13.5px] font-medium">Signed in as {identity.email}</div>
-              <div className="truncate text-[12.5px] text-fg-3">{identity.device}</div>
-            </>
-          ) : (
-            <div className="text-[13.5px]">This browser uses the install token.</div>
-          )}
+    <>
+      <Card title="Account">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <div className="min-w-0 flex-1">
+            {identity.kind === 'session' ? (
+              <>
+                <div className="truncate text-[13.5px] font-medium">Signed in as {identity.email}</div>
+                <div className="truncate text-[12.5px] text-fg-3">{identity.device}</div>
+              </>
+            ) : (
+              <div className="text-[13.5px]">This browser uses the install token.</div>
+            )}
+          </div>
+          {identity.kind === 'session' ? <SignOutButton onError={setError} /> : view.canSignIn && <GoogleButton onError={setError} />}
         </div>
-        {identity.kind === 'session' ? <SignOutButton onError={setError} /> : view.canSignIn && <GoogleButton onError={setError} />}
-      </div>
-      {view.note && <p className="text-[12.5px] text-fg-3">{view.note}</p>}
-      {view.allowed && <p className="text-[12.5px] text-fg-3">{view.allowed}</p>}
-      {error && <ErrorNote>{error}</ErrorNote>}
-    </Card>
+        {view.note && <p className="text-[12.5px] text-fg-3">{view.note}</p>}
+        {view.allowed && <p className="text-[12.5px] text-fg-3">{view.allowed}</p>}
+        {error && <ErrorNote>{error}</ErrorNote>}
+      </Card>
+      {view.listDevices && (
+        <Card title="Devices" subtitle="Browsers and Macs signed in with Google.">
+          <DevicesBody />
+        </Card>
+      )}
+    </>
   );
 }
 

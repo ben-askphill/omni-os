@@ -3,7 +3,7 @@ import OmniKit
 import SwiftUI
 
 /// The Account tab, like the Account section of the web's Settings: who this Mac is signed in as with Google, or
-/// that it uses the install token, and who may sign in.
+/// that it uses the install token, who may sign in, and the devices signed in with Google.
 struct AccountSettings: View {
   let model: AppModel
 
@@ -39,10 +39,96 @@ struct AccountSettings: View {
             .fixedSize(horizontal: false, vertical: true)
         }
       }
+      if let google = account.google, google.loopback || google.broker {
+        DevicesCard(account: account)
+      }
     }
     .task(id: model.client.baseURL) { await account.refresh() }
   }
 }
+
+/// Every browser and Mac signed in with Google, most recently seen first, each with a Sign out that asks first.
+private struct DevicesCard: View {
+  let account: AccountModel
+  @State private var confirming: SignedInDevice?
+
+  var body: some View {
+    SettingsCard(title: "Devices") {
+      if let devices = account.devices {
+        if devices.isEmpty {
+          Text("No devices are signed in with Google.").font(.omni(size: 13)).foregroundStyle(Tok.fg3)
+        } else {
+          VStack(spacing: 0) {
+            ForEach(devices) { device in
+              if device.id != devices.first?.id { Hairline().padding(.horizontal, z(10)) }
+              DeviceRow(device: device) { confirming = device }
+            }
+          }
+          .padding(z(6))
+          .omniCard(20)
+        }
+      } else if account.devicesError == nil {
+        LoadingNote()
+      }
+      if let error = account.devicesError { ErrorNote(text: error) }
+      Text("Scripts, agents and the Mac app's server check use the install token, which is not listed here. To shut everything out, delete data/api-token and restart Omni.")
+        .font(.omni(size: 12))
+        .foregroundStyle(Tok.fg3)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .confirmationDialog(
+      confirming.map { "Sign out \($0.name)?" } ?? "",
+      isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
+      presenting: confirming
+    ) { device in
+      Button("Sign out", role: .destructive) { Task { await account.revoke(device) } }
+      Button("Cancel", role: .cancel) {}
+    } message: { device in
+      Text(
+        device.current
+          ? "This Mac goes back to the install token. You can sign in again any time."
+          : "Its session stops working at once. It can sign in with Google again.")
+    }
+    #if DEBUG
+      .onAppear { QAAccountProbe.confirm = { confirming = $0 } }
+      .onDisappear { QAAccountProbe.confirm = nil }
+    #endif
+  }
+}
+
+/// A device: the browser or Mac glyph, its name, then the account and when it was last seen, or "This device".
+private struct DeviceRow: View {
+  let device: SignedInDevice
+  let signOut: () -> Void
+
+  var body: some View {
+    HStack(spacing: z(12)) {
+      OmniIcon(name: device.kind == .browser ? "browser" : "monitor", size: 15)
+        .foregroundStyle(Tok.fg2)
+        .frame(width: z(32), height: z(32))
+        .background(Tok.bg, in: Circle())
+      VStack(alignment: .leading, spacing: z(2)) {
+        Text(device.name).font(.omni(size: 13.5, weight: .medium)).foregroundStyle(Tok.fg).lineLimit(1)
+        TimelineView(.everyMinute) { context in
+          Text(device.detail(now: context.date)).font(.omni(size: 12)).foregroundStyle(Tok.fg3).lineLimit(1).truncationMode(.middle)
+        }
+      }
+      .help("Last seen \(device.lastSeenAt.formatted(date: .abbreviated, time: .shortened))")
+      Spacer(minLength: 0)
+      Button("Sign out", role: .destructive, action: signOut)
+        .buttonStyle(.pill(.ghost, height: 28))
+    }
+    .padding(.horizontal, z(10))
+    .padding(.vertical, z(8))
+  }
+}
+
+#if DEBUG
+  /// Opens or closes a device's Sign out confirmation, while the Devices list shows.
+  @MainActor enum QAAccountProbe {
+    static var confirm: ((SignedInDevice?) -> Void)?
+  }
+#endif
 
 /// "Sign in with Google": a pill with Google's G on the left, a Loader in its place while the sheet is up.
 struct GoogleSignInButton: View {

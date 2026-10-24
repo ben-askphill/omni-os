@@ -99,6 +99,9 @@ const NAMES = [
   'signin-finished.json',
   'auth-session.json',
   'signout.json',
+  // Settings > Devices: the list as this Mac's session sees it, and revoking another device.
+  'devices-signed-in.json',
+  'device-revoked.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -512,10 +515,13 @@ async function scenario() {
   const startBody = request('signin-start-request.json', { client: 'mac', deviceName: "Ada's MacBook Pro" });
   const start = (await call('POST', '/auth/google/start', startBody)) as { attempt: string; url: string; mode: string; claim: string };
   keep('signin-start.json', { ...start, attempt: 'attempt-id', claim: 'claim-secret', url: 'https://accounts.google.com/o/oauth2/v2/auth?response_type=code' });
-  const toCallback = (await fetch(`${start.url}&login_hint=ada@example.com`, { redirect: 'manual' })).headers.get('location')!;
-  const toApp = (await fetch(toCallback, { redirect: 'manual' })).headers.get('location');
-  expect(toApp).toBe(`omni://signin?attempt=${encodeURIComponent(start.attempt)}`);
-  const signedIn = (await call('POST', '/auth/google/finish', { attempt: start.attempt, claim: start.claim })) as { credential: string };
+  const finish = async (begun: { attempt: string; url: string; claim: string }) => {
+    const toCallback = (await fetch(`${begun.url}&login_hint=ada@example.com`, { redirect: 'manual' })).headers.get('location')!;
+    const toApp = (await fetch(toCallback, { redirect: 'manual' })).headers.get('location');
+    expect(toApp).toBe(`omni://signin?attempt=${encodeURIComponent(begun.attempt)}`);
+    return (await call('POST', '/auth/google/finish', { attempt: begun.attempt, claim: begun.claim })) as { credential: string; device: { id: string } };
+  };
+  const signedIn = await finish(start);
   keep('signin-finished.json', { ...signedIn, credential: 'omni_s1.session-id.session-secret' });
   const asSession = async (method: string, path: string) => {
     const res = await fetch(`${base}/api${path}`, {
@@ -527,6 +533,10 @@ async function scenario() {
     return res.json();
   };
   keep('auth-session.json', await asSession('GET', '/auth'));
+  // A second Mac signs in, so the list has another device to revoke.
+  const other = await finish((await call('POST', '/auth/google/start', { client: 'mac', deviceName: "Ada's iMac" })) as { attempt: string; url: string; claim: string });
+  keep('devices-signed-in.json', await asSession('GET', '/auth/devices'));
+  keep('device-revoked.json', await asSession('DELETE', `/auth/devices/${other.device.id}`));
   keep('signout.json', await asSession('POST', '/auth/signout'));
 }
 

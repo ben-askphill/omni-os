@@ -1,4 +1,5 @@
-import type { AuthState, SignInAvailability, SignedInUser } from './api.ts';
+import type { AuthState, SignInAvailability, SignedInDevice, SignedInUser } from './api.ts';
+import { relTime } from './format.ts';
 
 // What the Web UI shows about signing in with Google, decided from the server's answers (GET /api/auth and
 // GET /api/auth/google). Pure, so tests can run every case. The screens: components/Pair.tsx, components/Onboarding.tsx,
@@ -50,6 +51,8 @@ export type AccountView = {
   note: string | null;
   /** Who may sign in, as a muted line. Null when Google is not set up, which Settings says nothing about. */
   allowed: string | null;
+  /** Show Settings > Devices. */
+  listDevices: boolean;
 };
 
 const NOBODY_YET = 'Nobody has signed in yet. The first address to sign in is the one Omni allows.';
@@ -61,12 +64,26 @@ function allowedText({ allowedEmails, allowedHd }: AuthState['google']) {
 
 export function accountView(auth: AuthState, availability: SignInAvailability): AccountView {
   const identity: AccountView['identity'] = auth.via === 'session' ? { kind: 'session', email: auth.user.email, device: auth.device.name } : { kind: 'token' };
-  if (!auth.google.loopback && !auth.google.broker) return { identity, canSignIn: false, note: null, allowed: null };
+  if (!auth.google.loopback && !auth.google.broker) return { identity, canSignIn: false, note: null, allowed: null, listDevices: false };
   const token = auth.via === 'token';
   return {
     identity,
     canSignIn: token && availability.available,
     note: token && !availability.available ? availability.reason : null,
     allowed: allowedText(auth.google),
+    listDevices: true,
   };
 }
+
+/** One row of Settings > Devices. */
+export type DeviceRow = { id: string; name: string; icon: 'browser' | 'monitor'; detail: string; current: boolean };
+
+/** The server's devices as rows, in its order (most recently seen first). */
+export const deviceRows = (devices: readonly SignedInDevice[], now: number): DeviceRow[] =>
+  devices.map((d) => ({
+    id: d.id,
+    name: d.name,
+    icon: d.kind === 'mac' ? 'monitor' : 'browser',
+    detail: `${d.email} · ${d.current ? 'This device' : `last seen ${relTime(d.lastSeenAt, now)}`}`,
+    current: d.current,
+  }));
