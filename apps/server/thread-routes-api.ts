@@ -38,7 +38,7 @@ import {
 import { cancelHandoff, handOff } from './handoff.ts';
 import { handoffView } from './handoff/records.ts';
 import { headPage } from './history.ts';
-import { liveMessage, openingMessages, parseAfter, type DetailOf } from './stream-catch-up.ts';
+import { liveMessage, openingMessages, parseAfter, STREAM_QUEUE_MAX, type DetailOf } from './stream-catch-up.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
 import { checkUploads, imageMime, removeUploads, safeName, saveUploads } from './uploads.ts';
@@ -406,8 +406,11 @@ threadActionsApi.get('/:id/stream', (c) => {
     // Rows the opening messages carried, so the bus's copies are not sent twice (apps/server/stream-catch-up.ts).
     const sent = new Set<number>();
     let wake: (() => void) | null = null;
+    let overflowed = false;
     const onEvent = (e: unknown) => {
-      queue.push(e);
+      // A reader that fell this far behind reconnects and catches up with a page (stream-catch-up.ts).
+      if (queue.length >= STREAM_QUEUE_MAX) overflowed = true;
+      else queue.push(e);
       wake?.();
     };
     bus.on(`thread:${id}`, onEvent);
@@ -417,16 +420,19 @@ threadActionsApi.get('/:id/stream', (c) => {
       onEvent({ kind: 'thread', thread: e.thread, pending: pendingFor(id), live: isLive(id), handoff: handoffView(e.thread as Thread), ...(blocked && { blocked }) });
     };
     bus.on('feed', onFeed);
-    stream.onAbort(() => {
+    const detach = () => {
       bus.off(`thread:${id}`, onEvent);
       bus.off('feed', onFeed);
+    };
+    stream.onAbort(() => {
+      detach();
       wake?.();
     });
     // Flush headers immediately so proxies (vite dev) don't hold the stream back.
     await stream.writeSSE({ event: 'ping', data: '' });
     const detailOf: DetailOf = (page) => (t => (t ? threadDetail(t, page) : null))(threads.get(id));
     for (const m of openingMessages(id, after, detailOf, queue, sent)) await stream.writeSSE(m);
-    while (!stream.aborted) {
+    while (!stream.aborted && !overflowed) {
       if (!queue.length) {
         await Promise.race([new Promise<void>((r) => (wake = r)), stream.sleep(20_000)]);
         wake = null;
@@ -436,5 +442,6 @@ threadActionsApi.get('/:id/stream', (c) => {
       const m = liveMessage(queue.shift(), sent);
       if (m) await stream.writeSSE(m);
     }
+    detach();
   });
 });

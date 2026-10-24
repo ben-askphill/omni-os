@@ -58,6 +58,12 @@ const result = (id: string, text: string, isError: boolean): StreamRecord => ({
   payload: { tool_use_id: id, text: clip(text), is_error: isError, truncated: truncated(text) },
 });
 
+/** A command's call row. The adapter sends it when the command starts, so its row is there while it runs (#225). */
+export function commandUse(item: CodexItem): StreamRecord {
+  const command = asCommand((item as { command?: string | string[] }).command ?? '');
+  return { kind: 'tool_use', payload: { id: item.id, name: 'Bash', input: { command }, parent: null } };
+}
+
 /**
  * One completed Codex item to zero or more Omni records. Reasoning items drop out, the same
  * as for Claude. Unknown item kinds pass through as a tool row under their own name.
@@ -90,14 +96,10 @@ export function normalizeItem(item: CodexItem, savedImage?: string | null): Stre
     }
 
     case 'commandExecution': {
-      const command = asCommand((item as { command?: string | string[] }).command ?? '');
       const out = String((item as { aggregatedOutput?: unknown; output?: unknown }).aggregatedOutput ?? (item as { output?: unknown }).output ?? '');
       const { exitCode, status } = item as { exitCode?: number | null; status?: string };
       const failed = (exitCode ?? 0) !== 0 || status === 'failed' || status === 'declined';
-      return [
-        { kind: 'tool_use', payload: { id: item.id, name: 'Bash', input: { command }, parent: null } },
-        result(item.id, failed && exitCode ? `Exit code ${exitCode}\n${out}` : out, failed),
-      ];
+      return [commandUse(item), result(item.id, failed && exitCode ? `Exit code ${exitCode}\n${out}` : out, failed)];
     }
 
     case 'fileChange':

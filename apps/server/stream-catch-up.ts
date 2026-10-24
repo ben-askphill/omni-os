@@ -75,3 +75,9 @@ export function liveMessage(e: unknown, sent: ReadonlySet<number>): SSEMessage |
   if (sent.has(e.id)) return null;
   return message(clip(compactRow(e), BUDGET.rowBytes));
 }
+
+/**
+ * Messages one connection may have queued before it is closed. Its client reconnects and the catch-up above sends it
+ * a page at most, so a connection that stopped reading costs a bounded amount, not the thread's output (#225).
+ */
+export const STREAM_QUEUE_MAX = 2_000;

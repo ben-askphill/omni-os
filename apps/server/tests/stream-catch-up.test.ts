@@ -13,6 +13,7 @@ const { bus, publishFeed } = await import('../bus.ts');
 const { addEvent } = await import('../runner/state.ts');
 const { recordContext } = await import('../context.ts');
 const { headPage } = await import('../history.ts');
+const { STREAM_QUEUE_MAX } = await import('../stream-catch-up.ts');
 
 const B = HISTORY_BUDGET;
 const thread = (id: string) =>
@@ -315,4 +316,33 @@ describe('command noise', () => {
     }
     expect(JSON.parse(s.frames.find((f) => f.data?.id === live)!.data.payload).output.exit_code).toBe(1);
   });
+
+  it('closes a connection that fell past the queue limit, and its reconnect catches up within a page', async () => {
+    thread('stalled');
+    r.db.events.add('stalled', 'user', { text: 'go', source: 'ben' });
+    const ac = new AbortController();
+    const reader = (await app.request('/api/threads/stalled/stream?after=0', { signal: ac.signal })).body!.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    const read = async () => {
+      const { value, done } = await reader.read();
+      if (!done) buf += dec.decode(value, { stream: true });
+      return !done;
+    };
+    while (!buf.includes('"kind":"sync"')) expect(await read()).toBe(true);
+    const synced = Number(/^id: (\d+)$/m.exec(buf)?.[1]);
+    // Rows land faster than the writer runs, as a burst of command output would.
+    const written: number[] = [];
+    for (let i = 0; i < STREAM_QUEUE_MAX + 200; i++) written.push(addEvent('stalled', 'assistant_text', text(5, i)).id);
+    while (await read());
+    const delivered = new Set([...buf.matchAll(/^id: (\d+)$/gm)].map((m) => Number(m[1])));
+    expect(delivered.size, 'rows the closed connection still sent').toBeLessThan(written.length);
+    // Its reconnect resumes after what it saw: more than a page missed, so the newest page and a gap.
+    const s = open('stalled', String(Math.max(synced, ...delivered)));
+    const sync = await s.until(isSync);
+    await s.close();
+    expect(sync.data.catch_up).toBe('snapshot');
+    expect(sync.data.events.length).toBeLessThanOrEqual(B.rows + B.anchors);
+    expect(sync.data.events.at(-1).id).toBe(written.at(-1));
+  }, 60_000);
 });
