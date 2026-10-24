@@ -1,0 +1,124 @@
+{
+  "thread": {
+    "id": "output",
+    "channel_id": "scratch",
+    "title": "Run the tests",
+    "status": "done",
+    "role": null,
+    "model": null,
+    "harness": "claude-code",
+    "effort": "",
+    "auto_reason": null,
+    "queued_harness": null,
+    "queued_model": null,
+    "queued_effort": null,
+    "session_id": "output",
+    "has_run": 0,
+    "cwd": "/tmp/omni-fixtures",
+    "branch": null,
+    "parent_id": null,
+    "task_id": null,
+    "source": "manual",
+    "automation": null,
+    "last_text": null,
+    "suggestion": null,
+    "next_title": null,
+    "next_prompt": null,
+    "archived": 0,
+    "folder_id": null,
+    "pinned_at": null,
+    "done_at": null,
+    "setup": null,
+    "setup_error": null,
+    "limit_state": null,
+    "limit_resets_at": null,
+    "limit_elsewhere": 0,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "updated_at": "2026-01-05T09:00:00.000Z"
+  },
+  "channel": {
+    "id": "scratch",
+    "name": "Scratch",
+    "kind": "internal",
+    "repo_path": null,
+    "github_repo": null,
+    "use_worktree": 0,
+    "base_dir": "/tmp/omni-fixtures/scratch",
+    "store_domain": null,
+    "portal_slug": null,
+    "browser_headless": 1,
+    "notes": null,
+    "icon": null,
+    "design_system_name": null,
+    "archived": 0,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "default_harness": null,
+    "default_model": null,
+    "default_effort": null,
+    "design_system_size": 0
+  },
+  "events": [
+    {
+      "id": 1,
+      "thread_id": "output",
+      "kind": "user",
+      "payload": "{\"text\":\"run the tests\",\"source\":\"ben\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "thread_id": "output",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"call-ls\",\"name\":\"Bash\",\"input\":{\"command\":\"ls src\"},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 3,
+      "thread_id": "output",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"call-ls\",\"text\":\"cart.ts\\ntax.ts\\n\",\"is_error\":false,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 4,
+      "thread_id": "output",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"call-test\",\"name\":\"Bash\",\"input\":{\"command\":\"npm test\"},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 5,
+      "thread_id": "output",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"call-test\",\"is_error\":true,\"truncated\":true,\"text\":\"Exit code 1\\nFAIL src/cart-0.test.ts > rounds the total (0 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-1.test.ts > rounds the total (1 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-2.test.ts > rounds the total (2 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-3.test.ts > rounds the total (3 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-4.test.ts > rounds the total (4 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-5.test.ts > rounds the total (5 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-6.test.ts > rounds the total (6 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-7.test.ts > rounds the total (7 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-8.test.ts > rounds the total (8 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-9.test.ts > rounds the total (9 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-10.test.ts > rounds the total (10 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-11.test.ts > rounds the total (11 ms)\\n    expected 10.05 to be 10.06\\nFAIL src/cart-12.test.ts > rounds th\",\"output\":{\"chars\":11691,\"lines\":281,\"exit_code\":1}}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 6,
+      "thread_id": "output",
+      "kind": "assistant_text",
+      "payload": "{\"text\":\"Two things fail; the first is the rounding.\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 7,
+      "thread_id": "output",
+      "kind": "result",
+      "payload": "{\"ok\":true,\"subtype\":\"success\",\"turns\":1}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    }
+  ],
+  "history": {
+    "from": 0,
+    "to": null,
+    "results_below": 0
+  },
+  "artifacts": [],
+  "children": [],
+  "team": [],
+  "parent": null,
+  "pending": [],
+  "live": false,
+  "mods": [],
+  "handoff": null
+}
