@@ -132,7 +132,7 @@
       "name": "a kind this Omni does not know",
       "raw": {
         "id": "8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e",
-        "kind": "terminal_excerpt",
+        "kind": "future_kind",
         "v": 1,
         "label": "npm test (exit 1)",
         "note": "why does this fail",
@@ -2032,14 +2032,14 @@
         },
         {
           "id": "8a1c4e7f-0b3d-4f6a-9c2e-5d8f1b4a7c0e",
-          "kind": "terminal_excerpt",
+          "kind": "future_kind",
           "v": 1,
           "label": "src/cart.ts:1-3",
           "note": "",
           "body": {"command":"npm test"}
         }
       ],
-      "expect": {"ok":false,"error":"context[1].kind \"terminal_excerpt\" is not one this Omni knows"}
+      "expect": {"ok":false,"error":"context[1].kind \"future_kind\" is not one this Omni knows"}
     },
     {
       "name": "a kind named like an Object method",

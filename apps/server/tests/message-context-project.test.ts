@@ -155,7 +155,7 @@ describe('the context block', () => {
   });
 
   it('shows a record whose kind has no projector by its label and note', () => {
-    const later = { id: 'term-1', kind: 'terminal_excerpt', v: 1, label: 'npm test (exit 1)', note: 'why does this fail?', body: { lines: ['FAIL'] } };
+    const later = { id: 'term-1', kind: 'future_kind', v: 1, label: 'npm test (exit 1)', note: 'why does this fail?', body: { lines: ['FAIL'] } };
     const newer = { ...cart, id: 'newer', v: 2 };
     expect(contextBlock([later, newer], { remote: false, read: null })).toContain(
       ['[1] npm test (exit 1)', "Ben's note: why does this fail?", '(Omni could not include its contents.)', '', '[2] src/cart.ts:1-3', "Ben's note: this reduce reads better with names", '(Omni could not include its contents.)'].join('\n'),
@@ -183,9 +183,9 @@ describe('the context block', () => {
   });
 
   it('lists what each item was in a handover, without the excerpt', () => {
-    expect(contextLines([cart, { kind: 'terminal_excerpt', label: '', note: 'line\ntwo' }, 'junk'])).toEqual([
+    expect(contextLines([cart, { kind: 'future_kind', label: '', note: 'line\ntwo' }, 'junk'])).toEqual([
       '  - Context: src/cart.ts:1-3 (note: this reduce reads better with names)',
-      '  - Context: terminal_excerpt (note: line two)',
+      '  - Context: future_kind (note: line two)',
       '  - Context: an item',
     ]);
     expect(contextLines(undefined)).toEqual([]);

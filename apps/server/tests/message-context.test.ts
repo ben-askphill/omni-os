@@ -127,7 +127,7 @@ describe('a message with context', () => {
       expect(res.status).toBe(400);
       return res.body.error as string;
     };
-    expect(await refused([{ ...record, kind: 'terminal_excerpt' }])).toBe('context[0].kind "terminal_excerpt" is not one this Omni knows');
+    expect(await refused([{ ...record, kind: 'future_kind' }])).toBe('context[0].kind "future_kind" is not one this Omni knows');
     expect(await refused([{ ...record, v: 2 }])).toBe('context[0].v 2 is newer than this Omni reads (diff_selection v1)');
     expect(await refused([{ ...record, body: { ...record.body, path: '../secrets.txt' } }])).toMatch(/^context\[0\]\.body: path must be relative/);
     expect(await refused([record, record])).toBe("context[1].id repeats an earlier record's id");

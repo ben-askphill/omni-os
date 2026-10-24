@@ -116,7 +116,7 @@ describe('context chips', () => {
   });
 
   it('names the kind and version a newer Omni sent', () => {
-    expect(cantShowText({ kind: 'terminal_excerpt', v: 1 })).toBe("This Omni can't show terminal_excerpt v1. Update Omni to see it.");
+    expect(cantShowText({ kind: 'future_kind', v: 1 })).toBe("This Omni can't show future_kind v1. Update Omni to see it.");
     expect(cantShowText({ kind: 'diff_selection', v: 2 })).toBe("This Omni can't show diff_selection v2. Update Omni to see it.");
     expect(cantShowText({ kind: '', v: 0 })).toBe("This Omni can't show this item. Update Omni to see it.");
   });
