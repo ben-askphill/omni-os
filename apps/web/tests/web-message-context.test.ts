@@ -113,6 +113,10 @@ describe('context chips', () => {
       expect(inspector).toContain('shell pid 48213');
       expect(inspector).toContain('✕ totals an empty cart (4 ms)');
       expect(inspector).not.toContain('Update Omni');
+    } else if ((c.raw as { kind: string }).kind === 'browser_annotation') {
+      expect(inspector).toContain('shop.example.com/cart?coupon=SPRING');
+      expect(inspector).toContain('Area 480×160');
+      expect(inspector).not.toContain('Update Omni');
     } else {
       expect(inspector).toContain('src/cart.ts');
       expect(inspector).toContain('new lines 1–3');

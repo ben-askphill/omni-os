@@ -266,7 +266,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
       <div className="min-h-0 flex-1">
         {panelTab === 'artifacts' && <ArtifactsTab artifacts={files} selected={selectedArtifact} onSelect={setSelected} />}
         {panelTab === 'changes' && <ChangesTab thread={thread} />}
-        {panelTab === 'browser' && <BrowserTab channelId={thread.channel_id} shots={shots} />}
+        {panelTab === 'browser' && <BrowserTab channelId={thread.channel_id} threadId={thread.id} shots={shots} />}
         {panelTab === 'terminal' && (
           <Suspense fallback={<Loading />}>
             <TerminalView threadId={thread.id} cwd={thread.cwd} />

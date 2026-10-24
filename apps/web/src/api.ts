@@ -376,9 +376,12 @@ export type FeedEvent =
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** The response body as parsed, for a caller that reads more than the message. */
+  data?: unknown;
+  constructor(message: string, status: number, data?: unknown) {
     super(message);
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -432,7 +435,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
         : typeof data === 'string' && data
           ? data.slice(0, 300)
           : `Request failed (${res.status})`;
-    throw new ApiError(msg, res.status);
+    throw new ApiError(msg, res.status, data);
   }
   return data as T;
 }

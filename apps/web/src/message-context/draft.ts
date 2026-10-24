@@ -1,11 +1,45 @@
 // The context Ben has added to a thread's next message and not sent yet (packages/shared/message-context.ts). One
-// list per thread, shared by the desktop reply box and the phone composer, kept like their text: in memory, across
-// navigation, not across reloads.
+// list per thread, shared by the desktop reply box and the phone composer. Kept in memory across navigation and in
+// this browser's localStorage across a reload, as the Mac app keeps its own: a browser_annotation's screenshot is a file
+// on the server, so a reload that dropped the record would leave the file behind and cost Ben the capture.
 import { useSyncExternalStore } from 'react';
 import { CONTEXT_JSON_MAX, CONTEXT_MAX, type MessageContext } from '@omni/shared/message-context.ts';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 
-const drafts = new Map<string, readonly MessageContext[]>();
+const STORE_KEY = 'omni.contextDrafts';
+
+/** The stored drafts, each record checked again as the server would. Whatever does not parse is dropped, never thrown. */
+export function readStoredDrafts(raw: string | null | undefined): Map<string, readonly MessageContext[]> {
+  const out = new Map<string, readonly MessageContext[]>();
+  try {
+    const stored: unknown = raw ? JSON.parse(raw) : null;
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return out;
+    for (const [thread, list] of Object.entries(stored)) {
+      const checked = parseContexts(list);
+      if (checked.ok && checked.value.length) out.set(thread, checked.value);
+    }
+  } catch {
+    // Unreadable: no drafts.
+  }
+  return out;
+}
+
+const store = () => {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    // Blocked storage throws on access.
+    return null;
+  }
+};
+
+const drafts = (() => {
+  try {
+    return readStoredDrafts(store()?.getItem(STORE_KEY));
+  } catch {
+    return new Map<string, readonly MessageContext[]>();
+  }
+})();
 const listeners = new Set<() => void>();
 const NONE: readonly MessageContext[] = [];
 
@@ -23,6 +57,12 @@ export const useDraftContext = (threadId: string) =>
 function put(threadId: string, list: readonly MessageContext[]) {
   if (list.length) drafts.set(threadId, list);
   else drafts.delete(threadId);
+  try {
+    if (drafts.size) store()?.setItem(STORE_KEY, JSON.stringify(Object.fromEntries(drafts)));
+    else store()?.removeItem(STORE_KEY);
+  } catch {
+    // Full or blocked: the draft still lives in memory.
+  }
   listeners.forEach((fn) => fn());
 }
 
