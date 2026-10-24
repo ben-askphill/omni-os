@@ -81,8 +81,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     artifactIds.current.add(a.id);
     if (isNew && a.kind === 'html') {
       setSelected(a.id);
-      // Never pull Ben out of the shell mid-command, or out of the changes he is reading.
-      setPanelTab((t) => (t === 'terminal' || t === 'changes' ? t : 'artifacts'));
+      // Never pull Ben out of the shell mid-command, the changes he is reading or a run's output.
+      setPanelTab((t) => (t === 'terminal' || t === 'changes' || t === 'actions' ? t : 'artifacts'));
     }
     setArtifacts((prev) => (prev.some((x) => x.id === a.id) ? prev.map((x) => (x.id === a.id ? a : x)) : [...prev, a]));
   }, []);
