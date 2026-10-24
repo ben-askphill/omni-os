@@ -39,6 +39,7 @@ import { cancelHandoff, handOff } from './handoff.ts';
 import { handoffView } from './handoff/records.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
+import { basePick, baseView } from './worktree-base.ts';
 import { checkUploads, imageMime, removeUploads, safeName, saveUploads } from './uploads.ts';
 
 /** List, create, detail, and summary. Registered before PATCH and the terminal routes. */
@@ -60,6 +61,8 @@ const createSchema = z.object({
   source: z.enum(['manual', 'conductor', 'capture']).default('manual'),
   /** A sidebar folder of the channel, by id or name. A name no folder has makes one. */
   folder: z.string().max(200).nullish(),
+  /** Where a new worktree thread's branch starts (worktree-base.ts). Left out: the repo's HEAD, as before. */
+  base: basePick.nullish(),
 });
 
 threadRoutesApi.get('/', (c) =>
@@ -146,6 +149,12 @@ threadRoutesApi.get('/:id/summary', (c) => {
     updated_at: t.updated_at, last_reply: events.lastRunText(t.id) || events.lastAssistantText(t.id),
     artifacts: artifacts.byThread(t.id).map((a) => a.name),
   });
+});
+
+/** Where the thread's branch starts: what Ben chose and the commit it resolved to. Null for a thread with no worktree. */
+threadActionsApi.get('/:id/base', (c) => {
+  const t = threads.get(c.req.param('id'));
+  return t ? c.json(baseView(t)) : c.json({ error: 'not found' }, 404);
 });
 
 threadActionsApi.post('/:id/messages', async (c) => {

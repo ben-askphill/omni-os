@@ -1,0 +1,26 @@
+{
+  "available": true,
+  "head": {
+    "ref": "main",
+    "sha": "ccccccccccccccccccccccccccccccccccccccc2"
+  },
+  "refs": [
+    {
+      "ref": "main",
+      "kind": "branch",
+      "sha": "ccccccccccccccccccccccccccccccccccccccc2",
+      "current": true
+    },
+    {
+      "ref": "omni/00000000",
+      "kind": "branch",
+      "sha": "ccccccccccccccccccccccccccccccccccccccc1",
+      "current": false
+    }
+  ],
+  "remote": {
+    "remote": "origin",
+    "branch": "main",
+    "sha": "ccccccccccccccccccccccccccccccccccccccc2"
+  }
+}

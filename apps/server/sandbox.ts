@@ -131,9 +131,10 @@ async function switchBack(dir: string, branch: string, on: string | null): Promi
 /**
  * Make a thread's worktree at dir on branch and check it, or throw saying why. Safe to run again: a worktree an
  * earlier try made is checked and kept, a branch it made is checked out again, a clean worktree its agent moved to
- * another branch is switched back, and a folder that is in the way is never deleted.
+ * another branch is switched back, and a folder that is in the way is never deleted. A new branch is cut from the
+ * commit `base` names (worktree-base.ts), asked only once the repo and folder checks pass, or from HEAD without one.
  */
-export async function prepareWorktree(repo: string | null, dir: string, branch: string): Promise<void> {
+export async function prepareWorktree(repo: string | null, dir: string, branch: string, base?: () => Promise<string>): Promise<void> {
   if (!repo) throw new Error('The channel has no repository set.');
   if (!existsSync(repo)) throw new Error(`The channel's repository is not on this Mac: ${repo}`);
   if (!(await isGitRepo(repo))) throw new Error(`${repo} is not a git repository. Turn off "Worktree per thread" in the channel's settings to run threads in it directly.`);
@@ -152,8 +153,9 @@ export async function prepareWorktree(repo: string | null, dir: string, branch: 
   // A worktree removed by hand is still registered until pruned, and add refuses its path.
   await git('worktree', 'prune').catch(() => {});
   const hasBranch = await git('rev-parse', '--verify', '--quiet', `refs/heads/${branch}`).then(() => true, () => false);
+  const from = hasBranch || !base ? 'HEAD' : await base();
   try {
-    await git('worktree', 'add', ...(hasBranch ? [dir, branch] : ['-b', branch, dir, 'HEAD']));
+    await git('worktree', 'add', ...(hasBranch ? [dir, branch] : ['-b', branch, dir, from]));
   } catch (err) {
     throw new Error(`git worktree add failed: ${gitMessage(err)}`);
   }

@@ -85,6 +85,11 @@ const NAMES = [
   // The retried worktree thread's branch changes, every group, and a thread with no repo to read.
   'changes.json',
   'changes-unavailable.json',
+  // The base that thread started from, what the new-thread composer offers for its channel (a repo with an origin),
+  // and the body it sends with a chosen base.
+  'thread-base.json',
+  'bases.json',
+  'thread-create-base-request.json',
   // The same thread's saved turns, the newest one's diff (an edit, a commit and a new file during the turn), and a
   // thread whose turns are not saved.
   'turns.json',
@@ -462,6 +467,19 @@ async function scenario() {
   const changed = keep('changes.json', await get(`/threads/${wt.id}/changes`)) as { available: boolean; groups: { kind: string; files: unknown[] }[] };
   expect(changed.groups.map((g) => [g.kind, g.files.length])).toEqual([['committed', 4], ['staged', 1], ['unstaged', 2], ['untracked', 1]]);
   keep('changes-unavailable.json', await get(`/threads/${id}/changes`));
+
+  keep('thread-base.json', await get(`/threads/${wt.id}/base`));
+  const origin = join(tmp, 'widgets-origin.git');
+  execFileSync('git', ['init', '-q', '--bare', origin]);
+  git('remote', 'add', 'origin', origin);
+  git('push', '-q', 'origin', 'HEAD:refs/heads/main');
+  git('fetch', '-q', 'origin');
+  git('remote', 'set-head', 'origin', 'main');
+  keep('bases.json', await get('/channels/widgets/bases'));
+  // Acme runs in its own folder, so the server drops the pick: the body is only checked for being accepted.
+  const baseBody = request('thread-create-base-request.json', { channel: 'acme', prompt: 'TOOL:20 tidy the cart', title: 'Tidy the cart', base: { kind: 'ref', ref: 'main' } });
+  const tidy = (await call('POST', '/threads', baseBody)) as Thread;
+  expect(await get(`/threads/${tidy.id}/base`)).toBeNull();
 
   const edit = join(tmp, 'turn-edit.sh');
   writeFileSync(

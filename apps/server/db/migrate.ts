@@ -332,4 +332,9 @@ export function migrate() {
       SELECT 'completion', uid, 'upsert', created_at FROM completions
       WHERE seq = last_insert_rowid() AND EXISTS (SELECT 1 FROM kv WHERE key = 'sync.machine_id');
     END`);
+  // #212: what Ben chose as a new worktree thread's base, until it is resolved to a commit in thread_bases. Local, not synced.
+  db.exec(`CREATE TABLE IF NOT EXISTS thread_base_picks (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+    pick TEXT NOT NULL
+  )`);
 }
