@@ -20,6 +20,7 @@ import { useApp, useNow } from '../store.tsx';
 import { needsCard } from './activity.ts';
 import { MoComposer, type ComposerChip } from './MoComposer.tsx';
 import { NeedsActions, NeedsCardView } from './NeedsCard.tsx';
+import { BranchingFrom } from './BaseSheet.tsx';
 import { MoAvatar, MoBubble, MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSheet, MoStripes } from './parts.tsx';
 import { shortTime } from './rows.ts';
 import { useShell, useThread } from './shell.tsx';
@@ -550,6 +551,7 @@ export function ThreadScreen() {
           }}
         />
         {!view.turns.length && <MoEmpty>{thread.setup ? 'Preparing the worktree.' : 'Nothing here yet.'}</MoEmpty>}
+        {thread.setup && <BranchingFrom thread={thread} />}
         {/* A question's card above is where Ben answers it. */}
         {card && card.kind !== 'question' && <NeedsCardView card={card} inThread onRecovered={(r) => {
               applyThread(r.thread, true);

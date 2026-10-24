@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, errorText, type PendingMsg, type Thread } from '../../api.ts';
+import { useBranchingFrom } from '../BasePicker.tsx';
 import { Button, ErrorNote, Icon, Loader } from '../ui.tsx';
 
 /**
@@ -10,6 +11,7 @@ import { Button, ErrorNote, Icon, Loader } from '../ui.tsx';
 export function SetupCard({ thread, onRetried }: { thread: Thread; onRetried: (t: Thread, pending: PendingMsg[]) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const from = useBranchingFrom(thread);
   if (!thread.setup) return null;
   const failed = thread.setup === 'failed';
 
@@ -54,6 +56,7 @@ export function SetupCard({ thread, onRetried }: { thread: Thread; onRetried: (t
               </span>
             </div>
           )}
+          {from && <p className="mt-1 text-[11.5px] text-fg-4">{from}</p>}
         </div>
         {failed && (
           <Button size="sm" variant="primary" icon="refresh" busy={busy} onClick={() => void retry()} className="shrink-0">
