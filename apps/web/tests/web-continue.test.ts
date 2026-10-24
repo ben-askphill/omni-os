@@ -147,12 +147,21 @@ describe('attachments', () => {
     );
     expect(rows.map((r) => [r.name, r.meta, r.note, r.tag, r.selected, r.selectable])).toEqual([
       ['shot.png', 'PNG image · 3.3 KB', 'Goes inline as an image.', null, true, true],
-      ['notes.txt', 'Text · 10 B', 'Goes as a path to the file.', null, false, true],
-      ['photo.jpg', 'JPEG image · 3.3 KB', 'Goes as a path to the file. This harness does not show images inline.', null, false, true],
+      ['notes.txt', 'Text · 10 B', null, null, false, true],
+      ['photo.jpg', 'JPEG image · 3.3 KB', null, null, false, true],
       ['trace.zip', 'File · size unknown', 'Its bytes are not on this Mac.', 'Missing', false, false],
       ['big.mov', 'File · 85.8 MB', '85.8 MB is over the 25 MB limit for one file.', 'Too big', false, false],
       ['link', 'File · 3.3 KB', 'It is a link, not a file.', 'Not a file', false, false],
     ]);
+  });
+
+  it('says how a ticked file arrives, and that a harness without inline images takes an image by path', () => {
+    const [shot, photo] = attachmentRows(
+      carryover({ attachments: [file({ selected: true, carried: true, as: 'path' }), file({ id: 'u1:1', name: 'photo.jpg', mime: 'image/jpeg', selected: true, carried: true, as: 'path', image: true })] }),
+    );
+    expect(shot.note).toBe('Goes as a path to the file. This harness does not show images inline.');
+    expect(photo.note).toBe('Goes as a path to the file. This harness does not show images inline.');
+    expect(attachmentRows(carryover({ attachments: [file({ id: 'u1:2', name: 'notes.txt', mime: 'text/plain', image: false, selected: true, carried: true, as: 'path' })] }))[0].note).toBe('Goes as a path to the file.');
   });
 
   it('counts what will be copied', () => {

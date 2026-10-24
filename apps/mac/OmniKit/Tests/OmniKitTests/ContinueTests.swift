@@ -206,6 +206,12 @@ private let startBody = ContinueBody(
     let files = try decode(ContinuePreview.self, previewJSON()).carryover.attachments
     #expect(files.map(ContinueRules.attachmentMeta) == ["PNG image · 3.3 KB", "File · size unknown"])
     #expect(files.map(ContinueRules.attachmentNote) == ["Goes inline as an image.", "Its bytes are not on this Mac."])
+    let notTicked = try decode(
+      ContinuePreview.self,
+      previewJSON().replacingOccurrences(of: #""selected":true,"carried":true"#, with: #""selected":false,"carried":false"#)
+    ).carryover.attachments
+    #expect(ContinueRules.attachmentNote(notTicked[0]) == nil)
+    #expect(ContinueRules.attachmentNote(notTicked[1]) == "Its bytes are not on this Mac.")
     #expect(files.map(ContinueRules.attachmentTag) == [nil, "Missing"])
     #expect(ContinueRules.attachmentsSummary(files) == "1 of 2 will be copied into the new thread.")
     #expect(ContinueRules.attachmentsSummary([]) == "None will be carried. Tick the ones the new thread needs.")

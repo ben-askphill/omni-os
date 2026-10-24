@@ -28,6 +28,7 @@ struct ContinueSheet: View {
       VStack(alignment: .leading, spacing: 0) {
         FieldLabel(text: "First message", hint: "Sent after the carryover, never cut.")
         OmniTextEditor(text: $m.text, minHeight: 72)
+          .frame(maxHeight: z(110))
           .accessibilityLabel("First message")
         if let hint = ContinueRules.slashHint(m.text) {
           Text(hint).font(.omni(size: 12)).foregroundStyle(Tok.fg3).padding(.top, z(6))
@@ -44,7 +45,23 @@ struct ContinueSheet: View {
     }
     .task(id: m.ask) { await m.loadPreview() }
     .task { refresh() }
+    #if DEBUG
+    .onChange(of: m.preview) { qaTick() }
+    #endif
   }
+
+  #if DEBUG
+  @State private var qaTicked = false
+
+  // QA scripts can't click, so a launch argument (-OmniContinuePick "a.png,b.txt") ticks attachments by name once the
+  // first preview is in.
+  private func qaTick() {
+    guard !qaTicked, let p = m.preview, let names = UserDefaults.standard.string(forKey: "OmniContinuePick") else { return }
+    qaTicked = true
+    let want = Set(names.split(separator: ",").map { String($0) })
+    for a in p.carryover.attachments where want.contains(a.name) && a.availability == .available { m.toggle(a.id) }
+  }
+  #endif
 
   private var header: some View {
     VStack(alignment: .leading, spacing: z(4)) {
@@ -341,10 +358,12 @@ private struct AttachmentPicker: View {
                 if let tag = ContinueRules.attachmentTag(a) { Chip(text: tag, tone: .outline) }
               }
               Text(ContinueRules.attachmentMeta(a)).font(.omni(size: 11.5)).monospacedDigit().foregroundStyle(Tok.fg3)
-              Text(ContinueRules.attachmentNote(a))
-                .font(.omni(size: 11.5))
-                .foregroundStyle(Tok.fg3)
-                .fixedSize(horizontal: false, vertical: true)
+              if let note = ContinueRules.attachmentNote(a) {
+                Text(note)
+                  .font(.omni(size: 11.5))
+                  .foregroundStyle(Tok.fg3)
+                  .fixedSize(horizontal: false, vertical: true)
+              }
             }
             Spacer(minLength: z(8))
             Toggle(

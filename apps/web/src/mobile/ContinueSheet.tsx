@@ -136,7 +136,7 @@ function Sheet({
                         {r.tag && <Chip tone="outline">{r.tag}</Chip>}
                       </span>
                       <span className="text-[12.5px] leading-[1.35] text-fg-3 tabular-nums">{r.meta}</span>
-                      <span className="text-[12.5px] leading-[1.35] text-pretty text-fg-3">{r.note}</span>
+                      {r.note && <span className="text-[12.5px] leading-[1.35] text-pretty text-fg-3">{r.note}</span>}
                     </span>
                     <Toggle checked={r.selected} disabled={s.posting || !r.selectable} label={`Carry ${r.name}`} onChange={() => dispatch({ type: 'attach', id: r.id })} />
                   </div>

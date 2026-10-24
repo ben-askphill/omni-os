@@ -229,7 +229,7 @@ export function AttachmentList({ files, disabled, onToggle }: { files: Pick<Carr
               {r.tag && <Chip tone="outline">{r.tag}</Chip>}
             </div>
             <div className="mt-0.5 font-num text-[11.5px] text-fg-3">{r.meta}</div>
-            <div className="mt-0.5 break-words text-[11.5px] text-fg-3">{r.note}</div>
+            {r.note && <div className="mt-0.5 break-words text-[11.5px] text-fg-3">{r.note}</div>}
           </div>
           <Toggle checked={r.selected} disabled={disabled || !r.selectable} label={`Carry ${r.name}`} onChange={() => onToggle(r.id)} />
         </li>

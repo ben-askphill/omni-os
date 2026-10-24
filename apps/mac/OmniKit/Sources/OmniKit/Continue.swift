@@ -405,9 +405,11 @@ public enum ContinueRules {
     "\(typeLabel(a.mime)) · \(a.size.map(Format.bytes) ?? "size unknown")"
   }
 
-  /// How a file arrives, or why it cannot (`attachmentRows`' note).
-  public static func attachmentNote(_ a: CarryoverAttachment) -> String {
+  /// Why a file cannot be carried, or, once ticked, how it arrives (`attachmentRows`' note). Nil for a file that can go
+  /// and is not ticked.
+  public static func attachmentNote(_ a: CarryoverAttachment) -> String? {
     guard a.availability == .available else { return a.reason ?? "It cannot be carried." }
+    guard a.selected else { return nil }
     if a.arrival == "inline" { return "Goes inline as an image." }
     return a.image ? "Goes as a path to the file. This harness does not show images inline." : "Goes as a path to the file."
   }

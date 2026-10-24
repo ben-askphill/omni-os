@@ -287,8 +287,8 @@ export interface AttachmentRow {
   name: string;
   /** "PNG image · 1.2 KB". */
   meta: string;
-  /** How it arrives, or why it cannot. */
-  note: string;
+  /** Why it cannot be carried, or, once ticked, how it arrives. Nothing for a file that can go and is not ticked. */
+  note: string | null;
   /** A word beside the name when it cannot be carried. */
   tag: string | null;
   selected: boolean;
@@ -314,7 +314,7 @@ export const attachmentRows = (c: Pick<Carryover, 'attachments'>): AttachmentRow
     id: a.id,
     name: a.name,
     meta: `${typeLabel(a.mime)} · ${a.size === null ? 'size unknown' : bytes(a.size)}`,
-    note: a.availability === 'available' ? arrival(a) : (a.reason ?? 'It cannot be carried.'),
+    note: a.availability !== 'available' ? (a.reason ?? 'It cannot be carried.') : a.selected ? arrival(a) : null,
     tag: KIND[a.availability],
     selected: a.selected && a.availability === 'available',
     selectable: a.availability === 'available',
