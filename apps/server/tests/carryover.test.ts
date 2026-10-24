@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CarryoverFile } from '@omni/shared/continue.ts';
+import type { CarryoverAttachment, CarryoverFile } from '@omni/shared/continue.ts';
 import type { RunName } from '@omni/shared/run-switch.ts';
 import type { EventRow } from '../db.ts';
 import { buildCarryover, carriedStats, type CarryoverInput, type CarryoverP } from '../carryover.ts';
@@ -29,6 +29,7 @@ const input = (events: EventRow[], over: Partial<CarryoverInput> = {}): Carryove
   skipped: [],
   uncommitted: [],
   parked: [],
+  attachments: [],
   ...over,
 });
 
@@ -104,12 +105,38 @@ describe('buildCarryover', () => {
     expect(c.files).toBeNull();
   });
 
-  it('names attachments as not carried, never their paths or content', () => {
-    const events = [ev('user', { text: 'see the screenshot', attachments: [{ name: 'cart.png', path: '/other/uploads/cart.png', mime: 'image/png', image: true }] })];
-    const { carryover: c } = buildCarryover(input(events));
-    expect(c.attachments).toEqual([{ name: 'cart.png', event_id: events[0].id, carried: false }]);
-    expect(c.omitted).toContainEqual({ what: 'attachments', count: 1, note: '1 attachment is not carried yet: cart.png.', ref: null });
-    expect(c.text).toContain('  - Attachment: cart.png (not carried)');
+  const file = (over: Partial<CarryoverAttachment> = {}): CarryoverAttachment => ({
+    id: 'uid-1:0', name: 'cart.png', event_id: 1, mime: 'image/png', size: 2048, image: true, availability: 'available', reason: null, selected: false, carried: false, as: 'inline', ...over,
+  });
+  const withFiles = (attachments: CarryoverAttachment[]) => {
+    const events = [ev('user', { text: 'see the screenshots', attachments: attachments.map((a) => ({ name: a.name, path: `/other/uploads/${a.name}`, mime: a.mime, image: a.image })) })];
+    return buildCarryover(input(events, { attachments: attachments.map((a) => ({ ...a, event_id: events[0].id })) })).carryover;
+  };
+
+  it('names an attachment Ben did not pick as not carried, never its path or content', () => {
+    const c = withFiles([file()]);
+    expect(c.omitted).toContainEqual({ what: 'attachments', count: 1, note: '1 attachment was not carried: cart.png (not selected).', ref: null });
+    expect(c.text).toContain('  - Attachment: cart.png (not carried: not selected)');
+    expect(c.text).not.toContain('/other/uploads');
+    expect(carriedStats(c).attachments).toBe(0);
+  });
+
+  it('lists the files it carries, and each file it could not with its reason', () => {
+    const c = withFiles([
+      file({ id: 'uid-1:0', name: 'cart.png', selected: true, carried: true }),
+      file({ id: 'uid-1:1', name: 'trace.zip', mime: 'application/zip', image: false, availability: 'missing', reason: 'Its bytes are not on this Mac.', selected: true, as: null }),
+      file({ id: 'uid-1:2', name: 'huge.mov', mime: 'video/quicktime', image: false, availability: 'oversize', reason: '90 MB is over the limit.', selected: true, as: null }),
+    ]);
+    expect(c.text).toContain('Attachments carried, copied into your own uploads folder and listed with the first message you read: cart.png.');
+    expect(c.text).toContain('  - Attachment: cart.png (carried, listed with the first message)');
+    expect(c.text).toContain('  - Attachment: trace.zip (not carried: Its bytes are not on this Mac.)');
+    expect(c.omitted).toContainEqual({
+      what: 'attachments',
+      count: 2,
+      note: '2 attachments were not carried: trace.zip (Its bytes are not on this Mac.); huge.mov (90 MB is over the limit.).',
+      ref: null,
+    });
+    expect(carriedStats(c).attachments).toBe(1);
     expect(c.text).not.toContain('/other/uploads');
   });
 

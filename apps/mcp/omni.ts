@@ -265,6 +265,7 @@ server.registerTool(
       `Continue an idle thread in a new one on a local harness, only when ${USER} asks. The new thread is linked to it, in the same ` +
       'channel, with a session of its own and, for repo work, its own worktree on a new branch with the uncommitted changes carried. ' +
       'Its first session reads a carryover of the thread (goal, changed files, checks, recent history) ahead of `message`. ' +
+      'Files attached in the thread go only when named in `attachments`: they are copied into the new thread, and any that are missing, too big or not plain files are listed back with why. ' +
       'The thread itself stays as it is. Refused while anything runs or waits in it, and to or from Hermes or Cursor Cloud. Ids come from list_harnesses.',
     inputSchema: {
       thread_id: z.string(),
@@ -272,17 +273,39 @@ server.registerTool(
       model: z.string().optional().describe("A model id from list_harnesses. Omit for the harness's default. Not Omni's Auto; Cursor's own auto model is fine."),
       effort: z.string().optional().describe("One of the model's effort levels. Omit for its default."),
       message: z.string().describe('The first message for the new thread. It reads it after the carryover, whole.'),
+      attachments: z.array(z.string()).optional().describe('Names of files attached in the thread to carry into the new one. Omit to carry none.'),
     },
   },
-  async ({ thread_id, harness, model, effort, message }) => {
+  async ({ thread_id, harness, model, effort, message, attachments }) => {
     const run = { harness, model: model ?? '', effort: effort ?? '' };
-    const preview = await call(`/threads/${thread_id}/continue/preview`, { method: 'POST', body: JSON.stringify(run) });
+    const previewOf = (picked?: string[]) => call(`/threads/${thread_id}/continue/preview`, { method: 'POST', body: JSON.stringify({ ...run, attachments: picked }) });
+    let preview = await previewOf();
+    if (attachments?.length) {
+      const has: { id: string; name: string }[] = preview.carryover.attachments;
+      const missing = attachments.filter((n) => !has.some((a) => a.name === n));
+      if (missing.length) return text(`Not continued: this thread has no attachment named ${missing.join(', ')}. It has: ${has.map((a) => a.name).join(', ') || 'none'}.`);
+      preview = await previewOf(has.filter((a) => attachments.includes(a.name)).map((a) => a.id));
+    }
     if (preview.blocked) return text(`Not continued: ${preview.blocked.message}`);
+    const picked = (preview.carryover.attachments as { id: string; selected: boolean }[]).filter((a) => a.selected).map((a) => a.id);
     const { thread } = await call(`/threads/${thread_id}/continue`, {
       method: 'POST',
-      body: JSON.stringify({ ...run, text: message, request_id: randomUUID(), revision: preview.revision }),
+      body: JSON.stringify({ ...run, text: message, attachments: picked, request_id: randomUUID(), revision: preview.revision }),
     });
-    return text({ thread_id: thread.id, title: thread.title, continued_from: thread_id, harness: thread.harness, model: thread.model, effort: thread.effort, status: thread.status, branch: thread.branch });
+    const files = (preview.carryover.attachments as { name: string; selected: boolean; carried: boolean; reason: string | null }[])
+      .filter((a) => a.selected)
+      .map((a) => ({ name: a.name, carried: a.carried, ...(a.reason && { not_carried_because: a.reason }) }));
+    return text({
+      thread_id: thread.id,
+      title: thread.title,
+      continued_from: thread_id,
+      harness: thread.harness,
+      model: thread.model,
+      effort: thread.effort,
+      status: thread.status,
+      branch: thread.branch,
+      ...(files.length && { attachments: files }),
+    });
   },
 );
 

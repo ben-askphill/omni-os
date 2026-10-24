@@ -13,8 +13,9 @@ import { continueRefusal, continueSourceRefusal, type CarriedStats, type Carryov
 import type { Run, RunName } from '@omni/shared/run-switch.ts';
 import { channels, continuations, events, messageRequests, threadBases, threads, tx, type SkippedFile, type Thread, type ThreadBase } from './db.ts';
 import { buildCarryover, carriedStats, historyText, type CarryoverP } from './carryover.ts';
+import { copyAttachments, planAttachments, planSignature, type AttachmentPlan } from './continue-attachments.ts';
 import { changesCheckout, git, gitOr, parseNameStatus, real, threadBase } from './changes.ts';
-import { threadDir } from './config.ts';
+import { threadDir, uploadsDir } from './config.ts';
 import { asksAuto } from './harness/auto.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { isHarnessId, isRemoteHarness, remoteWhere } from './harness/types.ts';
@@ -142,10 +143,12 @@ interface Captured {
   /** The source's newest event when it was captured. A newer one refuses the start. */
   guard: number;
   checkout: Checkout;
+  /** The source's attachments as they were then, with Ben's picks. */
+  plan: AttachmentPlan;
 }
 
 /** The source as the continued thread would start from it now, and the preview of that. */
-async function capture(sourceId: string, to: RunName): Promise<Captured> {
+async function capture(sourceId: string, to: RunName, picked: readonly string[]): Promise<Captured> {
   const source = threads.get(sourceId);
   if (!source) throw refusal('thread not found', 404);
   const blocked = sourceBlock(source);
@@ -154,21 +157,26 @@ async function capture(sourceId: string, to: RunName): Promise<Captured> {
   const read = await readCheckout(source);
   const checkout: Checkout = 'code' in read ? { kind: 'folder' } : read;
   const repo = checkout.kind === 'folder' ? null : checkout;
+  const seen = events.since(sourceId).filter((e) => e.id <= guard);
+  const uid = (id: number) => events.uidOf(id) ?? String(id);
+  const plan = planAttachments(sourceId, seen, uid, picked, to.harness);
   const { carryover, body } = buildCarryover({
     source: { id: source.id, title: source.title, channel: source.channel_id, run: runName(runOf(source)) },
     to,
     user: userName(),
     role: source.role,
-    events: events.since(sourceId).filter((e) => e.id <= guard),
-    uid: (id) => events.uidOf(id) ?? String(id),
+    events: seen,
+    uid,
     workspace: repo ? { kind: repo.kind, paths: [source.cwd, real(source.cwd), repo.dir, real(repo.dir)] } : { kind: 'folder', cwd: source.cwd },
     files: repo && { base: repo.base.sha, head: repo.head, tree: repo.tree, changed: repo.changed },
     skipped: repo?.skipped ?? [],
     uncommitted: repo?.uncommitted ?? [],
     parked: messageRequests.parked(sourceId).map((r) => (typeof r.payload?.text === 'string' ? r.payload.text : r.prompt)),
+    attachments: plan.items,
+    uploads: [uploadsDir(sourceId), real(uploadsDir(sourceId))],
   });
   const revision = createHash('sha256')
-    .update(JSON.stringify([events.uidOf(guard) ?? guard, repo?.head ?? '', repo?.tree ?? '', body]))
+    .update(JSON.stringify([events.uidOf(guard) ?? guard, repo?.head ?? '', repo?.tree ?? '', body, planSignature(plan)]))
     .digest('hex')
     .slice(0, 16);
   return {
@@ -176,17 +184,19 @@ async function capture(sourceId: string, to: RunName): Promise<Captured> {
     body,
     guard,
     checkout,
+    plan,
   };
 }
 
 /** POST /api/threads/:id/continue/preview: the Carryover for this run, and whether the thread can be continued now. */
-export async function previewContinue(sourceId: string, run: Run): Promise<ContinuePreview> {
+export async function previewContinue(sourceId: string, run: Run, attachments: readonly string[] = []): Promise<ContinuePreview> {
   if (!threads.get(sourceId)) throw refusal('thread not found', 404);
-  return (await capture(sourceId, await targetRun(run))).preview;
+  return (await capture(sourceId, await targetRun(run), attachments)).preview;
 }
 
 /** The same message on the same run hashes the same. */
-const fingerprintOf = (b: ContinueBody) => createHash('sha256').update(JSON.stringify([b.text, b.harness, b.model, b.effort])).digest('hex');
+const fingerprintOf = (b: ContinueBody) =>
+  createHash('sha256').update(JSON.stringify([b.text, b.harness, b.model, b.effort, [...new Set(b.attachments ?? [])].sort()])).digest('hex');
 
 /** The thread a start with this request id made before, or a 409 when the id went with another message or run. */
 function startedBefore(sourceId: string, requestId: string, fingerprint: string): { thread: Thread; duplicate: true } | null {
@@ -214,7 +224,7 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
   const to = await targetRun(body);
   const idle = sourceBlock(threads.get(sourceId) ?? first);
   if (idle) throw busy(idle);
-  const cap = await capture(sourceId, to);
+  const cap = await capture(sourceId, to, body.attachments ?? []);
   if (cap.preview.blocked) throw busy(cap.preview.blocked);
   if (cap.preview.revision !== body.revision) throw changed(cap.preview);
 
@@ -239,7 +249,10 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
     if (!now) throw refusal('thread not found', 404);
     lost = sourceBlock(now);
     if (!lost && events.lastId(sourceId) === cap.guard) {
-      made = tx(() => {
+      // The picked files are copied here, before the thread is written: one that is no longer the file the preview
+      // judged starts nothing. A failure from here on removes the new thread's folder, uploads included.
+      const files = copyAttachments(sourceId, id, cap.plan);
+      if (files) made = tx(() => {
         const t = threads.create({
           id,
           channel_id: now.channel_id,
@@ -266,7 +279,7 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
         events.add(id, 'carryover', { source: carried.source, goal: carried.goal, text: cap.body, ...carriedStats(carried) } satisfies CarryoverP);
         continuations.add({ thread_id: id, source_id: sourceId, request_id: body.request_id, fingerprint, head: repo?.head ?? null, tree: repo?.kind === 'snapshot' ? repo.tree : null });
         if (repo) threadBases.set(id, { sha: repo.base.sha, ref: repo.base.ref, how: repo.base.how });
-        saveStart(t, body.text, undefined);
+        saveStart(t, body.text, files.length ? files : undefined);
         return threads.get(id)!;
       });
     }
@@ -277,7 +290,7 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
   if (!made) {
     discard();
     if (lost) throw busy(lost);
-    throw changed((await capture(sourceId, to)).preview);
+    throw changed((await capture(sourceId, to, body.attachments ?? [])).preview);
   }
 
   emitThread(id);
@@ -292,7 +305,7 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
 
 const statsOf = (threadId: string): CarriedStats | null => {
   const p = continuations.carryover(threadId);
-  return p && { entries: p.entries, condensed: p.condensed, omitted: p.omitted, chars: p.chars, budget: p.budget, files: p.files };
+  return p && { entries: p.entries, condensed: p.condensed, omitted: p.omitted, chars: p.chars, budget: p.budget, files: p.files, attachments: p.attachments ?? 0 };
 };
 
 const linkTo = (t: Thread, carried: CarriedStats | null): ContinueLink => ({

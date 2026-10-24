@@ -36,10 +36,10 @@ A switch keeps one thread. To leave a thread as it is and carry on in a new one,
 - For repo work, Omni snapshots the source's worktree the way it saves a turn: HEAD, every tracked change and untracked text file git does not ignore. The new branch starts at the source's HEAD with those changes laid in, uncommitted. Ignored files such as `.env`, and binary or large untracked files, are not copied; the preview lists the ones it left out. A source that runs in the channel's own checkout (worktree per thread off) shares it with you and other threads, so its uncommitted changes are listed, not copied, and the new thread still gets a worktree of its own.
 - Paths from the source's checkout reach the new session relative to the repo root, so it works in its own worktree. Older history it left out is readable through Omni's API, and the carryover says how.
 - If the source changes between the preview and Start (a new message, a turn, an edit to its files), Start is refused and the sheet shows the new preview.
-- Attachments from the source are listed but not carried yet.
+- **Attachments** from the source are listed with their name, type, size and whether Omni still has the bytes. None goes unless you tick it. A ticked file is copied into the new thread's own uploads folder and arrives with your first message the way any attachment does: images inline on Claude Code and Codex, and as a path to the file on Cursor Agent (the sheet says which). The new thread never points at the source's folder. A file that is missing on this Mac (for example attached on the other Mac), over the upload limit, past the 4-files'-worth total, a link instead of a file, or changed since it was attached stays on the list with its reason, and the carryover names it as not carried. Cancelling the sheet copies nothing, and a retried Start gives the same thread and the same files.
 - A message that starts with a command, like `/review`, runs first, and the carryover goes with your next message.
 - Hermes and Cursor Cloud can't take a continued thread, and a thread running on them can't be continued, since their files are not on this Mac.
-- The Conductor can do the same with `continue_thread`, when you ask it to.
+- The Conductor can do the same with `continue_thread`, when you ask it to. It names the attachments to carry, and the answer says which went and why the others did not.
 
 ## Auto
 

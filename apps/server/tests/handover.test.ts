@@ -154,6 +154,7 @@ describe('a continued thread', () => {
       skipped: [],
       uncommitted: [],
       parked: [],
+      attachments: [],
     });
     const p: CarryoverP = { source: c.source, goal: c.goal, text: body, entries: c.recent.length, condensed: 0, omitted: 0, chars: c.chars, budget: c.budget, files: 0 };
     return { c, p };

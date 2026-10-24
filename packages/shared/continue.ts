@@ -71,11 +71,27 @@ export interface CarryoverOmission {
   ref: string | null;
 }
 
-/** A file Ben attached in the source. None is carried yet (#222 lets Ben pick some); each is listed as left out. */
+/** Whether a file Ben attached in the source can go to the new thread. `missing`: its bytes are not on this Mac. */
+export type AttachmentAvailability = 'available' | 'missing' | 'oversize' | 'unsupported';
+
+/** A file Ben attached in the source, as the sheet lists it: what it is, whether its bytes can be copied, and whether he picked it. */
 export interface CarryoverAttachment {
+  /** The attachment's message (its event uid) and its place in it. The start names the files Ben picked by this. */
+  id: string;
   name: string;
   event_id: number;
-  carried: false;
+  mime: string;
+  /** Bytes on this Mac when the file is there, else the size recorded when it was attached, else null. */
+  size: number | null;
+  image: boolean;
+  availability: AttachmentAvailability;
+  /** Why it cannot be carried, or null when it can. */
+  reason: string | null;
+  selected: boolean;
+  /** Picked and available: its bytes are copied into the new thread's own uploads folder. */
+  carried: boolean;
+  /** How the picked harness reads it once copied: `inline` is an image in the message, `path` a note naming the file. Null when it cannot be copied. */
+  as: 'inline' | 'path' | null;
 }
 
 export interface Carryover {
@@ -112,6 +128,8 @@ export interface ContinueBody {
   harness: string;
   model: string;
   effort: string;
+  /** The ids of the source's attachments Ben picked (`CarryoverAttachment.id`). None by default. */
+  attachments?: string[];
   text: string;
   /** The client's id for this start, kept across retries: a retry gets the same thread back. */
   request_id: string;
@@ -126,6 +144,8 @@ export interface CarriedStats {
   chars: number;
   budget: number;
   files: number;
+  /** Attachments copied into the new thread. Absent on a thread continued before attachments could be carried. */
+  attachments?: number;
 }
 
 /** One end of a continuation link, as GET /api/threads/:id shows it (`continued_from`, `continued_in`). */
@@ -179,5 +199,6 @@ export function carriedText(c: CarriedStats): string {
   const condensed = c.condensed ? ` (${c.condensed} shortened)` : '';
   const left = c.omitted ? `, ${c.omitted} older left out` : '';
   const files = c.files ? `, ${count(c.files, 'changed file', 'changed files')}` : '';
-  return `Carried ${count(c.entries, 'entry', 'entries')}${condensed}${left}${files}.`;
+  const attached = c.attachments ? `, ${count(c.attachments, 'attachment', 'attachments')}` : '';
+  return `Carried ${count(c.entries, 'entry', 'entries')}${condensed}${left}${files}${attached}.`;
 }

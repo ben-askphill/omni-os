@@ -492,9 +492,19 @@ async function scenario() {
 
   const onto = { harness: 'claude-code', model: 'sonnet', effort: 'low' };
   writeFileSync(join(wt.cwd, 'photo.bin'), Buffer.from([0, 1, 2, 0]));
-  type Preview = { revision: string; blocked: unknown; workspace: string; carryover: { files: { total: number } | null; omitted: { what: string }[] } };
-  const shown = keep('continue-preview.json', await call('POST', `/threads/${wt.id}/continue/preview`, onto)) as Preview;
-  expect(shown).toMatchObject({ blocked: null, workspace: 'worktree', carryover: { omitted: [{ what: 'untracked' }] } });
+  // Two files attached to the worktree thread: the preview offers both and Ben picks one.
+  const form = new FormData();
+  form.set('payload', JSON.stringify({ prompt: 'here are the mocks' }));
+  form.append('files', new File(['mock bytes'], 'mock.png', { type: 'image/png' }));
+  form.append('files', new File(['some notes'], 'notes.txt', { type: 'text/plain' }));
+  const withFiles = await fetch(`${base}/api/threads/${wt.id}/messages`, { method: 'POST', headers: { authorization: `Bearer ${process.env.OMNI_TOKEN}` }, body: form });
+  expect(withFiles.ok, 'the message with files').toBe(true);
+  await eventually(async () => (await detail(wt.id)).thread.status === 'done', 'the message with files to run');
+  type Preview = { revision: string; blocked: unknown; workspace: string; carryover: { files: { total: number } | null; omitted: { what: string }[]; attachments: { id: string; name: string }[] } };
+  const offered = (await call('POST', `/threads/${wt.id}/continue/preview`, onto)) as Preview;
+  const mock = offered.carryover.attachments.find((a) => a.name === 'mock.png')!;
+  const shown = keep('continue-preview.json', await call('POST', `/threads/${wt.id}/continue/preview`, { ...onto, attachments: [mock.id] })) as Preview;
+  expect(shown).toMatchObject({ blocked: null, workspace: 'worktree', carryover: { omitted: [{ what: 'untracked' }, { what: 'attachments' }] } });
   expect(shown.carryover.files?.total, 'the worktree thread\'s changed files').toBeGreaterThan(0);
   const preview = (await call('POST', `/threads/${id}/continue/preview`, onto)) as Preview;
   expect(preview.blocked, 'the first thread is idle').toBeNull();

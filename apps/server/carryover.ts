@@ -69,6 +69,10 @@ export interface CarryoverInput {
   uncommitted: string[];
   /** The first line of each message parked in the source for Resume, which is not sent. */
   parked: string[];
+  /** The source's attachments, judged and marked with Ben's picks (continue-attachments.ts). */
+  attachments: CarryoverAttachment[];
+  /** The source's uploads folder as stored and resolved. A path into it names nothing the new thread can read. */
+  uploads?: string[];
   budget?: number;
 }
 
@@ -82,13 +86,18 @@ const listed = (names: string[], sep = ', ') =>
 /** Ends a body that is over the budget even with no history in it. */
 const OVER = '\n… (cut to fit the budget)';
 
+/** What a path into the source's uploads folder reads as: a place, not a path anyone can open. */
+const SOURCE_UPLOADS = '(source uploads)';
+
 /** Historical text can never open or close the block it is carried in. */
 const neutral = (s: string) => s.replace(/<(\/?)omni-(carryover|handover)/gi, '‹$1omni-$2');
 
 /** Every string the Carryover takes from the transcript or the checkout goes through this. */
 function cleaner(i: CarryoverInput) {
   const paths = i.workspace.kind === 'folder' ? [] : [...new Set(i.workspace.paths.filter(Boolean))].sort((a, b) => b.length - a.length);
-  return (s: string) => neutral(paths.reduce((t, p) => t.split(p).join('.'), s));
+  const uploads = [...new Set((i.uploads ?? []).filter(Boolean))].sort((a, b) => b.length - a.length);
+  const unreadable = (s: string) => uploads.reduce((t, p) => t.split(p).join(SOURCE_UPLOADS), s);
+  return (s: string) => neutral(paths.reduce((t, p) => t.split(p).join('.'), unreadable(s)));
 }
 
 /** What a run of the transcript says, as rows with their payloads read. */
@@ -111,8 +120,9 @@ interface Raw {
  * The transcript as entries, oldest first: messages, replies, top-level tool calls (with the result of a failed one or
  * one of the newest), crew reports, errors, run switches and earlier Carryovers. Attachments are named, never their
  * paths. `speaker` is the harness the thread ran on last. The history endpoint (continue.ts) reads the same entries.
+ * With `attachments`, each says whether it was carried; without, none was.
  */
-export function transcriptEntries(events: EventRow[], user: string, speaker: string, clean = (s: string) => s): Raw[] {
+export function transcriptEntries(events: EventRow[], user: string, speaker: string, clean = (s: string) => s, attachments?: CarryoverAttachment[]): Raw[] {
   const rows = read(events);
   const results = new Map<string, Row>();
   for (const r of rows) if (r.kind === 'tool_result') results.set(r.p.tool_use_id, r);
@@ -124,7 +134,9 @@ export function transcriptEntries(events: EventRow[], user: string, speaker: str
   for (const { id, kind, p } of rows) {
     if (p?.dropped) continue;
     if (kind === 'user') {
-      const files = attachmentNames(p).map((name) => `  - Attachment: ${clean(name)} (not carried)`);
+      const files = attachments
+        ? attachments.filter((a) => a.event_id === id).map((a) => `  - Attachment: ${clean(a.name)} (${a.carried ? 'carried, listed with the first message' : `not carried: ${attachmentReason(a)}`})`)
+        : attachmentNames(p).map((name) => `  - Attachment: ${clean(name)} (not carried)`);
       out.push({ id, who: 'user', text: [`[${user}] ${clean(cut(p.text ?? '', MESSAGE_MAX))}`, ...files].join('\n') });
     } else if (kind === 'assistant_text') {
       out.push({ id, who: 'agent', text: `[${who}] ${clean(cut(p.text ?? '', MESSAGE_MAX))}` });
@@ -150,6 +162,9 @@ export function transcriptEntries(events: EventRow[], user: string, speaker: str
 /** The transcript as the history endpoint serves it: every entry, oldest first. */
 export const historyText = (events: EventRow[], user: string, speaker: string) =>
   transcriptEntries(events, user, speaker).map((e) => e.text).join('\n');
+
+/** Why a file did not go: what is wrong with it, or that Ben did not pick it. */
+const attachmentReason = (a: CarryoverAttachment) => a.reason ?? 'not selected';
 
 function attachmentNames(p: { attachments?: unknown }): string[] {
   return (Array.isArray(p.attachments) ? p.attachments : []).flatMap((a: { name?: unknown }) => {
@@ -260,9 +275,9 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
   const files = i.files && { base: i.files.base, head: i.files.head, tree: i.files.tree, listed: changed.slice(0, FILES_LISTED), total: changed.length };
   const allChecks = checksOf(rows, clean);
   const checks = allChecks.slice(-CHECKS_KEPT);
-  const attachments: CarryoverAttachment[] = rows.flatMap((r) =>
-    r.kind === 'user' && !r.p?.dropped ? attachmentNames(r.p).map((name) => ({ name: clean(name), event_id: r.id, carried: false as const })) : [],
-  );
+  const attachments: CarryoverAttachment[] = i.attachments.map((a) => ({ ...a, name: clean(a.name), reason: a.reason && clean(a.reason) }));
+  const carriedFiles = attachments.filter((a) => a.carried);
+  const leftFiles = attachments.filter((a) => !a.carried);
 
   // Everything left out but older history, which depends on how much history fits.
   const left: CarryoverOmission[] = [];
@@ -284,9 +299,14 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
     const n = i.parked.length;
     left.push({ what: 'messages', count: n, note: `${plural(n, 'message', 'messages')} waiting for Resume in the source ${n === 1 ? 'was' : 'were'} not sent: ${listed(i.parked.map((m) => `"${clean(cut(firstLine(m), CONDENSED_MAX))}"`), '; ')}.`, ref: null });
   }
-  if (attachments.length) {
-    const n = attachments.length;
-    left.push({ what: 'attachments', count: n, note: `${plural(n, 'attachment is', 'attachments are')} not carried yet: ${listed(attachments.map((a) => a.name))}.`, ref: null });
+  if (leftFiles.length) {
+    const n = leftFiles.length;
+    left.push({
+      what: 'attachments',
+      count: n,
+      note: `${plural(n, 'attachment was', 'attachments were')} not carried: ${listed(leftFiles.map((a) => `${a.name} (${attachmentReason(a)})`), '; ')}.`,
+      ref: null,
+    });
   }
 
   // Shortened entries are the oldest kept, so one reference through the newest of them reads them all in full.
@@ -301,6 +321,9 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
       ...(files && files.total
         ? [[`Changed files, ${files.total} against ${(files.base ?? files.head).slice(0, 7)}:`, ...files.listed.map((f) => `  ${LETTER[f.status]} ${f.old_path ? `${clean(f.old_path)} -> ` : ''}${clean(f.path)}`)].join('\n')]
         : []),
+      ...(carriedFiles.length
+        ? [[`Attachments carried, copied into your own uploads folder and listed with the first message you read: ${listed(carriedFiles.map((a) => a.name))}.`].join('\n')]
+        : []),
       ...(checks.length
         ? [['Checks it ran, newest last:', ...checks.map((c) => `- ${c.ok ? 'passed' : 'failed'}: ${c.command}${c.output ? `\n    ${indent(c.output)}` : ''}`)].join('\n')]
         : []),
@@ -310,7 +333,7 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
 
   // The fixed sections first. History fills what is left, and the line for the history it leaves out is counted once
   // it is known, so the room shrinks by the overshoot until the whole text fits.
-  const raw = transcriptEntries(i.events, i.user, i.source.run.harnessName, clean);
+  const raw = transcriptEntries(i.events, i.user, i.source.run.harnessName, clean, attachments);
   const textOf = (body: string) => carryoverText(i.to, i.source, i.user, body);
   let room = budget - textOf(sections([], left)).length;
   for (;;) {
@@ -340,5 +363,6 @@ export function carriedStats(c: Carryover): CarriedStats {
     chars: c.chars,
     budget: c.budget,
     files: c.files?.total ?? 0,
+    attachments: c.attachments.filter((a) => a.carried).length,
   };
 }

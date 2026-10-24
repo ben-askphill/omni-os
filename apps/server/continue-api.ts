@@ -11,12 +11,14 @@ const runSchema = z.object({
   harness: z.string().min(1).max(100),
   model: z.string().max(200).nullish().transform((v) => v ?? ''),
   effort: z.string().max(100).nullish().transform((v) => v ?? ''),
+  // The ids of the source's attachments Ben picked (`CarryoverAttachment.id`). None unless he picks.
+  attachments: z.array(z.string().min(1).max(200)).max(200).optional(),
 });
 
 /** The Carryover the picked run would read, the revision a start must name, and what keeps the thread from it now. */
 continueApi.post('/:id/continue/preview', async (c) => {
-  const run = runSchema.parse(await c.req.json().catch(() => ({})));
-  return c.json(await previewContinue(c.req.param('id'), run));
+  const { attachments, ...run } = runSchema.parse(await c.req.json().catch(() => ({})));
+  return c.json(await previewContinue(c.req.param('id'), run, attachments));
 });
 
 const startSchema = runSchema.extend({
