@@ -125,7 +125,7 @@ public struct OmniClient: Sendable {
   public let baseURL: URL
   /// Sent as `Authorization: Bearer` on every request (apps/server/request-guard.ts).
   public let token: ServerToken
-  private let transport: any HTTPTransport
+  let transport: any HTTPTransport
 
   public init(baseURL: URL, token: ServerToken = .none, transport: any HTTPTransport = URLSessionTransport()) {
     self.baseURL = baseURL

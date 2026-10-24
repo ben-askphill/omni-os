@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { api, errorText, type HarnessWithRunning, type SetupState, type UserConfigPatch } from '../api.ts';
+import { api, authState, errorText, signInAvailability, type HarnessWithRunning, type SetupState, type UserConfigPatch } from '../api.ts';
 import { navigate, href } from '../router.ts';
+import { onboardingSteps, signInStep, type OnboardingStep, type SignInStep } from '../sign-in.ts';
 import { useApp } from '../store.tsx';
+import { GoogleButton } from './Account.tsx';
 import { OmniMark } from './brand.tsx';
 import { Button, CopyButton, ErrorNote, Icon, Label } from './ui.tsx';
 
-// Onboarding: five short screens on first run (no data/omni.config.json yet), or again from Settings. It writes the
-// user config through /api/setup; the Mac app (OnboardingSheet.swift) and `npm run setup` ask the same questions.
+// Onboarding: a few short screens on first run (no data/omni.config.json yet), or again from Settings, starting with
+// Sign in when Google can be used. It writes the user config through /api/setup; the Mac app (OnboardingSheet.swift)
+// and `npm run setup` ask the same questions.
 
 export const NAME_MAX = 60;
 const PRONOUNS = ['they/them', 'she/her', 'he/him'];
-const STEPS = ['You', 'Workspace', 'Harnesses', 'Channel', 'Done'] as const;
 
 type HarnessRow = HarnessWithRunning & { install?: string };
 
@@ -19,9 +21,17 @@ export function Onboarding() {
   return setupOpen ? <Wizard /> : null;
 }
 
+/** The Sign in step, or null when this browser has none (Google is not set up, or cannot be used yet). Never rejects. */
+const loadSignInStep = () =>
+  Promise.all([authState(), signInAvailability().catch(() => null)]).then(
+    ([auth, availability]) => signInStep(auth, availability),
+    () => null,
+  );
+
 function Wizard() {
   const { closeSetup, reloadProfile, reloadChannels } = useApp();
   const [state, setState] = useState<SetupState | null>(null);
+  const [signIn, setSignIn] = useState<SignInStep | null>(null);
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,10 +49,11 @@ function Wizard() {
   const [channelStore, setChannelStore] = useState('');
   const [createdChannel, setCreatedChannel] = useState<string | null>(null);
 
+  // The steps are fixed once `state` arrives, so both answers land together.
   useEffect(() => {
-    api
-      .get<SetupState>('/setup')
-      .then((s) => {
+    Promise.all([api.get<SetupState>('/setup'), loadSignInStep()])
+      .then(([s, step]) => {
+        setSignIn(step);
         setState(s);
         setName(s.config.user.name);
         setEmail(s.config.user.email);
@@ -56,6 +67,9 @@ function Wizard() {
   }, []);
 
   const rerun = !!state?.onboarded;
+  const steps = onboardingSteps(!!signIn);
+  const here = steps[step];
+  const offering = here === 'Sign in' && signIn?.kind === 'offer';
 
   const patch = (): UserConfigPatch => ({
     user: { name: name.trim().replace(/\s+/g, ' '), email: email.trim(), timezone: timezone.trim(), pronouns: pronouns.trim() || 'they/them' },
@@ -77,16 +91,16 @@ function Wizard() {
   const next = async (e?: FormEvent) => {
     e?.preventDefault();
     setError(null);
-    if (step === 0 && !name.trim()) return setError('Enter a name, or skip setup for now.');
-    if (step === 0 && name.trim().length > NAME_MAX) return setError(`Keep the name under ${NAME_MAX} characters.`);
+    if (here === 'You' && !name.trim()) return setError('Enter a name, or skip setup for now.');
+    if (here === 'You' && name.trim().length > NAME_MAX) return setError(`Keep the name under ${NAME_MAX} characters.`);
     setBusy(true);
     try {
-      if (step === 0 || step === 1) await save();
-      if (step === 3 && channelName.trim() && !createdChannel) {
+      if (here === 'You' || here === 'Workspace') await save();
+      if (here === 'Channel' && channelName.trim() && !createdChannel) {
         setCreatedChannel(await createChannel(channelName, channelRepo, channelStore));
         reloadChannels();
       }
-      if (step === 4) return await finish(patch());
+      if (here === 'Done') return await finish(patch());
       setStep((s) => s + 1);
     } catch (err) {
       setError(errorText(err));
@@ -114,11 +128,29 @@ function Wizard() {
       >
         <div className="flex items-center justify-between gap-3 px-6 pt-6 sm:px-8 sm:pt-8">
           <OmniMark size={32} state={busy ? 'thinking' : 'idle'} />
-          <Steps step={step} />
+          <Steps steps={steps} step={step} />
         </div>
         <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-6 pt-5 sm:px-8">
           {!state && !error && <p className="py-10 text-center text-[13px] text-fg-3">Loading…</p>}
-          {state && step === 0 && (
+          {state && signIn && here === 'Sign in' && (
+            <Screen
+              caption={rerun ? 'Setup' : 'Welcome to Omni'}
+              title="Sign in"
+              body={signIn.kind === 'offer' ? 'Use your Google account on this browser instead of the install token.' : 'This browser stays signed in. You can sign out in Settings.'}
+            >
+              {signIn.kind === 'offer' ? (
+                <GoogleButton variant="primary" size="lg" className="w-full" onError={setError} />
+              ) : (
+                <div className="flex items-center gap-2.5 rounded-[16px] bg-surface p-3.5">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-done text-on-done">
+                    <Icon name="check" size={13} />
+                  </span>
+                  <span className="min-w-0 truncate text-[13.5px] font-medium">Signed in as {signIn.user.email}</span>
+                </div>
+              )}
+            </Screen>
+          )}
+          {state && here === 'You' && (
             <Screen caption={rerun ? 'Setup' : 'Welcome to Omni'} title="Tell Omni about you" body="Your name and pronouns are told to every agent, so a thread knows who it works for. Automations use your timezone.">
               <Row label="Name" htmlFor="ob-name">
                 <input id="ob-name" className="field w-full" value={name} maxLength={NAME_MAX} autoComplete="name" placeholder="Your name" autoFocus onChange={(e) => setName(e.target.value)} />
@@ -136,7 +168,7 @@ function Wizard() {
               </div>
             </Screen>
           )}
-          {state && step === 1 && (
+          {state && here === 'Workspace' && (
             <Screen caption="Workspace" title="Where your work lives" body="Threads in a channel without a repo run in the workspace folder, and its CLAUDE.md and skills load in every Claude thread. Omni makes it if it is missing.">
               <Row label="Workspace folder" htmlFor="ob-root">
                 <input id="ob-root" className="field w-full font-mono !text-[13px]" value={root} placeholder={state.fallbacks.workspaceRoot} spellCheck={false} onChange={(e) => setRoot(e.target.value)} />
@@ -149,8 +181,8 @@ function Wizard() {
               </Row>
             </Screen>
           )}
-          {state && step === 2 && <HarnessScreen />}
-          {state && step === 3 && (
+          {state && here === 'Harnesses' && <HarnessScreen />}
+          {state && here === 'Channel' && (
             <Screen caption="First channel" title="Add a client or project" body="A channel holds the threads for one client or project. With a repo, every thread gets its own git worktree. Skip it and add channels later from the sidebar.">
               {createdChannel ? (
                 <p className="rounded-[16px] bg-surface p-4 text-[13px] text-fg-2">
@@ -178,7 +210,7 @@ function Wizard() {
               )}
             </Screen>
           )}
-          {state && step === 4 && (
+          {state && here === 'Done' && (
             <Screen caption="Done" title={`You're set${name.trim() ? `, ${name.trim().split(' ')[0]}` : ''}`} body={rerun ? 'Save to keep these settings.' : 'Omni opens #conductor with a welcome message. Tell the Conductor what you need and it hands the work to the right crew role.'}>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-[16px] bg-surface p-4 text-[13px]">
                 <Summary k="Name" v={name.trim()} />
@@ -206,9 +238,9 @@ function Wizard() {
             </Button>
           )}
           <div className="flex items-center gap-2">
-            {step === 3 && !createdChannel && !channelName.trim() && <span className="text-[12px] text-fg-3">Optional</span>}
-            <Button type="submit" variant="primary" busy={busy} disabled={!state}>
-              {step === 4 ? (rerun ? 'Save' : 'Open Conductor') : step === 3 && !channelName.trim() && !createdChannel ? 'Skip' : 'Continue'}
+            {here === 'Channel' && !createdChannel && !channelName.trim() && <span className="text-[12px] text-fg-3">Optional</span>}
+            <Button type="submit" variant={offering ? 'secondary' : 'primary'} busy={busy} disabled={!state}>
+              {here === 'Done' ? (rerun ? 'Save' : 'Open Conductor') : offering ? 'Use install token instead' : here === 'Channel' && !channelName.trim() && !createdChannel ? 'Skip' : 'Continue'}
             </Button>
           </div>
         </div>
@@ -294,10 +326,10 @@ function Command({ label, cmd }: { label: string; cmd: string }) {
   );
 }
 
-function Steps({ step }: { step: number }) {
+function Steps({ steps, step }: { steps: readonly OnboardingStep[]; step: number }) {
   return (
-    <ol className="flex items-center gap-1.5" aria-label={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}>
-      {STEPS.map((s, i) => (
+    <ol className="flex items-center gap-1.5" aria-label={`Step ${step + 1} of ${steps.length}: ${steps[step]}`}>
+      {steps.map((s, i) => (
         <li key={s} title={s} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-6 bg-fg' : i < step ? 'w-1.5 bg-fg-2' : 'w-1.5 bg-line-strong'}`} />
       ))}
     </ol>

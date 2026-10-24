@@ -82,6 +82,14 @@ func sseData(_ text: String) -> [String] {
     "request-edit-request.json": { _ = try decodeFixture(JSONValue.self, "request-edit-request.json") },
     // NeedsYouTests compares it with what the client encodes.
     "needs-you-read-request.json": { _ = try decodeFixture([String: String].self, "needs-you-read-request.json") },
+    // Sign in with Google. AccountTests compares signin-start-request.json with what the client encodes.
+    "auth-token.json": { _ = try decodeFixture(AuthState.self, "auth-token.json") },
+    "auth-session.json": { _ = try decodeFixture(AuthState.self, "auth-session.json") },
+    "signin-availability.json": { _ = try decodeFixture(SignInAvailability.self, "signin-availability.json") },
+    "signin-start.json": { _ = try decodeFixture(SignInStart.self, "signin-start.json") },
+    "signin-finished.json": { _ = try decodeFixture(SignInFinished.self, "signin-finished.json") },
+    "signout.json": { _ = try decodeFixture([String: Bool].self, "signout.json") },
+    "signin-start-request.json": { _ = try decodeFixture([String: String].self, "signin-start-request.json") },
   ]
 
   static func threadStream() throws -> [ThreadStreamMessage] {

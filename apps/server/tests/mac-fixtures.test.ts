@@ -3,6 +3,7 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { startFakeGoogle } from '@omni/test-fixtures/fake-google.mjs';
 import { diff, shapeOf, tagOf } from './fixture-shape.ts';
 import { FAKE_CLAUDE, fakeAlive } from './support.ts';
 
@@ -89,10 +90,21 @@ const NAMES = [
   // thread whose turns are not saved.
   'turns.json',
   'turns-unavailable.json',
+  // Signing in with Google as the Mac app does (apps/server/sign-in.ts), against the fake Google: the install-token
+  // view, start, finish with the claim, the session's own view, and signing out.
+  'auth-token.json',
+  'signin-availability.json',
+  'signin-start-request.json',
+  'signin-start.json',
+  'signin-finished.json',
+  'auth-session.json',
+  'signout.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
 const tmp = mkdtempSync(join(tmpdir(), 'omni-mac-fixtures-'));
+const GOOGLE_CLIENT = 'mac-fixtures.apps.googleusercontent.com';
+const google = await startFakeGoogle({ clients: { [GOOGLE_CLIENT]: 'fixture-secret' } });
 const data = join(tmp, 'data');
 const fakeLog = join(tmp, 'fake-claude.jsonl');
 const got = new Map<Name, string>();
@@ -118,6 +130,7 @@ afterAll(async () => {
     }
   }
   rmSync(tmp, { recursive: true, force: true });
+  await google.close();
 }, 20_000);
 
 // ---------- the server ----------
@@ -153,6 +166,8 @@ let setUp: { bin: string; automationsDir: string } | undefined;
 async function boot(): Promise<number> {
   if (!setUp) {
     mkdirSync(join(tmp, 'brain'));
+    mkdirSync(data, { recursive: true });
+    writeFileSync(join(data, 'omni.config.json'), JSON.stringify({ auth: { googleClientId: GOOGLE_CLIENT } }));
     setUp = { bin: fakeSecurity(), automationsDir: automations() };
   }
   const { bin, automationsDir } = setUp;
@@ -182,6 +197,10 @@ async function boot(): Promise<number> {
       FAKE_CLAUDE_LOG: fakeLog,
       FAKE_CLAUDE_LATENCY_MS: '10',
       FAKE_CLAUDE_CRASH_ON: 'CRASH_NOW',
+      OMNI_GOOGLE_AUTH_URL: google.endpoints.auth,
+      OMNI_GOOGLE_TOKEN_URL: google.endpoints.token,
+      OMNI_GOOGLE_JWKS_URL: google.endpoints.jwks,
+      OMNI_GOOGLE_CLIENT_SECRET: 'fixture-secret',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -485,6 +504,30 @@ async function scenario() {
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
+
+  // Sign in with Google as the Mac app: start with the token, Google sends ASWebAuthenticationSession to omni://,
+  // finish with the claim. What changes per run (the attempt, the claim, Google's URL, the credential) is fixed here.
+  keep('auth-token.json', await get('/auth'));
+  keep('signin-availability.json', await get('/auth/google'));
+  const startBody = request('signin-start-request.json', { client: 'mac', deviceName: "Ada's MacBook Pro" });
+  const start = (await call('POST', '/auth/google/start', startBody)) as { attempt: string; url: string; mode: string; claim: string };
+  keep('signin-start.json', { ...start, attempt: 'attempt-id', claim: 'claim-secret', url: 'https://accounts.google.com/o/oauth2/v2/auth?response_type=code' });
+  const toCallback = (await fetch(`${start.url}&login_hint=ada@example.com`, { redirect: 'manual' })).headers.get('location')!;
+  const toApp = (await fetch(toCallback, { redirect: 'manual' })).headers.get('location');
+  expect(toApp).toBe(`omni://signin?attempt=${encodeURIComponent(start.attempt)}`);
+  const signedIn = (await call('POST', '/auth/google/finish', { attempt: start.attempt, claim: start.claim })) as { credential: string };
+  keep('signin-finished.json', { ...signedIn, credential: 'omni_s1.session-id.session-secret' });
+  const asSession = async (method: string, path: string) => {
+    const res = await fetch(`${base}/api${path}`, {
+      method,
+      headers: { authorization: `Bearer ${signedIn.credential}`, ...(method === 'POST' ? { 'content-type': 'application/json' } : {}) },
+      body: method === 'POST' ? '{}' : undefined,
+    });
+    expect(res.ok, `${method} ${path} with the session`).toBe(true);
+    return res.json();
+  };
+  keep('auth-session.json', await asSession('GET', '/auth'));
+  keep('signout.json', await asSession('POST', '/auth/signout'));
 }
 
 /** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */

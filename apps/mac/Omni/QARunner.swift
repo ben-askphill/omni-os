@@ -239,6 +239,14 @@ final class QARunner {
           case .close: quick.hide()
           }
           try? await Task.sleep(for: .milliseconds(500))
+        case .account(let action):
+          let account = model.account
+          switch action {
+          case .signIn: await account.signIn(open: GoogleSignInSheet.open)
+          case .signOut: await account.signOut()
+          }
+          if case .failed(let message) = account.state { throw QAScriptError("account \(action.rawValue): \(message)") }
+          try? await Task.sleep(for: .milliseconds(400))
         case .quit:
           finish(result, started)
           await end()
@@ -478,6 +486,7 @@ final class QARunner {
     case .handOff(let device): "handOff \(device)"
     case .palette(let query): "palette \(query ?? "close")"
     case .quickPrompt(let action): "quickPrompt \(action)"
+    case .account(let action): "account \(action.rawValue)"
     case .quit: "quit"
     }
   }
@@ -679,6 +688,16 @@ final class QARunner {
         }
       }
       context.restoreGState()
+    }
+    // A Settings tab's scroll view comes out empty in the window's cache. Its page, drawn on its own, does not.
+    if isSettings(window) {
+      for scroll in descendants(of: root).compactMap({ $0 as? NSScrollView }) where !scroll.isHiddenOrHasHiddenAncestor {
+        guard let page = scroll.documentView, let image = cache(page) else { continue }
+        context.saveGState()
+        context.clip(to: pixels(scroll.contentView.convert(scroll.contentView.bounds, to: root)))
+        context.draw(image, in: pixels(page.convert(page.bounds, to: root)))
+        context.restoreGState()
+      }
     }
     // A terminal (SwiftTerm) comes out shifted and clipped in the window's cache. Drawn on its own it is right.
     for term in descendants(of: root) where "\(type(of: term))" == "TerminalView" && !term.isHiddenOrHasHiddenAncestor {

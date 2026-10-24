@@ -35,8 +35,15 @@ struct OnboardingSheet: View {
   @State private var harnesses: [HarnessInfo]?
   @State private var busy = false
   @State private var error: String?
+  /// The Sign in step is part of this run: Google can sign this Mac in, or it already has.
+  @State private var signInShown = false
 
   private var rerun: Bool { state?.onboarded ?? false }
+
+  private var signedIn: Bool {
+    if case .signedIn = model.account.state { return true }
+    return false
+  }
 
   /// Debug launch arg `-OmniOnboardingStep harnesses` opens on that screen, since QA scripts only pick routes.
   private static var firstStep: OnboardingStep {
@@ -55,7 +62,7 @@ struct OnboardingSheet: View {
       HStack {
         StaticMark(size: 32).foregroundStyle(Tok.fg)
         Spacer()
-        StepDots(step: step)
+        StepDots(step: step, steps: OnboardingStep.shown(signIn: signInShown || step == .signIn))
       }
       ScrollView {
         VStack(alignment: .leading, spacing: 0) {
@@ -77,7 +84,14 @@ struct OnboardingSheet: View {
       }
       .scrollIndicators(.automatic)
       HStack {
-        if step == .you {
+        if step == .signIn, !signedIn {
+          Button("Use install token instead") {
+            error = nil
+            step = .you
+          }
+          .buttonStyle(.pill(.ghost, height: 34))
+          .disabled(model.account.state == .signingIn)
+        } else if step == .you || step == .signIn {
           Button(rerun ? "Cancel" : "Skip setup") { rerun ? (model.setupRequested = false) : skip() }
             .buttonStyle(.pill(.ghost, height: 34))
             .disabled(busy)
@@ -90,12 +104,18 @@ struct OnboardingSheet: View {
           .disabled(busy)
         }
         Spacer()
-        Button(action: next) {
-          if busy { Loader(size: 14) } else { Text(primaryLabel) }
+        if step == .signIn, !signedIn {
+          GoogleSignInButton(account: model.account, variant: .primary, height: 34)
+            .disabled(state == nil)
+            .keyboardShortcut(.defaultAction)
+        } else {
+          Button(action: next) {
+            if busy { Loader(size: 14) } else { Text(primaryLabel) }
+          }
+          .buttonStyle(.pill(.primary, height: 34))
+          .disabled(busy || state == nil)
+          .keyboardShortcut(.defaultAction)
         }
-        .buttonStyle(.pill(.primary, height: 34))
-        .disabled(busy || state == nil)
-        .keyboardShortcut(.defaultAction)
       }
       .padding(.top, z(20))
     }
@@ -103,6 +123,11 @@ struct OnboardingSheet: View {
     .frame(width: 500, height: 600)
     .background(Tok.bg)
     .task {
+      await model.account.refresh()
+      if model.account.offersSignIn {
+        signInShown = true
+        if step == .you { step = .signIn }
+      }
       await load()
       if step == .harnesses, harnesses == nil { await loadHarnesses() }
     }
@@ -118,6 +143,24 @@ struct OnboardingSheet: View {
 
   @ViewBuilder private func screen(_ state: SetupState) -> some View {
     switch step {
+    case .signIn:
+      Screen(caption: rerun ? "Setup" : "Welcome to Omni", title: "Sign in to Omni",
+             note: "Sign in with Google to give this Mac its own session. You can also go on with the install token and sign in later in Settings.") {
+        switch model.account.state {
+        case .signedIn(let user, let device):
+          VStack(alignment: .leading, spacing: z(3)) {
+            Text("Signed in as \(user.email)").font(.omni(size: 13.5, weight: .medium)).foregroundStyle(Tok.fg)
+            Text(device.name).font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
+          }
+          .padding(z(16)).frame(maxWidth: .infinity, alignment: .leading).omniCard(16)
+        case .failed(let message):
+          Text(message).font(.omni(size: 12.5)).foregroundStyle(Tok.fg2).fixedSize(horizontal: false, vertical: true)
+        case .signedOut, .signingIn:
+          if let google = model.account.google {
+            Text(google.whoMaySignIn).font(.omni(size: 12)).foregroundStyle(Tok.fg3).fixedSize(horizontal: false, vertical: true)
+          }
+        }
+      }
     case .you:
       Screen(caption: rerun ? "Setup" : "Welcome to Omni", title: "Tell Omni about you",
              note: "Your name and pronouns are told to every agent, so a thread knows who it works for. Automations use your timezone.") {
@@ -235,7 +278,7 @@ struct OnboardingSheet: View {
           }
         case .done:
           return try await finish(SetupPatch.cleaned(form, integrations: false))
-        case .harnesses:
+        case .signIn, .harnesses:
           break
         }
         if let n = step.next {
@@ -320,10 +363,13 @@ private struct Field<Content: View>: View {
 
 private struct StepDots: View {
   let step: OnboardingStep
+  let steps: [OnboardingStep]
+
+  private var index: Int { steps.firstIndex(of: step) ?? 0 }
 
   var body: some View {
     HStack(spacing: z(6)) {
-      ForEach(OnboardingStep.allCases, id: \.self) { s in
+      ForEach(steps, id: \.self) { s in
         Capsule()
           .fill(s == step ? Tok.fg : s.rawValue < step.rawValue ? Tok.fg2 : Tok.lineStrong)
           .frame(width: z(s == step ? 24 : 6), height: z(6))
@@ -331,7 +377,7 @@ private struct StepDots: View {
     }
     .animation(Motion.settle, value: step)
     .accessibilityElement()
-    .accessibilityLabel("Step \(step.rawValue + 1) of \(OnboardingStep.allCases.count): \(step.title)")
+    .accessibilityLabel("Step \(index + 1) of \(steps.count): \(step.title)")
   }
 }
 

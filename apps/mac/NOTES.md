@@ -22,6 +22,8 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `StreamMessage.swift` | `ThreadStreamMessage` and `FeedEvent`: one SSE `data:` message each |
 | `Client.swift` | `OmniClient`, `HTTPTransport`, `OmniAPIError`, `NewThread`. `send` is internal so extensions in other files can use it |
 | `Client+Secrets.swift` | `secrets()`, `setSecret(scope:name:value:)`, `deleteSecret(scope:name:)` on `OmniClient` |
+| `Client+Auth.swift` | Sign in with Google: `AuthState`, `GoogleSignIn` (`whoMaySignIn`), `SignInAvailability`, `SignInStart`, `SignInFinished`, `SessionCredential` (prints redacted), `AccountAPI`, and `authState()`, `authState(session:)`, `startSignIn(deviceName:)`, `finishSignIn(attempt:claim:)` (nil on 202), `signOut(session:)` on `OmniClient`. Only `authState(session:)` and `signOut(session:)` send the session as Bearer |
+| `Account.swift` | `SessionStore`, `KeychainSessionStore` (generic password, service `com.omni-os.mac.session`, account `127.0.0.1:<port>`), `MemorySessionStore` (tests and QA runs), `AccountModel` (`AppModel.account`) |
 | `Client+GrokBot.swift` | `sendThreadToGrokBot(threadID:)` on `OmniClient`. Posts the thread id. The server sends the text |
 | `Secrets.swift` | `SecretScope`, `SecretRow`, `SecretName` (the Web UI's name rules), `SecretGroup`, `SecretScopeOption`, `SecretsModel` (the Secrets tab) |
 | `RelTime.swift` | `RelTime.label`: `relTime` in `apps/web/src/format.ts` |
@@ -61,6 +63,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `QuickPrompt.swift` | `QuickPromptShortcut` (the fixed choices and their Carbon key code and modifiers), `QuickPromptSettings` (on, shortcut, Wispr Flow, in UserDefaults), `QuickPromptAPI`, `QuickPromptModel` (text, target channel, phase, `awaitDictation`) |
 | `Handoff.swift` | `Device`, `Reachability`, `HandoffView`, `HandoffPhase`, `PrepareStep`, `HandoffBanner`, `HandoffAnswer`, `DevicesAPI`, `DevicesModel` (`AppModel.devices`), and `devices`, `handOff`, `cancelHandoff` on `OmniClient`. The shapes and text are `packages/shared/handoff.ts`; when to offer it, the picker and the banner follow `apps/web/src/handoff.ts` |
 | `QAScript.swift` | Debug only. `QAScript`, `QAStep`, `QACondition`, `QAFacts`, `QAServer`, `QASnapshot.looksBlank` |
+| `QASignIn.swift` | Debug only. `QASignIn.follow`: Google's URL with `login_hint`, its redirects followed by hand to `omni://signin` |
 
 ## Build and test
 
@@ -81,7 +84,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 - Recording is stable: paths, UUIDs, times, pids, ports, the git head and durations are normalized, so recording twice gives the same files.
 - `FixtureTests.swift` decodes every file, and fails if a file in the folder has no decoder in its table. Add a fixture in both places.
 - `thread-rich.json` is a second thread, for the transcript. Its prompt has the fake CLI's `RICH` marker, which plays the calls a real turn is made of: a plan updated three times, a sub-agent (`Task`) with a nested `Grep` and `Read`, a status, a failing `Bash`, an MCP tool. Then a child's crew report, `/context` (a zero-turn result), and a turn that crashes (`FAKE_CLAUDE_CRASH_ON`), with an error and a dropped message. It is recorded last, so the other fixtures kept their UUIDs.
-- Request fixtures (`secret-set-request.json`, `secret-delete-request.json`, `automation-enabled-request.json`) go the other way: the check run sends the recorded body to the server, so it must still take it, and `SecretsTests` checks the client encodes exactly that JSON.
+- Request fixtures (`secret-set-request.json`, `secret-delete-request.json`, `automation-enabled-request.json`, `signin-start-request.json`) go the other way: the check run sends the recorded body to the server, so it must still take it, and `SecretsTests` checks the client encodes exactly that JSON.
 - The secrets part runs with a `security` on PATH that stores nothing, so `npm test` never touches the Keychain.
 - The automations part reads a folder of the test's own (`OMNI_AUTOMATIONS_DIR`, see `.env.example`): `daily-digest` (enabled, run once) and `broken` (a cron the server can't schedule). Toggling one writes its YAML file, so never point a test server at the repo's `automations/`.
 
@@ -319,6 +322,7 @@ The live tests send `OMNI_TOKEN` as the API token, so run them in the shell that
 | `SidebarFolders.swift` | Folder rows, the inline name field, folder and Move to Folder menus, drops, the delete confirm |
 | `ServerView.swift` | The server screen, `ServerDetails`, `LogTail`, `ServerMenuItems`, `confirmStop` |
 | `SettingsView.swift` | The Settings tabs (`model.settingsTab`), the Connection pane, `PathField`, the folder and file pickers |
+| `AccountSettingsView.swift` | The Account tab (`AccountSettings`), `GoogleSignInButton`, `GoogleSignInSheet` (`ASWebAuthenticationSession`, callback scheme `omni`, not ephemeral) |
 | `SecretsSettingsView.swift` | The Secrets tab: `SecretsSettings` (a `SecretsModel` per client and visit), `SecretsForm`, `SecretRowView` |
 | `AppearanceSettingsView.swift` | The Appearance tab, `Appearance.nsAppearance` |
 | `NotificationSettingsView.swift` | The Notifications tab: this Mac's switch, the macOS permission, a switch per channel |
@@ -354,6 +358,8 @@ Server screen (`ServerScreen`):
 - "Reconnecting" shows next to Not running: the feed keeps trying, which is how a server started in a terminal is found. That is on purpose (see `AppModelTests`).
 
 Settings, Connection pane: Port, Repo (a field and a folder picker), Node (a field and a file picker; empty finds Node itself). The port and paths apply on Return, when the field loses focus or when Settings closes (closing a window does not end editing), and the paths on a pick too. Never per key: typing 4759 does not try 4, 47 and 475. A number that is not a port puts the current one back. A blank Repo is `~/omni-os` (`effectiveRepoPath`), in `config` and on the server screen. Everything applies at once, no relaunch. With launch arguments set, a note says changes last until the app quits. Status shows the server state, the feed, Open Log, and Build (the `OmniGitCommit` stamp) in an installed build.
+
+Settings, Account tab, like the web's Account section: "Signed in as <email>", the device name and Sign out, or "This Mac uses the install token." with Sign in with Google while `google.loopback`; under either, who may sign in. `AccountModel` keeps the session credential in the Keychain only and sends it only to GET /api/auth (which slides it) and sign out; every other call keeps the install token. It refreshes when the feed opens, on activation and when the tab shows; a 401 drops the stored session. Sign in starts with the install token, opens `GoogleSignInSheet`, checks the `omni://signin?attempt=` it ends on is this attempt, then finishes with the claim (asking again a second later while the server answers 202, ten times at most). Closing the sheet is no error. Sign out forgets the session here even when the server cannot be told. Onboarding opens on a Sign in step while `AccountModel.offersSignIn` (Google can sign this Mac in, or it has), with "Use install token instead" as the way past it. A Debug QA run keeps the session in memory, and `-OmniQASignInHint <email>` replaces the sheet with `QASignIn.follow`, which the QA stack's fake Google answers.
 
 Settings, Profile tab, like the web's Settings page (`Settings.tsx`): the name Omni calls you by (`Status.profile`, `PUT /api/profile`), saved on Return or Save, then the store refreshes so the greeting follows. First run: `OnboardingSupport` on the main window shows `OnboardingSheet` while the status has a profile with no name (as `Onboarding.tsx`); Skip or closing it hides it on this Mac (`onboarding.skipped` in UserDefaults). The sidebar's Settings item and `#/settings` open this tab, as Secrets opens its own.
 
@@ -461,7 +467,8 @@ Steps (a list, or an object with the list under `steps`):
 | `{"snapshot": "home"}` | `home.png` for the main window, `home-settings.png` for Settings, `home-window<n>.png` for others. Fails on a blank image |
 | `{"port": 4759}` | Sets the port, as Settings would. Never 4747 |
 | `{"open": "settings"}` | Opens Settings |
-| `{"settings": "secrets"}`, `"appearance"`, `"connection"` | Opens Settings on that tab |
+| `{"settings": "secrets"}`, `"appearance"`, `"connection"`, `"account"` | Opens Settings on that tab |
+| `{"account": "signIn"}`, `{"account": "signOut"}` | What Settings > Account's buttons do. Sign-in needs `-OmniQASignInHint <email>` and a stack with `QA_GOOGLE=1`; the step fails on the account's error |
 | `{"server": "start"}`, `"stop"`, `"check"` | Start Server, Stop Server (no confirmation), Check Again. Waits for it to finish |
 | `{"folder": {"new": "acme"}}` | The new folder field under a channel. With `"name"` it makes the folder, as Return would |
 | `{"folder": {"rename": "Specs"}}`, `{"delete": "Specs"}`, `{"here": "Specs"}` | A folder's name field, its delete confirm, or New Thread Here |
@@ -481,6 +488,7 @@ Steps (a list, or an object with the list under `steps`):
 Snapshots:
 
 - `cacheDisplay` of the window's frame view, so the title bar and toolbar are in. On macOS 26 and later it leaves out the sidebar's rows (the list's scroll view inside the glass draws nothing), and a row's own selection and separator views come out black. So the harness draws each row's cells and headers on their own, clipped to the list's visible area, and lays them over the capture. The selected row's highlight is a plain rounded rect the harness draws (gray unless the window is key).
+- A Settings tab's page (its scroll view) also comes out empty, so the harness draws each scroll view's document on its own, clipped to the visible part, over a Settings window.
 - The see-through glass is filled with the window background color; on screen the desktop shows through.
 - Spinners are drawn still. The app is not activated, so its window is not key: prominent buttons and the selection draw as in a window in the back.
 - A run takes 2 to 10 seconds. Keep the app from staying up: always end with `quit`, or let the steps run out. macOS has no `timeout`; to cap a run anyway, `perl -e 'alarm 60; exec @ARGV' <app binary> <args>`. A run killed that way leaves a server it started running, so only use it with scripts that start none.

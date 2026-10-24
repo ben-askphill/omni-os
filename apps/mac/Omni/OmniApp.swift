@@ -49,12 +49,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let settings = ServerSettings()
     #if DEBUG
     if let qa {
-      // A QA run keeps its server's log, record and data in its out folder, away from the real ones.
+      // A QA run keeps its server's log, record and data in its out folder, away from the real ones, and its
+      // sign-in session in memory (the default), so it never touches the login Keychain.
       let options = qa.supervisorOptions(repo: settings.config.repo)
       return AppModel(settings: settings, supervisor: ServerSupervisor(settings: settings, options: options))
     }
     #endif
-    return AppModel(settings: settings)
+    return AppModel(settings: settings, sessions: KeychainSessionStore())
   }
 
   /// Before any window shows, so none draws in the wrong appearance first.

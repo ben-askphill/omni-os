@@ -104,8 +104,11 @@ import Testing
   }
 
   @Test func stepsRunInOrder() {
-    #expect(OnboardingStep.allCases.map(\.title) == ["You", "Workspace", "Harnesses", "Channel", "Done"])
-    #expect(OnboardingStep.you.previous == nil)
+    #expect(OnboardingStep.allCases.map(\.title) == ["Sign in", "You", "Workspace", "Harnesses", "Channel", "Done"])
+    #expect(OnboardingStep.shown(signIn: false).map(\.title) == ["You", "Workspace", "Harnesses", "Channel", "Done"])
+    #expect(OnboardingStep.shown(signIn: true).first == .signIn)
+    #expect(OnboardingStep.signIn.previous == nil)
+    #expect(OnboardingStep.signIn.next == .you)
     #expect(OnboardingStep.done.next == nil)
     #expect(OnboardingStep.firstName("Ada Lovelace") == "Ada")
   }
