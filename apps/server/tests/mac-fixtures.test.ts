@@ -314,10 +314,12 @@ async function scenario() {
   keep('artifacts.json', await get('/artifacts'));
   keep('error-not-found.json', await call('GET', '/threads/nope', undefined, false));
   got.set('thread-stream.sse', await stream.stop());
+  got.set('feed.sse', await feed.stop());
   const stale = capture(`${base}/api/threads/${id}/stream?after=stale`);
   await eventually(async () => sent(stale.text(), 'sync'), () => `the snapshot sync:\n${stale.text()}`);
-  got.set('thread-stream-snapshot.sse', await stale.stop());
-  got.set('feed.sse', await feed.stop());
+  // Up to the sync: whether the context reading follows it in time is a race.
+  const snap = await stale.stop();
+  got.set('thread-stream-snapshot.sse', snap.slice(0, snap.indexOf('\n\n', snap.indexOf('"kind":"sync"')) + 2));
 
   // After everything above is kept, so the lists and streams stay as they were.
   const rich = (await call('POST', '/threads', { channel: 'acme', prompt: 'RICH fix the cart total', title: 'Fix the cart total' })) as Thread;

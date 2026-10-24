@@ -11,6 +11,18 @@ A thread opens with its newest page of events. Older pages load as Ben scrolls u
 - `GET /api/threads/:id/events/:eventId`: one row, never clipped. "Show all" on a clipped row reads it.
 - `GET /api/search`: each hit carries `event_id`, the event of the thread's best body hit. It is `null` when only the title matched.
 
+## The stream's catch-up
+
+`GET /api/threads/:id/stream?after=<id>` opens with a catch-up (`apps/server/stream-catch-up.ts`), on the first connect and every reconnect alike:
+
+- **Replay.** When the rows after `after` fit one page (`readAfter`: the oldest page after the cursor reaches the live end), they come one by one with their SSE ids. Then one `sync`: the detail `GET /api/threads/:id` answers with, with `events: []`.
+- **Snapshot.** When they do not fit, or `after` is stale (not an id, or past the thread's newest row), no rows come. The `sync` carries the newest page in `events` and `history`, like `?history=recent`, and its SSE id is that page's newest row.
+- Then the thread's last context reading, then live messages.
+
+A client applies the sync in place of fetching the detail again: thread, pending, live, blocked, handoff, artifacts, children and team are the server's now. On a snapshot it calls `detachHead`, so the rows it held become an island with their cursors intact, then joins the page with `applyHead`, and moves its `after` to the page's newest row. Rows it batched before the sync go in first.
+
+The stream subscribes to the bus before it reads the catch-up, so a row written in between is both queued and read. It remembers the ids the catch-up sent and drops their queued copies, and drops queued `thread`, `artifact` and `context` messages, which the sync and the context reading supersede. Every row it sends, replayed or live, is clipped to `rowBytes` like a page's. The size check reads payload sizes from the record header, so a gap too big to replay is never read whole. `apps/server/tests/stream-catch-up.test.ts` covers the races, the budgets, clipping and stale cursors.
+
 ## Budgets
 
 `HISTORY_BUDGET` sets every limit. The numbers come from the largest real threads: 3,100 to 3,200 events, 4.8 to 6.5 MB of payload, about 80 turns.
@@ -66,7 +78,7 @@ Every statement is a keyset read on an index. `history-budget.test.ts` runs `EXP
 
 Both clients hold one `History` and fold it with its spans (`buildItems(events, spans)` on the web, `Transcript.update(_:spans:)` on the Mac). The traps that cost time:
 
-- The stream's `after` moves only on the first load and on streamed rows. A reconnect head or an older page never moves it, or the replay would skip rows.
+- The stream's `after` moves only on the first load, on streamed rows and on a snapshot sync. An older page never moves it, or the replay would skip rows.
 - "New activity" and follow-the-bottom key on `tailId`, not on the row count, so an earlier page never looks like new output.
 - Web: the transcript sets `overflow-anchor: none` and `useScrollAnchor` restores the first visible `[data-key]` row itself, because phone Safari has no scroll anchoring. Without `none`, Chrome corrects a second time.
 - Mac: `.scrollTargetLayout()` alone did not hold the row. At the top edge the lazy stack keeps its offset and the page pushes the row down, so `holdsTopRow` (`TranscriptAnchor.swift`) scrolls it back after the layout.
@@ -74,7 +86,6 @@ Both clients hold one `History` and fold it with its spans (`buildItems(events, 
 
 ## What builds on this
 
-- #224 bounds the reconnect replay. Page cursors and the SSE `after` share one id space, and a client's `tailId` is the stream's `after`. When the gap is too big to replay, `detachHead` closes the head span into an island, and a fresh head joins with `applyHead`. Older history stays reachable through the same cursors.
 - #225 sends compact tool output. `GET /events/:id` is the full read on demand, and it is not bounded yet. Summaries for `tool_result` can replace clipping for that kind without changing paging.
 
 ## Seeding a long thread for QA
