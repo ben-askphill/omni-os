@@ -66,6 +66,32 @@ export const userConfigSchema = z.object({
       tailscaleLogin: z.string().trim().max(500).default(''),
     })
     .prefault({}),
+  /**
+   * Google sign-in (apps/server/sign-in.ts, docs/user/google-sign-in.md). Google only says who someone is: a verified
+   * address on the allowlist gets an Omni session for that browser or Mac, and the install token keeps working.
+   */
+  auth: z
+    .object({
+      /** The Google Cloud "Desktop app" OAuth client: sign-in on this Mac, back through a loopback redirect. Empty is off. */
+      googleClientId: z.string().trim().max(200).default(''),
+      /** The "Web application" client whose redirect URI is the broker's: sign-in from a phone over Tailscale. */
+      googleWebClientId: z.string().trim().max(200).default(''),
+      /**
+       * The OAuth broker (supabase/functions/omni-oauth-broker), like https://<ref>.supabase.co/functions/v1/omni-oauth-broker.
+       * HTTPS, since Google's codes pass through it; plain HTTP only on loopback, for tests.
+       */
+      brokerUrl: z
+        .string()
+        .trim()
+        .max(500)
+        .refine((v) => v === '' || /^https:\/\/[^/]/.test(v) || /^http:\/\/(localhost|127\.\d+\.\d+\.\d+)(:\d+)?(\/|$)/.test(v), 'brokerUrl must be an https:// URL')
+        .default(''),
+      /** Google accounts that may sign in, exact addresses. Empty until the first sign-in from a client that holds the token claims it. */
+      allowedEmails: z.array(z.string().trim().toLowerCase().max(200)).default([]),
+      /** A Google Workspace domain (the ID token's `hd`) whose verified accounts may all sign in, like example.com. Empty is none. */
+      allowedHd: z.string().trim().toLowerCase().max(200).default(''),
+    })
+    .prefault({}),
   /** Per-machine overrides of the shared automation YAML (`enabled`, `channel`), so toggling one never edits the repo. */
   automations: z.record(z.string(), automationOverride).default({}),
 });
@@ -79,6 +105,7 @@ export type UserConfigPatch = {
   user?: Partial<UserConfig['user']>;
   workspace?: Partial<UserConfig['workspace']>;
   integrations?: Partial<UserConfig['integrations']>;
+  auth?: Partial<UserConfig['auth']>;
   automations?: Record<string, AutomationOverride | null>;
 };
 
@@ -87,12 +114,13 @@ export const userConfigPatch = z.object({
   user: userConfigSchema.shape.user.unwrap().partial().optional(),
   workspace: userConfigSchema.shape.workspace.unwrap().partial().optional(),
   integrations: userConfigSchema.shape.integrations.unwrap().partial().optional(),
+  auth: userConfigSchema.shape.auth.unwrap().partial().optional(),
   automations: z.record(z.string(), automationOverride.nullable()).optional(),
 });
 
 const defaults = (): UserConfig => userConfigSchema.parse({});
 
-let cache: { mtimeMs: number; path: string; value: UserConfig | null } | null = null;
+let cache: { mtimeMs: number; path: string; value: UserConfig | null; invalid: boolean } | null = null;
 
 /** The file as saved, or null when there is none. Read again whenever it changes on disk (`npm run setup` while the server runs). */
 export function readUserConfig(): UserConfig | null {
@@ -105,6 +133,7 @@ export function readUserConfig(): UserConfig | null {
   }
   if (cache && cache.path === path && cache.mtimeMs === mtimeMs) return cache.value;
   let value: UserConfig | null = null;
+  let invalid = false;
   if (mtimeMs >= 0) {
     try {
       value = userConfigSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
@@ -113,9 +142,10 @@ export function readUserConfig(): UserConfig | null {
       console.error(`[omni] ignoring ${path}: ${(err as Error).message}`);
       value = defaults();
       value.onboardedAt = new Date(0).toISOString();
+      invalid = true;
     }
   }
-  cache = { mtimeMs, path, value };
+  cache = { mtimeMs, path, value, invalid };
   return value;
 }
 
@@ -123,6 +153,8 @@ export function readUserConfig(): UserConfig | null {
 export const userConfig = (): UserConfig => readUserConfig() ?? defaults();
 
 export const configExists = () => readUserConfig() !== null;
+/** The file is there but does not parse, so the server runs on defaults. Writing now would replace it with them. */
+export const configInvalid = () => (readUserConfig(), !!cache?.invalid);
 export const isOnboarded = () => !!readUserConfig()?.onboardedAt;
 
 export function writeUserConfig(next: UserConfig) {
@@ -149,6 +181,7 @@ export function updateUserConfig(patch: UserConfigPatch): UserConfig {
     user: { ...cur.user, ...patch.user },
     workspace: { ...cur.workspace, ...patch.workspace },
     integrations: { ...cur.integrations, ...patch.integrations },
+    auth: { ...cur.auth, ...patch.auth },
     automations,
   };
   if (patch.onboardedAt === null) delete next.onboardedAt;

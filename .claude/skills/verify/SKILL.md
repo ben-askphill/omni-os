@@ -24,6 +24,7 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 - Every `/api` call needs the stack's own token (`status` prints it; it is `$QA_DIR/data/api-token`, default `$TMPDIR/omni-qa-<port>/data/api-token`). Your shell's `OMNI_TOKEN` is the live server's, so never use it here. `T=$(cat "${TMPDIR:-/tmp}/omni-qa-4757/data/api-token")`
 - Create a thread: `curl -s -X POST localhost:4757/api/threads -H "Authorization: Bearer $T" -H 'content-type: application/json' -d '{"channel":"inbox","prompt":"RICH"}'`
 - The web URLs `up` and `status` print end in `?pair=<token>`, which pairs the browser. A bare URL shows the pairing screen.
+- Sign in with Google: `QA_GOOGLE=1 scripts/qa-stack.sh up` also starts a fake Google (an account chooser, no network) and sets a client id in a fresh stack's config. The first sign-in must come from a browser paired with the token; after that ada@example.com can sign in from any browser on the stack.
 - Need some other state (folders, channels, a stuck request)? Build it through the API first; reach into the sqlite db in the QA data dir only when no route exists.
 
 ## 3. Drive it

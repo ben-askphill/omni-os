@@ -33,6 +33,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@omni/oauth-broker": "*",
     "@omni/test-fixtures": "*",
     "@omni/typescript-config": "*",
     "@types/node": "^26.6.2",

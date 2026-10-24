@@ -3,8 +3,8 @@ import { Hono } from 'hono';
 import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cookieName, loadToken, proofFor } from '../api-token.ts';
-import { hostAllowed, requestGuard, viaTailnet } from '../request-guard.ts';
+import { cookieName, loadToken, proofFor, sessionCookieName } from '../api-token.ts';
+import { hostAllowed, requestGuard, useSessions, viaTailnet } from '../request-guard.ts';
 
 // requestGuard in front of /api: a request without this install's token is refused, and so is what a
 // cross-site page or a DNS-rebinding domain sends. What the Web UI (same origin, or through vite), the Mac
@@ -13,7 +13,19 @@ import { hostAllowed, requestGuard, viaTailnet } from '../request-guard.ts';
 
 const app = new Hono();
 app.use('*', requestGuard);
-app.all('*', (c) => c.json({ ok: true }));
+app.all('*', (c) => c.json({ ok: true, via: c.get('access')?.via ?? null }));
+
+// A stand-in for apps/server/sign-in.ts's session check, so this file needs no database.
+const LIVE = 'omni_s1.live.secret';
+const session = (renewed: boolean) => ({
+  sessionId: 'live',
+  expiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+  renewed,
+  user: { id: 'u', email: 'ada@example.com', name: 'Ada', hd: null },
+  device: { id: 'd', name: 'Safari on iPhone', kind: 'browser' as const },
+});
+let renewed = false;
+useSessions((credential) => (credential === LIVE ? session(renewed) : null));
 
 const TOKEN = process.env.OMNI_TOKEN!;
 const AUTH = { authorization: `Bearer ${TOKEN}` };
@@ -56,6 +68,55 @@ describe('requestGuard: the token', () => {
   it('still refuses a cross-site request that carries the cookie', async () => {
     const res = await send({ authorization: '', cookie: `${cookieName()}=${TOKEN}`, origin: 'https://evil.example', 'sec-fetch-site': 'cross-site', 'content-type': 'application/json' });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('requestGuard: a Google sign-in session', () => {
+  afterEach(() => {
+    renewed = false;
+  });
+
+  it('lets a live session through as the cookie or a bearer header, and says so', async () => {
+    const viaCookie = await get('/api/threads', { cookie: `${sessionCookieName()}=${LIVE}` });
+    expect(await viaCookie.json()).toEqual({ ok: true, via: 'session' });
+    expect(await (await get('/api/threads', { authorization: `Bearer ${LIVE}` })).json()).toEqual({ ok: true, via: 'session' });
+    expect(await (await get('/api/threads', AUTH)).json()).toEqual({ ok: true, via: 'token' });
+  });
+
+  it('refuses a dead or forged one, and never reads a session from the token cookie or the token from the session cookie', async () => {
+    expect((await get('/api/threads', { cookie: `${sessionCookieName()}=omni_s1.dead.secret` })).status).toBe(401);
+    expect((await get('/api/threads', { authorization: 'Bearer omni_s1.dead.secret' })).status).toBe(401);
+    expect((await get('/api/threads', { cookie: `${cookieName()}=${LIVE}` })).status).toBe(401);
+    expect((await get('/api/threads', { cookie: `${sessionCookieName()}=${TOKEN}` })).status).toBe(401);
+    // A wrong bearer header is not rescued by a good cookie, as with the token.
+    expect((await get('/api/threads', { authorization: 'Bearer nope', cookie: `${sessionCookieName()}=${LIVE}` })).status).toBe(401);
+  });
+
+  it('sends the cookie again with its new expiry when the session slid', async () => {
+    expect((await get('/api/threads', { cookie: `${sessionCookieName()}=${LIVE}` })).headers.get('set-cookie')).toBeNull();
+    renewed = true;
+    const slid = (await get('/api/threads', { cookie: `${sessionCookieName()}=${LIVE}` })).headers.get('set-cookie') ?? '';
+    expect(slid).toContain(`${sessionCookieName()}=${LIVE}`);
+    expect(slid).toMatch(/HttpOnly/);
+    expect(slid).toMatch(/SameSite=Strict/);
+    expect(Number(slid.match(/Max-Age=(\d+)/)?.[1])).toBeGreaterThan(29 * 86_400);
+  });
+
+  it('keeps the cross-site, Origin and content-type checks for a session as for the token', async () => {
+    const cookie = `${sessionCookieName()}=${LIVE}`;
+    expect((await send({ authorization: '', cookie, origin: 'https://evil.example', 'sec-fetch-site': 'cross-site', 'content-type': 'application/json' })).status).toBe(403);
+    expect((await send({ authorization: '', cookie, origin: 'http://evil.example:4747', 'content-type': 'application/json' })).status).toBe(403);
+    expect((await send({ authorization: '', cookie, 'content-type': 'text/plain' })).status).toBe(415);
+  });
+
+  it('opens only the sign-in routes to a browser with neither, and only same-origin', async () => {
+    expect(await (await get('/api/auth/google')).json()).toEqual({ ok: true, via: null });
+    const start = (headers: Record<string, string> = {}) =>
+      app.request('http://127.0.0.1:4747/api/auth/google/start', { method: 'POST', body: '{}', headers: { host: '127.0.0.1:4747', authorization: '', 'content-type': 'application/json', ...headers } });
+    expect((await start()).status).toBe(200);
+    expect((await start({ 'sec-fetch-site': 'cross-site' })).status).toBe(403);
+    expect((await start({ 'content-type': 'text/plain' })).status).toBe(415);
+    for (const path of ['/api/auth/google/callback', '/api/auth/google/start', '/api/auth/signout', '/api/auth']) expect((await get(path)).status, path).toBe(401);
   });
 });
 

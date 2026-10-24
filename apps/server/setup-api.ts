@@ -41,8 +41,9 @@ export function setupState() {
   };
 }
 
-// Automation overrides change through POST /api/automations/:id/enabled, not here.
-const patchInput = userConfigPatch.omit({ automations: true, onboardedAt: true }).superRefine((p, ctx) => {
+// Automation overrides change through POST /api/automations/:id/enabled, not here. Who may sign in (auth) is the
+// config file's, and the first sign-in's from a client holding the token (apps/server/sign-in.ts), never this route's.
+const patchInput = userConfigPatch.omit({ automations: true, onboardedAt: true, auth: true }).superRefine((p, ctx) => {
   const tz = p.user?.timezone;
   if (tz && !isTimezone(tz)) ctx.addIssue({ code: 'custom', path: ['user', 'timezone'], message: 'Unknown timezone. Use an IANA name like Europe/Amsterdam.' });
   const email = p.user?.email;

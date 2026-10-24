@@ -21,14 +21,14 @@ On an iPhone, open the `.ts.net` address in Safari and use Share, then Add to Ho
 
 ## Who can call the API
 
-Every `/api` request needs this install's token. The server makes it on first start: 32 random bytes in `data/api-token`, mode 0600, so only your macOS account can read it (`OMNI_TOKEN` in the server's environment replaces it, for tests and throwaway servers). A file rather than the Keychain: the Mac app and shell scripts read it without a Keychain prompt, and the Keychain would guard it from the same account the file mode already lets in. Delete the file and restart the server to rotate it; every browser then pairs again.
+Every `/api` request needs this install's token, or a session from [signing in with Google](google-sign-in.md). The server makes it on first start: 32 random bytes in `data/api-token`, mode 0600, so only your macOS account can read it (`OMNI_TOKEN` in the server's environment replaces it, for tests and throwaway servers). A file rather than the Keychain: the Mac app and shell scripts read it without a Keychain prompt, and the Keychain would guard it from the same account the file mode already lets in. Delete the file and restart the server to rotate it; every browser then pairs again.
 
 | Client | How it sends the token |
 | --- | --- |
 | Mac app | Reads `data/api-token` (or `OMNI_DATA_DIR`'s) and sends `Authorization: Bearer`. Before it attaches to whatever answers on the port, it asks `GET /api/auth/proof?nonce=` for an HMAC of the port and a fresh nonce, keyed with the token, so a program squatting on the port never gets the token or your secrets, even by relaying the nonce to an Omni on another port. It sends the token only to that server's exact host and port: images on any other URL load without it, and it never goes in a shared cookie store |
 | `scripts/omni.sh`, `npm run setup` | `OMNI_TOKEN`, else `data/api-token` |
 | Threads | `OMNI_TOKEN` in their environment, next to `OMNI_URL`. Omni's MCP servers (`apps/mcp/omni.ts`, `apps/mcp/ask.ts`) get `OMNI_TOKEN_FILE`, a path, so no token is written into `mcp.json` |
-| Web UI | Pairs once (below), then holds the token in a cookie |
+| Web UI | Signs in with Google (a session cookie of its own, revocable per device), or pairs once (below) and holds the token in a cookie |
 
 The Web UI and its assets are served without the token and never contain it, so opening the page gets you only the pairing screen. Pairing sends the token once to `POST /api/auth/pair`, which answers with an `HttpOnly`, `SameSite=Strict` cookie on `/api` (`Secure` behind HTTPS). Page scripts never see it, and `EventSource` streams and images carry it. The token gets to a browser one of two ways:
 
@@ -43,4 +43,6 @@ The token stops other macOS accounts, other tailnet devices and anything else th
 - `Sec-Fetch-Site: cross-site`, and any `Origin` (`null` included) that is not the host the request came in on.
 - `text/plain` and form-urlencoded bodies (415), the types a page can send without a CORS preflight.
 
-The Mac app, `apps/mcp/omni.ts`, `scripts/omni.sh` and curl send no `Origin`, so the `Host` and token checks apply to them. Without the token every route answers 401, except `GET /api/auth/proof`. HTML and SVG artifacts are served with `Content-Security-Policy: sandbox`, so a page opened in its own tab does not run on Omni's origin.
+The Mac app, `apps/mcp/omni.ts`, `scripts/omni.sh` and curl send no `Origin`, so the `Host` and token checks apply to them. A Google session gets exactly the checks the token's cookie gets. Without the token or a session every route answers 401, except `GET /api/auth/proof` and the routes that start and finish a Google sign-in (`GET /api/auth/google`, `POST /api/auth/google/start` and `/finish`), which still refuse other sites. Google's redirect back, `GET /api/auth/google/callback` (from Google, or from the OAuth broker), comes from another site by design, so it skips the cross-site and token checks and keeps the `Host` and Tailscale login checks; only the one-time sign-in state and the browser's binding cookie make it do anything.
+
+A session can do anything the token can, including starting a thread that reads `data/api-token`. Revoking a device (Settings > Devices) stops that browser; if you think one was stolen while it worked, rotate the token as well. HTML and SVG artifacts are served with `Content-Security-Policy: sandbox`, so a page opened in its own tab does not run on Omni's origin.

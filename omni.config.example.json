@@ -17,6 +17,13 @@
     "centralBrainDir": "",
     "tailscaleLogin": "ada@example.com"
   },
+  "auth": {
+    "googleClientId": "",
+    "googleWebClientId": "",
+    "brokerUrl": "",
+    "allowedEmails": ["ada@example.com"],
+    "allowedHd": ""
+  },
   "automations": {
     "weekly-review": { "enabled": true },
     "pr-babysitter": { "enabled": true, "channel": "omni-os" }

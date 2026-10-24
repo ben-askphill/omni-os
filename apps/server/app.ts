@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { paths } from './config.ts';
 import { artifactsApi } from './artifacts-api.ts';
-import { authApi } from './auth-api.ts';
+import { authApi, googleCallback } from './auth-api.ts';
 import { browserApi } from './browser-api.ts';
 import { changesApi } from './changes-api.ts';
 import { channelsApi } from './channels-api.ts';
@@ -22,7 +22,8 @@ import { terminalApi } from './terminal-api.ts';
 import { threadActionsApi, threadRoutesApi } from './thread-routes-api.ts';
 import { questionsApi } from './questions-api.ts';
 import { threadsApi } from './threads-api.ts';
-import { requestGuard } from './request-guard.ts';
+import { requestGuard, useSessions } from './request-guard.ts';
+import { CALLBACK_PATH, checkSession } from './sign-in.ts';
 import { toolFailuresApi } from './tool-failures-api.ts';
 
 // Every /api route, and the Web UI. apps/server/index.ts boots it.
@@ -35,8 +36,10 @@ app.onError((err, c) => {
   return c.json({ error: err.message }, status as 400);
 });
 
-// Ahead of every route: refuses requests without this install's token, and those other sites make through a browser
-// (apps/server/request-guard.ts). The Web UI below is served without either: it holds no secret, and pairs to get one.
+// Ahead of every route: refuses requests without this install's token or a Google sign-in session, and those other
+// sites make through a browser (apps/server/request-guard.ts). The Web UI below is served without either: it holds no
+// secret, and pairs or signs in to get one.
+useSessions(checkSession);
 api.use('*', requestGuard);
 
 // Mounted in the same order the handlers used to be registered. Hono runs the first match, so
@@ -66,6 +69,8 @@ api.route('/tool-failures', toolFailuresApi);
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
 api.all('*', (c) => c.json({ error: 'Not found' }, 404));
 
+// Google's redirect back after sign-in, from another site by design: ahead of the guard, with its own checks (auth-api.ts).
+app.get(CALLBACK_PATH, googleCallback);
 app.route('/api', api);
 
 // ---------- web ----------
