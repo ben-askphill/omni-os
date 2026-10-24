@@ -95,3 +95,10 @@ export function handoffBanner(h: HandoffView | null | undefined, status: string 
       return { size: 'line', tone: 'cancelled', text };
   }
 }
+
+/** The "can't take a turn" note over the composer, or null when the handoff card already says the same thing. */
+export function blockedNote(blocked: string | null | undefined, h: HandoffView | null | undefined, status: string | undefined): string | null {
+  if (!blocked) return null;
+  const banner = handoffBanner(h, status);
+  return banner?.size === 'card' && banner.text === blocked ? null : blocked;
+}

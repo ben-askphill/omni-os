@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Device, HandoffPhase, HandoffView } from '@omni/shared/handoff.ts';
-import { deviceRows, handoffBanner, handoffTargets } from '../src/handoff.ts';
+import { blockedNote, deviceRows, handoffBanner, handoffTargets } from '../src/handoff.ts';
 
 // What the Web UI shows for handing a thread to another synced Mac (apps/web/src/handoff.ts): when "Hand off to…" is
 // offered, which Macs can be picked and how each reads, and the banner per phase on the giving and the taking Mac.
@@ -101,5 +101,15 @@ describe('the handoff banner', () => {
     expect(handoffBanner(failed, 'stopped')).toMatchObject({ size: 'card', tone: 'alert', cancel: false, text: expect.stringContaining('reply to continue it') });
     expect(handoffBanner(failed, 'running')).toBeNull();
     expect(handoffBanner(failed, 'queued')).toBeNull();
+  });
+});
+
+describe('the note over the composer', () => {
+  it('stays out while the handoff card says the same thing, and shows otherwise', () => {
+    const waiting = view({ phase: 'offered', stale: false });
+    const text = handoffBanner(waiting, 'stopped')!.text;
+    expect(blockedNote(text, waiting, 'stopped')).toBeNull();
+    expect(blockedNote('This thread is running on Ben\'s MacBook Air.', view({ phase: 'accepted' }), 'running')).toBe("This thread is running on Ben's MacBook Air.");
+    expect(blockedNote("Omni is still preparing this thread's worktree.", null, 'queued')).toBe("Omni is still preparing this thread's worktree.");
   });
 });

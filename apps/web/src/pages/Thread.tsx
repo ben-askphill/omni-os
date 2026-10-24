@@ -17,6 +17,7 @@ import { OPEN_PR_PROMPT, ThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { Avatar, Button, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, StatusPill, Tabs } from '../components/ui.tsx';
 import { href } from '../router.ts';
+import { blockedNote } from '../handoff.ts';
 import { canMarkDone, shownResult } from '../needs-you.ts';
 import { reportNotes } from '../requests.ts';
 import { canSteer } from '../steer.ts';
@@ -87,6 +88,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
   } = useThreadSession(id, artifactParam);
   const { scrollRef, contentRef, onScroll, showJump, jump, pin } = useTranscriptScroll(events, thread !== null);
   const handoffTargets = useHandoffTargets(thread, blocked, handoff);
+  const note = blockedNote(blocked, handoff, thread?.status);
   const known = useMemo(() => [...children, ...team], [children, team]);
   const members = useMemo(() => teamOf(children), [children]);
   const reports = useMemo(() => reportNotes(queued), [queued]);
@@ -429,7 +431,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
           <div className="mx-auto max-w-4xl">
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             {/* The setup card above says why while the worktree is not ready. */}
-            {blocked && !thread.setup && <ErrorNote className="mb-2">{blocked}</ErrorNote>}
+            {note && !thread.setup && <ErrorNote className="mb-2">{note}</ErrorNote>}
             <ReplyComposer
               thread={thread}
               canSteer={canSteer(thread.harness, harnesses)}
