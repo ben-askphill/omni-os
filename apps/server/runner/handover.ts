@@ -1,7 +1,9 @@
 // The handover: what a thread's next session reads ahead of Ben's message after he moved the thread to another
 // harness. Built from Omni's own transcript, since no harness can read another's session. Pure (spawn.ts feeds it).
+// A continued thread's first session gets its Carryover (apps/server/carryover.ts) the same way.
 import { switchText, type RunName, type SwitchP } from '@omni/shared/run-switch.ts';
 import { basename, join } from 'node:path';
+import { carriedEntry, carryoverText, type CarryoverP } from '../carryover.ts';
 import type { EventRow } from '../db.ts';
 import { toolLabel } from '../tool-label.ts';
 
@@ -74,6 +76,10 @@ function history(i: HandoverInput) {
     } else if (kind === 'switch') {
       speaker = (p as SwitchP).to.harnessName;
       lines.push(`[Omni] ${switchText(p as SwitchP)}`);
+    } else if (kind === 'carryover') {
+      // A continued thread's Carryover says what the task is, like a first message.
+      if (first < 0) first = lines.length;
+      lines.push(carriedEntry(p as CarryoverP));
     } else if (kind === 'tool_use' && !p.parent) {
       const label = toolLabel(p.input);
       const r = results.get(p.id);
@@ -86,8 +92,27 @@ function history(i: HandoverInput) {
   return { lines, first, todos };
 }
 
+/** Transcript rows that are something a session saw or did, as events.hasContentAfter counts them. */
+const CONTENT = new Set(['user', 'crew_report', 'assistant_text', 'tool_use', 'tool_result']);
+
+/**
+ * A continued thread's Carryover while nothing has run after it: its first turn reads it whole. A run switch since
+ * then is fine, since the intro names the run that reads it.
+ */
+function pendingCarryover(events: EventRow[]): CarryoverP | null {
+  const at = events.findIndex((e) => e.kind === 'carryover');
+  if (at < 0) return null;
+  const ran = events.slice(at + 1).some((e) => CONTENT.has(e.kind) && !JSON.parse(e.payload)?.dropped);
+  return ran ? null : (JSON.parse(events[at].payload) as CarryoverP);
+}
+
 export function buildHandover(i: HandoverInput): Handover {
   const fresh = i.session === 'fresh';
+  const carried = fresh ? pendingCarryover(i.events) : null;
+  if (carried) {
+    const text = carryoverText(i.to, carried.source, i.user, carried.text);
+    return { text, entries: carried.entries, omitted: carried.omitted, chars: text.length };
+  }
   const { lines, first, todos } = history(i);
   // The thread's first message says what the task is, so a fresh session always gets it. Then the newest entries,
   // whole, as many as fit.

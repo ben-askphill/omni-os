@@ -3,6 +3,7 @@
 import { channels, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
 import { prepareWorktree } from '../sandbox.ts';
 import { recordStartBase } from '../changes.ts';
+import { carryInto } from '../continue-carry.ts';
 import type { Attachment } from '../uploads.ts';
 import { reportToParent, settleTeam } from './queue.ts';
 import { emitThread, refusal, runsHere } from './state.ts';
@@ -70,6 +71,8 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
   const repo = channels.get(t.channel_id)?.repo_path ?? null;
   try {
     if (!t.branch) throw new Error('The thread has no branch to check out.');
+    // A continued thread's branch starts at its source's HEAD, with the source's changes laid in (continue-carry.ts).
+    await carryInto(t);
     await prepareWorktree(repo, t.cwd, t.branch);
     // The commit the branch starts from, for the Changes panel. Recorded before anything runs there.
     await recordStartBase(t.id, repo!, t.cwd).catch((err) => console.error(`[setup] ${t.id}: could not record the base commit:`, (err as Error).message));

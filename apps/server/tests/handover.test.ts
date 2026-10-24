@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RunName, SwitchP } from '@omni/shared/run-switch.ts';
+import { buildCarryover, type CarryoverP } from '../carryover.ts';
 import type { EventRow } from '../db.ts';
 import { buildHandover, type HandoverInput } from '../runner/handover.ts';
 
@@ -135,5 +136,58 @@ describe('buildHandover', () => {
   it('gives the same text for the same input', () => {
     const events = [ev('user', { text: 'a' }), ev('assistant_text', { text: 'b' })];
     expect(buildHandover(input(events)).text).toBe(buildHandover(input(events)).text);
+  });
+});
+
+describe('a continued thread', () => {
+  /** A Carryover previewed for Codex, as its `carryover` event keeps it. */
+  const carried = () => {
+    const { carryover: c, body } = buildCarryover({
+      source: { id: 'src', title: 'Fix the cart', channel: 'acme', run: claude },
+      to: codex,
+      user: 'Ben',
+      role: null,
+      events: [ev('user', { text: 'remember the word PAPAYA' }), ev('assistant_text', { text: 'Noted.' })],
+      uid: (n) => `uid-${n}`,
+      workspace: { kind: 'folder', cwd: '/w/acme' },
+      files: null,
+      skipped: [],
+      uncommitted: [],
+      parked: [],
+    });
+    const p: CarryoverP = { source: c.source, goal: c.goal, text: body, entries: c.recent.length, condensed: 0, omitted: 0, chars: c.chars, budget: c.budget, files: 0 };
+    return { c, p };
+  };
+
+  it('gives its first session the Carryover exactly as previewed', () => {
+    const { c, p } = carried();
+    const h = buildHandover(input([ev('carryover', p)], { from: claude, to: codex }));
+    expect(h.text).toBe(c.text);
+    expect(h).toMatchObject({ entries: 2, omitted: 0, chars: c.text.length });
+  });
+
+  it('addresses the Carryover to the run that reads it after a switch before the first turn', () => {
+    const { p } = carried();
+    const away: SwitchP = { from: codex, to: claude, mode: 'handover' };
+    const h = buildHandover(input([ev('carryover', p), ev('switch', away), ev('user', { text: 'lost', dropped: true })], { from: claude, to: claude }));
+    expect(h.text.startsWith('<omni-carryover>')).toBe(true);
+    expect(h.text).toContain('Ben started this one on Claude Code (Opus 5.5)');
+    expect(h.text).toContain(p.text);
+    expect(h.text.endsWith("Ben's message:\n")).toBe(true);
+  });
+
+  it('hands the Carryover over as one entry once the thread has run, kept like a first message', () => {
+    const { p } = carried();
+    const events = [
+      ev('carryover', p),
+      ev('user', { text: 'now the tests' }),
+      ...Array.from({ length: 30 }, (_, i) => ev('assistant_text', { text: `reply ${i} ${'x'.repeat(80)}` })),
+    ];
+    const h = buildHandover(input(events, { from: codex, to: claude, budget: 2_500 }));
+    expect(h.text.startsWith('<omni-handover>')).toBe(true);
+    expect(h.text).toContain('[Carried over from "Fix the cart" on Claude Code (Opus 5.5)] Goal, the message the work started from:\nremember the word PAPAYA');
+    expect(h.text).toContain('reply 29');
+    expect(h.omitted).toBeGreaterThan(0);
+    expect(h.text).not.toContain('<omni-carryover>');
   });
 });

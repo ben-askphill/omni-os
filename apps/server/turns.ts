@@ -87,10 +87,10 @@ async function untracked(dir: string, env: Record<string, string>) {
 }
 
 /**
- * Save the checkout at dir as a commit under ref, which must not exist yet. Throws with git's reason. Writes only
- * objects, a temporary index outside the repo and the one ref.
+ * The tree a snapshot of the checkout at dir holds, and HEAD then. Throws with git's reason. Writes only objects and
+ * a temporary index outside the repo. A continued thread starts from one too (apps/server/continue.ts).
  */
-export async function snapshot(dir: string, ref: string): Promise<Snapshot> {
+export async function checkoutTree(dir: string): Promise<{ tree: string; head: string; skipped: SkippedFile[] }> {
   const headSha = await gitOr(dir, ['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']);
   if (!headSha) throw new Error('The checkout has no commit yet.');
   const tmp = mkdtempSync(join(tmpdir(), 'omni-turn-'));
@@ -104,13 +104,22 @@ export async function snapshot(dir: string, ref: string): Promise<Snapshot> {
     const { save, skipped } = await untracked(dir, env);
     for (let i = 0; i < save.length; i += ADD_CHUNK) await git(dir, ['--literal-pathspecs', 'add', '--', ...save.slice(i, i + ADD_CHUNK)], undefined, env);
     const tree = (await git(dir, ['write-tree'], undefined, env)).trim();
-    const sha = (await git(dir, ['commit-tree', tree, '-p', headSha, '-m', `Omni turn snapshot ${ref}`], undefined, env)).trim();
-    // An empty old value: the ref must be new, so a snapshot is never replaced.
-    await git(dir, ['update-ref', '--no-deref', ref, sha, ''], undefined, env);
-    return { sha, head: headSha, skipped };
+    return { tree, head: headSha, skipped };
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
+}
+
+/**
+ * Save the checkout at dir as a commit under ref, which must not exist yet. Throws with git's reason. Writes only
+ * objects, a temporary index outside the repo and the one ref.
+ */
+export async function snapshot(dir: string, ref: string): Promise<Snapshot> {
+  const { tree, head: headSha, skipped } = await checkoutTree(dir);
+  const sha = (await git(dir, ['commit-tree', tree, '-p', headSha, '-m', `Omni turn snapshot ${ref}`], undefined, IDENT)).trim();
+  // An empty old value: the ref must be new, so a snapshot is never replaced.
+  await git(dir, ['update-ref', '--no-deref', ref, sha, ''], undefined, IDENT);
+  return { sha, head: headSha, skipped };
 }
 
 /** One side of a turn, as the clients get it. */

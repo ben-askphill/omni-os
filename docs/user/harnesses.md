@@ -27,6 +27,20 @@ The model and effort pickers in a thread's reply box move it to another model, e
 - Back to a harness the thread ran on before: its own earlier session resumes and reads only what happened since. Straight back before anything ran elsewhere needs no handover.
 - The Conductor can do the same with `switch_thread_run`, when you ask it to.
 
+## Continuing on another harness
+
+A switch keeps one thread. To leave a thread as it is and carry on in a new one, use **Continue with another harness** in the thread's menu. The new thread is linked both ways ("Continued from" and "Continued in"). It gets its own session on the harness, model and effort you pick, and its own worktree. The source thread, its session and its checkout stay as they were.
+
+- Only an idle thread can be continued. Nothing may be running in it: no turn, background task or delegated thread, no queued messages, no scheduled limit resume, no open Terminal shell (the sheet offers to close it). The sheet still shows the preview and says what is in the way. Messages waiting for Resume don't block; the carryover lists them as not sent.
+- The preview shows the **carryover**, what the new session reads ahead of your message: the thread's goal, constraints, changed files, the checks it ran, then its history. The newest history is kept whole and older entries are shortened to their first line. Whatever does not fit the 24K-character budget is listed as left out, with where the new session can read it. Your message comes after the carryover and is never cut.
+- For repo work, Omni snapshots the source's worktree the way it saves a turn: HEAD, every tracked change and untracked text file git does not ignore. The new branch starts at the source's HEAD with those changes laid in, uncommitted. Ignored files such as `.env`, and binary or large untracked files, are not copied; the preview lists the ones it left out. A source that runs in the channel's own checkout (worktree per thread off) shares it with you and other threads, so its uncommitted changes are listed, not copied, and the new thread still gets a worktree of its own.
+- Paths from the source's checkout reach the new session relative to the repo root, so it works in its own worktree. Older history it left out is readable through Omni's API, and the carryover says how.
+- If the source changes between the preview and Start (a new message, a turn, an edit to its files), Start is refused and the sheet shows the new preview.
+- Attachments from the source are listed but not carried yet.
+- A message that starts with a command, like `/review`, runs first, and the carryover goes with your next message.
+- Hermes and Cursor Cloud can't take a continued thread, and a thread running on them can't be continued, since their files are not on this Mac.
+- The Conductor can do the same with `continue_thread`, when you ask it to.
+
 ## Auto
 
 Auto is the first entry in the model picker and the default for a new thread. Omni reads the first prompt and picks the harness, model and effort for it. The thread's model pill then reads "Auto · <model>", and hovering it shows why, for example "Hard code task: Opus 5.5, high effort". Once picked, it is the thread's run like any other, and [switching](#switching-mid-thread) it drops the "Auto".
