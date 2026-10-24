@@ -332,4 +332,22 @@ export function migrate() {
       SELECT 'completion', uid, 'upsert', created_at FROM completions
       WHERE seq = last_insert_rowid() AND EXISTS (SELECT 1 FROM kv WHERE key = 'sync.machine_id');
     END`);
+  // #221: a thread continued on another harness names its source (synced with the row; the source is never written).
+  // Its Carryover is a synced `carryover` event. This Mac keeps what cut its worktree (the source's HEAD and snapshot
+  // tree, the ref that holds them) and the client's request id, so a retried start gets the same thread back.
+  // Local, not synced: the refs are this Mac's.
+  ensureColumn('threads', 'continued_from', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS threads_continued_from ON threads(continued_from) WHERE continued_from IS NOT NULL');
+  db.exec(`CREATE TABLE IF NOT EXISTS thread_continuations (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+    source_id TEXT NOT NULL,
+    request_id TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    head TEXT,
+    tree TEXT,
+    snapshot_sha TEXT,
+    applied_at TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (source_id, request_id)
+  )`);
 }
