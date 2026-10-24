@@ -45,6 +45,8 @@ const NAMES = [
   'artifacts.json',
   'error-not-found.json',
   'thread-stream.sse',
+  // A stream opened with a stale `after`: the newest page in a sync, in place of a replay (#224).
+  'thread-stream-snapshot.sse',
   'feed.sse',
   // Last, so its ids number after the others'.
   'thread-rich.json',
@@ -312,6 +314,9 @@ async function scenario() {
   keep('artifacts.json', await get('/artifacts'));
   keep('error-not-found.json', await call('GET', '/threads/nope', undefined, false));
   got.set('thread-stream.sse', await stream.stop());
+  const stale = capture(`${base}/api/threads/${id}/stream?after=stale`);
+  await eventually(async () => sent(stale.text(), 'sync'), () => `the snapshot sync:\n${stale.text()}`);
+  got.set('thread-stream-snapshot.sse', await stale.stop());
   got.set('feed.sse', await feed.stop());
 
   // After everything above is kept, so the lists and streams stay as they were.

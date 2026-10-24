@@ -227,6 +227,15 @@ export function readPage(threadId: string, cursor: HistoryCursor, budget: Histor
   return { events: ascending([...page.rows, ...anchorsFor(threadId, page.rows, page.span, false, budget)]), span: page.span };
 }
 
+/**
+ * Every row after `after`, ascending, when they fit one page: the stream's replay (#224). Null when they do not. Rows
+ * over rowBytes are measured from the record header, so a gap too big to replay is never read whole.
+ */
+export function readAfter(threadId: string, after: number, budget: HistoryBudget = BUDGET): PageRow[] | null {
+  const { rows, span } = take(threadId, 'oldest', { after }, budget);
+  return span.to === null ? rows : null;
+}
+
 /** The newest page, its anchors, and the `history` GET /api/threads/:id?history=recent adds. */
 export function headPage(threadId: string, budget: HistoryBudget = BUDGET): { events: PageRow[]; history: HistoryHead } {
   const { rows, span } = take(threadId, 'newest', {}, budget);
