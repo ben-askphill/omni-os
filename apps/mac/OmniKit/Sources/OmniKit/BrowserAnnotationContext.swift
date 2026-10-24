@@ -16,6 +16,14 @@ public enum BrowserAnnotationContext: MessageContextKind {
   private static let idMax = 64
   private static let sizeMax = 20_000
   private static let labelURLMax = 60
+  /// What a picked element may hold, as `SELECTOR_MAX` and the rest in message-context-browser.ts.
+  public static let selectorMax = 300
+  public static let elementTextMax = 600
+  public static let elementHTMLMax = 2_000
+  public static let ancestorsMax = 4
+  public static let ancestorMax = 160
+  public static let framesMax = 3
+  public static let frameURLMax = 512
 
   public struct Rect: Codable, Hashable, Sendable {
     public let x: Int
@@ -47,6 +55,41 @@ public enum BrowserAnnotationContext: MessageContextKind {
     public let height: Int
     /// How many image pixels one CSS pixel is.
     public let scale: Double
+  }
+
+  public struct Point: Codable, Hashable, Sendable {
+    public let x: Int
+    public let y: Int
+  }
+
+  /// An element picked on the page: enough to find it again and to tell what it was, never the page's DOM. The text and
+  /// markup are data from the page, quoted to the agent and never run.
+  public struct Element: Codable, Hashable, Sendable {
+    /// The element's tag name, lowercase.
+    public let tag: String
+    /// A CSS selector for it, from the nearest ancestor with an id. Best effort: the page may have changed since.
+    public let selector: String
+    /// Its visible text with whitespace collapsed. Empty for a field or an image.
+    public let text: String
+    /// A shallow excerpt of its markup on one line. Never a form field's value.
+    public let html: String
+    /// Its parents' opening tags, nearest first.
+    public let ancestors: [String]
+    /// Its box clipped to the viewport, in CSS pixels from the viewport's top left.
+    public let bounds: Rect
+    /// Where Ben picked.
+    public let point: Point
+    /// The frames it sits in, outermost first, as their documents' addresses.
+    public let frames: [String]
+    /// True when the point is inside a frame from another site: the rest describes the frame element itself.
+    public let opaqueFrame: Bool
+    /// True when `text` or `html` was cut.
+    public let truncated: Bool
+
+    enum CodingKeys: String, CodingKey {
+      case tag, selector, text, html, ancestors, bounds, point, frames, truncated
+      case opaqueFrame = "opaque_frame"
+    }
   }
 
   public struct Scroll: Codable, Hashable, Sendable {
@@ -83,9 +126,11 @@ public enum BrowserAnnotationContext: MessageContextKind {
     /// When the screenshot was taken, as `2026-10-24T09:30:15.250Z`.
     public let capturedAt: String
     public let image: Image
+    /// The element Ben picked, when he picked one and the page could give it.
+    public let element: Element?
 
     enum CodingKeys: String, CodingKey {
-      case thread, url, title, viewport, scroll, rect, image
+      case thread, url, title, viewport, scroll, rect, image, element
       case capturedAt = "captured_at"
     }
   }
@@ -106,6 +151,7 @@ public enum BrowserAnnotationContext: MessageContextKind {
   public static func label(_ b: Body) -> String {
     let at = Array(shortURL(b.url).unicodeScalars)
     let where_ = at.count > labelURLMax ? String(String.UnicodeScalarView(at.prefix(labelURLMax - 1))) + "…" : String(String.UnicodeScalarView(at))
+    if let e = b.element { return MessageContext.cutLabel("Browser, <\(e.tag)> on \(where_)") }
     return MessageContext.cutLabel("Browser, \(b.rect.width)×\(b.rect.height) area on \(where_)")
   }
 
@@ -142,6 +188,79 @@ public enum BrowserAnnotationContext: MessageContextKind {
     else { return .failure(CheckError("rect must be whole CSS pixels inside the viewport")) }
     if x + w > viewport.width || y + h > viewport.height { return .failure(CheckError("rect reaches outside the viewport")) }
     return .success(Rect(x: x, y: y, width: w, height: h))
+  }
+
+  private static func maybePlain(_ v: JSONValue?, _ at: String, _ max: Int) -> Result<String, CheckError> {
+    if v?.stringValue == "" { return .success("") }
+    return plain(v, at, max)
+  }
+
+  private static func strings(_ v: JSONValue?, _ at: String, count: Int, each: Int) -> Result<[String], CheckError> {
+    guard case .array(let items)? = v, items.count <= count else { return .failure(CheckError("\(at) must be at most \(count) addresses")) }
+    var out: [String] = []
+    for item in items {
+      switch plain(item, at, each) {
+      case .success(let s): out.append(s)
+      case .failure(let e): return .failure(e)
+      }
+    }
+    return .success(out)
+  }
+
+  /// `elementOf` in TypeScript. `viewport` is the record's own, which the box and the point must sit inside.
+  static func element(_ v: JSONValue?, in viewport: (width: Int, height: Int)) -> Result<Element, CheckError> {
+    guard case .object(let o)? = v else { return .failure(CheckError("element must be an object")) }
+    let tag: String
+    switch plain(o["tag"], "element.tag", 40) {
+    case .success(let t): tag = t
+    case .failure(let e): return .failure(e)
+    }
+    guard tag.wholeMatch(of: #/[a-z][a-z0-9-]*/#) != nil else { return .failure(CheckError("element.tag must be a lowercase tag name")) }
+    let selector: String
+    switch plain(o["selector"], "element.selector", selectorMax) {
+    case .success(let t): selector = t
+    case .failure(let e): return .failure(e)
+    }
+    let text: String
+    switch maybePlain(o["text"], "element.text", elementTextMax) {
+    case .success(let t): text = t
+    case .failure(let e): return .failure(e)
+    }
+    let html: String
+    switch plain(o["html"], "element.html", elementHTMLMax) {
+    case .success(let t): html = t
+    case .failure(let e): return .failure(e)
+    }
+    guard case .array(let rawAncestors)? = o["ancestors"], rawAncestors.count <= ancestorsMax else {
+      return .failure(CheckError("element.ancestors must be at most \(ancestorsMax) tags"))
+    }
+    var ancestors: [String] = []
+    for a in rawAncestors {
+      switch plain(a, "element.ancestors", ancestorMax) {
+      case .success(let t): ancestors.append(t)
+      case .failure(let e): return .failure(e)
+      }
+    }
+    let bounds: Rect
+    switch rect(o["bounds"], in: viewport) {
+    case .success(let r): bounds = r
+    case .failure(let e): return .failure(CheckError(e.message.replacingOccurrences(of: "rect", with: "element.bounds")))
+    }
+    guard case .object(let pt)? = o["point"], let px = whole(pt["x"], 0, viewport.width - 1), let py = whole(pt["y"], 0, viewport.height - 1) else {
+      return .failure(CheckError("element.point must be whole CSS pixels inside the viewport"))
+    }
+    let frames: [String]
+    switch strings(o["frames"], "element.frames", count: framesMax, each: frameURLMax) {
+    case .success(let f): frames = f
+    case .failure(let e): return .failure(e)
+    }
+    guard case .bool(let opaque)? = o["opaque_frame"], case .bool(let truncated)? = o["truncated"] else {
+      return .failure(CheckError("element.opaque_frame and element.truncated must be true or false"))
+    }
+    return .success(
+      Element(
+        tag: tag, selector: selector, text: text, html: html, ancestors: ancestors, bounds: bounds, point: Point(x: px, y: py), frames: frames,
+        opaqueFrame: opaque, truncated: truncated))
   }
 
   private static func image(_ v: JSONValue?) -> Result<Image, CheckError> {
@@ -211,18 +330,27 @@ public enum BrowserAnnotationContext: MessageContextKind {
     case .success(let i): img = i
     case .failure(let e): return .failure(e)
     }
+    // Absent or null is a record of an area. Anything else must be a whole element.
+    var picked: Element?
+    if let raw = o["element"], raw != .null {
+      switch element(raw, in: (vw, vh)) {
+      case .success(let e): picked = e
+      case .failure(let e): return .failure(e)
+      }
+    }
     return .success(
       Body(
         thread: thread, url: url, title: title, viewport: Viewport(width: vw, height: vh, scale: (scale * 100).rounded() / 100),
-        scroll: Scroll(x: sx, y: sy), rect: r, capturedAt: at, image: img))
+        scroll: Scroll(x: sx, y: sy), rect: r, capturedAt: at, image: img, element: picked))
   }
 
-  /// The capture with Ben's rectangle on it, checked as the route will check it.
-  public static func annotate(_ capture: Capture, rect: Rect) -> Result<Body, CheckError> {
+  /// The capture with Ben's rectangle on it, and the element he picked if he did, checked as the route will check it.
+  public static func annotate(_ capture: Capture, rect: Rect, element: Element? = nil) -> Result<Body, CheckError> {
     guard var json = try? JSONValue(encoding: capture), case .object(var o) = json, let r = try? JSONValue(encoding: rect) else {
       return .failure(CheckError("the capture cannot be read"))
     }
     o["rect"] = r
+    if let element { guard let e = try? JSONValue(encoding: element) else { return .failure(CheckError("the element cannot be read")) }; o["element"] = e }
     json = .object(o)
     return check(json, v: 1)
   }
@@ -286,6 +414,19 @@ public enum BrowserAnnotationContext: MessageContextKind {
     return .success(Rect(x: x0, y: y0, width: x1 - x0, height: y1 - y0))
   }
 
+  /// The rectangle a picked element is marked with: its bounds, grown evenly to `rectMin` where it is smaller (an icon) and
+  /// kept inside the viewport. As `elementRect` in TypeScript.
+  public static func elementRect(_ bounds: Rect, viewport: (width: Int, height: Int)) -> Rect {
+    func side(_ pos: Int, _ size: Int, _ max: Int) -> (Int, Int) {
+      let len = min(max, Swift.max(size, rectMin))
+      let start = min(max - len, Swift.max(0, pos - (len - size) / 2))
+      return (start, len)
+    }
+    let (x, width) = side(bounds.x, bounds.width, viewport.width)
+    let (y, height) = side(bounds.y, bounds.height, viewport.height)
+    return Rect(x: x, y: y, width: width, height: height)
+  }
+
   /// The rectangle in image pixels, for a view that draws it over the image itself.
   public static func rectInImage(_ r: Rect, image: (width: Double, height: Double), viewport: (width: Double, height: Double)) -> Rect {
     let sx = image.width / viewport.width
@@ -323,5 +464,29 @@ public struct BrowserCaptureError: Error, Hashable, Sendable {
     self.message = message
     self.retryable = retryable
     self.stale = stale
+  }
+}
+
+/// The answer of `POST /api/channels/:id/browser/capture/:name/element`: the element, or why there is none. The screenshot,
+/// its marked area and the note stand either way.
+public enum ElementPickReply: Decodable, Hashable, Sendable {
+  case element(BrowserAnnotationContext.Element)
+  case unavailable(reason: String, message: String)
+
+  private struct Unavailable: Decodable {
+    let reason: String
+    let message: String
+  }
+
+  enum CodingKeys: String, CodingKey { case element, unavailable }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    if let e = try c.decodeIfPresent(BrowserAnnotationContext.Element.self, forKey: .element) {
+      self = .element(e)
+    } else {
+      let u = try c.decode(Unavailable.self, forKey: .unavailable)
+      self = .unavailable(reason: u.reason, message: u.message)
+    }
   }
 }

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
-import { annotate, browserAnnotation, cleanTitle, dragToRect, rectInImage, shortUrl, type BrowserAnnotation, type Drag, type PixelRect } from '../message-context-browser.ts';
+import { annotate, browserAnnotation, cleanTitle, dragToRect, elementRect, rectInImage, shortUrl, type BrowserAnnotation, type Drag, type PixelRect } from '../message-context-browser.ts';
 import { blobIds, clampToHunk, diffSelection, selectRows, type DiffFileLike, type DiffSelection, type DiffSource } from '../message-context-diff.ts';
 import { CONTEXT_KINDS, parseContexts, readContexts } from '../message-context-kinds.ts';
 import { LINES_MAX, TEXT_MAX, plainText, selectExcerpt, terminalExcerpt, type TerminalExcerpt } from '../message-context-terminal.ts';
@@ -27,6 +27,7 @@ const corpus = JSON.parse(readFileSync(fixture('message-context.json'), 'utf8'))
     expect: { ok: true; body: TerminalExcerpt; label: string } | { ok: false; error: string };
   }[];
   drags: { name: string; drag: Drag; shown: { width: number; height: number }; viewport: { width: number; height: number }; expect: { ok: true; rect: PixelRect } | { ok: false; error: string } }[];
+  elementRects: { name: string; bounds: PixelRect; viewport: { width: number; height: number }; expect: PixelRect }[];
   overlays: { name: string; rect: PixelRect; image: { width: number; height: number }; viewport: { width: number; height: number }; expect: PixelRect }[];
 };
 
@@ -214,6 +215,21 @@ describe('dragToRect', () => {
   });
 });
 
+describe('elementRect', () => {
+  it.each(corpus.elementRects.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    expect(elementRect(c.bounds, c.viewport)).toEqual(c.expect);
+  });
+
+  it('is a rectangle every annotation record accepts, for any box in the viewport', () => {
+    const base = known('a browser annotation').body as unknown as BrowserAnnotation;
+    const { width, height } = base.viewport;
+    for (const x of [0, 1, 639, width - 1]) for (const y of [0, 1, 300, height - 1]) for (const w of [1, 3, 8, 200]) for (const h of [1, 3, 8, 200]) {
+      const bounds = { x, y, width: Math.min(w, width - x), height: Math.min(h, height - y) };
+      expect(browserAnnotation.parse({ ...base, rect: elementRect(bounds, base.viewport) }, 1).ok).toBe(true);
+    }
+  });
+});
+
 describe('rectInImage', () => {
   it.each(corpus.overlays.map((c) => [c.name, c] as const))('%s', (_, c) => {
     expect(rectInImage(c.rect, c.image, c.viewport)).toEqual(c.expect);
@@ -228,6 +244,26 @@ describe('browser_annotation', () => {
     expect(annotate(capture, rect)).toEqual({ ok: true, value: { ...rest, viewport, rect, image } });
     expect(annotate(capture, { ...rect, width: 0 }).ok).toBe(false);
     expect(annotate(capture, { x: 1200, y: 0, width: 200, height: 20 })).toEqual({ ok: false, error: 'rect reaches outside the viewport' });
+  });
+
+  it('carries a picked element, labelled by its tag, and the same record parses again', () => {
+    const element = (known('a browser annotation').body as unknown as BrowserAnnotation).element;
+    expect(element).toBeUndefined();
+    const picked = corpus.parse.find((c) => c.name.startsWith('a browser annotation with a picked element'))!;
+    if (!picked.expect.ok) throw new Error('parses');
+    const body = picked.expect.records[0].body as BrowserAnnotation;
+    expect(Object.keys(body.element!)).toEqual(['tag', 'selector', 'text', 'html', 'ancestors', 'bounds', 'point', 'frames', 'opaque_frame', 'truncated']);
+    expect(picked.expect.records[0].label).toBe('Browser, <button> on shop.example.com/cart');
+    expect(annotate({ ...rest, image, viewport }, body.rect, body.element)).toEqual({ ok: true, value: body });
+    expect(browserAnnotation.parse(JSON.parse(JSON.stringify(body)), 1)).toEqual({ ok: true, value: body });
+  });
+
+  it('is refused whole for an element past a limit, never trimmed', () => {
+    const body = (corpus.parse.find((c) => c.name.startsWith('a browser annotation with a picked element'))!.expect as { records: MessageContext[] }).records[0].body as BrowserAnnotation;
+    const e = body.element!;
+    expect(annotate({ ...rest, image, viewport }, body.rect, { ...e, html: `<p>${'x'.repeat(2000)}` })).toEqual({ ok: false, error: 'element.html must be a string of 1 to 2000 characters' });
+    expect(annotate({ ...rest, image, viewport }, body.rect, { ...e, selector: 'a'.repeat(301) }).ok).toBe(false);
+    expect(annotate({ ...rest, image, viewport }, body.rect, { ...e, point: { x: viewport.width, y: 0 } }).ok).toBe(false);
   });
 
   it('reads the address for the label without its scheme, query or fragment', () => {

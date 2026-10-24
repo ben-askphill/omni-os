@@ -25,7 +25,8 @@ export type StaleReason = 'tab' | 'navigated' | 'viewport' | 'scrolled';
 
 /** What a capture gives, or why not. `retryable`: trying again can work. */
 export type CaptureResult =
-  | { ok: true; capture: BrowserCapture }
+  /** `page` is the page as the screenshot saw it, which an element pick compares the page against (browser-pick.ts). */
+  | { ok: true; capture: BrowserCapture; page: PageObservation }
   | { ok: false; status: number; error: string; retryable: boolean; stale?: StaleReason };
 
 /** A screenshot's encodings in the order they are tried: lossless, then JPEG at two qualities. */
@@ -102,7 +103,7 @@ export async function captureAnnotation(src: CaptureSource, threadId: string, no
     const dir = uploadsDir(threadId);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, name), buf);
-    return { ok: true, capture };
+    return { ok: true, capture, page: before };
   }
   return fail(413, `This page is too large to attach as an image (over ${(MAX_INLINE_IMAGE / 1_000_000).toFixed(1)} MB even as a JPEG). Make the browser window smaller and try again.`, false);
 }
@@ -124,7 +125,7 @@ export function discardCapture(threadId: string, name: string, now = Date.now())
 }
 
 /** The capture routes under /api/channels/:id/browser, for the channel's own browser session. */
-export function captureApi(browserFor: (c: Context) => CaptureSource) {
+export function captureApi(browserFor: (c: Context) => CaptureSource, hooks: { captured?: (threadId: string, name: string, page: PageObservation) => void; discarded?: (threadId: string, name: string) => void } = {}) {
   const api = new Hono();
   /** The thread the capture is for, which must belong to this channel. */
   const threadOf = (c: Context, id: string) => {
@@ -140,13 +141,16 @@ export function captureApi(browserFor: (c: Context) => CaptureSource) {
     if (t.error) return t.error;
     const r = await captureAnnotation(browserFor(c), id).catch((e: Error) => fail(502, `The browser could not be captured: ${e.message}`, true));
     if (!r.ok) return c.json({ error: r.error, retryable: r.retryable, ...(r.stale && { stale: r.stale }) }, r.status as 409);
+    hooks.captured?.(id, r.capture.image.name, r.page);
     return c.json({ capture: r.capture });
   });
 
   api.delete('/:id/browser/capture/:name', (c) => {
     const t = threadOf(c, c.req.query('thread') ?? '');
     if (t.error) return t.error;
-    return c.json({ removed: discardCapture(t.thread.id, c.req.param('name')) });
+    const name = c.req.param('name');
+    hooks.discarded?.(t.thread.id, name);
+    return c.json({ removed: discardCapture(t.thread.id, name) });
   });
   return api;
 }

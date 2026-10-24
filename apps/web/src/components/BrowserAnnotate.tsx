@@ -4,9 +4,10 @@
 // the server took, so nothing the page does afterwards can make it point somewhere else; the page is only read.
 import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NOTE_MAX, newContext } from '@omni/shared/message-context.ts';
-import { RECT_MIN, annotate, browserAnnotation, dragToRect, type BrowserCapture, type Drag, type PixelRect } from '@omni/shared/message-context-browser.ts';
+import { RECT_MIN, annotate, browserAnnotation, dragToRect, elementRect, type BrowserCapture, type Drag, type ElementPick, type PickedElement, type PixelRect } from '@omni/shared/message-context-browser.ts';
 import { ApiError, api, errorText, uploadUrl } from '../api.ts';
 import { addDraftContext } from '../message-context/draft.ts';
+import { PickedElementDetails } from '../message-context/picked-element.tsx';
 import { ShellCtx } from '../mobile/shell.tsx';
 import { Button, ErrorNote, Icon, IconButton } from './ui.tsx';
 
@@ -95,7 +96,7 @@ export function AnnotateLayer({ channelId, threadId, onClose, onAdded }: { chann
     <div role="dialog" aria-label="Annotate the page" className="absolute inset-0 z-20 flex min-h-0 flex-col bg-bg">
       <div className="flex shrink-0 items-center gap-2 px-3 py-2 text-[12px]">
         <Icon name="annotate" size={13} className="shrink-0 text-fg-3" />
-        <span className="min-w-0 flex-1 truncate text-fg-2">{phase.at === 'draw' ? 'Drag over the part of the page you mean.' : phase.at === 'capturing' ? 'Capturing the page' : 'Could not capture the page'}</span>
+        <span className="min-w-0 flex-1 truncate text-fg-2">{phase.at === 'draw' ? 'Tap an element, or drag over the part of the page you mean.' : phase.at === 'capturing' ? 'Capturing the page' : 'Could not capture the page'}</span>
         <Button size="sm" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
@@ -122,15 +123,16 @@ export function AnnotateLayer({ channelId, threadId, onClose, onAdded }: { chann
           </span>
         </div>
       ) : (
-        <Draw capture={phase.capture} threadId={threadId} onClose={onClose} onAdded={() => ((added.current = true), onAdded())} />
+        <Draw capture={phase.capture} channelId={channelId} threadId={threadId} onClose={onClose} onAdded={() => ((added.current = true), onAdded())} />
       )}
     </div>
   );
 }
 
 const DRAG_START = 3;
+const NO_ELEMENT = 'Element details are unavailable for this page. Drag over the area instead: the screenshot goes with your message.';
 
-function Draw({ capture, threadId, onClose, onAdded }: { capture: BrowserCapture; threadId: string; onClose: () => void; onAdded: () => void }) {
+function Draw({ capture, channelId, threadId, onClose, onAdded }: { capture: BrowserCapture; channelId: string; threadId: string; onClose: () => void; onAdded: () => void }) {
   const { viewport } = capture;
   const { box, scale, shown } = useFit(viewport);
   const stage = useRef<HTMLDivElement>(null);
@@ -139,6 +141,11 @@ function Draw({ capture, threadId, onClose, onAdded }: { capture: BrowserCapture
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [moved, setMoved] = useState(false);
+  // The element a tap picked, why a tap gave none, and a counter so a slow answer to an earlier tap is dropped.
+  const [element, setElement] = useState<PickedElement | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+  const pickId = useRef(0);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   const at = (e: { clientX: number; clientY: number }) => {
@@ -148,6 +155,11 @@ function Draw({ capture, threadId, onClose, onAdded }: { capture: BrowserCapture
   const finish = useCallback(
     (d: Drag) => {
       const r = dragToRect(d, shown, viewport);
+      // A dragged area is all Ben marked: an element picked before it no longer describes it.
+      pickId.current++;
+      setPicking(false);
+      setElement(null);
+      setNotice(null);
       if (!r.ok) {
         setRect(null);
         setError(r.error);
@@ -160,9 +172,34 @@ function Draw({ capture, threadId, onClose, onAdded }: { capture: BrowserCapture
     [shown, viewport],
   );
 
+  // A tap, not a drag: ask the page what is there. Whatever it cannot give leaves the screenshot as it is, says why, and a drag still works.
+  const pick = (p: { x: number; y: number }) => {
+    const id = ++pickId.current;
+    const x = Math.min(viewport.width - 1, Math.max(0, Math.floor(p.x / scale)));
+    const y = Math.min(viewport.height - 1, Math.max(0, Math.floor(p.y / scale)));
+    setPicking(true);
+    setError(null);
+    api
+      .post<ElementPick>(`/channels/${encodeURIComponent(channelId)}/browser/capture/${encodeURIComponent(capture.image.name)}/element`, { thread: threadId, x, y })
+      .catch((): ElementPick => ({ unavailable: { reason: 'unreadable', message: NO_ELEMENT } }))
+      .then((r) => {
+        if (id !== pickId.current) return;
+        setPicking(false);
+        if ('element' in r) {
+          setElement(r.element);
+          setNotice(null);
+          setRect(elementRect(r.element.bounds, viewport));
+          requestAnimationFrame(() => noteRef.current?.focus());
+        } else {
+          setElement(null);
+          setNotice(r.unavailable.message || NO_ELEMENT);
+        }
+      });
+  };
+
   const add = () => {
     if (!rect) return;
-    const body = annotate(capture, rect);
+    const body = annotate(capture, rect, element ?? undefined);
     if (!body.ok) return setError(body.error);
     const why = addDraftContext(threadId, newContext(browserAnnotation, body.value, note));
     if (why) return setError(why);
@@ -199,12 +236,12 @@ function Draw({ capture, threadId, onClose, onAdded }: { capture: BrowserCapture
             setDrag({ ...drag, x1: p.x, y1: p.y });
             if (Math.abs(p.x - drag.x0) + Math.abs(p.y - drag.y0) > DRAG_START) setMoved(true);
           }}
-          onPointerUp={() => {
+          onPointerUp={(e) => {
             if (!drag) return;
             const d = drag;
             setDrag(null);
             if (moved) finish(d);
-            else if (!rect) setError('Drag over the part of the page you mean.');
+            else pick(at(e));
           }}
           onPointerCancel={() => setDrag(null)}
         >
@@ -248,13 +285,19 @@ function Draw({ capture, threadId, onClose, onAdded }: { capture: BrowserCapture
               }}
               className="block w-full resize-none rounded-xl bg-surface px-3 py-2 text-[16px] leading-[1.45] outline-none placeholder:text-fg-4 focus:shadow-[inset_0_0_0_1px_var(--line-strong)] sm:text-[13px]"
             />
+            {element && <PickedElementDetails element={element} />}
+            {notice && <div className="mt-2 text-[11.5px] text-fg-3">{notice}</div>}
             {error && <ErrorNote className="mt-2">{error}</ErrorNote>}
             <div className="mt-2 flex items-center justify-end gap-1.5">
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => {
+                  pickId.current++;
+                  setPicking(false);
                   setRect(null);
+                  setElement(null);
+                  setNotice(null);
                   setError(null);
                 }}
               >
@@ -268,7 +311,10 @@ function Draw({ capture, threadId, onClose, onAdded }: { capture: BrowserCapture
         ) : (
           <>
             {error && <ErrorNote>{error}</ErrorNote>}
-            <div className="mt-1 text-[11.5px] text-fg-4">{error ? '' : `Marks an area of at least ${RECT_MIN} by ${RECT_MIN} page pixels. The page itself is not touched.`}</div>
+            {notice && <div className="mt-1 text-[11.5px] text-fg-3">{notice}</div>}
+            <div className="mt-1 text-[11.5px] text-fg-4">
+              {error ? '' : picking ? 'Looking at the page…' : `Tap an element to pick it, or drag an area of at least ${RECT_MIN} by ${RECT_MIN} page pixels. The page itself is not touched.`}
+            </div>
           </>
         )}
       </div>

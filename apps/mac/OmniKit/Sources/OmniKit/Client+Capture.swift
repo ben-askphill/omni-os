@@ -4,6 +4,12 @@ private struct CaptureRequest: Encodable, Sendable {
   let thread: String
 }
 
+private struct PickRequest: Encodable, Sendable {
+  let thread: String
+  let x: Int
+  let y: Int
+}
+
 private struct RemovedReply: Decodable {
   let removed: Bool
 }
@@ -51,5 +57,12 @@ extension OmniClient {
   /// Deletes a capture nothing was made of. Best effort: a capture left behind is only a file in the uploads folder.
   public func discardCapture(channel: String, thread: String, name: String) async {
     let _: RemovedReply? = try? await send("DELETE", capturePath(channel, "/\(uriComponent(name))"), query: [("thread", thread)])
+  }
+
+  /// What is at (`x`, `y`), in CSS pixels from the viewport's top left, on the page `name` was captured of
+  /// (apps/server/browser-pick.ts). A page that moved on, a frame from another site and a screenshot the server no longer
+  /// holds answer `.unavailable` with its words: the screenshot and the marked area still go with the message.
+  public func pickElement(channel: String, thread: String, name: String, x: Int, y: Int) async throws(OmniAPIError) -> ElementPickReply {
+    try await send("POST", capturePath(channel, "/\(uriComponent(name))/element"), body: PickRequest(thread: thread, x: x, y: y))
   }
 }

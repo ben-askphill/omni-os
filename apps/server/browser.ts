@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, rmSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { pickScript, type RawPick } from './browser-pick-script.ts';
 import { config, paths } from './config.ts';
 
 /**
@@ -436,6 +437,12 @@ class ChannelBrowser {
       viewport: { width: Math.round(v.w ?? 0), height: Math.round(v.h ?? 0) },
       scroll: { x: Math.round(v.x ?? 0), y: Math.round(v.y ?? 0) },
     };
+  }
+
+  /** The element at a point of the viewport, described by pickScript, or null when the page gave nothing. Changes nothing on the page. */
+  async pick(x: number, y: number): Promise<RawPick | null> {
+    const { result } = await this.page('Runtime.evaluate', { expression: pickScript(x, y), returnByValue: true, silent: true, timeout: 2000 });
+    return result?.value && typeof result.value === 'object' ? (result.value as RawPick) : null;
   }
 
   /** The visible viewport as an image, at the display scale the page is laid out at. Changes nothing on the page. */

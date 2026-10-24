@@ -236,7 +236,7 @@ private func parsed(_ json: String) throws -> DiffSelectionContext.Body {
         checked += 1
       }
     }
-    #expect(checked >= 15)
+    #expect(checked >= 30)
   }
 
   /// A drag on the shown screenshot becomes a rectangle in page pixels: each case is also run through the TypeScript.
@@ -257,6 +257,19 @@ private func parsed(_ json: String) throws -> DiffSelectionContext.Body {
       case .failure(let e): #expect(expect["error"]?.stringValue == e.message, "\(name)")
       case .success(let r): #expect(try JSONValue(encoding: r) == expect["rect"], "\(name)")
       }
+    }
+  }
+
+  /// An element's box becomes the rectangle it is marked with: each case is also run through the TypeScript.
+  @Test func marksAnElementWithItsBoxGrownToTheSmallestArea() throws {
+    let rects = try cases("elementRects")
+    #expect(rects.count >= 5)
+    for c in rects {
+      let name = c["name"]?.stringValue ?? "?"
+      func rect(_ v: JSONValue?) throws -> BrowserAnnotationContext.Rect { try JSONDecoder().decode(BrowserAnnotationContext.Rect.self, from: JSONEncoder().encode(try #require(v))) }
+      let viewport = try #require(c["viewport"])
+      let got = BrowserAnnotationContext.elementRect(try rect(c["bounds"]), viewport: (int(viewport["width"]) ?? 0, int(viewport["height"]) ?? 0))
+      #expect(got == (try rect(c["expect"])), "\(name)")
     }
   }
 

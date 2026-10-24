@@ -1,0 +1,25 @@
+{
+  "element": {
+    "tag": "button",
+    "selector": "#cart > div.summary > button.checkout",
+    "text": "Check out · €48,50",
+    "html": "<button id=\"go\" class=\"checkout\" type=\"submit\">Check out · €48,50</button>",
+    "ancestors": [
+      "<div class=\"summary\">",
+      "<main id=\"cart\">"
+    ],
+    "bounds": {
+      "x": 320,
+      "y": 96,
+      "width": 481,
+      "height": 160
+    },
+    "point": {
+      "x": 400,
+      "y": 150
+    },
+    "frames": [],
+    "opaque_frame": false,
+    "truncated": false
+  }
+}

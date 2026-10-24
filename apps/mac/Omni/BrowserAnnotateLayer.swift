@@ -20,6 +20,10 @@ struct BrowserAnnotateLayer: View {
 
   private var model: BrowserAnnotateModel { annotating.model }
 
+  /// How far a press moves before it is a drag and not a tap, in points.
+  private static let dragStart: CGFloat = 3
+  private static func isDrag(_ g: DragGesture.Value) -> Bool { abs(g.translation.width) + abs(g.translation.height) > dragStart }
+
   var body: some View {
     VStack(spacing: 0) {
       switch model.phase {
@@ -38,7 +42,7 @@ struct BrowserAnnotateLayer: View {
       case .picking(let capture):
         header
         screenshot(capture)
-        if model.rect != nil || model.error != nil { panel }
+        if model.rect != nil || model.error != nil || model.notice != nil || model.picking { panel }
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -53,7 +57,7 @@ struct BrowserAnnotateLayer: View {
   private var header: some View {
     HStack(spacing: z(8)) {
       OmniIcon(name: "target", size: 14).foregroundStyle(Tok.fg3)
-      Text("Drag over the part of the page you mean.")
+      Text("Tap an element, or drag over the part of the page you mean.")
         .font(.omni(size: 12, weight: .medium))
         .foregroundStyle(Tok.fg2)
       Spacer(minLength: 0)
@@ -101,10 +105,18 @@ struct BrowserAnnotateLayer: View {
           .contentShape(Rectangle())
           .gesture(
             DragGesture(minimumDistance: 0, coordinateSpace: .local)
-              .onChanged { g in live = .init(x0: g.startLocation.x, y0: g.startLocation.y, x1: g.location.x, y1: g.location.y) }
+              .onChanged { g in
+                // A press that has not moved is a tap, which picks an element; only a drag draws.
+                guard Self.isDrag(g) else { return }
+                live = .init(x0: g.startLocation.x, y0: g.startLocation.y, x1: g.location.x, y1: g.location.y)
+              }
               .onEnded { g in
-                model.drag(.init(x0: g.startLocation.x, y0: g.startLocation.y, x1: g.location.x, y1: g.location.y), shown: (size.width, size.height))
                 live = nil
+                if Self.isDrag(g) {
+                  model.drag(.init(x0: g.startLocation.x, y0: g.startLocation.y, x1: g.location.x, y1: g.location.y), shown: (size.width, size.height))
+                } else {
+                  Task { await model.tap(at: (g.location.x, g.location.y), shown: (size.width, size.height)) }
+                }
               }
           )
           .frame(width: size.width, height: size.height)
@@ -140,6 +152,12 @@ struct BrowserAnnotateLayer: View {
   private var panel: some View {
     @Bindable var model = model
     return VStack(alignment: .leading, spacing: z(8)) {
+      if let element = model.element { PickedElementView(element: element) }
+      if let notice = model.notice {
+        Text(notice).font(.omni(size: 11.5)).foregroundStyle(Tok.fg3)
+      } else if model.picking {
+        Text("Looking at the page…").font(.omni(size: 11.5)).foregroundStyle(Tok.fg3)
+      }
       if model.rect != nil {
         TextField("What about this?", text: $model.note, axis: .vertical)
           .textFieldStyle(.omni)

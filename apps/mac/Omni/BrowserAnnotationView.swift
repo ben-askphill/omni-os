@@ -53,6 +53,10 @@ private struct BrowserAnnotationDetail: View {
       Text("viewport \(annotation.viewport.width)×\(annotation.viewport.height) at \(scale), scrolled to y \(annotation.scroll.y)")
         .font(.omni(size: 11, design: .monospaced))
         .foregroundStyle(Tok.fg4)
+      if let element = annotation.element {
+        PickedElementView(element: element)
+          .padding(.top, z(6))
+      }
     }
   }
 }

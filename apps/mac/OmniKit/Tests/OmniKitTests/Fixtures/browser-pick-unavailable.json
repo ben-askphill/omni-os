@@ -1,0 +1,6 @@
+{
+  "unavailable": {
+    "reason": "stale",
+    "message": "The page navigated after the screenshot. The screenshot and the area you mark still go with your message."
+  }
+}

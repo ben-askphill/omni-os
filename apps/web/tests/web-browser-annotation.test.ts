@@ -11,6 +11,7 @@ import { CONTEXT_VIEWS } from '../src/message-context/kinds.ts';
 import { addDraftContext, draftContext, readStoredDrafts, removeDraftContext } from '../src/message-context/draft.ts';
 import { readContexts } from '@omni/shared/message-context-kinds.ts';
 import { ApiError } from '../src/api.ts';
+import { PickedElementDetails } from '../src/message-context/picked-element.tsx';
 
 // The Web UI's half of a browser_annotation: its view, the draft that keeps it across a reload, and when Annotate is on.
 // Dragging and the capture round trip are driven in a real browser (the PR's screenshots), not here.
@@ -40,6 +41,37 @@ describe('the browser_annotation view', () => {
 
   it('has an icon', () => {
     expect(CONTEXT_VIEWS.browser_annotation.icon).toBe('annotate');
+  });
+});
+
+describe('a browser_annotation with a picked element', () => {
+  const picked = (corpus as unknown as { parse: { name: string; expect: { records: MessageContext<'browser_annotation', BrowserAnnotation>[] } }[] }).parse.find((c) =>
+    c.name.startsWith('a browser annotation with a picked element'),
+  )!.expect.records[0];
+  const html = renderToStaticMarkup(createElement(ContextInspector, { reading: readContexts([picked])[0] }));
+
+  it('shows the tag and selector, and the text, as text', () => {
+    expect(html).toContain('data-picked-element');
+    expect(html).toContain('&lt;button&gt;');
+    expect(html).toContain('#cart &gt; div.summary &gt; button.checkout');
+  });
+
+  it('keeps the markup behind Details, and never renders it', () => {
+    const open = renderToStaticMarkup(createElement(PickedElementDetails, { element: { ...picked.body.element!, html: '<img src=x onerror=alert(1)>', text: '<b>bold</b>' }, defaultOpen: true }));
+    expect(open).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(open).toContain('&lt;b&gt;bold&lt;/b&gt;');
+    expect(open).not.toContain('<img');
+    expect(open).toContain('Parents, nearest first');
+    expect(html).not.toContain('Parents, nearest first');
+  });
+
+  it('says a frame from another site cannot be read', () => {
+    const frame = renderToStaticMarkup(createElement(PickedElementDetails, { element: { ...picked.body.element!, tag: 'iframe', opaque_frame: true } }));
+    expect(frame).toContain('This is a frame from another site');
+  });
+
+  it('is absent from a record of an area', () => {
+    expect(renderToStaticMarkup(createElement(ContextInspector, { reading: readContexts([record])[0] }))).not.toContain('data-picked-element');
   });
 });
 

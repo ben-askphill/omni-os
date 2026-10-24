@@ -41,7 +41,35 @@ export interface BrowserAnnotation {
   /** When the screenshot was taken, as `Date.toISOString` writes it. */
   captured_at: string;
   image: AnnotationImage;
-  // An element picked on the page (#216) is an optional `element` here, at v1: a record without it stays valid.
+  /** The element Ben picked on the page. Absent when he marked an area, or the page could not give one: a record without it is valid. */
+  element?: PickedElement;
+}
+
+/**
+ * An element picked on the page at capture time: enough to find it again and to tell what it was, never the page's
+ * DOM. Every field is bounded, and the text and markup are data from the page, quoted to the agent and never run.
+ */
+export interface PickedElement {
+  /** The element's tag name, lowercase. */
+  tag: string;
+  /** A CSS selector for it, from the nearest ancestor with an id. Best effort: the page may have changed since. */
+  selector: string;
+  /** Its visible text with whitespace collapsed, cut to ELEMENT_TEXT_MAX. Empty for a field or an image. */
+  text: string;
+  /** A shallow excerpt of its markup on one line, cut to ELEMENT_HTML_MAX. Never a form field's value. */
+  html: string;
+  /** Its parents' opening tags, nearest first. */
+  ancestors: string[];
+  /** Its box clipped to the viewport, in CSS pixels from the viewport's top left. */
+  bounds: PixelRect;
+  /** Where Ben picked, in CSS pixels from the viewport's top left. */
+  point: { x: number; y: number };
+  /** The frames it sits in, outermost first, as their documents' addresses. Empty for the page itself. */
+  frames: string[];
+  /** True when the point is inside a frame from another site: the page cannot read it, so `tag` and the rest are the frame element's own. */
+  opaque_frame: boolean;
+  /** True when `text` or `html` was cut. */
+  truncated: boolean;
 }
 
 /** What the server makes: everything about the page and the image, before Ben marks anything. */
@@ -51,6 +79,14 @@ export const URL_MAX = 2_048;
 export const TITLE_MAX = 300;
 /** The most a screenshot may weigh. The server keeps to MAX_INLINE_IMAGE (apps/server/uploads.ts) so every harness can take it inline. */
 export const IMAGE_BYTES_MAX = 5_000_000;
+/** What a picked element may hold. Together under 6,000 characters, inside the message's own 32,000. */
+export const SELECTOR_MAX = 300;
+export const ELEMENT_TEXT_MAX = 600;
+export const ELEMENT_HTML_MAX = 2_000;
+export const ANCESTORS_MAX = 4;
+export const ANCESTOR_MAX = 160;
+export const FRAMES_MAX = 3;
+export const FRAME_URL_MAX = 512;
 const SIZE_MAX = 20_000;
 /** The smallest rectangle, per side, in CSS pixels. */
 export const RECT_MIN = 8;
@@ -88,6 +124,49 @@ export function shortUrl(url: string) {
   return url.replace(/^https?:\/\//i, '').replace(/[?#].*$/, '').replace(/\/$/, '');
 }
 
+/** A field that may be empty: a string of at most `max` characters on one line. */
+function maybePlain(v: unknown, at: string, max: number): Parsed<string> {
+  return v === '' ? { ok: true, value: '' } : plain(v, at, max);
+}
+
+/** The picked element as `parse` holds it. `viewport` is the record's own, which the box and the point must sit inside. */
+export function elementOf(v: unknown, viewport: { width: number; height: number }): Parsed<PickedElement> {
+  if (!isObj(v)) return { ok: false, error: 'element must be an object' };
+  const tag = plain(v.tag, 'element.tag', 40);
+  if (!tag.ok) return tag;
+  if (!/^[a-z][a-z0-9-]*$/.test(tag.value)) return { ok: false, error: 'element.tag must be a lowercase tag name' };
+  const selector = plain(v.selector, 'element.selector', SELECTOR_MAX);
+  if (!selector.ok) return selector;
+  const text = maybePlain(v.text, 'element.text', ELEMENT_TEXT_MAX);
+  if (!text.ok) return text;
+  const html = plain(v.html, 'element.html', ELEMENT_HTML_MAX);
+  if (!html.ok) return html;
+  if (!Array.isArray(v.ancestors) || v.ancestors.length > ANCESTORS_MAX) return { ok: false, error: `element.ancestors must be at most ${ANCESTORS_MAX} tags` };
+  const ancestors: string[] = [];
+  for (const a of v.ancestors) {
+    const one = plain(a, 'element.ancestors', ANCESTOR_MAX);
+    if (!one.ok) return one;
+    ancestors.push(one.value);
+  }
+  const bounds = rectOf(v.bounds, viewport);
+  if (!bounds.ok) return { ok: false, error: bounds.error.replace('rect', 'element.bounds') };
+  const pt = v.point;
+  if (!isObj(pt) || !whole(pt.x, 0, viewport.width - 1) || !whole(pt.y, 0, viewport.height - 1)) return { ok: false, error: 'element.point must be whole CSS pixels inside the viewport' };
+  if (!Array.isArray(v.frames) || v.frames.length > FRAMES_MAX) return { ok: false, error: `element.frames must be at most ${FRAMES_MAX} addresses` };
+  const frames: string[] = [];
+  for (const f of v.frames) {
+    const one = plain(f, 'element.frames', FRAME_URL_MAX);
+    if (!one.ok) return one;
+    frames.push(one.value);
+  }
+  if (typeof v.opaque_frame !== 'boolean' || typeof v.truncated !== 'boolean') return { ok: false, error: 'element.opaque_frame and element.truncated must be true or false' };
+  // Fixed key order, so a record is the same bytes wherever it was parsed.
+  return {
+    ok: true,
+    value: { tag: tag.value, selector: selector.value, text: text.value, html: html.value, ancestors, bounds: bounds.value, point: { x: pt.x, y: pt.y }, frames, opaque_frame: v.opaque_frame, truncated: v.truncated },
+  };
+}
+
 export const browserAnnotation: MessageContextKind<BrowserAnnotation> = {
   kind: 'browser_annotation',
   v: 1,
@@ -113,6 +192,9 @@ export const browserAnnotation: MessageContextKind<BrowserAnnotation> = {
     if (!validTime(body.captured_at)) return { ok: false, error: 'captured_at must be a time like 2026-10-24T09:30:00.000Z' };
     const image = imageOf(body.image);
     if (!image.ok) return image;
+    // Absent or null is a record of an area. Anything else must be a whole element: a half of one is refused, not trimmed.
+    const element = body.element === undefined || body.element === null ? null : elementOf(body.element, viewport);
+    if (element && !element.ok) return element;
     return {
       ok: true,
       value: {
@@ -124,25 +206,45 @@ export const browserAnnotation: MessageContextKind<BrowserAnnotation> = {
         rect: rect.value,
         captured_at: body.captured_at,
         image: image.value,
+        ...(element && { element: element.value }),
       },
     };
   },
   label(b) {
     const at = [...shortUrl(b.url)];
     const where = at.length > LABEL_URL_MAX ? `${at.slice(0, LABEL_URL_MAX - 1).join('')}…` : at.join('');
-    return cutLabel(`Browser, ${b.rect.width}×${b.rect.height} area on ${where}`);
+    return cutLabel(b.element ? `Browser, <${b.element.tag}> on ${where}` : `Browser, ${b.rect.width}×${b.rect.height} area on ${where}`);
   },
 };
 
-/** The capture with Ben's rectangle on it, checked as the route will check it. */
-export function annotate(capture: BrowserCapture, rect: PixelRect): Parsed<BrowserAnnotation> {
-  return browserAnnotation.parse({ ...capture, rect }, 1);
+/** The capture with Ben's rectangle on it, and the element he picked if he did, checked as the route will check it. */
+export function annotate(capture: BrowserCapture, rect: PixelRect, element?: PickedElement): Parsed<BrowserAnnotation> {
+  return browserAnnotation.parse({ ...capture, rect, ...(element && { element }) }, 1);
 }
 
 /** A title as a record holds it: whitespace collapsed, control characters dropped, cut to TITLE_MAX. */
 export function cleanTitle(raw: string): string {
   const flat = raw.replace(new RegExp(FORBIDDEN_CLASS, 'gu'), ' ').replace(/\s+/g, ' ').trim();
   return overLimit(flat, TITLE_MAX) ? `${[...flat].slice(0, TITLE_MAX - 1).join('')}…` : flat;
+}
+
+/** What the server answers for a pick: the element, or why there is none (the screenshot and its area still stand). */
+export type ElementPick = { element: PickedElement } | { unavailable: { reason: ElementUnavailable; message: string } };
+export type ElementUnavailable = 'stale' | 'unknown_capture' | 'nothing' | 'unreadable';
+
+/**
+ * The rectangle a picked element is marked with: its bounds, grown evenly to RECT_MIN where it is smaller (an icon) and
+ * kept inside the viewport.
+ */
+export function elementRect(bounds: PixelRect, viewport: { width: number; height: number }): PixelRect {
+  const side = (pos: number, size: number, max: number) => {
+    const len = Math.min(max, Math.max(size, RECT_MIN));
+    const start = Math.min(max - len, Math.max(0, pos - Math.floor((len - size) / 2)));
+    return [start, len] as const;
+  };
+  const [x, width] = side(bounds.x, bounds.width, viewport.width);
+  const [y, height] = side(bounds.y, bounds.height, viewport.height);
+  return { x, y, width, height };
 }
 
 /** A drag across the screenshot as it is shown: corner to corner, in the shown image's own pixels. */

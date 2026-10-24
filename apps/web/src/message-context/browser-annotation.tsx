@@ -6,6 +6,7 @@ import type { BrowserAnnotation } from '@omni/shared/message-context-browser.ts'
 import { uploadUrl } from '../api.ts';
 import { displayUrl } from '../components/LiveBrowser.tsx';
 import { fullDate } from '../format.ts';
+import { PickedElementDetails } from './picked-element.tsx';
 import type { ContextView } from './views.ts';
 
 /** The screenshot is shown no taller than this, so a tall page does not fill the reply box. */
@@ -40,6 +41,7 @@ function BrowserAnnotationDetail({ body: b }: { body: BrowserAnnotation }) {
         Area {rect.width}×{rect.height} at {rect.x}, {rect.y} · viewport {viewport.width}×{viewport.height} at {viewport.scale}x · scrolled to {scroll.x}, {scroll.y}
       </div>
       <div className="text-[11px] text-fg-4">Captured {fullDate(b.captured_at)}</div>
+      {b.element && <PickedElementDetails element={b.element} />}
     </div>
   );
 }
