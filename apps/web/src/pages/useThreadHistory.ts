@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { appendLive, applyHead, emptyHistory, tailId, type History, type HistoryPage } from '@omni/shared/history.ts';
+import { appendLive, emptyHistory, tailId, type History, type HistoryPage } from '@omni/shared/history.ts';
 import { api, type HistoryEvent, type ThreadOpen } from '../api.ts';
-import { headOf, historyLoader, opening } from '../thread-history.ts';
+import { headOf, historyLoader, joinSnapshot, opening } from '../thread-history.ts';
 
 /**
  * The rows the thread holds and the loads on them (#223). useThreadSession owns the rest of the detail. A thread
@@ -13,8 +13,8 @@ export function useThreadHistory(threadId: string) {
   current.current = history;
   const [version, bump] = useReducer((n: number) => n + 1, 0);
   /**
-   * The stream's `after`: the newest row the first load or the stream brought. A reconnect's head never moves it, so a
-   * stream that drops again before its replay lands still replays what lies between.
+   * The stream's `after`: the newest row the first load or the stream brought. An older page never moves it. A snapshot
+   * sets it to its page's newest row, which the server sends as the sync's id, so the stream resumes right after it.
    */
   const lastId = useRef(0);
 
@@ -43,9 +43,6 @@ export function useThreadHistory(threadId: string) {
     },
     [update],
   );
-  /** A reconnect's fresh head, joined to what is held. */
-  const joinHead = useCallback((d: ThreadOpen) => update((h) => applyHead(h, d.events, headOf(d))), [update]);
-
   const pending = useRef<HistoryEvent[]>([]);
   const frame = useRef<number | undefined>(undefined);
   /** Rows from the live stream. Streams arrive in bursts; they go in once per frame instead of once per row. */
@@ -62,6 +59,18 @@ export function useThreadHistory(threadId: string) {
     },
     [update],
   );
+  /** A sync with the newest page in place of a replay. Rows still waiting for their frame join the old head first. */
+  const snapshot = useCallback(
+    (d: ThreadOpen) => {
+      if (frame.current !== undefined) cancelAnimationFrame(frame.current);
+      frame.current = undefined;
+      const batch = pending.current;
+      pending.current = [];
+      lastId.current = tailId({ rows: d.events });
+      update((h) => joinSnapshot(h, batch, d.events, headOf(d)));
+    },
+    [update],
+  );
   useEffect(
     () => () => {
       if (frame.current !== undefined) cancelAnimationFrame(frame.current);
@@ -70,9 +79,9 @@ export function useThreadHistory(threadId: string) {
   );
 
   return useMemo(
-    () => ({ history, lastId, prepare, open, joinHead, append, ...loader }),
+    () => ({ history, lastId, prepare, open, append, snapshot, ...loader }),
     // `version` re-renders the controls when a load starts, lands or fails.
-    [history, version, prepare, open, joinHead, append, loader], // eslint-disable-line react-hooks/exhaustive-deps
+    [history, version, prepare, open, append, snapshot, loader], // eslint-disable-line react-hooks/exhaustive-deps
   );
 }
 

@@ -50,7 +50,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   const [context, setContext] = useState<ContextUsage | null>(null);
 
   const toast = useToast();
-  const { prepare, open, joinHead, append, reveal } = history;
+  const { prepare, open, append, snapshot, reveal } = history;
   const atRef = useRef(at);
   atRef.current = at;
   // The `at` the first load or a later reveal already took, so each is scrolled to once.
@@ -69,41 +69,42 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   }, []);
   const artifactParamRef = useRef(artifactParam);
 
+  /** The thread's state from a detail: the first load's, or a stream sync's. */
+  const applyDetail = useCallback((d: ThreadOpen) => {
+    setThread((prev) => newer(prev, d.thread));
+    setQueued(d.pending ?? []);
+    if (d.live !== undefined) setWarm(d.live);
+    setBlocked(d.blocked ?? null);
+    setHandoff(d.handoff ?? null);
+    setChannel(d.channel);
+    setParent(d.parent);
+    setChildren(d.children);
+    setTeam(d.team ?? []);
+    setArtifacts(d.artifacts);
+    d.artifacts.forEach((a) => artifactIds.current.add(a.id));
+  }, []);
+
   const load = useCallback(
-    async (initial: boolean) => {
+    async () => {
       try {
         const d = await api.get<ThreadOpen>(`/threads/${encodeURIComponent(id)}?history=recent`);
-        const target = initial ? atRef.current : undefined;
+        const target = atRef.current;
         // Before any state is set, so the thread first renders with the hit's page already held.
-        const opened = initial ? await prepare(d, target) : null;
-        setThread((prev) => newer(prev, d.thread));
-        setQueued(d.pending ?? []);
-        if (d.live !== undefined) setWarm(d.live);
-        setBlocked(d.blocked ?? null);
-        setHandoff(d.handoff ?? null);
-        setChannel(d.channel);
-        setParent(d.parent);
-        setChildren(d.children);
-        setTeam(d.team ?? []);
-        setArtifacts(d.artifacts);
-        d.artifacts.forEach((a) => artifactIds.current.add(a.id));
-        if (opened) {
-          open(opened);
-          // Not held when its page failed: the reveal below tries again and says why.
-          if (target && holds(opened, target)) {
-            revealed.current = target;
-            setRevealTarget(target);
-          }
-          setReady(true);
-          if (!artifactParamRef.current) {
-            const visible = d.artifacts.filter((a) => a.kind !== 'screenshot');
-            const html = [...visible].reverse().find((a) => a.kind === 'html');
-            const pick = html ?? visible[visible.length - 1];
-            if (pick) setSelected(pick.id);
-            else if (!visible.length) setPanelTab('details');
-          }
-        } else {
-          joinHead(d);
+        const opened = await prepare(d, target);
+        applyDetail(d);
+        open(opened);
+        // Not held when its page failed: the reveal below tries again and says why.
+        if (target && holds(opened, target)) {
+          revealed.current = target;
+          setRevealTarget(target);
+        }
+        setReady(true);
+        if (!artifactParamRef.current) {
+          const visible = d.artifacts.filter((a) => a.kind !== 'screenshot');
+          const html = [...visible].reverse().find((a) => a.kind === 'html');
+          const pick = html ?? visible[visible.length - 1];
+          if (pick) setSelected(pick.id);
+          else if (!visible.length) setPanelTab('details');
         }
         setError(null);
       } catch (e) {
@@ -111,11 +112,11 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
         else setError(errorText(e));
       }
     },
-    [id, prepare, open, joinHead],
+    [id, prepare, open, applyDetail],
   );
 
   useEffect(() => {
-    void load(true);
+    void load();
   }, [load]);
 
   // A search hit opened while the thread is already open: load its page if needed, then scroll to it.
@@ -134,6 +135,10 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
       switch (m.type) {
         case 'event':
           append([m.event]);
+          break;
+        case 'sync':
+          applyDetail(m.detail);
+          if (m.snapshot) snapshot(m.detail);
           break;
         case 'artifact':
           upsertArtifact(m.artifact);
@@ -158,7 +163,6 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
         }
       }
     },
-    () => void load(false),
   );
 
   useFeed((e) => {

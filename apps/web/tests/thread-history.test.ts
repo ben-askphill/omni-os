@@ -1,13 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { LONG_THREAD } from '@omni/test-fixtures/long-thread.ts';
-import { appendLive, applyHead, atStart, earlierCursor, emptyHistory, historyQuery, laterCursor, openHistory, revealCursor, tailId, turnCount, type History, type HistoryPage, type HistoryRow } from '@omni/shared/history.ts';
-import { headOf, historyLoader, keyAtOrBefore, opening } from '../src/thread-history.ts';
+import { appendLive, applyHead, applyPage, atStart, earlierCursor, emptyHistory, historyQuery, laterCursor, openHistory, revealCursor, tailId, turnCount, type History, type HistoryCursor, type HistoryPage, type HistoryRow } from '@omni/shared/history.ts';
+import { headOf, historyLoader, joinSnapshot, keyAtOrBefore, opening } from '../src/thread-history.ts';
 import { historyServer, longRows } from './history-sim.ts';
 
 // The Web UI's thread session over a paged history: what the desktop transcript and the phone thread screen load.
 
 const ROWS = longRows();
 const needleOf = (rows: HistoryRow[]) => rows.find((r) => r.kind === 'user' && r.payload.includes(LONG_THREAD.oldNeedle))!.id;
+
+/** The cursor a page query names, as the server parses it. */
+function cursorOf(q: string): HistoryCursor {
+  const p = new URLSearchParams(q);
+  const n = (k: string) => (p.has(k) ? Number(p.get(k)) : undefined);
+  const at = n('at');
+  return at !== undefined ? { at, after: n('after'), before: n('before') } : p.get('take') === 'oldest' ? { take: 'oldest', after: n('after')!, before: n('before') } : { take: 'newest', after: n('after'), before: n('before') };
+}
 
 /** A loader over the in-memory server, with its state in a variable and every request counted. */
 function session(fail = new Set<string>()) {
@@ -20,10 +28,7 @@ function session(fail = new Set<string>()) {
     page: async (q) => {
       asked.push(q);
       if (fail.has(q)) throw new Error('Cannot reach the Omni server. Is it running?');
-      const p = new URLSearchParams(q);
-      const n = (k: string) => (p.has(k) ? Number(p.get(k)) : undefined);
-      const at = n('at');
-      return server.page(at !== undefined ? { at, after: n('after'), before: n('before') } : p.get('take') === 'oldest' ? { take: 'oldest', after: n('after')!, before: n('before') } : { take: 'newest', after: n('after'), before: n('before') });
+      return server.page(cursorOf(q));
     },
     row: async (id) => {
       asked.push(`row ${id}`);
@@ -144,5 +149,70 @@ describe('thread history session', () => {
     expect(keyAtOrBefore([10, 20, 30], 30)).toBe(30);
     expect(keyAtOrBefore([10, 20, 30], 5)).toBeNull();
     expect(keyAtOrBefore([], 5)).toBeNull();
+  });
+});
+
+describe('a reconnect whose gap is too big to replay (#224)', () => {
+  const now = historyServer(ROWS);
+  const fresh = now.head();
+
+  /**
+   * A client that saw the thread up to row `seen` (exclusive), with its head and one earlier page held. The stream then
+   * brought four more rows that were still waiting for their frame when the snapshot sync came.
+   */
+  function dropped(seen: number) {
+    const then = historyServer(ROWS.slice(0, seen));
+    const head = then.head();
+    const opened = openHistory(head.events, head.head);
+    const h = applyPage(opened, then.page(earlierCursor(opened)!));
+    return { h, waiting: now.rows.slice(seen, seen + 4) };
+  }
+
+  const ids = (h: History) => h.rows.map((r) => r.id);
+
+  it('keeps the old head as an island under the fresh one, rows that came first included', () => {
+    const { h, waiting } = dropped(ROWS.length - 1200);
+    const tail = waiting[waiting.length - 1].id;
+    expect(fresh.head.from).toBeGreaterThan(tail + 1);
+    const next = joinSnapshot(h, waiting, fresh.events, fresh.head);
+    expect(next.spans).toEqual([
+      { from: h.spans[0].from, to: tail + 1 },
+      { from: fresh.head.from, to: null },
+    ]);
+    expect(earlierCursor(next)).toEqual(earlierCursor(h));
+    expect(laterCursor(next, 0)).toEqual({ take: 'oldest', after: tail, before: fresh.head.from });
+    expect(ids(next)).toEqual([...new Set(ids(next))].sort((a, b) => a - b));
+    for (const r of waiting) expect(ids(next)).toContain(r.id);
+    expect(tailId(next)).toBe(ROWS[ROWS.length - 1].id);
+    expect(turnCount(next)).toBe(ROWS.filter((r) => r.kind === 'result').length);
+  });
+
+  it('fills the gap and the older history through their cursors, to the whole thread', async () => {
+    const { h, waiting } = dropped(ROWS.length - 1200);
+    let state: History = joinSnapshot(h, waiting, fresh.events, fresh.head);
+    const loader = historyLoader<HistoryRow>({
+      page: async (q) => now.page(cursorOf(q)),
+      row: async () => {
+        throw new Error('no row reads here');
+      },
+      get: () => state,
+      update: (fn) => {
+        state = fn(state);
+      },
+      changed: () => {},
+    });
+    while (state.spans.length > 1) expect(await loader.load(laterCursor(state, 0))).toBe(true);
+    while (earlierCursor(state)) expect(await loader.load(earlierCursor(state))).toBe(true);
+    expect(state.spans).toEqual([{ from: 0, to: null }]);
+    expect(ids(state)).toEqual(ROWS.map((r) => r.id));
+  });
+
+  it('joins a fresh head that reaches the held tail into one span, each row once', () => {
+    const { h, waiting } = dropped(ROWS.length - 50);
+    const next = joinSnapshot(h, waiting, fresh.events, fresh.head);
+    expect(next.spans).toEqual([{ from: h.spans[0].from, to: null }]);
+    const from = h.spans[0].from;
+    expect(ids(next)).toEqual([...new Set(ids(next))].sort((a, b) => a - b));
+    expect(ids(next).filter((id) => id >= from)).toEqual(ROWS.filter((r) => r.id >= from).map((r) => r.id));
   });
 });

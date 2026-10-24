@@ -616,13 +616,20 @@ export type StreamMessage =
   | { type: 'event'; event: EventRow }
   | { type: 'artifact'; artifact: Artifact }
   | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string; handoff?: HandoffView | null }
+  /**
+   * Sent once per connect, after any replayed rows (#224): the detail as GET /threads/:id has it now. `snapshot`: the
+   * gap was too big to replay, so `detail` carries the newest page and its head instead.
+   */
+  | { type: 'sync'; detail: ThreadOpen; snapshot: boolean }
   /** A new reading of the thread's context window. */
   | { type: 'context'; context: ContextUsage }
   | { type: 'mod_toast'; toast: ModToast };
 
-function classifyStream(d: unknown): StreamMessage | null {
+export function classifyStream(d: unknown): StreamMessage | null {
   if (!d || typeof d !== 'object') return null;
   const o = d as Record<string, unknown>;
+  if (o.kind === 'sync' && o.thread)
+    return { type: 'sync', detail: { ...o, events: Array.isArray(o.events) ? o.events : [] } as unknown as ThreadOpen, snapshot: o.catch_up === 'snapshot' && !!o.history };
   if (o.kind === 'artifact' && o.artifact) return { type: 'artifact', artifact: o.artifact as Artifact };
   if (o.kind === 'thread' && o.thread)
     return {
@@ -639,20 +646,12 @@ function classifyStream(d: unknown): StreamMessage | null {
 
 /**
  * Live stream for one thread. `lastId` is read on every (re)connect so no events are missed or
- * duplicated; the caller still dedupes by id. Starts only when `ready` is true (after the
- * initial GET has populated lastId).
+ * duplicated; the caller still dedupes by id. Each connect ends its catch-up with a `sync`, so a
+ * reconnect needs no refetch. Starts only when `ready` is true (after the initial GET has populated lastId).
  */
-export function useThreadStream(
-  threadId: string,
-  ready: boolean,
-  lastId: RefObject<number>,
-  onMessage: (m: StreamMessage) => void,
-  onReconnect: () => void,
-) {
+export function useThreadStream(threadId: string, ready: boolean, lastId: RefObject<number>, onMessage: (m: StreamMessage) => void) {
   const handler = useRef(onMessage);
-  const reconnect = useRef(onReconnect);
   handler.current = onMessage;
-  reconnect.current = onReconnect;
   // True until a connection actually drops, so a slow first byte does not read as "reconnecting".
   const [live, setLive] = useState(true);
 
@@ -665,10 +664,7 @@ export function useThreadStream(
         if (m) handler.current(m);
       },
       {
-        onOpen: (again) => {
-          setLive(true);
-          if (again) reconnect.current();
-        },
+        onOpen: () => setLive(true),
         onDown: () => setLive(false),
       },
     );

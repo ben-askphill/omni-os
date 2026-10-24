@@ -1,7 +1,7 @@
 // Loading a thread's history page by page (#223), React-free so the tests drive it: useThreadHistory holds the state.
 // The state itself and every join on it are @omni/shared/history.ts; this adds the requests, one in flight per
 // cursor, and what each control shows while one runs or after one failed.
-import { ALL, applyPage, historyQuery, openHistory, replaceRow, revealCursor, spanIndex, type History, type HistoryCursor, type HistoryHead, type HistoryPage, type HistoryRow } from '@omni/shared/history.ts';
+import { ALL, appendLive, applyHead, applyPage, detachHead, historyQuery, openHistory, replaceRow, revealCursor, spanIndex, type History, type HistoryCursor, type HistoryHead, type HistoryPage, type HistoryRow } from '@omni/shared/history.ts';
 import { errorText } from './api.ts';
 
 /** The head a detail answer carries; an older server sends every event and no head, which is the whole thread. */
@@ -72,6 +72,14 @@ export function historyLoader<R extends HistoryRow>(io: HistoryIO<R>) {
     rowBusy: (eventId: number) => inflight.has(rowKey(eventId)),
     rowError: (eventId: number) => errors.get(rowKey(eventId)) ?? null,
   };
+}
+
+/**
+ * A stream sync that carries a page instead of a replay (#224). `live`: rows the stream brought that are not joined
+ * yet, which belong to the old head. That head closes into an island, and the fresh head joins above it.
+ */
+export function joinSnapshot<R extends HistoryRow>(h: History<R>, live: readonly R[], events: readonly R[], head: HistoryHead): History<R> {
+  return applyHead(detachHead(appendLive(h, live)), events, head);
 }
 
 /** A thread's first state: its head, and the page holding `at` when Ben opened it at an older event. */

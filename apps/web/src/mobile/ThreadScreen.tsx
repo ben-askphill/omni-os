@@ -422,7 +422,7 @@ export function ThreadScreen() {
     return (
       <>
         <MoHeader onBack={shell.back} title="Thread" />
-        {notFound ? <MoEmpty>This thread was deleted, or the link is wrong.</MoEmpty> : <ErrorNote className="mx-4" onRetry={() => void load(true)}>{error}</ErrorNote>}
+        {notFound ? <MoEmpty>This thread was deleted, or the link is wrong.</MoEmpty> : <ErrorNote className="mx-4" onRetry={() => void load()}>{error}</ErrorNote>}
       </>
     );
   }

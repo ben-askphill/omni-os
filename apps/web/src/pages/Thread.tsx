@@ -175,7 +175,7 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
     return (
       <div className="px-6">
         {error ? (
-          <ErrorNote className="mt-6" onRetry={() => void load(true)}>
+          <ErrorNote className="mt-6" onRetry={() => void load()}>
             {error}
           </ErrorNote>
         ) : (
@@ -351,11 +351,6 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
         <div className="relative min-h-0 flex-1">
           <div ref={scrollRef} onScroll={onScroll} className="scroll-thin h-full overflow-y-auto [overflow-anchor:none]">
             <div ref={contentRef} className="mx-auto max-w-4xl px-4 pt-4 pb-10 md:px-6">
-              {error && (
-                <ErrorNote className="mb-3" onRetry={() => void load(false)}>
-                  {error}
-                </ErrorNote>
-              )}
               {/* Queued means waiting for a slot: nothing is working yet. */}
               <LinkChannel.Provider value={thread.channel_id}>
                 <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} />
