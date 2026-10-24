@@ -1021,6 +1021,21 @@
 .pop-in {
   animation: omni-pop 0.42s var(--ease-settle);
 }
+/* A search hit the thread scrolled to: the search mark's wash behind it, fading out. */
+@keyframes omni-flash {
+  from {
+    background-color: var(--mark);
+    box-shadow: 0 0 0 8px var(--mark);
+  }
+  to {
+    background-color: transparent;
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+.flash {
+  border-radius: 14px;
+  animation: omni-flash 2s var(--ease-out) 0.2s both;
+}
 @keyframes omni-sheet {
   from {
     transform: translateY(24px);

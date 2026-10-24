@@ -52,6 +52,8 @@ export function SearchSheet() {
       };
     });
   }, [query, recent.data, hits.data, channel, now]);
+  // A body hit opens its thread at the message it matched.
+  const hitAt = useMemo(() => new Map((query ? (hits.data ?? []) : []).flatMap((h) => (h.event_id ? [[h.thread_id, h.event_id] as const] : []))), [query, hits.data]);
   const empty = query
     ? hits.error ?? (hits.loading ? 'Searching' : matched.length ? null : `Nothing matches "${query}". Prefix matches work, so checko finds checkout.`)
     : recent.loading && !recent.data
@@ -94,7 +96,7 @@ export function SearchSheet() {
             ))}
           </MoGroup>
         )}
-        {rows.length ? <MoRows items={rows} onOpen={(r) => shell.open(href.thread(r.id))} /> : empty && <MoEmpty>{empty}</MoEmpty>}
+        {rows.length ? <MoRows items={rows} onOpen={(r) => shell.open(hitAt.get(r.id) ? href.threadAt(r.id, hitAt.get(r.id)!) : href.thread(r.id))} /> : empty && <MoEmpty>{empty}</MoEmpty>}
       </div>
     </MoSheet>
   );

@@ -20,7 +20,7 @@ export function Page({ route }: { route: Route }) {
     case 'channel':
       return <ChannelPage key={route.id} id={route.id} tab={route.tab} pr={route.pr} />;
     case 'thread':
-      return <ThreadPage key={route.id} id={route.id} artifact={route.artifact} />;
+      return <ThreadPage key={route.id} id={route.id} artifact={route.artifact} at={route.at} />;
     case 'search':
       return <SearchPage q={route.q} />;
     case 'automations':

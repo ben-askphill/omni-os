@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
+import type { Span } from '@omni/shared/history.ts';
 import type { HandoverP, RunName, SwitchP } from '@omni/shared/run-switch.ts';
 import { buildItems, buildTasks, type SwitchItem, type TranscriptEvent } from '../src/transcript/fold.ts';
 import { projectFold } from './transcript-snapshot.ts';
@@ -8,7 +9,7 @@ import { projectFold } from './transcript-snapshot.ts';
 // One corpus for the Web UI fold and the Mac transcript. Swift reads the same file from the repo.
 
 const corpus = JSON.parse(readFileSync(fixture('transcript', 'corpus.json'), 'utf8')) as {
-  cases: { name: string; events: TranscriptEvent[]; items: unknown; plan: unknown }[];
+  cases: { name: string; events: TranscriptEvent[]; spans?: Span[]; items: unknown; plan: unknown }[];
 };
 
 const REQUIRED = [
@@ -22,6 +23,8 @@ const REQUIRED = [
   'mod-logs',
   'cloud-agent',
   'run-switch',
+  'span-floor-break',
+  'span-gap',
 ];
 
 describe('transcript fold', () => {
@@ -38,7 +41,7 @@ describe('transcript fold', () => {
   it.each(REQUIRED)('%s matches the corpus', (name) => {
     const found = corpus.cases.find((c) => c.name === name);
     expect(found, name).toBeTruthy();
-    expect(projectFold(found!.events)).toEqual({ items: found!.items, plan: found!.plan });
+    expect(projectFold(found!.events, found!.spans)).toEqual({ items: found!.items, plan: found!.plan });
   });
 
   it('drops a call that names itself as its parent', () => {

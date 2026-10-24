@@ -6,6 +6,7 @@ import { useApp, useNow } from '../store.tsx';
 import { BranchFace, DelegationCard, RailItem, ROW_CARD } from './Delegation.tsx';
 import { PublishedCard } from './Published.tsx';
 import { CloudAgentCard } from './thread/CloudAgentCard.tsx';
+import { ClippedNote, HistoryCtx, HistoryEdgeRow } from './thread/HistoryEdgeRow.tsx';
 import { QuestionCard } from './thread/QuestionCard.tsx';
 import { Markdown } from './Markdown.tsx';
 import { Button, CheckItem, copyText, Icon, IconButton, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
@@ -34,6 +35,8 @@ import {
   type UserP,
 } from '../transcript/fold.ts';
 import { agentStatus, delegations, splitGroup, TASK_END, withLive, type Branch } from '../transcript/delegation.ts';
+import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
+import type { ThreadHistory } from '../pages/useThreadHistory.ts';
 
 export { toolLabel, toolSummary, type ToolCall };
 
@@ -201,10 +204,15 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
       {open && (
         <div className="fade-in mt-1 mb-2.5 ml-7 space-y-1.5">
           <ToolInput c={c} />
+          <ClippedNote event={c.event} clipped={c.clipped} />
           {c.result ? (
             <>
               <Pre tone={err ? 'bad' : undefined}>{c.result.text || '(no output)'}</Pre>
-              {c.result.truncated && <div className="text-[11px] text-fg-4">Output truncated</div>}
+              {c.result.clipped ? (
+                <ClippedNote event={c.result.event} clipped={c.result.clipped} />
+              ) : (
+                c.result.truncated && <div className="text-[11px] text-fg-4">Output truncated</div>
+              )}
             </>
           ) : (
             <div className="text-[11.5px] text-fg-4">{running ? 'Waiting for result' : 'No result recorded'}</div>
@@ -253,7 +261,9 @@ function AgentRow({ c, cwd, running }: { c: ToolCall; cwd?: string | null; runni
       {open && (
         <div className="fade-in mt-2 space-y-1.5 px-1">
           <ToolInput c={c} />
+          <ClippedNote event={c.event} clipped={c.clipped} />
           {c.result ? <Pre tone={err ? 'bad' : undefined}>{c.result.text || '(no output)'}</Pre> : null}
+          {c.result && <ClippedNote event={c.result.event} clipped={c.result.clipped} />}
         </div>
       )}
       {c.children.length > 0 && (open || busy) && (
@@ -843,12 +853,13 @@ function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'e
   );
 }
 
-function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: string }) {
+function UserBubble({ p, at, threadId, event, clipped }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped }) {
   const [more, setMore] = useState(false);
   // Where the pill whose description is open starts.
   const [about, setAbout] = useState<number | null>(null);
   const text = p.text ?? '';
-  const long = text.length > 1400;
+  // A clipped message shows all it came with; Show all under it loads the rest.
+  const long = !clipped && text.length > 1400;
   const cut = long && !more;
   const pieces = slashPieces(text, p.slash, cut ? 1200 : text.length);
   const open = pieces.find((x) => x.hit?.start === about)?.hit;
@@ -895,6 +906,7 @@ function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: strin
           </button>
         )}
       </div>
+      <ClippedNote event={event} clipped={clipped} className="mt-1 justify-end" />
       <CopyMsg text={text} align="end" />
     </div>
   );
@@ -1039,8 +1051,10 @@ export const Transcript = memo(function Transcript({
   team,
   artifacts = NO_ARTIFACTS,
   reports = NO_REPORTS,
+  history = null,
 }: {
   threadId: string;
+  /** Every row held, anchors included. */
   events: EventRow[];
   running: boolean;
   cwd?: string | null;
@@ -1052,9 +1066,15 @@ export const Transcript = memo(function Transcript({
   artifacts?: Artifact[];
   /** Where each crew report the agent has not read is, by the thread that reported (`reportNotes`). */
   reports?: Map<string, string>;
+  /** The spans `events` holds whole and the loads on them; null shows `events` as the whole thread. */
+  history?: ThreadHistory | null;
 }) {
   const byId = useMemo(() => new Map(known.map((t) => [t.id, t])), [known]);
-  const { items, plan } = useMemo(() => buildItems(events), [events]);
+  const spans = history?.history.spans;
+  const { items, plan } = useMemo(() => buildItems(events, spans), [events, spans]);
+  const edges = useMemo(() => (spans ? historyEdges({ spans }, items.map((it) => it.key)) : null), [spans, items]);
+  // The first item is the thread's first message only when the start is held.
+  const fromStart = !spans || atStart({ spans });
   const pages = useMemo(() => publishedByGroup(items), [items]);
   const { tasks: live, feedLive } = useApp();
   const stored = useMemo(() => buildTasks(events), [events]);
@@ -1080,68 +1100,93 @@ export const Transcript = memo(function Transcript({
   // The turn is waiting on Ben's answer, not working: the card under it says so.
   const asking = last?.type === 'question' && last.q.state === 'pending';
 
-  return (
-    <TaskCtx.Provider value={tasks}>
-      <div className="space-y-4">
-        {items.map((it, idx) => {
-          switch (it.type) {
-            case 'user': {
-              const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} />;
-              return idx === 0 && team?.length ? [bubble, <DelegationCard key="team" branches={team} team reports={reports} />] : bubble;
-            }
-            case 'text':
-              return (
-                <div key={it.key} className="group/msg flex flex-col">
-                  <Markdown text={it.p.text ?? ''} />
-                  <CopyMsg text={it.p.text ?? ''} />
-                </div>
-              );
-            case 'tools': {
-              const { agents, rest, agentsFirst } = splitGroup(it.calls);
-              const cards = [
-                ...delegations(it.calls).map((d) => (
-                  <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} reports={reports} />
-                )),
-                ...(pages.get(it.key) ?? []).map((p) => (
-                  <PublishedCard key={`p${p.url}`} p={p} threadId={threadId} artifact={artifacts.findLast((a) => a.url === p.url)} />
-                )),
-              ];
-              const isLast = idx === lastIdx;
-              const group = rest.length ? (
-                <ToolGroup key={it.key} calls={rest} total={rest.length + rest.reduce((n, c) => n + countCalls(c), 0)} cwd={cwd} running={running} isLast={isLast} />
-              ) : null;
-              const subagents = agents.length ? (
-                <DelegationCard key={`a${it.key}`} agents={agents.map((c) => <AgentRow key={c.id} c={c} cwd={cwd} running={running} />)} />
-              ) : null;
-              const out = [...(agentsFirst ? [subagents, group] : [group, subagents]), ...cards].filter(Boolean);
-              // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
-              return plan?.after === it.key ? [...out, <PlanCard key="plan" todos={plan.todos} />] : out;
-            }
-            case 'result':
-              return <ResultLine key={it.key} p={it.p} />;
-            case 'error':
-              return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
-            case 'report':
-              return <ReportCard key={it.key} p={it.p} />;
-            case 'mod':
-              return <ModLog key={it.key} lines={it.lines} />;
-            case 'cloud':
-              return <CloudAgentCard key={it.key} p={it.p} />;
-            case 'switch':
-              return <SwitchLine key={it.key} it={it} running={running} />;
-            case 'question':
-              return <QuestionCard key={it.key} threadId={threadId} q={it.q} />;
-            default:
-              return null;
-          }
-        })}
-        {(showWorking || latestStatus) && !asking && (
-          <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
-            {running && <Loader size={13} />}
-            <span className="truncate">{latestStatus ?? 'Working'}</span>
+  const teamCard = team?.length ? <DelegationCard key="team" branches={team} team reports={reports} /> : null;
+  const edgeRow = (key: number) => {
+    const edge = edges?.get(key);
+    return edge && history ? <HistoryEdgeRow key={edge.type === 'earlier' ? 'earlier' : `gap:${edge.after}`} edge={edge} history={history} /> : null;
+  };
+
+  const item = (it: Item, idx: number): ReactNode => {
+    switch (it.type) {
+      case 'user': {
+        const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} />;
+        return idx === 0 && fromStart && teamCard ? [bubble, teamCard] : bubble;
+      }
+      case 'text':
+        return (
+          <div key={it.key} className="group/msg flex flex-col">
+            <Markdown text={it.p.text ?? ''} />
+            <ClippedNote event={it.key} clipped={it.clipped} />
+            <CopyMsg text={it.p.text ?? ''} />
           </div>
-        )}
-      </div>
-    </TaskCtx.Provider>
+        );
+      case 'tools': {
+        const { agents, rest, agentsFirst } = splitGroup(it.calls);
+        const cards = [
+          ...delegations(it.calls).map((d) => (
+            <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} reports={reports} />
+          )),
+          ...(pages.get(it.key) ?? []).map((p) => (
+            <PublishedCard key={`p${p.url}`} p={p} threadId={threadId} artifact={artifacts.findLast((a) => a.url === p.url)} />
+          )),
+        ];
+        const isLast = idx === lastIdx;
+        const group = rest.length ? (
+          <ToolGroup key={it.key} calls={rest} total={rest.length + rest.reduce((n, c) => n + countCalls(c), 0)} cwd={cwd} running={running} isLast={isLast} />
+        ) : null;
+        const subagents = agents.length ? (
+          <DelegationCard key={`a${it.key}`} agents={agents.map((c) => <AgentRow key={c.id} c={c} cwd={cwd} running={running} />)} />
+        ) : null;
+        const out = [...(agentsFirst ? [subagents, group] : [group, subagents]), ...cards].filter(Boolean);
+        // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
+        return plan?.after === it.key ? [...out, <PlanCard key="plan" todos={plan.todos} />] : out;
+      }
+      case 'result':
+        return <ResultLine key={it.key} p={it.p} />;
+      case 'error':
+        return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
+      case 'report':
+        return <ReportCard key={it.key} p={it.p} />;
+      case 'mod':
+        return <ModLog key={it.key} lines={it.lines} />;
+      case 'cloud':
+        return <CloudAgentCard key={it.key} p={it.p} />;
+      case 'switch':
+        return <SwitchLine key={it.key} it={it} running={running} />;
+      case 'question':
+        return <QuestionCard key={it.key} threadId={threadId} q={it.q} />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <HistoryCtx.Provider value={history}>
+      <TaskCtx.Provider value={tasks}>
+        <div className="space-y-4">
+          {!fromStart && teamCard}
+          {items.flatMap((it, idx) => {
+            const body = item(it, idx);
+            const shown = Array.isArray(body) ? body.length > 0 : !!body;
+            // data-key: the row useScrollAnchor keeps in place and a search hit scrolls to.
+            return [
+              edgeRow(it.key),
+              shown && (
+                <div key={it.key} data-key={it.key} className="space-y-4">
+                  {body}
+                </div>
+              ),
+            ];
+          })}
+          {edgeRow(-1)}
+          {(showWorking || latestStatus) && !asking && (
+            <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
+              {running && <Loader size={13} />}
+              <span className="truncate">{latestStatus ?? 'Working'}</span>
+            </div>
+          )}
+        </div>
+      </TaskCtx.Provider>
+    </HistoryCtx.Provider>
   );
 });

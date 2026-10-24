@@ -36,10 +36,10 @@ export function useThread() {
 /**
  * One thread's load and live stream, shared by its screens (the thread, its steps, changes, viewer and the rest), so
  * moving between them neither refetches nor drops the stream. Like the desktop thread page, the thread's newest
- * result counts as read while it is on screen.
+ * result counts as read while it is on screen. `at`: the event a search hit opened the thread at.
  */
-export function ThreadScope({ id, children }: { id: string; children: ReactNode }) {
-  const session = useThreadSession(id, undefined);
+export function ThreadScope({ id, at, children }: { id: string; at?: number; children: ReactNode }) {
+  const session = useThreadSession(id, undefined, at);
   const { needsYou, readResult } = useApp();
   const visible = usePageVisible();
   const shown = shownResult(needsYou, id, session.thread?.status);

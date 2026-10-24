@@ -1,6 +1,7 @@
 import type { HandoverP, SwitchP } from '@omni/shared/run-switch.ts';
 import { isQuestionTool, QUESTION_EVENT, questionsIn, type ThreadQuestion } from '@omni/shared/question.ts';
 import type { SlashRecord } from '@omni/shared/slash.ts';
+import { spanIndex, type Clipped, type Span } from '@omni/shared/history.ts';
 import { parsePayload, shortPath } from '../format.ts';
 
 // The transcript fold. Pure: events in, rows out. Transcript.tsx renders the rows.
@@ -12,6 +13,8 @@ export interface TranscriptEvent {
   payload: string;
   created_at: string;
   thread_id?: string;
+  /** The row was too big to page whole: its long strings are cut (`@omni/shared/history.ts`). */
+  clipped?: Clipped;
 }
 
 /** A file on a user message. The same shape as the server's Attachment. */
@@ -49,6 +52,9 @@ interface ToolResultP {
   is_error: boolean;
   truncated: boolean;
 }
+
+/** A call's result, with the row it came in so a clipped one can be loaded whole. */
+export type ToolResult = ToolResultP & { event: number; clipped?: Clipped };
 export interface ResultP {
   ok: boolean;
   subtype: string;
@@ -116,15 +122,18 @@ export interface ToolCall {
   name: string;
   input: Record<string, unknown>;
   parent: string | null;
-  result?: ToolResultP;
+  result?: ToolResult;
+  /** The tool_use row. */
+  event: number;
+  clipped?: Clipped;
   at: string;
   children: ToolCall[];
   orphan: boolean;
 }
 
 export type Item =
-  | { type: 'user'; key: number; at: string; p: UserP }
-  | { type: 'text'; key: number; at: string; p: TextP }
+  | { type: 'user'; key: number; at: string; p: UserP; clipped?: Clipped }
+  | { type: 'text'; key: number; at: string; p: TextP; clipped?: Clipped }
   | { type: 'tools'; key: number; calls: ToolCall[]; total: number }
   | { type: 'result'; key: number; p: ResultP }
   | { type: 'error'; key: number; p: TextP }
@@ -183,12 +192,17 @@ export function buildTasks(events: TranscriptEvent[]) {
   return out;
 }
 
-export function buildItems(events: TranscriptEvent[]): { items: Item[]; plan: FoldPlan | null } {
-  const results = new Map<string, ToolResultP>();
+/**
+ * `spans`: the id ranges held whole (`History.spans`). Every row is folded, so rows outside them (anchors) still nest
+ * calls and settle questions, but only items keyed inside a span come back. A span edge closes the open tool group
+ * and the mod-line run, and the plan shows only when its group is in the last span. No spans: the whole thread.
+ */
+export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): { items: Item[]; plan: FoldPlan | null } {
+  const results = new Map<string, ToolResult>();
   for (const e of events) {
     if (e.kind === 'tool_result') {
       const p = parsePayload<ToolResultP>(e);
-      if (p.tool_use_id) results.set(p.tool_use_id, p);
+      if (p.tool_use_id) results.set(p.tool_use_id, { ...p, event: e.id, ...(e.clipped && { clipped: e.clipped }) });
     }
   }
   const questions = new Map(questionsIn(events).map((q) => [q.event_id, q]));
@@ -201,8 +215,18 @@ export function buildItems(events: TranscriptEvent[]): { items: Item[]; plan: Fo
   // A run's rows come in as its status, branch or PR moves: one card per run, updated in place.
   const runs = new Map<string, Extract<Item, { type: 'cloud' }>>();
   let pending: SwitchItem | null = null;
+  const segOf = spans ? (id: number) => spanIndex(spans, id) : () => 0;
+  let seg = Number.NaN;
+  // Mod lines join the run before them only from this item on.
+  let modFloor = 0;
 
   for (const e of events) {
+    const s = segOf(e.id);
+    if (s !== seg) {
+      seg = s;
+      group = null;
+      modFloor = items.length;
+    }
     switch (e.kind) {
       case 'tool_use': {
         const p = parsePayload<ToolUseP>(e);
@@ -218,6 +242,8 @@ export function buildItems(events: TranscriptEvent[]): { items: Item[]; plan: Fo
           at: e.created_at,
           children: [],
           orphan: false,
+          event: e.id,
+          ...(e.clipped && { clipped: e.clipped }),
         };
         const parent = call.parent ? byId.get(call.parent) : undefined;
         let home = parent && groupOf.get(parent.id);
@@ -245,11 +271,11 @@ export function buildItems(events: TranscriptEvent[]): { items: Item[]; plan: Fo
         break;
       case 'user':
         group = null;
-        items.push({ type: 'user', key: e.id, at: e.created_at, p: parsePayload<UserP>(e) });
+        items.push({ type: 'user', key: e.id, at: e.created_at, p: parsePayload<UserP>(e), ...(e.clipped && { clipped: e.clipped }) });
         break;
       case 'assistant_text':
         group = null;
-        items.push({ type: 'text', key: e.id, at: e.created_at, p: parsePayload<TextP>(e) });
+        items.push({ type: 'text', key: e.id, at: e.created_at, p: parsePayload<TextP>(e), ...(e.clipped && { clipped: e.clipped }) });
         break;
       case 'result': {
         const p = parsePayload<ResultP>(e);
@@ -310,7 +336,7 @@ export function buildItems(events: TranscriptEvent[]): { items: Item[]; plan: Fo
         const text = str(p.text);
         if (!text) break;
         const line = { key: e.id, at: e.created_at, plugin: str(p.plugin) || 'mod', text };
-        const last = items[items.length - 1];
+        const last = items.length > modFloor ? items[items.length - 1] : undefined;
         if (last?.type === 'mod') last.lines.push(line);
         else items.push({ type: 'mod', key: e.id, lines: [line] });
         break;
@@ -319,7 +345,9 @@ export function buildItems(events: TranscriptEvent[]): { items: Item[]; plan: Fo
         break;
     }
   }
-  return { items, plan };
+  if (!spans) return { items, plan };
+  // A gap after any span but the last may hold a newer TodoWrite.
+  return { items: items.filter((it) => segOf(it.key) >= 0), plan: plan && segOf(plan.after) === spans.length - 1 ? plan : null };
 }
 
 /** Whether the agent waits on Ben's answer to a question it asked in these events. */

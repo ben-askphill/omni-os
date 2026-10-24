@@ -6,6 +6,7 @@ import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
 import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
+import type { Clipped, HistoryHead } from '@omni/shared/history.ts';
 
 export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult };
 
@@ -118,6 +119,15 @@ export interface ThreadDetail {
   handoff?: HandoffView | null;
 }
 
+/** A row of a history page: one too big to page whole comes clipped, and GET /threads/:id/events/:eventId has it all. */
+export type HistoryEvent = EventRow & { clipped?: Clipped };
+
+/** GET /threads/:id?history=recent: the detail with the newest page of events. Older servers send every event and no `history`. */
+export interface ThreadOpen extends Omit<ThreadDetail, 'events'> {
+  events: HistoryEvent[];
+  history?: HistoryHead;
+}
+
 /** How a message reaches a busy thread: read at its next step, run after the turn, or interrupt then run. */
 export type SendMode = 'steer' | 'queue' | 'interrupt';
 
@@ -163,6 +173,8 @@ export interface SearchHit {
   status: string;
   updated_at: string;
   snippet: string;
+  /** The event the snippet is from; null for a title match. Older servers leave it out. */
+  event_id?: number | null;
 }
 
 export interface Checks {

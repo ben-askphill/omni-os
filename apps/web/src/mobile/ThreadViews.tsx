@@ -1,5 +1,6 @@
 // The screens pushed from a thread: its steps, changes and PR, the channel browser, the shell, details and a file.
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { turnCount } from '@omni/shared/history.ts';
 import { api, artifactUrl, errorText, useApi, type HarnessWithRunning, type PRDetail } from '../api.ts';
 import { HarnessMark, harnessLabel } from '../components/brand.tsx';
 import { ArtifactBody } from '../components/ArtifactViewer.tsx';
@@ -19,6 +20,7 @@ import { toolLabel, toolSummary, type Item, type ToolCall } from '../transcript/
 import { MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSection } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
 import { threadView } from './thread-view.ts';
+import { holds } from '../thread-history.ts';
 
 const SOURCE: Record<string, string> = { manual: 'You', conductor: 'The Conductor', team: 'Its team lead', automation: 'Automation', import: 'Imported', capture: 'Captured' };
 
@@ -65,15 +67,22 @@ function StepItem({ it, running, cwd }: { it: Item; running: boolean; cwd: strin
 /** Every call a turn made, in order, with what the agent said between them. */
 export function StepsScreen({ turn }: { turn?: number }) {
   const shell = useShell();
-  const { thread, events, files, children } = useThread();
-  const view = useMemo(() => (thread ? threadView({ events, thread, artifacts: files, children }) : null), [events, thread, files, children]);
-  const t = view?.turns.find((x) => x.key === turn) ?? view?.turns[view.turns.length - 1];
+  const { thread, events, history, files, children, ready } = useThread();
+  const spans = history.history.spans;
+  const view = useMemo(() => (thread ? threadView({ events, spans, thread, artifacts: files, children }) : null), [events, spans, thread, files, children]);
+  // A link to an older turn than the thread holds loads the page with it.
+  const held = !turn || holds(history.history, turn);
+  const { reveal } = history;
+  useEffect(() => {
+    if (ready && turn && !held) void reveal(turn);
+  }, [ready, turn, held, reveal]);
+  const t = view?.turns.find((x) => x.key === turn) ?? (held ? view?.turns[view.turns.length - 1] : undefined);
   const running = !!t && t.status === 'running';
   return (
     <>
       <MoHeader onBack={shell.back} title="Steps" sub={thread?.title} />
       <Body className="gap-2">
-        {t ? t.items.map((it) => <StepItem key={it.key} it={it} running={running} cwd={thread?.cwd ?? ''} />) : <MoEmpty>No steps yet.</MoEmpty>}
+        {t ? t.items.map((it) => <StepItem key={it.key} it={it} running={running} cwd={thread?.cwd ?? ''} />) : <MoEmpty>{held ? 'No steps yet.' : 'Loading'}</MoEmpty>}
         {t && !t.steps && <MoEmpty>This turn answered without calling a tool.</MoEmpty>}
       </Body>
     </>
@@ -264,11 +273,11 @@ export function TerminalScreen() {
 
 export function DetailsScreen() {
   const shell = useShell();
-  const { thread, init, lastResult, events } = useThread();
+  const { thread, init, lastResult, history } = useThread();
   const { channel } = useApp();
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   if (!thread) return <MoHeader onBack={shell.back} title="Details" />;
-  const turns = events.filter((e) => e.kind === 'result').length;
+  const turns = turnCount(history.history);
   const modelId = lastResult?.model || init?.model || thread.model || '';
   const { model } = harnesses ? modelOf(harnesses, { harness: thread.harness, model: modelId }) : { model: undefined };
   const rows: [string, ReactNode][] = [
