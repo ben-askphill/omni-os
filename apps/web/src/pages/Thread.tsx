@@ -16,6 +16,7 @@ import { HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx
 import { OPEN_PR_PROMPT, ThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { HeaderActions } from '../components/thread/HeaderActions.tsx';
+import { ContinueCrumbs } from '../components/ContinueLinks.tsx';
 import { Avatar, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { href } from '../router.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
@@ -78,6 +79,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     blocked,
     handoff,
     setHandoff,
+    links,
     live,
     load,
     applyThread,
@@ -275,7 +277,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
           </Suspense>
         )}
         {panelTab === 'actions' && <ActionsTab thread={thread} />}
-        {panelTab === 'details' && <DetailsTab thread={thread} channel={channel} parent={parent} children={children} init={init} lastResult={lastResult} warm={warm} />}
+        {panelTab === 'details' && <DetailsTab thread={thread} channel={channel} parent={parent} children={children} init={init} lastResult={lastResult} warm={warm} links={links} />}
       </div>
     </div>
   );
@@ -307,6 +309,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                 </>
               )}
               {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-4">{thread.task_id}</span>}
+              <ContinueCrumbs links={links} />
             </div>
             <h1 className="truncate font-display text-[16px] leading-snug md:text-[18px]" title={thread.title}>
               {thread.title}

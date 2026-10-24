@@ -1,10 +1,11 @@
 // A worktree thread's preparation: its worktree is made and checked before any harness runs, and a failure waits
 // for Retry with the first prompt and its files saved. Nothing runs in the channel's own checkout instead.
-import { channels, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
+import { channels, continuations, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
 import { prepareWorktree } from '../sandbox.ts';
 import { withWorkspace } from '../workspace.ts';
 import { recordStartBase } from '../changes.ts';
 import { baseFor } from '../worktree-base.ts';
+import { carryInto } from '../continue-carry.ts';
 import type { Attachment } from '../uploads.ts';
 import { reportToParent, settleTeam } from './queue.ts';
 import { beginAttempt, endAttempt, runSetupAction } from './setup-action.ts';
@@ -78,7 +79,13 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
   try {
     if (!t.branch) throw new Error('The thread has no branch to check out.');
     const branch = t.branch;
-    await withWorkspace(t.cwd, () => prepareWorktree(repo, t.cwd, branch, () => baseFor(t.id, repo!)));
+    // A continued thread's branch starts at its source's HEAD, with the source's changes laid in (continue-carry.ts),
+    // so only a new thread's branch is cut from the base Ben picked.
+    const base = continuations.get(t.id) ? undefined : () => baseFor(t.id, repo!);
+    await withWorkspace(t.cwd, async () => {
+      await carryInto(t);
+      await prepareWorktree(repo, t.cwd, branch, base);
+    });
     // The commit the branch starts from, for the Changes panel. Recorded before anything runs there.
     await recordStartBase(t.id, repo!, t.cwd).catch((err) => console.error(`[setup] ${t.id}: could not record the base commit:`, (err as Error).message));
   } catch (err) {

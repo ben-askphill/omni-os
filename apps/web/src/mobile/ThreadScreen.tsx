@@ -9,6 +9,8 @@ import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { handOff, HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx';
+import { MoContinueLinks } from '../components/ContinueLinks.tsx';
+import { sourceRefusal } from '../continue.ts';
 import { deviceRows } from '../handoff.ts';
 import { Button, ErrorNote, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';
 import { changesView } from '../changes.ts';
@@ -357,6 +359,13 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
         </MoGroup>
         <MoGroup>
           {targets.state === 'ready' && <MoListRow icon="share" label="Hand off to…" sub="Keep it running on another Mac" onClick={() => setHandingOff(true)} />}
+          <MoListRow
+            icon="branch"
+            label="Continue with another harness"
+            sub={sourceRefusal(thread.harness) ?? 'A new thread that picks up from here'}
+            disabled={!!sourceRefusal(thread.harness)}
+            onClick={() => (onClose(), shell.sheet({ name: 'continue', source: thread }))}
+          />
           <MoListRow icon="pin" label={thread.pinned_at ? 'Unpin from Activity' : 'Pin to Activity'} chevron={false} onClick={() => void pin()} />
           {(thread.done_at || canMarkDone(thread.status)) && (
             <MoListRow icon="check" label={thread.done_at ? 'Mark as not done' : 'Mark as done'} chevron={false} onClick={() => void done()} />
@@ -520,6 +529,7 @@ export function ThreadScreen() {
         }
       />
       <div ref={scroll} className="mo-scroll flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-2 pb-4">
+        <MoContinueLinks links={s.links} onOpen={(id) => shell.open(href.thread(id))} />
         {view.turns.map((t, i) => {
           const last = i === view.turns.length - 1;
           return (

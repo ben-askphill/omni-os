@@ -33,6 +33,7 @@
     "limit_state": "limited",
     "limit_resets_at": "2026-01-05T09:00:00.000Z",
     "limit_elsewhere": 0,
+    "continued_from": null,
     "created_at": "2026-01-05T09:00:00.000Z",
     "updated_at": "2026-01-05T09:00:00.000Z"
   },
@@ -69,7 +70,7 @@
       "id": 81,
       "thread_id": "00000000-0000-4000-8000-000000000019",
       "kind": "user",
-      "payload": "{\"text\":\"LIMIT:1792838156 tidy the copy\",\"source\":\"manual\"}",
+      "payload": "{\"text\":\"LIMIT:1792870494 tidy the copy\",\"source\":\"manual\"}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {
@@ -94,5 +95,7 @@
   "pending": [],
   "live": true,
   "mods": [],
-  "handoff": null
+  "handoff": null,
+  "continued_from": null,
+  "continued_in": []
 }

@@ -6,6 +6,7 @@ import { useApp } from '../store.tsx';
 import { ActionsScreen } from './ActionsScreen.tsx';
 import { ActivityScreen } from './ActivityScreen.tsx';
 import { ChannelScreen, ChannelsScreen } from './ChannelsScreen.tsx';
+import { ContinueSheet } from './ContinueSheet.tsx';
 import { LibraryScreen } from './LibraryScreen.tsx';
 import { NewSheet } from './NewSheet.tsx';
 import { MoEmpty, MoHeader } from './parts.tsx';
@@ -67,5 +68,7 @@ export function SheetView({ sheet }: { sheet: ShellSheet }) {
       return <NewSheet channel={sheet.channel} />;
     case 'search':
       return <SearchSheet />;
+    case 'continue':
+      return <ContinueSheet source={sheet.source} />;
   }
 }

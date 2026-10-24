@@ -8,6 +8,7 @@ import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
 import type { DeliveryPage, DeliveryView } from '@omni/shared/automation-triggers.ts';
 import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/automation-events.ts';
+import type { ContinueLink } from '@omni/shared/continue.ts';
 
 export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, DeliveryView, DeliveryPage };
 
@@ -118,6 +119,9 @@ export interface ThreadDetail {
   blocked?: string;
   /** A handoff to or from another synced Mac that is under way or just settled. Older servers leave it out. */
   handoff?: HandoffView | null;
+  /** The thread this one continues on another harness, and the threads that continue it. Older servers leave them out. */
+  continued_from?: ContinueLink | null;
+  continued_in?: ContinueLink[];
 }
 
 /** How a message reaches a busy thread: read at its next step, run after the turn, or interrupt then run. */
@@ -379,7 +383,7 @@ export type FeedEvent =
 
 export class ApiError extends Error {
   status: number;
-  /** The parsed reply of a refused request, for the ones that carry more than an `error`. */
+  /** The parsed reply of a refused request, for the ones that carry more than an `error` (a 409's `code`). */
   body: unknown;
   constructor(message: string, status: number, body?: unknown) {
     super(message);

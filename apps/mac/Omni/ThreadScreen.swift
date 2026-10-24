@@ -140,6 +140,7 @@ private struct ThreadHeader: View {
           .help(thread.title)
           .textSelection(.enabled)
         ModStatusLines(mods: model.store.mods.filter { $0.threadID == thread.id })
+        ContinueLinks(model: model, from: store.continuedFrom, continuedIn: store.continuedIn)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       if store.isReconnecting {
@@ -156,6 +157,7 @@ private struct ThreadHeader: View {
         ContextMeterButton(model: model, store: store, thread: thread)
       }
       HandOffButton(model: model, store: store)
+      ContinueButton(model: model, thread: thread)
       if !thread.archived {
         let on = thread.pinnedAt != nil
         Button {

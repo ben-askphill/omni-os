@@ -12,6 +12,8 @@ import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { TerminalView } from '../components/TerminalView.tsx';
 import { Button, Chip, copyText, ErrorNote, Icon, SlideToConfirm, StatusDot } from '../components/ui.tsx';
 import { cloudAgentUrl } from '../cloud-agent.ts';
+import { carriedText } from '@omni/shared/continue.ts';
+import { linkName } from '../components/ContinueLinks.tsx';
 import { fullDate, plural } from '../format.ts';
 import { checkTone } from '../pages/PRs.tsx';
 import type { Route } from '../router.ts';
@@ -284,7 +286,7 @@ export function TerminalScreen() {
 
 export function DetailsScreen() {
   const shell = useShell();
-  const { thread, init, lastResult, events } = useThread();
+  const { thread, init, lastResult, events, links } = useThread();
   const { channel } = useApp();
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   if (!thread) return <MoHeader onBack={shell.back} title="Details" />;
@@ -309,6 +311,25 @@ export function DetailsScreen() {
   ];
   if (thread.task_id) rows.splice(2, 0, ['Task', <span className="font-mono text-[13px]">{thread.task_id}</span>]);
   if (thread.branch) rows.push(['Branch', <span className="font-mono text-[13px]">{thread.branch}</span>]);
+  if (links.from)
+    rows.push([
+      'Continued from',
+      <span className="flex flex-col py-2">
+        <span className="truncate">{linkName(links.from)}</span>
+        {links.from.carried && <span className="text-[12.5px] leading-[1.35] whitespace-normal text-fg-3">{carriedText(links.from.carried)}</span>}
+      </span>,
+    ]);
+  if (links.into.length)
+    rows.push([
+      'Continued in',
+      <span className="flex flex-col py-2">
+        {links.into.map((l) => (
+          <span key={l.id} className="truncate">
+            {linkName(l)}
+          </span>
+        ))}
+      </span>,
+    ]);
   const agentUrl = thread.harness === 'cursor-cloud' ? cloudAgentUrl(thread.session_id) : null;
   if (agentUrl)
     rows.push([

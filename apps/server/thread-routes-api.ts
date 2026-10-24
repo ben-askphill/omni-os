@@ -12,6 +12,7 @@ import { uploadsDir } from './config.ts';
 import { artifacts, channels, events, fileDigests, messageRequests, publicChannel, requestFingerprint, threads, type Thread } from './db.ts';
 import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
+import { continueLinks } from './continue.ts';
 import {
   acceptedAgain,
   activeMods,
@@ -134,6 +135,8 @@ threadRoutesApi.get('/:id', (c) => {
     mods: activeMods().filter((m) => m.thread_id === t.id),
     // On its way to or from another Mac (apps/server/handoff.ts), null otherwise.
     handoff: handoffView(t),
+    // The thread it continues on another harness and the threads that continue it (apps/server/continue.ts).
+    ...continueLinks(t),
   };
   // Only when a turn cannot start here (a synced thread): why, for the composer to show.
   const blocked = turnBlocked(t, runsHere(t.id));

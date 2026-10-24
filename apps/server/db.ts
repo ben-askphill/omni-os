@@ -33,5 +33,6 @@ export { threadBasePicks } from './db/repos/thread-base-picks.ts';
 export { actionRuns, channelActions, threadSetupRuns } from './db/repos/channel-actions.ts';
 export type { SkippedFile, TurnSnapshot, TurnSnapshotState } from './db/repos/turn-snapshots.ts';
 export { turnSnapshots } from './db/repos/turn-snapshots.ts';
+export { continuations, type Continuation } from './db/repos/continuations.ts';
 export type { SyncEntity, SyncOp, OutboxRow } from './db/sync.ts';
 export { SEED_TS, outbox, syncMeta } from './db/sync.ts';

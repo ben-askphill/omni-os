@@ -101,6 +101,10 @@ const NAMES = [
   // thread whose turns are not saved.
   'turns.json',
   'turns-unavailable.json',
+  // Continuing an idle thread on another run: the worktree thread's preview (its changed files and a binary file left
+  // out), then the first thread continued, and that one continued again, so it has both links.
+  'continue-preview.json',
+  'thread-continued.json',
   // A channel's named actions: the body the editor sends, the action it makes and the list, then a thread's runs of
   // them (succeeded, failed, stopped and one still running), a run as it starts and as Stop returns it.
   'channel-action-request.json',
@@ -630,6 +634,32 @@ async function scenario() {
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
+
+  const onto = { harness: 'claude-code', model: 'sonnet', effort: 'low' };
+  writeFileSync(join(wt.cwd, 'photo.bin'), Buffer.from([0, 1, 2, 0]));
+  // Two files attached to the worktree thread: the preview offers both and Ben picks one.
+  const form = new FormData();
+  form.set('payload', JSON.stringify({ prompt: 'here are the mocks' }));
+  form.append('files', new File(['mock bytes'], 'mock.png', { type: 'image/png' }));
+  form.append('files', new File(['some notes'], 'notes.txt', { type: 'text/plain' }));
+  const withFiles = await fetch(`${base}/api/threads/${wt.id}/messages`, { method: 'POST', headers: { authorization: `Bearer ${process.env.OMNI_TOKEN}` }, body: form });
+  expect(withFiles.ok, 'the message with files').toBe(true);
+  await eventually(async () => (await detail(wt.id)).thread.status === 'done', 'the message with files to run');
+  type Preview = { revision: string; blocked: unknown; workspace: string; carryover: { files: { total: number } | null; omitted: { what: string }[]; attachments: { id: string; name: string }[] } };
+  const offered = (await call('POST', `/threads/${wt.id}/continue/preview`, onto)) as Preview;
+  const mock = offered.carryover.attachments.find((a) => a.name === 'mock.png')!;
+  const shown = keep('continue-preview.json', await call('POST', `/threads/${wt.id}/continue/preview`, { ...onto, attachments: [mock.id] })) as Preview;
+  expect(shown).toMatchObject({ blocked: null, workspace: 'worktree', carryover: { omitted: [{ what: 'untracked' }, { what: 'attachments' }] } });
+  expect(shown.carryover.files?.total, 'the worktree thread\'s changed files').toBeGreaterThan(0);
+  const idlePreview = (await call('POST', `/threads/${id}/continue/preview`, onto)) as Preview;
+  expect(idlePreview.blocked, 'the first thread is idle').toBeNull();
+  const next = (await call('POST', `/threads/${id}/continue`, { ...onto, text: 'carry on with the totals', request_id: 'continue-1', revision: idlePreview.revision })) as { thread: Thread };
+  await eventually(async () => (await detail(next.thread.id)).thread.status === 'done', 'the continued thread to run');
+  const nextPreview = (await call('POST', `/threads/${next.thread.id}/continue/preview`, onto)) as { revision: string };
+  await call('POST', `/threads/${next.thread.id}/continue`, { ...onto, text: 'and the tax', request_id: 'continue-2', revision: nextPreview.revision });
+  const continued = keep('thread-continued.json', await detail(next.thread.id)) as { continued_from: { id: string } | null; continued_in: unknown[] };
+  expect(continued.continued_from?.id).toBe(id);
+  expect(continued.continued_in).toHaveLength(1);
 
   const actionBody = request('channel-action-request.json', { name: 'Theme check', command: 'echo "Theme check passed"', secrets: [], port: null, setup: 'background' });
   const check = keep('channel-action.json', await call('POST', '/channels/acme/actions', actionBody)) as { id: string };

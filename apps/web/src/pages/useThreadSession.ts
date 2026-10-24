@@ -4,6 +4,7 @@ import type { InitP, ResultP } from '../components/thread/panel/DetailsTab.tsx';
 import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
 import { parsePayload } from '../format.ts';
+import { linksOf, linksWith, NO_LINKS, type ThreadLinks } from '../continue.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
 
 export type PanelTab = 'artifacts' | 'changes' | 'browser' | 'terminal' | 'actions' | 'details';
@@ -37,6 +38,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
   const [actionError, setActionError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [handoff, setHandoff] = useState<HandoffView | null>(null);
+  const [links, setLinks] = useState<ThreadLinks>(NO_LINKS);
   // The newest context reading the stream pushed. The meter loads its first one itself.
   const [context, setContext] = useState<ContextUsage | null>(null);
 
@@ -101,6 +103,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
         setParent(d.parent);
         setChildren(d.children);
         setTeam(d.team ?? []);
+        setLinks(linksOf(d));
         setArtifacts(d.artifacts);
         d.artifacts.forEach((a) => artifactIds.current.add(a.id));
         if (initial) {
@@ -175,6 +178,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     // A member of a team this thread started: its delegation card shows the change.
     if (t.source === 'team' && children.some((c) => c.id === t.parent_id)) setTeam(upsert);
     if (parent && t.id === parent.id) setParent(t);
+    setLinks((prev) => linksWith(prev, id, t));
   });
 
   // Queued or running: the header interrupt and the composer treat both as busy.
@@ -262,6 +266,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     blocked,
     handoff,
     setHandoff,
+    links,
     live,
     load,
     applyThread,

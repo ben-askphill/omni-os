@@ -8,8 +8,8 @@ import { fromPortable, safeSegment, toRemote } from '../paths.ts';
 // folder_id travels with the row. A folder that has not arrived yet waits in sync_folder_wait, and the folder's own
 // change files the thread (handlers/folder.ts). A change from an older build carries no folder_id: this Mac's stays,
 // unless the thread moved channel. pinned_at and done_at travel the same way: a change without them keeps this Mac's, and so does
-// auto_reason, which an older build does not send, sessions and handover (the run switch, runner/switch-plan.ts), and
-// the queued run (runner/switch.ts).
+// auto_reason, which an older build does not send, sessions and handover (the run switch, runner/switch-plan.ts), the
+// queued run (runner/switch.ts), and continued_from (a continued thread's source, apps/server/continue.ts).
 
 const COLUMNS = [
   'id', 'channel_id', 'title', 'status', 'role', 'model', 'harness', 'effort', 'session_id', 'has_run', 'cwd',
@@ -36,6 +36,7 @@ const setDone = db.prepare('UPDATE threads SET done_at = ? WHERE id = ?');
 const setAutoReason = db.prepare('UPDATE threads SET auto_reason = ? WHERE id = ?');
 const setSessionState = db.prepare('UPDATE threads SET sessions = ?, handover = ? WHERE id = ?');
 const setQueuedRun = db.prepare('UPDATE threads SET queued_harness = ?, queued_model = ?, queued_effort = ? WHERE id = ?');
+const setContinuedFrom = db.prepare('UPDATE threads SET continued_from = ? WHERE id = ?');
 
 /** Threads whose folder an applied change moved, so notify tells sidebars to regroup. */
 const regrouped = new Set<string>();
@@ -90,6 +91,7 @@ registerHandler('thread', {
     if (Object.prototype.hasOwnProperty.call(change.data ?? {}, 'queued_harness')) {
       setQueuedRun.run(t.queued_harness ?? null, t.queued_model ?? null, t.queued_effort ?? null, change.entity_id);
     }
+    if (Object.prototype.hasOwnProperty.call(change.data ?? {}, 'continued_from')) setContinuedFrom.run(t.continued_from ?? null, change.entity_id);
     const after = (folderOf.get(change.entity_id) as { folder_id: string | null }).folder_id;
     if (after !== before) regrouped.add(change.entity_id);
     if (differs) outbox.requeue('thread', change.entity_id);

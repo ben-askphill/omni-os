@@ -40,7 +40,7 @@ const NO_QUEUED = { queued_harness: null, queued_model: null, queued_effort: nul
 const holdsTurn = (live: Live | undefined) => !!live && (live.turn || !!live.inflight.length || !!live.held.length || hasBackground(live));
 
 /** The catalog's objection to a run, or null. */
-function invalid(cat: Catalog, to: Run & { harness: HarnessId }): string | null {
+export function invalid(cat: Catalog, to: Run & { harness: HarnessId }): string | null {
   const h = getHarness(cat, to.harness);
   if (!h) return `Unknown harness "${to.harness}".`;
   if (!h.available) return unavailableError(h.name, h.fix);
