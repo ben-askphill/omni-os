@@ -96,6 +96,12 @@ const NAMES = [
   // thread whose turns are not saved.
   'turns.json',
   'turns-unavailable.json',
+  // The storage scan over the worktrees above, once it has finished.
+  'worktree-scan.json',
+  // A cleanup of two of them that removes one and keeps the other, then this Mac's retention policy turned on.
+  'worktree-cleanup.json',
+  'worktree-retention-request.json',
+  'worktree-retention.json',
   // A thread with no PR watch, then one polled through the fake gh, then stopped.
   'pr-watch-none.json',
   'pr-watch.json',
@@ -599,6 +605,54 @@ async function scenario() {
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
 
+  // Two archived worktree threads in a repo with an origin, so that both can be cleaned up.
+  const origin = join(tmp, 'gadgets.git');
+  const gadgets = join(tmp, 'gadgets');
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
+  mkdirSync(gadgets);
+  const gg = (...args: string[]) => execFileSync('git', ['-C', gadgets, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', ...args]);
+  gg('init', '-q', '-b', 'main');
+  writeFileSync(join(gadgets, 'README.md'), '# Gadgets\n');
+  gg('add', '.');
+  gg('commit', '-q', '-m', 'start');
+  gg('remote', 'add', 'origin', origin);
+  gg('push', '-q', '-u', 'origin', 'main');
+  gg('remote', 'set-head', 'origin', 'main');
+  await call('POST', '/channels', { id: 'gadgets', name: 'Gadgets', kind: 'client', use_worktree: 1, repo_path: gadgets, notes: 'Fixture' });
+  const tidy = (await call('POST', '/threads', { channel: 'gadgets', prompt: 'tidy the gadgets', title: 'Tidy the gadgets' })) as Thread;
+  const draft = (await call('POST', '/threads', { channel: 'gadgets', prompt: 'draft the gadget notes', title: 'Draft the gadget notes' })) as Thread;
+  for (const t of [tidy, draft]) {
+    await eventually(async () => (await detail(t.id)).thread.status === 'done', 'a gadgets thread to run');
+    await call('PATCH', `/threads/${t.id}`, { archived: true });
+  }
+  // A restart closes their warm processes, which would keep the worktrees.
+  const warm = child!;
+  warm.kill('SIGTERM');
+  await eventually(async () => warm.exitCode !== null || warm.signalCode !== null, 'the server to stop');
+  base = `http://127.0.0.1:${await boot()}`;
+
+  await call('POST', '/worktrees/scan');
+  type View = { scan: { state: string; items: { id: string; verdict: string }[] }; cleanup: { runs: { manual: { state: string; items: { id: string; outcome: string }[] } | null } } };
+  const scanned = await eventually(async () => {
+    const b = (await get('/worktrees/scan')) as View;
+    return b.scan.state === 'done' && b;
+  }, 'the storage scan to finish');
+  keep('worktree-scan.json', scanned);
+  expect(scanned.scan.items.map((i) => i.id)).toContain(wt.id);
+  expect(scanned.scan.items.filter((i) => i.verdict === 'eligible').map((i) => i.id).sort()).toEqual([tidy.id, draft.id].sort());
+
+  // A file written after the scan keeps its worktree: the run checks each again right before removing it.
+  writeFileSync(join((await detail(draft.id)).thread.cwd, 'notes.txt'), 'not saved yet\n');
+  await call('POST', '/worktrees/cleanup', { ids: [tidy.id, draft.id] });
+  const cleaned = await eventually(async () => {
+    const b = (await get('/worktrees/scan')) as View;
+    return b.cleanup.runs.manual?.state === 'done' && b;
+  }, 'the cleanup to finish');
+  keep('worktree-cleanup.json', cleaned);
+  expect(Object.fromEntries(cleaned.cleanup.runs.manual!.items.map((i) => [i.id, i.outcome]))).toEqual({ [tidy.id]: 'removed', [draft.id]: 'kept' });
+
+  const retentionBody = request('worktree-retention-request.json', { enabled: true, idleDays: 30 });
+  keep('worktree-retention.json', await call('PUT', '/worktrees/retention', retentionBody));
   // Last, since it gives acme a GitHub repo. The app sends {} for the branch's PR; acme threads have no branch, so
   // this one names the PR.
   keep('pr-watch-none.json', await get(`/threads/${id}/pr-watch`));

@@ -1,0 +1,147 @@
+{
+  "scan": {
+    "id": "00000000-0000-4000-8000-000000000037",
+    "state": "done",
+    "phase": "finished",
+    "startedAt": "2026-01-05T09:00:00.000Z",
+    "finishedAt": "2026-01-05T09:00:00.000Z",
+    "total": 3,
+    "done": 3,
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000015",
+        "kind": "managed",
+        "verdict": "kept",
+        "dir": "/tmp/omni-fixtures/data/worktrees/00000000-0000-4000-8000-000000000015",
+        "repo": "/tmp/omni-fixtures/widgets",
+        "branch": "omni/00000000",
+        "threadId": "00000000-0000-4000-8000-000000000015",
+        "threadTitle": "Fix the widget",
+        "lastActiveAt": "2026-01-05T09:00:00.000Z",
+        "channelId": "widgets",
+        "channelName": "Widgets",
+        "folder": true,
+        "registered": true,
+        "bytes": 24576,
+        "sharedWith": [],
+        "reasons": [
+          {
+            "code": "open-thread",
+            "message": "Its thread is open (last active today), and it is not a merged branch idle for 7 days."
+          },
+          {
+            "code": "untracked",
+            "message": "1 untracked file."
+          },
+          {
+            "code": "unpushed",
+            "message": "3 commits no remote has."
+          }
+        ],
+        "eligibleBecause": null,
+        "errors": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000038",
+        "kind": "managed",
+        "verdict": "eligible",
+        "dir": "/tmp/omni-fixtures/data/worktrees/00000000-0000-4000-8000-000000000038",
+        "repo": "/tmp/omni-fixtures/gadgets",
+        "branch": "omni/00000000",
+        "threadId": "00000000-0000-4000-8000-000000000038",
+        "threadTitle": "Tidy the gadgets",
+        "lastActiveAt": "2026-01-05T09:00:00.000Z",
+        "channelId": "gadgets",
+        "channelName": "Gadgets",
+        "folder": true,
+        "registered": true,
+        "bytes": 8192,
+        "sharedWith": [],
+        "reasons": [],
+        "eligibleBecause": "archived",
+        "errors": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000039",
+        "kind": "managed",
+        "verdict": "eligible",
+        "dir": "/tmp/omni-fixtures/data/worktrees/00000000-0000-4000-8000-000000000039",
+        "repo": "/tmp/omni-fixtures/gadgets",
+        "branch": "omni/00000000",
+        "threadId": "00000000-0000-4000-8000-000000000039",
+        "threadTitle": "Draft the gadget notes",
+        "lastActiveAt": "2026-01-05T09:00:00.000Z",
+        "channelId": "gadgets",
+        "channelName": "Gadgets",
+        "folder": true,
+        "registered": true,
+        "bytes": 8192,
+        "sharedWith": [],
+        "reasons": [],
+        "eligibleBecause": "archived",
+        "errors": []
+      }
+    ],
+    "error": null
+  },
+  "summary": {
+    "eligible": {
+      "count": 2,
+      "bytes": 16384
+    },
+    "kept": {
+      "count": 1,
+      "bytes": 24576
+    },
+    "unknown": {
+      "count": 0,
+      "bytes": 0
+    },
+    "folders": 3,
+    "stale": 0,
+    "bytes": 40960
+  },
+  "cleanup": {
+    "policy": {
+      "enabled": false,
+      "idleDays": 14
+    },
+    "preview": {
+      "manual": {
+        "trigger": "manual",
+        "candidates": [
+          {
+            "id": "00000000-0000-4000-8000-000000000038",
+            "threadId": "00000000-0000-4000-8000-000000000038",
+            "threadTitle": "Tidy the gadgets",
+            "channelName": "Gadgets",
+            "branch": "omni/00000000",
+            "bytes": 8192,
+            "because": "archived",
+            "lastActiveAt": "2026-01-05T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000039",
+            "threadId": "00000000-0000-4000-8000-000000000039",
+            "threadTitle": "Draft the gadget notes",
+            "channelName": "Gadgets",
+            "branch": "omni/00000000",
+            "bytes": 8192,
+            "because": "archived",
+            "lastActiveAt": "2026-01-05T09:00:00.000Z"
+          }
+        ],
+        "bytes": 16384
+      },
+      "retention": {
+        "trigger": "retention",
+        "candidates": [],
+        "bytes": 0
+      }
+    },
+    "runs": {
+      "manual": null,
+      "retention": null
+    }
+  }
+}

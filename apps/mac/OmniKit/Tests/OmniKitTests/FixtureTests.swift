@@ -71,6 +71,9 @@ private struct DeliveryRefusal: Decodable {
     "thread-report-held.json": { _ = try decodeFixture(ThreadDetail.self, "thread-report-held.json") },
     "thread-setup-failed.json": { _ = try decodeFixture(ThreadDetail.self, "thread-setup-failed.json") },
     "setup-retried.json": { _ = try decodeFixture(RecoveryAnswer.self, "setup-retried.json") },
+    "worktree-scan.json": { _ = try decodeFixture(WorktreeScanReply.self, "worktree-scan.json") },
+    "worktree-cleanup.json": { _ = try decodeFixture(WorktreeScanReply.self, "worktree-cleanup.json") },
+    "worktree-retention.json": { _ = try decodeFixture(WorktreeScanReply.self, "worktree-retention.json") },
     "needs-you.json": { _ = try decodeFixture(NeedsYou.self, "needs-you.json") },
     "needs-you-read.json": { _ = try decodeFixture(NeedsYouRead.self, "needs-you-read.json") },
     "thread-limited.json": { _ = try decodeFixture(ThreadDetail.self, "thread-limited.json") },
@@ -102,6 +105,8 @@ private struct DeliveryRefusal: Decodable {
     "request-edit-request.json": { _ = try decodeFixture(JSONValue.self, "request-edit-request.json") },
     // NeedsYouTests compares it with what the client encodes.
     "needs-you-read-request.json": { _ = try decodeFixture([String: String].self, "needs-you-read-request.json") },
+    // WorktreeCleanupTests compares it with what the client encodes.
+    "worktree-retention-request.json": { _ = try decodeFixture(JSONValue.self, "worktree-retention-request.json") },
   ]
 
   static func threadStream() throws -> [ThreadStreamMessage] {

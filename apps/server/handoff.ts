@@ -23,6 +23,7 @@ import { prepareTurn } from './sync/guard.ts';
 import { toPortable } from './sync/paths.ts';
 import { activeWorker, onSynced, syncStatus, type SyncWorker } from './sync/worker.ts';
 import { reachabilityOf, tailnet } from './tailscale.ts';
+import { withWorkspace } from './workspace.ts';
 
 type Offered = Extract<HandoffOffer, { state: 'offered' }>;
 type Base = Pick<HandoffOffer, 'id' | 'thread' | 'from' | 'to'>;
@@ -262,10 +263,14 @@ async function take(offer: Offered, worker: SyncWorker) {
     const t = threads.get(id);
     // Not here yet, or the giving Mac's stopped row has not arrived: the next sync tries again.
     if (!t || busy(t)) return;
-    if (offer.bundle) {
+    const { bundle } = offer;
+    if (bundle) {
       const repo = channels.get(t.channel_id)?.repo_path;
       if (!t.branch || !repo || !existsSync(repo)) throw new Error(`the channel's repository is not on this Mac${repo ? `: ${repo}` : ''}`);
-      await unpackWorktree({ repo, dir: join(paths.worktrees, id), branch: t.branch, threadId: id, offerId: offer.id, bundle: offer.bundle, transport: worker.transport });
+      const dir = join(paths.worktrees, id);
+      const { branch } = t;
+      // Held like a start, so a cleanup never removes the folder while the handoff lays it out (workspace.ts).
+      await withWorkspace(dir, () => unpackWorktree({ repo, dir, branch, threadId: id, offerId: offer.id, bundle, transport: worker.transport }));
     }
     await prepareTurn(threads.get(id)!, false, true);
     // The download may have taken a while: hear of a Cancel on the other Mac before answering, not after.

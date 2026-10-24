@@ -9,8 +9,9 @@
 import { Hono, type Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
-import { threads } from './db.ts';
+import { threads, type Thread } from './db.ts';
 import { closeTerminal, getTerminal, openTerminal, resizeTerminal, snapshot, writeTerminal, type Terminal, type TerminalMessage } from './terminal.ts';
+import { inWorkspace } from './workspace.ts';
 
 export const terminalApi = new Hono();
 
@@ -28,6 +29,13 @@ const info = (t: Terminal | undefined) =>
 
 const threadOr404 = (c: Context) => threads.get(c.req.param('id')!);
 
+/** Opened with the folder held, so a cleanup cannot remove it under a new shell; a worktree it removed is checked out again. */
+const openIn = (t: Thread, size: { cols?: number; rows?: number }) =>
+  inWorkspace(t, (problem) => {
+    if (problem) throw Object.assign(new Error(problem), { status: 409 });
+    return openTerminal(t.id, t.cwd, size);
+  });
+
 terminalApi.get('/:id/terminal', (c) => {
   if (!threadOr404(c)) return c.json({ error: 'not found' }, 404);
   return c.json(info(getTerminal(c.req.param('id'))));
@@ -37,7 +45,7 @@ terminalApi.post('/:id/terminal', async (c) => {
   const t = threadOr404(c);
   if (!t) return c.json({ error: 'not found' }, 404);
   const size = sizeSchema.partial().parse(await c.req.json().catch(() => ({})));
-  return c.json(info(openTerminal(t.id, t.cwd, size)));
+  return c.json(info(await openIn(t, size)));
 });
 
 terminalApi.delete('/:id/terminal', (c) => {
@@ -60,13 +68,13 @@ terminalApi.post('/:id/terminal/resize', async (c) => {
   return c.json({ ok: true });
 });
 
-terminalApi.get('/:id/terminal/stream', (c) => {
+terminalApi.get('/:id/terminal/stream', async (c) => {
   const thread = threadOr404(c);
   if (!thread) return c.json({ error: 'not found' }, 404);
   // An exited shell stays exited until Ben restarts it, so a reconnect never starts one behind his back.
   const size = sizeSchema.safeParse(c.req.query());
   let term = getTerminal(thread.id);
-  if (!term) term = openTerminal(thread.id, thread.cwd, size.success ? size.data : {});
+  if (!term) term = await openIn(thread, size.success ? size.data : {});
   // Reflow to this client's size before the snapshot, so it fits.
   else if (size.success) resizeTerminal(thread.id, size.data.cols, size.data.rows);
   const t = term;

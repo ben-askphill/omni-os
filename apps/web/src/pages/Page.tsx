@@ -8,6 +8,7 @@ import { HomePage } from './Home.tsx';
 import { SearchPage } from './Search.tsx';
 import { SecretsPage } from './Secrets.tsx';
 import { SettingsPage } from './Settings.tsx';
+import { StoragePage } from './Storage.tsx';
 import { SyncPage } from './Sync.tsx';
 import { ThreadPage } from './Thread.tsx';
 
@@ -29,6 +30,8 @@ export function Page({ route }: { route: Route }) {
       return <SecretsPage />;
     case 'sync':
       return <SyncPage />;
+    case 'storage':
+      return <StoragePage />;
     case 'settings':
       return <SettingsPage />;
     case 'artifacts':
