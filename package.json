@@ -6,7 +6,8 @@
   "description": "One local workspace for Claude agent work: channels, threads, sandboxes, artifacts, PRs, conductor, automations.",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "supabase/functions/*"
   ],
   "scripts": {
     "dev": "turbo run dev",
