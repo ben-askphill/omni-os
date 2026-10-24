@@ -10,7 +10,8 @@
     "file": "/tmp/omni-fixtures/automations/broken.yaml",
     "catchup": false,
     "error": "invalid schedule (cron \"61 8 * * *\", timezone \"Europe/Amsterdam\"): CronPattern: Invalid value for minute: 61",
-    "runs": []
+    "runs": [],
+    "deliveries": []
   },
   {
     "id": "daily-digest",
@@ -34,6 +35,63 @@
         "created_at": "2026-01-05T09:00:00.000Z",
         "status": "done",
         "title": "Daily digest · 5 Jan"
+      }
+    ],
+    "deliveries": []
+  },
+  {
+    "id": "page-review",
+    "name": "Page review",
+    "cron": "",
+    "timezone": "Europe/Amsterdam",
+    "channel": "acme",
+    "prompt": "Review the page.",
+    "enabled": true,
+    "file": "/tmp/omni-fixtures/automations/page-review.yaml",
+    "catchup": false,
+    "on": {
+      "event": "artifact_published",
+      "channels": [
+        "acme"
+      ],
+      "updates": false
+    },
+    "next": null,
+    "runs": [
+      {
+        "id": 2,
+        "automation": "page-review",
+        "thread_id": "00000000-0000-4000-8000-000000000009",
+        "trigger": "event",
+        "created_at": "2026-01-05T09:00:00.000Z",
+        "status": "done",
+        "title": "Page review · launch-plan.html"
+      }
+    ],
+    "deliveries": [
+      {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "automation": "page-review",
+        "source": "artifact_published",
+        "source_id": "00000000-0000-4000-8000-000000000011:toolu_fake_1",
+        "summary": "launch-plan.html in #Acme",
+        "state": "started",
+        "reason": null,
+        "owner": null,
+        "source_thread": "00000000-0000-4000-8000-000000000011",
+        "thread_id": "00000000-0000-4000-8000-000000000009",
+        "created_at": "2026-01-05T09:00:00.000Z",
+        "updated_at": "2026-01-05T09:00:00.000Z",
+        "context": {
+          "url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000012",
+          "title": "launch-plan.html",
+          "file": "/tmp/omni-fixtures/launch-plan.html",
+          "description": "A fake page",
+          "update": "false",
+          "thread": "00000000-0000-4000-8000-000000000011",
+          "thread_title": "Publish the launch plan",
+          "channel": "acme"
+        }
       }
     ]
   }

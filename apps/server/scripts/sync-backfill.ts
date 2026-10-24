@@ -18,6 +18,7 @@ const LABEL: Record<BackfillCount['entity'], string> = {
   completion: 'results (Needs you)',
   result_read: 'read results (Needs you)',
   limit_stop: 'usage limit stops',
+  trigger_delivery: 'event automation deliveries',
   kv: 'settings (kv)',
 };
 

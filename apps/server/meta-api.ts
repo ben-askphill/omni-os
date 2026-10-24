@@ -3,6 +3,8 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { lastRuns, loadAutomations, runAutomation, setEnabled } from './automations.ts';
 import { pollErrors, watchedRepo } from './automation-watch.ts';
+import { isPrTrigger } from './automation-events.ts';
+import { triggerDeliveries } from './db/repos/trigger-deliveries.ts';
 import { listCrew } from './crew.ts';
 import { channelCatalog, freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
@@ -64,9 +66,11 @@ metaApi.get('/automations', (c) => {
     loadAutomations().map((a) => ({
       ...a,
       error: a.error ?? validateDefaults({ harness: a.harness, model: a.model, effort: a.effort }, cat),
-      // Event automations: the repo they watch and why the last poll failed, if it did.
-      ...(a.on && { repo: watchedRepo(a), poll_error: pollErrors.get(a.id) ?? null }),
+      // PR event automations: the repo they watch and why the last poll failed, if it did.
+      ...(isPrTrigger(a.on) && { repo: watchedRepo({ ...a, on: a.on }), poll_error: pollErrors.get(a.id) ?? null }),
       runs: lastRuns(a.id, 5),
+      // What events reached it and what became of each, newest first.
+      deliveries: triggerDeliveries.recent(a.id, 5),
     })),
   );
 });

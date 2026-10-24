@@ -19,7 +19,11 @@ prompt: |
 
 ## Event automations
 
-Replace `cron` with `on` and the automation runs when something happens on a PR instead of on a schedule:
+Replace `cron` with `on` and the automation runs when something happens instead of on a schedule: a change on a PR, or a page a thread published.
+
+### PR events
+
+
 
 ```yaml
 name: Fix failing PR checks
@@ -45,3 +49,24 @@ prompt: |
 - Drafts are skipped unless `drafts: true`. Run now still works and sends the plain prompt.
 - Only trusted authors fire: a PR, review or comment counts when its author is an `OWNER`, `MEMBER` or `COLLABORATOR` of the repo, and a PR from a fork never counts. A run checks out the PR and runs its code with your secrets and `gh` login, so on a public repo anyone could otherwise run code on your Mac by opening a PR. `trust: any` turns this off for that automation; only set it on a repo where you trust everyone who can open a PR.
 - The PR's title, branch and the event line reach the run inside a code fence, as data.
+
+### Published pages
+
+`on: artifact_published` runs the automation when a thread publishes a page to claude.ai with its Artifact tool (Claude Code threads; the other harnesses have no Artifact tool):
+
+```yaml
+name: Review published pages
+enabled: false
+on: { event: artifact_published, channels: [omni-os] }  # or just `on: artifact_published` for any channel
+channel: omni-os
+role: builder
+prompt: |
+  Review the page that was just published and list what to fix.
+```
+
+- `channels` limits it to publishes from threads in those channels. `updates: true` fires on a republish to a page's existing URL too; by default only a page's first publish counts.
+- Each publish that matches is saved as a delivery before any thread is made, keyed by the automation and the publish (the thread and its tool call). Seeing the same tool result again, a restart, or both Macs seeing it never starts a second run. A restart before the run was made starts it once Omni is back.
+- A publish from one of the automation's own runs, from a thread under one, or from a run whose page started it is skipped, so two automations cannot start each other forever.
+- The run's prompt is the automation's prompt plus an `## Event` section with the page's URL, and its title, file, description and the thread and channel that published it, in a code fence, as data. Its title is `<name> · <page>`, and its trigger is `event`.
+- The Automations page lists the last deliveries with their outcome: Started (with a link to the run), Held for owner, Failed or Skipped, with the reason.
+- With sync on, only the Mac that runs automations starts a run. The other Mac holds each delivery for it, whatever its own toggle says, and sync carries it over; that Mac skips it if the automation is paused there or it has no automation with that id. Personal automations in `data/automations/` only exist on their Mac, so a publish on the other Mac does not reach them.

@@ -7,7 +7,7 @@
 - [Threads](user/threads.md): the composer, steering and queueing, attachments, what each thread gets, Send to Grok Bot
 - [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent, Hermes and Cursor Cloud
 - [Crew and Conductor](user/crew.md)
-- [Automations](user/automations.md): cron and GitHub PR events
+- [Automations](user/automations.md): cron, GitHub PR events and published pages
 - [Sync between two Macs](user/sync.md)
 - [Remote access and security](user/remote-access.md)
 - [Link previews](user/link-previews.md)

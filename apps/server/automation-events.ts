@@ -1,7 +1,10 @@
-// Event triggers for automations: which GitHub PR changes should start a run. Pure, no db, no gh, so it is tested
-// directly (tests/automation-events.test.ts). apps/server/automation-watch.ts polls gh and feeds it.
+// Event triggers for automations: which GitHub PR changes should start a run, and the parsing of every `on:` block.
+// Pure, no db, no gh, so it is tested directly (tests/automation-events.test.ts). apps/server/automation-watch.ts polls
+// gh and feeds the PR events; apps/server/automation-triggers.ts takes artifact publishes.
 
-export const EVENT_TYPES = ['pr_opened', 'pr_checks_failed', 'pr_conflict', 'pr_review'] as const;
+export const PR_EVENT_TYPES = ['pr_opened', 'pr_checks_failed', 'pr_conflict', 'pr_review'] as const;
+export type PrEventType = (typeof PR_EVENT_TYPES)[number];
+export const EVENT_TYPES = [...PR_EVENT_TYPES, 'artifact_published'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 export const EVENT_LABELS: Record<EventType, string> = {
@@ -9,11 +12,12 @@ export const EVENT_LABELS: Record<EventType, string> = {
   pr_checks_failed: 'When PR checks fail',
   pr_conflict: 'When a PR has conflicts',
   pr_review: 'When a PR gets review comments',
+  artifact_published: 'When a page is published',
 };
 
-/** An automation's `on:` block. `repo` defaults to the channel's GitHub repo, resolved by the watcher. */
-export interface EventTrigger {
-  event: EventType;
+/** A PR automation's `on:` block. `repo` defaults to the channel's GitHub repo, resolved by the watcher. */
+export interface PrTrigger {
+  event: PrEventType;
   repo?: string;
   /** Draft PRs fire too. Off by default. */
   drafts: boolean;
@@ -24,16 +28,41 @@ export interface EventTrigger {
   trust?: 'any';
 }
 
-/** `on: pr_checks_failed`, or `on: { event, repo?, drafts?, trust? }`. A string error when it is neither. */
+/** `on: artifact_published`: a thread published a page to claude.ai with its Artifact tool. */
+export interface ArtifactTrigger {
+  event: 'artifact_published';
+  /** Only publishes from threads in these channels. Unset, any channel's. */
+  channels?: string[];
+  /** A republish to a page's existing url fires too. Off by default. */
+  updates: boolean;
+}
+
+/** An automation's `on:` block. */
+export type EventTrigger = PrTrigger | ArtifactTrigger;
+
+export const isPrTrigger = (t: EventTrigger | undefined): t is PrTrigger => !!t && t.event !== 'artifact_published';
+
+const CHANNEL_ID = /^[\w.-]+$/;
+
+/** `on: pr_checks_failed`, or `on: { event, repo?, drafts?, trust? }`, or `on: { event: artifact_published, channels?, updates? }`. A string error when it is none. */
 export function parseTrigger(raw: unknown): EventTrigger | string {
   const obj = typeof raw === 'string' ? { event: raw } : raw;
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return `"on" must be an event name or { event, repo }`;
-  const { event, repo, drafts, trust } = obj as Record<string, unknown>;
+  const { event, repo, drafts, trust, channels, updates } = obj as Record<string, unknown>;
   if (!EVENT_TYPES.includes(event as EventType)) return `unknown event "${String(event)}" (use ${EVENT_TYPES.join(', ')})`;
+  if (event === 'artifact_published') {
+    if (repo !== undefined || drafts !== undefined || trust !== undefined) return `repo, drafts and trust are for PR events`;
+    const list = typeof channels === 'string' ? [channels] : channels;
+    if (list !== undefined && (!Array.isArray(list) || !list.length || !list.every((c) => typeof c === 'string' && CHANNEL_ID.test(c))))
+      return `channels must be a channel id or a list of them`;
+    if (updates !== undefined && typeof updates !== 'boolean') return `updates must be true or false`;
+    return { event, ...(list && { channels: list as string[] }), updates: updates === true };
+  }
+  if (channels !== undefined || updates !== undefined) return `channels and updates are for artifact_published`;
   if (repo !== undefined && (typeof repo !== 'string' || !/^[\w.-]+\/[\w.-]+$/.test(repo))) return `repo must look like owner/name`;
   if (drafts !== undefined && typeof drafts !== 'boolean') return `drafts must be true or false`;
   if (trust !== undefined && trust !== 'any' && trust !== 'members') return `trust must be members or any`;
-  return { event: event as EventType, ...(repo ? { repo: repo as string } : {}), drafts: drafts === true, ...(trust === 'any' ? { trust } : {}) };
+  return { event: event as PrEventType, ...(repo ? { repo: repo as string } : {}), drafts: drafts === true, ...(trust === 'any' ? { trust } : {}) };
 }
 
 /** One open PR as `gh pr list --json` gives it, the fields the watcher asks for. */
@@ -77,7 +106,7 @@ export interface AutomationEventState {
 }
 
 export interface FiredEvent {
-  event: EventType;
+  event: PrEventType;
   pr: PRInfo;
   /** Short reason line for the run's prompt, e.g. the failed checks. */
   detail: string;
@@ -114,7 +143,7 @@ export function feedback(pr: PRInfo, self: string | null, trust?: 'any') {
  * save. The first poll only records, so turning an automation on never fires for PRs that were already there.
  * PRs from outside the repo's people, and fork PRs, never fire unless the trigger says `trust: any`.
  */
-export function detect(trigger: EventTrigger, state: AutomationEventState | undefined, prs: PRInfo[], self: string | null) {
+export function detect(trigger: PrTrigger, state: AutomationEventState | undefined, prs: PRInfo[], self: string | null) {
   const prev = state ?? { baselined: false, prs: {} };
   const next: AutomationEventState = { baselined: true, prs: {} };
   const fired: FiredEvent[] = [];
@@ -159,7 +188,7 @@ export function detect(trigger: EventTrigger, state: AutomationEventState | unde
 }
 
 /** A code fence longer than any backtick run in `text`, so the text cannot close it. */
-const fenced = (text: string) => {
+export const fenced = (text: string) => {
   const fence = '`'.repeat(Math.max(3, ...[...text.matchAll(/`+/g)].map((m) => m[0].length + 1)));
   return [fence, text, fence];
 };

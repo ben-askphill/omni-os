@@ -134,7 +134,7 @@ function fakeSecurity() {
   return bin;
 }
 
-/** One automation to toggle and run, and one the server can't schedule. */
+/** One automation to toggle and run, one the server can't schedule, and one a published page starts. */
 function automations() {
   const dir = join(tmp, 'automations');
   mkdirSync(dir);
@@ -144,6 +144,10 @@ function automations() {
       'model: claude-opus-5-5\nprompt: |\n  Summarize what changed in the cart since yesterday.\n',
   );
   writeFileSync(join(dir, 'broken.yaml'), 'name: Broken\nenabled: true\ncron: "61 8 * * *"\nchannel: acme\nprompt: Never runs.\n');
+  writeFileSync(
+    join(dir, 'page-review.yaml'),
+    'name: Page review\nenabled: true\non: { event: artifact_published, channels: [acme] }\nchannel: acme\nprompt: Review the page.\n',
+  );
   return dir;
 }
 
@@ -337,12 +341,22 @@ async function scenario() {
   // Automations, last, so their run is not in the thread lists above.
   type Automation = { id: string; enabled: boolean; error?: string; next?: string; runs: { thread_id: string; trigger: string; status: string }[] };
   const before = (await get('/automations')) as Automation[];
-  expect(before.map((a) => a.id).sort(), 'the test folder, not the repo').toEqual(['broken', 'daily-digest']);
+  expect(before.map((a) => a.id).sort(), 'the test folder, not the repo').toEqual(['broken', 'daily-digest', 'page-review']);
   const enableBody = request('automation-enabled-request.json', { enabled: true });
   keep('automation-enabled.json', await call('POST', '/automations/daily-digest/enabled', enableBody));
   const run = keep('automation-run.json', await call('POST', '/automations/daily-digest/run', {})) as Thread;
   await eventually(async () => (await detail(run.id)).thread.status === 'done', 'the automation run to finish');
+  // A page published in #acme starts Page review once, with the delivery that says why.
+  const pageFile = join(tmp, 'launch-plan.html');
+  writeFileSync(pageFile, '<title>Launch plan</title>');
+  await call('POST', '/threads', { channel: 'acme', prompt: `PUBLISH:${pageFile}`, title: 'Publish the launch plan' });
+  type Delivery = { state: string; thread_id: string | null };
+  const delivered = await eventually(async () => {
+    const d = ((await get('/automations')) as (Automation & { deliveries: Delivery[] })[]).find((a) => a.id === 'page-review')!.deliveries[0];
+    return d?.state === 'started' && !!d.thread_id && (await detail(d.thread_id)).thread.status === 'done' && d;
+  }, 'the page review run to finish');
   const listed2 = keep('automations.json', await get('/automations')) as Automation[];
+  expect(listed2.find((a) => a.id === 'page-review')!.runs).toMatchObject([{ thread_id: delivered.thread_id, trigger: 'event', status: 'done' }]);
   const digest = listed2.find((a) => a.id === 'daily-digest')!;
   expect(digest.enabled).toBe(true);
   expect(digest.next).toBeTruthy();

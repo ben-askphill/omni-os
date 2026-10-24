@@ -6,7 +6,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { config } from './config.ts';
 import { channels, kv } from './db.ts';
-import { detect, eventPrompt, type AutomationEventState, type PRInfo } from './automation-events.ts';
+import { detect, eventPrompt, isPrTrigger, type AutomationEventState, type PRInfo, type PrTrigger } from './automation-events.ts';
 import { loadAutomations, runAutomation, type Automation } from './automations.ts';
 import { runsAutomationsHere } from './sync/owner.ts';
 
@@ -48,8 +48,8 @@ const ghDeps: WatchDeps = {
 };
 
 /** The repo an event automation watches: its own `on.repo`, else its channel's GitHub repo. */
-export function watchedRepo(a: Automation): string | null {
-  return a.on?.repo ?? channels.get(a.channel)?.github_repo ?? null;
+export function watchedRepo(a: Automation & { on: PrTrigger }): string | null {
+  return a.on.repo ?? channels.get(a.channel)?.github_repo ?? null;
 }
 
 /** Last poll error per automation, for GET /api/automations. Cleared by the next good poll. */
@@ -58,8 +58,8 @@ export const pollErrors = new Map<string, string>();
 /** One poll of every enabled event automation. One gh call per repo, however many automations watch it. */
 export async function pollOnce(deps: WatchDeps = ghDeps): Promise<number> {
   if (!runsAutomationsHere()) return 0;
-  const watching = loadAutomations().filter((a) => a.on && a.enabled && !a.error);
-  const byRepo = new Map<string, Automation[]>();
+  const watching = loadAutomations().filter((a): a is Automation & { on: PrTrigger } => isPrTrigger(a.on) && a.enabled && !a.error);
+  const byRepo = new Map<string, (Automation & { on: PrTrigger })[]>();
   for (const a of watching) {
     const repo = watchedRepo(a);
     if (!repo) {
@@ -81,7 +81,7 @@ export async function pollOnce(deps: WatchDeps = ghDeps): Promise<number> {
     for (const a of list) {
       pollErrors.delete(a.id);
       const before = kv.get<AutomationEventState>(stateKey(a.id));
-      const { fired, state } = detect(a.on!, before, prs, self);
+      const { fired, state } = detect(a.on, before, prs, self);
       // Saved before the runs start: a crash mid-way skips an event rather than firing it twice.
       if (JSON.stringify(state) !== JSON.stringify(before)) kv.set(stateKey(a.id), state);
       for (const e of fired) {
