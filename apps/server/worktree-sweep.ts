@@ -3,6 +3,7 @@
 // so reopening the thread checks it out again (apps/server/sync/guard.ts). Runs on startup, once a day, and when Ben
 // archives a thread.
 import { execFile } from 'node:child_process';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync, readdirSync, realpathSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -14,14 +15,24 @@ import { runsHere } from './runner/state.ts';
 const run = promisify(execFile);
 const DAY = 24 * 3600 * 1000;
 
+/** The signal that stops every git call made inside `withSignal`, so a cancelled storage scan does not wait on them. */
+const cancel = new AsyncLocalStorage<AbortSignal>();
+export const currentSignal = () => cancel.getStore();
+export const withSignal = <T>(signal: AbortSignal, fn: () => T): T => cancel.run(signal, fn);
+
 /** git in dir, never prompting and never taking the index lock; null when it fails. */
-const git = (dir: string, ...args: string[]) =>
-  run('git', ['-C', dir, ...args], { timeout: 60_000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' } }).then(
+export const git = (dir: string, ...args: string[]) =>
+  run('git', ['-C', dir, ...args], {
+    timeout: 60_000,
+    maxBuffer: 16 * 1024 * 1024,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' },
+    signal: cancel.getStore(),
+  }).then(
     (r) => r.stdout.trim(),
     () => null,
   );
 
-const real = (p: string) => {
+export const real = (p: string) => {
   try {
     return realpathSync(p);
   } catch {
@@ -47,21 +58,48 @@ export interface SweepResult {
   freedBytes: number;
 }
 
+/** What a worktree holds that no remote has, counted. `statusFailed` and `pushUnknown` are checks that could not run. */
+export interface LocalWork {
+  /** Modified, staged or deleted tracked files. */
+  changed: number;
+  untracked: number;
+  /** Commits on HEAD no remote has. */
+  unpushed: number;
+  noCommits: boolean;
+  statusFailed: boolean;
+  pushUnknown: boolean;
+}
+
 /**
- * Why the worktree at dir must stay, or null when nothing in it can be lost: no uncommitted or untracked files, and
- * every commit on HEAD is on a remote (or is the head of a merged PR, for a squash merge whose branch was deleted).
- * Ignored files (node_modules, build output) do not count.
+ * What the worktree at dir would lose if it went: changes and untracked files, and commits on HEAD that are on no
+ * remote (a head that is the merged PR's head, for a squash merge whose branch was deleted, counts as pushed).
+ * Ignored files (node_modules, build output) are not counted.
  */
-export async function unsafeToRemove(dir: string, pushedHead?: string | null): Promise<string | null> {
+export async function localWork(dir: string, pushedHead?: string | null): Promise<LocalWork> {
+  const w: LocalWork = { changed: 0, untracked: 0, unpushed: 0, noCommits: false, statusFailed: false, pushUnknown: false };
   const status = await git(dir, 'status', '--porcelain', '--untracked-files=all');
-  if (status === null) return 'git status failed';
-  if (status) return `uncommitted or untracked changes (${status.split('\n').length} files)`;
+  if (status === null) w.statusFailed = true;
+  else if (status) for (const line of status.split('\n')) line.startsWith('??') ? w.untracked++ : w.changed++;
   const head = await git(dir, 'rev-parse', 'HEAD');
-  if (!head) return 'it has no commits';
-  if (pushedHead && head === pushedHead) return null;
+  if (!head) {
+    w.noCommits = true;
+    return w;
+  }
+  if (pushedHead && head === pushedHead) return w;
   const ahead = await git(dir, 'rev-list', '--count', 'HEAD', '--not', '--remotes');
-  if (ahead === null) return 'could not tell which commits are pushed';
-  if (Number(ahead) > 0) return `${ahead} commit(s) not pushed`;
+  if (ahead === null) w.pushUnknown = true;
+  else w.unpushed = Number(ahead);
+  return w;
+}
+
+/** Why the worktree at dir must stay, or null when nothing in it can be lost (see localWork). */
+export async function unsafeToRemove(dir: string, pushedHead?: string | null): Promise<string | null> {
+  const w = await localWork(dir, pushedHead);
+  if (w.statusFailed) return 'git status failed';
+  if (w.changed + w.untracked) return `uncommitted or untracked changes (${w.changed + w.untracked} files)`;
+  if (w.noCommits) return 'it has no commits';
+  if (w.pushUnknown) return 'could not tell which commits are pushed';
+  if (w.unpushed > 0) return `${w.unpushed} commit(s) not pushed`;
   return null;
 }
 
@@ -86,7 +124,7 @@ export async function branchMerged(repo: string, dir: string, branch: string, gi
 }
 
 /** The repo a worktree folder belongs to, when it is a registered worktree of one, else null. */
-async function owningRepo(dir: string): Promise<string | null> {
+export async function owningRepo(dir: string): Promise<string | null> {
   const top = await git(dir, 'rev-parse', '--show-toplevel');
   if (!top || real(top) !== real(dir)) return null;
   const common = await git(dir, 'rev-parse', '--path-format=absolute', '--git-common-dir');
@@ -104,7 +142,7 @@ const sizeOf = (dir: string) =>
   );
 
 /** Why the thread's worktree is in use (running, queued, its process still open, or being made), or null. */
-function busy(t: Thread): string | null {
+export function busy(t: Thread): string | null {
   if (t.status === 'running' || t.status === 'queued') return 'the thread is running';
   if (t.setup === 'preparing') return 'its worktree is being made';
   if (runsHere(t.id)) return 'its process is still open';
@@ -112,7 +150,7 @@ function busy(t: Thread): string | null {
 }
 
 /** Why a thread's worktree is up for removal, or null when it is not. */
-async function candidate(t: Thread, repo: string, dir: string, now: number): Promise<{ reason: SweepReason; prHead?: string } | null> {
+export async function candidate(t: Thread, repo: string, dir: string, now: number): Promise<{ reason: SweepReason; prHead?: string } | null> {
   if (t.archived) return { reason: 'archived' };
   if (!t.branch || now - Date.parse(t.updated_at) < config.worktreeIdleDays * DAY) return null;
   const m = await branchMerged(repo, dir, t.branch, channels.get(t.channel_id)?.github_repo ?? null);

@@ -57,6 +57,7 @@ func sseData(_ text: String) -> [String] {
     "thread-report-held.json": { _ = try decodeFixture(ThreadDetail.self, "thread-report-held.json") },
     "thread-setup-failed.json": { _ = try decodeFixture(ThreadDetail.self, "thread-setup-failed.json") },
     "setup-retried.json": { _ = try decodeFixture(RecoveryAnswer.self, "setup-retried.json") },
+    "worktree-scan.json": { _ = try decodeFixture(WorktreeScanReply.self, "worktree-scan.json") },
     "needs-you.json": { _ = try decodeFixture(NeedsYou.self, "needs-you.json") },
     "needs-you-read.json": { _ = try decodeFixture(NeedsYouRead.self, "needs-you-read.json") },
     "thread-limited.json": { _ = try decodeFixture(ThreadDetail.self, "thread-limited.json") },

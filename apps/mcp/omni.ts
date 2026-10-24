@@ -370,6 +370,11 @@ server.registerTool(
   async ({ query }) => text(await call(`/search?q=${encodeURIComponent(query)}`)),
 );
 
+server.registerTool('worktree_storage', {
+  description: 'Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing.',
+  inputSchema: { scan: z.boolean().optional() },
+}, async ({ scan }) => text(await call('/worktrees/scan', scan ? { method: 'POST' } : undefined)));
+
 server.registerTool('tool_failures', {
   description: 'Inspect machine-local tool failures grouped by harness, tool and category, most frequent first. With group_id, list occurrences with thread/call references. No raw arguments or error bodies. Use before for older occurrences.',
   inputSchema: { group_id: z.string().optional(), status: z.enum(['open', 'investigating', 'fixed', 'avoid', 'replacement']).optional(), before: z.number().int().positive().optional() },
