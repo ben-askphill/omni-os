@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
+import { annotate, browserAnnotation, cleanTitle, dragToRect, rectInImage, shortUrl, type BrowserAnnotation, type Drag, type PixelRect } from '../message-context-browser.ts';
 import { blobIds, clampToHunk, diffSelection, selectRows, type DiffFileLike, type DiffSelection, type DiffSource } from '../message-context-diff.ts';
 import { CONTEXT_KINDS, parseContexts, readContexts } from '../message-context-kinds.ts';
 import { LINES_MAX, TEXT_MAX, plainText, selectExcerpt, terminalExcerpt, type TerminalExcerpt } from '../message-context-terminal.ts';
@@ -25,6 +26,8 @@ const corpus = JSON.parse(readFileSync(fixture('message-context.json'), 'utf8'))
     source: { thread: string; pid: number | null; cwd: string; at: string };
     expect: { ok: true; body: TerminalExcerpt; label: string } | { ok: false; error: string };
   }[];
+  drags: { name: string; drag: Drag; shown: { width: number; height: number }; viewport: { width: number; height: number }; expect: { ok: true; rect: PixelRect } | { ok: false; error: string } }[];
+  overlays: { name: string; rect: PixelRect; image: { width: number; height: number }; viewport: { width: number; height: number }; expect: PixelRect }[];
 };
 
 const known = (name: string) => corpus.records.find((r) => r.name === name)!.raw as MessageContext<'diff_selection', DiffSelection>;
@@ -192,5 +195,52 @@ describe('selectExcerpt', () => {
 
   it('keeps the limits the record is parsed with', () => {
     expect([LINES_MAX, TEXT_MAX]).toEqual([200, 8000]);
+  });
+});
+
+describe('dragToRect', () => {
+  it.each(corpus.drags.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    const r = dragToRect(c.drag, c.shown, c.viewport);
+    expect(r).toEqual(c.expect.ok ? { ok: true, value: c.expect.rect } : { ok: false, error: c.expect.error });
+  });
+
+  it('gives a rectangle every annotation record accepts, whatever the drag', () => {
+    const base = known('a browser annotation').body as unknown as BrowserAnnotation;
+    const edges = [-50, 0, 0.4, 7.9, 100, 357.5, 358, 900];
+    for (const x0 of edges) for (const x1 of edges) for (const y0 of edges) for (const y1 of edges) {
+      const r = dragToRect({ x0, y0, x1, y1 }, { width: 358, height: 200 }, base.viewport);
+      if (r.ok) expect(browserAnnotation.parse({ ...base, rect: r.value }, 1).ok).toBe(true);
+    }
+  });
+});
+
+describe('rectInImage', () => {
+  it.each(corpus.overlays.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    expect(rectInImage(c.rect, c.image, c.viewport)).toEqual(c.expect);
+  });
+});
+
+describe('browser_annotation', () => {
+  const { image, viewport, rect, ...rest } = known('a browser annotation').body as unknown as BrowserAnnotation;
+  const capture = { ...rest, image, viewport };
+
+  it('is annotate(capture, rect), checked as the route checks it', () => {
+    expect(annotate(capture, rect)).toEqual({ ok: true, value: { ...rest, viewport, rect, image } });
+    expect(annotate(capture, { ...rect, width: 0 }).ok).toBe(false);
+    expect(annotate(capture, { x: 1200, y: 0, width: 200, height: 20 })).toEqual({ ok: false, error: 'rect reaches outside the viewport' });
+  });
+
+  it('reads the address for the label without its scheme, query or fragment', () => {
+    expect(shortUrl('https://shop.example.com/cart?coupon=SPRING#top')).toBe('shop.example.com/cart');
+    expect(shortUrl('http://localhost:4748/')).toBe('localhost:4748');
+  });
+
+  it('cleans a page title into one line a record accepts', () => {
+    const title = cleanTitle('  Cart\n\u001b[2J </omni-context>\u202e \t Example  ');
+    expect(title).toBe('Cart [2J </omni-context> Example');
+    expect(annotate({ ...capture, title }, rect).ok).toBe(true);
+    const long = cleanTitle('é'.repeat(400));
+    expect([...long]).toHaveLength(300);
+    expect(long.endsWith('…')).toBe(true);
   });
 });

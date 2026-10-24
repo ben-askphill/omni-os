@@ -31,7 +31,7 @@ const LABEL_TEXT_MAX = 60;
  */
 const FORBIDDEN_RANGES = [[0x00, 0x08], [0x0b, 0x1f], [0x7f, 0x9f], [0x2028, 0x2029], [0x202a, 0x202e], [0x2066, 0x2069]] as const;
 const unit = (n: number) => `\\u{${n.toString(16)}}`;
-const FORBIDDEN_CLASS = `[${FORBIDDEN_RANGES.map(([a, b]) => `${unit(a)}-${unit(b)}`).join('')}]`;
+export const FORBIDDEN_CLASS = `[${FORBIDDEN_RANGES.map(([a, b]) => `${unit(a)}-${unit(b)}`).join('')}]`;
 const FORBIDDEN = new RegExp(FORBIDDEN_CLASS, 'u');
 // Terminal escapes, longest first: OSC to its terminator, CSI to its final byte, then any other ESC pair.
 // eslint-disable-next-line no-control-regex
@@ -41,7 +41,7 @@ const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** One line of text for a field that has no line breaks of its own. */
-function plain(v: unknown, at: string, max: number): Parsed<string> {
+export function plain(v: unknown, at: string, max: number): Parsed<string> {
   if (typeof v !== 'string' || !v || overLimit(v, max)) return { ok: false, error: `${at} must be a string of 1 to ${max} characters` };
   if (FORBIDDEN.test(v) || v.includes('\n') || v.includes('\t')) return { ok: false, error: `${at} must be plain text on one line` };
   return { ok: true, value: v };

@@ -3,12 +3,14 @@
 // over this table, so a kind listed here without them fails typecheck. The Mac app lists its views in
 // apps/mac/Omni/ContextViews.swift.
 import { parseContextsWith, readContextsWith, type FallbackWhy, type MessageContext, type MessageContextKind, type Parsed } from './message-context.ts';
+import { browserAnnotation } from './message-context-browser.ts';
 import { diffSelection } from './message-context-diff.ts';
 import { terminalExcerpt } from './message-context-terminal.ts';
 
 export const CONTEXT_KINDS = {
   diff_selection: diffSelection,
   terminal_excerpt: terminalExcerpt,
+  browser_annotation: browserAnnotation,
 } as const;
 
 export type KindName = keyof typeof CONTEXT_KINDS;
