@@ -27,7 +27,11 @@ private func previewJSON(
       "files":\(files),
       "checks":[{"id":7,"command":"npm test","ok":false,"output":"1 failed"},{"id":9,"command":"npm run typecheck","ok":true,"output":""}],
       "recent":[{"id":3,"who":"user","text":"fix it","condensed":true},{"id":12,"who":"agent","text":"Done.\\nAll green.","condensed":false}],
-      "attachments":[{"name":"cart.png","event_id":2,"carried":false}],
+      "attachments":[
+        {"id":"u2:0","name":"cart.png","event_id":2,"mime":"image/png","size":3400,"image":true,"availability":"available",
+         "reason":null,"selected":true,"carried":true,"as":"inline"},
+        {"id":"u2:1","name":"trace.zip","event_id":2,"mime":"application/zip","size":null,"image":false,"availability":"missing",
+         "reason":"Its bytes are not on this Mac.","selected":true,"carried":false,"as":null}],
       "omitted":[{"what":"history","count":20,"note":"20 older entries left out.","ref":"/api/threads/t1/history?through=2"},
         {"what":"attachments","count":1,"note":"1 attachment is not carried.","ref":null},
         {"what":"uncommitted","count":2,"note":"2 binary files are not carried.","ref":"git -C /tmp/x status"},
@@ -90,7 +94,8 @@ private func catalog(codex: Bool = true) throws -> [HarnessInfo] {
 }
 
 private let startBody = ContinueBody(
-  run: Run(harness: .codex, model: "gpt-y", effort: ""), text: "Pick it up from the failing test", requestID: "q1", revision: "r1")
+  run: Run(harness: .codex, model: "gpt-y", effort: ""), attachments: ["u2:0"], text: "Pick it up from the failing test",
+  requestID: "q1", revision: "r1")
 
 @Suite struct ContinueDecodingTests {
   @Test func readsAPreview() throws {
@@ -115,8 +120,13 @@ private let startBody = ContinueBody(
     #expect(c.recent.map(\.who) == [.user, .agent])
     #expect(c.recent.map(\.condensed) == [true, false])
     #expect(c.recent[1].text == "Done.\nAll green.")
-    #expect(c.attachments.first?.eventID == 2)
-    #expect(c.attachments.first?.carried == false)
+    #expect(c.attachments.map(\.id) == ["u2:0", "u2:1"])
+    #expect(c.attachments.map(\.eventID) == [2, 2])
+    #expect(c.attachments.map(\.carried) == [true, false])
+    #expect(c.attachments.map(\.availability) == [.available, .missing])
+    #expect(c.attachments.map(\.arrival) == ["inline", nil])
+    #expect(c.attachments.map(\.size) == [3400, nil])
+    #expect(c.attachments[1].reason == "Its bytes are not on this Mac.")
     #expect(c.omitted.map(\.what) == [.history, .attachments, .uncommitted, .messages])
     #expect(c.omitted.map(\.ref) == ["/api/threads/t1/history?through=2", nil, "git -C /tmp/x status", nil])
     #expect(c.budget == 24000)
@@ -174,6 +184,33 @@ private let startBody = ContinueBody(
     #expect(ContinueRules.carriedText(stats) == text)
   }
 
+  @Test func writesTheCarriedLineWithAttachments() throws {
+    let some = try decode(
+      CarriedStats.self, #"{"entries":3,"condensed":0,"omitted":0,"chars":1,"budget":1,"files":2,"attachments":2}"#)
+    #expect(ContinueRules.carriedText(some) == "Carried 3 entries, 2 changed files, 2 attachments.")
+    let one = try decode(
+      CarriedStats.self, #"{"entries":3,"condensed":0,"omitted":0,"chars":1,"budget":1,"files":0,"attachments":1}"#)
+    #expect(ContinueRules.carriedText(one) == "Carried 3 entries, 1 attachment.")
+  }
+
+  // Expected strings printed by typeLabel and attachmentRows in apps/web/src/continue.ts.
+  @Test(arguments: [
+    ("image/png", "PNG image"), ("image/jpeg", "JPEG image"), ("image/svg+xml", "SVG image"), ("application/pdf", "PDF"),
+    ("text/plain", "Text"), ("application/zip", "File"), ("", "File"),
+  ])
+  func namesTheTypeOfAFile(_ mime: String, _ label: String) {
+    #expect(ContinueRules.typeLabel(mime) == label)
+  }
+
+  @Test func describesEachAttachment() throws {
+    let files = try decode(ContinuePreview.self, previewJSON()).carryover.attachments
+    #expect(files.map(ContinueRules.attachmentMeta) == ["PNG image · 3.3 KB", "File · size unknown"])
+    #expect(files.map(ContinueRules.attachmentNote) == ["Goes inline as an image.", "Its bytes are not on this Mac."])
+    #expect(files.map(ContinueRules.attachmentTag) == [nil, "Missing"])
+    #expect(ContinueRules.attachmentsSummary(files) == "1 of 2 will be copied into the new thread.")
+    #expect(ContinueRules.attachmentsSummary([]) == "None will be carried. Tick the ones the new thread needs.")
+  }
+
   @Test func refusesTheRemoteHarnessesOnly() {
     #expect(ContinueRules.continueRefusal(.hermes) == "Hermes runs on its own server, so this thread's files cannot move there.")
     #expect(
@@ -229,12 +266,28 @@ private let startBody = ContinueBody(
 @Suite struct ContinueClientTests {
   @Test func postsTheRunForAPreview() async throws {
     let t = StubTransport(body: previewJSON())
-    let p = try await OmniClient(port: 4799, transport: t).continuePreview("t 1", run: Run(harness: .codex, model: "gpt-y", effort: "high"))
+    let p = try await OmniClient(port: 4799, transport: t).continuePreview(
+      "t 1", run: Run(harness: .codex, model: "gpt-y", effort: "high"), attachments: [])
     #expect(p.revision == "r1")
     let req = try #require(t.requests.first)
     #expect(req.httpMethod == "POST")
     #expect(req.url?.absoluteString == "http://127.0.0.1:4799/api/threads/t%201/continue/preview")
-    #expect(try bodyJSON(req) == .object(["harness": .string("codex"), "model": .string("gpt-y"), "effort": .string("high")]))
+    #expect(
+      try bodyJSON(req)
+        == .object(["harness": .string("codex"), "model": .string("gpt-y"), "effort": .string("high"), "attachments": .array([])]))
+  }
+
+  @Test func postsTheSortedPicksForAPreview() async throws {
+    let t = StubTransport(body: previewJSON())
+    _ = try await OmniClient(port: 4799, transport: t).continuePreview(
+      "t1", run: Run(harness: .codex, model: "", effort: ""), attachments: ["u2:1", "u2:0"])
+    let req = try #require(t.requests.first)
+    #expect(
+      try bodyJSON(req)
+        == .object([
+          "harness": .string("codex"), "model": .string(""), "effort": .string(""),
+          "attachments": .array([.string("u2:0"), .string("u2:1")]),
+        ]))
   }
 
   @Test func startsAndReadsTheNewThread() async throws {
@@ -246,7 +299,7 @@ private let startBody = ContinueBody(
     let req = try #require(t.requests.first)
     #expect(req.url?.path() == "/api/threads/t1/continue")
     #expect(try bodyJSON(req) == .object([
-      "harness": .string("codex"), "model": .string("gpt-y"), "effort": .string(""),
+      "harness": .string("codex"), "model": .string("gpt-y"), "effort": .string(""), "attachments": .array([.string("u2:0")]),
       "text": .string("Pick it up from the failing test"), "request_id": .string("q1"), "revision": .string("r1"),
     ]))
   }
@@ -292,6 +345,7 @@ final class FakeContinueAPI: ContinueAPI {
     var holds: [HarnessID: Gate] = [:]
     var answers: [Result<ContinueStarted, ContinueError>] = []
     var starts: [ContinueBody] = []
+    var asked: [[String]] = []
     var closeFails: OmniAPIError?
     var closes = 0
   }
@@ -302,6 +356,8 @@ final class FakeContinueAPI: ContinueAPI {
   }
 
   var starts: [ContinueBody] { state.withLock { $0.starts } }
+  /// The picks each preview was asked with, in order.
+  var asked: [[String]] { state.withLock { $0.asked } }
   var closes: Int { state.withLock { $0.closes } }
   var closeFails: OmniAPIError? {
     get { state.withLock { $0.closeFails } }
@@ -319,7 +375,8 @@ final class FakeContinueAPI: ContinueAPI {
     return gate
   }
 
-  func continuePreview(_ id: String, run: Run) async throws(OmniAPIError) -> ContinuePreview {
+  func continuePreview(_ id: String, run: Run, attachments: [String]) async throws(OmniAPIError) -> ContinuePreview {
+    state.withLock { $0.asked.append(attachments) }
     let gate = state.withLock { $0.holds.removeValue(forKey: run.harness) }
     await gate?.wait()
     guard let p = state.withLock({ $0.previews[run.harness] }) else { throw .http(status: 400, message: "No preview") }
@@ -403,6 +460,42 @@ final class FakeContinueAPI: ContinueAPI {
     #expect(m.startBlocker == "The preview did not load")
     #expect(await m.start() == nil)
     #expect(api.starts.isEmpty)
+  }
+
+  @Test func asksForANewPreviewWithEachTickAndSendsThePicks() async throws {
+    let api = FakeContinueAPI([.codex: try preview()])
+    let m = await loaded(api)
+    #expect(m.picked.isEmpty)
+    let before = m.ask
+    m.toggle("u2:0")
+    #expect(m.ask != before)
+    #expect(m.startBlocker == "Loading the preview")
+    await m.loadPreview()
+    m.toggle("u2:1")
+    m.toggle("u2:1")
+    await m.loadPreview()
+    #expect(api.asked == [[], ["u2:0"], ["u2:0"]])
+    m.text = "go"
+    #expect(m.startBlocker == nil)
+    #expect(await m.start()?.id == "n1")
+    #expect(api.starts.first?.attachments == ["u2:0"])
+  }
+
+  @Test func holdsStartOnAPreviewOfOtherPicksAndTakesANewRequestIDForThem() async throws {
+    let api = FakeContinueAPI([.codex: try preview()])
+    api.answer(.failure(.api(.unreachable("offline"))))
+    let m = await loaded(api)
+    m.text = "go"
+    #expect(await m.start() == nil)
+    m.toggle("u2:0")
+    #expect(m.startBlocker == "Loading the preview")
+    #expect(await m.start() == nil)
+    await m.loadPreview()
+    #expect(await m.start()?.id == "n1")
+    let ids = api.starts.map(\.requestID)
+    #expect(ids.count == 2)
+    #expect(ids[0] != ids[1])
+    #expect(api.starts.map(\.attachments) == [[], ["u2:0"]])
   }
 
   @Test func keepsTheRequestIDAcrossRetriesAndChangesItWithTheText() async throws {

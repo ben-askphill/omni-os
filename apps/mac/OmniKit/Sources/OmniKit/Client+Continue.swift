@@ -3,15 +3,16 @@ import Foundation
 /// The calls the continue sheet makes. `OmniClient` is one; tests pass a fake. `closeTerminal` is in
 /// Client+Terminal.swift: it clears a `terminal` block.
 public protocol ContinueAPI: Sendable {
-  func continuePreview(_ id: String, run: Run) async throws(OmniAPIError) -> ContinuePreview
+  func continuePreview(_ id: String, run: Run, attachments: [String]) async throws(OmniAPIError) -> ContinuePreview
   func startContinue(_ id: String, _ body: ContinueBody) async throws(ContinueError) -> ContinueStarted
   func closeTerminal(_ id: String) async throws(OmniAPIError) -> TerminalInfo
 }
 
 extension OmniClient: ContinueAPI {
-  /// What a thread continued from `id` on `run` would read ahead of Ben's message, and whether it can start now.
-  public func continuePreview(_ id: String, run: Run) async throws(OmniAPIError) -> ContinuePreview {
-    try await send("POST", "/api/threads/\(uriComponent(id))/continue/preview", body: run)
+  /// What a thread continued from `id` on `run` would read ahead of Ben's message, with `attachments` (ids) carried,
+  /// and whether it can start now.
+  public func continuePreview(_ id: String, run: Run, attachments: [String]) async throws(OmniAPIError) -> ContinuePreview {
+    try await send("POST", "/api/threads/\(uriComponent(id))/continue/preview", body: ContinuePreviewBody(run: run, attachments: attachments))
   }
 
   /// Starts the continued thread. The three 409s come back as their own cases with what they carry; a 400 and

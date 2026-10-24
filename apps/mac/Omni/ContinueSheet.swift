@@ -42,7 +42,7 @@ struct ContinueSheet: View {
     .onChange(of: harnesses, initial: true) {
       if m.run == nil { m.run = ContinueTargets(harnesses, source: thread.harness).initial }
     }
-    .task(id: m.run) { await m.loadPreview() }
+    .task(id: m.ask) { await m.loadPreview() }
     .task { refresh() }
   }
 
@@ -128,8 +128,13 @@ struct ContinueSheet: View {
       ErrorNote(text: e.message) { Task { await m.loadPreview() } }
     } else if let p = m.preview {
       ScrollView {
-        CarryoverSections(preview: p)
-          .padding(.bottom, z(4))
+        VStack(alignment: .leading, spacing: z(14)) {
+          if !p.carryover.attachments.isEmpty {
+            AttachmentPicker(files: p.carryover.attachments, disabled: m.posting) { m.toggle($0) }
+          }
+          CarryoverSections(preview: p)
+        }
+        .padding(.bottom, z(4))
       }
       .opacity(m.loading ? 0.45 : 1)
       .overlay { if m.loading { Loader(size: 16, color: Tok.fg3) } }
@@ -263,19 +268,6 @@ private struct CarryoverSections: View {
           }
         }
       }
-      // #222 turns this list into a picker of the attachments to carry. Until then none is carried.
-      if !c.attachments.isEmpty {
-        section("Attachments", count: c.attachments.count) {
-          ForEach(Array(c.attachments.enumerated()), id: \.offset) { _, a in
-            HStack(spacing: z(8)) {
-              OmniIcon(name: "paperclip", size: 12).foregroundStyle(Tok.fg4)
-              Text(a.name).lineLimit(1).truncationMode(.middle)
-              Spacer(minLength: z(4))
-              Chip(text: a.carried ? "Carried" : "Not carried yet", tone: .outline)
-            }
-          }
-        }
-      }
       HStack(alignment: .firstTextBaseline) {
         DisclosureGroup("Show exact text", isExpanded: $showText) {
           Text(c.text)
@@ -317,6 +309,61 @@ private struct CarryoverSections: View {
         .padding(.horizontal, z(12))
         .padding(.vertical, z(10))
         .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(14), style: .continuous))
+    }
+  }
+}
+
+/// The source's attachments, each with a switch: the ticked ones are copied into the new thread's own uploads folder.
+/// One that cannot be copied says why and cannot be ticked.
+private struct AttachmentPicker: View {
+  let files: [CarryoverAttachment]
+  let disabled: Bool
+  let toggle: (String) -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: z(6)) {
+      HStack {
+        Text("Attachments").omniCaption()
+        Spacer()
+        Text("\(files.count)").font(.omni(size: 11)).monospacedDigit().foregroundStyle(Tok.fg3)
+      }
+      .padding(.horizontal, z(4))
+      VStack(alignment: .leading, spacing: z(10)) {
+        ForEach(files) { a in
+          let can = a.availability == .available
+          HStack(alignment: .top, spacing: z(10)) {
+            VStack(alignment: .leading, spacing: z(2)) {
+              HStack(spacing: z(6)) {
+                Text(a.name)
+                  .foregroundStyle(can ? Tok.fg : Tok.fg3)
+                  .lineLimit(1)
+                  .truncationMode(.middle)
+                if let tag = ContinueRules.attachmentTag(a) { Chip(text: tag, tone: .outline) }
+              }
+              Text(ContinueRules.attachmentMeta(a)).font(.omni(size: 11.5)).monospacedDigit().foregroundStyle(Tok.fg3)
+              Text(ContinueRules.attachmentNote(a))
+                .font(.omni(size: 11.5))
+                .foregroundStyle(Tok.fg3)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: z(8))
+            Toggle(
+              "Carry \(a.name)",
+              isOn: Binding(get: { a.selected && can }, set: { _ in toggle(a.id) })
+            )
+            .toggleStyle(.omni)
+            .labelsHidden()
+            .disabled(disabled || !can)
+            .accessibilityLabel("Carry \(a.name)")
+          }
+        }
+        Text(ContinueRules.attachmentsSummary(files)).font(.omni(size: 11.5)).foregroundStyle(Tok.fg3)
+      }
+      .font(.omni(size: 12.5))
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, z(12))
+      .padding(.vertical, z(10))
+      .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(14), style: .continuous))
     }
   }
 }

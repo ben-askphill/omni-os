@@ -142,16 +142,42 @@ public struct CarryoverOmission: Decodable, Hashable, Sendable {
   enum CodingKeys: String, CodingKey { case what, count, note, ref }
 }
 
-/// A file Ben attached in the source. None is carried yet (#222 lets Ben pick some); each is listed as left out.
-public struct CarryoverAttachment: Decodable, Hashable, Sendable {
+/// Whether a file Ben attached in the source can go to the new thread. `missing`: its bytes are not on this Mac.
+public struct AttachmentAvailability: OpenEnum {
+  public let rawValue: String
+  public init(rawValue: String) { self.rawValue = rawValue }
+
+  public static let available: Self = "available"
+  public static let missing: Self = "missing"
+  public static let oversize: Self = "oversize"
+  public static let unsupported: Self = "unsupported"
+}
+
+/// A file Ben attached in the source, as the sheet lists it: what it is, whether its bytes can be copied, and
+/// whether he picked it.
+public struct CarryoverAttachment: Decodable, Hashable, Sendable, Identifiable {
+  /// The attachment's message and its place in it. The start names the files Ben picked by this.
+  public let id: String
   public let name: String
   public let eventID: Int
-  /// Always false until #222. Decoded rather than assumed, so a server that carries some is shown as it is.
+  public let mime: String
+  /// Bytes on this Mac when the file is there, else the size recorded when it was attached.
+  public let size: Int?
+  public let image: Bool
+  public let availability: AttachmentAvailability
+  /// Why it cannot be carried. Nil when it can.
+  public let reason: String?
+  public let selected: Bool
+  /// Picked and available: its bytes are copied into the new thread's own uploads folder.
   public let carried: Bool
+  /// How the picked harness reads it once copied: `inline` is an image in the message, `path` a note naming the
+  /// file. Nil when it cannot be copied.
+  public let arrival: String?
 
   enum CodingKeys: String, CodingKey {
-    case name, carried
+    case id, name, mime, size, image, availability, reason, selected, carried
     case eventID = "event_id"
+    case arrival = "as"
   }
 }
 
@@ -213,24 +239,44 @@ public struct ContinueBody: Encodable, Hashable, Sendable {
   public let harness: HarnessID
   public let model: String
   public let effort: String
+  /// The ids of the source's attachments Ben picked (`CarryoverAttachment.id`).
+  public let attachments: [String]
   public let text: String
   /// The client's id for this start, kept across retries: a retry gets the same thread back.
   public let requestID: String
   public let revision: String
 
-  public init(run: Run, text: String, requestID: String, revision: String) {
+  public init(run: Run, attachments: [String] = [], text: String, requestID: String, revision: String) {
     harness = run.harness
     model = run.model
     effort = run.effort
+    self.attachments = attachments.sorted()
     self.text = text
     self.requestID = requestID
     self.revision = revision
   }
 
   enum CodingKeys: String, CodingKey {
-    case harness, model, effort, text, revision
+    case harness, model, effort, attachments, text, revision
     case requestID = "request_id"
   }
+}
+
+/// POST /api/threads/:id/continue/preview: the run, and the attachments Ben picked so far.
+public struct ContinuePreviewBody: Encodable, Hashable, Sendable {
+  public let harness: HarnessID
+  public let model: String
+  public let effort: String
+  public let attachments: [String]
+
+  public init(run: Run, attachments: [String]) {
+    harness = run.harness
+    model = run.model
+    effort = run.effort
+    self.attachments = attachments.sorted()
+  }
+
+  enum CodingKeys: String, CodingKey { case harness, model, effort, attachments }
 }
 
 /// What a start answers. `duplicate`: a retry of a start the server had already made, so this is that thread.
@@ -268,8 +314,21 @@ public struct CarriedStats: Decodable, Hashable, Sendable {
   public let chars: Int
   public let budget: Int
   public let files: Int
+  /// Attachments copied into the new thread. 0 on a thread continued before attachments could be carried.
+  public let attachments: Int
 
-  enum CodingKeys: String, CodingKey { case entries, condensed, omitted, chars, budget, files }
+  enum CodingKeys: String, CodingKey { case entries, condensed, omitted, chars, budget, files, attachments }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    entries = try c.decode(Int.self, forKey: .entries)
+    condensed = try c.decode(Int.self, forKey: .condensed)
+    omitted = try c.decode(Int.self, forKey: .omitted)
+    chars = try c.decode(Int.self, forKey: .chars)
+    budget = try c.decode(Int.self, forKey: .budget)
+    files = try c.decode(Int.self, forKey: .files)
+    attachments = try c.decodeIfPresent(Int.self, forKey: .attachments) ?? 0
+  }
 }
 
 /// One end of a continuation link, as GET /api/threads/:id shows it (`continued_from`, `continued_in`).
@@ -324,7 +383,51 @@ public enum ContinueRules {
     let condensed = c.condensed != 0 ? " (\(c.condensed) shortened)" : ""
     let left = c.omitted != 0 ? ", \(c.omitted) older left out" : ""
     let files = c.files != 0 ? ", \(Format.plural(c.files, "changed file"))" : ""
-    return "Carried \(Format.plural(c.entries, "entry", "entries"))\(condensed)\(left)\(files)."
+    let attached = c.attachments != 0 ? ", \(Format.plural(c.attachments, "attachment"))" : ""
+    return "Carried \(Format.plural(c.entries, "entry", "entries"))\(condensed)\(left)\(files)\(attached)."
+  }
+
+  /// "PNG image", "PDF", "Text" or "File" (`typeLabel`).
+  public static func typeLabel(_ mime: String) -> String {
+    let parts = mime.lowercased().split(separator: "/", maxSplits: 1).map(String.init)
+    let type = parts.first ?? ""
+    let sub = parts.count > 1 ? parts[1] : ""
+    if type == "image" {
+      let name = sub.split(separator: "+").first.map(String.init) ?? ""
+      return "\(name.isEmpty ? "Image" : name.uppercased()) image"
+    }
+    if sub == "pdf" { return "PDF" }
+    return type == "text" ? "Text" : "File"
+  }
+
+  /// "PNG image · 1.2 KB" (`attachmentRows`' meta).
+  public static func attachmentMeta(_ a: CarryoverAttachment) -> String {
+    "\(typeLabel(a.mime)) · \(a.size.map(Format.bytes) ?? "size unknown")"
+  }
+
+  /// How a file arrives, or why it cannot (`attachmentRows`' note).
+  public static func attachmentNote(_ a: CarryoverAttachment) -> String {
+    guard a.availability == .available else { return a.reason ?? "It cannot be carried." }
+    if a.arrival == "inline" { return "Goes inline as an image." }
+    return a.image ? "Goes as a path to the file. This harness does not show images inline." : "Goes as a path to the file."
+  }
+
+  /// The word beside a name when the file cannot be carried, else nil.
+  public static func attachmentTag(_ a: CarryoverAttachment) -> String? {
+    switch a.availability {
+    case .missing: "Missing"
+    case .oversize: "Too big"
+    case .unsupported: "Not a file"
+    default: nil
+    }
+  }
+
+  /// "2 of 3 will be copied", under the list (`attachmentsSummary`).
+  public static func attachmentsSummary(_ files: [CarryoverAttachment]) -> String {
+    let n = files.filter(\.carried).count
+    return n == 0
+      ? "None will be carried. Tick the ones the new thread needs."
+      : "\(n) of \(files.count) will be copied into the new thread."
   }
 
   /// Why a thread on this harness cannot be continued, for the header button's help (`continueSourceRefusal`). Nil
@@ -410,6 +513,8 @@ public final class ContinueModel {
   public let sourceID: String
   /// The run the new thread starts on. Nil until the catalog gives one. The sheet loads the preview on each change.
   public var run: Run?
+  /// The ids of the source's attachments Ben ticked. Each tick asks for a new preview, which names what will be copied.
+  public private(set) var picked: Set<String> = []
   /// Ben's first message in the new thread. It follows the Carryover and is never cut.
   public var text = ""
   /// The last preview loaded, kept on screen while the next one loads.
@@ -425,14 +530,27 @@ public final class ContinueModel {
   public private(set) var error: String?
   /// The last start found the thread changed: `preview` is the fresh one the server sent.
   public private(set) var changed = false
-  private var previewRun: Run?
+  private var previewAsk: Ask?
   private var request: PendingRequest?
   private var loadToken = 0
   private let api: any ContinueAPI
 
+  /// What a preview is of: the run and the picks. The sheet loads again whenever it changes.
+  public struct Ask: Hashable, Sendable {
+    public let run: Run
+    public let picked: Set<String>
+  }
+
+  public var ask: Ask? { run.map { Ask(run: $0, picked: picked) } }
+
   public init(api: any ContinueAPI, sourceID: String) {
     self.api = api
     self.sourceID = sourceID
+  }
+
+  /// Tick or untick one attachment.
+  public func toggle(_ id: String) {
+    if picked.contains(id) { picked.remove(id) } else { picked.insert(id) }
   }
 
   /// Why Start is off, for its help. Nil when it can go.
@@ -441,21 +559,21 @@ public final class ContinueModel {
     if closingTerminal { return "Closing the terminal" }
     guard let run else { return "No local harness is available" }
     if loading { return "Loading the preview" }
-    guard preview != nil, previewRun == run else { return loadError == nil ? "Loading the preview" : "The preview did not load" }
+    guard preview != nil, previewAsk == ask else { return loadError == nil ? "Loading the preview" : "The preview did not load" }
     if let blocked { return blocked.message }
     if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Write the first message for the new thread" }
     return nil
   }
 
   public func loadPreview() async {
-    guard let run else { return }
+    guard let run, let ask else { return }
     loadToken += 1
     let token = loadToken
     loading = true
     loadError = nil
     let answer: Result<ContinuePreview, OmniAPIError>
     do {
-      answer = .success(try await api.continuePreview(sourceID, run: run))
+      answer = .success(try await api.continuePreview(sourceID, run: run, attachments: picked.sorted()))
     } catch {
       answer = .failure(error)
     }
@@ -463,7 +581,7 @@ public final class ContinueModel {
     loading = false
     switch answer {
     case .success(let p):
-      show(p, for: run)
+      show(p, for: ask)
       changed = false
     case .failure(.cancelled): break
     case .failure(let e): loadError = e
@@ -473,7 +591,7 @@ public final class ContinueModel {
   /// Starts the continued thread. Nil when it did not start: `error`, `blocked` or `changed` says why.
   public func start() async -> OmniThread? {
     guard startBlocker == nil, let run, let preview else { return nil }
-    let key = [preview.revision, run.harness.rawValue, run.model, run.effort, text].joined(separator: "\u{1F}")
+    let key = ([preview.revision, run.harness.rawValue, run.model, run.effort, text] + picked.sorted()).joined(separator: "\u{1F}")
     let request = PendingRequest.next(after: self.request, key: key)
     self.request = request
     posting = true
@@ -482,13 +600,13 @@ public final class ContinueModel {
     defer { posting = false }
     do {
       let started = try await api.startContinue(
-        sourceID, ContinueBody(run: run, text: text, requestID: request.id, revision: preview.revision))
+        sourceID, ContinueBody(run: run, attachments: picked.sorted(), text: text, requestID: request.id, revision: preview.revision))
       self.request = nil
       return started.thread
     } catch {
       switch error {
       case .changed(_, let fresh):
-        show(fresh, for: run)
+        if let ask { show(fresh, for: ask) }
         changed = true
       case .busy(_, let block):
         blocked = block
@@ -516,9 +634,9 @@ public final class ContinueModel {
     await loadPreview()
   }
 
-  private func show(_ p: ContinuePreview, for run: Run) {
+  private func show(_ p: ContinuePreview, for ask: Ask) {
     preview = p
-    previewRun = run
+    previewAsk = ask
     blocked = p.blocked
   }
 }
