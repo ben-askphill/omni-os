@@ -36,5 +36,5 @@ Move a thread that is running on this Mac to your other Mac, which carries on wh
 - What travels: the session, the thread's files, and queued messages (their text, not their attachments).
 - A worktree thread also takes its branch's commits that are on no remote, and its uncommitted and untracked files, which arrive uncommitted. Files `.gitignore` covers stay on each Mac. The other Mac's own worktree for the thread must not have changes of its own, and the whole bundle must fit in 50 MB.
 - A thread in a shared folder (a repo without a worktree per thread, or your workspace) runs in that folder on the other Mac. Uncommitted changes in it stay on this Mac; the other Mac's agent is told so.
-- Claude Code and Hermes threads can always go. Codex and Cursor threads can go once they have reported their session, after their first reply.
+- Claude Code, Hermes and Cursor Cloud threads can always go. Codex and Cursor threads can go once they have reported their session, after their first reply. A Cursor Cloud thread's run is cancelled here and the other Mac follows up on the same cloud agent, so it needs `CURSOR_API_KEY` too.
 - If the other Mac cannot pick it up, or you cancel, the thread stays stopped here with its queued messages waiting for Resume, and the banner says why.

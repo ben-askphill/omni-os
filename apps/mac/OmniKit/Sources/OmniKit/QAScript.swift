@@ -68,7 +68,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
 /// `{"settings": "secrets"}` (or `connection`, `profile`, `sync`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
-/// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`), `{"expand": true}`, `{"meter": true}`, `{"foldAll": true}`,
+/// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`), `{"expand": true}`, `{"meter": true}`, `{"modelPicker": true}` (or a search, `"cursor"`), `{"foldAll": true}`,
 /// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`,
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
 /// `changes`, `turn`, `browser`, `terminal`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
@@ -97,6 +97,8 @@ public enum QAStep: Hashable, Sendable {
   case expand
   /// Opens the open thread's context meter panel.
   case meter
+  /// Opens the new-thread composer's model list, with this in its search.
+  case modelPicker(String)
   /// Presses the sidebar's collapse-all (or expand-all) button.
   case foldAll
   /// Opens the edit of the open thread's first editable unsent message, with this text in it.
@@ -212,7 +214,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "foldAll", "editPending", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -270,6 +272,10 @@ public struct QAScript: Hashable, Sendable {
       return .expand
     case "meter":
       return .meter
+    case "modelPicker":
+      if let query = value as? String { return .modelPicker(query) }
+      guard value as? Bool == true else { throw QAScriptError("modelPicker takes true or the text to search for") }
+      return .modelPicker("")
     case "foldAll":
       return .foldAll
     case "editPending":

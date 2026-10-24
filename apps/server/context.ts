@@ -11,7 +11,7 @@ import { toolLabel } from './tool-label.ts';
 
 const snapshots = new Map<string, ContextUsage>();
 
-/** The harnesses that report a context window. Cursor's is an estimate from its turn totals; Hermes reports none. */
+/** The harnesses that report a context window. Cursor's is an estimate from its turn totals; Hermes and Cursor Cloud report none. */
 export const METERED = new Set(['claude-code', 'codex', 'cursor']);
 /** The harnesses Omni can compact: Claude Code's /compact, and Codex's, which takes no instructions. */
 export const COMPACTS = new Set(['claude-code', 'codex']);
@@ -206,7 +206,7 @@ export interface ContextView {
 
 /** Why the thread can't compact now, or null when it can. */
 export function compactBlocked(t: Thread): string | null {
-  if (!COMPACTS.has(t.harness)) return `${t.harness === 'cursor' ? 'Cursor Agent' : 'Hermes'} has no compact command.`;
+  if (!COMPACTS.has(t.harness)) return `${t.harness === 'cursor' ? 'Cursor Agent' : t.harness === 'cursor-cloud' ? 'A Cursor cloud agent' : 'Hermes'} has no compact command.`;
   if (t.status === 'running' || t.status === 'queued') return 'Wait for the current turn to finish.';
   if (!t.has_run) return 'Nothing to compact yet.';
   return null;

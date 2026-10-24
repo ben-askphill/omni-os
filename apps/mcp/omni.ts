@@ -74,7 +74,13 @@ server.registerTool(
       prompt: z.string().describe('Self-contained task brief. Include everything the crewmate needs; it cannot see your chat.'),
       task_id: z.string().optional().describe('Short id like T-12 to match the report. Generated if omitted.'),
       title: z.string().optional(),
-      harness: z.string().optional().describe('Override the role default harness: claude-code, codex, cursor or hermes. Use list_harnesses.'),
+      harness: z
+        .string()
+        .optional()
+        .describe(
+          'Override the role default harness: claude-code, codex, cursor, hermes or cursor-cloud. cursor runs the cursor-agent CLI on this Mac; ' +
+            'cursor-cloud launches a Cursor cloud agent on Cursor\'s Linux machines that pushes a branch and opens a PR (no Mac build, Swift tests or screenshots). Use list_harnesses.',
+        ),
       model: z
         .string()
         .optional()
@@ -182,11 +188,15 @@ server.registerTool(
   'list_harnesses',
   {
     description:
-      'List the agent harnesses (Claude Code, Codex, Cursor, Hermes) with their availability, fix command, models and effort levels, so you can pass valid ids to delegate. ' +
-      'Model "auto" is not listed: it is Omni picking among these per brief.',
+      'List the agent harnesses (Claude Code, Codex, Cursor, Hermes, Cursor Cloud) with their availability, fix command, models and effort levels, so you can pass valid ids to delegate. ' +
+      'Pass channel to see them as that channel does: cursor-cloud needs the channel\'s GitHub repo. ' +
+      'Model "auto" is not listed: it is Omni picking among these per brief, and it never picks hermes or cursor-cloud.',
+    inputSchema: {
+      channel: z.string().optional().describe('Channel id the thread would run in. Cursor Cloud is unavailable in a channel with no GitHub repo.'),
+    },
   },
-  async () => {
-    const list = await call('/harnesses');
+  async ({ channel }) => {
+    const list = await call(channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses');
     return text(
       list.map((h: any) => ({
         id: h.id,
@@ -232,7 +242,7 @@ server.registerTool(
       'Move an existing thread to another harness, model or effort. Its next message runs on the new one. ' +
       'Same harness: its session carries on with the new model or effort. Another harness: the next session reads the thread so far first. ' +
       'While a turn runs, the switch waits and applies once the turn ends (`queued_*` on the result); its current run picked again drops it. ' +
-      `Only when ${USER} asks. Refused to or from Hermes. Ids come from list_harnesses.`,
+      `Only when ${USER} asks. Refused to or from Hermes or Cursor Cloud. Ids come from list_harnesses.`,
     inputSchema: {
       thread_id: z.string(),
       harness: z.string().describe('claude-code, codex or cursor.'),

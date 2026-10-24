@@ -17,9 +17,20 @@ public enum TranscriptMarkdown {
     case .error(_, let s): s
     case .report(_, _, let r): r.text
     case .mod(_, let lines): lines.map { "\($0.plugin): \($0.text)" }.joined(separator: "\n")
+    case .cloud(_, let s): cloudLines(s).joined(separator: "\n")
     case .runSwitch(let r): ([r.text] + (r.note.map { [$0] } ?? [])).joined(separator: "\n")
     case .question(let q): q.questions.indices.map { i in [q.questions[i].question, q.words(at: i)].compactMap { $0 }.joined(separator: "\n") }.joined(separator: "\n\n")
     }
+  }
+
+  /// The card's facts, one per line: name and status, where it works, and where it is on the web.
+  private static func cloudLines(_ s: CloudAgentState) -> [String] {
+    var lines = ["\(s.title) · \(s.statusLabel)"]
+    if !s.repo.isEmpty { lines.append("Repo: \(s.repo)" + (s.ref.map { " from \($0)" } ?? "")) }
+    if let branch = s.branch { lines.append("Branch: \(branch)") }
+    if let pr = s.prURL { lines.append("PR: \(pr)") }
+    lines.append("Agent: \(s.url)")
+    return lines
   }
 
   private static func block(_ item: TranscriptItem, cwd: String?) -> String {
@@ -52,6 +63,8 @@ public enum TranscriptMarkdown {
       return parts.joined(separator: "\n\n")
     case .mod(_, let lines):
       return lines.map { "*\($0.plugin)* \($0.text)" }.joined(separator: "\n")
+    case .cloud(_, let s):
+      return "**Cursor cloud agent** · \(s.statusLabel)\n\n" + cloudLines(s).dropFirst().map { "- \($0)" }.joined(separator: "\n")
     case .question(let q):
       let rows = q.questions.indices.map { i in "- \(q.questions[i].question)" + (q.words(at: i).map { " **\($0)**" } ?? "") }
       return (["**Question** · \(q.state.label)"] + rows).joined(separator: "\n")

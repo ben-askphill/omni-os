@@ -8,6 +8,7 @@ import { copyFileSync, existsSync, lstatSync, mkdtempSync, realpathSync, rmSync 
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { turnSnapshots, type SkippedFile, type Thread, type TurnSnapshot, type TurnSnapshotState } from './db.ts';
+import { isRemoteHarness, remoteWhere } from './harness/types.ts';
 import { MAX_UNTRACKED_BYTES, changesCheckout, commitsGroup, git, gitOr, head, real, type ChangeGroup, type ChangedFile } from './changes.ts';
 
 export const TURN_REFS = 'refs/omni/turns';
@@ -38,7 +39,7 @@ export interface Snapshot {
  */
 export async function snapshotCheckout(t: Thread | undefined): Promise<{ dir: string } | { reason: string }> {
   if (!t) return { reason: 'The thread is gone.' };
-  if (t.harness === 'hermes') return { reason: 'This thread runs on the Hermes server, so its files are not on this Mac.' };
+  if (isRemoteHarness(t.harness)) return { reason: `This thread runs ${remoteWhere(t.harness)}, so its files are not on this Mac.` };
   if (!t.branch) return { reason: 'Turns are saved only for a thread with a worktree of its own.' };
   return changesCheckout(t);
 }

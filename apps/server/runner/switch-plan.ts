@@ -19,6 +19,10 @@ export type SwitchPlan =
 export const HERMES_REFUSAL =
   "Hermes runs on its own server without this thread's worktree. Start a new thread to move work to or from Hermes.";
 
+/** A cloud agent keeps the model it was created with (a run cannot change it) and has no worktree on this Mac. */
+export const CURSOR_CLOUD_REFUSAL =
+  "A Cursor cloud agent keeps its model and works on its own clone of the repo. Start a new thread to change the model or move work to or from Cursor Cloud.";
+
 /**
  * The thread's sessions once it runs on `to`. `from` names the run it leaves, `lastEventId` is where its transcript
  * stands, and `hasContentSince(id)` says whether anything ran after that event (a message, a reply, a tool call).
@@ -26,6 +30,7 @@ export const HERMES_REFUSAL =
 export function planSwitch(t: RunState, to: Run, from: RunName, lastEventId: number, hasContentSince: (id: number) => boolean): SwitchPlan {
   if (sameRun(t, to)) return { kind: 'none' };
   const same = { session_id: t.session_id, sessions: t.sessions, handover: t.handover };
+  if (t.harness === 'cursor-cloud' || to.harness === 'cursor-cloud') return { kind: 'reject', error: CURSOR_CLOUD_REFUSAL };
   if (t.harness === to.harness) return { kind: 'settings', ...same };
   if (t.harness === 'hermes' || to.harness === 'hermes') return { kind: 'reject', error: HERMES_REFUSAL };
   // Nothing ran yet, so there is nothing to hand over. A session id the old harness noted belongs to it: the thread id

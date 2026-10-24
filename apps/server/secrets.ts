@@ -63,6 +63,11 @@ async function readSecret(scope: string, name: string): Promise<string | null> {
   }
 }
 
+/** Whether a secret of this name is set in this scope. Reads the names table only, never the Keychain. */
+export function hasSecret(scope: string, name: string): boolean {
+  return !!db.prepare('SELECT 1 FROM secrets WHERE scope = ? AND name = ?').get(scope, name);
+}
+
 /** One global secret from the Keychain, or null when it is missing. The value is never logged. */
 export async function globalSecret(name: string): Promise<string | null> {
   if (!NAME_RE.test(name)) return null;

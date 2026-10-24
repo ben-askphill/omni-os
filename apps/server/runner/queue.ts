@@ -12,7 +12,7 @@ import {
   capFor,
   deliveryPhase,
   emitThread,
-  harnessSteers,
+  deliveryCaps,
   isShuttingDown,
   lives,
   requestMsg,
@@ -32,7 +32,7 @@ export function deliver(threadId: string, m: Msg) {
   // The thread moves on: a limit stop it had, and the continuation scheduled for it, no longer apply (limits.ts).
   if (threads.get(threadId)?.limit_state) threads.setLimit(threadId, null);
   let live = lives.get(threadId);
-  const caps = { steer: harnessSteers(threadId) };
+  const caps = deliveryCaps(threadId);
   // Interrupt and send while the process is still starting: stop it like Interrupt does and start fresh with this message.
   if (live?.turn && !live.closing && resolveDelivery(m.mode, caps, deliveryPhase(live)) === 'stop-startup') {
     stopStartup(live);

@@ -71,6 +71,19 @@ export interface ReportP {
   dropped?: boolean;
 }
 
+/** Where a Cursor cloud agent's run stands: the server's CloudAgentState (apps/server/stream.ts). */
+export interface CloudAgentP {
+  agent_id: string;
+  url: string;
+  name?: string;
+  run_id?: string;
+  status: 'CREATING' | 'RUNNING' | 'FINISHED' | 'ERROR' | 'CANCELLED' | 'EXPIRED';
+  repo?: string;
+  ref?: string;
+  branch?: string;
+  pr_url?: string;
+}
+
 /** A mod's $.ui.log line. */
 export interface ModLine {
   key: number;
@@ -118,6 +131,8 @@ export type Item =
   | { type: 'report'; key: number; at: string; p: ReportP }
   /** Mod log lines in a row. They do not end a group of calls, so a busy hook does not split it. */
   | { type: 'mod'; key: number; lines: ModLine[] }
+  /** One Cursor cloud agent run, where its first row was, showing its newest state. */
+  | { type: 'cloud'; key: number; p: CloudAgentP }
   | SwitchItem
   /** A question the agent asked Ben, where it asked it. The card stands in for the ask_user_question call. */
   | { type: 'question'; key: number; at: string; q: ThreadQuestion };
@@ -183,6 +198,8 @@ export function buildItems(events: TranscriptEvent[]): { items: Item[]; plan: Fo
   const groupOf = new Map<string, Extract<Item, { type: 'tools' }>>();
   let group: Extract<Item, { type: 'tools' }> | null = null;
   let plan: FoldPlan | null = null;
+  // A run's rows come in as its status, branch or PR moves: one card per run, updated in place.
+  const runs = new Map<string, Extract<Item, { type: 'cloud' }>>();
   let pending: SwitchItem | null = null;
 
   for (const e of events) {
@@ -251,6 +268,21 @@ export function buildItems(events: TranscriptEvent[]): { items: Item[]; plan: Fo
         group = null;
         items.push({ type: 'report', key: e.id, at: e.created_at, p: parsePayload<ReportP>(e) });
         break;
+      case 'cloud_agent': {
+        const p = parsePayload<Partial<CloudAgentP>>(e);
+        if (!str(p.agent_id) || !str(p.url) || !str(p.status)) break;
+        const id = `${p.agent_id}:${str(p.run_id)}`;
+        const known = runs.get(id);
+        if (known) {
+          known.p = p as CloudAgentP;
+          break;
+        }
+        group = null;
+        const item = { type: 'cloud' as const, key: e.id, p: p as CloudAgentP };
+        runs.set(id, item);
+        items.push(item);
+        break;
+      }
       case 'switch': {
         const p = parsePayload<SwitchP>(e);
         const item: SwitchItem = { type: 'switch', key: e.id, p, done: null, superseded: false };

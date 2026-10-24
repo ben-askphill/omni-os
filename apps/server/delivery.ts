@@ -11,16 +11,18 @@ export type DeliveryPhase = 'startup' | 'running';
 
 /**
  * queue: hold until this turn ends. steer: write it now. interrupt: write it and ask the CLI to stop.
- * kill: interrupt was asked and the harness cannot steer, so the process is hard-killed.
+ * kill: interrupt was asked and the harness can't stop a turn on request, so the process is hard-killed.
  * stop-startup: interrupt during startup. Both call sites already answer that with `stopStartup`
  * (drop what is held, then kill or abort). It is not `kill`: a running interrupt on a harness
  * that cannot steer keeps the new message and hard-kills.
  */
 export type DeliveryAction = 'queue' | 'steer' | 'interrupt' | 'kill' | 'stop-startup';
 
-/** The only capability this decision reads. */
+/** The only capabilities this decision reads. */
 export interface DeliveryCaps {
   steer: boolean;
+  /** Stops a turn on request and keeps going. A harness that steers always can. */
+  interrupt: boolean;
 }
 
 type RunningAction = Exclude<DeliveryAction, 'stop-startup'>;
@@ -32,7 +34,7 @@ function runningDelivery(mode: DeliveryMode, caps: DeliveryCaps): RunningAction 
     case 'steer':
       return caps.steer ? 'steer' : 'queue';
     case 'interrupt':
-      return caps.steer ? 'interrupt' : 'kill';
+      return caps.steer || caps.interrupt ? 'interrupt' : 'kill';
     default: {
       const unreachable: never = mode;
       return unreachable;

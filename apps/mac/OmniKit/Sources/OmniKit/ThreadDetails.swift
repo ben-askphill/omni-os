@@ -35,8 +35,8 @@ public enum ThreadDetails {
 
   /// The command that resumes the session in a terminal. nil while the thread has no session.
   public static func resumeCommand(harness: HarnessID, sessionID: String?, cwd: String?) -> String? {
-    // Hermes runs on its own server, so there is nothing to resume in a terminal.
-    guard let sessionID, !sessionID.isEmpty, harness != .hermes else { return nil }
+    // Hermes and Cursor Cloud run off this Mac, so there is nothing to resume in a terminal.
+    guard let sessionID, !sessionID.isEmpty, !harness.isRemote else { return nil }
     let command =
       switch harness {
       case .codex: "codex resume \(sessionID)"
@@ -46,12 +46,22 @@ public enum ThreadDetails {
     return "cd \(shellQuote(cwd ?? "")) && \(command)"
   }
 
+  /// What the Working dir row says for a harness that runs off this Mac, where the thread's folder is not its workspace.
+  public static func remoteWorkspace(_ id: HarnessID) -> String? {
+    switch id {
+    case .hermes: "Hermes server, not an Omni worktree"
+    case .cursorCloud: "Cursor's cloud, on its own clone of the repo"
+    default: nil
+    }
+  }
+
   public static func harnessName(_ id: HarnessID) -> String {
     switch id {
     case .claudeCode: "Claude Code"
     case .codex: "Codex"
     case .cursor: "Cursor Agent"
     case .hermes: "Hermes"
+    case .cursorCloud: "Cursor Cloud"
     default: id.rawValue
     }
   }

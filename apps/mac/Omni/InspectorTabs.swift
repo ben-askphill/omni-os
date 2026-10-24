@@ -185,10 +185,19 @@ struct DetailsTab: View {
               Text(thread.source.rawValue) + Text(thread.automation.map { " · \($0)" } ?? "").foregroundStyle(Tok.fg3)
             }
             if let branch = thread.branch, !branch.isEmpty { row("Branch") { mono(branch) } }
-            row("Working dir") { mono(cwd) }
+            row("Working dir") {
+              if let remote = ThreadDetails.remoteWorkspace(thread.harness) { Text(remote).foregroundStyle(Tok.fg3) } else { mono(cwd) }
+            }
             row("Session") {
               VStack(alignment: .leading, spacing: z(3)) {
                 mono(thread.sessionID ?? "none")
+                if thread.harness == .cursorCloud, let agent = CursorCloud.agentURL(sessionID: thread.sessionID) {
+                  Link(destination: agent) {
+                    HStack(spacing: z(4)) { Text("Open the agent in Cursor"); OmniIcon(name: "external", size: 11) }
+                  }
+                  .foregroundStyle(Tok.fg2)
+                  .help(agent.absoluteString)
+                }
                 if let warm = store.warm {
                   HStack(spacing: z(5)) {
                     StatusDot(status: warm ? .done : .imported, size: 6)

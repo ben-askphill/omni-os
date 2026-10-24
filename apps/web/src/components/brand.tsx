@@ -285,6 +285,7 @@ const HARNESS: Record<string, { logo?: keyof typeof LOGO; label: string }> = {
   codex: { logo: 'openai', label: 'Codex' },
   cursor: { logo: 'cursor', label: 'Cursor' },
   hermes: { label: 'Hermes' },
+  'cursor-cloud': { logo: 'cursor', label: 'Cursor Cloud' },
 };
 
 export const harnessLabel = (harness: string) => HARNESS[harness]?.label ?? harness;
@@ -296,6 +297,9 @@ export const HARNESS_ROWS: { id: HarnessId; name: string }[] = [
   { id: 'cursor', name: 'Cursor' },
   { id: 'hermes', name: 'Hermes' },
 ];
+
+/** The harnesses the running-slots line counts: the usage rows, plus Cursor Cloud, which reports no usage of its own. */
+export const SLOT_ROWS: { id: HarnessId; name: string }[] = [...HARNESS_ROWS, { id: 'cursor-cloud', name: 'Cursor Cloud' }];
 
 /** The bare logo. Harnesses without one (Hermes) get their two-letter label. */
 export function HarnessLogo({ harness, size = 14, title }: { harness: string; size?: number; title?: string }) {

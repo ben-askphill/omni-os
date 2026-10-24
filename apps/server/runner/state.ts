@@ -16,6 +16,7 @@ import { claudeAdapter } from '../harness/claude/adapter.ts';
 import { codexAdapter } from '../harness/codex/adapter.ts';
 import { cursorAdapter } from '../harness/cursor/adapter.ts';
 import { hermesAdapter } from '../harness/hermes/adapter.ts';
+import { cursorCloudAdapter } from '../harness/cursor-cloud/adapter.ts';
 
 /** Where a thread's MCP servers reach this server: the port it bound, which differs from the configured one when that is 0. */
 export const omniUrl = () => `http://127.0.0.1:${about.port}`;
@@ -25,10 +26,16 @@ const ADAPTERS: Record<string, HarnessAdapter> = {
   codex: codexAdapter,
   cursor: cursorAdapter,
   hermes: hermesAdapter,
+  'cursor-cloud': cursorCloudAdapter,
 };
 export const adapterFor = (harness: string): HarnessAdapter => ADAPTERS[harness] ?? claudeAdapter;
 const capsOf = (harness: string) => CAPABILITIES[harness as HarnessId] ?? CAPABILITIES['claude-code'];
 export const harnessSteers = (threadId: string) => capsOf(threads.get(threadId)?.harness ?? 'claude-code').steer;
+/** What a send or Stop during a live turn can do on the thread's harness (delivery.ts). */
+export const deliveryCaps = (threadId: string) => {
+  const c = capsOf(threads.get(threadId)?.harness ?? 'claude-code');
+  return { steer: c.steer, interrupt: c.interrupt };
+};
 
 /** The concurrency cap for a harness. Claude Code uses OMNI_MAX_CONCURRENT. */
 const CAPS: Record<string, number> = {
@@ -36,11 +43,12 @@ const CAPS: Record<string, number> = {
   codex: config.maxConcurrentCodex,
   cursor: config.maxConcurrentCursor,
   hermes: config.maxConcurrentHermes,
+  'cursor-cloud': config.maxConcurrentCursorCloud,
 };
 export const capFor = (harness: string) => CAPS[harness] ?? config.maxConcurrent;
 
 /** The CLI name a harness shows in errors and the resume command. */
-const CLI_LABEL: Record<string, string> = { 'claude-code': 'claude', codex: 'codex', cursor: 'cursor-agent', hermes: 'Hermes' };
+const CLI_LABEL: Record<string, string> = { 'claude-code': 'claude', codex: 'codex', cursor: 'cursor-agent', hermes: 'Hermes', 'cursor-cloud': 'Cursor Cloud' };
 export const cliLabel = (harness: string) => CLI_LABEL[harness] ?? harness;
 
 // ---------- state ----------

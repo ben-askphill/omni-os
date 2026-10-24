@@ -101,7 +101,8 @@ export function MoComposer({
 }: {
   thread: Thread;
   chips: ComposerChip[];
-  placeholder: string;
+  /** A function gets whether a busy thread steers, so it can say queue where the harness cannot steer. */
+  placeholder: string | ((steers: boolean) => string);
   onSent: (t: Thread, mode?: SendMode) => void;
   /** The thread after its run switched. */
   onSwitched: (t: Thread) => void;
@@ -131,11 +132,13 @@ export function MoComposer({
   }, [text]);
 
   const busyThread = thread.status === 'running' || thread.status === 'queued';
+  // A switch queued behind the turn: the message waits for it too (apps/server/runner/queue.ts), so it queues.
+  const steers = canSteer(thread.harness, harnesses) && !thread.queued_harness;
+  const hint = typeof placeholder === 'function' ? placeholder(steers) : placeholder;
   const submit = async () => {
     const prompt = text.trim();
     if (!prompt || busy) return;
-    // A switch queued behind the turn: the message waits for it too (apps/server/runner/queue.ts), so it queues.
-    const mode: SendMode | undefined = busyThread ? (canSteer(thread.harness, harnesses) && !thread.queued_harness ? 'steer' : 'queue') : undefined;
+    const mode: SendMode | undefined = busyThread ? (steers ? 'steer' : 'queue') : undefined;
     setBusy(true);
     setError(null);
     try {
@@ -228,8 +231,8 @@ export function MoComposer({
             onChange={(e) => update(e.target.value)}
             onPaste={att.onPaste}
             enterKeyHint="send"
-            placeholder={placeholder}
-            aria-label={placeholder}
+            placeholder={hint}
+            aria-label={hint}
             className="min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-4"
           />
           {text.trim() || !mic.supported ? (

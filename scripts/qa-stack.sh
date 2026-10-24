@@ -13,6 +13,8 @@
 # (default $TMPDIR/omni-qa-<server port>). QA_CLAUDE_BIN, QA_CODEX_BIN and QA_CURSOR_BIN swap a fake CLI for a real one
 # (a live turn spends that plan). Otherwise threads run on fake-claude, so a prompt with directives such as
 # RICH, TOOL:<ms> or LIMIT drives a turn without spending a plan (see packages/test-fixtures/fake-claude.mjs).
+# Cursor Cloud threads talk to a fake Cursor API (packages/test-fixtures/fake-cursor-api.mjs) with a stand-in key, so
+# the real CURSOR_API_KEY is never read; they need a channel with a GitHub repo set.
 # The stack has its own API token in its data dir: curl it with -H "Authorization: Bearer $(cat <data>/data/api-token)",
 # and open the printed web URLs, which pair the browser.
 set -euo pipefail
@@ -48,10 +50,28 @@ up() {
   mkdir -p "$DIR/data" "$DIR/brain" "$DIR/automations"
   STARTING=1
   local fx="$ROOT/packages/test-fixtures"
+  # A `security` that answers the global CURSOR_API_KEY with a stand-in and passes every other call to the real one.
+  mkdir -p "$DIR/bin"
+  cat >"$DIR/bin/security" <<'SH'
+#!/bin/sh
+[ "$1" = find-generic-password ] && case "$*" in *" -a global/CURSOR_API_KEY "*) echo qa-fake-cursor-key; exit 0 ;; esac
+exec /usr/bin/security "$@"
+SH
+  chmod +x "$DIR/bin/security"
+  detach node "$fx/fake-cursor-api.mjs" 0 >"$DIR/cursor-api.log" 2>&1 &
+  echo $! >"$DIR/cursor-api.pid"
+  local cursor_api=""
+  for _ in $(seq 1 20); do
+    cursor_api="$(head -1 "$DIR/cursor-api.log" 2>/dev/null)"
+    [ -n "$cursor_api" ] && break
+    sleep 0.25
+  done
+  [ -n "$cursor_api" ] || die "fake Cursor API did not start"
   # OMNI_TOKEN cleared: an agent's shell carries the live server's, and this stack makes its own.
   OMNI_TOKEN= OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
     OMNI_CLAUDE_BIN="${QA_CLAUDE_BIN:-$fx/fake-claude.mjs}" OMNI_CODEX_BIN="${QA_CODEX_BIN:-$fx/fake-codex.mjs}" OMNI_CURSOR_BIN="${QA_CURSOR_BIN:-$fx/fake-cursor.mjs}" \
     OMNI_BROWSER=0 OMNI_SUGGESTIONS=0 OMNI_HERMES_URL= OMNI_AUTOMATIONS_DIR="$DIR/automations" \
+    OMNI_CURSOR_API_URL="$cursor_api" OMNI_CURSOR_CLOUD_POLL_MS=1500 PATH="$DIR/bin:$PATH" \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
     detach npx tsx apps/server/index.ts >"$DIR/server.log" 2>&1 &
   echo $! >"$DIR/server.pid"
@@ -79,7 +99,7 @@ up() {
 
 down() {
   local p pid cwd
-  for p in web server; do
+  for p in web server cursor-api; do
     alive "$p" || continue
     pid="$(cat "$DIR/$p.pid")"
     cwd="$(cwd_of "$pid")"
@@ -90,7 +110,7 @@ down() {
   # The recorded PID is the subshell that ran detach, so the process group to stop is led by it or by its child.
   # Only kill groups led by one of those two, never the group this script or its caller runs in.
   local c pg
-  for p in web server; do
+  for p in web server cursor-api; do
     alive "$p" || continue
     pid="$(cat "$DIR/$p.pid")"
     for c in "$pid" $(pgrep -P "$pid"); do

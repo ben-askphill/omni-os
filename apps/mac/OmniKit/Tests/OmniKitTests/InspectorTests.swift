@@ -127,6 +127,19 @@ private func list(_ items: [(Int, String)]) throws -> [Artifact] { try items.map
     #expect(ThreadDetails.resumeCommand(harness: .cursor, sessionID: "s1", cwd: "/x") == "cd /x && cursor-agent --resume s1")
     #expect(ThreadDetails.resumeCommand(harness: HarnessID(rawValue: "other"), sessionID: "s1", cwd: "/x") == "cd /x && claude --resume s1")
     #expect(ThreadDetails.resumeCommand(harness: .codex, sessionID: nil, cwd: "/x") == nil)
+    // Hermes and Cursor Cloud run off this Mac: nothing to resume in a terminal.
+    #expect(ThreadDetails.resumeCommand(harness: .hermes, sessionID: "omni-t", cwd: "/x") == nil)
+    #expect(ThreadDetails.resumeCommand(harness: .cursorCloud, sessionID: "bc-1", cwd: "/x") == nil)
+  }
+
+  @Test func namesCursorCloudAndItsWorkspace() {
+    #expect(ThreadDetails.harnessName(.cursorCloud) == "Cursor Cloud")
+    #expect(ThreadDetails.remoteWorkspace(.cursorCloud) == "Cursor's cloud, on its own clone of the repo")
+    #expect(ThreadDetails.remoteWorkspace(.hermes) == "Hermes server, not an Omni worktree")
+    #expect(ThreadDetails.remoteWorkspace(.cursor) == nil)
+    #expect(HarnessID(rawValue: "cursor-cloud") == .cursorCloud)
+    #expect(HarnessID.cursorCloud.isRemote && HarnessID.hermes.isRemote && !HarnessID.cursor.isRemote)
+    #expect(BrandPaths.harnessLogo["cursor-cloud"] == "cursor")
   }
 
   @Test func readsMCPServers() {

@@ -10,7 +10,7 @@ import { recordUsage } from '../usage.ts';
 import { recordContext, recordContextHint } from '../context.ts';
 import { addCursorTurn, afterCursorTurn } from '../cursor-usage.ts';
 import { beforeResume } from '../sync/files.ts';
-import type { HarnessId } from '../harness/types.ts';
+import { isRemoteHarness, type HarnessId } from '../harness/types.ts';
 import type { AdapterContext } from '../harness/adapter.ts';
 import { invalidateCommands } from '../commands.ts';
 import { runnableCommands } from '@omni/shared/slash.ts';
@@ -97,8 +97,8 @@ async function spawnLive(live: Live, thread: Thread) {
   const channel = channels.get(thread.channel_id)!;
   const role = getCrew(thread.role);
 
-  // Hermes is not on this Mac: it must not take the channel's browser profile or see local MCP config.
-  const remote = thread.harness === 'hermes';
+  // Hermes and Cursor Cloud are not on this Mac: they must not take the channel's browser profile or see local MCP config.
+  const remote = isRemoteHarness(thread.harness);
   // Every local harness starts here, so this is the one check that a worktree thread never runs anywhere else.
   const problem = remote ? null : await workdirProblem(thread, channel.repo_path);
   if (lives.get(thread.id) !== live) return;
@@ -123,9 +123,11 @@ async function spawnLive(live: Live, thread: Thread) {
   try {
     secretEnv = await secretsEnv(channel.id);
     // The catalog probe reads the same global key. A channel secret of the same name already won above.
-    if (remote && !secretEnv.HERMES_API_KEY) {
-      const key = await globalSecret('HERMES_API_KEY');
-      if (key) secretEnv = { ...secretEnv, HERMES_API_KEY: key };
+    // A key in the Keychain with no row in Secrets counts too. Each goes only to its own harness's HTTP client.
+    const keyName = thread.harness === 'hermes' ? 'HERMES_API_KEY' : thread.harness === 'cursor-cloud' ? 'CURSOR_API_KEY' : null;
+    if (keyName && !secretEnv[keyName]) {
+      const key = await globalSecret(keyName);
+      if (key) secretEnv = { ...secretEnv, [keyName]: key };
     }
   } catch (err) {
     addEvent(thread.id, 'error', { text: `Could not read secrets: ${(err as Error).message}` });

@@ -1,6 +1,6 @@
 import Foundation
 
-/// The agent CLI a thread runs in: claude-code, codex, cursor or hermes.
+/// The agent a thread runs in: claude-code, codex, cursor, hermes or cursor-cloud.
 public struct HarnessID: OpenEnum, CodingKeyRepresentable {
   public let rawValue: String
   public init(rawValue: String) { self.rawValue = rawValue }
@@ -9,6 +9,11 @@ public struct HarnessID: OpenEnum, CodingKeyRepresentable {
   public static let codex: Self = "codex"
   public static let cursor: Self = "cursor"
   public static let hermes: Self = "hermes"
+  /// A Cursor cloud agent, launched through Cursor's API on its own Linux machines.
+  public static let cursorCloud: Self = "cursor-cloud"
+
+  /// Runs off this Mac: no worktree, terminal session or local files.
+  public var isRemote: Bool { self == .hermes || self == .cursorCloud }
 
   public var codingKey: any CodingKey { Key(stringValue: rawValue) }
   public init?<T: CodingKey>(codingKey: T) { self.init(rawValue: codingKey.stringValue) }
@@ -230,6 +235,13 @@ public struct HarnessInfo: Decodable, Hashable, Sendable, Identifiable {
     models = try c.decode([ModelEntry].self, forKey: .models)
     cap = try c.decode(Int.self, forKey: .cap)
     running = try c.decodeIfPresent(Int.self, forKey: .running) ?? 0
+  }
+
+  /// The fix when it is a command to run, as the Web UI's picker tells them apart: three words at most. Longer fixes
+  /// are sentences, like Cursor Cloud's "Set the channel's GitHub repo…", and read as they are.
+  public var fixCommand: String? {
+    guard let fix, fix.split(whereSeparator: \.isWhitespace).count <= 3 else { return nil }
+    return fix
   }
 }
 

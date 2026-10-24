@@ -17,7 +17,7 @@ Each Claude Code thread gets one long-lived `claude -p --input-format stream-jso
 | env | `OMNI_THREAD_ID`, `OMNI_ARTIFACTS_DIR`, `OMNI_URL`, `OMNI_TOKEN` (the API token), plus global and channel secrets |
 | session | `--session-id` on the first run, `--resume` after, so every follow-up keeps full context. A switch to another harness and back resumes it with a handover of what it missed (`apps/server/runner/switch.ts`) |
 
-Codex threads run on `codex app-server` (ADR 0001) and Cursor threads on `cursor-agent`, each through an adapter in `apps/server/harness/` that turns its stream into the same events. Hermes is below.
+Codex threads run on `codex app-server` (ADR 0001) and Cursor threads on `cursor-agent`, each through an adapter in `apps/server/harness/` that turns its stream into the same events. Hermes is below. Cursor Cloud threads are Cursor cloud agents: `harness/cursor-cloud/` launches one through the Cloud Agents API and reads its run until it ends (docs/user/harnesses.md#cursor-cloud).
 
 Every stream event is stored in SQLite (`data/omni.db`) and pushed to the UI over SSE. The usage meter is per harness: Claude's rate-limit events drive the 5h / 7d meter, Codex reports its own, Cursor reports none.
 

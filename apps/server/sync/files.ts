@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, sep } from 'node:path';
 import { threadDir } from '../config.ts';
 import { db, kv, threads, type Thread } from '../db.ts';
+import { isRemoteHarness } from '../harness/types.ts';
 import { safeRel, safeSegment } from './paths.ts';
 import type { SyncTransport } from './transport.ts';
 import { activeWorker, onSynced, type SyncWorker } from './worker.ts';
@@ -541,7 +542,7 @@ export function sessionOnThisMac(t: Thread): boolean {
 /**
  * How the session download before a resume ended. `ready`: it finished, whether or not there was anything to bring.
  * `failed`: it threw, and the harness starts on what is here. `timed-out`: it outlived resumeTimeoutMs, queued or
- * running, and was cancelled. `skipped`: sync is off, the thread never ran, or Hermes keeps its session.
+ * running, and was cancelled. `skipped`: sync is off, the thread never ran, or Hermes or Cursor keeps its session.
  */
 export type ResumeOutcome = 'ready' | 'failed' | 'timed-out' | 'skipped';
 
@@ -552,8 +553,8 @@ export type ResumeOutcome = 'ready' | 'failed' | 'timed-out' | 'skipped';
  */
 export async function beforeResume(t: Thread): Promise<ResumeOutcome> {
   const opts = hookOpts();
-  // A thread that never ran has no session anywhere; Hermes keeps its own on its server.
-  if (!opts || !t.has_run || t.harness === 'hermes') return 'skipped';
+  // A thread that never ran has no session anywhere; Hermes and Cursor Cloud keep theirs off this Mac.
+  if (!opts || !t.has_run || isRemoteHarness(t.harness)) return 'skipped';
   const fence = new AbortController();
   const fenced = { ...opts, signal: fence.signal };
   // A job still queued behind another of this thread's jobs when the fence closes never starts.

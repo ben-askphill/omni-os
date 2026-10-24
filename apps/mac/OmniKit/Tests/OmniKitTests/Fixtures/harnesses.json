@@ -6,6 +6,7 @@
     "capabilities": {
       "warmProcess": true,
       "steer": true,
+      "interrupt": true,
       "inlineImages": true,
       "usage": "five-hour-week"
     },
@@ -83,6 +84,7 @@
     "capabilities": {
       "warmProcess": true,
       "steer": true,
+      "interrupt": true,
       "inlineImages": true,
       "usage": "five-hour-week"
     },
@@ -100,6 +102,7 @@
     "capabilities": {
       "warmProcess": false,
       "steer": false,
+      "interrupt": false,
       "inlineImages": false,
       "usage": "monthly"
     },
@@ -117,12 +120,30 @@
     "capabilities": {
       "warmProcess": false,
       "steer": true,
+      "interrupt": true,
       "inlineImages": false,
       "usage": "none"
     },
     "cap": 4,
     "available": false,
     "fix": "Set the Hermes URL in Settings (or OMNI_HERMES_URL) to its Tailscale address, set HERMES_API_KEY in Secrets, and connect this Mac to Tailscale",
+    "models": [],
+    "running": 0
+  },
+  {
+    "id": "cursor-cloud",
+    "name": "Cursor Cloud",
+    "plan": "Cursor plan",
+    "capabilities": {
+      "warmProcess": false,
+      "steer": false,
+      "interrupt": true,
+      "inlineImages": false,
+      "usage": "none"
+    },
+    "cap": 4,
+    "available": false,
+    "fix": "Add CURSOR_API_KEY in Secrets, globally or on the channel. Make the key at cursor.com/dashboard under Integrations",
     "models": [],
     "running": 0
   }

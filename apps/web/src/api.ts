@@ -451,6 +451,9 @@ export const api = {
   del: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
 };
 
+/** GET /harnesses as a channel sees them (Cursor Cloud needs its GitHub repo), or as a whole with no channel. */
+export const harnessesPath = (channel?: string | null) => (channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses');
+
 export const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export const artifactUrl = (a: Pick<Artifact, 'id' | 'updated_at'>, download = false) =>

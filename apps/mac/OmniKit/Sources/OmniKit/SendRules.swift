@@ -3,9 +3,9 @@ import Foundation
 /// How a reply is sent, from what the harness can do and whether the thread is busy
 /// (`SteerButton` and `ReplyComposer` in apps/web/src/components/Composer.tsx).
 public enum SendRules {
-  /// The harness's own answer when it is known, else every harness but Cursor steers.
+  /// The harness's own answer when it is known, else every harness but Cursor and Cursor Cloud steers.
   public static func canSteer(harness: HarnessID, capabilities: HarnessCapabilities?) -> Bool {
-    capabilities?.steer ?? (harness != .cursor)
+    capabilities?.steer ?? (harness != .cursor && harness != .cursorCloud)
   }
 
   /// The modes the split button offers, in order.

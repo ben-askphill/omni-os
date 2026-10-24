@@ -142,10 +142,61 @@ export function hermesHarness(probe: HermesProbe, cap: number): HarnessInfo {
   return { ...base, available: true, models: hermesModels() };
 }
 
+// ---------- Cursor Cloud ----------
+
+/** No key in Secrets or the Keychain. Kept apart from the other reasons: a channel key can still fix this one. */
+export const CURSOR_CLOUD_FIX = 'Add CURSOR_API_KEY in Secrets, globally or on the channel. Make the key at cursor.com/dashboard under Integrations';
+export const CURSOR_CLOUD_REJECTED = 'Cursor rejected CURSOR_API_KEY. Replace it in Secrets with a key from cursor.com/dashboard under Integrations';
+export const CURSOR_CLOUD_UNREACHABLE = 'Could not reach the Cursor API (api.cursor.com). Check the connection and try again';
+export const CURSOR_CLOUD_NO_REPO = "Set the channel's GitHub repo in its settings. A cloud agent clones the repo from GitHub";
+
+const CURSOR_CLOUD_NOTE = "Runs on Cursor's Linux cloud, on its own clone of the channel repo. Bills your Cursor plan.";
+
+/** "Cursor default" (no model sent, so the agent uses the one set on cursor.com), then the models the API lists. */
+export function cursorCloudModels(listed: { id: string; label: string }[] = []): ModelEntry[] {
+  return [
+    { id: 'default', label: 'Cursor default', note: CURSOR_CLOUD_NOTE, efforts: [], defaultEffort: '', default: true },
+    ...listed.filter((m) => m.id !== 'default').map((m) => ({ id: m.id, label: m.label, note: CURSOR_CLOUD_NOTE, efforts: [], defaultEffort: '' })),
+  ];
+}
+
+export interface CursorCloudProbe {
+  available: boolean;
+  /** Why not, when unavailable: one of the CURSOR_CLOUD_* messages. */
+  fix?: string;
+  models?: { id: string; label: string }[];
+}
+
+export function cursorCloudHarness(probe: CursorCloudProbe, cap: number): HarnessInfo {
+  const base: Omit<HarnessInfo, 'models' | 'available' | 'fix'> = {
+    id: 'cursor-cloud',
+    ...HARNESS_META['cursor-cloud'],
+    capabilities: CAPABILITIES['cursor-cloud'],
+    cap,
+  };
+  if (!probe.available) return { ...base, available: false, fix: probe.fix ?? CURSOR_CLOUD_FIX, models: [] };
+  return { ...base, available: true, models: cursorCloudModels(probe.models) };
+}
+
+/**
+ * The catalog as one channel sees it. Only Cursor Cloud depends on the channel: it needs the channel's GitHub repo,
+ * and a channel's own CURSOR_API_KEY makes it usable there when no global key is set.
+ */
+export function catalogForChannel(cat: Catalog, channel: { github_repo: string | null }, channelKey: boolean): Catalog {
+  const h = getHarness(cat, 'cursor-cloud');
+  if (!h) return cat;
+  let next = h;
+  if (!channel.github_repo) next = { ...h, available: false, fix: CURSOR_CLOUD_NO_REPO, models: [] };
+  else if (!h.available && channelKey && h.fix === CURSOR_CLOUD_FIX) next = { ...h, available: true, fix: undefined, models: cursorCloudModels() };
+  if (next === h) return cat;
+  return { harnesses: cat.harnesses.map((x) => (x.id === 'cursor-cloud' ? next : x)) };
+}
+
 const UNAVAILABLE_FIX: Partial<Record<HarnessId, string>> = {
   codex: 'codex login',
   cursor: 'cursor-agent login',
   hermes: HERMES_FIX,
+  'cursor-cloud': CURSOR_CLOUD_FIX,
 };
 
 // ---------- resolution & validation ----------

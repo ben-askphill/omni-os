@@ -1179,6 +1179,172 @@
         }
       ],
       "plan": null
+    },
+    {
+      "name": "cloud-agent",
+      "events": [
+        {
+          "id": 1,
+          "thread_id": "t",
+          "kind": "user",
+          "payload": "{\"text\":\"Move the toolbar buttons to the right\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 2,
+          "thread_id": "t",
+          "kind": "init",
+          "payload": "{\"model\":\"default\",\"cwd\":\"\",\"tools\":0,\"mcp\":[]}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 3,
+          "thread_id": "t",
+          "kind": "cloud_agent",
+          "payload": "{\"agent_id\":\"bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"url\":\"https://cursor.com/agents/bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"name\":\"Move the toolbar buttons\",\"repo\":\"acme/widgets\",\"run_id\":\"run-11111111-1111-4111-8111-111111111111\",\"status\":\"CREATING\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 4,
+          "thread_id": "t",
+          "kind": "status",
+          "payload": "{\"text\":\"Cursor cloud agent is starting\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 5,
+          "thread_id": "t",
+          "kind": "cloud_agent",
+          "payload": "{\"agent_id\":\"bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"url\":\"https://cursor.com/agents/bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"name\":\"Move the toolbar buttons\",\"repo\":\"acme/widgets\",\"run_id\":\"run-11111111-1111-4111-8111-111111111111\",\"status\":\"RUNNING\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 6,
+          "thread_id": "t",
+          "kind": "status",
+          "payload": "{\"text\":\"Cursor cloud agent is working\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 7,
+          "thread_id": "t",
+          "kind": "cloud_agent",
+          "payload": "{\"agent_id\":\"bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"url\":\"https://cursor.com/agents/bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"name\":\"Move the toolbar buttons\",\"repo\":\"acme/widgets\",\"run_id\":\"run-11111111-1111-4111-8111-111111111111\",\"status\":\"RUNNING\",\"branch\":\"cursor/move-the-toolbar-buttons-6f1c\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 8,
+          "thread_id": "t",
+          "kind": "cloud_agent",
+          "payload": "{\"agent_id\":\"bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"url\":\"https://cursor.com/agents/bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"name\":\"Move the toolbar buttons\",\"repo\":\"acme/widgets\",\"run_id\":\"run-11111111-1111-4111-8111-111111111111\",\"status\":\"FINISHED\",\"branch\":\"cursor/move-the-toolbar-buttons-6f1c\",\"pr_url\":\"https://github.com/acme/widgets/pull/42\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 9,
+          "thread_id": "t",
+          "kind": "assistant_text",
+          "payload": "{\"text\":\"Moved both buttons to the trailing edge.\\n\\n[Cursor cloud agent](https://cursor.com/agents/bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890) · PR https://github.com/acme/widgets/pull/42\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 10,
+          "thread_id": "t",
+          "kind": "result",
+          "payload": "{\"ok\":true,\"subtype\":\"success\",\"turns\":1,\"duration_ms\":61000}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 11,
+          "thread_id": "t",
+          "kind": "user",
+          "payload": "{\"text\":\"Also add a test\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 12,
+          "thread_id": "t",
+          "kind": "cloud_agent",
+          "payload": "{\"agent_id\":\"bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"url\":\"https://cursor.com/agents/bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"name\":\"Move the toolbar buttons\",\"repo\":\"acme/widgets\",\"run_id\":\"run-22222222-2222-4222-8222-222222222222\",\"status\":\"CREATING\",\"branch\":\"cursor/move-the-toolbar-buttons-6f1c\",\"pr_url\":\"https://github.com/acme/widgets/pull/42\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 13,
+          "thread_id": "t",
+          "kind": "cloud_agent",
+          "payload": "{\"agent_id\":\"bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"url\":\"https://cursor.com/agents/bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"name\":\"Move the toolbar buttons\",\"repo\":\"acme/widgets\",\"run_id\":\"run-22222222-2222-4222-8222-222222222222\",\"status\":\"CANCELLED\",\"branch\":\"cursor/move-the-toolbar-buttons-6f1c\",\"pr_url\":\"https://github.com/acme/widgets/pull/42\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 14,
+          "thread_id": "t",
+          "kind": "result",
+          "payload": "{\"ok\":false,\"subtype\":\"cancelled\",\"turns\":1,\"stopped\":true}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        },
+        {
+          "id": 15,
+          "thread_id": "t",
+          "kind": "cloud_agent",
+          "payload": "{\"agent_id\":\"bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890\",\"status\":\"RUNNING\"}",
+          "created_at": "2026-10-24T07:57:15.000Z"
+        }
+      ],
+      "items": [
+        {
+          "type": "user",
+          "key": 1,
+          "text": "Move the toolbar buttons to the right"
+        },
+        {
+          "type": "cloud",
+          "key": 3,
+          "agent_id": "bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890",
+          "url": "https://cursor.com/agents/bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890",
+          "name": "Move the toolbar buttons",
+          "repo": "acme/widgets",
+          "run_id": "run-11111111-1111-4111-8111-111111111111",
+          "status": "FINISHED",
+          "branch": "cursor/move-the-toolbar-buttons-6f1c",
+          "pr_url": "https://github.com/acme/widgets/pull/42"
+        },
+        {
+          "type": "text",
+          "key": 9,
+          "text": "Moved both buttons to the trailing edge.\n\n[Cursor cloud agent](https://cursor.com/agents/bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890) · PR https://github.com/acme/widgets/pull/42"
+        },
+        {
+          "type": "result",
+          "key": 10,
+          "ok": true,
+          "subtype": "success",
+          "turns": 1
+        },
+        {
+          "type": "user",
+          "key": 11,
+          "text": "Also add a test"
+        },
+        {
+          "type": "cloud",
+          "key": 12,
+          "agent_id": "bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890",
+          "url": "https://cursor.com/agents/bc-6f1c2d3e-4a5b-4c6d-8e7f-901234567890",
+          "name": "Move the toolbar buttons",
+          "repo": "acme/widgets",
+          "run_id": "run-22222222-2222-4222-8222-222222222222",
+          "status": "CANCELLED",
+          "branch": "cursor/move-the-toolbar-buttons-6f1c",
+          "pr_url": "https://github.com/acme/widgets/pull/42"
+        },
+        {
+          "type": "result",
+          "key": 14,
+          "ok": false,
+          "subtype": "cancelled",
+          "turns": 1
+        }
+      ],
+      "plan": null
     }
   ]
 }

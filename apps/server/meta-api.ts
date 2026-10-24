@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { lastRuns, loadAutomations, runAutomation, setEnabled } from './automations.ts';
 import { pollErrors, watchedRepo } from './automation-watch.ts';
 import { listCrew } from './crew.ts';
-import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
+import { channelCatalog, freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { HARNESS_INSTALL } from './harness/types.ts';
 import { runningByHarness } from './runner.ts';
@@ -26,8 +26,9 @@ metaApi.get('/crew', (c) => {
 
 // The harnesses with their availability, fix command, models, efforts, cap and running count.
 // A harness that is down is probed again first, so a login shows up when the picker opens.
+// With ?channel=, as that channel sees them: Cursor Cloud needs its GitHub repo and can use its own key.
 metaApi.get('/harnesses', async (c) => {
-  const cat = await freshCatalog();
+  const cat = channelCatalog(await freshCatalog(), c.req.query('channel'));
   const running = runningByHarness();
   return c.json(cat.harnesses.map((h) => ({ ...h, running: running[h.id] ?? 0, ...(!h.available && HARNESS_INSTALL[h.id] && { install: HARNESS_INSTALL[h.id] }) })));
 });

@@ -8,8 +8,9 @@ struct UsageCard: View {
   @AppStorage("usageCard.open") private var open = false
 
   var body: some View {
-    let rows = HarnessUsageRow.rows(usage: model.store.usage, slots: model.store.status?.slots ?? [:])
-    let slots = rows.compactMap { r in r.slot.map { "\(r.name) \($0.running)/\($0.cap)" } }
+    let running = model.store.status?.slots ?? [:]
+    let rows = HarnessUsageRow.rows(usage: model.store.usage, slots: running)
+    let slots = HarnessUsageRow.slotSummary(rows, slots: running)
     let live = model.connectionNotice == nil && model.supervisor.isRunning
     let summary = slots.isEmpty ? (live ? "Connected" : "Connecting") : slots.joined(separator: " · ")
     let peak = rows.flatMap { [$0.fiveHour, $0.week, $0.month?.meter] }.compactMap { $0 }.max { $0.fraction < $1.fraction }
@@ -53,9 +54,11 @@ struct UsageCard: View {
         .padding(.top, z(2))
         ForEach(rows) { UsageRow(row: $0) }
         Rectangle().fill(Tok.line).frame(height: 1)
+        // Five harnesses' slots outrun the sidebar's width: wrap, so Cursor Cloud's stays in view.
         Text(summary)
           .monospacedDigit()
-          .lineLimit(1)
+          .lineLimit(2)
+          .help(summary)
           .font(.omni(size: 11))
           .foregroundStyle(Tok.fg3)
           .padding(.top, z(2))

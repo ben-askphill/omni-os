@@ -5,7 +5,7 @@
 - [Install and first run](user/install.md), including the step-by-step agent instructions
 - [Configuration](user/configuration.md): your config, `.env`, placeholders and secrets
 - [Threads](user/threads.md): the composer, steering and queueing, attachments, what each thread gets, Send to Grok Bot
-- [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent and Hermes
+- [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent, Hermes and Cursor Cloud
 - [Crew and Conductor](user/crew.md)
 - [Automations](user/automations.md): cron and GitHub PR events
 - [Sync between two Macs](user/sync.md)

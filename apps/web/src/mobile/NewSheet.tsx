@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, errorText, useApi, type HarnessWithRunning, type Thread } from '../api.ts';
+import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type Thread } from '../api.ts';
 import { HarnessLogo, OmniMark } from '../components/brand.tsx';
 import { AttachmentStrip, useAttachments } from '../components/Composer.tsx';
 import type { ModelChoice } from '../components/ModelPicker.tsx';
@@ -26,7 +26,8 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
   const listed = channels.filter((c) => !c.archived && c.id !== 'conductor');
   const [target, setTarget] = useState(initial ?? 'conductor');
   const [text, setText] = useState('');
-  const { data: harnesses, reload } = useApi<HarnessWithRunning[]>('/harnesses');
+  // As the target channel sees them: Cursor Cloud needs its GitHub repo.
+  const { data: harnesses, reload } = useApi<HarnessWithRunning[]>(harnessesPath(target));
   // A pick holds for the target it was made for; another target starts on its own defaults, as on the desktop.
   const [picked, setPicked] = useState<{ target: string; choice: ModelChoice; effort: string } | null>(null);
   const [picking, setPicking] = useState(false);

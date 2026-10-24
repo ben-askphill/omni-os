@@ -19,6 +19,8 @@ public enum TranscriptItem: Hashable, Sendable, Identifiable {
   case report(eventID: Int, at: Date, CrewReport)
   /// Mod log lines in a row, keyed by the first. They do not end a group of calls, so a busy hook does not split it.
   case mod(eventID: Int, [ModLine])
+  /// A Cursor cloud agent's run: one card where the run first showed, with its newest state.
+  case cloud(eventID: Int, CloudAgentState)
   /// Ben switched the thread's harness, model or effort.
   case runSwitch(SwitchRow)
   /// A question the agent asked, as a card in place of its tool call, with what became of it.
@@ -26,7 +28,8 @@ public enum TranscriptItem: Hashable, Sendable, Identifiable {
 
   public var id: TranscriptItemID {
     switch self {
-    case .user(let id, _, _), .text(let id, _, _), .result(let id, _), .error(let id, _), .report(let id, _, _), .mod(let id, _): .event(id)
+    case .user(let id, _, _), .text(let id, _, _), .result(let id, _), .error(let id, _), .report(let id, _, _), .mod(let id, _), .cloud(let id, _):
+      .event(id)
     case .tools(let g): .event(g.eventID)
     case .runSwitch(let r): .event(r.eventID)
     case .question(let q): .event(q.eventID)
@@ -181,6 +184,8 @@ public struct Transcript: Sendable {
   private var refs: [String: [(group: Int, path: [Int])]] = [:]
   private var open: (index: Int, paths: [String: [Int]])?
   private var planIndex: Int?
+  /// Each cloud agent run's card, by run: the event it sits at.
+  private var cloudRuns: [String: Int] = [:]
   /// The handover switch row the next `handover` event completes.
   private var pendingSwitch: Int?
 
@@ -256,6 +261,15 @@ public struct Transcript: Sendable {
         items[items.count - 1] = .mod(eventID: first, lines)
       } else {
         items.append(.mod(eventID: e.id, [line]))
+      }
+    case .cloudAgent(let s):
+      // A later state of a run already shown replaces it in place; it ends a group of calls either way.
+      if let first = cloudRuns[s.runKey], let i = items.lastIndex(where: { $0.id == .event(first) }) {
+        open = nil
+        items[i] = .cloud(eventID: first, s)
+      } else {
+        cloudRuns[s.runKey] = e.id
+        close(.cloud(eventID: e.id, s))
       }
     case .runSwitch(let p):
       if p.mode != .settings, let id = pendingSwitch { withSwitch(id) { $0.superseded = true } }
@@ -421,6 +435,7 @@ extension Transcript {
     var rows: [Row] = []
     var group: Group?
     var plan: Plan?
+    var cloudRows: [String: Int] = [:]
     var pendingSwitch: Int?
     func questionRow(_ id: String) -> Int? {
       rows.lastIndex { if case .item(.question(let q)) = $0 { q.id == id } else { false } }
@@ -465,6 +480,14 @@ extension Transcript {
           rows[rows.count - 1] = .item(.mod(eventID: first, lines))
         } else {
           rows.append(.item(.mod(eventID: e.id, [line])))
+        }
+      case .cloudAgent(let s):
+        group = nil
+        if let i = cloudRows[s.runKey], case .item(.cloud(let first, _)) = rows[i] {
+          rows[i] = .item(.cloud(eventID: first, s))
+        } else {
+          cloudRows[s.runKey] = rows.count
+          rows.append(.item(.cloud(eventID: e.id, s)))
         }
       case .runSwitch(let p):
         group = nil

@@ -11,7 +11,7 @@ import { href, navigate, requestComposerFocus, useHash, useRoute } from '../rout
 import { readPref, useApp, useNow, writePref } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { ThemeSwitch } from './theme.tsx';
-import { HARNESS_ROWS, HarnessLogo, Loader, OmniMark } from './brand.tsx';
+import { HARNESS_ROWS, HarnessLogo, Loader, OmniMark, SLOT_ROWS } from './brand.tsx';
 import { ChannelMark, DoneMark, ErrorNote, Icon, IconButton, Kbd, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -75,7 +75,7 @@ function UsageCard() {
   const [open, setOpen] = useState(() => readPref('usage.open', false));
   const toggle = () => setOpen((o) => { writePref('usage.open', !o); return !o; });
   const slots = status?.slots ?? {};
-  const footer = HARNESS_ROWS.filter((r) => slots[r.id]).map((r) => `${r.name} ${slots[r.id]!.running}/${slots[r.id]!.cap}`).join(' · ');
+  const footer = SLOT_ROWS.filter((r) => slots[r.id]).map((r) => `${r.name} ${slots[r.id]!.running}/${slots[r.id]!.cap}`).join(' · ');
   const peak = HARNESS_ROWS.reduce<number | null>((max, r) => {
     const u = usage[r.id];
     for (const p of [windowPct(u?.five_hour), windowPct(u?.seven_day), windowPct(u?.monthly)]) if (p !== null && (max === null || p > max)) max = p;

@@ -455,6 +455,7 @@ Steps (a list, or an object with the list under `steps`):
 | `{"wait": "sidebarLoaded"}`, `{"wait": {"for": "serverState:running", "timeout": 30}}` | Polls every 100ms, 10s by default. Conditions: `sidebarLoaded`, `serverState:<unknown, checking, notRunning, starting, running, failed, stopping>`, `connection:<connecting, open, reconnecting, closed>`, `channel:<id>` |
 | `{"sleep": 1.5}` | Seconds |
 | `{"meter": true}` | Opens the open thread's context meter panel |
+| `{"modelPicker": true}`, `{"modelPicker": "cursor"}` | Opens the new thread box's model list, with that in its search. Draw it with `screen`: it is a popover |
 | `{"foldAll": true}` | Presses the sidebar's collapse-all (or expand-all) button |
 | `{"editPending": "text"}` | Opens the edit of the open thread's first editable unsent message, with this text in it |
 | `{"snapshot": "home"}` | `home.png` for the main window, `home-settings.png` for Settings, `home-window<n>.png` for others. Fails on a blank image |

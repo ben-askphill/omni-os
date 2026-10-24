@@ -2,6 +2,7 @@
 import { config, artifactsDir, browserOutDir, designSystemFile } from '../config.ts';
 import { artifacts, type Channel, type Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
+import { isRemoteHarness } from '../harness/types.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
 import { TOOL_FAILURE_POLICY } from '../tool-failure-policy.ts';
 
@@ -20,7 +21,7 @@ function publishedLines(channelId: string) {
 
 /** The channel's design system, as a file the agent reads before it writes a page. Local harnesses only. */
 function designSystemLines(thread: Thread, channel: Channel) {
-  if (!channel.design_system || thread.harness === 'hermes') return [];
+  if (!channel.design_system || isRemoteHarness(thread.harness)) return [];
   return [
     '',
     '## Design system',
@@ -30,12 +31,15 @@ function designSystemLines(thread: Thread, channel: Channel) {
 }
 
 export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false) {
-  const remote = thread.harness === 'hermes';
+  const remote = isRemoteHarness(thread.harness);
+  const cloud = thread.harness === 'cursor-cloud';
   const name = userName();
   const lines = [
     '# Omni OS context',
     TOOL_FAILURE_POLICY,
-    remote
+    cloud
+      ? `You are a Cursor cloud agent that Omni OS, ${userPossessive()} agent workspace on their Mac, started through the Cursor API. You run on a Linux machine of Cursor's, on your own clone of the repo; Omni, its tools, files and secrets are not here. Nobody watches live, so finish the task or clearly state what is blocking you.`
+      : remote
       ? `You are Hermes, running on your own server and reached by Omni OS over HTTP. ${name} is on their Mac; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`
       : `You are running headless inside Omni OS, ${userPossessive()} local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you. When a choice only ${name} can make blocks you, ask with the ask_user_question tool: it waits for the answer.`,
     getProfile().name ? `- You work for ${name}. Charters and automations that say "the user" mean them.` : '',
@@ -66,6 +70,15 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
             ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Screenshots land in ${browserOutDir(thread.id)} and show up in the thread.`
             : '',
         ]),
+    '',
+    ...(cloud
+      ? [
+          '',
+          '## Cursor cloud agent',
+          'Commit and push your work: Cursor opens the pull request from your branch when the run ends. Put the PR body in the shape the repo asks for (a PR template or a pr-writer skill).',
+          'This machine runs Linux. You cannot build or run macOS apps, run Swift or Xcode tests, or take screenshots of a Mac app or a browser. Do what you can, and list what you could not verify in your reply and in the PR body instead of claiming it.',
+        ]
+      : []),
     '',
     '## Secrets',
     remote

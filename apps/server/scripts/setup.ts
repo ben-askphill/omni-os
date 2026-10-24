@@ -167,7 +167,8 @@ async function harnesses(server: string | null) {
     say('   (Omni is not running, so this only checks the CLIs are on PATH, not that they are signed in.)');
   }
   for (const h of list) {
-    if (h.id === 'hermes' && !h.available) continue;
+    // Remote harnesses are opt-in: listed once they work, never as missing.
+    if ((h.id === 'hermes' || h.id === 'cursor-cloud') && !h.available) continue;
     say(`   ${h.available ? 'ready  ' : 'missing'}  ${h.name}`);
     if (!h.available) {
       if (h.install) say(`            install: ${h.install}`);

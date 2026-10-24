@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { config } from '../config.ts';
 import { completions, threads, turnSnapshots } from '../db.ts';
 import { snapshot, snapshotCheckout, turnRef } from '../turns.ts';
+import { isRemoteHarness } from '../harness/types.ts';
 import { crash, emitThread, lives, track, userLine, writeLine, type Live } from './state.ts';
 
 /** Each thread's last queued save. */
@@ -56,7 +57,7 @@ async function save(threadId: string, turnId: string, side: 'before' | 'after') 
 export function startTurnSnapshot(live: Live) {
   if (live.snap || !config.turnSnapshots) return;
   const t = threads.get(live.threadId);
-  if (!t?.branch || t.harness === 'hermes') return;
+  if (!t?.branch || isRemoteHarness(t.harness)) return;
   const id = randomUUID();
   live.snap = id;
   turnSnapshots.start(id, t.id, completions.latest(t.id)?.n ?? 0);

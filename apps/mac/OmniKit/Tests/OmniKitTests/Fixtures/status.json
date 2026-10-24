@@ -10,7 +10,8 @@
     },
     "codex": null,
     "cursor": null,
-    "hermes": null
+    "hermes": null,
+    "cursor-cloud": null
   },
   "slots": {
     "claude-code": {
@@ -26,6 +27,10 @@
       "cap": 4
     },
     "hermes": {
+      "running": 0,
+      "cap": 4
+    },
+    "cursor-cloud": {
       "running": 0,
       "cap": 4
     }

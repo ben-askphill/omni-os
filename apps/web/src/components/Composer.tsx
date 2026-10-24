@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type SyntheticEvent } from 'react';
-import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
+import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { bytes, CHANNEL_KIND } from '../format.ts';
 import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset, takeComposerFocus } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -420,7 +420,8 @@ export function NewThreadComposer({
   const [picked, setPicked] = useState<DraftRun | null>(() => preset?.choice ? { choice: preset.choice, effort: preset.effort ?? '' } : null);
   // "New thread here" on a sidebar folder files the thread in it, until Ben takes it out.
   const [folder, setFolder] = useState(preset?.folder ?? null);
-  const { data: harnesses, reload: reloadHarnesses } = useApi<HarnessWithRunning[]>('/harnesses');
+  // As the channel sees them: Cursor Cloud needs its GitHub repo.
+  const { data: harnesses, reload: reloadHarnesses } = useApi<HarnessWithRunning[]>(harnessesPath(channel));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);

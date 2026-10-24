@@ -70,7 +70,7 @@ _Avoid_: Inbox (in UI text), notifications, unread thread
 ### Harnesses
 
 **Harness**:
-The agent a thread runs in, together with what it bills: Claude Code (Claude plan), Codex (ChatGPT plan), Cursor Agent (Cursor plan) or Hermes (Anthropic API on the user's server, not their Claude, ChatGPT or Cursor plan).
+The agent a thread runs in, together with what it bills: Claude Code (Claude plan), Codex (ChatGPT plan), Cursor Agent (Cursor plan), Hermes (Anthropic API on the user's server, not their Claude, ChatGPT or Cursor plan) or Cursor Cloud (a Cursor cloud agent on Cursor's machines, Cursor plan).
 _Avoid_: Provider, engine, backend, runtime
 
 **Model**:
@@ -124,8 +124,9 @@ _Avoid_: Frontend, dashboard
 - A **Thread** runs on one **Harness** and one **Model** at a time, and has one current **Session**; it keeps the **Session** it had on each harness it left
 - A **Harness** offers many **Models**; the same model family can appear in several harnesses (Claude Opus runs in Claude Code and in Cursor Agent)
 - A Hermes **Thread** runs on the Hermes server, reached over Tailscale. The API listens on the server's tailnet address and is not public. The thread has no Omni worktree, browser profile or artifacts directory. Its **Session** id is `omni-<thread id>`. Artifacts come back as links or text
+- A Cursor Cloud **Thread** is one Cursor cloud agent on the **Channel**'s GitHub repo, on Cursor's Linux machines; each **Turn** is a run on it. Like Hermes it has no Omni worktree, browser profile or artifacts directory. Its **Session** id is the agent id, `bc-<thread id>`. Its work comes back as a branch and a PR that Cursor opens
 - The user picks the **Harness** per thread, or leaves it to **Auto**; Omni never switches a thread's harness on its own
-- The user (or the **Conductor**, when asked) can switch a thread's **Harness**, **Model** or **Effort** between **Turns**, never to or from Hermes. A switch picked during a **Turn** waits and applies once it ends, so a **Turn** never spans two runs; messages sent meanwhile run on the new one. The same **Harness** keeps its **Session**; another one gets a **Handover**
+- The user (or the **Conductor**, when asked) can switch a thread's **Harness**, **Model** or **Effort** between **Turns**, never to or from Hermes or Cursor Cloud, and a Cursor Cloud thread keeps its model. A switch picked during a **Turn** waits and applies once it ends, so a **Turn** never spans two runs; messages sent meanwhile run on the new one. The same **Harness** keeps its **Session**; another one gets a **Handover**
 - A **Crew role**, **Channel** or **Automation** can set a default **Harness**, **Model** and **Effort**, or **Auto**; a choice made on the thread wins, and **Auto** is the fallback
 - The **Conductor** delegates on the crew role's defaults, which for most roles is **Auto**, unless the user names a harness or model
 - A **Harness** offers many **Harness commands**; a thread's `/` menu lists its own **Harness**'s **Harness commands** plus the **Omni commands**

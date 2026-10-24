@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RunName } from '@omni/shared/run-switch.ts';
-import { HERMES_REFUSAL, planSwitch, type RunState } from '../runner/switch-plan.ts';
+import { CURSOR_CLOUD_REFUSAL, HERMES_REFUSAL, planSwitch, type RunState } from '../runner/switch-plan.ts';
 
 const opus: RunName = { harness: 'claude-code', model: 'opus', effort: 'high', harnessName: 'Claude Code', modelLabel: 'Opus' };
 const gpt = { harness: 'codex', model: 'gpt-5.6-sol', effort: '' };
@@ -32,6 +32,14 @@ describe('planSwitch', () => {
     expect(planSwitch(ran(), { harness: 'hermes', model: '', effort: '' }, opus, 10, content())).toEqual({ kind: 'reject', error: HERMES_REFUSAL });
     expect(planSwitch(ran({ harness: 'hermes', model: '', effort: '' }), claude, opus, 10, content())).toMatchObject({ kind: 'reject' });
     expect(planSwitch(ran({ harness: 'hermes', model: '', effort: '' }), { harness: 'hermes', model: 'x', effort: '' }, opus, 10, content())).toMatchObject({ kind: 'settings' });
+  });
+
+  it('refuses moving to or from Cursor Cloud, and a model change on it', () => {
+    const cloud = { harness: 'cursor-cloud', model: 'default', effort: '' } as const;
+    expect(planSwitch(ran(), cloud, opus, 10, content())).toEqual({ kind: 'reject', error: CURSOR_CLOUD_REFUSAL });
+    expect(planSwitch(ran(cloud), claude, opus, 10, content())).toEqual({ kind: 'reject', error: CURSOR_CLOUD_REFUSAL });
+    expect(planSwitch(ran(cloud), { ...cloud, model: 'composer-2' }, opus, 10, content())).toEqual({ kind: 'reject', error: CURSOR_CLOUD_REFUSAL });
+    expect(planSwitch(ran(cloud), cloud, opus, 10, content())).toEqual({ kind: 'none' });
   });
 
   it('hands a thread to a harness it never ran on with the whole thread, keeping the session it leaves', () => {

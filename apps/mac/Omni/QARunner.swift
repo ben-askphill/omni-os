@@ -170,6 +170,10 @@ final class QARunner {
           guard let open = QAProbe.openMeter else { throw QAScriptError("no context meter on screen") }
           open()
           try? await Task.sleep(for: .milliseconds(800))
+        case .modelPicker(let query):
+          guard let open = QAProbe.openModelPicker else { throw QAScriptError("no new thread box on screen") }
+          open(query)
+          try? await Task.sleep(for: .milliseconds(1200))
         case .foldAll:
           guard let fold = QAProbe.foldAll else { throw QAScriptError("no sidebar fold-all button on screen") }
           fold()
@@ -458,6 +462,7 @@ final class QARunner {
     case .scroll(let scroll): "scroll \(scroll.rawValue)"
     case .expand: "expand"
     case .meter: "meter"
+    case .modelPicker(let query): "modelPicker \(query)"
     case .foldAll: "foldAll"
     case .editPending(let text): "editPending \(text.prefix(40))"
     case .imageZoom(let scale): "imageZoom \(scale.map { "\($0)" } ?? "fit")"

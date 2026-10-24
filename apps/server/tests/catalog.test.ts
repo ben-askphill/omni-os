@@ -105,7 +105,7 @@ describe('validateRun', () => {
   });
 
   it('passes values through when the catalog could not be probed', () => {
-    const c = emptyCatalog({ 'claude-code': 4, codex: 4, cursor: 4, hermes: 4 });
+    const c = emptyCatalog({ 'claude-code': 4, codex: 4, cursor: 4, hermes: 4, 'cursor-cloud': 4 });
     // codex has no models in an empty catalog but is marked unavailable, so it errors;
     // simulate a probed-but-empty catalog by making it "available" with no models.
     const probed: Catalog = { harnesses: [{ ...codexHarness({ available: true, models: [] }, 4), available: true }] };

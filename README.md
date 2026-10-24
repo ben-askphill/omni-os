@@ -18,7 +18,7 @@ One Node server on your Mac runs everything (threads, harnesses, database, secre
 
 ## What does it cost?
 
-Nothing extra. Omni runs each thread through the official CLI of the harness you pick, signed in to the plan you already pay for. It does not need an API key, except for the optional Hermes harness.
+Nothing extra. Omni runs each thread through the official CLI of the harness you pick, signed in to the plan you already pay for. It does not need an API key, except for the optional Hermes and Cursor Cloud harnesses.
 
 ## Harnesses
 
@@ -29,6 +29,7 @@ Nothing extra. Omni runs each thread through the official CLI of the harness you
 > - Codex (ChatGPT plan): `npm install -g @openai/codex && codex login`
 > - Cursor Agent (Cursor plan): `curl https://cursor.com/install -fsS | bash && cursor-agent login`
 > - Hermes (Anthropic API, on your own Linux server): no CLI on the Mac. See [Harnesses](docs/user/harnesses.md#hermes-remote)
+> - Cursor Cloud (Cursor plan, a Cursor cloud agent on Cursor's machines): the secret `CURSOR_API_KEY`. See [Harnesses](docs/user/harnesses.md#cursor-cloud)
 
 `npm run setup` and the first-run screens check which ones are installed and signed in, and print the fix for each one that is not.
 

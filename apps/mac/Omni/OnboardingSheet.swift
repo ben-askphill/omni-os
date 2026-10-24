@@ -150,7 +150,7 @@ struct OnboardingSheet: View {
              note: "Each thread runs on a CLI you are signed in to, billed to that plan. Omni needs Claude Code; Codex and Cursor Agent are optional.") {
         VStack(alignment: .leading, spacing: z(8)) {
           if let harnesses {
-            ForEach(harnesses.filter { $0.id != .hermes || $0.available }) { HarnessRow(harness: $0) }
+            ForEach(harnesses.filter { !$0.id.isRemote || $0.available }) { HarnessRow(harness: $0) }
           } else {
             Loader(size: 16).frame(maxWidth: .infinity).padding(.vertical, z(20))
           }

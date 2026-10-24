@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { canSteer, type SteerCatalogRow } from '../src/steer.ts';
 
-/** Real catalog facts: Hermes can steer, Cursor cannot. */
+/** Real catalog facts: Hermes can steer, Cursor and Cursor Cloud cannot. */
 const catalog: SteerCatalogRow[] = [
   { id: 'claude-code', capabilities: { steer: true } },
   { id: 'codex', capabilities: { steer: true } },
   { id: 'cursor', capabilities: { steer: false } },
   { id: 'hermes', capabilities: { steer: true } },
+  { id: 'cursor-cloud', capabilities: { steer: false } },
 ];
 
 describe('canSteer', () => {
   it('falls back while the catalog is still loading', () => {
     for (const pending of [null, undefined]) {
       expect(canSteer('cursor', pending)).toBe(false);
+      expect(canSteer('cursor-cloud', pending)).toBe(false);
       expect(canSteer('hermes', pending)).toBe(true);
       expect(canSteer('claude-code', pending)).toBe(true);
       expect(canSteer('codex', pending)).toBe(true);
@@ -23,6 +25,7 @@ describe('canSteer', () => {
   it('reads steer from a loaded catalog row', () => {
     expect(canSteer('hermes', catalog)).toBe(true);
     expect(canSteer('cursor', catalog)).toBe(false);
+    expect(canSteer('cursor-cloud', catalog)).toBe(false);
     expect(canSteer('claude-code', catalog)).toBe(true);
     expect(canSteer('codex', catalog)).toBe(true);
   });

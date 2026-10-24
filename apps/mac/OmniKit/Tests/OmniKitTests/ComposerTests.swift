@@ -14,6 +14,12 @@ private func file(_ name: String, size: Int = 10, modified: Double = 0) -> Stage
     #expect(SendRules.options(canSteer: false) == [.queue, .interrupt])
   }
 
+  @Test func saysABusyReplyQueuesWhereItCannotSteer() {
+    #expect(SendRules.placeholder(busy: true, canSteer: false) == "Queue a message. It runs after this turn.")
+    #expect(SendRules.placeholder(busy: true) == "Steer the agent. It reads this at its next step.")
+    #expect(SendRules.placeholder(busy: false, canSteer: false) == "Reply")
+  }
+
   @Test func sendKeysOnlyPickAModeWhileBusy() {
     #expect(SendRules.mode(busy: false, canSteer: true, shift: false) == nil)
     #expect(SendRules.mode(busy: false, canSteer: true, shift: true) == nil)

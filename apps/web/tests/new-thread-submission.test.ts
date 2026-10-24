@@ -33,7 +33,7 @@ beforeEach(() => {
       requests.push(JSON.parse(init.body as string));
       return Response.json({ id: 'created' });
     }
-    if (url === '/api/harnesses') return Response.json(harnesses);
+    if (url.startsWith('/api/harnesses')) return Response.json(harnesses);
     if (url.startsWith('/api/commands')) return Response.json({ status: 'ready', commands: [] });
     throw new Error(`Unexpected request: ${url}`);
   }));

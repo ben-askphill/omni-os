@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { api, errorText, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
+import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
 import { AUTO, AUTO_CHOICE, asksAuto } from '../thread-run.ts';
 import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
@@ -136,8 +136,8 @@ function IconPicker({ value, name, onChange }: { value: string; name: string; on
 }
 
 /** The model and effort a new thread in the channel starts on, unless the thread or its role picks. */
-function RunDefaultsField({ value, onChange }: { value: FormState['run']; onChange: (v: FormState['run']) => void }) {
-  const { data: harnesses, reload } = useApi<HarnessWithRunning[]>('/harnesses');
+function RunDefaultsField({ channel, value, onChange }: { channel?: string; value: FormState['run']; onChange: (v: FormState['run']) => void }) {
+  const { data: harnesses, reload } = useApi<HarnessWithRunning[]>(harnessesPath(channel));
   if (!harnesses) return null;
   const unset = !(value.harness || value.model || value.effort);
   const choice = unset || asksAuto(value) ? AUTO_CHOICE : { harness: value.harness || 'claude-code', model: value.model };
@@ -350,7 +350,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
           </Field>
         )}
         <Field label="Default model" hint="What a new thread here starts on. A thread or crew role that picks its own wins.">
-          <RunDefaultsField value={f.run} onChange={(v) => set('run', v)} />
+          <RunDefaultsField channel={existing?.id} value={f.run} onChange={(v) => set('run', v)} />
         </Field>
         {existing && (
           <Field

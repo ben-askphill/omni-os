@@ -79,8 +79,8 @@ public enum BrandPaths {
     "cursor": "M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23",
   ]
 
-  /// The harness id to its logo. Hermes has none and shows its two letters.
-  public static let harnessLogo: [String: String] = ["claude-code": "claude", "codex": "openai", "cursor": "cursor"]
+  /// The harness id to its logo. Hermes has none and shows its two letters. Cursor Cloud is Cursor's.
+  public static let harnessLogo: [String: String] = ["claude-code": "claude", "codex": "openai", "cursor": "cursor", "cursor-cloud": "cursor"]
 
   /// "omni" as one continuous line, stroke 20, skewed -10 degrees in x, in its view box.
   public static let wordmark = "M46 90A40 40 0 0 0 86 50A40 40 0 0 0 46 10A40 40 0 0 0 6 50A40 40 0 0 0 46 90L92 90A26 26 0 0 0 118 64L118 34A24 24 0 0 1 166 34L166 74A16 16 0 0 0 198 74L198 34A24 24 0 0 1 246 34L246 74A16 16 0 0 0 278 74L278 38A28 28 0 0 1 334 38L334 74A16 16 0 0 0 366 74L366 10"

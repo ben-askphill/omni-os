@@ -8,11 +8,11 @@ import { parseSlash, resolveSlash, slashRecord, type SlashCommand, type SlashRec
 import { listCommands, peekCommands } from '../commands.ts';
 import { withMentions } from '../mentions.ts';
 import { saveUploads, type Attachment } from '../uploads.ts';
-import type { HarnessId } from '../harness/types.ts';
+import { isRemoteHarness, type HarnessId } from '../harness/types.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
 import { usageByHarness } from '../usage.ts';
-import { freshCatalog, getCatalog } from '../harness/catalog-service.ts';
+import { channelCatalog, freshCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { resolveRun, setsRun } from '../harness/resolve.ts';
 import type { CommandUse } from '../harness/adapter.ts';
 import { assembling, deliver, settleTeam } from './queue.ts';
@@ -104,12 +104,13 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const channelDefaults = { harness: channel.default_harness ?? undefined, model: channel.default_model ?? undefined, effort: channel.default_effort ?? undefined };
   // The Conductor role is automatic in its own channel. A saved channel run overrides its charter, including
   // after a retired channel default is dropped below, when the fallback must be Auto rather than the charter.
+  // Cursor Cloud is per channel: it needs the channel's GitHub repo, and can run on the channel's own key.
   const roleDefaults = role?.id === 'conductor' && channel.id === 'conductor' && setsRun(channelDefaults) ? undefined : role;
   const resolve = (cat: Catalog, withChannel = true) =>
     resolveRun(
       { harness: input.harness, model: input.model, effort: input.effort },
       roleDefaults,
-      cat,
+      channelCatalog(cat, channel.id),
       withChannel ? channelDefaults : undefined,
     );
   let run = resolve(getCatalog());
@@ -124,7 +125,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
 
   const id = randomUUID();
-  const remote = harness === 'hermes';
+  const remote = isRemoteHarness(harness);
   const wd = await prepareWorkdir(channel, id, { remote });
   const thread = threads.create({
     id,

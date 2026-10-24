@@ -165,7 +165,7 @@ public struct SwitchRow: Hashable, Sendable {
 
 extension OmniClient {
   /// Switches the thread's harness, model or effort. While a turn runs the switch waits for it (`queuedHarness`), and
-  /// the current run sent again drops it. 400 for a run the catalog does not have or a move to or from Hermes.
+  /// the current run sent again drops it. 400 for a run the catalog does not have, a move to or from Hermes or Cursor Cloud, or a model change on Cursor Cloud.
   public func switchRun(_ id: String, to run: Run) async throws(OmniAPIError) -> OmniThread {
     try await send("POST", "/api/threads/\(uriComponent(id))/run", body: run)
   }

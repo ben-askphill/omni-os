@@ -42,10 +42,14 @@ private struct NewThreadBox: View {
   let big: Bool
   @State private var caret: CaretRequest?
   @State private var pickerRequest = 0
+  /// What the model list's search holds when `pickerRequest` opens it. Only QA sets it.
+  @State private var pickerQuery = ""
   @State private var focusTick = 0
   @State private var focused = false
   @State private var over = false
   @State private var picking = false
+  /// The harnesses as the picked channel sees them, once fetched. The store's list stands in until then.
+  @State private var channelHarnesses: (channel: String, list: [HarnessInfo])?
 
   private struct Lists: Equatable {
     let crew: [CrewRole]
@@ -56,8 +60,9 @@ private struct NewThreadBox: View {
 
   private var lists: Lists {
     let channels = model.store.channels
+    let own = channelHarnesses.flatMap { $0.channel == composer.choice.channel ? $0.list : nil }
     return Lists(
-      crew: model.store.crew, channels: Set(channels.map(\.id)), harnesses: model.store.harnesses,
+      crew: model.store.crew, channels: Set(channels.map(\.id)), harnesses: own ?? model.store.harnesses,
       defaults: Dictionary(channels.map { ($0.id, $0.runDefaults) }, uniquingKeysWith: { a, _ in a }))
   }
 
@@ -95,6 +100,12 @@ private struct NewThreadBox: View {
     .onDisappear {
       if QAComposerProbe.owner == ObjectIdentifier(composer) { QAComposerProbe.current = nil }
     }
+    .onAppear {
+      QAProbe.openModelPicker = {
+        pickerQuery = $0
+        pickerRequest += 1
+      }
+    }
     #endif
     .onChange(of: lists, initial: true) { _, l in
       composer.update(crew: l.crew, channels: l.channels, harnesses: l.harnesses, defaults: l.defaults)
@@ -107,6 +118,8 @@ private struct NewThreadBox: View {
       takePreset()
     }
     .onChange(of: model.shell.newThreadPreset) { takePreset() }
+    // Cursor Cloud depends on the channel (it needs a GitHub repo), so the list is the channel's own.
+    .onChange(of: composer.choice.channel, initial: true) { refreshHarnesses() }
     // Another harness or channel has its own list.
     .onChange(of: NewThreadComposerView.source(composer.choice), initial: true) { _, source in
       menu.commands.source = source
@@ -166,7 +179,7 @@ private struct NewThreadBox: View {
       roleMenu
       ModelPickerButton(
         harnesses: composer.harnesses, harness: composer.choice.harness, model: composer.choice.model,
-        pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest)
+        pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest, openQuery: pickerQuery)
       EffortMenu(options: composer.effortOptions, value: composer.choice.effort, auto: composer.choice.isAuto, pick: composer.selectEffort)
       AttachButton(disabled: composer.sending) { picking = true }
       if let folder = composer.folderChip {
@@ -247,10 +260,12 @@ private struct NewThreadBox: View {
   }
 
   private func refreshHarnesses() {
+    let channel = composer.choice.channel
     Task {
-      guard let list = try? await model.client.harnesses() else { return }
+      guard let list = try? await model.client.harnesses(channel: channel) else { return }
+      channelHarnesses = (channel, list)
       let l = lists
-      composer.update(crew: composer.crew, channels: l.channels, harnesses: list, defaults: l.defaults)
+      composer.update(crew: composer.crew, channels: l.channels, harnesses: l.harnesses, defaults: l.defaults)
     }
   }
 
@@ -356,6 +371,8 @@ struct ModelPickerButton: View {
   let refresh: () -> Void
   /// Bumped to open the list, for "New thread on another model".
   var openRequest = 0
+  /// The search the list opens with on `openRequest`.
+  var openQuery = ""
   /// A thread's reply box leaves Auto out: Auto only picks a run for a new thread.
   var offersAuto = true
   /// Why Auto picked this model. The pill then reads "Auto · <model>".
@@ -389,7 +406,7 @@ struct ModelPickerButton: View {
     .accessibilityLabel(AutoRun.isAuto(model) ? "Model: Auto" : "Model: \(autoReason == nil ? "" : "Auto · ")\(c.model?.label ?? "none")\(c.harness.map { " on \($0.name)" } ?? "")")
     .popover(isPresented: $open, arrowEdge: .bottom) { list }
     .onChange(of: openRequest) {
-      query = ""
+      query = openQuery
       open = true
       refresh()
     }
@@ -497,7 +514,13 @@ struct ModelPickerButton: View {
   @ViewBuilder private func rows(_ group: ModelGroup) -> some View {
     let h = group.harness
     if !h.available {
-      Text("Not available. Run \(Text(h.fix ?? "the harness login").monospaced()).")
+      Group {
+        if let fix = h.fix, h.fixCommand == nil {
+          Text("Not available. \(fix)")
+        } else {
+          Text("Not available. Run \(Text(h.fix ?? "the harness login").monospaced()).")
+        }
+      }
         .font(.omni(size: 11.5))
         .foregroundStyle(Tok.fg4)
         .padding(.horizontal, z(12))

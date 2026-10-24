@@ -218,6 +218,11 @@ public struct OmniClient: Sendable {
     try await send("GET", "/api/harnesses")
   }
 
+  /// The harnesses as a channel sees them: Cursor Cloud is unavailable in a channel with no GitHub repo.
+  public func harnesses(channel: String) async throws(OmniAPIError) -> [HarnessInfo] {
+    try await send("GET", "/api/harnesses", query: [("channel", channel)])
+  }
+
   public func createThread(_ new: NewThread) async throws(OmniAPIError) -> OmniThread {
     try await send("POST", "/api/threads", body: new)
   }

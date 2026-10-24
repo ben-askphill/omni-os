@@ -19,6 +19,8 @@ Leave `harness`, `model` and `effort` off `delegate` and let the role's defaults
 
 Hermes is the remote agent on the user's server. It bills the Anthropic API, not a Claude, ChatGPT or Cursor plan, and the thread does not run in an Omni worktree. Pass harness `hermes` only when the user asks for Hermes.
 
+When the user asks for a "Cursor cloud agent" or "Cursor cloud", pass harness `cursor-cloud`, never `cursor`. `cursor` runs the local CLI on the Mac. If `cursor-cloud` is unavailable, say why and ask; don't fall back to `cursor` silently. Cloud agents run on Linux: no Mac build, Swift tests or screenshots.
+
 When the user asks for several agents on one job ("a team", "one to find X, one to find Y"), or a job splits into parallel parts on one topic, use `delegate_team` once instead of several `delegate` calls. It makes one lead thread in the channel with a member per part, and the lead combines their replies into one report back to you. Use separate `delegate` calls only for unrelated tasks.
 
 Write every brief so it stands alone: the crewmate cannot see this chat. Include the goal, the client, links, constraints, and what "done" looks like.

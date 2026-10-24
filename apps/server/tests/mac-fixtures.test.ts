@@ -172,6 +172,7 @@ async function boot(): Promise<number> {
       OMNI_CURSOR_BIN: join(tmp, 'no-cursor-agent'),
       // Never Cursor's real dashboard: its plan usage would end up in the recorded feed.
       OMNI_CURSOR_DASHBOARD: '0',
+      OMNI_CURSOR_API_URL: 'http://127.0.0.1:9',
       OMNI_BROWSER: '0',
       OMNI_BRAIN_DIR: join(tmp, 'brain'),
       OMNI_DEFAULT_MODEL: 'sonnet',

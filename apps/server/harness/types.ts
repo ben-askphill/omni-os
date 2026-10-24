@@ -1,11 +1,18 @@
 // The harness abstraction: the agent a thread runs in, together with what it bills.
 // Claude Code (Claude plan), Codex (ChatGPT plan), Cursor Agent (Cursor plan) or
-// Hermes (Anthropic API on Ben's server — not his Claude, ChatGPT or Cursor plan).
+// Hermes (Anthropic API on Ben's server — not his Claude, ChatGPT or Cursor plan), or
+// Cursor Cloud (a Cursor cloud agent on Cursor's own Linux machines, Cursor plan).
 // See CONTEXT.md for the domain terms.
 
-export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes';
+export type HarnessId = 'claude-code' | 'codex' | 'cursor' | 'hermes' | 'cursor-cloud';
 
-export const HARNESS_IDS: HarnessId[] = ['claude-code', 'codex', 'cursor', 'hermes'];
+export const HARNESS_IDS: HarnessId[] = ['claude-code', 'codex', 'cursor', 'hermes', 'cursor-cloud'];
+
+/** Harnesses that run off this Mac: no worktree, browser, MCP config or local files. */
+const REMOTE_HARNESSES = new Set<string>(['hermes', 'cursor-cloud']);
+export const isRemoteHarness = (h: string | null | undefined) => !!h && REMOTE_HARNESSES.has(h);
+/** Where a remote harness runs, for "its files are not on this Mac" reasons. */
+export const remoteWhere = (h: string) => (h === 'cursor-cloud' ? 'as a Cursor cloud agent' : 'on the Hermes server');
 
 /** Claude Code is the default everywhere, and existing threads carry on as Claude Code threads. */
 export const DEFAULT_HARNESS: HarnessId = 'claude-code';
@@ -20,6 +27,8 @@ export interface HarnessCapabilities {
   warmProcess: boolean;
   /** Steer mid-turn. When false, a steer request is handled as a queue. */
   steer: boolean;
+  /** Stop a turn on request and stay up. When false (and it can't steer), Stop kills the process. */
+  interrupt: boolean;
   /** Images ride along inline. When false, attachments go as path notes only. */
   inlineImages: boolean;
   /** Which plan usage windows the harness reports. */
@@ -27,13 +36,16 @@ export interface HarnessCapabilities {
 }
 
 export const CAPABILITIES: Record<HarnessId, HarnessCapabilities> = {
-  'claude-code': { warmProcess: true, steer: true, inlineImages: true, usage: 'five-hour-week' },
-  codex: { warmProcess: true, steer: true, inlineImages: true, usage: 'five-hour-week' },
+  'claude-code': { warmProcess: true, steer: true, interrupt: true, inlineImages: true, usage: 'five-hour-week' },
+  codex: { warmProcess: true, steer: true, interrupt: true, inlineImages: true, usage: 'five-hour-week' },
   // (Codex steer/interrupt/images are wired in #11; capabilities above reflect the shipped behavior.)
   // Plan usage is Cursor's monthly cycle, read from its dashboard (cursor-usage.ts).
-  cursor: { warmProcess: false, steer: false, inlineImages: false, usage: 'monthly' },
+  cursor: { warmProcess: false, steer: false, interrupt: false, inlineImages: false, usage: 'monthly' },
   // No warm CLI. Steer is an HTTP call. Images stay on the Mac. Token counts are per run, not a plan window.
-  hermes: { warmProcess: false, steer: true, inlineImages: false, usage: 'none' },
+  hermes: { warmProcess: false, steer: true, interrupt: true, inlineImages: false, usage: 'none' },
+  // An HTTP API too. A message sent mid-run waits for the run to end and goes as a follow-up run; Stop cancels the run.
+  // Images go up with the prompt, but the runner's attachment notes stay paths. Usage is Cursor's, not a plan window.
+  'cursor-cloud': { warmProcess: false, steer: false, interrupt: true, inlineImages: false, usage: 'none' },
 };
 
 /** One model a harness offers. */
@@ -74,11 +86,12 @@ export const HARNESS_META: Record<HarnessId, { name: string; plan: string }> = {
   codex: { name: 'Codex', plan: 'ChatGPT plan' },
   cursor: { name: 'Cursor Agent', plan: 'Cursor plan' },
   hermes: { name: 'Hermes', plan: 'Anthropic API via Hermes' },
+  'cursor-cloud': { name: 'Cursor Cloud', plan: 'Cursor plan' },
 };
 
 /**
  * How to install each local CLI, for onboarding (web, Mac, `npm run setup`). `fix` on HarnessInfo says how to sign
- * in once it is installed. Hermes runs on its own server, so it has none.
+ * in once it is installed. Hermes and Cursor Cloud run off this Mac, so they have none.
  */
 export const HARNESS_INSTALL: Partial<Record<HarnessId, string>> = {
   'claude-code': 'npm install -g @anthropic-ai/claude-code',

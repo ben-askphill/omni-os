@@ -118,8 +118,15 @@ func sseData(_ text: String) -> [String] {
     #expect(acme.active.first?.status == .running)
 
     let harnesses = try decodeFixture([HarnessInfo].self, "harnesses.json")
-    #expect(harnesses.map(\.id) == [.claudeCode, .codex, .cursor, .hermes])
+    #expect(harnesses.map(\.id) == [.claudeCode, .codex, .cursor, .hermes, .cursorCloud])
     #expect(harnesses.first?.models.contains { $0.isDefault } == true)
+    // No CURSOR_API_KEY in the fixture run: unavailable, with the fix, and no models.
+    let cloud = try #require(harnesses.first { $0.id == .cursorCloud })
+    #expect(!cloud.available && cloud.fix?.contains("CURSOR_API_KEY") == true && cloud.models.isEmpty)
+    #expect(cloud.capabilities.steer == false)
+    // The picker says "Run codex login" but shows a sentence fix as it is.
+    #expect(harnesses.first { $0.id == .codex }?.fixCommand == "codex login")
+    #expect(cloud.fixCommand == nil && harnesses.first { $0.id == .hermes }?.fixCommand == nil)
   }
 
   @Test func readsAThreadBeingHandedOff() throws {

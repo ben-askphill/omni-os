@@ -20,6 +20,7 @@ const REQUIRED = [
   'undecodable-tool-use',
   'first-string-field',
   'mod-logs',
+  'cloud-agent',
   'run-switch',
 ];
 

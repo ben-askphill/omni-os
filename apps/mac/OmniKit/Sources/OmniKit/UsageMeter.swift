@@ -86,4 +86,14 @@ public struct HarnessUsageRow: Hashable, Sendable, Identifiable {
       )
     }
   }
+
+  /// Harnesses that run slots but report no plan usage, so they have no meter row: only the running count.
+  static let slotOnly: [(id: HarnessID, name: String)] = [(.cursorCloud, "Cursor Cloud")]
+
+  /// The card's collapsed line, "Claude 1/4 · Codex 0/4 · … · Cursor Cloud 0/4", as SLOT_ROWS in brand.tsx. Harnesses
+  /// the server sent no slot for are left out.
+  public static func slotSummary(_ rows: [HarnessUsageRow], slots: [HarnessID: HarnessSlot]) -> [String] {
+    let meters = rows.compactMap { r in r.slot.map { "\(r.name) \($0.running)/\($0.cap)" } }
+    return meters + slotOnly.compactMap { h in slots[h.id].map { "\(h.name) \($0.running)/\($0.cap)" } }
+  }
 }

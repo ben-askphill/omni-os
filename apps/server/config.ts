@@ -39,6 +39,11 @@ export const config = {
   get hermesUrl() {
     return resolved.hermesUrl();
   },
+  maxConcurrentCursorCloud: Number(env.OMNI_MAX_CONCURRENT_CURSOR_CLOUD ?? 4),
+  /** The Cursor Cloud Agents API. Set only to point Omni at a fake for tests or QA. The key is the secret CURSOR_API_KEY. */
+  cursorApiUrl: env.OMNI_CURSOR_API_URL ?? 'https://api.cursor.com',
+  /** How often a running Cursor cloud agent's run is read for its status, branch and PR. */
+  cursorCloudPollMs: Number(env.OMNI_CURSOR_CLOUD_POLL_MS ?? 10_000),
   /** How long a thread's claude process stays warm after a turn. 0 closes it right away. */
   keepAliveSeconds: Number(env.OMNI_KEEPALIVE_SECONDS ?? 600),
   /** How long an idle process stays up for background agents that have not ended yet. */

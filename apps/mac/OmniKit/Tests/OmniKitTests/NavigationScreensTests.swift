@@ -221,4 +221,12 @@ private func listThread(_ id: String, title: String? = nil, channel: String = "a
     #expect(rows.map(\.hasData) == [true, false, false, false])
     #expect(rows[0].slot?.cap == 4 && rows[0].week == nil)
   }
+
+  @Test func slotLineAddsCursorCloudWithoutAMeterRow() {
+    let slots: [HarnessID: HarnessSlot] = [.claudeCode: HarnessSlot(running: 1, cap: 4), .cursorCloud: HarnessSlot(running: 2, cap: 4)]
+    let rows = HarnessUsageRow.rows(usage: [:], slots: slots)
+    #expect(!rows.map(\.id).contains(.cursorCloud))
+    #expect(HarnessUsageRow.slotSummary(rows, slots: slots) == ["Claude 1/4", "Cursor Cloud 2/4"])
+    #expect(HarnessUsageRow.slotSummary(rows, slots: [.claudeCode: HarnessSlot(running: 1, cap: 4)]) == ["Claude 1/4"])
+  }
 }

@@ -56,7 +56,7 @@ const plan = (t: Thread, to: Run, cat: Catalog) =>
 /**
  * Move a thread to another run. The same run again changes nothing, and drops a run queued since. While a turn runs
  * the pick is queued instead (`queued_*` on the thread): a later pick replaces it, and it applies once the thread is
- * quiet (`applyQueued`). A run the catalog does not offer, or a move to or from Hermes, is refused at once.
+ * quiet (`applyQueued`). A run the catalog does not offer, or a move to or from Hermes or Cursor Cloud, is refused at once.
  */
 export async function switchRun(threadId: string, to: Run): Promise<Thread> {
   const t = threads.get(threadId);

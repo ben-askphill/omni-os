@@ -4,6 +4,7 @@ import { HarnessMark } from '../../brand.tsx';
 import { Chip, CopyButton, StatusDot } from '../../ui.tsx';
 import { duration, fullDate, plural } from '../../../format.ts';
 import { href } from '../../../router.ts';
+import { cloudAgentUrl } from '../../../cloud-agent.ts';
 
 export interface InitP {
   model?: string;
@@ -90,7 +91,9 @@ export function DetailsTab({
   warm: boolean | undefined;
 }) {
   const cwd = init?.cwd || thread.cwd;
-  const remote = thread.harness === 'hermes';
+  const cloud = thread.harness === 'cursor-cloud';
+  const remote = thread.harness === 'hermes' || cloud;
+  const agentUrl = cloud ? cloudAgentUrl(thread.session_id) : null;
   const resumeCmd: Record<string, string> = {
     'claude-code': `claude --resume ${thread.session_id}`,
     codex: `codex resume ${thread.session_id}`,
@@ -126,7 +129,7 @@ export function DetailsTab({
         )}
         <Row k="Working dir">
           {remote ? (
-            <span className="text-fg-3">Hermes server, not an Omni worktree</span>
+            <span className="text-fg-3">{cloud ? 'Cursor cloud agent, not an Omni worktree' : 'Hermes server, not an Omni worktree'}</span>
           ) : (
             <span className="font-mono text-[12px]">{cwd}</span>
           )}
@@ -195,10 +198,24 @@ export function DetailsTab({
 
       {remote ? (
         <div className="mt-4 rounded-[20px] bg-bg p-3.5">
-          <div className="caption mb-2">Remote session</div>
-          <p className="text-[12.5px] leading-relaxed text-fg-2">
-            This thread runs on the Hermes server. Another message here resumes <span className="font-mono">{thread.session_id}</span>.
-          </p>
+          <div className="caption mb-2">{cloud ? 'Cursor cloud agent' : 'Remote session'}</div>
+          {cloud ? (
+            <p className="text-[12.5px] leading-relaxed text-fg-2">
+              This thread runs on Cursor's Linux cloud, on its own clone of the channel repo. It pushes a branch and Cursor opens the PR. Another message here
+              goes to the agent as a follow-up.{' '}
+              {agentUrl ? (
+                <a href={agentUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-fg underline-offset-2 hover:underline">
+                  Open it in Cursor
+                </a>
+              ) : (
+                'It has not started yet.'
+              )}
+            </p>
+          ) : (
+            <p className="text-[12.5px] leading-relaxed text-fg-2">
+              This thread runs on the Hermes server. Another message here resumes <span className="font-mono">{thread.session_id}</span>.
+            </p>
+          )}
         </div>
       ) : (
         <div className="mt-4 rounded-[20px] bg-bg p-3.5">

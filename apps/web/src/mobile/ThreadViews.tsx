@@ -10,6 +10,7 @@ import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { TerminalView } from '../components/TerminalView.tsx';
 import { Button, Chip, copyText, ErrorNote, SlideToConfirm, StatusDot } from '../components/ui.tsx';
+import { cloudAgentUrl } from '../cloud-agent.ts';
 import { fullDate, plural } from '../format.ts';
 import { checkTone } from '../pages/PRs.tsx';
 import type { Route } from '../router.ts';
@@ -288,6 +289,14 @@ export function DetailsScreen() {
   ];
   if (thread.task_id) rows.splice(2, 0, ['Task', <span className="font-mono text-[13px]">{thread.task_id}</span>]);
   if (thread.branch) rows.push(['Branch', <span className="font-mono text-[13px]">{thread.branch}</span>]);
+  const agentUrl = thread.harness === 'cursor-cloud' ? cloudAgentUrl(thread.session_id) : null;
+  if (agentUrl)
+    rows.push([
+      'Agent',
+      <a href={agentUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-fg">
+        Open in Cursor
+      </a>,
+    ]);
   return (
     <>
       <MoHeader onBack={shell.back} title="Details" sub={thread.title} />
@@ -300,7 +309,11 @@ export function DetailsScreen() {
             </div>
           ))}
         </MoGroup>
-        <p className="m-0 px-1 text-[13px] leading-[1.5] text-fg-3">The session id, working directory and resume command are on the Mac, under Details in the thread panel.</p>
+        <p className="m-0 px-1 text-[13px] leading-[1.5] text-fg-3">
+          {thread.harness === 'cursor-cloud'
+            ? "This thread runs as a Cursor cloud agent on Cursor's Linux cloud, on its own clone of the channel repo. Another message goes to it as a follow-up."
+            : 'The session id, working directory and resume command are on the Mac, under Details in the thread panel.'}
+        </p>
       </Body>
     </>
   );

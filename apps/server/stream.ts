@@ -22,6 +22,8 @@ export type Record =
   | { kind: 'limit'; payload: { resets_at: number | null } }
   /** A mod (a Claude Code plugin with JS hooks) called $.ui.log, $.ui.toast or $.ui.status. */
   | { kind: 'mod'; payload: ModUi }
+  /** Where a Cursor cloud agent's run stands. A new row each time its status, branch or PR moves; the newest per run wins. */
+  | { kind: 'cloud_agent'; payload: CloudAgentState }
   | {
       kind: 'result';
       payload: {
@@ -58,6 +60,24 @@ export interface TaskUpdate {
   tool_uses?: number;
   tokens?: number;
   duration_ms?: number;
+}
+
+export interface CloudAgentState {
+  /** `bc-…`, the agent's id. Also the thread's session id. */
+  agent_id: string;
+  /** The agent on cursor.com. */
+  url: string;
+  name?: string;
+  run_id?: string;
+  status: 'CREATING' | 'RUNNING' | 'FINISHED' | 'ERROR' | 'CANCELLED' | 'EXPIRED';
+  /** The channel's GitHub repo, owner/name. */
+  repo: string;
+  /** The branch the agent started from. Absent means the repo's default branch. */
+  ref?: string;
+  /** The branch it pushed, once it has. */
+  branch?: string;
+  /** The PR Cursor opened from that branch. */
+  pr_url?: string;
 }
 
 export interface ModUi {

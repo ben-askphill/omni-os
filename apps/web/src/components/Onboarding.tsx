@@ -241,7 +241,8 @@ function HarnessScreen() {
   const load = async () => {
     setChecking(true);
     try {
-      setList((await api.get<HarnessRow[]>('/harnesses')).filter((h) => h.id !== 'hermes' || h.available));
+      // Hermes and Cursor Cloud run off this Mac: listed once they work, never as something to install.
+      setList((await api.get<HarnessRow[]>('/harnesses')).filter((h) => (h.id !== 'hermes' && h.id !== 'cursor-cloud') || h.available));
     } finally {
       setChecking(false);
     }

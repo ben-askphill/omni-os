@@ -580,6 +580,8 @@ private struct TranscriptRow: View {
       ReportCard(report: report, document: markdown.document(for: id, text: report.text.isEmpty ? "(no reply)" : report.text), model: model)
     case .mod(_, let lines):
       ModLogView(lines: lines)
+    case .cloud(_, let state):
+      CloudAgentCard(state: state)
     case .runSwitch(let row):
       SwitchLineView(row: row, running: running)
     case .question(let q):
@@ -617,6 +619,8 @@ enum QAProbe {
   static var scroller: Scroller?
   static var expand: (() -> Void)?
   static var openMeter: (() -> Void)?
+  /// Opens the new-thread composer's model list with this in its search.
+  static var openModelPicker: ((String) -> Void)?
   /// Presses the sidebar's collapse-all (or expand-all) button.
   static var foldAll: (() -> Void)?
   /// Opens the edit of the first editable unsent message with this text. false when there is none.

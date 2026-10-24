@@ -1,4 +1,4 @@
-// The live catalog: it probes the CLIs (and the Hermes API) at server start and every 15 minutes.
+// The live catalog: it probes the CLIs (and the Hermes and Cursor Cloud APIs) at server start and every 15 minutes.
 // A harness that is down is probed again on demand (freshCatalog, at most every 10 seconds), so a
 // `codex login` or the Mac joining the tailnet shows in the picker without a restart.
 // The pure assembly lives in catalog.ts; this file does the I/O.
@@ -18,8 +18,10 @@ import type {
 import { cursorBin } from './cursor/bin.ts';
 import { parseCursorModels, rememberCursorWindows } from './cursor/models.ts';
 import { probeHermes } from './hermes/client.ts';
+import { CursorCloudClient, CursorCloudError } from './cursor-cloud/client.ts';
 import { harnessEnv } from './env-guard.ts';
-import { globalSecret } from '../secrets.ts';
+import { globalSecret, hasSecret } from '../secrets.ts';
+import { channels } from '../db.ts';
 import { recordUsage } from '../usage.ts';
 import { refreshCursorUsage } from '../cursor-usage.ts';
 import { HARNESS_IDS, type HarnessId, type HarnessInfo } from './types.ts';
@@ -28,11 +30,16 @@ import {
   codexHarness,
   cursorHarness,
   hermesHarness,
+  cursorCloudHarness,
+  catalogForChannel,
   getHarness,
+  CURSOR_CLOUD_REJECTED,
+  CURSOR_CLOUD_UNREACHABLE,
   type Catalog,
   type CodexProbe,
   type CursorProbe,
   type HermesProbe,
+  type CursorCloudProbe,
 } from './catalog.ts';
 
 type Probe = CodexProbe & { rateLimits?: RateLimits };
@@ -50,6 +57,7 @@ const caps = (): Record<HarnessId, number> => ({
   codex: config.maxConcurrentCodex,
   cursor: config.maxConcurrentCursor,
   hermes: config.maxConcurrentHermes,
+  'cursor-cloud': config.maxConcurrentCursorCloud,
 });
 
 /** Probe `cursor-agent --list-models` for the model list. Success means installed and logged in. */
@@ -156,6 +164,36 @@ export async function probeHermesHarness(cap: number): Promise<HarnessInfo> {
 }
 
 /**
+ * GET /v1/models with the global CURSOR_API_KEY: a 200 means the key works, and lists the models to pick from. No key
+ * is unavailable with CURSOR_CLOUD_FIX, which a channel's own key can still lift (catalogForChannel).
+ */
+export async function probeCursorCloud(key: string | null, baseUrl = config.cursorApiUrl): Promise<CursorCloudProbe> {
+  if (!key) return { available: false };
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 8000);
+  try {
+    const { items } = await new CursorCloudClient(key, baseUrl).listModels(ac.signal);
+    return { available: true, models: (items ?? []).map((m) => ({ id: m.id, label: m.displayName || m.id })) };
+  } catch (e) {
+    return { available: false, fix: e instanceof CursorCloudError && e.status === 401 ? CURSOR_CLOUD_REJECTED : CURSOR_CLOUD_UNREACHABLE };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function probeCursorCloudHarness(cap: number): Promise<HarnessInfo> {
+  const key = await globalSecret('CURSOR_API_KEY').catch(() => null);
+  return cursorCloudHarness(await probeCursorCloud(key), cap);
+}
+
+/** The catalog as a channel sees it: Cursor Cloud needs its GitHub repo, and can use its own key. Unknown channel: the global one. */
+export function channelCatalog(cat: Catalog, channelId: string | null | undefined): Catalog {
+  const ch = channelId ? channels.get(channelId) : undefined;
+  if (!ch) return cat;
+  return catalogForChannel(cat, ch, hasSecret(`channel:${ch.id}`, 'CURSOR_API_KEY'));
+}
+
+/**
  * Probe the harnesses in `only` (all by default) and keep the others as they are. A call while
  * a load is running joins that load.
  */
@@ -163,12 +201,13 @@ export function loadCatalog(only: HarnessId[] = HARNESS_IDS): Promise<Catalog> {
   loading ??= (async () => {
     const c = caps();
     const keep = (id: HarnessId) => getHarness(getCatalog(), id)!;
-    const [codex, cursor, hermes] = await Promise.all([
+    const [codex, cursor, hermes, cursorCloud] = await Promise.all([
       only.includes('codex') ? probeCodexHarness(c.codex) : keep('codex'),
       only.includes('cursor') ? probeCursorHarness(c.cursor) : keep('cursor'),
       only.includes('hermes') ? probeHermesHarness(c.hermes) : keep('hermes'),
+      only.includes('cursor-cloud') ? probeCursorCloudHarness(c['cursor-cloud']) : keep('cursor-cloud'),
     ]);
-    current = { harnesses: [claudeHarness(c['claude-code'], config.defaultModel), codex, cursor, hermes] };
+    current = { harnesses: [claudeHarness(c['claude-code'], config.defaultModel), codex, cursor, hermes, cursorCloud] };
     checkedAt = Date.now();
     return current;
   })().finally(() => {
@@ -187,6 +226,7 @@ export function getCatalog(): Catalog {
       codexHarness({ available: false, models: [] }, c.codex),
       cursorHarness({ available: false, models: [] }, c.cursor),
       hermesHarness({ available: false }, c.hermes),
+      cursorCloudHarness({ available: false }, c['cursor-cloud']),
     ],
   };
 }
