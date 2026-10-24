@@ -44,6 +44,30 @@ let artifactJSON = """
     guard case .unknown = odd else { Issue.record("a reading it can't read is unknown: \(odd)"); return }
   }
 
+  @Test func readsTheRecordedSyncs() throws {
+    let replays = try FixtureTests.threadStream().compactMap { if case .sync(let d, let snapshot) = $0 { (d, snapshot) } else { nil } }
+    let (replay, replaySnapshot) = try #require(replays.first)
+    #expect(!replaySnapshot)
+    #expect(replay.events.isEmpty)
+    #expect(replay.history == nil)
+    #expect(replay.channel?.id == "acme")
+
+    let stream = try FixtureTests.threadStream("thread-stream-snapshot.sse")
+    guard case .sync(let d, true)? = stream.first else { Issue.record("not a snapshot: \(String(describing: stream.first))"); return }
+    let head = try #require(d.history)
+    #expect(d.events.last?.id == 18)
+    #expect(d.events.contains { $0.id == head.from })
+    #expect(d.thread.status == .done)
+  }
+
+  @Test func readsASyncWithoutItsPageAsAReplay() throws {
+    let m = try decode(
+      ThreadStreamMessage.self,
+      #"{"kind":"sync","catch_up":"snapshot","thread":\#(threadJSON()),"events":[],"artifacts":[],"children":[],"parent":null,"pending":[],"live":true}"#)
+    guard case .sync(let d, false) = m else { Issue.record("not a replay sync: \(m)"); return }
+    #expect(d.live)
+  }
+
   @Test func keepsMessagesItDoesNotKnow() throws {
     let m = try decode(ThreadStreamMessage.self, #"{"kind":"typing","who":"agent"}"#)
     #expect(m == .unknown(.object(["kind": .string("typing"), "who": .string("agent")])))

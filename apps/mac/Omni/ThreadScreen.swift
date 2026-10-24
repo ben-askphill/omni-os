@@ -506,9 +506,6 @@ private struct TranscriptRows: View {
     let edges = store.history.edges(transcript.items.compactMap { if case .event(let k) = $0.id { k } else { nil } })
     let atStart = store.history.atStart
     LazyVStack(alignment: .leading, spacing: z(16)) {
-      if let error = store.refreshError {
-        ErrorNote(text: error.message) { Task { await store.reload() } }
-      }
       // The brief is in a page not loaded yet: the members go above it.
       if !atStart, !members.isEmpty {
         DelegationCard(delegation: Delegation(id: "team", lead: nil, branches: members), team: true, model: model, reports: reports)

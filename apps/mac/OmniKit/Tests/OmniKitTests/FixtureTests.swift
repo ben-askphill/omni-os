@@ -39,6 +39,7 @@ func sseData(_ text: String) -> [String] {
     "artifacts.json": { _ = try decodeFixture([GalleryArtifact].self, "artifacts.json") },
     "error-not-found.json": { _ = try decodeFixture([String: String].self, "error-not-found.json") },
     "thread-stream.sse": { _ = try threadStream() },
+    "thread-stream-snapshot.sse": { _ = try threadStream("thread-stream-snapshot.sse") },
     "feed.sse": { _ = try feed() },
     "secrets.json": { _ = try decodeFixture([SecretRow].self, "secrets.json") },
     "secret-saved.json": { _ = try decodeFixture([String: Bool].self, "secret-saved.json") },
@@ -89,8 +90,8 @@ func sseData(_ text: String) -> [String] {
     "search.json": { _ = try decodeFixture([SearchHit].self, "search.json") },
   ]
 
-  static func threadStream() throws -> [ThreadStreamMessage] {
-    try sseData(fixture("thread-stream.sse")).map { try OmniJSON.decoder().decode(ThreadStreamMessage.self, from: Data($0.utf8)) }
+  static func threadStream(_ name: String = "thread-stream.sse") throws -> [ThreadStreamMessage] {
+    try sseData(fixture(name)).map { try OmniJSON.decoder().decode(ThreadStreamMessage.self, from: Data($0.utf8)) }
   }
 
   static func feed() throws -> [FeedEvent] {
@@ -263,7 +264,7 @@ func sseData(_ text: String) -> [String] {
 
   @Test func readsEveryThreadStreamMessage() throws {
     let messages = try Self.threadStream()
-    var events = 0, artifacts = 0, threads = 0, contexts = 0
+    var events = 0, artifacts = 0, threads = 0, contexts = 0, syncs = 0
     for m in messages {
       switch m {
       case .event(let e):
@@ -272,6 +273,7 @@ func sseData(_ text: String) -> [String] {
       case .artifact: artifacts += 1
       case .thread: threads += 1
       case .context: contexts += 1
+      case .sync: syncs += 1
       // The recorded turn runs no mod; StreamMessageTests reads a toast.
       case .modToast: break
       case .unknown(let json): Issue.record("unknown message: \(json)")
@@ -281,6 +283,7 @@ func sseData(_ text: String) -> [String] {
     #expect(contexts > 0)
     #expect(artifacts == 1)
     #expect(threads > 0)
+    #expect(syncs == 1)
   }
 
   @Test func readsEveryFeedEvent() throws {

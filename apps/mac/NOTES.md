@@ -115,7 +115,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 What the server sends (see the `.sse` fixtures and `apps/server/app.ts`):
 
 - Framing: optional `event:`, one `data:` line of compact JSON, optional `id:`, blank line. Never `retry:`.
-- The thread stream opens with `event: ping`, then the backlog of `EventRow`s after `after`, each with its SSE `id`, then live messages. The `thread` and `artifact` messages carry no id. A row can come twice where the backlog meets the live queue.
+- The thread stream opens with `event: ping`, then its catch-up (#224, `apps/server/stream-catch-up.ts`): the `EventRow`s after `after`, each with its SSE `id`, then one `sync` (`ThreadStreamMessage.sync`), the detail with no events. When those rows do not fit one page, or `after` is stale, no rows come and the sync is a snapshot: its `events` and `history` are the newest page, and its SSE `id` is that page's newest row (none when that row is at or below `after`), so the cursor moves past it. Then live messages. The `thread` and `artifact` messages carry no id. The server sends no row twice on one connection.
 - The feed sends the usage of each harness that has some when it connects, then thread, usage and artifact messages, no ids. Both streams send `event: ping` after 20s of quiet.
 
 `SSEParser` follows the EventSource spec: LF, CR or CRLF line ends, even split across chunks; multi-line `data:` joined with `\n`; comments; the `id:` and `retry:` rules; a leading BOM; UTF-8 split across chunks. It is pure: `feed(bytes)` returns the messages it completes. `sseData` in `FixtureTests.swift` now runs the fixtures through it.
@@ -156,7 +156,7 @@ What the server sends (see the `.sse` fixtures and `apps/server/app.ts`):
 - `reveal(_:)` loads the page holding an event (a search hit) and sets `revealTarget` to its row; before the first load it waits for it. `ThreadStoreRegistry.reveal(_:at:)` hands a reveal to a store, or to the next `acquire`. `showAll(_:)` reads a clipped row whole (`clipped`, `clippedResults` by call id, `showingAll`, `showAllErrors`).
 - Stream messages gather for `frame` (16ms) and are applied together. A connection change applies what came before it first.
 - A thread row, from the stream or a load, replaces the one shown unless it is older (`updatedAt`). `merge(_:isReply:)` does the same for the answer to Ben's own request, which also loses a tie. `pending` and `warm` (the server's `live`) change only with a row that is applied.
-- Every stream open after the first loads the head again (`?history=recent`) and joins it: missing events are added (the stream's own replay fills anything between), the row goes through the rule above, channel, parent and children are replaced. Artifacts the stream sent while the load was out are laid over the answer unless it has a newer copy. A refetch that fails sets `refreshError` and keeps everything.
+- Every stream open, the first too, ends its catch-up with a sync, applied in line with the rows around it. Nothing is fetched again. The row goes through the rule above with its `pending` and `live`; blocked, handoff, channel, parent, children, team and artifacts are replaced. A snapshot closes the head span into an island (`History.detachHead`) and joins the newest page as the head, so the gap between them gets its controls and older pages load as before.
 - `isReconnecting` is the Web UI's Reconnecting label: loaded, and the stream is `.reconnecting`. It stays false during the first connection.
 - `interrupt()` posts stop. `stopping` holds until the thread stops running, a new result comes or 15s pass; a failed stop sets `actionError`. `interrupting` also counts an "Interrupt and send" message the agent has not read.
 - `workingLine` is the line under the transcript: the latest status, else "Working" when nothing came back since the last message. Only while the thread is `.running`; queued is not working yet.
@@ -189,7 +189,7 @@ For the thread screen (part C). What parts A and B leave ready and what they do 
 - Header: `isReconnecting` shows "Reconnecting", the status pill, `interrupting` turns the button into "Interrupting". Esc interrupts a running thread when nothing else wants Esc.
 - Artifacts are chosen per window, not in the store: start from `ThreadStore.defaultArtifact(store.artifacts)`, switch to `arrivedHTML` when it changes, list `files` and `screenshots`, load with `client.artifactURL(_:)`.
 - `cwd` for summaries is the last `init` event's cwd, else `thread.cwd`, as the Web UI does.
-- Errors: `.failed` and `.notFound` for the whole screen, `refreshError` and `actionError` as notes with a retry (`reload()`).
+- Errors: `.failed` and `.notFound` for the whole screen, with a retry (`reload()`); `actionError` as a note.
 - The transcript should be a lazy list keyed by `TranscriptItem.id`; items are `Hashable` so rows can skip redraws.
 
 ## Thread screen (#63 part C)

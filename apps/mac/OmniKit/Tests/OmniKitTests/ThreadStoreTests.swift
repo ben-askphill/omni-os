@@ -36,11 +36,25 @@ private func detail(
   _ thread: String = row(), events: [String] = [], artifacts: [String] = [], pending: [String] = [], live: Bool = false,
   children: [String] = [], parent: String? = nil, from: Int? = nil, resultsBelow: Int = 0
 ) throws -> ThreadDetail {
+  try decode(ThreadDetail.self, detailJSON(
+    thread, events: events, artifacts: artifacts, pending: pending, live: live, children: children, parent: parent, from: from,
+    resultsBelow: resultsBelow))
+}
+
+private func detailJSON(
+  _ thread: String = row(), events: [String] = [], artifacts: [String] = [], pending: [String] = [], live: Bool = false,
+  children: [String] = [], parent: String? = nil, from: Int? = nil, resultsBelow: Int = 0
+) -> String {
   let history = from.map { #","history":{"from":\#($0),"to":null,"results_below":\#(resultsBelow)}"# } ?? ""
-  return try decode(ThreadDetail.self, """
+  return """
     {"thread":\(thread),"channel":\(channelJSON),"events":[\(events.joined(separator: ","))],"artifacts":[\(artifacts.joined(separator: ","))],
      "children":[\(children.joined(separator: ","))],"parent":\(parent ?? "null"),"pending":[\(pending.joined(separator: ","))],"live":\(live)\(history)}
-    """)
+    """
+}
+
+/// The stream's sync: `detail` is `detailJSON`'s, events and all. A snapshot carries a page and `history`.
+private func syncMessage(_ detail: String, snapshot: Bool = false) -> String {
+  #"{"kind":"sync","catch_up":"\#(snapshot ? "snapshot" : "replay")","# + detail.drop { $0 != "{" }.dropFirst()
 }
 
 /// SSE text for stream messages, on one line as the server sends them: an event with its id, or any other
@@ -258,53 +272,35 @@ private let turn = [
     #expect(!store.merge(try decode(OmniThread.self, row("done", updated: 99, id: "other"))), "another thread's row")
   }
 
-  @Test func refetchesTheThreadAfterAReconnect() async throws {
-    let api = FakeThreadAPI(try detail(events: turn, artifacts: [artifact(1)]))
-    let (store, conn, t, clock) = try await openStore(api)
+  @Test func catchesUpFromTheStreamAfterAReconnect() async throws {
+    let api = FakeThreadAPI(try detail(events: turn, artifacts: [artifact(1)], pending: [pendingMsg("held")], live: true))
+    let (store, conn, t, clock) = try await openStore(api, frame: .milliseconds(16))
     defer { store.stop() }
-    await settle()
-    #expect(api.calls("thread") == 1, "the first open loads nothing more")
 
     conn.end()
     try await waitFor("reconnecting") { store.isReconnecting }
-    api.detail = .success(try detail(row("done", updated: 20), events: turn + [ev(4), ev(5, "result", #"{"ok":true,"subtype":"success","turns":1}"#)],
-                                     artifacts: [artifact(1), artifact(2, kind: "markdown")], children: [row(id: "c1", parent: "t1")]))
     clock.advance(by: .seconds(1))
     let again = try await t.next()
     #expect(again.after == "3")
     again.accept()
-    try await waitFor("the missed events") { store.events.map(\.id) == [1, 2, 3, 4, 5] }
+    let sync = detailJSON(
+      row("done", updated: 20), artifacts: [artifact(1), artifact(2, kind: "markdown")], live: false, children: [row(id: "c1", parent: "t1")])
+    again.send(sse(event: ev(4), id: 4) + sse(event: done(5), id: 5) + sse(syncMessage(sync)) + sse(event: ask(6), id: 6))
+    try await waitFor("the catch-up") {
+      clock.advance(by: .milliseconds(16))
+      return store.events.map(\.id) == [1, 2, 3, 4, 5, 6]
+    }
     #expect(!store.isReconnecting)
-    #expect(api.calls("thread") == 2)
     #expect(store.thread?.status == .done)
+    #expect(store.pending.isEmpty, "the sync's pending list replaces the one held")
+    #expect(store.warm == false)
     #expect(store.artifacts.map(\.id) == [1, 2])
     #expect(store.children.map(\.id) == ["c1"])
     #expect(store.transcript.items == Transcript.build(store.events))
-    #expect(store.refreshError == nil)
-  }
 
-  @Test func keepsWhatTheStreamBroughtWhileTheRefetchWasOut() async throws {
-    let api = FakeThreadAPI(try detail(artifacts: [artifact(1), artifact(2, updated: 1)]))
-    let (store, conn, t, clock) = try await openStore(api)
-    defer { store.stop() }
-    conn.end()
-    try await waitFor("reconnecting") { store.isReconnecting }
-
-    // The refetch answers with what the server had before the stream said more.
-    let gate = api.holdNext()
-    api.detail = .success(try detail(artifacts: [artifact(1), artifact(2, updated: 9)]))
-    clock.advance(by: .seconds(1))
-    let again = try await t.next()
-    again.accept()
-    try await waitFor("the refetch") { api.calls("thread") == 2 }
-    again.send(sse(#"{"kind":"artifact","artifact":\#(artifact(2, updated: 5))}"#))
-    again.send(sse(#"{"kind":"artifact","artifact":\#(artifact(3, kind: "markdown"))}"#))
-    try await waitFor("the new artifact") { store.artifacts.map(\.id) == [1, 2, 3] }
-    #expect(store.artifacts[1].updatedAt == base.addingTimeInterval(5))
-
-    gate.open()
-    try await waitFor("the answer applied") { store.artifacts.first(where: { $0.id == 2 })?.updatedAt == base.addingTimeInterval(9) }
-    #expect(store.artifacts.map(\.id) == [1, 2, 3], "an artifact the answer predates stays")
+    await store.reload()
+    await settle()
+    #expect(api.calls("thread") == 1, "the stream's sync stands in for a refetch")
   }
 
   @Test func showsABurstInOneUpdate() async throws {
@@ -356,21 +352,6 @@ private let turn = [
     #expect(store.loadState == .loaded)
     #expect(store.events.count == 3)
     #expect(try await t.next().after == "3")
-  }
-
-  @Test func keepsTheThreadUpWhenARefetchFails() async throws {
-    let api = FakeThreadAPI(try detail(events: turn))
-    let (store, _, _, _) = try await openStore(api)
-    defer { store.stop() }
-    api.detail = .failure(.http(status: 500, message: "boom"))
-    await store.reload()
-    #expect(store.loadState == .loaded)
-    #expect(store.refreshError == .http(status: 500, message: "boom"))
-    #expect(store.events.count == 3)
-
-    api.detail = .success(try detail(events: turn))
-    await store.reload()
-    #expect(store.refreshError == nil)
   }
 
   @Test func interruptsUntilTheTurnEnds() async throws {
@@ -691,16 +672,55 @@ private func historyPage(_ rows: [String], from: Int, to: Int?) throws -> Histor
 
     conn.end()
     try await waitFor("reconnecting") { store.isReconnecting }
-    api.detail = .success(try detail(events: [text(53), text(54)], from: 53, resultsBelow: 3))
     clock.advance(by: .seconds(1))
     let again = try await t.next()
     #expect(again.after == "53", "the stream resumes after the last row it sent")
     again.accept()
+    again.send(sse(event: syncMessage(detailJSON(events: [text(53), text(54)], from: 53, resultsBelow: 3), snapshot: true), id: 54))
     try await waitFor("the fresh head") { store.events.last?.id == 54 }
     #expect(store.events.map(\.id) == [1, 2, 20, 21, 22, 50, 51, 52, 53, 54])
-    #expect(store.history.spans == [HistorySpan(from: 0, to: nil)])
+    #expect(store.history.spans == [HistorySpan(from: 0, to: nil)], "a head that meets the one held joins it")
     try await waitFor("laid out") { store.transcript.items.last?.id == .event(54) }
     #expect(store.transcript.items == Transcript.build(store.events, spans: store.history.spans))
+    #expect(api.calls("thread") == 1)
+  }
+
+  @Test func joinsASnapshotUnderTheHeadItHeld() async throws {
+    let api = FakeThreadAPI(try detail(events: [ask(20), text(21), done(22)], from: 20, resultsBelow: 1))
+    let (store, conn, t, clock) = try await openStore(api, frame: .milliseconds(16))
+    defer { store.stop() }
+
+    conn.end()
+    try await waitFor("reconnecting") { store.isReconnecting }
+    clock.advance(by: .seconds(1))
+    let again = try await t.next()
+    #expect(again.after == "22")
+    again.accept()
+    let snapshot = syncMessage(detailJSON(row("done", updated: 9), events: [ask(40), text(41), done(42)], from: 40, resultsBelow: 3), snapshot: true)
+    again.send(
+      sse(event: text(23), id: 23) + sse(event: snapshot, id: 42) + sse(event: text(41), id: 41) + sse(event: done(42), id: 42)
+        + sse(event: ask(43), id: 43))
+    try await waitFor("the snapshot") {
+      clock.advance(by: .milliseconds(16))
+      return store.events.last?.id == 43
+    }
+    #expect(store.events.map(\.id) == [20, 21, 22, 23, 40, 41, 42, 43], "each row once")
+    #expect(store.history.spans == [HistorySpan(from: 20, to: 24), HistorySpan(from: 40, to: nil)], "a row before the sync stays with the island")
+    #expect(store.history.turnCount == 4)
+    #expect(store.thread?.status == .done)
+    try await waitFor("laid out") { store.transcript.items.last?.id == .event(43) }
+    #expect(store.transcript.items == Transcript.build(store.events, spans: store.history.spans))
+    #expect(store.history.edges([20, 21, 22, 23, 40, 41, 42, 43]) == [20: .earlier, 40: .gap(after: 0)])
+
+    api.setPage(.newest(before: 20), .success(try historyPage([ask(10), done(11)], from: 0, to: 20)))
+    await store.loadEarlier()
+    api.setPage(.oldest(after: 23, before: 40), .success(try historyPage([ask(30), done(31)], from: 24, to: 40)))
+    await store.loadLater(after: 0)
+    #expect(api.cursors == [.newest(before: 20), .oldest(after: 23, before: 40)])
+    #expect(store.history.spans == [HistorySpan(from: 0, to: nil)])
+    #expect(store.events.map(\.id) == [10, 11, 20, 21, 22, 23, 30, 31, 40, 41, 42, 43])
+    #expect(store.transcript.items == Transcript.build(store.events, spans: store.history.spans))
+    #expect(api.calls("thread") == 1)
   }
 
   @Test func showsAFailedPageOnItsEdgeAndAsksOnceAtATime() async throws {

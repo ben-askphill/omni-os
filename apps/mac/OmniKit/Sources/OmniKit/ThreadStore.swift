@@ -6,10 +6,10 @@ import Observation
 ///   Older pages load on demand (`loadEarlier`, `loadLater`, `reveal`) into `history`.
 /// - Each event is kept once, in id order, however the stream sends it.
 /// - A thread row replaces the one shown unless it is older. `pending` and `warm` come and go with it.
-/// - Every stream open after the first loads the thread again and merges it in, since messages were
-///   missed. Artifacts the stream sends while that load is out are laid over the answer, unless the
-///   answer has a newer copy.
-/// - Stream messages are applied in batches, one per `frame`.
+/// - Every stream connect ends its catch-up with a `sync` (#224): the thread's state now, after the rows it
+///   replayed. When the gap was too big to replay, the sync carries the newest page instead: the head held
+///   becomes an island and the fresh head joins under it, so older pages stay reachable.
+/// - Stream messages are applied in batches, one per `frame`, in the order they came.
 ///
 /// Children and the parent change on the feed, not the thread's stream: pass feed events to `apply(feed:)`.
 @MainActor @Observable
@@ -62,8 +62,6 @@ public final class ThreadStore {
   /// A CLI process is attached, so the next message starts at once. nil until the server says.
   public private(set) var warm: Bool?
   public private(set) var loadState = LoadState.loading
-  /// The last load after the first failed. What loaded before stays.
-  public private(set) var refreshError: OmniAPIError?
   public private(set) var connection = ConnectionState.connecting
   /// An interrupt was asked for and the turn has not ended yet.
   public private(set) var stopping = false
@@ -138,11 +136,8 @@ public final class ThreadStore {
   @ObservationIgnored private var artifactIDs: Set<Int> = []
   @ObservationIgnored private var started = false
   @ObservationIgnored private var ended = false
-  @ObservationIgnored private var opened = false
   /// The latest load. An answer to an older one is dropped.
   @ObservationIgnored private var loadToken = 0
-  /// Artifacts the stream sent while a load was out, by id. nil while none is.
-  @ObservationIgnored private var artifactsSinceLoad: [Int: Artifact]?
   /// Layouts asked for, and the one `transcript` is. A layout that lands after a newer one was asked for is dropped.
   @ObservationIgnored private var layoutSeq = 0
   @ObservationIgnored private var laidSeq = 0
@@ -204,7 +199,7 @@ public final class ThreadStore {
     connection = .closed
   }
 
-  /// Loads the thread again: the first load after it failed, else a refetch merged into what is shown.
+  /// Tries the first load again after it failed. Once loaded, the stream's sync keeps the thread current.
   public func reload() async {
     await load()
   }
@@ -292,10 +287,9 @@ public final class ThreadStore {
   private var isLoaded: Bool { loadState == .loaded }
 
   private func load() async {
-    guard !ended else { return }
+    guard !ended, !isLoaded else { return }
     loadToken += 1
     let token = loadToken
-    artifactsSinceLoad = [:]
     let answer: Result<ThreadDetail, OmniAPIError>
     do {
       answer = .success(try await api.threadOpen(id))
@@ -306,41 +300,24 @@ public final class ThreadStore {
 
     switch answer {
     case .failure(.http(status: 404, _)):
-      artifactsSinceLoad = nil
       loadState = .notFound
-      closeStream()
     case .failure(let e):
-      artifactsSinceLoad = nil
-      if isLoaded {
-        refreshError = e
-      } else {
-        loadState = .failed(e)
-      }
+      loadState = .failed(e)
     case .success(let d):
       // A server without bounded history sends every row.
-      let head = d.history ?? .whole
-      if isLoaded {
-        flush()
-        take(d)
-        history.apply(head: d.events, head)
-        clippedChanged()
-        historyChanged()
-      } else {
-        let h = History(open: d.events, head: head)
-        let laidOut = await Self.layout(h.rows, h.spans)
-        guard token == loadToken else { return }
-        take(d)
-        history = h
-        layoutSeq += 1
-        laidSeq = layoutSeq
-        transcript = laidOut
-        clippedChanged()
-        eventsChanged()
-        loadState = .loaded
-        openStream()
-        if let at = revealing { await reveal(at) }
-      }
-      refreshError = nil
+      let h = History(open: d.events, head: d.history ?? .whole)
+      let laidOut = await Self.layout(h.rows, h.spans)
+      guard token == loadToken else { return }
+      take(d)
+      history = h
+      layoutSeq += 1
+      laidSeq = layoutSeq
+      transcript = laidOut
+      clippedChanged()
+      eventsChanged()
+      loadState = .loaded
+      openStream()
+      if let at = revealing { await reveal(at) }
     }
   }
 
@@ -356,17 +333,8 @@ public final class ThreadStore {
     parent = d.parent
     children = d.children
     team = d.team
-    var list = d.artifacts
-    for a in (artifactsSinceLoad ?? [:]).values.sorted(by: { $0.id < $1.id }) {
-      if let i = list.firstIndex(where: { $0.id == a.id }) {
-        if list[i].updatedAt < a.updatedAt { list[i] = a }
-      } else {
-        list.append(a)
-      }
-    }
-    artifactsSinceLoad = nil
-    artifacts = list
-    artifactIDs.formUnion(list.map(\.id))
+    artifacts = d.artifacts
+    artifactIDs.formUnion(d.artifacts.map(\.id))
   }
 
   @discardableResult
@@ -528,13 +496,6 @@ public final class ThreadStore {
     s.start()
   }
 
-  private func closeStream() {
-    stream?.close()
-    streamTask?.cancel()
-    stream = nil
-    streamTask = nil
-  }
-
   private func handle(_ e: SSEEvent<ThreadStreamMessage>) {
     switch e {
     case .message(let m):
@@ -556,9 +517,6 @@ public final class ThreadStore {
     case .state(let s):
       flush()
       connection = s
-      guard s == .open else { return }
-      if opened { Task { await load() } }
-      opened = true
     }
   }
 
@@ -580,10 +538,25 @@ public final class ThreadStore {
         }
       case .modToast(let t): show(t)
       case .context(let c): context = c
+      case .sync(let d, let snapshot):
+        add(rows)
+        rows = []
+        sync(d, snapshot: snapshot)
       case .unknown: break
       }
     }
     add(rows)
+  }
+
+  /// The thread's state as the stream connected. A snapshot's page becomes the head, and the head held closes into
+  /// an island.
+  private func sync(_ d: ThreadDetail, snapshot: Bool) {
+    take(d)
+    guard snapshot, let head = d.history else { return }
+    history.detachHead()
+    history.apply(head: d.events, head)
+    clippedChanged()
+    historyChanged()
   }
 
   private func show(_ t: ModToast) {
@@ -602,7 +575,6 @@ public final class ThreadStore {
   }
 
   private func upsert(_ a: Artifact) {
-    artifactsSinceLoad?[a.id] = a
     let isNew = artifactIDs.insert(a.id).inserted
     if let i = artifacts.firstIndex(where: { $0.id == a.id }) {
       artifacts[i] = a
