@@ -78,17 +78,23 @@ struct ChannelActionsView: View {
   private func row(_ action: ChannelAction) -> some View {
     HStack(spacing: z(12)) {
       VStack(alignment: .leading, spacing: z(3)) {
-        Text(action.name)
-          .font(.omni(size: 13, weight: .medium))
-          .foregroundStyle(Tok.fg)
-          .lineLimit(1)
+        HStack(spacing: z(8)) {
+          Text(action.name)
+            .font(.omni(size: 13, weight: .medium))
+            .foregroundStyle(Tok.fg)
+            .lineLimit(1)
+          if let setup = action.setup {
+            Chip(text: "Setup", tone: .outline)
+              .help("Runs in each new worktree: \(setup.label.lowercased())")
+          }
+        }
         Text(action.command)
           .font(.omni(size: 12, design: .monospaced))
           .foregroundStyle(Tok.fg3)
           .lineLimit(1)
           .truncationMode(.tail)
           .help(action.command)
-        Text(([ChannelActions.portLabel(action.port)] + action.secrets).joined(separator: " · "))
+        Text(([ChannelActions.portLabel(action.port)] + action.secrets + [action.setup?.label].compactMap(\.self)).joined(separator: " · "))
           .font(.omni(size: 11.5))
           .foregroundStyle(Tok.fg4)
           .lineLimit(1)
@@ -165,6 +171,13 @@ struct ChannelActionsView: View {
           Spacer(minLength: 0)
         }
       }
+      VStack(alignment: .leading, spacing: 0) {
+        FieldLabel(text: "Run in new worktrees", hint: setupHint(draft.wrappedValue.setup))
+        SegmentedPill(selection: draft.setup, options: [(nil, "Off"), (.blocking, SetupMode.blocking.label), (.background, SetupMode.background.label)])
+          .fixedSize()
+          .accessibilityElement(children: .contain)
+          .accessibilityLabel("Run in new worktrees")
+      }
       if let formError { ErrorNote(text: formError) }
       HStack(spacing: z(10)) {
         Button { Task { await save() } } label: {
@@ -191,6 +204,19 @@ struct ChannelActionsView: View {
     case .free: "Omni picks a free port for each run as $OMNI_PORT, so two threads never share one."
     case .fixed: "Always this port. A second run while it is taken is refused."
     }
+  }
+
+  /// What the setup choice does, and which action it takes over from: a channel has one setup action.
+  private func setupHint(_ mode: SetupMode?) -> String {
+    let what = switch mode {
+    case .blocking?: "Runs once in each new worktree. The agent starts after it succeeds."
+    case .background?: "Runs once in each new worktree while the agent starts."
+    default: "New worktrees do not run it."
+    }
+    guard mode != nil, case .success(let list) = actions,
+      let other = list.first(where: { $0.setup != nil && $0.id != editing?.id })
+    else { return what }
+    return "\(what) It takes over from \(other.name), as a channel has one setup action."
   }
 
   private func open(_ e: Editing) {

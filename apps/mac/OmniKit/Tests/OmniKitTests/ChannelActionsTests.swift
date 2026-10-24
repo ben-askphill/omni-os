@@ -28,6 +28,7 @@ private func encoded(_ input: ChannelActionInput) throws -> JSONValue {
     #expect(list.map(\.name) == ["Theme check", "Theme preview", "Tests"])
     #expect(list.map(\.port) == [nil, 0, nil])
     #expect(list.map(\.position) == [0, 1, 2])
+    #expect(list.map(\.setup) == [.background, nil, nil])
     #expect(list.allSatisfy { $0.channelID == "acme" && $0.secrets.isEmpty })
     let one = try decodeFixture(ChannelAction.self, "channel-action.json")
     #expect(one == list[0])
@@ -37,6 +38,8 @@ private func encoded(_ input: ChannelActionInput) throws -> JSONValue {
     let t = try decodeFixture(ThreadActions.self, "thread-actions.json")
     #expect(t.blocked == nil)
     #expect(t.actions.count == 3)
+    #expect(t.setupRun == nil && t.backgroundSetupRun == nil)
+    #expect(t.setupAction?.name == "Theme check")
     #expect(t.runs.map(\.state) == [.running, .stopped, .failed, .succeeded])
     #expect(t.runs.map(\.exitCode) == [nil, nil, 1, 0])
     #expect(t.keepPolling)
@@ -55,7 +58,7 @@ private func encoded(_ input: ChannelActionInput) throws -> JSONValue {
   }
 
   @Test func encodesTheRecordedRequest() throws {
-    let input = ChannelActionInput(name: "Theme check", command: #"echo "Theme check passed""#)
+    let input = ChannelActionInput(name: "Theme check", command: #"echo "Theme check passed""#, setup: .background)
     #expect(try encoded(input) == (try decodeFixture(JSONValue.self, "channel-action-request.json")))
   }
 }
@@ -65,6 +68,26 @@ private func encoded(_ input: ChannelActionInput) throws -> JSONValue {
     #expect(try encoded(ChannelActionInput(name: "a", command: "b"))["port"] == .null)
     #expect(try encoded(ChannelActionInput(name: "a", command: "b", port: 0))["port"] == .number(0))
     #expect(try encoded(ChannelActionInput(name: "a", command: "b", secrets: ["X"], port: 9292))["port"] == .number(9292))
+  }
+
+  @Test func sendsSetupAsNullOrAMode() throws {
+    #expect(try encoded(ChannelActionInput(name: "a", command: "b"))["setup"] == .null)
+    #expect(try encoded(ChannelActionInput(name: "a", command: "b", setup: .blocking))["setup"] == .string("blocking"))
+    #expect([SetupMode.blocking, .background].map(\.label) == ["Before the agent starts", "Alongside the agent"])
+  }
+
+  @Test func readsTheSetupRun() throws {
+    let json = #"{"actions":[],"runs":[\#(runJSON(state: "running", exitCode: "null", ended: "null"))],"blocked":null,"setup_run":\#(runJSON(state: "running", exitCode: "null", ended: "null"))}"#
+    let t = try decode(ThreadActions.self, json)
+    #expect(t.setupRun?.id == "r1" && t.setupRun?.state == .running)
+    #expect(t.backgroundSetupRun?.id == "r1")
+    #expect(t.keepPolling)
+    let failed = try decode(ThreadActions.self, #"{"actions":[],"runs":[],"blocked":null,"setup_run":\#(runJSON())}"#)
+    #expect(failed.backgroundSetupRun?.exitCode == 1 && !failed.keepPolling)
+    for state in ["succeeded", "stopped"] {
+      let done = try decode(ThreadActions.self, #"{"actions":[],"runs":[],"blocked":null,"setup_run":\#(runJSON(state: state))}"#)
+      #expect(done.backgroundSetupRun == nil)
+    }
   }
 
   @Test func labelsStatesAndPorts() {
@@ -99,6 +122,47 @@ private func encoded(_ input: ChannelActionInput) throws -> JSONValue {
     #expect(!idle.keepPolling && idle.blocked == "The worktree is being prepared.")
     let busy = try decode(ThreadActions.self, #"{"actions":[],"runs":[\#(runJSON(state: "running", exitCode: "null", ended: "null"))],"blocked":null}"#)
     #expect(busy.keepPolling)
+  }
+}
+
+@Suite struct PreparationStepTests {
+  private let action = try! decodeFixture([ChannelAction].self, "channel-actions.json")[0]
+
+  private func describe(_ steps: [PreparationStep]) -> [String] {
+    steps.map { "\($0.title) \($0.state)" }
+  }
+
+  @Test func checksOutThenSetsUpThenStartsTheAgent() throws {
+    #expect(describe(PreparationStep.steps(setup: .preparing, action: action, run: nil)) == [
+      "Checkout active", "Setup \"Theme check\" waiting", "Agent waiting",
+    ])
+    let running = try run(runJSON(state: "running", exitCode: "null", ended: "null"))
+    let steps = PreparationStep.steps(setup: .preparing, action: action, run: running)
+    #expect(describe(steps) == ["Checkout done", "Setup \"Tests\" active", "Agent waiting"])
+    #expect(steps[1].detail == "Alongside the agent")
+    let passed = try run(runJSON(state: "succeeded", exitCode: "0"))
+    #expect(describe(PreparationStep.steps(setup: .preparing, action: action, run: passed)) == [
+      "Checkout done", "Setup \"Tests\" done", "Agent active",
+    ])
+  }
+
+  @Test func leavesOutSetupWhenTheChannelHasNone() {
+    #expect(describe(PreparationStep.steps(setup: .preparing, action: nil, run: nil)) == ["Checkout active", "Agent waiting"])
+    #expect(describe(PreparationStep.steps(setup: .failed, action: nil, run: nil)) == ["Checkout failed", "Agent waiting"])
+  }
+
+  @Test func marksTheStepAFailedPreparationEndedOn() throws {
+    #expect(describe(PreparationStep.steps(setup: .failed, action: action, run: try run(runJSON()))) == [
+      "Checkout done", "Setup \"Tests\" failed", "Agent waiting",
+    ])
+    #expect(PreparationStep.steps(setup: .failed, action: action, run: try run(runJSON()))[1].detail == nil)
+    #expect(describe(PreparationStep.steps(setup: .failed, action: action, run: try run(runJSON(state: "stopped")))) == [
+      "Checkout done", "Setup \"Tests\" failed", "Agent waiting",
+    ])
+    #expect(describe(PreparationStep.steps(setup: .failed, action: action, run: nil)) == [
+      "Checkout failed", "Setup \"Theme check\" waiting", "Agent waiting",
+    ])
+    #expect(PreparationStep.steps(setup: nil, action: action, run: nil).allSatisfy { $0.state == .done })
   }
 }
 
@@ -141,6 +205,8 @@ private func encoded(_ input: ChannelActionInput) throws -> JSONValue {
     #expect(fixed.secrets == "A_TOKEN, B")
     #expect(fixed.input == ChannelActionInput(name: "Dev", command: "x --port 9292", secrets: ["A_TOKEN", "B"], port: 9292))
     #expect(ChannelActionDraft(list[0]).portMode == .none)
+    #expect(ChannelActionDraft(list[0]).setup == .background && ChannelActionDraft(list[0]).input?.setup == .background)
+    #expect(preview.setup == nil && preview.input?.setup == nil)
   }
 }
 
@@ -154,7 +220,7 @@ private func encoded(_ input: ChannelActionInput) throws -> JSONValue {
       }
     }
     let client = OmniClient(port: 4799, transport: t)
-    let input = ChannelActionInput(name: "Theme check", command: #"echo "Theme check passed""#)
+    let input = ChannelActionInput(name: "Theme check", command: #"echo "Theme check passed""#, setup: .background)
     #expect(try await client.channelActions("a b").count == 3)
     #expect(try await client.createChannelAction("acme", input).name == "Theme check")
     _ = try await client.updateChannelAction("acme", action: "x/1", input)

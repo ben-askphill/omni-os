@@ -75,8 +75,8 @@ struct ActionsTab: View {
               .accessibilityAddTraits(.isHeader)
             ForEach(a.runs) { run in
               RunCard(
-                run: run, expanded: (run.id == a.runs.first?.id) != toggled.contains(run.id), blocked: a.blocked != nil,
-                busy: busy.contains(run.id)
+                run: run, setup: run.id == a.setupRun?.id, expanded: (run.id == a.runs.first?.id) != toggled.contains(run.id),
+                blocked: a.blocked != nil, busy: busy.contains(run.id)
               ) {
                 toggled.formSymmetricDifference([run.id])
               } stop: {
@@ -198,6 +198,8 @@ private struct ActionRow: View {
 
 private struct RunCard: View {
   let run: ActionRun
+  /// The run the thread's worktree preparation started.
+  let setup: Bool
   let expanded: Bool
   let blocked: Bool
   let busy: Bool
@@ -212,10 +214,15 @@ private struct RunCard: View {
           HStack(spacing: z(10)) {
             RunGlyph(state: run.state)
             VStack(alignment: .leading, spacing: z(2)) {
-              Text(run.name)
-                .font(.omni(size: 13, weight: .medium))
-                .foregroundStyle(Tok.fg)
-                .lineLimit(1)
+              HStack(spacing: z(6)) {
+                Text(run.name)
+                  .font(.omni(size: 13, weight: .medium))
+                  .foregroundStyle(Tok.fg)
+                  .lineLimit(1)
+                if setup {
+                  Chip(text: "Setup", tone: .outline).help("Started when the thread's worktree was prepared")
+                }
+              }
               summary
                 .font(.omni(size: 11.5).monospacedDigit())
                 .foregroundStyle(Tok.fg3)
@@ -227,7 +234,7 @@ private struct RunCard: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(run.name), \(run.state.label)")
+        .accessibilityLabel("\(run.name)\(setup ? ", setup" : ""), \(run.state.label)")
         .accessibilityHint(expanded ? "Hides the output" : "Shows the output")
         if run.state == .running {
           Button(action: stop) {
@@ -281,7 +288,7 @@ private struct RunCard: View {
 
 /// Status is the only colour: a running run turns ultramarine, a failed one is the vermilion diamond, a succeeded one
 /// the volt disc, a stopped one settles grey.
-private struct RunGlyph: View {
+struct RunGlyph: View {
   let state: ActionRunState
 
   var body: some View {
@@ -299,8 +306,10 @@ private struct RunGlyph: View {
 }
 
 /// The run's bounded output, selectable, scrolled to its end where a failure says why.
-private struct RunOutput: View {
+struct RunOutput: View {
   let text: String
+  /// Taller output scrolls in this height.
+  var height: CGFloat = 280
 
   var body: some View {
     let body = Text(text)
@@ -312,10 +321,10 @@ private struct RunOutput: View {
       .padding(.horizontal, z(12))
       .padding(.vertical, z(10))
     Group {
-      if Format.isTall(text) {
+      if Format.isTall(text, lines: Int(height / 14)) {
         ScrollView { body }
           .defaultScrollAnchor(.bottom)
-          .frame(height: z(280))
+          .frame(height: z(height))
       } else {
         body
       }
