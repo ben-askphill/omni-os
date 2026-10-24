@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OUTPUT_LIMIT, type ActionRun, type ChannelAction, type ThreadActions } from '@omni/shared/channel-actions.ts';
-import { actionInput, draftOf, liveRun, outputCut, parseSecrets, runSummary, shouldPoll, withRun } from '../src/channel-actions.ts';
+import { actionInput, anyRunning, draftOf, liveRun, outputCut, parseSecrets, runSummary, setupPolls, setupSteps, stripRun, withRun } from '../src/channel-actions.ts';
 
 // The thread Actions tab and the channel settings editor (apps/web/src/channel-actions.ts) on GET /threads/:id/actions.
 
@@ -11,6 +11,7 @@ const action = (over: Partial<ChannelAction> = {}): ChannelAction => ({
   command: 'shopify theme dev --port $OMNI_PORT',
   secrets: [],
   port: 0,
+  setup: null,
   position: 0,
   created_at: '2026-01-05T09:00:00.000Z',
   updated_at: '2026-01-05T09:00:00.000Z',
@@ -35,14 +36,61 @@ const run = (over: Partial<ActionRun> = {}): ActionRun => ({
   ...over,
 });
 
-const thread = (runs: ActionRun[]): ThreadActions => ({ actions: [action()], runs, blocked: null });
+const thread = (runs: ActionRun[], over: Partial<ThreadActions> = {}): ThreadActions => ({ actions: [action()], runs, blocked: null, setup_run: null, ...over });
 
 describe('polling', () => {
-  it('polls only while a run is running and the tab is visible', () => {
-    expect(shouldPoll(undefined, true)).toBe(false);
-    expect(shouldPoll(thread([run()]), true)).toBe(false);
-    expect(shouldPoll(thread([run({ state: 'running', ended_at: null })]), true)).toBe(true);
-    expect(shouldPoll(thread([run({ state: 'running', ended_at: null })]), false)).toBe(false);
+  it('the Actions tab polls only while a run is running', () => {
+    expect(anyRunning(undefined)).toBe(false);
+    expect(anyRunning(thread([run()]))).toBe(false);
+    expect(anyRunning(thread([run({ state: 'running', ended_at: null })]))).toBe(true);
+  });
+
+  it('the setup card polls while the worktree is prepared, and a ready thread only while its setup run runs', () => {
+    const live = run({ id: 's1', state: 'running', exit_code: null, ended_at: null });
+    const preview = run({ id: 'p1', action_id: 'a2', state: 'running', exit_code: null, ended_at: null });
+    expect(setupPolls('preparing', undefined)).toBe(true);
+    expect(setupPolls(null, thread([live], { setup_run: live }))).toBe(true);
+    // A theme preview running for hours is the Actions tab's business, not the strip's.
+    expect(setupPolls(null, thread([preview, run({ id: 's1' })], { setup_run: run({ id: 's1' }) }))).toBe(false);
+    expect(setupPolls('failed', thread([live], { setup_run: live }))).toBe(false);
+  });
+});
+
+describe('setup steps', () => {
+  const setup = action({ id: 'a9', name: 'Install', setup: 'blocking' });
+  const states = (data: ThreadActions | undefined) => setupSteps(data).map((s) => `${s.label}:${s.state}`);
+
+  it('is Checkout then Agent when the channel has no setup action', () => {
+    expect(states(thread([]))).toEqual(['Checkout:active', 'Agent:todo']);
+    expect(states(undefined)).toEqual(['Checkout:active', 'Agent:todo']);
+  });
+
+  it('puts the setup action between them, with its mode, active while its run runs', () => {
+    const data = thread([], { actions: [action(), setup] });
+    expect(states(data)).toEqual(['Checkout:active', 'Setup "Install":todo', 'Agent:todo']);
+    expect(setupSteps(data)[1]!.detail).toBe('Before the agent starts');
+    const running = run({ id: 's1', action_id: 'a9', name: 'Install', state: 'running', exit_code: null, ended_at: null });
+    expect(states({ ...data, setup_run: running })).toEqual(['Checkout:done', 'Setup "Install":active', 'Agent:todo']);
+    expect(states({ ...data, setup_run: { ...running, state: 'succeeded' } })).toEqual(['Checkout:done', 'Setup "Install":done', 'Agent:active']);
+  });
+
+  it('names the step after the run, which keeps its name when the action is renamed or deleted', () => {
+    const gone = run({ id: 's1', action_id: null, name: 'Old install', state: 'running', exit_code: null, ended_at: null });
+    const steps = setupSteps(thread([], { actions: [], setup_run: gone }));
+    expect(steps.map((s) => s.label)).toEqual(['Checkout', 'Setup "Old install"', 'Agent']);
+    expect(steps[1]!.detail).toBeNull();
+  });
+});
+
+describe('the background setup strip', () => {
+  const failed = run({ id: 's1', state: 'failed', exit_code: 2 });
+
+  it('shows the setup run while it runs or once it failed, and hides it when it succeeded or Ben stopped it', () => {
+    expect(stripRun(thread([], { setup_run: failed }))?.id).toBe('s1');
+    expect(stripRun(thread([], { setup_run: run({ id: 's1', state: 'running', ended_at: null }) }))?.id).toBe('s1');
+    expect(stripRun(thread([], { setup_run: run({ id: 's1' }) }))).toBeNull();
+    expect(stripRun(thread([], { setup_run: run({ id: 's1', state: 'stopped' }) }))).toBeNull();
+    expect(stripRun(undefined)).toBeNull();
   });
 });
 
@@ -86,18 +134,31 @@ describe('answers to Run, Stop and Retry', () => {
       ['r0', 'stopped'],
     ]);
   });
+
+  it('updates the setup run when the answer is about it', () => {
+    const data = thread([run({ id: 's1', state: 'running', ended_at: null })], { setup_run: run({ id: 's1', state: 'running', ended_at: null }) });
+    expect(withRun(data, run({ id: 's1', state: 'stopped' })).setup_run?.state).toBe('stopped');
+    expect(withRun(data, run({ id: 'r9' })).setup_run?.id).toBe('s1');
+  });
 });
 
 describe('the settings editor', () => {
   it('reads an action into the form and back', () => {
-    expect(draftOf()).toEqual({ name: '', command: '', secrets: '', portMode: 'none', port: '' });
+    expect(draftOf()).toEqual({ name: '', command: '', secrets: '', portMode: 'none', port: '', setup: null });
     expect(draftOf(action({ port: null }))).toMatchObject({ portMode: 'none', port: '' });
     expect(draftOf(action({ port: 0 }))).toMatchObject({ portMode: 'free', port: '' });
     const fixed = action({ port: 9292, secrets: ['SHOPIFY_CLI_THEME_TOKEN', 'API_KEY'] });
     expect(draftOf(fixed)).toMatchObject({ portMode: 'fixed', port: '9292', secrets: 'SHOPIFY_CLI_THEME_TOKEN, API_KEY' });
     expect(actionInput(draftOf(fixed))).toEqual({
-      input: { name: 'Theme preview', command: 'shopify theme dev --port $OMNI_PORT', secrets: ['SHOPIFY_CLI_THEME_TOKEN', 'API_KEY'], port: 9292 },
+      input: { name: 'Theme preview', command: 'shopify theme dev --port $OMNI_PORT', secrets: ['SHOPIFY_CLI_THEME_TOKEN', 'API_KEY'], port: 9292, setup: null },
     });
+  });
+
+  it('always sends setup, so saving an edit never clears it by leaving it out', () => {
+    expect(draftOf(action({ setup: 'background' })).setup).toBe('background');
+    expect(actionInput(draftOf(action({ setup: 'blocking' })))).toMatchObject({ input: { setup: 'blocking' } });
+    const input = actionInput(draftOf(action()));
+    expect('input' in input && 'setup' in input.input && input.input.setup).toBeNull();
   });
 
   it('splits secret names on commas and spaces, upper-cased, each once', () => {
@@ -106,14 +167,14 @@ describe('the settings editor', () => {
   });
 
   it('sends the port mode as null, 0 or the number', () => {
-    const base = { name: ' Tests ', command: ' npm test ', secrets: '', port: '9292' };
-    expect(actionInput({ ...base, portMode: 'none' })).toEqual({ input: { name: 'Tests', command: 'npm test', secrets: [], port: null } });
+    const base = { name: ' Tests ', command: ' npm test ', secrets: '', port: '9292', setup: null };
+    expect(actionInput({ ...base, portMode: 'none' })).toEqual({ input: { name: 'Tests', command: 'npm test', secrets: [], port: null, setup: null } });
     expect(actionInput({ ...base, portMode: 'free' })).toMatchObject({ input: { port: 0 } });
     expect(actionInput({ ...base, portMode: 'fixed' })).toMatchObject({ input: { port: 9292 } });
   });
 
   it('refuses a fixed port with no number rather than sending 0', () => {
-    expect(actionInput({ name: 'Preview', command: 'x', secrets: '', portMode: 'fixed', port: '' })).toEqual({ error: 'Give the fixed port a number, like 9292.' });
-    expect(actionInput({ name: 'Preview', command: 'x', secrets: '', portMode: 'fixed', port: '0' })).toHaveProperty('error');
+    expect(actionInput({ name: 'Preview', command: 'x', secrets: '', portMode: 'fixed', port: '', setup: null })).toEqual({ error: 'Give the fixed port a number, like 9292.' });
+    expect(actionInput({ name: 'Preview', command: 'x', secrets: '', portMode: 'fixed', port: '0', setup: null })).toHaveProperty('error');
   });
 });

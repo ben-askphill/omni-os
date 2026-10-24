@@ -1,7 +1,5 @@
-import { useBranchingFrom } from '../components/BasePicker.tsx';
 import { Icon } from '../components/ui.tsx';
 import type { BasePick } from '@omni/shared/worktree-base.ts';
-import type { Thread } from '../api.ts';
 import { pickKey, type BaseOption } from '../worktree-base.ts';
 import { MoGroup, MoListRow, MoRadio, MoSection, MoSheet } from './parts.tsx';
 
@@ -60,10 +58,4 @@ export function BaseSheet({ rows, value, onChange, onClose }: { rows: BaseOption
       </div>
     </MoSheet>
   );
-}
-
-/** Where the worktree of a thread that is not ready branches from, under its "Preparing the worktree" line. */
-export function BranchingFrom({ thread }: { thread: Pick<Thread, 'id' | 'setup'> }) {
-  const from = useBranchingFrom(thread);
-  return from ? <p className="m-0 -mt-2 px-1 text-center text-[12.5px] text-fg-4">{from}</p> : null;
 }

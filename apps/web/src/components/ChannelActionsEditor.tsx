@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import type { ChannelAction } from '@omni/shared/channel-actions.ts';
+import type { ChannelAction, SetupMode } from '@omni/shared/channel-actions.ts';
 import { api, errorText, useApi } from '../api.ts';
 import { actionInput, draftOf, type ActionDraft, type PortMode } from '../channel-actions.ts';
 import { href } from '../router.ts';
@@ -21,7 +21,11 @@ export function ChannelActionsEditor({ channelId }: { channelId: string }) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const saved = (a: ChannelAction) => {
-    setData((list = []) => (list.some((x) => x.id === a.id) ? list.map((x) => (x.id === a.id ? a : x)) : [...list, a]));
+    setData((list = []) => {
+      // The server takes setup off every other action when one gets it.
+      const rest = a.setup ? list.map((x) => (x.setup ? { ...x, setup: null } : x)) : list;
+      return rest.some((x) => x.id === a.id) ? rest.map((x) => (x.id === a.id ? a : x)) : [...rest, a];
+    });
     setEditing(null);
   };
 
@@ -74,6 +78,13 @@ export function ChannelActionsEditor({ channelId }: { channelId: string }) {
     </div>
   );
 }
+
+const SETUP_HINT: Record<SetupMode | 'off', string> = {
+  off: 'Runs only from a thread\'s Actions tab. One action in the channel can also run in each new worktree.',
+  blocking:
+    'Runs once in each new worktree and holds the agent until it succeeds. If it fails, the thread stops at Setup failed with Retry setup. Never on Hermes, Cursor Cloud or a shared checkout.',
+  background: 'Runs once in each new worktree while the agent starts. If it fails, the thread says so and the agent keeps going. Never on Hermes, Cursor Cloud or a shared checkout.',
+};
 
 const PORT_HINT: Record<PortMode, string> = {
   none: 'The command serves nothing.',
@@ -176,6 +187,21 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
             />
           )}
         </div>
+      </div>
+      <div>
+        <Label hint={SETUP_HINT[d.setup ?? 'off']}>Run in new worktrees</Label>
+        <Segmented
+          radio
+          size="sm"
+          label="Run in new worktrees"
+          value={d.setup ?? 'off'}
+          onChange={(m) => set('setup', m === 'off' ? null : m)}
+          options={[
+            { id: 'off', label: 'Off' },
+            { id: 'blocking', label: 'Before the agent', title: 'Before the agent starts' },
+            { id: 'background', label: 'Alongside', title: 'Alongside the agent' },
+          ]}
+        />
       </div>
       {error && <ErrorNote>{error}</ErrorNote>}
       <div className="flex flex-wrap items-center gap-2">

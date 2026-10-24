@@ -6,6 +6,7 @@ import { SwitchLine } from '../components/Transcript.tsx';
 import { ASKING_LABEL, QuestionCard } from '../components/thread/QuestionCard.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
+import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { handOff, HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx';
 import { deviceRows } from '../handoff.ts';
 import { Button, ErrorNote, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';
@@ -20,7 +21,6 @@ import { useApp, useNow } from '../store.tsx';
 import { needsCard } from './activity.ts';
 import { MoComposer, type ComposerChip } from './MoComposer.tsx';
 import { NeedsActions, NeedsCardView } from './NeedsCard.tsx';
-import { BranchingFrom } from './BaseSheet.tsx';
 import { MoAvatar, MoBubble, MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSheet, MoStripes } from './parts.tsx';
 import { shortTime } from './rows.ts';
 import { useShell, useThread } from './shell.tsx';
@@ -551,10 +551,18 @@ export function ThreadScreen() {
             setHandoff(a.handoff);
           }}
         />
-        {!view.turns.length && <MoEmpty>{thread.setup ? 'Preparing the worktree.' : 'Nothing here yet.'}</MoEmpty>}
-        {thread.setup && <BranchingFrom thread={thread} />}
-        {/* A question's card above is where Ben answers it. */}
-        {card && card.kind !== 'question' && <NeedsCardView card={card} inThread onRecovered={(r) => {
+        {!view.turns.length && !thread.setup && <MoEmpty>Nothing here yet.</MoEmpty>}
+        <SetupCard
+          thread={thread}
+          mobile
+          onRetried={(t, pending) => {
+            // Retry keeps updated_at, so it must win a tie.
+            applyThread(t);
+            setQueued(pending);
+          }}
+        />
+        {/* A question's card above is where Ben answers it, and the setup card is where he retries setup. */}
+        {card && card.kind !== 'question' && card.kind !== 'setup' && <NeedsCardView card={card} inThread onRecovered={(r) => {
               applyThread(r.thread, true);
               setQueued(r.pending);
             }} />}
