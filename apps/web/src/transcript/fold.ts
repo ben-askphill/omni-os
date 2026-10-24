@@ -1,5 +1,6 @@
 import type { HandoverP, SwitchP } from '@omni/shared/run-switch.ts';
 import { isQuestionTool, QUESTION_EVENT, questionsIn, type ThreadQuestion } from '@omni/shared/question.ts';
+import type { PRWakeItem } from '@omni/shared/pr-watch.ts';
 import type { SlashRecord } from '@omni/shared/slash.ts';
 import { parsePayload, shortPath } from '../format.ts';
 
@@ -33,6 +34,9 @@ export interface UserP {
   dropped?: boolean;
   /** The harness command the message starts with and its Mentions, as they resolved when sent. */
   slash?: SlashRecord;
+  /** A PR watch's wake: what it was for (the first few), and how many more there were. */
+  items?: PRWakeItem[];
+  more?: number;
 }
 export interface TextP {
   text: string;

@@ -153,8 +153,7 @@ async function notification(obs: PRObservation, events: WatchEvent[], deps: Evid
   return [
     `[pr watch] ${obs.repo}#${obs.number}, head ${obs.headSha}`,
     '',
-    ...sections,
-    '',
+    ...sections.flatMap((s) => [s, '']),
     'Omni is watching this PR for you. If a newer push already dealt with all of this, say so in one line and stop.',
   ].join('\n');
 }

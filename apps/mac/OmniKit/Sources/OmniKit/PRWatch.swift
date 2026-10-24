@@ -10,6 +10,7 @@ public struct PRWatchStop: OpenEnum {
   public static let merged: Self = "merged"
   public static let closed: Self = "closed"
   public static let wakeLimit: Self = "wake_limit"
+  public static let commentLimit: Self = "comment_limit"
   public static let errorLimit: Self = "error_limit"
 }
 
@@ -62,7 +63,7 @@ public struct PRWatch: Decodable, Hashable, Sendable {
   /// The menu row's two lines: what pressing it does, and the watch's line or what a watch would do. `watchCopy` in
   /// apps/web/src/components/thread/PRWatch.tsx.
   public static func copy(_ w: PRWatch?) -> (action: String, line: String) {
-    (w?.isWatching == true ? "Stop watching" : "Watch checks", w?.watchLine ?? "Wakes this thread when a check fails")
+    (w?.isWatching == true ? "Stop watching" : "Watch PR", w?.watchLine ?? "Wakes this thread when a check fails or a review comes in")
   }
 
   /// The one line a client shows for a watch: what it sees now, or why it stopped. `watchLine` in
@@ -74,17 +75,32 @@ public struct PRWatch: Decodable, Hashable, Sendable {
       case .merged: "Watch ended: PR merged"
       case .closed: "Watch ended: PR closed"
       case .wakeLimit: "Watch stopped after its wake limit"
+      case .commentLimit: "Watch stopped after its review wake limit"
       case .errorLimit: "Watch stopped: GitHub kept failing"
       default: "Watch stopped"
       }
     }
-    if error != nil { return "Watching checks, retrying GitHub" }
-    guard let c = checks else { return "Watching checks" }
-    if c.failed > 0 { return "Watching checks: \(c.failed) failing" }
-    if c.pending > 0 { return "Watching checks: \(c.pending) running" }
-    if c.passed > 0 { return "Watching checks: all passed" }
-    return "Watching checks"
+    if error != nil { return "Watching checks and reviews, retrying GitHub" }
+    guard let c = checks else { return "Watching checks and reviews" }
+    if c.failed > 0 { return "Watching checks and reviews: \(c.failed) failing" }
+    if c.pending > 0 { return "Watching checks and reviews: \(c.pending) running" }
+    if c.passed > 0 { return "Watching checks and reviews: all passed" }
+    return "Watching checks and reviews"
   }
+}
+
+/// One thing a PR watch's wake was about: a failing check, or a review comment with its author and a bounded excerpt.
+/// `PRWakeItem` in packages/shared/pr-watch.ts. The message's `items` hold the first few, `more` counts the rest.
+public struct PRWakeItem: Decodable, Hashable, Sendable {
+  /// `checks` or `feedback`.
+  public let source: String
+  /// A check's name, or the comment's author.
+  public let label: String
+  public let url: String?
+  /// Feedback only: the comment cut to size.
+  public let excerpt: String?
+  /// Feedback only: what it is, e.g. "changes requested".
+  public let kind: String?
 }
 
 extension OmniClient {

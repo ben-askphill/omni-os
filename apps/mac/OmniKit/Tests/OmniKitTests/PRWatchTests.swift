@@ -21,7 +21,7 @@ private func watch(state: String = "watching", stop: String? = nil, error: Strin
     #expect(w.checks.map { [$0.passed, $0.failed, $0.pending] } == [1, 0, 1])
     #expect(w.wakes == 0 && w.maxWakes == 5)
     #expect(w.headSHA?.count == 40 && w.lastPolledAt != nil && w.nextPollAt != nil)
-    #expect(w.watchLine == "Watching checks: 1 running")
+    #expect(w.watchLine == "Watching checks and reviews: 1 running")
   }
 
   @Test func readsAStoppedViewAndNone() throws {
@@ -38,6 +38,7 @@ private func watch(state: String = "watching", stop: String? = nil, error: Strin
     ("merged", "Watch ended: PR merged"),
     ("closed", "Watch ended: PR closed"),
     ("wake_limit", "Watch stopped after its wake limit"),
+    ("comment_limit", "Watch stopped after its review wake limit"),
     ("error_limit", "Watch stopped: GitHub kept failing"),
   ] as [(String?, String)])
   func saysWhyItStopped(_ reason: String?, _ want: String) throws {
@@ -45,21 +46,22 @@ private func watch(state: String = "watching", stop: String? = nil, error: Strin
   }
 
   @Test(arguments: [
-    (nil, nil, "Watching checks"),
-    ("gh failed", #"{"passed":0,"failed":2,"pending":0}"#, "Watching checks, retrying GitHub"),
-    (nil, #"{"passed":1,"failed":2,"pending":3}"#, "Watching checks: 2 failing"),
-    (nil, #"{"passed":1,"failed":0,"pending":3}"#, "Watching checks: 3 running"),
-    (nil, #"{"passed":4,"failed":0,"pending":0}"#, "Watching checks: all passed"),
-    (nil, #"{"passed":0,"failed":0,"pending":0}"#, "Watching checks"),
+    (nil, nil, "Watching checks and reviews"),
+    ("gh failed", #"{"passed":0,"failed":2,"pending":0}"#, "Watching checks and reviews, retrying GitHub"),
+    (nil, #"{"passed":1,"failed":2,"pending":3}"#, "Watching checks and reviews: 2 failing"),
+    (nil, #"{"passed":1,"failed":0,"pending":3}"#, "Watching checks and reviews: 3 running"),
+    (nil, #"{"passed":4,"failed":0,"pending":0}"#, "Watching checks and reviews: all passed"),
+    (nil, #"{"passed":0,"failed":0,"pending":0}"#, "Watching checks and reviews"),
   ] as [(String?, String?, String)])
   func saysWhatItSees(_ error: String?, _ checks: String?, _ want: String) throws {
     #expect(try watch(error: error, checks: checks).watchLine == want)
   }
 
   @Test func theToggleSaysWhatItDoes() throws {
-    #expect(PRWatch.copy(nil) == ("Watch checks", "Wakes this thread when a check fails"))
-    #expect(PRWatch.copy(try watch()) == ("Stop watching", "Watching checks"))
-    #expect(PRWatch.copy(try watch(state: "stopped", stop: "merged")) == ("Watch checks", "Watch ended: PR merged"))
+    #expect(PRWatch.copy(nil) == ("Watch PR", "Wakes this thread when a check fails or a review comes in"))
+    #expect(PRWatch.copy(try watch()) == ("Stop watching", "Watching checks and reviews"))
+    #expect(PRWatch.copy(try watch(state: "stopped", stop: "merged")) == ("Watch PR", "Watch ended: PR merged"))
+    #expect(PRWatch.copy(try watch(state: "stopped", stop: "comment_limit")).action == "Watch PR")
   }
 
   @Test func getsStartsAndStops() async throws {
@@ -94,5 +96,21 @@ private func watch(state: String = "watching", stop: String? = nil, error: Strin
     #expect(queued.label(lead: false) == "Queued, runs after this turn")
     #expect(ParkedMessages.heading([held]) == "1 message is waiting for Resume")
     #expect(ParkedMessages.heading([held, held]) == "2 messages are waiting for Resume")
+  }
+
+  @Test func aWakeListsWhatItWasFor() throws {
+    let m = try decode(UserMessage.self, """
+      {"text":"#12 at 4f9c2d1. Review feedback from sam","source":"pr-watch","more":52,"items":[
+        {"source":"feedback","label":"sam","url":"https://github.com/acme/shop/pull/12#discussion_r1","kind":"comment on src/a.ts:12","excerpt":"Please rename this."},
+        {"source":"checks","label":"CI / build","url":null}]}
+      """)
+    #expect(m.more == 52)
+    #expect(m.items?.map(\.label) == ["sam", "CI / build"])
+    #expect(m.items?.first?.url == "https://github.com/acme/shop/pull/12#discussion_r1")
+    #expect(m.items?.first?.excerpt == "Please rename this." && m.items?.first?.kind == "comment on src/a.ts:12")
+    #expect(m.items?[1].url == nil && m.items?[1].excerpt == nil)
+    // A wake from before the list existed has none.
+    let old = try decode(UserMessage.self, ##"{"text":"#12 at 4f9c2d1. CI failed: build","source":"pr-watch"}"##)
+    #expect(old.items == nil && old.more == nil)
   }
 }

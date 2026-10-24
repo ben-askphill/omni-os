@@ -4,6 +4,7 @@ import { harnessLabel, OmniMark } from '../components/brand.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { SwitchLine } from '../components/Transcript.tsx';
 import { ASKING_LABEL, QuestionCard } from '../components/thread/QuestionCard.tsx';
+import { PRWakeList } from '../components/thread/PRWatch.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
 import { handOff, HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx';
@@ -522,9 +523,21 @@ export function ThreadScreen() {
           return (
             <div key={t.key} ref={last ? newest : undefined} className="flex flex-col gap-4">
               {t.prompts.map((p, k) => (
-                <MoBubble key={k} caption={i === 0 && k === 0 && thread.parent_id ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}` : k > 0 ? 'Sent while it ran' : undefined}>
+                <MoBubble
+                  key={k}
+                  caption={
+                    p.source === 'pr-watch'
+                      ? 'PR watch'
+                      : i === 0 && k === 0 && thread.parent_id
+                        ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`
+                        : k > 0
+                          ? 'Sent while it ran'
+                          : undefined
+                  }
+                >
                   {p.text}
                   {p.attachments?.length ? <span className="text-fg-3"> · {plural(p.attachments.length, 'file')}</span> : null}
+                  {p.items?.length ? <PRWakeList items={p.items} more={p.more} /> : null}
                 </MoBubble>
               ))}
               {t.reports.map((r, k) => (

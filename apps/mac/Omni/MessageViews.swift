@@ -52,6 +52,9 @@ struct UserBubbleView: View {
             .foregroundStyle(Tok.fg3)
             .underline()
         }
+        if let items = message.items, !items.isEmpty {
+          PRWakeListView(items: items, more: message.more ?? 0)
+        }
       }
       .padding(.horizontal, z(16))
       .padding(.vertical, z(10))

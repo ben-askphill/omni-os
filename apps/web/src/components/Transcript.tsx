@@ -6,6 +6,7 @@ import { useApp, useNow } from '../store.tsx';
 import { BranchFace, DelegationCard, RailItem, ROW_CARD } from './Delegation.tsx';
 import { PublishedCard } from './Published.tsx';
 import { CloudAgentCard } from './thread/CloudAgentCard.tsx';
+import { PRWakeList } from './thread/PRWatch.tsx';
 import { QuestionCard } from './thread/QuestionCard.tsx';
 import { Markdown } from './Markdown.tsx';
 import { Button, CheckItem, copyText, Icon, IconButton, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
@@ -895,6 +896,7 @@ function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: strin
             {more ? 'Show less' : 'Show all'}
           </button>
         )}
+        {p.items?.length ? <PRWakeList items={p.items} more={p.more} /> : null}
       </div>
       <CopyMsg text={text} align="end" />
     </div>

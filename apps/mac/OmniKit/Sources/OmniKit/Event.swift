@@ -182,6 +182,9 @@ public struct UserMessage: Decodable, Hashable, Sendable {
   public let mode: SendMode?
   /// The agent never saw it.
   public let dropped: Bool?
+  /// A PR watch's wake: what it was for, and how many more there were. See `PRWakeItem`.
+  public let items: [PRWakeItem]?
+  public let more: Int?
 }
 
 /// kind `crew_report`: a child thread reporting back to its parent.
