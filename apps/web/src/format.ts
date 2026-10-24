@@ -1,6 +1,7 @@
 // Dates from SQLite are ISO strings in UTC. Display uses the browser's locale timezone,
 // except automations, which use their own timezone (Europe/Amsterdam by default).
 
+import { isDeliveryAhead, type DeliveryView, type TriggerSource } from '@omni/shared/automation-triggers.ts';
 import { formatCents } from '@omni/shared/context-meter.ts';
 import type { ArtifactTrigger, MonthlyUsage, WebhookTrigger } from './api.ts';
 
@@ -152,6 +153,57 @@ export function describeArtifactSource(on: ArtifactTrigger, name: (id: string) =
 /** Which webhooks an automation takes, for its filter chip: `acme/shop · workflow_run, pull_request_review · anyone`. */
 export function describeWebhookSource(on: WebhookTrigger): string {
   return [on.repo, on.events.join(', '), on.trust === 'any' && 'anyone'].filter(Boolean).join(' · ');
+}
+
+const SOURCE_LABELS: Record<TriggerSource, string> = { artifact_published: 'Published page', github_webhook: 'GitHub webhook' };
+
+/** Where a delivery came from, for its detail. */
+export const describeDeliverySource = (source: TriggerSource) => SOURCE_LABELS[source];
+
+/** How far off a time is, for what has not happened yet: `in 12m`, `in 3h`, `in 2d`. `now` once it has passed. */
+export function inTime(iso: string, now = Date.now()) {
+  const ms = toDate(iso).getTime() - now;
+  if (Number.isNaN(ms)) return '';
+  if (ms <= 0) return 'now';
+  const m = Math.ceil(ms / 60_000);
+  if (m < 60) return `in ${m}m`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `in ${h}h` : `in ${Math.round(h / 24)}d`;
+}
+
+/** When an event ages out, as a fact: `Expires in 3h`, or `Expired Thu 00:18` once it has. */
+export function expiryFact(iso: string, now = Date.now()) {
+  return toDate(iso).getTime() > now ? { label: 'Expires', value: inTime(iso, now) } : { label: 'Expired', value: relTime(iso, now) };
+}
+
+/** How long ago an event arrived, for one that came today. Earlier ones are told apart by the date alone. */
+export function receivedAgo(iso: string, now = Date.now()) {
+  return toDate(iso).getTime() >= startOfDay(new Date(now)).getTime() ? relTime(iso, now) : null;
+}
+
+/** The value when it is one http(s) link, else null. A delivery's context is text from outside, and only a web link becomes a link. */
+export function httpUrl(value: string): string | null {
+  if (/\s/.test(value)) return null;
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'https:' || protocol === 'http:' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Deliveries from a reload, a page of history or an answer to a retry or skip, folded into the ones already shown,
+ * newest first. A row in both takes the incoming copy unless the shown one is further along, so a late copy never
+ * takes a state back, and loaded history stays when the latest few move on.
+ */
+export function mergeDeliveries(incoming: DeliveryView[], current: DeliveryView[]): DeliveryView[] {
+  const byId = new Map(current.map((d) => [d.id, d]));
+  for (const d of incoming) {
+    const shown = byId.get(d.id);
+    if (!shown || !isDeliveryAhead(shown, d)) byId.set(d.id, d);
+  }
+  return [...byId.values()].sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
 }
 
 /** Best effort human text for common 5-field crons; falls back to the raw expression. */

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
-import { DELIVERY_STATE_LABELS, type TriggerDeliveryState } from '@omni/shared/automation-triggers.ts';
 import { api, errorText, useApi, type Automation, type Thread } from '../api.ts';
-import { Button, Chip, CopyButton, Empty, ErrorNote, Icon, InlineConfirm, Loading, PageHeader, StatusDot, Toggle, type ChipTone } from '../components/ui.tsx';
+import { DeliveryHistory } from '../components/DeliveryHistory.tsx';
+import { Button, Chip, CopyButton, Empty, ErrorNote, Icon, InlineConfirm, Loading, PageHeader, StatusDot, Toggle } from '../components/ui.tsx';
 import { artifactChannels, describeArtifactSource, describeCron, describeEvent, describeWebhookSource, nextRunLabel, relTime, shortPath } from '../format.ts';
 import { href, navigate } from '../router.ts';
 import { useApp, useFeed } from '../store.tsx';
@@ -12,15 +12,6 @@ const RUN_TONE: Record<string, string> = {
   stopped: 'var(--fg-4)',
   running: 'var(--live)',
   queued: 'var(--fg-4)',
-};
-
-const DELIVERY_TONE: Record<TriggerDeliveryState, ChipTone> = {
-  received: 'default',
-  accepted: 'default',
-  queued: 'default',
-  started: 'done',
-  failed: 'needs',
-  skipped: 'outline',
 };
 
 /** Recent runs as a row of bars, oldest left: a glance at reliability. */
@@ -322,37 +313,7 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
           {a.deliveries.length === 0 ? (
             <div className="text-[12.5px] text-fg-4">{a.on?.event === 'github_webhook' ? 'No GitHub deliveries since it was turned on.' : 'No pages published since it was turned on.'}</div>
           ) : (
-            <ul className="-mx-2">
-              {a.deliveries.map((d) => {
-                const inner = (
-                  <>
-                    <Chip tone={DELIVERY_TONE[d.state]}>{DELIVERY_STATE_LABELS[d.state]}</Chip>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate" title={d.summary}>
-                        {d.summary}
-                      </span>
-                      {d.reason && (
-                        <span className="block truncate text-[11.5px] text-fg-3" title={d.reason}>
-                          {d.reason}
-                        </span>
-                      )}
-                    </span>
-                    <span className="w-24 shrink-0 text-right font-num text-[11px] text-fg-4">{relTime(d.created_at)}</span>
-                  </>
-                );
-                return (
-                  <li key={d.id}>
-                    {d.thread_id ? (
-                      <a href={href.thread(d.thread_id)} className="hov flex min-h-8 min-w-0 items-center gap-2.5 rounded-full px-2 py-1 text-[12.5px] [--hov:var(--surface-2)]">
-                        {inner}
-                      </a>
-                    ) : (
-                      <div className="flex min-h-8 min-w-0 items-center gap-2.5 px-2 py-1 text-[12.5px]">{inner}</div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            <DeliveryHistory automation={a.id} latest={a.deliveries} latestMore={a.deliveries_more} onChanged={onChanged} />
           )}
         </div>
       )}

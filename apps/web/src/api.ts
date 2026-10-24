@@ -6,10 +6,10 @@ import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
 import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
-import type { TriggerDelivery } from '@omni/shared/automation-triggers.ts';
+import type { DeliveryPage, DeliveryView } from '@omni/shared/automation-triggers.ts';
 import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/automation-events.ts';
 
-export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, TriggerDelivery };
+export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, DeliveryView, DeliveryPage };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number };
@@ -303,7 +303,9 @@ export interface Automation {
   next?: string | null;
   runs: AutomationRun[];
   /** Published pages or GitHub webhooks delivered to the automation, newest first, at most 5. Empty for the rest. */
-  deliveries: TriggerDelivery[];
+  deliveries: DeliveryView[];
+  /** Older deliveries exist: GET /automations/:id/deliveries pages through them. */
+  deliveries_more: boolean;
   /** Set for a webhook automation: where GitHub posts, and whether this Mac holds the signing secret. `secret` is its Keychain name, never the value. */
   webhook?: { path: string; secret: string; secret_set: boolean };
 }
@@ -377,9 +379,12 @@ export type FeedEvent =
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** The parsed reply of a refused request, for the ones that carry more than an `error`. */
+  body: unknown;
+  constructor(message: string, status: number, body?: unknown) {
     super(message);
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -433,7 +438,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
         : typeof data === 'string' && data
           ? data.slice(0, 300)
           : `Request failed (${res.status})`;
-    throw new ApiError(msg, res.status);
+    throw new ApiError(msg, res.status, data);
   }
   return data as T;
 }
@@ -458,6 +463,13 @@ export const api = {
 export const harnessesPath = (channel?: string | null) => (channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses');
 
 export const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** What a refused retry or skip (409) says is true of the delivery now, so the row can show it next to the reason. */
+export function refusedDelivery(e: unknown): DeliveryView | undefined {
+  const body = e instanceof ApiError && e.body && typeof e.body === 'object' ? (e.body as { delivery?: unknown }) : undefined;
+  const d = body?.delivery;
+  return d && typeof d === 'object' && typeof (d as { id?: unknown }).id === 'string' ? (d as DeliveryView) : undefined;
+}
 
 export const artifactUrl = (a: Pick<Artifact, 'id' | 'updated_at'>, download = false) =>
   `/api/artifacts/${a.id}/raw?v=${encodeURIComponent(a.updated_at)}${download ? '&download=1' : ''}`;
