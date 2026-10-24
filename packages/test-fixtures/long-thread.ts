@@ -83,7 +83,7 @@ export function longThread({ turns = 80, hugeResult = 4_000_000, hugeWrite = 1_5
     if (t === 20) {
       const questions = [{ question: 'Ship it?', header: 'Ship', options: [{ label: 'Yes', description: 'Ship now' }, { label: 'No', description: 'Wait' }], multiSelect: false }];
       add('question', { id: LONG_THREAD.questionId, questions });
-      add('question_answer', { id: LONG_THREAD.questionId, state: 'answered', answers: [{ selected: ['Yes'], other: null }] });
+      add('question_answer', { id: LONG_THREAD.questionId, state: 'answered', answers: [{ selected: ['Yes'], other: null }], via: 'tool' });
     }
     if (t % 9 === 0) add(LONG_THREAD.unknownKind, { id: `ctx-${t}`, source: 'note', text: filler(300, t) });
     if (t === 41) add('user', { text: `Pasted log:\n${filler(160_000, t)}`, source: 'ben' });

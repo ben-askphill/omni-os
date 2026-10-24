@@ -11,33 +11,33 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
 @Suite struct ScrollPinTests {
   @Test func goesToTheBottomOnTheFirstEvents() {
     var pin = ScrollPin()
-    let go1 = pin.eventsChanged(count: 0)
+    let go1 = pin.eventsChanged(tail: 0)
     #expect(!go1, "nothing to show yet")
     _ = pin.geometryChanged(at(500))
     _ = pin.geometryChanged(at(10))
     #expect(!pin.isPinned)
-    let go2 = pin.eventsChanged(count: 5)
+    let go2 = pin.eventsChanged(tail: 5)
     #expect(go2)
     #expect(!pin.showsJump)
   }
 
   @Test func followsNewEventsAtTheBottom() {
     var pin = ScrollPin()
-    let go3 = pin.eventsChanged(count: 5)
+    let go3 = pin.eventsChanged(tail: 5)
     #expect(go3)
     _ = pin.geometryChanged(at(1500))
-    let go4 = pin.eventsChanged(count: 6)
+    let go4 = pin.eventsChanged(tail: 6)
     #expect(go4)
     #expect(!pin.showsJump)
   }
 
   @Test func showsTheJumpWhenScrolledUp() {
     var pin = ScrollPin()
-    _ = pin.eventsChanged(count: 5)
+    _ = pin.eventsChanged(tail: 5)
     _ = pin.geometryChanged(at(1500))
     _ = pin.geometryChanged(at(1470))
     #expect(!pin.isPinned, "30pt up already stops following")
-    let go5 = pin.eventsChanged(count: 6)
+    let go5 = pin.eventsChanged(tail: 6)
     #expect(!go5)
     #expect(pin.showsJump)
     _ = pin.geometryChanged(at(1480))
@@ -50,7 +50,7 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
   /// Ben's recording: a few lines up on an idle thread, the lazy stack measures a row, and the view jumped back.
   @Test func aRowMeasuredAfterAShortScrollUpDoesNotPullBack() {
     var pin = ScrollPin()
-    _ = pin.eventsChanged(count: 5)
+    _ = pin.eventsChanged(tail: 5)
     _ = pin.geometryChanged(at(1500))
     _ = pin.geometryChanged(at(1450))
     let measured = pin.geometryChanged(at(1450, content: 2012))
@@ -62,7 +62,7 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
 
   @Test func overscrollAtTheBottomKeepsFollowing() {
     var pin = ScrollPin()
-    _ = pin.eventsChanged(count: 5)
+    _ = pin.eventsChanged(tail: 5)
     _ = pin.geometryChanged(at(1500))
     _ = pin.geometryChanged(at(1530))
     _ = pin.geometryChanged(at(1500))
@@ -71,21 +71,21 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
 
   @Test func jumpPinsAgain() {
     var pin = ScrollPin()
-    _ = pin.eventsChanged(count: 5)
+    _ = pin.eventsChanged(tail: 5)
     _ = pin.geometryChanged(at(1500))
     _ = pin.geometryChanged(at(0))
-    _ = pin.eventsChanged(count: 6)
+    _ = pin.eventsChanged(tail: 6)
     #expect(pin.showsJump)
     pin.jump()
     #expect(pin.isPinned)
     #expect(!pin.showsJump)
-    let go6 = pin.eventsChanged(count: 7)
+    let go6 = pin.eventsChanged(tail: 7)
     #expect(go6)
   }
 
   @Test func staysPinnedWhileTheContentGrows() {
     var pin = ScrollPin()
-    _ = pin.eventsChanged(count: 5)
+    _ = pin.eventsChanged(tail: 5)
     _ = pin.geometryChanged(at(1500))
     // A row expands by 600pt: the bottom moved away, but nobody scrolled.
     let go7 = pin.geometryChanged(at(1500, content: 2600))
@@ -99,7 +99,7 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
 
   @Test func leavesTheContentAloneWhenScrolledUp() {
     var pin = ScrollPin()
-    _ = pin.eventsChanged(count: 5)
+    _ = pin.eventsChanged(tail: 5)
     _ = pin.geometryChanged(at(1500))
     _ = pin.geometryChanged(at(200))
     let go10 = pin.geometryChanged(at(200, content: 2600))
@@ -109,7 +109,7 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
 
   @Test func countsAShortThreadAsAtTheBottom() {
     var pin = ScrollPin()
-    _ = pin.eventsChanged(count: 1)
+    _ = pin.eventsChanged(tail: 1)
     _ = pin.geometryChanged(at(0, content: 300))
     _ = pin.geometryChanged(at(0, content: 300, viewport: 400))
     #expect(pin.isPinned)
@@ -118,7 +118,7 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
   /// A lazy stack measures rows as they scroll in, so a scroll often comes with a new content height.
   @Test func aScrollThatMeasuresRowsIsStillAScroll() {
     var pin = ScrollPin()
-    _ = pin.eventsChanged(count: 5)
+    _ = pin.eventsChanged(tail: 5)
     _ = pin.geometryChanged(at(1500))
     let up = pin.geometryChanged(at(1440, content: 2030))
     #expect(!up, "no pull back to the bottom")
@@ -128,9 +128,42 @@ private func at(_ offset: Double, content: Double = 2000, viewport: Double = 500
     #expect(!pin.isPinned)
   }
 
+  /// An earlier page lands above while Ben reads: the content grows, the newest event stays the same.
+  @Test func aPrependDoesNotShowThePill() {
+    var pin = ScrollPin()
+    _ = pin.eventsChanged(tail: 500)
+    _ = pin.geometryChanged(at(1500))
+    _ = pin.geometryChanged(at(0))
+    let anchored = pin.geometryChanged(at(900, content: 2900))
+    #expect(!anchored, "the view keeps its row, not the bottom")
+    let same = pin.eventsChanged(tail: 500)
+    #expect(!same)
+    #expect(!pin.showsJump)
+    let older = pin.eventsChanged(tail: 480)
+    #expect(!older)
+    #expect(!pin.showsJump)
+    let new = pin.eventsChanged(tail: 501)
+    #expect(!new)
+    #expect(pin.showsJump, "a newer event is news")
+  }
+
+  @Test func aRevealStopsFollowing() {
+    var pin = ScrollPin()
+    pin.release(tail: 500)
+    let first = pin.eventsChanged(tail: 500)
+    #expect(!first, "the events shown with the hit do not pull to the bottom")
+    #expect(!pin.isPinned)
+    #expect(!pin.showsJump)
+    _ = pin.geometryChanged(at(400))
+    let grown = pin.geometryChanged(at(400, content: 2600))
+    #expect(!grown)
+    _ = pin.eventsChanged(tail: 501)
+    #expect(pin.showsJump)
+  }
+
   @Test func keepsGoingToTheBottomUntilItGetsThere() {
     var pin = ScrollPin()
-    let go = pin.eventsChanged(count: 2000)
+    let go = pin.eventsChanged(tail: 2000)
     #expect(go)
     let first = pin.geometryChanged(at(0))
     #expect(first)

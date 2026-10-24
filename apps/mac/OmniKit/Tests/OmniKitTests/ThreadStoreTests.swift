@@ -30,13 +30,16 @@ private func ev(_ id: Int, _ kind: String = "assistant_text", _ payload: String 
   eventJSON(kind: kind, payload: payload, id: id)
 }
 
+/// A thread snapshot. `from`: the head page's first id, as `?history=recent` answers; nil for a server that sends
+/// every row.
 private func detail(
   _ thread: String = row(), events: [String] = [], artifacts: [String] = [], pending: [String] = [], live: Bool = false,
-  children: [String] = [], parent: String? = nil
+  children: [String] = [], parent: String? = nil, from: Int? = nil, resultsBelow: Int = 0
 ) throws -> ThreadDetail {
-  try decode(ThreadDetail.self, """
+  let history = from.map { #","history":{"from":\#($0),"to":null,"results_below":\#(resultsBelow)}"# } ?? ""
+  return try decode(ThreadDetail.self, """
     {"thread":\(thread),"channel":\(channelJSON),"events":[\(events.joined(separator: ","))],"artifacts":[\(artifacts.joined(separator: ","))],
-     "children":[\(children.joined(separator: ","))],"parent":\(parent ?? "null"),"pending":[\(pending.joined(separator: ","))],"live":\(live)}
+     "children":[\(children.joined(separator: ","))],"parent":\(parent ?? "null"),"pending":[\(pending.joined(separator: ","))],"live":\(live)\(history)}
     """)
 }
 
@@ -59,6 +62,10 @@ final class FakeThreadAPI: ThreadAPI {
     var stop: Result<Void, OmniAPIError> = .success(())
     var calls: [String: Int] = [:]
     var hold: Gate?
+    var pages: [HistoryCursor: Result<HistoryPage, OmniAPIError>] = [:]
+    var cursors: [HistoryCursor] = []
+    var holdPage: Gate?
+    var rows: [Int: EventRow] = [:]
     var handoff: Result<HandoffAnswer, OmniAPIError> = .failure(.unreachable("not set"))
     var handoffs: [String] = []
   }
@@ -86,7 +93,42 @@ final class FakeThreadAPI: ThreadAPI {
     return gate
   }
 
-  func thread(_ id: String) async throws(OmniAPIError) -> ThreadDetail {
+  /// The page each cursor answers with. A cursor with none fails.
+  func setPage(_ cursor: HistoryCursor, _ page: Result<HistoryPage, OmniAPIError>) {
+    state.withLock { $0.pages[cursor] = page }
+  }
+  /// The cursors the store asked for, in order.
+  var cursors: [HistoryCursor] { state.withLock { $0.cursors } }
+  /// The next page answers when the gate opens.
+  func holdNextPage() -> Gate {
+    let gate = Gate()
+    state.withLock { $0.holdPage = gate }
+    return gate
+  }
+  /// What `threadEvent` answers for each id.
+  func setRow(_ row: EventRow) {
+    state.withLock { $0.rows[row.id] = row }
+  }
+
+  func threadHistory(_ id: String, _ cursor: HistoryCursor) async throws(OmniAPIError) -> HistoryPage {
+    let gate = state.withLock { s in
+      s.calls["history", default: 0] += 1
+      s.cursors.append(cursor)
+      defer { s.holdPage = nil }
+      return s.holdPage
+    }
+    await gate?.wait()
+    return try state.withLock { $0.pages[cursor] ?? .failure(.http(status: 404, message: "no page")) }.get()
+  }
+
+  func threadEvent(_ id: String, eventID: Int) async throws(OmniAPIError) -> EventRow {
+    state.withLock { $0.calls["event", default: 0] += 1 }
+    guard let row = state.withLock({ $0.rows[eventID] }) else { throw .http(status: 404, message: "no event") }
+    return row
+  }
+
+  /// The snapshot, newest page first: counted as "thread".
+  func threadOpen(_ id: String) async throws(OmniAPIError) -> ThreadDetail {
     let gate = state.withLock { s in
       s.calls["thread", default: 0] += 1
       defer { s.hold = nil }
@@ -602,5 +644,127 @@ private func handoffAnswer(_ thread: String, _ state: String) throws -> HandoffA
     #expect(store.handoff?.state == .cancelled)
     #expect(store.thread?.status == .stopped)
     #expect(api.handoffs == ["m-pro", "m-pro", "cancel"])
+  }
+}
+
+private func text(_ id: Int, _ words: String = "ok") -> String { ev(id, "assistant_text", #"{"text":"\#(words)"}"#) }
+private func ask(_ id: Int, _ words: String = "go") -> String { ev(id, "user", #"{"text":"\#(words)"}"#) }
+private func done(_ id: Int) -> String { ev(id, "result", #"{"ok":true,"subtype":"success","turns":1}"#) }
+
+/// A row a page cut down to size.
+private func clippedRow(_ id: Int, _ kind: String, _ payload: String, bytes: Int = 90_000) -> String {
+  let json = eventJSON(kind: kind, payload: payload, id: id)
+  return String(json.dropLast()) + #","clipped":{"bytes":\#(bytes)}}"#
+}
+
+private func historyPage(_ rows: [String], from: Int, to: Int?) throws -> HistoryPage {
+  try decode(HistoryPage.self, #"{"events":[\#(rows.joined(separator: ","))],"span":{"from":\#(from),"to":\#(to.map(String.init) ?? "null")}}"#)
+}
+
+@MainActor @Suite struct ThreadStoreHistoryTests {
+  @Test func opensOnTheHeadThenLoadsEarlierRevealsAndJoinsTheStream() async throws {
+    let api = FakeThreadAPI(try detail(events: [ask(50), text(51), done(52)], from: 50, resultsBelow: 2))
+    let (store, conn, t, clock) = try await openStore(api)
+    defer { store.stop() }
+    #expect(api.calls("thread") == 1)
+    #expect(store.history.spans == [HistorySpan(from: 50, to: nil)])
+    #expect(!store.history.atStart)
+    #expect(store.history.turnCount == 3)
+    #expect(store.transcript.items.map(\.id) == [.event(50), .event(51), .event(52)])
+
+    api.setPage(.newest(before: 50), .success(try historyPage([ask(20), text(21), done(22)], from: 20, to: 50)))
+    await store.loadEarlier()
+    #expect(api.cursors == [.newest(before: 50)])
+    #expect(store.transcript.items.map(\.id) == [.event(20), .event(21), .event(22), .event(50), .event(51), .event(52)])
+    #expect(store.loadingEdges.isEmpty)
+    #expect(store.history.edges([20, 21, 22, 50]) == [20: .earlier])
+
+    api.setPage(.at(2, before: 20), .success(try historyPage([ask(1), text(2, "the needle")], from: 0, to: 20)))
+    await store.reveal(2)
+    #expect(store.revealTarget == .event(2))
+    #expect(store.history.atStart)
+    store.revealShown()
+    #expect(store.revealTarget == nil)
+
+    conn.send(sse(event: text(53), id: 53))
+    try await waitFor("the live row") { store.transcript.items.last?.id == .event(53) }
+
+    conn.end()
+    try await waitFor("reconnecting") { store.isReconnecting }
+    api.detail = .success(try detail(events: [text(53), text(54)], from: 53, resultsBelow: 3))
+    clock.advance(by: .seconds(1))
+    let again = try await t.next()
+    #expect(again.after == "53", "the stream resumes after the last row it sent")
+    again.accept()
+    try await waitFor("the fresh head") { store.events.last?.id == 54 }
+    #expect(store.events.map(\.id) == [1, 2, 20, 21, 22, 50, 51, 52, 53, 54])
+    #expect(store.history.spans == [HistorySpan(from: 0, to: nil)])
+    try await waitFor("laid out") { store.transcript.items.last?.id == .event(54) }
+    #expect(store.transcript.items == Transcript.build(store.events, spans: store.history.spans))
+  }
+
+  @Test func showsAFailedPageOnItsEdgeAndAsksOnceAtATime() async throws {
+    let api = FakeThreadAPI(try detail(events: [ask(50), text(51)], from: 50))
+    let (store, _, _, _) = try await openStore(api)
+    defer { store.stop() }
+
+    await store.loadEarlier()
+    #expect(store.edgeErrors[.earlier] != nil)
+    #expect(store.loadingEdges.isEmpty)
+
+    api.setPage(.newest(before: 50), .success(try historyPage([ask(1), text(2)], from: 0, to: 50)))
+    let gate = api.holdNextPage()
+    async let first: Void = store.loadEarlier()
+    try await waitFor("asking") { store.loadingEdges == [.earlier] }
+    #expect(store.edgeErrors[.earlier] == nil, "a retry clears the error")
+    await store.loadEarlier()
+    #expect(api.calls("history") == 2, "one request per edge")
+    gate.open()
+    await first
+    #expect(store.history.atStart)
+    #expect(store.transcript.items.map(\.id) == [.event(1), .event(2), .event(50), .event(51)])
+  }
+
+  @Test func loadsAClippedRowWhole() async throws {
+    let call = ev(50, "tool_use", #"{"id":"a","name":"Bash","input":{"command":"ls"}}"#)
+    let api = FakeThreadAPI(try detail(events: [
+      call, clippedRow(51, "tool_result", #"{"tool_use_id":"a","text":"cut…","is_error":false,"truncated":true}"#),
+      clippedRow(52, "assistant_text", #"{"text":"long…"}"#, bytes: 1_500_000),
+    ], from: 50))
+    let (store, _, _, _) = try await openStore(api)
+    defer { store.stop() }
+    #expect(store.clipped.keys.sorted() == [51, 52])
+    #expect(store.clipped[52]?.bytes == 1_500_000)
+    #expect(store.clippedResults == ["a": 51])
+
+    api.setRow(try decode(EventRow.self, text(52, "the whole reply")))
+    await store.showAll(52)
+    #expect(store.clipped.keys.sorted() == [51])
+    #expect(store.showingAll.isEmpty)
+    #expect(store.transcript.items.last == .text(eventID: 52, at: store.events.last!.createdAt, "the whole reply"))
+
+    await store.showAll(51)
+    #expect(store.showAllErrors[51] != nil, "the server had no such row")
+    #expect(store.clipped[51] != nil)
+  }
+
+  @Test func handsARevealToTheStoreItMakes() async throws {
+    let api = FakeThreadAPI(try detail(events: [ask(50), text(51)], from: 50))
+    api.setPage(.at(2, before: 50), .success(try historyPage([ask(1), text(2)], from: 0, to: 50)))
+    let t = ScriptedSSETransport(), clock = TestClock()
+    let client = OmniClient(port: 4799)
+    let registry = ThreadStoreRegistry { id in
+      ThreadStore(id: id, api: api, clock: clock, frame: .zero) { after in client.threadEvents(id, after: after, transport: t, clock: clock) }
+    }
+    registry.reveal("t1", at: 2)
+    let store = registry.acquire("t1")
+    defer { registry.release("t1") }
+    try await waitFor("the hit") { store.revealTarget == .event(2) }
+    #expect(api.cursors == [.at(2, before: 50)])
+
+    api.setPage(.at(1, before: 2), .success(try historyPage([], from: 0, to: 2)))
+    registry.reveal("t1", at: 51)
+    try await waitFor("a hit already held") { store.revealTarget == .event(51) }
+    #expect(api.cursors.count == 1, "nothing to load")
   }
 }

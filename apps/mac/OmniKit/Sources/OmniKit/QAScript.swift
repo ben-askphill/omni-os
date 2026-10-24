@@ -26,8 +26,10 @@ public enum QAInspector: String, Hashable, Sendable {
 
 public enum QAScroll: String, Hashable, Sendable {
   /// `nudge` goes to the bottom, then sends trackpad scroll events a few lines up, opens the tool groups so the
-  /// content grows, and notes how far from the bottom the view is after each.
-  case top, bottom, through, nudge
+  /// content grows, and notes how far from the bottom the view is after each. `earlier` scrolls up until an earlier
+  /// page of history starts loading, and notes the row at the top of the view then and once the page is in. `gap` centres
+  /// the first gap between held pages, which a reveal leaves.
+  case top, bottom, through, nudge, earlier, gap
 }
 
 /// What a channel step does to the channel `qa-channel`, through the same client calls as the settings form.
@@ -68,8 +70,8 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"route": "#/c/acme"}`, `{"wait": {"for": "sidebarLoaded", "timeout": 10}}` (or `{"wait": "sidebarLoaded"}`),
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
 /// `{"settings": "secrets"}` (or `connection`, `profile`, `sync`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
-/// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`), `{"expand": true}`, `{"meter": true}`, `{"modelPicker": true}` (or a search, `"cursor"`), `{"foldAll": true}`,
-/// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`,
+/// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`, `earlier`, `gap`), `{"expand": true}`, `{"meter": true}`, `{"modelPicker": true}` (or a search, `"cursor"`), `{"foldAll": true}`,
+/// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`, `{"searchHit": 0}`,
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
 /// `changes`, `turn`, `browser`, `terminal`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
 /// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
@@ -103,6 +105,8 @@ public enum QAStep: Hashable, Sendable {
   case foldAll
   /// Opens the edit of the open thread's first editable unsent message, with this text in it.
   case editPending(String)
+  /// Opens the search screen's hit at this index, as a click on its row does.
+  case searchHit(Int)
   /// Zooms the artifact image preview to this scale, or back to fit with nil.
   case imageZoom(Double?)
   /// Puts text in the reply box, as if typed.
@@ -214,7 +218,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "searchHit", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -266,7 +270,7 @@ public struct QAScript: Hashable, Sendable {
       guard let name = value as? String, let a = QAAppearance(rawValue: name) else { throw QAScriptError("appearance takes light or dark") }
       return .appearance(a)
     case "scroll":
-      guard let name = value as? String, let to = QAScroll(rawValue: name) else { throw QAScriptError("scroll takes top, bottom, through or nudge") }
+      guard let name = value as? String, let to = QAScroll(rawValue: name) else { throw QAScriptError("scroll takes top, bottom, through, nudge, earlier or gap") }
       return .scroll(to)
     case "expand":
       return .expand
@@ -281,6 +285,9 @@ public struct QAScript: Hashable, Sendable {
     case "editPending":
       guard let text = value as? String else { throw QAScriptError("editPending takes the text to put in the edit") }
       return .editPending(text)
+    case "searchHit":
+      guard let i = value as? Int, i >= 0 else { throw QAScriptError("searchHit takes the index of a result") }
+      return .searchHit(i)
     case "quickPrompt":
       if let text = value as? String { return .quickPrompt(.open(text)) }
       if let on = value as? Bool, !on { return .quickPrompt(.close) }

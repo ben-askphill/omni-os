@@ -77,6 +77,16 @@ struct SearchScreen: View {
             .padding(.bottom, z(8))
           ForEach(hits) { SearchRow(model: model, hit: $0).openInNewWindow($0.threadID, model: model) }
         }
+        #if DEBUG
+        .onAppear {
+          QAProbe.openSearchHit = { i in
+            guard hits.indices.contains(i) else { return nil }
+            SearchRow.open(hits[i], model: model)
+            return hits[i]
+          }
+        }
+        .onDisappear { QAProbe.openSearchHit = nil }
+        #endif
       }
     }
   }
@@ -97,7 +107,7 @@ private struct SearchRow: View {
   let hit: SearchHit
   var body: some View {
     Button {
-      model.route = .thread(id: hit.threadID)
+      Self.open(hit, model: model)
     } label: {
       VStack(alignment: .leading, spacing: z(4)) {
         HStack(spacing: z(8)) {
@@ -135,6 +145,12 @@ private struct SearchRow: View {
       .hoverWash()
     }
     .buttonStyle(.plain)
+  }
+
+  /// Opens the thread. A body hit opens it on its row, loading the page that holds it.
+  static func open(_ hit: SearchHit, model: AppModel) {
+    if let at = hit.eventID { model.threads.reveal(hit.threadID, at: at) }
+    model.route = .thread(id: hit.threadID)
   }
 
   static func highlighted(_ snippet: String) -> AttributedString {

@@ -9,11 +9,11 @@
   "fixture": {
     "turns": 80,
     "rows": 3472,
-    "payloadBytes": 8089024
+    "payloadBytes": 8089037
   },
   "full": {
     "rows": 3472,
-    "bytes": 8517312
+    "bytes": 8517329
   },
   "head": {
     "rows": 222,

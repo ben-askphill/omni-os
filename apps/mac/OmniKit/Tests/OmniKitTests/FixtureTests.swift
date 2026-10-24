@@ -82,6 +82,11 @@ func sseData(_ text: String) -> [String] {
     "request-edit-request.json": { _ = try decodeFixture(JSONValue.self, "request-edit-request.json") },
     // NeedsYouTests compares it with what the client encodes.
     "needs-you-read-request.json": { _ = try decodeFixture([String: String].self, "needs-you-read-request.json") },
+    "thread-open.json": { _ = try decodeFixture(ThreadDetail.self, "thread-open.json") },
+    "thread-history.json": { _ = try decodeFixture(HistoryPage.self, "thread-history.json") },
+    "thread-history-at.json": { _ = try decodeFixture(HistoryPage.self, "thread-history-at.json") },
+    "thread-event.json": { _ = try decodeFixture(EventRow.self, "thread-event.json") },
+    "search.json": { _ = try decodeFixture([SearchHit].self, "search.json") },
   ]
 
   static func threadStream() throws -> [ThreadStreamMessage] {

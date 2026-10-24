@@ -9,6 +9,8 @@ public struct SearchHit: Decodable, Hashable, Sendable, Identifiable {
   public let updatedAt: Date
   /// Text with `<mark>` around the matched words, empty when only the title matched.
   public let snippet: String
+  /// The event the body matched in, for the thread to open on. Nil when only the title matched.
+  public let eventID: Int?
 
   public var id: String { threadID }
 
@@ -17,6 +19,7 @@ public struct SearchHit: Decodable, Hashable, Sendable, Identifiable {
     case threadID = "thread_id"
     case channelID = "channel_id"
     case updatedAt = "updated_at"
+    case eventID = "event_id"
   }
 
   public init(from decoder: any Decoder) throws {
@@ -27,6 +30,7 @@ public struct SearchHit: Decodable, Hashable, Sendable, Identifiable {
     status = try c.decode(ThreadStatus.self, forKey: .status)
     updatedAt = try c.decode(Date.self, forKey: .updatedAt)
     snippet = try c.decodeIfPresent(String.self, forKey: .snippet) ?? ""
+    eventID = try c.decodeIfPresent(Int.self, forKey: .eventID)
   }
 }
 

@@ -15,10 +15,10 @@ final class TranscriptUI {
     if open.remove(key) == nil { open.insert(key) }
   }
 
-  /// Opens every group, and the calls that failed or have sub-calls (QA).
-  func expandAll(_ items: [TranscriptItem]) {
+  /// Opens every group, and the calls that failed, have sub-calls or match `also` (QA).
+  func expandAll(_ items: [TranscriptItem], also: (ToolCall) -> Bool = { _ in false }) {
     func visit(_ call: ToolCall) {
-      if call.isFailed || !call.children.isEmpty { open.insert("c\(call.id)") }
+      if call.isFailed || !call.children.isEmpty || also(call) { open.insert("c\(call.id)") }
       call.children.forEach(visit)
     }
     for case .tools(let group) in items {
@@ -219,13 +219,17 @@ struct ToolRowView: View {
 struct ToolDetail: View {
   let call: ToolCall
   let running: Bool
+  @Environment(\.threadStore) private var store
 
   var body: some View {
     VStack(alignment: .leading, spacing: z(6)) {
       ToolInputView(input: ToolInput(call.use))
+      ClippedNote(eventID: call.id)
       if let result = call.result {
         Pre(text: result.text.isEmpty ? "(no output)" : result.text, tone: call.isFailed ? .bad : .plain)
-        if result.truncated {
+        if let row = store?.clippedResults[call.callID] {
+          ClippedNote(eventID: row)
+        } else if result.truncated {
           Text("Output truncated").font(.omni(size: 11)).foregroundStyle(Tok.fg4)
         }
       } else {

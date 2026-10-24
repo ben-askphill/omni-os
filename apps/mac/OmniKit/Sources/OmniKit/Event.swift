@@ -11,9 +11,11 @@ public struct EventRow: Decodable, Hashable, Sendable, Identifiable {
   public let payload: String
   public let content: EventPayload
   public let createdAt: Date
+  /// Set on a row a history page cut down to size. `OmniClient.threadEvent` reads it whole.
+  public let clipped: Clipped?
 
   enum CodingKeys: String, CodingKey {
-    case id, kind, payload
+    case id, kind, payload, clipped
     case threadID = "thread_id"
     case createdAt = "created_at"
   }
@@ -25,6 +27,7 @@ public struct EventRow: Decodable, Hashable, Sendable, Identifiable {
     kind = try c.decode(String.self, forKey: .kind)
     payload = try c.decode(String.self, forKey: .payload)
     createdAt = try c.decode(Date.self, forKey: .createdAt)
+    clipped = try c.decodeIfPresent(Clipped.self, forKey: .clipped)
     content = EventPayload(kind: kind, json: payload)
   }
 }

@@ -274,9 +274,11 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
   public let blocked: String?
   /// A handoff of the thread to or from another Mac. Older servers leave it out; a phase this app does not know is nil.
   public let handoff: HandoffView?
+  /// Set when `events` is the newest page only (`?history=recent`). Nil means every row came.
+  public let history: HistoryHead?
 
   enum CodingKeys: String, CodingKey {
-    case thread, channel, events, artifacts, children, team, parent, pending, live, blocked, handoff
+    case thread, channel, events, artifacts, children, team, parent, pending, live, blocked, handoff, history
   }
 
   public init(from decoder: any Decoder) throws {
@@ -292,5 +294,6 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
     live = try c.decodeIfPresent(Bool.self, forKey: .live) ?? false
     blocked = try c.decodeIfPresent(String.self, forKey: .blocked)
     handoff = (try? c.decodeIfPresent(HandoffView.self, forKey: .handoff)) ?? nil
+    history = try c.decodeIfPresent(HistoryHead.self, forKey: .history)
   }
 }

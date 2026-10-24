@@ -55,7 +55,7 @@ const SPAN_CASES: { name: string; events: TranscriptEvent[]; spans: Span[] }[] =
       out(7, 't1'),
       ev(8, 'question', { id: 'q1', questions: [{ question: 'Ship it?', header: 'Ship', options: [{ label: 'Yes', description: 'Ship now' }, { label: 'No', description: 'Wait' }], multiSelect: false }] }),
       ev(9, 'mod', { plugin: 'lint', text: 'island line' }),
-      ev(15, 'question_answer', { id: 'q1', state: 'answered', answers: [{ selected: ['Yes'], other: null }] }),
+      ev(15, 'question_answer', { id: 'q1', state: 'answered', answers: [{ selected: ['Yes'], other: null }], via: 'tool' }),
       ev(20, 'mod', { plugin: 'lint', text: 'head line' }),
       call(21, 'h1', 'Read', { file_path: '/x/b.ts' }),
       out(22, 'h1'),
