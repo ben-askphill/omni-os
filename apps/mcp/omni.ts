@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { call, SELF, text } from './api.ts';
+import { registerReferencedThread } from './referenced-thread.ts';
 
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
 const USER = process.env.OMNI_USER || 'the user';
@@ -369,6 +370,9 @@ server.registerTool(
   { description: `Full-text search across every thread ${USER} has run.`, inputSchema: { query: z.string() } },
   async ({ query }) => text(await call(`/search?q=${encodeURIComponent(query)}`)),
 );
+
+// #218: the conductor reads a thread Ben referenced in a message the same way every other thread does.
+registerReferencedThread(server);
 
 server.registerTool('tool_failures', {
   description: 'Inspect machine-local tool failures grouped by harness, tool and category, most frequent first. With group_id, list occurrences with thread/call references. No raw arguments or error bodies. Use before for older occurrences.',

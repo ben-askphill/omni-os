@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
+import { stampThreadReferences } from './message-context/thread-reference.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
@@ -176,8 +177,11 @@ threadActionsApi.post('/:id/messages', async (c) => {
   // A retry: answered before its files are saved a second time.
   const again = request_id ? acceptedAgain(id, request_id, fingerprint) : null;
   if (again) return c.json(again);
+  // After the retry check, and the fingerprint is of what Ben sent: a retry after a rename or a delete still gets its first answer.
+  const stamped = stampThreadReferences(id, context.value);
+  if (!stamped.ok) return c.json({ error: stamped.error }, 400);
   const attachments = await saveUploads(id, files);
-  return c.json(await postMessage(id, prompt, { from, mode, attachments, context: context.value, requestId: request_id, fingerprint }));
+  return c.json(await postMessage(id, prompt, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint }));
 });
 
 const requestIds = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) });

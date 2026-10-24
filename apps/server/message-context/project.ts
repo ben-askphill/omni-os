@@ -11,6 +11,7 @@ import type { Thread } from '../db.ts';
 import type { Attachment } from '../uploads.ts';
 import { isRemoteHarness, remoteWhere } from '../harness/types.ts';
 import { userName, userPossessive } from '../profile.ts';
+import { HISTORY_TOOL, PAGE_ROWS_MAX } from '../thread-history.ts';
 import { defang } from './defang.ts';
 import { SERVER_KINDS } from './kinds.ts';
 
@@ -32,6 +33,8 @@ export interface Projection {
   excerpt?: { lang: string; text: string };
   /** An image it travels with. `attachment` is its file as the harness gets it (contextAttachments), null when the file is gone. */
   image?: { name: string; width: number; height: number; attachment: Attachment | null };
+  /** Another thread it points at. `readable`: it still exists. Written as a sentence by historyLine, never by the kind. */
+  history?: { thread: string; readable: boolean };
 }
 
 /** `read` is null when nothing may be read: a remote harness, or text that is read later on another Mac. */
@@ -98,6 +101,13 @@ function imageLine(img: NonNullable<Projection['image']>, place: Place): string 
   return `Screenshot: ${what}, is attached to this message: as an image where your harness takes images, and otherwise as the file ${defang(img.attachment.path)}.`;
 }
 
+/** The sentence about a referenced thread's history: how to read it, or that this agent cannot. */
+function historyLine(h: NonNullable<Projection['history']>, place: Place): string {
+  if (place.remote) return `History: you run ${place.where}, which has no Omni tool for reading another thread, so its history is not available to you. Work from the reference and ${userPossessive()} message.`;
+  if (!h.readable) return 'History: that thread no longer exists, so its history cannot be read. Work from the reference and the message.';
+  return `History: read it only if you need it, with the Omni tool ${HISTORY_TOOL} (thread_id ${defang(h.thread)}). It returns a page of at most ${PAGE_ROWS_MAX} messages at a time, starting with the newest, and says how to ask for older ones.`;
+}
+
 function item(n: number, r: ContextReading, place: Place): string {
   const note = r.record.note ? [`${userPossessive()} note: ${defang(r.record.note)}`] : [];
   if (r.as === 'fallback') return [`[${n}] ${defang(r.record.label || r.record.kind || 'Context')}`, ...note, '(Omni could not include its contents.)'].join('\n');
@@ -107,6 +117,7 @@ function item(n: number, r: ContextReading, place: Place): string {
   else if (p.file) lines.push(`File: ${defang(p.file)}, relative to your working directory.`);
   if (p.check && !place.remote) lines.push(`Check: ${p.check.stale ? 'STALE: ' : ''}${p.check.text}.`);
   if (p.image) lines.push(imageLine(p.image, place));
+  if (p.history) lines.push(historyLine(p.history, place));
   lines.push(...note);
   if (p.excerpt) {
     const f = fence(p.excerpt.text);

@@ -6,11 +6,13 @@ import { parseContextsWith, readContextsWith, type FallbackWhy, type MessageCont
 import { browserAnnotation } from './message-context-browser.ts';
 import { diffSelection } from './message-context-diff.ts';
 import { terminalExcerpt } from './message-context-terminal.ts';
+import { threadReference } from './message-context-thread.ts';
 
 export const CONTEXT_KINDS = {
   diff_selection: diffSelection,
   terminal_excerpt: terminalExcerpt,
   browser_annotation: browserAnnotation,
+  thread_reference: threadReference,
 } as const;
 
 export type KindName = keyof typeof CONTEXT_KINDS;
