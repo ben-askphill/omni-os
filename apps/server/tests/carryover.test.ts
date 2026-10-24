@@ -49,11 +49,11 @@ describe('buildCarryover', () => {
     const left = c.omitted.find((o) => o.what === 'history')!;
     expect(left.count + c.recent.length).toBe(201);
     const newestLeft = events[left.count - 1];
-    expect(left.ref).toBe(`/api/threads/src/history?through=uid-${newestLeft.id}`);
-    expect(c.text).toContain(`curl -s "$OMNI_URL/api/threads/src/history?through=uid-${newestLeft.id}" -H "Authorization: Bearer $OMNI_TOKEN"`);
+    expect(left.ref).toBe(`/api/threads/src/transcript?through=uid-${newestLeft.id}`);
+    expect(c.text).toContain(`curl -s "$OMNI_URL/api/threads/src/transcript?through=uid-${newestLeft.id}" -H "Authorization: Bearer $OMNI_TOKEN"`);
     expect(carriedStats(c)).toMatchObject({ entries: c.recent.length, omitted: left.count, chars: c.chars, budget: 8_000 });
     const short = c.recent.findLast((e) => e.condensed)!;
-    expect(c.text).toContain(`History, oldest first: Shortened entries in full: curl -s "$OMNI_URL/api/threads/src/history?through=uid-${short.id}"`);
+    expect(c.text).toContain(`History, oldest first: Shortened entries in full: curl -s "$OMNI_URL/api/threads/src/transcript?through=uid-${short.id}"`);
   });
 
   it('never goes over budgets large and small', () => {

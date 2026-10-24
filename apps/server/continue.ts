@@ -328,7 +328,7 @@ export function continueLinks(t: Thread): { continued_from: ContinueLink | null;
 }
 
 /**
- * GET /api/threads/:id/history: the thread's transcript as text, oldest first, the retrieval reference a Carryover gives
+ * GET /api/threads/:id/transcript: the thread's transcript as text, oldest first, the retrieval reference a Carryover gives
  * for what it left out. `after` and `through` are event uids, which name the same event on every Mac.
  */
 export function historyOf(threadId: string, after?: string, through?: string): string {

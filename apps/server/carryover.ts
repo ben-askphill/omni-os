@@ -250,7 +250,7 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
   const budget = i.budget ?? CARRYOVER_BUDGET;
   const clean = cleaner(i);
   const rows = read(i.events);
-  const history = `/api/threads/${i.source.id}/history`;
+  const history = `/api/threads/${i.source.id}/transcript`;
 
   const goal = clean(cut(goalOf(rows), GOAL_MAX));
   const plan = rows.findLast((r) => r.kind === 'tool_use' && r.p.name === 'TodoWrite')?.p.input?.todos as Todo[] | undefined;

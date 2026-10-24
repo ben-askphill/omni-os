@@ -32,7 +32,7 @@ private func previewJSON(
          "reason":null,"selected":true,"carried":true,"as":"inline"},
         {"id":"u2:1","name":"trace.zip","event_id":2,"mime":"application/zip","size":null,"image":false,"availability":"missing",
          "reason":"Its bytes are not on this Mac.","selected":true,"carried":false,"as":null}],
-      "omitted":[{"what":"history","count":20,"note":"20 older entries left out.","ref":"/api/threads/t1/history?through=2"},
+      "omitted":[{"what":"history","count":20,"note":"20 older entries left out.","ref":"/api/threads/t1/transcript?through=2"},
         {"what":"attachments","count":1,"note":"1 attachment is not carried.","ref":null},
         {"what":"uncommitted","count":2,"note":"2 binary files are not carried.","ref":"git -C /tmp/x status"},
         {"what":"messages","count":1,"note":"1 parked message is not carried.","ref":null}],
@@ -128,7 +128,7 @@ private let startBody = ContinueBody(
     #expect(c.attachments.map(\.size) == [3400, nil])
     #expect(c.attachments[1].reason == "Its bytes are not on this Mac.")
     #expect(c.omitted.map(\.what) == [.history, .attachments, .uncommitted, .messages])
-    #expect(c.omitted.map(\.ref) == ["/api/threads/t1/history?through=2", nil, "git -C /tmp/x status", nil])
+    #expect(c.omitted.map(\.ref) == ["/api/threads/t1/transcript?through=2", nil, "git -C /tmp/x status", nil])
     #expect(c.budget == 24000)
     #expect(c.chars == 12345)
     #expect(c.text.hasPrefix("<omni-carryover>"))

@@ -207,15 +207,15 @@ describe('continuing a thread on another harness', () => {
     H.runner.sendMessage(src.id, 'second words');
     await H.untilResults(src.id, 2);
     const [first, second] = H.byKind(src.id, 'user').map((e) => H.db.events.uidOf(e.id)!);
-    const through = await call('GET', `/threads/${src.id}/history?through=${first}`);
+    const through = await call('GET', `/threads/${src.id}/transcript?through=${first}`);
     expect(through.status).toBe(200);
     expect(through.body).toContain('[the user] first words');
     expect(through.body).not.toContain('second words');
-    const after = await call('GET', `/threads/${src.id}/history?after=${first}`);
+    const after = await call('GET', `/threads/${src.id}/transcript?after=${first}`);
     expect(after.body).toContain('[the user] second words');
     expect(after.body).not.toContain('[the user] first words');
-    expect((await call('GET', `/threads/${src.id}/history?through=${second}`)).body).toContain('second words');
-    expect((await call('GET', `/threads/${src.id}/history?through=nope`)).status).toBe(404);
+    expect((await call('GET', `/threads/${src.id}/transcript?through=${second}`)).body).toContain('second words');
+    expect((await call('GET', `/threads/${src.id}/transcript?through=nope`)).status).toBe(404);
   });
 });
 

@@ -278,7 +278,7 @@ describe("the preview's sections", () => {
       files: { base: 'b', head: 'h', tree: 't', listed: [{ path: 'a.ts', old_path: null, status: 'modified' }], total: 1 },
       checks: [{ id: 4, command: 'npm test', ok: true, output: 'ok' }],
       recent: [{ id: 9, who: 'agent', text: 'Done.', condensed: false }],
-      omitted: [{ what: 'history', count: 3, note: '3 older entries', ref: '/api/threads/src/history?through=5' }],
+      omitted: [{ what: 'history', count: 3, note: '3 older entries', ref: '/api/threads/src/transcript?through=5' }],
     });
     expect(previewSections(full).map((s) => s.title)).toEqual(['Goal', 'Constraints', 'Changed files', 'Checks', 'Recent history', 'Left out']);
   });
@@ -332,13 +332,13 @@ describe("the preview's sections", () => {
     const sections = previewSections(
       carryover({
         omitted: [
-          { what: 'history', count: 20, note: '20 older entries', ref: '/api/threads/src/history?through=41' },
+          { what: 'history', count: 20, note: '20 older entries', ref: '/api/threads/src/transcript?through=41' },
           { what: 'untracked', count: 2, note: '2 untracked binary files', ref: null },
         ],
       }),
     );
     expect(sections.find((s) => s.id === 'omitted')!.rows).toEqual([
-      expect.objectContaining({ text: '20 older entries', sub: '/api/threads/src/history?through=41' }),
+      expect.objectContaining({ text: '20 older entries', sub: '/api/threads/src/transcript?through=41' }),
       expect.objectContaining({ text: '2 untracked binary files', sub: undefined }),
     ]);
   });

@@ -1,5 +1,5 @@
 // /api/threads/:id/continue: continue an idle thread on another local harness (apps/server/continue.ts), with a
-// preview of the Carryover first. And /api/threads/:id/history, where a Carryover sends its new session for the
+// preview of the Carryover first. And /api/threads/:id/transcript, where a Carryover sends its new session for the
 // history it left out.
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -44,4 +44,4 @@ continueApi.post('/:id/continue', async (c) => {
 });
 
 /** The thread's history as text, oldest first: after the event `after`, through the event `through` (uids). */
-continueApi.get('/:id/history', (c) => c.text(historyOf(c.req.param('id'), c.req.query('after'), c.req.query('through'))));
+continueApi.get('/:id/transcript', (c) => c.text(historyOf(c.req.param('id'), c.req.query('after'), c.req.query('through'))));
