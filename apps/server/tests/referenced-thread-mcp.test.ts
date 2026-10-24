@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { createInterface } from 'node:readline';
 import { newContext } from '@omni/shared/message-context.ts';
 import { referenceBody, threadReference } from '@omni/shared/message-context-thread.ts';
 import { startRunner } from './runner-boot.ts';
@@ -21,9 +21,9 @@ const port = (server.address() as AddressInfo).port;
 const { buildMcpConfig } = await import('../sandbox.ts');
 const { stampThreadReferences } = await import('../message-context/thread-reference.ts');
 const { PAGE_ROWS_MAX } = await import('../thread-history.ts');
-const clients: Client[] = [];
-afterAll(async () => {
-  for (const c of clients) await c.close();
+const clients: McpClient[] = [];
+afterAll(() => {
+  for (const c of clients) c.close();
   server.close();
   server.closeAllConnections();
 });
@@ -32,18 +32,45 @@ const T = { timeout: 30_000 };
 const make = (title: string) =>
   h.db.threads.create({ id: randomUUID(), channel_id: 'scratch', title, status: 'done', role: null, model: null, session_id: randomUUID(), cwd: h.paths.data, branch: null, parent_id: null, task_id: null, source: 'manual', automation: null });
 
+/** Just enough of an MCP client over stdio (newline-delimited JSON-RPC) to list tools and call one. */
+class McpClient {
+  private id = 0;
+  private waiting = new Map<number, (r: any) => void>();
+  constructor(private child: ChildProcess) {
+    createInterface({ input: child.stdout! }).on('line', (line) => {
+      const msg = JSON.parse(line);
+      this.waiting.get(msg.id)?.(msg);
+    });
+  }
+  request(method: string, params: unknown = {}): Promise<any> {
+    const id = ++this.id;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`no answer to ${method}`)), 20_000);
+      this.waiting.set(id, (msg) => {
+        clearTimeout(timer);
+        if (msg.error) reject(new Error(msg.error.message));
+        else resolve(msg.result);
+      });
+      this.child.stdin!.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+    });
+  }
+  close() {
+    this.child.kill('SIGTERM');
+  }
+}
+
 /** A client of the thread's own omni-threads server, started the way a harness starts it. */
 async function connect(threadId: string) {
   const channel = h.db.channels.get('scratch')!;
   const cfg = buildMcpConfig({ threadId, channel, browserBusy: false, omniUrl: `http://127.0.0.1:${port}` });
   const s = cfg.mcpServers['omni-threads'];
-  const client = new Client({ name: 'test', version: '0' });
-  await client.connect(new StdioClientTransport({ command: s.command, args: s.args, env: { ...(process.env as Record<string, string>), ...s.env } }));
+  const client = new McpClient(spawn(s.command, s.args, { env: { ...(process.env as Record<string, string>), ...s.env }, stdio: ['pipe', 'pipe', 'inherit'] }));
   clients.push(client);
+  await client.request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
   return client;
 }
-const callTool = async (client: Client, args: Record<string, unknown>) => {
-  const r = (await client.callTool({ name: 'read_referenced_thread', arguments: args })) as { isError?: boolean; content: { type: string; text: string }[] };
+const callTool = async (client: McpClient, args: Record<string, unknown>) => {
+  const r = (await client.request('tools/call', { name: 'read_referenced_thread', arguments: args })) as { isError?: boolean; content: { type: string; text: string }[] };
   return { isError: !!r.isError, body: JSON.parse(r.content[0].text) as any };
 };
 
@@ -57,7 +84,7 @@ describe('read_referenced_thread', () => {
 
   it('is the only tool the thread gets, with its limits in the description', T, async () => {
     const client = await connect(from.id);
-    const { tools } = await client.listTools();
+    const { tools } = (await client.request('tools/list')) as { tools: { name: string; description: string }[] };
     expect(tools.map((t) => t.name)).toEqual(['read_referenced_thread']);
     expect(tools[0].description).toContain('at most 100 messages and 60,000 characters');
     expect(tools[0].description).toContain('cut at 8,000 characters');

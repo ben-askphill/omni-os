@@ -9,7 +9,7 @@ private let repoRoot = URL(filePath: #filePath)
   .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 
 /// The kinds these tests read with: every kind OmniKit has. The app's list is in apps/mac/Omni/ContextViews.swift.
-private let kinds: [any MessageContextKind.Type] = [DiffSelectionContext.self, TerminalExcerptContext.self, BrowserAnnotationContext.self]
+private let kinds: [any MessageContextKind.Type] = [DiffSelectionContext.self, TerminalExcerptContext.self, BrowserAnnotationContext.self, ThreadReferenceContext.self]
 
 private func corpus() throws -> JSONValue {
   try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: repoRoot.appending(path: "packages/test-fixtures/message-context.json")))

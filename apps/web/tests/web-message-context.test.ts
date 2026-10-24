@@ -117,6 +117,12 @@ describe('context chips', () => {
       expect(inspector).toContain('shop.example.com/cart?coupon=SPRING');
       expect(inspector).toContain('Area 480×160');
       expect(inspector).not.toContain('Update Omni');
+    } else if ((c.raw as { kind: string }).kind === 'thread_reference') {
+      expect(inspector).toContain('Fix the cart total');
+      expect(inspector).toContain('Shop');
+      expect(inspector).toContain('thread 7d3e91a0');
+      expect(inspector).toContain('Open thread');
+      expect(inspector).not.toContain('Update Omni');
     } else {
       expect(inspector).toContain('src/cart.ts');
       expect(inspector).toContain('new lines 1–3');
