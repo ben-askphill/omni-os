@@ -89,6 +89,10 @@ const NAMES = [
   // thread whose turns are not saved.
   'turns.json',
   'turns-unavailable.json',
+  // Continuing an idle thread on another run: the worktree thread's preview (its changed files and a binary file left
+  // out), then the first thread continued, and that one continued again, so it has both links.
+  'continue-preview.json',
+  'thread-continued.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -485,6 +489,22 @@ async function scenario() {
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
+
+  const onto = { harness: 'claude-code', model: 'sonnet', effort: 'low' };
+  writeFileSync(join(wt.cwd, 'photo.bin'), Buffer.from([0, 1, 2, 0]));
+  type Preview = { revision: string; blocked: unknown; workspace: string; carryover: { files: { total: number } | null; omitted: { what: string }[] } };
+  const shown = keep('continue-preview.json', await call('POST', `/threads/${wt.id}/continue/preview`, onto)) as Preview;
+  expect(shown).toMatchObject({ blocked: null, workspace: 'worktree', carryover: { omitted: [{ what: 'untracked' }] } });
+  expect(shown.carryover.files?.total, 'the worktree thread\'s changed files').toBeGreaterThan(0);
+  const preview = (await call('POST', `/threads/${id}/continue/preview`, onto)) as Preview;
+  expect(preview.blocked, 'the first thread is idle').toBeNull();
+  const next = (await call('POST', `/threads/${id}/continue`, { ...onto, text: 'carry on with the totals', request_id: 'continue-1', revision: preview.revision })) as { thread: Thread };
+  await eventually(async () => (await detail(next.thread.id)).thread.status === 'done', 'the continued thread to run');
+  const again = (await call('POST', `/threads/${next.thread.id}/continue/preview`, onto)) as { revision: string };
+  await call('POST', `/threads/${next.thread.id}/continue`, { ...onto, text: 'and the tax', request_id: 'continue-2', revision: again.revision });
+  const continued = keep('thread-continued.json', await detail(next.thread.id)) as { continued_from: { id: string } | null; continued_in: unknown[] };
+  expect(continued.continued_from?.id).toBe(id);
+  expect(continued.continued_in).toHaveLength(1);
 }
 
 /** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */
