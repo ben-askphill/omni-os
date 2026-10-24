@@ -181,6 +181,9 @@ final class QARunner {
         case .editPending(let text):
           guard let edit = QAProbe.editPending, edit(text) else { throw QAScriptError("no editable unsent message on screen") }
           try? await Task.sleep(for: .milliseconds(500))
+        case .webhookSecret(let id):
+          guard let open = QAProbe.openWebhookSecret, open(id) else { throw QAScriptError("no webhook automation \(id) on screen") }
+          try? await Task.sleep(for: .milliseconds(600))
         case .imageZoom(let scale):
           guard let zoom = QAProbe.imageZoom else { throw QAScriptError("no image preview on screen") }
           if let scale { zoom.step(scale / zoom.scale) } else { zoom.fit() }
@@ -465,6 +468,7 @@ final class QARunner {
     case .modelPicker(let query): "modelPicker \(query)"
     case .foldAll: "foldAll"
     case .editPending(let text): "editPending \(text.prefix(40))"
+    case .webhookSecret(let id): "webhookSecret \(id)"
     case .imageZoom(let scale): "imageZoom \(scale.map { "\($0)" } ?? "fit")"
     case .type(let text): "type \(text.prefix(40))"
     case .run(let run): "run \(run.harness.rawValue) \(run.model) \(run.effort)"

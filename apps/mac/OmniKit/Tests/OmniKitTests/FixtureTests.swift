@@ -144,7 +144,31 @@ func sseData(_ text: String) -> [String] {
     #expect(delivery.threadID == review.runs.first?.threadID)
     #expect(review.runs.first?.trigger == .event)
     #expect(delivery.context["thread_title"] == "Publish the launch plan")
-    #expect(list.filter { $0.id != "page-review" }.allSatisfy { $0.deliveries.isEmpty })
+    #expect(list.filter { !["page-review", "ci-fixer"].contains($0.id) }.allSatisfy { $0.deliveries.isEmpty })
+    #expect(list.filter { $0.id != "ci-fixer" }.allSatisfy { $0.webhook == nil })
+  }
+
+  /// `ci-fixer` takes signed GitHub webhooks from acme/shop. A CI failure reached it and started a run; the secret
+  /// shows by its Keychain name only.
+  @Test func readsAnAutomationAWebhookStarted() throws {
+    let list = try decodeFixture([Automation].self, "automations.json")
+    let fixer = try #require(list.first { $0.id == "ci-fixer" })
+    #expect(fixer.isWebhook)
+    #expect(fixer.on?.repo == "acme/shop")
+    #expect(fixer.on?.events == ["workflow_run", "pull_request_review"])
+    #expect(fixer.scheduleDetail().hasPrefix("acme/shop · workflow_run, pull_request_review"))
+    let hook = try #require(fixer.webhook)
+    #expect(hook.path == "/api/hooks/github/ci-fixer")
+    #expect(hook.secret == "OMNI_WEBHOOK_CI_FIXER")
+    #expect(hook.secretSet)
+    let delivery = try #require(fixer.deliveries.first)
+    #expect(delivery.source == "github_webhook")
+    #expect(delivery.state == .started)
+    #expect(delivery.sourceThread == nil)
+    #expect(delivery.threadID != nil)
+    #expect(delivery.threadID == fixer.runs.first?.threadID)
+    #expect(delivery.context["event"] == "workflow_run")
+    #expect(delivery.context["repo"] == "acme/shop")
   }
 
   @Test func readsAThreadBeingHandedOff() throws {

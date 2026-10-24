@@ -12,7 +12,8 @@ public struct AutomationTrigger: OpenEnum {
 }
 
 /// An event automation's `on:` block, as GET /api/automations sends it. A GitHub event has `repo` and `drafts`; a
-/// published page (`artifact_published`) has `channels` and `updates` and no `drafts`.
+/// published page (`artifact_published`) has `channels` and `updates` and no `drafts`; a signed GitHub webhook
+/// (`github_webhook`) has `repo`, `events` and maybe `trust`.
 public struct AutomationEvent: Decodable, Hashable, Sendable {
   public let event: String
   public let repo: String?
@@ -21,9 +22,13 @@ public struct AutomationEvent: Decodable, Hashable, Sendable {
   public let channels: [String]?
   /// A page published again to the same URL counts too.
   public let updates: Bool
+  /// The webhook events it takes (`workflow_run`, `pull_request_review`). nil for any other trigger.
+  public let events: [String]?
+  /// `any`: runs for fork PRs and reviews from outside the repo's people start it too. nil for only theirs.
+  public let trust: String?
 
   enum CodingKeys: String, CodingKey {
-    case event, repo, drafts, channels, updates
+    case event, repo, drafts, channels, updates, events, trust
   }
 
   public init(from decoder: any Decoder) throws {
@@ -33,10 +38,14 @@ public struct AutomationEvent: Decodable, Hashable, Sendable {
     drafts = try c.decodeIfPresent(Bool.self, forKey: .drafts) ?? false
     channels = try c.decodeIfPresent([String].self, forKey: .channels)
     updates = try c.decodeIfPresent(Bool.self, forKey: .updates) ?? false
+    events = try c.decodeIfPresent([String].self, forKey: .events)
+    trust = try c.decodeIfPresent(String.self, forKey: .trust)
   }
 
   /// Runs when a thread publishes a page to claude.ai, not on a GitHub event.
   public var isArtifact: Bool { event == "artifact_published" }
+  /// Runs when GitHub posts a signed event to the automation's endpoint, not on a poll.
+  public var isWebhook: Bool { event == "github_webhook" }
 
   /// `describeEvent` in web/src/format.ts.
   public var label: String {
@@ -46,6 +55,7 @@ public struct AutomationEvent: Decodable, Hashable, Sendable {
     case "pr_conflict": "When a PR has conflicts"
     case "pr_review": "When a PR gets review comments"
     case "artifact_published": "When a page is published"
+    case "github_webhook": "When GitHub sends a webhook"
     default: event
     }
   }
@@ -82,10 +92,10 @@ public struct TriggerDeliveryState: OpenEnum {
 public struct TriggerDelivery: Decodable, Hashable, Sendable, Identifiable {
   public let id: String
   public let automation: String
-  /// `artifact_published` for now.
+  /// `artifact_published` or `github_webhook`.
   public let source: String
   public let sourceID: String
-  /// One line, like "report.html in #acme".
+  /// One line, like "report.html in #acme" or "CI failure on fix-cart".
   public let summary: String
   /// Fields captured from the event (url, title, channel and so on). Data, never instructions.
   public let context: [String: String]
@@ -93,7 +103,7 @@ public struct TriggerDelivery: Decodable, Hashable, Sendable, Identifiable {
   /// Why it was skipped or failed.
   public let reason: String?
   public let owner: String?
-  /// The thread that published the page.
+  /// The thread that published the page. nil for a webhook.
   public let sourceThread: String?
   /// The automation thread it started.
   public let threadID: String?
@@ -108,6 +118,24 @@ public struct TriggerDelivery: Decodable, Hashable, Sendable, Identifiable {
     case createdAt = "created_at"
     case updatedAt = "updated_at"
   }
+}
+
+/// Where GitHub posts a webhook automation's events, and whether this Mac holds its signing secret. The server
+/// never sends the value.
+public struct AutomationWebhook: Decodable, Hashable, Sendable {
+  /// `/api/hooks/github/<id>`, on the server's own origin.
+  public let path: String
+  /// The secret's Keychain name, like `OMNI_WEBHOOK_CI_FIXER`.
+  public let secret: String
+  public let secretSet: Bool
+
+  enum CodingKeys: String, CodingKey {
+    case path, secret
+    case secretSet = "secret_set"
+  }
+
+  public var secretStatus: String { secretSet ? "Signing secret set on this Mac" : "No signing secret on this Mac" }
+  public var secretAction: String { secretSet ? "Replace secret…" : "Set secret…" }
 }
 
 /// A row of `automation_runs`, with the status and title of the thread it started. Both are nil once the
@@ -167,9 +195,11 @@ public struct Automation: Decodable, Hashable, Sendable, Identifiable {
   public let runs: [AutomationRun]
   /// The events handed to it, newest first, at most five. Empty from a server that sends none.
   public let deliveries: [TriggerDelivery]
+  /// Set for a `github_webhook` automation only.
+  public let webhook: AutomationWebhook?
 
   enum CodingKeys: String, CodingKey {
-    case id, name, cron, on, repo, timezone, channel, role, model, prompt, enabled, file, error, next, runs, deliveries
+    case id, name, cron, on, repo, timezone, channel, role, model, prompt, enabled, file, error, next, runs, deliveries, webhook
     case pollError = "poll_error"
   }
 
@@ -192,11 +222,14 @@ public struct Automation: Decodable, Hashable, Sendable, Identifiable {
     next = try c.decodeIfPresent(Date.self, forKey: .next)
     runs = try c.decode([AutomationRun].self, forKey: .runs)
     deliveries = try c.decodeIfPresent([TriggerDelivery].self, forKey: .deliveries) ?? []
+    webhook = try c.decodeIfPresent(AutomationWebhook.self, forKey: .webhook)
   }
 
   public var isEvent: Bool { on != nil }
   /// Runs when a page is published, not on a GitHub event or a schedule.
   public var isArtifact: Bool { on?.isArtifact == true }
+  /// Runs when GitHub posts a signed webhook.
+  public var isWebhook: Bool { on?.isWebhook == true }
   /// The first chip: the event in words, or the schedule.
   public var schedule: String { on?.label ?? AutomationSchedule.describe(cron) }
   public var scheduleHelp: String {
@@ -205,20 +238,25 @@ public struct Automation: Decodable, Hashable, Sendable, Identifiable {
   }
 
   /// The second chip: the channels a page must come from ("#acme, #ops" or "any channel", plus " · updates too"),
-  /// the watched repo, or the cron as written. `channelName` turns a channel id into its name; the id shows
-  /// when it gives nil.
+  /// a webhook's repo and events ("acme/shop · workflow_run", plus " · anyone" for `trust: any`), the watched repo,
+  /// or the cron as written. `channelName` turns a channel id into its name; the id shows when it gives nil.
   public func scheduleDetail(channelName: (String) -> String? = { _ in nil }) -> String {
     guard let on else { return cron }
+    if on.isWebhook {
+      let events = (on.events ?? []).joined(separator: ", ")
+      return [on.repo ?? "no repo", events, on.trust == "any" ? "anyone" : ""].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
     guard on.isArtifact else { return repo ?? "no repo" }
     let from = channelList(channelName) ?? "any channel"
     return on.updates ? "\(from) · updates too" : from
   }
 
   /// "Watching owner/name, one run per event" or the poll error, for a GitHub event. "Runs once per published
-  /// page", or "Runs once per page published in #acme, #ops" with a channel filter, for a published page. nil for a
-  /// scheduled or paused automation.
+  /// page", or "Runs once per page published in #acme, #ops" with a channel filter, for a published page. "Runs once
+  /// per GitHub delivery" for a webhook. nil for a scheduled or paused automation.
   public func watching(enabled: Bool, channelName: (String) -> String? = { _ in nil }) -> String? {
     guard enabled, error == nil, let on else { return nil }
+    if on.isWebhook { return "Runs once per GitHub delivery" }
     guard on.isArtifact else { return pollError ?? "Watching \(repo ?? "no repo"), one run per event" }
     return channelList(channelName).map { "Runs once per page published in \($0)" } ?? "Runs once per published page"
   }
@@ -229,8 +267,13 @@ public struct Automation: Decodable, Hashable, Sendable, Identifiable {
     return channels.map { "#\(channelName($0) ?? $0)" }.joined(separator: ", ")
   }
 
-  /// The Deliveries list shows for a published-page automation, and for any other that has some.
-  public var showsDeliveries: Bool { isArtifact || !deliveries.isEmpty }
+  /// The Deliveries list shows for a published-page or webhook automation, and for any other that has some.
+  public var showsDeliveries: Bool { isArtifact || isWebhook || !deliveries.isEmpty }
+
+  /// What the Deliveries list says while it is empty.
+  public var noDeliveries: String {
+    isWebhook ? "No GitHub deliveries since it was turned on." : "No pages published since it was turned on."
+  }
 
   public func badge(enabled: Bool) -> AutomationBadge? {
     if error != nil { return .invalid }

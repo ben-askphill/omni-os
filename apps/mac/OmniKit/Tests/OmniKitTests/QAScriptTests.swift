@@ -51,6 +51,7 @@ import OmniKit
         {"modelPicker": "cursor"},
         {"foldAll": true},
         {"editPending": "then write it up properly"},
+        {"webhookSecret": "ci-fixer"},
         {"imageZoom": 2},
         {"imageZoom": "fit"},
         {"openThread": "t2"}
@@ -70,6 +71,7 @@ import OmniKit
       .modelPicker("cursor"),
       .foldAll,
       .editPending("then write it up properly"),
+      .webhookSecret("ci-fixer"),
       .imageZoom(2),
       .imageZoom(nil),
       .openThread("t2"),

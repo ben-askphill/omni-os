@@ -28,8 +28,8 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `Appearance.swift` | `Appearance`, `AppearanceSettings` (in UserDefaults, `-appearance` for a run) |
 | `Zoom.swift` | `ZoomSettings`: the zoom level (80% to 160%, in UserDefaults, `-zoom` for a run), Zoom In, Zoom Out, Actual Size |
 | `SettingsTab.swift` | `SettingsTab`, `Route.settingsTab`, `AppModel.show(_:)` |
-| `Client+Automations.swift` | `automations()`, `runAutomation(_:)`, `setAutomationEnabled(_:_:)` on `OmniClient` |
-| `Automation.swift` | `Automation`, `AutomationEvent`, `AutomationRun`, `AutomationTrigger`, `AutomationBadge`, `NextRunText`, `AutomationSchedule` (`describeCron` and `nextRunLabel` in `apps/web/src/format.ts`), `TriggerDelivery` and `TriggerDeliveryState` (`packages/shared/automation-triggers.ts`) |
+| `Client+Automations.swift` | `automations()`, `runAutomation(_:)`, `setAutomationEnabled(_:_:)`, `setAutomationWebhookSecret(_:value:)`, `removeAutomationWebhookSecret(_:)` on `OmniClient` |
+| `Automation.swift` | `Automation`, `AutomationEvent`, `AutomationWebhook`, `AutomationRun`, `AutomationTrigger`, `AutomationBadge`, `NextRunText`, `AutomationSchedule` (`describeCron` and `nextRunLabel` in `apps/web/src/format.ts`), `TriggerDelivery` and `TriggerDeliveryState` (`packages/shared/automation-triggers.ts`) |
 | `AutomationsModel.swift` | `AutomationsModel` (the Automations page) |
 | `Route.swift` | `Route`, parsed from and printed to the Web UI hash routes |
 | `SSEParser.swift` | `SSEParser`, `SSEMessage`: the EventSource parsing rules, bytes in, messages out |
@@ -383,6 +383,7 @@ Automations page (#73), like `Automations.tsx`. The Web UI has no create or edit
 - An invalid automation shows the server's error and "Fix it in <file>" (`shortPath`), and its Run now and switch are off, as in the Web UI.
 - Run now opens the new thread. The switch shows its new value at once, turns back with the server's error if it refuses, and loads the list again when it takes it. Errors show on the automation until its next action.
 - Prompt is a disclosure group. Last runs: the strip (oldest left, finished runs full height, colors of `RUN_TONE`, the running one pulses, "done · 5m ago" tooltips), then a row per run: the status dot (a ring for queued), the title or "Thread removed", "manual", `RelTime`. A row with a thread opens it.
+- A `github_webhook` automation (#227) shows its repo, events and " · anyone" for `trust: any` in the second chip, then a panel: the endpoint path (selectable, with Copy), whether this Mac holds the signing secret (a warning when not) and "Set secret…" or "Replace secret…", which opens a sheet with a SecureField. Save sends the value with PUT `/api/automations/:id/webhook-secret` and reloads; Remove asks first, then DELETEs it. The server sends the secret's Keychain name and `secret_set`, never the value, and the app never keeps it past the sheet.
 - It loads when it shows and for a new port. The Web UI reloads a second after a feed event for an automation's thread; the screen subscribes to the feed and hands each message to `AutomationsModel.feed`. It also reloads a second after the feed opens again. Refresh in the toolbar, a spinner there while a reload runs.
 ## Thread inspector (#67)
 
@@ -470,6 +471,7 @@ Steps (a list, or an object with the list under `steps`):
 | `{"folder": {"file": "<thread title>", "into": "Specs"}}` | Files the thread there, as a drop does |
 | `{"folder": {"menu": "Specs", "shot": "menu"}}` | Right-clicks the folder and writes `menu.png` while its menu is open |
 | `{"folder": "reset"}` | Ends any of the above |
+| `{"webhookSecret": "ci-fixer"}` | On the Automations page, opens that webhook automation's Set secret form. Draw it with `screen`: it is a sheet |
 | `{"imageZoom": 2}`, `{"imageZoom": "fit"}` | Zooms the artifact image preview to that scale, or back to fit |
 | `{"screen": "name"}` | The main window with the app's windows over it (a sheet, a menu) drawn in place |
 | `{"quickPrompt": "text"}`, `{"quickPrompt": {"send": true}}`, `{"quickPrompt": false}` | Opens the Quick Prompt with this text (Wispr Flow off), sends it, or closes it |

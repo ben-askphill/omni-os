@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { createHmac } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -122,19 +123,25 @@ afterAll(async () => {
 
 // ---------- the server ----------
 
+/** The signing secret the fake Keychain holds for every webhook automation. */
+const HOOK_SECRET = 'fixture-hook-secret';
+
 /**
- * A `security` that stores nothing, so the secrets routes never reach the Keychain. `security -i` reads its
- * command from stdin; the other calls leave stdin open, so only that one reads it.
+ * A `security` that stores nothing, so the secrets routes never reach the Keychain, and finds HOOK_SECRET for a
+ * webhook automation. `security -i` reads its command from stdin; the other calls leave stdin open, so only that one reads it.
  */
 function fakeSecurity() {
   const bin = join(tmp, 'bin');
   mkdirSync(bin);
-  writeFileSync(join(bin, 'security'), '#!/bin/sh\n[ "$1" = "-i" ] && cat > /dev/null\nexit 0\n');
+  writeFileSync(
+    join(bin, 'security'),
+    `#!/bin/sh\n[ "$1" = "-i" ] && cat > /dev/null\ncase "$*" in *find-generic-password*OMNI_WEBHOOK_*) echo '${HOOK_SECRET}';; esac\nexit 0\n`,
+  );
   chmodSync(join(bin, 'security'), 0o755);
   return bin;
 }
 
-/** One automation to toggle and run, one the server can't schedule, and one a published page starts. */
+/** One automation to toggle and run, one the server can't schedule, one a published page starts and one a GitHub webhook starts. */
 function automations() {
   const dir = join(tmp, 'automations');
   mkdirSync(dir);
@@ -148,6 +155,7 @@ function automations() {
     join(dir, 'page-review.yaml'),
     'name: Page review\nenabled: true\non: { event: artifact_published, channels: [acme] }\nchannel: acme\nprompt: Review the page.\n',
   );
+  writeFileSync(join(dir, 'ci-fixer.yaml'), 'name: CI fixer\nenabled: true\non: { event: github_webhook, repo: acme/shop }\nchannel: acme\nprompt: Fix the build.\n');
   return dir;
 }
 
@@ -341,7 +349,7 @@ async function scenario() {
   // Automations, last, so their run is not in the thread lists above.
   type Automation = { id: string; enabled: boolean; error?: string; next?: string; runs: { thread_id: string; trigger: string; status: string }[] };
   const before = (await get('/automations')) as Automation[];
-  expect(before.map((a) => a.id).sort(), 'the test folder, not the repo').toEqual(['broken', 'daily-digest', 'page-review']);
+  expect(before.map((a) => a.id).sort(), 'the test folder, not the repo').toEqual(['broken', 'ci-fixer', 'daily-digest', 'page-review']);
   const enableBody = request('automation-enabled-request.json', { enabled: true });
   keep('automation-enabled.json', await call('POST', '/automations/daily-digest/enabled', enableBody));
   const run = keep('automation-run.json', await call('POST', '/automations/daily-digest/run', {})) as Thread;
@@ -355,8 +363,35 @@ async function scenario() {
     const d = ((await get('/automations')) as (Automation & { deliveries: Delivery[] })[]).find((a) => a.id === 'page-review')!.deliveries[0];
     return d?.state === 'started' && !!d.thread_id && (await detail(d.thread_id)).thread.status === 'done' && d;
   }, 'the page review run to finish');
+  // A signed workflow_run posted the way GitHub does, without the API token, starts CI fixer once.
+  await call('PUT', '/automations/ci-fixer/webhook-secret', { value: HOOK_SECRET });
+  const hookBody = JSON.stringify({
+    action: 'completed',
+    repository: { full_name: 'acme/shop' },
+    workflow_run: { name: 'CI', conclusion: 'failure', head_branch: 'fix-cart', head_sha: 'abcdef0123456789', display_title: 'Fix the cart total', html_url: 'https://github.com/acme/shop/actions/runs/7', head_repository: { full_name: 'acme/shop' } },
+  });
+  const hooked = await fetch(`${base}/api/hooks/github/ci-fixer`, {
+    method: 'POST',
+    body: hookBody,
+    headers: {
+      'content-type': 'application/json',
+      'x-github-event': 'workflow_run',
+      'x-github-delivery': '6f1c2d3e-0000-4000-8000-000000000227',
+      'x-hub-signature-256': `sha256=${createHmac('sha256', HOOK_SECRET).update(hookBody).digest('hex')}`,
+    },
+  });
+  expect(hooked.status).toBe(202);
+  const hookDelivery = await eventually(async () => {
+    const d = ((await get('/automations')) as (Automation & { deliveries: Delivery[] })[]).find((a) => a.id === 'ci-fixer')!.deliveries[0];
+    return d?.state === 'started' && !!d.thread_id && (await detail(d.thread_id)).thread.status === 'done' && d;
+  }, 'the CI fixer run to finish');
   const listed2 = keep('automations.json', await get('/automations')) as Automation[];
   expect(listed2.find((a) => a.id === 'page-review')!.runs).toMatchObject([{ thread_id: delivered.thread_id, trigger: 'event', status: 'done' }]);
+  expect(listed2.find((a) => a.id === 'ci-fixer')).toMatchObject({
+    webhook: { path: '/api/hooks/github/ci-fixer', secret: 'OMNI_WEBHOOK_CI_FIXER', secret_set: true },
+    runs: [{ thread_id: hookDelivery.thread_id, trigger: 'event', status: 'done' }],
+  });
+  expect(JSON.stringify(listed2)).not.toContain(HOOK_SECRET);
   const digest = listed2.find((a) => a.id === 'daily-digest')!;
   expect(digest.enabled).toBe(true);
   expect(digest.next).toBeTruthy();

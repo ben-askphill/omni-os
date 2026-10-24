@@ -625,6 +625,8 @@ enum QAProbe {
   static var foldAll: (() -> Void)?
   /// Opens the edit of the first editable unsent message with this text. false when there is none.
   static var editPending: ((String) -> Bool)?
+  /// Opens the Set secret form of the webhook automation with this id. false when the page shows none.
+  static var openWebhookSecret: ((String) -> Bool)?
 
   static func laidOut(_ store: ThreadStore, _ g: ScrollPin.Geometry) {
     guard shownThread != store.id, store.loadState == .loaded, g.contentHeight > 0 else { return }

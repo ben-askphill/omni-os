@@ -41,6 +41,17 @@ private func artifactAutomationJSON(
   #"{"id":"on-publish","name":"On publish","cron":"","on":\#(on),"timezone":"Europe/Amsterdam","channel":"acme","prompt":"Review it.","enabled":true,"error":null,"next":null,"runs":[],"deliveries":\#(deliveries)}"#
 }
 
+/// An automation GitHub posts signed events to, as GET /api/automations sends it. `on` and `webhook` are raw JSON;
+/// nil leaves the key out.
+private func webhookAutomationJSON(
+  on: String = #"{"event":"github_webhook","repo":"acme/shop","events":["workflow_run","pull_request_review"]}"#,
+  webhook: String? = #"{"path":"/api/hooks/github/ci-fixer","secret":"OMNI_WEBHOOK_CI_FIXER","secret_set":false}"#,
+  enabled: Bool = true
+) -> String {
+  let hook = webhook.map { #","webhook":\#($0)"# } ?? ""
+  return #"{"id":"ci-fixer","name":"CI fixer","cron":"","on":\#(on),"timezone":"Europe/Amsterdam","channel":"acme","prompt":"Fix it.","enabled":\#(enabled),"error":null,"next":null\#(hook),"runs":[],"deliveries":[]}"#
+}
+
 private func deliveryJSON(id: String, state: String, thread: String? = nil, reason: String? = nil, at: String = "2026-09-28T09:55:00.000Z") -> String {
   func quoted(_ s: String?) -> String { s.map { "\"\($0)\"" } ?? "null" }
   return #"{"id":"\#(id)","automation":"on-publish","source":"artifact_published","source_id":"src:\#(id)","summary":"report.html in #acme","context":{"url":"https://claude.ai/artifact/abc","title":"Report","file":"report.html","update":"false","thread":"src","thread_title":"Write the report","channel":"acme"},"state":"\#(state)","reason":\#(quoted(reason)),"owner":null,"source_thread":"src","thread_id":\#(quoted(thread)),"created_at":"\#(at)","updated_at":"2026-09-28T09:56:00Z"}"#
@@ -123,7 +134,7 @@ private final class AutomationsServer: HTTPTransport {
   @Test func listsAutomations() async throws {
     let t = StubTransport(body: try fixture("automations.json"))
     let list = try await OmniClient(port: 4799, transport: t).automations()
-    #expect(list.map(\.id) == ["broken", "daily-digest", "page-review"])
+    #expect(list.map(\.id) == ["broken", "ci-fixer", "daily-digest", "page-review"])
 
     let broken = list[0]
     #expect(broken.name == "Broken")
@@ -133,7 +144,7 @@ private final class AutomationsServer: HTTPTransport {
     #expect(broken.role == nil)
     #expect(broken.runs.isEmpty)
 
-    let digest = list[1]
+    let digest = list[2]
     #expect(digest.cron == "0 8 * * 1-5")
     #expect(digest.timezone == "Europe/Amsterdam")
     #expect(digest.channel == "acme")
@@ -241,6 +252,50 @@ private final class AutomationsServer: HTTPTransport {
     #expect(other.on?.channels == ["acme"])
     #expect(other.on?.updates == true)
     #expect(other.deliveries.first?.state == "rerouted")
+  }
+
+  @Test func readsAWebhookAutomation() throws {
+    let a = try decode(Automation.self, webhookAutomationJSON())
+    let on = try #require(a.on)
+    #expect(on.isWebhook && a.isWebhook)
+    #expect(!on.isArtifact && !a.isArtifact)
+    #expect(on.repo == "acme/shop")
+    #expect(on.events == ["workflow_run", "pull_request_review"])
+    #expect(on.trust == nil)
+    #expect(!on.drafts && !on.updates && on.channels == nil)
+    #expect(a.repo == nil, "the top-level repo is for polled PR events")
+    let hook = try #require(a.webhook)
+    #expect(hook.path == "/api/hooks/github/ci-fixer")
+    #expect(hook.secret == "OMNI_WEBHOOK_CI_FIXER")
+    #expect(!hook.secretSet)
+
+    let anyone = try decode(Automation.self, webhookAutomationJSON(on: #"{"event":"github_webhook","repo":"acme/shop","events":["workflow_run"],"trust":"any"}"#))
+    #expect(anyone.on?.trust == "any")
+    #expect(anyone.on?.events == ["workflow_run"])
+
+    // Other automations, and a server from before webhooks, send no `webhook`.
+    #expect(try decode(Automation.self, webhookAutomationJSON(webhook: nil)).webhook == nil)
+    #expect(try automation().webhook == nil)
+    #expect(try decode(Automation.self, artifactAutomationJSON()).webhook == nil)
+  }
+
+  @Test func setsTheWebhookSecret() async throws {
+    let t = StubTransport(body: #"{"ok":true,"secret_set":true}"#)
+    try await OmniClient(port: 4799, transport: t).setAutomationWebhookSecret("ci fixer", value: "s3cret")
+    let req = try #require(t.requests.first)
+    #expect(req.httpMethod == "PUT")
+    #expect(req.url?.absoluteString == "http://127.0.0.1:4799/api/automations/ci%20fixer/webhook-secret")
+    #expect(req.value(forHTTPHeaderField: "Content-Type") == "application/json")
+    #expect(try bodyJSON(req) == .object(["value": .string("s3cret")]))
+  }
+
+  @Test func removesTheWebhookSecret() async throws {
+    let t = StubTransport(body: #"{"ok":true,"secret_set":false}"#)
+    try await OmniClient(port: 4799, transport: t).removeAutomationWebhookSecret("ci-fixer")
+    let req = try #require(t.requests.first)
+    #expect(req.httpMethod == "DELETE")
+    #expect(req.url?.absoluteString == "http://127.0.0.1:4799/api/automations/ci-fixer/webhook-secret")
+    #expect(req.httpBody == nil)
   }
 
   /// An older server sends no `deliveries`.
@@ -400,6 +455,30 @@ private final class AutomationsServer: HTTPTransport {
     #expect(broken.watching(enabled: true) == nil)
   }
 
+  @Test func saysWhatAWebhookTakes() throws {
+    let a = try decode(Automation.self, webhookAutomationJSON())
+    #expect(a.isEvent)
+    #expect(a.schedule == "When GitHub sends a webhook")
+    #expect(a.scheduleHelp == "on: github_webhook")
+    #expect(a.scheduleDetail() == "acme/shop · workflow_run, pull_request_review")
+    #expect(a.watching(enabled: true) == "Runs once per GitHub delivery")
+    #expect(a.watching(enabled: false) == nil)
+    #expect(a.nextRun(enabled: true) == nil)
+    #expect(a.showsDeliveries, "an empty list still shows, with its empty text")
+    #expect(a.noDeliveries == "No GitHub deliveries since it was turned on.")
+    #expect(try decode(Automation.self, artifactAutomationJSON()).noDeliveries == "No pages published since it was turned on.")
+
+    let anyone = try decode(Automation.self, webhookAutomationJSON(on: #"{"event":"github_webhook","repo":"acme/shop","events":["pull_request_review"],"trust":"any"}"#))
+    #expect(anyone.scheduleDetail() == "acme/shop · pull_request_review · anyone")
+
+    let unset = try #require(a.webhook)
+    #expect(unset.secretStatus == "No signing secret on this Mac")
+    #expect(unset.secretAction == "Set secret…")
+    let set = try #require(try decode(Automation.self, webhookAutomationJSON(webhook: #"{"path":"/api/hooks/github/ci-fixer","secret":"OMNI_WEBHOOK_CI_FIXER","secret_set":true}"#)).webhook)
+    #expect(set.secretStatus == "Signing secret set on this Mac")
+    #expect(set.secretAction == "Replace secret…")
+  }
+
   @Test func labelsDeliveryStates() throws {
     let states: [TriggerDeliveryState] = [.received, .accepted, .queued, .started, .failed, .skipped, "later"]
     #expect(states.map(\.label) == ["Received", "Accepted", "Held for owner", "Started", "Failed", "Skipped", "later"])
@@ -479,7 +558,7 @@ private final class AutomationsServer: HTTPTransport {
     #expect(m.loadState == .loading)
     await m.load()
     #expect(m.loadState == .loaded)
-    #expect(m.automations.map(\.id) == ["broken", "daily-digest", "page-review"])
+    #expect(m.automations.map(\.id) == ["broken", "ci-fixer", "daily-digest", "page-review"])
     #expect(!m.isRefreshing)
   }
 
@@ -492,7 +571,7 @@ private final class AutomationsServer: HTTPTransport {
     server.recover("GET /api/automations")
     await m.load()
     #expect(m.loadState == .loaded)
-    #expect(m.automations.count == 3)
+    #expect(m.automations.count == 4)
   }
 
   @Test func marksARefreshWhileItLoads() async throws {
@@ -606,6 +685,74 @@ private final class AutomationsServer: HTTPTransport {
     #expect(m.errors[a.id] == nil)
     gate.open()
     await toggle.value
+  }
+
+  private func ciFixer(_ m: AutomationsModel) throws -> Automation {
+    try #require(m.automations.first { $0.id == "ci-fixer" })
+  }
+
+  @Test func savesTheWebhookSecretAndReloads() async throws {
+    let server = try AutomationsServer()
+    let m = model(server)
+    await m.load()
+    let a = try ciFixer(m)
+    #expect(m.canEditSecret(a))
+    #expect(!m.canEditSecret(try digest(m)), "only a webhook automation has a secret")
+
+    let gate = server.hold("PUT")
+    let save = Task { await m.setWebhookSecret("s3cret", for: a) }
+    try await waitFor("the secret to be sent") { m.savingSecret.contains(a.id) }
+    #expect(!m.canEditSecret(a))
+    gate.open()
+    #expect(await save.value == nil)
+
+    #expect(m.savingSecret.isEmpty)
+    let write = try #require(server.writes.first)
+    #expect(write.httpMethod == "PUT")
+    #expect(write.url?.path() == "/api/automations/ci-fixer/webhook-secret")
+    #expect(try bodyJSON(write) == .object(["value": .string("s3cret")]))
+    #expect(server.reads == 2, "the list is loaded again, for the new status")
+  }
+
+  @Test func refusesABlankSecret() async throws {
+    let server = try AutomationsServer()
+    let m = model(server)
+    await m.load()
+    #expect(!AutomationsModel.isSecretValue(" \n"))
+    #expect(AutomationsModel.isSecretValue(" s "))
+    #expect(await m.setWebhookSecret("  \n", for: try ciFixer(m)) == "Paste the signing secret.")
+    #expect(server.writes.isEmpty)
+  }
+
+  @Test func saysWhyTheSecretDidNotSave() async throws {
+    let server = try AutomationsServer()
+    server.fail("PUT /api/automations/ci-fixer/webhook-secret", 500, #"{"error":"security: write failed"}"#)
+    let m = model(server)
+    await m.load()
+    let a = try ciFixer(m)
+    #expect(await m.setWebhookSecret("s3cret", for: a) == "security: write failed")
+    #expect(m.savingSecret.isEmpty)
+    #expect(m.errors[a.id] == nil, "the form shows it, not the card")
+    #expect(server.reads == 1)
+  }
+
+  @Test func removesTheWebhookSecretAndReloads() async throws {
+    let server = try AutomationsServer()
+    let m = model(server)
+    await m.load()
+    let a = try ciFixer(m)
+    await m.removeWebhookSecret(for: a)
+    let write = try #require(server.writes.first)
+    #expect(write.httpMethod == "DELETE")
+    #expect(write.url?.path() == "/api/automations/ci-fixer/webhook-secret")
+    #expect(server.reads == 2)
+    #expect(m.errors.isEmpty)
+
+    server.fail("DELETE /api/automations/ci-fixer/webhook-secret", 404, #"{"error":"not a webhook automation"}"#)
+    await m.removeWebhookSecret(for: a)
+    #expect(m.errors[a.id] == "not a webhook automation")
+    #expect(m.savingSecret.isEmpty)
+    #expect(server.reads == 2)
   }
 
   @Test func reloadsASecondAfterAnAutomationThreadEvent() async throws {

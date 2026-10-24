@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// The Automations page, like the Web UI's: the list, Run now, and the enabled switch, which shows its new value
-/// at once and turns back if the server refuses. The list loads again a second after a feed thread event whose
+/// The Automations page, like the Web UI's: the list, Run now, the enabled switch, which shows its new value
+/// at once and turns back if the server refuses, and a webhook automation's signing secret. The list loads again a second after a feed thread event whose
 /// thread has `automation` set, an `automation_delivery` event, or a feed reconnect. The thread does not have to
 /// still be in `recent`.
 @MainActor @Observable
@@ -22,7 +22,9 @@ public final class AutomationsModel {
   public private(set) var isRefreshing = false
   public private(set) var toggling: Set<Automation.ID> = []
   public private(set) var starting: Set<Automation.ID> = []
-  /// The last toggle or Run now that failed, by automation.
+  /// Webhook automations whose signing secret is being saved or removed.
+  public private(set) var savingSecret: Set<Automation.ID> = []
+  /// The last toggle, Run now or secret removal that failed, by automation.
   public private(set) var errors: [Automation.ID: String] = [:]
   /// The switch's value while the server has not confirmed it.
   private var pending: [Automation.ID: Bool] = [:]
@@ -40,6 +42,9 @@ public final class AutomationsModel {
   public func isEnabled(_ a: Automation) -> Bool { pending[a.id] ?? a.enabled }
   public func canToggle(_ a: Automation) -> Bool { a.error == nil && !toggling.contains(a.id) }
   public func canRun(_ a: Automation) -> Bool { a.error == nil && !starting.contains(a.id) }
+  public func canEditSecret(_ a: Automation) -> Bool { a.webhook != nil && !savingSecret.contains(a.id) }
+  /// A secret that is only whitespace would be stored empty: the server trims it.
+  public static func isSecretValue(_ value: String) -> Bool { !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
   /// When loads overlap, the latest one's answer wins.
   public func load() async {
@@ -88,6 +93,38 @@ public final class AutomationsModel {
       errors[a.id] = error.message
       return nil
     }
+  }
+
+  /// Stores the signing secret and loads the list again, so the status reads set. Returns why it failed, nil once
+  /// saved; the caller drops the value either way.
+  public func setWebhookSecret(_ value: String, for a: Automation) async -> String? {
+    guard Self.isSecretValue(value) else { return "Paste the signing secret." }
+    guard canEditSecret(a) else { return "The last change to this secret is still being saved." }
+    savingSecret.insert(a.id)
+    errors[a.id] = nil
+    defer { savingSecret.remove(a.id) }
+    do throws(OmniAPIError) {
+      try await client.setAutomationWebhookSecret(a.id, value: value)
+    } catch {
+      return error.message
+    }
+    await load()
+    return nil
+  }
+
+  /// Removes the signing secret from the Keychain and loads the list again. A failure is in `errors`.
+  public func removeWebhookSecret(for a: Automation) async {
+    guard canEditSecret(a) else { return }
+    savingSecret.insert(a.id)
+    errors[a.id] = nil
+    defer { savingSecret.remove(a.id) }
+    do throws(OmniAPIError) {
+      try await client.removeAutomationWebhookSecret(a.id)
+    } catch {
+      errors[a.id] = error.message
+      return
+    }
+    await load()
   }
 
   /// The Web UI's predicate (Automations.tsx): a thread event whose thread has `automation` set, or a delivery
