@@ -13,6 +13,7 @@ import { channels, db, messageRequests, THREAD_COLUMNS, threads, type Channel, t
 import { branchPRs } from './github.ts';
 import { lives, waitingMsgs } from './runner/state.ts';
 import { getTerminal } from './terminal.ts';
+import { hasLiveRun } from './actions.ts';
 import { busy, candidate, currentSignal, git, localWork, owningRepo, real, withSignal } from './worktree-sweep.ts';
 
 const run = promisify(execFile);
@@ -175,6 +176,7 @@ async function inspect(id: string, dir: string, opts: InspectOptions, ctx: Known
     const pending = pendingWork(o);
     if (pending) keep('queued', `${plural(pending, 'message or turn')} for ${o.id === id ? 'its thread' : `thread ${o.id.slice(0, 8)}`} ${pending === 1 ? 'waits' : 'wait'} to run.`);
     if (getTerminal(o.id)?.running) keep('terminal', `A terminal is open in it${o.id === id ? '' : ` (thread ${o.id.slice(0, 8)})`}.`);
+    if (hasLiveRun(o.id)) keep('action', `An action is running in it${o.id === id ? '' : ` (thread ${o.id.slice(0, 8)})`}.`);
   }
 
   if (t?.branch && branch !== t.branch) keep('branch-mismatch', `It is on ${branch ? `branch ${branch}` : 'a detached HEAD'}, not the thread's ${t.branch}.`);

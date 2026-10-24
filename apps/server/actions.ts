@@ -12,6 +12,7 @@ import { actionRuns, channelActions, channels, threadSetupRuns, threads, type Th
 import { artifactsDir } from './config.ts';
 import { isRemoteHarness } from './harness/types.ts';
 import { worktreeProblem } from './sandbox.ts';
+import { inWorkspace } from './workspace.ts';
 import { namedSecrets } from './secrets.ts';
 import { STRIPPED, terminalEnv } from './terminal-env.ts';
 
@@ -140,7 +141,17 @@ export async function startRun(t: Thread, action: ChannelAction): Promise<{ run:
   for (const l of live.values()) {
     if (l.run.thread_id === t.id && l.run.action_id === action.id) throw refusal(`${action.name} is already running in this thread.`, 409);
   }
-  const cwd = await verifiedCwd(t);
+  // Held until the process is live, so a cleanup sees it (hasLiveRun); a worktree a cleanup removed is checked out again.
+  return inWorkspace(t, async (problem) => {
+    if (problem) throw refusal(problem, 409);
+    return spawnRun(t, action, await verifiedCwd(t));
+  });
+}
+
+/** Whether an action's process is running in the thread right now. */
+export const hasLiveRun = (threadId: string) => [...live.values()].some((l) => l.run.thread_id === threadId);
+
+async function spawnRun(t: Thread, action: ChannelAction, cwd: string): Promise<{ run: ActionRun; finished: Promise<ActionRun> }> {
   const port = await claimPort(action.port);
   let env: Record<string, string>;
   try {

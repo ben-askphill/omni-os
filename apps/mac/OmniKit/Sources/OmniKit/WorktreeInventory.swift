@@ -11,7 +11,7 @@ func decodeTolerant<T: RawRepresentable>(_ decoder: any Decoder, _ fallback: T) 
 }
 
 public struct KeepReason: Decodable, Hashable, Sendable {
-  /// running, queued, warm, preparing, terminal, shared, changed, untracked, ignored, unpushed, pr-open, branch-mismatch,
+  /// running, queued, warm, preparing, terminal, action, shared, changed, untracked, ignored, unpushed, pr-open, branch-mismatch,
   /// open-thread, unowned or unregistered; a cleanup's last check adds retention and changed-meanwhile. The app shows
   /// `message`; the code is for tests and future styling.
   public let code: String

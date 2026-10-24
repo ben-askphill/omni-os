@@ -18,6 +18,7 @@ export type KeepCode =
   | 'warm'
   | 'preparing'
   | 'terminal'
+  | 'action'
   | 'shared'
   | 'changed'
   | 'untracked'

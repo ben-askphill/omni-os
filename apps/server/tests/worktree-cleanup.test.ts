@@ -23,6 +23,8 @@ const { cleanupState, retentionPass, setRetentionPolicy, startCleanup } = await 
 const { withWorkspace, keptRef, trashOf } = await import('../workspace.ts');
 const { closeTerminal, openTerminal } = await import('../terminal.ts');
 const { runsHere } = await import('../runner/state.ts');
+const { startRun, stopRun } = await import('../actions.ts');
+const { channelActions } = await import('../db.ts');
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@example.com', '-c', 'user.name=t', '-C', cwd, ...args], { encoding: 'utf8' }).trim();
@@ -417,6 +419,26 @@ describe('cleanup: what it keeps', T, () => {
     r.db.threads.update(turn.t.id, { status: 'done' });
     await posted;
     await r.untilResults(msg.t.id, 2);
+  });
+
+  it('keeps it while a channel action runs in it, and an action started during a removal checks the branch out again', async () => {
+    const { t, wt } = await worktreeThread();
+    r.db.threads.update(t.id, { archived: 1 });
+    const serve = channelActions.create(t.channel_id, { name: 'Serve', command: 'sleep 30', secrets: [], port: null, setup: null });
+    const { run: serving } = await startRun(r.thread(t.id), serve);
+    await scanned();
+    expect(currentWorktreeScan()!.items.find((i) => i.id === t.id)!.reasons.map((x) => x.code)).toContain('action');
+    await stopRun(serving.id);
+
+    const check = channelActions.create(t.channel_id, { name: 'Check', command: 'git branch --show-current', secrets: [], port: null, setup: null });
+    const late: ReturnType<typeof startRun>[] = [];
+    const run = await cleanUp([t.id], { between: (id) => void late.push(startRun(r.thread(id), check)) });
+    expect(outcomes(run)).toEqual({ [t.id]: 'removed' });
+    const { finished } = await late[0];
+    const done = await finished;
+    expect(done.state).toBe('succeeded');
+    expect(done.output.trim()).toBe(t.branch);
+    expect(existsSync(wt)).toBe(true);
   });
 });
 
