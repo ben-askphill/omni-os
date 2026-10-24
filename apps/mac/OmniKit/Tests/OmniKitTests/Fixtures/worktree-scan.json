@@ -5,8 +5,8 @@
     "phase": "finished",
     "startedAt": "2026-01-05T09:00:00.000Z",
     "finishedAt": "2026-01-05T09:00:00.000Z",
-    "total": 1,
-    "done": 1,
+    "total": 3,
+    "done": 3,
     "items": [
       {
         "id": "00000000-0000-4000-8000-000000000015",
@@ -17,6 +17,7 @@
         "branch": "omni/00000000",
         "threadId": "00000000-0000-4000-8000-000000000015",
         "threadTitle": "Fix the widget",
+        "lastActiveAt": "2026-01-05T09:00:00.000Z",
         "channelId": "widgets",
         "channelName": "Widgets",
         "folder": true,
@@ -25,12 +26,8 @@
         "sharedWith": [],
         "reasons": [
           {
-            "code": "warm",
-            "message": "Its process is still open."
-          },
-          {
             "code": "open-thread",
-            "message": "Its thread is not archived, and no merged branch has sat idle for 7 days (last active 0 days ago)."
+            "message": "Its thread is open (last active today), and it is not a merged branch idle for 7 days."
           },
           {
             "code": "untracked",
@@ -43,14 +40,54 @@
         ],
         "eligibleBecause": null,
         "errors": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000038",
+        "kind": "managed",
+        "verdict": "eligible",
+        "dir": "/tmp/omni-fixtures/data/worktrees/00000000-0000-4000-8000-000000000038",
+        "repo": "/tmp/omni-fixtures/gadgets",
+        "branch": "omni/00000000",
+        "threadId": "00000000-0000-4000-8000-000000000038",
+        "threadTitle": "Tidy the gadgets",
+        "lastActiveAt": "2026-01-05T09:00:00.000Z",
+        "channelId": "gadgets",
+        "channelName": "Gadgets",
+        "folder": true,
+        "registered": true,
+        "bytes": 8192,
+        "sharedWith": [],
+        "reasons": [],
+        "eligibleBecause": "archived",
+        "errors": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000039",
+        "kind": "managed",
+        "verdict": "eligible",
+        "dir": "/tmp/omni-fixtures/data/worktrees/00000000-0000-4000-8000-000000000039",
+        "repo": "/tmp/omni-fixtures/gadgets",
+        "branch": "omni/00000000",
+        "threadId": "00000000-0000-4000-8000-000000000039",
+        "threadTitle": "Draft the gadget notes",
+        "lastActiveAt": "2026-01-05T09:00:00.000Z",
+        "channelId": "gadgets",
+        "channelName": "Gadgets",
+        "folder": true,
+        "registered": true,
+        "bytes": 8192,
+        "sharedWith": [],
+        "reasons": [],
+        "eligibleBecause": "archived",
+        "errors": []
       }
     ],
     "error": null
   },
   "summary": {
     "eligible": {
-      "count": 0,
-      "bytes": 0
+      "count": 2,
+      "bytes": 16384
     },
     "kept": {
       "count": 1,
@@ -60,8 +97,51 @@
       "count": 0,
       "bytes": 0
     },
-    "folders": 1,
+    "folders": 3,
     "stale": 0,
-    "bytes": 24576
+    "bytes": 40960
+  },
+  "cleanup": {
+    "policy": {
+      "enabled": false,
+      "idleDays": 14
+    },
+    "preview": {
+      "manual": {
+        "trigger": "manual",
+        "candidates": [
+          {
+            "id": "00000000-0000-4000-8000-000000000038",
+            "threadId": "00000000-0000-4000-8000-000000000038",
+            "threadTitle": "Tidy the gadgets",
+            "channelName": "Gadgets",
+            "branch": "omni/00000000",
+            "bytes": 8192,
+            "because": "archived",
+            "lastActiveAt": "2026-01-05T09:00:00.000Z"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000039",
+            "threadId": "00000000-0000-4000-8000-000000000039",
+            "threadTitle": "Draft the gadget notes",
+            "channelName": "Gadgets",
+            "branch": "omni/00000000",
+            "bytes": 8192,
+            "because": "archived",
+            "lastActiveAt": "2026-01-05T09:00:00.000Z"
+          }
+        ],
+        "bytes": 16384
+      },
+      "retention": {
+        "trigger": "retention",
+        "candidates": [],
+        "bytes": 0
+      }
+    },
+    "runs": {
+      "manual": null,
+      "retention": null
+    }
   }
 }

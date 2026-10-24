@@ -27,7 +27,10 @@ export type KeepCode =
   | 'branch-mismatch'
   | 'open-thread'
   | 'unowned'
-  | 'unregistered';
+  | 'unregistered'
+  // Set by a cleanup's check right before removal (worktree-cleanup.ts), never by a scan.
+  | 'retention'
+  | 'changed-meanwhile';
 
 export interface KeepReason {
   code: KeepCode;
@@ -48,6 +51,8 @@ export interface WorktreeItem {
   branch: string | null;
   threadId: string | null;
   threadTitle: string | null;
+  /** When its thread last had a turn or message. Null when no thread owns it. */
+  lastActiveAt: string | null;
   channelId: string | null;
   channelName: string | null;
   /** Whether the folder is on disk. False only for a stale registration. */

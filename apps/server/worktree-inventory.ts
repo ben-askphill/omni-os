@@ -1,7 +1,7 @@
 // Read-only inventory of data/worktrees: which folders Omni made, what each costs on disk, and why each one must stay
 // or may go. Nothing here deletes anything. The scan runs in the background, a couple of folders at a time, and can be
-// cancelled. `inspectWorktree` is the one-folder check #214's removal calls right before it deletes, and it applies the
-// same guards the sweep does (worktree-sweep.ts): busy threads, uncommitted, untracked and unpushed work, branch checks.
+// cancelled. `inspectWorktree` and `lastLook` are the checks the cleanup (worktree-cleanup.ts) runs right before it
+// removes a folder, on top of the git checks in worktree-sweep.ts: busy threads, uncommitted, untracked and unpushed work.
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, readdirSync } from 'node:fs';
@@ -29,7 +29,7 @@ const REGENERABLE = new Set([
 const NAMES_SHOWN = 5;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** One line of what a failed command said (its stderr, not the command line), for an item's errors. */
-const text = (err: unknown) => {
+export const text = (err: unknown) => {
   const stderr = (err as { stderr?: unknown })?.stderr;
   const said = typeof stderr === 'string' && stderr.trim() ? stderr : err instanceof Error ? err.message : String(err);
   return said.trim().split('\n')[0].slice(0, 200);
@@ -40,6 +40,8 @@ export interface InspectOptions {
   fetch?: boolean;
   /** Runs after the checks and before the thread is read again. Tests change ownership here. */
   between?: (id: string) => void | Promise<void>;
+  /** Measure the folder with `du`. A cleanup's check right before removal skips it: the scan measured it. */
+  size?: boolean;
   now?: number;
 }
 
@@ -63,7 +65,7 @@ function known(): Known {
 }
 
 /** What makes a thread's ownership of its folder: if any of it changes during a check, the verdict cannot be trusted. */
-const ownership = (id: string) => {
+export const ownership = (id: string) => {
   const t = threads.get(id);
   return t ? JSON.stringify([t.channel_id, t.archived, t.status, t.setup, t.cwd, t.branch]) : 'gone';
 };
@@ -90,7 +92,7 @@ async function ignoredFiles(dir: string): Promise<string[] | null> {
 
 function blank(id: string, dir: string, over: Partial<WorktreeItem>): WorktreeItem {
   return {
-    id, kind: 'orphan', verdict: 'kept', dir, repo: null, branch: null, threadId: null, threadTitle: null, channelId: null, channelName: null,
+    id, kind: 'orphan', verdict: 'kept', dir, repo: null, branch: null, threadId: null, threadTitle: null, lastActiveAt: null, channelId: null, channelName: null,
     folder: true, registered: false, bytes: null, sharedWith: [], reasons: [], eligibleBecause: null, errors: [], ...over,
   };
 }
@@ -124,12 +126,23 @@ async function inspect(id: string, dir: string, opts: InspectOptions, ctx: Known
   const before = ownership(id);
   const t = threads.get(id) ?? null;
   const channel: Channel | null = t ? (channels.get(t.channel_id) ?? null) : null;
-  const sizing = sizeOf(dir).then(
-    (b) => b,
-    (err) => (errors.push(`size unavailable: ${text(err)}`), null),
-  );
-  const done = async (over: Partial<WorktreeItem>) => blank(id, dir, { bytes: await sizing, errors, reasons, threadId: t?.id ?? null, threadTitle: t?.title ?? null, channelId: channel?.id ?? null, channelName: channel?.name ?? null, ...over });
+  const sizing =
+    opts.size === false
+      ? Promise.resolve(null)
+      : sizeOf(dir).then(
+          (b) => b,
+          (err) => (errors.push(`size unavailable: ${text(err)}`), null),
+        );
+  const done = async (over: Partial<WorktreeItem>) =>
+    blank(id, dir, {
+      bytes: await sizing, errors, reasons, threadId: t?.id ?? null, threadTitle: t?.title ?? null, lastActiveAt: t?.updated_at ?? null,
+      channelId: channel?.id ?? null, channelName: channel?.name ?? null, ...over,
+    });
 
+  if (id.startsWith('.removing-')) {
+    keep('unowned', 'A cleanup was cut short while removing this folder, after checking it held nothing unsaved. Look in it, then delete it by hand.');
+    return done({ registered: !!(await owningRepo(dir)) });
+  }
   const repo = await owningRepo(dir);
   if (!repo) {
     keep('unregistered', 'No repository lists it as a worktree, so Omni cannot tell what is in it. Look before deleting by hand.');
@@ -230,6 +243,25 @@ async function inspect(id: string, dir: string, opts: InspectOptions, ctx: Known
   });
 }
 
+/**
+ * The last look before a cleanup removes dir, synchronous so that nothing can start between it and the removal: the
+ * thread is as it was when the checks began (`before`, from ownership), and neither it nor another thread working
+ * in the folder is busy, has messages waiting or has a terminal open. The reason to keep it, or null.
+ */
+export function lastLook(id: string, dir: string, before: string): KeepReason | null {
+  if (ownership(id) !== before) return { code: 'changed-meanwhile', message: 'Its thread changed while it was checked.' };
+  for (const uid of new Set([id, ...(known().byCwd.get(real(dir)) ?? [])])) {
+    const t = threads.get(uid);
+    if (!t) continue;
+    const whose = uid === id ? 'its thread' : `thread ${uid.slice(0, 8)}`;
+    if (uid !== id && !t.archived) return { code: 'shared', message: 'Another thread works in this folder.' };
+    if (busy(t)) return { code: 'running', message: `A turn started in ${whose} while it was checked.` };
+    if (pendingWork(t)) return { code: 'queued', message: `A message for ${whose} came in while it was checked.` };
+    if (getTerminal(uid)?.running) return { code: 'terminal', message: 'A terminal was opened in it while it was checked.' };
+  }
+  return null;
+}
+
 /** Git's registrations under data/worktrees whose folder is gone, in the repos channels use. */
 async function staleRegistrations(repos: Set<string>): Promise<WorktreeItem[]> {
   const root = real(paths.worktrees);
@@ -246,7 +278,7 @@ async function staleRegistrations(repos: Set<string>): Promise<WorktreeItem[]> {
       out.push(
         blank(id, dir, {
           kind: 'stale-registration', verdict: 'eligible', eligibleBecause: 'stale', repo, branch: t?.branch ?? null, threadId: t?.id ?? null,
-          threadTitle: t?.title ?? null, channelId: ch?.id ?? null, channelName: ch?.name ?? null, folder: false, registered: true, bytes: 0,
+          threadTitle: t?.title ?? null, lastActiveAt: t?.updated_at ?? null, channelId: ch?.id ?? null, channelName: ch?.name ?? null, folder: false, registered: true, bytes: 0,
         }),
       );
     }
@@ -258,6 +290,8 @@ async function staleRegistrations(repos: Set<string>): Promise<WorktreeItem[]> {
 
 let current: WorktreeScan | null = null;
 let abort: AbortController | null = null;
+/** Settles when the running scan does. */
+let settled: Promise<void> = Promise.resolve();
 
 /** The running scan, or the last one finished, with a copy of its items. Null before the first. */
 export const currentWorktreeScan = (): WorktreeScan | null => (current ? { ...current, items: [...current.items] } : null);
@@ -272,7 +306,7 @@ export function startWorktreeScan(opts: InspectOptions = {}): WorktreeScan {
   const scan: WorktreeScan = { id: randomUUID(), state: 'running', phase: 'listing', startedAt: new Date().toISOString(), finishedAt: null, total: 0, done: 0, items: [], error: null };
   current = scan;
   abort = ctl;
-  void withSignal(ctl.signal, () => scanAll(scan, ctl.signal, opts)).catch((err) => {
+  settled = withSignal(ctl.signal, () => scanAll(scan, ctl.signal, opts)).catch((err) => {
     if (scan.state === 'running') Object.assign(scan, { state: 'failed', error: text(err) });
   }).finally(() => {
     if (scan.state === 'running') scan.state = 'done';
@@ -281,6 +315,22 @@ export function startWorktreeScan(opts: InspectOptions = {}): WorktreeScan {
     if (abort === ctl) abort = null;
   });
   return currentWorktreeScan()!;
+}
+
+/** A scan to its end: the running one, or a new one. Its state says whether it finished, was cancelled or failed. */
+export async function scanToEnd(opts: InspectOptions = {}): Promise<WorktreeScan> {
+  startWorktreeScan(opts);
+  await settled;
+  return currentWorktreeScan()!;
+}
+
+/** A cleanup checked one of the last scan's folders again: the fresh item replaces it, or null drops a removed one. */
+export function updateScanItem(id: string, item: WorktreeItem | null) {
+  if (!current || current.state === 'running') return;
+  const i = current.items.findIndex((it) => it.kind !== 'stale-registration' && it.id === id);
+  if (i < 0) return;
+  if (item) current.items[i] = { ...item, bytes: item.bytes ?? current.items[i].bytes };
+  else current.items.splice(i, 1);
 }
 
 /** Stop the running scan: no more folders start, and the git and du calls in flight are killed. Returns whether one was running. */
@@ -295,7 +345,8 @@ export function cancelWorktreeScan(): boolean {
 
 async function scanAll(scan: WorktreeScan, signal: AbortSignal, opts: InspectOptions) {
   const ctx = known();
-  const ids = existsSync(paths.worktrees) ? readdirSync(paths.worktrees).filter((n) => !n.startsWith('.')) : [];
+  // Hidden folders are left out, except what a cleanup cut short left behind (worktree-cleanup.ts).
+  const ids = existsSync(paths.worktrees) ? readdirSync(paths.worktrees).filter((n) => !n.startsWith('.') || n.startsWith('.removing-')) : [];
   const stale = await staleRegistrations(ctx.repos);
   if (signal.aborted) return;
   scan.total = ids.length + stale.length;

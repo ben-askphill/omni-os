@@ -10,6 +10,8 @@ import { startRunner } from './runner-boot.ts';
 // deletes nothing.
 
 const r = await startRunner({ OMNI_KEEPALIVE_SECONDS: '0' });
+// Each test makes worktree threads in real repos, which takes seconds when the whole suite runs at once.
+const T = { timeout: 60_000 };
 const { app } = await import('../app.ts');
 const { inspectWorktree, startWorktreeScan, cancelWorktreeScan, currentWorktreeScan } = await import('../worktree-inventory.ts');
 const { runsHere } = await import('../runner/state.ts');
@@ -55,7 +57,7 @@ const scanDone = async () => {
   return currentWorktreeScan()!;
 };
 
-describe('worktree inventory: verdicts', () => {
+describe('worktree inventory: verdicts', T, () => {
   it('calls a worktree of an archived thread eligible, with its size, and build output does not keep it', async () => {
     const { t, wt } = await worktreeThread();
     r.db.threads.update(t.id, { archived: 1 });
@@ -132,7 +134,7 @@ describe('worktree inventory: verdicts', () => {
   });
 });
 
-describe('worktree inventory: what is not managed', () => {
+describe('worktree inventory: what is not managed', T, () => {
   it('lists a leftover folder no repo knows as an orphan that is kept', async () => {
     const id = `leftover-${Date.now()}`;
     mkdirSync(join(r.paths.worktrees, id));
@@ -156,7 +158,7 @@ describe('worktree inventory: what is not managed', () => {
   });
 });
 
-describe('worktree inventory: stale registrations and missing folders', () => {
+describe('worktree inventory: stale registrations and missing folders', T, () => {
   it('separates a registration whose folder is gone, which takes no space', async () => {
     const { t, repo: main, wt } = await worktreeThread();
     rmSync(wt, { recursive: true, force: true });
@@ -177,7 +179,7 @@ describe('worktree inventory: stale registrations and missing folders', () => {
   });
 });
 
-describe('worktree inventory: the thread changes during the scan', () => {
+describe('worktree inventory: the thread changes during the scan', T, () => {
   it('reports unknown when the thread is archived between the checks and the verdict', async () => {
     const { t } = await worktreeThread();
     r.db.threads.update(t.id, { archived: 1 });
@@ -201,7 +203,7 @@ describe('worktree inventory: the thread changes during the scan', () => {
   });
 });
 
-describe('worktree inventory: the background scan and its API', () => {
+describe('worktree inventory: the background scan and its API', T, () => {
   it('reports progress, lists items and deletes nothing', async () => {
     const { t, wt } = await worktreeThread();
     r.db.threads.update(t.id, { archived: 1 });

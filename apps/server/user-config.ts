@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSyn
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
+import { DEFAULT_RETENTION, RETENTION_DAYS } from '@omni/shared/worktree-cleanup.ts';
 
 /** The repo root, the same as config.ts's ROOT (kept here so this module does not import config.ts). */
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -68,6 +69,17 @@ export const userConfigSchema = z.object({
     .prefault({}),
   /** Per-machine overrides of the shared automation YAML (`enabled`, `channel`), so toggling one never edits the repo. */
   automations: z.record(z.string(), automationOverride).default({}),
+  /** This Mac's worktree retention (apps/server/worktree-cleanup.ts). Off until turned on in Settings > Storage. */
+  worktrees: z
+    .object({
+      retention: z
+        .object({
+          enabled: z.boolean().default(DEFAULT_RETENTION.enabled),
+          idleDays: z.number().int().min(RETENTION_DAYS.min).max(RETENTION_DAYS.max).default(DEFAULT_RETENTION.idleDays),
+        })
+        .prefault({}),
+    })
+    .prefault({}),
 });
 
 export type UserConfig = z.infer<typeof userConfigSchema>;

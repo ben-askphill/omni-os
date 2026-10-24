@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formatBytes, summarize, type WorktreeItem } from '../worktree-inventory.ts';
 
 const item = (over: Partial<WorktreeItem>): WorktreeItem => ({
-  id: 'a', kind: 'managed', verdict: 'kept', dir: '/d/a', repo: '/r', branch: null, threadId: null, threadTitle: null, channelId: null, channelName: null,
+  id: 'a', kind: 'managed', verdict: 'kept', dir: '/d/a', repo: '/r', branch: null, threadId: null, threadTitle: null, lastActiveAt: null, channelId: null, channelName: null,
   folder: true, registered: true, bytes: 100, sharedWith: [], reasons: [], eligibleBecause: null, errors: [], ...over,
 });
 
