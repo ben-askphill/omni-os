@@ -6,7 +6,8 @@ import { fixture } from '@omni/test-fixtures';
 import { newContext, type MessageContext } from '@omni/shared/message-context.ts';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import { selectExcerpt, terminalExcerpt, type TerminalExcerpt } from '@omni/shared/message-context-terminal.ts';
-import { defang, projectTerminalExcerpt } from '../message-context/terminal-excerpt.ts';
+import { defang } from '../message-context/defang.ts';
+import { projectTerminalExcerpt } from '../message-context/terminal-excerpt.ts';
 import { contextBlock, harnessText } from '../message-context/project.ts';
 
 // A terminal_excerpt as harness text: multiline output quoted whole, with the shell and the time it was taken, and

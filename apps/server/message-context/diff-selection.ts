@@ -1,6 +1,7 @@
 // The diff_selection kind as harness text (project.ts): the rows Ben picked as a diff, and whether the file in the
 // checkout still has them where he picked them.
 import type { DiffRow, DiffSelection } from '@omni/shared/message-context-diff.ts';
+import { defang } from './defang.ts';
 import type { FileRead, Projection, Projector } from './project.ts';
 
 const GROUP: Record<DiffSelection['source']['group'], string> = {
@@ -41,8 +42,8 @@ export function freshness(b: DiffSelection, file: FileRead): Projection['check']
 }
 
 export const projectDiffSelection: Projector<DiffSelection> = (b, read) => ({
-  title: `Diff selection in ${b.path}${b.old_path ? ` (was ${b.old_path})` : ''}, ${b.side} ${lines(b.start, b.end)} (${GROUP[b.source.group]})`,
+  title: `Diff selection in ${defang(b.path)}${b.old_path ? ` (was ${defang(b.old_path)})` : ''}, ${b.side} ${lines(b.start, b.end)} (${GROUP[b.source.group]})`,
   file: b.path,
   ...(read && { check: freshness(b, read(b.path)) }),
-  excerpt: { lang: 'diff', text: b.rows.map((r) => `${MARK[r.kind]}${r.text}${r.cut ? ' (cut)' : ''}`).join('\n') },
+  excerpt: { lang: 'diff', text: defang(b.rows.map((r) => `${MARK[r.kind]}${r.text}${r.cut ? ' (cut)' : ''}`).join('\n')) },
 });

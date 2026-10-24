@@ -10,6 +10,7 @@ import { readContexts, type BodyOf, type ContextReading, type KindName, type Kno
 import type { Thread } from '../db.ts';
 import { isRemoteHarness, remoteWhere } from '../harness/types.ts';
 import { userName, userPossessive } from '../profile.ts';
+import { defang } from './defang.ts';
 import { SERVER_KINDS } from './kinds.ts';
 
 /** A checkout file as a check reads it, or why it could not. */
@@ -86,12 +87,12 @@ const project = <K extends KindName>(k: KnownContext<K>, read: Reader | null): P
 };
 
 function item(n: number, r: ContextReading, place: Place): string {
-  const note = r.record.note ? [`${userPossessive()} note: ${r.record.note}`] : [];
-  if (r.as === 'fallback') return [`[${n}] ${r.record.label || r.record.kind || 'Context'}`, ...note, '(Omni could not include its contents.)'].join('\n');
+  const note = r.record.note ? [`${userPossessive()} note: ${defang(r.record.note)}`] : [];
+  if (r.as === 'fallback') return [`[${n}] ${defang(r.record.label || r.record.kind || 'Context')}`, ...note, '(Omni could not include its contents.)'].join('\n');
   const p = project(r, place.remote ? null : place.read);
   const lines = [`[${n}] ${p.title}`];
-  if (p.file && place.remote) lines.push(`File: ${p.file}, in ${userPossessive()} checkout on the Mac. You run ${place.where} and cannot open it; work from the excerpt.`);
-  else if (p.file) lines.push(`File: ${p.file}, relative to your working directory.`);
+  if (p.file && place.remote) lines.push(`File: ${defang(p.file)}, in ${userPossessive()} checkout on the Mac. You run ${place.where} and cannot open it; work from the excerpt.`);
+  else if (p.file) lines.push(`File: ${defang(p.file)}, relative to your working directory.`);
   if (p.check && !place.remote) lines.push(`Check: ${p.check.stale ? 'STALE: ' : ''}${p.check.text}.`);
   lines.push(...note);
   if (p.excerpt) {
