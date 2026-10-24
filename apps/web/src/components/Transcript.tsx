@@ -20,6 +20,7 @@ import { statusLabel } from '../status-line.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
+import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import {
   buildItems,
   buildTasks,
@@ -488,7 +489,7 @@ export function QueuedMessages({
     }
   };
   const save = async (d: EditDraft) => {
-    if (!d.prompt.trim()) return;
+    if (!d.prompt.trim() && !hasContext(items.find((m) => m.uuid === d.uuid)?.context)) return;
     update(d.uuid, (x) => ({ ...x, status: 'saving', error: undefined }));
     try {
       const res = await api.send<{ pending?: PendingMsg[] }>(path(`/${encodeURIComponent(d.uuid)}`), editBody(d), d.added, 'PATCH');
@@ -592,6 +593,7 @@ function EditBox({ draft: d, label, actions: a }: { draft: EditDraft; label: str
   const m = a.items.find((x) => x.uuid === d.uuid);
   const kept = (m?.attachments ?? []).filter((f) => d.keep.includes(f.name));
   const saving = d.status === 'saving';
+  const empty = !d.prompt.trim() && !hasContext(m?.context);
   const pick = useRef<HTMLInputElement>(null);
   return (
     <div className="flex flex-col items-end">
@@ -614,6 +616,7 @@ function EditBox({ draft: d, label, actions: a }: { draft: EditDraft; label: str
           }}
           className="w-full resize-none bg-transparent text-[14px] leading-[1.55] text-fg outline-none"
         />
+        <ContextChips records={m?.context} className="mt-2" />
         {kept.length + d.added.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {kept.map((f) => (
@@ -641,7 +644,7 @@ function EditBox({ draft: d, label, actions: a }: { draft: EditDraft; label: str
           <Button size="sm" variant="ghost" disabled={saving} onClick={() => a.close(d.uuid)}>
             Cancel
           </Button>
-          <Button size="sm" variant="primary" icon="check" busy={saving} disabled={!d.prompt.trim()} onClick={() => void a.save(d)}>
+          <Button size="sm" variant="primary" icon="check" busy={saving} disabled={empty} onClick={() => void a.save(d)}>
             Save
           </Button>
         </div>
@@ -721,9 +724,12 @@ function PendingBubble({ m, label, icon, children }: { m: PendingMsg; label: str
           <Icon name={icon} size={12} /> {label}
           {m.attachments?.length ? <span className="text-fg-4">· {plural(m.attachments.length, 'file')}</span> : null}
         </div>
-        <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
-          {m.text}
-        </div>
+        <ContextChips records={m.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
+        {(m.text || !hasContext(m.context)) && (
+          <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
+            {m.text}
+          </div>
+        )}
       </div>
       {children}
     </div>
@@ -879,31 +885,34 @@ function UserBubble({ p, at, threadId, event, clipped }: { p: UserP; at: string;
         <span className="font-num text-[11px] text-fg-4">{clock(toDate(at))}</span>
       </div>
       {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} /> : null}
-      <div
-        className={`max-w-[92%] rounded-[22px] rounded-tr-lg px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%] ${
-          p.dropped ? 'border border-dashed border-line-strong' : 'bg-bubble'
-        }`}
-      >
-        {pieces.map(({ text: t, hit }, i) =>
-          hit ? (
-            <CommandPill key={i} label={t} cmd={hit} open={hit === open} onToggle={() => setAbout((a) => (a === hit.start ? null : hit.start))} />
-          ) : (
-            <Fragment key={i}>{t}</Fragment>
-          ),
-        )}
-        {cut && '...'}
-        {open && (
-          <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
-            {open.description || 'No description'} <span className="text-fg-4">· {SOURCE_TAG[open.source]}</span>
-          </span>
-        )}
-        {long && (
-          <button type="button" onClick={() => setMore((m) => !m)} className="mt-1 block text-[12px] font-medium text-fg-3 underline underline-offset-2">
-            {more ? 'Show less' : 'Show all'}
-          </button>
-        )}
-        {p.items?.length ? <PRWakeList items={p.items} more={p.more} /> : null}
-      </div>
+      <ContextChips records={p.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
+      {(text || !hasContext(p.context)) && (
+        <div
+          className={`max-w-[92%] rounded-[22px] rounded-tr-lg px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%] ${
+            p.dropped ? 'border border-dashed border-line-strong' : 'bg-bubble'
+          }`}
+        >
+          {pieces.map(({ text: t, hit }, i) =>
+            hit ? (
+              <CommandPill key={i} label={t} cmd={hit} open={hit === open} onToggle={() => setAbout((a) => (a === hit.start ? null : hit.start))} />
+            ) : (
+              <Fragment key={i}>{t}</Fragment>
+            ),
+          )}
+          {cut && '...'}
+          {open && (
+            <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
+              {open.description || 'No description'} <span className="text-fg-4">· {SOURCE_TAG[open.source]}</span>
+            </span>
+          )}
+          {long && (
+            <button type="button" onClick={() => setMore((m) => !m)} className="mt-1 block text-[12px] font-medium text-fg-3 underline underline-offset-2">
+              {more ? 'Show less' : 'Show all'}
+            </button>
+          )}
+          {p.items?.length ? <PRWakeList items={p.items} more={p.more} /> : null}
+        </div>
+      )}
       <ClippedNote event={event} clipped={clipped} className="mt-1 justify-end" />
       <CopyMsg text={text} align="end" />
     </div>

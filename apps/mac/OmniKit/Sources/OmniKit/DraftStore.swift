@@ -30,6 +30,19 @@ public struct DraftStore: Sendable {
     try? text.write(to: url, atomically: true, encoding: .utf8)
   }
 
+  /// A draft saved as JSON, or nil when there is none or it does not decode.
+  public func value<T: Decodable>(_ type: T.Type, for key: String) -> T? {
+    let text = text(for: key)
+    guard !text.isEmpty else { return nil }
+    return try? OmniJSON.decoder().decode(T.self, from: Data(text.utf8))
+  }
+
+  /// Saves the value as JSON; nil removes the draft.
+  public func save(json value: (some Encodable)?, for key: String) {
+    let data = value.flatMap { try? OmniJSON.encoder().encode($0) }
+    save(data.map { String(decoding: $0, as: UTF8.self) } ?? "", for: key)
+  }
+
   private func file(_ key: String) -> URL {
     let safe = key.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "draft"
     return directory.appending(path: safe + ".txt")

@@ -132,6 +132,8 @@ export async function startRunner(env: Record<string, string> = {}) {
     claudeStdin: (id: string) =>
       claudeStdin().filter((l) => l.thread_id === id).map((l) => (l.subtype ? `${l.type}:${l.subtype}` : l.type) as string),
     /** The text of each message a thread's claude processes read, in order. */
+    /** The media type of each image block of every user message the thread's Claude was sent. */
+    claudeImages: (id: string) => claudeStdin().filter((l) => l.thread_id === id && l.type === 'user').map((l) => (l.images ?? []) as string[]),
     claudeTexts: (id: string) => claudeStdin().filter((l) => l.thread_id === id && l.type === 'user').map((l) => l.text as string),
     codexRequests,
     /** Codex app-server processes spawned, oldest first (one per thread). */

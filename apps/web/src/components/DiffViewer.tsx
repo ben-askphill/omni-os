@@ -2,7 +2,7 @@ import { memo, useMemo, useState, type ReactNode } from 'react';
 import { MAX_LINES, parseDiff, startsOpen, type DiffLine, type FileDiff } from '../diff.ts';
 import { Icon } from './ui.tsx';
 
-const LINE_CLASS: Record<DiffLine['kind'], string> = {
+export const LINE_CLASS: Record<DiffLine['kind'], string> = {
   hunk: 'bg-surface text-fg-3',
   add: 'bg-[var(--diff-add)]',
   del: 'bg-[var(--diff-del)]',
@@ -10,10 +10,22 @@ const LINE_CLASS: Record<DiffLine['kind'], string> = {
   context: 'text-fg-2',
 };
 
+/** Lines Ben can pick to send to the agent (components/thread/panel/LineSelection.tsx). */
+export interface LineSelect {
+  /** The picked lines as indexes into the file's lines, `to` maybe above `from`. Null when none are in this file. */
+  range: { from: number; to: number } | null;
+  press(i: number, extend: boolean): void;
+}
+
+// The numbers go a step darker: fg-4 on the mark tint is too faint in dark mode.
+const PICKED = ' bg-[image:linear-gradient(var(--mark),var(--mark))] shadow-[inset_2px_0_0_var(--fg-3)] [&_[aria-hidden]]:text-fg-2';
+const pickable = (l: DiffLine) => l.kind === 'add' || l.kind === 'del' || l.kind === 'context';
+
 /**
  * One file of a diff: a header that opens and closes it, then its numbered lines. The PR page and a thread's
  * Changes panel both use it. `label` replaces the path in the header, `badge` sits before it, and `notice` says why
- * there are no lines (binary, too large).
+ * there are no lines (binary, too large). With `select`, a line's numbers pick it (shift extends); on a touch screen
+ * the whole line does, and a tap in the same hunk extends.
  */
 export const DiffFile = memo(function DiffFile({
   file,
@@ -21,17 +33,22 @@ export const DiffFile = memo(function DiffFile({
   label,
   badge,
   notice,
+  select,
 }: {
   file: FileDiff;
   defaultOpen: boolean;
   label?: ReactNode;
   badge?: ReactNode;
   notice?: string | null;
+  select?: LineSelect;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [all, setAll] = useState(false);
   const shown = all ? file.lines : file.lines.slice(0, MAX_LINES);
   const numbered = file.lines.some((l) => l.old !== null || l.new !== null);
+  const range = select?.range;
+  const [lo, hi] = range ? [Math.min(range.from, range.to), Math.max(range.from, range.to)] : [-1, -1];
+  const rowTap = !!select && (!numbered || (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches));
   return (
     <div className="overflow-hidden rounded-[18px] shadow-[inset_0_0_0_1px_var(--line)]">
       <button
@@ -51,21 +68,58 @@ export const DiffFile = memo(function DiffFile({
           {(notice || (file.binary && notice === undefined)) && <div className="px-3 py-2 text-[12px] text-fg-3">{notice ?? 'Binary file'}</div>}
           {shown.length > 0 && (
             <pre className="min-w-max font-mono text-[11.5px] leading-[1.6]">
-              {shown.map((l, i) => (
-                <div key={i} className={`flex ${LINE_CLASS[l.kind]}`}>
-                  {numbered && (
-                    <>
-                      <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-4 select-none" aria-hidden>
-                        {l.old ?? ''}
-                      </span>
-                      <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-4 select-none" aria-hidden>
-                        {l.new ?? ''}
-                      </span>
-                    </>
-                  )}
-                  <span className={numbered ? 'pr-3 pl-1' : 'px-3'}>{l.text || ' '}</span>
-                </div>
-              ))}
+              {shown.map((l, i) => {
+                const gutters = numbered && (
+                  <>
+                    <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-4 select-none" aria-hidden>
+                      {l.old ?? ''}
+                    </span>
+                    <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-4 select-none" aria-hidden>
+                      {l.new ?? ''}
+                    </span>
+                  </>
+                );
+                const text = <span className={numbered ? 'pr-3 pl-1' : 'px-3'}>{l.text || ' '}</span>;
+                if (!select || !pickable(l)) {
+                  return (
+                    <div key={i} className={`flex ${LINE_CLASS[l.kind]}`}>
+                      {gutters}
+                      {text}
+                    </div>
+                  );
+                }
+                const picked = lo <= i && i <= hi;
+                return (
+                  <div
+                    key={i}
+                    data-picked={picked || undefined}
+                    onClick={rowTap ? () => select.press(i, true) : undefined}
+                    className={`flex ${LINE_CLASS[l.kind]}${picked ? PICKED : ''}`}
+                  >
+                    {numbered && (
+                      // On a touch screen the line's own tap handler picks; the button is there for keyboards and screen readers.
+                      <button
+                        type="button"
+                        aria-pressed={picked}
+                        aria-label={l.kind === 'del' ? `Select removed line ${l.old}` : `Select line ${l.new}`}
+                        onClick={
+                          rowTap
+                            ? undefined
+                            : (e) => {
+                                // Safari does not focus a clicked button; Esc in the panel needs the focus there.
+                                e.currentTarget.focus();
+                                select.press(i, e.shiftKey);
+                              }
+                        }
+                        className="hov flex shrink-0"
+                      >
+                        {gutters}
+                      </button>
+                    )}
+                    {text}
+                  </div>
+                );
+              })}
             </pre>
           )}
           {!all && file.lines.length > MAX_LINES && (

@@ -343,6 +343,8 @@ export function migrate() {
   db.exec(`UPDATE completions SET n = (SELECT COUNT(*) FROM completions c WHERE c.thread_id = completions.thread_id AND c.seq <= completions.seq)
     WHERE n IS NULL`);
   db.exec('CREATE INDEX IF NOT EXISTS completions_order ON completions(thread_id, n, uid)');
+  // #209: the typed context a request carries (packages/shared/message-context.ts), as JSON; null for none.
+  ensureColumn('message_requests', 'context', 'TEXT');
   // result_reads kept the local seq before read state synced: it names the result by (n, uid) now.
   if ((db.prepare('PRAGMA table_info(result_reads)').all() as unknown as { name: string }[]).some((c) => c.name === 'seq')) {
     db.exec(`ALTER TABLE result_reads RENAME TO result_reads_old;

@@ -3,6 +3,8 @@ import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Th
 import { HarnessLogo } from '../components/brand.tsx';
 import { AttachmentStrip, useAttachments, useReplySend } from '../components/Composer.tsx';
 import { ErrorNote, Icon, type IconName } from '../components/ui.tsx';
+import { ContextChips } from '../message-context/ContextChips.tsx';
+import { removeDraftContext, useDraftContext } from '../message-context/draft.ts';
 import { canSteer } from '../steer.ts';
 import { currentRun, pickedRun, shownRun, threadChoice, threadRunLabels } from '../thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
@@ -115,6 +117,7 @@ export function MoComposer({
   const [switching, setSwitching] = useState(false);
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>('/harnesses');
   const att = useAttachments();
+  const context = useDraftContext(thread.id);
   const send = useReplySend(thread.id);
   const ref = useRef<HTMLTextAreaElement>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -135,14 +138,15 @@ export function MoComposer({
   // A switch queued behind the turn: the message waits for it too (apps/server/runner/queue.ts), so it queues.
   const steers = canSteer(thread.harness, harnesses) && !thread.queued_harness;
   const hint = typeof placeholder === 'function' ? placeholder(steers) : placeholder;
+  const canSend = !!text.trim() || context.length > 0;
   const submit = async () => {
     const prompt = text.trim();
-    if (!prompt || busy) return;
+    if (!canSend || busy) return;
     const mode: SendMode | undefined = busyThread ? (steers ? 'steer' : 'queue') : undefined;
     setBusy(true);
     setError(null);
     try {
-      const t = await send(prompt, mode, att.files);
+      const t = await send(prompt, mode, att.files, context);
       if ((drafts.get(thread.id) ?? '') === text) {
         drafts.delete(thread.id);
         setText('');
@@ -221,6 +225,7 @@ export function MoComposer({
       )}
       {(att.error || error) && <ErrorNote className="mb-2">{att.error ?? error}</ErrorNote>}
       <div className="flex flex-col rounded-[26px] bg-surface">
+        <ContextChips records={context} onRemove={(id) => removeDraftContext(thread.id, id)} className="px-3 pt-3 pb-0.5" />
         <AttachmentStrip files={att.files} onRemove={att.remove} />
         <div className="flex min-h-[52px] items-end gap-1.5 p-1.5">
           <MoRound icon="plus" label="Attach, model and effort" onClick={() => setPlus(true)} disabled={busy} />
@@ -235,8 +240,8 @@ export function MoComposer({
             aria-label={hint}
             className="min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-4"
           />
-          {text.trim() || !mic.supported ? (
-            <MoRound ink icon="send" label={!busyThread ? 'Send' : next ? 'Send after this turn' : 'Send to the running turn'} onClick={() => void submit()} disabled={!text.trim() || busy} />
+          {canSend || !mic.supported ? (
+            <MoRound ink icon="send" label={!busyThread ? 'Send' : next ? 'Send after this turn' : 'Send to the running turn'} onClick={() => void submit()} disabled={!canSend || busy} />
           ) : (
             <MoRound quiet={!mic.on} ink={mic.on} icon={mic.on ? 'stop' : 'mic'} label={mic.on ? 'Stop dictating' : 'Dictate'} onClick={mic.toggle} />
           )}

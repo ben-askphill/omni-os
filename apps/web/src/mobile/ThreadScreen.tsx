@@ -25,6 +25,7 @@ import { isOmnis, parkedLabel } from '../requests.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
+import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { needsCard } from './activity.ts';
 import { MoComposer, type ComposerChip } from './MoComposer.tsx';
 import { NeedsActions, NeedsCardView } from './NeedsCard.tsx';
@@ -230,7 +231,10 @@ function Pending({ thread, items, onPending }: { thread: Thread; items: PendingM
       {items.map((m) => (
         <div key={m.uuid} className="flex flex-col items-end gap-1.5 opacity-75">
           <span className="text-[12px] leading-[1.3] text-fg-3">{parkedLabel(m) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent')}</span>
-          <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">{m.text}</div>
+          <ContextChips records={m.context} align="end" className="w-full max-w-[86%]" />
+          {(m.text || !hasContext(m.context)) && (
+            <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">{m.text}</div>
+          )}
           {(m.delivery === 'uncertain' || (m.delivery && isOmnis(m))) && (
             <div className="flex gap-2">
               {m.delivery === 'uncertain' && (
@@ -561,9 +565,14 @@ export function ThreadScreen() {
                                   ? 'Sent while it ran'
                                   : undefined
                           }
+                          above={<ContextChips records={p.context} align="end" className="w-full max-w-[86%]" />}
                         >
-                          {p.text}
-                          {p.attachments?.length ? <span className="text-fg-3"> · {plural(p.attachments.length, 'file')}</span> : null}
+                          {p.text || p.attachments?.length || !hasContext(p.context) ? (
+                            <>
+                              {p.text}
+                              {p.attachments?.length ? <span className="text-fg-3"> · {plural(p.attachments.length, 'file')}</span> : null}
+                            </>
+                          ) : null}
                           {p.items?.length ? <PRWakeList items={p.items} more={p.more} /> : null}
                         </MoBubble>
                         <ClippedNote event={p.key} clipped={p.clipped} className="-mt-2.5 justify-end" />

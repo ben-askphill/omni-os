@@ -58,6 +58,8 @@ public struct PendingEditDraft: Hashable, Sendable, Identifiable {
   public var keep: [String]
   /// How many files the message had when the edit opened.
   public let had: Int
+  /// The message carries records, which an edit keeps as they are, so its text may be left empty.
+  public let hasContext: Bool
   public var added: [StagedFile] = []
   public var status = Status.editing
   public var error: String?
@@ -70,10 +72,14 @@ public struct PendingEditDraft: Hashable, Sendable, Identifiable {
     prompt = m.text
     keep = (m.attachments ?? []).map(\.name)
     had = keep.count
+    hasContext = m.context?.isEmpty == false
   }
 
   /// Whether Ben changed anything worth keeping.
   public var changed: Bool { prompt != original || !added.isEmpty || keep.count != had }
+
+  /// Text, or a message whose records stand without it.
+  public var canSave: Bool { hasContext || !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
   /// After the server refused it. 409: the message was sent first, so the edit is stale. Anything else: try again.
   public func failed(status: Int?, message: String) -> Self {
@@ -164,9 +170,8 @@ public final class PendingEditsModel {
 
   /// Saves an open edit. The answer, for the store; nil when it failed, and the draft says why (stale on a 409).
   public func save(_ uuid: String, using api: any PendingRequestsAPI) async -> EditAnswer? {
-    guard let d = draft(for: uuid), d.status == .editing else { return nil }
+    guard let d = draft(for: uuid), d.status == .editing, d.canSave else { return nil }
     let prompt = d.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !prompt.isEmpty else { return nil }
     update(uuid) {
       $0.status = .saving
       $0.error = nil

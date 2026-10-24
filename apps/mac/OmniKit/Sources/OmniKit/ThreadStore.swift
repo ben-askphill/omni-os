@@ -59,6 +59,8 @@ public final class ThreadStore {
   }
   /// Open edits of unsent messages, and the actions on them.
   public let edits: PendingEditsModel
+  /// Records waiting in the reply box, which the Changes tab adds to.
+  public let draftContext: DraftContextModel
   /// A CLI process is attached, so the next message starts at once. nil until the server says.
   public private(set) var warm: Bool?
   public private(set) var loadState = LoadState.loading
@@ -155,11 +157,12 @@ public final class ThreadStore {
   ///   - stream: opens the thread's stream from the event id given.
   public init(
     id: String, api: any ThreadAPI, clock: any Clock<Duration> = ContinuousClock(), frame: Duration = .milliseconds(16),
-    stream: @escaping @Sendable (_ after: Int) -> SSEClient<ThreadStreamMessage>
+    drafts: DraftStore = .standard, stream: @escaping @Sendable (_ after: Int) -> SSEClient<ThreadStreamMessage>
   ) {
     self.id = id
     self.api = api
     self.edits = PendingEditsModel(threadID: id)
+    self.draftContext = DraftContextModel(threadID: id, drafts: drafts)
     self.ticker = Ticker(clock)
     self.frame = frame
     self.makeStream = stream

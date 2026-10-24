@@ -22,6 +22,26 @@ Files can ride along with a message (paperclip, drag-and-drop or paste). They la
 
 To continue a thread in a terminal or Claude Desktop: `cd <cwd> && claude --resume <session id>` (the thread's Details panel has a copy button). Check there that the session is no longer warm first, so two processes do not write the same session.
 
+## Point the agent at lines of a diff
+
+In a thread's Changes panel (desktop, phone and the Mac app), click a line number to pick it and shift-click another in the same hunk to pick the lines between (on a phone, tap a line, then tap another). Write a note and press **Add to message**: the lines and the note go into the reply box as a chip, next to whatever you have typed. Click a chip to see what it holds, x to take it out. A message can be just chips.
+
+The agent gets the lines as you saw them, with the path, the line numbers, the commits they were compared at and your note, and is told when the file has changed since you picked them. Your message in the thread keeps the lines exactly as you sent them. It is feedback for this thread only, not a GitHub review. Hermes and Cursor Cloud threads have no Changes panel; a message with lines in it tells them the file is on your Mac. How it works: [Message context](../internals/message-context.md).
+
+## Point the agent at terminal output
+
+In a thread's Terminal tab (desktop and the Mac app), select output with the mouse as usual. A panel opens over the terminal's foot: write a note and press **Add to message**, and the selected text goes into the reply box as a chip, next to whatever you have typed. Copy and paste work as before, and Esc in the panel clears the selection. On a phone the terminal is read only and can't be dragged over: tap a line, then tap another to take the lines between, then Add to message. A message can be just chips.
+
+The chip is a snapshot of the text, the directory the shell started in, the shell's process id and the time you added it. It stays as it was when the terminal scrolls on, restarts or the shell exits. The agent gets the text as plain text and is told it was not run: escape sequences are dropped when you add it, and output that holds Omni's own block tags can't pass for them. Up to 200 lines and 8,000 characters at once; more is refused rather than cut. How it works: [Message context](../internals/message-context.md).
+
+## Point the agent at part of a web page
+
+In a thread's Browser panel (desktop, the Mac app and the phone's Browser screen), press **Annotate**. Omni screenshots the channel's own browser, the same session the agent drives, and shows that screenshot in place of the live view. Drag over the part of the page you mean, or tap an element to pick it, write a note and press **Add to message**: a chip goes into the reply box, and opening it shows the screenshot with your area outlined, the page's address and title, and when you took it. The page is only read, never clicked, navigated or changed. Esc or Cancel leaves without adding.
+
+If the page navigates, the tab changes, the browser is resized or the page scrolls while the screenshot is taken, Omni says so and offers **Try again**, so the area is never drawn on a different page than the one it describes. The screenshot is kept as a file in the thread, so the chip survives a reload (the web keeps unsent chips in this browser) and shows in the sent message. The agent gets the page's address and title, the viewport, and the area in page pixels, with the screenshot as an image: Claude Code and Codex see it, Cursor reads the file from the path it is given, and an agent on another machine (Hermes, Cursor Cloud) is told the file is on your Mac. A screenshot that has gone missing is stated, not skipped.
+
+**Picking an element.** A tap on the screenshot (rather than a drag) asks the page what element is under that spot, marks its box, and shows its tag, selector, text and a short excerpt of its markup under **Details** before you add it. The agent gets that same excerpt, quoted as data from the page. It is bounded (600 characters of text, 2,000 of markup, four parent tags), never holds what you typed into a field, and leaves a link's query and fragment out. If the page has moved on since the screenshot, the spot is in a frame from another site, or the page cannot be read, Omni says so and the screenshot and any area you drag still go with the message, without the element. How it works: [Message context](../internals/message-context.md).
+
 ## When the agent asks you
 
 An agent can stop and ask you one to four multiple-choice questions with Omni's `ask_user_question` tool. Every Claude Code, Codex and Cursor thread has it (the `omni-ask` MCP server); Hermes threads have no MCP servers, so not there. Claude Code's own AskUserQuestion is turned off in Omni, because nothing can answer it in a headless run.

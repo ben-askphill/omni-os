@@ -62,12 +62,15 @@ export function editRequest(threadId: string, id: string, edit: { prompt: string
   const t = thread(threadId);
   const { row, at } = editable(threadId, id);
   if (row.payload) throw refusal(OWN, 409);
+  if (!edit.prompt && !row.context?.length) throw refusal('Write a message to send.', 400);
   const kept = (row.attachments ?? []).filter((a) => !edit.keep || edit.keep.includes(a.name));
   const attachments = [...kept, ...(edit.added ?? [])];
   if (!messageRequests.edit(id, { prompt: edit.prompt, attachments })) throw refusal(ALREADY_SENT, 409);
   if (at) {
     const was = at.list[at.i];
-    const next = messageFor(t, edit.prompt, { uuid: was.uuid, requestId: was.requestId, from: row.source as 'ben' | 'conductor', mode: was.mode, attachments });
+    const next = messageFor(t, edit.prompt, {
+      uuid: was.uuid, requestId: was.requestId, from: row.source as 'ben' | 'conductor', mode: was.mode, attachments, context: row.context ?? undefined,
+    });
     at.list[at.i] = { ...next, ...(was.midTurn && { midTurn: true }) };
   }
   emitThread(threadId);

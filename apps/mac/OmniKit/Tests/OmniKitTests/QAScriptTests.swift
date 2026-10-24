@@ -107,6 +107,44 @@ import OmniKit
     #expect(throws: QAScriptError.self) { try QAScript(json: Data(#"[{"run":{"model":"x"}}]"#.utf8)) }
   }
 
+  @Test func readsTheLineSelectionSteps() throws {
+    let script = try QAScript(json: Data(#"""
+      [{"selectLines": {"file": "src/cart.ts", "from": 1, "to": 3}}, {"addContext": "names read better"}, {"addContext": ""},
+       {"openContext": 0}]
+      """#.utf8))
+    #expect(script.steps == [.selectLines(file: "src/cart.ts", from: 1, to: 3), .addContext("names read better"), .addContext(""), .openContext(0)])
+    for bad in [
+      #"[{"selectLines": {"file": "src/cart.ts", "from": 1}}]"#, #"[{"selectLines": {"file": "", "from": 1, "to": 2}}]"#,
+      #"[{"selectLines": {"file": "a", "from": -1, "to": 2}}]"#, #"[{"selectLines": "src/cart.ts"}]"#,
+      #"[{"addContext": true}]"#, #"[{"openContext": -1}]"#, #"[{"openContext": "first"}]"#,
+    ] {
+      #expect(throws: QAScriptError.self, "\(bad)") { try QAScript(json: Data(bad.utf8)) }
+    }
+  }
+
+  @Test func readsTheTerminalSelectionSteps() throws {
+    let script = try QAScript(json: Data(#"[{"selectTerminal": true}, {"addTerminal": "why does this fail?"}, {"addTerminal": ""}]"#.utf8))
+    #expect(script.steps == [.selectTerminal, .addTerminal("why does this fail?"), .addTerminal("")])
+    for bad in [#"[{"selectTerminal": false}]"#, #"[{"selectTerminal": "all"}]"#, #"[{"addTerminal": true}]"#, #"[{"addTerminal": 1}]"#] {
+      #expect(throws: QAScriptError.self, "\(bad)") { try QAScript(json: Data(bad.utf8)) }
+    }
+  }
+
+  @Test func readsTheAnnotateStepsAndTheBrowserFrameCondition() throws {
+    let script = try QAScript(
+      json: Data(#"[{"wait": "browserFrame"}, {"annotate": "start"}, {"annotate": {"drag": [0.1, 0.2, 0.6, 0.5], "note": "the total"}}, {"annotate": {"drag": [0, 0, 1, 1]}}, {"annotate": {"tap": [0.4, 0.3], "note": "this button"}}, {"annotate": {"tap": [0, 1]}}, {"annotate": "add"}, {"annotate": "cancel"}]"#.utf8))
+    #expect(script.steps == [
+      .wait(.browserFrame, timeout: .seconds(10)), .annotate(.start),
+      .annotate(.drag(x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.5, note: "the total")), .annotate(.drag(x0: 0, y0: 0, x1: 1, y1: 1, note: "")),
+      .annotate(.tap(x: 0.4, y: 0.3, note: "this button")), .annotate(.tap(x: 0, y: 1, note: "")), .annotate(.add), .annotate(.cancel),
+    ])
+    for bad in [#"[{"annotate": "go"}]"#, #"[{"annotate": true}]"#, #"[{"annotate": {"drag": [0, 0, 1]}}]"#, #"[{"annotate": {"drag": [0, 0, 1, 2]}}]"#, #"[{"annotate": {"drag": [0, 0, 1, 1], "note": 3}}]"#, #"[{"annotate": {"tap": [0.5]}}]"#, #"[{"annotate": {"tap": [0.5, 2]}}]"#, #"[{"annotate": {"tap": [0.5, 0.5], "note": 3}}]"#, #"[{"wait": "browserFrame:x"}]"#] {
+      #expect(throws: QAScriptError.self, "\(bad)") { try QAScript(json: Data(bad.utf8)) }
+    }
+    #expect(QACondition.browserFrame.holds(in: QAFacts(serverState: "running", connection: "open", sidebarLoaded: true, channels: [], browserFrame: true)))
+    #expect(!QACondition.browserFrame.holds(in: QAFacts(serverState: "running", connection: "open", sidebarLoaded: true, channels: [])))
+  }
+
   @Test func sumsUpFrames() {
     let stats = QAFrameStats(gaps: [16, 17, 16, 50, 16, 34])
     #expect(stats.frames == 6)

@@ -18,7 +18,7 @@ struct ReplyComposerHost: View {
   }
 
   var body: some View {
-    let reply = box.model ?? ReplyComposerModel(threadID: store.id, api: model.client)
+    let reply = box.model ?? ReplyComposerModel(threadID: store.id, api: model.client, context: store.draftContext)
     box.model = reply
     let menu = box.menu ?? SlashMenuModel(
       commands: SlashCommandsStore(api: model.client, source: .thread(store.id)),
@@ -219,6 +219,8 @@ private struct ReplyComposerView: View {
         caret = CaretRequest(id: (caret?.id ?? 0) + 1, offset: at)
       }
     }
+    // Lines just added from the Changes tab: Ben writes about them next.
+    .onChange(of: reply.context.records.count) { old, new in if new > old { focusTick += 1 } }
     // Text set from outside the box (a sent or cleared draft) reaches the menu with the caret at the end.
     .onChange(of: reply.text) { _, text in
       if menu.text != text { menu.update(text: text, caret: text.utf16.count) }
@@ -230,6 +232,7 @@ private struct ReplyComposerView: View {
 
   private var shell: some View {
     VStack(alignment: .leading, spacing: 0) {
+      DraftContextStrip(draft: reply.context)
       if !reply.files.isEmpty {
         AttachmentStrip(files: reply.files, remove: reply.removeFile)
       }

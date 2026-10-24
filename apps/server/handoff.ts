@@ -13,6 +13,7 @@ import { publishFeed } from './bus.ts';
 import { paths } from './config.ts';
 import { channels, completions, messageRequests, outbox, resultReads, threads, tx, type Thread } from './db.ts';
 import { HARNESS_META, isHarnessId } from './harness/types.ts';
+import { contextBlock, placeFor } from './message-context/project.ts';
 import { handoffView, offerOf, offers, phaseOf, replyOf, writeOffer, writeReply } from './handoff/records.ts';
 import { inOwnWorktree, packWorktree, unpackWorktree, type WorktreeBundle } from './handoff/worktree.ts';
 import { releaseForHandoff, runsHere, saveOwn, wake, type Msg } from './runner.ts';
@@ -65,8 +66,17 @@ function notResumable(t: Thread): string | null {
   return `${name} has not reported this thread's session yet, so another Mac could not resume it. Try again once it has replied.`;
 }
 
-/** What a message the turn never read said: Ben's own words for his, the whole prompt for one Omni wrote. */
-const textOf = (m: Msg) => (!m.byOmni && typeof m.event.payload.text === 'string' ? m.event.payload.text : m.text);
+/**
+ * What a message the turn never read said: Ben's own words for his, the whole prompt for one Omni wrote. Its context
+ * goes as text, unchecked: the other Mac sends it later, as a plain message.
+ */
+function textOf(m: Msg, t: Thread) {
+  const said = !m.byOmni && typeof m.event.payload.text === 'string' ? m.event.payload.text : m.text;
+  if (!m.contexts?.length) return said;
+  const place = placeFor(t);
+  const block = contextBlock(m.contexts, place.remote ? place : { remote: false, read: null });
+  return said ? `${said}\n\n${block}` : block;
+}
 
 /**
  * Ben's Hand off. Refuses with why, or writes the offer and returns at once: the rest runs in the background and
@@ -162,7 +172,7 @@ async function giveAway(offer: HandoffOffer, worker: SyncWorker) {
       bundle = await packWorktree(t.cwd, id, offer.id, worker.transport);
     } else left = await leftBehind(t.cwd, offer.from.name);
     tx(() => {
-      advance(b, { state: 'offered', queued: carried.map(textOf), bundle, leftBehind: left });
+      advance(b, { state: 'offered', queued: carried.map((m) => textOf(m, t)), bundle, leftBehind: left });
       // The other Mac sends them now. Here they leave the queue unsent, as a cancelled message does.
       for (const m of carried) if (m.requestId) messageRequests.mark(m.uuid, 'cancelled');
     });

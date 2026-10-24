@@ -5,6 +5,7 @@ import { switchText, type RunName, type SwitchP } from '@omni/shared/run-switch.
 import { basename, join } from 'node:path';
 import { carriedEntry, carryoverText, type CarryoverP } from '../carryover.ts';
 import type { EventRow } from '../db.ts';
+import { contextLines } from '../message-context/project.ts';
 import { toolLabel } from '../tool-label.ts';
 
 export const HANDOVER_MAX_CHARS = 32_000;
@@ -66,7 +67,7 @@ function history(i: HandoverInput) {
         const name = basename(a.name.replace(/\\/g, '/'));
         return name && name !== '.' && name !== '..' ? [`  - Attachment: ${name}, read from ${join(i.uploadsDir, name)}`] : [];
       });
-      lines.push([`[${i.user}] ${cut(p.text ?? '', MESSAGE_MAX)}`, ...attachments].join('\n'));
+      lines.push([`[${i.user}] ${cut(p.text ?? '', MESSAGE_MAX)}`, ...attachments, ...contextLines(p.context)].join('\n'));
     } else if (kind === 'crew_report') {
       lines.push(`[Crew report: ${p.title ?? p.task_id ?? 'task'}, ${p.status}] ${cut(p.text ?? '', MESSAGE_MAX)}`);
     } else if (kind === 'assistant_text') {

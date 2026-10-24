@@ -1,0 +1,24 @@
+{
+  "capture": {
+    "thread": "00000000-0000-4000-8000-000000000001",
+    "url": "https://shop.example.com/cart?coupon=SPRING",
+    "title": "Your cart · Example Shop",
+    "viewport": {
+      "width": 1280,
+      "height": 713,
+      "scale": 2
+    },
+    "scroll": {
+      "x": 0,
+      "y": 240
+    },
+    "captured_at": "2026-01-05T09:00:00.000Z",
+    "image": {
+      "name": "annotation-38b6e29d81ac33d3.png",
+      "mime": "image/png",
+      "width": 2560,
+      "height": 1426,
+      "bytes": 64
+    }
+  }
+}

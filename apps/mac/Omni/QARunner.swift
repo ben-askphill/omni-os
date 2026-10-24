@@ -246,6 +246,26 @@ final class QARunner {
           try? await Task.sleep(for: .milliseconds(400))
         case .webTitle(let title):
           try await InspectorProbe.waitForTitle(title)
+        case .selectLines(let file, let from, let to):
+          guard let select = LineSelectionProbe.select else { throw QAScriptError("the Changes tab is not showing") }
+          guard select(file, from, to) else { throw QAScriptError("no file \(file) whose lines can be picked") }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .addContext(let note):
+          guard let add = LineSelectionProbe.add else { throw QAScriptError("the Changes tab is not showing") }
+          if let refused = add(note) { throw QAScriptError(refused) }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .selectTerminal:
+          guard let select = TerminalSelectionProbe.select, select() else { throw QAScriptError("the Terminal tab is not showing") }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .addTerminal(let note):
+          guard let add = TerminalSelectionProbe.add else { throw QAScriptError("no terminal output is selected") }
+          if let refused = await add(note) { throw QAScriptError(refused) }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .annotate(let action):
+          try await annotate(action)
+        case .openContext(let index):
+          guard let toggle = ContextChipsProbe.toggle, toggle(index) else { throw QAScriptError("no context chip \(index) in the reply box") }
+          try? await Task.sleep(for: .milliseconds(400))
         case .quickPrompt(let action):
           guard let quick = Self.quickPrompt else { throw QAScriptError("no Quick Prompt") }
           switch action {
@@ -497,6 +517,12 @@ final class QARunner {
     case .handOff(let device): "handOff \(device)"
     case .palette(let query): "palette \(query ?? "close")"
     case .quickPrompt(let action): "quickPrompt \(action)"
+    case .selectLines(let file, let from, let to): "selectLines \(file) \(from)-\(to)"
+    case .addContext(let note): "addContext \(note.prefix(40))"
+    case .selectTerminal: "selectTerminal"
+    case .addTerminal(let note): "addTerminal \(note.prefix(40))"
+    case .annotate(let action): "annotate \(action)"
+    case .openContext(let index): "openContext \(index)"
     case .quit: "quit"
     }
   }
@@ -516,7 +542,41 @@ final class QARunner {
   private var facts: QAFacts {
     var f = model.qaFacts
     f.shownThread = QAProbe.shownThread
+    f.browserFrame = BrowserAnnotateProbe.browser?.frame != nil
     return f
+  }
+
+  /// The Browser tab's Annotate, through the model its buttons use. `start` waits for the screenshot, and says why when
+  /// the capture failed.
+  private func annotate(_ action: QAAnnotate) async throws(QAScriptError) {
+    guard let a = BrowserAnnotateProbe.annotating else { throw QAScriptError("the Browser tab is not showing") }
+    switch action {
+    case .start:
+      await a.model.start()
+      if case .failed(let e) = a.model.phase { throw QAScriptError(e.message) }
+      // The screenshot is on screen once the image view has loaded it.
+      try? await Task.sleep(for: .milliseconds(1200))
+    case .drag(let x0, let y0, let x1, let y1, let note):
+      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to draw on") }
+      // A 1000 by 1000 stand-in for the shown size, so the fractions are the page's.
+      a.model.drag(.init(x0: x0 * 1000, y0: y0 * 1000, x1: x1 * 1000, y1: y1 * 1000), shown: (1000, 1000))
+      guard a.model.rect != nil else { throw QAScriptError(a.model.error ?? "no rectangle") }
+      a.model.note = note
+      try? await Task.sleep(for: .milliseconds(500))
+    case .tap(let x, let y, let note):
+      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to tap") }
+      // The same stand-in size as a drag, so the fractions are the page's.
+      await a.model.tap(at: (x * 1000, y * 1000), shown: (1000, 1000))
+      guard a.model.element != nil else { throw QAScriptError(a.model.notice ?? "no element") }
+      a.model.note = note
+      try? await Task.sleep(for: .milliseconds(500))
+    case .add:
+      if let refused = a.model.add(to: a.draft) { throw QAScriptError(refused) }
+      try? await Task.sleep(for: .milliseconds(400))
+    case .cancel:
+      a.model.cancel()
+      try? await Task.sleep(for: .milliseconds(400))
+    }
   }
 
   // MARK: Scrolling

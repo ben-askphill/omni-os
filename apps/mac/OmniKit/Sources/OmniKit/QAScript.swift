@@ -24,6 +24,17 @@ public enum QAInspector: String, Hashable, Sendable {
   case open, close, artifacts, changes, turn, browser, terminal, actions, details
 }
 
+/// What an annotate step does in the Browser tab: press Annotate and wait for the screenshot, draw a rectangle (in fractions
+/// of the shown screenshot, 0 to 1) and write the note, press Add to Message, or Cancel.
+public enum QAAnnotate: Hashable, Sendable {
+  case start
+  case drag(x0: Double, y0: Double, x1: Double, y1: Double, note: String)
+  /// A tap at a fraction of the shown screenshot, which picks the element there; the note is written once it is picked.
+  case tap(x: Double, y: Double, note: String)
+  case add
+  case cancel
+}
+
 public enum QAScroll: String, Hashable, Sendable {
   /// `nudge` goes to the bottom, then sends trackpad scroll events a few lines up, opens the tool groups so the
   /// content grows, and notes how far from the bottom the view is after each. `earlier` scrolls up until an earlier
@@ -93,7 +104,9 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
 /// `{"drag": "<thread title>", "over": "<folder>"}`, `{"file": "<thread title>", "into": "<folder>"}`,
 /// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"prMenu": "name"}`, `{"handOff": "<device id>"}`,
-/// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"quit": true}`.
+/// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"selectLines": {"file": "<path>", "from": 1, "to": 3}}`,
+/// `{"addContext": "note"}`, `{"selectTerminal": true}`, `{"addTerminal": "note"}`, `{"annotate": "start"}` (or `add`, `cancel`, or
+/// `{"drag": [0.1, 0.2, 0.6, 0.5], "note": "text"}`, or `{"tap": [0.4, 0.3], "note": "text"}`), `{"openContext": 0}`, `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -153,6 +166,18 @@ public enum QAStep: Hashable, Sendable {
   /// Hands the open thread to this device, as picking it in Hand Off to does.
   case handOff(String)
   case quickPrompt(QAQuickPrompt)
+  /// In the Changes tab, clicks the number of row `from` of the file at that path, then shift-clicks row `to`.
+  case selectLines(file: String, from: Int, to: Int)
+  /// Writes this note in the line selection's dock and presses Add to Message.
+  case addContext(String)
+  /// In the Terminal tab, selects everything the terminal shows.
+  case selectTerminal
+  /// Writes this note in the terminal selection's dock and presses Add to Message.
+  case addTerminal(String)
+  /// The Browser tab's Annotate flow.
+  case annotate(QAAnnotate)
+  /// Clicks the reply box's context chip at this index, which opens or closes its inspector.
+  case openContext(Int)
   case quit
 
   static let defaultTimeout = Duration.seconds(10)
@@ -170,6 +195,8 @@ public enum QACondition: Hashable, Sendable {
   case channel(String)
   /// `thread:<id>`: the thread's transcript is on screen, laid out.
   case thread(String)
+  /// The Browser tab shows a frame of the page.
+  case browserFrame
 
   static let serverStates: Set = ["unknown", "checking", "notRunning", "starting", "running", "failed", "stopping"]
   static let connectionStates: Set = ["connecting", "open", "reconnecting", "closed"]
@@ -182,6 +209,7 @@ public enum QACondition: Hashable, Sendable {
     case ("connection", let s?) where Self.connectionStates.contains(s): self = .connection(s)
     case ("channel", let id?) where !id.isEmpty: self = .channel(id)
     case ("thread", let id?) where !id.isEmpty: self = .thread(id)
+    case ("browserFrame", nil): self = .browserFrame
     default: throw QAScriptError("unknown condition \(text)")
     }
   }
@@ -193,6 +221,7 @@ public enum QACondition: Hashable, Sendable {
     case .connection(let s): facts.connection == s
     case .channel(let id): facts.channels.contains(id)
     case .thread(let id): facts.shownThread == id
+    case .browserFrame: facts.browserFrame
     }
   }
 }
@@ -205,8 +234,11 @@ public struct QAFacts: Hashable, Sendable {
   public var channels: Set<String>
   /// The thread whose transcript is on screen, once it is laid out.
   public var shownThread: String?
+  /// The Browser tab has a frame of the page on screen.
+  public var browserFrame: Bool
 
-  public init(serverState: String, connection: String, sidebarLoaded: Bool, channels: Set<String>, shownThread: String? = nil) {
+  public init(serverState: String, connection: String, sidebarLoaded: Bool, channels: Set<String>, shownThread: String? = nil, browserFrame: Bool = false) {
+    self.browserFrame = browserFrame
     self.serverState = serverState
     self.connection = connection
     self.sidebarLoaded = sidebarLoaded
@@ -240,7 +272,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "searchHit", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "prMenu", "handOff", "quickPrompt", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "searchHit", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "prMenu", "handOff", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "openContext", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -379,9 +411,54 @@ public struct QAScript: Hashable, Sendable {
     case "handOff":
       guard let id = value as? String, !id.isEmpty else { throw QAScriptError("handOff takes a device id") }
       return .handOff(id)
+    case "selectLines":
+      guard let d = value as? [String: Any], let file = d["file"] as? String, !file.isEmpty, let from = d["from"] as? Int, let to = d["to"] as? Int,
+        from >= 0, to >= 0
+      else { throw QAScriptError(#"selectLines takes {"file": path, "from": row, "to": row}, rows counted from 0"#) }
+      return .selectLines(file: file, from: from, to: to)
+    case "addContext":
+      guard let note = value as? String else { throw QAScriptError("addContext takes the note, which may be empty") }
+      return .addContext(note)
+    case "selectTerminal":
+      guard value as? Bool == true else { throw QAScriptError("selectTerminal takes true") }
+      return .selectTerminal
+    case "addTerminal":
+      guard let note = value as? String else { throw QAScriptError("addTerminal takes the note, which may be empty") }
+      return .addTerminal(note)
+    case "annotate":
+      return .annotate(try annotate(value))
+    case "openContext":
+      guard let i = value as? Int, i >= 0 else { throw QAScriptError("openContext takes the chip's index, from 0") }
+      return .openContext(i)
     default:
       return .quit
     }
+  }
+
+  private static func annotate(_ value: Any) throws(QAScriptError) -> QAAnnotate {
+    let usage = QAScriptError(#"annotate takes start, add, cancel, {"drag": [x0, y0, x1, y1], "note": text} or {"tap": [x, y], "note": text} with fractions from 0 to 1"#)
+    switch value as? String {
+    case "start": return .start
+    case "add": return .add
+    case "cancel": return .cancel
+    case nil: break
+    default: throw usage
+    }
+    guard let d = value as? [String: Any] else { throw usage }
+    func fractions(_ any: Any?, _ count: Int) throws(QAScriptError) -> [Double] {
+      guard let list = any as? [Any], list.count == count else { throw usage }
+      let n = list.compactMap { ($0 as? NSNumber).flatMap { $0 === kCFBooleanTrue || $0 === kCFBooleanFalse ? nil : $0.doubleValue } }
+      guard n.count == count, n.allSatisfy({ (0...1).contains($0) }) else { throw usage }
+      return n
+    }
+    let note = d["note"] ?? ""
+    guard let note = note as? String else { throw usage }
+    if d["tap"] != nil {
+      let at = try fractions(d["tap"], 2)
+      return .tap(x: at[0], y: at[1], note: note)
+    }
+    let n = try fractions(d["drag"], 4)
+    return .drag(x0: n[0], y0: n[1], x1: n[2], y1: n[3], note: note)
   }
 
   private static func folderAction(_ value: Any) throws(QAScriptError) -> QAFolderAction {

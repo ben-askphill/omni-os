@@ -6,6 +6,8 @@ import { streamSSE } from 'hono/streaming';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { parseContexts } from '@omni/shared/message-context-kinds.ts';
+import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
@@ -172,24 +174,31 @@ threadActionsApi.get('/:id/base', (c) => {
 threadActionsApi.post('/:id/messages', async (c) => {
   const id = c.req.param('id');
   const { data, files } = await readBody(c);
-  const { prompt, from, mode, request_id } = z
+  const { prompt, from, mode, request_id, context: raw } = z
     .object({
-      prompt: z.string().min(1),
+      prompt: z.string(),
       from: z.enum(['ben', 'conductor']).default('ben'),
       // steer: read at the agent's next step. queue: after this turn. interrupt: stop the turn, then run it.
       mode: z.enum(['steer', 'queue', 'interrupt']).default('steer'),
       // The client's id for this send, kept across its retries: a retry gets the first acceptance back.
       request_id: z.string().min(1).max(200).optional(),
+      // Records Ben attached (packages/shared/message-context.ts), checked and normalized by parseContexts.
+      context: z.unknown().optional(),
     })
     .parse(data);
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  const context = parseContexts(raw);
+  if (!context.ok) return c.json({ error: context.error }, 400);
+  if (!prompt && !context.value.length) return c.json({ error: 'Write a message or add context to send.' }, 400);
+  const unsendable = checkAnnotations(id, context.value);
+  if (unsendable) return c.json({ error: unsendable }, 400);
   checkUploads(files);
-  const fingerprint = requestFingerprint({ prompt, mode, source: from, files: await fileDigests(files) });
+  const fingerprint = requestFingerprint({ prompt, mode, source: from, files: await fileDigests(files), context: context.value });
   // A retry: answered before its files are saved a second time.
   const again = request_id ? acceptedAgain(id, request_id, fingerprint) : null;
   if (again) return c.json(again);
   const attachments = await saveUploads(id, files);
-  return c.json(await postMessage(id, prompt, { from, mode, attachments, requestId: request_id, fingerprint }));
+  return c.json(await postMessage(id, prompt, { from, mode, attachments, context: context.value, requestId: request_id, fingerprint }));
 });
 
 const requestIds = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) });
@@ -275,7 +284,8 @@ threadActionsApi.post('/:id/requests/discard', async (c) => {
 threadActionsApi.patch('/:id/requests/:rid', async (c) => {
   const id = c.req.param('id');
   const { data, files } = await readBody(c);
-  const { prompt, keep } = z.object({ prompt: z.string().min(1), keep: z.array(z.string()).max(100).optional() }).parse(data);
+  // Empty only for a message with context: editRequest refuses it otherwise.
+  const { prompt, keep } = z.object({ prompt: z.string(), keep: z.array(z.string()).max(100).optional() }).parse(data);
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
   checkUploads(files);
   const added = await saveUploads(id, files);

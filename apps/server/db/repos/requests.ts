@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { contextDigest, type MessageContext } from '@omni/shared/message-context.ts';
 import { db, now, tx } from '../connection.ts';
 import type { Attachment } from '../../uploads.ts';
 
@@ -63,6 +64,8 @@ export interface MessageRequest {
    * harness gets. Null for a message sent through the API. These are resumed or discarded, never edited or moved.
    */
   payload: Record<string, unknown> | null;
+  /** The records Ben attached, normalized at the route (packages/shared/message-context.ts). Never edited. */
+  context: MessageContext[] | null;
   /** What was sent, hashed: a retry must match it. */
   fingerprint: string;
   state: DeliveryState;
@@ -74,9 +77,14 @@ export interface MessageRequest {
   updated_at: string;
 }
 
-type Row = Omit<MessageRequest, 'attachments' | 'payload'> & { attachments: string | null; payload: string | null };
+type Row = Omit<MessageRequest, 'attachments' | 'payload' | 'context'> & { attachments: string | null; payload: string | null; context: string | null };
 const parse = (r: Row | undefined): MessageRequest | undefined =>
-  r && { ...r, attachments: r.attachments ? JSON.parse(r.attachments) : null, payload: r.payload ? JSON.parse(r.payload) : null };
+  r && {
+    ...r,
+    attachments: r.attachments ? JSON.parse(r.attachments) : null,
+    payload: r.payload ? JSON.parse(r.payload) : null,
+    context: r.context ? JSON.parse(r.context) : null,
+  };
 const list = (sql: string, ...args: (string | number)[]) => (db.prepare(sql).all(...args) as unknown as Row[]).map((r) => parse(r)!);
 const marks = (states: readonly DeliveryState[]) => states.map((s) => `'${s}'`).join(',');
 
@@ -87,10 +95,12 @@ export interface FileDigest {
   sha256: string;
 }
 
-/** The same message, mode, sender and files hash the same, whatever order the JSON keys came in. */
-export function requestFingerprint(m: { prompt: string; mode: string; source: string; files: FileDigest[] }): string {
+/** The same message, mode, sender, files and context hash the same, whatever order the JSON keys came in. */
+export function requestFingerprint(m: { prompt: string; mode: string; source: string; files: FileDigest[]; context?: MessageContext[] }): string {
   const files = m.files.map((f) => [f.name, f.size, f.sha256]);
-  return createHash('sha256').update(JSON.stringify([m.prompt, m.mode, m.source, files])).digest('hex');
+  // Context only when there is some, so a fingerprint saved before it existed still matches its retry.
+  const context = m.context?.length ? [contextDigest(m.context)] : [];
+  return createHash('sha256').update(JSON.stringify([m.prompt, m.mode, m.source, files, ...context])).digest('hex');
 }
 
 export async function fileDigests(files: File[]): Promise<FileDigest[]> {
@@ -119,7 +129,7 @@ export const messageRequests = {
    */
   accept(
     r: Pick<MessageRequest, 'thread_id' | 'request_id' | 'prompt' | 'mode' | 'source' | 'attachments' | 'fingerprint' | 'machine_id'> &
-      Partial<Pick<MessageRequest, 'kind' | 'payload'>>,
+      Partial<Pick<MessageRequest, 'kind' | 'payload' | 'context'>>,
   ) {
     return tx(() => {
       const had = messageRequests.byRequestId(r.thread_id, r.request_id);
@@ -127,11 +137,11 @@ export const messageRequests = {
       const id = randomUUID();
       const ts = now();
       db.prepare(
-        `INSERT INTO message_requests (id, thread_id, request_id, prompt, mode, source, attachments, kind, payload, fingerprint, state, machine_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'accepted', ?, ?, ?)`,
+        `INSERT INTO message_requests (id, thread_id, request_id, prompt, mode, source, attachments, kind, payload, context, fingerprint, state, machine_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'accepted', ?, ?, ?)`,
       ).run(
         id, r.thread_id, r.request_id, r.prompt, r.mode, r.source, r.attachments?.length ? JSON.stringify(r.attachments) : null,
-        r.kind ?? 'user', r.payload ? JSON.stringify(r.payload) : null, r.fingerprint, r.machine_id, ts, ts,
+        r.kind ?? 'user', r.payload ? JSON.stringify(r.payload) : null, r.context?.length ? JSON.stringify(r.context) : null, r.fingerprint, r.machine_id, ts, ts,
       );
       db.prepare('UPDATE message_requests SET pos = seq WHERE id = ?').run(id);
       return { row: messageRequests.get(id)!, fresh: true };

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react';
 import { api, errorText, openSSE } from '../api.ts';
+import { AnnotateButton, AnnotateLayer, useAfterAdd } from './BrowserAnnotate.tsx';
 import { Button, Icon, IconButton } from './ui.tsx';
 
 export interface BrowserTabInfo {
@@ -504,14 +505,23 @@ export function BrowserWatch({ b }: { b: Browser }) {
  * then the toolbar). The agent drives it through its browser MCP; Ben can take over at any point
  * (a login, a captcha) and hand it back.
  */
-export function LiveBrowser({ channelId, extra }: { channelId: string; extra?: ReactNode }) {
+export function LiveBrowser({ channelId, threadId, extra }: { channelId: string; threadId?: string; extra?: ReactNode }) {
   const b = useChannelBrowser(channelId);
   const address = useRef<HTMLInputElement>(null);
+  const [annotating, setAnnotating] = useState(false);
+  const close = useCallback(() => setAnnotating(false), []);
+  const added = useAfterAdd(close);
+  const tools = (
+    <>
+      {threadId && <AnnotateButton state={b.state} onClick={() => setAnnotating(true)} />}
+      {extra}
+    </>
+  );
   return (
     <div className="flex h-full min-h-0 flex-col">
       <TabStrip b={b} />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] bg-bg">
-        <Toolbar b={b} extra={extra} address={address} />
+        <Toolbar b={b} extra={tools} address={address} />
         <div className="relative h-px shrink-0 overflow-hidden bg-line">
           {b.state?.loading && <div className="load-bar absolute inset-y-0 left-0 w-full bg-fg-3" />}
         </div>
@@ -524,7 +534,10 @@ export function LiveBrowser({ channelId, extra }: { channelId: string; extra?: R
             </Button>
           </div>
         )}
-        <Viewport b={b} address={address} />
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <Viewport b={b} address={address} />
+          {annotating && threadId && <AnnotateLayer channelId={channelId} threadId={threadId} onClose={close} onAdded={added} />}
+        </div>
       </div>
     </div>
   );

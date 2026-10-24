@@ -48,10 +48,11 @@ enum ChangesProbe {
 }
 #endif
 
-/// The groups of a changes answer, each file a DiffFileView.
+/// The groups of a changes answer, each file a DiffFileView whose lines can be picked where `picking` says.
 private struct ChangeGroupsView: View {
   let groups: [ChangesView.Group]
   let fileCount: Int
+  let picking: (ChangesView.Group, ChangesView.File) -> DiffFileView.Picking?
 
   var body: some View {
     ForEach(groups) { group in
@@ -68,7 +69,7 @@ private struct ChangeGroupsView: View {
           ForEach(group.files) { f in
             DiffFileView(
               file: f.diff, startsOpen: DiffParser.startsOpen(f.diff, fileCount: fileCount),
-              label: f.file.label, badge: f.file.letter, notice: f.file.notice)
+              label: f.file.label, badge: f.file.letter, notice: f.file.notice, picking: picking(group, f))
           }
         }
         if group.truncated {
@@ -110,7 +111,7 @@ private struct SinceBaseChanges: View {
         ScrollView { ErrorNote(text: error.message) { Task { await load() } }.padding(.horizontal, z(10)) }
       case .success(let changes):
         if let view = ChangesView(changes) {
-          content(view)
+          content(view, head: changes.head)
         } else {
           EmptyNote(symbol: "diff", title: "No changes to show", message: changes.reason ?? "")
             .panelEmptyNote()
@@ -125,18 +126,25 @@ private struct SinceBaseChanges: View {
     }
   }
 
-  private func content(_ view: ChangesView) -> some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: z(16)) {
-        header(view)
-        if view.fileCount == 0 {
-          EmptyNote(symbol: "diff", title: "No changes", message: "Nothing changed since \(view.base.short): no commits, staged, unstaged or untracked files.")
-            .frame(maxWidth: .infinity)
-        }
-        ChangeGroupsView(groups: view.groups, fileCount: view.fileCount)
+  /// Lines are picked against the base Omni recorded and HEAD now.
+  private func content(_ view: ChangesView, head: String?) -> some View {
+    LinePicking(store: store, groups: view.groups) { group in
+      DiffSelectionContext.Group(rawValue: group.kind.rawValue).flatMap { g in
+        head.map { DiffSelectionContext.Source(group: g, from: view.base.sha, to: $0, turn: nil) }
       }
-      .padding(.horizontal, z(10))
-      .padding(.bottom, z(12))
+    } content: { picking in
+      ScrollView {
+        VStack(alignment: .leading, spacing: z(16)) {
+          header(view)
+          if view.fileCount == 0 {
+            EmptyNote(symbol: "diff", title: "No changes", message: "Nothing changed since \(view.base.short): no commits, staged, unstaged or untracked files.")
+              .frame(maxWidth: .infinity)
+          }
+          ChangeGroupsView(groups: view.groups, fileCount: view.fileCount, picking: picking)
+        }
+        .padding(.horizontal, z(10))
+        .padding(.bottom, z(12))
+      }
     }
   }
 
@@ -227,30 +235,37 @@ private struct ThisTurnChanges: View {
     return "\(t.id) \(c.hashValue)"
   }
 
+  /// Lines are picked against the snapshots saved before and after the turn.
   private func content(_ view: TurnChangesView, turns: [TurnView]) -> some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: z(12)) {
-        header(view, turns: turns)
-        Text(TurnChangesView.note)
-          .font(.omni(size: 11.5))
-          .foregroundStyle(Tok.fg4)
-          .fixedSize(horizontal: false, vertical: true)
-          .padding(.horizontal, z(4))
-        if let note = view.turn.stateNote {
-          if view.turn.state == .failed {
-            ErrorNote(text: note)
-          } else {
-            LoadingNote(label: note)
-          }
-        } else if view.fileCount == 0 {
-          EmptyNote(symbol: "diff", title: "No changes", message: "Nothing in the worktree changed during this turn.")
-            .frame(maxWidth: .infinity)
-        } else {
-          ChangeGroupsView(groups: view.groups, fileCount: view.fileCount)
-        }
+    LinePicking(store: store, groups: view.groups) { _ in
+      view.turn.before.flatMap { before in
+        view.turn.after.map { DiffSelectionContext.Source(group: .turn, from: before.sha, to: $0.sha, turn: view.turn.id) }
       }
-      .padding(.horizontal, z(10))
-      .padding(.bottom, z(12))
+    } content: { picking in
+      ScrollView {
+        VStack(alignment: .leading, spacing: z(12)) {
+          header(view, turns: turns)
+          Text(TurnChangesView.note)
+            .font(.omni(size: 11.5))
+            .foregroundStyle(Tok.fg4)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, z(4))
+          if let note = view.turn.stateNote {
+            if view.turn.state == .failed {
+              ErrorNote(text: note)
+            } else {
+              LoadingNote(label: note)
+            }
+          } else if view.fileCount == 0 {
+            EmptyNote(symbol: "diff", title: "No changes", message: "Nothing in the worktree changed during this turn.")
+              .frame(maxWidth: .infinity)
+          } else {
+            ChangeGroupsView(groups: view.groups, fileCount: view.fileCount, picking: picking)
+          }
+        }
+        .padding(.horizontal, z(10))
+        .padding(.bottom, z(12))
+      }
     }
   }
 

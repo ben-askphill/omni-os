@@ -1,0 +1,5 @@
+{
+  "error": "The page navigated while the screenshot was taken. Try again once it has loaded.",
+  "retryable": true,
+  "stale": "navigated"
+}

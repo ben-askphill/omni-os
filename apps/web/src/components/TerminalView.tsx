@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { api, errorText, openSSE } from '../api.ts';
 import { shortPath } from '../format.ts';
+import { TerminalSelectionDock, useSelectedText, useTapToPick } from './TerminalSelection.tsx';
 import { Button, ErrorNote, Icon, IconButton } from './ui.tsx';
 
 type TerminalMessage =
@@ -49,6 +50,8 @@ export function TerminalView({ threadId, cwd, readOnly }: { threadId: string; cw
   const [error, setError] = useState<string | null>(null);
   // Bumped by Restart, so the stream reconnects to the fresh shell.
   const [generation, setGeneration] = useState(0);
+  // The live terminal, for the dock that adds what is selected in it to the thread's next message.
+  const termRef = useRef<Terminal | null>(null);
 
   useEffect(() => {
     const el = host.current;
@@ -67,6 +70,7 @@ export function TerminalView({ threadId, cwd, readOnly }: { threadId: string; cw
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(el);
+    termRef.current = term;
     const base = `/threads/${encodeURIComponent(threadId)}/terminal`;
     let closed = false;
 
@@ -179,6 +183,11 @@ export function TerminalView({ threadId, cwd, readOnly }: { threadId: string; cw
     };
   }, [threadId, generation, readOnly]);
 
+  // After the effect above, which makes the terminal: these watch it from the same render on.
+  const termKey = `${threadId}:${generation}:${readOnly}`;
+  const selected = useSelectedText(termRef, termKey);
+  useTapToPick(termRef, host, !!readOnly, termKey);
+
   const restart = async () => {
     setError(null);
     try {
@@ -198,13 +207,17 @@ export function TerminalView({ threadId, cwd, readOnly }: { threadId: string; cw
   };
 
   const exited = state && !state.running;
+  const dock = <TerminalSelectionDock threadId={threadId} cwd={cwd} term={termRef} text={selected} />;
 
   if (readOnly) {
     return (
       <div className="flex h-full min-h-0 flex-col">
         {error && <ErrorNote className="mb-2">{error}</ErrorNote>}
-        <div className="min-h-0 flex-1 overflow-auto rounded-[20px] bg-[#141518] p-3">
-          <div ref={host} className="inline-block" data-terminal />
+        <div className="relative min-h-0 flex-1">
+          <div className="h-full overflow-auto rounded-[20px] bg-[#141518] p-3">
+            <div ref={host} className="inline-block" data-terminal />
+          </div>
+          {dock}
         </div>
       </div>
     );
@@ -226,8 +239,9 @@ export function TerminalView({ threadId, cwd, readOnly }: { threadId: string; cw
         )}
       </div>
       {error && <ErrorNote className="mb-2">{error}</ErrorNote>}
-      <div className="min-h-0 flex-1 overflow-hidden rounded-xl bg-[#141518] p-2">
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl bg-[#141518] p-2">
         <div ref={host} className="h-full w-full" data-terminal />
+        {dock}
       </div>
     </div>
   );

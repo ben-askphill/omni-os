@@ -193,6 +193,8 @@ public struct UserMessage: Decodable, Hashable, Sendable {
   /// A PR watch's wake: what it was for, and how many more there were. See `PRWakeItem`.
   public let items: [PRWakeItem]?
   public let more: Int?
+  /// Records Ben attached. A value this app can't read is no records, never a failed event.
+  public let context: MessageContextList?
 }
 
 /// kind `crew_report`: a child thread reporting back to its parent.

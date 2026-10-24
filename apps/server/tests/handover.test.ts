@@ -36,6 +36,14 @@ describe('buildHandover', () => {
     expect(h.text).not.toContain('/other-mac');
   });
 
+  it('names the context a message carried, and its note, without the excerpt', () => {
+    const record = { id: 'c1', kind: 'diff_selection', v: 1, label: 'src/cart.ts:1-3', note: 'names read better', body: { rows: [{ text: 'SECRET_ROW' }] } };
+    const h = buildHandover(input([ev('user', { text: 'tidy this', context: [record] }), ev('user', { text: '', context: [{ ...record, note: '' }] })]));
+    expect(h.text).toContain('[Ben] tidy this\n  - Context: src/cart.ts:1-3 (note: names read better)');
+    expect(h.text).toContain('[Ben] \n  - Context: src/cart.ts:1-3\n');
+    expect(h.text).not.toContain('SECRET_ROW');
+  });
+
   it('carries the thread facts and every entry, with Ben’s message to follow', () => {
     const h = buildHandover(
       input(

@@ -246,6 +246,8 @@ public struct PendingMsg: Decodable, Hashable, Sendable, Identifiable {
   public let requestID: String?
   /// Where the server's saved copy is. `recovered` and `uncertain` come with `state` held and wait on Ben.
   public let delivery: DeliveryState?
+  /// Records Ben attached. A value this app can't read is no records, never a failed detail.
+  public let context: MessageContextList?
 
   public var id: String { uuid }
 
@@ -253,7 +255,7 @@ public struct PendingMsg: Decodable, Hashable, Sendable, Identifiable {
   public var isParked: Bool { delivery == .recovered || delivery == .uncertain }
 
   enum CodingKeys: String, CodingKey {
-    case uuid, kind, text, source, mode, state, role, attachments, delivery
+    case uuid, kind, text, source, mode, state, role, attachments, delivery, context
     case taskID = "task_id"
     case threadID = "thread_id"
     case requestID = "request_id"

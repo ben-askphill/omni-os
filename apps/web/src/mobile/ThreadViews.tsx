@@ -1,9 +1,10 @@
 // The screens pushed from a thread: its steps, changes and PR, the channel browser, the shell, details and a file.
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { turnCount } from '@omni/shared/history.ts';
 import { api, artifactUrl, errorText, useApi, type HarnessWithRunning, type PRDetail } from '../api.ts';
 import { HarnessMark, harnessLabel } from '../components/brand.tsx';
 import { ArtifactBody } from '../components/ArtifactViewer.tsx';
+import { AnnotateLayer, canAnnotate, useAfterAdd } from '../components/BrowserAnnotate.tsx';
 import { BrowserWatch, displayUrl, useChannelBrowser } from '../components/LiveBrowser.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { modelOf } from '../components/ModelPicker.tsx';
@@ -288,18 +289,22 @@ export function PRScreen() {
 export function BrowserScreen() {
   const shell = useShell();
   const { thread } = useThread();
-  return thread ? <BrowserBody channelId={thread.channel_id} onBack={shell.back} /> : <MoHeader onBack={shell.back} title="Browser" />;
+  return thread ? <BrowserBody channelId={thread.channel_id} threadId={thread.id} onBack={shell.back} /> : <MoHeader onBack={shell.back} title="Browser" />;
 }
 
-function BrowserBody({ channelId, onBack }: { channelId: string; onBack: () => void }) {
+function BrowserBody({ channelId, threadId, onBack }: { channelId: string; threadId: string; onBack: () => void }) {
   const b = useChannelBrowser(channelId);
   const url = b.state?.url ? displayUrl(b.state.url) : null;
+  const [annotating, setAnnotating] = useState(false);
+  const close = useCallback(() => setAnnotating(false), []);
+  const added = useAfterAdd(close);
   return (
     <>
-      <MoHeader onBack={onBack} title="Browser" sub={[url, 'watch only'].filter(Boolean).join(' · ')} />
+      <MoHeader onBack={onBack} title="Browser" sub={[url, 'watch only'].filter(Boolean).join(' · ')} right={<MoRound icon="annotate" label="Annotate this page" disabled={!canAnnotate(b.state)} onClick={() => setAnnotating(true)} />} />
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-3 pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] bg-surface">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] bg-surface">
           <BrowserWatch b={b} />
+          {annotating && <AnnotateLayer channelId={channelId} threadId={threadId} onClose={close} onAdded={added} />}
         </div>
         <p className="m-0 px-1 text-[13px] leading-[1.5] text-fg-3">The agent drives this browser. Logins and captchas are handled on the Mac.</p>
       </div>
@@ -312,7 +317,7 @@ export function TerminalScreen() {
   const { thread } = useThread();
   return (
     <>
-      <MoHeader onBack={shell.back} title="Terminal" sub="Read only · take over on the Mac" />
+      <MoHeader onBack={shell.back} title="Terminal" sub="Read only · tap lines to add them to a message" />
       <div className="flex min-h-0 flex-1 flex-col px-3 pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
         {thread ? <TerminalView threadId={thread.id} cwd={thread.cwd} readOnly /> : <MoEmpty>Loading</MoEmpty>}
       </div>

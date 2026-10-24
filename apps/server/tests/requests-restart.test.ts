@@ -3,6 +3,8 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { fixture } from '@omni/test-fixtures';
+import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import { FAKE_CLAUDE, fakeAlive, sleep, waitFor } from './support.ts';
 
 // Durable requests across real restarts: apps/server/index.ts as a process of its own on a throwaway data dir, the
@@ -88,6 +90,7 @@ function boot(data: string, extra: Record<string, string> = {}) {
 
 type Pending = {
   uuid: string; kind: string; text: string; state: string; delivery?: string; request_id?: string; mode: string; thread_id?: string; attachments?: { name: string }[];
+  context?: unknown[];
 };
 type Detail = { thread: { id: string; status: string }; events: { id: number; kind: string; payload: string }[]; pending: Pending[] };
 
@@ -109,7 +112,7 @@ function client(port: number) {
   };
   const detail = (id: string) => ok('GET', `/threads/${id}`) as Promise<Detail>;
   const users = async (id: string) =>
-    (await detail(id)).events.filter((e) => e.kind === 'user').map((e) => JSON.parse(e.payload) as { text: string; dropped?: boolean; attachments?: unknown[] });
+    (await detail(id)).events.filter((e) => e.kind === 'user').map((e) => JSON.parse(e.payload) as { text: string; dropped?: boolean; attachments?: unknown[]; context?: unknown[] });
   return { call, ok, detail, users };
 }
 
@@ -201,6 +204,40 @@ describe('requests across a forced restart', () => {
     expect(discarded.pending).toEqual([]);
     expect((await api2.users(id)).at(-1)).toMatchObject({ text: 'steer: add PINEAPPLE', dropped: true });
     expect((await api2.call('POST', `/threads/${id}/requests/resume`, { ids: [steer.request.id] })).status).toBe(409);
+    await next.stop();
+  });
+});
+
+describe('context across a forced restart', () => {
+  it('keeps the records of parked messages, sends them on Resume and keeps them when discarded', T, async () => {
+    const parsed = parseContexts([JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')).records[0].raw]);
+    if (!parsed.ok) throw new Error(parsed.error);
+    const context = parsed.value;
+    const { data, server, api, id } = await busy('context');
+    const kept = await api.ok('POST', `/threads/${id}/messages`, withFile({ prompt: 'resume me', mode: 'queue', request_id: 'ctx-a', context }, 'notes.txt', 'cart'));
+    const dropped = await api.ok('POST', `/threads/${id}/messages`, { prompt: '', mode: 'queue', request_id: 'ctx-b', context });
+    await server.kill();
+    const next = boot(data);
+    const api2 = client(await next.port());
+    const after = await api2.detail(id);
+    expect(after.pending.map((p) => [p.request_id, p.delivery, p.context])).toEqual([
+      ['ctx-a', 'recovered', context],
+      ['ctx-b', 'recovered', context],
+    ]);
+    // The retry a client makes after the restart still matches what was saved, context and all.
+    expect((await api2.ok('POST', `/threads/${id}/messages`, { prompt: '', mode: 'queue', request_id: 'ctx-b', context })).request).toMatchObject({ id: dropped.request.id, duplicate: true });
+
+    await api2.ok('POST', `/threads/${id}/requests/resume`, { ids: [kept.request.id] });
+    for (const end = Date.now() + 15_000; ; ) {
+      const d = await api2.detail(id);
+      if (d.thread.status === 'done' && d.pending.length === 1) break;
+      if (Date.now() > end) throw new Error(`the resumed message never ran: ${JSON.stringify(d.thread)} ${JSON.stringify(d.pending)}`);
+      await sleep(50);
+    }
+    expect((await api2.users(id)).at(-1)).toMatchObject({ text: 'resume me', attachments: [expect.objectContaining({ name: 'notes.txt' })], context });
+
+    await api2.ok('POST', `/threads/${id}/requests/discard`, { ids: [dropped.request.id] });
+    expect((await api2.users(id)).at(-1)).toEqual({ text: '', source: 'ben', context, dropped: true });
     await next.stop();
   });
 });
