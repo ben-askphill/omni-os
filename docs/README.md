@@ -10,6 +10,7 @@
 - [Automations](user/automations.md): cron and GitHub PR events
 - [Sync between two Macs](user/sync.md)
 - [Remote access and security](user/remote-access.md)
+- [Sign in with Google](user/google-sign-in.md): per-device sessions, the allowlist, the OAuth clients and the broker
 - [Link previews](user/link-previews.md)
 - [Mods](user/mods.md)
 - [Other ways in](user/entry-points.md): shell, Quick Prompt, history import, brain export

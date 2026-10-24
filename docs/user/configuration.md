@@ -6,7 +6,7 @@ Everything personal lives in `data/` (gitignored) or the Keychain. Tracked files
 
 | Where | What |
 | --- | --- |
-| `data/omni.config.json` | You, your folders, integrations (Hermes URL, central brain, the Tailscale login allowed through `tailscale serve`), automation on/off. Every field: `omni.config.example.json` |
+| `data/omni.config.json` | You, your folders, integrations (Hermes URL, central brain, the Tailscale login allowed through `tailscale serve`), Google sign-in (`auth`, see [Sign in with Google](google-sign-in.md)), automation on/off. Every field: `omni.config.example.json` |
 | `data/crew/*.md` | Your own version of a crew charter; replaces the one in `crew/` with the same name |
 | `data/automations/*.yaml` | Your own automations; one with the same id as a shared one replaces it |
 | `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file |
@@ -32,7 +32,7 @@ Stored in the macOS Keychain under service `omni-os` (account `<scope>/<NAME>`).
 
 - Scope `global` goes to every thread as an env var.
 - Scope `channel:<slug>` goes only to that channel's threads and overrides a global with the same name.
-- Billing keys stay out of a harness and the terminal. Sync keys stay out of the terminal, and a global one stays out of a harness. `GROKBOT_WEBHOOK_URL` and `GROKBOT_WEBHOOK_AUTH` stay out of both, at any scope. See [Grok Bot](#grok-bot).
+- Billing keys stay out of a harness and the terminal. Sync keys stay out of the terminal, and a global one stays out of a harness. `GROKBOT_WEBHOOK_URL` and `GROKBOT_WEBHOOK_AUTH` stay out of both, at any scope. See [Grok Bot](#grok-bot). So do `GOOGLE_OAUTH_CLIENT_SECRET` and `GOOGLE_OAUTH_WEB_CLIENT_SECRET`, the [Google sign-in](google-sign-in.md) client secrets.
 
 ## Grok Bot
 
