@@ -68,7 +68,7 @@ prompt: |
 - Each publish that matches is saved as a delivery before any thread is made, keyed by the automation and the publish (the thread and its tool call). Seeing the same tool result again, a restart, or both Macs seeing it never starts a second run. A restart before the run was made starts it once Omni is back.
 - A publish from one of the automation's own runs, from a thread under one, or from a run whose page started it is skipped, so two automations cannot start each other forever.
 - The run's prompt is the automation's prompt plus an `## Event` section with the page's URL, and its title, file, description and the thread and channel that published it, in a code fence, as data. Its title is `<name> · <page>`, and its trigger is `event`.
-- The Automations page lists the last deliveries with their outcome: Started (with a link to the run), Held for owner, Failed or Skipped, with the reason.
+- The Automations page lists the last deliveries with their outcome: Started (with a link to the run), Held for owner, Failed or Skipped, with the reason. [Deliveries](#deliveries-history-retry-and-skip) says what you can do with one.
 - With sync on, only the Mac that runs automations starts a run. The other Mac holds each delivery for it, whatever its own toggle says, and sync carries it over; that Mac skips it if the automation is paused there or it has no automation with that id. Personal automations in `data/automations/` only exist on their Mac, so a publish on the other Mac does not reach them.
 
 ### GitHub webhooks
@@ -93,3 +93,31 @@ prompt: |
 - The run's prompt is the automation's prompt plus an `## Event` section with what GitHub sent (workflow, conclusion, branch, commit, run URL; or PR, reviewer, state and up to 1,000 characters of the review), each field cut short, in a code fence, as data. Its title is `<name> · <commit or PR title>`, and its trigger is `event`.
 - Deliveries, sync and the other Mac work as for published pages: the Mac that receives the request saves it, and only the Mac that runs automations starts the run.
 - Omni does not expose the endpoint to the internet. GitHub reaches it only if you route it there yourself; a signed request from your own network goes the whole way.
+
+### Deliveries: history, retry and skip
+
+Both event triggers save every event as a delivery, and the card for an event automation lists them: the latest five, then Show older for the rest. Open a delivery to see how far it got in three steps.
+
+- **Trigger.** Received, Accepted, Held for owner (saved on the other Mac, waiting for the one that runs automations) or Skipped, with the reason.
+- **Run.** Whether its thread was made. Waiting to start (with why), Thread created, Could not start, or Never started.
+- **Execution.** What the thread did, its own status: Running, Finished, Failed or Stopped. A run that failed is still a created run. Its delivery says Started, and the thread has the failure.
+
+The detail also shows when the event arrived, which attempt this is, when it expires, and the fields that came with the event. It never shows a signature, a header or the raw request. A delivery that has a thread links to it.
+
+What you can do:
+
+- **Retry** goes again for a delivery that failed before any thread was made, for example because the channel was gone and you have fixed it. It runs as the next attempt, with a thread of its own, and starts at once, on the Mac that runs automations. Clicking twice makes one attempt.
+- **Skip** is final: the event never starts, here or on the other Mac, and cannot be retried. It works on a delivery that has not started, including a failed one. If the run is already being made when you skip, the skip is refused and the run goes ahead.
+- **A failed delivery whose thread exists is never retried.** The thread was made, so what it did is unknown. Open it and send a follow-up there. Retry is hidden and the card says why.
+
+Limits, set in the `on:` block of a published-page or webhook automation:
+
+```yaml
+on: { event: github_webhook, repo: acme/shop, max_age: 2h, concurrency: 1 }
+```
+
+- `max_age` (`90s`, `15m`, `6h`, `2d`; a day by default) skips an event that is older than this when its turn comes. It counts from when the event arrived, so an hour of Omni being off, or the other Mac asleep on a held event, does not revive it. A skipped event stays skipped after a restart or when the automations move to the other Mac. A retry of an event past its age is refused.
+- `concurrency` (1 to 8; 2 by default) is how many of the automation's runs may be going at once. The rest of a burst waits as Accepted and starts as runs end, so a hundred events cannot queue ahead of your own messages.
+- After a start fails, the automation's other new events wait 30 seconds, then 1 minute, doubling to 15 minutes, until a start works. A retry you ask for is not held by that wait.
+
+The Conductor has the same three actions: `list_automation_deliveries`, `retry_delivery` and `skip_delivery`.

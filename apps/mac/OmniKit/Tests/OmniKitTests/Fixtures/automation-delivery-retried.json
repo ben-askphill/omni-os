@@ -1,0 +1,33 @@
+{
+  "delivery": {
+    "id": "00000000-0000-4000-8000-000000000009",
+    "automation": "flaky-hook",
+    "source": "github_webhook",
+    "source_id": "00000000-0000-4000-8000-000000000010",
+    "summary": "CI failure on fix-nav",
+    "state": "accepted",
+    "reason": null,
+    "owner": null,
+    "source_thread": null,
+    "thread_id": null,
+    "attempt": 2,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "updated_at": "2026-01-05T09:00:00.000Z",
+    "context": {
+      "event": "workflow_run",
+      "repo": "acme/shop",
+      "workflow": "CI",
+      "conclusion": "failure",
+      "branch": "fix-nav",
+      "sha": "abcdef012345",
+      "title": "Fix the nav",
+      "run_url": "https://github.com/acme/shop/actions/runs/9"
+    },
+    "thread_status": null,
+    "expires_at": "2026-01-05T09:00:00.000Z",
+    "waiting": null,
+    "can_skip": true,
+    "can_retry": false,
+    "retry_blocked": null
+  }
+}

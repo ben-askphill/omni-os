@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { lastRuns, loadAutomations, runAutomation, setEnabled } from './automations.ts';
 import { pollErrors, watchedRepo } from './automation-watch.ts';
 import { isPrTrigger } from './automation-events.ts';
-import { triggerDeliveries } from './db/repos/trigger-deliveries.ts';
+import { recentDeliveries } from './automation-deliveries.ts';
 import { webhookInfo } from './github-webhook-api.ts';
 import { listCrew } from './crew.ts';
 import { channelCatalog, freshCatalog, getCatalog } from './harness/catalog-service.ts';
@@ -72,8 +72,8 @@ metaApi.get('/automations', (c) => {
       // Webhook automations: where GitHub posts, and whether this Mac holds the signing secret (never its value).
       ...webhookInfo(a),
       runs: lastRuns(a.id, 5),
-      // What events reached it and what became of each, newest first.
-      deliveries: triggerDeliveries.recent(a.id, 5),
+      // What events reached it and what became of each, newest first, and whether the history has older ones.
+      ...recentDeliveries(a.id),
     })),
   );
 });

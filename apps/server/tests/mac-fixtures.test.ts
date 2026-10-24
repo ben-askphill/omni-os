@@ -57,6 +57,12 @@ const NAMES = [
   'automation-enabled-request.json',
   'automation-enabled.json',
   'automation-run.json',
+  'automation-delivery-retry-request.json',
+  'automation-delivery-retried.json',
+  'automation-delivery-refused.json',
+  'automation-delivery-skip-request.json',
+  'automation-delivery-skipped.json',
+  'automation-deliveries.json',
   'automations.json',
   // Last: the server restarts with messages still waiting.
   'message-queued-request.json',
@@ -141,7 +147,7 @@ function fakeSecurity() {
   return bin;
 }
 
-/** One automation to toggle and run, one the server can't schedule, one a published page starts and one a GitHub webhook starts. */
+/** One automation to toggle and run, one the server can't schedule, one a published page starts, one a GitHub webhook starts and one whose channel is gone, so every start of it fails. */
 function automations() {
   const dir = join(tmp, 'automations');
   mkdirSync(dir);
@@ -156,6 +162,7 @@ function automations() {
     'name: Page review\nenabled: true\non: { event: artifact_published, channels: [acme] }\nchannel: acme\nprompt: Review the page.\n',
   );
   writeFileSync(join(dir, 'ci-fixer.yaml'), 'name: CI fixer\nenabled: true\non: { event: github_webhook, repo: acme/shop }\nchannel: acme\nprompt: Fix the build.\n');
+  writeFileSync(join(dir, 'flaky-hook.yaml'), 'name: Flaky hook\nenabled: true\non: { event: github_webhook, repo: acme/shop, max_age: 6h, concurrency: 1 }\nchannel: gone\nprompt: Never starts.\n');
   return dir;
 }
 
@@ -349,7 +356,7 @@ async function scenario() {
   // Automations, last, so their run is not in the thread lists above.
   type Automation = { id: string; enabled: boolean; error?: string; next?: string; runs: { thread_id: string; trigger: string; status: string }[] };
   const before = (await get('/automations')) as Automation[];
-  expect(before.map((a) => a.id).sort(), 'the test folder, not the repo').toEqual(['broken', 'ci-fixer', 'daily-digest', 'page-review']);
+  expect(before.map((a) => a.id).sort(), 'the test folder, not the repo').toEqual(['broken', 'ci-fixer', 'daily-digest', 'flaky-hook', 'page-review']);
   const enableBody = request('automation-enabled-request.json', { enabled: true });
   keep('automation-enabled.json', await call('POST', '/automations/daily-digest/enabled', enableBody));
   const run = keep('automation-run.json', await call('POST', '/automations/daily-digest/run', {})) as Thread;
@@ -385,6 +392,39 @@ async function scenario() {
     const d = ((await get('/automations')) as (Automation & { deliveries: Delivery[] })[]).find((a) => a.id === 'ci-fixer')!.deliveries[0];
     return d?.state === 'started' && !!d.thread_id && (await detail(d.thread_id)).thread.status === 'done' && d;
   }, 'the CI fixer run to finish');
+  // A webhook for an automation whose channel is gone fails before any thread is made, so it can go again.
+  type FlakyView = Delivery & { id: string; attempt: number; can_retry: boolean; can_skip: boolean; retry_blocked: string | null; waiting: string | null; reason: string | null };
+  const flaky = async () => ((await get('/automations')) as (Automation & { deliveries: FlakyView[] })[]).find((a) => a.id === 'flaky-hook')!.deliveries;
+  const flakyPost = (guid: string) => {
+    const body = JSON.stringify({
+      action: 'completed',
+      repository: { full_name: 'acme/shop' },
+      workflow_run: { name: 'CI', conclusion: 'failure', head_branch: 'fix-nav', head_sha: 'abcdef0123456789', display_title: 'Fix the nav', html_url: 'https://github.com/acme/shop/actions/runs/9', head_repository: { full_name: 'acme/shop' } },
+    });
+    return fetch(`${base}/api/hooks/github/flaky-hook`, {
+      method: 'POST',
+      body,
+      headers: { 'content-type': 'application/json', 'x-github-event': 'workflow_run', 'x-github-delivery': guid, 'x-hub-signature-256': `sha256=${createHmac('sha256', HOOK_SECRET).update(body).digest('hex')}` },
+    });
+  };
+  await call('PUT', '/automations/flaky-hook/webhook-secret', { value: HOOK_SECRET });
+  expect((await flakyPost('6f1c2d3e-0000-4000-8000-000000000228')).status).toBe(202);
+  const flakyFailed = await eventually(async () => (await flaky()).find((d) => d.state === 'failed'), 'the delivery to fail');
+  expect(flakyFailed).toMatchObject({ attempt: 1, thread_id: null, can_retry: true, can_skip: true, reason: 'unknown channel "gone"' });
+  // A second one waits behind the pause after that failure, and can be skipped while it waits.
+  expect((await flakyPost('6f1c2d3e-0000-4000-8000-000000000229')).status).toBe(202);
+  const flakyHeld = (await eventually(async () => (await flaky()).find((d) => d.id !== flakyFailed.id), 'the second delivery')) as FlakyView;
+  expect(flakyHeld).toMatchObject({ state: 'accepted', can_skip: true, can_retry: false });
+  expect(flakyHeld.waiting).toMatch(/^Backing off after a start that failed/);
+  const flakySkipBody = request('automation-delivery-skip-request.json', { attempt: 1 });
+  keep('automation-delivery-skipped.json', await call('POST', `/deliveries/${flakyHeld.id}/skip`, flakySkipBody));
+  const flakyRetryBody = request('automation-delivery-retry-request.json', { attempt: 1 });
+  const flakyRetried = keep('automation-delivery-retried.json', await call('POST', `/deliveries/${flakyFailed.id}/retry`, flakyRetryBody)) as { delivery: FlakyView };
+  expect(flakyRetried.delivery).toMatchObject({ attempt: 2, state: 'accepted' });
+  await eventually(async () => (await flaky()).find((d) => d.id === flakyFailed.id && d.attempt === 2 && d.state === 'failed'), 'the retry to fail too');
+  // The same click again names the attempt it saw, which has gone: refused, with the delivery as it is now.
+  keep('automation-delivery-refused.json', await call('POST', `/deliveries/${flakyFailed.id}/retry`, flakyRetryBody, false));
+  keep('automation-deliveries.json', await get('/automations/flaky-hook/deliveries?limit=1'));
   const listed2 = keep('automations.json', await get('/automations')) as Automation[];
   expect(listed2.find((a) => a.id === 'page-review')!.runs).toMatchObject([{ thread_id: delivered.thread_id, trigger: 'event', status: 'done' }]);
   expect(listed2.find((a) => a.id === 'ci-fixer')).toMatchObject({

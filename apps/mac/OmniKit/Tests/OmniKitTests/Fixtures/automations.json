@@ -11,7 +11,8 @@
     "catchup": false,
     "error": "invalid schedule (cron \"61 8 * * *\", timezone \"Europe/Amsterdam\"): CronPattern: Invalid value for minute: 61",
     "runs": [],
-    "deliveries": []
+    "deliveries": [],
+    "deliveries_more": false
   },
   {
     "id": "ci-fixer",
@@ -41,7 +42,7 @@
       {
         "id": 3,
         "automation": "ci-fixer",
-        "thread_id": "00000000-0000-4000-8000-000000000009",
+        "thread_id": "00000000-0000-4000-8000-000000000013",
         "trigger": "event",
         "created_at": "2026-01-05T09:00:00.000Z",
         "status": "done",
@@ -50,16 +51,17 @@
     ],
     "deliveries": [
       {
-        "id": "00000000-0000-4000-8000-000000000010",
+        "id": "00000000-0000-4000-8000-000000000014",
         "automation": "ci-fixer",
         "source": "github_webhook",
-        "source_id": "00000000-0000-4000-8000-000000000011",
+        "source_id": "00000000-0000-4000-8000-000000000015",
         "summary": "CI failure on fix-cart",
         "state": "started",
         "reason": null,
         "owner": null,
         "source_thread": null,
-        "thread_id": "00000000-0000-4000-8000-000000000009",
+        "thread_id": "00000000-0000-4000-8000-000000000013",
+        "attempt": 1,
         "created_at": "2026-01-05T09:00:00.000Z",
         "updated_at": "2026-01-05T09:00:00.000Z",
         "context": {
@@ -71,9 +73,16 @@
           "sha": "abcdef012345",
           "title": "Fix the cart total",
           "run_url": "https://github.com/acme/shop/actions/runs/7"
-        }
+        },
+        "thread_status": "done",
+        "expires_at": null,
+        "waiting": null,
+        "can_skip": false,
+        "can_retry": false,
+        "retry_blocked": null
       }
-    ]
+    ],
+    "deliveries_more": false
   },
   {
     "id": "daily-digest",
@@ -99,7 +108,101 @@
         "title": "Daily digest · 5 Jan"
       }
     ],
-    "deliveries": []
+    "deliveries": [],
+    "deliveries_more": false
+  },
+  {
+    "id": "flaky-hook",
+    "name": "Flaky hook",
+    "cron": "",
+    "timezone": "Europe/Amsterdam",
+    "channel": "gone",
+    "prompt": "Never starts.",
+    "enabled": true,
+    "file": "/tmp/omni-fixtures/automations/flaky-hook.yaml",
+    "catchup": false,
+    "on": {
+      "event": "github_webhook",
+      "repo": "acme/shop",
+      "events": [
+        "workflow_run",
+        "pull_request_review"
+      ],
+      "max_age": "6h",
+      "concurrency": 1
+    },
+    "next": null,
+    "webhook": {
+      "path": "/api/hooks/github/flaky-hook",
+      "secret": "OMNI_WEBHOOK_FLAKY_HOOK",
+      "secret_set": true
+    },
+    "runs": [],
+    "deliveries": [
+      {
+        "id": "00000000-0000-4000-8000-000000000011",
+        "automation": "flaky-hook",
+        "source": "github_webhook",
+        "source_id": "00000000-0000-4000-8000-000000000012",
+        "summary": "CI failure on fix-nav",
+        "state": "skipped",
+        "reason": "Skipped by hand",
+        "owner": null,
+        "source_thread": null,
+        "thread_id": null,
+        "attempt": 1,
+        "created_at": "2026-01-05T09:00:00.000Z",
+        "updated_at": "2026-01-05T09:00:00.000Z",
+        "context": {
+          "event": "workflow_run",
+          "repo": "acme/shop",
+          "workflow": "CI",
+          "conclusion": "failure",
+          "branch": "fix-nav",
+          "sha": "abcdef012345",
+          "title": "Fix the nav",
+          "run_url": "https://github.com/acme/shop/actions/runs/9"
+        },
+        "thread_status": null,
+        "expires_at": null,
+        "waiting": null,
+        "can_skip": false,
+        "can_retry": false,
+        "retry_blocked": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000009",
+        "automation": "flaky-hook",
+        "source": "github_webhook",
+        "source_id": "00000000-0000-4000-8000-000000000010",
+        "summary": "CI failure on fix-nav",
+        "state": "failed",
+        "reason": "unknown channel \"gone\"",
+        "owner": null,
+        "source_thread": null,
+        "thread_id": null,
+        "attempt": 2,
+        "created_at": "2026-01-05T09:00:00.000Z",
+        "updated_at": "2026-01-05T09:00:00.000Z",
+        "context": {
+          "event": "workflow_run",
+          "repo": "acme/shop",
+          "workflow": "CI",
+          "conclusion": "failure",
+          "branch": "fix-nav",
+          "sha": "abcdef012345",
+          "title": "Fix the nav",
+          "run_url": "https://github.com/acme/shop/actions/runs/9"
+        },
+        "thread_status": null,
+        "expires_at": "2026-01-05T09:00:00.000Z",
+        "waiting": null,
+        "can_skip": true,
+        "can_retry": true,
+        "retry_blocked": null
+      }
+    ],
+    "deliveries_more": false
   },
   {
     "id": "page-review",
@@ -123,7 +226,7 @@
       {
         "id": 2,
         "automation": "page-review",
-        "thread_id": "00000000-0000-4000-8000-000000000012",
+        "thread_id": "00000000-0000-4000-8000-000000000016",
         "trigger": "event",
         "created_at": "2026-01-05T09:00:00.000Z",
         "status": "done",
@@ -132,29 +235,37 @@
     ],
     "deliveries": [
       {
-        "id": "00000000-0000-4000-8000-000000000013",
+        "id": "00000000-0000-4000-8000-000000000017",
         "automation": "page-review",
         "source": "artifact_published",
-        "source_id": "00000000-0000-4000-8000-000000000014:toolu_fake_1",
+        "source_id": "00000000-0000-4000-8000-000000000018:toolu_fake_1",
         "summary": "launch-plan.html in #Acme",
         "state": "started",
         "reason": null,
         "owner": null,
-        "source_thread": "00000000-0000-4000-8000-000000000014",
-        "thread_id": "00000000-0000-4000-8000-000000000012",
+        "source_thread": "00000000-0000-4000-8000-000000000018",
+        "thread_id": "00000000-0000-4000-8000-000000000016",
+        "attempt": 1,
         "created_at": "2026-01-05T09:00:00.000Z",
         "updated_at": "2026-01-05T09:00:00.000Z",
         "context": {
-          "url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000015",
+          "url": "https://claude.ai/code/artifact/00000000-0000-4000-8000-000000000019",
           "title": "launch-plan.html",
           "file": "/tmp/omni-fixtures/launch-plan.html",
           "description": "A fake page",
           "update": "false",
-          "thread": "00000000-0000-4000-8000-000000000014",
+          "thread": "00000000-0000-4000-8000-000000000018",
           "thread_title": "Publish the launch plan",
           "channel": "acme"
-        }
+        },
+        "thread_status": "done",
+        "expires_at": null,
+        "waiting": null,
+        "can_skip": false,
+        "can_retry": false,
+        "retry_blocked": null
       }
-    ]
+    ],
+    "deliveries_more": false
   }
 ]
