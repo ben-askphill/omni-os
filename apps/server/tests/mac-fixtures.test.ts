@@ -3,8 +3,10 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { newContext } from '@omni/shared/message-context.ts';
+import { diffSelection, selectRows } from '@omni/shared/message-context-diff.ts';
 import { diff, shapeOf, tagOf } from './fixture-shape.ts';
-import { FAKE_CLAUDE, fakeAlive } from './support.ts';
+import { FAKE_CLAUDE, diffFile, fakeAlive } from './support.ts';
 
 // Golden fixtures for the Mac app's Swift types (apps/mac/OmniKit). Boots the real server with the fake claude CLI,
 // makes a channel and runs a thread through three turns, and keeps what the app reads: the JSON of each GET
@@ -89,6 +91,10 @@ const NAMES = [
   // thread whose turns are not saved.
   'turns.json',
   'turns-unavailable.json',
+  // Lines picked in that thread's unstaged diff, sent with a note: the request, then the thread with the record on the
+  // sent message and on one held behind its turn.
+  'message-context-request.json',
+  'thread-context.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -481,6 +487,31 @@ async function scenario() {
   keep('turns.json', saved);
   expect(saved.groups[0].files.map((f) => f.path)).toEqual(['src/cart.ts', 'todo.md']);
   keep('turns-unavailable.json', await get(`/threads/${id}/turns`));
+
+  type Changes = { head: string; base: { sha: string }; groups: { kind: string; files: { path: string; old_path: string | null; diff: string }[] }[] };
+  const picked = changed as unknown as Changes;
+  const cart = picked.groups.find((g) => g.kind === 'unstaged')!.files.find((f) => f.path === 'src/cart.ts')!;
+  const rows = selectRows(diffFile(cart), 1, 4, { group: 'unstaged', from: picked.base.sha, to: picked.head, turn: null });
+  if (!rows.ok) throw new Error(rows.error);
+  const contextBody = request('message-context-request.json', {
+    prompt: 'TOOL:4000 tidy this reduce',
+    context: [newContext(diffSelection, rows.value, 'this reduce reads better with names')],
+    request_id: 'req-context',
+  }) as { context: unknown[] };
+  const tools = count(await detail(wt.id), 'tool_use');
+  await call('POST', `/threads/${wt.id}/messages`, contextBody);
+  await eventually(async () => {
+    const d = await detail(wt.id);
+    return d.thread.status === 'running' && count(d, 'tool_use') === tools + 1;
+  }, 'the context message to run its tool');
+  await call('POST', `/threads/${wt.id}/messages`, { prompt: 'then check the rounding', mode: 'queue', context: contextBody.context, request_id: 'req-context-held' });
+  const withContext = keep('thread-context.json', await detail(wt.id)) as { events: { kind: string; payload: string }[]; pending: { context?: unknown }[] };
+  expect(JSON.parse(withContext.events.filter((e) => e.kind === 'user').at(-1)!.payload).context).toHaveLength(1);
+  expect(withContext.pending.map((p) => p.context)).toEqual([contextBody.context]);
+  await eventually(async () => {
+    const d = await detail(wt.id);
+    return d.thread.status === 'done' && !d.pending?.length;
+  }, 'the held context message to run');
 
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));

@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import type { DiffFileLike, DiffLineLike } from '@omni/shared/message-context-diff.ts';
 import { fixture } from '@omni/test-fixtures';
 
 export const FAKE_CLAUDE = fixture('fake-claude.mjs');
@@ -44,4 +45,24 @@ export function fakeAlive(pid: number, needle = 'fake-claude.mjs') {
   } catch {
     return false;
   }
+}
+
+/** A file of a /changes response, its diff numbered as the clients number it (apps/web/src/diff.ts), for selectRows. */
+export function diffFile(f: { path: string; old_path: string | null; diff: string }): DiffFileLike {
+  const header: string[] = [];
+  const lines: DiffLineLike[] = [];
+  let old = 0;
+  let nu = 0;
+  for (const text of f.diff.replace(/\n$/, '').split('\n')) {
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text);
+    if (hunk) {
+      [old, nu] = [Number(hunk[1]), Number(hunk[2])];
+      lines.push({ kind: 'hunk', text, old: null, new: null });
+    } else if (!lines.length) header.push(text);
+    else if (text.startsWith('+')) lines.push({ kind: 'add', text, old: null, new: nu++ });
+    else if (text.startsWith('-')) lines.push({ kind: 'del', text, old: old++, new: null });
+    else if (text.startsWith('\\')) lines.push({ kind: 'note', text, old: null, new: null });
+    else lines.push({ kind: 'context', text, old: old++, new: nu++ });
+  }
+  return { path: f.path, old_path: f.old_path, header, lines };
 }
