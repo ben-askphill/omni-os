@@ -75,7 +75,9 @@ private struct ThreadView: View {
         #if DEBUG
         .onAppear {
           QAProbe.expand = {
-            ui.expandAll(store.transcript.items) { store.clipped[$0.id] != nil || store.clippedResults[$0.callID] != nil }
+            ui.expandAll(store.transcript.items) {
+              store.clipped[$0.id] != nil || store.clippedResults[$0.callID] != nil || $0.result?.output != nil || $0.isPending
+            }
           }
           QAProbe.editPending = { text in
             guard let m = store.pending.first(where: \.isEditable) else { return false }
@@ -419,6 +421,7 @@ private struct TranscriptView: View {
     .modifier(ThreadLinks(model: model))
     .environment(\.linkScope, LinkScope(store: model.links, channel: store.thread?.channelID))
     .environment(\.threadStore, store)
+    .environment(\.toolOutputAPI, model.client)
     .holdsTopRow(
       store: store, position: $position, following: { pin.isPinned }, viewport: { pin.geometry?.viewportHeight },
       release: { pin.release(tail: store.history.tailID) })

@@ -88,6 +88,10 @@ func sseData(_ text: String) -> [String] {
     "thread-history-at.json": { _ = try decodeFixture(HistoryPage.self, "thread-history-at.json") },
     "thread-event.json": { _ = try decodeFixture(EventRow.self, "thread-event.json") },
     "search.json": { _ = try decodeFixture([SearchHit].self, "search.json") },
+    "tool-output-open.json": { _ = try decodeFixture(ThreadDetail.self, "tool-output-open.json") },
+    "tool-output-chunk.json": { _ = try decodeFixture(OutputChunk.self, "tool-output-chunk.json") },
+    "tool-output-chunk-end.json": { _ = try decodeFixture(OutputChunk.self, "tool-output-chunk-end.json") },
+    "tool-tail.json": { _ = try decodeFixture([TailMessage].self, "tool-tail.json") },
   ]
 
   static func threadStream(_ name: String = "thread-stream.sse") throws -> [ThreadStreamMessage] {

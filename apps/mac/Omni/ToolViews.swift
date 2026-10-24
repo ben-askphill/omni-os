@@ -168,7 +168,7 @@ struct ToolRowView: View {
           } else if call.isFailed {
             HStack(spacing: z(4)) {
               GlyphView(glyph: .needs, size: 7)
-              Text("error")
+              Text("error" + (call.result?.exitCode.map { " · exit \($0)" } ?? ""))
             }
             .font(.omni(size: 11))
             .foregroundStyle(Tok.fg)
@@ -219,24 +219,12 @@ struct ToolRowView: View {
 struct ToolDetail: View {
   let call: ToolCall
   let running: Bool
-  @Environment(\.threadStore) private var store
 
   var body: some View {
     VStack(alignment: .leading, spacing: z(6)) {
       ToolInputView(input: ToolInput(call.use))
       ClippedNote(eventID: call.id)
-      if let result = call.result {
-        Pre(text: result.text.isEmpty ? "(no output)" : result.text, tone: call.isFailed ? .bad : .plain)
-        if let row = store?.clippedResults[call.callID] {
-          ClippedNote(eventID: row)
-        } else if result.truncated {
-          Text("Output truncated").font(.omni(size: 11)).foregroundStyle(Tok.fg4)
-        }
-      } else {
-        Text(running ? "Waiting for result" : "No result recorded")
-          .font(.omni(size: ThreadStyle.mono))
-          .foregroundStyle(Tok.fg4)
-      }
+      ToolOutputView(call: call, running: running)
     }
   }
 }
