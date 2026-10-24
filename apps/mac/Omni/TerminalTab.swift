@@ -10,6 +10,8 @@ struct TerminalTab: View {
   let client: OmniClient
   let thread: String
   let cwd: String?
+  /// The thread's reply box context: Add to Message in the selection dock puts the selected output there.
+  let draft: DraftContextModel
   @State private var session: TerminalSession?
 
   var body: some View {
@@ -56,6 +58,9 @@ struct TerminalTab: View {
       }
       .padding(z(8))
       .background(TerminalSession.background, in: RoundedRectangle(cornerRadius: z(12), style: .continuous))
+      .overlay(alignment: .bottom) {
+        if let session { TerminalSelectionDock(session: session, cwd: cwd, draft: draft) }
+      }
       .padding(.horizontal, z(10))
       .padding(.bottom, z(10))
     }
@@ -64,6 +69,10 @@ struct TerminalTab: View {
       let s = TerminalSession(client: client, thread: thread)
       session = s
       s.start()
+      #if DEBUG
+      TerminalSelectionProbe.select = { s.view.selectAll(); return true }
+      defer { TerminalSelectionProbe.select = nil; TerminalSelectionProbe.add = nil }
+      #endif
       // Holds the stream until the tab goes away or the thread changes.
       await withTaskCancellationHandler {
         await s.run()
@@ -84,8 +93,10 @@ final class TerminalSession {
   private(set) var exited = false
   private(set) var attached = false
   private(set) var error: String?
+  /// What is selected in the terminal, as plain text; empty when nothing is.
+  private(set) var selected = ""
 
-  @ObservationIgnored let view: SwiftTerm.TerminalView
+  @ObservationIgnored let view: ShellTerminalView
   @ObservationIgnored private var stream: SSEClient<TerminalMessage>?
   @ObservationIgnored private var input: TerminalInputQueue?
   @ObservationIgnored private var bridge: Bridge?
@@ -99,7 +110,7 @@ final class TerminalSession {
   init(client: OmniClient, thread: String) {
     self.client = client
     self.thread = thread
-    view = SwiftTerm.TerminalView(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+    view = ShellTerminalView(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
     view.font = Self.font(scale: UIZoom.settings.scale)
     view.nativeBackgroundColor = NSColor(TerminalSession.background)
     view.nativeForegroundColor = NSColor(red: 0xec / 255, green: 0xea / 255, blue: 0xe5 / 255, alpha: 1)
@@ -110,6 +121,12 @@ final class TerminalSession {
     self.bridge = bridge
     view.terminalDelegate = bridge
     bridge.session = self
+    view.onSelectionChange = { [weak self] in self?.selectionChanged() }
+  }
+
+  private func selectionChanged() {
+    let text = TerminalExcerptContext.plainText(view.getSelection() ?? "")
+    if text != selected { selected = text }
   }
 
   /// The Web UI's ANSI palette (`TerminalView.tsx`), for a dark background in both appearances.

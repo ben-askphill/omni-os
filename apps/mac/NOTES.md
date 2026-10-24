@@ -480,6 +480,8 @@ Steps (a list, or an object with the list under `steps`):
 | `{"handOff": "<device id>"}` | Hands the open thread to that Mac, as picking it in Hand Off to does |
 | `{"selectLines": {"file": "src/cart.ts", "from": 1, "to": 3}}` | In the Changes tab's shown view, clicks the numbers of row `from` (an index into the file's diff rows, hunk rows counted, from 0) of the first file at that path, then Shift-clicks row `to`. The dock shows under the diff |
 | `{"addContext": "note"}` | Writes the note in the dock and presses Add to Message. Fails with the reason when the reply box refuses the lines |
+| `{"selectTerminal": true}` | In the Terminal tab, selects everything the terminal shows. The selection panel opens over its foot. The shell lives on the server, so put output in it first, with `POST /api/threads/:id/terminal/input` |
+| `{"addTerminal": "note"}` | Writes the note in the terminal selection's panel and presses Add to Message. Fails with the reason when the reply box refuses it |
 | `{"openContext": 0}` | Clicks the reply box's context chip at that index, which opens or closes its inspector |
 | `{"quit": true}` | Writes the report and exits |
 

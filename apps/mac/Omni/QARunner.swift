@@ -239,6 +239,13 @@ final class QARunner {
           guard let add = LineSelectionProbe.add else { throw QAScriptError("the Changes tab is not showing") }
           if let refused = add(note) { throw QAScriptError(refused) }
           try? await Task.sleep(for: .milliseconds(400))
+        case .selectTerminal:
+          guard let select = TerminalSelectionProbe.select, select() else { throw QAScriptError("the Terminal tab is not showing") }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .addTerminal(let note):
+          guard let add = TerminalSelectionProbe.add else { throw QAScriptError("no terminal output is selected") }
+          if let refused = await add(note) { throw QAScriptError(refused) }
+          try? await Task.sleep(for: .milliseconds(400))
         case .openContext(let index):
           guard let toggle = ContextChipsProbe.toggle, toggle(index) else { throw QAScriptError("no context chip \(index) in the reply box") }
           try? await Task.sleep(for: .milliseconds(400))
@@ -491,6 +498,8 @@ final class QARunner {
     case .quickPrompt(let action): "quickPrompt \(action)"
     case .selectLines(let file, let from, let to): "selectLines \(file) \(from)-\(to)"
     case .addContext(let note): "addContext \(note.prefix(40))"
+    case .selectTerminal: "selectTerminal"
+    case .addTerminal(let note): "addTerminal \(note.prefix(40))"
     case .openContext(let index): "openContext \(index)"
     case .quit: "quit"
     }

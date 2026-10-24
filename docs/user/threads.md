@@ -28,6 +28,12 @@ In a thread's Changes panel (desktop, phone and the Mac app), click a line numbe
 
 The agent gets the lines as you saw them, with the path, the line numbers, the commits they were compared at and your note, and is told when the file has changed since you picked them. Your message in the thread keeps the lines exactly as you sent them. It is feedback for this thread only, not a GitHub review. Hermes and Cursor Cloud threads have no Changes panel; a message with lines in it tells them the file is on your Mac. How it works: [Message context](../internals/message-context.md).
 
+## Point the agent at terminal output
+
+In a thread's Terminal tab (desktop and the Mac app), select output with the mouse as usual. A panel opens over the terminal's foot: write a note and press **Add to message**, and the selected text goes into the reply box as a chip, next to whatever you have typed. Copy and paste work as before, and Esc in the panel clears the selection. On a phone the terminal is read only and can't be dragged over: tap a line, then tap another to take the lines between, then Add to message. A message can be just chips.
+
+The chip is a snapshot of the text, the directory the shell started in, the shell's process id and the time you added it. It stays as it was when the terminal scrolls on, restarts or the shell exits. The agent gets the text as plain text and is told it was not run: escape sequences are dropped when you add it, and output that holds Omni's own block tags can't pass for them. Up to 200 lines and 8,000 characters at once; more is refused rather than cut. How it works: [Message context](../internals/message-context.md).
+
 ## When the agent asks you
 
 An agent can stop and ask you one to four multiple-choice questions with Omni's `ask_user_question` tool. Every Claude Code, Codex and Cursor thread has it (the `omni-ask` MCP server); Hermes threads have no MCP servers, so not there. Claude Code's own AskUserQuestion is turned off in Omni, because nothing can answer it in a headless run.

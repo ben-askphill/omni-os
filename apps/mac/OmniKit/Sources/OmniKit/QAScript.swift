@@ -76,7 +76,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"drag": "<thread title>", "over": "<folder>"}`, `{"file": "<thread title>", "into": "<folder>"}`,
 /// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"handOff": "<device id>"}`,
 /// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"selectLines": {"file": "<path>", "from": 1, "to": 3}}`,
-/// `{"addContext": "note"}`, `{"openContext": 0}`, `{"quit": true}`.
+/// `{"addContext": "note"}`, `{"selectTerminal": true}`, `{"addTerminal": "note"}`, `{"openContext": 0}`, `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -132,6 +132,10 @@ public enum QAStep: Hashable, Sendable {
   case selectLines(file: String, from: Int, to: Int)
   /// Writes this note in the line selection's dock and presses Add to Message.
   case addContext(String)
+  /// In the Terminal tab, selects everything the terminal shows.
+  case selectTerminal
+  /// Writes this note in the terminal selection's dock and presses Add to Message.
+  case addTerminal(String)
   /// Clicks the reply box's context chip at this index, which opens or closes its inspector.
   case openContext(Int)
   case quit
@@ -221,7 +225,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "selectLines", "addContext", "openContext", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "openContext", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -349,6 +353,12 @@ public struct QAScript: Hashable, Sendable {
     case "addContext":
       guard let note = value as? String else { throw QAScriptError("addContext takes the note, which may be empty") }
       return .addContext(note)
+    case "selectTerminal":
+      guard value as? Bool == true else { throw QAScriptError("selectTerminal takes true") }
+      return .selectTerminal
+    case "addTerminal":
+      guard let note = value as? String else { throw QAScriptError("addTerminal takes the note, which may be empty") }
+      return .addTerminal(note)
     case "openContext":
       guard let i = value as? Int, i >= 0 else { throw QAScriptError("openContext takes the chip's index, from 0") }
       return .openContext(i)

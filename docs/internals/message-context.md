@@ -1,6 +1,6 @@
 # Message context
 
-A message can carry typed records next to Ben's text: lines picked in the Changes panel now (`diff_selection`), terminal output, screenshot annotations, picked page elements and thread references later. The user-facing account is in [Threads](../user/threads.md#point-the-agent-at-lines-of-a-diff).
+A message can carry typed records next to Ben's text: lines picked in the Changes panel (`diff_selection`), terminal output (`terminal_excerpt`), screenshot annotations, picked page elements and thread references later. The user-facing account is in [Threads](../user/threads.md#point-the-agent-at-lines-of-a-diff).
 
 ## The record
 
@@ -27,3 +27,14 @@ One file per layer and one registry line per layer. Nothing in the core changes.
 - The web and Mac files give an icon and a detail view. The chip, the inspector, the fallback and the draft store are shared.
 - `SERVER_KINDS` and `CONTEXT_VIEWS` are typed over `CONTEXT_KINDS`, so a kind added to the shared table without them fails typecheck. The Mac has no such check: add records of the new kind to `packages/test-fixtures/message-context.json`, which the TypeScript and Swift tests both read.
 - The producer (an "Add to message" in the panel that makes the record) calls `addDraftContext` on the web and `ThreadStore.draftContext.add` on the Mac.
+
+## Terminal excerpts
+
+`terminal_excerpt` is the second kind: output selected in a thread's Terminal tab (`TerminalView.tsx` and `TerminalSelection.tsx` on the web, `TerminalTab.swift` and `TerminalSelection.swift` on the Mac). Body: `{ thread, pid, cwd, captured_at, lines, text }`.
+
+- **A snapshot.** `text` is the selection as it was when Ben added it. It is never read from the shell again, so scrollback, a restart or an exit change nothing. `pid` tells a restarted shell from the one he selected in; `cwd` is where the shell started, since a `cd` is not known.
+- **Never executable.** The clients make the text with `selectExcerpt` (Swift: `TerminalExcerptContext.select`): escape sequences are dropped whole, other control characters are dropped, line endings become `\n`. `parse` then refuses any control character, line or paragraph separator or bidirectional override, so a record that skipped the clients is refused at the route. The projector writes `<omni-context` and `</omni-context` as `&lt;...`, in the text and in `cwd`, so output can't end the block early or open a second one.
+- **Bounded, not cut.** 200 lines and 8,000 characters. A selection over either is refused with the limit named, since a cut excerpt would not be the output he meant. The message's own 32,000-character JSON limit still applies.
+- **Where it is added.** The shell runs on Ben's Mac whichever harness the agent is, so the projector says so and offers no file to open. Remote harnesses get the same text.
+- **Selection.** Mouse selection is xterm's (web) and SwiftTerm's (Mac) own, and the panel only reads it, so copy and paste are untouched. xterm has no touch selection, so on the phone `useTapToPick` selects lines on tap.
+

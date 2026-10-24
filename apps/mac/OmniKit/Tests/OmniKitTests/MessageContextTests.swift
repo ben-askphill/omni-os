@@ -9,7 +9,7 @@ private let repoRoot = URL(filePath: #filePath)
   .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 
 /// The kinds these tests read with: every kind OmniKit has. The app's list is in apps/mac/Omni/ContextViews.swift.
-private let kinds: [any MessageContextKind.Type] = [DiffSelectionContext.self]
+private let kinds: [any MessageContextKind.Type] = [DiffSelectionContext.self, TerminalExcerptContext.self]
 
 private func corpus() throws -> JSONValue {
   try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: repoRoot.appending(path: "packages/test-fixtures/message-context.json")))
@@ -142,7 +142,7 @@ private func parsed(_ json: String) throws -> DiffSelectionContext.Body {
     let prefix = "context[0].body: "
     var checked = 0
     for c in try cases("parse") {
-      guard case .array(let raw)? = c["raw"], let record = raw.first, case .object = record else { continue }
+      guard case .array(let raw)? = c["raw"], let record = raw.first, case .object = record, record["kind"]?.stringValue == "diff_selection" else { continue }
       let name = c["name"]?.stringValue ?? "?"
       let got = DiffSelectionContext.check(record["body"] ?? .null, v: int(record["v"]) ?? 0)
       if case .array(let want)? = c["expect"]?["records"], let first = want.first {
@@ -156,6 +156,65 @@ private func parsed(_ json: String) throws -> DiffSelectionContext.Body {
       }
     }
     #expect(checked >= 8)
+  }
+
+  /// The same, for a terminal_excerpt: its body's errors, and what it makes of a record that parses.
+  @Test func checksTerminalBodiesAsTheServerDoes() throws {
+    let prefix = "context[0].body: "
+    var checked = 0
+    for c in try cases("parse") {
+      guard case .array(let raw)? = c["raw"], let record = raw.first, case .object = record, record["kind"]?.stringValue == "terminal_excerpt" else { continue }
+      let name = c["name"]?.stringValue ?? "?"
+      let got = TerminalExcerptContext.check(record["body"] ?? .null, v: int(record["v"]) ?? 0)
+      if case .array(let want)? = c["expect"]?["records"], let first = want.first {
+        let body = try got.get()
+        #expect(try JSONValue(encoding: body) == first["body"], "\(name)")
+        #expect(TerminalExcerptContext.label(body) == first["label"]?.stringValue, "\(name)")
+        checked += 1
+      } else if let error = c["expect"]?["error"]?.stringValue, error.hasPrefix(prefix) {
+        #expect(got.failureMessage == String(error.dropFirst(prefix.count)), "\(name)")
+        checked += 1
+      }
+    }
+    #expect(checked >= 10)
+  }
+
+  /// What the terminal's selection becomes: each case is also run through the TypeScript, so the two cannot drift.
+  @Test func selectsEveryCorpusExcerpt() throws {
+    let excerpts = try cases("excerpts")
+    #expect(excerpts.count >= 15)
+    for c in excerpts {
+      let name = c["name"]?.stringValue ?? "?"
+      let s = try #require(c["source"])
+      let stamp = try #require(s["at"]?.stringValue)
+      let at = try #require(OmniJSON.parseDate(stamp))
+      let source = TerminalExcerptContext.Source(thread: try #require(s["thread"]?.stringValue), pid: int(s["pid"]), cwd: try #require(s["cwd"]?.stringValue), at: at)
+      let got = TerminalExcerptContext.select(c["raw"]?.stringValue, from: source)
+      let expect = try #require(c["expect"])
+      switch got {
+      case .failure(let e):
+        #expect(expect["error"]?.stringValue == e.message, "\(name)")
+      case .success(let body):
+        #expect(try JSONValue(encoding: body) == expect["body"], "\(name)")
+        #expect(TerminalExcerptContext.label(body) == expect["label"]?.stringValue, "\(name)")
+        #expect(TerminalExcerptContext.parse(try JSONValue(encoding: body), v: 1) == body, "\(name) parses again")
+      }
+      if let raw = c["raw"]?.stringValue {
+        let once = TerminalExcerptContext.plainText(raw)
+        #expect(TerminalExcerptContext.plainText(once) == once, "\(name) is unchanged by a second pass")
+      }
+    }
+  }
+
+  @Test func makesATerminalRecordAndDescribesIt() throws {
+    let source = TerminalExcerptContext.Source(thread: "t1", pid: 7, cwd: "/Users/ben/code/shop", at: Date(timeIntervalSince1970: 1_792_834_215.25))
+    let body = try TerminalExcerptContext.select("$ ls\nsrc", from: source).get()
+    #expect(body.capturedAt == "2026-10-24T09:30:15.250Z")
+    let r = MessageContext.make(TerminalExcerptContext.self, body: body, note: " why? ", id: "id-1")
+    #expect((r.id, r.kind, r.v, r.label, r.note) == ("id-1", "terminal_excerpt", 1, "Terminal, 2 lines: $ ls", "why?"))
+    #expect(TerminalExcerptContext.parse(r.body, v: 1) == body)
+    #expect(TerminalExcerptContext.countLine(1) == "1 line selected")
+    #expect(TerminalExcerptContext.countLine(3) == "3 lines selected")
   }
 
   @Test func clampsToTheHunkFromIsIn() throws {

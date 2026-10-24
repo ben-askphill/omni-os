@@ -97,6 +97,14 @@ import OmniKit
     }
   }
 
+  @Test func readsTheTerminalSelectionSteps() throws {
+    let script = try QAScript(json: Data(#"[{"selectTerminal": true}, {"addTerminal": "why does this fail?"}, {"addTerminal": ""}]"#.utf8))
+    #expect(script.steps == [.selectTerminal, .addTerminal("why does this fail?"), .addTerminal("")])
+    for bad in [#"[{"selectTerminal": false}]"#, #"[{"selectTerminal": "all"}]"#, #"[{"addTerminal": true}]"#, #"[{"addTerminal": 1}]"#] {
+      #expect(throws: QAScriptError.self, "\(bad)") { try QAScript(json: Data(bad.utf8)) }
+    }
+  }
+
   @Test func sumsUpFrames() {
     let stats = QAFrameStats(gaps: [16, 17, 16, 50, 16, 34])
     #expect(stats.frames == 6)
