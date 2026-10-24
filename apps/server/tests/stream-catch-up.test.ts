@@ -181,11 +181,11 @@ describe('oversized rows', () => {
     const f = await s.until((x) => x.data?.id === live);
     await s.close();
     const replayed = s.frames.find((x) => x.data?.id === huge)!;
-    for (const row of [replayed.data, f.data]) {
-      expect(Buffer.byteLength(JSON.stringify(row))).toBeLessThanOrEqual(B.rowBytes);
-      expect(row.clipped.bytes).toBeGreaterThan(B.rowBytes);
-    }
-    expect(JSON.parse(replayed.data.payload)).toMatchObject({ tool_use_id: 'c', truncated: true });
+    for (const row of [replayed.data, f.data]) expect(Buffer.byteLength(JSON.stringify(row))).toBeLessThanOrEqual(B.rowBytes);
+    // A text row is clipped; a tool_result is made compact instead (#225).
+    expect(f.data.clipped.bytes).toBeGreaterThan(B.rowBytes);
+    expect(replayed.data.clipped).toBeUndefined();
+    expect(JSON.parse(replayed.data.payload)).toMatchObject({ tool_use_id: 'c', truncated: true, output: { chars: 2_000_000 } });
   });
 });
 
@@ -294,5 +294,25 @@ describe('live output during the catch-up', () => {
     }
     expect(streams.some(({ s }) => s.frames.find(isSync)!.data.catch_up === 'snapshot')).toBe(true);
     expect(streams.some(({ s }) => s.frames.find(isSync)!.data.catch_up === 'replay')).toBe(true);
+  });
+});
+
+describe('command noise', () => {
+  it('reaches the stream as compact tool results, replayed or live', async () => {
+    thread('noise');
+    const first = r.db.events.add('noise', 'user', { text: 'run it', source: 'ben' }).id;
+    const replayed = r.db.events.add('noise', 'tool_result', { tool_use_id: 'a', text: 'a'.repeat(20_000), is_error: false, truncated: false }).id;
+    const s = open('noise', String(first));
+    await s.until(isSync);
+    const live = addEvent('noise', 'tool_result', { tool_use_id: 'b', text: `Exit code 1\n${'b'.repeat(20_000)}`, is_error: true, truncated: false }).id;
+    await s.until((f) => f.data?.id === live);
+    await s.close();
+    for (const [id, chars] of [[replayed, 20_000], [live, 20_012]] as const) {
+      const row = s.frames.find((f) => f.data?.id === id)!.data;
+      expect(row.clipped).toBeUndefined();
+      expect(Buffer.byteLength(JSON.stringify(row))).toBeLessThan(3_000);
+      expect(JSON.parse(row.payload).output.chars).toBe(chars);
+    }
+    expect(JSON.parse(s.frames.find((f) => f.data?.id === live)!.data.payload).output.exit_code).toBe(1);
   });
 });

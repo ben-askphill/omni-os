@@ -15,6 +15,7 @@ import {
   type HistoryRow,
   type Span,
 } from '@omni/shared/history.ts';
+import { TOOL_OUTPUT } from '@omni/shared/tool-output.ts';
 import { LONG_THREAD, longThread } from '@omni/test-fixtures/long-thread.ts';
 import { startRunner } from './runner-boot.ts';
 
@@ -82,7 +83,7 @@ const partial = (rows: readonly Row[]) => !rows.slice(0, -1).some((e) => e.kind 
 const measured: Record<string, unknown> = {};
 
 describe('thread history on a long thread', () => {
-  it('opens on the newest page within budget, with the session and the 4 MB result clipped', T, async () => {
+  it('opens on the newest page within budget, with the session and the 4 MB result compact', T, async () => {
     const full = await get<{ events: Row[]; history?: unknown }>(`/threads/${ID}`);
     expect(full.events.length).toBe(all.length);
     expect(full.history).toBeUndefined();
@@ -98,8 +99,12 @@ describe('thread history on a long thread', () => {
     expect(anchors.map((e) => e.id)).toContain(all.findLast((e) => e.kind === 'init' && e.id < d.history.from)!.id);
 
     const huge = rows.find((e) => e.kind === 'tool_result' && payload(e).tool_use_id === LONG_THREAD.hugeResultCall)!;
-    expect(huge.clipped!.bytes).toBeGreaterThanOrEqual(4_000_000);
+    // A tool_result is made compact, not clipped (#225): its preview and its size.
+    expect(huge.clipped).toBeUndefined();
     expect(payload(huge)).toMatchObject({ tool_use_id: LONG_THREAD.hugeResultCall, is_error: false, truncated: true });
+    expect(payload(huge).output.chars).toBeGreaterThanOrEqual(4_000_000);
+    expect(payload(huge).text.length).toBeLessThanOrEqual(TOOL_OUTPUT.preview);
+    expect(Buffer.byteLength(JSON.stringify(huge))).toBeLessThan(8 * 1024);
     const whole = await get<Row>(`/threads/${ID}/events/${huge.id}`);
     expect(whole).toEqual(byId.get(huge.id));
     expect(whole.payload.length).toBeGreaterThan(4_000_000);
@@ -137,8 +142,8 @@ describe('thread history on a long thread', () => {
     const unknown = h.rows.filter((e) => e.kind === LONG_THREAD.unknownKind);
     expect(unknown.length).toBe(all.filter((e) => e.kind === LONG_THREAD.unknownKind).length);
     expect(unknown.every((e) => !e.clipped && e.payload === byId.get(e.id)!.payload)).toBe(true);
-    // The pasted log and the big Write are clipped like the big result.
-    expect(h.rows.filter((e) => e.clipped).length).toBe(3);
+    // The pasted log and the big Write are clipped. The big result is compact (#225) and so never clipped.
+    expect(h.rows.filter((e) => e.clipped).length).toBe(2);
     measured.pages = { count: pages, partial: partials, maxRows, maxBytes };
   });
 

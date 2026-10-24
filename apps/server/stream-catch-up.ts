@@ -5,6 +5,7 @@ import type { HistoryHead } from '@omni/shared/history.ts';
 import { lastContext } from './context.ts';
 import { events } from './db.ts';
 import { BUDGET, clip, headPage, readAfter, type PageRow } from './history.ts';
+import { compactRow } from './tool-output.ts';
 
 export type CatchUp = { mode: 'replay'; rows: PageRow[] } | { mode: 'snapshot'; events: PageRow[]; history: HistoryHead };
 
@@ -68,9 +69,9 @@ export function openingMessages(threadId: string, after: number | null, detailOf
   return out;
 }
 
-/** A message from the bus as the stream sends it: a row clipped like a page's, null for one already sent. */
+/** A message from the bus as the stream sends it: a row clipped like a page's (a tool_result compact, #225), null for one already sent. */
 export function liveMessage(e: unknown, sent: ReadonlySet<number>): SSEMessage | null {
   if (!isRow(e)) return message(e);
   if (sent.has(e.id)) return null;
-  return message(clip(e, BUDGET.rowBytes));
+  return message(clip(compactRow(e), BUDGET.rowBytes));
 }

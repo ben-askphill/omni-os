@@ -16,16 +16,16 @@
     "bytes": 8517329
   },
   "head": {
-    "rows": 222,
-    "bytes": 186624,
+    "rows": 262,
+    "bytes": 158053,
     "anchors": 1,
     "anchorBytes": 173,
-    "resultsBelow": 75
+    "resultsBelow": 74
   },
   "pages": {
     "count": 13,
-    "partial": 0,
-    "maxRows": 276,
-    "maxBytes": 221738
+    "partial": 1,
+    "maxRows": 299,
+    "maxBytes": 178266
   }
 }

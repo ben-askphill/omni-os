@@ -1,6 +1,7 @@
 // Bounded thread history (#223): the newest page a thread opens with, and older pages on demand.
 // Rows are read with bounded keyset queries (db/repos/history.ts), cut with the shared `cut` and `spanOf`, clipped
-// when one is too big, and joined by the anchors the clients' folds need from outside the page.
+// when one is too big (a tool_result is made compact first, #225), and joined by the anchors the clients' folds need
+// from outside the page.
 // Why the budgets, anchors and clip tiers are what they are: docs/internals/thread-history.md.
 import {
   HISTORY_BUDGET,
@@ -15,6 +16,7 @@ import {
 } from '@omni/shared/history.ts';
 import type { EventRow } from './db/repos/events.ts';
 import { history as repo, type Bounds, type Probe } from './db/repos/history.ts';
+import { compactRow, compactStored } from './tool-output.ts';
 
 /** A row as a page carries it. */
 export type PageRow = EventRow & { clipped?: Clipped };
@@ -188,7 +190,7 @@ function take(threadId: string, dir: 'newest' | 'oldest', b: Bounds, budget: His
     if (p.payload === null) return null;
     let row = carried.get(p.id);
     if (!row) {
-      row = clip({ id: p.id, thread_id: p.thread_id, kind: p.kind, payload: p.payload, created_at: p.created_at }, budget.rowBytes, p.bytes);
+      row = clip(compactRow({ id: p.id, thread_id: p.thread_id, kind: p.kind, payload: p.payload, created_at: p.created_at }), budget.rowBytes, p.bytes);
       carried.set(p.id, row);
     }
     return row;
@@ -203,7 +205,8 @@ function take(threadId: string, dir: 'newest' | 'oldest', b: Bounds, budget: His
     const row = carry(p);
     if (row) return row;
     const { id, thread_id, kind, created_at, bytes } = p;
-    return clip({ id, thread_id, kind, payload: repo.payload(id), created_at }, budget.rowBytes, bytes);
+    // A tool_result is cut by SQLite to its preview; any other row is read whole, then clipped.
+    return (kind === 'tool_result' && compactStored(id)) || clip({ id, thread_id, kind, payload: repo.payload(id), created_at }, budget.rowBytes, bytes);
   });
   if (dir === 'newest') rows.reverse();
   return { rows, span: spanOf(kept, next, dir, b.after, b.before) };

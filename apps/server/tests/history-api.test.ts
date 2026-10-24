@@ -41,9 +41,11 @@ describe('GET /api/threads/:id', () => {
     const { body } = await call('/threads/a?history=recent');
     expect(body.history).toEqual({ from: 0, to: null, results_below: 0 });
     expect(body.events.map((e: any) => e.id)).toEqual([first, first + 1, use, big, big + 1, end]);
-    const clipped = body.events.find((e: any) => e.id === big);
-    expect(clipped.clipped.bytes).toBeGreaterThan(100_000);
-    expect(JSON.parse(clipped.payload)).toMatchObject({ tool_use_id: 'c1', truncated: true });
+    // A tool_result travels compact (#225), not clipped: its preview and its size.
+    const compact = body.events.find((e: any) => e.id === big);
+    expect(compact.clipped).toBeUndefined();
+    expect(JSON.parse(compact.payload)).toMatchObject({ tool_use_id: 'c1', truncated: true, output: { chars: 100_000, lines: 1 } });
+    expect(JSON.parse(compact.payload).text).toHaveLength(1024);
     expect(body.thread.id).toBe('a');
   });
 
