@@ -417,6 +417,9 @@ export type AuthState = {
 /** POST /api/auth/google/finish, once Google has answered. */
 export type SignInFinished = { ok: true; user: SignedInUser; device: SignInDevice; claimed: boolean };
 
+/** GET /api/auth/devices: a browser or Mac signed in with Google that can still get in. `current`: the one asking. */
+export type SignedInDevice = { id: string; name: string; kind: SignInDevice['kind']; email: string; createdAt: string; lastSeenAt: string; expiresAt: string; current: boolean };
+
 const FINISH_TRIES = 10;
 const FINISH_GAP_MS = 1000;
 const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
@@ -442,6 +445,9 @@ export async function finishGoogleSignIn(attempt: string, pause: (ms: number) =>
 
 /** Ends this browser's session. The page reloads after, which lands on the pairing screen. */
 export const signOut = () => api.post<{ ok: true }>('/auth/signout');
+
+/** Signs a device out for good. `current`: it was this browser, which no longer gets in. */
+export const revokeDevice = (id: string) => api.del<{ ok: true; current: boolean }>(`/auth/devices/${encodeURIComponent(id)}`);
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   // FormData carries its own multipart content type, so never set one for it.

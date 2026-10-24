@@ -241,11 +241,21 @@ final class QARunner {
           try? await Task.sleep(for: .milliseconds(500))
         case .account(let action):
           let account = model.account
+          func device(_ name: String) throws(QAScriptError) -> SignedInDevice {
+            guard let d = account.devices?.first(where: { $0.name == name }) else { throw QAScriptError("no device named \(name)") }
+            return d
+          }
           switch action {
           case .signIn: await account.signIn(open: GoogleSignInSheet.open)
           case .signOut: await account.signOut()
+          case .confirm(let name, let shot):
+            try await confirmRevoke(try device(name), shot: shot)
+            result.files = [shot + ".png"]
+          case .revoke(let name):
+            await account.revoke(try device(name))
+            if let error = account.devicesError { throw QAScriptError("revoke \(name): \(error)") }
           }
-          if case .failed(let message) = account.state { throw QAScriptError("account \(action.rawValue): \(message)") }
+          if case .failed(let message) = account.state { throw QAScriptError("account \(action.description): \(message)") }
           try? await Task.sleep(for: .milliseconds(400))
         case .quit:
           finish(result, started)
@@ -416,6 +426,19 @@ final class QARunner {
     }
   }
 
+  /// Opens Sign out's confirmation on the device's row in Settings, shoots the Settings window with it, closes it.
+  private func confirmRevoke(_ device: SignedInDevice, shot: String) async throws(QAScriptError) {
+    guard let settings = Self.windows.first(where: Self.isSettings), let confirm = QAAccountProbe.confirm else {
+      throw QAScriptError("Settings > Account > Devices is not on screen")
+    }
+    confirm(device)
+    defer { confirm(nil) }
+    try? await Task.sleep(for: .milliseconds(900))
+    let dialog = NSApp.windows.filter { $0.isVisible && ($0.sheetParent === settings || $0.parent === settings) }
+    guard !dialog.isEmpty else { throw QAScriptError("no confirmation opened for \(device.name)") }
+    try shoot(settings, to: shot, over: dialog)
+  }
+
   /// The main window with what is over it (sheets, menus).
   private func screen(_ name: String) async throws(QAScriptError) {
     guard let window = Self.windows.first(where: Self.isMain) else { throw QAScriptError("no main window") }
@@ -425,7 +448,8 @@ final class QARunner {
 
   /// The main window drawn as `snapshot` draws it, with the app's windows over it (a sheet, an open menu) drawn
   /// in place on top. No screen capture, so it works with the screen locked and with no permission.
-  private func shoot(_ window: NSWindow, to name: String) throws(QAScriptError) {
+  /// - Parameter over: the windows to draw over it; every window in its frame by default.
+  private func shoot(_ window: NSWindow, to name: String, over only: [NSWindow]? = nil) throws(QAScriptError) {
     guard let base = Self.render(window), let space = CGColorSpace(name: CGColorSpace.sRGB),
       let context = CGContext(
         data: nil, width: base.width, height: base.height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
@@ -433,7 +457,7 @@ final class QARunner {
     else { throw QAScriptError("can't render \(name).png") }
     let scale = CGFloat(base.width) / max(window.frame.width, 1)
     context.draw(base, in: CGRect(x: 0, y: 0, width: base.width, height: base.height))
-    let over = NSApp.windows
+    let over = (only ?? NSApp.windows)
       .filter { $0 !== window && $0.isVisible && $0.frame.intersects(window.frame) }
       .sorted { ($0.level.rawValue, $0.orderedIndex * -1) < ($1.level.rawValue, $1.orderedIndex * -1) }
     for w in over {
@@ -486,7 +510,7 @@ final class QARunner {
     case .handOff(let device): "handOff \(device)"
     case .palette(let query): "palette \(query ?? "close")"
     case .quickPrompt(let action): "quickPrompt \(action)"
-    case .account(let action): "account \(action.rawValue)"
+    case .account(let action): "account \(action.description)"
     case .quit: "quit"
     }
   }

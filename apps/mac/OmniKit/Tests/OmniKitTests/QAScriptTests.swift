@@ -101,6 +101,9 @@ import OmniKit
     let script = try QAScript(json: Data(#"[{"settings": "account"}, {"account": "signIn"}, {"account": "signOut"}]"#.utf8))
     #expect(script.steps == [.settings(.account), .account(.signIn), .account(.signOut)])
     #expect(throws: QAScriptError.self) { try QAScript(json: Data(#"[{"account": "google"}]"#.utf8)) }
+    let devices = try QAScript(json: Data(#"[{"account": {"confirm": "Ada's iMac", "shot": "confirm"}}, {"account": {"revoke": "Ada's iMac"}}]"#.utf8))
+    #expect(devices.steps == [.account(.confirm(device: "Ada's iMac", shot: "confirm")), .account(.revoke(device: "Ada's iMac"))])
+    #expect(throws: QAScriptError.self) { try QAScript(json: Data(#"[{"account": {"confirm": "Ada's iMac", "shot": "../x"}}]"#.utf8)) }
   }
 
   @Test func takesTheStepsUnderAKeyToo() throws {

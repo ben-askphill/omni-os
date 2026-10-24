@@ -64,9 +64,23 @@ public enum QAServerAction: String, Hashable, Sendable {
   case start, stop, check
 }
 
-/// What the Sign in with Google and Sign out buttons do. Sign-in needs `-OmniQASignInHint <email>` (`QASignIn`).
-public enum QAAccountAction: String, Hashable, Sendable {
+/// What Settings > Account's buttons do. Sign-in needs `-OmniQASignInHint <email>` (`QASignIn`). A device is named as
+/// its Devices row shows it.
+public enum QAAccountAction: Hashable, Sendable {
   case signIn, signOut
+  /// Opens the device's Sign out confirmation, writes Settings with it open to `<shot>.png`, and closes it.
+  case confirm(device: String, shot: String)
+  /// Signs the device out, as the confirmation's Sign out does.
+  case revoke(device: String)
+
+  public var description: String {
+    switch self {
+    case .signIn: "signIn"
+    case .signOut: "signOut"
+    case .confirm(let device, let shot): "confirm \(device) to \(shot)"
+    case .revoke(let device): "revoke \(device)"
+    }
+  }
 }
 
 /// One step of a Debug QA run, from the JSON the app gets with `-OmniQAScript`:
@@ -80,7 +94,8 @@ public enum QAAccountAction: String, Hashable, Sendable {
 /// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
 /// `{"drag": "<thread title>", "over": "<folder>"}`, `{"file": "<thread title>", "into": "<folder>"}`,
 /// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"handOff": "<device id>"}`,
-/// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"account": "signIn"}` (or `signOut`), `{"quit": true}`.
+/// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"account": "signIn"}` (or `signOut`,
+/// `{"confirm": "<device>", "shot": "<name>"}`, `{"revoke": "<device>"}`), `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -289,10 +304,13 @@ public struct QAScript: Hashable, Sendable {
       guard let text = value as? String else { throw QAScriptError("editPending takes the text to put in the edit") }
       return .editPending(text)
     case "account":
-      guard let name = value as? String, let action = QAAccountAction(rawValue: name) else {
-        throw QAScriptError("account takes signIn or signOut")
+      if value as? String == "signIn" { return .account(.signIn) }
+      if value as? String == "signOut" { return .account(.signOut) }
+      if let d = value as? [String: Any], let device = d["confirm"] as? String, let shot = d["shot"] as? String, validName(shot) {
+        return .account(.confirm(device: device, shot: shot))
       }
-      return .account(action)
+      if let d = value as? [String: Any], let device = d["revoke"] as? String { return .account(.revoke(device: device)) }
+      throw QAScriptError(#"account takes signIn, signOut, {"confirm": device, "shot": name} or {"revoke": device}"#)
     case "quickPrompt":
       if let text = value as? String { return .quickPrompt(.open(text)) }
       if let on = value as? Bool, !on { return .quickPrompt(.close) }

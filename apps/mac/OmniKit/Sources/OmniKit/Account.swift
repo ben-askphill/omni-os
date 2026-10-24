@@ -76,6 +76,11 @@ public final class AccountModel {
   public private(set) var google: GoogleSignIn?
   /// What the server calls this Mac's device.
   public let deviceName: String
+  /// Every device signed in with Google, most recently seen first, this Mac's own marked `current`. nil until loaded,
+  /// and while the install has no Google sign-in.
+  public private(set) var devices: [SignedInDevice]?
+  /// Why the list could not load, or a device could not be signed out. Cleared by the next load that works.
+  public private(set) var devicesError: String?
 
   @ObservationIgnored private let sessions: any SessionStore
   @ObservationIgnored private let retryDelay: Duration
@@ -104,35 +109,68 @@ public final class AccountModel {
     generation += 1
     state = .signedOut
     google = nil
+    devices = nil
+    devicesError = nil
   }
 
-  /// Asks the server who this Mac is, with the stored session (which slides it). A session the server no longer
-  /// takes is dropped. An unreachable server leaves everything as it was.
+  /// Asks the server who this Mac is, with the stored session (which slides it), then for the devices while Google is
+  /// set up. A session the server no longer takes is dropped. An unreachable server leaves the account and the list as
+  /// they were, with the reason under the list.
   public func refresh() async {
     guard let api else { return }
     let asked = generation
     do throws(OmniAPIError) {
-      if let session = sessions.load(key) {
+      var session = sessions.load(key)
+      var auth: AuthState?
+      if let stored = session {
         do throws(OmniAPIError) {
-          let auth = try await api.authState(session: session)
-          guard asked == generation else { return }
-          google = auth.google
-          if auth.via == .session, let user = auth.user, let device = auth.device {
-            state = .signedIn(user, device)
-            return
-          }
-        } catch .http(status: 401, _) {
-          guard asked == generation else { return }
+          let answer = try await api.authState(session: stored)
+          if answer.via == .session, answer.user != nil, answer.device != nil { auth = answer }
+        } catch .http(status: 401, _) {}
+        guard asked == generation else { return }
+        if auth == nil {
+          sessions.clear(key)
+          session = nil
         }
-        sessions.clear(key)
       }
-      let auth = try await api.authState()
+      let answer: AuthState
+      if let auth { answer = auth } else { answer = try await api.authState() }
       guard asked == generation else { return }
-      google = auth.google
-      if case .signedIn = state { state = .signedOut }
+      google = answer.google
+      if let user = answer.user, let device = answer.device, answer.via == .session {
+        state = .signedIn(user, device)
+      } else if case .signedIn = state {
+        state = .signedOut
+      }
+      guard answer.google.loopback || answer.google.broker else {
+        devices = nil
+        return
+      }
+      let list = try await api.signedInDevices(session: session)
+      guard asked == generation else { return }
+      devices = list
+      devicesError = nil
     } catch {
-      return
+      guard asked == generation, google != nil else { return }
+      devicesError = error.message
     }
+  }
+
+  /// Signs a device out of Omni, as its row's Sign out does. This Mac's own row signs it out here too.
+  public func revoke(_ device: SignedInDevice) async {
+    guard let api else { return }
+    let asked = generation
+    do throws(OmniAPIError) {
+      let current = try await api.revokeDevice(id: device.id, session: sessions.load(key))
+      guard asked == generation else { return }
+      if current || device.current { forgetSession(.signedOut) }
+    } catch .http(status: 404, _) {
+      guard asked == generation else { return }
+    } catch {
+      guard asked == generation else { return }
+      return devicesError = error.message
+    }
+    await refresh()
   }
 
   /// Starts a sign-in, has `open` show Google's page and hand back the `omni://signin?attempt=` URL it ends on,
@@ -177,10 +215,7 @@ public final class AccountModel {
   /// Revokes this Mac's session on the server and forgets it. Forgotten here even when the server can't be told.
   public func signOut() async {
     guard let api else { return }
-    guard let session = sessions.load(key) else {
-      generation += 1
-      return state = .signedOut
-    }
+    guard let session = sessions.load(key) else { return forgetSession(.signedOut) }
     let asked = generation
     var unheard: String?
     do throws(OmniAPIError) {
@@ -190,9 +225,15 @@ public final class AccountModel {
       unheard = error.message
     }
     guard asked == generation else { return }
+    forgetSession(unheard.map { .failed("Signed out on this Mac. The server did not hear it: \($0)") } ?? .signedOut)
+    await refresh()
+  }
+
+  /// Drops this Mac's session and drops the answers to asks made with it.
+  private func forgetSession(_ then: State) {
     sessions.clear(key)
     generation += 1
-    state = unheard.map { .failed("Signed out on this Mac. The server did not hear it: \($0)") } ?? .signedOut
+    state = then
   }
 
   /// The attempt in `omni://signin?attempt=<id>`, where the server sends the sign-in sheet at the end.

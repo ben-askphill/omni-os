@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { ApiError, finishGoogleSignIn, type AuthState, type SignInAvailability, type SignInFinished } from '../src/api.ts';
-import { accountView, onboardingSteps, pairingVariant, signInStep, takeHashParam } from '../src/sign-in.ts';
+import { ApiError, finishGoogleSignIn, revokeDevice, type AuthState, type SignInAvailability, type SignInFinished, type SignedInDevice } from '../src/api.ts';
+import { accountView, deviceRows, onboardingSteps, pairingVariant, signInStep, takeHashParam } from '../src/sign-in.ts';
 
 // What the Web UI shows about Sign in with Google (apps/web/src/sign-in.ts), against the same recorded server answers
 // the Mac app's Swift tests decode (apps/server/tests/mac-fixtures.test.ts records them).
@@ -122,12 +122,13 @@ describe('Settings > Account', () => {
       canSignIn: false,
       note: null,
       allowed: 'Who may sign in: ada@example.com.',
+      listDevices: true,
     });
   });
 
   it('offers a paired browser Google, and says nobody owns the install yet', () => {
     const view = accountView(viaToken(), availability());
-    expect(view).toMatchObject({ identity: { kind: 'token' }, canSignIn: true, note: null });
+    expect(view).toMatchObject({ identity: { kind: 'token' }, canSignIn: true, note: null, listDevices: true });
     expect(view.allowed).toMatch(/^Nobody has signed in yet/);
   });
 
@@ -144,9 +145,47 @@ describe('Settings > Account', () => {
   it('says nothing about Google when this install has not set it up', () => {
     const token = viaToken();
     token.google = { loopback: false, broker: false, allowedEmails: [], allowedHd: null };
-    expect(accountView(token, notSetUp)).toEqual({ identity: { kind: 'token' }, canSignIn: false, note: null, allowed: null });
+    expect(accountView(token, notSetUp)).toEqual({ identity: { kind: 'token' }, canSignIn: false, note: null, allowed: null, listDevices: false });
     const session = viaSession();
     session.google = { loopback: false, broker: false, allowedEmails: ['ada@example.com'], allowedHd: null };
-    expect(accountView(session, notSetUp)).toMatchObject({ identity: { kind: 'session' }, canSignIn: false, allowed: null });
+    expect(accountView(session, notSetUp)).toMatchObject({ identity: { kind: 'session' }, canSignIn: false, allowed: null, listDevices: false });
+  });
+});
+
+describe('Settings > Devices', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const listed = () => fixture<SignedInDevice[]>('devices-signed-in.json');
+  const at = (iso: string, plusMs: number) => Date.parse(iso) + plusMs;
+
+  it('makes a row per device in the server\'s order, marking this one instead of giving a time', () => {
+    const [imac, macbook] = listed();
+    expect(deviceRows(listed(), at(macbook.lastSeenAt, 3 * 60_000))).toEqual([
+      { id: imac.id, name: "Ada's iMac", icon: 'monitor', detail: 'ada@example.com · last seen 3m ago', current: false },
+      { id: macbook.id, name: "Ada's MacBook Pro", icon: 'monitor', detail: 'ada@example.com · This device', current: true },
+    ]);
+  });
+
+  it('draws a browser with the browser glyph and says when it was last seen', () => {
+    const now = new Date(2026, 0, 5, 15, 0).getTime();
+    const browser: SignedInDevice = { ...listed()[0], kind: 'browser', name: 'Chrome on Mac', lastSeenAt: new Date(now - 2 * 3_600_000).toISOString() };
+    expect(deviceRows([browser], now)).toEqual([{ id: browser.id, name: 'Chrome on Mac', icon: 'browser', detail: 'ada@example.com · last seen 2h ago', current: false }]);
+    expect(deviceRows([{ ...browser, lastSeenAt: new Date(now - 10_000).toISOString() }], now)[0].detail).toBe('ada@example.com · last seen just now');
+  });
+
+  it('has no rows for no devices', () => {
+    expect(deviceRows([], Date.now())).toEqual([]);
+  });
+
+  it('signs a device out by its id, and says whether it was this browser', async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify(fixture('device-revoked.json')), { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    expect(await revokeDevice('a b')).toEqual({ ok: true, current: false });
+    expect(fetch).toHaveBeenCalledWith('/api/auth/devices/a%20b', expect.objectContaining({ method: 'DELETE' }));
+  });
+
+  it('shows the server\'s words when the device is already gone', async () => {
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ error: 'No such signed-in device.' }), { status: 404 }));
+    await expect(revokeDevice('x')).rejects.toMatchObject({ message: 'No such signed-in device.', status: 404 });
   });
 });
