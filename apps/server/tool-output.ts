@@ -1,7 +1,8 @@
 // Compact tool results (#225): a tool_result travels in history pages and on the stream as its first
 // TOOL_OUTPUT.preview characters and its size. The stored row keeps the whole text; GET .../events/:eventId/output
 // reads it back in chunks. Why: docs/internals/thread-history.md.
-import { TOOL_OUTPUT, exitCodeOf, type OutputChunk, type OutputMeta } from '@omni/shared/tool-output.ts';
+import { TOOL_OUTPUT, exitCodeOf, wholeResult, type OutputChunk, type OutputMeta } from '@omni/shared/tool-output.ts';
+import { events } from './db.ts';
 import type { EventRow } from './db/repos/events.ts';
 import { toolOutput, type StoredHead } from './db/repos/tool-output.ts';
 
@@ -15,9 +16,14 @@ function build(row: Pick<EventRow, 'id' | 'thread_id' | 'kind' | 'created_at'>, 
   return { id: row.id, thread_id: row.thread_id, kind: row.kind, payload, created_at: row.created_at };
 }
 
+/** A result a client reads as data (`wholeResult`): one indexed read of its call, made only for a result over the preview. */
+const readAsData = (threadId: string, toolUseId: unknown) =>
+  typeof toolUseId === 'string' && wholeResult(events.toolUse(threadId, toolUseId)?.name);
+
 /**
  * A tool_result whose text is longer than the preview, as the page and the stream carry it. Any other row, a short
- * result and one that is already compact come back unchanged. The same bytes as `compactStored` makes of the same row.
+ * result, one a client reads as data and one that is already compact come back unchanged. The same bytes as
+ * `compactStored` makes of the same row.
  */
 export function compactRow<R extends EventRow>(row: R): R {
   // The JSON of a text is never shorter than the text.
@@ -31,7 +37,7 @@ export function compactRow<R extends EventRow>(row: R): R {
   const { text, ...rest } = parsed ?? {};
   if (typeof text !== 'string') return row;
   const chars = points(text);
-  if (chars.length <= TOOL_OUTPUT.preview) return row;
+  if (chars.length <= TOOL_OUTPUT.preview || readAsData(row.thread_id, rest.tool_use_id)) return row;
   const lines = text.split('\n').length;
   return { ...row, ...build(row, rest, chars.slice(0, TOOL_OUTPUT.preview).join(''), chars.length, lines) };
 }
@@ -49,6 +55,7 @@ export function compactStored(id: number): EventRow | null {
   } catch {
     return null;
   }
+  if (readAsData(s.thread_id, (rest as { tool_use_id?: unknown }).tool_use_id)) return null;
   return build({ id: s.id, thread_id: s.thread_id, kind: 'tool_result', created_at: s.created_at }, rest, s.head, s.chars, s.breaks + 1);
 }
 

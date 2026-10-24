@@ -23,6 +23,12 @@ export const TOOL_OUTPUT = {
   clientTail: 64 * 1024,
 } as const;
 
+/**
+ * Tools whose result a client reads as data, not as text to show: the delegation cards parse it as JSON, and the
+ * published page takes its URL from it. Such a result always travels whole.
+ */
+export const wholeResult = (tool: string | undefined) => tool === 'Artifact' || tool === 'mcp__omni__delegate' || tool === 'mcp__omni__delegate_team';
+
 /** What a compact tool_result says about its stored output, in `payload.output`. */
 export interface OutputMeta {
   /** Code points of the stored text. */

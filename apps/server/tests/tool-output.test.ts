@@ -63,6 +63,26 @@ describe('compactRow', () => {
   });
 });
 
+describe('a result a client reads as data', () => {
+  it('always travels whole: a delegation\'s JSON, a published page\'s URL', async () => {
+    thread('data');
+    const big = JSON.stringify({ lead: { thread_id: 'x', title: 'y'.repeat(4000) }, members: [] });
+    for (const [name, id] of [['mcp__omni__delegate_team', 'd1'], ['Artifact', 'a1'], ['Bash', 'b1']] as const) {
+      r.db.events.add('data', 'tool_use', { id, name, input: {}, parent: null });
+      const row = r.db.events.add('data', 'tool_result', { tool_use_id: id, text: big, is_error: false, truncated: false });
+      expect(compactRow(row) === row, name).toBe(name !== 'Bash');
+      expect(payload(compactRow(row)).text.length === big.length, name).toBe(name !== 'Bash');
+    }
+    // Too big for a row too: the page cuts the Bash one by SQLite and leaves the delegation's to the blind clip.
+    const huge = JSON.stringify({ text: 'z'.repeat(60_000) });
+    r.db.events.add('data', 'tool_use', { id: 'd2', name: 'mcp__omni__delegate', input: {}, parent: null });
+    const stored = r.db.events.add('data', 'tool_result', { tool_use_id: 'd2', text: huge, is_error: false, truncated: false });
+    expect(compactStored(stored.id)).toBeNull();
+    const { events } = headPage('data');
+    expect(events.filter((e) => e.kind === 'tool_result').map((e) => payload(e).output?.chars ?? null)).toEqual([null, null, big.length, null]);
+  });
+});
+
 describe('a stored result too big to load', () => {
   it('is cut by SQLite to the same bytes compactRow makes', () => {
     const text = `Exit code 1\n${'ünï 😀 line\n'.repeat(60_000)}`;
