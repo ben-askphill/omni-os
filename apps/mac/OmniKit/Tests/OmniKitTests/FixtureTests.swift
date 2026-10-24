@@ -74,6 +74,9 @@ func sseData(_ text: String) -> [String] {
     // Recorded by apps/server/tests/browser-capture.test.ts, which has no Chrome to capture.
     "browser-capture.json": { _ = try decodeFixture(BrowserCaptureReply.self, "browser-capture.json") },
     "browser-capture-stale.json": { _ = try decodeFixture(BrowserCaptureFailureBody.self, "browser-capture-stale.json") },
+    // Recorded by apps/server/tests/browser-pick.test.ts, as above.
+    "browser-pick-element.json": { _ = try decodeFixture(ElementPickReply.self, "browser-pick-element.json") },
+    "browser-pick-unavailable.json": { _ = try decodeFixture(ElementPickReply.self, "browser-pick-unavailable.json") },
     // Hand-made: apps/server/tests/sync-setup.test.ts checks the server still sends its keys and types.
     "sync-status.json": { _ = try decodeFixture(SyncStatus.self, "sync-status.json") },
     // Request bodies the app sends. SecretsTests compares them with what the client encodes.
