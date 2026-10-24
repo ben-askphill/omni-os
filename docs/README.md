@@ -4,7 +4,7 @@
 
 - [Install and first run](user/install.md), including the step-by-step agent instructions
 - [Configuration](user/configuration.md): your config, `.env`, placeholders and secrets
-- [Threads](user/threads.md): the composer, steering and queueing, attachments, what each thread gets, Send to Grok Bot
+- [Threads](user/threads.md): the composer, steering and queueing, attachments, diff lines for the agent, what each thread gets, Send to Grok Bot
 - [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent, Hermes and Cursor Cloud
 - [Crew and Conductor](user/crew.md)
 - [Automations](user/automations.md): cron and GitHub PR events
@@ -22,6 +22,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 
 - [Architecture overview](internals/overview.md): how a thread runs, the Web UI and Mac app split, repo layout
 - [Auto routing](internals/auto-routing.md): how Auto picks a model, and the benchmarks that check it
+- [Message context](internals/message-context.md): typed records on a message (diff lines and later kinds), and how to add a kind
 - [Glossary](../CONTEXT.md)
 - [Mac app notes](../apps/mac/NOTES.md)
 - [Screenshots on PRs](pr-screenshots.md)

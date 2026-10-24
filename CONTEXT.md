@@ -35,6 +35,10 @@ A cron schedule, or a GitHub PR event (`on:`), that starts a new thread on every
 A message sent to a thread through the API, saved before the client hears it was accepted. It carries the client's request id, kept across retries: a retry with the same id gets the first acceptance back, and the same id with another message is refused. Local to the Mac that accepted it (`message_requests`, `apps/server/db/repos/requests.ts`).
 _Avoid_: Job, task
 
+**Message context**:
+Typed records a **Request** carries next to its text, each with the user's note: lines picked in the Changes panel (`diff_selection`) for now. The agent gets them as an `<omni-context>` block; the transcript keeps the records as sent ([docs/internals/message-context.md](docs/internals/message-context.md)).
+_Avoid_: Context (alone, which is the context window), attachment (a file)
+
 **Crew report**:
 A child thread's reply to the thread that delegated it, sent when its turn ends. Saved as a **Request** on the parent before the parent is woken, once per child turn, so a restart before the parent reads it keeps it for Resume. A team's go to its lead is saved the same way. Omni wrote both, so the user can resume or discard them but not edit or move them.
 _Avoid_: Result, callback
