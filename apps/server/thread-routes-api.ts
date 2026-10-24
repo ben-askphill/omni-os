@@ -38,6 +38,8 @@ import {
 } from './runner.ts';
 import { cancelHandoff, handOff } from './handoff.ts';
 import { handoffView } from './handoff/records.ts';
+import { headPage } from './history.ts';
+import { liveMessage, openingMessages, parseAfter, STREAM_QUEUE_MAX, type DetailOf } from './stream-catch-up.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
 import { basePick, baseView } from './worktree-base.ts';
@@ -120,10 +122,17 @@ threadRoutesApi.get('/:id', (c) => {
   if (!t) return c.json({ error: 'not found' }, 404);
   // With sync on, the files it has on the other Mac download in the background.
   void threadOpened(t.id);
+  // ?history=recent: the newest page of events, older ones from GET /:id/history (apps/server/history.ts).
+  return c.json(threadDetail(t, c.req.query('history') === 'recent' ? headPage(t.id) : { events: events.since(t.id) }));
+});
+
+/** The detail with `page`'s events: every event, the head and its `history`, or none (the stream's sync). */
+function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
   const detail = {
     thread: t,
     channel: (ch => ch && publicChannel(ch))(channels.get(t.channel_id)),
-    events: events.since(t.id),
+    events: page.events,
+    ...(page.history && { history: page.history }),
     artifacts: artifacts.byThread(t.id),
     children: threads.children(t.id),
     // Members of the teams this thread started, so its delegation cards can show their state.
@@ -140,8 +149,8 @@ threadRoutesApi.get('/:id', (c) => {
   };
   // Only when a turn cannot start here (a synced thread): why, for the composer to show.
   const blocked = turnBlocked(t, runsHere(t.id));
-  return c.json(blocked ? { ...detail, blocked } : detail);
-});
+  return blocked ? { ...detail, blocked } : detail;
+}
 
 /** Compact view for the conductor MCP. */
 threadRoutesApi.get('/:id/summary', (c) => {
@@ -403,12 +412,17 @@ threadActionsApi.post('/:id/interrupt', interrupt);
 
 threadActionsApi.get('/:id/stream', (c) => {
   const id = c.req.param('id');
-  const after = Number(c.req.query('after') ?? c.req.header('Last-Event-ID') ?? 0);
+  const after = parseAfter(c.req.query('after') ?? c.req.header('Last-Event-ID') ?? '0');
   return streamSSE(c, async (stream) => {
     const queue: unknown[] = [];
+    // Rows the opening messages carried, so the bus's copies are not sent twice (apps/server/stream-catch-up.ts).
+    const sent = new Set<number>();
     let wake: (() => void) | null = null;
+    let overflowed = false;
     const onEvent = (e: unknown) => {
-      queue.push(e);
+      // A reader that fell this far behind reconnects and catches up with a page (stream-catch-up.ts).
+      if (queue.length >= STREAM_QUEUE_MAX) overflowed = true;
+      else queue.push(e);
       wake?.();
     };
     bus.on(`thread:${id}`, onEvent);
@@ -418,23 +432,28 @@ threadActionsApi.get('/:id/stream', (c) => {
       onEvent({ kind: 'thread', thread: e.thread, pending: pendingFor(id), live: isLive(id), handoff: handoffView(e.thread as Thread), ...(blocked && { blocked }) });
     };
     bus.on('feed', onFeed);
-    stream.onAbort(() => {
+    const detach = () => {
       bus.off(`thread:${id}`, onEvent);
       bus.off('feed', onFeed);
+    };
+    stream.onAbort(() => {
+      detach();
       wake?.();
     });
     // Flush headers immediately so proxies (vite dev) don't hold the stream back.
     await stream.writeSSE({ event: 'ping', data: '' });
-    for (const row of events.since(id, after)) await stream.writeSSE({ id: String(row.id), data: JSON.stringify(row) });
-    while (!stream.aborted) {
+    const detailOf: DetailOf = (page) => (t => (t ? threadDetail(t, page) : null))(threads.get(id));
+    for (const m of openingMessages(id, after, detailOf, queue, sent)) await stream.writeSSE(m);
+    while (!stream.aborted && !overflowed) {
       if (!queue.length) {
         await Promise.race([new Promise<void>((r) => (wake = r)), stream.sleep(20_000)]);
         wake = null;
         if (!queue.length) await stream.writeSSE({ event: 'ping', data: '' });
         continue;
       }
-      const e = queue.shift() as any;
-      await stream.writeSSE({ id: e.id ? String(e.id) : undefined, data: JSON.stringify(e) });
+      const m = liveMessage(queue.shift(), sent);
+      if (m) await stream.writeSSE(m);
     }
+    detach();
   });
 });

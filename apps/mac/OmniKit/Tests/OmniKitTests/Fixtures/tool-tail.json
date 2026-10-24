@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "tail",
+    "text": "Compiling 1/3\n",
+    "skipped": 0,
+    "reset": true
+  },
+  {
+    "kind": "tail",
+    "text": "Compiling 2/3\n",
+    "skipped": 0
+  },
+  {
+    "kind": "tail",
+    "text": "xxxxxxxx…",
+    "skipped": 50
+  },
+  {
+    "kind": "end",
+    "live": true
+  }
+]

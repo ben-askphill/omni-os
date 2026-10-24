@@ -173,16 +173,30 @@ public struct Plan: Hashable, Sendable {
 
 /// The rows for a thread's events. `update` takes the whole event list each time and lays out only what is new
 /// since the last call, so a busy thread costs the same per event however long it runs.
+///
+/// With `spans` (`History.spans`), every event is folded, so rows outside them (anchors) still nest calls and settle
+/// questions, but only items keyed inside a span show, as buildItems in apps/web/src/transcript/fold.ts does it:
+/// a span edge closes the open group of calls and the run of mod lines, and the plan shows only when its group is
+/// in the last span. No spans: the whole thread.
 public struct Transcript: Sendable {
+  /// The rows shown.
   public private(set) var items: [TranscriptItem] = []
+  /// Every row the events make, anchors' included.
+  private var all: [TranscriptItem] = []
+  private var spans: [HistorySpan]?
 
   private var consumed = 0
   private var lastID: Int?
+  /// The span of the last event folded, -1 outside every span.
+  private var span = Int.min
+  /// A span edge came since the last mod line, so the next one starts a run.
+  private var modsSplit = false
   /// The latest result for each call id, as the Web UI's results map.
   private var results: [String: ToolResult] = [:]
-  /// Where each call sits: its group's event id and the path to it.
+  /// Where each call sits: its group's event id and the path to it. The last is where a sub-call of that id nests.
   private var refs: [String: [(group: Int, path: [Int])]] = [:]
-  private var open: (index: Int, paths: [String: [Int]])?
+  /// The index of the open group of calls.
+  private var open: Int?
   private var planIndex: Int?
   /// Each cloud agent run's card, by run: the event it sits at.
   private var cloudRuns: [String: Int] = [:]
@@ -191,14 +205,49 @@ public struct Transcript: Sendable {
 
   public init() {}
 
-  public init(_ events: [EventRow]) { update(events) }
+  public init(_ events: [EventRow], spans: [HistorySpan]? = nil) {
+    self.spans = spans
+    update(events, spans: spans)
+  }
 
-  /// Lays out `events`, sorted by id. Events that arrived out of order lay the whole list out again.
-  public mutating func update(_ events: [EventRow]) {
-    if consumed > events.count || (consumed > 0 && events[consumed - 1].id != lastID) { self = Transcript() }
+  /// Lays out `events`, sorted by id. Events that arrived out of order, or new spans, lay the whole list out again.
+  public mutating func update(_ events: [EventRow], spans: [HistorySpan]? = nil) {
+    if !extends(events, spans: spans) {
+      self = Transcript()
+      self.spans = spans
+    }
     for e in events[consumed...] { add(e) }
     consumed = events.count
     lastID = events.last?.id
+    items = Self.shown(all, spans)
+  }
+
+  /// `update` would only add to what is laid out, not lay everything out again.
+  func extends(_ events: [EventRow], spans: [HistorySpan]?) -> Bool {
+    spans == self.spans && consumed <= events.count && (consumed == 0 || events[consumed - 1].id == lastID)
+  }
+
+  /// The shown row an event is part of: its own, the group its call or result is in, else the row before it.
+  public func itemID(holding eventID: Int) -> TranscriptItemID? {
+    var before: TranscriptItemID?
+    for item in items {
+      guard case .event(let key) = item.id else { continue }
+      if key == eventID { return item.id }
+      if case .tools(let g) = item, g.flat.contains(where: { $0.id == eventID }) { return item.id }
+      if key < eventID { before = item.id }
+    }
+    return before
+  }
+
+  private static func shown(_ all: [TranscriptItem], _ spans: [HistorySpan]?) -> [TranscriptItem] {
+    guard let spans else { return all }
+    return all.filter { item in
+      switch item.id {
+      case .event(let key): HistorySpan.index(of: key, in: spans) != nil
+      // A gap after any span but the last may hold a newer TodoWrite.
+      case .plan: if case .plan(let p) = item { HistorySpan.index(of: p.after, in: spans) == spans.count - 1 } else { false }
+      }
+    }
   }
 
   /// The last row that is not the plan or mod log lines, which are asides.
@@ -237,6 +286,12 @@ public struct Transcript: Sendable {
   }
 
   private mutating func add(_ e: EventRow) {
+    let s = spans.map { HistorySpan.index(of: e.id, in: $0) ?? -1 } ?? 0
+    if s != span {
+      span = s
+      open = nil
+      modsSplit = true
+    }
     switch Self.content(of: e) {
     case .toolUse(let use):
       if !Self.isSelfParent(use) && !Question.isTool(use.name) { addCall(use, e) }
@@ -244,7 +299,7 @@ public struct Transcript: Sendable {
       guard !r.toolUseID.isEmpty else { return }
       results[r.toolUseID] = r
       for ref in refs[r.toolUseID] ?? [] {
-        guard let i = items.lastIndex(where: { $0.id == .event(ref.group) }) else { continue }
+        guard let i = all.lastIndex(where: { $0.id == .event(ref.group) }) else { continue }
         withGroup(at: i) { g in g.calls[ref.path[0]].update(ref.path.dropFirst()) { $0.result = r } }
       }
     case .user(let m): close(.user(eventID: e.id, at: e.createdAt, m))
@@ -256,17 +311,18 @@ public struct Transcript: Sendable {
     case .crewReport(let r): close(.report(eventID: e.id, at: e.createdAt, r))
     case .mod(let log):
       guard let line = ModLine(log, e) else { return }
-      if case .mod(let first, var lines)? = items.last {
+      if !modsSplit, case .mod(let first, var lines)? = all.last {
         lines.append(line)
-        items[items.count - 1] = .mod(eventID: first, lines)
+        all[all.count - 1] = .mod(eventID: first, lines)
       } else {
-        items.append(.mod(eventID: e.id, [line]))
+        all.append(.mod(eventID: e.id, [line]))
       }
+      modsSplit = false
     case .cloudAgent(let s):
       // A later state of a run already shown replaces it in place; it ends a group of calls either way.
-      if let first = cloudRuns[s.runKey], let i = items.lastIndex(where: { $0.id == .event(first) }) {
+      if let first = cloudRuns[s.runKey], let i = all.lastIndex(where: { $0.id == .event(first) }) {
         open = nil
-        items[i] = .cloud(eventID: first, s)
+        all[i] = .cloud(eventID: first, s)
       } else {
         cloudRuns[s.runKey] = e.id
         close(.cloud(eventID: e.id, s))
@@ -279,11 +335,11 @@ public struct Transcript: Sendable {
       if let id = pendingSwitch { withSwitch(id) { $0.done = h } }
       pendingSwitch = nil
     case .question(let p):
-      if Self.questionIndex(p.id, in: items) == nil { close(.question(ThreadQuestion(id: p.id, eventID: e.id, questions: p.questions))) }
+      if Self.questionIndex(p.id, in: all) == nil { close(.question(ThreadQuestion(id: p.id, eventID: e.id, questions: p.questions))) }
     case .questionAnswer(let a):
-      guard let i = Self.questionIndex(a.id, in: items), case .question(var q) = items[i] else { return }
+      guard let i = Self.questionIndex(a.id, in: all), case .question(var q) = all[i] else { return }
       q.settle(a)
-      items[i] = .question(q)
+      all[i] = .question(q)
     case .status, .sessionInit, .task: break
     case .unknown(let kind, _):
       if Self.breaking.contains(kind) { close(nil) }
@@ -291,9 +347,9 @@ public struct Transcript: Sendable {
   }
 
   private mutating func withSwitch(_ eventID: Int, _ body: (inout SwitchRow) -> Void) {
-    guard let i = items.lastIndex(where: { $0.id == .event(eventID) }), case .runSwitch(var r) = items[i] else { return }
+    guard let i = all.lastIndex(where: { $0.id == .event(eventID) }), case .runSwitch(var r) = all[i] else { return }
     body(&r)
-    items[i] = .runSwitch(r)
+    all[i] = .runSwitch(r)
   }
 
   private static func questionIndex(_ id: String, in items: [TranscriptItem]) -> Int? {
@@ -357,23 +413,30 @@ public struct Transcript: Sendable {
 
   private mutating func close(_ item: TranscriptItem?) {
     open = nil
-    if let item { items.append(item) }
+    if let item { all.append(item) }
   }
 
   private mutating func addCall(_ use: ToolUse, _ e: EventRow) {
-    if open == nil {
-      items.append(.tools(ToolGroup(eventID: e.id, firstCallID: use.id)))
-      open = (items.count - 1, [:])
+    // A sub-call nests under its parent wherever that call is, even turns back (a background agent's), as the web
+    // fold's byId does. Only a call with no parent laid out joins the open group.
+    var parent = use.parent.flatMap { refs[$0]?.last }
+    var home = parent.flatMap { groupIndex($0.group) }
+    if home == nil {
+      parent = nil
+      if open == nil {
+        all.append(.tools(ToolGroup(eventID: e.id, firstCallID: use.id)))
+        open = all.count - 1
+      }
+      home = open
     }
-    guard var (index, paths) = open, case .tools(let g) = items[index] else { return }
-    let parentPath = use.parent.flatMap { paths[$0] }
-    let call = ToolCall(id: e.id, use: use, result: results[use.id], at: e.createdAt, orphan: parentPath == nil && use.parent != nil)
+    guard let index = home, case .tools(let g) = all[index] else { return }
+    let call = ToolCall(id: e.id, use: use, result: results[use.id], at: e.createdAt, orphan: parent == nil && use.parent != nil)
     var path: [Int] = []
     withGroup(at: index) { g in
       g.total += 1
-      if let parentPath {
-        g.calls[parentPath[0]].update(parentPath.dropFirst()) { p in
-          path = parentPath + [p.children.count]
+      if let parent {
+        g.calls[parent.path[0]].update(parent.path.dropFirst()) { p in
+          path = parent.path + [p.children.count]
           p.children.append(call)
         }
       } else {
@@ -381,35 +444,45 @@ public struct Transcript: Sendable {
         g.calls.append(call)
       }
     }
-    paths[use.id] = path
     refs[use.id, default: []].append((g.eventID, path))
-    if let plan = Plan(use, after: g.eventID) {
-      if let p = planIndex, p == index + 1 {
-        items[p] = .plan(plan)
-      } else {
-        if let p = planIndex {
-          items.remove(at: p)
-          if p < index { index -= 1 }
-        }
-        items.insert(.plan(plan), at: index + 1)
-        planIndex = index + 1
-      }
+    if let plan = Plan(use, after: g.eventID) { place(plan, after: index) }
+  }
+
+  /// The index of the group that starts at `eventID`.
+  private func groupIndex(_ eventID: Int) -> Int? {
+    if let open, all[open].id == .event(eventID) { return open }
+    return all.lastIndex { $0.id == .event(eventID) }
+  }
+
+  /// Puts the plan right after the group at `index`, taking it from where it was.
+  private mutating func place(_ plan: Plan, after index: Int) {
+    if let p = planIndex, p == index + 1 {
+      all[p] = .plan(plan)
+      return
     }
-    open = (index, paths)
+    var index = index
+    if let p = planIndex {
+      all.remove(at: p)
+      if p < index { index -= 1 }
+      if let o = open, p < o { open = o - 1 }
+    }
+    all.insert(.plan(plan), at: index + 1)
+    if let o = open, index + 1 <= o { open = o + 1 }
+    planIndex = index + 1
   }
 
   /// Changes the group at `i` in place, without copying its calls.
   private mutating func withGroup(at i: Int, _ body: (inout ToolGroup) -> Void) {
-    guard case .tools(var g) = items[i] else { return }
-    items[i] = .error(eventID: 0, "")
+    guard case .tools(var g) = all[i] else { return }
+    all[i] = .error(eventID: 0, "")
     body(&g)
-    items[i] = .tools(g)
+    all[i] = .tools(g)
   }
 }
 
 extension Transcript {
   /// Every row for `events` in one pass over them, as buildItems does it. The reference `update` must match.
-  public static func build(_ events: [EventRow]) -> [TranscriptItem] {
+  public static func build(_ events: [EventRow], spans: [HistorySpan]? = nil) -> [TranscriptItem] {
     final class Node {
       let id: Int, use: ToolUse, result: ToolResult?, at: Date, orphan: Bool
       var children: [Node] = []
@@ -420,7 +493,7 @@ extension Transcript {
     }
     final class Group {
       let eventID: Int, first: String
-      var calls: [Node] = [], total = 0, byID: [String: Node] = [:]
+      var calls: [Node] = [], total = 0
       init(_ eventID: Int, _ first: String) { (self.eventID, self.first) = (eventID, first) }
     }
     enum Row {
@@ -434,28 +507,43 @@ extension Transcript {
     }
     var rows: [Row] = []
     var group: Group?
+    // Every call so far, with its group: a sub-call nests under its parent wherever that is.
+    var calls: [String: (node: Node, group: Group)] = [:]
     var plan: Plan?
     var cloudRows: [String: Int] = [:]
     var pendingSwitch: Int?
+    var span = Int.min
+    var modsSplit = false
     func questionRow(_ id: String) -> Int? {
       rows.lastIndex { if case .item(.question(let q)) = $0 { q.id == id } else { false } }
     }
     for e in events {
+      let s = spans.map { HistorySpan.index(of: e.id, in: $0) ?? -1 } ?? 0
+      if s != span {
+        span = s
+        group = nil
+        modsSplit = true
+      }
       switch Self.content(of: e) {
       case .toolUse(let use):
         if Self.isSelfParent(use) || Question.isTool(use.name) { break }
-        if group == nil {
-          let g = Group(e.id, use.id)
-          rows.append(.group(g))
-          group = g
+        let parent = use.parent.flatMap { calls[$0] }
+        let home: Group
+        if let parent {
+          home = parent.group
+        } else {
+          if group == nil {
+            let g = Group(e.id, use.id)
+            rows.append(.group(g))
+            group = g
+          }
+          home = group!
         }
-        let g = group!
-        g.total += 1
-        if let p = Plan(use, after: g.eventID) { plan = p }
-        let parent = use.parent.flatMap { g.byID[$0] }
+        home.total += 1
+        if let p = Plan(use, after: home.eventID) { plan = p }
         let node = Node(e.id, use, results[use.id], e.createdAt, parent == nil && use.parent != nil)
-        if let parent { parent.children.append(node) } else { g.calls.append(node) }
-        g.byID[use.id] = node
+        if let parent { parent.node.children.append(node) } else { home.calls.append(node) }
+        calls[use.id] = (node, home)
       case .toolResult, .status, .sessionInit, .task: break
       case .user(let m):
         group = nil
@@ -475,12 +563,13 @@ extension Transcript {
         rows.append(.item(.report(eventID: e.id, at: e.createdAt, r)))
       case .mod(let log):
         guard let line = ModLine(log, e) else { break }
-        if case .item(.mod(let first, var lines))? = rows.last {
+        if !modsSplit, case .item(.mod(let first, var lines))? = rows.last {
           lines.append(line)
           rows[rows.count - 1] = .item(.mod(eventID: first, lines))
         } else {
           rows.append(.item(.mod(eventID: e.id, [line])))
         }
+        modsSplit = false
       case .cloudAgent(let s):
         group = nil
         if let i = cloudRows[s.runKey], case .item(.cloud(let first, _)) = rows[i] {
@@ -515,7 +604,7 @@ extension Transcript {
         if breaking.contains(kind) { group = nil }
       }
     }
-    return rows.flatMap { row -> [TranscriptItem] in
+    let all = rows.flatMap { row -> [TranscriptItem] in
       switch row {
       case .item(let item): return [item]
       case .group(let g):
@@ -524,6 +613,7 @@ extension Transcript {
         return [item]
       }
     }
+    return shown(all, spans)
   }
 }
 

@@ -19,6 +19,7 @@
 //
 // Directives in a turn's input text:
 //   CMD       run a shell command (a commandExecution item) before the reply
+//   NOISY     run a command that prints 3,000 lines (outputDelta) and stays up FAKE_CODEX_NOISY_MS (700) before it ends
 //   PLAN      update the checklist (turn/plan/updated) before the reply
 //   SLOW      take 400 ms before replying
 //   HANG      never finish on its own; only turn/interrupt ends the turn
@@ -192,6 +193,7 @@ const turnOf = (t) => ({
   completedAt: null,
   durationMs: null,
 });
+const NOISY_MS = Number(process.env.FAKE_CODEX_NOISY_MS ?? 700);
 const item = (turn, it, phase) => notify(`item/${phase}`, { item: it, threadId, turnId: turn.id, [`${phase}AtMs`]: Date.now() });
 const message = (text) => ({ type: 'agentMessage', id: nextItemId(), text, phase: 'final_answer', memoryCitation: null, delivery: null, questions: null });
 
@@ -249,6 +251,31 @@ async function runTurn(turn, input) {
     item(turn, cmd, 'started');
     await delay(5);
     item(turn, { ...cmd, status: 'completed', aggregatedOutput: 'hi\n', exitCode: 0, durationMs: 3 }, 'completed');
+  }
+  if (said.includes('NOISY')) {
+    // A command that prints a lot while it runs, then stays up for a while: its row opens at once and its output
+    // arrives as outputDelta notifications until it completes.
+    const cmd = {
+      type: 'commandExecution',
+      id: nextItemId(),
+      pluginId: null,
+      scriptPath: null,
+      command: "/bin/zsh -lc 'yes noise'",
+      cwd: process.cwd(),
+      processId: '4243',
+      source: 'unifiedExecStartup',
+      status: 'inProgress',
+      commandActions: [{ type: 'unknown', command: 'yes noise' }],
+      aggregatedOutput: null,
+      exitCode: null,
+      durationMs: null,
+    };
+    item(turn, cmd, 'started');
+    for (let i = 0; i < 3000; i++) notify('item/commandExecution/outputDelta', { threadId, turnId: turn.id, itemId: cmd.id, delta: `noise ${i} ${'n'.repeat(60)}\n` });
+    await delay(NOISY_MS);
+    // The result is every line again, which the runner keeps the first 16,000 characters of.
+    const all = Array.from({ length: 3000 }, (_, i) => `noise ${i} ${'n'.repeat(60)}`).join('\n');
+    item(turn, { ...cmd, status: 'completed', aggregatedOutput: all, exitCode: 0, durationMs: NOISY_MS }, 'completed');
   }
   if (!rateLimitsSent) {
     rateLimitsSent = true;

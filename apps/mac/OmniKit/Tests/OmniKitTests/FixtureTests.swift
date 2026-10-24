@@ -51,6 +51,7 @@ private struct DeliveryRefusal: Decodable {
     "artifacts.json": { _ = try decodeFixture([GalleryArtifact].self, "artifacts.json") },
     "error-not-found.json": { _ = try decodeFixture([String: String].self, "error-not-found.json") },
     "thread-stream.sse": { _ = try threadStream() },
+    "thread-stream-snapshot.sse": { _ = try threadStream("thread-stream-snapshot.sse") },
     "feed.sse": { _ = try feed() },
     "secrets.json": { _ = try decodeFixture([SecretRow].self, "secrets.json") },
     "secret-saved.json": { _ = try decodeFixture([String: Bool].self, "secret-saved.json") },
@@ -120,10 +121,19 @@ private struct DeliveryRefusal: Decodable {
     "thread-create-base-request.json": { _ = try decodeFixture(JSONValue.self, "thread-create-base-request.json") },
     // ChannelActionsTests compares it with what the client encodes.
     "channel-action-request.json": { _ = try decodeFixture(JSONValue.self, "channel-action-request.json") },
+    "thread-open.json": { _ = try decodeFixture(ThreadDetail.self, "thread-open.json") },
+    "thread-history.json": { _ = try decodeFixture(HistoryPage.self, "thread-history.json") },
+    "thread-history-at.json": { _ = try decodeFixture(HistoryPage.self, "thread-history-at.json") },
+    "thread-event.json": { _ = try decodeFixture(EventRow.self, "thread-event.json") },
+    "search.json": { _ = try decodeFixture([SearchHit].self, "search.json") },
+    "tool-output-open.json": { _ = try decodeFixture(ThreadDetail.self, "tool-output-open.json") },
+    "tool-output-chunk.json": { _ = try decodeFixture(OutputChunk.self, "tool-output-chunk.json") },
+    "tool-output-chunk-end.json": { _ = try decodeFixture(OutputChunk.self, "tool-output-chunk-end.json") },
+    "tool-tail.json": { _ = try decodeFixture([TailMessage].self, "tool-tail.json") },
   ]
 
-  static func threadStream() throws -> [ThreadStreamMessage] {
-    try sseData(fixture("thread-stream.sse")).map { try OmniJSON.decoder().decode(ThreadStreamMessage.self, from: Data($0.utf8)) }
+  static func threadStream(_ name: String = "thread-stream.sse") throws -> [ThreadStreamMessage] {
+    try sseData(fixture(name)).map { try OmniJSON.decoder().decode(ThreadStreamMessage.self, from: Data($0.utf8)) }
   }
 
   static func feed() throws -> [FeedEvent] {
@@ -380,7 +390,7 @@ private struct DeliveryRefusal: Decodable {
 
   @Test func readsEveryThreadStreamMessage() throws {
     let messages = try Self.threadStream()
-    var events = 0, artifacts = 0, threads = 0, contexts = 0
+    var events = 0, artifacts = 0, threads = 0, contexts = 0, syncs = 0
     for m in messages {
       switch m {
       case .event(let e):
@@ -389,6 +399,7 @@ private struct DeliveryRefusal: Decodable {
       case .artifact: artifacts += 1
       case .thread: threads += 1
       case .context: contexts += 1
+      case .sync: syncs += 1
       // The recorded turn runs no mod; StreamMessageTests reads a toast.
       case .modToast: break
       case .unknown(let json): Issue.record("unknown message: \(json)")
@@ -398,6 +409,7 @@ private struct DeliveryRefusal: Decodable {
     #expect(contexts > 0)
     #expect(artifacts == 1)
     #expect(threads > 0)
+    #expect(syncs == 1)
   }
 
   @Test func readsEveryFeedEvent() throws {

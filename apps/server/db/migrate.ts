@@ -428,6 +428,10 @@ export function migrate() {
     created_at TEXT NOT NULL,
     UNIQUE (source_id, request_id)
   )`);
+  // #223 Thread history pages (apps/server/history.ts): turn ends, session starts, and tool calls by their own id.
+  db.exec(`CREATE INDEX IF NOT EXISTS events_result ON events(thread_id, id) WHERE kind = 'result';
+    CREATE INDEX IF NOT EXISTS events_init ON events(thread_id, id) WHERE kind = 'init';
+    CREATE INDEX IF NOT EXISTS events_call ON events(thread_id, json_extract(payload, '$.id')) WHERE kind = 'tool_use';`);
   // #226 Event-trigger deliveries (db/repos/trigger-deliveries.ts): one row per automation and source event, its uid
   // derived from both, so a replay or the other Mac's copy is the same row. Synced; states only move forward.
   db.exec(`CREATE TABLE IF NOT EXISTS trigger_deliveries (

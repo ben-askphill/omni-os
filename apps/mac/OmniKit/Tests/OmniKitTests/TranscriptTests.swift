@@ -65,11 +65,16 @@ private func recorded(_ name: String) throws -> [EventRow] {
     #expect(g.flat.map(\.callID) == ["t", "g", "x", "r", "lost"])
   }
 
-  @Test func adoptsOnlyWithinAGroup() throws {
-    let e = try events([use("t", "Task"), text("Meanwhile"), use("c", "Read", parent: "t")])
-    let later = try #require(groups(Transcript(e).items).last)
-    #expect(later.calls.map(\.callID) == ["c"])
-    #expect(later.calls[0].orphan)
+  /// A background agent's calls land after later text and turns, and still nest under it, as the web fold's byId.
+  @Test func adoptsAcrossGroups() throws {
+    let e = try events([use("t", "Task"), text("Meanwhile"), use("c", "Read", parent: "t"), use("d", "Bash")])
+    let t = Transcript(e)
+    #expect(t.items.map(\.id) == [.event(1), .event(2), .event(4)])
+    let first = try #require(groups(t.items).first)
+    #expect(first.calls[0].children.map(\.callID) == ["c"])
+    #expect(first.total == 2)
+    #expect(groups(t.items).last?.calls.map(\.callID) == ["d"])
+    #expect(t.items == Transcript.build(e))
   }
 
   @Test func keepsOnePlanAfterTheGroupOfTheLatestTodoWrite() throws {

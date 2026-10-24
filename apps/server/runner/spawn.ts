@@ -8,6 +8,7 @@ import { attachThread, detachThread } from '../browser.ts';
 import { globalSecret, secretsEnv } from '../secrets.ts';
 import { closePipesAfterExit } from '../child.ts';
 import { recordUsage } from '../usage.ts';
+import { toolTails } from '../tool-tail.ts';
 import { recordContext, recordContextHint } from '../context.ts';
 import { addCursorTurn, afterCursorTurn } from '../cursor-usage.ts';
 import { beforeResume } from '../sync/files.ts';
@@ -170,6 +171,7 @@ async function spawnLive(live: Live, thread: Thread) {
       sessionStarted(live);
     },
     commandsChanged: () => invalidateCommands(thread.harness as HarnessId),
+    toolOutput: (use, text) => (text === undefined ? toolTails.begin(thread.id, use) : toolTails.append(thread.id, use, text)),
     commands: (list) => (live.commands = { status: 'ready', commands: runnableCommands(list), fetchedAt: Date.now() }),
     context: (c) => recordContext(thread.id, c),
     contextHint: (h) => recordContextHint(thread.id, h),

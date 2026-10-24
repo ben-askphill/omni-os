@@ -233,10 +233,25 @@ public final class AppModel {
     return route.title { store.channel($0)?.name }
   }
 
-  /// A thread as Markdown, once its store has it. For the window that has focus, whichever it is.
-  public func threadMarkdown(_ id: String) -> String? {
+  /// The thread's store has loaded, so Copy Thread as Markdown can run.
+  public func canCopyThreadMarkdown(_ id: String) -> Bool {
+    threads.store(id).map { $0.thread != nil && $0.loadState == .loaded } ?? false
+  }
+
+  /// The whole thread as Markdown, for the window that has focus, whichever it is. The store holds pages of it, so
+  /// this reads the full detail unless the store holds every row. Nil when it can't.
+  public func threadMarkdown(_ id: String) async -> String? {
     guard let s = threads.store(id), let t = s.thread, s.loadState == .loaded else { return nil }
-    return TranscriptMarkdown.thread(title: t.title, items: s.transcript.items, cwd: s.cwd)
+    if s.history.atStart && s.history.spans.count == 1 {
+      return TranscriptMarkdown.thread(title: t.title, items: s.transcript.items, cwd: s.cwd)
+    }
+    guard let d = try? await client.thread(id) else { return nil }
+    let transcript = await Self.layout(d.events.sorted { $0.id < $1.id })
+    return TranscriptMarkdown.thread(title: d.thread.title, items: transcript.items, cwd: s.cwd)
+  }
+
+  private nonisolated static func layout(_ rows: [EventRow]) async -> Transcript {
+    Transcript(rows)
   }
 
   // MARK: Actions

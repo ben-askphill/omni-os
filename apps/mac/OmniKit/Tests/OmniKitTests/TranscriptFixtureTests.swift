@@ -72,9 +72,13 @@ private struct FoldItem: Decodable, Equatable {
   var p: SwitchP? = nil
   var done: HandoverP? = nil
   var superseded: Bool? = nil
+  // A question card: which, and what became of it.
+  var questionID: String? = nil
+  var state: String? = nil
 
   enum CodingKeys: String, CodingKey {
-    case type, key, text, total, calls, ok, subtype, turns, lines, url, name, status, repo, ref, branch, p, done, superseded
+    case type, key, text, total, calls, ok, subtype, turns, lines, url, name, status, repo, ref, branch, p, done, superseded, state
+    case questionID = "id"
     case taskId = "task_id"
     case agentId = "agent_id"
     case runId = "run_id"
@@ -84,6 +88,8 @@ private struct FoldItem: Decodable, Equatable {
 
 private struct FoldCase: Decodable {
   var name: String
+  /// The spans held: only rows keyed inside them show (packages/shared/history.ts).
+  var spans: [HistorySpan]?
   var events: [EventRow]
   var items: [FoldItem]
   var plan: FoldPlan?
@@ -138,7 +144,7 @@ private func project(_ transcript: Transcript) -> (items: [FoldItem], plan: Fold
     case .runSwitch(let r):
       items.append(FoldItem(type: "switch", key: r.eventID, p: r.p, done: r.done, superseded: r.superseded))
     case .question(let q):
-      items.append(FoldItem(type: "question", key: q.eventID))
+      items.append(FoldItem(type: "question", key: q.eventID, questionID: q.id, state: q.state.rawValue))
     }
   }
   return (items, plan)
@@ -151,15 +157,19 @@ private func project(_ transcript: Transcript) -> (items: [FoldItem], plan: Fold
     let names = Set(corpus.cases.map(\.name))
     #expect(names == Set([
       "cloud-agent", "first-string-field", "grouping", "mod-logs", "plan-placement", "result-before-call", "run-switch",
-      "self-parent", "undecodable-tool-use", "zero-turn-success",
+      "self-parent", "span-floor-break", "span-gap", "undecodable-tool-use", "zero-turn-success",
     ]))
     for c in corpus.cases {
-      let got = project(Transcript(c.events))
-      let plans = c.events.isEmpty ? 0 : Transcript(c.events).items.count { if case .plan = $0 { true } else { false } }
+      let transcript = Transcript(c.events, spans: c.spans)
+      let got = project(transcript)
+      let plans = transcript.items.count { if case .plan = $0 { true } else { false } }
       #expect(plans <= 1, "\(c.name) has one plan")
       #expect(got.items == c.items, "\(c.name) items")
       #expect(got.plan == c.plan, "\(c.name) plan")
-      #expect(Transcript(c.events).items == Transcript.build(c.events), "\(c.name) builds the same both ways")
+      #expect(transcript.items == Transcript.build(c.events, spans: c.spans), "\(c.name) builds the same both ways")
+      var pieces = Transcript()
+      for n in 1...max(1, c.events.count) { pieces.update(Array(c.events.prefix(n)), spans: c.spans) }
+      #expect(pieces.items == transcript.items, "\(c.name) piece by piece")
     }
   }
 }

@@ -1,6 +1,8 @@
 event: ping
 data: 
 
+data: {"kind":"sync","catch_up":"replay","thread":{"id":"00000000-0000-4000-8000-000000000001","channel_id":"acme","title":"Fix the cart","status":"running","role":null,"model":"claude-haiku-4-5","harness":"claude-code","effort":"low","auto_reason":"Light quick task: Haiku 4.5, low effort","queued_harness":null,"queued_model":null,"queued_effort":null,"session_id":"00000000-0000-4000-8000-000000000001","has_run":0,"cwd":"/tmp/omni-fixtures/acme","branch":null,"parent_id":null,"task_id":null,"source":"manual","automation":null,"last_text":null,"suggestion":null,"next_title":null,"next_prompt":null,"archived":0,"folder_id":null,"pinned_at":null,"done_at":null,"setup":null,"setup_error":null,"limit_state":null,"limit_resets_at":null,"limit_elsewhere":0,"created_at":"2026-01-05T09:00:00.000Z","updated_at":"2026-01-05T09:00:00.000Z"},"channel":{"id":"acme","name":"Acme","kind":"client","repo_path":null,"github_repo":null,"use_worktree":0,"base_dir":"/tmp/omni-fixtures/acme","store_domain":null,"portal_slug":null,"browser_headless":1,"notes":"Fixture","icon":null,"design_system_name":null,"archived":0,"created_at":"2026-01-05T09:00:00.000Z","default_harness":null,"default_model":null,"default_effort":null,"design_system_size":0},"events":[],"artifacts":[],"children":[],"team":[],"parent":null,"pending":[{"uuid":"00000000-0000-4000-8000-000000000004","kind":"user","text":"TOOL:20 fix the cart","source":"manual","mode":"steer","state":"sent"}],"live":true,"mods":[],"handoff":null}
+
 data: {"id":1,"thread_id":"00000000-0000-4000-8000-000000000001","kind":"init","payload":"{\"model\":\"claude-haiku-4-5\",\"cwd\":\"/tmp/omni-fixtures/acme\",\"tools\":10,\"mcp\":[\"omni-ask:connected\"]}","created_at":"2026-01-05T09:00:00.000Z"}
 id: 1
 

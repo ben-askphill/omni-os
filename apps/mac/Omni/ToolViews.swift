@@ -15,10 +15,10 @@ final class TranscriptUI {
     if open.remove(key) == nil { open.insert(key) }
   }
 
-  /// Opens every group, and the calls that failed or have sub-calls (QA).
-  func expandAll(_ items: [TranscriptItem]) {
+  /// Opens every group, and the calls that failed, have sub-calls or match `also` (QA).
+  func expandAll(_ items: [TranscriptItem], also: (ToolCall) -> Bool = { _ in false }) {
     func visit(_ call: ToolCall) {
-      if call.isFailed || !call.children.isEmpty { open.insert("c\(call.id)") }
+      if call.isFailed || !call.children.isEmpty || also(call) { open.insert("c\(call.id)") }
       call.children.forEach(visit)
     }
     for case .tools(let group) in items {
@@ -168,7 +168,7 @@ struct ToolRowView: View {
           } else if call.isFailed {
             HStack(spacing: z(4)) {
               GlyphView(glyph: .needs, size: 7)
-              Text("error")
+              Text("error" + (call.result?.exitCode.map { " · exit \($0)" } ?? ""))
             }
             .font(.omni(size: 11))
             .foregroundStyle(Tok.fg)
@@ -223,16 +223,8 @@ struct ToolDetail: View {
   var body: some View {
     VStack(alignment: .leading, spacing: z(6)) {
       ToolInputView(input: ToolInput(call.use))
-      if let result = call.result {
-        Pre(text: result.text.isEmpty ? "(no output)" : result.text, tone: call.isFailed ? .bad : .plain)
-        if result.truncated {
-          Text("Output truncated").font(.omni(size: 11)).foregroundStyle(Tok.fg4)
-        }
-      } else {
-        Text(running ? "Waiting for result" : "No result recorded")
-          .font(.omni(size: ThreadStyle.mono))
-          .foregroundStyle(Tok.fg4)
-      }
+      ClippedNote(eventID: call.id)
+      ToolOutputView(call: call, running: running)
     }
   }
 }

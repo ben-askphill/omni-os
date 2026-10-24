@@ -9,6 +9,8 @@ import type { HandoffView } from '@omni/shared/handoff.ts';
 import type { DeliveryPage, DeliveryView } from '@omni/shared/automation-triggers.ts';
 import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/automation-events.ts';
 import type { ContinueLink } from '@omni/shared/continue.ts';
+import type { Clipped, HistoryHead } from '@omni/shared/history.ts';
+import { outputQuery, type OutputChunk } from '@omni/shared/tool-output.ts';
 
 export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, DeliveryView, DeliveryPage };
 
@@ -124,6 +126,15 @@ export interface ThreadDetail {
   continued_in?: ContinueLink[];
 }
 
+/** A row of a history page: one too big to page whole comes clipped, and GET /threads/:id/events/:eventId has it all. */
+export type HistoryEvent = EventRow & { clipped?: Clipped };
+
+/** GET /threads/:id?history=recent: the detail with the newest page of events. Older servers send every event and no `history`. */
+export interface ThreadOpen extends Omit<ThreadDetail, 'events'> {
+  events: HistoryEvent[];
+  history?: HistoryHead;
+}
+
 /** How a message reaches a busy thread: read at its next step, run after the turn, or interrupt then run. */
 export type SendMode = 'steer' | 'queue' | 'interrupt';
 
@@ -169,6 +180,8 @@ export interface SearchHit {
   status: string;
   updated_at: string;
   snippet: string;
+  /** The event the snippet is from; null for a title match. Older servers leave it out. */
+  event_id?: number | null;
 }
 
 export interface Checks {
@@ -411,7 +424,7 @@ export async function pairBrowser(token: string): Promise<boolean> {
   return true;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   // FormData carries its own multipart content type, so never set one for it.
   const form = body instanceof FormData;
   let res: Response;
@@ -420,6 +433,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       method,
       headers: body !== undefined && !form ? { 'Content-Type': 'application/json' } : undefined,
       body: body === undefined ? undefined : form ? body : JSON.stringify(body),
+      signal,
     });
   } catch {
     throw new ApiError('Cannot reach the Omni server. Is it running?', 0);
@@ -448,7 +462,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>('GET', path),
+  get: <T>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, signal),
   post: <T>(path: string, body: unknown = {}) => request<T>('POST', path, body),
   /** Same body as `post` (or `patch`), plus attachments. Falls back to plain JSON when there are none. */
   send: <T>(path: string, body: Record<string, unknown>, files: File[], method: 'POST' | 'PATCH' = 'POST') => {
@@ -480,6 +494,14 @@ export const artifactUrl = (a: Pick<Artifact, 'id' | 'updated_at'>, download = f
 
 export const uploadUrl = (threadId: string, a: Pick<Attachment, 'name'>, download = false) =>
   `/api/threads/${encodeURIComponent(threadId)}/uploads/${encodeURIComponent(a.name)}${download ? '?download=1' : ''}`;
+
+/** GET /threads/:id/events/:eventId/output: the chunk of a tool_result's saved text that starts at `offset` (#225). */
+export const getToolOutput = (threadId: string, eventId: number, offset: number, signal: AbortSignal) =>
+  api.get<OutputChunk>(`/threads/${encodeURIComponent(threadId)}/events/${eventId}/output?${outputQuery(offset)}`, signal);
+
+/** GET /threads/:id/tools/:toolUseId/tail: a running call's output. The stream ends with an `end` message, and the caller closes on it. */
+export const openToolTail = (threadId: string, toolUseId: string, onData: (data: unknown) => void) =>
+  openSSE(() => `/api/threads/${encodeURIComponent(threadId)}/tools/${encodeURIComponent(toolUseId)}/tail`, onData);
 
 // ---------- hooks ----------
 
@@ -623,13 +645,20 @@ export type StreamMessage =
   | { type: 'event'; event: EventRow }
   | { type: 'artifact'; artifact: Artifact }
   | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string; handoff?: HandoffView | null }
+  /**
+   * Sent once per connect, after any replayed rows (#224): the detail as GET /threads/:id has it now. `snapshot`: the
+   * gap was too big to replay, so `detail` carries the newest page and its head instead.
+   */
+  | { type: 'sync'; detail: ThreadOpen; snapshot: boolean }
   /** A new reading of the thread's context window. */
   | { type: 'context'; context: ContextUsage }
   | { type: 'mod_toast'; toast: ModToast };
 
-function classifyStream(d: unknown): StreamMessage | null {
+export function classifyStream(d: unknown): StreamMessage | null {
   if (!d || typeof d !== 'object') return null;
   const o = d as Record<string, unknown>;
+  if (o.kind === 'sync' && o.thread)
+    return { type: 'sync', detail: { ...o, events: Array.isArray(o.events) ? o.events : [] } as unknown as ThreadOpen, snapshot: o.catch_up === 'snapshot' && !!o.history };
   if (o.kind === 'artifact' && o.artifact) return { type: 'artifact', artifact: o.artifact as Artifact };
   if (o.kind === 'thread' && o.thread)
     return {
@@ -646,20 +675,12 @@ function classifyStream(d: unknown): StreamMessage | null {
 
 /**
  * Live stream for one thread. `lastId` is read on every (re)connect so no events are missed or
- * duplicated; the caller still dedupes by id. Starts only when `ready` is true (after the
- * initial GET has populated lastId).
+ * duplicated; the caller still dedupes by id. Each connect ends its catch-up with a `sync`, so a
+ * reconnect needs no refetch. Starts only when `ready` is true (after the initial GET has populated lastId).
  */
-export function useThreadStream(
-  threadId: string,
-  ready: boolean,
-  lastId: RefObject<number>,
-  onMessage: (m: StreamMessage) => void,
-  onReconnect: () => void,
-) {
+export function useThreadStream(threadId: string, ready: boolean, lastId: RefObject<number>, onMessage: (m: StreamMessage) => void) {
   const handler = useRef(onMessage);
-  const reconnect = useRef(onReconnect);
   handler.current = onMessage;
-  reconnect.current = onReconnect;
   // True until a connection actually drops, so a slow first byte does not read as "reconnecting".
   const [live, setLive] = useState(true);
 
@@ -672,10 +693,7 @@ export function useThreadStream(
         if (m) handler.current(m);
       },
       {
-        onOpen: (again) => {
-          setLive(true);
-          if (again) reconnect.current();
-        },
+        onOpen: () => setLive(true),
         onDown: () => setLive(false),
       },
     );

@@ -2,13 +2,14 @@ import Foundation
 import Observation
 
 /// One thread, kept current from its stream with the Web UI's rules (apps/web/src/pages/Thread.tsx):
-/// - `start()` loads the thread, then streams its events from the last one loaded.
+/// - `start()` loads the thread with its newest page of events, then streams its events from the last one loaded.
+///   Older pages load on demand (`loadEarlier`, `loadLater`, `reveal`) into `history`.
 /// - Each event is kept once, in id order, however the stream sends it.
 /// - A thread row replaces the one shown unless it is older. `pending` and `warm` come and go with it.
-/// - Every stream open after the first loads the thread again and merges it in, since messages were
-///   missed. Artifacts the stream sends while that load is out are laid over the answer, unless the
-///   answer has a newer copy.
-/// - Stream messages are applied in batches, one per `frame`.
+/// - Every stream connect ends its catch-up with a `sync` (#224): the thread's state now, after the rows it
+///   replayed. When the gap was too big to replay, the sync carries the newest page instead: the head held
+///   becomes an island and the fresh head joins under it, so older pages stay reachable.
+/// - Stream messages are applied in batches, one per `frame`, in the order they came.
 ///
 /// Children and the parent change on the feed, not the thread's stream: pass feed events to `apply(feed:)`.
 @MainActor @Observable
@@ -30,9 +31,27 @@ public final class ThreadStore {
   public private(set) var children: [OmniThread] = []
   /// Members of the teams among `children`.
   public private(set) var team: [OmniThread] = []
-  /// In id order, each once.
-  public private(set) var events: [EventRow] = []
+  /// The pages of the thread held so far, and the rows they carry.
+  public private(set) var history = History()
+  /// Every row held, in id order, each once: the spans' rows and the anchors around them.
+  public var events: [EventRow] { history.rows }
   public private(set) var transcript = Transcript()
+  /// Rows a page cut down to size, by event id. `showAll` loads one whole.
+  public private(set) var clipped: [Int: Clipped] = [:]
+  /// The clipped result row of each call, by tool_use id.
+  public private(set) var clippedResults: [String: Int] = [:]
+  /// Edges of the transcript with a page on the way. One at a time each.
+  public private(set) var loadingEdges: Set<HistoryEdge> = []
+  /// The last page asked for at an edge failed.
+  public private(set) var edgeErrors: [HistoryEdge: OmniAPIError] = [:]
+  /// Clipped rows being loaded whole, and the ones that failed.
+  public private(set) var showingAll: Set<Int> = []
+  public private(set) var showAllErrors: [Int: OmniAPIError] = [:]
+  /// The row a reveal brought in, for the screen to scroll to once. `revealShown()` clears it.
+  public private(set) var revealTarget: TranscriptItemID?
+  /// Counts the layouts of rows that were not only new at the tail (a page, a whole row, a reconnect): rows above the
+  /// one Ben reads may have changed, so the screen puts that row back where it was.
+  public private(set) var pagesLaidOut = 0
   public private(set) var artifacts: [Artifact] = []
   /// Messages Ben sent that the agent has not read yet. Every new list is checked against the open edits.
   public private(set) var pending: [PendingMsg] = [] {
@@ -43,8 +62,6 @@ public final class ThreadStore {
   /// A CLI process is attached, so the next message starts at once. nil until the server says.
   public private(set) var warm: Bool?
   public private(set) var loadState = LoadState.loading
-  /// The last load after the first failed. What loaded before stays.
-  public private(set) var refreshError: OmniAPIError?
   public private(set) var connection = ConnectionState.connecting
   /// An interrupt was asked for and the turn has not ended yet.
   public private(set) var stopping = false
@@ -119,16 +136,19 @@ public final class ThreadStore {
   @ObservationIgnored private var stopTimer: Task<Void, Never>?
   @ObservationIgnored private var inbox: [ThreadStreamMessage] = []
   @ObservationIgnored private var toastSeq = 0
-  @ObservationIgnored private var seen: Set<Int> = []
-  @ObservationIgnored private var lastID = 0
   @ObservationIgnored private var artifactIDs: Set<Int> = []
   @ObservationIgnored private var started = false
   @ObservationIgnored private var ended = false
-  @ObservationIgnored private var opened = false
   /// The latest load. An answer to an older one is dropped.
   @ObservationIgnored private var loadToken = 0
-  /// Artifacts the stream sent while a load was out, by id. nil while none is.
-  @ObservationIgnored private var artifactsSinceLoad: [Int: Artifact]?
+  /// Layouts asked for, and the one `transcript` is. A layout that lands after a newer one was asked for is dropped.
+  @ObservationIgnored private var layoutSeq = 0
+  @ObservationIgnored private var laidSeq = 0
+  @ObservationIgnored private var layoutTask: Task<Void, Never>?
+  /// A row changed in place while a layout was out, so it must lay out again when it lands.
+  @ObservationIgnored private var stale = false
+  /// The event a reveal waits to show: until the first load, then until the page holding it is laid out.
+  @ObservationIgnored private var revealing: Int?
 
   /// - Parameters:
   ///   - frame: how long stream messages gather before they are applied together.
@@ -158,6 +178,7 @@ public final class ThreadStore {
     stream?.close()
     flushTask?.cancel()
     stopTimer?.cancel()
+    layoutTask?.cancel()
   }
 
   public func start() {
@@ -181,7 +202,7 @@ public final class ThreadStore {
     connection = .closed
   }
 
-  /// Loads the thread again: the first load after it failed, else a refetch merged into what is shown.
+  /// Tries the first load again after it failed. Once loaded, the stream's sync keeps the thread current.
   public func reload() async {
     await load()
   }
@@ -271,13 +292,12 @@ public final class ThreadStore {
   private var isLoaded: Bool { loadState == .loaded }
 
   private func load() async {
-    guard !ended else { return }
+    guard !ended, !isLoaded else { return }
     loadToken += 1
     let token = loadToken
-    artifactsSinceLoad = [:]
     let answer: Result<ThreadDetail, OmniAPIError>
     do {
-      answer = .success(try await api.thread(id))
+      answer = .success(try await api.threadOpen(id))
     } catch {
       answer = .failure(error)
     }
@@ -285,40 +305,29 @@ public final class ThreadStore {
 
     switch answer {
     case .failure(.http(status: 404, _)):
-      artifactsSinceLoad = nil
       loadState = .notFound
-      closeStream()
     case .failure(let e):
-      artifactsSinceLoad = nil
-      if isLoaded {
-        refreshError = e
-      } else {
-        loadState = .failed(e)
-      }
+      loadState = .failed(e)
     case .success(let d):
-      if isLoaded {
-        flush()
-        take(d)
-        add(d.events)
-      } else {
-        let rows = d.events.sorted { $0.id < $1.id }
-        let laidOut = await Self.layout(rows)
-        guard token == loadToken else { return }
-        take(d)
-        seen = Set(rows.map(\.id))
-        lastID = rows.last?.id ?? 0
-        events = rows
-        transcript = laidOut
-        eventsChanged()
-        loadState = .loaded
-        openStream()
-      }
-      refreshError = nil
+      // A server without bounded history sends every row.
+      let h = History(open: d.events, head: d.history ?? .whole)
+      let laidOut = await Self.layout(h.rows, h.spans)
+      guard token == loadToken else { return }
+      take(d)
+      history = h
+      layoutSeq += 1
+      laidSeq = layoutSeq
+      transcript = laidOut
+      clippedChanged()
+      eventsChanged()
+      loadState = .loaded
+      openStream()
+      if let at = revealing { await reveal(at) }
     }
   }
 
-  private nonisolated static func layout(_ rows: [EventRow]) async -> Transcript {
-    Transcript(rows)
+  private nonisolated static func layout(_ rows: [EventRow], _ spans: [HistorySpan]) async -> Transcript {
+    Transcript(rows, spans: spans)
   }
 
   private func take(_ d: ThreadDetail) {
@@ -331,17 +340,8 @@ public final class ThreadStore {
     continuedIn = d.continuedIn
     children = d.children
     team = d.team
-    var list = d.artifacts
-    for a in (artifactsSinceLoad ?? [:]).values.sorted(by: { $0.id < $1.id }) {
-      if let i = list.firstIndex(where: { $0.id == a.id }) {
-        if list[i].updatedAt < a.updatedAt { list[i] = a }
-      } else {
-        list.append(a)
-      }
-    }
-    artifactsSinceLoad = nil
-    artifacts = list
-    artifactIDs.formUnion(list.map(\.id))
+    artifacts = d.artifacts
+    artifactIDs.formUnion(d.artifacts.map(\.id))
   }
 
   @discardableResult
@@ -356,11 +356,143 @@ public final class ThreadStore {
     return true
   }
 
+  // MARK: History
+
+  /// Loads the page above span `span` (the first by default): "Earlier messages", or a gap's "Show earlier".
+  public func loadEarlier(_ span: Int = 0) async {
+    guard let cursor = history.earlier(span) else { return }
+    await loadPage(cursor, at: span == 0 ? .earlier : .gap(after: span - 1))
+  }
+
+  /// Loads the page under span `span + 1`, filling the gap up from span `span`: a gap's "Show later".
+  public func loadLater(after span: Int) async {
+    guard let cursor = history.later(span) else { return }
+    await loadPage(cursor, at: .gap(after: span))
+  }
+
+  /// Brings event `eventID` (a search hit) into the transcript, loading the page that holds it, then points
+  /// `revealTarget` at its row. Before the first load it waits for it.
+  public func reveal(_ eventID: Int) async {
+    revealing = eventID
+    guard isLoaded else { return }
+    if let cursor = history.reveal(eventID), !(await loadPage(cursor, at: nil)) {
+      if revealing == eventID { revealing = nil }
+      return
+    }
+    settleReveal()
+  }
+
+  public func revealShown() {
+    revealTarget = nil
+  }
+
+  /// Loads a clipped row whole and shows it in place of its copy.
+  public func showAll(_ eventID: Int) async {
+    guard isLoaded, clipped[eventID] != nil, !showingAll.contains(eventID) else { return }
+    showingAll.insert(eventID)
+    showAllErrors[eventID] = nil
+    defer { showingAll.remove(eventID) }
+    do {
+      let row = try await api.threadEvent(id, eventID: eventID)
+      guard !ended, history.replace(row) else { return }
+      clippedChanged()
+      historyChanged(force: true)
+      await layingOut()
+    } catch {
+      if error != .cancelled { showAllErrors[eventID] = error }
+    }
+  }
+
+  /// Loads one page into `history`. `edge`: the control that asked, which shows it loading or failed.
+  /// Returns once the page is laid out.
+  @discardableResult
+  private func loadPage(_ cursor: HistoryCursor, at edge: HistoryEdge?) async -> Bool {
+    guard isLoaded, !ended else { return false }
+    if let edge {
+      guard !loadingEdges.contains(edge) else { return false }
+      loadingEdges.insert(edge)
+      edgeErrors[edge] = nil
+    }
+    defer { if let edge { loadingEdges.remove(edge) } }
+    do {
+      let page = try await api.threadHistory(id, cursor)
+      guard !ended else { return false }
+      history.apply(page)
+      clippedChanged()
+      historyChanged()
+      await layingOut()
+      return true
+    } catch {
+      if let edge, error != .cancelled { edgeErrors[edge] = error }
+      return false
+    }
+  }
+
+  /// After `history` changed: the transcript follows, in place when only the tail grew, else laid out again off the
+  /// main actor, as the first load does.
+  private func historyChanged(force: Bool = false) {
+    eventsChanged()
+    guard laidSeq == layoutSeq else {
+      if force { stale = true }
+      return
+    }
+    if !force && transcript.extends(history.rows, spans: history.spans) {
+      transcript.update(history.rows, spans: history.spans)
+      settleReveal()
+    } else {
+      relayout()
+    }
+  }
+
+  private func relayout() {
+    layoutSeq += 1
+    let seq = layoutSeq
+    let (rows, spans) = (history.rows, history.spans)
+    layoutTask = Task {
+      let laidOut = await Self.layout(rows, spans)
+      guard seq == layoutSeq, !ended else { return }
+      laidSeq = seq
+      transcript = laidOut
+      pagesLaidOut += 1
+      // Rows that came while it was out: the tail, else everything again.
+      if !stale && laidOut.extends(history.rows, spans: history.spans) {
+        transcript.update(history.rows, spans: history.spans)
+        settleReveal()
+      } else {
+        stale = false
+        relayout()
+      }
+    }
+  }
+
+  /// Waits for the layouts asked for so far.
+  private func layingOut() async {
+    while laidSeq != layoutSeq, !ended, let task = layoutTask { await task.value }
+  }
+
+  private func settleReveal() {
+    guard let at = revealing, laidSeq == layoutSeq, history.spanIndex(at) != nil else { return }
+    revealing = nil
+    revealTarget = transcript.itemID(holding: at)
+  }
+
+  private func clippedChanged() {
+    var rows: [Int: Clipped] = [:]
+    var results: [String: Int] = [:]
+    for r in history.rows {
+      guard let c = r.clipped else { continue }
+      rows[r.id] = c
+      if case .toolResult(let t) = r.content { results[t.toolUseID] = r.id }
+    }
+    if clipped != rows { clipped = rows }
+    if clippedResults != results { clippedResults = results }
+  }
+
   // MARK: Stream
 
   private func openStream() {
     guard stream == nil, !ended else { return }
-    let s = makeStream(lastID)
+    let s = makeStream(history.tailID)
     stream = s
     streamTask = Task { [weak self, events = s.events] in
       for await e in events {
@@ -369,13 +501,6 @@ public final class ThreadStore {
       }
     }
     s.start()
-  }
-
-  private func closeStream() {
-    stream?.close()
-    streamTask?.cancel()
-    stream = nil
-    streamTask = nil
   }
 
   private func handle(_ e: SSEEvent<ThreadStreamMessage>) {
@@ -399,9 +524,6 @@ public final class ThreadStore {
     case .state(let s):
       flush()
       connection = s
-      guard s == .open else { return }
-      if opened { Task { await load() } }
-      opened = true
     }
   }
 
@@ -423,10 +545,25 @@ public final class ThreadStore {
         }
       case .modToast(let t): show(t)
       case .context(let c): context = c
+      case .sync(let d, let snapshot):
+        add(rows)
+        rows = []
+        sync(d, snapshot: snapshot)
       case .unknown: break
       }
     }
     add(rows)
+  }
+
+  /// The thread's state as the stream connected. A snapshot's page becomes the head, and the head held closes into
+  /// an island.
+  private func sync(_ d: ThreadDetail, snapshot: Bool) {
+    take(d)
+    guard snapshot, let head = d.history else { return }
+    history.detachHead()
+    history.apply(head: d.events, head)
+    clippedChanged()
+    historyChanged()
   }
 
   private func show(_ t: ModToast) {
@@ -445,7 +582,6 @@ public final class ThreadStore {
   }
 
   private func upsert(_ a: Artifact) {
-    artifactsSinceLoad?[a.id] = a
     let isNew = artifactIDs.insert(a.id).inserted
     if let i = artifacts.firstIndex(where: { $0.id == a.id }) {
       artifacts[i] = a
@@ -456,15 +592,9 @@ public final class ThreadStore {
   }
 
   private func add(_ rows: [EventRow]) {
-    let fresh = rows.filter { seen.insert($0.id).inserted }
-    guard !fresh.isEmpty else { return }
-    let inOrder = zip(fresh, fresh.dropFirst()).allSatisfy { $0.id < $1.id } && fresh[0].id > lastID
-    lastID = max(lastID, fresh.map(\.id).max() ?? 0)
-    var next = events + fresh
-    if !inOrder { next.sort { $0.id < $1.id } }
-    events = next
-    transcript.update(next)
-    eventsChanged()
+    guard history.append(live: rows) else { return }
+    if rows.contains(where: { $0.clipped != nil }) { clippedChanged() }
+    historyChanged()
   }
 
   private func eventsChanged() {
@@ -509,6 +639,8 @@ public final class ThreadStore {
 public final class ThreadStoreRegistry {
   @ObservationIgnored private let make: (String) -> ThreadStore
   private var stores: [String: (store: ThreadStore, holds: Int)] = [:]
+  /// Reveals asked for threads with no store yet, handed over on `acquire`.
+  @ObservationIgnored private var reveals: [String: Int] = [:]
 
   public init(make: @escaping (String) -> ThreadStore) {
     self.make = make
@@ -527,7 +659,18 @@ public final class ThreadStoreRegistry {
     let store = make(id)
     stores[id] = (store, 1)
     store.start()
+    if let at = reveals.removeValue(forKey: id) { Task { await store.reveal(at) } }
     return store
+  }
+
+  /// Opens the thread on event `eventID` (a search hit): its store loads the page holding it and scrolls there. A
+  /// thread not open yet takes it when it is.
+  public func reveal(_ id: String, at eventID: Int) {
+    if let store = stores[id]?.store {
+      Task { await store.reveal(eventID) }
+    } else {
+      reveals[id] = eventID
+    }
   }
 
   public func release(_ id: String) {
@@ -555,6 +698,7 @@ public final class ThreadStoreRegistry {
   public func stopAll() {
     let all = stores.values.map(\.store)
     stores = [:]
+    reveals = [:]
     for store in all { store.stop() }
   }
 }

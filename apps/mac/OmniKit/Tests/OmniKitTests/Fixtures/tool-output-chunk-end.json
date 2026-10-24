@@ -1,0 +1,11 @@
+{
+  "event_id": 5,
+  "tool_use_id": "call-test",
+  "offset": 11591,
+  "text": ".05 to be 10.06\nFAIL src/cart-139.test.ts > rounds the total (139 ms)\n    expected 10.05 to be 10.06",
+  "next": null,
+  "total": 11691,
+  "is_error": true,
+  "truncated": false,
+  "exit_code": 1
+}

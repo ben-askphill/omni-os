@@ -13,8 +13,8 @@ export type Route =
   /** The phone layout's Channels tab. The desktop lists channels in the sidebar and shows Home here. */
   | { name: 'channels' }
   | { name: 'channel'; id: string; tab: ChannelTab; pr?: number }
-  /** `turn`: the steps view's turn, the event id of the message that started it. */
-  | { name: 'thread'; id: string; artifact?: number; view?: ThreadView; turn?: number }
+  /** `turn`: the steps view's turn, the event id of the message that started it. `at`: an event to scroll to (a search hit). */
+  | { name: 'thread'; id: string; artifact?: number; view?: ThreadView; turn?: number; at?: number }
   | { name: 'search'; q: string }
   | { name: 'automations' }
   | { name: 'secrets' }
@@ -51,12 +51,14 @@ export function parseHash(hash: string): Route {
   if (a === 't' && b) {
     const art = Number(q.get('artifact'));
     const turn = Number(q.get('turn'));
+    const at = Number(q.get('at'));
     return {
       name: 'thread',
       id: b,
       artifact: Number.isFinite(art) && art > 0 ? art : undefined,
       view: isThreadView(c) ? c : undefined,
       turn: Number.isFinite(turn) && turn > 0 ? turn : undefined,
+      at: Number.isInteger(at) && at > 0 ? at : undefined,
     };
   }
   if (a === 'channels' && !b) return { name: 'channels' };
@@ -138,6 +140,8 @@ export const href = {
   pr: (id: string, n: number) => `#/c/${encodeURIComponent(id)}/prs/${n}`,
   settings: (id: string) => `#/c/${encodeURIComponent(id)}/settings`,
   thread: (id: string, artifact?: number) => `#/t/${encodeURIComponent(id)}${artifact ? `?artifact=${artifact}` : ''}`,
+  /** The thread scrolled to one event, loading the page that holds it. */
+  threadAt: (id: string, eventId: number) => `#/t/${encodeURIComponent(id)}?at=${eventId}`,
   threadView: (id: string, view: ThreadView, turn?: number) => `#/t/${encodeURIComponent(id)}/${view}${turn ? `?turn=${turn}` : ''}`,
   channels: () => '#/channels',
   search: (q: string) => `#/search?q=${encodeURIComponent(q)}`,

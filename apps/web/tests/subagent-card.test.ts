@@ -7,10 +7,11 @@ const call = (id: string, name: string, result?: { text: string; is_error?: bool
   name,
   input: {},
   parent: null,
-  result: result && { tool_use_id: id, text: result.text, is_error: !!result.is_error, truncated: false },
+  result: result && { tool_use_id: id, text: result.text, is_error: !!result.is_error, truncated: false, event: 2 },
   at: '2026-10-04T09:00:00Z',
   children: [],
   orphan: false,
+  event: 1,
 });
 
 describe('sub-agent delegation cards', () => {

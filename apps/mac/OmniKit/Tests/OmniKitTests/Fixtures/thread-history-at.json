@@ -1,0 +1,53 @@
+{
+  "events": [
+    {
+      "id": 99,
+      "thread_id": "00000000-0000-4000-8000-000000000037",
+      "kind": "init",
+      "payload": "{\"model\":\"claude-opus-5-5\",\"cwd\":\"/tmp/omni-fixtures/acme\",\"tools\":10,\"mcp\":[\"omni-ask:connected\"]}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 100,
+      "thread_id": "00000000-0000-4000-8000-000000000037",
+      "kind": "user",
+      "payload": "{\"text\":\"RICH the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the cart total rounds the wrong way the…\",\"source\":\"manual\"}",
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "clipped": {
+        "bytes": 2194
+      }
+    },
+    {
+      "id": 101,
+      "thread_id": "00000000-0000-4000-8000-000000000037",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_1\",\"name\":\"TodoWrite\",\"input\":{\"todos\":[{\"content\":\"Find the cart code\",\"activeForm\":\"Finding the cart code\",\"status\":\"in_progress\"},{\"content\":\"Fix the total\",\"activeForm\":\"Fixing the total\",\"status\":\"pending\"},{\"content\":\"Run the tests\",\"activeForm\":\"Running the tests\",\"status\":\"pending\"}]},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 102,
+      "thread_id": "00000000-0000-4000-8000-000000000037",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"toolu_fake_1\",\"text\":\"Todos have been modified successfully.\",\"is_error\":false,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 103,
+      "thread_id": "00000000-0000-4000-8000-000000000037",
+      "kind": "status",
+      "payload": "{\"text\":\"Looking for the cart code\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 104,
+      "thread_id": "00000000-0000-4000-8000-000000000037",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_2\",\"name\":\"Task\",\"input\":{\"description\":\"Find the cart code\",\"prompt\":\"Find where the cart total is computed.\",\"subagent_type\":\"Explore\"},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    }
+  ],
+  "span": {
+    "from": 0,
+    "to": 105
+  }
+}

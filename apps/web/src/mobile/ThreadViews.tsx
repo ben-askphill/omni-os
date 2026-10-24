@@ -1,5 +1,6 @@
 // The screens pushed from a thread: its steps, changes and PR, the channel browser, the shell, details and a file.
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { turnCount } from '@omni/shared/history.ts';
 import { api, artifactUrl, errorText, useApi, type HarnessWithRunning, type PRDetail } from '../api.ts';
 import { HarnessMark, harnessLabel } from '../components/brand.tsx';
 import { ArtifactBody } from '../components/ArtifactViewer.tsx';
@@ -10,6 +11,7 @@ import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
 import { usePRWatch, watchCopy } from '../components/thread/PRWatch.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { TerminalView } from '../components/TerminalView.tsx';
+import { ThreadIdCtx, ToolOutput } from '../components/thread/ToolOutput.tsx';
 import { Button, Chip, copyText, ErrorNote, Icon, SlideToConfirm, StatusDot } from '../components/ui.tsx';
 import { cloudAgentUrl } from '../cloud-agent.ts';
 import { carriedText } from '@omni/shared/continue.ts';
@@ -22,6 +24,8 @@ import { toolLabel, toolSummary, type Item, type ToolCall } from '../transcript/
 import { MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSection } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
 import { threadView } from './thread-view.ts';
+import { holds } from '../thread-history.ts';
+import { hasLiveOutput, outputTarget } from '../tool-output.ts';
 
 const SOURCE: Record<string, string> = { manual: 'You', conductor: 'The Conductor', team: 'Its team lead', automation: 'Automation', import: 'Imported', capture: 'Captured' };
 
@@ -38,28 +42,52 @@ function Body({ children, className = '' }: { children: ReactNode; className?: s
 /** The output worth a line under a step: a failure's message, and what a command printed. */
 const outputOf = (c: ToolCall) => (c.result && (c.result.is_error || c.name === 'Bash') ? c.result.text.trim().split('\n').slice(0, 3).join('\n').slice(0, 240) : '');
 
-function Step({ c, depth, running, cwd }: { c: ToolCall; depth: number; running: boolean; cwd: string }) {
+const OUTPUT_BOX = 'rounded-[10px] bg-surface-2 px-[9px] py-1.5 font-mono text-[12px] leading-[1.45] break-words whitespace-pre-wrap';
+
+/** `tails`: the turn's harness reports a call's output while it runs, so a running step has one to follow. */
+function Step({ c, depth, running, cwd, tails }: { c: ToolCall; depth: number; running: boolean; cwd: string; tails: boolean }) {
+  const [open, setOpen] = useState(false);
   const out = outputOf(c);
   const state = !c.result ? (running ? 'running' : 'stopped') : c.result.is_error ? 'failed' : 'done';
+  const target = outputTarget(c, running);
+  // A step Ben opened stays openable when its call settles, so the card does not fold away under his thumb.
+  const tappable = open || target?.kind === 'saved' || (target?.kind === 'live' && tails);
+  const head = (
+    <>
+      <span className="flex items-center gap-2.5">
+        <StatusDot status={state} size={8} />
+        <span className="shrink-0 text-[13px] font-medium">{toolLabel(c.name)}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] leading-[1.3] text-fg-2">{toolSummary(c, cwd)}</span>
+        {tappable && <Icon name="chevronRight" size={14} className={`shrink-0 text-fg-4 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />}
+      </span>
+      {out && !open && <span className={`ml-[18px] block ${OUTPUT_BOX} ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{out}</span>}
+    </>
+  );
   return (
     <>
-      <div className="flex flex-col gap-1.5 rounded-2xl bg-surface px-3.5 py-[11px]" style={{ marginLeft: depth * 14 }}>
-        <div className="flex items-center gap-2.5">
-          <StatusDot status={state} size={8} />
-          <span className="shrink-0 text-[13px] font-medium">{toolLabel(c.name)}</span>
-          <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] leading-[1.3] text-fg-2">{toolSummary(c, cwd)}</span>
-        </div>
-        {out && <div className={`ml-[18px] rounded-[10px] bg-surface-2 px-[9px] py-1.5 font-mono text-[12px] leading-[1.45] break-words whitespace-pre-wrap ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{out}</div>}
+      <div className="flex flex-col rounded-2xl bg-surface" style={{ marginLeft: depth * 14 }}>
+        {tappable ? (
+          <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-11 w-full flex-col justify-center gap-1.5 rounded-2xl px-3.5 py-[11px] text-left">
+            {head}
+          </button>
+        ) : (
+          <div className="flex flex-col gap-1.5 px-3.5 py-[11px]">{head}</div>
+        )}
+        {open && (
+          <div className="flex flex-col gap-2 px-3.5 pb-[11px]">
+            <ToolOutput call={c} running={running} touch box={(text) => <div className={`mo-scroll max-h-[60vh] overflow-auto ${OUTPUT_BOX} ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{text || '(no output)'}</div>} />
+          </div>
+        )}
       </div>
       {c.children.map((k) => (
-        <Step key={k.id} c={k} depth={depth + 1} running={running} cwd={cwd} />
+        <Step key={k.id} c={k} depth={depth + 1} running={running} cwd={cwd} tails={tails} />
       ))}
     </>
   );
 }
 
-function StepItem({ it, running, cwd }: { it: Item; running: boolean; cwd: string }) {
-  if (it.type === 'tools') return it.calls.map((c) => <Step key={c.id} c={c} depth={0} running={running} cwd={cwd} />);
+function StepItem({ it, running, cwd, tails }: { it: Item; running: boolean; cwd: string; tails: boolean }) {
+  if (it.type === 'tools') return it.calls.map((c) => <Step key={c.id} c={c} depth={0} running={running} cwd={cwd} tails={tails} />);
   if (it.type === 'text') return <Markdown text={it.p.text} className="px-1 py-1 text-[14px] leading-[1.55] text-fg-2" />;
   if (it.type === 'error') return <ErrorNote>{it.p.text}</ErrorNote>;
   return null;
@@ -68,17 +96,27 @@ function StepItem({ it, running, cwd }: { it: Item; running: boolean; cwd: strin
 /** Every call a turn made, in order, with what the agent said between them. */
 export function StepsScreen({ turn }: { turn?: number }) {
   const shell = useShell();
-  const { thread, events, files, children } = useThread();
-  const view = useMemo(() => (thread ? threadView({ events, thread, artifacts: files, children }) : null), [events, thread, files, children]);
-  const t = view?.turns.find((x) => x.key === turn) ?? view?.turns[view.turns.length - 1];
+  const { thread, events, history, files, children, ready } = useThread();
+  const spans = history.history.spans;
+  const view = useMemo(() => (thread ? threadView({ events, spans, thread, artifacts: files, children }) : null), [events, spans, thread, files, children]);
+  // A link to an older turn than the thread holds loads the page with it.
+  const held = !turn || holds(history.history, turn);
+  const { reveal } = history;
+  useEffect(() => {
+    if (ready && turn && !held) void reveal(turn);
+  }, [ready, turn, held, reveal]);
+  const t = view?.turns.find((x) => x.key === turn) ?? (held ? view?.turns[view.turns.length - 1] : undefined);
   const running = !!t && t.status === 'running';
+  const tails = !!t && hasLiveOutput(t.harness);
   return (
     <>
       <MoHeader onBack={shell.back} title="Steps" sub={thread?.title} />
-      <Body className="gap-2">
-        {t ? t.items.map((it) => <StepItem key={it.key} it={it} running={running} cwd={thread?.cwd ?? ''} />) : <MoEmpty>No steps yet.</MoEmpty>}
-        {t && !t.steps && <MoEmpty>This turn answered without calling a tool.</MoEmpty>}
-      </Body>
+      <ThreadIdCtx.Provider value={thread?.id ?? ''}>
+        <Body className="gap-2">
+          {t ? t.items.map((it) => <StepItem key={it.key} it={it} running={running} cwd={thread?.cwd ?? ''} tails={tails} />) : <MoEmpty>{held ? 'No steps yet.' : 'Loading'}</MoEmpty>}
+          {t && !t.steps && <MoEmpty>This turn answered without calling a tool.</MoEmpty>}
+        </Body>
+      </ThreadIdCtx.Provider>
     </>
   );
 }
@@ -286,11 +324,11 @@ export function TerminalScreen() {
 
 export function DetailsScreen() {
   const shell = useShell();
-  const { thread, init, lastResult, events, links } = useThread();
+  const { thread, init, lastResult, links, history } = useThread();
   const { channel } = useApp();
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   if (!thread) return <MoHeader onBack={shell.back} title="Details" />;
-  const turns = events.filter((e) => e.kind === 'result').length;
+  const turns = turnCount(history.history);
   const modelId = lastResult?.model || init?.model || thread.model || '';
   const { model } = harnesses ? modelOf(harnesses, { harness: thread.harness, model: modelId }) : { model: undefined };
   const rows: [string, ReactNode][] = [

@@ -113,10 +113,11 @@ struct CopyThreadMarkdownCommand: View {
 
   var body: some View {
     Button("Copy Thread as Markdown") {
-      if let shown, let text = model.threadMarkdown(shown.id) { Pasteboard.copy(text) }
+      guard let shown else { return }
+      Task { if let text = await model.threadMarkdown(shown.id) { Pasteboard.copy(text) } }
     }
     .keyboardShortcut("c", modifiers: [.command, .shift])
-    .disabled(shown.flatMap { model.threadMarkdown($0.id) } == nil)
+    .disabled(!(shown.map { model.canCopyThreadMarkdown($0.id) } ?? false))
   }
 }
 

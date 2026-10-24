@@ -2,7 +2,10 @@ import Foundation
 
 /// The REST calls a thread store makes. `OmniClient` is one; tests pass a fake.
 public protocol ThreadAPI: Sendable {
-  func thread(_ id: String) async throws(OmniAPIError) -> ThreadDetail
+  /// The thread with its newest page of events.
+  func threadOpen(_ id: String) async throws(OmniAPIError) -> ThreadDetail
+  func threadHistory(_ id: String, _ cursor: HistoryCursor) async throws(OmniAPIError) -> HistoryPage
+  func threadEvent(_ id: String, eventID: Int) async throws(OmniAPIError) -> EventRow
   func stopThread(_ id: String) async throws(OmniAPIError) -> OmniThread
   func handOff(_ id: String, to: String) async throws(OmniAPIError) -> HandoffAnswer
   func cancelHandoff(_ id: String) async throws(OmniAPIError) -> HandoffAnswer

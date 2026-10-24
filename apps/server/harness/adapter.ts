@@ -63,6 +63,12 @@ export interface AdapterCallbacks {
   contextHint?: (h: ContextHint) => void;
   /** A finished turn's token counts, for a harness that reports them per turn (Cursor). */
   turnTokens?: (u: CursorTurnUsage) => void;
+  /**
+   * A tool call that prints while it runs: without `text`, it started; with it, what it printed. The clients that have
+   * its row open follow it (apps/server/tool-tail.ts). The call's tool_result ends it. A harness that reports a tool's
+   * output only when it ends never calls this.
+   */
+  toolOutput?: (toolUseId: string, text?: string) => void;
 }
 
 /** A running harness process, wired to the runner. */

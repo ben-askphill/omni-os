@@ -281,9 +281,11 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
   /// The thread this one continues, and the threads that continue it. Older servers leave them out.
   public let continuedFrom: ContinueLink?
   public let continuedIn: [ContinueLink]
+  /// Set when `events` is the newest page only (`?history=recent`). Nil means every row came.
+  public let history: HistoryHead?
 
   enum CodingKeys: String, CodingKey {
-    case thread, channel, events, artifacts, children, team, parent, pending, live, blocked, handoff
+    case thread, channel, events, artifacts, children, team, parent, pending, live, blocked, handoff, history
     case continuedFrom = "continued_from"
     case continuedIn = "continued_in"
   }
@@ -303,5 +305,6 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
     handoff = (try? c.decodeIfPresent(HandoffView.self, forKey: .handoff)) ?? nil
     continuedFrom = try c.decodeIfPresent(ContinueLink.self, forKey: .continuedFrom)
     continuedIn = try c.decodeIfPresent([ContinueLink].self, forKey: .continuedIn) ?? []
+    history = try c.decodeIfPresent(HistoryHead.self, forKey: .history)
   }
 }

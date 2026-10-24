@@ -8,6 +8,7 @@ import { turnFinished } from '../sync/files.ts';
 import { suggestNextThread, suggestReply } from './aux.ts';
 import { finishTurnSnapshot, settleSnapshots } from './snapshots.ts';
 import { pump, reportToParent } from './queue.ts';
+import { toolTails } from '../tool-tail.ts';
 import { endTasks } from './records.ts';
 import { stopPreparation } from './setup-action.ts';
 import { applyQueued } from './switch.ts';
@@ -109,6 +110,7 @@ export function armIdle(live: Live) {
 export function teardown(live: Live) {
   clearTimeout(live.idleTimer);
   endTasks(live);
+  toolTails.endThread(live.threadId);
   clearMods(live);
   clearInterrupt(live);
   if (live.browser && browserHolder.get(live.channelId) === live.threadId) {

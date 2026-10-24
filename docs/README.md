@@ -22,6 +22,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 
 - [Architecture overview](internals/overview.md): how a thread runs, the Web UI and Mac app split, repo layout
 - [Auto routing](internals/auto-routing.md): how Auto picks a model, and the benchmarks that check it
+- [Thread history](internals/thread-history.md): how a long thread opens on its newest page, the budgets, and what clients hold
 - [Glossary](../CONTEXT.md)
 - [Mac app notes](../apps/mac/NOTES.md)
 - [Screenshots on PRs](pr-screenshots.md)

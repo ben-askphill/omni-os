@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BOTTOM_SLACK, followAfterScroll } from '../src/pages/useTranscriptScroll.ts';
+import { firstBelow } from '../src/pages/useScrollAnchor.ts';
+import { BOTTOM_SLACK, followAfterScroll, onContent } from '../src/pages/useTranscriptScroll.ts';
 
 // The transcript's auto scroll, as ScrollPin.swift on the Mac: a scroll up leaves the bottom, however small.
 
@@ -21,5 +22,28 @@ describe('followAfterScroll', () => {
 
   it('keeps following while the jump scrolls down', () => {
     expect(followAfterScroll(true, 200, 600, 900)).toBe(true);
+  });
+});
+
+describe('onContent', () => {
+  it('keeps to the bottom on open and while following', () => {
+    expect(onContent(true, false, true)).toBe('bottom');
+    expect(onContent(false, true, false)).toBe('bottom');
+  });
+
+  it('shows New activity only for rows newer than the tail, never for older rows loading above', () => {
+    expect(onContent(false, false, true)).toBe('pill');
+    expect(onContent(false, false, false)).toBe('stay');
+  });
+});
+
+describe('firstBelow', () => {
+  const bottoms = [40, 90, 150, 300];
+  it('finds the first row still showing under the top edge', () => {
+    expect(firstBelow(bottoms.length, (i) => bottoms[i], 0)).toBe(0);
+    expect(firstBelow(bottoms.length, (i) => bottoms[i], 90)).toBe(2);
+    expect(firstBelow(bottoms.length, (i) => bottoms[i], 120)).toBe(2);
+    expect(firstBelow(bottoms.length, (i) => bottoms[i], 300)).toBe(4);
+    expect(firstBelow(0, () => 0, 0)).toBe(0);
   });
 });

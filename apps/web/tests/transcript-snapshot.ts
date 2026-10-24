@@ -1,3 +1,4 @@
+import type { Span } from '@omni/shared/history.ts';
 import { buildItems, toolSummary, type Item, type Todo, type ToolCall, type TranscriptEvent } from '../src/transcript/fold.ts';
 
 // The shape Swift's transcript tests read back from packages/test-fixtures/transcript/corpus.json.
@@ -79,9 +80,9 @@ function projectTodo(t: Todo) {
   return o;
 }
 
-/** The fold's items, in the shape the checked-in corpus stores. */
-export function projectFold(events: TranscriptEvent[]) {
-  const { items, plan } = buildItems(events);
+/** The fold's items, in the shape the checked-in corpus stores. A case with `spans` folds only those. */
+export function projectFold(events: TranscriptEvent[], spans?: readonly Span[]) {
+  const { items, plan } = buildItems(events, spans);
   return {
     items: items.map(projectItem),
     plan: plan ? { after: plan.after, todos: plan.todos.map(projectTodo) } : null,
