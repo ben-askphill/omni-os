@@ -1,5 +1,6 @@
 // Stdio MCP server handed to conductor threads. It talks to the local Omni API,
 // so delegated threads are ordinary threads the user can open, search and continue.
+import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -254,6 +255,34 @@ server.registerTool(
     const t = await call(`/threads/${thread_id}/run`, { method: 'POST', body: JSON.stringify({ harness, model: model ?? '', effort: effort ?? '' }) });
     const queued = t.queued_harness ? { harness: t.queued_harness, model: t.queued_model, effort: t.queued_effort } : null;
     return text({ thread_id: t.id, harness: t.harness, model: t.model, effort: t.effort, queued });
+  },
+);
+
+server.registerTool(
+  'continue_thread',
+  {
+    description:
+      `Continue an idle thread in a new one on a local harness, only when ${USER} asks. The new thread is linked to it, in the same ` +
+      'channel, with a session of its own and, for repo work, its own worktree on a new branch with the uncommitted changes carried. ' +
+      'Its first session reads a carryover of the thread (goal, changed files, checks, recent history) ahead of `message`. ' +
+      'The thread itself stays as it is. Refused while anything runs or waits in it, and to or from Hermes or Cursor Cloud. Ids come from list_harnesses.',
+    inputSchema: {
+      thread_id: z.string(),
+      harness: z.string().describe('claude-code, codex or cursor.'),
+      model: z.string().optional().describe("A model id from list_harnesses. Omit for the harness's default. Not auto."),
+      effort: z.string().optional().describe("One of the model's effort levels. Omit for its default."),
+      message: z.string().describe('The first message for the new thread. It reads it after the carryover, whole.'),
+    },
+  },
+  async ({ thread_id, harness, model, effort, message }) => {
+    const run = { harness, model: model ?? '', effort: effort ?? '' };
+    const preview = await call(`/threads/${thread_id}/continue/preview`, { method: 'POST', body: JSON.stringify(run) });
+    if (preview.blocked) return text(`Not continued: ${preview.blocked.message}`);
+    const { thread } = await call(`/threads/${thread_id}/continue`, {
+      method: 'POST',
+      body: JSON.stringify({ ...run, text: message, request_id: randomUUID(), revision: preview.revision }),
+    });
+    return text({ thread_id: thread.id, title: thread.title, continued_from: thread_id, harness: thread.harness, model: thread.model, effort: thread.effort, status: thread.status, branch: thread.branch });
   },
 );
 
