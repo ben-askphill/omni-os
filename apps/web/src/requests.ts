@@ -33,8 +33,8 @@ export function parkedOf(items: readonly PendingMsg[]) {
   };
 }
 
-/** Omni wrote it, not Ben: a crew report, or the go a team's lead gets once its members have reported. */
-export const isOmnis = (m: PendingMsg) => m.kind === 'crew_report' || m.source === 'team' || m.source === 'crew';
+/** Omni wrote it, not Ben: a crew report, the go a team's lead gets once its members have reported, or a PR watch's wake. */
+export const isOmnis = (m: PendingMsg) => m.kind === 'crew_report' || m.source === 'team' || m.source === 'crew' || m.source === 'pr-watch';
 
 /** "Crew report T-1 from coder": who a crew report is from. */
 export function reportName(m: PendingMsg): string {
@@ -54,6 +54,7 @@ export function parkedLabel(m: PendingMsg): string | null {
     if (m.delivery === 'uncertain') return `${reportName(m)}, may have reached the agent before the restart`;
     return null;
   }
+  if (m.source === 'pr-watch' && m.delivery === 'recovered') return 'PR watch, held for Resume';
   if (m.delivery === 'recovered') return 'Held after a restart, waiting for Resume';
   if (m.delivery === 'uncertain') return 'May have reached the agent before the restart';
   return null;
@@ -63,6 +64,9 @@ export function parkedLabel(m: PendingMsg): string | null {
 export function parkedHeading(items: readonly PendingMsg[]): string {
   const n = items.length;
   const reports = items.filter((m) => m.kind === 'crew_report').length;
+  // A PR watch's wake also waits for Resume when the thread cannot run here, with no restart behind it.
+  const watches = items.filter((m) => m.source === 'pr-watch').length;
+  if (!reports && watches) return `${n === 1 ? '1 message is' : `${n} messages are`} waiting for Resume`;
   if (!reports) return `${n === 1 ? '1 message was' : `${n} messages were`} waiting when Omni restarted`;
   if (reports === n) return `${n === 1 ? '1 crew report is' : `${n} crew reports are`} waiting for Resume`;
   return `${n} messages and crew reports are waiting for Resume`;
