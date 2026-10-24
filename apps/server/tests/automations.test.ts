@@ -4,8 +4,10 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('../runner.ts', () => ({ createThread: vi.fn() }));
 vi.mock('../db.ts', () => ({ db: { prepare: vi.fn() } }));
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseAutomation } from '../automations.ts';
-import { config } from '../config.ts';
+import { config, paths } from '../config.ts';
 
 const valid = `
 name: Morning coffee
@@ -122,5 +124,17 @@ describe('parseAutomation', () => {
     const all = loadAutomations();
     expect(all.length).toBeGreaterThan(0);
     for (const a of all) expect(a.error, `${a.id}: ${a.error}`).toBeUndefined();
+  });
+
+  // Off until the user turns it on, weekday mornings, and a missed slot still runs once the Mac is back.
+  it('ships tool-failure-triage as an off-by-default weekday builder run with catch-up', () => {
+    const file = join(paths.automations, 'tool-failure-triage.yaml');
+    const a = parseAutomation('tool-failure-triage', readFileSync(file, 'utf8'), file);
+    expect(a).toMatchObject({ cron: '30 8 * * 1-5', catchup: true, channel: 'omni-os', role: 'builder', enabled: false });
+    expect(a.error).toBeUndefined();
+    expect(a.prompt).not.toMatch(/\{\{/);
+    const next = new Date(a.next!);
+    expect([1, 2, 3, 4, 5]).toContain(next.getUTCDay());
+    expect(next.getUTCMinutes()).toBe(30);
   });
 });

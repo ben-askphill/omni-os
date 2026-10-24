@@ -1,6 +1,6 @@
 # Automations
 
-`automations/*.yaml` are shared examples (`morning-coffee`, `weekly-review`, `artifact-comments`, `brain-nightly`, `pr-babysitter`, `fix-failing-checks`), all off until you turn them on. Turning one on or off in the UI writes `automations.<id>.enabled` to `data/omni.config.json`, never the YAML, and `automations.<id>.channel` there moves it to another channel. Your own automations go in `data/automations/`.
+`automations/*.yaml` are shared examples (`morning-coffee`, `weekly-review`, `artifact-comments`, `brain-nightly`, `pr-babysitter`, `fix-failing-checks`, `tool-failure-triage`), all off until you turn them on. Turning one on or off in the UI writes `automations.<id>.enabled` to `data/omni.config.json`, never the YAML, and `automations.<id>.channel` there moves it to another channel. Your own automations go in `data/automations/`.
 
 ```yaml
 name: Morning coffee
@@ -15,7 +15,20 @@ prompt: |
   Run the morning-coffee skill for today.
 ```
 
-`timezone` defaults to your timezone from the config (`OMNI_TZ` wins, else the system's). Both folders are watched; edits apply without a restart. The Mac has to be awake at the scheduled time.
+`timezone` defaults to your timezone from the config (`OMNI_TZ` wins, else the system's). Both folders are watched; edits apply without a restart. The Mac has to be awake at the scheduled time, unless the automation sets `catchup: true`: then a missed slot runs once Omni is back.
+
+## Tool-failure triage
+
+`tool-failure-triage` reviews the tool-failure log (`GET /api/tool-failures`) at 08:30 on weekdays in the `omni-os` channel as a builder:
+
+- It reads only occurrences newer than the `Reviewed through <time>` that starts each group's guidance, and skips its own thread.
+- A group is investigated once it has 3 or more occurrences or spans 2 or more threads, or when one occurrence is plainly an Omni bug. The run reads each failed call's context from its thread's events and never copies arguments or output anywhere.
+- Expected noise (a grep with no match, a probe, a test failing mid-fix) goes into the group's guidance. Its status is left as it was, because one group can mix noise and real causes.
+- Recurring causes in Omni or in your workspace folder's repo (its skills, rules and CLAUDE.md) are fixed in one PR per repo, labelled `tool-failure-triage`. While one is open, later runs push to it. Nothing is merged.
+- Groups a PR addresses become `investigating` with `owner/repo#N` in their guidance (guidance drops links). A later run marks them `fixed` once the PR is merged.
+- It never sets `avoid` or `replacement` and never disables a tool. It proposes those in its reply instead.
+
+The log is local to each Mac, and with sync on scheduled runs fire only on the Mac that owns automations, so that is the Mac whose failures get reviewed.
 
 ## Event automations
 
