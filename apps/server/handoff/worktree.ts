@@ -135,11 +135,13 @@ export async function unpackWorktree(u: Unpack): Promise<void> {
     if (problem) throw new Error(problem);
     const tree = await snapshotTree(dir);
     const clean = tree === (await git(dir, ['rev-parse', 'HEAD^{tree}']));
-    if (!clean) {
-      const handed = (await git(repo, ['for-each-ref', '--format=%(tree)', `refs/omni/handoff/${u.threadId}/`])).split('\n');
-      if (!handed.includes(tree)) {
-        throw new Error("this Mac's worktree for the thread has uncommitted changes of its own, so Omni left it alone. Commit or stash them there, then hand the thread over again");
-      }
+    const handed = (await git(repo, ['for-each-ref', '--format=%(tree)', `refs/omni/handoff/${u.threadId}/`])).split('\n');
+    // A file staged and then edited again: its staged version is in no snapshot, so the reset below would lose it.
+    const names = async (args: string[]) => new Set((await git(dir, ['diff', '--name-only', '-z', ...args])).split('\0').filter(Boolean));
+    const unstaged = await names([]);
+    const stagedOnly = [...(await names(['--cached']))].some((f) => unstaged.has(f));
+    if (stagedOnly || (!clean && !handed.includes(tree))) {
+      throw new Error("this Mac's worktree for the thread has uncommitted changes of its own, so Omni left it alone. Commit or stash them there, then hand the thread over again");
     }
     if (!(await descends(dir, await git(dir, ['rev-parse', 'HEAD']), bundle.base))) throw ownCommits(branch);
     await git(dir, ['reset', '--quiet', '--hard', bundle.base]);

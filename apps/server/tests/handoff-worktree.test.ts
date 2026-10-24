@@ -104,4 +104,14 @@ describe('a worktree handed to another Mac', () => {
     expect(status(wtB)).toEqual(mine);
     expect(read(join(wtB, 'README.md'))).toBe('edited on B after it left\n');
   });
+
+  it('leaves alone a file staged and edited again, whose staged version no snapshot holds', T, async () => {
+    // A's files are what B handed it, but README's staged version is one only A's index has.
+    write(join(wtA, 'README.md'), 'staged on A only\n');
+    git(wtA, 'add', 'README.md');
+    write(join(wtA, 'README.md'), 'shop, edited on B\n');
+
+    await expect(hand(wtB, { repo: repoA, dir: wtA }, 'offer-4')).rejects.toThrow(/uncommitted changes of its own/);
+    expect(git(wtA, 'show', ':README.md')).toBe('staged on A only');
+  });
 });
