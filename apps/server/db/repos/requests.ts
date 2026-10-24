@@ -51,9 +51,10 @@ export interface MessageRequest {
   /**
    * crew: a child's report. team: the go a team's lead gets once its members have reported. limit: the continuation
    * of a turn stopped at a usage limit (apps/server/runner/limits.ts). handoff: a thread handed over from another Mac,
-   * its continuation and the messages that were queued there (apps/server/handoff.ts).
+   * its continuation and the messages that were queued there (apps/server/handoff.ts). pr-watch: a watched PR's new
+   * check failure (apps/server/pr-watch/).
    */
-  source: 'ben' | 'conductor' | 'crew' | 'team' | 'limit' | 'handoff';
+  source: 'ben' | 'conductor' | 'crew' | 'team' | 'limit' | 'handoff' | 'pr-watch';
   attachments: Attachment[] | null;
   /** The transcript row it becomes: `user`, or `crew_report` for a child's report. */
   kind: 'user' | 'crew_report';

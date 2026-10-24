@@ -43,6 +43,16 @@ An agent can stop and ask you one to four multiple-choice questions with Omni's 
 
 How the process behind a thread is launched: [Architecture overview](../internals/overview.md#how-a-thread-runs).
 
+## Watch PR
+
+A thread with an open PR can watch its checks: **Watch checks** in the composer's PR menu (on the phone, the PR screen), or the Conductor's `watch_pr` tool. Omni polls GitHub itself, so no client needs to be open and an unchanged poll costs no agent turn.
+
+- A check that fails on the PR head wakes the thread once, with the head commit, the failing checks and the tail of each GitHub Actions log. The same check failing again on the same head, after a re-run, does not wake it again; failing on a new head does.
+- The wake is saved before it is sent, like any queued message. One saved before a restart waits in the thread for Resume. A thread this Mac cannot run (it runs on your other Mac, its worktree is not ready) gets it held for Resume too.
+- Polls come every minute while checks run and slow to every 15 minutes while nothing changes. GitHub errors back off, and five in a row stop the watch. A rate limit pauses every watch for 15 minutes without counting as an error.
+- A watch ends when you stop it, the PR merges or closes, the thread is archived, or it has woken the thread five times. The PR menu says which; Watch checks starts it again.
+- Watches live on the Mac that started them and are not synced.
+
 ## Send to Grok Bot
 
 The thread header and the right-click menu send the title and the messages. On a phone, Thread options has the same action. The context is the channel id and the thread id. The Conductor tool is `send_to_grok_bot`. Where the webhook URL and Authorization value go: [Configuration](configuration.md#grok-bot).

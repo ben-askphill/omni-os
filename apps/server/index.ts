@@ -28,6 +28,7 @@ const { startArtifactWatcher } = await import('./artifacts.ts');
 const { backfillPublished } = await import('./published.ts');
 const { startScheduler } = await import('./automations.ts');
 const { startEventWatch } = await import('./automation-watch.ts');
+const { startPRWatch } = await import('./pr-watch/worker.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
 const { startSync } = await import('./sync/worker.ts');
 const { recoverHandoffs } = await import('./handoff.ts');
@@ -68,6 +69,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   backfillPublished();
   startScheduler();
   startEventWatch();
+  startPRWatch();
   startCatalogRefresh();
   // Removes worktrees of archived, deleted and merged-and-idle threads that hold nothing unsaved, now and daily.
   startWorktreeSweep();
