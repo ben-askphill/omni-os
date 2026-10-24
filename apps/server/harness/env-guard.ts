@@ -1,8 +1,8 @@
 // Builds each harness's process environment from Omni's own environment plus the
 // channel and global secrets, then strips the variables that would switch that
 // harness off its subscription onto API billing. The guard wins: a secret whose
-// name is on the strip list never reaches that harness. The Grok Bot webhook is
-// stripped for every harness too. Pure, so it is testable.
+// name is on the strip list never reaches that harness. The Grok Bot webhook and the
+// Google sign-in client secrets are stripped for every harness too. Pure, so it is testable.
 import type { HarnessId } from './types.ts';
 
 /**
@@ -23,7 +23,14 @@ export const STRIPPED_VARS: Record<HarnessId, string[]> = {
 /** The Grok Bot webhook. The server reads these. A harness process and a thread's terminal do not. */
 export const GROKBOT_WEBHOOK_URL = 'GROKBOT_WEBHOOK_URL';
 export const GROKBOT_WEBHOOK_AUTH = 'GROKBOT_WEBHOOK_AUTH';
-export const SERVER_ONLY_VARS = [GROKBOT_WEBHOOK_URL, GROKBOT_WEBHOOK_AUTH] as const;
+/**
+ * The Google OAuth clients' secrets for sign-in (apps/server/sign-in.ts): the Desktop client's and the Web client's,
+ * as Keychain secrets, and the OMNI_ env names tests and the QA stack set instead.
+ */
+export const GOOGLE_CLIENT_SECRET = 'GOOGLE_OAUTH_CLIENT_SECRET';
+export const GOOGLE_WEB_CLIENT_SECRET = 'GOOGLE_OAUTH_WEB_CLIENT_SECRET';
+const GOOGLE_SECRET_ENV = ['OMNI_GOOGLE_CLIENT_SECRET', 'OMNI_GOOGLE_WEB_CLIENT_SECRET'];
+export const SERVER_ONLY_VARS = [GROKBOT_WEBHOOK_URL, GROKBOT_WEBHOOK_AUTH, GOOGLE_CLIENT_SECRET, GOOGLE_WEB_CLIENT_SECRET, ...GOOGLE_SECRET_ENV] as const;
 
 /**
  * The environment a harness process gets. `base` is Omni's own environment

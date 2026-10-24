@@ -1,14 +1,33 @@
 // The gate in front of every /api route. Two jobs:
 // - Only Omni's own clients get in: every request carries this install's token (apps/server/api-token.ts), as
-//   `Authorization: Bearer` or the cookie a paired browser holds. Through tailscale serve, the Tailscale login must
+//   `Authorization: Bearer` or the cookie a paired browser holds, or a live Google sign-in session
+//   (apps/server/sign-in.ts) as its cookie or bearer credential. Through tailscale serve, the Tailscale login must
 //   also be the owner's when the user config names one.
-// - A web page in a browser that holds the cookie cannot use it: a cross-site POST /api/threads would run a prompt
+// - A web page in a browser that holds a cookie cannot use it: a cross-site POST /api/threads would run a prompt
 //   with bypassPermissions, and a DNS-rebinding domain could read the responses as well.
 import type { Context, MiddlewareHandler } from 'hono';
-import { getCookie } from 'hono/cookie';
-import { cookieName, tokenMatches } from './api-token.ts';
+import { getCookie, setCookie } from 'hono/cookie';
+import { cookieName, isSessionCredential, sessionCookieName, tokenMatches } from './api-token.ts';
 import { config } from './config.ts';
 import { resolved } from './user-config.ts';
+import type { SessionAccess } from './db/repos/auth.ts';
+
+/** How a request got in: the install token, or a Google sign-in session (and whether it came as the cookie). */
+export type Access = { via: 'token' } | { via: 'session'; session: SessionAccess; cookie: boolean };
+
+declare module 'hono' {
+  interface ContextVariableMap {
+    /** Set by requestGuard. Null only on the routes that take no credential. */
+    access: Access | null;
+  }
+}
+
+let lookupSession: (credential: string) => SessionAccess | null = () => null;
+
+/** apps/server/sign-in.ts hands the guard its session check at startup, so this module stays clear of the database. */
+export function useSessions(lookup: (credential: string) => SessionAccess | null) {
+  lookupSession = lookup;
+}
 
 /** Names the server answers to: loopback, the tailnet (tailscale serve), OMNI_HOST, and OMNI_ALLOWED_HOSTS. */
 export function hostAllowed(hostname: string, extra: readonly string[] = extraHosts()): boolean {
@@ -27,7 +46,11 @@ function extraHosts(): string[] {
   return list.map((s) => s.trim().toLowerCase()).filter(Boolean);
 }
 
-const hostnameOf = (host: string) => {
+/** The Host the request names, as host[:port]. */
+export const requestHost = (c: Context) => c.req.header('host') ?? new URL(c.req.url).host;
+
+/** The hostname in a Host header, or '' when it is not one. */
+export const hostnameOf = (host: string) => {
   try {
     return new URL(`http://${host}`).hostname;
   } catch {
@@ -38,8 +61,15 @@ const hostnameOf = (host: string) => {
 const refuse = (reason: string, status = 403) =>
   new Response(JSON.stringify({ error: status === 403 ? `Forbidden: ${reason}` : reason }), { status, headers: { 'content-type': 'application/json' } });
 
-/** The one route that takes no token: the Mac app asks it to prove it is this install before sending the token. */
+/** The Mac app asks this to prove it is this install before sending the token. */
 export const PROOF_PATH = '/api/auth/proof';
+
+/**
+ * The routes that take no token and no session, so a browser can start signing in. Every other check below still
+ * applies, so only a page on this origin can call them. Google's redirect back (GET /api/auth/google/callback) is
+ * not here: it comes from another site by design, so app.ts routes it ahead of this guard, behind `hostAndOwner`.
+ */
+const OPEN = new Set([`GET ${PROOF_PATH}`, 'GET /api/auth/google', 'POST /api/auth/google/start', 'POST /api/auth/google/finish']);
 
 const bearer = (c: Context) => c.req.header('authorization')?.match(/^Bearer\s+(\S+)\s*$/i)?.[1];
 
@@ -65,19 +95,59 @@ const cameThroughProxy = (c: Context, host: string) => viaTailnet(hostnameOf(hos
 /** Body types a cross-site page can send without a CORS preflight. JSON routes never take them. */
 const SIMPLE_TYPES = ['text/plain', 'application/x-www-form-urlencoded'];
 
+/** The request reached the server over HTTPS, directly or through tailscale serve. */
+export const isHttps = (c: Context) => new URL(c.req.url).protocol === 'https:' || c.req.header('x-forwarded-proto') === 'https';
+
+/** The session cookie: HttpOnly, SameSite=Strict, on /api, until the session's own expiry. */
+export function setSessionCookie(c: Context, credential: string, expiresAt: string) {
+  const maxAge = Math.max(0, Math.floor((Date.parse(expiresAt) - Date.now()) / 1000));
+  setCookie(c, sessionCookieName(), credential, { path: '/api', httpOnly: true, sameSite: 'Strict', secure: isHttps(c), maxAge });
+}
+
+/** A bearer header wins over the cookies, as it always has; a session credential and the token are told apart by shape. */
+function accessOf(c: Context): Access | null {
+  const given = bearer(c);
+  if (given !== undefined) {
+    if (!isSessionCredential(given)) return tokenMatches(given) ? { via: 'token' } : null;
+    const session = lookupSession(given);
+    return session ? { via: 'session', session, cookie: false } : null;
+  }
+  const fromCookie = getCookie(c, sessionCookieName());
+  const session = fromCookie ? lookupSession(fromCookie) : null;
+  if (session) return { via: 'session', session, cookie: true };
+  return tokenMatches(getCookie(c, cookieName())) ? { via: 'token' } : null;
+}
+
+/** Through tailscale serve, refuses a Tailscale login that is not the owner's, when the user config names one. */
+function notOwner(c: Context, host: string): Response | null {
+  const owners = resolved.tailscaleLogins();
+  if (owners.length && cameThroughProxy(c, host) && !owners.includes((c.req.header('tailscale-user-login') ?? '').trim().toLowerCase())) {
+    return refuse('this Tailscale login is not the owner');
+  }
+  return null;
+}
+
+/** Refuses a Host outside hostAllowed, and through tailscale serve a Tailscale login that is not the owner's. */
+export function hostAndOwner(c: Context): Response | null {
+  const host = requestHost(c);
+  return hostAllowed(hostnameOf(host)) ? notOwner(c, host) : refuse('host not allowed');
+}
+
 /**
  * Lets through what Omni's own clients send and refuses what a browser sends on another site's behalf:
  * - a Host outside hostAllowed (DNS rebinding);
  * - Sec-Fetch-Site: cross-site (any request a page on another site made);
  * - an Origin, `null` included, that is not the Host the request came in on;
  * - a text/plain or form-urlencoded body, the content types that skip the preflight;
- * - no token, or the wrong one (401), in the Authorization header or the paired browser's cookie;
  * - through tailscale serve (a tailnet Host, or any proxy header), a Tailscale-User-Login that is not in
- *   `integrations.tailscaleLogin`, when that is set.
+ *   `integrations.tailscaleLogin`, when that is set;
+ * - neither the token nor a live session (401), in the Authorization header or the browser's cookies, outside OPEN.
+ *   A session is looked up last, so a request refused above never renews one.
  * The Mac app, apps/mcp/omni.ts, scripts and curl send no Origin or Sec-Fetch-Site, so the Host and token checks apply to them.
+ * A session cookie used more than 5 minutes after its last use is sent again with its new 30-day expiry.
  */
 export const requestGuard: MiddlewareHandler = async (c, next) => {
-  const host = c.req.header('host') ?? new URL(c.req.url).host;
+  const host = requestHost(c);
   if (!hostAllowed(hostnameOf(host))) return refuse('host not allowed');
   if (c.req.header('sec-fetch-site') === 'cross-site') return refuse('cross-site request');
   const origin = c.req.header('origin');
@@ -94,12 +164,13 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
   }
   const type = (c.req.header('content-type') ?? '').split(';')[0].trim().toLowerCase();
   if (SIMPLE_TYPES.includes(type)) return refuse('send JSON', 415);
-  if (!(c.req.method === 'GET' && c.req.path === PROOF_PATH)) {
-    if (!tokenMatches(bearer(c) ?? getCookie(c, cookieName()))) return refuse("Unauthorized: send this install's token (data/api-token), or pair this browser", 401);
+  const owner = notOwner(c, host);
+  if (owner) return owner;
+  const access = accessOf(c);
+  if (!access && !OPEN.has(`${c.req.method} ${c.req.path}`)) {
+    return refuse("Unauthorized: send this install's token (data/api-token), or sign in or pair this browser", 401);
   }
-  const owners = resolved.tailscaleLogins();
-  if (owners.length && cameThroughProxy(c, host) && !owners.includes((c.req.header('tailscale-user-login') ?? '').trim().toLowerCase())) {
-    return refuse('this Tailscale login is not the owner');
-  }
+  c.set('access', access);
+  if (access?.via === 'session' && access.cookie && access.session.renewed) setSessionCookie(c, getCookie(c, sessionCookieName())!, access.session.expiresAt);
   await next();
 };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GROKBOT_WEBHOOK_AUTH, GROKBOT_WEBHOOK_URL, harnessEnv, STRIPPED_VARS } from '../harness/env-guard.ts';
+import { GOOGLE_CLIENT_SECRET, GOOGLE_WEB_CLIENT_SECRET, GROKBOT_WEBHOOK_AUTH, GROKBOT_WEBHOOK_URL, harnessEnv, STRIPPED_VARS } from '../harness/env-guard.ts';
 import { HARNESS_IDS } from '../harness/types.ts';
 
 describe('harness env guard', () => {
@@ -60,6 +60,14 @@ describe('harness env guard', () => {
       expect(env[GROKBOT_WEBHOOK_URL]).toBeUndefined();
       expect(env[GROKBOT_WEBHOOK_AUTH]).toBeUndefined();
       expect(env.PATH).toBe('/usr/bin');
+    }
+  });
+
+  it('keeps the Google sign-in client secrets on the server, from the Keychain or from the env', () => {
+    const dirty = { PATH: '/usr/bin', OMNI_GOOGLE_CLIENT_SECRET: 'env', OMNI_GOOGLE_WEB_CLIENT_SECRET: 'env' } as NodeJS.ProcessEnv;
+    for (const harness of HARNESS_IDS) {
+      const env = harnessEnv(harness, {}, { [GOOGLE_CLIENT_SECRET]: 'keychain', [GOOGLE_WEB_CLIENT_SECRET]: 'keychain' }, dirty);
+      expect(Object.keys(env).filter((k) => k.includes('CLIENT_SECRET'))).toEqual([]);
     }
   });
 });

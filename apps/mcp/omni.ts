@@ -387,4 +387,17 @@ server.registerTool('note_tool_failure_recovery', {
   inputSchema: { id: z.string(), recovery: z.enum(['recovered', 'not_recovered', 'unknown']), retry_of: z.string().optional() },
 }, async ({ id, ...body }) => text(await call(`/tool-failures/occurrences/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) })));
 
+server.registerTool('signed_in_devices', {
+  description:
+    `List the browsers and Macs signed in to this Omni with Google (Settings > Devices): name, account, when each was last seen and when its session expires. ` +
+    'The install token (scripts, agents, the Mac app\'s server check, browsers paired with the token) is not a device and is not listed.',
+}, async () => text(await call('/auth/devices')));
+
+server.registerTool('revoke_device', {
+  description:
+    `Sign one device out of this Omni, by its id from signed_in_devices. Its session stops working at once; it can sign in with Google again while its account is allowed. ` +
+    `Only when ${USER} asks for it. If the device may have been stolen, also tell ${USER} to rotate the install token (delete data/api-token and restart), since a session could have read it.`,
+  inputSchema: { id: z.string() },
+}, async ({ id }) => text(await call(`/auth/devices/${encodeURIComponent(id)}`, { method: 'DELETE' })));
+
 await server.connect(new StdioServerTransport());

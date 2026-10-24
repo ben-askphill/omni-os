@@ -15,6 +15,8 @@
 # RICH, TOOL:<ms> or LIMIT drives a turn without spending a plan (see packages/test-fixtures/fake-claude.mjs).
 # Cursor Cloud threads talk to a fake Cursor API (packages/test-fixtures/fake-cursor-api.mjs) with a stand-in key, so
 # the real CURSOR_API_KEY is never read; they need a channel with a GitHub repo set.
+# QA_GOOGLE=1 also starts a fake Google (packages/test-fixtures/fake-google.mjs) and points sign-in at it, with the
+# client id qa-desktop.apps.googleusercontent.com in a fresh stack's config, so Sign in with Google works end to end.
 # The stack has its own API token in its data dir: curl it with -H "Authorization: Bearer $(cat <data>/data/api-token)",
 # and open the printed web URLs, which pair the browser.
 set -euo pipefail
@@ -67,13 +69,27 @@ SH
     sleep 0.25
   done
   [ -n "$cursor_api" ] || die "fake Cursor API did not start"
+  local google=()
+  if [ "${QA_GOOGLE:-0}" = 1 ]; then
+    detach node "$fx/fake-google.mjs" >"$DIR/google.log" 2>&1 &
+    echo $! >"$DIR/google.pid"
+    for _ in $(seq 1 40); do grep -q '"jwks"' "$DIR/google.log" 2>/dev/null && break; sleep 0.25; done
+    local g gauth gtoken gjwks
+    g="$(node -e 'const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); console.log(`${j.auth} ${j.token} ${j.jwks}`)' "$DIR/google.log")" \
+      || die "fake Google did not start: $(cat "$DIR/google.log")"
+    read -r gauth gtoken gjwks <<<"$g"
+    # Dummy client secrets, so sign-in never reads the real ones from the Keychain. The fake takes any for an unknown client.
+    google=(OMNI_GOOGLE_AUTH_URL="$gauth" OMNI_GOOGLE_TOKEN_URL="$gtoken" OMNI_GOOGLE_JWKS_URL="$gjwks"
+      OMNI_GOOGLE_CLIENT_SECRET=qa-desktop-secret OMNI_GOOGLE_WEB_CLIENT_SECRET=qa-web-secret)
+    [ -f "$DIR/data/omni.config.json" ] || echo '{"auth":{"googleClientId":"qa-desktop.apps.googleusercontent.com"}}' >"$DIR/data/omni.config.json"
+  fi
   # OMNI_TOKEN cleared: an agent's shell carries the live server's, and this stack makes its own.
   OMNI_TOKEN= OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
     OMNI_CLAUDE_BIN="${QA_CLAUDE_BIN:-$fx/fake-claude.mjs}" OMNI_CODEX_BIN="${QA_CODEX_BIN:-$fx/fake-codex.mjs}" OMNI_CURSOR_BIN="${QA_CURSOR_BIN:-$fx/fake-cursor.mjs}" \
     OMNI_BROWSER=0 OMNI_SUGGESTIONS=0 OMNI_HERMES_URL= OMNI_AUTOMATIONS_DIR="$DIR/automations" \
     OMNI_CURSOR_API_URL="$cursor_api" OMNI_CURSOR_CLOUD_POLL_MS=1500 PATH="$DIR/bin:$PATH" \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
-    detach npx tsx apps/server/index.ts >"$DIR/server.log" 2>&1 &
+    detach env ${google[@]+"${google[@]}"} npx tsx apps/server/index.ts >"$DIR/server.log" 2>&1 &
   echo $! >"$DIR/server.pid"
   OMNI_PORT="$SERVER_PORT" detach npx vite --config apps/web/vite.config.ts --port "$WEB_PORT" --strictPort >"$DIR/web.log" 2>&1 &
   echo $! >"$DIR/web.pid"
@@ -99,7 +115,7 @@ SH
 
 down() {
   local p pid cwd
-  for p in web server cursor-api; do
+  for p in web server cursor-api google; do
     alive "$p" || continue
     pid="$(cat "$DIR/$p.pid")"
     cwd="$(cwd_of "$pid")"
@@ -110,7 +126,7 @@ down() {
   # The recorded PID is the subshell that ran detach, so the process group to stop is led by it or by its child.
   # Only kill groups led by one of those two, never the group this script or its caller runs in.
   local c pg
-  for p in web server cursor-api; do
+  for p in web server cursor-api google; do
     alive "$p" || continue
     pid="$(cat "$DIR/$p.pid")"
     for c in "$pid" $(pgrep -P "$pid"); do
@@ -127,6 +143,7 @@ down() {
 status() {
   echo "server  $API  $(alive server && echo up || echo down)"
   echo "web     $WEB  $(alive web && echo up || echo down)"
+  alive google && echo "google  $(head -1 "$DIR/google.log")"
   echo "data    $DIR"
   if alive server; then
     echo "token   $(tok)"

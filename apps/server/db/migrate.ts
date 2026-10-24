@@ -225,6 +225,38 @@ CREATE TABLE IF NOT EXISTS turn_snapshots (
 );
 CREATE INDEX IF NOT EXISTS turn_snapshots_thread ON turn_snapshots(thread_id, n);
 
+-- Google sign-in (db/repos/auth.ts, apps/server/sign-in.ts). Google says who someone is; Omni hands each browser or
+-- Mac that signs in its own session. Install-local, never synced: each Mac has its own install token and devices.
+CREATE TABLE IF NOT EXISTS auth_users (
+  id TEXT PRIMARY KEY,
+  google_sub TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL,
+  name TEXT,
+  -- The Workspace domain claim, null for a consumer account.
+  hd TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS auth_devices (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES auth_users(id),
+  name TEXT NOT NULL,
+  -- browser or mac.
+  kind TEXT NOT NULL,
+  user_agent TEXT,
+  created_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+-- One session per device. The cookie (or the Mac's credential) holds the id and a secret; only its hash is here.
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  id TEXT PRIMARY KEY,
+  device_id TEXT NOT NULL UNIQUE REFERENCES auth_devices(id),
+  token_hash TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+
 -- A thread the other Mac filed in a folder that has not arrived here yet. The folder's arrival puts it there.
 CREATE TABLE IF NOT EXISTS sync_folder_wait (
   thread_id TEXT PRIMARY KEY,

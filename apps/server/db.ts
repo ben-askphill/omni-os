@@ -31,5 +31,7 @@ export type { BaseHow, ThreadBase } from './db/repos/thread-bases.ts';
 export { threadBases } from './db/repos/thread-bases.ts';
 export type { SkippedFile, TurnSnapshot, TurnSnapshotState } from './db/repos/turn-snapshots.ts';
 export { turnSnapshots } from './db/repos/turn-snapshots.ts';
+export type { AuthDevice, AuthUser, DeviceKind, DeviceListing, SessionAccess } from './db/repos/auth.ts';
+export { SESSION_DAYS, auth } from './db/repos/auth.ts';
 export type { SyncEntity, SyncOp, OutboxRow } from './db/sync.ts';
 export { SEED_TS, outbox, syncMeta } from './db/sync.ts';

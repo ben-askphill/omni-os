@@ -20,7 +20,7 @@ apiToken();
 
 // Loaded once the lock is held: db.ts opens the database as it loads.
 const { app } = await import('./app.ts');
-const { messageRequests, outbox, threads, turnSnapshots } = await import('./db.ts');
+const { auth, messageRequests, outbox, threads, turnSnapshots } = await import('./db.ts');
 const { shutdownAll, startLimits } = await import('./runner.ts');
 const { closeAllBrowsers } = await import('./browser.ts');
 const { closeAllTerminals } = await import('./terminal.ts');
@@ -62,6 +62,9 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   // A turn whose checkout a killed server was still saving: its This turn diff says so instead of waiting forever.
   const unsaved = turnSnapshots.failUnsettled("Omni stopped before this turn's snapshots were saved.");
   if (unsaved) console.log(`[omni] ${unsaved} turn snapshot(s) were not saved`);
+  // Signed-in devices revoked or expired a month ago leave the database, now and daily: a server can run for weeks.
+  auth.prune();
+  setInterval(() => auth.prune(), 86_400_000).unref();
   // Continuations Ben scheduled for a usage limit's reset: one that came due while Omni was down runs now, once.
   startLimits();
   startArtifactWatcher();
