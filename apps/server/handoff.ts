@@ -21,7 +21,7 @@ import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
 import { sessionOnThisMac, uploadNow } from './sync/files.ts';
 import { prepareTurn } from './sync/guard.ts';
 import { toPortable } from './sync/paths.ts';
-import { activeWorker, onSynced, type SyncWorker } from './sync/worker.ts';
+import { activeWorker, onSynced, syncStatus, type SyncWorker } from './sync/worker.ts';
 import { reachabilityOf, tailnet } from './tailscale.ts';
 
 type Offered = Extract<HandoffOffer, { state: 'offered' }>;
@@ -49,6 +49,14 @@ const logFailure = (threadId: string) => (err: unknown) => console.error(`[hando
 /** Ben cancelled while the offer was still being prepared. */
 class Cancelled extends Error {}
 
+/** Why this Mac cannot tell the other one anything now, said as Settings would. */
+function syncProblem(): string {
+  const status = syncStatus();
+  if (!status.machineId || !status.configured) return 'Sync is not set up on this Mac. Handing a thread off needs sync on both Macs.';
+  if (!status.enabled) return 'Sync is paused on this Mac. Resume it on the Sync page to hand threads off.';
+  return 'Sync is set up on this Mac but not running, so the other Mac cannot be told. Check the Sync page, then try again.';
+}
+
 /** Why the thread's harness could not resume it on another Mac, or null when it can. */
 function notResumable(t: Thread): string | null {
   if ((t.harness !== 'codex' && t.harness !== 'cursor') || t.session_id !== t.id) return null;
@@ -67,7 +75,7 @@ export async function handOff(threadId: string, to: string): Promise<HandoffResu
   if (!threads.get(threadId)) throw refused('thread not found', 404);
   const self = outbox.machineId();
   const worker = activeWorker();
-  if (!self || !worker) throw refused('Sync is off on this Mac. Handing a thread off needs sync on both Macs.');
+  if (!self || !worker) throw refused(syncProblem());
   if (to === self) throw refused('That is this Mac. Pick the Mac to hand the thread to.');
   const target = deviceRecord(to);
   if (!target) throw refused('No synced Mac has that id. A Mac shows up once it has synced with this one.');
@@ -80,6 +88,8 @@ export async function handOff(threadId: string, to: string): Promise<HandoffResu
   const t = threads.get(threadId)!;
   const why = notResumable(t);
   if (why) throw refused(why);
+  // Its report would wake the thread that delegated it on the other Mac, while that one may be running here.
+  if (t.parent_id) throw refused('This thread reports to the thread that delegated it, so it stays on this Mac. Hand that thread off instead, once this one is done.');
   if (!busy(t) || !runsHere(threadId)) throw refused('Only a thread running on this Mac can be handed off.');
   if (threads.children(threadId).some(busy)) throw refused('Threads this one delegated are still running here. Hand it off once they finish.');
   const phase = phaseOf(threadId)?.phase;
@@ -178,6 +188,24 @@ function restore(offer: Offered) {
   if (saved.length) publishFeed({ type: 'needs_you', thread_id: offer.thread });
 }
 
+/**
+ * The other Mac picked the thread up before it heard of the Cancel, so it runs there with the messages it carried: the
+ * copies the Cancel left here for Resume go, or they would be sent twice.
+ */
+function withdraw(offer: HandoffOffer) {
+  let gone = 0;
+  for (let n = 0; ; n++) {
+    const row = messageRequests.byRequestId(offer.thread, `handoff-back:${offer.id}:${n}`);
+    if (!row) break;
+    if (messageRequests.mark(row.id, 'cancelled')) gone++;
+  }
+  if (gone) {
+    publishFeed({ type: 'needs_you', thread_id: offer.thread });
+    const t = threads.get(offer.thread);
+    if (t) publishFeed({ type: 'thread', thread: t });
+  }
+}
+
 /** Ben's Cancel, on the giving Mac, while the offer is prepared or waits to be picked up. Cancelling twice is a no-op. */
 export function cancelHandoff(threadId: string): HandoffResult {
   if (!threads.get(threadId)) throw refused('thread not found', 404);
@@ -240,6 +268,8 @@ async function take(offer: Offered, worker: SyncWorker) {
       await unpackWorktree({ repo, dir: join(paths.worktrees, id), branch: t.branch, threadId: id, offerId: offer.id, bundle: offer.bundle, transport: worker.transport });
     }
     await prepareTurn(threads.get(id)!, false, true);
+    // The download may have taken a while: hear of a Cancel on the other Mac before answering, not after.
+    await worker.syncNow();
     const rows = tx(() => {
       if (!unanswered()) return [];
       writeReply(id, { offer: offer.id, at: iso(), state: 'accepted' });
@@ -269,11 +299,18 @@ async function take(offer: Offered, worker: SyncWorker) {
  */
 export function reconcileHandoffs(worker: SyncWorker) {
   for (const offer of offers()) {
-    if (offer.state !== 'offered') continue;
-    const reply = replyOf(offer.thread);
-    const answer = reply?.offer === offer.id ? reply : null;
-    if (offer.to.id === worker.machineId && !answer) void take(offer, worker).catch(logFailure(offer.thread));
-    else if (offer.from.id === worker.machineId && answer?.state === 'failed') tx(() => restore(offer));
+    // One offer that cannot be settled (its thread deleted here) must not fail the sync or hold up the others.
+    try {
+      if (!threads.get(offer.thread)) continue;
+      const reply = replyOf(offer.thread);
+      const answer = reply?.offer === offer.id ? reply : null;
+      const mine = offer.from.id === worker.machineId;
+      if (offer.state === 'offered' && offer.to.id === worker.machineId && !answer) void take(offer, worker).catch(logFailure(offer.thread));
+      else if (offer.state === 'offered' && mine && answer?.state === 'failed') tx(() => restore(offer));
+      else if (offer.state === 'cancelled' && mine && answer?.state === 'accepted') withdraw(offer);
+    } catch (err) {
+      logFailure(offer.thread)(err);
+    }
   }
 }
 

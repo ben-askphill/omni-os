@@ -95,8 +95,10 @@ describe('handing a running thread to the other Mac', () => {
       });
     thread('idle', {});
     thread('codex-new', { harness: 'codex' });
+    thread('delegated', { parent_id: 'idle' });
     const refusals = [
       [await handOff(a, id, 'mac-a'), /this Mac/],
+      [await handOff(a, 'delegated', 'mac-b'), /reports to the thread that delegated it, so it stays on this Mac/],
       [await handOff(a, id, 'mac-z'), /No synced Mac/],
       [await handOff(a, 'idle', 'mac-b'), /Only a thread running on this Mac/],
       [await handOff(a, 'codex-new', 'mac-b'), /Codex has not reported this thread's session/],
@@ -211,6 +213,43 @@ describe('a handoff that does not go through', () => {
     expect(d.blocked).toBeUndefined();
     expect(d.pending.map((p: { text: string; delivery: string }) => [p.text, p.delivery])).toEqual([['and the footer', 'recovered']]);
     expect((await listed(a, other)) as unknown).toMatchObject({ blockers: [{ kind: 'recovered', count: 1 }] });
+  });
+
+  it('cancelled after B already picked it up: runs on B, and A drops the copy it kept for Resume', T, async () => {
+    const other = await startOnA('TOOL:60000 check the search box', shared);
+    expect((await handOff(a, other, 'mac-b')).status).toBe(200);
+    await offered(a, other);
+    // B hears of the offer and takes it before A hears B's answer.
+    await b.sync();
+    await waitFor(() => b.runner.isLive(other), 'B to pick it up');
+    expect((await a.json(`/threads/${other}/handoff/cancel`, { body: {} })).status).toBe(200);
+
+    await both();
+    const d = await eventually(async () => {
+      await both();
+      const v = await detail(a, other);
+      return v.handoff?.state.phase === 'accepted' && v.pending.length === 0 && v;
+    }, 'A to see it running on B');
+    expect(d.blocked).toBe('This thread is running on Mac B.');
+    expect(await listed(a, other)).toBeUndefined();
+    await waitFor(() => b.byKind(other, 'user').length >= 3, 'B to run the queued message');
+    expect(b.byKind(other, 'user').map((e) => e.p.text)).toEqual(['TOOL:60000 check the search box', 'Handed off from Mac A. Continue where you left off.', 'and the footer']);
+  });
+
+  it('B stops holding a thread whose giving Mac went quiet mid-way', async () => {
+    const quiet = 'quiet-thread';
+    b.db.threads.create({
+      id: quiet, channel_id: 'shop', title: quiet, status: 'stopped', role: null, model: null, session_id: quiet, cwd: shared,
+      branch: null, parent_id: null, task_id: null, source: 'manual', automation: null,
+    });
+    const offer = (minutesAgo: number) => ({
+      id: `offer-${minutesAgo}`, thread: quiet, from: { id: 'mac-a', name: 'Mac A' }, to: { id: 'mac-b', name: 'Mac B' },
+      at: new Date(Date.now() - minutesAgo * 60_000).toISOString(), state: 'preparing', step: 'uploading',
+    });
+    b.db.kv.set(`handoff.offer.${quiet}`, offer(1));
+    expect((await detail(b, quiet)).blocked).toBe('Mac A is handing this thread to this Mac.');
+    b.db.kv.set(`handoff.offer.${quiet}`, offer(16));
+    expect((await detail(b, quiet)).blocked).toBeUndefined();
   });
 
   it('B cannot pick it up: A says why, keeps it stopped and takes the queued message back', T, async () => {

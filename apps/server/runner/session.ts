@@ -229,7 +229,9 @@ export async function releaseForHandoff(threadId: string): Promise<Msg[]> {
     await live.exited;
   }
   const t = threads.get(threadId);
-  if (t && (t.status === 'running' || t.status === 'queued')) threads.update(threadId, { status: 'stopped' });
+  // A turn started meanwhile (the handoff was cancelled and Ben wrote again) is this Mac's again, and running.
+  const restarted = lives.has(threadId) || waiting.includes(threadId);
+  if (t && !restarted && (t.status === 'running' || t.status === 'queued')) threads.update(threadId, { status: 'stopped' });
   emitThread(threadId);
   return [...read, ...held, ...queued];
 }

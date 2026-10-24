@@ -11,6 +11,11 @@ const OFFER = 'handoff.offer.';
 const REPLY = 'handoff.reply.';
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
+/**
+ * How long the taking Mac waits on a step of the giving Mac's before it stops holding the thread: a giving Mac that
+ * died mid-way and never comes back must not lock the thread there for good.
+ */
+const STEP_PATIENCE_MS = 15 * MINUTE;
 
 const STEPS = new Set(['stopping', 'uploading', 'packing']);
 const isId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9-]{1,100}$/.test(v);
@@ -102,9 +107,11 @@ export function handoffView(t: Pick<Thread, 'id' | 'status'>, now = Date.now()):
  * Why no turn may start on this Mac while the thread is on its way, or null. The giving Mac holds it from the first
  * step, and the taking Mac until it answers. `taking`: the taking Mac's own pickup, which is what ends the wait.
  */
-export function handoffBlock(t: Pick<Thread, 'id' | 'status'>, taking = false): string | null {
-  const v = handoffView(t);
+export function handoffBlock(t: Pick<Thread, 'id' | 'status'>, taking = false, now = Date.now()): string | null {
+  const v = handoffView(t, now);
   if (!v) return null;
-  const waits = v.state.phase === 'preparing' || (v.state.phase === 'offered' && !(taking && !v.outgoing));
+  const { phase } = v.state;
+  const preparing = phase === 'preparing' && (v.outgoing || now - Date.parse(v.at) < STEP_PATIENCE_MS);
+  const waits = preparing || (phase === 'offered' && !(taking && !v.outgoing));
   return waits ? handoffText(v) : null;
 }
