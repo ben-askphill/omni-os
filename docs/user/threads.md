@@ -34,6 +34,12 @@ In a thread's Terminal tab (desktop and the Mac app), select output with the mou
 
 The chip is a snapshot of the text, the directory the shell started in, the shell's process id and the time you added it. It stays as it was when the terminal scrolls on, restarts or the shell exits. The agent gets the text as plain text and is told it was not run: escape sequences are dropped when you add it, and output that holds Omni's own block tags can't pass for them. Up to 200 lines and 8,000 characters at once; more is refused rather than cut. How it works: [Message context](../internals/message-context.md).
 
+## Point the agent at part of a web page
+
+In a thread's Browser panel (desktop, the Mac app and the phone's Browser screen), press **Annotate**. Omni screenshots the channel's own browser, the same session the agent drives, and shows that screenshot in place of the live view. Drag over the part of the page you mean, write a note and press **Add to message**: a chip goes into the reply box, and opening it shows the screenshot with your area outlined, the page's address and title, and when you took it. The page is only read, never clicked, navigated or changed. Esc or Cancel leaves without adding.
+
+If the page navigates, the tab changes, the browser is resized or the page scrolls while the screenshot is taken, Omni says so and offers **Try again**, so the area is never drawn on a different page than the one it describes. The screenshot is kept as a file in the thread, so the chip survives a reload (the web keeps unsent chips in this browser) and shows in the sent message. The agent gets the page's address and title, the viewport, and the area in page pixels, with the screenshot as an image: Claude Code and Codex see it, Cursor reads the file from the path it is given, and an agent on another machine (Hermes, Cursor Cloud) is told the file is on your Mac. A screenshot that has gone missing is stated, not skipped. How it works: [Message context](../internals/message-context.md).
+
 ## When the agent asks you
 
 An agent can stop and ask you one to four multiple-choice questions with Omni's `ask_user_question` tool. Every Claude Code, Codex and Cursor thread has it (the `omni-ask` MCP server); Hermes threads have no MCP servers, so not there. Claude Code's own AskUserQuestion is turned off in Omni, because nothing can answer it in a headless run.

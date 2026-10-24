@@ -417,17 +417,24 @@ class ChannelBrowser {
     return typeof result?.value === 'string' ? result.value : '';
   }
 
-  /** The active page now, for a capture. The page's own address and title, not the tab strip's, which lag a navigation. */
+  /**
+   * The active page now, for a capture. The page's own address and title, not the tab strip's, which lag a navigation. The
+   * viewport is the window's inner size, scrollbar included, which is the area a screenshot covers.
+   */
   async observe(): Promise<PageObservation> {
-    const [{ cssVisualViewport: v }, { currentIndex, entries }] = await Promise.all([this.page('Page.getLayoutMetrics'), this.page('Page.getNavigationHistory')]);
+    const [{ result }, { currentIndex, entries }] = await Promise.all([
+      this.page('Runtime.evaluate', { expression: '({ w: innerWidth, h: innerHeight, x: scrollX, y: scrollY })', returnByValue: true }),
+      this.page('Page.getNavigationHistory'),
+    ]);
+    const v = (result?.value ?? {}) as { w?: number; h?: number; x?: number; y?: number };
     const entry = entries[currentIndex];
     return {
       tab: this.active,
       url: entry?.url ?? '',
       title: entry?.title ?? '',
       navigations: this.navigations,
-      viewport: { width: Math.round(v.clientWidth), height: Math.round(v.clientHeight) },
-      scroll: { x: Math.round(v.pageX), y: Math.round(v.pageY) },
+      viewport: { width: Math.round(v.w ?? 0), height: Math.round(v.h ?? 0) },
+      scroll: { x: Math.round(v.x ?? 0), y: Math.round(v.y ?? 0) },
     };
   }
 

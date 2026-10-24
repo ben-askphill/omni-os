@@ -8,6 +8,9 @@ import { displayUrl } from '../components/LiveBrowser.tsx';
 import { fullDate } from '../format.ts';
 import type { ContextView } from './views.ts';
 
+/** The screenshot is shown no taller than this, so a tall page does not fill the reply box. */
+const SHOT_MAX_REM = 20;
+
 function BrowserAnnotationDetail({ body: b }: { body: BrowserAnnotation }) {
   const [missing, setMissing] = useState(false);
   const { viewport, rect, scroll } = b;
@@ -21,7 +24,10 @@ function BrowserAnnotationDetail({ body: b }: { body: BrowserAnnotation }) {
       {missing ? (
         <p className="mt-2 rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] text-fg-3">The screenshot is not on this Mac.</p>
       ) : (
-        <div className="relative mt-2 overflow-hidden rounded-xl shadow-[inset_0_0_0_1px_var(--line)]" style={{ aspectRatio: `${b.image.width} / ${b.image.height}` }}>
+        <div
+          className="relative mt-2 overflow-hidden rounded-xl shadow-[inset_0_0_0_1px_var(--line)]"
+          style={{ aspectRatio: `${b.image.width} / ${b.image.height}`, width: `min(100%, ${((SHOT_MAX_REM * b.image.width) / b.image.height).toFixed(2)}rem)` }}
+        >
           <img src={uploadUrl(b.thread, b.image)} alt={`Screenshot of ${b.title || displayUrl(b.url)}`} onError={() => setMissing(true)} className="block h-full w-full" />
           <span
             aria-label={`Marked area, ${rect.width} by ${rect.height}`}

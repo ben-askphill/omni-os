@@ -1,6 +1,6 @@
 # Message context
 
-A message can carry typed records next to Ben's text: lines picked in the Changes panel (`diff_selection`), terminal output (`terminal_excerpt`), screenshot annotations, picked page elements and thread references later. The user-facing account is in [Threads](../user/threads.md#point-the-agent-at-lines-of-a-diff).
+A message can carry typed records next to Ben's text: lines picked in the Changes panel (`diff_selection`), terminal output (`terminal_excerpt`), browser annotations (`browser_annotation`), picked page elements and thread references later. The user-facing account is in [Threads](../user/threads.md#point-the-agent-at-lines-of-a-diff).
 
 ## The record
 
@@ -38,3 +38,13 @@ One file per layer and one registry line per layer. Nothing in the core changes.
 - **Where it is added.** The shell runs on Ben's Mac whichever harness the agent is, so the projector says so and offers no file to open. Remote harnesses get the same text.
 - **Selection.** Mouse selection is xterm's (web) and SwiftTerm's (Mac) own, and the panel only reads it, so copy and paste are untouched. xterm has no touch selection, so on the phone `useTapToPick` selects lines on tap.
 
+
+## Browser annotations
+
+`browser_annotation` is the third kind: a rectangle Ben drew on a screenshot of the channel's browser. Body: `{ thread, url, title, viewport: { width, height, scale }, scroll, rect, captured_at, image: { name, mime, width, height, bytes } }`. The rectangle is whole CSS pixels from the viewport's top left (`dragToRect` turns a drag on the shown image into it, so a phone and a desktop agree); `scale` is image pixels per CSS pixel. #216 adds an optional `element` here: a record without it stays valid.
+
+- **The server captures, the client marks.** `POST /api/channels/:id/browser/capture` with `{ thread }` (`apps/server/browser-capture.ts`) screenshots the active page of the channel's real Chrome (`Page.captureScreenshot`, nothing on the page changes) and returns everything but the rectangle, which is drawn on that very image. The page is observed before and after (tab, main-frame navigations, address, window size, scroll); any difference answers 409 `{ error, retryable: true, stale }` and saves nothing. The viewport is `innerWidth` by `innerHeight`, scrollbar included, since that is what the image covers.
+- **The file.** `uploads/annotation-<hex>.png` in the thread's uploads folder, so it syncs and is served by the existing `/api/threads/:id/uploads/:name`. PNG, then JPEG at 80 and 50, until it is under `MAX_INLINE_IMAGE`; past that it is refused (413, not retryable). A capture that is not made into a record is deleted by the client (`DELETE .../browser/capture/:name?thread=`, only within six hours of being made).
+- **Sending.** The message route refuses a record whose `thread` is another thread's or whose file is gone (`checkAnnotations`). `userLine` adds the screenshot to the message's attachments (`contextAttachments` in `project.ts`, fed by `Projection.image`), so Claude Code gets an image block, Codex a local image and Cursor the path in its Attachments note. `project.ts` writes the sentence about it: attached locally, `is a file on Ben's Mac` for a remote harness, `is unavailable` when the file is gone by the time the message is written.
+- **Text in the block.** The page's address and title come from the page, so they are defanged like every projected string (`defang.ts`); the core also defangs file names, notes and fallback labels.
+- **Drafts.** The web keeps unsent context in localStorage (`omni.contextDrafts`) as well as memory, the Mac in `DraftStore`, so a reload does not strand a capture.
