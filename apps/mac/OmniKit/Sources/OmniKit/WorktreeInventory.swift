@@ -5,14 +5,15 @@ import Observation
 // packages/shared/worktree-inventory.ts, which the Web UI's Storage page uses.
 
 /// Decodes a string enum, answering `fallback` for a value a newer server sent that this app does not know.
-private func decodeTolerant<T: RawRepresentable>(_ decoder: any Decoder, _ fallback: T) throws -> T where T.RawValue == String {
+func decodeTolerant<T: RawRepresentable>(_ decoder: any Decoder, _ fallback: T) throws -> T where T.RawValue == String {
   let raw = try decoder.singleValueContainer().decode(String.self)
   return T(rawValue: raw) ?? fallback
 }
 
 public struct KeepReason: Decodable, Hashable, Sendable {
   /// running, queued, warm, preparing, terminal, shared, changed, untracked, ignored, unpushed, pr-open, branch-mismatch,
-  /// open-thread, unowned or unregistered. The app shows `message`; the code is for tests and future styling.
+  /// open-thread, unowned or unregistered; a cleanup's last check adds retention and changed-meanwhile. The app shows
+  /// `message`; the code is for tests and future styling.
   public let code: String
   public let message: String
 
@@ -77,6 +78,8 @@ public struct WorktreeItem: Decodable, Hashable, Sendable, Identifiable {
   public let branch: String?
   public let threadId: String?
   public let threadTitle: String?
+  /// When its thread last had a turn or message. Nil when no thread owns it.
+  public let lastActiveAt: Date?
   public let channelId: String?
   public let channelName: String?
   public let folder: Bool
@@ -89,7 +92,7 @@ public struct WorktreeItem: Decodable, Hashable, Sendable, Identifiable {
   public let errors: [String]
 
   private enum CodingKeys: String, CodingKey {
-    case id, kind, verdict, dir, repo, branch, threadId, threadTitle, channelId, channelName, folder, registered
+    case id, kind, verdict, dir, repo, branch, threadId, threadTitle, lastActiveAt, channelId, channelName, folder, registered
     case bytes, sharedWith, reasons, eligibleBecause, errors
   }
 
@@ -103,6 +106,7 @@ public struct WorktreeItem: Decodable, Hashable, Sendable, Identifiable {
     branch = try c.decodeIfPresent(String.self, forKey: .branch)
     threadId = try c.decodeIfPresent(String.self, forKey: .threadId)
     threadTitle = try c.decodeIfPresent(String.self, forKey: .threadTitle)
+    lastActiveAt = try c.decodeIfPresent(Date.self, forKey: .lastActiveAt)
     channelId = try c.decodeIfPresent(String.self, forKey: .channelId)
     channelName = try c.decodeIfPresent(String.self, forKey: .channelName)
     folder = try c.decode(Bool.self, forKey: .folder)
@@ -201,10 +205,14 @@ public struct InventorySummary: Decodable, Hashable, Sendable {
   }
 }
 
-/// The answer of GET and POST /api/worktrees/scan: the scan (nil before the first) and its totals.
+/// The answer of every /api/worktrees route: the scan (nil before the first), its totals and the cleanup state.
 public struct WorktreeScanReply: Decodable, Sendable {
   public let scan: WorktreeScan?
   public let summary: InventorySummary?
+  /// Nil from a server without cleanup.
+  public let cleanup: CleanupState?
+
+  private enum CodingKeys: String, CodingKey { case scan, summary, cleanup }
 }
 
 /// Said under the inventory: pruning is not cleanup.
@@ -223,7 +231,9 @@ public enum ByteSize {
   }
 }
 
-/// The Storage tab: the last scan, Scan and Cancel, and a poll while a scan runs. Nothing scans until Ben presses Scan.
+/// The Storage tab: the last scan, Scan and Cancel, the cleanup and this Mac's retention policy, and a poll while a scan
+/// or a cleanup runs. It scans only when Ben presses Scan and removes only what he reviewed; retention passes are the
+/// server's.
 @MainActor @Observable
 public final class WorktreeInventoryModel {
   public enum LoadState: Hashable, Sendable {
@@ -232,11 +242,23 @@ public final class WorktreeInventoryModel {
     case failed(String)
   }
 
+  /// What Ben pressed, so a refusal shows beside it.
+  public enum Action: Hashable, Sendable {
+    case scan, cleanup, retention
+  }
+
+  public struct ActionError: Hashable, Sendable {
+    public let action: Action
+    public let message: String
+  }
+
   public private(set) var scan: WorktreeScan?
+  /// Nil from a server without cleanup.
+  public private(set) var cleanup: CleanupState?
   public private(set) var loadState = LoadState.loading
-  /// A Scan or Cancel is on its way to the server.
+  /// A request Ben started is on its way to the server.
   public private(set) var isBusy = false
-  public private(set) var actionError: String?
+  public private(set) var actionError: ActionError?
 
   @ObservationIgnored private let client: OmniClient
   @ObservationIgnored private let pollInterval: Duration
@@ -257,6 +279,9 @@ public final class WorktreeInventoryModel {
 
   public var staleRegistrations: [WorktreeItem] { items.filter { $0.kind == .staleRegistration } }
 
+  /// The server refuses a scan while a cleanup removes folders.
+  public var isCleaning: Bool { cleanup?.isRunning == true }
+
   /// "Checking 4 of 12", "Listing folders", "Cancelled after 4 of 12", "Checked 12", per where the scan stands.
   public var progressLabel: String? {
     guard let scan else { return nil }
@@ -266,6 +291,27 @@ public final class WorktreeInventoryModel {
     case .failed: return scan.error ?? "The scan failed"
     case .done: return "Checked \(scan.total)"
     }
+  }
+
+  /// The Clean Up card's line: what Review would list, or why there is nothing to review.
+  public var cleanupNote: String {
+    if cleanup?.runs.manual?.isRunning == true { return "Each worktree is checked again right before it goes." }
+    guard let preview = cleanup?.preview?.manual else { return awaitingScan("Scan to see what can be removed.") }
+    if preview.candidates.isEmpty { return "Nothing to clean up." }
+    return "\(preview.amount) can be removed now. Each is checked again right before it goes."
+  }
+
+  /// The Retention card's line: what the next pass would remove under the policy as it is set.
+  public var retentionNote: String? {
+    guard let cleanup else { return nil }
+    guard let preview = cleanup.preview?.retention else { return awaitingScan("Scan to see what it would remove.") }
+    let what = preview.candidates.isEmpty ? "nothing" : preview.amount
+    return cleanup.policy.enabled ? "The next pass would remove \(what)." : "If turned on, the next pass would remove \(what)."
+  }
+
+  /// The server has no preview while a scan runs.
+  private func awaitingScan(_ otherwise: String) -> String {
+    scan?.isRunning == true ? "Shown once the scan is done." : otherwise
   }
 
   /// Reads the last scan, and follows it if one is running.
@@ -280,11 +326,22 @@ public final class WorktreeInventoryModel {
   }
 
   public func startScan() async {
-    await act { c throws(OmniAPIError) in try await c.startWorktreeScan() }
+    await act(.scan) { c throws(OmniAPIError) in try await c.startWorktreeScan() }
   }
 
   public func cancelScan() async {
-    await act { c throws(OmniAPIError) in try await c.cancelWorktreeScan() }
+    await act(.scan) { c throws(OmniAPIError) in try await c.cancelWorktreeScan() }
+  }
+
+  /// Removes exactly the worktrees Ben reviewed. Answers whether the server started the cleanup.
+  @discardableResult
+  public func startCleanup(ids: [String]) async -> Bool {
+    await act(.cleanup) { c throws(OmniAPIError) in try await c.startWorktreeCleanup(ids: ids) }
+  }
+
+  /// Changes what is given and leaves the rest of the policy as it is.
+  public func setRetention(enabled: Bool? = nil, idleDays: Int? = nil) async {
+    await act(.retention) { c throws(OmniAPIError) in try await c.setWorktreeRetention(enabled: enabled, idleDays: idleDays) }
   }
 
   /// Stops polling, when the tab closes.
@@ -293,22 +350,26 @@ public final class WorktreeInventoryModel {
     poller = nil
   }
 
-  private func act(_ run: (OmniClient) async throws(OmniAPIError) -> WorktreeScanReply) async {
-    guard !isBusy else { return }
+  @discardableResult
+  private func act(_ action: Action, _ run: (OmniClient) async throws(OmniAPIError) -> WorktreeScanReply) async -> Bool {
+    guard !isBusy else { return false }
     isBusy = true
     actionError = nil
     defer { isBusy = false }
     do throws(OmniAPIError) {
       apply(try await run(client))
       loadState = .loaded
+      return true
     } catch {
-      if error != .cancelled { actionError = error.message }
+      if error != .cancelled { actionError = ActionError(action: action, message: error.message) }
+      return false
     }
   }
 
   private func apply(_ reply: WorktreeScanReply) {
     scan = reply.scan
-    guard reply.scan?.isRunning == true else { return stop() }
+    cleanup = reply.cleanup
+    guard reply.scan?.isRunning == true || reply.cleanup?.isRunning == true else { return stop() }
     guard poller == nil else { return }
     poller = Task { [weak self, pollInterval] in
       while !Task.isCancelled {

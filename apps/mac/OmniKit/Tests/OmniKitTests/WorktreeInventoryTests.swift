@@ -19,8 +19,9 @@ private func scan(state: String = "running", done: Int = 0, total: Int = 4, item
   """
 }
 
-/// The /api/worktrees/scan routes: GET answers the current scan and every POST answers it too.
-private final class ScanServer: Sendable {
+/// The /api/worktrees routes: GET answers the current scan and every POST answers it too. `route` answers a
+/// request first when it has a reply for it.
+final class ScanServer: Sendable {
   private final class Replies: Sendable {
     let queue: Mutex<[String]>
     init(_ queue: [String]) { self.queue = Mutex(queue) }
@@ -29,9 +30,13 @@ private final class ScanServer: Sendable {
   let transport: StubTransport
 
   /// Each GET takes the next reply, and the last one stays.
-  init(get: [String], post: String = #"{"scan":null,"summary":null}"#) {
+  init(
+    get: [String], post: String = #"{"scan":null,"summary":null}"#,
+    route: @escaping @Sendable (URLRequest) -> StubTransport.Reply? = { _ in nil }
+  ) {
     let replies = Replies(get)
     transport = StubTransport { req in
+      if let reply = route(req) { return reply }
       if req.httpMethod == "GET" {
         let next = replies.queue.withLock { $0.count > 1 ? $0.removeFirst() : ($0.first ?? #"{"scan":null,"summary":null}"#) }
         return StubTransport.Reply(body: next)
@@ -49,12 +54,14 @@ private final class ScanServer: Sendable {
     let reply = try decodeFixture(WorktreeScanReply.self, "worktree-scan.json")
     let scan = try #require(reply.scan)
     #expect(scan.state == .done && scan.phase == .finished && !scan.isRunning)
-    #expect(scan.total == 1 && scan.done == 1 && scan.progress == 1)
+    #expect(scan.total == 3 && scan.done == 3 && scan.progress == 1)
     let it = try #require(scan.items.first)
     #expect(it.kind == .managed && it.verdict == .kept && it.title == "Fix the widget")
     #expect(it.detail == "Widgets · omni/00000000")
-    #expect(it.reasons.map(\.code) == ["warm", "open-thread", "untracked", "unpushed"])
+    #expect(it.reasons.map(\.code) == ["open-thread", "untracked", "unpushed"])
     #expect(it.eligibleBecause == nil)
+    #expect(it.lastActiveAt == OmniJSON.parseDate("2026-01-05T09:00:00.000Z"))
+    #expect(scan.items.dropFirst().map(\.eligibleBecause) == [.archived, .archived])
   }
 
   @Test func theLocalTotalsMatchTheServers() throws {
