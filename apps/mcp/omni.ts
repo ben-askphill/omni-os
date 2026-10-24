@@ -269,7 +269,7 @@ server.registerTool(
     inputSchema: {
       thread_id: z.string(),
       harness: z.string().describe('claude-code, codex or cursor.'),
-      model: z.string().optional().describe("A model id from list_harnesses. Omit for the harness's default. Not auto."),
+      model: z.string().optional().describe("A model id from list_harnesses. Omit for the harness's default. Not Omni's Auto; Cursor's own auto model is fine."),
       effort: z.string().optional().describe("One of the model's effort levels. Omit for its default."),
       message: z.string().describe('The first message for the new thread. It reads it after the carryover, whole.'),
     },

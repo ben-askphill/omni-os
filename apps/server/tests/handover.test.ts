@@ -176,11 +176,19 @@ describe('a continued thread', () => {
     expect(h.text.endsWith("Ben's message:\n")).toBe(true);
   });
 
-  it('hands the Carryover over as one entry once the thread has run, kept like a first message', () => {
+  it('keeps the Carryover whole for the message after a slash command that ran first', () => {
+    const { c, p } = carried();
+    const events = [ev('carryover', p), ev('user', { text: '/verify the cart' }), ev('assistant_text', { text: 'Verified.' })];
+    const h = buildHandover(input(events, { from: claude, to: codex }));
+    expect(h.text).toBe(c.text);
+  });
+
+  it('hands the Carryover over as one entry once a message carried it, kept like a first message', () => {
     const { p } = carried();
     const events = [
       ev('carryover', p),
       ev('user', { text: 'now the tests' }),
+      ev('handover', { to: codex, session: 'fresh', entries: 2, omitted: 0, chars: 900 }),
       ...Array.from({ length: 30 }, (_, i) => ev('assistant_text', { text: `reply ${i} ${'x'.repeat(80)}` })),
     ];
     const h = buildHandover(input(events, { from: codex, to: claude, budget: 2_500 }));

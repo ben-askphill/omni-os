@@ -269,7 +269,7 @@
   "continued_in": [
     {
       "id": "00000000-0000-4000-8000-000000000039",
-      "title": "Fix the cart and the tests (continued) (continued)",
+      "title": "Fix the cart and the tests (continued)",
       "harness": "claude-code",
       "model": "sonnet",
       "status": "running",

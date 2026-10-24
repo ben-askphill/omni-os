@@ -51,6 +51,8 @@ describe('buildCarryover', () => {
     expect(left.ref).toBe(`/api/threads/src/history?through=uid-${newestLeft.id}`);
     expect(c.text).toContain(`curl -s "$OMNI_URL/api/threads/src/history?through=uid-${newestLeft.id}" -H "Authorization: Bearer $OMNI_TOKEN"`);
     expect(carriedStats(c)).toMatchObject({ entries: c.recent.length, omitted: left.count, chars: c.chars, budget: 8_000 });
+    const short = c.recent.findLast((e) => e.condensed)!;
+    expect(c.text).toContain(`History, oldest first: Shortened entries in full: curl -s "$OMNI_URL/api/threads/src/history?through=uid-${short.id}"`);
   });
 
   it('never goes over budgets large and small', () => {
@@ -59,6 +61,23 @@ describe('buildCarryover', () => {
       const { carryover: c } = buildCarryover(input(events, { budget }));
       expect(c.chars, `budget ${budget}`).toBeLessThanOrEqual(budget);
     }
+  });
+
+  it('stays in the budget when the plan, waiting messages and files alone would be over it', () => {
+    const todos = Array.from({ length: 40 }, (_, n) => ({ content: `todo ${n} ${'t'.repeat(400)}`, status: 'pending' }));
+    const events = [ev('user', { text: 'THE TASK' }), ev('tool_use', { id: 'plan', name: 'TodoWrite', input: { todos } })];
+    const parked = Array.from({ length: 150 }, (_, n) => `waiting message ${n} ${'p'.repeat(300)}`);
+    const roomy = buildCarryover(input(events, { parked })).carryover;
+    expect(roomy.chars).toBeLessThanOrEqual(24_000);
+    expect(roomy.text).toContain(' and 30 more');
+    expect(roomy.text).toContain(' and 140 more');
+
+    const changed: CarryoverFile[] = Array.from({ length: 60 }, (_, n) => ({ path: `src/${'d'.repeat(400)}/${n}.ts`, old_path: null, status: 'modified' }));
+    const files = { base: 'b'.repeat(40), head: 'a'.repeat(40), tree: 'c'.repeat(40), changed };
+    const { carryover: c } = buildCarryover(input(events, { parked, files, budget: 8_000 }));
+    expect(c.chars).toBeLessThanOrEqual(8_000);
+    expect(c.text).toContain('… (cut to fit the budget)\n</omni-carryover>');
+    expect(c.text.endsWith("Ben's message:\n")).toBe(true);
   });
 
   it('neutralises tags that would end the block, so history stays data', () => {
@@ -117,7 +136,7 @@ describe('buildCarryover', () => {
     const { carryover: c } = buildCarryover(input([ev('user', { text: 'go' })], { files: { base: 'b'.repeat(40), head: 'a'.repeat(40), tree: 'c'.repeat(40), changed } }));
     expect(c.files).toMatchObject({ total: 70, base: 'b'.repeat(40) });
     expect(c.files!.listed).toHaveLength(60);
-    expect(c.omitted).toContainEqual({ what: 'files', count: 10, note: '10 more changed files.', ref: `git diff --stat ${'b'.repeat(40)}` });
+    expect(c.omitted).toContainEqual({ what: 'files', count: 10, note: '10 more changed files.', ref: `git diff --stat ${'b'.repeat(40)} ${'c'.repeat(40)}` });
     expect(c.text).toContain('Changed files, 70 against bbbbbbb:\n  R src/old.ts -> src/new.ts\n  M src/f1.ts');
   });
 

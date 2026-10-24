@@ -15,6 +15,7 @@ import { channels, continuations, events, messageRequests, threadBases, threads,
 import { buildCarryover, carriedStats, historyText, type CarryoverP } from './carryover.ts';
 import { changesCheckout, git, gitOr, parseNameStatus, real, threadBase } from './changes.ts';
 import { threadDir } from './config.ts';
+import { asksAuto } from './harness/auto.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { isHarnessId, isRemoteHarness, remoteWhere } from './harness/types.ts';
 import { userName } from './profile.ts';
@@ -68,12 +69,12 @@ export function sourceBlock(t: Thread): ContinueBlock | null {
   return null;
 }
 
-/** The run Ben picked, checked: a local harness the catalog offers, on a model he chose. */
+/** The run Ben picked, checked: a local harness the catalog offers, on a model he chose. Cursor's own `auto` is one. */
 async function targetRun(run: Run): Promise<RunName> {
+  if (asksAuto(run)) throw refusal('Pick a model: a continued thread runs on the one you choose, not Auto.', 400);
   if (!isHarnessId(run.harness)) throw refusal(`Unknown harness "${run.harness}".`, 400);
   const remote = continueRefusal(run.harness);
   if (remote) throw refusal(remote, 400);
-  if (run.model === 'auto') throw refusal('Pick a model: a continued thread runs on the one you choose, not Auto.', 400);
   const to = { ...run, harness: run.harness };
   // Ben may have just logged in to the harness: look again before refusing.
   if (invalid(getCatalog(), to)) {

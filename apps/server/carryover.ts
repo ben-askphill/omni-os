@@ -77,8 +77,10 @@ const tail = (s: string, max: number) => (s.length > max ? `…${s.slice(-max)}`
 const named = (r: RunName) => `${r.harnessName} (${r.modelLabel})`;
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const firstLine = (s: string) => s.trim().split('\n', 1)[0];
-const listed = (names: string[]) =>
-  names.slice(0, NAMES_LISTED).join(', ') + (names.length > NAMES_LISTED ? ` and ${names.length - NAMES_LISTED} more` : '');
+const listed = (names: string[], sep = ', ') =>
+  names.slice(0, NAMES_LISTED).join(sep) + (names.length > NAMES_LISTED ? ` and ${names.length - NAMES_LISTED} more` : '');
+/** Ends a body that is over the budget even with no history in it. */
+const OVER = '\n… (cut to fit the budget)';
 
 /** Historical text can never open or close the block it is carried in. */
 const neutral = (s: string) => s.replace(/<(\/?)omni-(carryover|handover)/gi, '‹$1omni-$2');
@@ -251,7 +253,7 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
     ...(ws.kind === 'folder'
       ? []
       : ["Paths from the source's checkout are shown relative to its root. Your working directory is your own checkout of the same repo; never write to the source thread's checkout."]),
-    ...(todos.length ? [`Open todos: ${todos.map((t) => `${clean(t.content!)} (${t.status ?? 'pending'})`).join('; ')}`] : []),
+    ...(todos.length ? [`Open todos: ${listed(todos.map((t) => `${clean(cut(t.content!, CONDENSED_MAX))} (${t.status ?? 'pending'})`), '; ')}`] : []),
   ];
 
   const changed = i.files?.changed ?? [];
@@ -268,7 +270,7 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
   if (older) left.push({ what: 'checks', count: older, note: `${plural(older, 'older check', 'older checks')} it ran.`, ref: `${history}?through=${i.uid(allChecks[older - 1].id)}` });
   if (files && files.total > files.listed.length) {
     const more = files.total - files.listed.length;
-    left.push({ what: 'files', count: more, note: `${plural(more, 'more changed file', 'more changed files')}.`, ref: `git diff --stat ${files.base ?? files.head}` });
+    left.push({ what: 'files', count: more, note: `${plural(more, 'more changed file', 'more changed files')}.`, ref: `git diff --stat ${files.base ?? files.head} ${files.tree}` });
   }
   if (i.skipped.length) {
     const n = i.skipped.length;
@@ -280,13 +282,18 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
   }
   if (i.parked.length) {
     const n = i.parked.length;
-    left.push({ what: 'messages', count: n, note: `${plural(n, 'message', 'messages')} waiting for Resume in the source ${n === 1 ? 'was' : 'were'} not sent: ${i.parked.map((m) => `"${clean(cut(firstLine(m), CONDENSED_MAX))}"`).join('; ')}.`, ref: null });
+    left.push({ what: 'messages', count: n, note: `${plural(n, 'message', 'messages')} waiting for Resume in the source ${n === 1 ? 'was' : 'were'} not sent: ${listed(i.parked.map((m) => `"${clean(cut(firstLine(m), CONDENSED_MAX))}"`), '; ')}.`, ref: null });
   }
   if (attachments.length) {
     const n = attachments.length;
     left.push({ what: 'attachments', count: n, note: `${plural(n, 'attachment is', 'attachments are')} not carried yet: ${listed(attachments.map((a) => a.name))}.`, ref: null });
   }
 
+  // Shortened entries are the oldest kept, so one reference through the newest of them reads them all in full.
+  const historyHead = (kept: CarryoverEntry[]) => {
+    const short = kept.findLast((e) => e.condensed);
+    return `History, oldest first:${short ? ` Shortened entries in full: ${how(`${history}?through=${i.uid(short.id)}`)}` : ''}`;
+  };
   const sections = (kept: CarryoverEntry[], omitted: CarryoverOmission[]) =>
     [
       `Goal, the message the work started from:\n${goal || '(none)'}`,
@@ -297,7 +304,7 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
       ...(checks.length
         ? [['Checks it ran, newest last:', ...checks.map((c) => `- ${c.ok ? 'passed' : 'failed'}: ${c.command}${c.output ? `\n    ${indent(c.output)}` : ''}`)].join('\n')]
         : []),
-      ...(kept.length ? [['History, oldest first:', ...kept.map((e) => e.text)].join('\n')] : []),
+      ...(kept.length ? [[historyHead(kept), ...kept.map((e) => e.text)].join('\n')] : []),
       ...(omitted.length ? [['Left out:', ...omitted.map(omissionLine)].join('\n')] : []),
     ].join('\n\n');
 
@@ -309,8 +316,13 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
   for (;;) {
     const { kept, cut: n } = fit(raw, room);
     const omitted = n ? [{ what: 'history' as const, count: n, note: `${plural(n, 'older history entry', 'older history entries')}.`, ref: `${history}?through=${i.uid(raw[n - 1].id)}` }, ...left] : left;
-    const body = sections(kept, omitted);
-    const text = textOf(body);
+    let body = sections(kept, omitted);
+    let text = textOf(body);
+    // No history is left to give up, so the fixed sections alone are over: the body's end goes.
+    if (text.length > budget && room <= 0) {
+      body = body.slice(0, Math.max(0, body.length - (text.length - budget) - OVER.length)) + OVER;
+      text = textOf(body);
+    }
     if (text.length <= budget || room <= 0) {
       const carryover: Carryover = { source: i.source, to: i.to, goal, constraints, files, checks, recent: kept, attachments, omitted, budget, chars: text.length, text };
       return { carryover, body };

@@ -125,9 +125,9 @@ describe('continuing a thread on another harness', () => {
     expect((await detail(src.id)).continued_in).toMatchObject([{ id, harness: 'codex', carried: { entries: 2 } }]);
   });
 
-  it('starts on Cursor Agent with the Carryover too', async () => {
+  it("starts on Cursor Agent with the Carryover too, on Cursor's own auto model", async () => {
     const src = await idle('remember the word FIG');
-    const res = await start(src.id, cursor, 'which fruit?');
+    const res = await start(src.id, { ...cursor, model: 'auto' }, 'which fruit?');
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     const id = res.body.thread.id;
     await H.untilResults(id, 1);
@@ -157,6 +157,8 @@ describe('continuing a thread on another harness', () => {
       expect(res.body.error).toMatch(/cannot (move there|start from)/);
     }
     expect((await preview(src.id, { ...claude, model: 'auto' })).status).toBe(400);
+    const auto = await preview(src.id, { harness: 'auto', model: 'auto', effort: '' });
+    expect(auto).toMatchObject({ status: 400, body: { error: expect.stringMatching(/^Pick a model/) } });
 
     const remote = H.db.threads.create({
       id: `remote-${++n}`, channel_id: 'scratch', title: 'On Hermes', status: 'done', role: null, model: null, harness: 'hermes',

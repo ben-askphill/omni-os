@@ -92,18 +92,16 @@ function history(i: HandoverInput) {
   return { lines, first, todos };
 }
 
-/** Transcript rows that are something a session saw or did, as events.hasContentAfter counts them. */
-const CONTENT = new Set(['user', 'crew_report', 'assistant_text', 'tool_use', 'tool_result']);
-
 /**
- * A continued thread's Carryover while nothing has run after it: its first turn reads it whole. A run switch since
- * then is fine, since the intro names the run that reads it.
+ * A continued thread's Carryover until a message has carried it (the `handover` event handedOver writes): the session
+ * reads it whole. A slash command that ran first does not count, and a run switch since is fine, since the intro names
+ * the run that reads it.
  */
 function pendingCarryover(events: EventRow[]): CarryoverP | null {
   const at = events.findIndex((e) => e.kind === 'carryover');
   if (at < 0) return null;
-  const ran = events.slice(at + 1).some((e) => CONTENT.has(e.kind) && !JSON.parse(e.payload)?.dropped);
-  return ran ? null : (JSON.parse(events[at].payload) as CarryoverP);
+  const read = events.slice(at + 1).some((e) => e.kind === 'handover');
+  return read ? null : (JSON.parse(events[at].payload) as CarryoverP);
 }
 
 export function buildHandover(i: HandoverInput): Handover {
