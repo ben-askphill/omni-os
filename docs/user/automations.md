@@ -19,7 +19,7 @@ prompt: |
 
 ## Event automations
 
-Replace `cron` with `on` and the automation runs when something happens instead of on a schedule: a change on a PR, or a page a thread published.
+Replace `cron` with `on` and the automation runs when something happens instead of on a schedule: a change on a PR, a page a thread published, or a signed GitHub webhook.
 
 ### PR events
 
@@ -42,7 +42,7 @@ prompt: |
 | `pr_conflict` | once per head commit that conflicts with its base |
 | `pr_review` | when reviews or comments arrive from a trusted author other than the `gh` account Omni uses (a bare approval does not count) |
 
-- Omni polls `gh pr list` every `OMNI_AUTOMATION_POLL_SECONDS` (default 120, 15 at least), one call per repo however many automations watch it. Polling, not webhooks: the server is on loopback, GitHub cannot reach it.
+- Omni polls `gh pr list` every `OMNI_AUTOMATION_POLL_SECONDS` (default 120, 15 at least), one call per repo however many automations watch it. Polling, so it works while GitHub cannot reach the server; [GitHub webhooks](#github-webhooks) need a route from GitHub to it.
 - The first poll after an automation is turned on only records what is open, so it never fires for old failures.
 - Each run's prompt is the automation's prompt plus an `## Event` section (repo, PR number and title, what happened, branch and URL). Its title is `<name> · #<PR>`, and its trigger is `event` in the run list.
 - What each automation has seen lives in kv `automations.events.<id>`, so a restart does not fire again. With sync on, only the Mac that runs scheduled automations polls.
@@ -70,3 +70,26 @@ prompt: |
 - The run's prompt is the automation's prompt plus an `## Event` section with the page's URL, and its title, file, description and the thread and channel that published it, in a code fence, as data. Its title is `<name> · <page>`, and its trigger is `event`.
 - The Automations page lists the last deliveries with their outcome: Started (with a link to the run), Held for owner, Failed or Skipped, with the reason.
 - With sync on, only the Mac that runs automations starts a run. The other Mac holds each delivery for it, whatever its own toggle says, and sync carries it over; that Mac skips it if the automation is paused there or it has no automation with that id. Personal automations in `data/automations/` only exist on their Mac, so a publish on the other Mac does not reach them.
+
+### GitHub webhooks
+
+`on: { event: github_webhook, repo: owner/name }` runs the automation when GitHub posts a signed `workflow_run` or `pull_request_review` event to it:
+
+```yaml
+name: Fix failed CI
+enabled: false
+on: { event: github_webhook, repo: acme/shop, events: [workflow_run] }  # events: both by default
+channel: acme
+role: builder
+prompt: |
+  A workflow run finished. If it failed, find the cause on its branch, fix it, verify, push.
+```
+
+- Each webhook automation has its own endpoint, `POST /api/hooks/github/<id>`, shown on its card in both clients. Set it as the hook's Payload URL on GitHub with content type `application/json`, and choose the events the automation takes.
+- The signing secret lives in this Mac's Keychain as `OMNI_WEBHOOK_<ID>`. Set it with Set secret on the automation's card (Web UI or Mac app), and paste the same value into the hook's Secret on GitHub. The clients only show whether it is set. It never reaches a thread. Each Mac that receives the hook needs its own copy.
+- That route takes no API token: a request proves itself with its `X-Hub-Signature-256`. A body over 1 MB, a content type other than `application/json`, an event the automation does not take, a missing `X-GitHub-Delivery`, a bad signature or another repo is refused before anything is saved. Without a secret on this Mac the route answers 503. GitHub's `ping` gets a 200 and saves nothing.
+- Only finished workflow runs (`completed`) and submitted reviews count; other actions get a 202 and save nothing. Runs for fork PRs and reviews from outside the repo's owners, members and collaborators are saved as Skipped unless `trust: any`. Reviews by the `gh` account Omni uses are always skipped, so a run that reviews cannot start the next.
+- A valid event is saved as a delivery, keyed by the automation and its `X-GitHub-Delivery` id, before Omni replies (202). GitHub redelivering it, to either Mac, gets the same delivery back (200, `duplicate: true`) and starts nothing more. On a paused automation the Mac that runs automations answers 409 and saves nothing.
+- The run's prompt is the automation's prompt plus an `## Event` section with what GitHub sent (workflow, conclusion, branch, commit, run URL; or PR, reviewer, state and up to 1,000 characters of the review), each field cut short, in a code fence, as data. Its title is `<name> · <commit or PR title>`, and its trigger is `event`.
+- Deliveries, sync and the other Mac work as for published pages: the Mac that receives the request saves it, and only the Mac that runs automations starts the run.
+- Omni does not expose the endpoint to the internet. GitHub reaches it only if you route it there yourself; a signed request from your own network goes the whole way.
