@@ -35,6 +35,23 @@ import OmniKit
     ])
   }
 
+  @Test func readsTheDeliveriesStep() throws {
+    let script = try QAScript(json: Data("""
+      [
+        {"deliveries": "ci-fixer"},
+        {"deliveries": {"automation": "ci-fixer", "open": "failed"}},
+        {"deliveries": {"automation": "ci-fixer", "older": true}},
+        {"deliveries": {"automation": "ci-fixer", "open": "00000000-0000-4000-8000-000000000009", "older": false}}
+      ]
+      """.utf8))
+    #expect(script.steps == [
+      .deliveries(QADeliveries(automation: "ci-fixer", open: nil, older: false)),
+      .deliveries(QADeliveries(automation: "ci-fixer", open: "failed", older: false)),
+      .deliveries(QADeliveries(automation: "ci-fixer", open: nil, older: true)),
+      .deliveries(QADeliveries(automation: "ci-fixer", open: "00000000-0000-4000-8000-000000000009", older: false)),
+    ])
+  }
+
   @Test func readsTheThreadSteps() throws {
     let script = try QAScript(json: Data("""
       [
@@ -125,6 +142,11 @@ import OmniKit
     #"[{"folder": {"menu": "Specs", "shot": "../x"}}]"#,
     #"[{"folder": {"rename": "Specs", "delete": "Specs"}}]"#,
     #"[{"screen": ""}]"#,
+    #"[{"deliveries": ""}]"#,
+    #"[{"deliveries": {"open": "failed"}}]"#,
+    #"[{"deliveries": {"automation": "x", "older": "yes"}}]"#,
+    #"[{"deliveries": {"automation": "x", "open": 3}}]"#,
+    #"[{"deliveries": {"automation": "x", "bogus": 1}}]"#,
     #"{"nope": []}"#,
   ])
   func rejectsWhatItDoesNotKnow(json: String) {

@@ -103,10 +103,33 @@ struct AutomationsList: View {
       EmptyNote(symbol: "clock", title: "No automations yet",
                 message: "Add a YAML file to automations/ with name, cron, channel and prompt. It shows up here right away.")
     case .loaded:
-      VStack(spacing: z(12)) {
-        ForEach(automations.automations) { a in
-          AutomationSection(model: model, automations: automations, automation: a) { secretFor = a }
+      ScrollViewReader { proxy in
+        VStack(spacing: z(12)) {
+          ForEach(automations.automations) { a in
+            AutomationSection(model: model, automations: automations, automation: a) { secretFor = a }
+          }
         }
+        #if DEBUG
+        .onAppear {
+          QAProbe.showDeliveries = { target in
+            guard let a = automations.automations.first(where: { $0.id == target.automation }) else { return "no automation \(target.automation) on screen" }
+            if target.older {
+              await automations.showOlder(for: a)
+              if let failure = automations.olderErrors[a.id] { return failure }
+            }
+            if let key = target.open {
+              guard let d = automations.deliveries(of: a).first(where: { $0.id == key || $0.state.rawValue == key }) else {
+                return "no \(key) delivery in \(a.id)"
+              }
+              automations.setExpanded(true, for: d)
+            }
+            try? await Task.sleep(for: .milliseconds(300))
+            proxy.scrollTo("deliveries-\(a.id)", anchor: .top)
+            return nil
+          }
+        }
+        .onDisappear { QAProbe.showDeliveries = nil }
+        #endif
       }
     }
   }
@@ -302,20 +325,9 @@ struct AutomationSection: View {
     }
   }
 
-  @ViewBuilder private var deliveries: some View {
-    VStack(alignment: .leading, spacing: z(8)) {
-      Text("Deliveries").omniCaption()
-      if automation.deliveries.isEmpty {
-        Text(automation.noDeliveries).font(.omni(size: 12.5)).foregroundStyle(Tok.fg4)
-      } else {
-        VStack(spacing: 0) {
-          ForEach(automation.deliveries) { delivery in
-            DeliveryRow(delivery: delivery) { id in model.route = .thread(id: id) }
-          }
-        }
-        .padding(.horizontal, z(-8))
-      }
-    }
+  private var deliveries: some View {
+    DeliveryList(model: model, automations: automations, automation: automation)
+      .id("deliveries-\(automation.id)")
   }
 }
 
@@ -524,58 +536,6 @@ private struct RunRow: View {
     .font(.omni(size: 12.5))
     .padding(.horizontal, z(8))
     .frame(height: z(32))
-  }
-}
-
-/// An event handed to the automation: its state, what happened, why it was skipped or failed and, once it ran, a
-/// link to the thread it started. A row with no thread is not dimmed: skipped or waiting is a normal state here.
-private struct DeliveryRow: View {
-  let delivery: TriggerDelivery
-  let open: (String) -> Void
-
-  var body: some View {
-    if let id = delivery.threadID {
-      Button { open(id) } label: { content.hoverWash(16, fill: Tok.surface2) }
-        .buttonStyle(.plain)
-        .help("Open the thread")
-    } else {
-      content
-    }
-  }
-
-  private var content: some View {
-    HStack(spacing: z(10)) {
-      Chip(text: delivery.state.label, tone: tone)
-      VStack(alignment: .leading, spacing: z(2)) {
-        Text(delivery.summary).lineLimit(1).truncationMode(.tail).foregroundStyle(Tok.fg)
-        if let reason = delivery.reason {
-          Text(reason).font(.omni(size: 11.5)).foregroundStyle(Tok.fg3).help(reason)
-        }
-      }
-      Spacer(minLength: z(8))
-      TimelineView(.everyMinute) { context in
-        Text(RelTime.label(delivery.createdAt, now: context.date))
-          .font(.omni(size: 11).monospacedDigit())
-          .foregroundStyle(Tok.fg4)
-          .frame(width: z(96), alignment: .trailing)
-      }
-      .help(delivery.createdAt.formatted(date: .complete, time: .standard))
-    }
-    .font(.omni(size: 12.5))
-    .padding(.horizontal, z(8))
-    .padding(.vertical, z(6))
-    .frame(minHeight: z(32))
-    .contentShape(Rectangle())
-  }
-
-  /// Started reads as done, failed as needs you, skipped as quiet, and anything still on its way as plain.
-  private var tone: Chip.Tone {
-    switch delivery.state {
-    case .started: .done
-    case .failed: .needs
-    case .skipped: .outline
-    default: .plain
-    }
   }
 }
 

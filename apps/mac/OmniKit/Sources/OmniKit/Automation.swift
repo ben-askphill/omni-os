@@ -86,9 +86,26 @@ public struct TriggerDeliveryState: OpenEnum {
     default: rawValue
     }
   }
+
+  /// DELIVERY_RANK: within one attempt a delivery only moves up. nil for a state this app does not know.
+  public var rank: Int? {
+    switch self {
+    case .received: 0
+    case .accepted, .queued: 1
+    case .failed: 2
+    case .skipped: 3
+    case .started: 4
+    default: nil
+    }
+  }
+
+  /// `isPendingDelivery`: not started, failed or skipped yet.
+  public var isPending: Bool { rank.map { $0 < 2 } ?? false }
 }
 
-/// One event handed to an event-triggered automation, as GET /api/automations lists it under the automation.
+/// One event handed to an event-triggered automation, as GET /api/automations lists it under the automation, and as
+/// the delivery routes send it (`DeliveryView` in packages/shared/automation-triggers.ts). The flags and notes at the
+/// end are the server's own answer to what Ben can do with it now; the app does not work them out again.
 public struct TriggerDelivery: Decodable, Hashable, Sendable, Identifiable {
   public let id: String
   public let automation: String
@@ -100,24 +117,83 @@ public struct TriggerDelivery: Decodable, Hashable, Sendable, Identifiable {
   /// Fields captured from the event (url, title, channel and so on). Data, never instructions.
   public let context: [String: String]
   public let state: TriggerDeliveryState
-  /// Why it was skipped or failed.
+  /// Why it was skipped or failed, or what went wrong after its thread was made (it is then `started`).
   public let reason: String?
   public let owner: String?
   /// The thread that published the page. nil for a webhook.
   public let sourceThread: String?
   /// The automation thread it started.
   public let threadID: String?
+  /// 1 for the first go. A retry makes it 2, and so on, each with its own thread id.
+  public let attempt: Int
   public let createdAt: Date
   public let updatedAt: Date
+  /// The status of the thread it started. nil with no thread, or one that was removed.
+  public let threadStatus: ThreadStatus?
+  /// When the trigger's max age skips it. nil once it has started or been skipped.
+  public let expiresAt: Date?
+  /// Why a pending delivery has not started: the automation's runs are at their limit, or it is backing off.
+  public let waiting: String?
+  /// A pending or failed delivery nothing is starting. Skipping it is final.
+  public let canSkip: Bool
+  /// A failed delivery with no thread, which retrying cannot duplicate.
+  public let canRetry: Bool
+  /// For a failed delivery that cannot go again, why not.
+  public let retryBlocked: String?
 
   enum CodingKeys: String, CodingKey {
-    case id, automation, source, summary, context, state, reason, owner
+    case id, automation, source, summary, context, state, reason, owner, attempt, waiting
     case sourceID = "source_id"
     case sourceThread = "source_thread"
     case threadID = "thread_id"
     case createdAt = "created_at"
     case updatedAt = "updated_at"
+    case threadStatus = "thread_status"
+    case expiresAt = "expires_at"
+    case canSkip = "can_skip"
+    case canRetry = "can_retry"
+    case retryBlocked = "retry_blocked"
   }
+
+  /// A server from before the delivery routes sends none of the fields after `updated_at`: attempt 1, nothing to do.
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    id = try c.decode(String.self, forKey: .id)
+    automation = try c.decode(String.self, forKey: .automation)
+    source = try c.decode(String.self, forKey: .source)
+    sourceID = try c.decode(String.self, forKey: .sourceID)
+    summary = try c.decode(String.self, forKey: .summary)
+    context = try c.decode([String: String].self, forKey: .context)
+    state = try c.decode(TriggerDeliveryState.self, forKey: .state)
+    reason = try c.decodeIfPresent(String.self, forKey: .reason)
+    owner = try c.decodeIfPresent(String.self, forKey: .owner)
+    sourceThread = try c.decodeIfPresent(String.self, forKey: .sourceThread)
+    threadID = try c.decodeIfPresent(String.self, forKey: .threadID)
+    attempt = try c.decodeIfPresent(Int.self, forKey: .attempt) ?? 1
+    createdAt = try c.decode(Date.self, forKey: .createdAt)
+    updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+    threadStatus = try c.decodeIfPresent(ThreadStatus.self, forKey: .threadStatus)
+    expiresAt = try c.decodeIfPresent(Date.self, forKey: .expiresAt)
+    waiting = try c.decodeIfPresent(String.self, forKey: .waiting)
+    canSkip = try c.decodeIfPresent(Bool.self, forKey: .canSkip) ?? false
+    canRetry = try c.decodeIfPresent(Bool.self, forKey: .canRetry) ?? false
+    retryBlocked = try c.decodeIfPresent(String.self, forKey: .retryBlocked)
+  }
+
+  /// `isDeliveryAhead(self, other)`: a later attempt beats every state of an earlier one, and within an attempt the
+  /// higher rank wins. A state this app does not know never wins on rank, so the server's copy stands.
+  public func isAhead(of other: TriggerDelivery) -> Bool {
+    if attempt != other.attempt { return attempt > other.attempt }
+    guard let mine = state.rank, let theirs = other.state.rank else { return false }
+    return mine > theirs
+  }
+}
+
+/// The page GET /api/automations/:id/deliveries returns: older deliveries, newest first.
+public struct DeliveryPage: Decodable, Hashable, Sendable {
+  public let deliveries: [TriggerDelivery]
+  /// Older ones exist: ask again with `before` set to the last id.
+  public let more: Bool
 }
 
 /// Where GitHub posts a webhook automation's events, and whether this Mac holds its signing secret. The server
@@ -195,12 +271,15 @@ public struct Automation: Decodable, Hashable, Sendable, Identifiable {
   public let runs: [AutomationRun]
   /// The events handed to it, newest first, at most five. Empty from a server that sends none.
   public let deliveries: [TriggerDelivery]
+  /// Older deliveries than these five exist.
+  public let deliveriesMore: Bool
   /// Set for a `github_webhook` automation only.
   public let webhook: AutomationWebhook?
 
   enum CodingKeys: String, CodingKey {
     case id, name, cron, on, repo, timezone, channel, role, model, prompt, enabled, file, error, next, runs, deliveries, webhook
     case pollError = "poll_error"
+    case deliveriesMore = "deliveries_more"
   }
 
   public init(from decoder: any Decoder) throws {
@@ -222,6 +301,7 @@ public struct Automation: Decodable, Hashable, Sendable, Identifiable {
     next = try c.decodeIfPresent(Date.self, forKey: .next)
     runs = try c.decode([AutomationRun].self, forKey: .runs)
     deliveries = try c.decodeIfPresent([TriggerDelivery].self, forKey: .deliveries) ?? []
+    deliveriesMore = try c.decodeIfPresent(Bool.self, forKey: .deliveriesMore) ?? false
     webhook = try c.decodeIfPresent(AutomationWebhook.self, forKey: .webhook)
   }
 
