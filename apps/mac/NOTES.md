@@ -29,7 +29,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `Zoom.swift` | `ZoomSettings`: the zoom level (80% to 160%, in UserDefaults, `-zoom` for a run), Zoom In, Zoom Out, Actual Size |
 | `SettingsTab.swift` | `SettingsTab`, `Route.settingsTab`, `AppModel.show(_:)` |
 | `Client+Automations.swift` | `automations()`, `runAutomation(_:)`, `setAutomationEnabled(_:_:)` on `OmniClient` |
-| `Automation.swift` | `Automation`, `AutomationRun`, `AutomationTrigger`, `AutomationBadge`, `NextRunText`, `AutomationSchedule` (`describeCron` and `nextRunLabel` in `apps/web/src/format.ts`) |
+| `Automation.swift` | `Automation`, `AutomationEvent`, `AutomationRun`, `AutomationTrigger`, `AutomationBadge`, `NextRunText`, `AutomationSchedule` (`describeCron` and `nextRunLabel` in `apps/web/src/format.ts`), `TriggerDelivery` and `TriggerDeliveryState` (`packages/shared/automation-triggers.ts`) |
 | `AutomationsModel.swift` | `AutomationsModel` (the Automations page) |
 | `Route.swift` | `Route`, parsed from and printed to the Web UI hash routes |
 | `SSEParser.swift` | `SSEParser`, `SSEMessage`: the EventSource parsing rules, bytes in, messages out |

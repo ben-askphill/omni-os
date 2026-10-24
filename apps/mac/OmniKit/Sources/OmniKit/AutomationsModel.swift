@@ -3,7 +3,8 @@ import Observation
 
 /// The Automations page, like the Web UI's: the list, Run now, and the enabled switch, which shows its new value
 /// at once and turns back if the server refuses. The list loads again a second after a feed thread event whose
-/// thread has `automation` set, or after the feed reconnects. The thread does not have to still be in `recent`.
+/// thread has `automation` set, an `automation_delivery` event, or a feed reconnect. The thread does not have to
+/// still be in `recent`.
 @MainActor @Observable
 public final class AutomationsModel {
   public enum LoadState: Hashable, Sendable {
@@ -89,12 +90,15 @@ public final class AutomationsModel {
     }
   }
 
-  /// The Web UI's predicate (Automations.tsx): a thread event whose thread has `automation` set schedules a
-  /// reload. Anything else does not. A reconnect calls `scheduleReload()` on its own.
+  /// The Web UI's predicate (Automations.tsx): a thread event whose thread has `automation` set, or a delivery
+  /// that was saved or moved on, schedules a reload. Anything else does not. A reconnect calls `scheduleReload()`
+  /// on its own.
   public func feed(_ event: FeedEvent) {
     switch event {
     case .thread(let thread):
       if let automation = thread.automation, !automation.isEmpty { scheduleReload() }
+    case .automationDelivery(_):
+      scheduleReload()
     case .usage(_, _), .artifact(_), .tasks(_), .mods(_), .channel(_), .needsYou(_), .unknown(_):
       break
     }

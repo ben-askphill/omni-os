@@ -11,11 +11,32 @@ public struct AutomationTrigger: OpenEnum {
   public static let event: Self = "event"
 }
 
-/// An event automation's `on:` block, as GET /api/automations sends it.
+/// An event automation's `on:` block, as GET /api/automations sends it. A GitHub event has `repo` and `drafts`; a
+/// published page (`artifact_published`) has `channels` and `updates` and no `drafts`.
 public struct AutomationEvent: Decodable, Hashable, Sendable {
   public let event: String
   public let repo: String?
   public let drafts: Bool
+  /// The channel ids a published page must come from. nil or empty for any channel.
+  public let channels: [String]?
+  /// A page published again to the same URL counts too.
+  public let updates: Bool
+
+  enum CodingKeys: String, CodingKey {
+    case event, repo, drafts, channels, updates
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    event = try c.decode(String.self, forKey: .event)
+    repo = try c.decodeIfPresent(String.self, forKey: .repo)
+    drafts = try c.decodeIfPresent(Bool.self, forKey: .drafts) ?? false
+    channels = try c.decodeIfPresent([String].self, forKey: .channels)
+    updates = try c.decodeIfPresent(Bool.self, forKey: .updates) ?? false
+  }
+
+  /// Runs when a thread publishes a page to claude.ai, not on a GitHub event.
+  public var isArtifact: Bool { event == "artifact_published" }
 
   /// `describeEvent` in web/src/format.ts.
   public var label: String {
@@ -24,8 +45,68 @@ public struct AutomationEvent: Decodable, Hashable, Sendable {
     case "pr_checks_failed": "When PR checks fail"
     case "pr_conflict": "When a PR has conflicts"
     case "pr_review": "When a PR gets review comments"
+    case "artifact_published": "When a page is published"
     default: event
     }
+  }
+}
+
+/// Where a delivery is (packages/shared/automation-triggers.ts). `queued` waits for the Mac that runs automations;
+/// `started`, `failed` and `skipped` are final.
+public struct TriggerDeliveryState: OpenEnum {
+  public let rawValue: String
+  public init(rawValue: String) { self.rawValue = rawValue }
+
+  public static let received: Self = "received"
+  public static let accepted: Self = "accepted"
+  public static let queued: Self = "queued"
+  public static let started: Self = "started"
+  public static let failed: Self = "failed"
+  public static let skipped: Self = "skipped"
+
+  /// DELIVERY_STATE_LABELS. A state this app does not know shows as the server spells it.
+  public var label: String {
+    switch self {
+    case .received: "Received"
+    case .accepted: "Accepted"
+    case .queued: "Held for owner"
+    case .started: "Started"
+    case .failed: "Failed"
+    case .skipped: "Skipped"
+    default: rawValue
+    }
+  }
+}
+
+/// One event handed to an event-triggered automation, as GET /api/automations lists it under the automation.
+public struct TriggerDelivery: Decodable, Hashable, Sendable, Identifiable {
+  public let id: String
+  public let automation: String
+  /// `artifact_published` for now.
+  public let source: String
+  public let sourceID: String
+  /// One line, like "report.html in #acme".
+  public let summary: String
+  /// Fields captured from the event (url, title, channel and so on). Data, never instructions.
+  public let context: [String: String]
+  public let state: TriggerDeliveryState
+  /// Why it was skipped or failed.
+  public let reason: String?
+  public let owner: String?
+  /// The thread that published the page.
+  public let sourceThread: String?
+  /// The automation thread it started.
+  public let threadID: String?
+  public let createdAt: Date
+  public let updatedAt: Date
+
+  enum CodingKeys: String, CodingKey {
+    case id, automation, source, summary, context, state, reason, owner
+    case sourceID = "source_id"
+    case sourceThread = "source_thread"
+    case threadID = "thread_id"
+    case createdAt = "created_at"
+    case updatedAt = "updated_at"
   }
 }
 
@@ -84,24 +165,72 @@ public struct Automation: Decodable, Hashable, Sendable, Identifiable {
   public let next: Date?
   /// Newest first, at most five.
   public let runs: [AutomationRun]
+  /// The events handed to it, newest first, at most five. Empty from a server that sends none.
+  public let deliveries: [TriggerDelivery]
 
   enum CodingKeys: String, CodingKey {
-    case id, name, cron, on, repo, timezone, channel, role, model, prompt, enabled, file, error, next, runs
+    case id, name, cron, on, repo, timezone, channel, role, model, prompt, enabled, file, error, next, runs, deliveries
     case pollError = "poll_error"
   }
 
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    id = try c.decode(String.self, forKey: .id)
+    name = try c.decode(String.self, forKey: .name)
+    cron = try c.decode(String.self, forKey: .cron)
+    on = try c.decodeIfPresent(AutomationEvent.self, forKey: .on)
+    repo = try c.decodeIfPresent(String.self, forKey: .repo)
+    pollError = try c.decodeIfPresent(String.self, forKey: .pollError)
+    timezone = try c.decode(String.self, forKey: .timezone)
+    channel = try c.decode(String.self, forKey: .channel)
+    role = try c.decodeIfPresent(String.self, forKey: .role)
+    model = try c.decodeIfPresent(String.self, forKey: .model)
+    prompt = try c.decode(String.self, forKey: .prompt)
+    enabled = try c.decode(Bool.self, forKey: .enabled)
+    file = try c.decodeIfPresent(String.self, forKey: .file)
+    error = try c.decodeIfPresent(String.self, forKey: .error)
+    next = try c.decodeIfPresent(Date.self, forKey: .next)
+    runs = try c.decode([AutomationRun].self, forKey: .runs)
+    deliveries = try c.decodeIfPresent([TriggerDelivery].self, forKey: .deliveries) ?? []
+  }
+
   public var isEvent: Bool { on != nil }
+  /// Runs when a page is published, not on a GitHub event or a schedule.
+  public var isArtifact: Bool { on?.isArtifact == true }
   /// The first chip: the event in words, or the schedule.
   public var schedule: String { on?.label ?? AutomationSchedule.describe(cron) }
-  public var scheduleHelp: String { on.map { "on: \($0.event)\($0.drafts ? " (drafts too)" : "")" } ?? "\(cron) (\(timezone))" }
-  /// The second chip: the watched repo, or the cron as written.
-  public var scheduleDetail: String { isEvent ? (repo ?? "no repo") : cron }
-
-  /// "Watching owner/name, one run per event", or the poll error. nil for a scheduled or paused automation.
-  public func watching(enabled: Bool) -> String? {
-    guard enabled, error == nil, isEvent else { return nil }
-    return pollError ?? "Watching \(repo ?? "no repo"), one run per event"
+  public var scheduleHelp: String {
+    guard let on else { return "\(cron) (\(timezone))" }
+    return "on: \(on.event)\(on.drafts ? " (drafts too)" : "")\(on.updates ? " (updates too)" : "")"
   }
+
+  /// The second chip: the channels a page must come from ("#acme, #ops" or "any channel", plus " · updates too"),
+  /// the watched repo, or the cron as written. `channelName` turns a channel id into its name; the id shows
+  /// when it gives nil.
+  public func scheduleDetail(channelName: (String) -> String? = { _ in nil }) -> String {
+    guard let on else { return cron }
+    guard on.isArtifact else { return repo ?? "no repo" }
+    let from = channelList(channelName) ?? "any channel"
+    return on.updates ? "\(from) · updates too" : from
+  }
+
+  /// "Watching owner/name, one run per event" or the poll error, for a GitHub event. "Runs once per published
+  /// page", or "Runs once per page published in #acme, #ops" with a channel filter, for a published page. nil for a
+  /// scheduled or paused automation.
+  public func watching(enabled: Bool, channelName: (String) -> String? = { _ in nil }) -> String? {
+    guard enabled, error == nil, let on else { return nil }
+    guard on.isArtifact else { return pollError ?? "Watching \(repo ?? "no repo"), one run per event" }
+    return channelList(channelName).map { "Runs once per page published in \($0)" } ?? "Runs once per published page"
+  }
+
+  /// "#acme, #ops" for a published-page trigger's channel filter, nil when it has none.
+  private func channelList(_ channelName: (String) -> String?) -> String? {
+    guard let channels = on?.channels, !channels.isEmpty else { return nil }
+    return channels.map { "#\(channelName($0) ?? $0)" }.joined(separator: ", ")
+  }
+
+  /// The Deliveries list shows for a published-page automation, and for any other that has some.
+  public var showsDeliveries: Bool { isArtifact || !deliveries.isEmpty }
 
   public func badge(enabled: Bool) -> AutomationBadge? {
     if error != nil { return .invalid }

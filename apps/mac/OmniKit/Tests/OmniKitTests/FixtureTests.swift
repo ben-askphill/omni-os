@@ -129,6 +129,24 @@ func sseData(_ text: String) -> [String] {
     #expect(cloud.fixCommand == nil && harnesses.first { $0.id == .hermes }?.fixCommand == nil)
   }
 
+  /// `page-review` runs when a page is published in #acme. The fake CLI published one, which started a run.
+  @Test func readsAnAutomationAPublishedPageStarted() throws {
+    let list = try decodeFixture([Automation].self, "automations.json")
+    let review = try #require(list.first { $0.id == "page-review" })
+    #expect(review.isArtifact)
+    #expect(review.on?.channels == ["acme"])
+    #expect(review.on?.drafts == false && review.on?.updates == false)
+    #expect(review.watching(enabled: true) == "Runs once per page published in #acme")
+    let delivery = try #require(review.deliveries.first)
+    #expect(delivery.state == .started)
+    #expect(delivery.summary == "launch-plan.html in #Acme")
+    #expect(delivery.threadID != nil)
+    #expect(delivery.threadID == review.runs.first?.threadID)
+    #expect(review.runs.first?.trigger == .event)
+    #expect(delivery.context["thread_title"] == "Publish the launch plan")
+    #expect(list.filter { $0.id != "page-review" }.allSatisfy { $0.deliveries.isEmpty })
+  }
+
   @Test func readsAThreadBeingHandedOff() throws {
     let devices = try decodeFixture([Device].self, "devices.json")
     #expect(devices.map(\.name) == ["Mac B"])
