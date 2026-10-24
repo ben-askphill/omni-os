@@ -137,6 +137,8 @@ export interface PendingMsg {
   /** A crew report: the thread that reported. */
   thread_id?: string;
   attachments?: Attachment[];
+  /** Message context records (packages/shared/message-context.ts), as stored: read them with `readContexts`. */
+  context?: unknown;
   /** Sent through the API: the client's request id, and where the server's saved copy is (apps/server/db/repos/requests.ts). */
   request_id?: string;
   /** `recovered` and `uncertain` (shown with `state: 'held'`) wait on Ben after a restart. */

@@ -27,6 +27,8 @@ export interface UserP {
   text: string;
   source?: string;
   attachments?: TranscriptAttachment[];
+  /** Message context records (packages/shared/message-context.ts), as stored: read them with `readContexts`. */
+  context?: unknown;
   /** Set when the message was sent while a turn was in progress. */
   mode?: 'steer' | 'queue' | 'interrupt';
   /** The run ended before the agent saw this message. */
