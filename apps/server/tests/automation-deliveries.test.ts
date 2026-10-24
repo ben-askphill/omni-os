@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
@@ -349,6 +349,40 @@ describe('a late delivery', () => {
   });
 });
 
+describe('a thread that exists', () => {
+  it('wins over an age limit that passed, a pause and a removed automation: the delivery is started, never skipped', async () => {
+    const aged = make({ extra: ', max_age: 1h' });
+    const paused = make({ enabled: false });
+    const gone = make();
+    const made = async (automation: string) => {
+      const d = add(automation);
+      await r.runner.createThread({ id: deliveryThreadId(d.id), channel: 'scratch', prompt: 'THINK:1', source: 'automation', automation });
+      return d;
+    };
+    // Omni died after making each thread and before the delivery said so, and was off past the limit, or paused, or the file went.
+    const [late, off, removed] = [await made(aged), await made(paused), await made(gone)];
+    age(late.id, 3 * HOUR);
+    unlinkSync(join(dir, `${gone}.yaml`));
+    await triggers.admitPending();
+    for (const d of [late, off, removed]) expect(row(d.id)).toMatchObject({ state: 'started', thread_id: deliveryThreadId(d.id), reason: null });
+    expect(threadsOf(aged)).toHaveLength(1);
+    expect(runsOf(aged)).toEqual([{ thread_id: deliveryThreadId(late.id) }]);
+  });
+
+  it("of an earlier attempt blocks a later one: a retry that slipped past the check starts nothing", async () => {
+    const a = make();
+    const d = add(a);
+    // Older code saved a failure without its thread. The thread is there, and a retry reaches the worker anyway.
+    await r.runner.createThread({ id: deliveryThreadId(d.id), channel: 'scratch', prompt: 'THINK:1', source: 'automation', automation: a });
+    triggerDeliveries.settle(d.id, 1, 'failed', { reason: 'boom' });
+    expect(triggerDeliveries.retry(d.id, 1, 'accepted', null)).toBe(true);
+    await triggers.admitPending();
+    expect(row(d.id)).toMatchObject({ state: 'started', attempt: 2, thread_id: deliveryThreadId(d.id, 1), reason: 'An earlier attempt had already made this thread' });
+    expect(r.db.threads.get(deliveryThreadId(d.id, 2))).toBeUndefined();
+    expect(threadsOf(a)).toHaveLength(1);
+  });
+});
+
 describe('a restart', () => {
   it('after a retry made its thread but before the delivery said so: the thread is found, not made again', async () => {
     const { a, d } = await failedThenFixed();
@@ -360,6 +394,19 @@ describe('a restart', () => {
     expect(row(d.id)).toMatchObject({ state: 'started', attempt: 2, thread_id: deliveryThreadId(d.id, 2) });
     expect(threadsOf(a)).toHaveLength(1);
     expect(runsOf(a)).toHaveLength(1);
+  });
+
+  it('a copy of a later attempt never replaces a delivery that started, or has a thread: only a failure makes a retry', async () => {
+    const a = make();
+    const d = add(a);
+    await triggers.admitPending();
+    expect(row(d.id).state).toBe('started');
+    expect(fromOtherMac(d.id, { state: 'queued', attempt: 2, thread_id: null, reason: null })).toBe('skipped');
+    expect(row(d.id)).toMatchObject({ state: 'started', attempt: 1, thread_id: deliveryThreadId(d.id) });
+    const skipped = add(a, { state: 'skipped', reason: 'Skipped by hand' });
+    // A retry racing a skip on the other Mac does win: both were Ben's, and the later attempt is the one that runs.
+    expect(fromOtherMac(skipped.id, { state: 'queued', attempt: 2, reason: null })).toBe('applied');
+    expect(row(skipped.id)).toMatchObject({ state: 'queued', attempt: 2 });
   });
 
   it('a stale copy of attempt 1 from the other Mac never undoes the retry', async () => {
@@ -389,6 +436,20 @@ describe('bursts', () => {
     expect(await triggers.admitPending()).toBe(1);
     await r.untilStatus(row(burst[2].id).thread_id!, 'done', 15_000);
     expect(threadsOf(a)).toHaveLength(3);
+  });
+
+  it("counts this Mac's runs only: a run another Mac left going does not hold a slot", async () => {
+    const a = make({ extra: ', concurrency: 1', prompt: 'TOOL:400' });
+    const far = await r.runner.createThread({ channel: 'scratch', prompt: 'TOOL:3000', source: 'automation', automation: a });
+    const d = add(a);
+    await triggers.admitPending();
+    expect(row(d.id).state).toBe('accepted');
+    // It is the other Mac's run, and that Mac died: its row says running there and nothing here can end it.
+    r.db.db.prepare(`UPDATE threads SET run_machine = 'other-mac' WHERE id = ?`).run(far.id);
+    expect(triggerDeliveries.liveRuns(a)).toBe(0);
+    await triggers.admitPending();
+    expect(row(d.id).state).toBe('started');
+    await r.untilStatus(row(d.id).thread_id!, 'done', 15_000);
   });
 
   it('a held delivery that outlives the age limit while it waits is skipped, not started when a slot frees', async () => {
@@ -463,6 +524,18 @@ describe('the history and detail routes', () => {
     expect(Object.keys(view.context)).toEqual(['event', 'repo', 'workflow', 'conclusion', 'branch']);
     expect(JSON.stringify(view).toLowerCase()).not.toMatch(/signature|secret|sha256|x-hub/);
     expect((await get('/deliveries/00000000-0000-4000-8000-00000000dead')).status).toBe(404);
+  });
+
+  it('answers a bad request with a 4xx: malformed JSON, no attempt, or a place in the history that is not there', async () => {
+    const d = add(make({ enabled: false }), { state: 'failed', reason: 'boom' });
+    const raw = await app.request(`/api/deliveries/${d.id}/retry`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{nope' });
+    expect(raw.status).toBe(400);
+    expect((await post(`/deliveries/${d.id}/retry`, {})).status).toBe(400);
+    expect((await post(`/deliveries/${d.id}/retry`, { attempt: 0 })).status).toBe(400);
+    expect((await post(`/deliveries/${d.id}/skip`, { attempt: 'one' })).status).toBe(400);
+    expect((await get(`/automations/x/deliveries?before=00000000-0000-4000-8000-00000000dead`)).status).toBe(404);
+    for (const limit of ['0', '-5', 'abc', '99999']) expect((await get(`/automations/x/deliveries?limit=${limit}`)).status).toBe(200);
+    expect(row(d.id)).toMatchObject({ state: 'failed', attempt: 1 });
   });
 
   it('shows where a started delivery stands: the thread it made and what that thread did', async () => {

@@ -17,7 +17,9 @@ const PAGE = { default: 20, max: 100 };
 
 automationDeliveriesApi.get('/automations/:id/deliveries', (c) => {
   const limit = Math.min(Math.max(Math.trunc(Number(c.req.query('limit'))) || PAGE.default, 1), PAGE.max);
-  const { rows, more } = triggerDeliveries.page(c.req.param('id'), limit, c.req.query('before') || undefined);
+  const before = c.req.query('before') || undefined;
+  if (before && !triggerDeliveries.get(before)) return c.json({ error: 'no delivery with this id to page from' }, 404);
+  const { rows, more } = triggerDeliveries.page(c.req.param('id'), limit, before);
   return c.json({ deliveries: viewsOf(rows), more } satisfies DeliveryPage);
 });
 
@@ -30,7 +32,7 @@ const reply = (c: { json: (body: unknown, status?: 404 | 409) => Response }, r: 
   r.ok ? c.json({ delivery: r.delivery }) : c.json({ error: r.error, delivery: r.delivery }, r.status);
 
 automationDeliveriesApi.post('/deliveries/:id/retry', async (c) => {
-  const { attempt } = z.object({ attempt: z.number().int().positive() }).parse(await c.req.json());
+  const { attempt } = z.object({ attempt: z.number().int().positive() }).parse(await c.req.json().catch(() => ({})));
   const r = retryDelivery(c.req.param('id'), attempt);
   // Started here when this Mac runs automations. Another Mac holds it for the one that does.
   if (r.ok) void admitPending();

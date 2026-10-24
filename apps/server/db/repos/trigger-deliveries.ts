@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { isDeliveryAhead, isPendingDelivery, type TriggerDelivery, type TriggerDeliveryState, type TriggerSource } from '@omni/shared/automation-triggers.ts';
 import { db, now, tx } from '../connection.ts';
-import { record } from '../sync.ts';
+import { outbox, record } from '../sync.ts';
 
 // What started, or did not start, an event automation (apps/server/automation-triggers.ts). A row per automation and
 // source event, saved before any thread is made. Synced (sync/handlers/trigger-delivery.ts), so the Mac that runs
@@ -165,8 +165,24 @@ export const triggerDeliveries = {
     });
   },
 
-  /** How many of the automation's threads are queued or running, whichever Mac started them: its runs that are going. */
+  /** How many of the automation's threads are queued or running on this Mac: its runs that are going. Another Mac's are its own load, and a Mac that died mid-run must not hold slots here. */
   liveRuns(automation: string): number {
-    return (db.prepare(`SELECT COUNT(*) AS n FROM threads WHERE automation = ? AND status IN ('queued', 'running')`).get(automation) as { n: number }).n;
+    return (
+      db
+        .prepare(`SELECT COUNT(*) AS n FROM threads WHERE automation = ? AND status IN ('queued', 'running') AND (run_machine IS NULL OR run_machine = ?)`)
+        .get(automation, outbox.machineId() ?? '') as { n: number }
+    ).n;
+  },
+
+  /**
+   * The thread this attempt of a delivery made, or an earlier attempt did, newest first. One exists: a run was admitted,
+   * so nothing may start another, whatever else is true of the delivery now.
+   */
+  admitted(id: string, attempt: number): string | null {
+    for (let k = attempt; k >= 1; k--) {
+      const thread = deliveryThreadId(id, k);
+      if (db.prepare('SELECT 1 FROM threads WHERE id = ?').get(thread)) return thread;
+    }
+    return null;
   },
 };

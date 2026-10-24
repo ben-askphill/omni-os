@@ -118,18 +118,20 @@ async function admit(listed: TriggerDelivery, automations: Automation[]): Promis
     const a = automations.find((x) => x.id === d.automation);
     const settle = (state: TriggerDeliveryState, patch: { reason?: string | null; thread_id?: string | null } = {}) => triggerDeliveries.settle(d.id, d.attempt, state, patch);
     const skip = (reason: string) => settle('skipped', { reason });
+    const id = deliveryThreadId(d.id, d.attempt);
+    // A thread of this attempt, or an earlier one, exists: a run was admitted, before a restart that came before the
+    // delivery could say so, or by the other Mac. It is started whatever is true now (paused, expired, gone), and nothing starts another.
+    const made = triggerDeliveries.admitted(d.id, d.attempt);
+    if (made) {
+      if (a) adopt(a, made);
+      return settle('started', { thread_id: made, reason: made === id ? null : 'An earlier attempt had already made this thread' });
+    }
     if (!a) return skip('No automation with this id on the Mac that runs automations');
     if (a.error) return skip(`The automation is invalid: ${a.error}`);
     if (!a.enabled) return skip('Paused on the Mac that runs automations');
     const limits = a.on && !isPrTrigger(a.on) ? a.on : undefined;
     // Late, whether Omni was off, the other Mac slept on it or the automation was at its limit: it never starts now.
     if (isExpired(d.created_at, limits)) return skip(`Expired: it arrived ${span(Date.now() - new Date(d.created_at).getTime())} ago, over the ${span(maxAgeMs(limits))} limit`);
-    const id = deliveryThreadId(d.id, d.attempt);
-    // Made before a restart, which came before the delivery could say so.
-    if (threads.get(id)) {
-      adopt(a, id);
-      return settle('started', { thread_id: id });
-    }
     if (holdReason(a.id, limits, triggerDeliveries.liveRuns(a.id), Date.now(), d.attempt > 1)) return false;
     const attempt = d.attempt > 1 ? ` (attempt ${d.attempt})` : '';
     try {

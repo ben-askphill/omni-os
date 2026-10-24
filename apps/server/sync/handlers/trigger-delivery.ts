@@ -47,6 +47,8 @@ registerHandler('trigger_delivery', {
             d.updated_at ?? change.ts,
           ).changes > 0
       );
+    // A retry only follows a failure that made no thread. A copy that claims otherwise is out of step with what happened here.
+    if (attempt > cur.attempt && (cur.state === 'started' || cur.thread_id)) return false;
     if (!isDeliveryAhead({ attempt, state: d.state }, cur)) return false;
     db.prepare('UPDATE trigger_deliveries SET state = ?, reason = ?, thread_id = ?, attempt = ?, updated_at = ? WHERE uid = ?').run(
       d.state,

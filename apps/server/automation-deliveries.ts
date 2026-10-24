@@ -7,7 +7,7 @@ import { isPendingDelivery, type DeliveryView, type TriggerDelivery } from '@omn
 import { isPrTrigger } from './automation-events.ts';
 import { publishFeed } from './bus.ts';
 import { threads } from './db.ts';
-import { deliveryThreadId, triggerDeliveries } from './db/repos/trigger-deliveries.ts';
+import { triggerDeliveries } from './db/repos/trigger-deliveries.ts';
 import { expiresAt, holdReason, isExpired, maxAgeMs, span } from './delivery-policy.ts';
 import { loadAutomations, type Automation } from './automations.ts';
 import { automationsOwner } from './sync/owner.ts';
@@ -29,11 +29,15 @@ function retryBlock(d: TriggerDelivery, a: Automation | undefined, made: boolean
   return null;
 }
 
+/** What a Mac that does not run automations says of a pending delivery: another Mac decides, so nothing here may skip it. */
+const HELD_FOR_OWNER = 'Held for the Mac that runs automations. Skip it there: it may already be starting.';
+
 /** A delivery as the routes send it: the row and what is true of it right now. `live` counts runs going, by automation, for one request. */
 export function viewOf(d: TriggerDelivery, a: Automation | undefined, live: Map<string, number> = new Map(), now = Date.now()): DeliveryView {
   const limits = limitsOf(a);
   const pending = isPendingDelivery(d.state);
-  const made = !!threads.get(deliveryThreadId(d.id, d.attempt));
+  const owns = automationsOwner().isThisMac;
+  const made = !!triggerDeliveries.admitted(d.id, d.attempt);
   const retryable = d.state === 'failed' && !d.thread_id;
   const runs = (id: string) => live.get(id) ?? live.set(id, triggerDeliveries.liveRuns(id)).get(id)!;
   const block = d.state === 'failed' ? retryBlock(d, a, made, now) : null;
@@ -41,8 +45,9 @@ export function viewOf(d: TriggerDelivery, a: Automation | undefined, live: Map<
     ...d,
     thread_status: d.thread_id ? (threads.get(d.thread_id)?.status ?? null) : null,
     expires_at: pending || retryable ? expiresAt(d.created_at, limits).toISOString() : null,
-    waiting: pending && a && !isExpired(d.created_at, limits, now) ? holdReason(a.id, limits, runs(a.id), now, d.attempt > 1) : null,
-    can_skip: (pending || retryable) && !made && !triggerDeliveries.isStarting(d.id),
+    waiting: !pending ? null : !owns ? HELD_FOR_OWNER : a && !isExpired(d.created_at, limits, now) ? holdReason(a.id, limits, runs(a.id), now, d.attempt > 1) : null,
+    // A pending delivery on the Mac that does not run automations may be started by the other one this moment, so only that Mac skips it.
+    can_skip: ((pending && owns) || retryable) && !made && !triggerDeliveries.isStarting(d.id),
     can_retry: d.state === 'failed' && block === null,
     retry_blocked: block,
   };
@@ -102,7 +107,9 @@ export function skipDelivery(id: string, attempt?: number): DeliveryAction {
   if (!view.can_skip) {
     const error = triggerDeliveries.isStarting(id)
       ? 'It is being started right now. Its thread opens in a moment.'
-      : d.state === 'started' || d.thread_id
+      : view.waiting === HELD_FOR_OWNER
+        ? HELD_FOR_OWNER
+        : d.state === 'started' || d.thread_id
         ? 'It already started. Open its thread.'
         : d.state === 'skipped'
           ? 'It was already skipped.'

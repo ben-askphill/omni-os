@@ -75,11 +75,14 @@ const REPO = /^[\w.-]+\/[\w.-]+$/;
 const DURATION = /^(\d+)\s*([smhd])$/i;
 const UNIT_MS = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 } as const;
 
-/** `90s`, `15m`, `6h`, `2d` in milliseconds. Undefined for anything else, and for zero. */
+/** The longest `max_age`: a year. Anything longer is no limit, and a date that far out is not one JavaScript can print. */
+const DURATION_MAX_MS = 365 * UNIT_MS.d;
+
+/** `90s`, `15m`, `6h`, `2d` in milliseconds. Undefined for anything else, for zero and for more than a year. */
 export function parseDuration(v: unknown): number | undefined {
   const m = typeof v === 'string' ? DURATION.exec(v.trim()) : null;
   const ms = m ? Number(m[1]) * UNIT_MS[m[2].toLowerCase() as keyof typeof UNIT_MS] : 0;
-  return ms > 0 ? ms : undefined;
+  return ms > 0 && ms <= DURATION_MAX_MS ? ms : undefined;
 }
 
 export const CONCURRENCY_MAX = 8;
@@ -87,7 +90,7 @@ export const CONCURRENCY_MAX = 8;
 /** The `max_age` and `concurrency` of an `on:` block, or the message that says what is wrong with them. */
 function parseLimits(raw: { max_age?: unknown; concurrency?: unknown }): DeliveryLimits | string {
   const { max_age, concurrency } = raw;
-  if (max_age !== undefined && parseDuration(max_age) === undefined) return `max_age must look like 15m, 6h or 2d`;
+  if (max_age !== undefined && parseDuration(max_age) === undefined) return `max_age must look like 15m, 6h or 2d, and be at most 365d`;
   if (concurrency !== undefined && (!Number.isInteger(concurrency) || (concurrency as number) < 1 || (concurrency as number) > CONCURRENCY_MAX))
     return `concurrency must be a whole number from 1 to ${CONCURRENCY_MAX}`;
   return { ...(max_age !== undefined && { max_age: (max_age as string).trim().toLowerCase().replace(/\s+/g, '') }), ...(concurrency !== undefined && { concurrency: concurrency as number }) };

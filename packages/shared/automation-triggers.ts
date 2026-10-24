@@ -1,5 +1,5 @@
 // Deliveries of an event to an event-triggered automation (apps/server/automation-triggers.ts). Pure types and labels,
-// shared by the server and the Web UI. apps/mac/OmniKit/Sources/OmniKit/Automation.swift ports them.
+// shared by the server and the Web UI. apps/mac/OmniKit/Sources/OmniKit/Automation.swift and DeliveryStages.swift port them.
 
 /**
  * Where a delivery came from. A successful Artifact publish in any thread (packages/shared/published.ts), or a signed
@@ -113,7 +113,7 @@ const EXECUTION: Record<string, Pick<DeliveryStage, 'label' | 'tone'>> = {
  * could not be. Execution: what that thread did, the thread's own status. A delivery whose thread exists is never
  * called a failure of the run, whatever it reported: its thread says, and a follow-up goes there. (A failed one with a
  * thread, which only older builds saved, is shown as started and then errored.)
- * apps/mac/OmniKit/Sources/OmniKit/Automation.swift ports it.
+ * apps/mac/OmniKit/Sources/OmniKit/DeliveryStages.swift ports it.
  */
 export function deliveryStages(d: Pick<DeliveryView, 'state' | 'reason' | 'thread_id' | 'thread_status' | 'waiting'>): DeliveryStage[] {
   const trigger: DeliveryStage =
@@ -131,7 +131,8 @@ export function deliveryStages(d: Pick<DeliveryView, 'state' | 'reason' | 'threa
       : d.state === 'failed'
         ? { name: 'Run', label: d.thread_id ? 'Started, then reported an error' : 'Could not start', tone: 'needs', note: d.reason }
         : { name: 'Run', label: 'Never started', tone: 'quiet', note: null };
-  const seen = d.thread_id ? (EXECUTION[d.thread_status ?? ''] ?? { label: d.thread_status ?? 'Thread removed', tone: 'quiet' as const }) : null;
+  const known = d.thread_status && Object.hasOwn(EXECUTION, d.thread_status) ? EXECUTION[d.thread_status] : null;
+  const seen = d.thread_id ? (known ?? { label: d.thread_status ?? 'Thread removed', tone: 'quiet' as const }) : null;
   const execution: DeliveryStage = seen ? { name: 'Execution', ...seen, note: null } : { name: 'Execution', label: 'No run', tone: 'quiet', note: null };
   return [trigger, run, execution];
 }

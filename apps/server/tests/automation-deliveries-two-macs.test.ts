@@ -82,18 +82,20 @@ describe('retry and skip on two Macs', () => {
     expect(runs(a)).toHaveLength(1);
   });
 
-  it('a skip on B racing the start on A ends as the start on both Macs', T, async () => {
+  it('B cannot skip what it holds for A, which may be starting it: only A skips', T, async () => {
     b.triggers.observePublication(source, 'toolu_race', page('race'));
     expect(delivery(b, 'toolu_race')).toMatchObject({ state: 'queued' });
+    const held = (await b.json(`/deliveries/${uidOf('toolu_race')}`)).body;
+    expect(held).toMatchObject({ can_skip: false, waiting: expect.stringMatching(/^Held for the Mac that runs automations/) });
+    const refused = await b.json(`/deliveries/${uidOf('toolu_race')}/skip`, { body: {} });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toMatch(/Skip it there/);
+    expect(delivery(b, 'toolu_race')).toMatchObject({ state: 'queued' });
+
     a.triggers.observePublication(source, 'toolu_race', page('race'));
     await a.until('A to start it', () => delivery(a, 'toolu_race')?.state === 'started');
-    // B has not heard yet: Ben skips what it still shows as held.
-    const skipped = await b.json(`/deliveries/${uidOf('toolu_race')}/skip`, { body: {} });
-    expect(skipped.status).toBe(200);
-    expect(delivery(b, 'toolu_race')).toMatchObject({ state: 'skipped', reason: 'Skipped by hand' });
     await both();
     const onA = delivery(a, 'toolu_race')!;
-    expect(onA.state).toBe('started');
     expect(delivery(b, 'toolu_race')).toEqual(onA);
     expect(runs(a).filter((r) => r.id === onA.thread_id)).toHaveLength(1);
     expect(runs(a)).toHaveLength(2);

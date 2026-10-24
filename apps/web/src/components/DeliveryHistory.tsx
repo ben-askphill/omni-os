@@ -30,7 +30,8 @@ const FACTS = 'grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1 text-[12px]
 
 /** What the server kept of the event: fields it bounded already, shown as text, and a web link as a link. */
 function ContextFacts({ context }: { context: Record<string, string> }) {
-  const fields = Object.entries(context).filter(([, value]) => value.trim());
+  // By key, as the Mac app lists them: the server's order does not survive its JSON decoder.
+  const fields = Object.entries(context).filter(([, value]) => value.trim()).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   if (!fields.length) return null;
   return (
     <dl className={`${FACTS} mt-2 border-t border-line pt-2`}>

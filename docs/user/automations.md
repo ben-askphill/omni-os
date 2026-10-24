@@ -107,7 +107,7 @@ The detail also shows when the event arrived, which attempt this is, when it exp
 What you can do:
 
 - **Retry** goes again for a delivery that failed before any thread was made, for example because the channel was gone and you have fixed it. It runs as the next attempt, with a thread of its own, and starts at once, on the Mac that runs automations. Clicking twice makes one attempt.
-- **Skip** is final: the event never starts, here or on the other Mac, and cannot be retried. It works on a delivery that has not started, including a failed one. If the run is already being made when you skip, the skip is refused and the run goes ahead.
+- **Skip** is final: the event never starts, here or on the other Mac, and cannot be retried. It works on a delivery that has not started, including a failed one. If the run is already being made when you skip, the skip is refused and the run goes ahead. With sync on, only the Mac that runs automations skips an event that has not started, because the other Mac cannot tell whether it is starting this moment. That Mac's card says so.
 - **A run that was made is never retried.** If Omni errors after it made the thread, the delivery shows Started with the error, linked to the thread. What the run did is unknown, so open the thread and send a follow-up there. Failed always means no thread was made.
 
 Limits, set in the `on:` block of a published-page or webhook automation:

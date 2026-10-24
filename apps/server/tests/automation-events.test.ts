@@ -62,6 +62,9 @@ describe('parseTrigger', () => {
     expect(parseTrigger({ event: 'artifact_published', max_age: '0m' })).toMatch(/max_age must look like/);
     expect(parseTrigger({ event: 'artifact_published', max_age: 15 })).toMatch(/max_age must look like/);
     expect(parseTrigger({ event: 'artifact_published', max_age: 'soon' })).toMatch(/max_age must look like/);
+    expect(parseTrigger({ event: 'artifact_published', max_age: '365d' })).toMatchObject({ max_age: '365d' });
+    expect(parseTrigger({ event: 'artifact_published', max_age: '366d' })).toMatch(/at most 365d/);
+    expect(parseTrigger({ event: 'artifact_published', max_age: '1000000000d' })).toMatch(/at most 365d/);
     expect(parseTrigger({ event: 'artifact_published', concurrency: 0 })).toMatch(/concurrency must be/);
     expect(parseTrigger({ event: 'artifact_published', concurrency: 9 })).toMatch(/concurrency must be/);
     expect(parseTrigger({ event: 'artifact_published', concurrency: 1.5 })).toMatch(/concurrency must be/);
