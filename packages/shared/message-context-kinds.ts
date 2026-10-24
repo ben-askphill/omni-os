@@ -4,9 +4,11 @@
 // apps/mac/Omni/ContextViews.swift.
 import { parseContextsWith, readContextsWith, type FallbackWhy, type MessageContext, type MessageContextKind, type Parsed } from './message-context.ts';
 import { diffSelection } from './message-context-diff.ts';
+import { terminalExcerpt } from './message-context-terminal.ts';
 
 export const CONTEXT_KINDS = {
   diff_selection: diffSelection,
+  terminal_excerpt: terminalExcerpt,
 } as const;
 
 export type KindName = keyof typeof CONTEXT_KINDS;

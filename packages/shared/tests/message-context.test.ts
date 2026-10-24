@@ -3,6 +3,7 @@ import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
 import { blobIds, clampToHunk, diffSelection, selectRows, type DiffFileLike, type DiffSelection, type DiffSource } from '../message-context-diff.ts';
 import { CONTEXT_KINDS, parseContexts, readContexts } from '../message-context-kinds.ts';
+import { LINES_MAX, TEXT_MAX, plainText, selectExcerpt, terminalExcerpt, type TerminalExcerpt } from '../message-context-terminal.ts';
 import { CONTEXT_JSON_MAX, LABEL_MAX, contextDigest, contextKey, cutLabel, newContext, readContextsWith, type MessageContext } from '../message-context.ts';
 
 // The same corpus runs in the web tests and apps/mac/OmniKit/Tests/OmniKitTests/MessageContextTests.swift.
@@ -18,6 +19,12 @@ const corpus = JSON.parse(readFileSync(fixture('message-context.json'), 'utf8'))
     expect: { ok: true; body: DiffSelection; label: string } | { ok: false; error: string };
   }[];
   parse: { name: string; raw: unknown; expect: { ok: true; records: MessageContext[] } | { ok: false; error: string } }[];
+  excerpts: {
+    name: string;
+    raw: string;
+    source: { thread: string; pid: number | null; cwd: string; at: string };
+    expect: { ok: true; body: TerminalExcerpt; label: string } | { ok: false; error: string };
+  }[];
 };
 
 const known = (name: string) => corpus.records.find((r) => r.name === name)!.raw as MessageContext<'diff_selection', DiffSelection>;
@@ -37,7 +44,7 @@ describe('readContexts', () => {
     const [r] = readContexts([c.raw]);
     expect({ as: r.as, ...(r.as === 'fallback' && { why: r.why }), id: r.record.id, label: r.record.label, note: r.record.note }).toEqual(c.expect);
     if (r.as === 'known') {
-      expect(r.kind).toBe('diff_selection');
+      expect(r.kind).toBe(r.record.kind);
       expect(r.body).toEqual(r.record.body);
     }
   });
@@ -159,5 +166,31 @@ describe('cutLabel', () => {
     expect([...cut]).toHaveLength(LABEL_MAX);
     expect(cut.startsWith('…🛒/')).toBe(true);
     expect(cut.endsWith('cart.ts:1-3')).toBe(true);
+  });
+});
+
+describe('selectExcerpt', () => {
+  it.each(corpus.excerpts.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    const r = selectExcerpt(c.raw, { ...c.source, at: new Date(c.source.at) });
+    if (!c.expect.ok) return expect(r).toEqual({ ok: false, error: c.expect.error });
+    expect(JSON.stringify(r)).toBe(JSON.stringify({ ok: true, value: c.expect.body }));
+    if (!r.ok) return;
+    expect(terminalExcerpt.label(r.value)).toBe(c.expect.label);
+    expect(JSON.stringify(terminalExcerpt.parse(r.value, 1))).toBe(JSON.stringify(r));
+  });
+
+  it('makes text with no character the record refuses, whatever the terminal sent', () => {
+    const span = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => String.fromCharCode(from + i));
+    const noisy = [...span(0, 0x100), ...span(0x2028, 0x2030), ...span(0x2060, 0x206a)].join('');
+    const text = plainText(`\u001b[31m${noisy}\u001b]0;title\u0007`);
+    expect(terminalExcerpt.parse({ thread: 't', pid: null, cwd: '/', captured_at: '2026-10-24T09:30:15.250Z', text: `x${text}` }, 1).ok).toBe(true);
+  });
+
+  it('is unchanged by a second pass', () => {
+    for (const c of corpus.excerpts) expect(plainText(plainText(c.raw))).toBe(plainText(c.raw));
+  });
+
+  it('keeps the limits the record is parsed with', () => {
+    expect([LINES_MAX, TEXT_MAX]).toEqual([200, 8000]);
   });
 });
