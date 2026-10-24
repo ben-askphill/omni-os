@@ -61,10 +61,12 @@ public enum FeedEvent: Decodable, Hashable, Sendable {
   case channel(id: String)
   /// Ben read a thread's result, here or in the Web UI: refetch Needs you. Nothing else about the thread changed.
   case needsYou(threadID: String)
+  /// An event-triggered automation's delivery was saved or changed state: refetch the automations.
+  case automationDelivery(automation: String)
   case unknown(JSONValue)
 
   private enum CodingKeys: String, CodingKey {
-    case type, thread, harness, usage, artifact, tasks, mods, id
+    case type, thread, harness, usage, artifact, tasks, mods, id, automation
     case threadID = "thread_id"
   }
 
@@ -91,6 +93,8 @@ public enum FeedEvent: Decodable, Hashable, Sendable {
       self = .channel(id: try c.decode(String.self, forKey: .id))
     case "needs_you":
       self = .needsYou(threadID: try c.decode(String.self, forKey: .threadID))
+    case "automation_delivery":
+      self = .automationDelivery(automation: try c.decode(String.self, forKey: .automation))
     default:
       self = .unknown(try JSONValue(from: decoder))
     }

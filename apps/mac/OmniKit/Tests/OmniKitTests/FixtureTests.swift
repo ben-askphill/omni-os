@@ -20,6 +20,16 @@ func sseData(_ text: String) -> [String] {
   return parser.feed(Array(text.utf8)).filter { $0.event == "message" }.map(\.data)
 }
 
+/// The answer to a retry or skip, and to a refused one (409): the reason, and the delivery as it is now.
+private struct DeliveryReply: Decodable {
+  let delivery: TriggerDelivery
+}
+
+private struct DeliveryRefusal: Decodable {
+  let error: String
+  let delivery: TriggerDelivery
+}
+
 @Suite struct FixtureTests {
   /// Every fixture file and what it decodes as.
   static let decoders: [String: @Sendable () throws -> Void] = [
@@ -47,6 +57,10 @@ func sseData(_ text: String) -> [String] {
     "automations.json": { _ = try decodeFixture([Automation].self, "automations.json") },
     "automation-run.json": { _ = try decodeFixture(OmniThread.self, "automation-run.json") },
     "automation-enabled.json": { _ = try decodeFixture([String: Bool].self, "automation-enabled.json") },
+    "automation-deliveries.json": { _ = try decodeFixture(DeliveryPage.self, "automation-deliveries.json") },
+    "automation-delivery-retried.json": { _ = try decodeFixture(DeliveryReply.self, "automation-delivery-retried.json") },
+    "automation-delivery-skipped.json": { _ = try decodeFixture(DeliveryReply.self, "automation-delivery-skipped.json") },
+    "automation-delivery-refused.json": { _ = try decodeFixture(DeliveryRefusal.self, "automation-delivery-refused.json") },
     "thread-recovered.json": { _ = try decodeFixture(ThreadDetail.self, "thread-recovered.json") },
     "requests-resumed.json": { _ = try decodeFixture(RecoveryAnswer.self, "requests-resumed.json") },
     "request-edited.json": { _ = try decodeFixture(EditAnswer.self, "request-edited.json") },
@@ -76,6 +90,9 @@ func sseData(_ text: String) -> [String] {
     "secret-set-request.json": { _ = try decodeFixture([String: String].self, "secret-set-request.json") },
     "secret-delete-request.json": { _ = try decodeFixture([String: String].self, "secret-delete-request.json") },
     "automation-enabled-request.json": { _ = try decodeFixture([String: Bool].self, "automation-enabled-request.json") },
+    // AutomationsClientTests compares them with what the client encodes.
+    "automation-delivery-retry-request.json": { _ = try decodeFixture([String: Int].self, "automation-delivery-retry-request.json") },
+    "automation-delivery-skip-request.json": { _ = try decodeFixture([String: Int].self, "automation-delivery-skip-request.json") },
     // ReplyRequestTests compares it with what the client encodes.
     "message-queued-request.json": { _ = try decodeFixture([String: String].self, "message-queued-request.json") },
     // PendingEditsTests compares it with what the client encodes.
@@ -127,6 +144,90 @@ func sseData(_ text: String) -> [String] {
     // The picker says "Run codex login" but shows a sentence fix as it is.
     #expect(harnesses.first { $0.id == .codex }?.fixCommand == "codex login")
     #expect(cloud.fixCommand == nil && harnesses.first { $0.id == .hermes }?.fixCommand == nil)
+  }
+
+  /// `page-review` runs when a page is published in #acme. The fake CLI published one, which started a run.
+  @Test func readsAnAutomationAPublishedPageStarted() throws {
+    let list = try decodeFixture([Automation].self, "automations.json")
+    let review = try #require(list.first { $0.id == "page-review" })
+    #expect(review.isArtifact)
+    #expect(review.on?.channels == ["acme"])
+    #expect(review.on?.drafts == false && review.on?.updates == false)
+    #expect(review.watching(enabled: true) == "Runs once per page published in #acme")
+    let delivery = try #require(review.deliveries.first)
+    #expect(delivery.state == .started)
+    #expect(delivery.summary == "launch-plan.html in #Acme")
+    #expect(delivery.threadID != nil)
+    #expect(delivery.threadID == review.runs.first?.threadID)
+    #expect(review.runs.first?.trigger == .event)
+    #expect(delivery.context["thread_title"] == "Publish the launch plan")
+    #expect(list.filter { !["page-review", "ci-fixer", "flaky-hook"].contains($0.id) }.allSatisfy { $0.deliveries.isEmpty })
+    #expect(list.filter { !["ci-fixer", "flaky-hook"].contains($0.id) }.allSatisfy { $0.webhook == nil })
+  }
+
+  /// `ci-fixer` takes signed GitHub webhooks from acme/shop. A CI failure reached it and started a run; the secret
+  /// shows by its Keychain name only.
+  @Test func readsAnAutomationAWebhookStarted() throws {
+    let list = try decodeFixture([Automation].self, "automations.json")
+    let fixer = try #require(list.first { $0.id == "ci-fixer" })
+    #expect(fixer.isWebhook)
+    #expect(fixer.on?.repo == "acme/shop")
+    #expect(fixer.on?.events == ["workflow_run", "pull_request_review"])
+    #expect(fixer.scheduleDetail().hasPrefix("acme/shop · workflow_run, pull_request_review"))
+    let hook = try #require(fixer.webhook)
+    #expect(hook.path == "/api/hooks/github/ci-fixer")
+    #expect(hook.secret == "OMNI_WEBHOOK_CI_FIXER")
+    #expect(hook.secretSet)
+    let delivery = try #require(fixer.deliveries.first)
+    #expect(delivery.source == "github_webhook")
+    #expect(delivery.state == .started)
+    #expect(delivery.sourceThread == nil)
+    #expect(delivery.threadID != nil)
+    #expect(delivery.threadID == fixer.runs.first?.threadID)
+    #expect(delivery.context["event"] == "workflow_run")
+    #expect(delivery.context["repo"] == "acme/shop")
+  }
+
+  /// `flaky-hook` is a webhook whose start failed: its first delivery was skipped by hand, and the second, attempt 2
+  /// of the same event, failed and can go again.
+  @Test func readsAFailedDeliveryThatCanGoAgain() throws {
+    let list = try decodeFixture([Automation].self, "automations.json")
+    let flaky = try #require(list.first { $0.id == "flaky-hook" })
+    #expect(!flaky.deliveriesMore)
+    #expect(flaky.deliveries.count == 2)
+    let skipped = try #require(flaky.deliveries.first { $0.state == .skipped })
+    #expect(skipped.reason == "Skipped by hand")
+    #expect(!skipped.canSkip && !skipped.canRetry && skipped.attempt == 1)
+    let failed = try #require(flaky.deliveries.first { $0.state == .failed })
+    #expect(failed.attempt == 2)
+    #expect(failed.canRetry && failed.canSkip)
+    #expect(failed.threadID == nil && failed.threadStatus == nil && failed.retryBlocked == nil)
+    #expect(failed.expiresAt != nil)
+    #expect(failed.stages.map(\.label) == ["Accepted", "Could not start", "No run"])
+    let started = try #require(list.first { $0.id == "ci-fixer" }?.deliveries.first)
+    #expect(started.threadStatus == .done)
+    #expect(started.stages.map(\.label) == ["Accepted", "Thread created", "Finished"])
+    // Bounded fields only: no header, signature or body.
+    #expect(Set(failed.context.keys) == ["event", "repo", "workflow", "conclusion", "branch", "sha", "title", "run_url"])
+  }
+
+  @Test func readsThePageOfOlderDeliveries() throws {
+    let page = try decodeFixture(DeliveryPage.self, "automation-deliveries.json")
+    #expect(page.more)
+    #expect(page.deliveries.map(\.state) == [.skipped])
+  }
+
+  @Test func readsTheAnswersToARetryAndASkip() throws {
+    let retried = try decodeFixture(DeliveryReply.self, "automation-delivery-retried.json").delivery
+    #expect(retried.state == .accepted && retried.attempt == 2)
+    #expect(!retried.canRetry && retried.canSkip)
+    let skipped = try decodeFixture(DeliveryReply.self, "automation-delivery-skipped.json").delivery
+    #expect(skipped.state == .skipped && !skipped.canSkip && !skipped.canRetry)
+    // A refused click: the reason, and the row as it is now.
+    let refused = try decodeFixture(DeliveryRefusal.self, "automation-delivery-refused.json")
+    #expect(refused.error == "This delivery moved on since you looked. Reload it.")
+    #expect(refused.delivery.attempt == 2)
+    #expect(refused.delivery.id == retried.id)
   }
 
   @Test func readsAThreadBeingHandedOff() throws {

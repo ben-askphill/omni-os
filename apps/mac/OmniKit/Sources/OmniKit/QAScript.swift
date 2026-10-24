@@ -60,6 +60,21 @@ public enum QAQuickPrompt: Hashable, Sendable {
   case close
 }
 
+/// What a `{"deliveries": ...}` step does on the Automations page: scroll an automation's Deliveries into view, then open
+/// its first delivery in a state (or with an id), and load the next page of older ones.
+public struct QADeliveries: Hashable, Sendable {
+  public let automation: String
+  /// A delivery state (`failed`) or a delivery id.
+  public let open: String?
+  public let older: Bool
+
+  public init(automation: String, open: String?, older: Bool) {
+    self.automation = automation
+    self.open = open
+    self.older = older
+  }
+}
+
 public enum QAServerAction: String, Hashable, Sendable {
   case start, stop, check
 }
@@ -69,7 +84,8 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
 /// `{"settings": "secrets"}` (or `connection`, `profile`, `sync`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
 /// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`), `{"expand": true}`, `{"meter": true}`, `{"modelPicker": true}` (or a search, `"cursor"`), `{"foldAll": true}`,
-/// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`,
+/// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`, `{"webhookSecret": "<automation id>"}`,
+/// `{"deliveries": "<automation id>"}` (or `{"automation": "<id>", "open": "failed", "older": true}`),
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
 /// `changes`, `turn`, `browser`, `terminal`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
 /// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
@@ -103,6 +119,10 @@ public enum QAStep: Hashable, Sendable {
   case foldAll
   /// Opens the edit of the open thread's first editable unsent message, with this text in it.
   case editPending(String)
+  /// Opens the Set secret form of the webhook automation with this id, on the Automations page.
+  case webhookSecret(String)
+  /// Shows an automation's deliveries on the Automations page, with a detail open or older ones loaded.
+  case deliveries(QADeliveries)
   /// Zooms the artifact image preview to this scale, or back to fit with nil.
   case imageZoom(Double?)
   /// Puts text in the reply box, as if typed.
@@ -214,7 +234,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -281,6 +301,17 @@ public struct QAScript: Hashable, Sendable {
     case "editPending":
       guard let text = value as? String else { throw QAScriptError("editPending takes the text to put in the edit") }
       return .editPending(text)
+    case "webhookSecret":
+      guard let id = value as? String, !id.isEmpty else { throw QAScriptError("webhookSecret takes the automation id") }
+      return .webhookSecret(id)
+    case "deliveries":
+      if let id = value as? String, !id.isEmpty { return .deliveries(QADeliveries(automation: id, open: nil, older: false)) }
+      let usage = #"deliveries takes an automation id, or {"automation": id, "open": state or delivery id, "older": true}"#
+      guard let d = value as? [String: Any], let id = d["automation"] as? String, !id.isEmpty,
+        Set(d.keys).isSubset(of: ["automation", "open", "older"]) else { throw QAScriptError(usage) }
+      if let open = d["open"], !(open is String) { throw QAScriptError(usage) }
+      if let older = d["older"], !(older is Bool) { throw QAScriptError(usage) }
+      return .deliveries(QADeliveries(automation: id, open: d["open"] as? String, older: d["older"] as? Bool ?? false))
     case "quickPrompt":
       if let text = value as? String { return .quickPrompt(.open(text)) }
       if let on = value as? Bool, !on { return .quickPrompt(.close) }

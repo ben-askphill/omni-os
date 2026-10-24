@@ -332,4 +332,26 @@ export function migrate() {
       SELECT 'completion', uid, 'upsert', created_at FROM completions
       WHERE seq = last_insert_rowid() AND EXISTS (SELECT 1 FROM kv WHERE key = 'sync.machine_id');
     END`);
+  // #226 Event-trigger deliveries (db/repos/trigger-deliveries.ts): one row per automation and source event, its uid
+  // derived from both, so a replay or the other Mac's copy is the same row. Synced; states only move forward.
+  db.exec(`CREATE TABLE IF NOT EXISTS trigger_deliveries (
+    uid TEXT PRIMARY KEY,
+    automation TEXT NOT NULL,
+    source TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    context TEXT NOT NULL,
+    state TEXT NOT NULL,
+    reason TEXT,
+    owner TEXT,
+    source_thread TEXT,
+    thread_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (automation, source, source_id)
+  );
+  CREATE INDEX IF NOT EXISTS trigger_deliveries_automation ON trigger_deliveries(automation, created_at);
+  CREATE INDEX IF NOT EXISTS trigger_deliveries_thread ON trigger_deliveries(thread_id) WHERE thread_id IS NOT NULL;`);
+  // #228 A retry is the next attempt of the same delivery row: 1 for the first go. Each attempt has its own thread id.
+  ensureColumn('trigger_deliveries', 'attempt', 'INTEGER NOT NULL DEFAULT 1');
 }

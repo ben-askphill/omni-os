@@ -48,6 +48,8 @@ struct AutomationsView: View {
 struct AutomationsList: View {
   let model: AppModel
   let automations: AutomationsModel
+  /// The webhook automation whose Set secret form is open.
+  @State private var secretFor: Automation?
 
   var body: some View {
     ScreenColumn {
@@ -74,6 +76,21 @@ struct AutomationsList: View {
         content
       }
     }
+    .sheet(item: $secretFor) { a in
+      if let hook = a.webhook {
+        WebhookSecretSheet(name: a.name, webhook: hook) { value in await automations.setWebhookSecret(value, for: a) }
+      }
+    }
+    #if DEBUG
+    .onAppear {
+      QAProbe.openWebhookSecret = { id in
+        guard let a = automations.automations.first(where: { $0.id == id && $0.webhook != nil }) else { return false }
+        secretFor = a
+        return true
+      }
+    }
+    .onDisappear { QAProbe.openWebhookSecret = nil }
+    #endif
   }
 
   @ViewBuilder private var content: some View {
@@ -86,10 +103,33 @@ struct AutomationsList: View {
       EmptyNote(symbol: "clock", title: "No automations yet",
                 message: "Add a YAML file to automations/ with name, cron, channel and prompt. It shows up here right away.")
     case .loaded:
-      VStack(spacing: z(12)) {
-        ForEach(automations.automations) { a in
-          AutomationSection(model: model, automations: automations, automation: a)
+      ScrollViewReader { proxy in
+        VStack(spacing: z(12)) {
+          ForEach(automations.automations) { a in
+            AutomationSection(model: model, automations: automations, automation: a) { secretFor = a }
+          }
         }
+        #if DEBUG
+        .onAppear {
+          QAProbe.showDeliveries = { target in
+            guard let a = automations.automations.first(where: { $0.id == target.automation }) else { return "no automation \(target.automation) on screen" }
+            if target.older {
+              await automations.showOlder(for: a)
+              if let failure = automations.olderErrors[a.id] { return failure }
+            }
+            if let key = target.open {
+              guard let d = automations.deliveries(of: a).first(where: { $0.id == key || $0.state.rawValue == key }) else {
+                return "no \(key) delivery in \(a.id)"
+              }
+              automations.setExpanded(true, for: d)
+            }
+            try? await Task.sleep(for: .milliseconds(300))
+            proxy.scrollTo("deliveries-\(a.id)", anchor: .top)
+            return nil
+          }
+        }
+        .onDisappear { QAProbe.showDeliveries = nil }
+        #endif
       }
     }
   }
@@ -100,6 +140,8 @@ struct AutomationSection: View {
   let model: AppModel
   let automations: AutomationsModel
   let automation: Automation
+  /// Opens the Set secret form, for a webhook automation.
+  let editSecret: () -> Void
   @State private var showPrompt = false
 
   private var enabled: Bool { automations.isEnabled(automation) }
@@ -113,7 +155,16 @@ struct AutomationSection: View {
       if let error = automations.errors[automation.id] {
         ErrorNote(text: error).padding(.horizontal, z(20)).padding(.bottom, z(16))
       }
+      if let hook = automation.webhook {
+        WebhookPanel(automations: automations, automation: automation, webhook: hook, edit: editSecret)
+          .padding(.horizontal, z(20))
+          .padding(.bottom, z(12))
+      }
       prompt.padding(.horizontal, z(10)).padding(.bottom, z(4))
+      // Above the runs: a delivery is what starts one.
+      if automation.showsDeliveries {
+        deliveries.padding(.horizontal, z(20)).padding(.top, z(8)).padding(.bottom, z(8))
+      }
       runs.padding(.horizontal, z(20)).padding(.top, z(8)).padding(.bottom, z(16))
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -172,7 +223,7 @@ struct AutomationSection: View {
           if let badge = automation.badge(enabled: enabled) { Badge(badge: badge) }
         }
         details.padding(.top, z(8))
-        if let watching = automation.watching(enabled: enabled) {
+        if let watching = automation.watching(enabled: enabled, channelName: channelName) {
           Text(watching)
             .font(.omni(size: 12.5))
             .foregroundStyle(automation.pollError == nil ? Tok.fg3 : Tok.fg2)
@@ -220,15 +271,23 @@ struct AutomationSection: View {
     }
   }
 
+  private func channelName(_ id: String) -> String? { model.store.channel(id)?.name }
+
+  private var triggerIcon: String {
+    if automation.isWebhook { return "inbox" }
+    if automation.isArtifact { return "globe" }
+    return automation.isEvent ? "pr" : "clock"
+  }
+
   private var details: some View {
     FlowRow(spacing: 6, lineSpacing: 6) {
       HStack(spacing: z(6)) {
-        OmniIcon(name: automation.isEvent ? "pr" : "clock", size: 12).foregroundStyle(Tok.fg3)
+        OmniIcon(name: triggerIcon, size: 12).foregroundStyle(Tok.fg3)
         Text(automation.schedule)
       }
       .chip()
       .help(automation.scheduleHelp)
-      Text(automation.scheduleDetail)
+      Text(automation.scheduleDetail(channelName: channelName))
         .font(.omni(size: 11, design: .monospaced))
         .foregroundStyle(Tok.fg4)
         .padding(.horizontal, z(8))
@@ -262,6 +321,143 @@ struct AutomationSection: View {
           }
         }
         .padding(.horizontal, z(-8))
+      }
+    }
+  }
+
+  private var deliveries: some View {
+    DeliveryList(model: model, automations: automations, automation: automation)
+      .id("deliveries-\(automation.id)")
+  }
+}
+
+/// Where GitHub posts a webhook automation's events, and whether this Mac holds the signing secret. The value never
+/// shows; only whether it is set.
+private struct WebhookPanel: View {
+  let automations: AutomationsModel
+  let automation: Automation
+  let webhook: AutomationWebhook
+  let edit: () -> Void
+  @State private var copied = false
+  @State private var confirmingRemove = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: z(10)) {
+      HStack(spacing: z(10)) {
+        Text("Endpoint").omniCaption()
+        Text(webhook.path)
+          .font(.omni(size: 12, design: .monospaced))
+          .foregroundStyle(Tok.fg)
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .textSelection(.enabled)
+        Button {
+          Pasteboard.copy(webhook.path)
+          copied = true
+          Task {
+            try? await Task.sleep(for: .seconds(1.4))
+            copied = false
+          }
+        } label: {
+          OmniIcon(name: copied ? "check" : "copy", size: 13)
+        }
+        .buttonStyle(.icon(size: 26))
+        .help(copied ? "Copied" : "Copy the endpoint path")
+        .accessibilityLabel("Copy the endpoint path")
+        Spacer(minLength: 0)
+      }
+      HStack(spacing: z(8)) {
+        OmniIcon(name: webhook.secretSet ? "lock" : "alert", size: 13)
+          .foregroundStyle(webhook.secretSet ? Tok.fg3 : Tok.warn)
+        Text(webhook.secretStatus)
+          .font(.omni(size: 12.5))
+          .foregroundStyle(webhook.secretSet ? Tok.fg2 : Tok.warn)
+          .help("Kept in the Keychain as \(webhook.secret). GitHub signs each delivery with it.")
+        Spacer(minLength: z(8))
+        if automations.savingSecret.contains(automation.id) { Loader(size: 12) }
+        Button(webhook.secretAction, action: edit)
+          .buttonStyle(.pill(.secondary, height: 28))
+          .disabled(!automations.canEditSecret(automation))
+        if webhook.secretSet {
+          Button("Remove") { confirmingRemove = true }
+            .buttonStyle(.pill(.ghost, height: 28))
+            .disabled(!automations.canEditSecret(automation))
+        }
+      }
+    }
+    .padding(.horizontal, z(14))
+    .padding(.vertical, z(12))
+    .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
+    .confirmationDialog("Remove the signing secret for \(automation.name)?", isPresented: $confirmingRemove) {
+      Button("Remove", role: .destructive) { Task { await automations.removeWebhookSecret(for: automation) } }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("Omni deletes it from this Mac's Keychain. GitHub deliveries are refused until you set it again.")
+    }
+  }
+}
+
+/// Set or replace a webhook automation's signing secret. The value lives in this form only until it is saved.
+private struct WebhookSecretSheet: View {
+  let name: String
+  let webhook: AutomationWebhook
+  let save: (String) async -> String?
+  @Environment(\.dismiss) private var dismiss
+  @State private var value = ""
+  @State private var busy = false
+  @State private var error: String?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: z(14)) {
+      Text(webhook.secretSet ? "Replace the signing secret" : "Set the signing secret")
+        .font(.omni(size: 17, weight: .medium))
+        .foregroundStyle(Tok.fg)
+      Text("Paste the secret from the GitHub webhook that posts to \(Text(webhook.path).font(.omni(size: 12, design: .monospaced))) for \(name). Omni keeps it in this Mac's Keychain and never shows it again.")
+        .font(.omni(size: 12.5))
+        .foregroundStyle(Tok.fg3)
+        .fixedSize(horizontal: false, vertical: true)
+      VStack(alignment: .leading, spacing: 0) {
+        FieldLabel(text: "Secret")
+        SecureField("Secret", text: $value, prompt: Text("Paste the secret"))
+          .textFieldStyle(.omniMono)
+          .privacySensitive()
+          .onSubmit(submit)
+      }
+      if let error { ErrorNote(text: error) }
+      HStack {
+        Spacer()
+        Button("Cancel") { dismiss() }
+          .buttonStyle(.pill(.ghost, height: 34))
+          .keyboardShortcut(.cancelAction)
+          .disabled(busy)
+        Button(action: submit) {
+          HStack(spacing: z(8)) {
+            if busy { Loader(size: 14) }
+            Text("Save")
+          }
+        }
+        .buttonStyle(.pill(.primary, height: 34))
+        .keyboardShortcut(.defaultAction)
+        .disabled(busy || !AutomationsModel.isSecretValue(value))
+      }
+    }
+    .padding(z(24))
+    .frame(width: z(460))
+    .background(Tok.bg)
+  }
+
+  private func submit() {
+    guard !busy, AutomationsModel.isSecretValue(value) else { return }
+    busy = true
+    error = nil
+    Task {
+      let failure = await save(value)
+      busy = false
+      if let failure {
+        error = failure
+      } else {
+        value = ""
+        dismiss()
       }
     }
   }

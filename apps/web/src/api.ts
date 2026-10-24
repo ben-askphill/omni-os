@@ -6,8 +6,10 @@ import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
 import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
+import type { DeliveryPage, DeliveryView } from '@omni/shared/automation-triggers.ts';
+import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/automation-events.ts';
 
-export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult };
+export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, DeliveryView, DeliveryPage };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number };
@@ -277,23 +279,18 @@ export interface AutomationRun {
   status: string | null;
   title: string | null;
 }
-export interface AutomationTrigger {
-  event: 'pr_opened' | 'pr_checks_failed' | 'pr_conflict' | 'pr_review' | (string & {});
-  repo?: string;
-  drafts: boolean;
-  /** `any`: outside authors and fork PRs fire too. Unset, only the repo's owners, members and collaborators. */
-  trust?: 'any';
-}
+/** A PR change on GitHub, a page a thread published (`artifact_published`), or a signed GitHub webhook (`github_webhook`). */
+export type AutomationTrigger = PrTrigger | ArtifactTrigger | WebhookTrigger;
 export interface Automation {
   id: string;
   name: string;
   /** Empty for an event automation. */
   cron: string;
-  /** Set for an event automation: it runs when this happens on GitHub instead of on a schedule. */
+  /** Set for an event automation: it runs when this happens instead of on a schedule. */
   on?: AutomationTrigger;
-  /** The repo an event automation watches (its `on.repo`, else its channel's), null when there is none. */
+  /** The repo a PR automation watches (its `on.repo`, else its channel's), null when there is none. */
   repo?: string | null;
-  /** Why the last GitHub poll for an event automation failed. */
+  /** Why the last GitHub poll for a PR automation failed. */
   poll_error?: string | null;
   timezone: string;
   channel: string;
@@ -305,6 +302,12 @@ export interface Automation {
   error?: string;
   next?: string | null;
   runs: AutomationRun[];
+  /** Published pages or GitHub webhooks delivered to the automation, newest first, at most 5. Empty for the rest. */
+  deliveries: DeliveryView[];
+  /** Older deliveries exist: GET /automations/:id/deliveries pages through them. */
+  deliveries_more: boolean;
+  /** Set for a webhook automation: where GitHub posts, and whether this Mac holds the signing secret. `secret` is its Keychain name, never the value. */
+  webhook?: { path: string; secret: string; secret_set: boolean };
 }
 
 export interface SecretRow {
@@ -368,15 +371,20 @@ export type FeedEvent =
   | { type: 'channel'; id: string }
   /** Ben read a thread's result, here or in the Mac app: Needs you changed, nothing else did. */
   | { type: 'needs_you'; thread_id: string }
+  /** A delivery to this automation was saved or changed state. */
+  | { type: 'automation_delivery'; automation: string }
   | { type: 'reconnect' };
 
 // ---------- fetch helpers ----------
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** The parsed reply of a refused request, for the ones that carry more than an `error`. */
+  body: unknown;
+  constructor(message: string, status: number, body?: unknown) {
     super(message);
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -430,7 +438,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
         : typeof data === 'string' && data
           ? data.slice(0, 300)
           : `Request failed (${res.status})`;
-    throw new ApiError(msg, res.status);
+    throw new ApiError(msg, res.status, data);
   }
   return data as T;
 }
@@ -455,6 +463,13 @@ export const api = {
 export const harnessesPath = (channel?: string | null) => (channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses');
 
 export const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** What a refused retry or skip (409) says is true of the delivery now, so the row can show it next to the reason. */
+export function refusedDelivery(e: unknown): DeliveryView | undefined {
+  const body = e instanceof ApiError && e.body && typeof e.body === 'object' ? (e.body as { delivery?: unknown }) : undefined;
+  const d = body?.delivery;
+  return d && typeof d === 'object' && typeof (d as { id?: unknown }).id === 'string' ? (d as DeliveryView) : undefined;
+}
 
 export const artifactUrl = (a: Pick<Artifact, 'id' | 'updated_at'>, download = false) =>
   `/api/artifacts/${a.id}/raw?v=${encodeURIComponent(a.updated_at)}${download ? '&download=1' : ''}`;

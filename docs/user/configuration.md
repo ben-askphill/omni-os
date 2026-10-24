@@ -32,7 +32,7 @@ Stored in the macOS Keychain under service `omni-os` (account `<scope>/<NAME>`).
 
 - Scope `global` goes to every thread as an env var.
 - Scope `channel:<slug>` goes only to that channel's threads and overrides a global with the same name.
-- Billing keys stay out of a harness and the terminal. Sync keys stay out of the terminal, and a global one stays out of a harness. `GROKBOT_WEBHOOK_URL` and `GROKBOT_WEBHOOK_AUTH` stay out of both, at any scope. See [Grok Bot](#grok-bot).
+- Billing keys stay out of a harness and the terminal. Sync keys stay out of the terminal, and a global one stays out of a harness. `GROKBOT_WEBHOOK_URL`, `GROKBOT_WEBHOOK_AUTH` and webhook signing secrets (`OMNI_WEBHOOK_*`) stay out of both, at any scope. See [Grok Bot](#grok-bot) and [GitHub webhooks](automations.md#github-webhooks).
 
 ## Grok Bot
 

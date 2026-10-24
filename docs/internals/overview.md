@@ -55,7 +55,7 @@ packages/shared/            @omni/shared: pure TypeScript both clients use (slas
 packages/test-fixtures/     @omni/test-fixtures: fake CLIs and corpora the TS and Swift tests share
 packages/typescript-config/ @omni/typescript-config: the tsconfig bases every package extends
 crew/                       shared role charters (yours override them from data/crew/)
-automations/                shared automation YAML, cron or PR events (yours go in data/automations/)
+automations/                shared automation YAML, cron or events (yours go in data/automations/)
 omni.config.example.json    every field of data/omni.config.json
 mods/                       Claude Code mods loaded with OMNI_MODS=1 (omni-progress)
 scripts/                    shell shim, Mac build, QA stack, PR screenshots, launchd install

@@ -72,6 +72,8 @@ function slashFor(prompt: string, commands: () => SlashCommand[]): { text: strin
 // ---------- public API ----------
 
 export interface CreateThreadInput {
+  /** The new thread's id, when the caller fixed it in advance. A new uuid otherwise. */
+  id?: string;
   channel: string;
   prompt: string;
   role?: string | null;
@@ -124,7 +126,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
 
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
 
-  const id = randomUUID();
+  const id = input.id ?? randomUUID();
   const remote = isRemoteHarness(harness);
   const wd = await prepareWorkdir(channel, id, { remote });
   const thread = threads.create({

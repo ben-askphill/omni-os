@@ -1,7 +1,11 @@
-// Event triggers for automations: which GitHub PR changes should start a run. Pure, no db, no gh, so it is tested
-// directly (tests/automation-events.test.ts). apps/server/automation-watch.ts polls gh and feeds it.
+// Event triggers for automations: which GitHub PR changes should start a run, and the parsing of every `on:` block.
+// Pure, no db, no gh, so it is tested directly (tests/automation-events.test.ts). apps/server/automation-watch.ts polls
+// gh and feeds the PR events; apps/server/automation-triggers.ts takes artifact publishes; apps/server/github-webhook-api.ts
+// takes signed GitHub webhooks.
 
-export const EVENT_TYPES = ['pr_opened', 'pr_checks_failed', 'pr_conflict', 'pr_review'] as const;
+export const PR_EVENT_TYPES = ['pr_opened', 'pr_checks_failed', 'pr_conflict', 'pr_review'] as const;
+export type PrEventType = (typeof PR_EVENT_TYPES)[number];
+export const EVENT_TYPES = [...PR_EVENT_TYPES, 'artifact_published', 'github_webhook'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 export const EVENT_LABELS: Record<EventType, string> = {
@@ -9,11 +13,17 @@ export const EVENT_LABELS: Record<EventType, string> = {
   pr_checks_failed: 'When PR checks fail',
   pr_conflict: 'When a PR has conflicts',
   pr_review: 'When a PR gets review comments',
+  artifact_published: 'When a page is published',
+  github_webhook: 'When GitHub sends a webhook',
 };
 
-/** An automation's `on:` block. `repo` defaults to the channel's GitHub repo, resolved by the watcher. */
-export interface EventTrigger {
-  event: EventType;
+/** The GitHub webhook events an automation can take. */
+export const WEBHOOK_EVENTS = ['workflow_run', 'pull_request_review'] as const;
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
+
+/** A PR automation's `on:` block. `repo` defaults to the channel's GitHub repo, resolved by the watcher. */
+export interface PrTrigger {
+  event: PrEventType;
   repo?: string;
   /** Draft PRs fire too. Off by default. */
   drafts: boolean;
@@ -24,16 +34,103 @@ export interface EventTrigger {
   trust?: 'any';
 }
 
-/** `on: pr_checks_failed`, or `on: { event, repo?, drafts?, trust? }`. A string error when it is neither. */
+/** What every delivered event (a publish, a webhook) is held to before and while it starts (delivery-policy.ts). */
+export interface DeliveryLimits {
+  /** `15m`, `6h`, `2d`: an event older than this when its turn comes is skipped, not started. Unset, a day. */
+  max_age?: string;
+  /** How many of the automation's runs may be going at once. A burst waits its turn instead of crowding out Ben's own messages. Unset, 2. */
+  concurrency?: number;
+}
+
+/** `on: artifact_published`: a thread published a page to claude.ai with its Artifact tool. */
+export interface ArtifactTrigger extends DeliveryLimits {
+  event: 'artifact_published';
+  /** Only publishes from threads in these channels. Unset, any channel's. */
+  channels?: string[];
+  /** A republish to a page's existing url fires too. Off by default. */
+  updates: boolean;
+}
+
+/** `on: { event: github_webhook, repo, events? }`: GitHub posts a signed event to the automation's own endpoint. */
+export interface WebhookTrigger extends DeliveryLimits {
+  event: 'github_webhook';
+  /** The only repo whose events it takes. */
+  repo: string;
+  /** Which events it takes. Both unless the file names some. */
+  events: WebhookEvent[];
+  /** `any`: reviews from anyone, and runs for fork PRs, fire too. Unset, only the repo's people and its own branches. */
+  trust?: 'any';
+}
+
+/** An automation's `on:` block. */
+export type EventTrigger = PrTrigger | ArtifactTrigger | WebhookTrigger;
+
+export const isPrTrigger = (t: EventTrigger | undefined): t is PrTrigger => !!t && (PR_EVENT_TYPES as readonly string[]).includes(t.event);
+const isPrEvent = (e: unknown) => (PR_EVENT_TYPES as readonly unknown[]).includes(e);
+
+const CHANNEL_ID = /^[\w.-]+$/;
+
+const REPO = /^[\w.-]+\/[\w.-]+$/;
+
+const DURATION = /^(\d+)\s*([smhd])$/i;
+const UNIT_MS = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 } as const;
+
+/** The longest `max_age`: a year. Anything longer is no limit, and a date that far out is not one JavaScript can print. */
+const DURATION_MAX_MS = 365 * UNIT_MS.d;
+
+/** `90s`, `15m`, `6h`, `2d` in milliseconds. Undefined for anything else, for zero and for more than a year. */
+export function parseDuration(v: unknown): number | undefined {
+  const m = typeof v === 'string' ? DURATION.exec(v.trim()) : null;
+  const ms = m ? Number(m[1]) * UNIT_MS[m[2].toLowerCase() as keyof typeof UNIT_MS] : 0;
+  return ms > 0 && ms <= DURATION_MAX_MS ? ms : undefined;
+}
+
+export const CONCURRENCY_MAX = 8;
+
+/** The `max_age` and `concurrency` of an `on:` block, or the message that says what is wrong with them. */
+function parseLimits(raw: { max_age?: unknown; concurrency?: unknown }): DeliveryLimits | string {
+  const { max_age, concurrency } = raw;
+  if (max_age !== undefined && parseDuration(max_age) === undefined) return `max_age must look like 15m, 6h or 2d, and be at most 365d`;
+  if (concurrency !== undefined && (!Number.isInteger(concurrency) || (concurrency as number) < 1 || (concurrency as number) > CONCURRENCY_MAX))
+    return `concurrency must be a whole number from 1 to ${CONCURRENCY_MAX}`;
+  return { ...(max_age !== undefined && { max_age: (max_age as string).trim().toLowerCase().replace(/\s+/g, '') }), ...(concurrency !== undefined && { concurrency: concurrency as number }) };
+}
+
+/**
+ * `on: pr_checks_failed`, or `on: { event, repo?, drafts?, trust? }`, or `on: { event: artifact_published, channels?,
+ * updates? }`, or `on: { event: github_webhook, repo, events?, trust? }`. A string error when it is none.
+ */
 export function parseTrigger(raw: unknown): EventTrigger | string {
   const obj = typeof raw === 'string' ? { event: raw } : raw;
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return `"on" must be an event name or { event, repo }`;
-  const { event, repo, drafts, trust } = obj as Record<string, unknown>;
+  const { event, repo, drafts, trust, channels, updates, events, max_age, concurrency } = obj as Record<string, unknown>;
   if (!EVENT_TYPES.includes(event as EventType)) return `unknown event "${String(event)}" (use ${EVENT_TYPES.join(', ')})`;
-  if (repo !== undefined && (typeof repo !== 'string' || !/^[\w.-]+\/[\w.-]+$/.test(repo))) return `repo must look like owner/name`;
+  if (events !== undefined && event !== 'github_webhook') return `events is for github_webhook`;
+  if ((max_age !== undefined || concurrency !== undefined) && isPrEvent(event)) return `max_age and concurrency are for artifact_published and github_webhook`;
+  const limits = parseLimits({ max_age, concurrency });
+  if (typeof limits === 'string') return limits;
+  if (event === 'github_webhook') {
+    if (drafts !== undefined || channels !== undefined || updates !== undefined) return `drafts, channels and updates are not for github_webhook`;
+    if (typeof repo !== 'string' || !REPO.test(repo)) return `github_webhook needs repo: owner/name`;
+    const list = typeof events === 'string' ? [events] : (events ?? [...WEBHOOK_EVENTS]);
+    if (!Array.isArray(list) || !list.length || !list.every((e) => WEBHOOK_EVENTS.includes(e as WebhookEvent)))
+      return `events must be one or more of ${WEBHOOK_EVENTS.join(', ')}`;
+    if (trust !== undefined && trust !== 'any' && trust !== 'members') return `trust must be members or any`;
+    return { event, repo, events: [...new Set(list as WebhookEvent[])], ...(trust === 'any' ? { trust } : {}), ...limits };
+  }
+  if (event === 'artifact_published') {
+    if (repo !== undefined || drafts !== undefined || trust !== undefined) return `repo, drafts and trust are for PR events`;
+    const list = typeof channels === 'string' ? [channels] : channels;
+    if (list !== undefined && (!Array.isArray(list) || !list.length || !list.every((c) => typeof c === 'string' && CHANNEL_ID.test(c))))
+      return `channels must be a channel id or a list of them`;
+    if (updates !== undefined && typeof updates !== 'boolean') return `updates must be true or false`;
+    return { event, ...(list && { channels: list as string[] }), updates: updates === true, ...limits };
+  }
+  if (channels !== undefined || updates !== undefined) return `channels and updates are for artifact_published`;
+  if (repo !== undefined && (typeof repo !== 'string' || !REPO.test(repo))) return `repo must look like owner/name`;
   if (drafts !== undefined && typeof drafts !== 'boolean') return `drafts must be true or false`;
   if (trust !== undefined && trust !== 'any' && trust !== 'members') return `trust must be members or any`;
-  return { event: event as EventType, ...(repo ? { repo: repo as string } : {}), drafts: drafts === true, ...(trust === 'any' ? { trust } : {}) };
+  return { event: event as PrEventType, ...(repo ? { repo: repo as string } : {}), drafts: drafts === true, ...(trust === 'any' ? { trust } : {}) };
 }
 
 /** One open PR as `gh pr list --json` gives it, the fields the watcher asks for. */
@@ -77,7 +174,7 @@ export interface AutomationEventState {
 }
 
 export interface FiredEvent {
-  event: EventType;
+  event: PrEventType;
   pr: PRInfo;
   /** Short reason line for the run's prompt, e.g. the failed checks. */
   detail: string;
@@ -114,7 +211,7 @@ export function feedback(pr: PRInfo, self: string | null, trust?: 'any') {
  * save. The first poll only records, so turning an automation on never fires for PRs that were already there.
  * PRs from outside the repo's people, and fork PRs, never fire unless the trigger says `trust: any`.
  */
-export function detect(trigger: EventTrigger, state: AutomationEventState | undefined, prs: PRInfo[], self: string | null) {
+export function detect(trigger: PrTrigger, state: AutomationEventState | undefined, prs: PRInfo[], self: string | null) {
   const prev = state ?? { baselined: false, prs: {} };
   const next: AutomationEventState = { baselined: true, prs: {} };
   const fired: FiredEvent[] = [];
@@ -159,7 +256,7 @@ export function detect(trigger: EventTrigger, state: AutomationEventState | unde
 }
 
 /** A code fence longer than any backtick run in `text`, so the text cannot close it. */
-const fenced = (text: string) => {
+export const fenced = (text: string) => {
   const fence = '`'.repeat(Math.max(3, ...[...text.matchAll(/`+/g)].map((m) => m[0].length + 1)));
   return [fence, text, fence];
 };

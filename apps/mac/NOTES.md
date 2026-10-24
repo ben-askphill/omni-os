@@ -28,8 +28,10 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `Appearance.swift` | `Appearance`, `AppearanceSettings` (in UserDefaults, `-appearance` for a run) |
 | `Zoom.swift` | `ZoomSettings`: the zoom level (80% to 160%, in UserDefaults, `-zoom` for a run), Zoom In, Zoom Out, Actual Size |
 | `SettingsTab.swift` | `SettingsTab`, `Route.settingsTab`, `AppModel.show(_:)` |
-| `Client+Automations.swift` | `automations()`, `runAutomation(_:)`, `setAutomationEnabled(_:_:)` on `OmniClient` |
-| `Automation.swift` | `Automation`, `AutomationRun`, `AutomationTrigger`, `AutomationBadge`, `NextRunText`, `AutomationSchedule` (`describeCron` and `nextRunLabel` in `apps/web/src/format.ts`) |
+| `Client+Automations.swift` | `automations()`, `runAutomation(_:)`, `setAutomationEnabled(_:_:)`, `setAutomationWebhookSecret(_:value:)`, `removeAutomationWebhookSecret(_:)`, `automationDeliveries(_:limit:before:)`, `delivery(_:)`, `retryDelivery(_:attempt:)`, `skipDelivery(_:attempt:)` on `OmniClient` |
+| `Automation.swift` | `Automation`, `AutomationEvent`, `AutomationWebhook`, `AutomationRun`, `AutomationTrigger`, `AutomationBadge`, `NextRunText`, `AutomationSchedule` (`describeCron` and `nextRunLabel` in `apps/web/src/format.ts`), `TriggerDelivery` (a `DeliveryView`), `TriggerDeliveryState` (with `rank`, as `DELIVERY_RANK`) and `DeliveryPage` (`packages/shared/automation-triggers.ts`) |
+| `DeliveryStages.swift` | `DeliveryStage` and `TriggerDelivery.stages`: `deliveryStages` ported. `DeliveryStagesTests` runs the cases in `packages/test-fixtures/delivery-stages.json`, which the TypeScript test shares |
+| `DeliveryDetail.swift` | `TriggerDelivery.contextFields`, `webLink`, `sourceLabel`, `receivedLabel`, `expiresLabel` (`inTime`), and `merge` (`mergeDeliveries`: a late copy never takes a row back) |
 | `AutomationsModel.swift` | `AutomationsModel` (the Automations page) |
 | `Route.swift` | `Route`, parsed from and printed to the Web UI hash routes |
 | `SSEParser.swift` | `SSEParser`, `SSEMessage`: the EventSource parsing rules, bytes in, messages out |
@@ -323,6 +325,8 @@ The live tests send `OMNI_TOKEN` as the API token, so run them in the shell that
 | `AppearanceSettingsView.swift` | The Appearance tab, `Appearance.nsAppearance` |
 | `NotificationSettingsView.swift` | The Notifications tab: this Mac's switch, the macOS permission, a switch per channel |
 | `AutomationsView.swift` | The Automations page: `AutomationsView` (an `AutomationsModel` per client and visit), `AutomationSection`, `RunStrip`, `RunRow`, `FlowRow` |
+| `DeliveryViews.swift` | An automation's Deliveries: `DeliveryList`, its rows, the open detail and Retry |
+| `DeliveryStagesView.swift` | `DeliveryStagesView`: the Trigger, Run and Execution lines of a delivery |
 | `SystemEvents.swift` | Wake (`NSWorkspace.didWakeNotification`) to `didWake()`, `NWPathMonitor` changes (not the first update) to `networkChanged()`. Both also `POST /api/sync/now`, ignoring a 409 (sync off) or 502 |
 | `SystemNotifications.swift` | UserNotifications for `AttentionCenter`: posts, withdraws, opens the thread on a click |
 | `LayerAnimations.swift` | `LayerAnimation`: animations that run while something works (the Loader with a `color`, the running dot's ping, the active plan step's pulse), drawn once into layers and moved by Core Animation. A repeating SwiftUI animation redraws the whole window every frame: four running threads kept the app at about 40 to 55% CPU, 1% after |
@@ -383,6 +387,8 @@ Automations page (#73), like `Automations.tsx`. The Web UI has no create or edit
 - An invalid automation shows the server's error and "Fix it in <file>" (`shortPath`), and its Run now and switch are off, as in the Web UI.
 - Run now opens the new thread. The switch shows its new value at once, turns back with the server's error if it refuses, and loads the list again when it takes it. Errors show on the automation until its next action.
 - Prompt is a disclosure group. Last runs: the strip (oldest left, finished runs full height, colors of `RUN_TONE`, the running one pulses, "done · 5m ago" tooltips), then a row per run: the status dot (a ring for queued), the title or "Thread removed", "manual", `RelTime`. A row with a thread opens it.
+- A `github_webhook` automation (#227) shows its repo, events and " · anyone" for `trust: any` in the second chip, then a panel: the endpoint path (selectable, with Copy), whether this Mac holds the signing secret (a warning when not) and "Set secret…" or "Replace secret…", which opens a sheet with a SecureField. Save sends the value with PUT `/api/automations/:id/webhook-secret` and reloads; Remove asks first, then DELETEs it. The server sends the secret's Keychain name and `secret_set`, never the value, and the app never keeps it past the sheet.
+- Deliveries (#228): a row is a chevron, the state chip, the summary with its reason or why it waits, a dot for the thread (grey once it is removed) and the time. A click opens the detail under it: the three stages (`DeliveryStagesView`), when it came, the attempt past the first, when its age limit skips it, the source and its id, the context fields by key (a web link is a link, anything else text) and the actions. Retry sits on the collapsed row of a failed one that can go again; Skip asks first. The server decides what can be done (`can_retry`, `can_skip`, `retry_blocked`) and the app only shows it. Each action sends the attempt the row showed and takes the answer back into the row; a refusal (409) shows the server's reason and fetches the row with GET /api/deliveries/:id, since `OmniClient` keeps only the message of a failed call. `AutomationsModel` holds the open rows and the rows each automation shows (the latest five of every load merged by id with history from Show older), so a reload keeps both. Context fields are by key because Foundation's decoder keeps no key order.
 - It loads when it shows and for a new port. The Web UI reloads a second after a feed event for an automation's thread; the screen subscribes to the feed and hands each message to `AutomationsModel.feed`. It also reloads a second after the feed opens again. Refresh in the toolbar, a spinner there while a reload runs.
 ## Thread inspector (#67)
 
@@ -470,6 +476,8 @@ Steps (a list, or an object with the list under `steps`):
 | `{"folder": {"file": "<thread title>", "into": "Specs"}}` | Files the thread there, as a drop does |
 | `{"folder": {"menu": "Specs", "shot": "menu"}}` | Right-clicks the folder and writes `menu.png` while its menu is open |
 | `{"folder": "reset"}` | Ends any of the above |
+| `{"webhookSecret": "ci-fixer"}` | On the Automations page, opens that webhook automation's Set secret form. Draw it with `screen`: it is a sheet |
+| `{"deliveries": "ci-fixer"}`, `{"deliveries": {"automation": "ci-fixer", "open": "failed", "older": true}}` | On the Automations page, scrolls that automation's Deliveries into view, opens its first delivery in that state (or with that id) and loads the next page of older ones |
 | `{"imageZoom": 2}`, `{"imageZoom": "fit"}` | Zooms the artifact image preview to that scale, or back to fit |
 | `{"screen": "name"}` | The main window with the app's windows over it (a sheet, a menu) drawn in place |
 | `{"quickPrompt": "text"}`, `{"quickPrompt": {"send": true}}`, `{"quickPrompt": false}` | Opens the Quick Prompt with this text (Wispr Flow off), sends it, or closes it |

@@ -3,7 +3,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { call, SELF, text } from './api.ts';
+import { ApiError, call, SELF, text } from './api.ts';
 
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
 const USER = process.env.OMNI_USER || 'the user';
@@ -368,6 +368,54 @@ server.registerTool(
   'search_history',
   { description: `Full-text search across every thread ${USER} has run.`, inputSchema: { query: z.string() } },
   async ({ query }) => text(await call(`/search?q=${encodeURIComponent(query)}`)),
+);
+
+/** A refused delivery action is an answer for the conductor to read, not a crash: the server says why in `error`. */
+const refused = async (run: () => Promise<unknown>) => {
+  try {
+    return text(await run());
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) return text({ done: false, why: err.message });
+    throw err;
+  }
+};
+
+server.registerTool(
+  'list_automation_deliveries',
+  {
+    description:
+      "An event automation's deliveries, newest first: each event that reached it (a published page, a GitHub webhook) and what became of it. " +
+      'state is received, accepted, queued (held for the Mac that runs automations), started (its thread exists: see thread_id and thread_status), ' +
+      'failed or skipped (with reason). can_retry means it failed before any thread was made, so retrying cannot duplicate a run. ' +
+      "A failed one that has a thread (retry_blocked says so) has an unknown outcome: open that thread and follow up there. Pass the last id as before to page.",
+    inputSchema: { automation: z.string().min(1).max(200), limit: z.number().int().min(1).max(100).optional(), before: z.string().optional() },
+  },
+  async ({ automation, limit, before }) =>
+    text(await call(`/automations/${encodeURIComponent(automation)}/deliveries?limit=${limit ?? 20}${before ? `&before=${encodeURIComponent(before)}` : ''}`)),
+);
+
+server.registerTool(
+  'retry_delivery',
+  {
+    description:
+      `Run a failed automation delivery again, only when ${USER} asks. Works only for a delivery with can_retry: it failed before any thread was made, and the event is still within the automation's max age. ` +
+      'Pass the attempt you saw; a stale attempt, a delivery that already started and one whose thread exists are refused with the reason, and nothing is started twice.',
+    inputSchema: { delivery_id: z.string().min(1).max(200), attempt: z.number().int().positive() },
+  },
+  async ({ delivery_id, attempt }) =>
+    refused(() => call(`/deliveries/${encodeURIComponent(delivery_id)}/retry`, { method: 'POST', body: JSON.stringify({ attempt }) })),
+);
+
+server.registerTool(
+  'skip_delivery',
+  {
+    description:
+      `Skip a delivery of an event automation for good, only when ${USER} asks: it never starts and cannot be retried. Works for a delivery that has not started (accepted, queued, or failed with no thread). ` +
+      'Refused with the reason once its thread exists or while Omni is starting it.',
+    inputSchema: { delivery_id: z.string().min(1).max(200), attempt: z.number().int().positive().optional() },
+  },
+  async ({ delivery_id, attempt }) =>
+    refused(() => call(`/deliveries/${encodeURIComponent(delivery_id)}/skip`, { method: 'POST', body: JSON.stringify(attempt === undefined ? {} : { attempt }) })),
 );
 
 server.registerTool('tool_failures', {
