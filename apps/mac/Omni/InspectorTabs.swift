@@ -9,7 +9,11 @@ struct BrowserTab: View {
   let client: OmniClient
   let channel: String?
   let shots: [Artifact]
+  /// The thread whose reply box Annotate adds to.
+  let thread: String
+  let draft: DraftContextModel
   @State private var browser: ChannelBrowserModel?
+  @State private var annotate: BrowserAnnotateModel?
   @State private var showShots = false
 
   var body: some View {
@@ -33,14 +37,20 @@ struct BrowserTab: View {
         LiveBrowserView(model: browser, trailing: AnyView(
           Button(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))", systemImage: "photo") { showShots = true }
             .help(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))")
-        ))
+        ), annotating: annotate.map { Annotating(model: $0, client: client, draft: draft) })
       } else {
         Color.clear
       }
     }
     .frame(maxHeight: .infinity, alignment: .top)
     .onChange(of: channel, initial: true) { _, id in
-      if let id, browser?.channel != id { browser = ChannelBrowserModel(client: client, channel: id) }
+      if let id, browser?.channel != id {
+        browser = ChannelBrowserModel(client: client, channel: id)
+        annotate = BrowserAnnotateModel(client: client, channel: id, thread: thread)
+      }
+    }
+    .onChange(of: thread) { _, thread in
+      if let channel { annotate = BrowserAnnotateModel(client: client, channel: channel, thread: thread) }
     }
   }
 }

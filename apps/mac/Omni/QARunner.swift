@@ -246,6 +246,8 @@ final class QARunner {
           guard let add = TerminalSelectionProbe.add else { throw QAScriptError("no terminal output is selected") }
           if let refused = await add(note) { throw QAScriptError(refused) }
           try? await Task.sleep(for: .milliseconds(400))
+        case .annotate(let action):
+          try await annotate(action)
         case .openContext(let index):
           guard let toggle = ContextChipsProbe.toggle, toggle(index) else { throw QAScriptError("no context chip \(index) in the reply box") }
           try? await Task.sleep(for: .milliseconds(400))
@@ -500,6 +502,7 @@ final class QARunner {
     case .addContext(let note): "addContext \(note.prefix(40))"
     case .selectTerminal: "selectTerminal"
     case .addTerminal(let note): "addTerminal \(note.prefix(40))"
+    case .annotate(let action): "annotate \(action)"
     case .openContext(let index): "openContext \(index)"
     case .quit: "quit"
     }
@@ -520,7 +523,34 @@ final class QARunner {
   private var facts: QAFacts {
     var f = model.qaFacts
     f.shownThread = QAProbe.shownThread
+    f.browserFrame = BrowserAnnotateProbe.browser?.frame != nil
     return f
+  }
+
+  /// The Browser tab's Annotate, through the model its buttons use. `start` waits for the screenshot, and says why when
+  /// the capture failed.
+  private func annotate(_ action: QAAnnotate) async throws(QAScriptError) {
+    guard let a = BrowserAnnotateProbe.annotating else { throw QAScriptError("the Browser tab is not showing") }
+    switch action {
+    case .start:
+      await a.model.start()
+      if case .failed(let e) = a.model.phase { throw QAScriptError(e.message) }
+      // The screenshot is on screen once the image view has loaded it.
+      try? await Task.sleep(for: .milliseconds(1200))
+    case .drag(let x0, let y0, let x1, let y1, let note):
+      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to draw on") }
+      // A 1000 by 1000 stand-in for the shown size, so the fractions are the page's.
+      a.model.drag(.init(x0: x0 * 1000, y0: y0 * 1000, x1: x1 * 1000, y1: y1 * 1000), shown: (1000, 1000))
+      guard a.model.rect != nil else { throw QAScriptError(a.model.error ?? "no rectangle") }
+      a.model.note = note
+      try? await Task.sleep(for: .milliseconds(500))
+    case .add:
+      if let refused = a.model.add(to: a.draft) { throw QAScriptError(refused) }
+      try? await Task.sleep(for: .milliseconds(400))
+    case .cancel:
+      a.model.cancel()
+      try? await Task.sleep(for: .milliseconds(400))
+    }
   }
 
   // MARK: Scrolling

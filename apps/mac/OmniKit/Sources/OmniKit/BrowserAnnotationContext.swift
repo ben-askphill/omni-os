@@ -1,0 +1,327 @@
+import Foundation
+
+/// The browser_annotation kind of message context, ported from packages/shared/message-context-browser.ts: a rectangle Ben
+/// drew on a screenshot of the channel's browser, with the page it was taken of. The screenshot is a file in the thread's
+/// uploads folder that the record names; the rectangle is in the page's own CSS pixels, so it means the same thing on any
+/// client and at any display scale. The server takes the screenshot and everything but the rectangle (`Capture`), so the
+/// rectangle is drawn on the very image it describes; the client adds the rectangle and the note.
+public enum BrowserAnnotationContext: MessageContextKind {
+  public static let kind = "browser_annotation"
+  public static let version = 1
+  public static let urlMax = 2_048
+  public static let titleMax = 300
+  public static let imageBytesMax = 5_000_000
+  /// The smallest rectangle, per side, in CSS pixels.
+  public static let rectMin = 8
+  private static let idMax = 64
+  private static let sizeMax = 20_000
+  private static let labelURLMax = 60
+
+  public struct Rect: Codable, Hashable, Sendable {
+    public let x: Int
+    public let y: Int
+    public let width: Int
+    public let height: Int
+
+    public init(x: Int, y: Int, width: Int, height: Int) {
+      self.x = x
+      self.y = y
+      self.width = width
+      self.height = height
+    }
+  }
+
+  /// The screenshot, as the server saved it.
+  public struct Image: Codable, Hashable, Sendable {
+    /// A file in the thread's uploads folder: `annotation-<hex>.png` or `.jpg`.
+    public let name: String
+    public let mime: String
+    /// In image pixels: the viewport's CSS size times the display scale.
+    public let width: Int
+    public let height: Int
+    public let bytes: Int
+  }
+
+  public struct Viewport: Codable, Hashable, Sendable {
+    public let width: Int
+    public let height: Int
+    /// How many image pixels one CSS pixel is.
+    public let scale: Double
+  }
+
+  public struct Scroll: Codable, Hashable, Sendable {
+    public let x: Int
+    public let y: Int
+  }
+
+  /// What the server makes: everything about the page and the image, before Ben marks anything. The `capture` of
+  /// `POST /api/channels/:id/browser/capture`.
+  public struct Capture: Codable, Hashable, Sendable {
+    public let thread: String
+    public let url: String
+    public let title: String
+    public let viewport: Viewport
+    public let scroll: Scroll
+    public let capturedAt: String
+    public let image: Image
+
+    enum CodingKeys: String, CodingKey {
+      case thread, url, title, viewport, scroll, image
+      case capturedAt = "captured_at"
+    }
+  }
+
+  public struct Body: Codable, Hashable, Sendable {
+    /// The thread the screenshot was saved for.
+    public let thread: String
+    public let url: String
+    public let title: String
+    public let viewport: Viewport
+    public let scroll: Scroll
+    /// What Ben marked, in CSS pixels from the viewport's top left, inside the viewport.
+    public let rect: Rect
+    /// When the screenshot was taken, as `2026-10-24T09:30:15.250Z`.
+    public let capturedAt: String
+    public let image: Image
+
+    enum CodingKeys: String, CodingKey {
+      case thread, url, title, viewport, scroll, rect, image
+      case capturedAt = "captured_at"
+    }
+  }
+
+  /// Why a body does not parse, or why a drag cannot be a rectangle. The text is the TypeScript's.
+  public struct CheckError: Error, Hashable, Sendable {
+    public let message: String
+
+    public init(_ message: String) {
+      self.message = message
+    }
+  }
+
+  public static func parse(_ body: JSONValue, v: Int) -> Body? {
+    try? check(body, v: v).get()
+  }
+
+  public static func label(_ b: Body) -> String {
+    let at = Array(shortURL(b.url).unicodeScalars)
+    let where_ = at.count > labelURLMax ? String(String.UnicodeScalarView(at.prefix(labelURLMax - 1))) + "…" : String(String.UnicodeScalarView(at))
+    return MessageContext.cutLabel("Browser, \(b.rect.width)×\(b.rect.height) area on \(where_)")
+  }
+
+  /// The address without its scheme, query or fragment, for a label: shop.example.com/cart.
+  public static func shortURL(_ url: String) -> String {
+    var s = Substring(url)
+    for p in ["https://", "http://"] where s.lowercased().hasPrefix(p) {
+      s = s.dropFirst(p.count)
+      break
+    }
+    if let i = s.firstIndex(where: { $0 == "?" || $0 == "#" }) { s = s[..<i] }
+    if s.hasSuffix("/") { s = s.dropLast() }
+    return String(s)
+  }
+
+  // MARK: Parse
+
+  private static func whole(_ v: JSONValue?, _ lo: Int, _ hi: Int) -> Int? {
+    guard case .number(let n)? = v, let i = Int(exactly: n), i >= lo, i <= hi else { return nil }
+    return i
+  }
+
+  private static func plain(_ v: JSONValue?, _ at: String, _ max: Int) -> Result<String, CheckError> {
+    switch TerminalExcerptContext.plain(v, at, max) {
+    case .success(let s): .success(s)
+    case .failure(let e): .failure(CheckError(e.message))
+    }
+  }
+
+  private static func rect(_ v: JSONValue?, in viewport: (width: Int, height: Int)) -> Result<Rect, CheckError> {
+    guard case .object(let o)? = v else { return .failure(CheckError("rect must be an object")) }
+    guard let x = whole(o["x"], 0, viewport.width), let y = whole(o["y"], 0, viewport.height), let w = whole(o["width"], 1, viewport.width),
+      let h = whole(o["height"], 1, viewport.height)
+    else { return .failure(CheckError("rect must be whole CSS pixels inside the viewport")) }
+    if x + w > viewport.width || y + h > viewport.height { return .failure(CheckError("rect reaches outside the viewport")) }
+    return .success(Rect(x: x, y: y, width: w, height: h))
+  }
+
+  private static func image(_ v: JSONValue?) -> Result<Image, CheckError> {
+    guard case .object(let o)? = v else { return .failure(CheckError("image must be an object")) }
+    guard let name = o["name"]?.stringValue, let m = name.wholeMatch(of: #/annotation-[0-9a-f]{8,32}\.(png|jpg)/#) else {
+      return .failure(CheckError("image.name must be an annotation-<hex>.png or .jpg file name"))
+    }
+    let mime = o["mime"]?.stringValue
+    guard mime == (m.1 == "png" ? "image/png" : "image/jpeg"), let mime else { return .failure(CheckError("image.mime does not match the file name")) }
+    guard let w = whole(o["width"], 1, sizeMax), let h = whole(o["height"], 1, sizeMax) else {
+      return .failure(CheckError("image.width and image.height must be whole pixels"))
+    }
+    guard let bytes = whole(o["bytes"], 1, imageBytesMax) else { return .failure(CheckError("image.bytes must be 1 to \(imageBytesMax)")) }
+    return .success(Image(name: name, mime: mime, width: w, height: h, bytes: bytes))
+  }
+
+  private static let seconds = Date.ISO8601FormatStyle()
+  private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+
+  /// `2026-10-24T09:30:15.250Z`: that shape exactly and a real time. The seconds are compared as written; the
+  /// milliseconds are not formatted back from a `Date`, whose double can land a millisecond off.
+  static func validTime(_ s: String) -> Bool {
+    guard s.wholeMatch(of: #/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z/#) != nil, let date = try? fractional.parse(s) else { return false }
+    return date.formatted(seconds) == String(s.prefix(19)) + "Z"
+  }
+
+  /// `parse` with its reason, as `browserAnnotation.parse` in TypeScript.
+  public static func check(_ body: JSONValue, v: Int) -> Result<Body, CheckError> {
+    guard v == 1 else { return .failure(CheckError("browser_annotation has no version \(v)")) }
+    guard case .object(let o) = body else { return .failure(CheckError("not an object")) }
+    let thread: String
+    switch plain(o["thread"], "thread", idMax) {
+    case .success(let t): thread = t
+    case .failure(let e): return .failure(e)
+    }
+    let url: String
+    switch plain(o["url"], "url", urlMax) {
+    case .success(let u): url = u
+    case .failure(let e): return .failure(e)
+    }
+    guard url.range(of: #"^https?://[^\s/]"#, options: [.regularExpression, .caseInsensitive]) != nil else { return .failure(CheckError("url must be a web page address")) }
+    let title: String
+    if o["title"]?.stringValue == "" {
+      title = ""
+    } else {
+      switch plain(o["title"], "title", titleMax) {
+      case .success(let t): title = t
+      case .failure(let e): return .failure(e)
+      }
+    }
+    guard case .object(let vp)? = o["viewport"], let vw = whole(vp["width"], 1, sizeMax), let vh = whole(vp["height"], 1, sizeMax),
+      case .number(let scale)? = vp["scale"], scale > 0, scale <= 8
+    else { return .failure(CheckError("viewport must be a whole CSS width and height and a scale up to 8")) }
+    guard case .object(let sc)? = o["scroll"], let sx = whole(sc["x"], 0, 10_000_000), let sy = whole(sc["y"], 0, 10_000_000) else {
+      return .failure(CheckError("scroll must be whole CSS pixels"))
+    }
+    let r: Rect
+    switch rect(o["rect"], in: (vw, vh)) {
+    case .success(let v): r = v
+    case .failure(let e): return .failure(e)
+    }
+    guard let at = o["captured_at"]?.stringValue, validTime(at) else {
+      return .failure(CheckError("captured_at must be a time like 2026-10-24T09:30:00.000Z"))
+    }
+    let img: Image
+    switch image(o["image"]) {
+    case .success(let i): img = i
+    case .failure(let e): return .failure(e)
+    }
+    return .success(
+      Body(
+        thread: thread, url: url, title: title, viewport: Viewport(width: vw, height: vh, scale: (scale * 100).rounded() / 100),
+        scroll: Scroll(x: sx, y: sy), rect: r, capturedAt: at, image: img))
+  }
+
+  /// The capture with Ben's rectangle on it, checked as the route will check it.
+  public static func annotate(_ capture: Capture, rect: Rect) -> Result<Body, CheckError> {
+    guard var json = try? JSONValue(encoding: capture), case .object(var o) = json, let r = try? JSONValue(encoding: rect) else {
+      return .failure(CheckError("the capture cannot be read"))
+    }
+    o["rect"] = r
+    json = .object(o)
+    return check(json, v: 1)
+  }
+
+  // MARK: Title
+
+  /// JavaScript's `\s`.
+  private static func space(_ u: Unicode.Scalar) -> Bool {
+    switch u.value {
+    case 0x09...0x0d, 0x20, 0xa0, 0x1680, 0x2000...0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff: true
+    default: false
+    }
+  }
+
+  /// A title as a record holds it: whitespace collapsed, control characters dropped, cut to `titleMax`.
+  public static func cleanTitle(_ raw: String) -> String {
+    var out: [Unicode.Scalar] = []
+    var gap = false
+    for u in raw.unicodeScalars {
+      if space(u) || TerminalExcerptContext.forbidden(u) {
+        gap = true
+      } else {
+        if gap, !out.isEmpty { out.append(" ") }
+        gap = false
+        out.append(u)
+      }
+    }
+    return out.count > titleMax ? String(String.UnicodeScalarView(out.prefix(titleMax - 1))) + "…" : String(String.UnicodeScalarView(out))
+  }
+
+  // MARK: Drag
+
+  /// A drag across the screenshot as it is shown: corner to corner, in the shown image's own points.
+  public struct Drag: Hashable, Sendable {
+    public var x0: Double
+    public var y0: Double
+    public var x1: Double
+    public var y1: Double
+
+    public init(x0: Double, y0: Double, x1: Double, y1: Double) {
+      self.x0 = x0
+      self.y0 = y0
+      self.x1 = x1
+      self.y1 = y1
+    }
+  }
+
+  /// Ben's drag on the screenshot, shown `shown` big (on-screen points), as a rectangle in the page's CSS pixels. The
+  /// corners are put in order, rounded outward so the rectangle holds what he dragged over, and kept inside the
+  /// viewport. Refused when it is smaller than `rectMin` either way.
+  public static func dragToRect(_ drag: Drag, shown: (width: Double, height: Double), viewport: (width: Double, height: Double)) -> Result<Rect, CheckError> {
+    guard shown.width > 0, shown.height > 0, viewport.width > 0, viewport.height > 0 else { return .failure(CheckError("There is no screenshot to draw on.")) }
+    let sx = viewport.width / shown.width
+    let sy = viewport.height / shown.height
+    func clamp(_ n: Double, _ hi: Double) -> Double { min(hi, max(0, n)) }
+    let x0 = Int(clamp(min(drag.x0, drag.x1) * sx, viewport.width).rounded(.down))
+    let y0 = Int(clamp(min(drag.y0, drag.y1) * sy, viewport.height).rounded(.down))
+    let x1 = Int(clamp(max(drag.x0, drag.x1) * sx, viewport.width).rounded(.up))
+    let y1 = Int(clamp(max(drag.y0, drag.y1) * sy, viewport.height).rounded(.up))
+    if x1 - x0 < rectMin || y1 - y0 < rectMin { return .failure(CheckError("Draw a larger area.")) }
+    return .success(Rect(x: x0, y: y0, width: x1 - x0, height: y1 - y0))
+  }
+
+  /// The rectangle in image pixels, for a view that draws it over the image itself.
+  public static func rectInImage(_ r: Rect, image: (width: Double, height: Double), viewport: (width: Double, height: Double)) -> Rect {
+    let sx = image.width / viewport.width
+    let sy = image.height / viewport.height
+    return Rect(x: Int((Double(r.x) * sx).rounded()), y: Int((Double(r.y) * sy).rounded()), width: Int((Double(r.width) * sx).rounded()), height: Int((Double(r.height) * sy).rounded()))
+  }
+}
+
+extension Result where Failure == BrowserAnnotationContext.CheckError {
+  /// The error's text, nil on success.
+  public var failureMessage: String? { if case .failure(let e) = self { e.message } else { nil } }
+}
+
+/// The answer of `POST /api/channels/:id/browser/capture`.
+public struct BrowserCaptureReply: Decodable, Hashable, Sendable {
+  public let capture: BrowserAnnotationContext.Capture
+}
+
+/// The body of a refused `POST /api/channels/:id/browser/capture`.
+public struct BrowserCaptureFailureBody: Decodable, Hashable, Sendable {
+  public let error: String
+  public let retryable: Bool
+  /// What changed under a stale capture: `tab`, `navigated`, `viewport` or `scrolled`.
+  public let stale: String?
+}
+
+/// Why a capture of the channel browser gave nothing. `retryable`: trying again can work; `stale`: the page moved while
+/// the screenshot was taken.
+public struct BrowserCaptureError: Error, Hashable, Sendable {
+  public let message: String
+  public let retryable: Bool
+  public let stale: String?
+
+  public init(message: String, retryable: Bool, stale: String? = nil) {
+    self.message = message
+    self.retryable = retryable
+    self.stale = stale
+  }
+}

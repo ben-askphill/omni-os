@@ -8,6 +8,8 @@ import SwiftUI
 struct LiveBrowserView: View {
   let model: ChannelBrowserModel
   var trailing: AnyView = AnyView(EmptyView())
+  /// Annotate: the model, the client and the reply box's context. Nil shows no Annotate button.
+  var annotating: Annotating?
   @State private var address = ""
   @FocusState private var editing: Bool
   @Environment(\.displayScale) private var displayScale
@@ -41,7 +43,10 @@ struct LiveBrowserView: View {
         GeometryReader { geo in
           ZStack {
             Tok.bg
-            BrowserCanvas(frame: model.frame, send: model.send, shortcut: shortcut)
+            // While Annotate shows, the page is not given any input: it is hidden, and its keys go nowhere.
+            let annotateOn = annotating?.model.isActive == true
+            BrowserCanvas(frame: model.frame, send: annotateOn ? { _ in } : model.send, shortcut: annotateOn ? { _, _ in true } : shortcut)
+              .allowsHitTesting(!annotateOn)
               .accessibilityLabel(s.title.isEmpty ? "Browser page" : s.title)
             if model.frame == nil, model.error == nil {
               HStack(spacing: z(8)) {
@@ -52,6 +57,7 @@ struct LiveBrowserView: View {
               .foregroundStyle(Tok.fg3)
               .allowsHitTesting(false)
             }
+            if let annotating, annotating.model.isActive { BrowserAnnotateLayer(annotating: annotating) }
           }
           // The page follows this view's size, debounced while the panel is dragged.
           .task(id: geo.size) {
@@ -64,8 +70,20 @@ struct LiveBrowserView: View {
       .background(Tok.bg)
       .clipShape(RoundedRectangle(cornerRadius: z(14), style: .continuous))
     }
-    .onAppear { model.start() }
-    .onDisappear { model.stop() }
+    .onAppear {
+      model.start()
+      #if DEBUG
+      BrowserAnnotateProbe.annotating = annotating
+      BrowserAnnotateProbe.browser = model
+      #endif
+    }
+    .onDisappear {
+      model.stop()
+      #if DEBUG
+      BrowserAnnotateProbe.annotating = nil
+      BrowserAnnotateProbe.browser = nil
+      #endif
+    }
     .onChange(of: s.url, initial: true) { _, url in
       if !editing { address = url == "about:blank" ? "" : url }
     }
@@ -112,6 +130,11 @@ struct LiveBrowserView: View {
       .contentShape(Capsule())
       .onTapGesture { editing = true }
       .padding(.leading, z(4))
+      if let annotating {
+        Button("Annotate", systemImage: "viewfinder") { Task { await annotating.model.start() } }
+          .disabled(!s.running || !s.url.lowercased().hasPrefix("http") || annotating.model.isActive)
+          .help("Annotate this page")
+      }
       trailing
     }
     .labelStyle(.iconOnly)

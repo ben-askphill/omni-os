@@ -71,7 +71,7 @@ public enum TerminalExcerptContext: MessageContextKind {
 
   /// A character the record never holds, other than `\n` and `\t`: C0 and C1 controls (so no escape sequence), the line
   /// and paragraph separators, and the bidirectional overrides that make text read as something it is not.
-  private static func forbidden(_ u: Unicode.Scalar) -> Bool {
+  static func forbidden(_ u: Unicode.Scalar) -> Bool {
     switch u.value {
     case 0x00...0x08, 0x0b...0x1f, 0x7f...0x9f, 0x2028...0x2029, 0x202a...0x202e, 0x2066...0x2069: true
     default: false
@@ -79,7 +79,7 @@ public enum TerminalExcerptContext: MessageContextKind {
   }
 
   /// One line of text for a field that has no line breaks of its own.
-  private static func plain(_ v: JSONValue?, _ at: String, _ max: Int) -> Result<String, SelectionError> {
+  static func plain(_ v: JSONValue?, _ at: String, _ max: Int) -> Result<String, SelectionError> {
     guard let s = v?.stringValue, !s.isEmpty, !MessageContext.overLimit(s, max) else {
       return .failure(SelectionError("\(at) must be a string of 1 to \(max) characters"))
     }
@@ -92,7 +92,7 @@ public enum TerminalExcerptContext: MessageContextKind {
   private static let time = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
 
   /// `2026-10-24T09:30:15.250Z`: that shape exactly, a real time, and written as `format` writes it.
-  private static func validTime(_ s: String) -> Bool {
+  static func validTime(_ s: String) -> Bool {
     let shape = s.wholeMatch(of: #/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z/#) != nil
     guard shape, let date = try? time.parse(s) else { return false }
     return format(date) == s

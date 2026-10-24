@@ -51,6 +51,9 @@ beforeAll(async () => {
   fake = await startFakeCursorApi();
   process.env.OMNI_CURSOR_API_URL = fake.url;
   process.env.OMNI_CURSOR_CLOUD_POLL_MS = '5';
+  // The static imports above already loaded config.ts (the message-context kinds read the uploads folder from it), before
+  // these env vars were set. The adapter gets a fresh config.
+  vi.resetModules();
   ({ cursorCloudAdapter: adapter } = await import('../harness/cursor-cloud/adapter.ts'));
 });
 beforeEach(() => {

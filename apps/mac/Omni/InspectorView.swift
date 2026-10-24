@@ -159,7 +159,7 @@ private struct InspectorPanel: View {
       case .changes:
         ChangesTab(client: model.client, store: store)
       case .browser:
-        BrowserTab(client: model.client, channel: store.thread?.channelID, shots: store.screenshots)
+        BrowserTab(client: model.client, channel: store.thread?.channelID, shots: store.screenshots, thread: store.id, draft: store.draftContext)
       case .terminal:
         TerminalTab(client: model.client, thread: store.id, cwd: store.thread?.cwd, draft: store.draftContext)
       case .details:

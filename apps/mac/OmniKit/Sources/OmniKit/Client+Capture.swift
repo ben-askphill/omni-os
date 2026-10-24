@@ -1,0 +1,55 @@
+import Foundation
+
+private struct CaptureRequest: Encodable, Sendable {
+  let thread: String
+}
+
+private struct RemovedReply: Decodable {
+  let removed: Bool
+}
+
+extension OmniClient {
+  private func capturePath(_ channel: String, _ rest: String = "") -> String {
+    "/api/channels/\(uriComponent(channel))/browser/capture\(rest)"
+  }
+
+  /// A screenshot of the channel browser's active page for the thread, with the page's address, title, viewport and
+  /// scroll (apps/server/browser-capture.ts). It changes nothing on the page. A page that moved while it was taken, a
+  /// browser that is off and a tab that is not a web page come back as a `BrowserCaptureError` with the server's words.
+  public func captureBrowser(channel: String, thread: String) async throws(BrowserCaptureError) -> BrowserAnnotationContext.Capture {
+    var req = authorized(url(capturePath(channel)))
+    req.httpMethod = "POST"
+    req.cachePolicy = .reloadIgnoringLocalCacheData
+    req.setValue("application/json", forHTTPHeaderField: "Accept")
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    do {
+      req.httpBody = try OmniJSON.encoder().encode(CaptureRequest(thread: thread))
+    } catch {
+      throw BrowserCaptureError(message: "The request could not be made.", retryable: false)
+    }
+    let data: Data
+    let response: HTTPURLResponse
+    do {
+      (data, response) = try await transport.send(req)
+    } catch {
+      throw BrowserCaptureError(message: OmniAPIError.unreachable(error.localizedDescription).message, retryable: true)
+    }
+    guard (200..<300).contains(response.statusCode) else {
+      if let body = try? JSONDecoder().decode(BrowserCaptureFailureBody.self, from: data) {
+        throw BrowserCaptureError(message: body.error, retryable: body.retryable, stale: body.stale)
+      }
+      let type = response.value(forHTTPHeaderField: "Content-Type")
+      throw BrowserCaptureError(message: Self.errorMessage(data, contentType: type, status: response.statusCode), retryable: false)
+    }
+    do {
+      return try OmniJSON.decoder().decode(BrowserCaptureReply.self, from: data).capture
+    } catch {
+      throw BrowserCaptureError(message: OmniAPIError.decoding(Self.describe(error)).message, retryable: false)
+    }
+  }
+
+  /// Deletes a capture nothing was made of. Best effort: a capture left behind is only a file in the uploads folder.
+  public func discardCapture(channel: String, thread: String, name: String) async {
+    let _: RemovedReply? = try? await send("DELETE", capturePath(channel, "/\(uriComponent(name))"), query: [("thread", thread)])
+  }
+}

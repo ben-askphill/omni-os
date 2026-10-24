@@ -71,6 +71,9 @@ func sseData(_ text: String) -> [String] {
     // Recorded by apps/server/tests/handoff-two-macs.test.ts, which needs two Macs.
     "devices.json": { _ = try decodeFixture([Device].self, "devices.json") },
     "thread-handoff.json": { _ = try decodeFixture(ThreadDetail.self, "thread-handoff.json") },
+    // Recorded by apps/server/tests/browser-capture.test.ts, which has no Chrome to capture.
+    "browser-capture.json": { _ = try decodeFixture(BrowserCaptureReply.self, "browser-capture.json") },
+    "browser-capture-stale.json": { _ = try decodeFixture(BrowserCaptureFailureBody.self, "browser-capture-stale.json") },
     // Hand-made: apps/server/tests/sync-setup.test.ts checks the server still sends its keys and types.
     "sync-status.json": { _ = try decodeFixture(SyncStatus.self, "sync-status.json") },
     // Request bodies the app sends. SecretsTests compares them with what the client encodes.

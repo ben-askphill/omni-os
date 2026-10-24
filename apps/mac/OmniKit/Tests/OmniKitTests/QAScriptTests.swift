@@ -105,6 +105,21 @@ import OmniKit
     }
   }
 
+  @Test func readsTheAnnotateStepsAndTheBrowserFrameCondition() throws {
+    let script = try QAScript(
+      json: Data(#"[{"wait": "browserFrame"}, {"annotate": "start"}, {"annotate": {"drag": [0.1, 0.2, 0.6, 0.5], "note": "the total"}}, {"annotate": {"drag": [0, 0, 1, 1]}}, {"annotate": "add"}, {"annotate": "cancel"}]"#.utf8))
+    #expect(script.steps == [
+      .wait(.browserFrame, timeout: .seconds(10)), .annotate(.start),
+      .annotate(.drag(x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.5, note: "the total")), .annotate(.drag(x0: 0, y0: 0, x1: 1, y1: 1, note: "")),
+      .annotate(.add), .annotate(.cancel),
+    ])
+    for bad in [#"[{"annotate": "go"}]"#, #"[{"annotate": true}]"#, #"[{"annotate": {"drag": [0, 0, 1]}}]"#, #"[{"annotate": {"drag": [0, 0, 1, 2]}}]"#, #"[{"annotate": {"drag": [0, 0, 1, 1], "note": 3}}]"#, #"[{"wait": "browserFrame:x"}]"#] {
+      #expect(throws: QAScriptError.self, "\(bad)") { try QAScript(json: Data(bad.utf8)) }
+    }
+    #expect(QACondition.browserFrame.holds(in: QAFacts(serverState: "running", connection: "open", sidebarLoaded: true, channels: [], browserFrame: true)))
+    #expect(!QACondition.browserFrame.holds(in: QAFacts(serverState: "running", connection: "open", sidebarLoaded: true, channels: [])))
+  }
+
   @Test func sumsUpFrames() {
     let stats = QAFrameStats(gaps: [16, 17, 16, 50, 16, 34])
     #expect(stats.frames == 6)

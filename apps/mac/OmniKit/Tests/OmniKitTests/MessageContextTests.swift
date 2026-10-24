@@ -9,7 +9,7 @@ private let repoRoot = URL(filePath: #filePath)
   .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 
 /// The kinds these tests read with: every kind OmniKit has. The app's list is in apps/mac/Omni/ContextViews.swift.
-private let kinds: [any MessageContextKind.Type] = [DiffSelectionContext.self, TerminalExcerptContext.self]
+private let kinds: [any MessageContextKind.Type] = [DiffSelectionContext.self, TerminalExcerptContext.self, BrowserAnnotationContext.self]
 
 private func corpus() throws -> JSONValue {
   try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: repoRoot.appending(path: "packages/test-fixtures/message-context.json")))
@@ -215,6 +215,120 @@ private func parsed(_ json: String) throws -> DiffSelectionContext.Body {
     #expect(TerminalExcerptContext.parse(r.body, v: 1) == body)
     #expect(TerminalExcerptContext.countLine(1) == "1 line selected")
     #expect(TerminalExcerptContext.countLine(3) == "3 lines selected")
+  }
+
+  /// The same, for a browser_annotation: its body's errors, and what it makes of a record that parses.
+  @Test func checksBrowserBodiesAsTheServerDoes() throws {
+    let prefix = "context[0].body: "
+    var checked = 0
+    for c in try cases("parse") {
+      guard case .array(let raw)? = c["raw"], let record = raw.first, case .object = record, record["kind"]?.stringValue == "browser_annotation" else { continue }
+      let name = c["name"]?.stringValue ?? "?"
+      let got = BrowserAnnotationContext.check(record["body"] ?? .null, v: int(record["v"]) ?? 0)
+      if case .array(let want)? = c["expect"]?["records"], let first = want.first {
+        let body = try got.get()
+        #expect(try JSONValue(encoding: body) == first["body"], "\(name)")
+        #expect(BrowserAnnotationContext.label(body) == first["label"]?.stringValue, "\(name)")
+        #expect(BrowserAnnotationContext.parse(try JSONValue(encoding: body), v: 1) == body, "\(name) parses again")
+        checked += 1
+      } else if let error = c["expect"]?["error"]?.stringValue, error.hasPrefix(prefix) {
+        #expect(got.failureMessage == String(error.dropFirst(prefix.count)), "\(name)")
+        checked += 1
+      }
+    }
+    #expect(checked >= 15)
+  }
+
+  /// A drag on the shown screenshot becomes a rectangle in page pixels: each case is also run through the TypeScript.
+  @Test func turnsEveryCorpusDragIntoARectangle() throws {
+    let drags = try cases("drags")
+    #expect(drags.count >= 8)
+    for c in drags {
+      let name = c["name"]?.stringValue ?? "?"
+      func size(_ v: JSONValue?) -> (width: Double, height: Double) {
+        guard case .number(let w)? = v?["width"], case .number(let h)? = v?["height"] else { return (0, 0) }
+        return (w, h)
+      }
+      func num(_ k: String) -> Double { if case .number(let n)? = c["drag"]?[k] { n } else { 0 } }
+      let drag = BrowserAnnotationContext.Drag(x0: num("x0"), y0: num("y0"), x1: num("x1"), y1: num("y1"))
+      let got = BrowserAnnotationContext.dragToRect(drag, shown: size(c["shown"]), viewport: size(c["viewport"]))
+      let expect = try #require(c["expect"])
+      switch got {
+      case .failure(let e): #expect(expect["error"]?.stringValue == e.message, "\(name)")
+      case .success(let r): #expect(try JSONValue(encoding: r) == expect["rect"], "\(name)")
+      }
+    }
+  }
+
+  @Test func placesTheRectangleOnTheImage() throws {
+    let overlays = try cases("overlays")
+    #expect(overlays.count >= 2)
+    for c in overlays {
+      let name = c["name"]?.stringValue ?? "?"
+      let rect = try JSONDecoder().decode(BrowserAnnotationContext.Rect.self, from: JSONEncoder().encode(try #require(c["rect"])))
+      func size(_ v: JSONValue?) -> (width: Double, height: Double) {
+        guard case .number(let w)? = v?["width"], case .number(let h)? = v?["height"] else { return (0, 0) }
+        return (w, h)
+      }
+      let got = BrowserAnnotationContext.rectInImage(rect, image: size(c["image"]), viewport: size(c["viewport"]))
+      #expect(try JSONValue(encoding: got) == c["expect"], "\(name)")
+    }
+  }
+
+  private func browserBody() throws -> BrowserAnnotationContext.Body {
+    let record = try #require(try cases("records").first { $0["name"]?.stringValue == "a browser annotation" }?["raw"])
+    let raw = try #require(record["body"])
+    return try #require(BrowserAnnotationContext.parse(raw, v: 1))
+  }
+
+  @Test func giveARectangleEveryAnnotationRecordAccepts() throws {
+    let base = try browserBody()
+    let edges: [Double] = [-50, 0, 0.4, 7.9, 100, 357.5, 358, 900]
+    var accepted = 0
+    for x0 in edges { for x1 in edges { for y0 in edges { for y1 in edges {
+      let drag = BrowserAnnotationContext.Drag(x0: x0, y0: y0, x1: x1, y1: y1)
+      guard case .success(let r) = BrowserAnnotationContext.dragToRect(drag, shown: (358, 200), viewport: (Double(base.viewport.width), Double(base.viewport.height))) else { continue }
+      var json = try JSONValue(encoding: base)
+      if case .object(var o) = json { o["rect"] = try JSONValue(encoding: r); json = .object(o) }
+      #expect(BrowserAnnotationContext.parse(json, v: 1) != nil)
+      accepted += 1
+    } } } }
+    #expect(accepted > 0)
+  }
+
+  @Test func annotatesACaptureAndMakesARecordWithItsLabel() throws {
+    let body = try browserBody()
+    let capture = BrowserAnnotationContext.Capture(
+      thread: body.thread, url: body.url, title: body.title, viewport: body.viewport, scroll: body.scroll, capturedAt: body.capturedAt, image: body.image)
+    #expect(try BrowserAnnotationContext.annotate(capture, rect: body.rect).get() == body)
+    #expect(BrowserAnnotationContext.annotate(capture, rect: .init(x: 1200, y: 0, width: 200, height: 20)).failureMessage == "rect reaches outside the viewport")
+    #expect(BrowserAnnotationContext.annotate(capture, rect: .init(x: 0, y: 0, width: 0, height: 20)).failureMessage != nil)
+    let r = MessageContext.make(BrowserAnnotationContext.self, body: body, note: " look ", id: "id-1")
+    #expect((r.id, r.kind, r.v, r.label, r.note) == ("id-1", "browser_annotation", 1, "Browser, 480×160 area on shop.example.com/cart", "look"))
+    #expect(BrowserAnnotationContext.parse(r.body, v: 1) == body)
+  }
+
+  @Test func readsAnyMillisecondOfACaptureTime() throws {
+    let body = try browserBody()
+    for stamp in ["2026-10-25T00:03:41.123Z", "2026-10-25T00:03:41.001Z", "2026-10-25T00:03:41.999Z", "2026-02-28T23:59:59.000Z"] {
+      var json = try JSONValue(encoding: body)
+      if case .object(var o) = json { o["captured_at"] = .string(stamp); json = .object(o) }
+      #expect(BrowserAnnotationContext.parse(json, v: 1)?.capturedAt == stamp, "\(stamp)")
+    }
+    for stamp in ["2026-02-30T00:00:00.000Z", "2026-10-25T24:00:00.000Z", "2026-10-25T00:03:41Z", "yesterday"] {
+      var json = try JSONValue(encoding: body)
+      if case .object(var o) = json { o["captured_at"] = .string(stamp); json = .object(o) }
+      #expect(BrowserAnnotationContext.parse(json, v: 1) == nil, "\(stamp)")
+    }
+  }
+
+  @Test func readsTheAddressForTheLabelAndCleansATitle() {
+    #expect(BrowserAnnotationContext.shortURL("https://shop.example.com/cart?coupon=SPRING#top") == "shop.example.com/cart")
+    #expect(BrowserAnnotationContext.shortURL("HTTP://localhost:4748/") == "localhost:4748")
+    let title = BrowserAnnotationContext.cleanTitle("  Cart\n\u{1b}[2J </omni-context>\u{202e} \t Example  ")
+    #expect(title == "Cart [2J </omni-context> Example")
+    let long = BrowserAnnotationContext.cleanTitle(String(repeating: "é", count: 400))
+    #expect(long.unicodeScalars.count == 300 && long.hasSuffix("…"))
   }
 
   @Test func clampsToTheHunkFromIsIn() throws {

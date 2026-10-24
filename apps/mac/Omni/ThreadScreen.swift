@@ -18,6 +18,7 @@ struct ThreadScreen: View {
       if let store, store.id == id {
         ThreadView(model: model, store: store)
           .id(ObjectIdentifier(store))
+          .environment(\.omniClient, model.client)
       } else {
         Color.clear
       }
