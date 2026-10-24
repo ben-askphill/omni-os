@@ -83,10 +83,12 @@ function Preparing({ thread, data, mobile }: { thread: Thread; data: ThreadActio
     >
       <ol aria-label="Steps" className="mt-2.5 space-y-1.5">
         {steps.map((s) => (
-          <li key={s.id} aria-current={s.state === 'active' ? 'step' : undefined} className="flex min-w-0 items-center gap-2 text-[12.5px] leading-snug">
-            <StatusDot status={s.state === 'done' ? 'done' : s.state === 'active' ? 'running' : 'idle'} size={7} className="shrink-0" />
-            <span className={`min-w-0 truncate ${s.state === 'todo' ? 'text-fg-4' : 'text-fg-2'} ${s.state === 'active' ? 'font-medium text-fg' : ''}`}>{s.label}</span>
-            {s.detail && <span className="min-w-0 truncate text-fg-4">{s.detail}</span>}
+          <li key={s.id} aria-current={s.state === 'active' ? 'step' : undefined} className="flex min-w-0 items-baseline gap-2 text-[12.5px] leading-snug">
+            <StatusDot status={s.state === 'done' ? 'done' : s.state === 'active' ? 'running' : 'idle'} size={7} className="shrink-0 -translate-y-px" />
+            <span className="flex min-w-0 flex-wrap gap-x-2">
+              <span className={`min-w-0 break-words ${s.state === 'todo' ? 'text-fg-4' : 'text-fg-2'} ${s.state === 'active' ? 'font-medium text-fg' : ''}`}>{s.label}</span>
+              {s.detail && <span className="text-fg-4">{s.detail}</span>}
+            </span>
           </li>
         ))}
       </ol>
