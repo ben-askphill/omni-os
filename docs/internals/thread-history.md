@@ -9,6 +9,8 @@ A thread opens with its newest page of events. Older pages load as Ben scrolls u
 - `GET /api/threads/:id?history=recent`: the usual detail, with `events` cut to the newest page and its anchors, plus `history: { from, to: null, results_below }`.
 - `GET /api/threads/:id/history?<cursor>`: `{ events, span }`. The cursor is `historyQuery` of a `HistoryCursor`: `before` and `after` bound it, `take=oldest` fills a gap upward, `at=<event id>` reveals one event.
 - `GET /api/threads/:id/events/:eventId`: one row, never clipped. "Show all" on a clipped row reads it.
+- `GET /api/threads/:id/events/:eventId/output?offset=&limit=`: a chunk of a `tool_result`'s saved text (#225).
+- `GET /api/threads/:id/tools/:toolUseId/tail`: the live tail of a running call (#225).
 - `GET /api/search`: each hit carries `event_id`, the event of the thread's best body hit. It is `null` when only the title matched.
 
 ## The stream's catch-up
@@ -21,7 +23,7 @@ A thread opens with its newest page of events. Older pages load as Ben scrolls u
 
 A client applies the sync in place of fetching the detail again: thread, pending, live, blocked, handoff, artifacts, children and team are the server's now. On a snapshot it calls `detachHead`, so the rows it held become an island with their cursors intact, then joins the page with `applyHead`, and moves its `after` to the page's newest row. Rows it batched before the sync go in first.
 
-The stream subscribes to the bus before it reads the catch-up, so a row written in between is both queued and read. It remembers the ids the catch-up sent and drops their queued copies, and drops queued `thread`, `artifact` and `context` messages, which the sync and the context reading supersede. Every row it sends, replayed or live, is clipped to `rowBytes` like a page's. The size check reads payload sizes from the record header, so a gap too big to replay is never read whole. `apps/server/tests/stream-catch-up.test.ts` covers the races, the budgets, clipping and stale cursors.
+The stream subscribes to the bus before it reads the catch-up, so a row written in between is both queued and read. It remembers the ids the catch-up sent and drops their queued copies, and drops queued `thread`, `artifact` and `context` messages, which the sync and the context reading supersede. Every row it sends, replayed or live, is clipped to `rowBytes` like a page's, a `tool_result` made compact first. A connection whose reader falls `STREAM_QUEUE_MAX` (2,000) messages behind is closed, and its client reconnects into the catch-up above, so a reader that stopped costs a page at most. The size check reads payload sizes from the record header, so a gap too big to replay is never read whole. `apps/server/tests/stream-catch-up.test.ts` covers the races, the budgets, clipping and stale cursors.
 
 ## Budgets
 
@@ -32,7 +34,7 @@ The stream subscribes to the bus before it reads the catch-up, so a row written 
 - `rowBytes: 32 KiB`. The runner caps a `tool_result` at about 20 KB (about 30 KB encoded), and `assistant_text` peaks at 8 KB, so normal rows never clip. Only abnormal rows do: a 3.5 MB `Write`, a 159 KB pasted log.
 - `anchors: 16`, `anchorBytes: 64 KiB`. A real anchor is a 2 to 5 KB `init`, a 1 KB `result` or a 1 to 2 KB parent call.
 
-The long fixture (`packages/test-fixtures/long-thread.ts`) records what this buys in `packages/test-fixtures/history/baseline.json`. The full open is 3,472 rows and 8.1 MiB. The head is 222 rows and 182 KiB, plus one 173-byte anchor. Thirteen pages reach the start, and the largest is 217 KiB. `apps/server/tests/history-budget.test.ts` checks the exact numbers. Record them again with `OMNI_RECORD_HISTORY_BASELINE=1` after a deliberate change.
+The long fixture (`packages/test-fixtures/long-thread.ts`) records what this buys in `packages/test-fixtures/history/baseline.json`. The full open is 3,472 rows and 8.1 MiB. The head is 262 rows and 154 KiB, plus one 173-byte anchor. Thirteen pages reach the start, one of them cut mid-turn by the row cap, and the largest is 174 KiB. `apps/server/tests/history-budget.test.ts` checks the exact numbers. Record them again with `OMNI_RECORD_HISTORY_BASELINE=1` after a deliberate change.
 
 `OMNI_HISTORY_BUDGET=rows:bytes:rowBytes` overrides the first three, read once at boot. It exists only for recording the Mac fixtures, where a short thread has to show a head, an older page, a reveal and a clipped row. Do not set it on a real install.
 
@@ -59,7 +61,7 @@ A new kind (#209) pages like any other row. One that refers back to an earlier r
 
 ## Clipping
 
-A row whose encoded JSON exceeds `rowBytes` gets its payload rewritten. Every string longer than 2048, then 512, then 128 characters is shortened to a prefix and `…`, stopping at the first tier that fits. The last tier keeps only the top-level scalars of 128 characters or fewer. A payload that is not JSON, or still too big, becomes `{}`. The row gains `clipped: { bytes }`, the stored payload's size, and a boolean `truncated` becomes `true`.
+A row whose encoded JSON exceeds `rowBytes` gets its payload rewritten. A `tool_result` is made compact before it gets here (see Tool output), which leaves it far under `rowBytes`, so only the other kinds clip. Every string longer than 2048, then 512, then 128 characters is shortened to a prefix and `…`, stopping at the first tier that fits. The last tier keeps only the top-level scalars of 128 characters or fewer. A payload that is not JSON, or still too big, becomes `{}`. The row gains `clipped: { bytes }`, the stored payload's size, and a boolean `truncated` becomes `true`.
 
 It is blind to kind. Ids, names, `parent`, `tool_use_id` and flags are short top-level fields every tier keeps, so grouping and nesting survive for kinds no client knows. Per-kind stubs could not cover those kinds. Clipping is deterministic, so an anchor and a page copy of one row are the same bytes. When a client holds two copies, the unclipped one wins.
 
@@ -84,9 +86,18 @@ Both clients hold one `History` and fold it with its spans (`buildItems(events, 
 - Mac: `.scrollTargetLayout()` alone did not hold the row. At the top edge the lazy stack keeps its offset and the page pushes the row down, so `holdsTopRow` (`TranscriptAnchor.swift`) scrolls it back after the layout.
 - A reveal (`?at=` on the web, `ThreadStoreRegistry.reveal` on the Mac) reads from the start of the hit's turn, so the hit's group folds as it would in the full thread.
 
-## What builds on this
+## Tool output
 
-- #225 sends compact tool output. `GET /events/:id` is the full read on demand, and it is not bounded yet. Summaries for `tool_result` can replace clipping for that kind without changing paging.
+A tool's output is the bulk of a thread, and a client only needs it once Ben opens the row. So history never sends it whole (#225). Where the other kinds wait until they are too big, a `tool_result` is made compact as soon as its text is longer than `TOOL_OUTPUT.preview` (1,024 characters): `compactRow` in `apps/server/tool-output.ts` keeps the first 1,024 characters in `text`, sets `truncated: true` and adds `output: { chars, lines, exit_code? }` for what it left out. A result that fits travels as it was stored. A compact row is never `clipped`.
+
+The stored row is never changed. Sync, `GET /api/threads/:id` without `?history=recent`, the Conductor and the brain export still read every character the runner saved. That is at most 16,000 characters: each harness's parser cuts the text there and sets the row's own `truncated`. #225 does not change what is saved.
+
+- **Compact rows come from two places.** A row that fits `rowBytes` is cut in JavaScript (`compactRow`). A bigger one is cut by SQLite from its primary key (`compactStored`), so a multi-MB result never reaches JavaScript. The two give the same bytes. The stream's live rows go through `compactRow` in `liveMessage`.
+- **Chunks.** `GET .../events/:eventId/output?offset=&limit=` returns `{ text, next, total, is_error, truncated, exit_code? }`: 16K characters by default, 64K at most. Offsets count code points, which is what SQLite's `substr` counts, so no chunk splits a character. A client sends `next` back as it is and never computes an offset. `truncated` is the saved text's own flag, for a note after the last chunk. Each read is one primary-key read (`tests/tool-output.test.ts` reads the plans).
+- **The tail.** `GET .../tools/:toolUseId/tail` follows a call that prints while it runs. Its messages never go through the bus, which is what keeps a noisy command out of the global feed and every thread stream's queue. The server keeps the newest 32K units of each running call's output (`apps/server/tool-tail.ts`). A subscriber has a buffer of the same size: older output is dropped and counted in `skipped`, never queued, and a stream sends at most one message every 100 ms. At most 64 calls are tracked. A call ends with its `tool_result`, or with its thread's process. Closing the connection frees the subscription.
+- **Which harness has a tail.** Codex reports a command's output as it runs (`item/commandExecution/outputDelta`), and its adapter now opens the command's row when the command starts, so there is a row to open while it runs. Claude Code, Cursor and Hermes report a tool's output only when it ends, so their tail says `end` with `live: false` and the open row keeps showing "Waiting for result".
+
+A client mounts the output loader when the row opens and unmounts it when the row closes. It shows the preview at once, loads the first chunk, offers "Load more" for the next, and follows the tail while the call has no result. Closing the row cancels the chunk request, closes the tail connection and drops what it loaded. If a chunk fails, the row keeps its tool name, its error status and the preview, and offers Retry.
 
 ## Seeding a long thread for QA
 
