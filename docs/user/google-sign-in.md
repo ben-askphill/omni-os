@@ -16,6 +16,27 @@ A sign-in finishes only in the browser (or Mac app) that started it, once, withi
 
 Sessions last 30 days from the last use. Each sign-in is its own device, and signing in again in the same browser signs its old session out. Taking an address off the allowlist locks its sessions out at once, and they stop renewing.
 
+## Signing in
+
+- **Pairing screen** (desktop and phone): when this address can use Google, it says Sign in to Omni and leads with Sign in with Google. The token form is under **Use the install token instead**. Before anyone has claimed the install, a browser without the token sees the token form with a note saying so.
+- **Onboarding**: a Sign in step comes before You, on the Web UI (for a browser paired with the token) and in the Mac app. **Use install token instead** skips it.
+- **Settings > Account** on the Web UI, the phone's Settings and the Mac app's Account tab: who this browser or Mac is signed in as, Sign out, and who may sign in. A browser still on the token gets the Google button here.
+- **The Mac app** signs in through the system's sign-in sheet and keeps its session in the login Keychain (service `com.omni-os.mac.session`). It keeps using the install token for everything else, so its server check and scripts work whether or not it is signed in.
+
+After Google, the browser comes back to Home (`#/?signin=…`). A failed sign-in (cancelled, or an address not on the allowlist) shows on the pairing screen, or as a toast in a browser that is already paired.
+
+An iPhone home-screen app keeps its own cookies apart from Safari's, and iOS may open Google outside it. If signing in there ends with "started in another browser", the sign-in did nothing: pair the home-screen app with the token instead, or sign in from Safari.
+
+## Devices
+
+Settings > Account > Devices lists every browser and Mac signed in with Google: its name, the account, and when it was last seen. The one you are using says This device. **Sign out** on a row revokes it at once; signing out the browser you are on takes it back to the pairing screen. The Conductor can do the same with `signed_in_devices` and `revoke_device`.
+
+The install token is not a device and is not listed. Scripts, agents and the Mac app's server check use it. To shut everything out, revoke the devices, delete `data/api-token` and restart Omni.
+
+## Locked out
+
+The install token always works, so you can always get back in from the Mac: open `scripts/omni.sh --pair`'s link, or paste `data/api-token` under **Use the install token instead**. From there, fix the allowlist in `data/omni.config.json`. Signing in with Google never turns the token off.
+
 ## Who may sign in
 
 The allowlist lives in `data/omni.config.json`:
