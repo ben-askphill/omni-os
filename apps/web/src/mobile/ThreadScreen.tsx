@@ -7,6 +7,7 @@ import { ASKING_LABEL, QuestionCard } from '../components/thread/QuestionCard.ts
 import { PRWakeList } from '../components/thread/PRWatch.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
+import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { handOff, HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx';
 import { deviceRows } from '../handoff.ts';
 import { Button, ErrorNote, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';
@@ -351,6 +352,7 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
           {thread.branch && <MoListRow icon="diff" label="Changes" sub={prLabel ?? `On ${thread.branch}`} onClick={() => go(href.threadView(thread.id, prLabel ? 'pr' : 'changes'))} />}
           <MoListRow icon="browser" label="Browser" sub="Watch only" onClick={() => go(href.threadView(thread.id, 'browser'))} />
           <MoListRow icon="terminal" label="Terminal" sub="Read only" onClick={() => go(href.threadView(thread.id, 'terminal'))} />
+          <MoListRow icon="play" label="Actions" sub="Preview, checks, tests" onClick={() => go(href.threadView(thread.id, 'actions'))} />
           <MoListRow icon="info" label="Details" sub="Harness, model, session" onClick={() => go(href.threadView(thread.id, 'details'))} last />
         </MoGroup>
         <MoGroup>
@@ -562,9 +564,18 @@ export function ThreadScreen() {
             setHandoff(a.handoff);
           }}
         />
-        {!view.turns.length && <MoEmpty>{thread.setup ? 'Preparing the worktree.' : 'Nothing here yet.'}</MoEmpty>}
-        {/* A question's card above is where Ben answers it. */}
-        {card && card.kind !== 'question' && <NeedsCardView card={card} inThread onRecovered={(r) => {
+        {!view.turns.length && !thread.setup && <MoEmpty>Nothing here yet.</MoEmpty>}
+        <SetupCard
+          thread={thread}
+          mobile
+          onRetried={(t, pending) => {
+            // Retry keeps updated_at, so it must win a tie.
+            applyThread(t);
+            setQueued(pending);
+          }}
+        />
+        {/* A question's card above is where Ben answers it, and the setup card is where he retries setup. */}
+        {card && card.kind !== 'question' && card.kind !== 'setup' && <NeedsCardView card={card} inThread onRecovered={(r) => {
               applyThread(r.thread, true);
               setQueued(r.pending);
             }} />}

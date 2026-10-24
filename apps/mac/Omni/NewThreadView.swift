@@ -50,6 +50,7 @@ private struct NewThreadBox: View {
   @State private var picking = false
   /// The harnesses as the picked channel sees them, once fetched. The store's list stands in until then.
   @State private var channelHarnesses: (channel: String, list: [HarnessInfo])?
+  @State private var bases = BaseOptionsModel()
 
   private struct Lists: Equatable {
     let crew: [CrewRole]
@@ -120,6 +121,7 @@ private struct NewThreadBox: View {
     .onChange(of: model.shell.newThreadPreset) { takePreset() }
     // Cursor Cloud depends on the channel (it needs a GitHub repo), so the list is the channel's own.
     .onChange(of: composer.choice.channel, initial: true) { refreshHarnesses() }
+    .task(id: composer.choice.channel) { await bases.load(channel: composer.choice.channel, api: model.client) }
     // Another harness or channel has its own list.
     .onChange(of: NewThreadComposerView.source(composer.choice), initial: true) { _, source in
       menu.commands.source = source
@@ -181,6 +183,9 @@ private struct NewThreadBox: View {
         harnesses: composer.harnesses, harness: composer.choice.harness, model: composer.choice.model,
         pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest, openQuery: pickerQuery)
       EffortMenu(options: composer.effortOptions, value: composer.choice.effort, auto: composer.choice.isAuto, pick: composer.selectEffort)
+      if BaseRules.isOffered(bases.options, harness: composer.choice.harness), let options = bases.options {
+        BasePicker(options: options, pick: composer.basePick, select: composer.selectBase)
+      }
       AttachButton(disabled: composer.sending) { picking = true }
       if let folder = composer.folderChip {
         // "New thread here" on a sidebar folder files the thread in it, until Ben takes it out.
@@ -318,7 +323,7 @@ private struct NewThreadBox: View {
   }
 }
 
-private extension View {
+extension View {
   func pillMenu() -> some View {
     menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
   }

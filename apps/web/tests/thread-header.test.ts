@@ -8,7 +8,7 @@ import { FOLD, HeaderActions, UNFOLD } from '../src/components/thread/HeaderActi
 // and every button that always shows takes width from the title. A new header button folds into the More menu
 // below the breakpoint, or is added to ALWAYS here on purpose.
 
-const ALWAYS = ['Thread actions', 'Interrupt', 'Artifacts, changes, browser, terminal, details'];
+const ALWAYS = ['Thread actions', 'Interrupt', 'Artifacts, changes, browser, terminal, actions, details'];
 
 const thread = (over: Partial<Thread> = {}) => ({ id: 't1', title: 'A thread', status: 'running', archived: 0, pinned_at: null, done_at: null, ...over }) as Thread;
 

@@ -87,6 +87,13 @@ private struct DeliveryRefusal: Decodable {
     "pr-watch-none.json": { _ = try decodeFixture(PRWatch?.self, "pr-watch-none.json") },
     "pr-watch.json": { _ = try decodeFixture(PRWatch.self, "pr-watch.json") },
     "pr-watch-stopped.json": { _ = try decodeFixture(PRWatch.self, "pr-watch-stopped.json") },
+    "bases.json": { _ = try decodeFixture(BaseOptions.self, "bases.json") },
+    "thread-base.json": { _ = try decodeFixture(ThreadBaseView.self, "thread-base.json") },
+    "channel-actions.json": { _ = try decodeFixture([ChannelAction].self, "channel-actions.json") },
+    "channel-action.json": { _ = try decodeFixture(ChannelAction.self, "channel-action.json") },
+    "thread-actions.json": { _ = try decodeFixture(ThreadActions.self, "thread-actions.json") },
+    "action-run.json": { _ = try decodeFixture(ActionRun.self, "action-run.json") },
+    "action-run-stopped.json": { _ = try decodeFixture(ActionRun.self, "action-run-stopped.json") },
     // Recorded by apps/server/tests/handoff-two-macs.test.ts, which needs two Macs.
     "devices.json": { _ = try decodeFixture([Device].self, "devices.json") },
     "thread-handoff.json": { _ = try decodeFixture(ThreadDetail.self, "thread-handoff.json") },
@@ -107,6 +114,10 @@ private struct DeliveryRefusal: Decodable {
     "needs-you-read-request.json": { _ = try decodeFixture([String: String].self, "needs-you-read-request.json") },
     // WorktreeCleanupTests compares it with what the client encodes.
     "worktree-retention-request.json": { _ = try decodeFixture(JSONValue.self, "worktree-retention-request.json") },
+    // WorktreeBaseTests compares it with what the client encodes.
+    "thread-create-base-request.json": { _ = try decodeFixture(JSONValue.self, "thread-create-base-request.json") },
+    // ChannelActionsTests compares it with what the client encodes.
+    "channel-action-request.json": { _ = try decodeFixture(JSONValue.self, "channel-action-request.json") },
   ]
 
   static func threadStream() throws -> [ThreadStreamMessage] {

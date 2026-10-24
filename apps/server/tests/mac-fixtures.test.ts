@@ -92,10 +92,23 @@ const NAMES = [
   // The retried worktree thread's branch changes, every group, and a thread with no repo to read.
   'changes.json',
   'changes-unavailable.json',
+  // The base that thread started from, what the new-thread composer offers for its channel (a repo with an origin),
+  // and the body it sends with a chosen base.
+  'thread-base.json',
+  'bases.json',
+  'thread-create-base-request.json',
   // The same thread's saved turns, the newest one's diff (an edit, a commit and a new file during the turn), and a
   // thread whose turns are not saved.
   'turns.json',
   'turns-unavailable.json',
+  // A channel's named actions: the body the editor sends, the action it makes and the list, then a thread's runs of
+  // them (succeeded, failed, stopped and one still running), a run as it starts and as Stop returns it.
+  'channel-action-request.json',
+  'channel-action.json',
+  'channel-actions.json',
+  'action-run.json',
+  'action-run-stopped.json',
+  'thread-actions.json',
   // The storage scan over the worktrees above, once it has finished.
   'worktree-scan.json',
   // A cleanup of two of them that removes one and keeps the other, then this Mac's retention policy turned on.
@@ -582,6 +595,19 @@ async function scenario() {
   expect(changed.groups.map((g) => [g.kind, g.files.length])).toEqual([['committed', 4], ['staged', 1], ['unstaged', 2], ['untracked', 1]]);
   keep('changes-unavailable.json', await get(`/threads/${id}/changes`));
 
+  keep('thread-base.json', await get(`/threads/${wt.id}/base`));
+  const origin = join(tmp, 'widgets-origin.git');
+  execFileSync('git', ['init', '-q', '--bare', origin]);
+  git('remote', 'add', 'origin', origin);
+  git('push', '-q', 'origin', 'HEAD:refs/heads/main');
+  git('fetch', '-q', 'origin');
+  git('remote', 'set-head', 'origin', 'main');
+  keep('bases.json', await get('/channels/widgets/bases'));
+  // Acme runs in its own folder, so the server drops the pick: the body is only checked for being accepted.
+  const baseBody = request('thread-create-base-request.json', { channel: 'acme', prompt: 'TOOL:20 tidy the cart', title: 'Tidy the cart', base: { kind: 'ref', ref: 'main' } });
+  const tidy = (await call('POST', '/threads', baseBody)) as Thread;
+  expect(await get(`/threads/${tidy.id}/base`)).toBeNull();
+
   const edit = join(tmp, 'turn-edit.sh');
   writeFileSync(
     edit,
@@ -605,23 +631,42 @@ async function scenario() {
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
 
+  const actionBody = request('channel-action-request.json', { name: 'Theme check', command: 'echo "Theme check passed"', secrets: [], port: null, setup: 'background' });
+  const check = keep('channel-action.json', await call('POST', '/channels/acme/actions', actionBody)) as { id: string };
+  const preview = (await call('POST', '/channels/acme/actions', { name: 'Theme preview', command: 'echo "Previewing on $OMNI_PORT"; sleep 30', port: 0 })) as { id: string };
+  const tests = (await call('POST', '/channels/acme/actions', { name: 'Tests', command: 'echo "1 failing" >&2; exit 1' })) as { id: string };
+  keep('channel-actions.json', await get('/channels/acme/actions'));
+  type Run = { id: string; state: string; output: string };
+  const settle = async (actionId: string, state: string) => {
+    const run = (await call('POST', `/threads/${id}/actions/${actionId}/run`)) as Run;
+    return eventually(async () => ((await get(`/threads/${id}/actions`)) as { runs: Run[] }).runs.find((r) => r.id === run.id && r.state === state), `a run to be ${state}`);
+  };
+  await settle(check.id, 'succeeded');
+  await settle(tests.id, 'failed');
+  const previewing = keep('action-run.json', await call('POST', `/threads/${id}/actions/${preview.id}/run`)) as Run;
+  await eventually(async () => ((await get(`/threads/${id}/actions`)) as { runs: Run[] }).runs.find((r) => r.id === previewing.id && r.output.includes('Previewing')), 'the preview to print');
+  keep('action-run-stopped.json', await call('POST', `/threads/${id}/action-runs/${previewing.id}/stop`, {}));
+  const again = (await call('POST', `/threads/${id}/action-runs/${previewing.id}/retry`, {})) as Run;
+  keep('thread-actions.json', await get(`/threads/${id}/actions`));
+  await call('POST', `/threads/${id}/action-runs/${again.id}/stop`, {});
+
   // Two archived worktree threads in a repo with an origin, so that both can be cleaned up.
-  const origin = join(tmp, 'gadgets.git');
+  const gadgetsOrigin = join(tmp, 'gadgets.git');
   const gadgets = join(tmp, 'gadgets');
-  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', gadgetsOrigin]);
   mkdirSync(gadgets);
   const gg = (...args: string[]) => execFileSync('git', ['-C', gadgets, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', ...args]);
   gg('init', '-q', '-b', 'main');
   writeFileSync(join(gadgets, 'README.md'), '# Gadgets\n');
   gg('add', '.');
   gg('commit', '-q', '-m', 'start');
-  gg('remote', 'add', 'origin', origin);
+  gg('remote', 'add', 'origin', gadgetsOrigin);
   gg('push', '-q', '-u', 'origin', 'main');
   gg('remote', 'set-head', 'origin', 'main');
   await call('POST', '/channels', { id: 'gadgets', name: 'Gadgets', kind: 'client', use_worktree: 1, repo_path: gadgets, notes: 'Fixture' });
-  const tidy = (await call('POST', '/threads', { channel: 'gadgets', prompt: 'tidy the gadgets', title: 'Tidy the gadgets' })) as Thread;
+  const tidyGadgets = (await call('POST', '/threads', { channel: 'gadgets', prompt: 'tidy the gadgets', title: 'Tidy the gadgets' })) as Thread;
   const draft = (await call('POST', '/threads', { channel: 'gadgets', prompt: 'draft the gadget notes', title: 'Draft the gadget notes' })) as Thread;
-  for (const t of [tidy, draft]) {
+  for (const t of [tidyGadgets, draft]) {
     await eventually(async () => (await detail(t.id)).thread.status === 'done', 'a gadgets thread to run');
     await call('PATCH', `/threads/${t.id}`, { archived: true });
   }
@@ -639,20 +684,21 @@ async function scenario() {
   }, 'the storage scan to finish');
   keep('worktree-scan.json', scanned);
   expect(scanned.scan.items.map((i) => i.id)).toContain(wt.id);
-  expect(scanned.scan.items.filter((i) => i.verdict === 'eligible').map((i) => i.id).sort()).toEqual([tidy.id, draft.id].sort());
+  expect(scanned.scan.items.filter((i) => i.verdict === 'eligible').map((i) => i.id).sort()).toEqual([tidyGadgets.id, draft.id].sort());
 
   // A file written after the scan keeps its worktree: the run checks each again right before removing it.
   writeFileSync(join((await detail(draft.id)).thread.cwd, 'notes.txt'), 'not saved yet\n');
-  await call('POST', '/worktrees/cleanup', { ids: [tidy.id, draft.id] });
+  await call('POST', '/worktrees/cleanup', { ids: [tidyGadgets.id, draft.id] });
   const cleaned = await eventually(async () => {
     const b = (await get('/worktrees/scan')) as View;
     return b.cleanup.runs.manual?.state === 'done' && b;
   }, 'the cleanup to finish');
   keep('worktree-cleanup.json', cleaned);
-  expect(Object.fromEntries(cleaned.cleanup.runs.manual!.items.map((i) => [i.id, i.outcome]))).toEqual({ [tidy.id]: 'removed', [draft.id]: 'kept' });
+  expect(Object.fromEntries(cleaned.cleanup.runs.manual!.items.map((i) => [i.id, i.outcome]))).toEqual({ [tidyGadgets.id]: 'removed', [draft.id]: 'kept' });
 
   const retentionBody = request('worktree-retention-request.json', { enabled: true, idleDays: 30 });
   keep('worktree-retention.json', await call('PUT', '/worktrees/retention', retentionBody));
+
   // Last, since it gives acme a GitHub repo. The app sends {} for the branch's PR; acme threads have no branch, so
   // this one names the PR.
   keep('pr-watch-none.json', await get(`/threads/${id}/pr-watch`));
@@ -726,7 +772,8 @@ function normalize(files: Map<Name, string>): Map<Name, string> {
     t = t.replace(TIME, (s) => (s.includes('.') ? '2026-01-05T09:00:00.000Z' : '2026-01-05T09:00:00Z'));
     t = t
       .replace(/("pid": )\d+/g, '$14242')
-      .replace(/("port": )\d+/g, '$14799')
+      // A port that is set; an action's 0 ("pick a free one") means something.
+      .replace(/("port": )[1-9]\d*/g, '$14799')
       .replace(/("gitHead": )"[0-9a-f]{40}"/g, `$1"${'0'.repeat(40)}"`)
       // Commit ids (a thread's base and head), which carry the time they were made.
       .replace(/\b(?!0{40})[0-9a-f]{40}\b/g, (sha) => {

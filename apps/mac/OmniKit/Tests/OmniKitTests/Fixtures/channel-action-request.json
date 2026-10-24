@@ -1,0 +1,7 @@
+{
+  "name": "Theme check",
+  "command": "echo \"Theme check passed\"",
+  "secrets": [],
+  "port": null,
+  "setup": "background"
+}

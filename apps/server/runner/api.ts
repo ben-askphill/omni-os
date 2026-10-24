@@ -1,8 +1,10 @@
 // createThread, sendMessage, and postMessage. Slash commands are resolved here, then delivered.
 import { randomUUID } from 'node:crypto';
-import { channels, folders, messageRequests, outbox, requestFingerprint, threads, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
+import { channels, folders, messageRequests, outbox, threadBasePicks, requestFingerprint, threads, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
+import { checkBase } from '../worktree-base.ts';
+import type { BasePick } from '@omni/shared/worktree-base.ts';
 import { prepareTurn, turnBlocked } from '../sync/guard.ts';
 import { parseSlash, resolveSlash, slashRecord, type SlashCommand, type SlashRecord } from '@omni/shared/slash.ts';
 import { listCommands, peekCommands } from '../commands.ts';
@@ -87,6 +89,8 @@ export interface CreateThreadInput {
   automation?: string | null;
   /** A sidebar folder of the channel to file the thread in, by id or name. A name no folder has makes one. */
   folder?: string | null;
+  /** The base a new worktree thread's branch is cut from (worktree-base.ts). None, or a thread with no worktree: the repo's HEAD. */
+  base?: BasePick | null;
   /** Files Ben attached to the first message. Validate them with `checkUploads` before calling. */
   files?: File[];
 }
@@ -128,6 +132,8 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
 
   const id = input.id ?? randomUUID();
   const remote = isRemoteHarness(harness);
+  // Refused before anything is made, so a ref that names nothing leaves the draft where it was typed.
+  const base = await checkBase(channel, input.base, { remote });
   const wd = await prepareWorkdir(channel, id, { remote });
   const thread = threads.create({
     id,
@@ -149,6 +155,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
     folder_id: filedIn?.id ?? null,
     setup: needsWorktree(channel, { remote }) ? 'preparing' : null,
   });
+  if (base) threadBasePicks.set(id, base);
   return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
 }
 

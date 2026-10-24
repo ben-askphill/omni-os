@@ -497,7 +497,7 @@ private struct TranscriptRows: View {
       if let line = store.workingLine {
         WorkingLine(text: line)
       }
-      if let t = store.thread, t.setup != nil {
+      if let t = store.thread, SetupCard.shows(t, model: model) {
         SetupCard(model: model, store: store, thread: t)
       }
       if let t = store.thread, t.limit != nil {

@@ -116,7 +116,7 @@ export function HeaderActions({
         </Button>
       )}
       <span className="relative">
-        <IconButton icon="panel" label="Artifacts, changes, browser, terminal, details" active={panelOpen} onClick={onPanel} />
+        <IconButton icon="panel" label="Artifacts, changes, browser, terminal, actions, details" active={panelOpen} onClick={onPanel} />
         {artifactCount > 0 && (
           <span className="pointer-events-none absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-fg px-1 font-num text-[9.5px] text-on-ink">{artifactCount}</span>
         )}

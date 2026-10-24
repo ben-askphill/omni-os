@@ -88,3 +88,21 @@ export async function secretsEnv(channelId: string): Promise<Record<string, stri
   }
   return env;
 }
+
+/**
+ * The values of the secrets a channel action names, channel scope first, then global, read from the Keychain. A name
+ * set in neither scope, or one no thread may have, is in `missing`.
+ */
+export async function namedSecrets(channelId: string, names: string[]): Promise<{ env: Record<string, string>; missing: string[] }> {
+  const env: Record<string, string> = {};
+  const missing: string[] = [];
+  for (const name of names) {
+    let value: string | null = null;
+    for (const scope of [`channel:${channelId}`, 'global']) {
+      if (value == null && secretReachesThread(scope, name) && hasSecret(scope, name)) value = await readSecret(scope, name);
+    }
+    if (value == null) missing.push(name);
+    else env[name] = value;
+  }
+  return { env, missing };
+}

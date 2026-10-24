@@ -10,6 +10,13 @@ const USER = process.env.OMNI_USER || 'the user';
 
 const server = new McpServer({ name: 'omni', version: '0.1.0' });
 
+/** The API's base pick for the `base` a tool call names: head, remote-default or a ref. */
+const basePick = (base?: string) => {
+  const name = base?.trim();
+  if (!name) return undefined;
+  return name === 'head' || name === 'remote-default' ? { kind: name } : { kind: 'ref', ref: name };
+};
+
 /** A channel's sidebar folders, with a few recent thread titles so you can tell what each one holds. */
 const folderSummary = (folders: any[] = []) =>
   folders.map((f: any) => ({ id: f.id, name: f.name, threads: f.count, recent: (f.threads ?? []).slice(0, 3).map((t: any) => t.title) }));
@@ -88,13 +95,20 @@ server.registerTool(
       effort: z.string().optional().describe('Reasoning effort supported by the model, e.g. high. Use list_harnesses.'),
       folder: z.string().optional().describe('Sidebar folder in the channel to file the thread in, by name or id. Use list_channels. It must exist unless create_folder is true.'),
       create_folder: z.boolean().optional().describe(`Create \`folder\` when the channel has none by that name. Only when ${USER} asked for the folder or agreed to it.`),
+      base: z
+        .string()
+        .optional()
+        .describe(
+          'Where a repo channel\'s new worktree branch starts: omit or "head" for the repo\'s current commit, "remote-default" for origin\'s default branch (fetched first, the checkout is never moved), ' +
+            'or the name of an existing branch, tag or commit. Ignored when the thread gets no worktree. Use it when the work must start from the latest origin, not a stale local checkout.',
+        ),
     },
   },
-  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, create_folder }) => {
+  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, create_folder, base }) => {
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
     const t = await call('/threads', {
       method: 'POST',
-      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, folder, parent_id: SELF, source: 'conductor' }),
+      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, folder, base: basePick(base), parent_id: SELF, source: 'conductor' }),
     });
     return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch });
   },

@@ -21,7 +21,7 @@ public enum QAAppearance: String, Hashable, Sendable {
 /// a screen per frame and reports how long the frames took.
 public enum QAInspector: String, Hashable, Sendable {
   /// `turn`: the Changes tab on This turn.
-  case open, close, artifacts, changes, turn, browser, terminal, details
+  case open, close, artifacts, changes, turn, browser, terminal, actions, details
 }
 
 public enum QAScroll: String, Hashable, Sendable {
@@ -87,7 +87,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`, `{"webhookSecret": "<automation id>"}`,
 /// `{"deliveries": "<automation id>"}` (or `{"automation": "<id>", "open": "failed", "older": true}`),
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
-/// `changes`, `turn`, `browser`, `terminal`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
+/// `changes`, `turn`, `browser`, `terminal`, `actions`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
 /// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
 /// `{"drag": "<thread title>", "over": "<folder>"}`, `{"file": "<thread title>", "into": "<folder>"}`,
 /// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"prMenu": "name"}`, `{"handOff": "<device id>"}`,
@@ -337,7 +337,7 @@ public struct QAScript: Hashable, Sendable {
       return .send(name == "reply" ? nil : SendMode(rawValue: name))
     case "inspector":
       guard let name = value as? String, let to = QAInspector(rawValue: name) else {
-        throw QAScriptError("inspector takes open, close, artifacts, changes, turn, browser, terminal or details")
+        throw QAScriptError("inspector takes open, close, artifacts, changes, turn, browser, terminal, actions or details")
       }
       return .inspector(to)
     case "webTitle":

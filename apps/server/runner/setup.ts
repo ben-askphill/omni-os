@@ -4,8 +4,10 @@ import { channels, messageRequests, outbox, requestFingerprint, threads, type Th
 import { prepareWorktree } from '../sandbox.ts';
 import { withWorkspace } from '../workspace.ts';
 import { recordStartBase } from '../changes.ts';
+import { baseFor } from '../worktree-base.ts';
 import type { Attachment } from '../uploads.ts';
 import { reportToParent, settleTeam } from './queue.ts';
+import { beginAttempt, endAttempt, runSetupAction } from './setup-action.ts';
 import { emitThread, refusal, runsHere } from './state.ts';
 
 /** The request id a worktree thread's first prompt is saved under. One per thread, so it is saved once. */
@@ -56,13 +58,17 @@ export function setUpThread(threadId: string): Promise<Thread | undefined> {
   if (!t) return Promise.resolve(undefined);
   const status = t.status === 'failed' || t.status === 'stopped' ? (waitingLead(t) ? 'running' : 'queued') : t.status;
   threads.update(threadId, { setup: 'preparing', setup_error: null, status, updated_at: t.updated_at });
+  beginAttempt(threadId);
   emitThread(threadId);
   const job = prepare(t)
     .catch((err) => {
       console.error(`[setup] ${threadId}:`, err);
       return threads.get(threadId);
     })
-    .finally(() => preparing.delete(threadId));
+    .finally(() => {
+      endAttempt(threadId);
+      preparing.delete(threadId);
+    });
   preparing.set(threadId, job);
   return job;
 }
@@ -72,11 +78,17 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
   try {
     if (!t.branch) throw new Error('The thread has no branch to check out.');
     const branch = t.branch;
-    await withWorkspace(t.cwd, () => prepareWorktree(repo, t.cwd, branch));
+    await withWorkspace(t.cwd, () => prepareWorktree(repo, t.cwd, branch, () => baseFor(t.id, repo!)));
     // The commit the branch starts from, for the Changes panel. Recorded before anything runs there.
     await recordStartBase(t.id, repo!, t.cwd).catch((err) => console.error(`[setup] ${t.id}: could not record the base commit:`, (err as Error).message));
   } catch (err) {
     failSetup(t.id, (err as Error).message);
+    return threads.get(t.id);
+  }
+  // The channel's setup action, in the verified checkout: a blocking one holds the agent until it succeeds.
+  const held = await runSetupAction(t);
+  if (held) {
+    failSetup(t.id, held.reason, held.stopped);
     return threads.get(t.id);
   }
   threads.update(t.id, { setup: null, setup_error: null, updated_at: t.updated_at });
@@ -102,13 +114,15 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
   return threads.get(t.id);
 }
 
-/** The thread could not be prepared: why, on the thread, with its first prompt kept for Retry. */
-export function failSetup(threadId: string, reason: string) {
-  threads.update(threadId, { setup: 'failed', setup_error: reason, status: 'failed' });
+/** The thread could not be prepared, or Ben stopped it first: why, on the thread, with its first prompt kept for Retry. */
+export function failSetup(threadId: string, reason: string, stopped = false) {
+  threads.update(threadId, { setup: 'failed', setup_error: reason, status: stopped ? 'stopped' : 'failed' });
   for (const r of messageRequests.unstarted(threadId)) messageRequests.park(r.id);
   emitThread(threadId);
   const t = threads.get(threadId);
-  if (t?.parent_id) reportToParent(threadId, 'failed', `Omni could not prepare this thread's worktree, so it has not run: ${reason}`);
+  if (!t?.parent_id) return;
+  if (stopped) reportToParent(threadId, 'stopped', `Ben stopped this thread while its worktree was being prepared, so it has not run.`);
+  else reportToParent(threadId, 'failed', `Omni could not prepare this thread's worktree, so it has not run: ${reason}`);
 }
 
 /**

@@ -366,6 +366,50 @@ export function migrate() {
       SELECT 'completion', uid, 'upsert', created_at FROM completions
       WHERE seq = last_insert_rowid() AND EXISTS (SELECT 1 FROM kv WHERE key = 'sync.machine_id');
     END`);
+  // #212: what Ben chose as a new worktree thread's base, until it is resolved to a commit in thread_bases. Local, not synced.
+  db.exec(`CREATE TABLE IF NOT EXISTS thread_base_picks (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+    pick TEXT NOT NULL
+  )`);
+  // #210: a channel's named actions (command and secret names only, never a value), and each run of one in a thread,
+  // with its state and the tail of its output. Local, not synced: a run is a process on this Mac.
+  db.exec(`CREATE TABLE IF NOT EXISTS channel_actions (
+    id TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    command TEXT NOT NULL,
+    secrets TEXT NOT NULL DEFAULT '[]',
+    port INTEGER,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (channel_id, name)
+  );
+  CREATE TABLE IF NOT EXISTS action_runs (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    action_id TEXT,
+    name TEXT NOT NULL,
+    command TEXT NOT NULL,
+    cwd TEXT NOT NULL,
+    port INTEGER,
+    state TEXT NOT NULL,
+    exit_code INTEGER,
+    error TEXT,
+    output TEXT NOT NULL DEFAULT '',
+    output_bytes INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL,
+    ended_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS action_runs_thread ON action_runs(thread_id, started_at DESC);`);
+  // #211: the one action a channel runs to set up each new worktree, and how (blocking or background), and the setup
+  // run of each thread's latest preparation attempt, so its card shows that run's output after a restart. Local, not synced.
+  ensureColumn('channel_actions', 'setup', 'TEXT');
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS channel_actions_setup ON channel_actions(channel_id) WHERE setup IS NOT NULL;
+  CREATE TABLE IF NOT EXISTS thread_setup_runs (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+    run_id TEXT NOT NULL
+  );`);
   // #226 Event-trigger deliveries (db/repos/trigger-deliveries.ts): one row per automation and source event, its uid
   // derived from both, so a replay or the other Mac's copy is the same row. Synced; states only move forward.
   db.exec(`CREATE TABLE IF NOT EXISTS trigger_deliveries (
