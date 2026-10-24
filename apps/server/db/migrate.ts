@@ -352,4 +352,6 @@ export function migrate() {
   );
   CREATE INDEX IF NOT EXISTS trigger_deliveries_automation ON trigger_deliveries(automation, created_at);
   CREATE INDEX IF NOT EXISTS trigger_deliveries_thread ON trigger_deliveries(thread_id) WHERE thread_id IS NOT NULL;`);
+  // #228 A retry is the next attempt of the same delivery row: 1 for the first go. Each attempt has its own thread id.
+  ensureColumn('trigger_deliveries', 'attempt', 'INTEGER NOT NULL DEFAULT 1');
 }

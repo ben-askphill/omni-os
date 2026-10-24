@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { DELIVERY_RANK, type TriggerDelivery, type TriggerDeliveryState, type TriggerSource } from '@omni/shared/automation-triggers.ts';
+import { isDeliveryAhead, isPendingDelivery, type TriggerDelivery, type TriggerDeliveryState, type TriggerSource } from '@omni/shared/automation-triggers.ts';
 import { db, now, tx } from '../connection.ts';
 import { record } from '../sync.ts';
 
@@ -12,7 +12,7 @@ interface Row extends Omit<TriggerDelivery, 'id' | 'context'> {
   context: string;
 }
 
-const COLUMNS = 'uid, automation, source, source_id, summary, context, state, reason, owner, source_thread, thread_id, created_at, updated_at';
+const COLUMNS = 'uid, automation, source, source_id, summary, context, state, reason, owner, source_thread, thread_id, attempt, created_at, updated_at';
 
 const toDelivery = ({ uid, context, ...r }: Row): TriggerDelivery => ({ id: uid, ...r, context: JSON.parse(context) as Record<string, string> });
 
@@ -30,8 +30,15 @@ function stableId(...parts: string[]) {
 export const DELIVERY_PENDING = 'trigger_delivery:pending';
 
 export const deliveryId = (automation: string, source: TriggerSource, sourceId: string) => stableId('delivery', automation, source, sourceId);
-/** The thread a delivery starts. Fixed in advance, so a restart after the thread was made finds it instead of making a second. */
-export const deliveryThreadId = (id: string) => stableId('delivery-thread', id);
+/**
+ * The thread an attempt of a delivery starts. Fixed in advance, so a restart after the thread was made finds it
+ * instead of making a second, and each attempt has its own: a retry never finds the failed one's. The first attempt's
+ * id is what it was before there were attempts.
+ */
+export const deliveryThreadId = (id: string, attempt = 1) => (attempt <= 1 ? stableId('delivery-thread', id) : stableId('delivery-thread', id, String(attempt)));
+
+/** Deliveries this process is starting right now: the claim that keeps a skip, a retry and a second pass out of a start in flight. */
+const starting = new Set<string>();
 
 export type NewDelivery = Pick<TriggerDelivery, 'automation' | 'source' | 'source_id' | 'summary' | 'context' | 'state' | 'reason' | 'owner' | 'source_thread'>;
 
@@ -43,7 +50,7 @@ export const triggerDeliveries = {
       const at = now();
       const fresh =
         db
-          .prepare(`INSERT INTO trigger_deliveries (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?) ON CONFLICT(uid) DO NOTHING`)
+          .prepare(`INSERT INTO trigger_deliveries (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, ?, ?) ON CONFLICT(uid) DO NOTHING`)
           .run(uid, d.automation, d.source, d.source_id, d.summary, JSON.stringify(d.context), d.state, d.reason, d.owner, d.source_thread, at, at).changes > 0;
       if (fresh) record('trigger_delivery', uid);
       return { delivery: triggerDeliveries.get(uid)!, fresh };
@@ -62,10 +69,17 @@ export const triggerDeliveries = {
     );
   },
 
-  recent(automation: string, limit = 5): TriggerDelivery[] {
-    return (
-      db.prepare(`SELECT ${COLUMNS} FROM trigger_deliveries WHERE automation = ? ORDER BY created_at DESC, uid DESC LIMIT ?`).all(automation, limit) as unknown as Row[]
-    ).map(toDelivery);
+  /** An automation's deliveries, newest first, `limit` of them after the one `before` names. `more` when older ones exist. */
+  page(automation: string, limit: number, before?: string): { rows: TriggerDelivery[]; more: boolean } {
+    const cursor = before ? triggerDeliveries.get(before) : undefined;
+    const rows = (
+      cursor
+        ? db
+            .prepare(`SELECT ${COLUMNS} FROM trigger_deliveries WHERE automation = ? AND (created_at, uid) < (?, ?) ORDER BY created_at DESC, uid DESC LIMIT ?`)
+            .all(automation, cursor.created_at, cursor.id, limit + 1)
+        : db.prepare(`SELECT ${COLUMNS} FROM trigger_deliveries WHERE automation = ? ORDER BY created_at DESC, uid DESC LIMIT ?`).all(automation, limit + 1)
+    ) as unknown as Row[];
+    return { rows: rows.slice(0, limit).map(toDelivery), more: rows.length > limit };
   },
 
   /** The thread whose event started this one, when a delivery started it. */
@@ -75,13 +89,32 @@ export const triggerDeliveries = {
   },
 
   /**
-   * Move a delivery to a later state, never back: a pending one only. False when it had already moved on, so of two
-   * callers settling the same delivery only the first wins.
+   * Take a pending delivery to start it, or null when it is not pending any more or this process is already starting it.
+   * The row is read here, not taken from a list read earlier, so a skip that landed since is seen. Hand it back with
+   * `release` when the start is over, whatever came of it.
    */
-  settle(id: string, state: TriggerDeliveryState, patch: { reason?: string | null; thread_id?: string | null } = {}): boolean {
+  claim(id: string): TriggerDelivery | null {
+    const cur = triggerDeliveries.get(id);
+    if (!cur || !isPendingDelivery(cur.state) || starting.has(id)) return null;
+    starting.add(id);
+    return cur;
+  },
+
+  release(id: string) {
+    starting.delete(id);
+  },
+
+  isStarting: (id: string) => starting.has(id),
+
+  /**
+   * Move a delivery on: to a higher state of the same attempt, never back. False when it had already moved on, or is
+   * on another attempt than the one the caller started, so of two callers settling the same delivery only the first
+   * wins, and a late answer for an old attempt changes nothing.
+   */
+  settle(id: string, attempt: number, state: TriggerDeliveryState, patch: { reason?: string | null; thread_id?: string | null } = {}): boolean {
     return tx(() => {
       const cur = triggerDeliveries.get(id);
-      if (!cur || DELIVERY_RANK[state] <= DELIVERY_RANK[cur.state]) return false;
+      if (!cur || cur.attempt !== attempt || !isDeliveryAhead({ attempt, state }, cur)) return false;
       db.prepare('UPDATE trigger_deliveries SET state = ?, reason = ?, thread_id = ?, updated_at = ? WHERE uid = ?').run(
         state,
         patch.reason ?? null,
@@ -92,5 +125,48 @@ export const triggerDeliveries = {
       record('trigger_delivery', id);
       return true;
     });
+  },
+
+  /**
+   * Skip a delivery that has not started: final. False when it is on another attempt than the caller saw, is being
+   * started in this process, has a thread, or is already started or skipped. The update names all of that, so a skip
+   * racing a start or a retry changes nothing it should not.
+   */
+  skip(id: string, attempt: number, reason: string): boolean {
+    if (starting.has(id)) return false;
+    return tx(() => {
+      const changed = db
+        .prepare(
+          `UPDATE trigger_deliveries SET state = 'skipped', reason = ?, updated_at = ?
+           WHERE uid = ? AND attempt = ? AND thread_id IS NULL AND state IN ('received', 'accepted', 'queued', 'failed')`,
+        )
+        .run(reason, now(), id, attempt).changes;
+      if (changed) record('trigger_delivery', id);
+      return changed > 0;
+    });
+  },
+
+  /**
+   * Go again: a failed delivery with no thread becomes the next attempt, pending. False for anything else, and for a
+   * caller that saw an earlier attempt, so two clicks on Retry make one attempt. The caller has checked that no thread
+   * of this attempt exists (automation-deliveries.ts); this is the check-and-set that makes the click count once.
+   */
+  retry(id: string, attempt: number, to: 'accepted' | 'queued', owner: string | null): boolean {
+    if (starting.has(id)) return false;
+    return tx(() => {
+      const changed = db
+        .prepare(
+          `UPDATE trigger_deliveries SET attempt = attempt + 1, state = ?, reason = NULL, owner = ?, updated_at = ?
+           WHERE uid = ? AND attempt = ? AND state = 'failed' AND thread_id IS NULL`,
+        )
+        .run(to, owner, now(), id, attempt).changes;
+      if (changed) record('trigger_delivery', id);
+      return changed > 0;
+    });
+  },
+
+  /** How many of the automation's threads are queued or running, whichever Mac started them: its runs that are going. */
+  liveRuns(automation: string): number {
+    return (db.prepare(`SELECT COUNT(*) AS n FROM threads WHERE automation = ? AND status IN ('queued', 'running')`).get(automation) as { n: number }).n;
   },
 };

@@ -34,8 +34,16 @@ export interface PrTrigger {
   trust?: 'any';
 }
 
+/** What every delivered event (a publish, a webhook) is held to before and while it starts (delivery-policy.ts). */
+export interface DeliveryLimits {
+  /** `15m`, `6h`, `2d`: an event older than this when its turn comes is skipped, not started. Unset, a day. */
+  max_age?: string;
+  /** How many of the automation's runs may be going at once. A burst waits its turn instead of crowding out Ben's own messages. Unset, 2. */
+  concurrency?: number;
+}
+
 /** `on: artifact_published`: a thread published a page to claude.ai with its Artifact tool. */
-export interface ArtifactTrigger {
+export interface ArtifactTrigger extends DeliveryLimits {
   event: 'artifact_published';
   /** Only publishes from threads in these channels. Unset, any channel's. */
   channels?: string[];
@@ -44,7 +52,7 @@ export interface ArtifactTrigger {
 }
 
 /** `on: { event: github_webhook, repo, events? }`: GitHub posts a signed event to the automation's own endpoint. */
-export interface WebhookTrigger {
+export interface WebhookTrigger extends DeliveryLimits {
   event: 'github_webhook';
   /** The only repo whose events it takes. */
   repo: string;
@@ -58,10 +66,32 @@ export interface WebhookTrigger {
 export type EventTrigger = PrTrigger | ArtifactTrigger | WebhookTrigger;
 
 export const isPrTrigger = (t: EventTrigger | undefined): t is PrTrigger => !!t && (PR_EVENT_TYPES as readonly string[]).includes(t.event);
+const isPrEvent = (e: unknown) => (PR_EVENT_TYPES as readonly unknown[]).includes(e);
 
 const CHANNEL_ID = /^[\w.-]+$/;
 
 const REPO = /^[\w.-]+\/[\w.-]+$/;
+
+const DURATION = /^(\d+)\s*([smhd])$/i;
+const UNIT_MS = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 } as const;
+
+/** `90s`, `15m`, `6h`, `2d` in milliseconds. Undefined for anything else, and for zero. */
+export function parseDuration(v: unknown): number | undefined {
+  const m = typeof v === 'string' ? DURATION.exec(v.trim()) : null;
+  const ms = m ? Number(m[1]) * UNIT_MS[m[2].toLowerCase() as keyof typeof UNIT_MS] : 0;
+  return ms > 0 ? ms : undefined;
+}
+
+export const CONCURRENCY_MAX = 8;
+
+/** The `max_age` and `concurrency` of an `on:` block, or the message that says what is wrong with them. */
+function parseLimits(raw: { max_age?: unknown; concurrency?: unknown }): DeliveryLimits | string {
+  const { max_age, concurrency } = raw;
+  if (max_age !== undefined && parseDuration(max_age) === undefined) return `max_age must look like 15m, 6h or 2d`;
+  if (concurrency !== undefined && (!Number.isInteger(concurrency) || (concurrency as number) < 1 || (concurrency as number) > CONCURRENCY_MAX))
+    return `concurrency must be a whole number from 1 to ${CONCURRENCY_MAX}`;
+  return { ...(max_age !== undefined && { max_age: (max_age as string).trim().toLowerCase().replace(/\s+/g, '') }), ...(concurrency !== undefined && { concurrency: concurrency as number }) };
+}
 
 /**
  * `on: pr_checks_failed`, or `on: { event, repo?, drafts?, trust? }`, or `on: { event: artifact_published, channels?,
@@ -70,9 +100,12 @@ const REPO = /^[\w.-]+\/[\w.-]+$/;
 export function parseTrigger(raw: unknown): EventTrigger | string {
   const obj = typeof raw === 'string' ? { event: raw } : raw;
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return `"on" must be an event name or { event, repo }`;
-  const { event, repo, drafts, trust, channels, updates, events } = obj as Record<string, unknown>;
+  const { event, repo, drafts, trust, channels, updates, events, max_age, concurrency } = obj as Record<string, unknown>;
   if (!EVENT_TYPES.includes(event as EventType)) return `unknown event "${String(event)}" (use ${EVENT_TYPES.join(', ')})`;
   if (events !== undefined && event !== 'github_webhook') return `events is for github_webhook`;
+  if ((max_age !== undefined || concurrency !== undefined) && isPrEvent(event)) return `max_age and concurrency are for artifact_published and github_webhook`;
+  const limits = parseLimits({ max_age, concurrency });
+  if (typeof limits === 'string') return limits;
   if (event === 'github_webhook') {
     if (drafts !== undefined || channels !== undefined || updates !== undefined) return `drafts, channels and updates are not for github_webhook`;
     if (typeof repo !== 'string' || !REPO.test(repo)) return `github_webhook needs repo: owner/name`;
@@ -80,7 +113,7 @@ export function parseTrigger(raw: unknown): EventTrigger | string {
     if (!Array.isArray(list) || !list.length || !list.every((e) => WEBHOOK_EVENTS.includes(e as WebhookEvent)))
       return `events must be one or more of ${WEBHOOK_EVENTS.join(', ')}`;
     if (trust !== undefined && trust !== 'any' && trust !== 'members') return `trust must be members or any`;
-    return { event, repo, events: [...new Set(list as WebhookEvent[])], ...(trust === 'any' ? { trust } : {}) };
+    return { event, repo, events: [...new Set(list as WebhookEvent[])], ...(trust === 'any' ? { trust } : {}), ...limits };
   }
   if (event === 'artifact_published') {
     if (repo !== undefined || drafts !== undefined || trust !== undefined) return `repo, drafts and trust are for PR events`;
@@ -88,7 +121,7 @@ export function parseTrigger(raw: unknown): EventTrigger | string {
     if (list !== undefined && (!Array.isArray(list) || !list.length || !list.every((c) => typeof c === 'string' && CHANNEL_ID.test(c))))
       return `channels must be a channel id or a list of them`;
     if (updates !== undefined && typeof updates !== 'boolean') return `updates must be true or false`;
-    return { event, ...(list && { channels: list as string[] }), updates: updates === true };
+    return { event, ...(list && { channels: list as string[] }), updates: updates === true, ...limits };
   }
   if (channels !== undefined || updates !== undefined) return `channels and updates are for artifact_published`;
   if (repo !== undefined && (typeof repo !== 'string' || !REPO.test(repo))) return `repo must look like owner/name`;

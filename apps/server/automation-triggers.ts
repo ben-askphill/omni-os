@@ -2,16 +2,19 @@
 // (`on: artifact_published`). Each match is saved as a delivery (db/repos/trigger-deliveries.ts) before any thread is
 // made, keyed by the automation and the event, so seeing the same tool result again, a restart, or the other Mac
 // seeing it too never starts a second run. Only the Mac that runs automations (sync/owner.ts) starts one; another Mac
-// holds it, and sync carries it over (sync/handlers/trigger-delivery.ts).
+// holds it, and sync carries it over (sync/handlers/trigger-delivery.ts). Before a start the event must still be young
+// enough, the automation must have a run to spare and not be backing off after a failed start (delivery-policy.ts). A
+// start is claimed first, so a skip or a retry from Ben (automation-deliveries.ts) never lands inside it.
 import type { Published } from '@omni/shared/published.ts';
-import { bus, publishFeed } from './bus.ts';
+import { bus, publishFeed, type FeedEvent } from './bus.ts';
 import { automationRuns, channels, db, threads, type Thread } from './db.ts';
 import { DELIVERY_PENDING, deliveryThreadId, triggerDeliveries } from './db/repos/trigger-deliveries.ts';
-import { fenced, type ArtifactTrigger } from './automation-events.ts';
+import { fenced, isPrTrigger, type ArtifactTrigger } from './automation-events.ts';
+import { clearBackoff, holdReason, isExpired, maxAgeMs, recordFailedStart, span } from './delivery-policy.ts';
 import { webhookPrompt } from './github-webhook.ts';
 import { loadAutomations, runAutomation, type Automation } from './automations.ts';
 import { automationsOwner, runsAutomationsHere } from './sync/owner.ts';
-import type { TriggerDelivery } from '@omni/shared/automation-triggers.ts';
+import type { TriggerDelivery, TriggerDeliveryState } from '@omni/shared/automation-triggers.ts';
 
 /** Each captured field is cut to this, so a long title or description cannot flood the run's prompt or the list. */
 const FIELD_MAX = 200;
@@ -98,24 +101,50 @@ export function deliveryPrompt(prompt: string, d: TriggerDelivery): string {
   ].join('\n');
 }
 
-/** Start one pending delivery, or settle it with why it will not start. */
-async function admit(d: TriggerDelivery, automations: Automation[]) {
-  const a = automations.find((x) => x.id === d.automation);
-  const skip = (reason: string) => triggerDeliveries.settle(d.id, 'skipped', { reason });
-  if (!a) return skip('No automation with this id on the Mac that runs automations');
-  if (a.error) return skip(`The automation is invalid: ${a.error}`);
-  if (!a.enabled) return skip('Paused on the Mac that runs automations');
-  const id = deliveryThreadId(d.id);
-  // Made before a restart, which came before the delivery could say so.
-  if (threads.get(id)) {
-    if (!db.prepare('SELECT 1 FROM automation_runs WHERE thread_id = ?').get(id)) automationRuns.add(a.id, id, 'event');
-    return triggerDeliveries.settle(d.id, 'started', { thread_id: id });
-  }
+/** The automation's thread for this attempt exists: count it as one of its runs, once, whatever made it. */
+function adopt(a: Automation, threadId: string) {
+  if (!db.prepare('SELECT 1 FROM automation_runs WHERE thread_id = ?').get(threadId)) automationRuns.add(a.id, threadId, 'event');
+}
+
+/**
+ * Start one pending delivery, or settle it with why it will not start. True when it settled the delivery. False when it
+ * left it pending: the automation is at its limit or backing off, or a skip, another pass or the other Mac got there
+ * first. The delivery is read again and claimed, so what a list read a moment ago said is never acted on.
+ */
+async function admit(listed: TriggerDelivery, automations: Automation[]): Promise<boolean> {
+  const d = triggerDeliveries.claim(listed.id);
+  if (!d) return false;
   try {
-    const t = await runAutomation(a, 'event', { prompt: deliveryPrompt(a.prompt, d), title: clip(`${a.name} · ${d.context.title ?? d.summary}`), id });
-    triggerDeliveries.settle(d.id, 'started', { thread_id: t.id });
-  } catch (err) {
-    triggerDeliveries.settle(d.id, 'failed', { reason: clip((err as Error).message.split('\n')[0] ?? 'failed') });
+    const a = automations.find((x) => x.id === d.automation);
+    const settle = (state: TriggerDeliveryState, patch: { reason?: string | null; thread_id?: string | null } = {}) => triggerDeliveries.settle(d.id, d.attempt, state, patch);
+    const skip = (reason: string) => settle('skipped', { reason });
+    if (!a) return skip('No automation with this id on the Mac that runs automations');
+    if (a.error) return skip(`The automation is invalid: ${a.error}`);
+    if (!a.enabled) return skip('Paused on the Mac that runs automations');
+    const limits = a.on && !isPrTrigger(a.on) ? a.on : undefined;
+    // Late, whether Omni was off, the other Mac slept on it or the automation was at its limit: it never starts now.
+    if (isExpired(d.created_at, limits)) return skip(`Expired: it arrived ${span(Date.now() - new Date(d.created_at).getTime())} ago, over the ${span(maxAgeMs(limits))} limit`);
+    const id = deliveryThreadId(d.id, d.attempt);
+    // Made before a restart, which came before the delivery could say so.
+    if (threads.get(id)) {
+      adopt(a, id);
+      return settle('started', { thread_id: id });
+    }
+    if (holdReason(a.id, limits, triggerDeliveries.liveRuns(a.id), Date.now(), d.attempt > 1)) return false;
+    const attempt = d.attempt > 1 ? ` (attempt ${d.attempt})` : '';
+    try {
+      const t = await runAutomation(a, 'event', { prompt: deliveryPrompt(a.prompt, d), title: clip(`${a.name} · ${d.context.title ?? d.summary}${attempt}`), id });
+      clearBackoff(a.id);
+      return settle('started', { thread_id: t.id });
+    } catch (err) {
+      recordFailedStart(a.id);
+      // A thread of this attempt exists: it was made before the error, so what it did is unknown and nothing is retried.
+      const made = threads.get(id) ? id : null;
+      if (made) adopt(a, made);
+      return settle('failed', { reason: clip((err as Error).message.split('\n')[0] ?? 'failed'), thread_id: made });
+    }
+  } finally {
+    triggerDeliveries.release(d.id);
   }
 }
 
@@ -141,7 +170,7 @@ export function admitPending(): Promise<number> {
       if (!pending.length) break;
       const automations = loadAutomations();
       for (const d of pending) {
-        await admit(d, automations);
+        if (!(await admit(d, automations))) continue;
         settled++;
         publishFeed({ type: 'automation_delivery', automation: d.automation });
       }
@@ -156,10 +185,17 @@ export function admitPending(): Promise<number> {
 /** How often to look for deliveries held here while another Mac ran automations, in case this one took them over. */
 const ADMIT_EVERY_MS = 60_000;
 
-/** At boot, start what a restart left pending, then whatever the other Mac holds for this one, and keep checking. */
+/**
+ * At boot, start what a restart left pending, then whatever the other Mac holds for this one, and keep checking. Also
+ * when one of an automation's runs ends, since that frees a slot a held delivery may be waiting for.
+ */
 export function startTriggerDeliveries() {
   const tick = () => void admitPending().catch((err) => console.error('[automations] could not start deliveries:', err));
   tick();
   bus.on(DELIVERY_PENDING, tick);
+  bus.on('feed', (e: FeedEvent) => {
+    const t = e.type === 'thread' ? (e.thread as Pick<Thread, 'automation' | 'status'>) : null;
+    if (t?.automation && t.status !== 'running' && t.status !== 'queued') tick();
+  });
   setInterval(tick, ADMIT_EVERY_MS).unref();
 }

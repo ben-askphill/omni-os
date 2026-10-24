@@ -1,0 +1,110 @@
+[
+  {
+    "case": "held for the Mac that runs automations",
+    "input": { "state": "queued", "reason": null, "thread_id": null, "thread_status": null, "waiting": null },
+    "expected": [
+      { "name": "Trigger", "label": "Held for owner", "tone": "plain", "note": null },
+      { "name": "Run", "label": "Waiting to start", "tone": "plain", "note": null },
+      { "name": "Execution", "label": "No run", "tone": "quiet", "note": null }
+    ]
+  },
+  {
+    "case": "accepted but waiting for a free slot",
+    "input": { "state": "accepted", "reason": null, "thread_id": null, "thread_status": null, "waiting": "Waiting for a free slot: 1 of 1 runs are going" },
+    "expected": [
+      { "name": "Trigger", "label": "Accepted", "tone": "done", "note": null },
+      { "name": "Run", "label": "Waiting to start", "tone": "plain", "note": "Waiting for a free slot: 1 of 1 runs are going" },
+      { "name": "Execution", "label": "No run", "tone": "quiet", "note": null }
+    ]
+  },
+  {
+    "case": "received, not yet matched",
+    "input": { "state": "received", "reason": null, "thread_id": null, "thread_status": null, "waiting": null },
+    "expected": [
+      { "name": "Trigger", "label": "Received", "tone": "plain", "note": null },
+      { "name": "Run", "label": "Waiting to start", "tone": "plain", "note": null },
+      { "name": "Execution", "label": "No run", "tone": "quiet", "note": null }
+    ]
+  },
+  {
+    "case": "started and still running",
+    "input": { "state": "started", "reason": null, "thread_id": "t1", "thread_status": "running", "waiting": null },
+    "expected": [
+      { "name": "Trigger", "label": "Accepted", "tone": "done", "note": null },
+      { "name": "Run", "label": "Thread created", "tone": "done", "note": null },
+      { "name": "Execution", "label": "Running", "tone": "live", "note": null }
+    ]
+  },
+  {
+    "case": "started and finished",
+    "input": { "state": "started", "reason": null, "thread_id": "t1", "thread_status": "done", "waiting": null },
+    "expected": [
+      { "name": "Trigger", "label": "Accepted", "tone": "done", "note": null },
+      { "name": "Run", "label": "Thread created", "tone": "done", "note": null },
+      { "name": "Execution", "label": "Finished", "tone": "done", "note": null }
+    ]
+  },
+  {
+    "case": "started and the run failed: the run was still created",
+    "input": { "state": "started", "reason": null, "thread_id": "t1", "thread_status": "failed", "waiting": null },
+    "expected": [
+      { "name": "Trigger", "label": "Accepted", "tone": "done", "note": null },
+      { "name": "Run", "label": "Thread created", "tone": "done", "note": null },
+      { "name": "Execution", "label": "Failed", "tone": "needs", "note": null }
+    ]
+  },
+  {
+    "case": "started and the thread was stopped",
+    "input": { "state": "started", "reason": null, "thread_id": "t1", "thread_status": "stopped", "waiting": null },
+    "expected": [
+      { "name": "Trigger", "label": "Accepted", "tone": "done", "note": null },
+      { "name": "Run", "label": "Thread created", "tone": "done", "note": null },
+      { "name": "Execution", "label": "Stopped", "tone": "quiet", "note": null }
+    ]
+  },
+  {
+    "case": "started and the thread was removed since",
+    "input": { "state": "started", "reason": null, "thread_id": "t1", "thread_status": null, "waiting": null },
+    "expected": [
+      { "name": "Trigger", "label": "Accepted", "tone": "done", "note": null },
+      { "name": "Run", "label": "Thread created", "tone": "done", "note": null },
+      { "name": "Execution", "label": "Thread removed", "tone": "quiet", "note": null }
+    ]
+  },
+  {
+    "case": "failed before any thread was made",
+    "input": { "state": "failed", "reason": "unknown channel \"gone\"", "thread_id": null, "thread_status": null, "waiting": null },
+    "expected": [
+      { "name": "Trigger", "label": "Accepted", "tone": "done", "note": null },
+      { "name": "Run", "label": "Could not start", "tone": "needs", "note": "unknown channel \"gone\"" },
+      { "name": "Execution", "label": "No run", "tone": "quiet", "note": null }
+    ]
+  },
+  {
+    "case": "failed after its thread was made: uncertain, so the thread is the answer",
+    "input": { "state": "failed", "reason": "Omni is shutting down", "thread_id": "t1", "thread_status": "queued", "waiting": null },
+    "expected": [
+      { "name": "Trigger", "label": "Accepted", "tone": "done", "note": null },
+      { "name": "Run", "label": "Started, then reported an error", "tone": "needs", "note": "Omni is shutting down" },
+      { "name": "Execution", "label": "Queued", "tone": "plain", "note": null }
+    ]
+  },
+  {
+    "case": "skipped with a reason",
+    "input": { "state": "skipped", "reason": "Expired: it arrived 2d 3h ago, over the 12h limit", "thread_id": null, "thread_status": null, "waiting": null },
+    "expected": [
+      { "name": "Trigger", "label": "Skipped", "tone": "quiet", "note": "Expired: it arrived 2d 3h ago, over the 12h limit" },
+      { "name": "Run", "label": "Never started", "tone": "quiet", "note": null },
+      { "name": "Execution", "label": "No run", "tone": "quiet", "note": null }
+    ]
+  },
+  {
+    "case": "a thread status this app does not know shows as the server spells it",
+    "input": { "state": "started", "reason": null, "thread_id": "t1", "thread_status": "imported", "waiting": null },
+    "expected": [
+      { "name": "Trigger", "label": "Accepted", "tone": "done", "note": null },
+      { "name": "Run", "label": "Thread created", "tone": "done", "note": null },
+      { "name": "Execution", "label": "imported", "tone": "quiet", "note": null }
+    ]
+  }
+]

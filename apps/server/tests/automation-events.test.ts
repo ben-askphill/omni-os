@@ -55,6 +55,19 @@ describe('parseTrigger', () => {
     expect(parseTrigger({ event: 'artifact_published', updates: 'yes' })).toMatch(/updates must be/);
     expect(parseTrigger({ event: 'pr_opened', channels: ['a'] })).toMatch(/for artifact_published/);
   });
+
+  it('takes a max age and a concurrency for delivered events, and names what is wrong with them', () => {
+    expect(parseTrigger({ event: 'artifact_published', max_age: '15m', concurrency: 1 })).toEqual({ event: 'artifact_published', updates: false, max_age: '15m', concurrency: 1 });
+    expect(parseTrigger({ event: 'github_webhook', repo: 'o/r', max_age: ' 6H ' })).toEqual({ event: 'github_webhook', repo: 'o/r', events: ['workflow_run', 'pull_request_review'], max_age: '6h' });
+    expect(parseTrigger({ event: 'artifact_published', max_age: '0m' })).toMatch(/max_age must look like/);
+    expect(parseTrigger({ event: 'artifact_published', max_age: 15 })).toMatch(/max_age must look like/);
+    expect(parseTrigger({ event: 'artifact_published', max_age: 'soon' })).toMatch(/max_age must look like/);
+    expect(parseTrigger({ event: 'artifact_published', concurrency: 0 })).toMatch(/concurrency must be/);
+    expect(parseTrigger({ event: 'artifact_published', concurrency: 9 })).toMatch(/concurrency must be/);
+    expect(parseTrigger({ event: 'artifact_published', concurrency: 1.5 })).toMatch(/concurrency must be/);
+    expect(parseTrigger({ event: 'pr_opened', max_age: '1h' })).toMatch(/max_age and concurrency are for/);
+    expect(parseTrigger({ event: 'pr_opened', concurrency: 1 })).toMatch(/max_age and concurrency are for/);
+  });
 });
 
 describe('detect', () => {
