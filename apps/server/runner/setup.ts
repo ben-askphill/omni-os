@@ -2,6 +2,7 @@
 // for Retry with the first prompt and its files saved. Nothing runs in the channel's own checkout instead.
 import { channels, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
 import { prepareWorktree } from '../sandbox.ts';
+import { withWorkspace } from '../workspace.ts';
 import { recordStartBase } from '../changes.ts';
 import type { Attachment } from '../uploads.ts';
 import { reportToParent, settleTeam } from './queue.ts';
@@ -70,7 +71,8 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
   const repo = channels.get(t.channel_id)?.repo_path ?? null;
   try {
     if (!t.branch) throw new Error('The thread has no branch to check out.');
-    await prepareWorktree(repo, t.cwd, t.branch);
+    const branch = t.branch;
+    await withWorkspace(t.cwd, () => prepareWorktree(repo, t.cwd, branch));
     // The commit the branch starts from, for the Changes panel. Recorded before anything runs there.
     await recordStartBase(t.id, repo!, t.cwd).catch((err) => console.error(`[setup] ${t.id}: could not record the base commit:`, (err as Error).message));
   } catch (err) {

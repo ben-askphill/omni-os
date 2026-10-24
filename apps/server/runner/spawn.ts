@@ -3,6 +3,7 @@ import { config } from '../config.ts';
 import { channels, messageRequests, threads, type Thread } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { worktreeProblem, writeDesignSystem, writeMcpConfig } from '../sandbox.ts';
+import { inWorkspace } from '../workspace.ts';
 import { attachThread, detachThread } from '../browser.ts';
 import { globalSecret, secretsEnv } from '../secrets.ts';
 import { closePipesAfterExit } from '../child.ts';
@@ -99,8 +100,9 @@ async function spawnLive(live: Live, thread: Thread) {
 
   // Hermes and Cursor Cloud are not on this Mac: they must not take the channel's browser profile or see local MCP config.
   const remote = isRemoteHarness(thread.harness);
-  // Every local harness starts here, so this is the one check that a worktree thread never runs anywhere else.
-  const problem = remote ? null : await workdirProblem(thread, channel.repo_path);
+  // Every local harness starts here, so this is the one check that a worktree thread never runs anywhere else. It waits
+  // out a cleanup of the folder, and checks the branch out again if one removed it (apps/server/workspace.ts).
+  const problem = remote ? null : await inWorkspace(thread, (missing) => missing ?? workdirProblem(thread, channel.repo_path));
   if (lives.get(thread.id) !== live) return;
   if (problem) return refuseStart(live, problem);
   // Chrome locks a profile dir: the first live process in a channel keeps it until it exits.
