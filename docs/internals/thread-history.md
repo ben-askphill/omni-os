@@ -62,6 +62,16 @@ Every statement is a keyset read on an index. `history-budget.test.ts` runs `EXP
 
 `events_call` indexes `json_extract(payload, '$.id')`, so inserting a `tool_use` whose payload is not valid JSON fails. `events.add` always stringifies.
 
+## Clients
+
+Both clients hold one `History` and fold it with its spans (`buildItems(events, spans)` on the web, `Transcript.update(_:spans:)` on the Mac). The traps that cost time:
+
+- The stream's `after` moves only on the first load and on streamed rows. A reconnect head or an older page never moves it, or the replay would skip rows.
+- "New activity" and follow-the-bottom key on `tailId`, not on the row count, so an earlier page never looks like new output.
+- Web: the transcript sets `overflow-anchor: none` and `useScrollAnchor` restores the first visible `[data-key]` row itself, because phone Safari has no scroll anchoring. Without `none`, Chrome corrects a second time.
+- Mac: `.scrollTargetLayout()` alone did not hold the row. At the top edge the lazy stack keeps its offset and the page pushes the row down, so `holdsTopRow` (`TranscriptAnchor.swift`) scrolls it back after the layout.
+- A reveal (`?at=` on the web, `ThreadStoreRegistry.reveal` on the Mac) reads from the start of the hit's turn, so the hit's group folds as it would in the full thread.
+
 ## What builds on this
 
 - #224 bounds the reconnect replay. Page cursors and the SSE `after` share one id space, and a client's `tailId` is the stream's `after`. When the gap is too big to replay, `detachHead` closes the head span into an island, and a fresh head joins with `applyHead`. Older history stays reachable through the same cursors.
