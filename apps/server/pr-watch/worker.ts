@@ -8,6 +8,7 @@ import { messageRequests, outbox, threads, tx, type MessageRequest } from '../db
 import { emitThread, runsHere, saveOwn, wake } from '../runner.ts';
 import { turnBlocked } from '../sync/guard.ts';
 import { checkLog, observePR } from './gh.ts';
+import { MAX_WAKE_ITEMS } from '@omni/shared/pr-watch.ts';
 import { checkCounts, SOURCES, type EvidenceDeps, type PRObservation, type WatchEvent } from './sources.ts';
 import { prWatches, type PRWatchRow } from './store.ts';
 
@@ -88,7 +89,7 @@ async function apply(w: PRWatchRow, obs: PRObservation, deps: PRWatchDeps): Prom
     prWatches.stop(w.thread_id, obs.state === 'MERGED' ? 'merged' : 'closed', iso(at));
     return false;
   }
-  const all = SOURCES.flatMap((s) => s.events(obs));
+  const all = SOURCES.flatMap((s) => s.events(obs, w));
   const seen = prWatches.seen(w.thread_id, all.map((e) => e.key));
   const fresh = all.filter((e) => !seen.has(e.key));
   const checks = checkCounts(obs);
@@ -118,7 +119,9 @@ function save(w: PRWatchRow, obs: PRObservation, events: WatchEvent[], prompt: s
     return mine.length ? [s.summary(mine)] : [];
   });
   const text = `#${obs.number} at ${short}. ${said.join('. ')}`;
-  const payload = { text, source: 'pr-watch', repo: obs.repo, number: obs.number, head_sha: obs.headSha };
+  // What the transcript lists under the line: the first few events, so the message stays small however many there were.
+  const items = events.slice(0, MAX_WAKE_ITEMS).map((e) => e.item);
+  const payload = { text, source: 'pr-watch', repo: obs.repo, number: obs.number, head_sha: obs.headSha, items, more: Math.max(0, events.length - items.length) };
   return tx(() => {
     const row = saveOwn(w.thread_id, requestKey(obs, events), { prompt, kind: 'user', payload, source: 'pr-watch', mode: 'queue' });
     if (row) prWatches.woke(w.thread_id, events, row.id, at);
@@ -152,8 +155,7 @@ async function notification(obs: PRObservation, events: WatchEvent[], deps: Evid
     '',
     ...sections,
     '',
-    `Omni is watching this PR for you. If the branch head is still ${obs.headSha.slice(0, 7)}, find the cause, fix it and push. ` +
-      'If a newer push already fixed it, say so in one line and stop.',
+    'Omni is watching this PR for you. If a newer push already dealt with all of this, say so in one line and stop.',
   ].join('\n');
 }
 

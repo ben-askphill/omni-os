@@ -261,9 +261,11 @@ server.registerTool(
   'watch_pr',
   {
     description:
-      "Watch a thread's PR checks. Omni polls GitHub itself and wakes the thread once per new failing check on a head, " +
-      'with the failing checks and a log tail; unchanged polls cost no turn. A watch ends on its own when the PR merges or ' +
-      'closes, the thread is archived, or after its wake limit. action: start (the branch\'s open PR, or `number`), stop, ' +
+      "Watch a thread's PR. Omni polls GitHub itself and wakes the thread once per new failing check on a head, with the " +
+      'failing checks and a log tail, and once per batch of new review feedback from someone else (reviews, inline and ' +
+      "conversation comments, never the signed-in account's own), with author, link and an excerpt; unchanged polls cost " +
+      'no turn. A watch ends on its own when the PR merges or closes, the thread is archived, or after its wake limit ' +
+      '(three wakes for review comments alone). action: start (the branch\'s open PR, or `number`), stop, ' +
       'or status. Without thread_id, status lists every watch on this Mac.',
     inputSchema: {
       thread_id: z.string().optional(),

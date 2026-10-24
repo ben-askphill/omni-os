@@ -45,12 +45,15 @@ How the process behind a thread is launched: [Architecture overview](../internal
 
 ## Watch PR
 
-A thread with an open PR can watch its checks: **Watch checks** in the composer's PR menu (on the phone, the PR screen), or the Conductor's `watch_pr` tool. Omni polls GitHub itself, so no client needs to be open and an unchanged poll costs no agent turn.
+A thread with an open PR can watch its checks and its reviews: **Watch PR** in the composer's PR menu (on the phone, the PR screen), or the Conductor's `watch_pr` tool. Omni polls GitHub itself, so no client needs to be open and an unchanged poll costs no agent turn.
 
 - A check that fails on the PR head wakes the thread once, with the head commit, the failing checks and the tail of each GitHub Actions log. The same check failing again on the same head, after a re-run, does not wake it again; failing on a new head does.
+- New review feedback from someone else wakes it too: a review that says something or asks for changes, an inline comment, a conversation comment. One wake carries everything new since the last poll, with each author, a link, the head the comment was written on and an excerpt (the first eight with their text, the rest by link). Only feedback written after the watch started counts.
+- Your own comments (the account `gh` is signed in as) never wake it, so the agent replying on the PR cannot start a loop. Comments from people with no history in the repo are ignored; bots count. A person editing a comment to new words wakes it once more; a bot editing its own comment does not, and neither does an edit back to words it already woke for.
+- Comment text is quoted to the agent as input to weigh, not as instructions from you.
 - The wake is saved before it is sent, like any queued message. One saved before a restart waits in the thread for Resume. A thread this Mac cannot run (it runs on your other Mac, its worktree is not ready) gets it held for Resume too.
 - Polls come every minute while checks run and slow to every 15 minutes while nothing changes. GitHub errors back off, and five in a row stop the watch. A rate limit pauses every watch for 15 minutes without counting as an error.
-- A watch ends when you stop it, the PR merges or closes, the thread is archived, or it has woken the thread five times. The PR menu says which; Watch checks starts it again.
+- A watch ends when you stop it, the PR merges or closes, the thread is archived, it has woken the thread five times, or three times for review comments alone with no failing check in the wake. The PR menu says which; Watch PR starts it again with fresh budgets. Starting a watch that is already running changes nothing.
 - Watches live on the Mac that started them and are not synced.
 
 ## Send to Grok Bot

@@ -139,9 +139,9 @@ function fakeSecurity() {
 }
 
 /**
- * A `gh` that answers only the PR watch's poll, with an open PR whose checks are one passed and one running, so the
- * watch records counts and wakes no one. Every other call fails, as gh does in a repo without a remote, and nothing
- * reaches GitHub.
+ * A `gh` that answers only the PR watch's poll, with an open PR whose checks are one passed and one running, no
+ * review feedback and a signed-in login, so the watch records counts and wakes no one. Every other call fails, as gh
+ * does in a repo without a remote, and nothing reaches GitHub.
  */
 function fakeGh(bin: string) {
   const pr = {
@@ -153,7 +153,7 @@ function fakeGh(bin: string) {
       { __typename: 'CheckRun', name: 'e2e', conclusion: '', status: 'IN_PROGRESS' },
     ],
   };
-  writeFileSync(join(bin, 'gh'), `#!/bin/sh\nif [ "$1 $2" = "pr view" ]; then echo '${JSON.stringify(pr)}'; exit 0; fi\necho "fake gh: $*" >&2\nexit 1\n`);
+  writeFileSync(join(bin, 'gh'), `#!/bin/sh\nif [ "$1 $2" = "pr view" ]; then echo '${JSON.stringify(pr)}'; exit 0; fi\nif [ "$1 $2" = "api user" ]; then echo ben; exit 0; fi\nif [ "$1" = "api" ]; then exit 0; fi\necho "fake gh: $*" >&2\nexit 1\n`);
   chmodSync(join(bin, 'gh'), 0o755);
 }
 

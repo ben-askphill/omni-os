@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // A stand-in for the gh CLI, for QA runs that need pull requests without GitHub. Put a `gh` link to it first on PATH.
-// It answers the calls apps/server/github.ts makes with fixed PRs; `pr merge` prints what gh prints and changes nothing.
+// It answers the calls apps/server/github.ts and apps/server/pr-watch/gh.ts make with fixed PRs; `pr merge` prints what gh prints and changes nothing.
 const args = process.argv.slice(2);
 const has = (...a) => a.every((x, i) => args[i] === x);
 const arg = (name) => args[args.indexOf(name) + 1];
@@ -73,7 +73,29 @@ const detail = (p) => ({
   comments: [{ author: { login: 'maya' }, body: 'Switched to the metafield.', createdAt: new Date(Date.now() - 86400_000).toISOString() }],
 });
 
-if (has('repo', 'view')) {
+// `gh api`, as the PR watch reads it: the signed-in login, and the reviews and comments of PR 12 as `--jq` prints them,
+// one JSON object a line. Stamped with the time of the call, so they are always newer than any watch.
+const feedback = (kind) => {
+  const at = new Date().toISOString();
+  const url = 'https://github.com/acme/shop/pull/12';
+  const base = { bot: false, assoc: 'MEMBER', at };
+  if (kind === 'pulls/12/reviews')
+    return [{ ...base, id: 801, user: 'sam', body: 'Can the table come from a metafield instead of hard coding?', url: `${url}#pullrequestreview-801`, commit: PRS[0].headRefOid, state: 'CHANGES_REQUESTED' }];
+  if (kind === 'pulls/12/comments')
+    return [{ ...base, id: 802, user: 'maya', body: 'This label should go through the translation helper too.', url: `${url}#discussion_r802`, commit: PRS[0].headRefOid, path: 'sections/size-guide.liquid', line: 3 }];
+  if (kind === 'issues/12/comments')
+    return [
+      { ...base, id: 803, user: 'vercel[bot]', bot: true, assoc: 'NONE', body: 'Preview deployed.', url: `${url}#issuecomment-803` },
+      { ...base, id: 804, user: 'ben-askphill', body: 'Switched to the metafield.', url: `${url}#issuecomment-804` },
+    ];
+  return [];
+};
+
+if (has('api')) {
+  const path = args.find((a, i) => i > 0 && !a.startsWith('-') && args[i - 1] !== '--jq');
+  if (path === 'user') console.log('ben-askphill');
+  else for (const f of feedback((path ?? '').replace(/^repos\/[^/]+\/[^/]+\//, ''))) console.log(JSON.stringify(f));
+} else if (has('repo', 'view')) {
   console.log(JSON.stringify({ nameWithOwner: 'acme/shop' }));
 } else if (has('pr', 'list')) {
   const state = arg('--state');

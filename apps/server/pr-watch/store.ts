@@ -5,6 +5,11 @@ import type { PRWatchChecks, PRWatchStop, PRWatchView } from '@omni/shared/pr-wa
 
 /** How often one watch may wake its thread before it stops itself, so a fix-push-fail loop ends. */
 export const MAX_WAKES = 5;
+/**
+ * How often it may wake its thread for review comments alone, with no failing check in the wake. Lower than MAX_WAKES:
+ * a reviewer and an agent replying to each other is the loop this ends.
+ */
+export const MAX_COMMENT_WAKES = 3;
 
 /** A watch as the worker reads it: the view plus its poll bookkeeping. */
 export interface PRWatchRow extends Omit<PRWatchView, 'max_wakes'> {
@@ -14,6 +19,8 @@ export interface PRWatchRow extends Omit<PRWatchView, 'max_wakes'> {
   interval_s: number;
   /** The Mac that polls it. Null before sync is set up. */
   machine_id: string | null;
+  /** Wakes spent on review comments alone, of at most MAX_COMMENT_WAKES. */
+  comment_wakes: number;
 }
 
 type Raw = Omit<PRWatchRow, 'checks'> & { checks: string | null };
@@ -21,7 +28,7 @@ const parse = (r: Raw | undefined): PRWatchRow | null => (r ? { ...r, checks: r.
 const one = (threadId: string) => parse(db.prepare('SELECT * FROM pr_watches WHERE thread_id = ?').get(threadId) as Raw | undefined);
 
 export const view = (r: PRWatchRow): PRWatchView => {
-  const { failures: _f, interval_s: _i, machine_id: _m, ...rest } = r;
+  const { failures: _f, interval_s: _i, machine_id: _m, comment_wakes: _c, ...rest } = r;
   return { ...rest, max_wakes: MAX_WAKES };
 };
 
@@ -41,18 +48,22 @@ export const prWatches = {
         .all(at, machineId ?? '') as unknown as Raw[]
     ).map((r) => parse(r)!),
   /**
-   * Start, or start again, a thread's watch on a PR: polled at once, with its wake budget and failures reset. Events
-   * it already woke the thread for stay recorded, so starting again never repeats one.
+   * Start, or start again, a thread's watch on a PR: polled at once, with its wake budgets and failures reset. Events
+   * it already woke the thread for stay recorded, so starting again never repeats one. A watch that is already
+   * running on that PR is left as it is, so a repeated start (a double click, a retrying tool) never refills a budget.
+   * Review feedback counts from when the watch was created, and from now for a watch moved to another PR.
    */
   start(threadId: string, repo: string, number: number, machineId: string | null, intervalS: number, at: string) {
     return tx(() => {
       const had = one(threadId);
       const samePR = had?.repo === repo && had.number === number;
+      if (had && samePR && had.state === 'watching') return had;
       db.prepare(
-        `INSERT INTO pr_watches (thread_id, repo, number, state, stop_reason, head_sha, checks, wakes, failures, interval_s, error, machine_id, next_poll_at, created_at, updated_at)
-         VALUES (?, ?, ?, 'watching', NULL, NULL, NULL, 0, 0, ?, NULL, ?, ?, ?, ?)
+        `INSERT INTO pr_watches (thread_id, repo, number, state, stop_reason, head_sha, checks, wakes, comment_wakes, failures, interval_s, error, machine_id, next_poll_at, created_at, updated_at)
+         VALUES (?, ?, ?, 'watching', NULL, NULL, NULL, 0, 0, 0, ?, NULL, ?, ?, ?, ?)
          ON CONFLICT(thread_id) DO UPDATE SET repo = excluded.repo, number = excluded.number, state = 'watching', stop_reason = NULL,
-           head_sha = ${samePR ? 'head_sha' : 'NULL'}, checks = ${samePR ? 'checks' : 'NULL'}, wakes = 0, failures = 0,
+           head_sha = ${samePR ? 'head_sha' : 'NULL'}, checks = ${samePR ? 'checks' : 'NULL'}, wakes = 0, comment_wakes = 0, failures = 0,
+           created_at = ${samePR ? 'created_at' : 'excluded.created_at'},
            interval_s = excluded.interval_s, error = NULL, machine_id = excluded.machine_id, next_poll_at = excluded.next_poll_at, updated_at = excluded.updated_at`,
       ).run(threadId, repo, number, intervalS, machineId, at, at, at);
       return one(threadId)!;
@@ -91,12 +102,16 @@ export const prWatches = {
   woke(threadId: string, events: WatchEventMark[], requestId: string, at: string) {
     const add = db.prepare('INSERT OR IGNORE INTO pr_watch_events (thread_id, key, source, request_id, created_at) VALUES (?, ?, ?, ?, ?)');
     for (const e of events) add.run(threadId, e.key, e.source, requestId, at);
+    // A wake with a failing check in it is a CI wake; only one made of review comments alone spends the comment budget.
+    const commentOnly = events.length > 0 && events.every((e) => e.source === 'feedback') ? 1 : 0;
+    // Every right-hand side reads the row as it was before this wake.
+    const hitComments = `(? = 1 AND comment_wakes + 1 >= ?)`;
     db.prepare(
-      `UPDATE pr_watches SET wakes = wakes + 1, last_wake_at = ?, updated_at = ?,
-         state = CASE WHEN wakes + 1 >= ? THEN 'stopped' ELSE state END,
-         stop_reason = CASE WHEN wakes + 1 >= ? THEN 'wake_limit' ELSE stop_reason END,
-         next_poll_at = CASE WHEN wakes + 1 >= ? THEN NULL ELSE next_poll_at END
+      `UPDATE pr_watches SET wakes = wakes + 1, comment_wakes = comment_wakes + ?, last_wake_at = ?, updated_at = ?,
+         state = CASE WHEN wakes + 1 >= ? OR ${hitComments} THEN 'stopped' ELSE state END,
+         stop_reason = CASE WHEN wakes + 1 >= ? THEN 'wake_limit' WHEN ${hitComments} THEN 'comment_limit' ELSE stop_reason END,
+         next_poll_at = CASE WHEN wakes + 1 >= ? OR ${hitComments} THEN NULL ELSE next_poll_at END
        WHERE thread_id = ?`,
-    ).run(at, at, MAX_WAKES, MAX_WAKES, MAX_WAKES, threadId);
+    ).run(commentOnly, at, at, MAX_WAKES, commentOnly, MAX_COMMENT_WAKES, MAX_WAKES, commentOnly, MAX_COMMENT_WAKES, MAX_WAKES, commentOnly, MAX_COMMENT_WAKES, threadId);
   },
 };

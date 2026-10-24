@@ -328,6 +328,8 @@ export function migrate() {
   // Queue order for durable requests (db/repos/requests.ts); a row saved before reordering existed keeps its arrival order.
   ensureColumn('message_requests', 'pos', 'INTEGER');
   db.exec('UPDATE message_requests SET pos = seq WHERE pos IS NULL');
+  // #220: wakes a PR watch spent on review comments alone, against its own budget (server/pr-watch/store.ts).
+  ensureColumn('pr_watches', 'comment_wakes', 'INTEGER NOT NULL DEFAULT 0');
   // Crew reports and a team's go to its lead are durable requests too, with the transcript payload Omni wrote.
   ensureColumn('message_requests', 'kind', `TEXT NOT NULL DEFAULT 'user'`);
   ensureColumn('message_requests', 'payload', 'TEXT');
