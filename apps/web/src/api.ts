@@ -7,9 +7,9 @@ import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
 import type { TriggerDelivery } from '@omni/shared/automation-triggers.ts';
-import type { ArtifactTrigger, PrTrigger } from '@omni/server/automation-events.ts';
+import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/automation-events.ts';
 
-export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, TriggerDelivery };
+export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, TriggerDelivery };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number };
@@ -279,8 +279,8 @@ export interface AutomationRun {
   status: string | null;
   title: string | null;
 }
-/** A PR change on GitHub, or a page a thread published (`artifact_published`). */
-export type AutomationTrigger = PrTrigger | ArtifactTrigger;
+/** A PR change on GitHub, a page a thread published (`artifact_published`), or a signed GitHub webhook (`github_webhook`). */
+export type AutomationTrigger = PrTrigger | ArtifactTrigger | WebhookTrigger;
 export interface Automation {
   id: string;
   name: string;
@@ -302,8 +302,10 @@ export interface Automation {
   error?: string;
   next?: string | null;
   runs: AutomationRun[];
-  /** Pages delivered to an artifact automation, newest first, at most 5. Empty for the rest. */
+  /** Published pages or GitHub webhooks delivered to the automation, newest first, at most 5. Empty for the rest. */
   deliveries: TriggerDelivery[];
+  /** Set for a webhook automation: where GitHub posts, and whether this Mac holds the signing secret. `secret` is its Keychain name, never the value. */
+  webhook?: { path: string; secret: string; secret_set: boolean };
 }
 
 export interface SecretRow {

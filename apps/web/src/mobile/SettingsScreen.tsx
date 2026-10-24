@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApi, type Automation, type SyncStatus } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { HARNESS_ROWS } from '../components/brand.tsx';
 import { useTheme } from '../components/theme.tsx';
 import { Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { describeCron, describeEvent, relTime, windowPct } from '../format.ts';
-import { href } from '../router.ts';
+import { href, useRoute } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { MoEmpty, MoGroup, MoHeader, MoListRow, MoScroll, MoSection } from './parts.tsx';
 import { useShell } from './shell.tsx';
@@ -34,7 +34,7 @@ const automationGlyph = (a: Automation) => (a.error ? 'failed' : !a.enabled ? 'i
 
 function automationSub(a: Automation, now: number) {
   const when = a.on ? describeEvent(a.on.event) : describeCron(a.cron);
-  const last = a.error ? 'Invalid file' : !a.enabled ? 'Paused' : a.runs[0] ? `ran ${relTime(a.runs[0].created_at, now)}` : 'Not run yet';
+  const last = a.error ? 'Invalid file' : !a.enabled ? 'Paused' : a.webhook && !a.webhook.secret_set ? 'No signing secret' : a.runs[0] ? `ran ${relTime(a.runs[0].created_at, now)}` : 'Not run yet';
   return `${when} · ${last}`;
 }
 
@@ -53,6 +53,15 @@ export function SettingsScreen() {
   const [theme, setTheme] = useTheme();
   const now = useNow(60_000);
   const automations = useApi<Automation[]>('/automations');
+  const { reload: reloadAutomations } = automations;
+  // This screen stays mounted under the pages it opens, so the list refetches on the way back from Automations.
+  const route = useRoute();
+  const onTop = route.name === 'settings' && !route.page;
+  const wasOnTop = useRef(onTop);
+  useEffect(() => {
+    if (onTop && !wasOnTop.current) reloadAutomations();
+    wasOnTop.current = onTop;
+  }, [onTop, reloadAutomations]);
   const sync = useApi<SyncStatus>('/sync/status');
   const prefs = useNotificationPrefs();
   const [permission, setPermission] = useState<Permission>(permissionNow);

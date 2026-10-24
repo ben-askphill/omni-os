@@ -2,7 +2,7 @@
 // except automations, which use their own timezone (Europe/Amsterdam by default).
 
 import { formatCents } from '@omni/shared/context-meter.ts';
-import type { ArtifactTrigger, MonthlyUsage } from './api.ts';
+import type { ArtifactTrigger, MonthlyUsage, WebhookTrigger } from './api.ts';
 
 const DAY = 86_400_000;
 
@@ -131,6 +131,7 @@ const EVENT_LABELS: Record<string, string> = {
   pr_conflict: 'When a PR has conflicts',
   pr_review: 'When a PR gets review comments',
   artifact_published: 'When a page is published',
+  github_webhook: 'When GitHub sends a webhook',
 };
 
 /** An event automation's trigger in words (server/automation-events.ts EVENT_LABELS). */
@@ -146,6 +147,11 @@ export function artifactChannels(on: ArtifactTrigger, name: (id: string) => stri
 /** Which publishes an artifact automation takes, for its filter chip: `#acme, #ops · updates too`. */
 export function describeArtifactSource(on: ArtifactTrigger, name: (id: string) => string): string {
   return `${artifactChannels(on, name) ?? 'any channel'}${on.updates ? ' · updates too' : ''}`;
+}
+
+/** Which webhooks an automation takes, for its filter chip: `acme/shop · workflow_run, pull_request_review · anyone`. */
+export function describeWebhookSource(on: WebhookTrigger): string {
+  return [on.repo, on.events.join(', '), on.trust === 'any' && 'anyone'].filter(Boolean).join(' · ');
 }
 
 /** Best effort human text for common 5-field crons; falls back to the raw expression. */
