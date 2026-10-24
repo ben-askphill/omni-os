@@ -96,7 +96,7 @@ export function AnnotateLayer({ channelId, threadId, onClose, onAdded }: { chann
     <div role="dialog" aria-label="Annotate the page" className="absolute inset-0 z-20 flex min-h-0 flex-col bg-bg">
       <div className="flex shrink-0 items-center gap-2 px-3 py-2 text-[12px]">
         <Icon name="annotate" size={13} className="shrink-0 text-fg-3" />
-        <span className="min-w-0 flex-1 truncate text-fg-2">{phase.at === 'draw' ? 'Tap an element, or drag over the part of the page you mean.' : phase.at === 'capturing' ? 'Capturing the page' : 'Could not capture the page'}</span>
+        <span className="min-w-0 flex-1 truncate text-fg-2">{phase.at === 'draw' ? 'Tap an element, or drag an area.' : phase.at === 'capturing' ? 'Capturing the page' : 'Could not capture the page'}</span>
         <Button size="sm" variant="ghost" onClick={onClose}>
           Cancel
         </Button>

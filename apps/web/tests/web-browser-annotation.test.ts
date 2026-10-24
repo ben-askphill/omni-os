@@ -56,13 +56,20 @@ describe('a browser_annotation with a picked element', () => {
     expect(html).toContain('#cart &gt; div.summary &gt; button.checkout');
   });
 
-  it('keeps the markup behind Details, and never renders it', () => {
+  it('opens on the details in the inspector, and keeps them behind Details beside the screenshot while picking', () => {
+    expect(html).toContain('Parents, nearest first');
+    expect(html).toContain('Hide details');
+    const compact = renderToStaticMarkup(createElement(PickedElementDetails, { element: picked.body.element! }));
+    expect(compact).not.toContain('Parents, nearest first');
+    expect(compact).toContain('>Details<');
+  });
+
+  it('never renders the page\'s markup as markup', () => {
     const open = renderToStaticMarkup(createElement(PickedElementDetails, { element: { ...picked.body.element!, html: '<img src=x onerror=alert(1)>', text: '<b>bold</b>' }, defaultOpen: true }));
     expect(open).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(open).toContain('&lt;b&gt;bold&lt;/b&gt;');
     expect(open).not.toContain('<img');
     expect(open).toContain('Parents, nearest first');
-    expect(html).not.toContain('Parents, nearest first');
   });
 
   it('says a frame from another site cannot be read', () => {

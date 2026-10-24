@@ -54,7 +54,8 @@ private struct BrowserAnnotationDetail: View {
         .font(.omni(size: 11, design: .monospaced))
         .foregroundStyle(Tok.fg4)
       if let element = annotation.element {
-        PickedElementView(element: element)
+        // Opened from the chip to look at it: the details are shown, not behind a click.
+        PickedElementView(element: element, open: true)
           .padding(.top, z(6))
       }
     }

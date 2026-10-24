@@ -29,6 +29,8 @@ public enum QAInspector: String, Hashable, Sendable {
 public enum QAAnnotate: Hashable, Sendable {
   case start
   case drag(x0: Double, y0: Double, x1: Double, y1: Double, note: String)
+  /// A tap at a fraction of the shown screenshot, which picks the element there; the note is written once it is picked.
+  case tap(x: Double, y: Double, note: String)
   case add
   case cancel
 }
@@ -86,7 +88,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"handOff": "<device id>"}`,
 /// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"selectLines": {"file": "<path>", "from": 1, "to": 3}}`,
 /// `{"addContext": "note"}`, `{"selectTerminal": true}`, `{"addTerminal": "note"}`, `{"annotate": "start"}` (or `add`, `cancel`, or
-/// `{"drag": [0.1, 0.2, 0.6, 0.5], "note": "text"}`), `{"openContext": 0}`, `{"quit": true}`.
+/// `{"drag": [0.1, 0.2, 0.6, 0.5], "note": "text"}`, or `{"tap": [0.4, 0.3], "note": "text"}`), `{"openContext": 0}`, `{"quit": true}`.
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -389,7 +391,7 @@ public struct QAScript: Hashable, Sendable {
   }
 
   private static func annotate(_ value: Any) throws(QAScriptError) -> QAAnnotate {
-    let usage = QAScriptError(#"annotate takes start, add, cancel, or {"drag": [x0, y0, x1, y1], "note": text} with fractions from 0 to 1"#)
+    let usage = QAScriptError(#"annotate takes start, add, cancel, {"drag": [x0, y0, x1, y1], "note": text} or {"tap": [x, y], "note": text} with fractions from 0 to 1"#)
     switch value as? String {
     case "start": return .start
     case "add": return .add
@@ -397,11 +399,20 @@ public struct QAScript: Hashable, Sendable {
     case nil: break
     default: throw usage
     }
-    guard let d = value as? [String: Any], let drag = d["drag"] as? [Any], drag.count == 4 else { throw usage }
-    let n = drag.compactMap { ($0 as? NSNumber).flatMap { $0 === kCFBooleanTrue || $0 === kCFBooleanFalse ? nil : $0.doubleValue } }
-    guard n.count == 4, n.allSatisfy({ (0...1).contains($0) }) else { throw usage }
+    guard let d = value as? [String: Any] else { throw usage }
+    func fractions(_ any: Any?, _ count: Int) throws(QAScriptError) -> [Double] {
+      guard let list = any as? [Any], list.count == count else { throw usage }
+      let n = list.compactMap { ($0 as? NSNumber).flatMap { $0 === kCFBooleanTrue || $0 === kCFBooleanFalse ? nil : $0.doubleValue } }
+      guard n.count == count, n.allSatisfy({ (0...1).contains($0) }) else { throw usage }
+      return n
+    }
     let note = d["note"] ?? ""
     guard let note = note as? String else { throw usage }
+    if d["tap"] != nil {
+      let at = try fractions(d["tap"], 2)
+      return .tap(x: at[0], y: at[1], note: note)
+    }
+    let n = try fractions(d["drag"], 4)
     return .drag(x0: n[0], y0: n[1], x1: n[2], y1: n[3], note: note)
   }
 

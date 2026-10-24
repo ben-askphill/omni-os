@@ -544,6 +544,13 @@ final class QARunner {
       guard a.model.rect != nil else { throw QAScriptError(a.model.error ?? "no rectangle") }
       a.model.note = note
       try? await Task.sleep(for: .milliseconds(500))
+    case .tap(let x, let y, let note):
+      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to tap") }
+      // The same stand-in size as a drag, so the fractions are the page's.
+      await a.model.tap(at: (x * 1000, y * 1000), shown: (1000, 1000))
+      guard a.model.element != nil else { throw QAScriptError(a.model.notice ?? "no element") }
+      a.model.note = note
+      try? await Task.sleep(for: .milliseconds(500))
     case .add:
       if let refused = a.model.add(to: a.draft) { throw QAScriptError(refused) }
       try? await Task.sleep(for: .milliseconds(400))

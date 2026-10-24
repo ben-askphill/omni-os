@@ -57,7 +57,7 @@ struct BrowserAnnotateLayer: View {
   private var header: some View {
     HStack(spacing: z(8)) {
       OmniIcon(name: "target", size: 14).foregroundStyle(Tok.fg3)
-      Text("Tap an element, or drag over the part of the page you mean.")
+      Text("Tap an element, or drag an area.")
         .font(.omni(size: 12, weight: .medium))
         .foregroundStyle(Tok.fg2)
       Spacer(minLength: 0)
