@@ -4,7 +4,7 @@ import type { NewThreadPreset } from './new-thread-preset.ts';
 export type ChannelTab = 'threads' | 'prs' | 'settings';
 
 /** What a thread link can open on its own screen in the phone layout. The desktop shows the thread itself. */
-export const THREAD_VIEWS = ['steps', 'changes', 'pr', 'browser', 'terminal', 'details'] as const;
+export const THREAD_VIEWS = ['steps', 'changes', 'pr', 'browser', 'terminal', 'actions', 'details'] as const;
 export type ThreadView = (typeof THREAD_VIEWS)[number];
 const isThreadView = (s: string | undefined): s is ThreadView => (THREAD_VIEWS as readonly string[]).includes(s ?? '');
 

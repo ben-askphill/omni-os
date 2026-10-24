@@ -46,6 +46,7 @@ export const SCREENS: Record<ScreenKey, ScreenSpec> = {
   pr: threadScreen,
   browser: threadScreen,
   terminal: threadScreen,
+  actions: threadScreen,
   details: threadScreen,
   viewer: threadScreen,
   settings: { tab: 'channels', parent: () => '/channels' },

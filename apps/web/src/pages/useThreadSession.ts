@@ -6,7 +6,7 @@ import { useFeed } from '../store.tsx';
 import { parsePayload } from '../format.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
 
-export type PanelTab = 'artifacts' | 'changes' | 'browser' | 'terminal' | 'details';
+export type PanelTab = 'artifacts' | 'changes' | 'browser' | 'terminal' | 'actions' | 'details';
 
 /**
  * The later of two snapshots of the thread. A send's reply can land after the stream has already

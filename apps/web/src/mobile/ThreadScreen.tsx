@@ -351,6 +351,7 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
           {thread.branch && <MoListRow icon="diff" label="Changes" sub={prLabel ?? `On ${thread.branch}`} onClick={() => go(href.threadView(thread.id, prLabel ? 'pr' : 'changes'))} />}
           <MoListRow icon="browser" label="Browser" sub="Watch only" onClick={() => go(href.threadView(thread.id, 'browser'))} />
           <MoListRow icon="terminal" label="Terminal" sub="Read only" onClick={() => go(href.threadView(thread.id, 'terminal'))} />
+          <MoListRow icon="play" label="Actions" sub="Preview, checks, tests" onClick={() => go(href.threadView(thread.id, 'actions'))} />
           <MoListRow icon="info" label="Details" sub="Harness, model, session" onClick={() => go(href.threadView(thread.id, 'details'))} last />
         </MoGroup>
         <MoGroup>
