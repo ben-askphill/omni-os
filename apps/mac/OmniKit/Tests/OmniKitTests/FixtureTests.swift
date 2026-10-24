@@ -67,6 +67,7 @@ func sseData(_ text: String) -> [String] {
     "changes-unavailable.json": { _ = try decodeFixture(BranchChanges.self, "changes-unavailable.json") },
     "turns.json": { _ = try decodeFixture(TurnChanges.self, "turns.json") },
     "turns-unavailable.json": { _ = try decodeFixture(TurnChanges.self, "turns-unavailable.json") },
+    "thread-context.json": { _ = try decodeFixture(ThreadDetail.self, "thread-context.json") },
     // Recorded by apps/server/tests/handoff-two-macs.test.ts, which needs two Macs.
     "devices.json": { _ = try decodeFixture([Device].self, "devices.json") },
     "thread-handoff.json": { _ = try decodeFixture(ThreadDetail.self, "thread-handoff.json") },
@@ -82,6 +83,8 @@ func sseData(_ text: String) -> [String] {
     "request-edit-request.json": { _ = try decodeFixture(JSONValue.self, "request-edit-request.json") },
     // NeedsYouTests compares it with what the client encodes.
     "needs-you-read-request.json": { _ = try decodeFixture([String: String].self, "needs-you-read-request.json") },
+    // ReplyRequestTests makes it from changes.json and compares it with what the client encodes.
+    "message-context-request.json": { _ = try decodeFixture([String: JSONValue].self, "message-context-request.json") },
   ]
 
   static func threadStream() throws -> [ThreadStreamMessage] {
@@ -242,6 +245,30 @@ func sseData(_ text: String) -> [String] {
     #expect(resumed.pending.first?.source == "limit")
     // A thread no limit stopped has none.
     #expect(try decodeFixture(ThreadDetail.self, "thread.json").thread.limit == nil)
+  }
+
+  /// apps/web/tests/web-message-context.test.ts renders the same record to the same label, range and source line.
+  @Test func readsTheContextOnASentAndAQueuedMessage() throws {
+    let d = try decodeFixture(ThreadDetail.self, "thread-context.json")
+    let sent = d.events.compactMap { e -> MessageContextList? in
+      if case .user(let m) = e.content, let c = m.context, !c.isEmpty { c } else { nil }
+    }
+    #expect(sent.count == 1)
+    let queued = try #require(d.pending.first?.context)
+    for list in [try #require(sent.first), queued] {
+      let readings = ContextReading.read(list, kinds: [DiffSelectionContext.self])
+      #expect(readings.count == 1)
+      guard case .known(let record, let value)? = readings.first, let body = value as? DiffSelectionContext.Body else {
+        Issue.record("the record does not read as a diff selection: \(readings)")
+        continue
+      }
+      #expect(record.label == "src/cart.ts:1-3")
+      #expect(DiffSelectionContext.label(body) == record.label)
+      #expect(record.note == "this reduce reads better with names")
+      #expect(DiffSelectionContext.range(body) == "new lines 1–3")
+      #expect(DiffSelectionContext.sourceLine(body) == "Unstaged · HEAD ccccccc · blob a31fcc1")
+      #expect(body.rows.map(\.kind) == [.context, .del, .add, .context])
+    }
   }
 
   @Test func readsTheKindOfASavedRequest() throws {

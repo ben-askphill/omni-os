@@ -25,21 +25,30 @@ struct DiffView: View {
 
 /// One file of a diff: a header that opens and closes it, then its numbered lines, as `DiffFile` in DiffViewer.tsx.
 /// The PR page and a thread's Changes tab both use it. `label` replaces the path in the header, `badge` sits before
-/// it, and `notice` says why there are no lines (binary, too large).
+/// it, and `notice` says why there are no lines (binary, too large). `picking` lets Ben pick lines by their numbers;
+/// without it (the PR page) the file draws as before.
 struct DiffFileView: View {
+  /// Picking lines: the rows picked (indexes into `file.rows`), and what a click on a line's numbers does.
+  struct Picking {
+    let range: ClosedRange<Int>?
+    let press: (_ row: Int, _ extend: Bool) -> Void
+  }
+
   let file: FileDiff
   var label: String?
   var badge: String?
   var notice: String?
+  var picking: Picking?
   @State private var open: Bool
   @State private var showAll = false
   @State private var hover = false
 
-  init(file: FileDiff, startsOpen: Bool, label: String? = nil, badge: String? = nil, notice: String? = nil) {
+  init(file: FileDiff, startsOpen: Bool, label: String? = nil, badge: String? = nil, notice: String? = nil, picking: Picking? = nil) {
     self.file = file
     self.label = label
     self.badge = badge
     self.notice = notice
+    self.picking = picking
     _open = State(initialValue: startsOpen)
   }
 
@@ -83,11 +92,11 @@ struct DiffFileView: View {
         }
         let numbered = file.numbered
         LazyVStack(alignment: .leading, spacing: 0) {
-          ForEach(Array(file.shown(all: showAll).enumerated()), id: \.offset) { _, line in
+          ForEach(Array(file.shown(all: showAll).enumerated()), id: \.offset) { i, line in
+            let picked = picking?.range?.contains(i) == true
             HStack(alignment: .firstTextBaseline, spacing: 0) {
               if numbered {
-                number(line.old)
-                number(line.new)
+                gutter(i, line)
               }
               Text(line.text.isEmpty ? " " : line.text)
                 .foregroundStyle(color(line.kind))
@@ -99,6 +108,8 @@ struct DiffFileView: View {
             .padding(.vertical, z(2))
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(background(line.kind))
+            .overlay { if picked { Tok.wash.allowsHitTesting(false) } }
+            .overlay(alignment: .leading) { if picked { Rectangle().fill(Tok.live).frame(width: z(2)) } }
           }
         }
         .textSelection(.enabled)
@@ -116,6 +127,26 @@ struct DiffFileView: View {
     }
     .clipShape(RoundedRectangle(cornerRadius: z(18), style: .continuous))
     .overlay { RoundedRectangle(cornerRadius: z(18), style: .continuous).strokeBorder(Tok.line) }
+  }
+
+  /// The line's numbers; with `picking`, a click there picks the line and a Shift-click picks up to it.
+  @ViewBuilder private func gutter(_ i: Int, _ line: DiffLine) -> some View {
+    let numbers = HStack(alignment: .firstTextBaseline, spacing: 0) {
+      number(line.old)
+      number(line.new)
+    }
+    if let picking, line.kind != .hunk, line.kind != .note {
+      numbers
+        .contentShape(Rectangle())
+        .textSelection(.disabled)
+        .pointerStyle(.link)
+        .onTapGesture { picking.press(i, NSEvent.modifierFlags.contains(.shift)) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Pick line \(line.new ?? line.old ?? 0)")
+        .accessibilityAddTraits(.isButton)
+    } else {
+      numbers
+    }
   }
 
   private func number(_ n: Int?) -> some View {

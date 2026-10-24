@@ -231,6 +231,17 @@ final class QARunner {
           try? await Task.sleep(for: .milliseconds(400))
         case .webTitle(let title):
           try await InspectorProbe.waitForTitle(title)
+        case .selectLines(let file, let from, let to):
+          guard let select = LineSelectionProbe.select else { throw QAScriptError("the Changes tab is not showing") }
+          guard select(file, from, to) else { throw QAScriptError("no file \(file) whose lines can be picked") }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .addContext(let note):
+          guard let add = LineSelectionProbe.add else { throw QAScriptError("the Changes tab is not showing") }
+          if let refused = add(note) { throw QAScriptError(refused) }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .openContext(let index):
+          guard let toggle = ContextChipsProbe.toggle, toggle(index) else { throw QAScriptError("no context chip \(index) in the reply box") }
+          try? await Task.sleep(for: .milliseconds(400))
         case .quickPrompt(let action):
           guard let quick = Self.quickPrompt else { throw QAScriptError("no Quick Prompt") }
           switch action {
@@ -478,6 +489,9 @@ final class QARunner {
     case .handOff(let device): "handOff \(device)"
     case .palette(let query): "palette \(query ?? "close")"
     case .quickPrompt(let action): "quickPrompt \(action)"
+    case .selectLines(let file, let from, let to): "selectLines \(file) \(from)-\(to)"
+    case .addContext(let note): "addContext \(note.prefix(40))"
+    case .openContext(let index): "openContext \(index)"
     case .quit: "quit"
     }
   }

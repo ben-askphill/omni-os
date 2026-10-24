@@ -182,6 +182,8 @@ public struct UserMessage: Decodable, Hashable, Sendable {
   public let mode: SendMode?
   /// The agent never saw it.
   public let dropped: Bool?
+  /// Records Ben attached. A value this app can't read is no records, never a failed event.
+  public let context: MessageContextList?
 }
 
 /// kind `crew_report`: a child thread reporting back to its parent.

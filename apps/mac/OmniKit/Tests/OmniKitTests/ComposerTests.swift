@@ -98,23 +98,38 @@ private func file(_ name: String, size: Int = 10, modified: Double = 0) -> Stage
 @MainActor
 private final class FakeReplyAPI: ReplyAPI {
   var failWith: OmniAPIError?
-  var sent: [(id: String, prompt: String, mode: SendMode?, files: [String], requestID: String?)] = []
-  nonisolated func reply(to id: String, prompt: String, mode: SendMode?, files: [UploadFile], requestID: String?) async throws(OmniAPIError) -> OmniThread {
+  var sent: [(id: String, prompt: String, mode: SendMode?, files: [String], requestID: String?, context: [String])] = []
+  /// When set, each send waits for it after it is recorded.
+  var gate: Gate?
+  nonisolated func reply(
+    to id: String, prompt: String, mode: SendMode?, files: [UploadFile], requestID: String?, context: [MessageContext]
+  ) async throws(OmniAPIError) -> OmniThread {
     let names = files.map(\.name)
-    let fail = await MainActor.run { () -> OmniAPIError? in
-      self.sent.append((id, prompt, mode, names, requestID))
-      return self.failWith
+    let (fail, gate) = await MainActor.run { () -> (OmniAPIError?, Gate?) in
+      self.sent.append((id, prompt, mode, names, requestID, context.map(\.id)))
+      return (self.failWith, self.gate)
     }
+    await gate?.wait()
     if let fail { throw fail }
     return try! OmniJSON.decoder().decode(OmniThread.self, from: Data(threadJSON(status: "running").utf8))
   }
 }
 
+/// A diff_selection record with this id.
+private func record(_ id: String, note: String = "") -> MessageContext {
+  let body = DiffSelectionContext.parse(JSONValue.parse("""
+    {"path":"src/cart.ts","old_path":null,"rows":[{"kind":"add","text":"x","old":null,"new":4}],
+     "source":{"group":"unstaged","from":"9f2c1e4","to":"3f2a1c9","turn":null,"blob_old":null,"blob_new":null}}
+    """), v: 1)!
+  return MessageContext.make(DiffSelectionContext.self, body: body, note: note, id: id)
+}
+
 @MainActor
 @Suite struct ReplyComposerModelTests {
   private func make(_ api: FakeReplyAPI, _ dir: TempDir) -> ReplyComposerModel {
-    ReplyComposerModel(
-      threadID: "t1", api: api, drafts: DraftStore(directory: dir.url),
+    let drafts = DraftStore(directory: dir.url)
+    return ReplyComposerModel(
+      threadID: "t1", api: api, context: DraftContextModel(threadID: "t1", drafts: drafts), drafts: drafts,
       readFile: { UploadFile(name: $0.name, mime: "text/plain", data: Data("x".utf8)) })
   }
 
@@ -183,6 +198,64 @@ private final class FakeReplyAPI: ReplyAPI {
     #expect(api.sent.isEmpty)
   }
 
+  @Test func addingContextKeepsTheTextAndSendsBothThenClearsBoth() async {
+    let dir = TempDir("drafts")
+    let api = FakeReplyAPI()
+    let m = make(api, dir)
+    m.text = "half a thought"
+    #expect(m.context.add(record("r1")) == nil)
+    #expect(m.text == "half a thought")
+    #expect(DraftStore(directory: dir.url).text(for: "reply:t1") == "half a thought")
+    #expect(await m.send(mode: nil) != nil)
+    #expect(api.sent.map(\.prompt) == ["half a thought"])
+    #expect(api.sent.map(\.context) == [["r1"]])
+    #expect(m.text == "" && m.context.records.isEmpty)
+  }
+
+  @Test func contextAloneCanBeSent() async {
+    let dir = TempDir("drafts")
+    let api = FakeReplyAPI()
+    let m = make(api, dir)
+    #expect(!m.canSend)
+    _ = m.context.add(record("r1"))
+    #expect(m.canSend)
+    #expect(await m.send(mode: .queue) != nil)
+    #expect(api.sent.map(\.prompt) == [""])
+    #expect(!m.canSend)
+  }
+
+  @Test func aFailedSendKeepsTheContextAndARetryKeepsItsRequestID() async {
+    let dir = TempDir("drafts")
+    let api = FakeReplyAPI()
+    api.failWith = .unreachable("offline")
+    let m = make(api, dir)
+    _ = m.context.add(record("r1"))
+    #expect(await m.send(mode: nil) == nil)
+    #expect(m.context.records.map(\.id) == ["r1"])
+    #expect(await m.send(mode: nil) == nil)
+    _ = m.context.add(record("r2"))
+    #expect(await m.send(mode: nil) == nil)
+    let ids = api.sent.map(\.requestID)
+    #expect(ids[0] == ids[1])
+    #expect(ids[2] != ids[1], "another record is another message")
+  }
+
+  @Test func aSendSettlesOnlyTheRecordsItCarried() async throws {
+    let dir = TempDir("drafts")
+    let api = FakeReplyAPI()
+    let gate = Gate()
+    api.gate = gate
+    let m = make(api, dir)
+    _ = m.context.add(record("r1"))
+    let sending = Task { await m.send(mode: nil) }
+    try await waitFor("the send to be out") { !api.sent.isEmpty }
+    #expect(m.context.add(record("r2")) == nil)
+    gate.open()
+    #expect(await sending.value != nil)
+    #expect(m.context.records.map(\.id) == ["r2"])
+    #expect(DraftContextModel(threadID: "t1", drafts: DraftStore(directory: dir.url)).records.map(\.id) == ["r2"])
+  }
+
   @Test func openPRQueuesWhileBusyAndLeavesTheDraftAlone() async {
     let dir = TempDir("drafts")
     let api = FakeReplyAPI()
@@ -193,6 +266,45 @@ private final class FakeReplyAPI: ReplyAPI {
     #expect(api.sent.map(\.mode) == [.queue, nil])
     #expect(api.sent.first?.prompt == ReplyComposerModel.openPRPrompt)
     #expect(m.text == "draft")
+  }
+}
+
+@MainActor
+@Suite struct DraftContextModelTests {
+  @Test func addsOnceRemovesAndSurvivesARelaunch() {
+    let dir = TempDir("drafts")
+    let m = DraftContextModel(threadID: "t1", drafts: DraftStore(directory: dir.url))
+    #expect(m.add(record("r1", note: "look")) == nil)
+    #expect(m.add(record("r1", note: "look")) == nil)
+    #expect(m.add(record("r2")) == nil)
+    #expect(m.records.map(\.id) == ["r1", "r2"])
+    let again = DraftContextModel(threadID: "t1", drafts: DraftStore(directory: dir.url))
+    #expect(again.records == m.records)
+    #expect(DraftContextModel(threadID: "t2", drafts: DraftStore(directory: dir.url)).records.isEmpty)
+    m.remove(id: "r1")
+    #expect(DraftContextModel(threadID: "t1", drafts: DraftStore(directory: dir.url)).records.map(\.id) == ["r2"])
+    m.settle(sent: ["r2"])
+    #expect(DraftStore(directory: dir.url).text(for: "context:t1") == "")
+  }
+
+  @Test func refusesANinthRecordAndTooMuchJSON() {
+    let dir = TempDir("drafts")
+    let m = DraftContextModel(threadID: "t1", drafts: DraftStore(directory: dir.url))
+    for i in 0..<MessageContext.maxCount { #expect(m.add(record("r\(i)")) == nil) }
+    #expect(m.add(record("r9")) == "A message holds at most 8 of these. Send it, or remove one first.")
+    #expect(m.records.count == MessageContext.maxCount)
+
+    let big = DraftContextModel(threadID: "t2", drafts: DraftStore(directory: dir.url))
+    let long = String(repeating: "x", count: 1_900)
+    var refused: String?
+    for i in 0..<MessageContext.maxCount where refused == nil { refused = big.add(record("n\(i)", note: long)) }
+    #expect(refused == nil, "notes alone stay under the limit")
+    let rows = (1...100).map { #"{"kind":"add","text":"\#(String(repeating: "y", count: 400))","old":null,"new":\#($0)}"# }
+    let body = DiffSelectionContext.parse(JSONValue.parse(#"{"path":"a","rows":[\#(rows.joined(separator: ","))],"source":{"group":"unstaged","from":"a","to":"b"}}"#), v: 1)!
+    let huge = MessageContext.make(DiffSelectionContext.self, body: body, note: "", id: "huge")
+    #expect(DraftContextModel(threadID: "t3", drafts: DraftStore(directory: dir.url)).add(huge) == "Too much for one message. Pick fewer lines, or send what is attached first.")
+    let note = DraftContextModel(threadID: "t4", drafts: DraftStore(directory: dir.url))
+    #expect(note.add(record("long", note: String(repeating: "z", count: 2_001))) == "A note can be 2000 characters at most.")
   }
 }
 
@@ -214,6 +326,48 @@ private final class FakeReplyAPI: ReplyAPI {
     _ = try await client.reply(to: "t1", prompt: "then write it up", mode: .queue, files: [], requestID: "req-1")
     let expected = try JSONDecoder().decode(JSONValue.self, from: Data(try fixture("message-queued-request.json").utf8))
     #expect(try bodyJSON(t.requests[0]) == expected)
+  }
+
+  /// The lines the fixture run picked in its Changes answer, picked here the way the Changes tab does, make exactly the
+  /// body the server took.
+  @Test func linesPickedFromTheChangesAnswerAreTheRecordedRequest() async throws {
+    let changes = try decodeFixture(BranchChanges.self, "changes.json")
+    let view = try #require(ChangesView(changes))
+    let file = try #require(view.groups.first { $0.kind == .unstaged }?.files.first { $0.file.path == "src/cart.ts" })
+    let source = DiffSelectionContext.Source(group: .unstaged, from: view.base.sha, to: try #require(changes.head), turn: nil)
+    let body = try DiffSelectionContext.select(file: file.diff, path: file.file.path, oldPath: file.file.oldPath, from: 1, to: 4, source: source).get()
+    let record = MessageContext.make(
+      DiffSelectionContext.self, body: body, note: "this reduce reads better with names", id: "00000000-0000-4000-8000-000000000037")
+    let t = StubTransport(body: threadJSON())
+    _ = try await OmniClient(port: 4799, transport: t).reply(
+      to: "t1", prompt: "TOOL:4000 tidy this reduce", mode: nil, files: [], requestID: "req-context", context: [record])
+    let expected = try JSONDecoder().decode(JSONValue.self, from: Data(try fixture("message-context-request.json").utf8))
+    #expect(try bodyJSON(t.requests[0]) == expected)
+  }
+
+  @Test func contextGoesInTheBodyOnlyWhenThereIsSome() async throws {
+    let t = StubTransport(body: threadJSON())
+    let client = OmniClient(port: 4799, transport: t)
+    _ = try await client.reply(to: "t1", prompt: "", mode: nil, files: [], requestID: "req-1", context: [record("r1", note: "this one")])
+    _ = try await client.reply(to: "t1", prompt: "hi", mode: nil, files: [], requestID: "req-2", context: [])
+    let sent = try bodyJSON(t.requests[0])
+    #expect(sent["prompt"] == .string("") && sent["request_id"] == .string("req-1"))
+    guard case .array(let records)? = sent["context"], let r = records.first else {
+      Issue.record("no context in \(sent)")
+      return
+    }
+    #expect(records.count == 1)
+    #expect(r["id"] == .string("r1") && r["kind"] == .string("diff_selection") && r["v"] == .number(1))
+    #expect(r["label"] == .string("src/cart.ts:4") && r["note"] == .string("this one"))
+    #expect(r["body"]?["old_path"] == .null, "nulls are sent, not left out")
+    #expect(r["body"]?["rows"] == .array([.object(["kind": .string("add"), "text": .string("x"), "old": .null, "new": .number(4)])]))
+    #expect(try bodyJSON(t.requests[1]) == .object(["prompt": .string("hi"), "request_id": .string("req-2")]))
+  }
+
+  @Test func theRetryKeyAddsRecordIDsOnlyWhenThereAreSome() {
+    #expect(PendingRequest.key(prompt: "hi", mode: .queue, files: ["/a"]) == "hi\u{1F}queue\u{1F}/a")
+    #expect(PendingRequest.key(prompt: "hi", mode: .queue, files: ["/a"], context: []) == "hi\u{1F}queue\u{1F}/a")
+    #expect(PendingRequest.key(prompt: "", mode: nil, files: [], context: ["r1", "r2"]) == "\u{1F}\u{1F}r1\u{1F}r2")
   }
 
   @Test func filesGoAsMultipartWithAPayloadField() async throws {

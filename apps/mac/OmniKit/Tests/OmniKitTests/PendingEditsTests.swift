@@ -9,9 +9,13 @@ private func pending(_ json: String) throws -> [PendingMsg] {
   try OmniJSON.decoder().decode([PendingMsg].self, from: Data(json.utf8))
 }
 
-private func msg(_ uuid: String, _ state: String, delivery: String? = nil, kind: String = "user", requestID: Bool = true, text: String? = nil) -> String {
+private func msg(
+  _ uuid: String, _ state: String, delivery: String? = nil, kind: String = "user", requestID: Bool = true, text: String? = nil,
+  context: String? = nil
+) -> String {
   let rid = requestID ? #","request_id":"r-\#(uuid)""# : ""
-  return #"{"uuid":"\#(uuid)","kind":"\#(kind)","text":"\#(text ?? uuid)","mode":"queue","state":"\#(state)","delivery":"\#(delivery ?? state)"\#(rid)}"#
+  let records = context.map { #","context":\#($0)"# } ?? ""
+  return #"{"uuid":"\#(uuid)","kind":"\#(kind)","text":"\#(text ?? uuid)","mode":"queue","state":"\#(state)","delivery":"\#(delivery ?? state)"\#(rid)\#(records)}"#
 }
 
 @MainActor @Suite struct PendingEditsTests {
@@ -135,6 +139,26 @@ private func msg(_ uuid: String, _ state: String, delivery: String? = nil, kind:
     #expect(model.drafts.isEmpty)
     let multipartless = try #require(won.requests.first)
     #expect(try bodyJSON(multipartless) == .object(["prompt": .string("again"), "keep": .array([])]))
+  }
+
+  @Test func anEditOfAMessageWithContextSavesWithNoText() async throws {
+    let request = try decode(JSONValue.self, try fixture("message-context-request.json"))
+    let context = String(decoding: try OmniJSON.encoder().encode(try #require(request["context"])), as: UTF8.self)
+    let items = try pending("[\(msg("a", "held", text: "check the rounding", context: context)),\(msg("b", "held", text: "plain"))]")
+    let model = PendingEditsModel(threadID: "t1")
+    model.open(items[0])
+    model.open(items[1])
+    model.update("a") { $0.prompt = "  " }
+    model.update("b") { $0.prompt = "" }
+    #expect(model.draft(for: "a")?.canSave == true)
+    #expect(model.draft(for: "b")?.canSave == false)
+
+    let t = StubTransport(body: try fixture("request-edited.json"))
+    #expect(await model.save("b", using: OmniClient(port: 4799, transport: t)) == nil)
+    #expect(t.requests.isEmpty, "empty text with no records is not sent")
+    #expect(await model.save("a", using: OmniClient(port: 4799, transport: t)) != nil)
+    #expect(try bodyJSON(try #require(t.requests.first)) == .object(["prompt": .string(""), "keep": .array([])]))
+    #expect(model.draft(for: "a") == nil)
   }
 
   @Test func resumingWhileAnEditIsOpenKeepsTheEditAndAStaleOrderIsRefused() async throws {

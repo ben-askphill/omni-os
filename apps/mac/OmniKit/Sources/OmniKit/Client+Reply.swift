@@ -15,13 +15,21 @@ public struct UploadFile: Hashable, Sendable {
 
 /// The call a reply composer makes. `OmniClient` is one; tests pass a fake. `requestID` is kept across retries
 /// of one message, so the server answers a retry of something it already saved with that first acceptance.
+/// `context` may stand in for the text: a message can be only records.
 public protocol ReplyAPI: Sendable {
-  func reply(to id: String, prompt: String, mode: SendMode?, files: [UploadFile], requestID: String?) async throws(OmniAPIError) -> OmniThread
+  func reply(
+    to id: String, prompt: String, mode: SendMode?, files: [UploadFile], requestID: String?, context: [MessageContext]
+  ) async throws(OmniAPIError) -> OmniThread
 }
 
 extension OmniClient: ReplyAPI {}
 
 extension ReplyAPI {
+  /// A message with no records.
+  public func reply(to id: String, prompt: String, mode: SendMode?, files: [UploadFile], requestID: String?) async throws(OmniAPIError) -> OmniThread {
+    try await reply(to: id, prompt: prompt, mode: mode, files: files, requestID: requestID, context: [])
+  }
+
   /// A send no retry will repeat: the server makes the request id.
   public func reply(to id: String, prompt: String, mode: SendMode?, files: [UploadFile]) async throws(OmniAPIError) -> OmniThread {
     try await reply(to: id, prompt: prompt, mode: mode, files: files, requestID: nil)
@@ -32,16 +40,18 @@ private struct ReplyBody: Encodable, Sendable {
   let prompt: String
   let mode: SendMode?
   let requestID: String?
+  /// Nil when there are none, so a message without records sends the same body as before.
+  let context: [MessageContext]?
 
   enum CodingKeys: String, CodingKey {
-    case prompt, mode
+    case prompt, mode, context
     case requestID = "request_id"
   }
 }
 
 /// One request id per message, kept across its retries, as `requestIdFor` in apps/web/src/requests.ts.
 public struct PendingRequest: Hashable, Sendable {
-  /// What makes two sends the same message: its text, mode and files.
+  /// What makes two sends the same message: its text, mode, files and records.
   public let key: String
   public let id: String
 
@@ -50,8 +60,9 @@ public struct PendingRequest: Hashable, Sendable {
     self.id = id
   }
 
-  public static func key(prompt: String, mode: SendMode?, files: [String]) -> String {
-    ([prompt, mode?.rawValue ?? ""] + files).joined(separator: "\u{1F}")
+  /// The records' ids go last, and only when there are some, so a key without them is unchanged.
+  public static func key(prompt: String, mode: SendMode?, files: [String], context: [String] = []) -> String {
+    ([prompt, mode?.rawValue ?? ""] + files + context).joined(separator: "\u{1F}")
   }
 
   /// The last failed send's when Ben retries the same message, a new one for anything else.
@@ -143,8 +154,10 @@ extension OmniClient {
   /// Sends a message to a thread. `mode` only matters while a turn runs; nil leaves it out and the server
   /// starts the next turn. With files the body is multipart: a `payload` field with the JSON, one `files`
   /// part per file. Without, plain JSON.
-  public func reply(to id: String, prompt: String, mode: SendMode?, files: [UploadFile], requestID: String?) async throws(OmniAPIError) -> OmniThread {
-    let body = ReplyBody(prompt: prompt, mode: mode, requestID: requestID)
+  public func reply(
+    to id: String, prompt: String, mode: SendMode?, files: [UploadFile], requestID: String?, context: [MessageContext]
+  ) async throws(OmniAPIError) -> OmniThread {
+    let body = ReplyBody(prompt: prompt, mode: mode, requestID: requestID, context: context.isEmpty ? nil : context)
     return try await send("POST", "/api/threads/\(uriComponent(id))/messages", body: body, files: files)
   }
 

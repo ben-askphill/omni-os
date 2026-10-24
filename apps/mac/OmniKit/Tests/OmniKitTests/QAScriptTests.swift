@@ -82,6 +82,21 @@ import OmniKit
     #expect(throws: QAScriptError.self) { try QAScript(json: Data(#"[{"run":{"model":"x"}}]"#.utf8)) }
   }
 
+  @Test func readsTheLineSelectionSteps() throws {
+    let script = try QAScript(json: Data(#"""
+      [{"selectLines": {"file": "src/cart.ts", "from": 1, "to": 3}}, {"addContext": "names read better"}, {"addContext": ""},
+       {"openContext": 0}]
+      """#.utf8))
+    #expect(script.steps == [.selectLines(file: "src/cart.ts", from: 1, to: 3), .addContext("names read better"), .addContext(""), .openContext(0)])
+    for bad in [
+      #"[{"selectLines": {"file": "src/cart.ts", "from": 1}}]"#, #"[{"selectLines": {"file": "", "from": 1, "to": 2}}]"#,
+      #"[{"selectLines": {"file": "a", "from": -1, "to": 2}}]"#, #"[{"selectLines": "src/cart.ts"}]"#,
+      #"[{"addContext": true}]"#, #"[{"openContext": -1}]"#, #"[{"openContext": "first"}]"#,
+    ] {
+      #expect(throws: QAScriptError.self, "\(bad)") { try QAScript(json: Data(bad.utf8)) }
+    }
+  }
+
   @Test func sumsUpFrames() {
     let stats = QAFrameStats(gaps: [16, 17, 16, 50, 16, 34])
     #expect(stats.frames == 6)

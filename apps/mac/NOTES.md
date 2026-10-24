@@ -61,6 +61,9 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `QuickPrompt.swift` | `QuickPromptShortcut` (the fixed choices and their Carbon key code and modifiers), `QuickPromptSettings` (on, shortcut, Wispr Flow, in UserDefaults), `QuickPromptAPI`, `QuickPromptModel` (text, target channel, phase, `awaitDictation`) |
 | `Handoff.swift` | `Device`, `Reachability`, `HandoffView`, `HandoffPhase`, `PrepareStep`, `HandoffBanner`, `HandoffAnswer`, `DevicesAPI`, `DevicesModel` (`AppModel.devices`), and `devices`, `handOff`, `cancelHandoff` on `OmniClient`. The shapes and text are `packages/shared/handoff.ts`; when to offer it, the picker and the banner follow `apps/web/src/handoff.ts` |
 | `QAScript.swift` | Debug only. `QAScript`, `QAStep`, `QACondition`, `QAFacts`, `QAServer`, `QASnapshot.looksBlank` |
+| `MessageContext.swift` | `MessageContext` (a record), `MessageContextList` (a message's `context`, never fails to decode), `MessageContextKind`, `ContextReading` (`readContextsWith` in `packages/shared/message-context.ts`) |
+| `DiffSelectionContext.swift` | The `diff_selection` kind (`packages/shared/message-context-diff.ts`): body, parse with the TypeScript's errors, `select`, `clampToHunk`, `blobIds`, `range` and `sourceLine` (the web's `rangeText` and `sourceText`), and `LinePick` (a click or Shift-click on a line number) |
+| `DraftContextModel.swift` | `DraftContextModel`: the records waiting in a thread's reply box (`ThreadStore.draftContext`), in `DraftStore` under `context:<thread id>` |
 
 ## Build and test
 
@@ -475,6 +478,9 @@ Steps (a list, or an object with the list under `steps`):
 | `{"quickPrompt": "text"}`, `{"quickPrompt": {"send": true}}`, `{"quickPrompt": false}` | Opens the Quick Prompt with this text (Wispr Flow off), sends it, or closes it |
 | `{"handoffMenu": "name"}` | Clicks the open thread's Hand Off button and writes `name.png` while its menu is open |
 | `{"handOff": "<device id>"}` | Hands the open thread to that Mac, as picking it in Hand Off to does |
+| `{"selectLines": {"file": "src/cart.ts", "from": 1, "to": 3}}` | In the Changes tab's shown view, clicks the numbers of row `from` (an index into the file's diff rows, hunk rows counted, from 0) of the first file at that path, then Shift-clicks row `to`. The dock shows under the diff |
+| `{"addContext": "note"}` | Writes the note in the dock and presses Add to Message. Fails with the reason when the reply box refuses the lines |
+| `{"openContext": 0}` | Clicks the reply box's context chip at that index, which opens or closes its inspector |
 | `{"quit": true}` | Writes the report and exits |
 
 `qa.json` is written after every step: `{ok, error, steps: [{step, action, ok, ms, error, files}], facts: {serverState, connection, sidebarLoaded, channels, route, windows}}`. A failed wait says what the server, feed and sidebar were.
@@ -620,3 +626,11 @@ Wired (both composers):
 - The header button refreshes the device list every 30s while the thread could go.
 - `ThreadDetail` and the thread stream's thread message carry `blocked` and `handoff`; the server leaves each out when there is none. `blocked` shows above the reply box as in the Web UI. The handoff is a card at the end of the transcript (`HandoffCard`), with Cancel on the giving Mac while it prepares or is offered, and one quiet line once taken or cancelled. A failed handoff hides once the thread runs again. An offer goes stale on screen 90s after `at` without waiting for the server.
 - A refused handoff or cancel (409 with the server's sentence) shows as `store.actionError` above the reply box, like a failed interrupt.
+
+## Lines of a diff in a message (#209)
+
+- The record and its rules are [docs/internals/message-context.md](../../docs/internals/message-context.md). OmniKit ports the client half; `MessageContextTests` runs the shared corpus (`packages/test-fixtures/message-context.json`) through it, so the Swift reader and line picker can't drift from the TypeScript.
+- Changes tab: `LinePicking` (LineSelectionDock.swift) wraps each view of the tab. A click on a line's numbers picks it, a Shift-click picks up to it within the hunk, a click on the only picked line clears it. `DiffFileView` takes the pick as `picking`; the PR page passes none and is unchanged. The dock (`LineSelectionDock`) shows the label, a note, Cancel and Add to Message (Return or Cmd-Return in the note, Esc cancels). Since base names the base sha and HEAD; This turn names the snapshots before and after the turn and its id. A reload that changes the picked file's lines drops the pick.
+- `ThreadStore.draftContext` is shared by the Changes tab, the reply box and every window on the thread. The reply box shows it in `DraftContextStrip` above the files; text or records alone can be sent, and a send settles only the records it carried.
+- Chips (`MessageContextChips.swift`) over sent and queued messages and in the reply box; a click opens the kind's detail and the note in a popover. Inline under the strip, it grew the reply box and pushed the window's content up under the title bar. A record this app can't read is a fallback chip: its label (or "Context from a newer Omni") and "This Omni can't show <kind> v<v>. Update Omni to see it." A message of context alone shows no empty bubble.
+- A new kind: `<Kind>Context.swift` in OmniKit, `<Kind>View.swift` in the app, and one line in `contextViews` (ContextViews.swift), which the kinds the app reads come from. Add its records to the corpus; nothing checks the Mac has every kind the server knows.
