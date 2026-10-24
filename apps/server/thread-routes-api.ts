@@ -37,6 +37,7 @@ import {
 } from './runner.ts';
 import { cancelHandoff, handOff } from './handoff.ts';
 import { handoffView } from './handoff/records.ts';
+import { headPage } from './history.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
 import { checkUploads, imageMime, removeUploads, safeName, saveUploads } from './uploads.ts';
@@ -116,10 +117,13 @@ threadRoutesApi.get('/:id', (c) => {
   if (!t) return c.json({ error: 'not found' }, 404);
   // With sync on, the files it has on the other Mac download in the background.
   void threadOpened(t.id);
+  // ?history=recent: the newest page of events, older ones from GET /:id/history (apps/server/history.ts).
+  const head = c.req.query('history') === 'recent' ? headPage(t.id) : null;
   const detail = {
     thread: t,
     channel: (ch => ch && publicChannel(ch))(channels.get(t.channel_id)),
-    events: events.since(t.id),
+    events: head ? head.events : events.since(t.id),
+    ...(head && { history: head.history }),
     artifacts: artifacts.byThread(t.id),
     children: threads.children(t.id),
     // Members of the teams this thread started, so its delegation cards can show their state.

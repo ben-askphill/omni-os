@@ -332,4 +332,8 @@ export function migrate() {
       SELECT 'completion', uid, 'upsert', created_at FROM completions
       WHERE seq = last_insert_rowid() AND EXISTS (SELECT 1 FROM kv WHERE key = 'sync.machine_id');
     END`);
+  // #223 Thread history pages (apps/server/history.ts): turn ends, session starts, and tool calls by their own id.
+  db.exec(`CREATE INDEX IF NOT EXISTS events_result ON events(thread_id, id) WHERE kind = 'result';
+    CREATE INDEX IF NOT EXISTS events_init ON events(thread_id, id) WHERE kind = 'init';
+    CREATE INDEX IF NOT EXISTS events_call ON events(thread_id, json_extract(payload, '$.id')) WHERE kind = 'tool_use';`);
 }

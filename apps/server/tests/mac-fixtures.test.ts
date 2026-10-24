@@ -3,6 +3,7 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { applyPage, earlierCursor, historyQuery, openHistory, revealCursor, type HistoryHead, type HistoryPage, type HistoryRow } from '@omni/shared/history.ts';
 import { diff, shapeOf, tagOf } from './fixture-shape.ts';
 import { FAKE_CLAUDE, fakeAlive } from './support.ts';
 
@@ -89,6 +90,13 @@ const NAMES = [
   // thread whose turns are not saved.
   'turns.json',
   'turns-unavailable.json',
+  // Bounded history (#223), on a thread whose first message is too big for a row, under a tiny OMNI_HISTORY_BUDGET:
+  // the head with an anchor, an older page, a reveal of the first message, that message whole, and search hits.
+  'thread-open.json',
+  'thread-history.json',
+  'thread-history-at.json',
+  'thread-event.json',
+  'search.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -182,6 +190,8 @@ async function boot(): Promise<number> {
       FAKE_CLAUDE_LOG: fakeLog,
       FAKE_CLAUDE_LATENCY_MS: '10',
       FAKE_CLAUDE_CRASH_ON: 'CRASH_NOW',
+      // Pages of 6 rows, 8 KB, 1 KB a row: a short thread still shows every history shape.
+      OMNI_HISTORY_BUDGET: '6:8192:1024',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -485,6 +495,28 @@ async function scenario() {
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
+
+  // Bounded history: a first turn whose prompt and answer are too big for a row, then a short one. The client opens on
+  // the head, loads the page above it, then reveals the first message and reads it whole, as a search hit would.
+  const paged = (await call('POST', '/threads', { channel: 'acme', prompt: `RICH ${'the cart total rounds the wrong way '.repeat(60)}`, title: 'Round the cart total' })) as Thread;
+  await eventually(async () => (await detail(paged.id)).thread.status === 'done', 'the paged thread to finish');
+  await call('POST', `/threads/${paged.id}/messages`, { prompt: 'and the tax', mode: 'steer' });
+  await eventually(async () => {
+    const d = await detail(paged.id);
+    return d.thread.status === 'done' && count(d, 'result') === 2;
+  }, 'the paged thread to finish its second turn');
+  const opened = keep('thread-open.json', await get(`/threads/${paged.id}?history=recent`)) as { events: HistoryRow[]; history: HistoryHead };
+  let history = openHistory(opened.events, opened.history);
+  const earlier = keep('thread-history.json', await get(`/threads/${paged.id}/history?${historyQuery(earlierCursor(history)!)}`)) as HistoryPage;
+  history = applyPage(history, earlier);
+  const first = ((await detail(paged.id)).events as HistoryRow[]).find((e) => e.kind === 'user')!;
+  const reveal = revealCursor(history, first.id);
+  expect(reveal, 'the first message is not held yet').not.toBeNull();
+  const at = keep('thread-history-at.json', await get(`/threads/${paged.id}/history?${historyQuery(reveal!)}`)) as HistoryPage;
+  expect(opened.events.length, 'the head and its anchor').toBeGreaterThan(opened.events.filter((e) => e.id >= opened.history.from).length);
+  expect(at.events.find((e) => e.id === first.id)?.clipped, 'the first message, clipped').toBeTruthy();
+  keep('thread-event.json', await get(`/threads/${paged.id}/events/${first.id}`));
+  keep('search.json', await get('/search?q=cart'));
 }
 
 /** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */

@@ -1,0 +1,38 @@
+[
+  {
+    "thread_id": "00000000-0000-4000-8000-000000000037",
+    "title": "Round the cart total",
+    "channel_id": "acme",
+    "status": "done",
+    "updated_at": "2026-01-05T09:00:00.000Z",
+    "snippet": "",
+    "event_id": 100
+  },
+  {
+    "thread_id": "00000000-0000-4000-8000-000000000006",
+    "title": "Fix the cart total",
+    "channel_id": "acme",
+    "status": "failed",
+    "updated_at": "2026-01-05T09:00:00.000Z",
+    "snippet": "",
+    "event_id": 20
+  },
+  {
+    "thread_id": "00000000-0000-4000-8000-000000000001",
+    "title": "Fix the cart and the tests",
+    "channel_id": "acme",
+    "status": "done",
+    "updated_at": "2026-01-05T09:00:00.000Z",
+    "snippet": "",
+    "event_id": 2
+  },
+  {
+    "thread_id": "00000000-0000-4000-8000-000000000008",
+    "title": "Daily digest · 5 Jan",
+    "channel_id": "acme",
+    "status": "done",
+    "updated_at": "2026-01-05T09:00:00.000Z",
+    "snippet": "Summarize what changed in the <mark>cart</mark> since yesterday.",
+    "event_id": 55
+  }
+]

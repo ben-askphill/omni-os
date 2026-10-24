@@ -21,6 +21,8 @@ Codex threads run on `codex app-server` (ADR 0001) and Cursor threads on `cursor
 
 Every stream event is stored in SQLite (`data/omni.db`) and pushed to the UI over SSE. The usage meter is per harness: Claude's rate-limit events drive the 5h / 7d meter, Codex reports its own, Cursor reports none.
 
+Both clients open a thread with `GET /api/threads/:id?history=recent`: its newest page of events, within a row and byte budget. Older pages come from `GET /api/threads/:id/history` as Ben scrolls up or opens a search hit. The stream then sends only rows after the newest one held. The budgets, cursors and the rows a page carries from outside it are in [Thread history](thread-history.md).
+
 Durable messages: a message is saved as a request before the client hears it was accepted, so a restart parks it instead of losing it. The states are in [CONTEXT.md](../../CONTEXT.md) under Delivery state.
 
 ## The channel browser
