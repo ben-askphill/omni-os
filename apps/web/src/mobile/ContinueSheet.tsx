@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react';
 import { useApi, type HarnessWithRunning, type Thread } from '../api.ts';
 import { HarnessLogo, harnessLabel } from '../components/brand.tsx';
 import { BlockNote, ExactText, rowTone, useContinue } from '../components/ContinueSheet.tsx';
-import { Button, Chip, ErrorNote } from '../components/ui.tsx';
+import { Button, Chip, ErrorNote, Toggle } from '../components/ui.tsx';
 import {
+  attachmentRows,
+  attachmentsSummary,
   blockOf,
   canStart,
   continueTargets,
@@ -123,6 +125,26 @@ function Sheet({
               </p>
             ))}
           </MoSection>
+          {p && p.carryover.attachments.length > 0 && (
+            <MoSection title="Attachments">
+              <MoGroup>
+                {attachmentRows(p.carryover).map((r, i, all) => (
+                  <div key={r.id} className={`flex items-start gap-3 px-4 py-2.5 ${i < all.length - 1 ? 'border-b border-line' : ''}`}>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className={`truncate text-[14px] leading-[1.4] ${r.selectable ? '' : 'text-fg-3'}`}>{r.name}</span>
+                        {r.tag && <Chip tone="outline">{r.tag}</Chip>}
+                      </span>
+                      <span className="text-[12.5px] leading-[1.35] text-fg-3 tabular-nums">{r.meta}</span>
+                      <span className="text-[12.5px] leading-[1.35] text-pretty text-fg-3">{r.note}</span>
+                    </span>
+                    <Toggle checked={r.selected} disabled={s.posting || !r.selectable} label={`Carry ${r.name}`} onChange={() => dispatch({ type: 'attach', id: r.id })} />
+                  </div>
+                ))}
+              </MoGroup>
+              <p className="m-0 px-1 text-[12.5px] leading-[1.4] text-fg-3">{attachmentsSummary(p.carryover)}</p>
+            </MoSection>
+          )}
           <div className="flex flex-col gap-2.5 px-3">
             <div className="rounded-[26px] bg-surface px-2 pt-3 pb-2.5">
               <textarea

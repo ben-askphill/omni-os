@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import type { ContinueBlock, ContinuePreview } from '@omni/shared/continue.ts';
+import type { Carryover, ContinueBlock, ContinuePreview } from '@omni/shared/continue.ts';
 import { api, errorText, useApi, type HarnessWithRunning, type Thread } from '../api.ts';
 import {
+  attachmentRows,
+  attachmentsSummary,
   blockOf,
   canStart,
   closesTerminal,
@@ -25,7 +27,7 @@ import {
 } from '../continue.ts';
 import { href, navigate } from '../router.ts';
 import { EffortPicker, ModelPicker } from './ModelPicker.tsx';
-import { Button, Chip, ErrorNote, Icon, Label, Loading, Modal, type ChipTone } from './ui.tsx';
+import { Button, Chip, ErrorNote, Icon, Label, Loading, Modal, Toggle, type ChipTone } from './ui.tsx';
 
 /**
  * One continue sheet's state, for the desktop and the phone: the picked run's preview, asked again whenever the run
@@ -33,19 +35,19 @@ import { Button, Chip, ErrorNote, Icon, Label, Loading, Modal, type ChipTone } f
  */
 export function useContinue(source: ContinueSource, offered: HarnessWithRunning[], onStarted: (t: Thread) => void) {
   const [s, dispatch] = useReducer(continueReducer, offered, (o) => initContinue(defaultRun(o, source.harness)));
-  const { run, asked } = s;
+  const { run, picked, asked } = s;
   useEffect(() => {
     if (!run) return;
     // A later ask replaces this one: its answer, if it comes last, is stale.
     let alive = true;
     api
-      .post<ContinuePreview>(`/threads/${encodeURIComponent(source.id)}/continue/preview`, run)
-      .then((preview) => alive && dispatch({ type: 'previewed', run, preview }))
-      .catch((e) => alive && dispatch({ type: 'previewFailed', run, error: errorText(e) }));
+      .post<ContinuePreview>(`/threads/${encodeURIComponent(source.id)}/continue/preview`, { ...run, attachments: picked })
+      .then((preview) => alive && dispatch({ type: 'previewed', run, picked, preview }))
+      .catch((e) => alive && dispatch({ type: 'previewFailed', run, picked, error: errorText(e) }));
     return () => {
       alive = false;
     };
-  }, [source.id, run, asked]);
+  }, [source.id, run, picked, asked]);
 
   const [closing, setClosing] = useState(false);
   const closeTerminal = async () => {
@@ -62,7 +64,7 @@ export function useContinue(source: ContinueSource, offered: HarnessWithRunning[
 
   const start = async () => {
     if (!canStart(s) || !s.run || s.preview.kind !== 'ready') return;
-    const { body, attempt } = startBody(s.run, s.text, s.preview.preview.revision, s.attempt);
+    const { body, attempt } = startBody(s.run, s.text, s.preview.preview.revision, s.attempt, undefined, s.picked);
     dispatch({ type: 'posting', attempt });
     try {
       const res = await api.post<{ thread: Thread; duplicate: boolean }>(`/threads/${encodeURIComponent(source.id)}/continue`, body);
@@ -137,6 +139,7 @@ function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: Cont
   const { run } = s;
   const note = refusalText(s.refusal);
   const hint = slashHint(s.text);
+  const files = shownPreview(s.preview)?.carryover ?? null;
   return (
     <div className="grid gap-x-8 gap-y-6 px-6 pt-1 pb-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <div className="flex min-w-0 flex-col gap-4">
@@ -172,6 +175,12 @@ function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: Cont
             </ul>
           )}
         </div>
+        {files && files.attachments.length > 0 && (
+          <div>
+            <Label hint={attachmentsSummary(files)}>Attachments</Label>
+            <AttachmentList files={files} disabled={s.posting} onToggle={(id) => dispatch({ type: 'attach', id })} />
+          </div>
+        )}
         <div>
           <Label htmlFor="continue-message" hint="It reads this after the carryover, and it is never cut.">
             Your message
@@ -205,6 +214,27 @@ function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: Cont
       </div>
       {run && <PreviewPane s={s} onRecheck={recheck} onCloseTerminal={() => void closeTerminal()} closing={closing} />}
     </div>
+  );
+}
+
+/** The source's attachments, each with a switch: the ticked ones are copied into the new thread's own uploads. */
+export function AttachmentList({ files, disabled, onToggle }: { files: Pick<Carryover, 'attachments'>; disabled?: boolean; onToggle: (id: string) => void }) {
+  return (
+    <ul className="divide-y divide-line rounded-[18px] bg-surface">
+      {attachmentRows(files).map((r) => (
+        <li key={r.id} className="flex min-w-0 items-start gap-2.5 px-3.5 py-2.5 text-[12.5px] leading-snug">
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className={`truncate text-fg ${r.selectable ? '' : 'text-fg-3'}`}>{r.name}</span>
+              {r.tag && <Chip tone="outline">{r.tag}</Chip>}
+            </div>
+            <div className="mt-0.5 font-num text-[11.5px] text-fg-3">{r.meta}</div>
+            <div className="mt-0.5 break-words text-[11.5px] text-fg-3">{r.note}</div>
+          </div>
+          <Toggle checked={r.selected} disabled={disabled || !r.selectable} label={`Carry ${r.name}`} onChange={() => onToggle(r.id)} />
+        </li>
+      ))}
+    </ul>
   );
 }
 

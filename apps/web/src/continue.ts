@@ -8,6 +8,7 @@ import {
   continueSourceRefusal,
   entryText,
   type Carryover,
+  type CarryoverAttachment,
   type CarryoverEntry,
   type CarryoverFile,
   type ContinueBlock,
@@ -17,6 +18,7 @@ import {
 } from '@omni/shared/continue.ts';
 import { sameRun, type Run } from '@omni/shared/run-switch.ts';
 import { ApiError, errorText, type HarnessWithRunning, type Thread } from './api.ts';
+import { bytes } from './format.ts';
 import { requestIdFor, type PendingRequest } from './requests.ts';
 
 /** The thread a sheet continues. */
@@ -62,10 +64,17 @@ export function defaultRun(offered: readonly HarnessWithRunning[], sourceHarness
 
 /**
  * POST /threads/:id/continue's body. The request id is the last Start's while Ben retries the same one, so a retry
- * gets the same thread back; another message, run or preview gets a new id.
+ * gets the same thread back; another message, run, set of attachments or preview gets a new id.
  */
-export function startBody(run: Run, text: string, revision: string, last: PendingRequest | null, make?: () => string): { body: ContinueBody; attempt: PendingRequest } {
-  const fields = { harness: run.harness, model: run.model, effort: run.effort, text: text.trim(), revision };
+export function startBody(
+  run: Run,
+  text: string,
+  revision: string,
+  last: PendingRequest | null,
+  make?: () => string,
+  attachments: readonly string[] = [],
+): { body: ContinueBody; attempt: PendingRequest } {
+  const fields = { harness: run.harness, model: run.model, effort: run.effort, attachments: [...new Set(attachments)].sort(), text: text.trim(), revision };
   const attempt = requestIdFor(last, JSON.stringify(fields), make);
   return { body: { ...fields, request_id: attempt.id }, attempt };
 }
@@ -105,6 +114,8 @@ export type StartRefusal = { kind: 'changed' } | { kind: 'busy'; block: Continue
 export interface ContinueState {
   /** Null when no local harness is ready. */
   run: Run | null;
+  /** The ids of the source's attachments Ben ticked. */
+  picked: string[];
   text: string;
   preview: PreviewState;
   /** Counts "check again": the same run's preview asked for anew. */
@@ -117,15 +128,18 @@ export interface ContinueState {
 
 export type ContinueAction =
   | { type: 'pick'; run: Run }
+  /** Tick or untick one attachment. */
+  | { type: 'attach'; id: string }
   | { type: 'text'; text: string }
-  | { type: 'previewed'; run: Run; preview: ContinuePreview }
-  | { type: 'previewFailed'; run: Run; error: string }
+  | { type: 'previewed'; run: Run; picked: string[]; preview: ContinuePreview }
+  | { type: 'previewFailed'; run: Run; picked: string[]; error: string }
   | { type: 'recheck' }
   | { type: 'posting'; attempt: PendingRequest }
   | { type: 'refused'; error: StartError };
 
 export const initContinue = (run: Run | null): ContinueState => ({
   run,
+  picked: [],
   text: '',
   preview: { kind: 'loading', last: null },
   asked: 0,
@@ -137,7 +151,10 @@ export const initContinue = (run: Run | null): ContinueState => ({
 /** The preview on screen: the ready one, or the last one while the next loads. */
 export const shownPreview = (p: PreviewState) => (p.kind === 'ready' ? p.preview : p.kind === 'loading' ? p.last : null);
 
-const isPicked = (s: ContinueState, run: Run) => !!s.run && sameRun(s.run, run);
+const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id) => b.includes(id));
+
+/** Whether an answer is for what Ben has picked now: this run and these attachments. */
+const isPicked = (s: ContinueState, run: Run, picked: readonly string[]) => !!s.run && sameRun(s.run, run) && sameIds(s.picked, picked);
 
 function refuse(s: ContinueState, e: StartError): ContinueState {
   const done = { ...s, posting: false };
@@ -156,15 +173,22 @@ function refuse(s: ContinueState, e: StartError): ContinueState {
 export function continueReducer(s: ContinueState, a: ContinueAction): ContinueState {
   switch (a.type) {
     case 'pick':
-      if (isPicked(s, a.run)) return s;
+      if (s.run && sameRun(s.run, a.run)) return s;
       return { ...s, run: a.run, preview: { kind: 'loading', last: shownPreview(s.preview) }, refusal: null };
+    case 'attach':
+      return {
+        ...s,
+        picked: s.picked.includes(a.id) ? s.picked.filter((id) => id !== a.id) : [...s.picked, a.id],
+        preview: { kind: 'loading', last: shownPreview(s.preview) },
+        refusal: null,
+      };
     case 'text':
       return { ...s, text: a.text };
-    // An answer for a run Ben has since changed is dropped: the picked run's own is on its way.
+    // An answer for a run or a set of attachments Ben has since changed is dropped: the current one's is on its way.
     case 'previewed':
-      return isPicked(s, a.run) ? { ...s, preview: { kind: 'ready', preview: a.preview } } : s;
+      return isPicked(s, a.run, a.picked) ? { ...s, preview: { kind: 'ready', preview: a.preview } } : s;
     case 'previewFailed':
-      return isPicked(s, a.run) ? { ...s, preview: { kind: 'failed', error: a.error } } : s;
+      return isPicked(s, a.run, a.picked) ? { ...s, preview: { kind: 'failed', error: a.error } } : s;
     case 'recheck':
       return { ...s, preview: { kind: 'loading', last: shownPreview(s.preview) }, asked: s.asked + 1, refusal: null };
     case 'posting':
@@ -208,7 +232,7 @@ export interface PreviewRow {
 }
 
 export interface PreviewSection {
-  id: 'goal' | 'constraints' | 'files' | 'checks' | 'recent' | 'omitted' | 'attachments';
+  id: 'goal' | 'constraints' | 'files' | 'checks' | 'recent' | 'omitted';
   title: string;
   count: number | null;
   rows: PreviewRow[];
@@ -252,9 +276,54 @@ export function previewSections(c: Carryover): PreviewSection[] {
       c.recent.map((e) => ({ key: `entry:${e.id}`, label: WHO[e.who], text: entryText(e), tag: e.condensed ? 'Shortened' : undefined })),
     ),
     section('omitted', 'Left out', c.omitted.map((o, i) => ({ key: `omitted:${o.what}:${i}`, text: o.note, sub: o.ref ?? undefined, subCode: true })), null),
-    // #222 makes attachments selectable here, keyed by their event; until then each is listed and none is carried.
-    section('attachments', 'Attachments', c.attachments.map((a) => ({ key: `attachment:${a.event_id}:${a.name}`, text: a.name, tag: 'Not carried yet' }))),
   ].filter((s) => s.rows.length > 0 || s.more);
+}
+
+// ---------- attachments ----------
+
+/** One attachment of the source as the sheet lists it: what it is, whether it can go, and whether Ben ticked it. */
+export interface AttachmentRow {
+  id: string;
+  name: string;
+  /** "PNG image · 1.2 KB". */
+  meta: string;
+  /** How it arrives, or why it cannot. */
+  note: string;
+  /** A word beside the name when it cannot be carried. */
+  tag: string | null;
+  selected: boolean;
+  /** Only a file Omni can copy can be ticked. */
+  selectable: boolean;
+}
+
+const KIND: Record<CarryoverAttachment['availability'], string | null> = { available: null, missing: 'Missing', oversize: 'Too big', unsupported: 'Not a file' };
+
+/** "PNG image", "PDF", "Text" or "File". */
+export function typeLabel(mime: string): string {
+  const [type, sub = ''] = mime.toLowerCase().split('/');
+  if (type === 'image') return `${sub.replace(/\+.*$/, '').toUpperCase() || 'Image'} image`;
+  if (sub === 'pdf') return 'PDF';
+  return type === 'text' ? 'Text' : 'File';
+}
+
+const arrival = (a: CarryoverAttachment) =>
+  a.as === 'inline' ? 'Goes inline as an image.' : a.image ? 'Goes as a path to the file. This harness does not show images inline.' : 'Goes as a path to the file.';
+
+export const attachmentRows = (c: Pick<Carryover, 'attachments'>): AttachmentRow[] =>
+  c.attachments.map((a) => ({
+    id: a.id,
+    name: a.name,
+    meta: `${typeLabel(a.mime)} · ${a.size === null ? 'size unknown' : bytes(a.size)}`,
+    note: a.availability === 'available' ? arrival(a) : (a.reason ?? 'It cannot be carried.'),
+    tag: KIND[a.availability],
+    selected: a.selected && a.availability === 'available',
+    selectable: a.availability === 'available',
+  }));
+
+/** "2 of 3 will be copied", under the list. */
+export function attachmentsSummary(c: Pick<Carryover, 'attachments'>): string {
+  const n = c.attachments.filter((a) => a.carried).length;
+  return n ? `${n} of ${c.attachments.length} will be copied into the new thread.` : 'None will be carried. Tick the ones the new thread needs.';
 }
 
 export const sizeLine = carryoverSize;

@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import type { Carryover, ContinueLink, ContinuePreview } from '@omni/shared/continue.ts';
+import type { Carryover, CarryoverAttachment, ContinueLink, ContinuePreview } from '@omni/shared/continue.ts';
 import { ApiError, type HarnessWithRunning, type Thread } from '../src/api.ts';
 import { ContinueCrumbs, MoContinueLinks } from '../src/components/ContinueLinks.tsx';
 import { BlockNote } from '../src/components/ContinueSheet.tsx';
@@ -9,6 +9,8 @@ import { threadView } from '../src/mobile/thread-view.ts';
 import { buildItems, type TranscriptEvent } from '../src/transcript/fold.ts';
 import {
   NO_LINKS,
+  attachmentRows,
+  attachmentsSummary,
   blockOf,
   canStart,
   closesTerminal,
@@ -95,7 +97,7 @@ describe('the Start request', () => {
 
   it("sends the run, Ben's message and the preview's revision", () => {
     const { body } = startBody({ harness: 'codex', model: 'codex-b', effort: 'high' }, '  Carry on  ', 'r1', null, make);
-    expect(body).toEqual({ harness: 'codex', model: 'codex-b', effort: 'high', text: 'Carry on', revision: 'r1', request_id: expect.any(String) });
+    expect(body).toEqual({ harness: 'codex', model: 'codex-b', effort: 'high', attachments: [], text: 'Carry on', revision: 'r1', request_id: expect.any(String) });
   });
 
   it('reuses the request id when Ben retries the same Start, so the server answers with the same thread', () => {
@@ -125,11 +127,66 @@ describe('the Start request', () => {
   });
 });
 
+const file = (over: Partial<CarryoverAttachment> = {}): CarryoverAttachment => ({
+  id: 'u1:0', name: 'shot.png', event_id: 2, mime: 'image/png', size: 3_400, image: true, availability: 'available', reason: null, selected: false, carried: false, as: 'inline', ...over,
+});
+
+describe('attachments', () => {
+  it('shows each file with its type, size and how it arrives, and lets only an available one be ticked', () => {
+    const rows = attachmentRows(
+      carryover({
+        attachments: [
+          file({ selected: true, carried: true }),
+          file({ id: 'u1:1', name: 'notes.txt', mime: 'text/plain', size: 10, image: false, as: 'path' }),
+          file({ id: 'u1:2', name: 'photo.jpg', mime: 'image/jpeg', as: 'path' }),
+          file({ id: 'u1:3', name: 'trace.zip', mime: 'application/zip', size: null, image: false, availability: 'missing', reason: 'Its bytes are not on this Mac.', selected: true, as: null }),
+          file({ id: 'u1:4', name: 'big.mov', mime: 'video/quicktime', size: 90_000_000, image: false, availability: 'oversize', reason: '85.8 MB is over the 25 MB limit for one file.', as: null }),
+          file({ id: 'u1:5', name: 'link', mime: 'application/octet-stream', availability: 'unsupported', reason: 'It is a link, not a file.', as: null }),
+        ],
+      }),
+    );
+    expect(rows.map((r) => [r.name, r.meta, r.note, r.tag, r.selected, r.selectable])).toEqual([
+      ['shot.png', 'PNG image · 3.3 KB', 'Goes inline as an image.', null, true, true],
+      ['notes.txt', 'Text · 10 B', 'Goes as a path to the file.', null, false, true],
+      ['photo.jpg', 'JPEG image · 3.3 KB', 'Goes as a path to the file. This harness does not show images inline.', null, false, true],
+      ['trace.zip', 'File · size unknown', 'Its bytes are not on this Mac.', 'Missing', false, false],
+      ['big.mov', 'File · 85.8 MB', '85.8 MB is over the 25 MB limit for one file.', 'Too big', false, false],
+      ['link', 'File · 3.3 KB', 'It is a link, not a file.', 'Not a file', false, false],
+    ]);
+  });
+
+  it('counts what will be copied', () => {
+    expect(attachmentsSummary(carryover({ attachments: [file(), file({ id: 'u1:1' })] }))).toBe('None will be carried. Tick the ones the new thread needs.');
+    expect(attachmentsSummary(carryover({ attachments: [file({ carried: true, selected: true }), file({ id: 'u1:1' })] }))).toBe('1 of 2 will be copied into the new thread.');
+  });
+
+  it('asks for a new preview with each tick and drops one that answers other picks', () => {
+    let s = continueReducer(initContinue(CODEX), { type: 'previewed', run: CODEX, picked: [], preview: preview('r1') });
+    s = continueReducer(s, { type: 'attach', id: 'u1:0' });
+    expect(s).toMatchObject({ picked: ['u1:0'], preview: { kind: 'loading', last: preview('r1') } });
+    expect(continueReducer(s, { type: 'previewed', run: CODEX, picked: [], preview: preview('stale') })).toBe(s);
+    expect(continueReducer(s, { type: 'previewFailed', run: CODEX, picked: [], error: 'gone' })).toBe(s);
+    s = continueReducer(s, { type: 'previewed', run: CODEX, picked: ['u1:0'], preview: preview('r2') });
+    expect(s.preview).toEqual({ kind: 'ready', preview: preview('r2') });
+    s = continueReducer(s, { type: 'attach', id: 'u1:1' });
+    expect(continueReducer(s, { type: 'attach', id: 'u1:0' }).picked).toEqual(['u1:1']);
+    expect(continueReducer(s, { type: 'pick', run: CLAUDE }).picked, 'a new run keeps the picks').toEqual(['u1:0', 'u1:1']);
+  });
+
+  it('sends the picks, and a retry of the same picks reuses its request id while other picks get a new one', () => {
+    const run = CODEX;
+    const one = startBody(run, 'go', 'r1', null, () => 'id-a', ['u1:1', 'u1:0']);
+    expect(one.body).toMatchObject({ attachments: ['u1:0', 'u1:1'], request_id: 'id-a' });
+    expect(startBody(run, 'go', 'r1', one.attempt, () => 'id-b', ['u1:0', 'u1:1']).body.request_id).toBe('id-a');
+    expect(startBody(run, 'go', 'r1', one.attempt, () => 'id-b', ['u1:0']).body.request_id).toBe('id-b');
+  });
+});
+
 describe('the sheet', () => {
   it('asks for a preview of the run it opens on, and of every run Ben picks, keeping the last one on screen', () => {
     let s = initContinue(CODEX);
     expect(s.preview).toEqual({ kind: 'loading', last: null });
-    s = continueReducer(s, { type: 'previewed', run: CODEX, preview: preview('r1') });
+    s = continueReducer(s, { type: 'previewed', run: CODEX, picked: [], preview: preview('r1') });
     expect(s.preview).toEqual({ kind: 'ready', preview: preview('r1') });
     s = continueReducer(s, { type: 'pick', run: CLAUDE });
     expect(s).toMatchObject({ run: CLAUDE, preview: { kind: 'loading', last: preview('r1') } });
@@ -138,9 +195,9 @@ describe('the sheet', () => {
 
   it('drops a preview that answers a run Ben has since changed', () => {
     const s = continueReducer(initContinue(CODEX), { type: 'pick', run: CLAUDE });
-    expect(continueReducer(s, { type: 'previewed', run: CODEX, preview: preview('old') })).toBe(s);
-    expect(continueReducer(s, { type: 'previewFailed', run: CODEX, error: 'gone' })).toBe(s);
-    expect(continueReducer(s, { type: 'previewFailed', run: CLAUDE, error: 'Thread not found' }).preview).toEqual({ kind: 'failed', error: 'Thread not found' });
+    expect(continueReducer(s, { type: 'previewed', run: CODEX, picked: [], preview: preview('old') })).toBe(s);
+    expect(continueReducer(s, { type: 'previewFailed', run: CODEX, picked: [], error: 'gone' })).toBe(s);
+    expect(continueReducer(s, { type: 'previewFailed', run: CLAUDE, picked: [], error: 'Thread not found' }).preview).toEqual({ kind: 'failed', error: 'Thread not found' });
   });
 
   it('starts only with a ready preview, an idle source and a message, once at a time', () => {
@@ -173,7 +230,7 @@ describe('the sheet', () => {
     expect(refusalText(s.refusal)).toBeNull();
     s = continueReducer(s, { type: 'recheck' });
     expect(s).toMatchObject({ asked: 1, refusal: null, preview: { kind: 'loading', last: preview('r1') } });
-    s = continueReducer(s, { type: 'previewed', run: CODEX, preview: preview('r2') });
+    s = continueReducer(s, { type: 'previewed', run: CODEX, picked: [], preview: preview('r2') });
     expect(canStart(s)).toBe(true);
   });
 
@@ -213,9 +270,8 @@ describe("the preview's sections", () => {
       checks: [{ id: 4, command: 'npm test', ok: true, output: 'ok' }],
       recent: [{ id: 9, who: 'agent', text: 'Done.', condensed: false }],
       omitted: [{ what: 'history', count: 3, note: '3 older entries', ref: '/api/threads/src/history?through=5' }],
-      attachments: [{ name: 'shot.png', event_id: 2, carried: false }],
     });
-    expect(previewSections(full).map((s) => s.title)).toEqual(['Goal', 'Constraints', 'Changed files', 'Checks', 'Recent history', 'Left out', 'Attachments']);
+    expect(previewSections(full).map((s) => s.title)).toEqual(['Goal', 'Constraints', 'Changed files', 'Checks', 'Recent history', 'Left out']);
   });
 
   it('says how many changed files the Carryover does not list', () => {
@@ -263,21 +319,19 @@ describe("the preview's sections", () => {
     ]);
   });
 
-  it('gives each left-out part its note and where to read it, and lists attachments as not carried yet', () => {
+  it('gives each left-out part its note and where to read it', () => {
     const sections = previewSections(
       carryover({
         omitted: [
           { what: 'history', count: 20, note: '20 older entries', ref: '/api/threads/src/history?through=41' },
           { what: 'untracked', count: 2, note: '2 untracked binary files', ref: null },
         ],
-        attachments: [{ name: 'trace.zip', event_id: 12, carried: false }],
       }),
     );
     expect(sections.find((s) => s.id === 'omitted')!.rows).toEqual([
       expect.objectContaining({ text: '20 older entries', sub: '/api/threads/src/history?through=41' }),
       expect.objectContaining({ text: '2 untracked binary files', sub: undefined }),
     ]);
-    expect(sections.find((s) => s.id === 'attachments')!.rows).toEqual([expect.objectContaining({ key: 'attachment:12:trace.zip', text: 'trace.zip', tag: 'Not carried yet' })]);
   });
 
   it('reads its size against the budget, and where the new thread works', () => {
