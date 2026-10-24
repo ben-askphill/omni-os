@@ -247,14 +247,16 @@ export function threadActions(t: Thread): ThreadActions {
   };
 }
 
-/** Run the action a run ran, again, with the action's current command. */
+/** Run the action a run ran, again, with the action's current command. Again of the setup run is the setup run. */
 export async function retryRun(t: Thread, runId: string) {
   const run = actionRuns.get(runId);
   if (!run || run.thread_id !== t.id) throw refusal('run not found', 404);
   if (run.state === 'running' && live.has(runId)) throw refusal(`${run.name} is still running. Stop it first.`, 409);
   const action = run.action_id ? channelActions.get(run.action_id) : undefined;
   if (!action || action.channel_id !== t.channel_id) throw refusal(`"${run.name}" is no longer one of the channel's actions.`, 404);
-  return startRun(t, action);
+  const started = await startRun(t, action);
+  if (threadSetupRuns.get(t.id) === runId) threadSetupRuns.set(t.id, started.run.id);
+  return started;
 }
 
 /** On server stop: every run's process group gets SIGTERM and its record says why it ended. */

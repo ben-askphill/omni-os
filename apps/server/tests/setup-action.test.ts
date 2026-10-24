@@ -174,6 +174,20 @@ describe('Stop while a worktree is prepared', () => {
   });
 });
 
+describe('a team', () => {
+  it("stopping a lead while its worktree is prepared stops its members too", async () => {
+    const ch = channel();
+    await setupAction(ch.id, 'sleep 30', 'blocking');
+    const { lead, members } = await r.runner.createTeam({ channel: ch.id, prompt: 'split it', tasks: [{ prompt: 'part one' }] });
+    await until('both setups to run', async () => (await setupRun(lead.id))?.state === 'running' && (await setupRun(members[0].id))?.state === 'running');
+    await call('POST', `/threads/${lead.id}/stop`, {});
+    await r.until('both to stop', () => r.thread(lead.id).setup === 'failed' && r.thread(members[0].id).setup === 'failed');
+    expect([r.thread(lead.id).status, r.thread(members[0].id).status]).toEqual(['stopped', 'stopped']);
+    await settle();
+    expect([...r.spawns(lead.id), ...r.spawns(members[0].id)]).toEqual([]);
+  });
+});
+
 describe('a background setup action', () => {
   it('lets the agent start while it runs, and completes after', async () => {
     const ch = channel();
@@ -199,7 +213,13 @@ describe('a background setup action', () => {
     await r.untilResults(t.id, 1);
     await untilRun(t.id, 'failed');
     expect(r.thread(t.id)).toMatchObject({ setup: null, setup_error: null });
-    expect((await setupRun(t.id))!.exit_code).toBe(2);
+    const failed = (await setupRun(t.id))!;
+    expect(failed.exit_code).toBe(2);
+    // Run again from the thread: the new run is its setup run now.
+    const again = await call<ActionRun>('POST', `/threads/${t.id}/action-runs/${failed.id}/retry`, {});
+    expect(again.status).toBe(201);
+    expect((await setupRun(t.id))!.id).toBe(again.body.id);
+    expect(r.spawns(t.id)).toHaveLength(1);
   });
 });
 

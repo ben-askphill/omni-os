@@ -33,7 +33,7 @@ An agent can stop and ask you one to four multiple-choice questions with Omni's 
 
 ## What a thread gets
 
-- **Worktree**: in a repo channel, its own git worktree on branch `omni/<id>`. It is removed once nothing in it can be lost ([Known limits](limits.md)).
+- **Worktree**: in a repo channel, its own git worktree on branch `omni/<id>`. It is removed once nothing in it can be lost ([Known limits](limits.md)). While it is prepared, the thread shows each step (checkout, the channel's setup action if it has one, then the agent) with the setup's output and a Stop button ([Configuration](configuration.md#channel-actions)).
 - **Base**: the commit that branch starts from. The new-thread composer shows the repo's current commit as the default ("From main · a1b2c3d") and lets you pick another branch or tag, or the remote default branch. The remote default is fetched first, and the repo's own checkout and branches never move. The thread keeps the commit it resolved, and the Changes tab compares to it, so a branch that moves later changes nothing. If the fetch fails (offline, no access), the thread stops at "Setup failed" with the reason and your message kept, and Retry tries again. Threads started by a channel, crew role or automation without a choice start from the repo's current commit, as before. Hermes and Cursor Cloud threads have no worktree here, so no base.
 - **Browser**: the channel's persistent Chrome (logins survive), shown live in the thread's Browser panel. You can click and type in it too.
 - **Terminal tab**: a real shell (PTY) in the thread's working directory.
