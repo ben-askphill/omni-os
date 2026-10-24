@@ -5,7 +5,7 @@
 import { SERVER_ONLY_VARS, STRIPPED_VARS } from './harness/env-guard.ts';
 import { SYNC_SECRETS } from './secrets.ts';
 
-const STRIPPED = [...Object.values(STRIPPED_VARS).flat(), ...Object.values(SYNC_SECRETS), ...SERVER_ONLY_VARS];
+export const STRIPPED = [...Object.values(STRIPPED_VARS).flat(), ...Object.values(SYNC_SECRETS), ...SERVER_ONLY_VARS];
 
 /**
  * Copy `base` (Omni's own environment) and delete the names the terminal must not see.

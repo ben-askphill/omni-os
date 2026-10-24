@@ -24,6 +24,7 @@ const { messageRequests, outbox, threads, turnSnapshots } = await import('./db.t
 const { shutdownAll, startLimits } = await import('./runner.ts');
 const { closeAllBrowsers } = await import('./browser.ts');
 const { closeAllTerminals } = await import('./terminal.ts');
+const { stopAllRuns } = await import('./actions.ts');
 const { startArtifactWatcher } = await import('./artifacts.ts');
 const { backfillPublished } = await import('./published.ts');
 const { startScheduler } = await import('./automations.ts');
@@ -88,6 +89,7 @@ const shutdown = (sig: string) => {
   console.log(`[omni] ${sig}, closing live sessions`);
   server.close();
   closeAllTerminals();
+  stopAllRuns();
   setTimeout(() => process.exit(0), 6000).unref();
   void shutdownAll().finally(() => {
     closeAllBrowsers();

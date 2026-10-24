@@ -337,4 +337,35 @@ export function migrate() {
     thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
     pick TEXT NOT NULL
   )`);
+  // #210: a channel's named actions (command and secret names only, never a value), and each run of one in a thread,
+  // with its state and the tail of its output. Local, not synced: a run is a process on this Mac.
+  db.exec(`CREATE TABLE IF NOT EXISTS channel_actions (
+    id TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    command TEXT NOT NULL,
+    secrets TEXT NOT NULL DEFAULT '[]',
+    port INTEGER,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (channel_id, name)
+  );
+  CREATE TABLE IF NOT EXISTS action_runs (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    action_id TEXT,
+    name TEXT NOT NULL,
+    command TEXT NOT NULL,
+    cwd TEXT NOT NULL,
+    port INTEGER,
+    state TEXT NOT NULL,
+    exit_code INTEGER,
+    error TEXT,
+    output TEXT NOT NULL DEFAULT '',
+    output_bytes INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL,
+    ended_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS action_runs_thread ON action_runs(thread_id, started_at DESC);`);
 }
