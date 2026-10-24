@@ -41,6 +41,9 @@ const refuse = (reason: string, status = 403) =>
 /** The one route that takes no token: the Mac app asks it to prove it is this install before sending the token. */
 export const PROOF_PATH = '/api/auth/proof';
 
+/** GitHub's webhook posts (apps/server/github-webhook-api.ts) take no token either: each proves itself with its signature. */
+export const isWebhookPost = (c: Context) => c.req.method === 'POST' && /^\/api\/hooks\/github\/[\w.-]+$/.test(c.req.path);
+
 const bearer = (c: Context) => c.req.header('authorization')?.match(/^Bearer\s+(\S+)\s*$/i)?.[1];
 
 /** A Host that only reaches the server through Tailscale: a MagicDNS name or a 100.64.0.0/10 address. */
@@ -71,7 +74,8 @@ const SIMPLE_TYPES = ['text/plain', 'application/x-www-form-urlencoded'];
  * - Sec-Fetch-Site: cross-site (any request a page on another site made);
  * - an Origin, `null` included, that is not the Host the request came in on;
  * - a text/plain or form-urlencoded body, the content types that skip the preflight;
- * - no token, or the wrong one (401), in the Authorization header or the paired browser's cookie;
+ * - no token, or the wrong one (401), in the Authorization header or the paired browser's cookie, except on the
+ *   proof route and a GitHub webhook post, which carries its own signature;
  * - through tailscale serve (a tailnet Host, or any proxy header), a Tailscale-User-Login that is not in
  *   `integrations.tailscaleLogin`, when that is set.
  * The Mac app, apps/mcp/omni.ts, scripts and curl send no Origin or Sec-Fetch-Site, so the Host and token checks apply to them.
@@ -94,7 +98,7 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
   }
   const type = (c.req.header('content-type') ?? '').split(';')[0].trim().toLowerCase();
   if (SIMPLE_TYPES.includes(type)) return refuse('send JSON', 415);
-  if (!(c.req.method === 'GET' && c.req.path === PROOF_PATH)) {
+  if (!(c.req.method === 'GET' && c.req.path === PROOF_PATH) && !isWebhookPost(c)) {
     if (!tokenMatches(bearer(c) ?? getCookie(c, cookieName()))) return refuse("Unauthorized: send this install's token (data/api-token), or pair this browser", 401);
   }
   const owners = resolved.tailscaleLogins();

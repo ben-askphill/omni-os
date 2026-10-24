@@ -8,6 +8,7 @@ import { bus, publishFeed } from './bus.ts';
 import { automationRuns, channels, db, threads, type Thread } from './db.ts';
 import { DELIVERY_PENDING, deliveryThreadId, triggerDeliveries } from './db/repos/trigger-deliveries.ts';
 import { fenced, type ArtifactTrigger } from './automation-events.ts';
+import { webhookPrompt } from './github-webhook.ts';
 import { loadAutomations, runAutomation, type Automation } from './automations.ts';
 import { automationsOwner, runsAutomationsHere } from './sync/owner.ts';
 import type { TriggerDelivery } from '@omni/shared/automation-triggers.ts';
@@ -83,6 +84,7 @@ export function observePublication(threadId: string, toolUseId: string, p: Publi
 
 /** The run's prompt: the automation's own, then the page. Everything the thread named goes in a fence, as data. */
 export function deliveryPrompt(prompt: string, d: TriggerDelivery): string {
+  if (d.source === 'github_webhook') return webhookPrompt(prompt, d);
   const c = d.context;
   const fields = ['title', 'file', 'description', 'update', 'thread_title', 'thread', 'channel'].filter((k) => c[k] !== undefined);
   return [

@@ -1,8 +1,11 @@
 // Deliveries of an event to an event-triggered automation (apps/server/automation-triggers.ts). Pure types and labels,
 // shared by the server and the Web UI. apps/mac/OmniKit/Sources/OmniKit/Automation.swift ports them.
 
-/** Where a delivery came from. A successful Artifact publish in any thread (packages/shared/published.ts). */
-export type TriggerSource = 'artifact_published';
+/**
+ * Where a delivery came from. A successful Artifact publish in any thread (packages/shared/published.ts), or a signed
+ * GitHub webhook posted to the automation's endpoint (apps/server/github-webhook-api.ts).
+ */
+export type TriggerSource = 'artifact_published' | 'github_webhook';
 
 /**
  * Where a delivery is. `received`: seen, not yet matched to the automation. `accepted`: saved on the Mac that runs
@@ -33,7 +36,7 @@ export interface TriggerDelivery {
   id: string;
   automation: string;
   source: TriggerSource;
-  /** The event's stable identity at its source: `<thread id>:<tool use id>` for a publish. */
+  /** The event's stable identity at its source: `<thread id>:<tool use id>` for a publish, the X-GitHub-Delivery id for a webhook. */
   source_id: string;
   /** One line on what happened, for the list. */
   summary: string;

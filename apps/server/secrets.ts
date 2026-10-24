@@ -2,6 +2,7 @@ import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { db } from './db.ts';
 import { SERVER_ONLY_VARS } from './harness/env-guard.ts';
+import { WEBHOOK_SECRET_PREFIX } from './github-webhook.ts';
 
 // Secret values live only in the macOS Keychain (service "omni-os").
 // The DB keeps names and scopes so the UI can list them without reading values.
@@ -13,9 +14,9 @@ export const SYNC_SECRETS = { url: 'SUPABASE_URL', anonKey: 'SUPABASE_ANON_KEY',
 const PRIVATE = new Set<string>(Object.values(SYNC_SECRETS));
 const SERVER_ONLY = new Set<string>(SERVER_ONLY_VARS);
 
-/** False for Omni's sync credentials (global only) and for the Grok Bot webhook (any scope). */
+/** False for Omni's sync credentials (global only), the Grok Bot webhook and webhook signing secrets (any scope). */
 export function secretReachesThread(scope: string, name: string): boolean {
-  if (SERVER_ONLY.has(name)) return false;
+  if (SERVER_ONLY.has(name) || name.startsWith(WEBHOOK_SECRET_PREFIX)) return false;
   if (scope === 'global' && PRIVATE.has(name)) return false;
   return true;
 }

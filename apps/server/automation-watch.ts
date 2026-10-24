@@ -47,6 +47,9 @@ const ghDeps: WatchDeps = {
   start: (a, prompt, title) => runAutomation(a, 'event', { prompt, title }),
 };
 
+/** The gh login, asked once. Webhook reviews by it are an automation's own (github-webhook.ts). */
+export const ghLogin = () => ghDeps.self();
+
 /** The repo an event automation watches: its own `on.repo`, else its channel's GitHub repo. */
 export function watchedRepo(a: Automation & { on: PrTrigger }): string | null {
   return a.on.repo ?? channels.get(a.channel)?.github_repo ?? null;

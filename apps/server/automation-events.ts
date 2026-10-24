@@ -1,10 +1,11 @@
 // Event triggers for automations: which GitHub PR changes should start a run, and the parsing of every `on:` block.
 // Pure, no db, no gh, so it is tested directly (tests/automation-events.test.ts). apps/server/automation-watch.ts polls
-// gh and feeds the PR events; apps/server/automation-triggers.ts takes artifact publishes.
+// gh and feeds the PR events; apps/server/automation-triggers.ts takes artifact publishes; apps/server/github-webhook-api.ts
+// takes signed GitHub webhooks.
 
 export const PR_EVENT_TYPES = ['pr_opened', 'pr_checks_failed', 'pr_conflict', 'pr_review'] as const;
 export type PrEventType = (typeof PR_EVENT_TYPES)[number];
-export const EVENT_TYPES = [...PR_EVENT_TYPES, 'artifact_published'] as const;
+export const EVENT_TYPES = [...PR_EVENT_TYPES, 'artifact_published', 'github_webhook'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 export const EVENT_LABELS: Record<EventType, string> = {
@@ -13,7 +14,12 @@ export const EVENT_LABELS: Record<EventType, string> = {
   pr_conflict: 'When a PR has conflicts',
   pr_review: 'When a PR gets review comments',
   artifact_published: 'When a page is published',
+  github_webhook: 'When GitHub sends a webhook',
 };
+
+/** The GitHub webhook events an automation can take. */
+export const WEBHOOK_EVENTS = ['workflow_run', 'pull_request_review'] as const;
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
 /** A PR automation's `on:` block. `repo` defaults to the channel's GitHub repo, resolved by the watcher. */
 export interface PrTrigger {
@@ -37,19 +43,45 @@ export interface ArtifactTrigger {
   updates: boolean;
 }
 
-/** An automation's `on:` block. */
-export type EventTrigger = PrTrigger | ArtifactTrigger;
+/** `on: { event: github_webhook, repo, events? }`: GitHub posts a signed event to the automation's own endpoint. */
+export interface WebhookTrigger {
+  event: 'github_webhook';
+  /** The only repo whose events it takes. */
+  repo: string;
+  /** Which events it takes. Both unless the file names some. */
+  events: WebhookEvent[];
+  /** `any`: reviews from anyone, and runs for fork PRs, fire too. Unset, only the repo's people and its own branches. */
+  trust?: 'any';
+}
 
-export const isPrTrigger = (t: EventTrigger | undefined): t is PrTrigger => !!t && t.event !== 'artifact_published';
+/** An automation's `on:` block. */
+export type EventTrigger = PrTrigger | ArtifactTrigger | WebhookTrigger;
+
+export const isPrTrigger = (t: EventTrigger | undefined): t is PrTrigger => !!t && (PR_EVENT_TYPES as readonly string[]).includes(t.event);
 
 const CHANNEL_ID = /^[\w.-]+$/;
 
-/** `on: pr_checks_failed`, or `on: { event, repo?, drafts?, trust? }`, or `on: { event: artifact_published, channels?, updates? }`. A string error when it is none. */
+const REPO = /^[\w.-]+\/[\w.-]+$/;
+
+/**
+ * `on: pr_checks_failed`, or `on: { event, repo?, drafts?, trust? }`, or `on: { event: artifact_published, channels?,
+ * updates? }`, or `on: { event: github_webhook, repo, events?, trust? }`. A string error when it is none.
+ */
 export function parseTrigger(raw: unknown): EventTrigger | string {
   const obj = typeof raw === 'string' ? { event: raw } : raw;
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return `"on" must be an event name or { event, repo }`;
-  const { event, repo, drafts, trust, channels, updates } = obj as Record<string, unknown>;
+  const { event, repo, drafts, trust, channels, updates, events } = obj as Record<string, unknown>;
   if (!EVENT_TYPES.includes(event as EventType)) return `unknown event "${String(event)}" (use ${EVENT_TYPES.join(', ')})`;
+  if (events !== undefined && event !== 'github_webhook') return `events is for github_webhook`;
+  if (event === 'github_webhook') {
+    if (drafts !== undefined || channels !== undefined || updates !== undefined) return `drafts, channels and updates are not for github_webhook`;
+    if (typeof repo !== 'string' || !REPO.test(repo)) return `github_webhook needs repo: owner/name`;
+    const list = typeof events === 'string' ? [events] : (events ?? [...WEBHOOK_EVENTS]);
+    if (!Array.isArray(list) || !list.length || !list.every((e) => WEBHOOK_EVENTS.includes(e as WebhookEvent)))
+      return `events must be one or more of ${WEBHOOK_EVENTS.join(', ')}`;
+    if (trust !== undefined && trust !== 'any' && trust !== 'members') return `trust must be members or any`;
+    return { event, repo, events: [...new Set(list as WebhookEvent[])], ...(trust === 'any' ? { trust } : {}) };
+  }
   if (event === 'artifact_published') {
     if (repo !== undefined || drafts !== undefined || trust !== undefined) return `repo, drafts and trust are for PR events`;
     const list = typeof channels === 'string' ? [channels] : channels;
@@ -59,7 +91,7 @@ export function parseTrigger(raw: unknown): EventTrigger | string {
     return { event, ...(list && { channels: list as string[] }), updates: updates === true };
   }
   if (channels !== undefined || updates !== undefined) return `channels and updates are for artifact_published`;
-  if (repo !== undefined && (typeof repo !== 'string' || !/^[\w.-]+\/[\w.-]+$/.test(repo))) return `repo must look like owner/name`;
+  if (repo !== undefined && (typeof repo !== 'string' || !REPO.test(repo))) return `repo must look like owner/name`;
   if (drafts !== undefined && typeof drafts !== 'boolean') return `drafts must be true or false`;
   if (trust !== undefined && trust !== 'any' && trust !== 'members') return `trust must be members or any`;
   return { event: event as PrEventType, ...(repo ? { repo: repo as string } : {}), drafts: drafts === true, ...(trust === 'any' ? { trust } : {}) };
