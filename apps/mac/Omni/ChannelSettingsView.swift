@@ -126,6 +126,7 @@ struct ChannelSettingsForm: View {
     VStack(alignment: .leading, spacing: z(16)) {
       basics
       code
+      if let existing { ChannelActionsView(client: model.client, channel: existing.id) }
       storeAndBrowser
       if let error { ErrorNote(text: error) }
       actions
