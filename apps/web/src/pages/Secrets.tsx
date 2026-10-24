@@ -12,6 +12,8 @@ const KNOWN_GLOBALS: { name: string; blurb: string }[] = [
   { name: 'HERMES_API_KEY', blurb: 'Hermes API bearer token. Global. Sent on HTTP requests, not in a shell environment.' },
   { name: 'GROKBOT_WEBHOOK_URL', blurb: 'Grok Bot webhook URL from the Omni OS requests routine. Global. Send to Grok Bot posts here. Stays on the server.' },
   { name: 'GROKBOT_WEBHOOK_AUTH', blurb: 'Authorization value for that webhook, pasted as Grok Bot shows it. Global. Stays on the server.' },
+  { name: 'GOOGLE_OAUTH_CLIENT_SECRET', blurb: 'Client secret of the Google Desktop app OAuth client, for Sign in with Google on this Mac. Global. Stays on the server.' },
+  { name: 'GOOGLE_OAUTH_WEB_CLIENT_SECRET', blurb: 'Client secret of the Google Web application OAuth client the sign-in broker uses. Global. Stays on the server.' },
 ];
 
 function scopeLabel(scope: string, name: (id: string) => string | undefined) {

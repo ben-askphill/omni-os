@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import type { Thread, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult } from '@omni/server/db.ts';
+import type { Thread, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, SessionAccess } from '@omni/server/db.ts';
+import type { Availability } from '@omni/server/sign-in.ts';
 import type { Attachment } from '@omni/server/uploads.ts';
 import type { HarnessInfo, ModelEntry, HarnessId } from '@omni/server/harness/types.ts';
 import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
@@ -398,6 +399,49 @@ export async function pairBrowser(token: string): Promise<boolean> {
   if (!res.ok) throw new ApiError(`Request failed (${res.status})`, res.status);
   return true;
 }
+
+// Sign in with Google (docs/user/google-sign-in.md). The server's answers, as apps/server/auth-api.ts sends them.
+
+export type SignedInUser = Pick<SessionAccess['user'], 'email' | 'name'>;
+/** The browser or Mac a session belongs to. */
+export type SignInDevice = SessionAccess['device'];
+/** Whether a browser here can sign in with Google now (GET /api/auth/google). `configured` false: this install never set it up for this address. */
+export type SignInAvailability = Availability;
+
+/** GET /api/auth: how this request got in (the install token, or a Google session) and who may sign in. */
+export type AuthState = {
+  ok: true;
+  google: { loopback: boolean; broker: boolean; allowedEmails: string[]; allowedHd: string | null };
+} & ({ via: 'token'; user: null; device: null } | { via: 'session'; user: SignedInUser; device: SignInDevice });
+
+/** POST /api/auth/google/finish, once Google has answered. */
+export type SignInFinished = { ok: true; user: SignedInUser; device: SignInDevice; claimed: boolean };
+
+const FINISH_TRIES = 10;
+const FINISH_GAP_MS = 1000;
+const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+
+export const authState = () => api.get<AuthState>('/auth');
+
+export const signInAvailability = () => api.get<SignInAvailability>('/auth/google');
+
+/** Starts a sign-in for this browser, which the server ties to it with a cookie. Gives the Google address to go to. */
+export async function startGoogleSignIn(): Promise<string> {
+  return (await api.post<{ attempt: string; url: string }>('/auth/google/start', { client: 'web' })).url;
+}
+
+/** Finishes the sign-in Google sent this browser back to. A 202 means Google's answer has not arrived yet: ask again. */
+export async function finishGoogleSignIn(attempt: string, pause: (ms: number) => Promise<void> = sleep): Promise<SignInFinished> {
+  for (let n = 1; ; n++) {
+    const answer = await api.post<SignInFinished | { pending: true }>('/auth/google/finish', { attempt });
+    if (!('pending' in answer)) return answer;
+    if (n === FINISH_TRIES) throw new Error('Google took too long to answer. Start again.');
+    await pause(FINISH_GAP_MS);
+  }
+}
+
+/** Ends this browser's session. The page reloads after, which lands on the pairing screen. */
+export const signOut = () => api.post<{ ok: true }>('/auth/signout');
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   // FormData carries its own multipart content type, so never set one for it.
