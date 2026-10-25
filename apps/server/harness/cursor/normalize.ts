@@ -79,6 +79,10 @@ export function normalizeCursor(evt: any): CursorParsed {
       break;
     }
     case 'tool_call':
+      if (evt.tool_call && typeof evt.tool_call === 'object') {
+        out.records.push(...nestedToolCall(evt));
+        break;
+      }
       if (evt.subtype === 'completed' || evt.subtype === 'failed') {
         out.records.push(...toolCall(evt));
         const result = evt.result;
@@ -158,4 +162,61 @@ function toolCall(evt: any): StreamRecord[] {
     default:
       return [toolUse(id, tool || 'tool', input)];
   }
+}
+
+/** Cursor's live protobuf JSON envelope. Legacy flat events above remain completion-only. */
+function nestedToolCall(evt: any): StreamRecord[] {
+  const entry = Object.entries(evt.tool_call).find(([key]) => key.endsWith('ToolCall'));
+  if (!entry) return [];
+  const [key, value] = entry as [string, any];
+  // Cursor joins its call id and function-call id with a newline. The first is shared by both events.
+  const id = String(evt.call_id ?? evt.toolCallId ?? evt.callId ?? '').split('\n')[0];
+  const input = value?.args ?? {};
+  if (evt.subtype === 'started') {
+    const kind = key.slice(0, -'ToolCall'.length);
+    const aliases: Record<string, string> = { updateTodos: 'todos' };
+    const tool = aliases[kind] ?? kind;
+    // Reuse the flat adapter's Claude names without emitting any of its completion records.
+    const mapped = {
+      ...input,
+      command: input.command ?? input.path,
+      pattern: input.pattern ?? input.globPattern ?? input.path,
+      content: input.content ?? input.fileText,
+      server: input.server ?? input.providerIdentifier,
+      tool: input.tool ?? input.toolName ?? input.name,
+    };
+    const use = toolCall({ toolCallId: id, tool, input: mapped })[0];
+    if (use.kind === 'tool_use' && use.payload.name === tool) {
+      // New Cursor kinds keep their raw args and a readable name, never an anonymous "tool" row.
+      return [toolUse(id, kind.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()), input)];
+    }
+    if (use.kind === 'tool_use' && ['Grep', 'Glob'].includes(use.payload.name)) {
+      use.payload.input = { ...input, pattern: mapped.pattern ?? '' };
+    }
+    return [use];
+  }
+  if (evt.subtype !== 'completed' && evt.subtype !== 'failed') return [];
+  // Documented at docs.cursor.com/en/cli/reference/output-format. The installed CLI also emits
+  // shell result.failure/timeout/rejected/spawnError/permissionDenied alongside result.success.
+  const result = value?.result ?? evt.result;
+  const failure = result?.error || result?.failure || result?.timeout || result?.rejected || result?.spawnError || result?.permissionDenied;
+  const body = failure || result?.success || result;
+  const failed = evt.subtype === 'failed' || !!evt.error || !!failure || body?.isError === true || body?.is_error === true ||
+    !!body?.error || result?.success === false || body?.status === 'failed' || (body?.exitCode != null && body.exitCode !== 0);
+  let text = resultText(evt.error || body);
+  if (body?.exitCode != null && body.exitCode !== 0) text = `Exit code ${body.exitCode}\n${text}`;
+  return [toolResult(id, text || (failed ? 'Tool reported failure.' : ''), failed)];
+}
+
+function resultText(result: any): string {
+  if (result == null) return '';
+  if (typeof result === 'string') return result;
+  if (result.stdout != null || result.stderr != null) return [result.stdout, result.stderr].filter(Boolean).join('\n');
+  if (result.error) return resultText(result.error);
+  if (result.content != null) return typeof result.content === 'string' ? result.content : textOf(result.content) || JSON.stringify(result.content);
+  if (result.output != null) return resultText(result.output);
+  if (result.errorMessage != null) return String(result.errorMessage);
+  if (result.reason != null) return String(result.reason);
+  if (result.result != null) return resultText(result.result);
+  return JSON.stringify(result);
 }

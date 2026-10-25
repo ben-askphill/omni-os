@@ -120,3 +120,67 @@ describe('fromCursorTurn', () => {
     expect(contextSummary({ used: 1000, max: 10_000, source: 'claude-cli' })).toBe('1K / 10K tokens (10%)');
   });
 });
+
+describe('Cursor nested stream tools', () => {
+  const event = (kind: string, args: unknown, subtype = 'started', result?: unknown) => ({
+    type: 'tool_call', subtype, call_id: 'call-stable\nfc_stable', tool_call: { [kind]: { args, ...(result === undefined ? {} : { result }) } },
+  });
+
+  it('replays the captured stream with one named use and one attached result per call', () => {
+    const records = readFileSync(join(import.meta.dirname, 'fixtures/cursor-stream-tools.jsonl'), 'utf8')
+      .trim().split('\n').flatMap((line) => normalizeCursor(JSON.parse(line)).records);
+    const uses = records.filter((r) => r.kind === 'tool_use');
+    const results = records.filter((r) => r.kind === 'tool_result');
+    expect(uses.map((r) => r.payload.name)).toEqual(['Glob', 'Glob', 'Read', 'Bash', 'Read', 'Read']);
+    expect(uses[0].payload.input).toEqual({ path: '/w/a.txt', pattern: '/w/a.txt' });
+    expect(uses[2].payload.input).toEqual({ file_path: '/w/a.txt' });
+    expect(uses[3].payload.input).toEqual({ command: '/w/a.txt' });
+    expect(new Set(uses.map((r) => r.payload.id)).size).toBe(6);
+    expect(results.map((r) => r.payload.tool_use_id)).toEqual(uses.map((r) => r.payload.id));
+    expect(results.every((r) => !r.payload.is_error)).toBe(true);
+    expect(uses.some((r) => r.payload.name === 'tool' || r.payload.id.includes('\n'))).toBe(false);
+  });
+
+  it.each([
+    ['shellToolCall', { command: 'ls -la' }, 'Bash', { command: 'ls -la' }],
+    ['readToolCall', { path: '/w/a.txt' }, 'Read', { file_path: '/w/a.txt' }],
+    ['writeToolCall', { path: '/w/a.txt', fileText: 'hello' }, 'Write', { file_path: '/w/a.txt', content: 'hello' }],
+    ['editToolCall', { path: '/w/a.txt', oldString: 'a', newString: 'b' }, 'Edit', { file_path: '/w/a.txt', old_string: 'a', new_string: 'b' }],
+    ['editToolCall', { path: '/w/a.txt', edits: [{old_string:'a',new_string:'b'},{old_string:'b',new_string:'c'}] }, 'MultiEdit', { file_path: '/w/a.txt' }],
+    ['grepToolCall', { pattern: 'needle', path: '/w' }, 'Grep', { pattern: 'needle', path: '/w' }],
+    ['globToolCall', { globPattern: '*.ts', targetDirectory: '/w' }, 'Glob', { pattern: '*.ts', targetDirectory: '/w' }],
+    ['lsToolCall', { path: '/w' }, 'LS', { path: '/w' }],
+    ['updateTodosToolCall', { todos: [{ content: 'test', status: 'running' }] }, 'TodoWrite', { todos: [{ content: 'test', status: 'in_progress' }] }],
+    ['mcpToolCall', { providerIdentifier: 'omni', toolName: 'list_channels', args: { a: 1 } }, 'mcp__omni__list_channels', { a: 1 }],
+    ['webSearchToolCall', { searchTerm: 'Cursor' }, 'Web Search', { searchTerm: 'Cursor' }],
+    ['somethingNewToolCall', { foo: 'bar' }, 'Something New', { foo: 'bar' }],
+  ])('shows %s with its input before completion', (kind, args, name, input) => {
+    expect(normalizeCursor(event(kind, args)).records).toMatchObject([
+      { kind: 'tool_use', payload: { id: 'call-stable', name, input, parent: null } },
+    ]);
+  });
+
+  // Read success is the documented stream-json example, not an invented flat result.
+  it('attaches the documented nested read result without adding another row', () => {
+    const records = normalizeCursor(event('readToolCall', { path: 'file.txt' }, 'completed', {
+      success: { content: 'file contents...', isEmpty: false, exceededLimit: false, totalLines: 54, totalChars: 1254 },
+    })).records;
+    expect(records).toEqual([{ kind: 'tool_result', payload: { tool_use_id: 'call-stable', text: 'file contents...', is_error: false, truncated: false } }]);
+  });
+
+  it('keeps shell stdout and stderr, nonzero exits and nested errors', () => {
+    expect(normalizeCursor(event('shellToolCall', {}, 'completed', { failure: { stdout: 'out', stderr: 'bad', exitCode: 2 } })).records)
+      .toMatchObject([{ kind: 'tool_result', payload: { text: 'Exit code 2\nout\nbad', is_error: true } }]);
+    expect(normalizeCursor(event('readToolCall', {}, 'failed', { error: { errorMessage: 'Permission denied' } })).records)
+      .toMatchObject([{ kind: 'tool_result', payload: { text: 'Permission denied', is_error: true } }]);
+    expect(normalizeCursor(event('mcpToolCall', {}, 'completed', { success: { isError: true, content: [{ type: 'text', text: 'Denied' }] } })).records)
+      .toMatchObject([{ kind: 'tool_result', payload: { text: 'Denied', is_error: true } }]);
+  });
+
+  it('clips large nested output and completes calls with no output', () => {
+    expect(normalizeCursor(event('shellToolCall', {}, 'completed', { success: { stdout: 'x'.repeat(20_000), exitCode: 0 } })).records)
+      .toMatchObject([{ kind: 'tool_result', payload: { text: 'x'.repeat(16_000), truncated: true, is_error: false } }]);
+    expect(normalizeCursor(event('globToolCall', {}, 'completed')).records)
+      .toMatchObject([{ kind: 'tool_result', payload: { text: '', is_error: false } }]);
+  });
+});

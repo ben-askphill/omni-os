@@ -85,6 +85,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 - In Xcode, open `apps/mac/Omni.xcodeproj` to run the app. Its scheme has no tests: Xcode does not offer a local package's test target to the project's schemes. For Cmd-U on OmniKit, open `apps/mac/OmniKit/Package.swift`.
 - `apps/mac/.xcode`, `apps/mac/OmniKit/.build`, `apps/mac/OmniKit/.swiftpm` and `xcuserdata` are gitignored.
 - OmniKit's one dependency is swift-markdown (from 0.6.0), which brings swift-cmark. Two `Package.resolved` files pin them and are committed: `apps/mac/OmniKit/Package.resolved` for `swift test`, and `apps/mac/Omni.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` for xcodebuild and Xcode. Keep their pins the same: after `swift package update` in `apps/mac/OmniKit`, copy its file over the Xcode one (or resolve in Xcode and copy back). The first build of a checkout fetches both from GitHub; later ones use the cache.
+- Run `npm install --include=dev` before building the app. Its resource phase copies the pinned `mermaid/dist/mermaid.min.js` from the root `node_modules` for offline diagram rendering.
 - The app target, not OmniKit, also depends on SwiftTerm (the Terminal tab), so the Xcode `Package.resolved` has a swiftterm pin that OmniKit's file lacks. That difference is deliberate; the swift-markdown and swift-cmark pins must still match. SwiftTerm is held at `upToNextMinorVersion 1.11.2`: 1.12 and later compile Metal shaders (xcodebuild fails without the Metal Toolchain component), and 1.19 and later add a build plugin that needs a trust prompt, which a headless build cannot answer.
 
 ### Golden fixtures
@@ -222,7 +223,9 @@ For the thread screen (part C). What parts A and B leave ready and what they do 
 
 ## Markdown (#63 part B)
 
-`MarkdownDocument(parsing:)` reads text the way `apps/web/src/components/Markdown.tsx` shows it: react-markdown with remark-gfm, then its thread id links. swift-markdown (cmark-gfm) parses, smart punctuation off, and `Markdown.swift` turns its tree into plain `Sendable` values, so no swift-markdown type leaves OmniKit.
+`MarkdownDocument(parsing:)` reads text the way `apps/web/src/components/Markdown.tsx` shows it: react-markdown with remark-gfm, then its thread id links. Mermaid fences leave the selectable text flow and render SVG in a non-persistent WKWebView with the bundled renderer, existing theme tokens and source fallback. Other code stays selectable.
+
+The swift-markdown parser (cmark-gfm) reads the source, smart punctuation off, and `Markdown.swift` turns its tree into plain `Sendable` values, so no swift-markdown type leaves OmniKit.
 
 - Blocks: `.paragraph`, `.heading(level:)`, `.code(language:code:)` (the first word of the fence info; no trailing newline), `.quote`, `.list`, `.table`, `.thematicBreak`, `.html` (a raw HTML block, shown as the text it is).
 - `MarkdownList`: `isOrdered`, `start`, `isLoose`, and items of blocks, so lists nest. `checked` is nil for an item that is not a task. `isLoose` is CommonMark's loose list (a blank line between items, or between two blocks of one item); the Web UI wraps each item in a `<p>` then, which spaces the list out.

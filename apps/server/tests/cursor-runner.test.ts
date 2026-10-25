@@ -36,6 +36,17 @@ describe('cursor tracer', () => {
     expect(H.byKind(t.id, 'user').length).toBe(1);
   });
 
+  it('stores a named nested tool when it starts and attaches one result when it completes', async () => {
+    const t = await H.start('CMD TOOL:1500 list files', cursor);
+    await H.until('started Bash row', () => H.byKind(t.id, 'tool_use').length === 1);
+    expect(H.byKind(t.id, 'tool_use')[0].p).toMatchObject({ id: 'tc_1', name: 'Bash', input: { command: 'ls -a' } });
+    expect(H.byKind(t.id, 'tool_result')).toHaveLength(0);
+    await H.untilResults(t.id, 1);
+    expect(H.byKind(t.id, 'tool_use')).toHaveLength(1);
+    expect(H.byKind(t.id, 'tool_result')).toHaveLength(1);
+    expect(H.byKind(t.id, 'tool_result')[0].p).toMatchObject({ tool_use_id: 'tc_1', text: 'a\nb\n', is_error: false });
+  });
+
   it('runs with full access and never leaks the Cursor api key', () => {
     const turn = H.cursorRequests().find((r: any) => r.method === 'turn');
     for (const r of H.cursorRequests()) expect(r.cursor_auth).toEqual([]);

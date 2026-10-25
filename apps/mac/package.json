@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@omni/shared": "*"
+    "@omni/shared": "*",
+    "mermaid": "^11.17.2"
   },
   "devDependencies": {
     "@omni/test-fixtures": "*",

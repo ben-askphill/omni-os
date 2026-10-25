@@ -10,6 +10,7 @@ extension MarkdownBlock {
   var flowsAsText: Bool {
     switch self {
     case .table, .thematicBreak: false
+    case .code(let language, _) where language == "mermaid": false
     case .paragraph(let text): !text.hasImages
     case .quote(let inner): inner.allSatisfy(\.flowsAsText)
     case .list(let list): list.items.allSatisfy { $0.blocks.allSatisfy(\.flowsAsText) }

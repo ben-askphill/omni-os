@@ -11,7 +11,8 @@
 //                          available_commands_update, then waits to be killed
 //
 // Directives in the prompt:
-//   CMD     emit a shell tool_call before the reply
+//   CMD     emit a nested shell tool_call before the reply
+//   TOOL:<ms> delay the CMD completion so tests can observe the started row
 //   CRASH   exit(1) once the prompt is echoed, like the process dying mid-turn
 //   HANG    emit init + assistant but no result, and stay alive until killed
 //   ORPHAN  first leave a child behind that holds our stdout until it is killed (two minutes at most), like a
@@ -103,9 +104,11 @@ async function runTurn() {
   // A call that runs tools tags its events with a model_call_id; the final reply's call tags none.
   if (prompt.includes('CMD')) {
     const model_call_id = 'req_1-0-abcd';
-    write({ type: 'tool_call', subtype: 'started', toolCallId: 'tc_1', tool: 'shell', input: { command: 'ls -a' }, model_call_id });
-    await delay(3);
-    write({ type: 'tool_call', subtype: 'completed', toolCallId: 'tc_1', tool: 'shell', input: { command: 'ls -a' }, result: { output: 'a\nb\n', exitCode: 0 }, model_call_id });
+    const call_id = 'tc_1\nfc_1';
+    const args = { command: 'ls -a' };
+    write({ type: 'tool_call', subtype: 'started', call_id, tool_call: { shellToolCall: { args } }, model_call_id });
+    await delay(Number(prompt.match(/TOOL:(\d+)/)?.[1] ?? 3));
+    write({ type: 'tool_call', subtype: 'completed', call_id, tool_call: { shellToolCall: { args, result: { success: { stdout: 'a\nb\n', stderr: '', exitCode: 0 } } } }, model_call_id });
   }
   write({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: `ack: ${prompt}` }] } });
 

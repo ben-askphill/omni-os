@@ -81,6 +81,8 @@ private struct MarkdownBlockView: View {
         .font(.omni(size: Self.headingSize(level, base: size), weight: level <= 2 ? .medium : .semibold))
         .lineSpacing(1)
         .padding(.top, z(6))
+    case .code(let language, let code) where language == "mermaid":
+      MermaidDiagramView(source: code) { MarkdownBlockView(block: .code(language: nil, code: code), size: size, chips: chips) }
     case .code(_, let code):
       ScrollView(.horizontal) {
         Text(code)

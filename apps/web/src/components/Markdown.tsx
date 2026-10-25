@@ -2,6 +2,7 @@ import { memo, type ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ExternalLink } from './LinkChip.tsx';
+import { MermaidDiagram } from './MermaidDiagram.tsx';
 
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/g;
 const UUID_EXACT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -26,6 +27,15 @@ function linkThreadIds(md: string) {
 }
 
 const components: Components = {
+  pre({ node, children }) {
+    const code = node?.children[0];
+    if (code?.type === 'element' && code.tagName === 'code' &&
+      Array.isArray(code.properties.className) && code.properties.className.includes('language-mermaid')) {
+      const source = code.children.map((child) => child.type === 'text' ? child.value : '').join('');
+      return <MermaidDiagram source={source} />;
+    }
+    return <pre>{children}</pre>;
+  },
   a({ href, children }) {
     const internal = href?.startsWith('#');
     if (href && /^https?:\/\//i.test(href)) return <ExternalLink href={href}>{children}</ExternalLink>;

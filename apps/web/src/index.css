@@ -1226,3 +1226,16 @@ html:has(.mo-app) body {
     opacity: 1;
   }
 }
+
+/* Inline diagrams use the same tokens and scrolling as fenced code. */
+.md .mermaid-diagram {
+  margin: 0.6em 0;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--code-bg);
+  color: var(--fg);
+}
+.md .mermaid-diagram > div { padding: 12px 14px; }
+.md .mermaid-diagram svg { display: block; height: auto; max-width: 100%; margin: auto; }
+.md .mermaid-diagram pre { margin: 0; border: 0; }
