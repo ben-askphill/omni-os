@@ -108,7 +108,7 @@ describe('buildMcpConfig: browser', () => {
   it('adds no browser when OMNI_BROWSER is off', () => {
     config.browser = false;
     const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), browserBusy: false, omniUrl: OMNI_URL });
-    expect(Object.keys(cfg.mcpServers)).toEqual(['omni-ask']);
+    expect(Object.keys(cfg.mcpServers)).toEqual(['omni-ask', 'omni-threads']);
   });
 });
 
@@ -123,6 +123,21 @@ describe('buildMcpConfig: omni-ask', () => {
       });
     }
     expect(existsSync(paths.mcpAsk)).toBe(true);
+  });
+});
+
+describe('buildMcpConfig: omni-threads', () => {
+  it('gives every thread without the conductor server read_referenced_thread, which the conductor server has itself', () => {
+    for (const r of [undefined, role([]), role(['github'])]) {
+      const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: r, browserBusy: false, omniUrl: OMNI_URL });
+      expect(cfg.mcpServers['omni-threads']).toEqual({
+        command: paths.tsx,
+        args: [paths.mcpThreads],
+        env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
+      });
+    }
+    expect(buildMcpConfig({ threadId: THREAD, channel: channel(), role: role(['omni']), browserBusy: false, omniUrl: OMNI_URL }).mcpServers['omni-threads']).toBeUndefined();
+    expect(existsSync(paths.mcpThreads)).toBe(true);
   });
 });
 

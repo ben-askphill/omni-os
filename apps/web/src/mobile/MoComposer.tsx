@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { HarnessLogo } from '../components/brand.tsx';
 import { AttachmentStrip, useAttachments, useReplySend } from '../components/Composer.tsx';
+import { ThreadReferencePanel } from '../components/ThreadReference.tsx';
 import { ErrorNote, Icon, type IconName } from '../components/ui.tsx';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { removeDraftContext, useDraftContext } from '../message-context/draft.ts';
@@ -35,6 +36,7 @@ function PlusSheet({
   thread,
   harnesses,
   onPick,
+  onReference,
   onRun,
   onKeep,
   onClose,
@@ -42,6 +44,7 @@ function PlusSheet({
   thread: Thread;
   harnesses?: HarnessWithRunning[];
   onPick: (p: Pick) => void;
+  onReference: () => void;
   onRun?: () => void;
   onKeep: () => void;
   onClose: () => void;
@@ -67,6 +70,11 @@ function PlusSheet({
         ))}
       </div>
       <div className="px-3">
+        <MoGroup>
+          <MoListRow icon="message" label="Reference a thread" sub="Attach another thread, not its messages" onClick={onReference} />
+        </MoGroup>
+      </div>
+      <div className="px-3 pt-2.5">
         <MoGroup>
           <MoListRow
             icon={<HarnessLogo harness={shown.harness} size={15} />}
@@ -114,6 +122,7 @@ export function MoComposer({
   const [error, setError] = useState<string | null>(null);
   const [plus, setPlus] = useState(false);
   const [runSheet, setRunSheet] = useState(false);
+  const [referencing, setReferencing] = useState(false);
   const [switching, setSwitching] = useState(false);
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>('/harnesses');
   const att = useAttachments();
@@ -262,6 +271,10 @@ export function MoComposer({
           thread={thread}
           harnesses={harnesses}
           onPick={pick}
+          onReference={() => {
+            setPlus(false);
+            setReferencing(true);
+          }}
           onRun={
             harnesses
               ? () => {
@@ -277,6 +290,11 @@ export function MoComposer({
           }}
           onClose={() => setPlus(false)}
         />
+      )}
+      {referencing && (
+        <MoSheet onClose={() => setReferencing(false)} label="Reference a thread" full>
+          <ThreadReferencePanel thread={thread} touch onPicked={() => setReferencing(false)} />
+        </MoSheet>
       )}
       {runSheet && harnesses && (
         <ModelSheet

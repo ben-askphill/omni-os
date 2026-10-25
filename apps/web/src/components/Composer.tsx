@@ -20,6 +20,7 @@ import { parseSlash, type SlashCommand } from '@omni/shared/slash.ts';
 import { requestIdFor, sendKey, type PendingRequest } from '../requests.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { ContextChips } from '../message-context/ContextChips.tsx';
+import { ThreadReferenceButton } from './ThreadReference.tsx';
 import { removeDraftContext, settleDraftContext, useDraftContext } from '../message-context/draft.ts';
 
 // Unsent text survives navigation (not reloads). Keyed by where the composer lives.
@@ -962,6 +963,7 @@ export function ReplyComposer({
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
         {extra}
         <AttachButton onPick={att.add} disabled={busy} />
+        <ThreadReferenceButton thread={thread} disabled={busy} />
         <ThreadRunPills thread={thread} onSwitched={(t) => onChanged?.(t)} onError={setError} />
         <div className="ml-auto flex items-center gap-2.5">
           <Hint tab={!!suggestion} />

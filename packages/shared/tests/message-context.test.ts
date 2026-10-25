@@ -5,6 +5,7 @@ import { annotate, browserAnnotation, cleanTitle, dragToRect, elementRect, rectI
 import { blobIds, clampToHunk, diffSelection, selectRows, type DiffFileLike, type DiffSelection, type DiffSource } from '../message-context-diff.ts';
 import { CONTEXT_KINDS, parseContexts, readContexts } from '../message-context-kinds.ts';
 import { LINES_MAX, TEXT_MAX, plainText, selectExcerpt, terminalExcerpt, type TerminalExcerpt } from '../message-context-terminal.ts';
+import { CHANNEL_NAME_MAX, TITLE_MAX, cleanLine, referenceBody, shortId, threadReference, type ThreadIdentity, type ThreadReference } from '../message-context-thread.ts';
 import { CONTEXT_JSON_MAX, LABEL_MAX, contextDigest, contextKey, cutLabel, newContext, readContextsWith, type MessageContext } from '../message-context.ts';
 
 // The same corpus runs in the web tests and apps/mac/OmniKit/Tests/OmniKitTests/MessageContextTests.swift.
@@ -28,6 +29,7 @@ const corpus = JSON.parse(readFileSync(fixture('message-context.json'), 'utf8'))
   }[];
   drags: { name: string; drag: Drag; shown: { width: number; height: number }; viewport: { width: number; height: number }; expect: { ok: true; rect: PixelRect } | { ok: false; error: string } }[];
   elementRects: { name: string; bounds: PixelRect; viewport: { width: number; height: number }; expect: PixelRect }[];
+  threadReferences: { name: string; thread: ThreadIdentity; current: string; at: string; expect: ThreadReference }[];
   overlays: { name: string; rect: PixelRect; image: { width: number; height: number }; viewport: { width: number; height: number }; expect: PixelRect }[];
 };
 
@@ -278,5 +280,42 @@ describe('browser_annotation', () => {
     const long = cleanTitle('é'.repeat(400));
     expect([...long]).toHaveLength(300);
     expect(long.endsWith('…')).toBe(true);
+  });
+});
+
+describe('thread references', () => {
+  it.each(corpus.threadReferences.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    const body = referenceBody(c.thread, c.current, new Date(c.at));
+    expect(JSON.stringify(body)).toBe(JSON.stringify(c.expect));
+    expect(JSON.stringify(threadReference.parse(body, 1))).toBe(JSON.stringify({ ok: true, value: body }));
+  });
+
+  it('labels a thread by title, channel and the start of its id, so two threads with one title differ', () => {
+    const a = referenceBody({ id: 'aaaaaaaa-1111', title: 'Fix the cart', channel: 'shop', channel_name: 'Shop' }, 'shop', new Date(0));
+    const b = referenceBody({ id: 'bbbbbbbb-2222', title: 'Fix the cart', channel: 'shop', channel_name: 'Shop' }, 'shop', new Date(0));
+    expect(threadReference.label(a)).toBe('Thread: Fix the cart (Shop · aaaaaaaa)');
+    expect(threadReference.label(a)).not.toBe(threadReference.label(b));
+    expect(shortId('aaaaaaaa-1111')).toBe('aaaaaaaa');
+  });
+
+  it('keeps the id in a label cut to LABEL_MAX, since a cut drops the start', () => {
+    const long = referenceBody({ id: 'cccccccc-3333', title: 'a'.repeat(TITLE_MAX), channel: 'shop', channel_name: 'S'.repeat(CHANNEL_NAME_MAX) }, 'shop', new Date(0));
+    const label = cutLabel(threadReference.label(long));
+    expect([...label]).toHaveLength(LABEL_MAX);
+    expect(label.endsWith('· cccccccc)')).toBe(true);
+  });
+
+  it('is refused for what a record cannot hold, by name', () => {
+    const ok = referenceBody({ id: 't', title: 'x', channel: 'c', channel_name: 'C' }, 'c', new Date(0));
+    expect(threadReference.parse({ ...ok, thread: '' }, 1)).toEqual({ ok: false, error: 'thread must be a string of 1 to 64 characters' });
+    expect(threadReference.parse({ ...ok, channel_name: 'a\u202eb' }, 1)).toEqual({ ok: false, error: 'channel_name must be plain text on one line' });
+    expect(threadReference.parse(ok, 2)).toEqual({ ok: false, error: 'thread_reference has no version 2' });
+    expect(threadReference.parse(null, 1)).toEqual({ ok: false, error: 'not an object' });
+  });
+
+  it('cleans outside strings the way a record needs them', () => {
+    expect(cleanLine(undefined, 10, 'none')).toBe('none');
+    expect(cleanLine('a\u0000b\n c', 10, 'none')).toBe('a b c');
+    expect([...cleanLine('é'.repeat(30), 10, 'none')]).toHaveLength(10);
   });
 });

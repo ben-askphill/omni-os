@@ -104,6 +104,8 @@ export const paths = {
   mcpOmni: join(ROOT, 'apps', 'mcp', 'omni.ts'),
   /** ask_user_question, which every local thread gets. */
   mcpAsk: join(ROOT, 'apps', 'mcp', 'ask.ts'),
+  /** read_referenced_thread alone, which every local thread without `omni` gets. */
+  mcpThreads: join(ROOT, 'apps', 'mcp', 'threads.ts'),
   /** Claude Code mods (plugins of function hooks) Omni loads when config.mods is on. */
   mods: join(ROOT, 'mods'),
   modProgress: join(ROOT, 'mods', 'omni-progress'),

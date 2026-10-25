@@ -98,6 +98,7 @@ private struct DeliveryRefusal: Decodable {
     "action-run.json": { _ = try decodeFixture(ActionRun.self, "action-run.json") },
     "action-run-stopped.json": { _ = try decodeFixture(ActionRun.self, "action-run-stopped.json") },
     "thread-context.json": { _ = try decodeFixture(ThreadDetail.self, "thread-context.json") },
+    "thread-references.json": { _ = try decodeFixture([ThreadReferenceCandidate].self, "thread-references.json") },
     // Recorded by apps/server/tests/handoff-two-macs.test.ts, which needs two Macs.
     "devices.json": { _ = try decodeFixture([Device].self, "devices.json") },
     "thread-handoff.json": { _ = try decodeFixture(ThreadDetail.self, "thread-handoff.json") },

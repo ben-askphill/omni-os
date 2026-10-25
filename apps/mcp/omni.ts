@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { ApiError, call, SELF, text } from './api.ts';
+import { registerReferencedThread } from './referenced-thread.ts';
 
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
 const USER = process.env.OMNI_USER || 'the user';
@@ -516,6 +517,9 @@ server.registerTool('worktree_storage', {
   description: 'Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup, plus what a cleanup or this Mac\'s retention policy would remove and the last cleanup runs. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing: only Ben removes worktrees, in Settings > Storage.',
   inputSchema: { scan: z.boolean().optional() },
 }, async ({ scan }) => text(await call('/worktrees/scan', scan ? { method: 'POST' } : undefined)));
+
+// #218: the conductor reads a thread Ben referenced in a message the same way every other thread does.
+registerReferencedThread(server);
 
 server.registerTool('tool_failures', {
   description: 'Inspect machine-local tool failures grouped by harness, tool and category, most frequent first. With group_id, list occurrences with thread/call references. No raw arguments or error bodies. Use before for older occurrences.',

@@ -110,6 +110,8 @@ const NAMES = [
   // sent message and on one held behind its turn.
   'message-context-request.json',
   'thread-context.json',
+  // The thread reference picker's search over every channel, from that thread.
+  'thread-references.json',
   // Bounded history (#223), on a thread whose first message is too big for a row, under a tiny OMNI_HISTORY_BUDGET:
   // the head with an anchor, an older page, a reveal of the first message, that message whole, and search hits.
   'thread-open.json',
@@ -678,6 +680,8 @@ async function scenario() {
     const d = await detail(wt.id);
     return d.thread.status === 'done' && !d.pending?.length;
   }, 'the held context message to run');
+  const references = keep('thread-references.json', await get(`/thread-references?thread=${wt.id}&q=&scope=all`)) as { same_channel: boolean }[];
+  expect(references.map((r) => r.same_channel)).toContain(false);
 
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
@@ -871,6 +875,8 @@ function normalize(files: Map<Name, string>): Map<Name, string> {
     });
     t = t.replace(TIME, (s) => (s.includes('.') ? '2026-01-05T09:00:00.000Z' : '2026-01-05T09:00:00Z'));
     t = t
+      // A thread reference candidate's short id is the start of its id, which is now the stand-in.
+      .replace(/("id": "00000000)([^"]*",\s*"short_id": ")[0-9a-f]{8}/g, '$1$200000000')
       .replace(/("pid": )\d+/g, '$14242')
       // A port that is set; an action's 0 ("pick a free one") means something.
       .replace(/("port": )[1-9]\d*/g, '$14799')

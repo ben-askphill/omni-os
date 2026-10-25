@@ -1,5 +1,5 @@
 {
-  "kinds": ["diff_selection", "terminal_excerpt", "browser_annotation"],
+  "kinds": ["diff_selection", "terminal_excerpt", "browser_annotation", "thread_reference"],
   "records": [
     {
       "name": "a diff selection",
@@ -227,7 +227,56 @@
     {"name":"a terminal excerpt whose text holds an escape sequence","raw":{"id":"b7e2c9d4-6a1f-4c83-9e50-1f3a8d2b6c47","kind":"terminal_excerpt","v":1,"label":"Terminal, 1 line: FAIL","note":"why does the second test fail?","body":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","pid":48213,"cwd":"/Users/ben/code/shop","captured_at":"2026-10-24T09:30:15.250Z","lines":1,"text":"\u001b[31mFAIL\u001b[0m"}},"expect":{"as":"fallback","why":"unreadable","id":"b7e2c9d4-6a1f-4c83-9e50-1f3a8d2b6c47","label":"Terminal, 1 line: FAIL","note":"why does the second test fail?"}},
     {"name":"a terminal excerpt of a newer version","raw":{"id":"b7e2c9d4-6a1f-4c83-9e50-1f3a8d2b6c47","kind":"terminal_excerpt","v":2,"label":"Terminal, 3 lines: $ npm test","note":"why does the second test fail?","body":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","pid":48213,"cwd":"/Users/ben/code/shop","captured_at":"2026-10-24T09:30:15.250Z","lines":3,"text":"$ npm test\n FAIL  src/cart.test.ts\n  \u2715 totals an empty cart (4 ms)"}},"expect":{"as":"fallback","why":"newer_version","id":"b7e2c9d4-6a1f-4c83-9e50-1f3a8d2b6c47","label":"Terminal, 3 lines: $ npm test","note":"why does the second test fail?"}},
     {"name":"a browser annotation","raw":{"id":"c4a8e1f7-2d5b-4a93-8e60-7b1d3f9a5c28","kind":"browser_annotation","v":1,"label":"Browser, 480×160 area on shop.example.com/cart","note":"the total looks wrong here","body":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","url":"https://shop.example.com/cart?coupon=SPRING","title":"Your cart · Example Shop","viewport":{"width":1280,"height":713,"scale":2},"scroll":{"x":0,"y":240},"rect":{"x":320,"y":96,"width":480,"height":160},"captured_at":"2026-10-24T09:30:15.250Z","image":{"name":"annotation-3f9a1c7e5b2d4a60.png","mime":"image/png","width":2560,"height":1426,"bytes":412873}}},"expect":{"as":"known","id":"c4a8e1f7-2d5b-4a93-8e60-7b1d3f9a5c28","label":"Browser, 480×160 area on shop.example.com/cart","note":"the total looks wrong here"}},
-    {"name":"a browser annotation of a newer version","raw":{"id":"c4a8e1f7-2d5b-4a93-8e60-7b1d3f9a5c28","kind":"browser_annotation","v":2,"label":"Browser, 480×160 area on shop.example.com/cart","note":"the total looks wrong here","body":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","url":"https://shop.example.com/cart?coupon=SPRING","title":"Your cart · Example Shop","viewport":{"width":1280,"height":713,"scale":2},"scroll":{"x":0,"y":240},"rect":{"x":320,"y":96,"width":480,"height":160},"captured_at":"2026-10-24T09:30:15.250Z","image":{"name":"annotation-3f9a1c7e5b2d4a60.png","mime":"image/png","width":2560,"height":1426,"bytes":412873},"element":{"selector":"form > button"}}},"expect":{"as":"fallback","why":"newer_version","id":"c4a8e1f7-2d5b-4a93-8e60-7b1d3f9a5c28","label":"Browser, 480×160 area on shop.example.com/cart","note":"the total looks wrong here"}}
+    {"name":"a browser annotation of a newer version","raw":{"id":"c4a8e1f7-2d5b-4a93-8e60-7b1d3f9a5c28","kind":"browser_annotation","v":2,"label":"Browser, 480×160 area on shop.example.com/cart","note":"the total looks wrong here","body":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","url":"https://shop.example.com/cart?coupon=SPRING","title":"Your cart · Example Shop","viewport":{"width":1280,"height":713,"scale":2},"scroll":{"x":0,"y":240},"rect":{"x":320,"y":96,"width":480,"height":160},"captured_at":"2026-10-24T09:30:15.250Z","image":{"name":"annotation-3f9a1c7e5b2d4a60.png","mime":"image/png","width":2560,"height":1426,"bytes":412873},"element":{"selector":"form > button"}}},"expect":{"as":"fallback","why":"newer_version","id":"c4a8e1f7-2d5b-4a93-8e60-7b1d3f9a5c28","label":"Browser, 480×160 area on shop.example.com/cart","note":"the total looks wrong here"}},
+    {
+      "name": "a thread reference",
+      "raw": {
+        "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
+        "kind": "thread_reference",
+        "v": 1,
+        "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
+        "note": "the cart fix I mean",
+        "body": {
+          "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+          "title": "Fix the cart total",
+          "channel": "shop",
+          "channel_name": "Shop",
+          "cross_channel": false,
+          "captured_at": "2026-10-25T08:15:30.125Z"
+        }
+      },
+      "expect": {
+        "as": "known",
+        "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
+        "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
+        "note": "the cart fix I mean"
+      }
+    },
+    {
+      "name": "a thread reference of a newer version",
+      "raw": {
+        "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
+        "kind": "thread_reference",
+        "v": 2,
+        "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
+        "note": "the cart fix I mean",
+        "body": {
+          "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+          "title": "Fix the cart total",
+          "channel": "shop",
+          "channel_name": "Shop",
+          "cross_channel": false,
+          "captured_at": "2026-10-25T08:15:30.125Z"
+        }
+      },
+      "expect": {
+        "as": "fallback",
+        "why": "newer_version",
+        "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
+        "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
+        "note": "the cart fix I mean"
+      }
+    }
   ],
   "selections": [
     {
@@ -2511,7 +2560,166 @@
     {"name":"an element whose box leaves the viewport","raw":[{"id":"c4a8e1f7-2d5b-4a93-8e60-7b1d3f9a5c28","kind":"browser_annotation","v":1,"label":"Browser, 480×160 area on shop.example.com/cart","note":"the total looks wrong here","body":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","url":"https://shop.example.com/cart?coupon=SPRING","title":"Your cart · Example Shop","viewport":{"width":1280,"height":713,"scale":2},"scroll":{"x":0,"y":240},"rect":{"x":320,"y":96,"width":480,"height":160},"captured_at":"2026-10-24T09:30:15.250Z","image":{"name":"annotation-3f9a1c7e5b2d4a60.png","mime":"image/png","width":2560,"height":1426,"bytes":412873},"element":{"tag":"button","selector":"#cart > div.summary > button.checkout","text":"Check out · €48,50","html":"<button id=\"go\" class=\"checkout primary\" type=\"submit\">Check out · €48,50<span class=\"icon\">…</span></button>","ancestors":["<div class=\"summary\">","<main id=\"cart\">"],"bounds":{"x":1200,"y":0,"width":200,"height":20},"point":{"x":400,"y":150},"frames":[],"opaque_frame":false,"truncated":false}}}],"expect":{"ok":false,"error":"context[0].body: element.bounds reaches outside the viewport"}},
     {"name":"an element picked outside the viewport","raw":[{"id":"c4a8e1f7-2d5b-4a93-8e60-7b1d3f9a5c28","kind":"browser_annotation","v":1,"label":"Browser, 480×160 area on shop.example.com/cart","note":"the total looks wrong here","body":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","url":"https://shop.example.com/cart?coupon=SPRING","title":"Your cart · Example Shop","viewport":{"width":1280,"height":713,"scale":2},"scroll":{"x":0,"y":240},"rect":{"x":320,"y":96,"width":480,"height":160},"captured_at":"2026-10-24T09:30:15.250Z","image":{"name":"annotation-3f9a1c7e5b2d4a60.png","mime":"image/png","width":2560,"height":1426,"bytes":412873},"element":{"tag":"button","selector":"#cart > div.summary > button.checkout","text":"Check out · €48,50","html":"<button id=\"go\" class=\"checkout primary\" type=\"submit\">Check out · €48,50<span class=\"icon\">…</span></button>","ancestors":["<div class=\"summary\">","<main id=\"cart\">"],"bounds":{"x":320,"y":96,"width":480,"height":160},"point":{"x":1280,"y":10},"frames":[],"opaque_frame":false,"truncated":false}}}],"expect":{"ok":false,"error":"context[0].body: element.point must be whole CSS pixels inside the viewport"}},
     {"name":"an element in four frames","raw":[{"id":"c4a8e1f7-2d5b-4a93-8e60-7b1d3f9a5c28","kind":"browser_annotation","v":1,"label":"Browser, 480×160 area on shop.example.com/cart","note":"the total looks wrong here","body":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","url":"https://shop.example.com/cart?coupon=SPRING","title":"Your cart · Example Shop","viewport":{"width":1280,"height":713,"scale":2},"scroll":{"x":0,"y":240},"rect":{"x":320,"y":96,"width":480,"height":160},"captured_at":"2026-10-24T09:30:15.250Z","image":{"name":"annotation-3f9a1c7e5b2d4a60.png","mime":"image/png","width":2560,"height":1426,"bytes":412873},"element":{"tag":"button","selector":"#cart > div.summary > button.checkout","text":"Check out · €48,50","html":"<button id=\"go\" class=\"checkout primary\" type=\"submit\">Check out · €48,50<span class=\"icon\">…</span></button>","ancestors":["<div class=\"summary\">","<main id=\"cart\">"],"bounds":{"x":320,"y":96,"width":480,"height":160},"point":{"x":400,"y":150},"frames":["https://a.example.com/","https://b.example.com/","https://c.example.com/","https://d.example.com/"],"opaque_frame":false,"truncated":false}}}],"expect":{"ok":false,"error":"context[0].body: element.frames must be at most 3 addresses"}},
-    {"name":"an element without its flags","raw":[{"id":"c4a8e1f7-2d5b-4a93-8e60-7b1d3f9a5c28","kind":"browser_annotation","v":1,"label":"Browser, 480×160 area on shop.example.com/cart","note":"the total looks wrong here","body":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","url":"https://shop.example.com/cart?coupon=SPRING","title":"Your cart · Example Shop","viewport":{"width":1280,"height":713,"scale":2},"scroll":{"x":0,"y":240},"rect":{"x":320,"y":96,"width":480,"height":160},"captured_at":"2026-10-24T09:30:15.250Z","image":{"name":"annotation-3f9a1c7e5b2d4a60.png","mime":"image/png","width":2560,"height":1426,"bytes":412873},"element":{"tag":"button","selector":"#cart > div.summary > button.checkout","text":"Check out · €48,50","html":"<button id=\"go\" class=\"checkout primary\" type=\"submit\">Check out · €48,50<span class=\"icon\">…</span></button>","ancestors":["<div class=\"summary\">","<main id=\"cart\">"],"bounds":{"x":320,"y":96,"width":480,"height":160},"point":{"x":400,"y":150},"frames":[],"truncated":false}}}],"expect":{"ok":false,"error":"context[0].body: element.opaque_frame and element.truncated must be true or false"}}
+    {"name":"an element without its flags","raw":[{"id":"c4a8e1f7-2d5b-4a93-8e60-7b1d3f9a5c28","kind":"browser_annotation","v":1,"label":"Browser, 480×160 area on shop.example.com/cart","note":"the total looks wrong here","body":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","url":"https://shop.example.com/cart?coupon=SPRING","title":"Your cart · Example Shop","viewport":{"width":1280,"height":713,"scale":2},"scroll":{"x":0,"y":240},"rect":{"x":320,"y":96,"width":480,"height":160},"captured_at":"2026-10-24T09:30:15.250Z","image":{"name":"annotation-3f9a1c7e5b2d4a60.png","mime":"image/png","width":2560,"height":1426,"bytes":412873},"element":{"tag":"button","selector":"#cart > div.summary > button.checkout","text":"Check out · €48,50","html":"<button id=\"go\" class=\"checkout primary\" type=\"submit\">Check out · €48,50<span class=\"icon\">…</span></button>","ancestors":["<div class=\"summary\">","<main id=\"cart\">"],"bounds":{"x":320,"y":96,"width":480,"height":160},"point":{"x":400,"y":150},"frames":[],"truncated":false}}}],"expect":{"ok":false,"error":"context[0].body: element.opaque_frame and element.truncated must be true or false"}},
+    {
+      "name": "a thread reference is rebuilt in key order and its label recomputed",
+      "raw": [
+        {
+          "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
+          "kind": "thread_reference",
+          "v": 1,
+          "label": "x",
+          "note": "  the cart fix I mean  ",
+          "body": {
+            "captured_at": "2026-10-25T08:15:30.125Z",
+            "cross_channel": true,
+            "channel_name": "Shop",
+            "channel": "shop",
+            "title": "Fix the cart total",
+            "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51"
+          }
+        }
+      ],
+      "expect": {
+        "ok": true,
+        "records": [
+          {
+            "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
+            "kind": "thread_reference",
+            "v": 1,
+            "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
+            "note": "the cart fix I mean",
+            "body": {
+              "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+              "title": "Fix the cart total",
+              "channel": "shop",
+              "channel_name": "Shop",
+              "cross_channel": true,
+              "captured_at": "2026-10-25T08:15:30.125Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a thread reference without a title",
+      "raw": [
+        {
+          "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
+          "kind": "thread_reference",
+          "v": 1,
+          "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
+          "note": "the cart fix I mean",
+          "body": {
+            "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+            "channel": "shop",
+            "channel_name": "Shop",
+            "cross_channel": false,
+            "captured_at": "2026-10-25T08:15:30.125Z"
+          }
+        }
+      ],
+      "expect": {
+        "ok": false,
+        "error": "context[0].body: title must be a string of 1 to 200 characters"
+      }
+    },
+    {
+      "name": "a thread reference with a line break in its title",
+      "raw": [
+        {
+          "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
+          "kind": "thread_reference",
+          "v": 1,
+          "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
+          "note": "the cart fix I mean",
+          "body": {
+            "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+            "title": "Fix\nthe cart",
+            "channel": "shop",
+            "channel_name": "Shop",
+            "cross_channel": false,
+            "captured_at": "2026-10-25T08:15:30.125Z"
+          }
+        }
+      ],
+      "expect": {
+        "ok": false,
+        "error": "context[0].body: title must be plain text on one line"
+      }
+    },
+    {
+      "name": "a thread reference with a title over 200 characters",
+      "raw": [
+        {
+          "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
+          "kind": "thread_reference",
+          "v": 1,
+          "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
+          "note": "the cart fix I mean",
+          "body": {
+            "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+            "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "channel": "shop",
+            "channel_name": "Shop",
+            "cross_channel": false,
+            "captured_at": "2026-10-25T08:15:30.125Z"
+          }
+        }
+      ],
+      "expect": {
+        "ok": false,
+        "error": "context[0].body: title must be a string of 1 to 200 characters"
+      }
+    },
+    {
+      "name": "a thread reference whose cross_channel is not a boolean",
+      "raw": [
+        {
+          "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
+          "kind": "thread_reference",
+          "v": 1,
+          "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
+          "note": "the cart fix I mean",
+          "body": {
+            "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+            "title": "Fix the cart total",
+            "channel": "shop",
+            "channel_name": "Shop",
+            "cross_channel": "yes",
+            "captured_at": "2026-10-25T08:15:30.125Z"
+          }
+        }
+      ],
+      "expect": {
+        "ok": false,
+        "error": "context[0].body: cross_channel must be true or false"
+      }
+    },
+    {
+      "name": "a thread reference with a bad time",
+      "raw": [
+        {
+          "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
+          "kind": "thread_reference",
+          "v": 1,
+          "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
+          "note": "the cart fix I mean",
+          "body": {
+            "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+            "title": "Fix the cart total",
+            "channel": "shop",
+            "channel_name": "Shop",
+            "cross_channel": false,
+            "captured_at": "yesterday"
+          }
+        }
+      ],
+      "expect": {
+        "ok": false,
+        "error": "context[0].body: captured_at must be a time like 2026-10-24T09:30:00.000Z"
+      }
+    }
   ],
   "excerpts": [
     {"name":"one line, and no shell pid","raw":"$ npm test","source":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","pid":null,"cwd":"/Users/ben/code/shop","at":"2026-10-24T09:30:15.250Z"},"expect":{"ok":true,"body":{"thread":"5c1a7e92-4b3d-4f60-8a1e-9d2c3b4a5f60","pid":null,"cwd":"/Users/ben/code/shop","captured_at":"2026-10-24T09:30:15.250Z","lines":1,"text":"$ npm test"},"label":"Terminal, 1 line: $ npm test"}},
@@ -2552,5 +2760,140 @@
     {"name":"a thin line is grown across only","bounds":{"x":50,"y":300,"width":600,"height":1},"viewport":{"width":1280,"height":713},"expect":{"x":50,"y":297,"width":600,"height":8}},
     {"name":"an icon in the top left corner stays inside the viewport","bounds":{"x":0,"y":0,"width":3,"height":3},"viewport":{"width":1280,"height":713},"expect":{"x":0,"y":0,"width":8,"height":8}},
     {"name":"an icon in the bottom right corner stays inside the viewport","bounds":{"x":1277,"y":710,"width":3,"height":3},"viewport":{"width":1280,"height":713},"expect":{"x":1272,"y":705,"width":8,"height":8}}
+  ],
+  "threadReferences": [
+    {
+      "name": "a thread in the channel of the thread the message goes to",
+      "thread": {
+        "id": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "Fix the cart total",
+        "channel": "shop",
+        "channel_name": "Shop"
+      },
+      "current": "shop",
+      "at": "2026-10-25T08:15:30.125Z",
+      "expect": {
+        "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "Fix the cart total",
+        "channel": "shop",
+        "channel_name": "Shop",
+        "cross_channel": false,
+        "captured_at": "2026-10-25T08:15:30.125Z"
+      }
+    },
+    {
+      "name": "a thread in another channel is cross-channel",
+      "thread": {
+        "id": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "Fix the cart total",
+        "channel": "shop",
+        "channel_name": "Shop"
+      },
+      "current": "inbox",
+      "at": "2026-10-25T08:15:30.125Z",
+      "expect": {
+        "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "Fix the cart total",
+        "channel": "shop",
+        "channel_name": "Shop",
+        "cross_channel": true,
+        "captured_at": "2026-10-25T08:15:30.125Z"
+      }
+    },
+    {
+      "name": "control characters and runs of whitespace become one space",
+      "thread": {
+        "id": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "  Fix\u001b[2J \t the\n\ncart‮ total  ",
+        "channel": "shop",
+        "channel_name": "Shop"
+      },
+      "current": "shop",
+      "at": "2026-10-25T08:15:30.125Z",
+      "expect": {
+        "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "Fix [2J the cart total",
+        "channel": "shop",
+        "channel_name": "Shop",
+        "cross_channel": false,
+        "captured_at": "2026-10-25T08:15:30.125Z"
+      }
+    },
+    {
+      "name": "a title of only blanks is untitled",
+      "thread": {
+        "id": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "  \n ",
+        "channel": "shop",
+        "channel_name": "Shop"
+      },
+      "current": "shop",
+      "at": "2026-10-25T08:15:30.125Z",
+      "expect": {
+        "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "Untitled thread",
+        "channel": "shop",
+        "channel_name": "Shop",
+        "cross_channel": false,
+        "captured_at": "2026-10-25T08:15:30.125Z"
+      }
+    },
+    {
+      "name": "a title over 200 characters is cut with an ellipsis",
+      "thread": {
+        "id": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "channel": "shop",
+        "channel_name": "Shop"
+      },
+      "current": "shop",
+      "at": "2026-10-25T08:15:30.125Z",
+      "expect": {
+        "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…",
+        "channel": "shop",
+        "channel_name": "Shop",
+        "cross_channel": false,
+        "captured_at": "2026-10-25T08:15:30.125Z"
+      }
+    },
+    {
+      "name": "emoji are counted as characters",
+      "thread": {
+        "id": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒",
+        "channel": "shop",
+        "channel_name": "Shop"
+      },
+      "current": "shop",
+      "at": "2026-10-25T08:15:30.125Z",
+      "expect": {
+        "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒🛒…",
+        "channel": "shop",
+        "channel_name": "Shop",
+        "cross_channel": false,
+        "captured_at": "2026-10-25T08:15:30.125Z"
+      }
+    },
+    {
+      "name": "a channel name of only blanks is the channel id",
+      "thread": {
+        "id": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "Fix the cart total",
+        "channel": "shop",
+        "channel_name": " "
+      },
+      "current": "shop",
+      "at": "2026-10-25T08:15:30.125Z",
+      "expect": {
+        "thread": "7d3e91a0-5c2b-4e48-9f16-0a8b4c6d2e51",
+        "title": "Fix the cart total",
+        "channel": "shop",
+        "channel_name": "shop",
+        "cross_channel": false,
+        "captured_at": "2026-10-25T08:15:30.125Z"
+      }
+    }
   ]
 }

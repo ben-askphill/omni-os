@@ -12,7 +12,7 @@ protocol MessageContextView: SendableMetatype {
 }
 
 /// Every kind the app shows, one line each. A kind missing here reads as a fallback chip.
-let contextViews: [any MessageContextView.Type] = [DiffSelectionView.self, TerminalExcerptView.self, BrowserAnnotationView.self]
+let contextViews: [any MessageContextView.Type] = [DiffSelectionView.self, TerminalExcerptView.self, BrowserAnnotationView.self, ThreadReferenceView.self]
 
 /// The kinds the app reads, from `contextViews`.
 let contextKinds: [any MessageContextKind.Type] = contextViews.map { $0.kindType }
