@@ -65,6 +65,20 @@ describe('requestGuard: the token', () => {
     expect((await get('/api/auth/proof/x')).status).toBe(401);
   });
 
+  it('lets a POST to a GitHub webhook path through without one, and nothing else under /api/hooks', async () => {
+    const hook = (path: string, headers: Record<string, string> = {}, method = 'POST') =>
+      app.request(`http://127.0.0.1:4747${path}`, { method, body: method === 'POST' ? '{}' : undefined, headers: { host: '127.0.0.1:4747', authorization: '', 'content-type': 'application/json', ...headers } });
+    expect((await hook('/api/hooks/github/ci-fixer')).status).toBe(200);
+    expect((await hook('/api/hooks/github/ci-fixer', {}, 'GET')).status).toBe(401);
+    expect((await hook('/api/hooks/github/ci-fixer/extra')).status).toBe(401);
+    expect((await hook('/api/hooks/github/%2e%2e%2fthreads')).status).toBe(401);
+    expect((await hook('/api/hooks/slack/x')).status).toBe(401);
+    // The other checks still apply: GitHub sends JSON, from no browser.
+    expect((await hook('/api/hooks/github/ci-fixer', { 'content-type': 'application/x-www-form-urlencoded' })).status).toBe(415);
+    expect((await hook('/api/hooks/github/ci-fixer', { origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' })).status).toBe(403);
+    expect((await hook('/api/hooks/github/ci-fixer', { host: 'evil.example' })).status).toBe(403);
+  });
+
   it('still refuses a cross-site request that carries the cookie', async () => {
     const res = await send({ authorization: '', cookie: `${cookieName()}=${TOKEN}`, origin: 'https://evil.example', 'sec-fetch-site': 'cross-site', 'content-type': 'application/json' });
     expect(res.status).toBe(403);

@@ -57,6 +57,7 @@ extension UserMessage {
     case "capture": "Captured"
     case "import": "Imported"
     case "limit": "After the usage limit"
+    case "pr-watch": "PR watch"
     default: nil
     }
   }
@@ -83,9 +84,9 @@ extension PendingMsg {
     starting ? list.firstIndex { $0.state == .sent } : nil
   }
 
-  /// Omni wrote it, not Ben: a crew report, or the go a team's lead gets once its members have reported. As
-  /// `isOmnis` in apps/web/src/requests.ts.
-  public var isOmnis: Bool { kind == "crew_report" || source == "team" || source == "crew" }
+  /// Omni wrote it, not Ben: a crew report, the go a team's lead gets once its members have reported, or a PR watch's
+  /// wake. As `isOmnis` in apps/web/src/requests.ts.
+  public var isOmnis: Bool { kind == "crew_report" || source == "team" || source == "crew" || source == "pr-watch" }
 
   /// "Crew report T-1 from coder": who a crew report is from.
   public var reportName: String {
@@ -109,6 +110,7 @@ extension PendingMsg {
     if setup != nil { return isParked ? "Waits for the worktree" : Self.setupLabel }
     if kind == "crew_report" && delivery == .recovered { return "\(reportName), held for Resume" }
     if kind == "crew_report" && delivery == .uncertain { return "\(reportName), may have reached the agent before the restart" }
+    if source == "pr-watch" && delivery == .recovered { return "PR watch, held for Resume" }
     if delivery == .recovered { return "Held after a restart, waiting for Resume" }
     if delivery == .uncertain { return "May have reached the agent before the restart" }
     if kind == "crew_report" {
@@ -149,6 +151,8 @@ public struct ParkedMessages: Hashable, Sendable {
   public static func heading(_ items: [PendingMsg]) -> String {
     let n = items.count
     let reports = items.filter { $0.kind == "crew_report" }.count
+    // A PR watch's wake also waits for Resume when the thread cannot run here, with no restart behind it.
+    if reports == 0 && items.contains(where: { $0.source == "pr-watch" }) { return n == 1 ? "1 message is waiting for Resume" : "\(n) messages are waiting for Resume" }
     if reports == 0 { return n == 1 ? "1 message was waiting when Omni restarted" : "\(n) messages were waiting when Omni restarted" }
     if reports == n { return n == 1 ? "1 crew report is waiting for Resume" : "\(n) crew reports are waiting for Resume" }
     return "\(n) messages and crew reports are waiting for Resume"

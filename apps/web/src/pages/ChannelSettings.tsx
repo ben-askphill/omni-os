@@ -220,7 +220,7 @@ function DesignSystemPicker({ channel, onChange }: { channel: Channel; onChange:
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-4 rounded-[24px] p-5 shadow-[inset_0_0_0_1px_var(--line)]">
       <h2 className="font-display text-[16px]">{title}</h2>

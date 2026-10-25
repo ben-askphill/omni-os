@@ -24,14 +24,17 @@ const { auth, messageRequests, outbox, threads, turnSnapshots } = await import('
 const { shutdownAll, startLimits } = await import('./runner.ts');
 const { closeAllBrowsers } = await import('./browser.ts');
 const { closeAllTerminals } = await import('./terminal.ts');
+const { stopAllRuns } = await import('./actions.ts');
 const { startArtifactWatcher } = await import('./artifacts.ts');
 const { backfillPublished } = await import('./published.ts');
 const { startScheduler } = await import('./automations.ts');
 const { startEventWatch } = await import('./automation-watch.ts');
+const { startTriggerDeliveries } = await import('./automation-triggers.ts');
+const { startPRWatch } = await import('./pr-watch/worker.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
 const { startSync } = await import('./sync/worker.ts');
 const { recoverHandoffs } = await import('./handoff.ts');
-const { startWorktreeSweep } = await import('./worktree-sweep.ts');
+const { startWorktreeRetention } = await import('./worktree-cleanup.ts');
 const { migrateLegacyConfig } = await import('./config-migrate.ts');
 
 // An install from before data/omni.config.json keeps its old settings and skips onboarding.
@@ -71,9 +74,11 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   backfillPublished();
   startScheduler();
   startEventWatch();
+  startTriggerDeliveries();
+  startPRWatch();
   startCatalogRefresh();
-  // Removes worktrees of archived, deleted and merged-and-idle threads that hold nothing unsaved, now and daily.
-  startWorktreeSweep();
+  // With this Mac's retention policy on (Settings > Storage), removes idle worktrees that hold nothing unsaved, now and daily.
+  startWorktreeRetention();
   // Off unless the sync credentials are in the Keychain; then it runs alongside, and a failure only logs.
   startSync().catch((err) => console.error('[sync] could not start:', (err as Error).message));
   if (!isLoopback(config.host)) {
@@ -91,6 +96,7 @@ const shutdown = (sig: string) => {
   console.log(`[omni] ${sig}, closing live sessions`);
   server.close();
   closeAllTerminals();
+  stopAllRuns();
   setTimeout(() => process.exit(0), 6000).unref();
   void shutdownAll().finally(() => {
     closeAllBrowsers();

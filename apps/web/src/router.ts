@@ -4,7 +4,7 @@ import type { NewThreadPreset } from './new-thread-preset.ts';
 export type ChannelTab = 'threads' | 'prs' | 'settings';
 
 /** What a thread link can open on its own screen in the phone layout. The desktop shows the thread itself. */
-export const THREAD_VIEWS = ['steps', 'changes', 'pr', 'browser', 'terminal', 'details'] as const;
+export const THREAD_VIEWS = ['steps', 'changes', 'pr', 'browser', 'terminal', 'actions', 'details'] as const;
 export type ThreadView = (typeof THREAD_VIEWS)[number];
 const isThreadView = (s: string | undefined): s is ThreadView => (THREAD_VIEWS as readonly string[]).includes(s ?? '');
 
@@ -13,12 +13,13 @@ export type Route =
   /** The phone layout's Channels tab. The desktop lists channels in the sidebar and shows Home here. */
   | { name: 'channels' }
   | { name: 'channel'; id: string; tab: ChannelTab; pr?: number }
-  /** `turn`: the steps view's turn, the event id of the message that started it. */
-  | { name: 'thread'; id: string; artifact?: number; view?: ThreadView; turn?: number }
+  /** `turn`: the steps view's turn, the event id of the message that started it. `at`: an event to scroll to (a search hit). */
+  | { name: 'thread'; id: string; artifact?: number; view?: ThreadView; turn?: number; at?: number }
   | { name: 'search'; q: string }
   | { name: 'automations' }
   | { name: 'secrets' }
   | { name: 'sync' }
+  | { name: 'storage' }
   /** `workspace`: the full workspace settings, which the phone layout keeps behind its own Settings screen. */
   | { name: 'settings'; page?: 'workspace' }
   | { name: 'artifacts' }
@@ -50,12 +51,14 @@ export function parseHash(hash: string): Route {
   if (a === 't' && b) {
     const art = Number(q.get('artifact'));
     const turn = Number(q.get('turn'));
+    const at = Number(q.get('at'));
     return {
       name: 'thread',
       id: b,
       artifact: Number.isFinite(art) && art > 0 ? art : undefined,
       view: isThreadView(c) ? c : undefined,
       turn: Number.isFinite(turn) && turn > 0 ? turn : undefined,
+      at: Number.isInteger(at) && at > 0 ? at : undefined,
     };
   }
   if (a === 'channels' && !b) return { name: 'channels' };
@@ -63,6 +66,7 @@ export function parseHash(hash: string): Route {
   if (a === 'automations' && !b) return { name: 'automations' };
   if (a === 'secrets' && !b) return { name: 'secrets' };
   if (a === 'sync' && !b) return { name: 'sync' };
+  if (a === 'storage' && !b) return { name: 'storage' };
   if (a === 'settings' && !b) return { name: 'settings' };
   if (a === 'settings' && b === 'workspace' && !c) return { name: 'settings', page: 'workspace' };
   if (a === 'artifacts' && !b) return { name: 'artifacts' };
@@ -89,6 +93,8 @@ export function pageTitle(route: Route, channelName: (id: string) => string | un
       return 'Secrets';
     case 'sync':
       return 'Sync';
+    case 'storage':
+      return 'Storage';
     case 'settings':
       return 'Settings';
     case 'artifacts':
@@ -134,12 +140,15 @@ export const href = {
   pr: (id: string, n: number) => `#/c/${encodeURIComponent(id)}/prs/${n}`,
   settings: (id: string) => `#/c/${encodeURIComponent(id)}/settings`,
   thread: (id: string, artifact?: number) => `#/t/${encodeURIComponent(id)}${artifact ? `?artifact=${artifact}` : ''}`,
+  /** The thread scrolled to one event, loading the page that holds it. */
+  threadAt: (id: string, eventId: number) => `#/t/${encodeURIComponent(id)}?at=${eventId}`,
   threadView: (id: string, view: ThreadView, turn?: number) => `#/t/${encodeURIComponent(id)}/${view}${turn ? `?turn=${turn}` : ''}`,
   channels: () => '#/channels',
   search: (q: string) => `#/search?q=${encodeURIComponent(q)}`,
   automations: () => '#/automations',
   secrets: () => '#/secrets',
   sync: () => '#/sync',
+  storage: () => '#/storage',
   /** The workspace Settings page (your name). A channel's own settings tab is `settings(id)`. */
   settingsPage: () => '#/settings',
   workspaceSettings: () => '#/settings/workspace',

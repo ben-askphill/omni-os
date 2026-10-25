@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type Thread } from '../api.ts';
 import { HarnessLogo, OmniMark } from '../components/brand.tsx';
+import { useBasePick, useBaseRows } from '../components/BasePicker.tsx';
 import { AttachmentStrip, useAttachments } from '../components/Composer.tsx';
 import type { ModelChoice } from '../components/ModelPicker.tsx';
 import { Avatar, ErrorNote } from '../components/ui.tsx';
 import { draftRun, draftRunRequest } from '../new-thread-preset.ts';
+import { baseRequest } from '../worktree-base.ts';
 import { asksAuto } from '../thread-run.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { useDictation, withPhrase } from './dictation.ts';
+import { BaseChip, BaseSheet } from './BaseSheet.tsx';
 import { ModelSheet, runLabel } from './ModelSheet.tsx';
 import { MoRound, MoSheet } from './parts.tsx';
 import { useShell } from './shell.tsx';
@@ -31,6 +34,8 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
   // A pick holds for the target it was made for; another target starts on its own defaults, as on the desktop.
   const [picked, setPicked] = useState<{ target: string; choice: ModelChoice; effort: string } | null>(null);
   const [picking, setPicking] = useState(false);
+  const [pickingBase, setPickingBase] = useState(false);
+  const [base, setBase] = useBasePick(target);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const att = useAttachments();
@@ -47,6 +52,7 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
   const role = conductor && crew.some((r) => r.id === 'conductor') ? 'conductor' : '';
   const ro = crew.find((r) => r.id === role);
   const run = harnesses ? draftRun(picked?.target === target ? picked : null, ro, channels.find((c) => c.id === target), harnesses) : null;
+  const { rows: baseRows, reload: reloadBases } = useBaseRows(target, run?.choice.harness ?? '');
   const onTarget = (next: string) => {
     if (next === target) return;
     setTarget(next);
@@ -67,6 +73,7 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
           prompt,
           role: role || undefined,
           ...draftRunRequest(picked?.target === target ? run : null),
+          ...baseRequest(base, run?.choice.harness),
         },
         att.files,
       );
@@ -112,6 +119,16 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
             placeholder={ch ? `Describe the task for #${ch.name}` : 'Ask the Conductor. It delegates to the crew.'}
             className="resize-none bg-transparent px-2 text-[16px] leading-[1.45] text-fg outline-none placeholder:text-fg-4"
           />
+          {baseRows && (
+            <BaseChip
+              rows={baseRows}
+              value={base}
+              onClick={() => {
+                reloadBases();
+                setPickingBase(true);
+              }}
+            />
+          )}
           <div className="flex items-center gap-1.5">
             <input
               ref={file}
@@ -151,6 +168,7 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
             : 'The Conductor picks the crew and reports back here. Activity shows you when something needs you.'}
         </p>
       </MoSheet>
+      {pickingBase && baseRows && <BaseSheet rows={baseRows} value={base} onChange={setBase} onClose={() => setPickingBase(false)} />}
       {picking && harnesses && run && (
         <ModelSheet
           harnesses={harnesses}

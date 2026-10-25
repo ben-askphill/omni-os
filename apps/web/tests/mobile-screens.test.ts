@@ -18,6 +18,7 @@ describe('the phone layout\'s screens', () => {
     expect(screenOf(route(href.thread('t1', 4)))).toBe('viewer');
     expect(screenOf(route(href.threadView('t1', 'steps', 9)))).toBe('steps');
     expect(screenOf(route(href.threadView('t1', 'terminal')))).toBe('terminal');
+    expect(screenOf(route(href.threadView('t1', 'actions')))).toBe('actions');
     expect(screenOf(route(href.settingsPage()))).toBe('settings');
     expect(screenOf(route(href.workspaceSettings()))).toBe('page');
     expect(screenOf(route(href.automations()))).toBe('page');

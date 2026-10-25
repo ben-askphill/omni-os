@@ -8,6 +8,7 @@ import { classify } from './artifacts.ts';
 import { publishFeed, publishThread } from './bus.ts';
 import { artifactsDir, paths } from './config.ts';
 import { artifacts, events, kv, threads, type Artifact } from './db.ts';
+import { observePublication } from './automation-triggers.ts';
 
 const BACKFILL_KEY = 'published.backfilled';
 
@@ -51,15 +52,24 @@ export function linkPublished(threadId: string, p: Published): Artifact | null {
   return linked;
 }
 
-/** A tool result came in: if it finished an Artifact publish, link the page. Never throws into the stream. */
+/**
+ * A tool result came in: if it finished an Artifact publish, link the page and hand it to the event automations
+ * (automation-triggers.ts). Never throws into the stream. The backfill below links only, so it starts nothing.
+ */
 export function onToolResult(threadId: string, r: { tool_use_id: string; text: string; is_error: boolean }) {
   if (r.is_error || !r.text.includes('claude.ai/')) return;
+  let p: Published | null = null;
   try {
     const use = events.toolUse(threadId, r.tool_use_id);
-    const p = use && publishedFrom(use.name, use.input, r);
+    p = use && publishedFrom(use.name, use.input, r);
     if (p) linkPublished(threadId, p);
   } catch (err) {
     console.error('[published] could not link a publish:', (err as Error).message);
+  }
+  try {
+    if (p) observePublication(threadId, r.tool_use_id, p);
+  } catch (err) {
+    console.error('[published] could not hand a publish to automations:', (err as Error).message);
   }
 }
 

@@ -71,6 +71,9 @@ export const PROOF_PATH = '/api/auth/proof';
  */
 const OPEN = new Set([`GET ${PROOF_PATH}`, 'GET /api/auth/google', 'POST /api/auth/google/start', 'POST /api/auth/google/finish']);
 
+/** GitHub's webhook posts (apps/server/github-webhook-api.ts) take no token either: each proves itself with its signature. */
+export const isWebhookPost = (c: Context) => c.req.method === 'POST' && /^\/api\/hooks\/github\/[\w.-]+$/.test(c.req.path);
+
 const bearer = (c: Context) => c.req.header('authorization')?.match(/^Bearer\s+(\S+)\s*$/i)?.[1];
 
 /** A Host that only reaches the server through Tailscale: a MagicDNS name or a 100.64.0.0/10 address. */
@@ -141,8 +144,8 @@ export function hostAndOwner(c: Context): Response | null {
  * - a text/plain or form-urlencoded body, the content types that skip the preflight;
  * - through tailscale serve (a tailnet Host, or any proxy header), a Tailscale-User-Login that is not in
  *   `integrations.tailscaleLogin`, when that is set;
- * - neither the token nor a live session (401), in the Authorization header or the browser's cookies, outside OPEN.
- *   A session is looked up last, so a request refused above never renews one.
+ * - neither the token nor a live session (401), in the Authorization header or the browser's cookies, outside OPEN
+ *   and signed GitHub webhook routes. A session is looked up last, so a request refused above never renews one.
  * The Mac app, apps/mcp/omni.ts, scripts and curl send no Origin or Sec-Fetch-Site, so the Host and token checks apply to them.
  * A session cookie used more than 5 minutes after its last use is sent again with its new 30-day expiry.
  */
@@ -167,7 +170,7 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
   const owner = notOwner(c, host);
   if (owner) return owner;
   const access = accessOf(c);
-  if (!access && !OPEN.has(`${c.req.method} ${c.req.path}`)) {
+  if (!access && !OPEN.has(`${c.req.method} ${c.req.path}`) && !isWebhookPost(c)) {
     return refuse("Unauthorized: send this install's token (data/api-token), or sign in or pair this browser", 401);
   }
   c.set('access', access);

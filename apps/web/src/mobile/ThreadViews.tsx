@@ -1,16 +1,22 @@
 // The screens pushed from a thread: its steps, changes and PR, the channel browser, the shell, details and a file.
-import { useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { turnCount } from '@omni/shared/history.ts';
 import { api, artifactUrl, errorText, useApi, type HarnessWithRunning, type PRDetail } from '../api.ts';
 import { HarnessMark, harnessLabel } from '../components/brand.tsx';
 import { ArtifactBody } from '../components/ArtifactViewer.tsx';
+import { AnnotateLayer, canAnnotate, useAfterAdd } from '../components/BrowserAnnotate.tsx';
 import { BrowserWatch, displayUrl, useChannelBrowser } from '../components/LiveBrowser.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { modelOf } from '../components/ModelPicker.tsx';
 import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
+import { usePRWatch, watchCopy } from '../components/thread/PRWatch.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { TerminalView } from '../components/TerminalView.tsx';
-import { Button, Chip, copyText, ErrorNote, SlideToConfirm, StatusDot } from '../components/ui.tsx';
+import { ThreadIdCtx, ToolOutput } from '../components/thread/ToolOutput.tsx';
+import { Button, Chip, copyText, ErrorNote, Icon, SlideToConfirm, StatusDot } from '../components/ui.tsx';
 import { cloudAgentUrl } from '../cloud-agent.ts';
+import { carriedText } from '@omni/shared/continue.ts';
+import { linkName } from '../components/ContinueLinks.tsx';
 import { fullDate, plural } from '../format.ts';
 import { checkTone } from '../pages/PRs.tsx';
 import type { Route } from '../router.ts';
@@ -19,6 +25,8 @@ import { toolLabel, toolSummary, type Item, type ToolCall } from '../transcript/
 import { MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSection } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
 import { threadView } from './thread-view.ts';
+import { holds } from '../thread-history.ts';
+import { hasLiveOutput, outputTarget } from '../tool-output.ts';
 
 const SOURCE: Record<string, string> = { manual: 'You', conductor: 'The Conductor', team: 'Its team lead', automation: 'Automation', import: 'Imported', capture: 'Captured' };
 
@@ -35,28 +43,52 @@ function Body({ children, className = '' }: { children: ReactNode; className?: s
 /** The output worth a line under a step: a failure's message, and what a command printed. */
 const outputOf = (c: ToolCall) => (c.result && (c.result.is_error || c.name === 'Bash') ? c.result.text.trim().split('\n').slice(0, 3).join('\n').slice(0, 240) : '');
 
-function Step({ c, depth, running, cwd }: { c: ToolCall; depth: number; running: boolean; cwd: string }) {
+const OUTPUT_BOX = 'rounded-[10px] bg-surface-2 px-[9px] py-1.5 font-mono text-[12px] leading-[1.45] break-words whitespace-pre-wrap';
+
+/** `tails`: the turn's harness reports a call's output while it runs, so a running step has one to follow. */
+function Step({ c, depth, running, cwd, tails }: { c: ToolCall; depth: number; running: boolean; cwd: string; tails: boolean }) {
+  const [open, setOpen] = useState(false);
   const out = outputOf(c);
   const state = !c.result ? (running ? 'running' : 'stopped') : c.result.is_error ? 'failed' : 'done';
+  const target = outputTarget(c, running);
+  // A step Ben opened stays openable when its call settles, so the card does not fold away under his thumb.
+  const tappable = open || target?.kind === 'saved' || (target?.kind === 'live' && tails);
+  const head = (
+    <>
+      <span className="flex items-center gap-2.5">
+        <StatusDot status={state} size={8} />
+        <span className="shrink-0 text-[13px] font-medium">{toolLabel(c.name)}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] leading-[1.3] text-fg-2">{toolSummary(c, cwd)}</span>
+        {tappable && <Icon name="chevronRight" size={14} className={`shrink-0 text-fg-4 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />}
+      </span>
+      {out && !open && <span className={`ml-[18px] block ${OUTPUT_BOX} ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{out}</span>}
+    </>
+  );
   return (
     <>
-      <div className="flex flex-col gap-1.5 rounded-2xl bg-surface px-3.5 py-[11px]" style={{ marginLeft: depth * 14 }}>
-        <div className="flex items-center gap-2.5">
-          <StatusDot status={state} size={8} />
-          <span className="shrink-0 text-[13px] font-medium">{toolLabel(c.name)}</span>
-          <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] leading-[1.3] text-fg-2">{toolSummary(c, cwd)}</span>
-        </div>
-        {out && <div className={`ml-[18px] rounded-[10px] bg-surface-2 px-[9px] py-1.5 font-mono text-[12px] leading-[1.45] break-words whitespace-pre-wrap ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{out}</div>}
+      <div className="flex flex-col rounded-2xl bg-surface" style={{ marginLeft: depth * 14 }}>
+        {tappable ? (
+          <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-11 w-full flex-col justify-center gap-1.5 rounded-2xl px-3.5 py-[11px] text-left">
+            {head}
+          </button>
+        ) : (
+          <div className="flex flex-col gap-1.5 px-3.5 py-[11px]">{head}</div>
+        )}
+        {open && (
+          <div className="flex flex-col gap-2 px-3.5 pb-[11px]">
+            <ToolOutput call={c} running={running} touch box={(text) => <div className={`mo-scroll max-h-[60vh] overflow-auto ${OUTPUT_BOX} ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{text || '(no output)'}</div>} />
+          </div>
+        )}
       </div>
       {c.children.map((k) => (
-        <Step key={k.id} c={k} depth={depth + 1} running={running} cwd={cwd} />
+        <Step key={k.id} c={k} depth={depth + 1} running={running} cwd={cwd} tails={tails} />
       ))}
     </>
   );
 }
 
-function StepItem({ it, running, cwd }: { it: Item; running: boolean; cwd: string }) {
-  if (it.type === 'tools') return it.calls.map((c) => <Step key={c.id} c={c} depth={0} running={running} cwd={cwd} />);
+function StepItem({ it, running, cwd, tails }: { it: Item; running: boolean; cwd: string; tails: boolean }) {
+  if (it.type === 'tools') return it.calls.map((c) => <Step key={c.id} c={c} depth={0} running={running} cwd={cwd} tails={tails} />);
   if (it.type === 'text') return <Markdown text={it.p.text} className="px-1 py-1 text-[14px] leading-[1.55] text-fg-2" />;
   if (it.type === 'error') return <ErrorNote>{it.p.text}</ErrorNote>;
   return null;
@@ -65,17 +97,27 @@ function StepItem({ it, running, cwd }: { it: Item; running: boolean; cwd: strin
 /** Every call a turn made, in order, with what the agent said between them. */
 export function StepsScreen({ turn }: { turn?: number }) {
   const shell = useShell();
-  const { thread, events, files, children } = useThread();
-  const view = useMemo(() => (thread ? threadView({ events, thread, artifacts: files, children }) : null), [events, thread, files, children]);
-  const t = view?.turns.find((x) => x.key === turn) ?? view?.turns[view.turns.length - 1];
+  const { thread, events, history, files, children, ready } = useThread();
+  const spans = history.history.spans;
+  const view = useMemo(() => (thread ? threadView({ events, spans, thread, artifacts: files, children }) : null), [events, spans, thread, files, children]);
+  // A link to an older turn than the thread holds loads the page with it.
+  const held = !turn || holds(history.history, turn);
+  const { reveal } = history;
+  useEffect(() => {
+    if (ready && turn && !held) void reveal(turn);
+  }, [ready, turn, held, reveal]);
+  const t = view?.turns.find((x) => x.key === turn) ?? (held ? view?.turns[view.turns.length - 1] : undefined);
   const running = !!t && t.status === 'running';
+  const tails = !!t && hasLiveOutput(t.harness);
   return (
     <>
       <MoHeader onBack={shell.back} title="Steps" sub={thread?.title} />
-      <Body className="gap-2">
-        {t ? t.items.map((it) => <StepItem key={it.key} it={it} running={running} cwd={thread?.cwd ?? ''} />) : <MoEmpty>No steps yet.</MoEmpty>}
-        {t && !t.steps && <MoEmpty>This turn answered without calling a tool.</MoEmpty>}
-      </Body>
+      <ThreadIdCtx.Provider value={thread?.id ?? ''}>
+        <Body className="gap-2">
+          {t ? t.items.map((it) => <StepItem key={it.key} it={it} running={running} cwd={thread?.cwd ?? ''} tails={tails} />) : <MoEmpty>{held ? 'No steps yet.' : 'Loading'}</MoEmpty>}
+          {t && !t.steps && <MoEmpty>This turn answered without calling a tool.</MoEmpty>}
+        </Body>
+      </ThreadIdCtx.Provider>
     </>
   );
 }
@@ -101,6 +143,7 @@ export function PRScreen() {
   const { thread, slotBusy, applyThread } = useThread();
   const { channel } = useApp();
   const mark = useThreadPR(thread, slotBusy, true);
+  const watch = usePRWatch(thread?.id, mark);
   const ch = thread ? channel(thread.channel_id) : undefined;
   const n = mark?.pr?.number;
   const q = useApi<PRDetail>(n && ch?.github_repo ? `/channels/${encodeURIComponent(ch.id)}/prs/${n}` : null);
@@ -171,6 +214,8 @@ export function PRScreen() {
   const note = [failing && `${plural(failing, 'check')} failing.`, pending && `${plural(pending, 'check')} still running. Merging now skips them.`, p.mergeable === 'CONFLICTING' && 'It conflicts with the base branch.']
     .filter(Boolean)
     .join(' ');
+  const canWatch = open || watch.watching;
+  const { action, line } = watchCopy(watch.watch);
   return (
     <>
       <MoHeader
@@ -190,6 +235,22 @@ export function PRScreen() {
             {p.headRefName} → {p.baseRefName}
           </span>
         </div>
+        {(canWatch || watch.watch) && (
+          <div className="flex flex-col gap-2">
+            <MoGroup>
+              <MoListRow
+                icon={<Icon name="bell" size={18} className={watch.watching ? 'text-live-text' : ''} />}
+                label={canWatch ? action : line}
+                sub={canWatch ? line : undefined}
+                onClick={canWatch ? () => void (watch.watching ? watch.stop() : watch.start()) : undefined}
+                chevron={false}
+                disabled={watch.busy}
+                last
+              />
+            </MoGroup>
+            {watch.error && <ErrorNote>{watch.error}</ErrorNote>}
+          </div>
+        )}
         {p.checkRuns.length > 0 && (
           <MoSection title="Checks" count={p.checkRuns.length} pad={false}>
             <MoGroup>
@@ -228,18 +289,22 @@ export function PRScreen() {
 export function BrowserScreen() {
   const shell = useShell();
   const { thread } = useThread();
-  return thread ? <BrowserBody channelId={thread.channel_id} onBack={shell.back} /> : <MoHeader onBack={shell.back} title="Browser" />;
+  return thread ? <BrowserBody channelId={thread.channel_id} threadId={thread.id} onBack={shell.back} /> : <MoHeader onBack={shell.back} title="Browser" />;
 }
 
-function BrowserBody({ channelId, onBack }: { channelId: string; onBack: () => void }) {
+function BrowserBody({ channelId, threadId, onBack }: { channelId: string; threadId: string; onBack: () => void }) {
   const b = useChannelBrowser(channelId);
   const url = b.state?.url ? displayUrl(b.state.url) : null;
+  const [annotating, setAnnotating] = useState(false);
+  const close = useCallback(() => setAnnotating(false), []);
+  const added = useAfterAdd(close);
   return (
     <>
-      <MoHeader onBack={onBack} title="Browser" sub={[url, 'watch only'].filter(Boolean).join(' · ')} />
+      <MoHeader onBack={onBack} title="Browser" sub={[url, 'watch only'].filter(Boolean).join(' · ')} right={<MoRound icon="annotate" label="Annotate this page" disabled={!canAnnotate(b.state)} onClick={() => setAnnotating(true)} />} />
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-3 pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] bg-surface">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] bg-surface">
           <BrowserWatch b={b} />
+          {annotating && <AnnotateLayer channelId={channelId} threadId={threadId} onClose={close} onAdded={added} />}
         </div>
         <p className="m-0 px-1 text-[13px] leading-[1.5] text-fg-3">The agent drives this browser. Logins and captchas are handled on the Mac.</p>
       </div>
@@ -252,7 +317,7 @@ export function TerminalScreen() {
   const { thread } = useThread();
   return (
     <>
-      <MoHeader onBack={shell.back} title="Terminal" sub="Read only · take over on the Mac" />
+      <MoHeader onBack={shell.back} title="Terminal" sub="Read only · tap lines to add them to a message" />
       <div className="flex min-h-0 flex-1 flex-col px-3 pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
         {thread ? <TerminalView threadId={thread.id} cwd={thread.cwd} readOnly /> : <MoEmpty>Loading</MoEmpty>}
       </div>
@@ -264,11 +329,11 @@ export function TerminalScreen() {
 
 export function DetailsScreen() {
   const shell = useShell();
-  const { thread, init, lastResult, events } = useThread();
+  const { thread, init, lastResult, links, history } = useThread();
   const { channel } = useApp();
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   if (!thread) return <MoHeader onBack={shell.back} title="Details" />;
-  const turns = events.filter((e) => e.kind === 'result').length;
+  const turns = turnCount(history.history);
   const modelId = lastResult?.model || init?.model || thread.model || '';
   const { model } = harnesses ? modelOf(harnesses, { harness: thread.harness, model: modelId }) : { model: undefined };
   const rows: [string, ReactNode][] = [
@@ -289,6 +354,25 @@ export function DetailsScreen() {
   ];
   if (thread.task_id) rows.splice(2, 0, ['Task', <span className="font-mono text-[13px]">{thread.task_id}</span>]);
   if (thread.branch) rows.push(['Branch', <span className="font-mono text-[13px]">{thread.branch}</span>]);
+  if (links.from)
+    rows.push([
+      'Continued from',
+      <span className="flex flex-col py-2">
+        <span className="truncate">{linkName(links.from)}</span>
+        {links.from.carried && <span className="text-[12.5px] leading-[1.35] whitespace-normal text-fg-3">{carriedText(links.from.carried)}</span>}
+      </span>,
+    ]);
+  if (links.into.length)
+    rows.push([
+      'Continued in',
+      <span className="flex flex-col py-2">
+        {links.into.map((l) => (
+          <span key={l.id} className="truncate">
+            {linkName(l)}
+          </span>
+        ))}
+      </span>,
+    ]);
   const agentUrl = thread.harness === 'cursor-cloud' ? cloudAgentUrl(thread.session_id) : null;
   if (agentUrl)
     rows.push([

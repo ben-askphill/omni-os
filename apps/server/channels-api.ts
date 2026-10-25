@@ -11,6 +11,7 @@ import { getCatalog } from './harness/catalog-service.ts';
 import { activeTasks } from './runner.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { publishFeed } from './bus.ts';
+import { baseOptions } from './worktree-base.ts';
 
 export const channelsApi = new Hono();
 
@@ -201,6 +202,12 @@ channelsApi.delete('/:id/design-system', (c) => {
   const id = c.req.param('id');
   if (!channels.get(id)) return c.json({ error: 'not found' }, 404);
   return c.json(publicChannel(channels.update(id, { design_system: null, design_system_name: null })!));
+});
+
+/** What the new-thread composer offers as a base for a worktree thread in this channel (worktree-base.ts). */
+channelsApi.get('/:id/bases', async (c) => {
+  const channel = channels.get(c.req.param('id'));
+  return channel ? c.json(await baseOptions(channel)) : c.json({ error: 'not found' }, 404);
 });
 
 channelsApi.get('/:id/threads', (c) => c.json(threads.byChannel(c.req.param('id'), 200, c.req.query('archived') === '1')));

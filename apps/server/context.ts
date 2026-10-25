@@ -47,7 +47,7 @@ function publish(threadId: string, c: ContextUsage) {
 }
 
 /** The last reading: live, or kept from an earlier run (Cursor). */
-function lastContext(threadId: string): ContextUsage | null {
+export function lastContext(threadId: string): ContextUsage | null {
   return snapshots.get(threadId) ?? kv.get<ContextUsage>(lastKey(threadId)) ?? null;
 }
 

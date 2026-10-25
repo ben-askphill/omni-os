@@ -69,7 +69,7 @@ struct HomeScreen: View {
     if !shown.isEmpty {
       ThreadDayList(model: model, threads: shown, showChannel: true)
     } else if recent.isEmpty && model.store.loadState == .loading {
-      Loader(size: 16).foregroundStyle(Tok.fg3).frame(maxWidth: .infinity).padding(.vertical, z(40))
+      Loader(size: 16, color: Tok.fg3).frame(maxWidth: .infinity).padding(.vertical, z(40))
     } else {
       switch filter {
       case .all:

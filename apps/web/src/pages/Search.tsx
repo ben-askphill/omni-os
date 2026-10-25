@@ -62,7 +62,7 @@ export function SearchPage({ q }: { q: string }) {
               <ul className="rise">
                 {hits.map((h, i) => (
                   <li key={h.thread_id} style={{ '--i': i } as CSSProperties}>
-                    <a href={href.thread(h.thread_id)} className="hov block rounded-[18px] px-3.5 py-3 [--hov:var(--surface)]">
+                    <a href={h.event_id ? href.threadAt(h.thread_id, h.event_id) : href.thread(h.thread_id)} className="hov block rounded-[18px] px-3.5 py-3 [--hov:var(--surface)]">
                       <div className="flex min-w-0 items-center gap-2">
                         <StatusDot status={h.status} />
                         <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{h.title}</span>

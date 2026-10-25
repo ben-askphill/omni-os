@@ -2,6 +2,7 @@ import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { db } from './db.ts';
 import { SERVER_ONLY_VARS } from './harness/env-guard.ts';
+import { WEBHOOK_SECRET_PREFIX } from './github-webhook.ts';
 
 // Secret values live only in the macOS Keychain (service "omni-os").
 // The DB keeps names and scopes so the UI can list them without reading values.
@@ -13,9 +14,9 @@ export const SYNC_SECRETS = { url: 'SUPABASE_URL', anonKey: 'SUPABASE_ANON_KEY',
 const PRIVATE = new Set<string>(Object.values(SYNC_SECRETS));
 const SERVER_ONLY = new Set<string>(SERVER_ONLY_VARS);
 
-/** False for Omni's sync credentials (global only) and for the Grok Bot webhook (any scope). */
+/** False for Omni's sync credentials (global only), the Grok Bot webhook and webhook signing secrets (any scope). */
 export function secretReachesThread(scope: string, name: string): boolean {
-  if (SERVER_ONLY.has(name)) return false;
+  if (SERVER_ONLY.has(name) || name.startsWith(WEBHOOK_SECRET_PREFIX)) return false;
   if (scope === 'global' && PRIVATE.has(name)) return false;
   return true;
 }
@@ -86,4 +87,22 @@ export async function secretsEnv(channelId: string): Promise<Record<string, stri
     if (v != null) env[r.name] = v;
   }
   return env;
+}
+
+/**
+ * The values of the secrets a channel action names, channel scope first, then global, read from the Keychain. A name
+ * set in neither scope, or one no thread may have, is in `missing`.
+ */
+export async function namedSecrets(channelId: string, names: string[]): Promise<{ env: Record<string, string>; missing: string[] }> {
+  const env: Record<string, string> = {};
+  const missing: string[] = [];
+  for (const name of names) {
+    let value: string | null = null;
+    for (const scope of [`channel:${channelId}`, 'global']) {
+      if (value == null && secretReachesThread(scope, name) && hasSecret(scope, name)) value = await readSecret(scope, name);
+    }
+    if (value == null) missing.push(name);
+    else env[name] = value;
+  }
+  return { env, missing };
 }

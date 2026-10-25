@@ -3,8 +3,10 @@ import type { ReactNode } from 'react';
 import { Page } from '../pages/Page.tsx';
 import { pageTitle, type Route } from '../router.ts';
 import { useApp } from '../store.tsx';
+import { ActionsScreen } from './ActionsScreen.tsx';
 import { ActivityScreen } from './ActivityScreen.tsx';
 import { ChannelScreen, ChannelsScreen } from './ChannelsScreen.tsx';
+import { ContinueSheet } from './ContinueSheet.tsx';
 import { LibraryScreen } from './LibraryScreen.tsx';
 import { NewSheet } from './NewSheet.tsx';
 import { MoEmpty, MoHeader } from './parts.tsx';
@@ -51,6 +53,7 @@ export const RENDER: Record<ScreenKey, (r: Route) => ReactNode> = {
   pr: () => <PRScreen />,
   browser: () => <BrowserScreen />,
   terminal: () => <TerminalScreen />,
+  actions: () => <ActionsScreen />,
   details: () => <DetailsScreen />,
   viewer: (r) => <ViewerScreen route={r} />,
   settings: () => <SettingsScreen />,
@@ -65,5 +68,7 @@ export function SheetView({ sheet }: { sheet: ShellSheet }) {
       return <NewSheet channel={sheet.channel} />;
     case 'search':
       return <SearchSheet />;
+    case 'continue':
+      return <ContinueSheet source={sheet.source} />;
   }
 }

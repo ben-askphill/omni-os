@@ -1,14 +1,23 @@
 // Stdio MCP server handed to conductor threads. It talks to the local Omni API,
 // so delegated threads are ordinary threads the user can open, search and continue.
+import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { call, SELF, text } from './api.ts';
+import { ApiError, call, SELF, text } from './api.ts';
+import { registerReferencedThread } from './referenced-thread.ts';
 
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
 const USER = process.env.OMNI_USER || 'the user';
 
 const server = new McpServer({ name: 'omni', version: '0.1.0' });
+
+/** The API's base pick for the `base` a tool call names: head, remote-default or a ref. */
+const basePick = (base?: string) => {
+  const name = base?.trim();
+  if (!name) return undefined;
+  return name === 'head' || name === 'remote-default' ? { kind: name } : { kind: 'ref', ref: name };
+};
 
 /** A channel's sidebar folders, with a few recent thread titles so you can tell what each one holds. */
 const folderSummary = (folders: any[] = []) =>
@@ -88,13 +97,20 @@ server.registerTool(
       effort: z.string().optional().describe('Reasoning effort supported by the model, e.g. high. Use list_harnesses.'),
       folder: z.string().optional().describe('Sidebar folder in the channel to file the thread in, by name or id. Use list_channels. It must exist unless create_folder is true.'),
       create_folder: z.boolean().optional().describe(`Create \`folder\` when the channel has none by that name. Only when ${USER} asked for the folder or agreed to it.`),
+      base: z
+        .string()
+        .optional()
+        .describe(
+          'Where a repo channel\'s new worktree branch starts: omit or "head" for the repo\'s current commit, "remote-default" for origin\'s default branch (fetched first, the checkout is never moved), ' +
+            'or the name of an existing branch, tag or commit. Ignored when the thread gets no worktree. Use it when the work must start from the latest origin, not a stale local checkout.',
+        ),
     },
   },
-  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, create_folder }) => {
+  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, create_folder, base }) => {
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
     const t = await call('/threads', {
       method: 'POST',
-      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, folder, parent_id: SELF, source: 'conductor' }),
+      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, folder, base: basePick(base), parent_id: SELF, source: 'conductor' }),
     });
     return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch });
   },
@@ -258,6 +274,85 @@ server.registerTool(
 );
 
 server.registerTool(
+  'watch_pr',
+  {
+    description:
+      "Watch a thread's PR. Omni polls GitHub itself and wakes the thread once per new failing check on a head, with the " +
+      'failing checks and a log tail, and once per batch of new review feedback from someone else (reviews, inline and ' +
+      "conversation comments, never the signed-in account's own), with author, link and an excerpt; unchanged polls cost " +
+      'no turn. A watch ends on its own when the PR merges or closes, the thread is archived, or after its wake limit ' +
+      '(three wakes for review comments alone). action: start (the branch\'s open PR, or `number`), stop, ' +
+      'or status. Without thread_id, status lists every watch on this Mac.',
+    inputSchema: {
+      thread_id: z.string().optional(),
+      action: z.enum(['start', 'stop', 'status']),
+      number: z.number().int().positive().optional().describe("The PR to watch. Omit for the thread branch's open PR."),
+    },
+  },
+  async ({ thread_id, action, number }) => {
+    if (!thread_id) {
+      if (action !== 'status') throw new Error('start and stop need a thread_id.');
+      return text(await call('/pr-watches'));
+    }
+    const path = `/threads/${encodeURIComponent(thread_id)}/pr-watch`;
+    if (action === 'start') return text(await call(path, { method: 'PUT', body: JSON.stringify(number ? { number } : {}) }));
+    if (action === 'stop') return text(await call(path, { method: 'DELETE' }));
+    return text(await call(path));
+  },
+);
+
+server.registerTool(
+  'continue_thread',
+  {
+    description:
+      `Continue an idle thread in a new one on a local harness, only when ${USER} asks. The new thread is linked to it, in the same ` +
+      'channel, with a session of its own and, for repo work, its own worktree on a new branch with the uncommitted changes carried. ' +
+      'Its first session reads a carryover of the thread (goal, changed files, checks, recent history) ahead of `message`. ' +
+      'Files attached in the thread go only when named in `attachments`: they are copied into the new thread, and any that are missing, too big or not plain files are listed back with why. ' +
+      'The thread itself stays as it is. Refused while anything runs or waits in it, and to or from Hermes or Cursor Cloud. Ids come from list_harnesses.',
+    inputSchema: {
+      thread_id: z.string(),
+      harness: z.string().describe('claude-code, codex or cursor.'),
+      model: z.string().optional().describe("A model id from list_harnesses. Omit for the harness's default. Not Omni's Auto; Cursor's own auto model is fine."),
+      effort: z.string().optional().describe("One of the model's effort levels. Omit for its default."),
+      message: z.string().describe('The first message for the new thread. It reads it after the carryover, whole.'),
+      attachments: z.array(z.string()).optional().describe('Names of files attached in the thread to carry into the new one. Omit to carry none.'),
+    },
+  },
+  async ({ thread_id, harness, model, effort, message, attachments }) => {
+    const run = { harness, model: model ?? '', effort: effort ?? '' };
+    const previewOf = (picked?: string[]) => call(`/threads/${thread_id}/continue/preview`, { method: 'POST', body: JSON.stringify({ ...run, attachments: picked }) });
+    let preview = await previewOf();
+    if (attachments?.length) {
+      const has: { id: string; name: string }[] = preview.carryover.attachments;
+      const missing = attachments.filter((n) => !has.some((a) => a.name === n));
+      if (missing.length) return text(`Not continued: this thread has no attachment named ${missing.join(', ')}. It has: ${has.map((a) => a.name).join(', ') || 'none'}.`);
+      preview = await previewOf(has.filter((a) => attachments.includes(a.name)).map((a) => a.id));
+    }
+    if (preview.blocked) return text(`Not continued: ${preview.blocked.message}`);
+    const picked = (preview.carryover.attachments as { id: string; selected: boolean }[]).filter((a) => a.selected).map((a) => a.id);
+    const { thread } = await call(`/threads/${thread_id}/continue`, {
+      method: 'POST',
+      body: JSON.stringify({ ...run, text: message, attachments: picked, request_id: randomUUID(), revision: preview.revision }),
+    });
+    const files = (preview.carryover.attachments as { name: string; selected: boolean; carried: boolean; reason: string | null }[])
+      .filter((a) => a.selected)
+      .map((a) => ({ name: a.name, carried: a.carried, ...(a.reason && { not_carried_because: a.reason }) }));
+    return text({
+      thread_id: thread.id,
+      title: thread.title,
+      continued_from: thread_id,
+      harness: thread.harness,
+      model: thread.model,
+      effort: thread.effort,
+      status: thread.status,
+      branch: thread.branch,
+      ...(files.length && { attachments: files }),
+    });
+  },
+);
+
+server.registerTool(
   'get_thread',
   { description: 'Status, last reply and artifacts of a thread.', inputSchema: { thread_id: z.string() } },
   async ({ thread_id }) => text(await call(`/threads/${thread_id}/summary`)),
@@ -369,6 +464,62 @@ server.registerTool(
   { description: `Full-text search across every thread ${USER} has run.`, inputSchema: { query: z.string() } },
   async ({ query }) => text(await call(`/search?q=${encodeURIComponent(query)}`)),
 );
+
+/** A refused delivery action is an answer for the conductor to read, not a crash: the server says why in `error`. */
+const refused = async (run: () => Promise<unknown>) => {
+  try {
+    return text(await run());
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) return text({ done: false, why: err.message });
+    throw err;
+  }
+};
+
+server.registerTool(
+  'list_automation_deliveries',
+  {
+    description:
+      "An event automation's deliveries, newest first: each event that reached it (a published page, a GitHub webhook) and what became of it. " +
+      'state is received, accepted, queued (held for the Mac that runs automations), started (its thread exists: see thread_id and thread_status), ' +
+      'failed or skipped (with reason). can_retry means it failed before any thread was made, so retrying cannot duplicate a run. ' +
+      "A failed one that has a thread (retry_blocked says so) has an unknown outcome: open that thread and follow up there. Pass the last id as before to page.",
+    inputSchema: { automation: z.string().min(1).max(200), limit: z.number().int().min(1).max(100).optional(), before: z.string().optional() },
+  },
+  async ({ automation, limit, before }) =>
+    text(await call(`/automations/${encodeURIComponent(automation)}/deliveries?limit=${limit ?? 20}${before ? `&before=${encodeURIComponent(before)}` : ''}`)),
+);
+
+server.registerTool(
+  'retry_delivery',
+  {
+    description:
+      `Run a failed automation delivery again, only when ${USER} asks. Works only for a delivery with can_retry: it failed before any thread was made, and the event is still within the automation's max age. ` +
+      'Pass the attempt you saw; a stale attempt, a delivery that already started and one whose thread exists are refused with the reason, and nothing is started twice.',
+    inputSchema: { delivery_id: z.string().min(1).max(200), attempt: z.number().int().positive() },
+  },
+  async ({ delivery_id, attempt }) =>
+    refused(() => call(`/deliveries/${encodeURIComponent(delivery_id)}/retry`, { method: 'POST', body: JSON.stringify({ attempt }) })),
+);
+
+server.registerTool(
+  'skip_delivery',
+  {
+    description:
+      `Skip a delivery of an event automation for good, only when ${USER} asks: it never starts and cannot be retried. Works for a delivery that has not started (accepted, queued, or failed with no thread). ` +
+      'Refused with the reason once its thread exists or while Omni is starting it.',
+    inputSchema: { delivery_id: z.string().min(1).max(200), attempt: z.number().int().positive().optional() },
+  },
+  async ({ delivery_id, attempt }) =>
+    refused(() => call(`/deliveries/${encodeURIComponent(delivery_id)}/skip`, { method: 'POST', body: JSON.stringify(attempt === undefined ? {} : { attempt }) })),
+);
+
+server.registerTool('worktree_storage', {
+  description: 'Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup, plus what a cleanup or this Mac\'s retention policy would remove and the last cleanup runs. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing: only Ben removes worktrees, in Settings > Storage.',
+  inputSchema: { scan: z.boolean().optional() },
+}, async ({ scan }) => text(await call('/worktrees/scan', scan ? { method: 'POST' } : undefined)));
+
+// #218: the conductor reads a thread Ben referenced in a message the same way every other thread does.
+registerReferencedThread(server);
 
 server.registerTool('tool_failures', {
   description: 'Inspect machine-local tool failures grouped by harness, tool and category, most frequent first. With group_id, list occurrences with thread/call references. No raw arguments or error bodies. Use before for older occurrences.',

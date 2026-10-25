@@ -24,39 +24,48 @@ struct UserBubbleView: View {
       if let files = message.attachments, !files.isEmpty {
         AttachmentsView(threadID: threadID, items: files, client: client)
       }
-      VStack(alignment: .leading, spacing: z(4)) {
-        Text(Self.text(pieces, cut: long && !more))
-          .font(.omni(size: ThreadStyle.prose + 0.5))
-          .lineSpacing(5)
-          .foregroundStyle(Tok.fg)
-          .tint(Tok.fg)
-          .textSelection(.enabled)
-          .fixedSize(horizontal: false, vertical: true)
-          .environment(\.openURL, OpenURLAction { url in
-            guard url.scheme == Self.pillScheme, let start = Int(url.host() ?? "") else { return .discarded }
-            for hit in pieces.compactMap(\.hit) where hit.start != start { if ui.isOpen(aboutKey(hit.start)) { ui.toggle(aboutKey(hit.start)) } }
-            ui.toggle(aboutKey(start))
-            return .handled
-          })
-        if let about {
-          Hairline().padding(.top, z(2))
-          Text("\(about.description.isEmpty ? "No description" : about.description)\(Text(" · \(about.sourceTag)").foregroundStyle(Tok.fg4))")
-            .font(.omni(size: ThreadStyle.small))
-            .foregroundStyle(Tok.fg3)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        if long {
-          Button(more ? "Show less" : "Show all") { ui.toggle(moreKey) }
-            .buttonStyle(.link)
-            .font(.omni(size: 12, weight: .medium))
-            .foregroundStyle(Tok.fg3)
-            .underline()
-        }
+      if let context = message.context, !context.isEmpty {
+        MessageContextChips(readings: ContextReading.read(context, kinds: contextKinds))
       }
-      .padding(.horizontal, z(16))
-      .padding(.vertical, z(10))
-      .background(background)
-      .frame(maxWidth: z(600), alignment: .trailing)
+      // A message of context alone has no text to put in a bubble.
+      if !message.text.isEmpty || message.context?.isEmpty != false {
+        VStack(alignment: .leading, spacing: z(4)) {
+          Text(Self.text(pieces, cut: long && !more))
+            .font(.omni(size: ThreadStyle.prose + 0.5))
+            .lineSpacing(5)
+            .foregroundStyle(Tok.fg)
+            .tint(Tok.fg)
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+            .environment(\.openURL, OpenURLAction { url in
+              guard url.scheme == Self.pillScheme, let start = Int(url.host() ?? "") else { return .discarded }
+              for hit in pieces.compactMap(\.hit) where hit.start != start { if ui.isOpen(aboutKey(hit.start)) { ui.toggle(aboutKey(hit.start)) } }
+              ui.toggle(aboutKey(start))
+              return .handled
+            })
+          if let about {
+            Hairline().padding(.top, z(2))
+            Text("\(about.description.isEmpty ? "No description" : about.description)\(Text(" · \(about.sourceTag)").foregroundStyle(Tok.fg4))")
+              .font(.omni(size: ThreadStyle.small))
+              .foregroundStyle(Tok.fg3)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          if long {
+            Button(more ? "Show less" : "Show all") { ui.toggle(moreKey) }
+              .buttonStyle(.link)
+              .font(.omni(size: 12, weight: .medium))
+              .foregroundStyle(Tok.fg3)
+              .underline()
+          }
+          if let items = message.items, !items.isEmpty {
+            PRWakeListView(items: items, more: message.more ?? 0)
+          }
+        }
+        .padding(.horizontal, z(16))
+        .padding(.vertical, z(10))
+        .background(background)
+        .frame(maxWidth: z(600), alignment: .trailing)
+      }
     }
     .frame(maxWidth: .infinity, alignment: .trailing)
     .opacity(message.dropped == true ? 0.6 : 1)
@@ -315,7 +324,7 @@ struct SwitchLineView: View {
         HStack(spacing: z(8)) {
           Image(systemName: "arrow.triangle.2.circlepath").font(.omni(size: 11))
           Text(row.text).multilineTextAlignment(.center)
-          if row.isPending && running { Loader(size: 11) }
+          if row.isPending && running { Loader(size: 11, color: Tok.fg3) }
         }
         .font(.omni(size: 12, weight: .medium))
         .foregroundStyle(Tok.fg3)
@@ -499,7 +508,7 @@ struct WorkingLine: View {
 
   var body: some View {
     HStack(spacing: z(8)) {
-      Loader(size: 13).foregroundStyle(Tok.fg3)
+      Loader(size: 13, color: Tok.fg3)
       Text(text).lineLimit(1).truncationMode(.tail)
     }
     .font(.omni(size: ThreadStyle.small))
@@ -560,20 +569,25 @@ struct PendingBubble: View {
       }
       .font(.omni(size: 11.5, weight: .medium))
       .foregroundStyle(Tok.fg3)
-      Text(m.text)
-        .font(.omni(size: ThreadStyle.prose))
-        .lineSpacing(5)
-        .foregroundStyle(Tok.fg)
-        .textSelection(.enabled)
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, z(16))
-        .padding(.vertical, z(10))
-        .background(
-          UnevenRoundedRectangle(
-            topLeadingRadius: 22, bottomLeadingRadius: 22, bottomTrailingRadius: 22, topTrailingRadius: 8, style: .continuous)
-            .strokeBorder(Tok.lineStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-        )
-        .frame(maxWidth: z(600), alignment: .trailing)
+      if let context = m.context, !context.isEmpty {
+        MessageContextChips(readings: ContextReading.read(context, kinds: contextKinds))
+      }
+      if !m.text.isEmpty || m.context?.isEmpty != false {
+        Text(m.text)
+          .font(.omni(size: ThreadStyle.prose))
+          .lineSpacing(5)
+          .foregroundStyle(Tok.fg)
+          .textSelection(.enabled)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(.horizontal, z(16))
+          .padding(.vertical, z(10))
+          .background(
+            UnevenRoundedRectangle(
+              topLeadingRadius: 22, bottomLeadingRadius: 22, bottomTrailingRadius: 22, topTrailingRadius: 8, style: .continuous)
+              .strokeBorder(Tok.lineStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+          )
+          .frame(maxWidth: z(600), alignment: .trailing)
+      }
     }
     .frame(maxWidth: .infinity, alignment: .trailing)
     .opacity(0.7)
@@ -682,6 +696,10 @@ struct PendingEditBox: View {
           .accessibilityLabel("Edit queued message")
           .onAppear { text = draft.prompt }
           .onChange(of: text) { _, t in store.edits.update(m.uuid) { $0.prompt = t } }
+        // An edit changes the text and files only: the records show as they will be sent.
+        if let context = m.context, !context.isEmpty {
+          MessageContextChips(readings: ContextReading.read(context, kinds: contextKinds), alignment: .leading)
+        }
         if !kept.isEmpty || !draft.added.isEmpty {
           HStack(spacing: z(6)) {
             ForEach(kept, id: \.name) { f in
@@ -710,7 +728,7 @@ struct PendingEditBox: View {
           }
           .buttonStyle(.pill(.primary, height: 28))
           .keyboardShortcut(.return, modifiers: .command)
-          .disabled(saving || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          .disabled(saving || !draft.canSave)
         }
       }
       .padding(z(10))

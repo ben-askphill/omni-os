@@ -3,10 +3,13 @@ import { promisify } from 'node:util';
 
 const run = promisify(execFile);
 
-async function gh(args: string[], cwd?: string) {
-  const { stdout } = await run('gh', args, { cwd, maxBuffer: 32 * 1024 * 1024 });
+async function gh(args: string[], cwd?: string, timeout?: number) {
+  const { stdout } = await run('gh', args, { cwd, maxBuffer: 32 * 1024 * 1024, timeout });
   return stdout;
 }
+
+/** For the worktree checks, which hold a thread's folder while they run (workspace.ts): a stalled `gh` gives up. */
+const CHECK_TIMEOUT = 30_000;
 
 export async function detectRepo(repoPath: string): Promise<string | null> {
   try {
@@ -41,15 +44,14 @@ export function pickBranchPR<T extends { state?: string }>(prs: T[]): T | null {
 
 /** Every PR opened from a branch, newest first, and the one to show for it. */
 export async function branchPRs(repo: string, branch: string) {
-  const raw = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--head', branch, '--state', 'all', '--limit', '30', '--json', PR_FIELDS]));
+  const raw = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--head', branch, '--state', 'all', '--limit', '30', '--json', PR_FIELDS], undefined, CHECK_TIMEOUT));
   const prs = (raw as any[]).map((p) => ({ ...p, checks: summarizeChecks(p.statusCheckRollup), statusCheckRollup: undefined }));
   return { pr: pickBranchPR(prs), prs };
 }
 
-/** The merged PR a branch was opened as, with its head commit, or null when none is merged. */
-export async function mergedBranchPR(repo: string, branch: string): Promise<{ number: number; headRefOid: string } | null> {
-  const prs = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--head', branch, '--state', 'merged', '--limit', '5', '--json', 'number,headRefOid']));
-  return prs[0] ?? null;
+/** The merged PRs a branch was opened as, newest first, with the branch each went into, its head and its merge commit. */
+export async function mergedBranchPRs(repo: string, branch: string): Promise<{ number: number; headRefOid: string; baseRefName: string; mergeCommit: { oid: string } | null }[]> {
+  return JSON.parse(await gh(['pr', 'list', '--repo', repo, '--head', branch, '--state', 'merged', '--limit', '5', '--json', 'number,headRefOid,baseRefName,mergeCommit'], undefined, CHECK_TIMEOUT));
 }
 
 export async function getPR(repo: string, n: number) {

@@ -17,10 +17,10 @@ create table if not exists public.changes (
 
 -- The entities the relay takes. Set again on every run, so pasting this file again lets a relay made by an older
 -- version take the newer entities (folders came later, then completions and result_read for Needs you, then
--- limit_stop for usage limits). Keep it in step with SyncEntity in server/db/sync.ts.
+-- limit_stop for usage limits, then trigger_delivery for event automations). Keep it in step with SyncEntity in server/db/sync.ts.
 alter table public.changes drop constraint if exists changes_entity_check;
 alter table public.changes add constraint changes_entity_check
-  check (entity in ('channel', 'folder', 'thread', 'event', 'artifact', 'automation_run', 'kv', 'completion', 'result_read', 'limit_stop'));
+  check (entity in ('channel', 'folder', 'thread', 'event', 'artifact', 'automation_run', 'kv', 'completion', 'result_read', 'limit_stop', 'trigger_delivery'));
 
 create index if not exists changes_user_seq on public.changes (user_id, seq);
 

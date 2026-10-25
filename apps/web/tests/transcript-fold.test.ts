@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
+import type { Span } from '@omni/shared/history.ts';
 import type { HandoverP, RunName, SwitchP } from '@omni/shared/run-switch.ts';
 import { buildItems, buildTasks, type SwitchItem, type TranscriptEvent } from '../src/transcript/fold.ts';
 import { projectFold } from './transcript-snapshot.ts';
@@ -8,7 +9,7 @@ import { projectFold } from './transcript-snapshot.ts';
 // One corpus for the Web UI fold and the Mac transcript. Swift reads the same file from the repo.
 
 const corpus = JSON.parse(readFileSync(fixture('transcript', 'corpus.json'), 'utf8')) as {
-  cases: { name: string; events: TranscriptEvent[]; items: unknown; plan: unknown }[];
+  cases: { name: string; events: TranscriptEvent[]; spans?: Span[]; items: unknown; plan: unknown }[];
 };
 
 const REQUIRED = [
@@ -22,6 +23,8 @@ const REQUIRED = [
   'mod-logs',
   'cloud-agent',
   'run-switch',
+  'span-floor-break',
+  'span-gap',
 ];
 
 describe('transcript fold', () => {
@@ -38,7 +41,7 @@ describe('transcript fold', () => {
   it.each(REQUIRED)('%s matches the corpus', (name) => {
     const found = corpus.cases.find((c) => c.name === name);
     expect(found, name).toBeTruthy();
-    expect(projectFold(found!.events)).toEqual({ items: found!.items, plan: found!.plan });
+    expect(projectFold(found!.events, found!.spans)).toEqual({ items: found!.items, plan: found!.plan });
   });
 
   it('drops a call that names itself as its parent', () => {
@@ -73,6 +76,28 @@ describe('transcript fold', () => {
     ];
     const tasks = buildTasks(events);
     expect(tasks.get('agent')).toMatchObject({ running: false, background: true, status: 'completed', tool_uses: 4, started: events[0].created_at });
+  });
+
+  describe('compact tool results', () => {
+    const at = '2026-10-25T09:00:00.000Z';
+    const use = { id: 1, kind: 'tool_use', payload: JSON.stringify({ id: 'c1', name: 'Bash', input: { command: 'ls' }, parent: null }), created_at: at };
+    const result = (payload: unknown) => ({ id: 2, kind: 'tool_result', payload: JSON.stringify(payload), created_at: at });
+    const callOf = (events: TranscriptEvent[]) => {
+      const group = buildItems(events).items[0];
+      if (group.type !== 'tools') throw new Error('no tool group');
+      return group.calls[0];
+    };
+
+    it('keeps the output meta on the call result', () => {
+      const output = { chars: 5000, lines: 40, exit_code: 1 };
+      const c = callOf([use, result({ tool_use_id: 'c1', text: 'Exit code 1\nboom', is_error: true, truncated: true, output })]);
+      expect(c.result).toMatchObject({ event: 2, text: 'Exit code 1\nboom', is_error: true, output });
+    });
+
+    it('leaves a whole result without one', () => {
+      const c = callOf([use, result({ tool_use_id: 'c1', text: 'ok', is_error: false, truncated: false })]);
+      expect(c.result?.output).toBeUndefined();
+    });
   });
 
   describe('run switches', () => {

@@ -1,0 +1,232 @@
+{
+  "thread": {
+    "id": "00000000-0000-4000-8000-000000000015",
+    "channel_id": "widgets",
+    "title": "Fix the widget",
+    "status": "running",
+    "role": null,
+    "model": "claude-haiku-4-5",
+    "harness": "claude-code",
+    "effort": "low",
+    "auto_reason": "Light quick task: Haiku 4.5, low effort",
+    "queued_harness": null,
+    "queued_model": null,
+    "queued_effort": null,
+    "session_id": "00000000-0000-4000-8000-000000000015",
+    "has_run": 1,
+    "cwd": "/tmp/omni-fixtures/data/worktrees/00000000-0000-4000-8000-000000000015",
+    "branch": "omni/00000000",
+    "parent_id": null,
+    "task_id": null,
+    "source": "manual",
+    "automation": null,
+    "last_text": "ack: RUN:/tmp/omni-fixtures/turn-edit.sh round the total",
+    "suggestion": null,
+    "next_title": null,
+    "next_prompt": null,
+    "archived": 0,
+    "folder_id": null,
+    "pinned_at": null,
+    "done_at": null,
+    "setup": null,
+    "setup_error": null,
+    "limit_state": null,
+    "limit_resets_at": null,
+    "limit_elsewhere": 0,
+    "continued_from": null,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "updated_at": "2026-01-05T09:00:00.000Z"
+  },
+  "channel": {
+    "id": "widgets",
+    "name": "Widgets",
+    "kind": "client",
+    "repo_path": "/tmp/omni-fixtures/widgets",
+    "github_repo": null,
+    "use_worktree": 1,
+    "base_dir": null,
+    "store_domain": null,
+    "portal_slug": null,
+    "browser_headless": 1,
+    "notes": "Fixture",
+    "icon": null,
+    "design_system_name": null,
+    "archived": 0,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "default_harness": null,
+    "default_model": null,
+    "default_effort": null,
+    "design_system_size": 0
+  },
+  "events": [
+    {
+      "id": 85,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "init",
+      "payload": "{\"model\":\"claude-haiku-4-5\",\"cwd\":\"/tmp/omni-fixtures/data/worktrees/00000000-0000-4000-8000-000000000015\",\"tools\":10,\"mcp\":[\"omni-ask:connected\"]}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 86,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "user",
+      "payload": "{\"text\":\"TOOL:20 fix the widget\",\"source\":\"manual\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 87,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_1\",\"name\":\"Bash\",\"input\":{\"command\":\"sleep 0.02\",\"description\":\"Fake tool\"},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 88,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "task",
+      "payload": "{\"task_id\":\"toolu_fake_1\",\"event\":\"started\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 89,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "tool_result",
+      "payload": "{\"tool_use_id\":\"toolu_fake_1\",\"text\":\"slept 20ms\",\"is_error\":false,\"truncated\":false}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 90,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "task",
+      "payload": "{\"task_id\":\"toolu_fake_1\",\"event\":\"ended\",\"status\":\"completed\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 91,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "assistant_text",
+      "payload": "{\"text\":\"ack: TOOL:20 fix the widget\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 92,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "result",
+      "payload": "{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":1000,\"turns\":2,\"cost_usd\":0.002}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 93,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "user",
+      "payload": "{\"text\":\"RUN:/tmp/omni-fixtures/turn-edit.sh round the total\",\"source\":\"ben\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 94,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "assistant_text",
+      "payload": "{\"text\":\"ack: RUN:/tmp/omni-fixtures/turn-edit.sh round the total\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 95,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "result",
+      "payload": "{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":1000,\"turns\":1,\"cost_usd\":0.001}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 96,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "user",
+      "payload": "{\"text\":\"TOOL:4000 tidy this reduce\",\"source\":\"ben\",\"context\":[{\"id\":\"00000000-0000-4000-8000-000000000037\",\"kind\":\"diff_selection\",\"v\":1,\"label\":\"src/cart.ts:1-3\",\"note\":\"this reduce reads better with names\",\"body\":{\"path\":\"src/cart.ts\",\"old_path\":null,\"side\":\"new\",\"start\":1,\"end\":3,\"rows\":[{\"kind\":\"context\",\"text\":\"export function total(items: number[]) {\",\"old\":1,\"new\":1},{\"kind\":\"del\",\"text\":\"  return items.reduce((a, b) => a + b, 0);\",\"old\":2,\"new\":null},{\"kind\":\"add\",\"text\":\"  return items.reduce((sum, n) => sum + n, 0);\",\"old\":null,\"new\":2},{\"kind\":\"context\",\"text\":\"}\",\"old\":3,\"new\":3}],\"source\":{\"group\":\"unstaged\",\"from\":\"ccccccccccccccccccccccccccccccccccccccc2\",\"to\":\"ccccccccccccccccccccccccccccccccccccccc1\",\"turn\":null,\"blob_old\":\"fa9fb2e\",\"blob_new\":\"a31fcc1\"}}}]}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 97,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "tool_use",
+      "payload": "{\"id\":\"toolu_fake_4\",\"name\":\"Bash\",\"input\":{\"command\":\"sleep 4\",\"description\":\"Fake tool\"},\"parent\":null}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 98,
+      "thread_id": "00000000-0000-4000-8000-000000000015",
+      "kind": "task",
+      "payload": "{\"task_id\":\"toolu_fake_4\",\"event\":\"started\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    }
+  ],
+  "artifacts": [],
+  "children": [],
+  "team": [],
+  "parent": null,
+  "pending": [
+    {
+      "uuid": "00000000-0000-4000-8000-000000000038",
+      "kind": "user",
+      "text": "then check the rounding",
+      "source": "ben",
+      "mode": "queue",
+      "state": "held",
+      "request_id": "req-context-held",
+      "delivery": "held",
+      "context": [
+        {
+          "id": "00000000-0000-4000-8000-000000000037",
+          "kind": "diff_selection",
+          "v": 1,
+          "label": "src/cart.ts:1-3",
+          "note": "this reduce reads better with names",
+          "body": {
+            "path": "src/cart.ts",
+            "old_path": null,
+            "side": "new",
+            "start": 1,
+            "end": 3,
+            "rows": [
+              {
+                "kind": "context",
+                "text": "export function total(items: number[]) {",
+                "old": 1,
+                "new": 1
+              },
+              {
+                "kind": "del",
+                "text": "  return items.reduce((a, b) => a + b, 0);",
+                "old": 2,
+                "new": null
+              },
+              {
+                "kind": "add",
+                "text": "  return items.reduce((sum, n) => sum + n, 0);",
+                "old": null,
+                "new": 2
+              },
+              {
+                "kind": "context",
+                "text": "}",
+                "old": 3,
+                "new": 3
+              }
+            ],
+            "source": {
+              "group": "unstaged",
+              "from": "ccccccccccccccccccccccccccccccccccccccc2",
+              "to": "ccccccccccccccccccccccccccccccccccccccc1",
+              "turn": null,
+              "blob_old": "fa9fb2e",
+              "blob_new": "a31fcc1"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "live": true,
+  "mods": [],
+  "handoff": null,
+  "continued_from": null,
+  "continued_in": []
+}

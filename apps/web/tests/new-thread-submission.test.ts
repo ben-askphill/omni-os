@@ -34,6 +34,7 @@ beforeEach(() => {
       return Response.json({ id: 'created' });
     }
     if (url.startsWith('/api/harnesses')) return Response.json(harnesses);
+    if (url.startsWith('/api/channels/')) return Response.json({ available: false, reason: 'No repository.' });
     if (url.startsWith('/api/commands')) return Response.json({ status: 'ready', commands: [] });
     throw new Error(`Unexpected request: ${url}`);
   }));

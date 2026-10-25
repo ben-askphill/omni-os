@@ -249,7 +249,7 @@ public final class WorkspaceStore {
       if mods != list { mods = list }
     case .message(.needsYou(_)):
       needsYouChanged()
-    case .message(.artifact(_)), .message(.unknown(_)):
+    case .message(.artifact(_)), .message(.automationDelivery(_)), .message(.unknown(_)):
       break
     }
   }

@@ -1,0 +1,19 @@
+{
+  "fixture": "longThread()",
+  "budget": {
+    "rows": 300,
+    "bytes": 262144,
+    "rowBytes": 32768,
+    "anchorBytes": 65536,
+    "anchors": 16
+  },
+  "full": {
+    "rows": 3472,
+    "items": 322
+  },
+  "head": {
+    "rows": 223,
+    "anchors": 1,
+    "items": 20
+  }
+}

@@ -72,10 +72,10 @@ export const config = {
   },
   /** How often event automations (`on:` in automations/*.yaml) poll GitHub. */
   automationPollSeconds: Math.max(15, Number(env.OMNI_AUTOMATION_POLL_SECONDS ?? 120)),
-  /** Remove thread worktrees once nothing in them can be lost (apps/server/worktree-sweep.ts). '0' turns it off. */
-  worktreeSweep: (env.OMNI_WORKTREE_SWEEP ?? '1') !== '0',
-  /** How long a thread on a merged branch sits idle before its worktree is removed. */
+  /** How long a thread on a merged branch sits idle before its worktree is eligible for cleanup (worktree-inventory.ts). */
   worktreeIdleDays: Number(env.OMNI_WORKTREE_IDLE_DAYS ?? 7),
+  /** How long after startup the first retention pass runs (worktree-cleanup.ts). Tests shorten it. */
+  retentionFirstPassMs: Number(env.OMNI_RETENTION_FIRST_PASS_MS ?? 60_000),
 };
 
 // OMNI_DATA_DIR moves all runtime state, so tests can run against a temp dir.
@@ -104,6 +104,8 @@ export const paths = {
   mcpOmni: join(ROOT, 'apps', 'mcp', 'omni.ts'),
   /** ask_user_question, which every local thread gets. */
   mcpAsk: join(ROOT, 'apps', 'mcp', 'ask.ts'),
+  /** read_referenced_thread alone, which every local thread without `omni` gets. */
+  mcpThreads: join(ROOT, 'apps', 'mcp', 'threads.ts'),
   /** Claude Code mods (plugins of function hooks) Omni loads when config.mods is on. */
   mods: join(ROOT, 'mods'),
   modProgress: join(ROOT, 'mods', 'omni-progress'),

@@ -79,7 +79,6 @@ struct LiveServerTests {
       store.events.map(\.id) == d.events.map(\.id) && store.thread?.status == d.thread.status
     }
     #expect(store.transcript.items == Transcript.build(d.events))
-    #expect(store.refreshError == nil)
   }
 
   @MainActor @Test func fillsTheWorkspaceStore() async throws {

@@ -156,6 +156,10 @@ final class QARunner {
         case .handoffMenu(let name):
           try await handoffMenu(shot: name)
           result.files = [name + ".png"]
+        case .prMenu(let name):
+          guard let frame = QAPRProbe.button else { throw QAScriptError("no PR button on screen") }
+          try await shootMenu(at: NSPoint(x: frame.midX, y: frame.midY), button: .leftMouseDown, shot: name, what: "the PR button")
+          result.files = [name + ".png"]
         case .handOff(let device):
           guard let handOff = QAHandoffProbe.handOff else { throw QAScriptError("no thread that can be handed off on screen") }
           await handOff(device)
@@ -178,9 +182,20 @@ final class QARunner {
           guard let fold = QAProbe.foldAll else { throw QAScriptError("no sidebar fold-all button on screen") }
           fold()
           try? await Task.sleep(for: .milliseconds(800))
+        case .searchHit(let i):
+          guard let hit = QAProbe.openSearchHit?(i) else { throw QAScriptError("no search result \(i) on screen") }
+          routedAt = .now
+          result.note = try await revealed(hit)
         case .editPending(let text):
           guard let edit = QAProbe.editPending, edit(text) else { throw QAScriptError("no editable unsent message on screen") }
           try? await Task.sleep(for: .milliseconds(500))
+        case .webhookSecret(let id):
+          guard let open = QAProbe.openWebhookSecret, open(id) else { throw QAScriptError("no webhook automation \(id) on screen") }
+          try? await Task.sleep(for: .milliseconds(600))
+        case .deliveries(let target):
+          guard let show = QAProbe.showDeliveries else { throw QAScriptError("no Automations page on screen") }
+          if let failure = await show(target) { throw QAScriptError(failure) }
+          try? await Task.sleep(for: .milliseconds(600))
         case .imageZoom(let scale):
           guard let zoom = QAProbe.imageZoom else { throw QAScriptError("no image preview on screen") }
           if let scale { zoom.step(scale / zoom.scale) } else { zoom.fit() }
@@ -231,6 +246,30 @@ final class QARunner {
           try? await Task.sleep(for: .milliseconds(400))
         case .webTitle(let title):
           try await InspectorProbe.waitForTitle(title)
+        case .selectLines(let file, let from, let to):
+          guard let select = LineSelectionProbe.select else { throw QAScriptError("the Changes tab is not showing") }
+          guard select(file, from, to) else { throw QAScriptError("no file \(file) whose lines can be picked") }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .addContext(let note):
+          guard let add = LineSelectionProbe.add else { throw QAScriptError("the Changes tab is not showing") }
+          if let refused = add(note) { throw QAScriptError(refused) }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .selectTerminal:
+          guard let select = TerminalSelectionProbe.select, select() else { throw QAScriptError("the Terminal tab is not showing") }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .addTerminal(let note):
+          guard let add = TerminalSelectionProbe.add else { throw QAScriptError("no terminal output is selected") }
+          if let refused = await add(note) { throw QAScriptError(refused) }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .annotate(let action):
+          try await annotate(action)
+        case .openContext(let index):
+          guard let toggle = ContextChipsProbe.toggle, toggle(index) else { throw QAScriptError("no context chip \(index) in the reply box") }
+          try? await Task.sleep(for: .milliseconds(400))
+        case .referenceThread(let action):
+          guard let probe = ThreadReferenceProbe.current else { throw QAScriptError("the reply box has no thread reference button") }
+          try await probe.run(action)
+          try? await Task.sleep(for: .milliseconds(500))
         case .quickPrompt(let action):
           guard let quick = Self.quickPrompt else { throw QAScriptError("no Quick Prompt") }
           switch action {
@@ -465,6 +504,9 @@ final class QARunner {
     case .modelPicker(let query): "modelPicker \(query)"
     case .foldAll: "foldAll"
     case .editPending(let text): "editPending \(text.prefix(40))"
+    case .webhookSecret(let id): "webhookSecret \(id)"
+    case .deliveries(let target): "deliveries \(target.automation)"
+    case .searchHit(let i): "searchHit \(i)"
     case .imageZoom(let scale): "imageZoom \(scale.map { "\($0)" } ?? "fit")"
     case .type(let text): "type \(text.prefix(40))"
     case .run(let run): "run \(run.harness.rawValue) \(run.model) \(run.effort)"
@@ -475,9 +517,17 @@ final class QARunner {
     case .folder(let action): "folder \(action)"
     case .screen(let name): "screen \(name)"
     case .handoffMenu(let name): "handoffMenu \(name)"
+    case .prMenu(let name): "prMenu \(name)"
     case .handOff(let device): "handOff \(device)"
     case .palette(let query): "palette \(query ?? "close")"
     case .quickPrompt(let action): "quickPrompt \(action)"
+    case .selectLines(let file, let from, let to): "selectLines \(file) \(from)-\(to)"
+    case .addContext(let note): "addContext \(note.prefix(40))"
+    case .selectTerminal: "selectTerminal"
+    case .addTerminal(let note): "addTerminal \(note.prefix(40))"
+    case .annotate(let action): "annotate \(action)"
+    case .openContext(let index): "openContext \(index)"
+    case .referenceThread(let action): "referenceThread \(action)"
     case .quit: "quit"
     }
   }
@@ -497,7 +547,41 @@ final class QARunner {
   private var facts: QAFacts {
     var f = model.qaFacts
     f.shownThread = QAProbe.shownThread
+    f.browserFrame = BrowserAnnotateProbe.browser?.frame != nil
     return f
+  }
+
+  /// The Browser tab's Annotate, through the model its buttons use. `start` waits for the screenshot, and says why when
+  /// the capture failed.
+  private func annotate(_ action: QAAnnotate) async throws(QAScriptError) {
+    guard let a = BrowserAnnotateProbe.annotating else { throw QAScriptError("the Browser tab is not showing") }
+    switch action {
+    case .start:
+      await a.model.start()
+      if case .failed(let e) = a.model.phase { throw QAScriptError(e.message) }
+      // The screenshot is on screen once the image view has loaded it.
+      try? await Task.sleep(for: .milliseconds(1200))
+    case .drag(let x0, let y0, let x1, let y1, let note):
+      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to draw on") }
+      // A 1000 by 1000 stand-in for the shown size, so the fractions are the page's.
+      a.model.drag(.init(x0: x0 * 1000, y0: y0 * 1000, x1: x1 * 1000, y1: y1 * 1000), shown: (1000, 1000))
+      guard a.model.rect != nil else { throw QAScriptError(a.model.error ?? "no rectangle") }
+      a.model.note = note
+      try? await Task.sleep(for: .milliseconds(500))
+    case .tap(let x, let y, let note):
+      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to tap") }
+      // The same stand-in size as a drag, so the fractions are the page's.
+      await a.model.tap(at: (x * 1000, y * 1000), shown: (1000, 1000))
+      guard a.model.element != nil else { throw QAScriptError(a.model.notice ?? "no element") }
+      a.model.note = note
+      try? await Task.sleep(for: .milliseconds(500))
+    case .add:
+      if let refused = a.model.add(to: a.draft) { throw QAScriptError(refused) }
+      try? await Task.sleep(for: .milliseconds(400))
+    case .cancel:
+      a.model.cancel()
+      try? await Task.sleep(for: .milliseconds(400))
+    }
   }
 
   // MARK: Scrolling
@@ -539,9 +623,78 @@ final class QARunner {
       try? await Task.sleep(for: .milliseconds(1500))
       let later = scroller.distanceFromBottom() ?? -1
       return "from the bottom \(Int(soon.rounded())) pt after the swipe, \(Int(later.rounded())) pt once the content grew"
+    case .earlier:
+      return try await earlierPage()
+    case .gap:
+      guard let store = QAProbe.store, store.history.spans.count > 1 else { throw QAScriptError("no gap in the open thread") }
+      let keys = store.transcript.items.compactMap { if case .event(let k) = $0.id { k } else { nil } }
+      guard let key = store.history.edges(keys).first(where: { if case .gap = $0.value { true } else { false } })?.key, key >= 0
+      else { throw QAScriptError("no shown row under the gap") }
+      scroller.toItem(.event(key))
     }
     try? await Task.sleep(for: .milliseconds(600))
     return nil
+  }
+
+  /// Scrolls up with trackpad events, as Ben would, until "Earlier messages" starts a page by itself, takes the row at
+  /// the top of the view right then (the page cannot have landed: it is still on the network), and again once the
+  /// page is laid out. The reading position holds when the same row sits at the same height.
+  private func earlierPage() async throws(QAScriptError) -> String {
+    guard let store = QAProbe.store else { throw QAScriptError("no thread on screen") }
+    guard let window = Self.windows.first(where: Self.isMain), let content = window.contentView,
+      let transcript = Self.scrollViews(in: content).max(by: { $0.frame.width < $1.frame.width })
+    else { throw QAScriptError("no transcript scroll view") }
+    guard let from = store.history.spans.first?.from, from > 0 else { throw QAScriptError("the whole thread is loaded") }
+    func wheel(_ phase: CGScrollPhase, _ dy: Int32) throws(QAScriptError) {
+      guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: dy, wheel2: 0, wheel3: 0)
+      else { throw QAScriptError("can't make a scroll event") }
+      cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: Int64(phase.rawValue))
+      cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+      guard let event = NSEvent(cgEvent: cg) else { throw QAScriptError("can't make a scroll event") }
+      transcript.scrollWheel(with: event)
+    }
+    func top() -> (id: TranscriptItemID, minY: Double)? { QAProbe.rows?.anchor.map { ($0.id, $0.frame.minY) } }
+    var before: (id: TranscriptItemID, minY: Double)?
+    let deadline = ContinuousClock.now + .seconds(30)
+    try wheel(.began, 0)
+    while !store.loadingEdges.contains(.earlier) {
+      guard ContinuousClock.now < deadline else { throw QAScriptError("no earlier page started") }
+      before = top()
+      try wheel(.changed, 40)
+      try? await Task.sleep(for: .milliseconds(8))
+    }
+    try wheel(.ended, 0)
+    before = top() ?? before
+    while store.loadingEdges.contains(.earlier) {
+      guard ContinuousClock.now < deadline else { throw QAScriptError("the earlier page did not land") }
+      try? await Task.sleep(for: .milliseconds(5))
+    }
+    try? await Task.sleep(for: .milliseconds(800))
+    let held = store.history.spans.first?.from ?? 0
+    guard let before else { return "no row on screen before the page; held from \(from) to \(held)" }
+    let id = if case .event(let k) = before.id { "\(k)" } else { "plan" }
+    guard let now = QAProbe.rows?.frames[before.id]?.minY else {
+      return "row \(id) at \(Int(before.minY.rounded())) pt before, off screen after: moved; held from \(from) to \(held)"
+    }
+    let verdict = abs(now - before.minY) < 1 ? "held" : "moved \(Int((now - before.minY).rounded())) pt"
+    return "row \(id) at \(Int(before.minY.rounded())) pt before, \(Int(now.rounded())) pt after: \(verdict); held from \(from) to \(held)"
+  }
+
+  /// Waits for the thread a search hit opened to show the hit's row in view, and says where.
+  private func revealed(_ hit: SearchHit) async throws(QAScriptError) -> String {
+    guard let at = hit.eventID else { return "a title hit: the thread opens at the bottom" }
+    let deadline = ContinuousClock.now + .seconds(15)
+    while ContinuousClock.now < deadline {
+      try? await Task.sleep(for: .milliseconds(100))
+      guard let store = QAProbe.store, store.id == hit.threadID, store.revealTarget == nil, store.history.spanIndex(at) != nil,
+        let id = store.transcript.itemID(holding: at), let frame = QAProbe.rows?.frames[id],
+        let height = QAProbe.scroller?.viewportHeight(), frame.minY < height, frame.maxY > 0
+      else { continue }
+      try? await Task.sleep(for: .milliseconds(400))
+      let key = if case .event(let k) = id { "\(k)" } else { "plan" }
+      return "event \(at) in row \(key) at \(Int(frame.minY.rounded())) pt of \(Int(height.rounded())); held from \(store.history.spans.map { "\($0.from)" }.joined(separator: ", "))"
+    }
+    throw QAScriptError("event \(at) never showed")
   }
 
   private func abort(_ message: String) {

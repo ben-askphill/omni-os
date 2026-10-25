@@ -88,6 +88,8 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   public let branch: String?
   public let parentID: String?
   public let taskID: String?
+  /// The thread this one continues on another harness (packages/shared/continue.ts). Older servers leave it out.
+  public let continuedFrom: String?
   public let source: ThreadSource
   public let automation: String?
   public let lastText: String?
@@ -137,6 +139,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     case hasRun = "has_run"
     case parentID = "parent_id"
     case taskID = "task_id"
+    case continuedFrom = "continued_from"
     case lastText = "last_text"
     case createdAt = "created_at"
     case updatedAt = "updated_at"
@@ -162,6 +165,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     branch = try c.decodeIfPresent(String.self, forKey: .branch)
     parentID = try c.decodeIfPresent(String.self, forKey: .parentID)
     taskID = try c.decodeIfPresent(String.self, forKey: .taskID)
+    continuedFrom = try c.decodeIfPresent(String.self, forKey: .continuedFrom)
     source = try c.decode(ThreadSource.self, forKey: .source)
     automation = try c.decodeIfPresent(String.self, forKey: .automation)
     lastText = try c.decodeIfPresent(String.self, forKey: .lastText)
@@ -242,6 +246,8 @@ public struct PendingMsg: Decodable, Hashable, Sendable, Identifiable {
   public let requestID: String?
   /// Where the server's saved copy is. `recovered` and `uncertain` come with `state` held and wait on Ben.
   public let delivery: DeliveryState?
+  /// Records Ben attached. A value this app can't read is no records, never a failed detail.
+  public let context: MessageContextList?
 
   public var id: String { uuid }
 
@@ -249,7 +255,7 @@ public struct PendingMsg: Decodable, Hashable, Sendable, Identifiable {
   public var isParked: Bool { delivery == .recovered || delivery == .uncertain }
 
   enum CodingKeys: String, CodingKey {
-    case uuid, kind, text, source, mode, state, role, attachments, delivery
+    case uuid, kind, text, source, mode, state, role, attachments, delivery, context
     case taskID = "task_id"
     case threadID = "thread_id"
     case requestID = "request_id"
@@ -274,9 +280,16 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
   public let blocked: String?
   /// A handoff of the thread to or from another Mac. Older servers leave it out; a phase this app does not know is nil.
   public let handoff: HandoffView?
+  /// The thread this one continues, and the threads that continue it. Older servers leave them out.
+  public let continuedFrom: ContinueLink?
+  public let continuedIn: [ContinueLink]
+  /// Set when `events` is the newest page only (`?history=recent`). Nil means every row came.
+  public let history: HistoryHead?
 
   enum CodingKeys: String, CodingKey {
-    case thread, channel, events, artifacts, children, team, parent, pending, live, blocked, handoff
+    case thread, channel, events, artifacts, children, team, parent, pending, live, blocked, handoff, history
+    case continuedFrom = "continued_from"
+    case continuedIn = "continued_in"
   }
 
   public init(from decoder: any Decoder) throws {
@@ -292,5 +305,8 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
     live = try c.decodeIfPresent(Bool.self, forKey: .live) ?? false
     blocked = try c.decodeIfPresent(String.self, forKey: .blocked)
     handoff = (try? c.decodeIfPresent(HandoffView.self, forKey: .handoff)) ?? nil
+    continuedFrom = try c.decodeIfPresent(ContinueLink.self, forKey: .continuedFrom)
+    continuedIn = try c.decodeIfPresent([ContinueLink].self, forKey: .continuedIn) ?? []
+    history = try c.decodeIfPresent(HistoryHead.self, forKey: .history)
   }
 }

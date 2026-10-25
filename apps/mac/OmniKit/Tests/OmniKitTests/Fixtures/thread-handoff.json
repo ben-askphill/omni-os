@@ -33,6 +33,7 @@
     "limit_state": null,
     "limit_resets_at": null,
     "limit_elsewhere": 0,
+    "continued_from": null,
     "created_at": "2026-01-05T09:00:00.000Z",
     "updated_at": "2026-01-05T09:00:00.000Z"
   },
@@ -62,7 +63,7 @@
       "id": 1,
       "thread_id": "00000000-0000-4000-8000-000000000001",
       "kind": "init",
-      "payload": "{\"model\":\"claude-haiku-4-5\",\"cwd\":\"/tmp/omni-fixtures\",\"tools\":10,\"mcp\":[]}",
+      "payload": "{\"model\":\"claude-haiku-4-5\",\"cwd\":\"/tmp/omni-fixtures\",\"tools\":10,\"mcp\":[\"omni-ask:connected\"]}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {
@@ -119,5 +120,7 @@
     },
     "leftBehind": null
   },
+  "continued_from": null,
+  "continued_in": [],
   "blocked": "Waiting for Mac B to pick it up."
 }

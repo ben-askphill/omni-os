@@ -1,6 +1,7 @@
 // Live processes, the queue's waiting maps, and the helpers the lifecycle modules share.
 import { readFileSync } from 'node:fs';
 import type { ChildProcess } from 'node:child_process';
+import type { MessageContext } from '@omni/shared/message-context.ts';
 import type { HandoverP } from '@omni/shared/run-switch.ts';
 import type { DeliveryPhase } from '../delivery.ts';
 import { about } from '../about.ts';
@@ -8,6 +9,7 @@ import { config } from '../config.ts';
 import { events, messageRequests, threads, type DeliveryState, type MessageRequest } from '../db.ts';
 import { publishFeed, publishThread } from '../bus.ts';
 import { describeAttachments, inlinable, messageContent, type Attachment } from '../uploads.ts';
+import { contextAttachments, harnessText } from '../message-context/project.ts';
 import type { CommandList } from '../commands.ts';
 import { handOverWith } from './switch.ts';
 import { CAPABILITIES, type HarnessId } from '../harness/types.ts';
@@ -65,6 +67,8 @@ export interface Msg {
   mode: SendMode;
   /** Files Ben attached, already written into the thread's uploads folder. */
   attachments?: Attachment[];
+  /** Records Ben attached. Turned into text only when written to the harness (userLine). */
+  contexts?: MessageContext[];
   /** Written while a turn was already running, so the transcript marks where it steered. */
   midTurn?: boolean;
   /** Harness commands the text names, for the adapter. */
@@ -91,6 +95,7 @@ export interface PendingMsg {
   request_id?: string;
   delivery?: DeliveryState;
   attachments?: Attachment[];
+  context?: MessageContext[];
 }
 
 /** One long-lived claude process per thread. It runs many turns and stays warm in between. */
@@ -278,7 +283,7 @@ type ShownPayload = { text?: string; source?: string; task_id?: string | null; r
 const pendingRow = (
   base: Pick<PendingMsg, 'uuid' | 'kind' | 'text' | 'mode' | 'state'>,
   p: ShownPayload,
-  rest: Pick<PendingMsg, 'request_id' | 'delivery' | 'attachments'>,
+  rest: Pick<PendingMsg, 'request_id' | 'delivery' | 'attachments' | 'context'>,
 ): PendingMsg => ({
   uuid: base.uuid, kind: base.kind, text: base.text, source: p.source, mode: base.mode, state: base.state, task_id: p.task_id ?? undefined, role: p.role ?? undefined,
   ...(base.kind === 'crew_report' && p.thread_id && { thread_id: p.thread_id }),
@@ -290,6 +295,7 @@ const pendingView = (m: Msg, state: PendingMsg['state']): PendingMsg => {
   return pendingRow({ uuid: m.uuid, kind: m.event.kind, text: p.text ?? m.text, mode: m.mode, state }, p, {
     ...(m.requestId && { request_id: m.requestId, delivery: state }),
     ...(m.attachments?.length && { attachments: m.attachments }),
+    ...(m.contexts?.length && { context: m.contexts }),
   });
 };
 
@@ -320,6 +326,7 @@ export function pendingFor(threadId: string): PendingMsg[] {
           request_id: r.request_id,
           delivery: r.state,
           ...(r.attachments?.length && { attachments: r.attachments }),
+          ...(r.context?.length && { context: r.context }),
         }),
     ),
     ...messageRequests.parked(threadId).map(
@@ -328,6 +335,7 @@ export function pendingFor(threadId: string): PendingMsg[] {
           request_id: r.request_id,
           delivery: r.state,
           ...(r.attachments?.length && { attachments: r.attachments }),
+          ...(r.context?.length && { context: r.context }),
         }),
     ),
   ];
@@ -373,27 +381,33 @@ export function writeLine(live: Live, obj: unknown) {
  * Attachments add a note naming every file and where it is on disk, and images small enough for the
  * API ride along as real image blocks, so the agent sees them without a Read.
  */
-function messageBody(m: Msg): string | ReturnType<typeof messageContent> {
-  const attachments = m.attachments ?? [];
-  if (!attachments.length) return m.text;
-  const text = `${m.text}\n\n${describeAttachments(attachments)}`;
+function messageBody(text: string, attachments: Attachment[]): string | ReturnType<typeof messageContent> {
+  if (!attachments.length) return text;
   return messageContent(
-    text,
+    `${text}\n\n${describeAttachments(attachments)}`,
     attachments.filter(inlinable).map((a) => ({ mime: a.mime, data: readFileSync(a.path).toString('base64') })),
   );
 }
 
-export const userLine = (live: Live, m: Msg) => ({
-  type: 'user',
-  message: { role: 'user', content: messageBody(m) },
-  parent_tool_use_id: null,
-  session_id: live.sessionId,
-  uuid: m.uuid,
-  // Side channel for adapters that need the raw text, attachment paths and commands (Codex sends
-  // images as localImage paths and skills as skill items). The Claude adapter strips this before
-  // writing to its stdin.
-  _omni: { text: m.text, attachments: m.attachments ?? [], commands: m.commands ?? [] },
-});
+export const userLine = (live: Live, m: Msg) => {
+  // Context is projected here, as the harness gets it, so a check of the file holds now, not when it was sent. A thread
+  // deleted meanwhile (by sync, from the other Mac) has no checkout to place it in; never throw on the write path.
+  const thread = threads.get(live.threadId);
+  const text = thread ? harnessText(m.text, m.contexts, thread) : m.text;
+  // The images its context items name travel as attachments, so each harness takes them its own way.
+  const attachments = [...(m.attachments ?? []), ...contextAttachments(m.contexts)];
+  return {
+    type: 'user',
+    message: { role: 'user', content: messageBody(text, attachments) },
+    parent_tool_use_id: null,
+    session_id: live.sessionId,
+    uuid: m.uuid,
+    // Side channel for adapters that need the raw text, attachment paths and commands (Codex sends
+    // images as localImage paths and skills as skill items). The Claude adapter strips this before
+    // writing to its stdin.
+    _omni: { text, attachments, commands: m.commands ?? [] },
+  };
+};
 
 /** stdin is gone: kill it so the close handler fails the turn and records what was not delivered. */
 export const crash = (live: Live) => live.child && alive(live.child) && live.child.kill('SIGKILL');

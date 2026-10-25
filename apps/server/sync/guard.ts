@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { paths, threadDir } from '../config.ts';
 import { channels, outbox, threads, type Thread } from '../db.ts';
-import { restoreWorktree } from '../sandbox.ts';
+import { restoreCheckout } from '../workspace.ts';
 import { handoffBlock } from '../handoff/records.ts';
 import { deviceName } from './devices.ts';
 
@@ -56,21 +56,21 @@ export function turnBlocked(t: Thread, here = false, taking = false): string | n
 
 /**
  * Before a turn: refuse it with the reason turnBlocked gives, and make the thread's folder here when Omni can,
- * checking its branch out again for a worktree thread (made on the other Mac, or removed by the worktree sweep).
+ * checking its branch out again for a worktree thread (made on the other Mac, or removed by a cleanup).
  * Returns the thread, with its cwd moved when it was.
  */
 export async function prepareTurn(t: Thread, here = false, taking = false): Promise<Thread> {
   const blocked = turnBlocked(t, here, taking);
   if (blocked) throw refused(blocked);
   if (existsSync(t.cwd)) return t;
-  // A worktree the sweep removed (apps/server/worktree-sweep.ts) is cut again from its branch, synced or not.
+  // A worktree a cleanup removed (apps/server/worktree-cleanup.ts) is cut again from its branch, synced or not.
   const target = rebuildable(t);
   if (!target) return t;
   if (!existsSync(target.cwd)) {
     if (!target.worktree) mkdirSync(target.cwd, { recursive: true });
     else {
       try {
-        await restoreWorktree(target.worktree.repo, target.cwd, target.worktree.branch);
+        await restoreCheckout(target.worktree.repo, target.cwd, target.worktree.branch);
       } catch (err) {
         throw refused(`This thread's worktree is not on this Mac and Omni could not make it again: ${(err as Error).message}`);
       }

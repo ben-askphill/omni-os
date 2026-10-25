@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import type { ChildProcess } from 'node:child_process';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { fixture } from '@omni/test-fixtures';
+import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import type { AdapterContext, HarnessAdapter } from '../harness/adapter.ts';
+import { harnessText } from '../message-context/project.ts';
 import type { Record as StreamRecord } from '../stream.ts';
 import { HERMES_FIX } from '../harness/catalog.ts';
 import { startFakeHermes, type FakeHermes } from './fake-hermes.ts';
@@ -141,6 +144,24 @@ describe('Hermes adapter', () => {
     expect(input).toContain('not transferred');
     expect(input).not.toContain('/Users/ben');
     expect(s.records.find((r) => r.kind === 'replay')?.payload).toMatchObject({ text: 'see this' });
+  });
+
+  it('sends context as an excerpt it says it cannot open, with no path on the Mac', async () => {
+    const parsed = parseContexts([JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')).records[0].raw]);
+    if (!parsed.ok) throw new Error(parsed.error);
+    const s = boot();
+    // As runner/state.ts userLine writes it for this thread.
+    s.user(harnessText('tidy this reduce', parsed.value, { harness: 'hermes', cwd: '/tmp/omni-test' }), 'm-ctx');
+    await waitFor(() => posts().length === 1, 'create');
+    const input = (posts()[0].body as { input: string }).input;
+    expect(input).toContain('tidy this reduce\n\n<omni-context>');
+    expect(input).toContain('File: src/cart.ts, in');
+    expect(input).toContain('You run on the Hermes server and cannot open it; work from the excerpt.');
+    expect(input).toContain('+  return items.reduce((sum, n) => sum + n, 0);');
+    expect(input).not.toContain('relative to your working directory');
+    expect(input).not.toContain('Check:');
+    expect(input).not.toContain('/tmp/omni-test');
+    expect(input).not.toMatch(/(^|[\s(])\/[A-Za-z]/m);
   });
 
   it('steers the active run, and queues the text when Hermes answers 409', async () => {

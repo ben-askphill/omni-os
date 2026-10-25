@@ -71,6 +71,12 @@ function groupByThread(layers: Layer[]): { thread: string | null; layers: Layer[
   return out;
 }
 
+/** The event the top thread screen was opened at (a search hit). */
+const atOf = (layers: Layer[]) => {
+  const r = layers[layers.length - 1]?.route;
+  return r?.name === 'thread' ? r.at : undefined;
+};
+
 // `isolate`: a layer's own z-indexes (its header, a segmented thumb) must not reach over the layer pushed above it.
 const layerCls = 'absolute inset-0 isolate flex flex-col overflow-hidden bg-bg';
 
@@ -156,7 +162,7 @@ export function MobileShell() {
         })}
         {groupByThread(layers).map((g) =>
           g.thread ? (
-            <ThreadScope key={`thread:${g.thread}`} id={g.thread}>
+            <ThreadScope key={`thread:${g.thread}`} id={g.thread} at={atOf(g.layers)}>
               {g.layers.map(renderLayer)}
             </ThreadScope>
           ) : (

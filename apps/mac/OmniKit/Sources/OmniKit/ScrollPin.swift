@@ -2,7 +2,8 @@ import Foundation
 
 /// The transcript's auto scroll, with the Web UI's rules (apps/web/src/pages/useTranscriptScroll.ts):
 /// - The first events go to the bottom wherever the view is.
-/// - Later events follow while the view follows the bottom, and show the New activity pill otherwise.
+/// - Later events follow while the view follows the bottom, and show the New activity pill otherwise. Only events
+///   past the newest one count: an earlier page of history coming in above is not new activity.
 /// - Any scroll up stops following, however small, so a resize cannot pull Ben back down while he reads. Only
 ///   reaching the bottom again, or the pill, follows again.
 /// - Content that grows without new events (a row that expands, a resize) keeps the view at the bottom while
@@ -30,12 +31,14 @@ public struct ScrollPin: Hashable, Sendable {
   public private(set) var showsJump = false
   private var scrolledOnce = false
   private var last: Geometry?
+  private var tail = 0
 
   public init() {}
 
-  /// New events came in. Returns whether to go to the bottom.
-  public mutating func eventsChanged(count: Int) -> Bool {
-    guard count > 0 else { return false }
+  /// The newest event is now `tail` (`History.tailID`). Returns whether to go to the bottom.
+  public mutating func eventsChanged(tail: Int) -> Bool {
+    guard tail > self.tail else { return false }
+    self.tail = tail
     if !scrolledOnce || isPinned {
       scrolledOnce = true
       return true
@@ -68,5 +71,13 @@ public struct ScrollPin: Hashable, Sendable {
   public mutating func jump() {
     isPinned = true
     showsJump = false
+  }
+
+  /// The view went to a row of its own accord (a search hit) with events up to `tail` shown: stop following, as a
+  /// scroll up does.
+  public mutating func release(tail: Int) {
+    scrolledOnce = true
+    isPinned = false
+    self.tail = max(self.tail, tail)
   }
 }

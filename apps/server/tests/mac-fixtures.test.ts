@@ -1,10 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { createHmac } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { applyPage, earlierCursor, historyQuery, openHistory, revealCursor, type HistoryHead, type HistoryPage, type HistoryRow } from '@omni/shared/history.ts';
+import { newContext } from '@omni/shared/message-context.ts';
+import { diffSelection, selectRows } from '@omni/shared/message-context-diff.ts';
 import { diff, shapeOf, tagOf } from './fixture-shape.ts';
-import { FAKE_CLAUDE, fakeAlive } from './support.ts';
+import { FAKE_CLAUDE, diffFile, fakeAlive } from './support.ts';
 
 // Golden fixtures for the Mac app's Swift types (apps/mac/OmniKit). Boots the real server with the fake claude CLI,
 // makes a channel and runs a thread through three turns, and keeps what the app reads: the JSON of each GET
@@ -44,6 +48,8 @@ const NAMES = [
   'artifacts.json',
   'error-not-found.json',
   'thread-stream.sse',
+  // A stream opened with a stale `after`: the newest page in a sync, in place of a replay (#224).
+  'thread-stream-snapshot.sse',
   'feed.sse',
   // Last, so its ids number after the others'.
   'thread-rich.json',
@@ -56,6 +62,12 @@ const NAMES = [
   'automation-enabled-request.json',
   'automation-enabled.json',
   'automation-run.json',
+  'automation-delivery-retry-request.json',
+  'automation-delivery-retried.json',
+  'automation-delivery-refused.json',
+  'automation-delivery-skip-request.json',
+  'automation-delivery-skipped.json',
+  'automation-deliveries.json',
   'automations.json',
   // Last: the server restarts with messages still waiting.
   'message-queued-request.json',
@@ -85,10 +97,50 @@ const NAMES = [
   // The retried worktree thread's branch changes, every group, and a thread with no repo to read.
   'changes.json',
   'changes-unavailable.json',
+  // The base that thread started from, what the new-thread composer offers for its channel (a repo with an origin),
+  // and the body it sends with a chosen base.
+  'thread-base.json',
+  'bases.json',
+  'thread-create-base-request.json',
   // The same thread's saved turns, the newest one's diff (an edit, a commit and a new file during the turn), and a
   // thread whose turns are not saved.
   'turns.json',
   'turns-unavailable.json',
+  // Lines picked in that thread's unstaged diff, sent with a note: the request, then the thread with the record on the
+  // sent message and on one held behind its turn.
+  'message-context-request.json',
+  'thread-context.json',
+  // The thread reference picker's search over every channel, from that thread.
+  'thread-references.json',
+  // Bounded history (#223), on a thread whose first message is too big for a row, under a tiny OMNI_HISTORY_BUDGET:
+  // the head with an anchor, an older page, a reveal of the first message, that message whole, and search hits.
+  'thread-open.json',
+  'thread-history.json',
+  'thread-history-at.json',
+  'thread-event.json',
+  'search.json',
+  // Continuing an idle thread on another run: the worktree thread's preview (its changed files and a binary file left
+  // out), then the first thread continued, and that one continued again, so it has both links.
+  'continue-preview.json',
+  'thread-continued.json',
+  // A channel's named actions: the body the editor sends, the action it makes and the list, then a thread's runs of
+  // them (succeeded, failed, stopped and one still running), a run as it starts and as Stop returns it.
+  'channel-action-request.json',
+  'channel-action.json',
+  'channel-actions.json',
+  'action-run.json',
+  'action-run-stopped.json',
+  'thread-actions.json',
+  // The storage scan over the worktrees above, once it has finished.
+  'worktree-scan.json',
+  // A cleanup of two of them that removes one and keeps the other, then this Mac's retention policy turned on.
+  'worktree-cleanup.json',
+  'worktree-retention-request.json',
+  'worktree-retention.json',
+  // A thread with no PR watch, then one polled through the fake gh, then stopped.
+  'pr-watch-none.json',
+  'pr-watch.json',
+  'pr-watch-stopped.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -122,19 +174,44 @@ afterAll(async () => {
 
 // ---------- the server ----------
 
+/** The signing secret the fake Keychain holds for every webhook automation. */
+const HOOK_SECRET = 'fixture-hook-secret';
+
 /**
- * A `security` that stores nothing, so the secrets routes never reach the Keychain. `security -i` reads its
- * command from stdin; the other calls leave stdin open, so only that one reads it.
+ * A `security` that stores nothing, so the secrets routes never reach the Keychain, and finds HOOK_SECRET for a
+ * webhook automation. `security -i` reads its command from stdin; the other calls leave stdin open, so only that one reads it.
  */
 function fakeSecurity() {
   const bin = join(tmp, 'bin');
   mkdirSync(bin);
-  writeFileSync(join(bin, 'security'), '#!/bin/sh\n[ "$1" = "-i" ] && cat > /dev/null\nexit 0\n');
+  writeFileSync(
+    join(bin, 'security'),
+    `#!/bin/sh\n[ "$1" = "-i" ] && cat > /dev/null\ncase "$*" in *find-generic-password*OMNI_WEBHOOK_*) echo '${HOOK_SECRET}';; esac\nexit 0\n`,
+  );
   chmodSync(join(bin, 'security'), 0o755);
   return bin;
 }
 
-/** One automation to toggle and run, and one the server can't schedule. */
+/**
+ * A `gh` that answers only the PR watch's poll, with an open PR whose checks are one passed and one running, no
+ * review feedback and a signed-in login, so the watch records counts and wakes no one. Every other call fails, as gh
+ * does in a repo without a remote, and nothing reaches GitHub.
+ */
+function fakeGh(bin: string) {
+  const pr = {
+    number: 7,
+    state: 'OPEN',
+    headRefOid: 'a'.repeat(40),
+    statusCheckRollup: [
+      { __typename: 'CheckRun', name: 'lint', conclusion: 'SUCCESS', status: 'COMPLETED' },
+      { __typename: 'CheckRun', name: 'e2e', conclusion: '', status: 'IN_PROGRESS' },
+    ],
+  };
+  writeFileSync(join(bin, 'gh'), `#!/bin/sh\nif [ "$1 $2" = "pr view" ]; then echo '${JSON.stringify(pr)}'; exit 0; fi\nif [ "$1 $2" = "api user" ]; then echo ben; exit 0; fi\nif [ "$1" = "api" ]; then exit 0; fi\necho "fake gh: $*" >&2\nexit 1\n`);
+  chmodSync(join(bin, 'gh'), 0o755);
+}
+
+/** One automation to toggle and run, one the server can't schedule, one a published page starts, one a GitHub webhook starts and one whose channel is gone, so every start of it fails. */
 function automations() {
   const dir = join(tmp, 'automations');
   mkdirSync(dir);
@@ -144,6 +221,12 @@ function automations() {
       'model: claude-opus-5-5\nprompt: |\n  Summarize what changed in the cart since yesterday.\n',
   );
   writeFileSync(join(dir, 'broken.yaml'), 'name: Broken\nenabled: true\ncron: "61 8 * * *"\nchannel: acme\nprompt: Never runs.\n');
+  writeFileSync(
+    join(dir, 'page-review.yaml'),
+    'name: Page review\nenabled: true\non: { event: artifact_published, channels: [acme] }\nchannel: acme\nprompt: Review the page.\n',
+  );
+  writeFileSync(join(dir, 'ci-fixer.yaml'), 'name: CI fixer\nenabled: true\non: { event: github_webhook, repo: acme/shop }\nchannel: acme\nprompt: Fix the build.\n');
+  writeFileSync(join(dir, 'flaky-hook.yaml'), 'name: Flaky hook\nenabled: true\non: { event: github_webhook, repo: acme/shop, max_age: 6h, concurrency: 1 }\nchannel: gone\nprompt: Never starts.\n');
   return dir;
 }
 
@@ -154,6 +237,7 @@ async function boot(): Promise<number> {
   if (!setUp) {
     mkdirSync(join(tmp, 'brain'));
     setUp = { bin: fakeSecurity(), automationsDir: automations() };
+    fakeGh(setUp.bin);
   }
   const { bin, automationsDir } = setUp;
   child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', 'tsx', 'apps/server/index.ts'], {
@@ -182,6 +266,8 @@ async function boot(): Promise<number> {
       FAKE_CLAUDE_LOG: fakeLog,
       FAKE_CLAUDE_LATENCY_MS: '10',
       FAKE_CLAUDE_CRASH_ON: 'CRASH_NOW',
+      // Pages of 6 rows, 8 KB, 1 KB a row: a short thread still shows every history shape.
+      OMNI_HISTORY_BUDGET: '6:8192:1024',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -303,6 +389,11 @@ async function scenario() {
   keep('error-not-found.json', await call('GET', '/threads/nope', undefined, false));
   got.set('thread-stream.sse', await stream.stop());
   got.set('feed.sse', await feed.stop());
+  const stale = capture(`${base}/api/threads/${id}/stream?after=stale`);
+  await eventually(async () => sent(stale.text(), 'sync'), () => `the snapshot sync:\n${stale.text()}`);
+  // Up to the sync: whether the context reading follows it in time is a race.
+  const snap = await stale.stop();
+  got.set('thread-stream-snapshot.sse', snap.slice(0, snap.indexOf('\n\n', snap.indexOf('"kind":"sync"')) + 2));
 
   // After everything above is kept, so the lists and streams stay as they were.
   const rich = (await call('POST', '/threads', { channel: 'acme', prompt: 'RICH fix the cart total', title: 'Fix the cart total' })) as Thread;
@@ -337,12 +428,82 @@ async function scenario() {
   // Automations, last, so their run is not in the thread lists above.
   type Automation = { id: string; enabled: boolean; error?: string; next?: string; runs: { thread_id: string; trigger: string; status: string }[] };
   const before = (await get('/automations')) as Automation[];
-  expect(before.map((a) => a.id).sort(), 'the test folder, not the repo').toEqual(['broken', 'daily-digest']);
+  expect(before.map((a) => a.id).sort(), 'the test folder, not the repo').toEqual(['broken', 'ci-fixer', 'daily-digest', 'flaky-hook', 'page-review']);
   const enableBody = request('automation-enabled-request.json', { enabled: true });
   keep('automation-enabled.json', await call('POST', '/automations/daily-digest/enabled', enableBody));
   const run = keep('automation-run.json', await call('POST', '/automations/daily-digest/run', {})) as Thread;
   await eventually(async () => (await detail(run.id)).thread.status === 'done', 'the automation run to finish');
+  // A page published in #acme starts Page review once, with the delivery that says why.
+  const pageFile = join(tmp, 'launch-plan.html');
+  writeFileSync(pageFile, '<title>Launch plan</title>');
+  await call('POST', '/threads', { channel: 'acme', prompt: `PUBLISH:${pageFile}`, title: 'Publish the launch plan' });
+  type Delivery = { state: string; thread_id: string | null };
+  const delivered = await eventually(async () => {
+    const d = ((await get('/automations')) as (Automation & { deliveries: Delivery[] })[]).find((a) => a.id === 'page-review')!.deliveries[0];
+    return d?.state === 'started' && !!d.thread_id && (await detail(d.thread_id)).thread.status === 'done' && d;
+  }, 'the page review run to finish');
+  // A signed workflow_run posted the way GitHub does, without the API token, starts CI fixer once.
+  await call('PUT', '/automations/ci-fixer/webhook-secret', { value: HOOK_SECRET });
+  const hookBody = JSON.stringify({
+    action: 'completed',
+    repository: { full_name: 'acme/shop' },
+    workflow_run: { name: 'CI', conclusion: 'failure', head_branch: 'fix-cart', head_sha: 'abcdef0123456789', display_title: 'Fix the cart total', html_url: 'https://github.com/acme/shop/actions/runs/7', head_repository: { full_name: 'acme/shop' } },
+  });
+  const hooked = await fetch(`${base}/api/hooks/github/ci-fixer`, {
+    method: 'POST',
+    body: hookBody,
+    headers: {
+      'content-type': 'application/json',
+      'x-github-event': 'workflow_run',
+      'x-github-delivery': '6f1c2d3e-0000-4000-8000-000000000227',
+      'x-hub-signature-256': `sha256=${createHmac('sha256', HOOK_SECRET).update(hookBody).digest('hex')}`,
+    },
+  });
+  expect(hooked.status).toBe(202);
+  const hookDelivery = await eventually(async () => {
+    const d = ((await get('/automations')) as (Automation & { deliveries: Delivery[] })[]).find((a) => a.id === 'ci-fixer')!.deliveries[0];
+    return d?.state === 'started' && !!d.thread_id && (await detail(d.thread_id)).thread.status === 'done' && d;
+  }, 'the CI fixer run to finish');
+  // A webhook for an automation whose channel is gone fails before any thread is made, so it can go again.
+  type FlakyView = Delivery & { id: string; attempt: number; can_retry: boolean; can_skip: boolean; retry_blocked: string | null; waiting: string | null; reason: string | null };
+  const flaky = async () => ((await get('/automations')) as (Automation & { deliveries: FlakyView[] })[]).find((a) => a.id === 'flaky-hook')!.deliveries;
+  const flakyPost = (guid: string) => {
+    const body = JSON.stringify({
+      action: 'completed',
+      repository: { full_name: 'acme/shop' },
+      workflow_run: { name: 'CI', conclusion: 'failure', head_branch: 'fix-nav', head_sha: 'abcdef0123456789', display_title: 'Fix the nav', html_url: 'https://github.com/acme/shop/actions/runs/9', head_repository: { full_name: 'acme/shop' } },
+    });
+    return fetch(`${base}/api/hooks/github/flaky-hook`, {
+      method: 'POST',
+      body,
+      headers: { 'content-type': 'application/json', 'x-github-event': 'workflow_run', 'x-github-delivery': guid, 'x-hub-signature-256': `sha256=${createHmac('sha256', HOOK_SECRET).update(body).digest('hex')}` },
+    });
+  };
+  await call('PUT', '/automations/flaky-hook/webhook-secret', { value: HOOK_SECRET });
+  expect((await flakyPost('6f1c2d3e-0000-4000-8000-000000000228')).status).toBe(202);
+  const flakyFailed = await eventually(async () => (await flaky()).find((d) => d.state === 'failed'), 'the delivery to fail');
+  expect(flakyFailed).toMatchObject({ attempt: 1, thread_id: null, can_retry: true, can_skip: true, reason: 'unknown channel "gone"' });
+  // A second one waits behind the pause after that failure, and can be skipped while it waits.
+  expect((await flakyPost('6f1c2d3e-0000-4000-8000-000000000229')).status).toBe(202);
+  const flakyHeld = (await eventually(async () => (await flaky()).find((d) => d.id !== flakyFailed.id), 'the second delivery')) as FlakyView;
+  expect(flakyHeld).toMatchObject({ state: 'accepted', can_skip: true, can_retry: false });
+  expect(flakyHeld.waiting).toMatch(/^Backing off after a start that failed/);
+  const flakySkipBody = request('automation-delivery-skip-request.json', { attempt: 1 });
+  keep('automation-delivery-skipped.json', await call('POST', `/deliveries/${flakyHeld.id}/skip`, flakySkipBody));
+  const flakyRetryBody = request('automation-delivery-retry-request.json', { attempt: 1 });
+  const flakyRetried = keep('automation-delivery-retried.json', await call('POST', `/deliveries/${flakyFailed.id}/retry`, flakyRetryBody)) as { delivery: FlakyView };
+  expect(flakyRetried.delivery).toMatchObject({ attempt: 2, state: 'accepted' });
+  await eventually(async () => (await flaky()).find((d) => d.id === flakyFailed.id && d.attempt === 2 && d.state === 'failed'), 'the retry to fail too');
+  // The same click again names the attempt it saw, which has gone: refused, with the delivery as it is now.
+  keep('automation-delivery-refused.json', await call('POST', `/deliveries/${flakyFailed.id}/retry`, flakyRetryBody, false));
+  keep('automation-deliveries.json', await get('/automations/flaky-hook/deliveries?limit=1'));
   const listed2 = keep('automations.json', await get('/automations')) as Automation[];
+  expect(listed2.find((a) => a.id === 'page-review')!.runs).toMatchObject([{ thread_id: delivered.thread_id, trigger: 'event', status: 'done' }]);
+  expect(listed2.find((a) => a.id === 'ci-fixer')).toMatchObject({
+    webhook: { path: '/api/hooks/github/ci-fixer', secret: 'OMNI_WEBHOOK_CI_FIXER', secret_set: true },
+    runs: [{ thread_id: hookDelivery.thread_id, trigger: 'event', status: 'done' }],
+  });
+  expect(JSON.stringify(listed2)).not.toContain(HOOK_SECRET);
   const digest = listed2.find((a) => a.id === 'daily-digest')!;
   expect(digest.enabled).toBe(true);
   expect(digest.next).toBeTruthy();
@@ -463,6 +624,19 @@ async function scenario() {
   expect(changed.groups.map((g) => [g.kind, g.files.length])).toEqual([['committed', 4], ['staged', 1], ['unstaged', 2], ['untracked', 1]]);
   keep('changes-unavailable.json', await get(`/threads/${id}/changes`));
 
+  keep('thread-base.json', await get(`/threads/${wt.id}/base`));
+  const origin = join(tmp, 'widgets-origin.git');
+  execFileSync('git', ['init', '-q', '--bare', origin]);
+  git('remote', 'add', 'origin', origin);
+  git('push', '-q', 'origin', 'HEAD:refs/heads/main');
+  git('fetch', '-q', 'origin');
+  git('remote', 'set-head', 'origin', 'main');
+  keep('bases.json', await get('/channels/widgets/bases'));
+  // Acme runs in its own folder, so the server drops the pick: the body is only checked for being accepted.
+  const baseBody = request('thread-create-base-request.json', { channel: 'acme', prompt: 'TOOL:20 tidy the cart', title: 'Tidy the cart', base: { kind: 'ref', ref: 'main' } });
+  const tidy = (await call('POST', '/threads', baseBody)) as Thread;
+  expect(await get(`/threads/${tidy.id}/base`)).toBeNull();
+
   const edit = join(tmp, 'turn-edit.sh');
   writeFileSync(
     edit,
@@ -482,9 +656,166 @@ async function scenario() {
   expect(saved.groups[0].files.map((f) => f.path)).toEqual(['src/cart.ts', 'todo.md']);
   keep('turns-unavailable.json', await get(`/threads/${id}/turns`));
 
+  type Changes = { head: string; base: { sha: string }; groups: { kind: string; files: { path: string; old_path: string | null; diff: string }[] }[] };
+  const picked = changed as unknown as Changes;
+  const cart = picked.groups.find((g) => g.kind === 'unstaged')!.files.find((f) => f.path === 'src/cart.ts')!;
+  const rows = selectRows(diffFile(cart), 1, 4, { group: 'unstaged', from: picked.base.sha, to: picked.head, turn: null });
+  if (!rows.ok) throw new Error(rows.error);
+  const contextBody = request('message-context-request.json', {
+    prompt: 'TOOL:4000 tidy this reduce',
+    context: [newContext(diffSelection, rows.value, 'this reduce reads better with names')],
+    request_id: 'req-context',
+  }) as { context: unknown[] };
+  const tools = count(await detail(wt.id), 'tool_use');
+  await call('POST', `/threads/${wt.id}/messages`, contextBody);
+  await eventually(async () => {
+    const d = await detail(wt.id);
+    return d.thread.status === 'running' && count(d, 'tool_use') === tools + 1;
+  }, 'the context message to run its tool');
+  await call('POST', `/threads/${wt.id}/messages`, { prompt: 'then check the rounding', mode: 'queue', context: contextBody.context, request_id: 'req-context-held' });
+  const withContext = keep('thread-context.json', await detail(wt.id)) as { events: { kind: string; payload: string }[]; pending: { context?: unknown }[] };
+  expect(JSON.parse(withContext.events.filter((e) => e.kind === 'user').at(-1)!.payload).context).toHaveLength(1);
+  expect(withContext.pending.map((p) => p.context)).toEqual([contextBody.context]);
+  await eventually(async () => {
+    const d = await detail(wt.id);
+    return d.thread.status === 'done' && !d.pending?.length;
+  }, 'the held context message to run');
+  const references = keep('thread-references.json', await get(`/thread-references?thread=${wt.id}&q=&scope=all`)) as { same_channel: boolean }[];
+  expect(references.map((r) => r.same_channel)).toContain(false);
+
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
+
+  // Bounded history: a first turn whose prompt and answer are too big for a row, then a short one. The client opens on
+  // the head, loads the page above it, then reveals the first message and reads it whole, as a search hit would.
+  const paged = (await call('POST', '/threads', { channel: 'acme', prompt: `RICH ${'the cart total rounds the wrong way '.repeat(60)}`, title: 'Round the cart total' })) as Thread;
+  await eventually(async () => (await detail(paged.id)).thread.status === 'done', 'the paged thread to finish');
+  await call('POST', `/threads/${paged.id}/messages`, { prompt: 'and the tax', mode: 'steer' });
+  await eventually(async () => {
+    const d = await detail(paged.id);
+    return d.thread.status === 'done' && count(d, 'result') === 2;
+  }, 'the paged thread to finish its second turn');
+  const opened = keep('thread-open.json', await get(`/threads/${paged.id}?history=recent`)) as { events: HistoryRow[]; history: HistoryHead };
+  let history = openHistory(opened.events, opened.history);
+  const earlier = keep('thread-history.json', await get(`/threads/${paged.id}/history?${historyQuery(earlierCursor(history)!)}`)) as HistoryPage;
+  history = applyPage(history, earlier);
+  const first = ((await detail(paged.id)).events as HistoryRow[]).find((e) => e.kind === 'user')!;
+  const reveal = revealCursor(history, first.id);
+  expect(reveal, 'the first message is not held yet').not.toBeNull();
+  const at = keep('thread-history-at.json', await get(`/threads/${paged.id}/history?${historyQuery(reveal!)}`)) as HistoryPage;
+  expect(opened.events.length, 'the head and its anchor').toBeGreaterThan(opened.events.filter((e) => e.id >= opened.history.from).length);
+  expect(at.events.find((e) => e.id === first.id)?.clipped, 'the first message, clipped').toBeTruthy();
+  keep('thread-event.json', await get(`/threads/${paged.id}/events/${first.id}`));
+  keep('search.json', await get('/search?q=cart'));
+
+  const onto = { harness: 'claude-code', model: 'sonnet', effort: 'low' };
+  writeFileSync(join(wt.cwd, 'photo.bin'), Buffer.from([0, 1, 2, 0]));
+  // Two files attached to the worktree thread: the preview offers both and Ben picks one.
+  const form = new FormData();
+  form.set('payload', JSON.stringify({ prompt: 'here are the mocks' }));
+  form.append('files', new File(['mock bytes'], 'mock.png', { type: 'image/png' }));
+  form.append('files', new File(['some notes'], 'notes.txt', { type: 'text/plain' }));
+  const withFiles = await fetch(`${base}/api/threads/${wt.id}/messages`, { method: 'POST', headers: { authorization: `Bearer ${process.env.OMNI_TOKEN}` }, body: form });
+  expect(withFiles.ok, 'the message with files').toBe(true);
+  await eventually(async () => (await detail(wt.id)).thread.status === 'done', 'the message with files to run');
+  type Preview = { revision: string; blocked: unknown; workspace: string; carryover: { files: { total: number } | null; omitted: { what: string }[]; attachments: { id: string; name: string }[] } };
+  const offered = (await call('POST', `/threads/${wt.id}/continue/preview`, onto)) as Preview;
+  const mock = offered.carryover.attachments.find((a) => a.name === 'mock.png')!;
+  const shown = keep('continue-preview.json', await call('POST', `/threads/${wt.id}/continue/preview`, { ...onto, attachments: [mock.id] })) as Preview;
+  expect(shown).toMatchObject({ blocked: null, workspace: 'worktree', carryover: { omitted: [{ what: 'untracked' }, { what: 'attachments' }] } });
+  expect(shown.carryover.files?.total, 'the worktree thread\'s changed files').toBeGreaterThan(0);
+  const idlePreview = (await call('POST', `/threads/${id}/continue/preview`, onto)) as Preview;
+  expect(idlePreview.blocked, 'the first thread is idle').toBeNull();
+  const next = (await call('POST', `/threads/${id}/continue`, { ...onto, text: 'carry on with the totals', request_id: 'continue-1', revision: idlePreview.revision })) as { thread: Thread };
+  await eventually(async () => (await detail(next.thread.id)).thread.status === 'done', 'the continued thread to run');
+  const nextPreview = (await call('POST', `/threads/${next.thread.id}/continue/preview`, onto)) as { revision: string };
+  await call('POST', `/threads/${next.thread.id}/continue`, { ...onto, text: 'and the tax', request_id: 'continue-2', revision: nextPreview.revision });
+  const continued = keep('thread-continued.json', await detail(next.thread.id)) as { continued_from: { id: string } | null; continued_in: unknown[] };
+  expect(continued.continued_from?.id).toBe(id);
+  expect(continued.continued_in).toHaveLength(1);
+
+  const actionBody = request('channel-action-request.json', { name: 'Theme check', command: 'echo "Theme check passed"', secrets: [], port: null, setup: 'background' });
+  const check = keep('channel-action.json', await call('POST', '/channels/acme/actions', actionBody)) as { id: string };
+  const preview = (await call('POST', '/channels/acme/actions', { name: 'Theme preview', command: 'echo "Previewing on $OMNI_PORT"; sleep 30', port: 0 })) as { id: string };
+  const tests = (await call('POST', '/channels/acme/actions', { name: 'Tests', command: 'echo "1 failing" >&2; exit 1' })) as { id: string };
+  keep('channel-actions.json', await get('/channels/acme/actions'));
+  type Run = { id: string; state: string; output: string };
+  const settle = async (actionId: string, state: string) => {
+    const run = (await call('POST', `/threads/${id}/actions/${actionId}/run`)) as Run;
+    return eventually(async () => ((await get(`/threads/${id}/actions`)) as { runs: Run[] }).runs.find((r) => r.id === run.id && r.state === state), `a run to be ${state}`);
+  };
+  await settle(check.id, 'succeeded');
+  await settle(tests.id, 'failed');
+  const previewing = keep('action-run.json', await call('POST', `/threads/${id}/actions/${preview.id}/run`)) as Run;
+  await eventually(async () => ((await get(`/threads/${id}/actions`)) as { runs: Run[] }).runs.find((r) => r.id === previewing.id && r.output.includes('Previewing')), 'the preview to print');
+  keep('action-run-stopped.json', await call('POST', `/threads/${id}/action-runs/${previewing.id}/stop`, {}));
+  const again = (await call('POST', `/threads/${id}/action-runs/${previewing.id}/retry`, {})) as Run;
+  keep('thread-actions.json', await get(`/threads/${id}/actions`));
+  await call('POST', `/threads/${id}/action-runs/${again.id}/stop`, {});
+
+  // Two archived worktree threads in a repo with an origin, so that both can be cleaned up.
+  const gadgetsOrigin = join(tmp, 'gadgets.git');
+  const gadgets = join(tmp, 'gadgets');
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', gadgetsOrigin]);
+  mkdirSync(gadgets);
+  const gg = (...args: string[]) => execFileSync('git', ['-C', gadgets, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', ...args]);
+  gg('init', '-q', '-b', 'main');
+  writeFileSync(join(gadgets, 'README.md'), '# Gadgets\n');
+  gg('add', '.');
+  gg('commit', '-q', '-m', 'start');
+  gg('remote', 'add', 'origin', gadgetsOrigin);
+  gg('push', '-q', '-u', 'origin', 'main');
+  gg('remote', 'set-head', 'origin', 'main');
+  await call('POST', '/channels', { id: 'gadgets', name: 'Gadgets', kind: 'client', use_worktree: 1, repo_path: gadgets, notes: 'Fixture' });
+  const tidyGadgets = (await call('POST', '/threads', { channel: 'gadgets', prompt: 'tidy the gadgets', title: 'Tidy the gadgets' })) as Thread;
+  const draft = (await call('POST', '/threads', { channel: 'gadgets', prompt: 'draft the gadget notes', title: 'Draft the gadget notes' })) as Thread;
+  for (const t of [tidyGadgets, draft]) {
+    await eventually(async () => (await detail(t.id)).thread.status === 'done', 'a gadgets thread to run');
+    await call('PATCH', `/threads/${t.id}`, { archived: true });
+  }
+  // A restart closes their warm processes, which would keep the worktrees.
+  const warm = child!;
+  warm.kill('SIGTERM');
+  await eventually(async () => warm.exitCode !== null || warm.signalCode !== null, 'the server to stop');
+  base = `http://127.0.0.1:${await boot()}`;
+
+  await call('POST', '/worktrees/scan');
+  type View = { scan: { state: string; items: { id: string; verdict: string }[] }; cleanup: { runs: { manual: { state: string; items: { id: string; outcome: string }[] } | null } } };
+  const scanned = await eventually(async () => {
+    const b = (await get('/worktrees/scan')) as View;
+    return b.scan.state === 'done' && b;
+  }, 'the storage scan to finish');
+  keep('worktree-scan.json', scanned);
+  expect(scanned.scan.items.map((i) => i.id)).toContain(wt.id);
+  expect(scanned.scan.items.filter((i) => i.verdict === 'eligible').map((i) => i.id).sort()).toEqual([tidyGadgets.id, draft.id].sort());
+
+  // A file written after the scan keeps its worktree: the run checks each again right before removing it.
+  writeFileSync(join((await detail(draft.id)).thread.cwd, 'notes.txt'), 'not saved yet\n');
+  await call('POST', '/worktrees/cleanup', { ids: [tidyGadgets.id, draft.id] });
+  const cleaned = await eventually(async () => {
+    const b = (await get('/worktrees/scan')) as View;
+    return b.cleanup.runs.manual?.state === 'done' && b;
+  }, 'the cleanup to finish');
+  keep('worktree-cleanup.json', cleaned);
+  expect(Object.fromEntries(cleaned.cleanup.runs.manual!.items.map((i) => [i.id, i.outcome]))).toEqual({ [tidyGadgets.id]: 'removed', [draft.id]: 'kept' });
+
+  const retentionBody = request('worktree-retention-request.json', { enabled: true, idleDays: 30 });
+  keep('worktree-retention.json', await call('PUT', '/worktrees/retention', retentionBody));
+
+  // Last, since it gives acme a GitHub repo. The app sends {} for the branch's PR; acme threads have no branch, so
+  // this one names the PR.
+  keep('pr-watch-none.json', await get(`/threads/${id}/pr-watch`));
+  await call('PATCH', '/channels/acme', { github_repo: 'acme/shop' });
+  await call('PUT', `/threads/${id}/pr-watch`, { number: 7 });
+  const polled = await eventually(async () => {
+    const w = (await get(`/threads/${id}/pr-watch`)) as { last_polled_at: string | null };
+    return w.last_polled_at && w;
+  }, 'the PR watch to poll');
+  expect(polled).toMatchObject({ state: 'watching', error: null, checks: { passed: 1, failed: 0, pending: 1 } });
+  keep('pr-watch.json', polled);
+  const ended = keep('pr-watch-stopped.json', await call('DELETE', `/threads/${id}/pr-watch`));
+  expect(ended).toMatchObject({ state: 'stopped', stop_reason: 'stopped' });
 }
 
 /** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */
@@ -544,8 +875,11 @@ function normalize(files: Map<Name, string>): Map<Name, string> {
     });
     t = t.replace(TIME, (s) => (s.includes('.') ? '2026-01-05T09:00:00.000Z' : '2026-01-05T09:00:00Z'));
     t = t
+      // A thread reference candidate's short id is the start of its id, which is now the stand-in.
+      .replace(/("id": "00000000)([^"]*",\s*"short_id": ")[0-9a-f]{8}/g, '$1$200000000')
       .replace(/("pid": )\d+/g, '$14242')
-      .replace(/("port": )\d+/g, '$14799')
+      // A port that is set; an action's 0 ("pick a free one") means something.
+      .replace(/("port": )[1-9]\d*/g, '$14799')
       .replace(/("gitHead": )"[0-9a-f]{40}"/g, `$1"${'0'.repeat(40)}"`)
       // Commit ids (a thread's base and head), which carry the time they were made.
       .replace(/\b(?!0{40})[0-9a-f]{40}\b/g, (sha) => {

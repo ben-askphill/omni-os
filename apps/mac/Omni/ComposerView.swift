@@ -18,7 +18,7 @@ struct ReplyComposerHost: View {
   }
 
   var body: some View {
-    let reply = box.model ?? ReplyComposerModel(threadID: store.id, api: model.client)
+    let reply = box.model ?? ReplyComposerModel(threadID: store.id, api: model.client, context: store.draftContext)
     box.model = reply
     let menu = box.menu ?? SlashMenuModel(
       commands: SlashCommandsStore(api: model.client, source: .thread(store.id)),
@@ -67,6 +67,8 @@ private struct ThreadPRSlot: View {
   /// nil until the first answer, so the button does not flash before the PR shows.
   @State private var prs: ThreadPullRequests?
   @State private var failed = false
+  @State private var watch: PRWatch?
+  @State private var watchError: String?
 
   var body: some View {
     // A ZStack, not a Group: a Group spreads its modifiers over its children, and before the first
@@ -85,12 +87,14 @@ private struct ThreadPRSlot: View {
             Divider()
             Button("Open a new PR", action: open).disabled(opening)
           }
+          PRWatchSection(client: model.client, threadID: thread.id, open: pr.isOpen, watch: $watch, error: $watchError)
         } label: {
           HStack(spacing: z(5)) {
             if opening { ProgressView().controlSize(.mini) } else { Image(systemName: "arrow.triangle.pull") }
             Text("#\(pr.number)")
             PRChip(text: pr.badge, tone: pr.badge == "open" ? .ok : pr.badge == "merged" ? .info : .outline)
             if prs.prs.count > 1 { Text("+\(prs.prs.count - 1)").foregroundStyle(Tok.fg4) }
+            PRWatchGlyph(watch: watch)
           }
           .font(.omni(size: 12.5))
         }
@@ -102,6 +106,9 @@ private struct ThreadPRSlot: View {
         .frame(height: z(26))
         .foregroundStyle(Tok.fg3)
         .help(pr.title)
+        #if DEBUG
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { QAPRProbe.button = $0 }
+        #endif
       } else if prs != nil || failed {
         openButton
       } else {
@@ -135,6 +142,12 @@ private struct ThreadPRSlot: View {
       prs = try await model.client.pullRequests(forThread: thread.id)
     } catch {
       failed = true
+    }
+    guard prs?.pr != nil else { return }
+    do {
+      watch = try await model.client.prWatch(forThread: thread.id)
+    } catch {
+      // A failed read keeps the last answer.
     }
   }
 }
@@ -206,6 +219,8 @@ private struct ReplyComposerView: View {
         caret = CaretRequest(id: (caret?.id ?? 0) + 1, offset: at)
       }
     }
+    // Lines just added from the Changes tab: Ben writes about them next.
+    .onChange(of: reply.context.records.count) { old, new in if new > old { focusTick += 1 } }
     // Text set from outside the box (a sent or cleared draft) reaches the menu with the caret at the end.
     .onChange(of: reply.text) { _, text in
       if menu.text != text { menu.update(text: text, caret: text.utf16.count) }
@@ -217,6 +232,7 @@ private struct ReplyComposerView: View {
 
   private var shell: some View {
     VStack(alignment: .leading, spacing: 0) {
+      DraftContextStrip(draft: reply.context)
       if !reply.files.isEmpty {
         AttachmentStrip(files: reply.files, remove: reply.removeFile)
       }
@@ -252,6 +268,7 @@ private struct ReplyComposerView: View {
   private var footer: some View {
     ComposerFooterLayout {
       AttachButton(disabled: reply.sending) { picking = true }
+      ThreadReferenceButton(client: model.client, thread: thread, draft: store.draftContext, disabled: reply.sending)
       DictateButton { focusTick += 1 }
       runPickers
       if thread.branch != nil {

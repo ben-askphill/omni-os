@@ -8,7 +8,8 @@ import { ArchivedThreads, ThreadGroups, useLiveThreads, useThreadPRs } from '../
 import { Avatar, Button, Empty, StatusDot, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { href, usePresetSeq, type ChannelTab } from '../router.ts';
 import { useApp } from '../store.tsx';
-import { ChannelSettingsForm } from './ChannelSettings.tsx';
+import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
+import { ChannelSettingsForm, Section } from './ChannelSettings.tsx';
 import { PRDetail, PRList } from './PRs.tsx';
 
 function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
@@ -155,8 +156,11 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
       {tab === 'threads' && <ThreadsTab id={id} isConductor={isConductor} />}
       {tab === 'prs' && (pr ? <PRDetail channel={ch} n={pr} /> : <PRList channel={ch} />)}
       {tab === 'settings' && (
-        <div className="mx-auto max-w-2xl px-4 pt-6 pb-16 md:px-8">
+        <div className="mx-auto max-w-2xl space-y-4 px-4 pt-6 pb-16 md:px-8">
           <ChannelSettingsForm existing={ch} />
+          <Section title="Actions">
+            <ChannelActionsEditor channelId={ch.id} />
+          </Section>
         </div>
       )}
     </div>

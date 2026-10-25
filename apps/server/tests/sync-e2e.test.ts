@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fixture } from '@omni/test-fixtures';
+import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import { MemoryTransport } from '../sync/transport.ts';
 
 // Two Macs in one process: each loads its own copy of the server modules against its own temp data dir,
@@ -120,5 +122,17 @@ describe('two machines, one relay', () => {
     await a.worker.syncNow();
     await b.worker.syncNow();
     expect(b.db.threads.get('t1')!.status).toBe('failed');
+  });
+
+  it("a message's context arrives on B as A saved it", async () => {
+    const parsed = parseContexts([JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')).records[0].raw]);
+    if (!parsed.ok) throw new Error(parsed.error);
+    const payload = { text: 'tidy this reduce', source: 'ben', context: parsed.value };
+    a.db.events.add('t1', 'user', payload);
+    await a.worker.syncNow();
+    const up = relay.changes.find((c) => c.entity === 'event' && (c.data as any)?.payload?.text === payload.text)!;
+    expect((up.data as any).payload).toEqual(payload);
+    await b.worker.syncNow();
+    expect(b.db.events.since('t1').map((e) => JSON.parse(e.payload)).find((p) => p.text === payload.text)).toEqual(payload);
   });
 });

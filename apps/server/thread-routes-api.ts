@@ -6,12 +6,16 @@ import { streamSSE } from 'hono/streaming';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { parseContexts } from '@omni/shared/message-context-kinds.ts';
+import { checkAnnotations } from './message-context/browser-annotation.ts';
+import { stampThreadReferences } from './message-context/thread-reference.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
 import { artifacts, channels, events, fileDigests, messageRequests, publicChannel, requestFingerprint, threads, type Thread } from './db.ts';
 import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
+import { continueLinks } from './continue.ts';
 import {
   acceptedAgain,
   activeMods,
@@ -37,8 +41,11 @@ import {
 } from './runner.ts';
 import { cancelHandoff, handOff } from './handoff.ts';
 import { handoffView } from './handoff/records.ts';
+import { headPage } from './history.ts';
+import { liveMessage, openingMessages, parseAfter, STREAM_QUEUE_MAX, type DetailOf } from './stream-catch-up.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
+import { basePick, baseView } from './worktree-base.ts';
 import { checkUploads, imageMime, removeUploads, safeName, saveUploads } from './uploads.ts';
 
 /** List, create, detail, and summary. Registered before PATCH and the terminal routes. */
@@ -60,6 +67,8 @@ const createSchema = z.object({
   source: z.enum(['manual', 'conductor', 'capture']).default('manual'),
   /** A sidebar folder of the channel, by id or name. A name no folder has makes one. */
   folder: z.string().max(200).nullish(),
+  /** Where a new worktree thread's branch starts (worktree-base.ts). Left out: the repo's HEAD, as before. */
+  base: basePick.nullish(),
 });
 
 threadRoutesApi.get('/', (c) =>
@@ -116,10 +125,17 @@ threadRoutesApi.get('/:id', (c) => {
   if (!t) return c.json({ error: 'not found' }, 404);
   // With sync on, the files it has on the other Mac download in the background.
   void threadOpened(t.id);
+  // ?history=recent: the newest page of events, older ones from GET /:id/history (apps/server/history.ts).
+  return c.json(threadDetail(t, c.req.query('history') === 'recent' ? headPage(t.id) : { events: events.since(t.id) }));
+});
+
+/** The detail with `page`'s events: every event, the head and its `history`, or none (the stream's sync). */
+function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
   const detail = {
     thread: t,
     channel: (ch => ch && publicChannel(ch))(channels.get(t.channel_id)),
-    events: events.since(t.id),
+    events: page.events,
+    ...(page.history && { history: page.history }),
     artifacts: artifacts.byThread(t.id),
     children: threads.children(t.id),
     // Members of the teams this thread started, so its delegation cards can show their state.
@@ -131,11 +147,13 @@ threadRoutesApi.get('/:id', (c) => {
     mods: activeMods().filter((m) => m.thread_id === t.id),
     // On its way to or from another Mac (apps/server/handoff.ts), null otherwise.
     handoff: handoffView(t),
+    // The thread it continues on another harness and the threads that continue it (apps/server/continue.ts).
+    ...continueLinks(t),
   };
   // Only when a turn cannot start here (a synced thread): why, for the composer to show.
   const blocked = turnBlocked(t, runsHere(t.id));
-  return c.json(blocked ? { ...detail, blocked } : detail);
-});
+  return blocked ? { ...detail, blocked } : detail;
+}
 
 /** Compact view for the conductor MCP. */
 threadRoutesApi.get('/:id/summary', (c) => {
@@ -148,27 +166,43 @@ threadRoutesApi.get('/:id/summary', (c) => {
   });
 });
 
+/** Where the thread's branch starts: what Ben chose and the commit it resolved to. Null for a thread with no worktree. */
+threadActionsApi.get('/:id/base', (c) => {
+  const t = threads.get(c.req.param('id'));
+  return t ? c.json(baseView(t)) : c.json({ error: 'not found' }, 404);
+});
+
 threadActionsApi.post('/:id/messages', async (c) => {
   const id = c.req.param('id');
   const { data, files } = await readBody(c);
-  const { prompt, from, mode, request_id } = z
+  const { prompt, from, mode, request_id, context: raw } = z
     .object({
-      prompt: z.string().min(1),
+      prompt: z.string(),
       from: z.enum(['ben', 'conductor']).default('ben'),
       // steer: read at the agent's next step. queue: after this turn. interrupt: stop the turn, then run it.
       mode: z.enum(['steer', 'queue', 'interrupt']).default('steer'),
       // The client's id for this send, kept across its retries: a retry gets the first acceptance back.
       request_id: z.string().min(1).max(200).optional(),
+      // Records Ben attached (packages/shared/message-context.ts), checked and normalized by parseContexts.
+      context: z.unknown().optional(),
     })
     .parse(data);
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  const context = parseContexts(raw);
+  if (!context.ok) return c.json({ error: context.error }, 400);
+  if (!prompt && !context.value.length) return c.json({ error: 'Write a message or add context to send.' }, 400);
+  const unsendable = checkAnnotations(id, context.value);
+  if (unsendable) return c.json({ error: unsendable }, 400);
   checkUploads(files);
-  const fingerprint = requestFingerprint({ prompt, mode, source: from, files: await fileDigests(files) });
+  const fingerprint = requestFingerprint({ prompt, mode, source: from, files: await fileDigests(files), context: context.value });
   // A retry: answered before its files are saved a second time.
   const again = request_id ? acceptedAgain(id, request_id, fingerprint) : null;
   if (again) return c.json(again);
+  // After the retry check, and the fingerprint is of what Ben sent: a retry after a rename or a delete still gets its first answer.
+  const stamped = stampThreadReferences(id, context.value);
+  if (!stamped.ok) return c.json({ error: stamped.error }, 400);
   const attachments = await saveUploads(id, files);
-  return c.json(await postMessage(id, prompt, { from, mode, attachments, requestId: request_id, fingerprint }));
+  return c.json(await postMessage(id, prompt, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint }));
 });
 
 const requestIds = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) });
@@ -254,7 +288,8 @@ threadActionsApi.post('/:id/requests/discard', async (c) => {
 threadActionsApi.patch('/:id/requests/:rid', async (c) => {
   const id = c.req.param('id');
   const { data, files } = await readBody(c);
-  const { prompt, keep } = z.object({ prompt: z.string().min(1), keep: z.array(z.string()).max(100).optional() }).parse(data);
+  // Empty only for a message with context: editRequest refuses it otherwise.
+  const { prompt, keep } = z.object({ prompt: z.string(), keep: z.array(z.string()).max(100).optional() }).parse(data);
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
   checkUploads(files);
   const added = await saveUploads(id, files);
@@ -391,12 +426,17 @@ threadActionsApi.post('/:id/interrupt', interrupt);
 
 threadActionsApi.get('/:id/stream', (c) => {
   const id = c.req.param('id');
-  const after = Number(c.req.query('after') ?? c.req.header('Last-Event-ID') ?? 0);
+  const after = parseAfter(c.req.query('after') ?? c.req.header('Last-Event-ID') ?? '0');
   return streamSSE(c, async (stream) => {
     const queue: unknown[] = [];
+    // Rows the opening messages carried, so the bus's copies are not sent twice (apps/server/stream-catch-up.ts).
+    const sent = new Set<number>();
     let wake: (() => void) | null = null;
+    let overflowed = false;
     const onEvent = (e: unknown) => {
-      queue.push(e);
+      // A reader that fell this far behind reconnects and catches up with a page (stream-catch-up.ts).
+      if (queue.length >= STREAM_QUEUE_MAX) overflowed = true;
+      else queue.push(e);
       wake?.();
     };
     bus.on(`thread:${id}`, onEvent);
@@ -406,23 +446,28 @@ threadActionsApi.get('/:id/stream', (c) => {
       onEvent({ kind: 'thread', thread: e.thread, pending: pendingFor(id), live: isLive(id), handoff: handoffView(e.thread as Thread), ...(blocked && { blocked }) });
     };
     bus.on('feed', onFeed);
-    stream.onAbort(() => {
+    const detach = () => {
       bus.off(`thread:${id}`, onEvent);
       bus.off('feed', onFeed);
+    };
+    stream.onAbort(() => {
+      detach();
       wake?.();
     });
     // Flush headers immediately so proxies (vite dev) don't hold the stream back.
     await stream.writeSSE({ event: 'ping', data: '' });
-    for (const row of events.since(id, after)) await stream.writeSSE({ id: String(row.id), data: JSON.stringify(row) });
-    while (!stream.aborted) {
+    const detailOf: DetailOf = (page) => (t => (t ? threadDetail(t, page) : null))(threads.get(id));
+    for (const m of openingMessages(id, after, detailOf, queue, sent)) await stream.writeSSE(m);
+    while (!stream.aborted && !overflowed) {
       if (!queue.length) {
         await Promise.race([new Promise<void>((r) => (wake = r)), stream.sleep(20_000)]);
         wake = null;
         if (!queue.length) await stream.writeSSE({ event: 'ping', data: '' });
         continue;
       }
-      const e = queue.shift() as any;
-      await stream.writeSSE({ id: e.id ? String(e.id) : undefined, data: JSON.stringify(e) });
+      const m = liveMessage(queue.shift(), sent);
+      if (m) await stream.writeSSE(m);
     }
+    detach();
   });
 });

@@ -9,7 +9,7 @@ import { Screenshots } from './Screenshots.tsx';
  * The channel's browser, live: the same Chrome the agent drives, which Ben can click and type in.
  * The screenshots the agent saved sit one click away.
  */
-export function BrowserTab({ channelId, shots }: { channelId: string; shots: Artifact[] }) {
+export function BrowserTab({ channelId, threadId, shots }: { channelId: string; threadId: string; shots: Artifact[] }) {
   const [view, setView] = useState<'live' | 'shots'>('live');
   const [expanded, setExpanded] = useState(false);
   const extra = (
@@ -43,11 +43,11 @@ export function BrowserTab({ channelId, shots }: { channelId: string; shots: Art
           </Button>
         </Empty>
       ) : (
-        <LiveBrowser channelId={channelId} extra={extra} />
+        <LiveBrowser channelId={channelId} threadId={threadId} extra={extra} />
       )}
       <Modal open={expanded} onClose={() => setExpanded(false)} wide title="Browser">
         <div className="h-[78vh] pb-3">
-          <LiveBrowser channelId={channelId} />
+          <LiveBrowser channelId={channelId} threadId={threadId} />
         </div>
       </Modal>
     </div>

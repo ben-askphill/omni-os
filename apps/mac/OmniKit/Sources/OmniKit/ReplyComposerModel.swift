@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import UniformTypeIdentifiers
 
-/// The reply box under a thread: its text (kept as a draft), staged files, and the send. Logic only; the
-/// views are in apps/mac/Omni/Composer*.swift.
+/// The reply box under a thread: its text (kept as a draft), staged files, the records in `context`, and the send.
+/// Logic only; the views are in apps/mac/Omni/Composer*.swift.
 @MainActor @Observable
 public final class ReplyComposerModel {
   /// The prompt Open PR sends, as OPEN_PR_PROMPT in Thread.tsx.
@@ -23,8 +23,13 @@ public final class ReplyComposerModel {
   public private(set) var openingPR = false
   /// From /status, 25 until it is known.
   public var maxUploadMB = AttachmentRules.defaultMaxMB
+  /// The thread's draft records, shared with the Changes tab and the thread's other windows.
+  public let context: DraftContextModel
 
-  public var canSend: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !sending }
+  /// Text, or records alone.
+  public var canSend: Bool {
+    (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !context.records.isEmpty) && !sending
+  }
 
   @ObservationIgnored private let api: any ReplyAPI
   @ObservationIgnored private let drafts: DraftStore
@@ -34,11 +39,12 @@ public final class ReplyComposerModel {
   private var key: String { "reply:\(threadID)" }
 
   public init(
-    threadID: String, api: any ReplyAPI, drafts: DraftStore = .standard,
+    threadID: String, api: any ReplyAPI, context: DraftContextModel, drafts: DraftStore = .standard,
     readFile: @escaping @Sendable (StagedFile) throws -> UploadFile = ReplyComposerModel.read
   ) {
     self.threadID = threadID
     self.api = api
+    self.context = context
     self.drafts = drafts
     self.readFile = readFile
     text = drafts.text(for: "reply:\(threadID)")
@@ -57,26 +63,29 @@ public final class ReplyComposerModel {
     discard(f)
   }
 
-  /// Sends the text and files. On success the text is cleared unless Ben typed more meanwhile, the files go,
-  /// and the answer is returned. On failure everything stays and `sendError` says why.
+  /// Sends the text, files and records. On success the text is cleared unless Ben typed more meanwhile, the files
+  /// and records it carried go, and the answer is returned. On failure everything stays and `sendError` says why.
   @discardableResult
   public func send(mode: SendMode?) async -> OmniThread? {
     let raw = text
     let prompt = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !prompt.isEmpty, !sending else { return nil }
+    let records = context.records
+    guard !prompt.isEmpty || !records.isEmpty, !sending else { return nil }
     sending = true
     sendError = nil
     defer { sending = false }
     let staged = files
-    let request = PendingRequest.next(after: lastRequest, key: PendingRequest.key(prompt: prompt, mode: mode, files: staged.map(\.url.path)))
+    let key = PendingRequest.key(prompt: prompt, mode: mode, files: staged.map(\.url.path), context: records.map(\.id))
+    let request = PendingRequest.next(after: lastRequest, key: key)
     lastRequest = request
     do {
       let uploads = try await Self.load(staged, with: readFile)
-      let thread = try await api.reply(to: threadID, prompt: prompt, mode: mode, files: uploads, requestID: request.id)
+      let thread = try await api.reply(to: threadID, prompt: prompt, mode: mode, files: uploads, requestID: request.id, context: records)
       lastRequest = nil
       if text == raw { text = "" }
       files.removeAll { staged.contains($0) }
       staged.forEach(discard)
+      context.settle(sent: records.map(\.id))
       attachError = nil
       return thread
     } catch let error as OmniAPIError {

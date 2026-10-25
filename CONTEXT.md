@@ -29,11 +29,15 @@ _Avoid_: Agent, persona, bot
 The crew role the user talks to, which delegates work to crew threads in other channels.
 
 **Automation**:
-A cron schedule, or a GitHub PR event (`on:`), that starts a new thread on every run.
+A cron schedule, or an event (`on:`), that starts a new thread on every run. Events can be GitHub PR changes, a page a thread published, or a signed GitHub webhook.
 
 **Request**:
 A message sent to a thread through the API, saved before the client hears it was accepted. It carries the client's request id, kept across retries: a retry with the same id gets the first acceptance back, and the same id with another message is refused. Local to the Mac that accepted it (`message_requests`, `apps/server/db/repos/requests.ts`).
 _Avoid_: Job, task
+
+**Message context**:
+Typed records a **Request** carries next to its text, each with the user's note: lines picked in Changes (`diff_selection`), terminal output (`terminal_excerpt`), a browser screenshot with an area or element picked (`browser_annotation`), or another thread by identity (`thread_reference`). The agent gets them as an `<omni-context>` block; the transcript keeps the records as sent ([docs/internals/message-context.md](docs/internals/message-context.md)).
+_Avoid_: Context (alone, which is the context window), attachment (a file)
 
 **Crew report**:
 A child thread's reply to the thread that delegated it, sent when its turn ends. Saved as a **Request** on the parent before the parent is woken, once per child turn, so a restart before the parent reads it keeps it for Resume. A team's go to its lead is saved the same way. Omni wrote both, so the user can resume or discard them but not edit or move them.
@@ -44,7 +48,7 @@ Where a **Request** is. `accepted` (saved), `waiting` (for a slot), `held` (runs
 _Avoid_: Status (a thread's), queue state
 
 **Setup**:
-Making and checking a **Thread**'s own git worktree before anything runs in it, for a **Channel** with a worktree per thread. `preparing`, then ready, or `failed` with git's reason until the user presses Retry, which uses the same thread, branch and **Session**. A worktree thread's first prompt and files are saved as its first **Request**, so they survive a restart while it waits.
+Making and checking a **Thread**'s own git worktree at its chosen base, then running the **Channel**'s setup action if it has one, before the agent starts or alongside it. Only for a channel with a worktree per thread. `preparing`, then ready, or `failed` with the checkout or setup command's reason until the user presses Retry, which uses the same thread, branch and **Session**. A worktree thread's first prompt and files are saved as its first **Request**, so they survive a restart while it waits.
 _Avoid_: Provisioning, bootstrap
 
 **Result**:
@@ -64,8 +68,16 @@ Questions an agent asks the user with Omni's `ask_user_question` tool: one to fo
 _Avoid_: Prompt, form, AskUserQuestion (Claude Code's own tool, off in Omni)
 
 **Needs you**:
-One list across every thread not archived: each thread's newest unread **Result**, and what blocks a thread until the user acts (a **Question card** waiting for an answer, even in a running thread, a failed **Setup**, `recovered` or `uncertain` **Requests**, a **Limit stop**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Read state is its own (`result_reads`): it never changes a thread's status, place in the lists or folder. It syncs, and only moves forward: each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock.
+One list across every thread neither archived nor marked done: each thread's newest unread **Result**, and what blocks a thread until the user acts (a **Question card** waiting for an answer, even in a running thread, a failed **Setup**, `recovered` or `uncertain` **Requests**, a **Limit stop**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Read state is its own (`result_reads`): it never changes a thread's status, place in the lists or folder. It syncs, and only moves forward: each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock.
 _Avoid_: Inbox (in UI text), notifications, unread thread
+
+**Marked done**:
+A user-set flag (`done_at`) that takes a **Thread** out of **Needs you** without changing its run status or removing it from its channel or folder. Mark as not done reverses it. A new message, a run starting or a setup retry clears it. It syncs between Macs; running or queued threads cannot be marked done.
+_Avoid_: Result (how a turn ended), archive
+
+**Trigger delivery**:
+A saved published-page or GitHub webhook event for an **Automation**, kept before a run starts and synced to the Mac that runs automations. It records acceptance, why it waits or was skipped, and whether a thread was made. Started means the thread exists, even if that thread later fails.
+_Avoid_: Request (a message), delivery state (a request's state)
 
 ### Harnesses
 
@@ -92,6 +104,18 @@ _Avoid_: Codex "thread", Cursor "chat" (their names for the same thing)
 **Handover**:
 What a thread's next **Session** reads ahead of the user's message after the thread moved to another **Harness**: the thread's facts and its transcript, built by Omni, since no harness reads another's session. A harness the thread never ran on gets the whole thread in a new **Session**; one it ran on before resumes its own **Session** and gets only what happened since. Pending until that session starts.
 _Avoid_: Context transfer, migration
+
+**Handoff**:
+Moving a running **Thread** to another synced Mac on the same **Harness** and **Session**. Omni stops it here, transfers its session and files, then resumes it there. Tailscale checks reachability; the sync relay carries the handoff.
+_Avoid_: Handover (a harness switch), continued thread (a new thread)
+
+**Continued thread**:
+A new **Thread** started from an idle one (its source) on another local **Harness**, with a **Session** and worktree of its own and a **Carryover** ahead of the user's first message. The two are linked both ways. The source, its **Session** and its checkout stay as they were.
+_Avoid_: Continuation (what resuming a **Limit stop** sends), fork, child (a crew relation)
+
+**Carryover**:
+What a new **Session** reads ahead of the user's first message when it carries on work that ran elsewhere: a **Continued thread**'s source, or an imported transcript (#187). It has a character budget, says that its history is data and not instructions, and lists what it left out with where to read it. The user's message follows it and is never cut.
+_Avoid_: Handover (a thread that changed **Harness**), context transfer
 
 **Slash command**:
 Anything the user runs by typing `/` in the composer: a **Harness command** or an **Omni command**.
@@ -127,6 +151,7 @@ _Avoid_: Frontend, dashboard
 - A Cursor Cloud **Thread** is one Cursor cloud agent on the **Channel**'s GitHub repo, on Cursor's Linux machines; each **Turn** is a run on it. Like Hermes it has no Omni worktree, browser profile or artifacts directory. Its **Session** id is the agent id, `bc-<thread id>`. Its work comes back as a branch and a PR that Cursor opens
 - The user picks the **Harness** per thread, or leaves it to **Auto**; Omni never switches a thread's harness on its own
 - The user (or the **Conductor**, when asked) can switch a thread's **Harness**, **Model** or **Effort** between **Turns**, never to or from Hermes or Cursor Cloud, and a Cursor Cloud thread keeps its model. A switch picked during a **Turn** waits and applies once it ends, so a **Turn** never spans two runs; messages sent meanwhile run on the new one. The same **Harness** keeps its **Session**; another one gets a **Handover**
+- An idle **Thread** can be continued on a local **Harness** (Claude Code, Codex or Cursor Agent), never on or from Hermes or Cursor Cloud. The **Continued thread** stays in the source's **Channel** and keeps its **Crew role**, but is not its crew child: it reports to nobody. For repo work it gets a worktree of its own on a new branch at the source's HEAD; when the source had its own worktree, its uncommitted changes come along, still uncommitted
 - A **Crew role**, **Channel** or **Automation** can set a default **Harness**, **Model** and **Effort**, or **Auto**; a choice made on the thread wins, and **Auto** is the fallback
 - The **Conductor** delegates on the crew role's defaults, which for most roles is **Auto**, unless the user names a harness or model
 - A **Harness** offers many **Harness commands**; a thread's `/` menu lists its own **Harness**'s **Harness commands** plus the **Omni commands**
@@ -153,3 +178,4 @@ _Avoid_: Frontend, dashboard
 - "provider" was used for both the CLI a thread runs in and the company behind the model. Resolved: the CLI plus its subscription is the **Harness**; the model vendor is only part of the **Model** name.
 - Codex calls its conversations "threads" and Cursor calls them "chats". Resolved: in Omni those are **Sessions**; **Thread** always means an Omni thread.
 - "Syncing slash commands" could mean copying command files between the tools. Resolved: Omni reads each **Harness**'s own **Harness commands** live and copies nothing; a command defined in one tool only shows in threads on that tool.
+- "Continuation" was used for both what resuming a **Limit stop** sends and a new thread that carries on another's work on another harness. Resolved: the first is the **Continuation**, the second a **Continued thread**, and what its first session reads is its **Carryover**.

@@ -12,10 +12,14 @@ public enum ThreadStreamMessage: Decodable, Hashable, Sendable {
   case context(ContextUsage)
   /// A mod's `$.ui.toast`, for whoever has the thread open. Never stored.
   case modToast(ModToast)
+  /// The thread's state when the stream connected, after the rows it replayed (#224): the detail without events.
+  /// `snapshot`: the gap was too big to replay, so `events` and `history` are the newest page instead.
+  case sync(ThreadDetail, snapshot: Bool)
   case unknown(JSONValue)
 
   private enum CodingKeys: String, CodingKey {
     case kind, artifact, thread, pending, live, id, payload, text, context, blocked, handoff
+    case catchUp = "catch_up"
   }
 
   public init(from decoder: any Decoder) throws {
@@ -36,6 +40,9 @@ public enum ThreadStreamMessage: Decodable, Hashable, Sendable {
       )
     } else if kind == "context", let usage = try? c.decode(ContextUsage.self, forKey: .context) {
       self = .context(usage)
+    } else if kind == "sync" {
+      let d = try ThreadDetail(from: decoder)
+      self = .sync(d, snapshot: d.history != nil && (try? c.decode(String.self, forKey: .catchUp)) == "snapshot")
     } else if kind == "mod_toast", (try? c.decode(String.self, forKey: .text)) != nil {
       self = .modToast(try ModToast(from: decoder))
     } else if (try? c.decode(Int.self, forKey: .id)) != nil, (try? c.decode(String.self, forKey: .payload)) != nil {
@@ -61,10 +68,12 @@ public enum FeedEvent: Decodable, Hashable, Sendable {
   case channel(id: String)
   /// Ben read a thread's result, here or in the Web UI: refetch Needs you. Nothing else about the thread changed.
   case needsYou(threadID: String)
+  /// An event-triggered automation's delivery was saved or changed state: refetch the automations.
+  case automationDelivery(automation: String)
   case unknown(JSONValue)
 
   private enum CodingKeys: String, CodingKey {
-    case type, thread, harness, usage, artifact, tasks, mods, id
+    case type, thread, harness, usage, artifact, tasks, mods, id, automation
     case threadID = "thread_id"
   }
 
@@ -91,6 +100,8 @@ public enum FeedEvent: Decodable, Hashable, Sendable {
       self = .channel(id: try c.decode(String.self, forKey: .id))
     case "needs_you":
       self = .needsYou(threadID: try c.decode(String.self, forKey: .threadID))
+    case "automation_delivery":
+      self = .automationDelivery(automation: try c.decode(String.self, forKey: .automation))
     default:
       self = .unknown(try JSONValue(from: decoder))
     }

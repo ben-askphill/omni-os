@@ -217,11 +217,15 @@ export function MoListRow({
   );
 }
 
-export function MoBubble({ children, caption }: { children: ReactNode; caption?: ReactNode }) {
+/** Ben's message. `above` sits over the bubble (the context he attached); without `children` there is no bubble. */
+export function MoBubble({ children, caption, above }: { children: ReactNode; caption?: ReactNode; above?: ReactNode }) {
   return (
     <div className="flex flex-col items-end gap-1">
       {caption && <span className="text-[12px] leading-[1.3] text-fg-3">{caption}</span>}
-      <div className="max-w-[86%] rounded-[20px] bg-bubble px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap text-pretty">{children}</div>
+      {above}
+      {children != null && (
+        <div className="max-w-[86%] rounded-[20px] bg-bubble px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap text-pretty">{children}</div>
+      )}
     </div>
   );
 }

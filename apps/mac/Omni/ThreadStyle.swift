@@ -108,17 +108,12 @@ struct GlyphView: View {
   var size: CGFloat = 8
   /// Inside a needs or done pill: the glyph takes the ink.
   var onPop = false
-  @State private var ping = false
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     ZStack {
       switch glyph {
       case .running:
-        Circle().fill(Tok.live)
-          .scaleEffect(ping ? 2.6 : 1)
-          .opacity(ping ? 0 : 0.55)
-        Circle().fill(Tok.live)
+        LayerAnimation<PingLayers>(color: Tok.live)
       case .needs:
         RoundedRectangle(cornerRadius: z(1.5))
           .fill(onPop ? Tok.ink : Tok.needs)
@@ -137,10 +132,6 @@ struct GlyphView: View {
       }
     }
     .frame(width: z(size), height: z(size))
-    .onAppear {
-      guard glyph == .running, !reduceMotion else { return }
-      withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 1.6).repeatForever(autoreverses: false)) { ping = true }
-    }
     .accessibilityHidden(true)
   }
 }

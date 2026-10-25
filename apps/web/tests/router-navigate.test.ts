@@ -28,6 +28,7 @@ describe('navigate', () => {
       href.prs('x'),
       href.pr('x', 3),
       href.thread('t1', 2),
+      href.threadAt('t1', 9),
       href.threadView('t1', 'steps', 41),
       href.search('q'),
       href.settingsPage(),
@@ -68,5 +69,12 @@ describe('parseHash', () => {
 
   it('treats an unknown thread view as the thread', () => {
     expect(parseHash('#/t/t1/nope?turn=x')).toEqual({ name: 'thread', id: 't1' });
+  });
+
+  it('reads the event a search hit opens the thread at, and ignores one that is not an id', () => {
+    expect(href.threadAt('t 1', 3021)).toBe('#/t/t%201?at=3021');
+    expect(parseHash(href.threadAt('t 1', 3021))).toEqual({ name: 'thread', id: 't 1', at: 3021 });
+    expect(parseHash('#/t/t1?at=2.5')).toEqual({ name: 'thread', id: 't1' });
+    expect(parseHash('#/t/t1?at=-3')).toEqual({ name: 'thread', id: 't1' });
   });
 });

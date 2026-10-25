@@ -50,8 +50,8 @@ export function SettingsPage() {
           <div>
             Your profile, workspace and integrations live in <code>{state?.path ?? 'data/omni.config.json'}</code> on this machine and never go into git, so a fork
             stays clean. Appearance and notifications stay in this browser. Secrets,
-            sync and automations have their own pages: <a className="underline" href={href.secrets()}>Secrets</a>, <a className="underline" href={href.sync()}>Sync</a> and{' '}
-            <a className="underline" href={href.automations()}>Automations</a>. Server options such as the port and model defaults live in <code>.env</code>.
+            sync, storage and automations have their own pages: <a className="underline" href={href.secrets()}>Secrets</a>, <a className="underline" href={href.sync()}>Sync</a>,{' '}
+            <a className="underline" href={href.storage()}>Storage</a> and <a className="underline" href={href.automations()}>Automations</a>. Server options such as the port and model defaults live in <code>.env</code>.
           </div>
         </div>
       </div>

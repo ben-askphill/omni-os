@@ -1345,6 +1345,347 @@
         }
       ],
       "plan": null
+    },
+    {
+      "name": "span-floor-break",
+      "events": [
+        {
+          "id": 10,
+          "thread_id": "t",
+          "kind": "init",
+          "payload": "{\"model\":\"m\",\"cwd\":\"/x\",\"tools\":1,\"mcp\":[]}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 12,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"bg\",\"name\":\"Agent\",\"input\":{\"description\":\"Watch the build\",\"subagent_type\":\"general-purpose\",\"run_in_background\":true},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 20,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"c1\",\"name\":\"Bash\",\"input\":{\"command\":\"tail build.log\"},\"parent\":\"bg\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 21,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"c1\",\"text\":\"ok\",\"is_error\":false,\"truncated\":false}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 22,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"c2\",\"name\":\"Grep\",\"input\":{\"pattern\":\"error\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 23,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"c2\",\"text\":\"ok\",\"is_error\":false,\"truncated\":false}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 24,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"p\",\"name\":\"TodoWrite\",\"input\":{\"todos\":[{\"content\":\"Fix the build\",\"activeForm\":\"Fixing the build\",\"status\":\"in_progress\"}]},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 25,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"p\",\"text\":\"ok\",\"is_error\":false,\"truncated\":false}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 26,
+          "thread_id": "t",
+          "kind": "assistant_text",
+          "payload": "{\"text\":\"Found it.\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 27,
+          "thread_id": "t",
+          "kind": "result",
+          "payload": "{\"ok\":true,\"subtype\":\"success\",\"turns\":3}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        }
+      ],
+      "spans": [
+        {
+          "from": 20,
+          "to": null
+        }
+      ],
+      "items": [
+        {
+          "type": "tools",
+          "key": 22,
+          "total": 2,
+          "calls": [
+            {
+              "id": "c2",
+              "name": "Grep",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "pattern": "error"
+              },
+              "summary": "error",
+              "result": {
+                "text": "ok",
+                "is_error": false,
+                "truncated": false
+              },
+              "children": []
+            },
+            {
+              "id": "p",
+              "name": "TodoWrite",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "todos": [
+                  {
+                    "content": "Fix the build",
+                    "activeForm": "Fixing the build",
+                    "status": "in_progress"
+                  }
+                ]
+              },
+              "summary": "0/1 done",
+              "result": {
+                "text": "ok",
+                "is_error": false,
+                "truncated": false
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "key": 26,
+          "text": "Found it."
+        },
+        {
+          "type": "result",
+          "key": 27,
+          "ok": true,
+          "subtype": "success",
+          "turns": 3
+        }
+      ],
+      "plan": {
+        "after": 22,
+        "todos": [
+          {
+            "content": "Fix the build",
+            "activeForm": "Fixing the build",
+            "status": "in_progress"
+          }
+        ]
+      }
+    },
+    {
+      "name": "span-gap",
+      "events": [
+        {
+          "id": 5,
+          "thread_id": "t",
+          "kind": "user",
+          "payload": "{\"text\":\"Plan it\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 6,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"t1\",\"name\":\"TodoWrite\",\"input\":{\"todos\":[{\"content\":\"Old step\",\"status\":\"pending\"}]},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 7,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"t1\",\"text\":\"ok\",\"is_error\":false,\"truncated\":false}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 8,
+          "thread_id": "t",
+          "kind": "question",
+          "payload": "{\"id\":\"q1\",\"questions\":[{\"question\":\"Ship it?\",\"header\":\"Ship\",\"options\":[{\"label\":\"Yes\",\"description\":\"Ship now\"},{\"label\":\"No\",\"description\":\"Wait\"}],\"multiSelect\":false}]}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 9,
+          "thread_id": "t",
+          "kind": "mod",
+          "payload": "{\"plugin\":\"lint\",\"text\":\"island line\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 15,
+          "thread_id": "t",
+          "kind": "question_answer",
+          "payload": "{\"id\":\"q1\",\"state\":\"answered\",\"answers\":[{\"selected\":[\"Yes\"],\"other\":null}],\"via\":\"tool\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 20,
+          "thread_id": "t",
+          "kind": "mod",
+          "payload": "{\"plugin\":\"lint\",\"text\":\"head line\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 21,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"h1\",\"name\":\"Read\",\"input\":{\"file_path\":\"/x/b.ts\"},\"parent\":null}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 22,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"h1\",\"text\":\"ok\",\"is_error\":false,\"truncated\":false}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 23,
+          "thread_id": "t",
+          "kind": "assistant_text",
+          "payload": "{\"text\":\"Done.\"}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        },
+        {
+          "id": 24,
+          "thread_id": "t",
+          "kind": "result",
+          "payload": "{\"ok\":true,\"subtype\":\"success\",\"turns\":3}",
+          "created_at": "2026-09-28T07:57:15.000Z"
+        }
+      ],
+      "spans": [
+        {
+          "from": 5,
+          "to": 12
+        },
+        {
+          "from": 20,
+          "to": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user",
+          "key": 5,
+          "text": "Plan it"
+        },
+        {
+          "type": "tools",
+          "key": 6,
+          "total": 1,
+          "calls": [
+            {
+              "id": "t1",
+              "name": "TodoWrite",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "todos": [
+                  {
+                    "content": "Old step",
+                    "status": "pending"
+                  }
+                ]
+              },
+              "summary": "0/1 done",
+              "result": {
+                "text": "ok",
+                "is_error": false,
+                "truncated": false
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "question",
+          "key": 8,
+          "id": "q1",
+          "state": "answered"
+        },
+        {
+          "type": "mod",
+          "key": 9,
+          "lines": [
+            {
+              "key": 9,
+              "plugin": "lint",
+              "text": "island line"
+            }
+          ]
+        },
+        {
+          "type": "mod",
+          "key": 20,
+          "lines": [
+            {
+              "key": 20,
+              "plugin": "lint",
+              "text": "head line"
+            }
+          ]
+        },
+        {
+          "type": "tools",
+          "key": 21,
+          "total": 1,
+          "calls": [
+            {
+              "id": "h1",
+              "name": "Read",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "file_path": "/x/b.ts"
+              },
+              "summary": "/x/b.ts",
+              "result": {
+                "text": "ok",
+                "is_error": false,
+                "truncated": false
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "key": 23,
+          "text": "Done."
+        },
+        {
+          "type": "result",
+          "key": 24,
+          "ok": true,
+          "subtype": "success",
+          "turns": 3
+        }
+      ],
+      "plan": null
     }
   ]
 }

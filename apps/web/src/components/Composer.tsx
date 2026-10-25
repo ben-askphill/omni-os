@@ -6,6 +6,8 @@ import { useApp } from '../store.tsx';
 import { ErrorNote, Icon, IconButton, Kbd, Loader, Picker, type IconName, type PickerOption } from './ui.tsx';
 import { CrewMark, isCrewRole } from './brand.tsx';
 import { EffortPicker, ModelPicker, type ModelChoice } from './ModelPicker.tsx';
+import { BasePicker, useBasePick } from './BasePicker.tsx';
+import { baseRequest } from '../worktree-base.ts';
 import { currentRun, pickedRun, shownRun, threadChoice, threadRunLabels, type RunPick } from '../thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
 import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
@@ -16,6 +18,10 @@ import { draftRun, draftRunRequest, newThreadBody, otherModel, sameSettings, typ
 import { asksAuto } from '../thread-run.ts';
 import { parseSlash, type SlashCommand } from '@omni/shared/slash.ts';
 import { requestIdFor, sendKey, type PendingRequest } from '../requests.ts';
+import type { MessageContext } from '@omni/shared/message-context.ts';
+import { ContextChips } from '../message-context/ContextChips.tsx';
+import { ThreadReferenceButton } from './ThreadReference.tsx';
+import { removeDraftContext, settleDraftContext, useDraftContext } from '../message-context/draft.ts';
 
 // Unsent text survives navigation (not reloads). Keyed by where the composer lives.
 const drafts = new Map<string, string>();
@@ -429,6 +435,7 @@ export function NewThreadComposer({
   useAutosize(ref, text, big ? 360 : 260);
   useFocusRequests(ref, true);
 
+  const [base, setBase] = useBasePick(channel);
   const { choice, effort } = draftRun(picked, crew.find((r) => r.id === role), channels.find((c) => c.id === channel), harnesses ?? []);
 
   // Default the role once crew loads, if the conductor channel is selected. A preset keeps its own.
@@ -493,6 +500,7 @@ export function NewThreadComposer({
           prompt,
           role: role || undefined,
           ...draftRunRequest(picked ? { choice, effort } : null),
+          ...baseRequest(base, choice.harness),
           folder: folder && channel === preset?.channel ? folder.id : undefined,
         },
         att.files,
@@ -555,6 +563,7 @@ export function NewThreadComposer({
           />
         )}
         {harnesses && <EffortPicker harnesses={harnesses} choice={choice} value={effort} onChange={(effort) => setPicked({ choice, effort })} />}
+        <BasePicker channel={channel} harness={choice.harness} value={base} onChange={setBase} />
         <AttachButton onPick={att.add} disabled={busy} />
         {folder && channel === preset?.channel && (
           <button
@@ -775,7 +784,7 @@ function ThreadRunPills({ thread, onSwitched, onError }: { thread: Thread; onSwi
 /** Follow-up composer pinned under a thread. On a busy thread it steers by default. */
 /**
  * Sends a reply to a thread. A message keeps its request id until it goes through, so retrying one whose answer was
- * lost is not delivered twice.
+ * lost is not delivered twice. The context it carried leaves the thread's draft once it has.
  */
 export function useReplySend(threadId: string) {
   // The last send that failed: retrying the same message reuses its request id.
@@ -784,12 +793,14 @@ export function useReplySend(threadId: string) {
     lastRequest.current = null;
   }, [threadId]);
   return useCallback(
-    async (prompt: string, mode: SendMode | undefined, files: File[]) => {
-      const request = requestIdFor(lastRequest.current, sendKey(prompt, mode, files));
+    async (prompt: string, mode: SendMode | undefined, files: File[], context: readonly MessageContext[] = []) => {
+      const ids = context.map((r) => r.id);
+      const request = requestIdFor(lastRequest.current, sendKey(prompt, mode, files, ids));
       lastRequest.current = request;
-      const body = { prompt, ...(mode && { mode }), request_id: request.id };
+      const body = { prompt, ...(mode && { mode }), ...(context.length ? { context } : {}), request_id: request.id };
       const t = await api.send<Thread>(`/threads/${encodeURIComponent(threadId)}/messages`, body, files);
       lastRequest.current = null;
+      settleDraftContext(threadId, ids);
       return t;
     },
     [threadId],
@@ -820,6 +831,7 @@ export function ReplyComposer({
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const att = useAttachments();
+  const context = useDraftContext(threadId);
   const sendReply = useReplySend(threadId);
   useAutosize(ref, text, 240);
 
@@ -848,14 +860,15 @@ export function ReplyComposer({
   const menus = joinMenus(slashMenu, fileMenu);
 
   // `mode` only matters while a turn is in progress; an idle thread just starts the next turn.
+  const canSend = !!text.trim() || context.length > 0;
   const submit = async (mode?: SendMode) => {
     const raw = text;
     const prompt = raw.trim();
-    if (!prompt || busy) return;
+    if (!canSend || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const t = await sendReply(prompt, mode, att.files);
+      const t = await sendReply(prompt, mode, att.files, context);
       // Keep anything typed while the send was in flight.
       if (drafts.get(key) === raw) drafts.delete(key);
       if (latest.current === raw) setText('');
@@ -923,6 +936,7 @@ export function ReplyComposer({
       <DropHint over={att.over} />
       {slashMenu.menu && <SlashMenu {...slashMenu.menu} />}
       {fileMenu.menu && <FileMenu {...fileMenu.menu} />}
+      <ContextChips records={context} onRemove={(id) => removeDraftContext(threadId, id)} className="px-3 pt-3 pb-0.5" />
       <AttachmentStrip files={att.files} onRemove={att.remove} />
       <textarea
         ref={ref}
@@ -949,6 +963,7 @@ export function ReplyComposer({
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
         {extra}
         <AttachButton onPick={att.add} disabled={busy} />
+        <ThreadReferenceButton thread={thread} disabled={busy} />
         <ThreadRunPills thread={thread} onSwitched={(t) => onChanged?.(t)} onError={setError} />
         <div className="ml-auto flex items-center gap-2.5">
           <Hint tab={!!suggestion} />
@@ -957,9 +972,9 @@ export function ReplyComposer({
               {slash.label ?? 'Send'}
             </SendButton>
           ) : busyThread ? (
-            <SteerButton disabled={!text.trim()} busy={busy} canSteer={steers} onSend={sendVia} />
+            <SteerButton disabled={!canSend} busy={busy} canSteer={steers} onSend={sendVia} />
           ) : (
-            <SendButton armed={!!text.trim()} busy={busy} onClick={() => void submit()}>
+            <SendButton armed={canSend} busy={busy} onClick={() => void submit()}>
               Send
             </SendButton>
           )}

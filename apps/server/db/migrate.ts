@@ -262,6 +262,38 @@ CREATE TABLE IF NOT EXISTS sync_folder_wait (
   thread_id TEXT PRIMARY KEY,
   folder_id TEXT NOT NULL
 );
+
+-- #219 Watch PR (server/pr-watch/): one watch per thread, polled by the Mac that started it, and every event it has
+-- woken the thread for, keyed by source and identity (a failing check on one head), so an event wakes it once.
+-- Local, not synced: the wake is a durable request on this Mac (db/repos/requests.ts).
+CREATE TABLE IF NOT EXISTS pr_watches (
+  thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+  repo TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  state TEXT NOT NULL,
+  stop_reason TEXT,
+  head_sha TEXT,
+  checks TEXT,
+  wakes INTEGER NOT NULL DEFAULT 0,
+  failures INTEGER NOT NULL DEFAULT 0,
+  interval_s INTEGER NOT NULL,
+  error TEXT,
+  machine_id TEXT,
+  last_wake_at TEXT,
+  last_polled_at TEXT,
+  next_poll_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS pr_watches_due ON pr_watches(next_poll_at) WHERE state = 'watching';
+CREATE TABLE IF NOT EXISTS pr_watch_events (
+  thread_id TEXT NOT NULL REFERENCES pr_watches(thread_id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  source TEXT NOT NULL,
+  request_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (thread_id, key)
+);
 `;
 
 /** Add a column the current schema needs to a database created by an older version. Safe to run again. */
@@ -328,6 +360,8 @@ export function migrate() {
   // Queue order for durable requests (db/repos/requests.ts); a row saved before reordering existed keeps its arrival order.
   ensureColumn('message_requests', 'pos', 'INTEGER');
   db.exec('UPDATE message_requests SET pos = seq WHERE pos IS NULL');
+  // #220: wakes a PR watch spent on review comments alone, against its own budget (server/pr-watch/store.ts).
+  ensureColumn('pr_watches', 'comment_wakes', 'INTEGER NOT NULL DEFAULT 0');
   // Crew reports and a team's go to its lead are durable requests too, with the transcript payload Omni wrote.
   ensureColumn('message_requests', 'kind', `TEXT NOT NULL DEFAULT 'user'`);
   ensureColumn('message_requests', 'payload', 'TEXT');
@@ -341,6 +375,8 @@ export function migrate() {
   db.exec(`UPDATE completions SET n = (SELECT COUNT(*) FROM completions c WHERE c.thread_id = completions.thread_id AND c.seq <= completions.seq)
     WHERE n IS NULL`);
   db.exec('CREATE INDEX IF NOT EXISTS completions_order ON completions(thread_id, n, uid)');
+  // #209: the typed context a request carries (packages/shared/message-context.ts), as JSON; null for none.
+  ensureColumn('message_requests', 'context', 'TEXT');
   // result_reads kept the local seq before read state synced: it names the result by (n, uid) now.
   if ((db.prepare('PRAGMA table_info(result_reads)').all() as unknown as { name: string }[]).some((c) => c.name === 'seq')) {
     db.exec(`ALTER TABLE result_reads RENAME TO result_reads_old;
@@ -364,4 +400,92 @@ export function migrate() {
       SELECT 'completion', uid, 'upsert', created_at FROM completions
       WHERE seq = last_insert_rowid() AND EXISTS (SELECT 1 FROM kv WHERE key = 'sync.machine_id');
     END`);
+  // #212: what Ben chose as a new worktree thread's base, until it is resolved to a commit in thread_bases. Local, not synced.
+  db.exec(`CREATE TABLE IF NOT EXISTS thread_base_picks (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+    pick TEXT NOT NULL
+  )`);
+  // #210: a channel's named actions (command and secret names only, never a value), and each run of one in a thread,
+  // with its state and the tail of its output. Local, not synced: a run is a process on this Mac.
+  db.exec(`CREATE TABLE IF NOT EXISTS channel_actions (
+    id TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    command TEXT NOT NULL,
+    secrets TEXT NOT NULL DEFAULT '[]',
+    port INTEGER,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (channel_id, name)
+  );
+  CREATE TABLE IF NOT EXISTS action_runs (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    action_id TEXT,
+    name TEXT NOT NULL,
+    command TEXT NOT NULL,
+    cwd TEXT NOT NULL,
+    port INTEGER,
+    state TEXT NOT NULL,
+    exit_code INTEGER,
+    error TEXT,
+    output TEXT NOT NULL DEFAULT '',
+    output_bytes INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL,
+    ended_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS action_runs_thread ON action_runs(thread_id, started_at DESC);`);
+  // #211: the one action a channel runs to set up each new worktree, and how (blocking or background), and the setup
+  // run of each thread's latest preparation attempt, so its card shows that run's output after a restart. Local, not synced.
+  ensureColumn('channel_actions', 'setup', 'TEXT');
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS channel_actions_setup ON channel_actions(channel_id) WHERE setup IS NOT NULL;
+  CREATE TABLE IF NOT EXISTS thread_setup_runs (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+    run_id TEXT NOT NULL
+  );`);
+  // #221: a thread continued on another harness names its source (synced with the row; the source is never written).
+  // Its Carryover is a synced `carryover` event. This Mac keeps what cut its worktree (the source's HEAD and snapshot
+  // tree, the ref that holds them) and the client's request id, so a retried start gets the same thread back.
+  // Local, not synced: the refs are this Mac's.
+  ensureColumn('threads', 'continued_from', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS threads_continued_from ON threads(continued_from) WHERE continued_from IS NOT NULL');
+  db.exec(`CREATE TABLE IF NOT EXISTS thread_continuations (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+    source_id TEXT NOT NULL,
+    request_id TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    head TEXT,
+    tree TEXT,
+    snapshot_sha TEXT,
+    applied_at TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (source_id, request_id)
+  )`);
+  // #223 Thread history pages (apps/server/history.ts): turn ends, session starts, and tool calls by their own id.
+  db.exec(`CREATE INDEX IF NOT EXISTS events_result ON events(thread_id, id) WHERE kind = 'result';
+    CREATE INDEX IF NOT EXISTS events_init ON events(thread_id, id) WHERE kind = 'init';
+    CREATE INDEX IF NOT EXISTS events_call ON events(thread_id, json_extract(payload, '$.id')) WHERE kind = 'tool_use';`);
+  // #226 Event-trigger deliveries (db/repos/trigger-deliveries.ts): one row per automation and source event, its uid
+  // derived from both, so a replay or the other Mac's copy is the same row. Synced; states only move forward.
+  db.exec(`CREATE TABLE IF NOT EXISTS trigger_deliveries (
+    uid TEXT PRIMARY KEY,
+    automation TEXT NOT NULL,
+    source TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    context TEXT NOT NULL,
+    state TEXT NOT NULL,
+    reason TEXT,
+    owner TEXT,
+    source_thread TEXT,
+    thread_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (automation, source, source_id)
+  );
+  CREATE INDEX IF NOT EXISTS trigger_deliveries_automation ON trigger_deliveries(automation, created_at);
+  CREATE INDEX IF NOT EXISTS trigger_deliveries_thread ON trigger_deliveries(thread_id) WHERE thread_id IS NOT NULL;`);
+  // #228 A retry is the next attempt of the same delivery row: 1 for the first go. Each attempt has its own thread id.
+  ensureColumn('trigger_deliveries', 'attempt', 'INTEGER NOT NULL DEFAULT 1');
 }

@@ -30,14 +30,31 @@ private func ev(_ id: Int, _ kind: String = "assistant_text", _ payload: String 
   eventJSON(kind: kind, payload: payload, id: id)
 }
 
+/// A thread snapshot. `from`: the head page's first id, as `?history=recent` answers; nil for a server that sends
+/// every row.
 private func detail(
   _ thread: String = row(), events: [String] = [], artifacts: [String] = [], pending: [String] = [], live: Bool = false,
-  children: [String] = [], parent: String? = nil
+  children: [String] = [], parent: String? = nil, from: Int? = nil, resultsBelow: Int = 0
 ) throws -> ThreadDetail {
-  try decode(ThreadDetail.self, """
+  try decode(ThreadDetail.self, detailJSON(
+    thread, events: events, artifacts: artifacts, pending: pending, live: live, children: children, parent: parent, from: from,
+    resultsBelow: resultsBelow))
+}
+
+private func detailJSON(
+  _ thread: String = row(), events: [String] = [], artifacts: [String] = [], pending: [String] = [], live: Bool = false,
+  children: [String] = [], parent: String? = nil, from: Int? = nil, resultsBelow: Int = 0
+) -> String {
+  let history = from.map { #","history":{"from":\#($0),"to":null,"results_below":\#(resultsBelow)}"# } ?? ""
+  return """
     {"thread":\(thread),"channel":\(channelJSON),"events":[\(events.joined(separator: ","))],"artifacts":[\(artifacts.joined(separator: ","))],
-     "children":[\(children.joined(separator: ","))],"parent":\(parent ?? "null"),"pending":[\(pending.joined(separator: ","))],"live":\(live)}
-    """)
+     "children":[\(children.joined(separator: ","))],"parent":\(parent ?? "null"),"pending":[\(pending.joined(separator: ","))],"live":\(live)\(history)}
+    """
+}
+
+/// The stream's sync: `detail` is `detailJSON`'s, events and all. A snapshot carries a page and `history`.
+private func syncMessage(_ detail: String, snapshot: Bool = false) -> String {
+  #"{"kind":"sync","catch_up":"\#(snapshot ? "snapshot" : "replay")","# + detail.drop { $0 != "{" }.dropFirst()
 }
 
 /// SSE text for stream messages, on one line as the server sends them: an event with its id, or any other
@@ -59,6 +76,10 @@ final class FakeThreadAPI: ThreadAPI {
     var stop: Result<Void, OmniAPIError> = .success(())
     var calls: [String: Int] = [:]
     var hold: Gate?
+    var pages: [HistoryCursor: Result<HistoryPage, OmniAPIError>] = [:]
+    var cursors: [HistoryCursor] = []
+    var holdPage: Gate?
+    var rows: [Int: EventRow] = [:]
     var handoff: Result<HandoffAnswer, OmniAPIError> = .failure(.unreachable("not set"))
     var handoffs: [String] = []
   }
@@ -86,7 +107,42 @@ final class FakeThreadAPI: ThreadAPI {
     return gate
   }
 
-  func thread(_ id: String) async throws(OmniAPIError) -> ThreadDetail {
+  /// The page each cursor answers with. A cursor with none fails.
+  func setPage(_ cursor: HistoryCursor, _ page: Result<HistoryPage, OmniAPIError>) {
+    state.withLock { $0.pages[cursor] = page }
+  }
+  /// The cursors the store asked for, in order.
+  var cursors: [HistoryCursor] { state.withLock { $0.cursors } }
+  /// The next page answers when the gate opens.
+  func holdNextPage() -> Gate {
+    let gate = Gate()
+    state.withLock { $0.holdPage = gate }
+    return gate
+  }
+  /// What `threadEvent` answers for each id.
+  func setRow(_ row: EventRow) {
+    state.withLock { $0.rows[row.id] = row }
+  }
+
+  func threadHistory(_ id: String, _ cursor: HistoryCursor) async throws(OmniAPIError) -> HistoryPage {
+    let gate = state.withLock { s in
+      s.calls["history", default: 0] += 1
+      s.cursors.append(cursor)
+      defer { s.holdPage = nil }
+      return s.holdPage
+    }
+    await gate?.wait()
+    return try state.withLock { $0.pages[cursor] ?? .failure(.http(status: 404, message: "no page")) }.get()
+  }
+
+  func threadEvent(_ id: String, eventID: Int) async throws(OmniAPIError) -> EventRow {
+    state.withLock { $0.calls["event", default: 0] += 1 }
+    guard let row = state.withLock({ $0.rows[eventID] }) else { throw .http(status: 404, message: "no event") }
+    return row
+  }
+
+  /// The snapshot, newest page first: counted as "thread".
+  func threadOpen(_ id: String) async throws(OmniAPIError) -> ThreadDetail {
     let gate = state.withLock { s in
       s.calls["thread", default: 0] += 1
       defer { s.hold = nil }
@@ -216,53 +272,35 @@ private let turn = [
     #expect(!store.merge(try decode(OmniThread.self, row("done", updated: 99, id: "other"))), "another thread's row")
   }
 
-  @Test func refetchesTheThreadAfterAReconnect() async throws {
-    let api = FakeThreadAPI(try detail(events: turn, artifacts: [artifact(1)]))
-    let (store, conn, t, clock) = try await openStore(api)
+  @Test func catchesUpFromTheStreamAfterAReconnect() async throws {
+    let api = FakeThreadAPI(try detail(events: turn, artifacts: [artifact(1)], pending: [pendingMsg("held")], live: true))
+    let (store, conn, t, clock) = try await openStore(api, frame: .milliseconds(16))
     defer { store.stop() }
-    await settle()
-    #expect(api.calls("thread") == 1, "the first open loads nothing more")
 
     conn.end()
     try await waitFor("reconnecting") { store.isReconnecting }
-    api.detail = .success(try detail(row("done", updated: 20), events: turn + [ev(4), ev(5, "result", #"{"ok":true,"subtype":"success","turns":1}"#)],
-                                     artifacts: [artifact(1), artifact(2, kind: "markdown")], children: [row(id: "c1", parent: "t1")]))
     clock.advance(by: .seconds(1))
     let again = try await t.next()
     #expect(again.after == "3")
     again.accept()
-    try await waitFor("the missed events") { store.events.map(\.id) == [1, 2, 3, 4, 5] }
+    let sync = detailJSON(
+      row("done", updated: 20), artifacts: [artifact(1), artifact(2, kind: "markdown")], live: false, children: [row(id: "c1", parent: "t1")])
+    again.send(sse(event: ev(4), id: 4) + sse(event: done(5), id: 5) + sse(syncMessage(sync)) + sse(event: ask(6), id: 6))
+    try await waitFor("the catch-up") {
+      clock.advance(by: .milliseconds(16))
+      return store.events.map(\.id) == [1, 2, 3, 4, 5, 6]
+    }
     #expect(!store.isReconnecting)
-    #expect(api.calls("thread") == 2)
     #expect(store.thread?.status == .done)
+    #expect(store.pending.isEmpty, "the sync's pending list replaces the one held")
+    #expect(store.warm == false)
     #expect(store.artifacts.map(\.id) == [1, 2])
     #expect(store.children.map(\.id) == ["c1"])
     #expect(store.transcript.items == Transcript.build(store.events))
-    #expect(store.refreshError == nil)
-  }
 
-  @Test func keepsWhatTheStreamBroughtWhileTheRefetchWasOut() async throws {
-    let api = FakeThreadAPI(try detail(artifacts: [artifact(1), artifact(2, updated: 1)]))
-    let (store, conn, t, clock) = try await openStore(api)
-    defer { store.stop() }
-    conn.end()
-    try await waitFor("reconnecting") { store.isReconnecting }
-
-    // The refetch answers with what the server had before the stream said more.
-    let gate = api.holdNext()
-    api.detail = .success(try detail(artifacts: [artifact(1), artifact(2, updated: 9)]))
-    clock.advance(by: .seconds(1))
-    let again = try await t.next()
-    again.accept()
-    try await waitFor("the refetch") { api.calls("thread") == 2 }
-    again.send(sse(#"{"kind":"artifact","artifact":\#(artifact(2, updated: 5))}"#))
-    again.send(sse(#"{"kind":"artifact","artifact":\#(artifact(3, kind: "markdown"))}"#))
-    try await waitFor("the new artifact") { store.artifacts.map(\.id) == [1, 2, 3] }
-    #expect(store.artifacts[1].updatedAt == base.addingTimeInterval(5))
-
-    gate.open()
-    try await waitFor("the answer applied") { store.artifacts.first(where: { $0.id == 2 })?.updatedAt == base.addingTimeInterval(9) }
-    #expect(store.artifacts.map(\.id) == [1, 2, 3], "an artifact the answer predates stays")
+    await store.reload()
+    await settle()
+    #expect(api.calls("thread") == 1, "the stream's sync stands in for a refetch")
   }
 
   @Test func showsABurstInOneUpdate() async throws {
@@ -314,21 +352,6 @@ private let turn = [
     #expect(store.loadState == .loaded)
     #expect(store.events.count == 3)
     #expect(try await t.next().after == "3")
-  }
-
-  @Test func keepsTheThreadUpWhenARefetchFails() async throws {
-    let api = FakeThreadAPI(try detail(events: turn))
-    let (store, _, _, _) = try await openStore(api)
-    defer { store.stop() }
-    api.detail = .failure(.http(status: 500, message: "boom"))
-    await store.reload()
-    #expect(store.loadState == .loaded)
-    #expect(store.refreshError == .http(status: 500, message: "boom"))
-    #expect(store.events.count == 3)
-
-    api.detail = .success(try detail(events: turn))
-    await store.reload()
-    #expect(store.refreshError == nil)
   }
 
   @Test func interruptsUntilTheTurnEnds() async throws {
@@ -602,5 +625,166 @@ private func handoffAnswer(_ thread: String, _ state: String) throws -> HandoffA
     #expect(store.handoff?.state == .cancelled)
     #expect(store.thread?.status == .stopped)
     #expect(api.handoffs == ["m-pro", "m-pro", "cancel"])
+  }
+}
+
+private func text(_ id: Int, _ words: String = "ok") -> String { ev(id, "assistant_text", #"{"text":"\#(words)"}"#) }
+private func ask(_ id: Int, _ words: String = "go") -> String { ev(id, "user", #"{"text":"\#(words)"}"#) }
+private func done(_ id: Int) -> String { ev(id, "result", #"{"ok":true,"subtype":"success","turns":1}"#) }
+
+/// A row a page cut down to size.
+private func clippedRow(_ id: Int, _ kind: String, _ payload: String, bytes: Int = 90_000) -> String {
+  let json = eventJSON(kind: kind, payload: payload, id: id)
+  return String(json.dropLast()) + #","clipped":{"bytes":\#(bytes)}}"#
+}
+
+private func historyPage(_ rows: [String], from: Int, to: Int?) throws -> HistoryPage {
+  try decode(HistoryPage.self, #"{"events":[\#(rows.joined(separator: ","))],"span":{"from":\#(from),"to":\#(to.map(String.init) ?? "null")}}"#)
+}
+
+@MainActor @Suite struct ThreadStoreHistoryTests {
+  @Test func opensOnTheHeadThenLoadsEarlierRevealsAndJoinsTheStream() async throws {
+    let api = FakeThreadAPI(try detail(events: [ask(50), text(51), done(52)], from: 50, resultsBelow: 2))
+    let (store, conn, t, clock) = try await openStore(api)
+    defer { store.stop() }
+    #expect(api.calls("thread") == 1)
+    #expect(store.history.spans == [HistorySpan(from: 50, to: nil)])
+    #expect(!store.history.atStart)
+    #expect(store.history.turnCount == 3)
+    #expect(store.transcript.items.map(\.id) == [.event(50), .event(51), .event(52)])
+
+    api.setPage(.newest(before: 50), .success(try historyPage([ask(20), text(21), done(22)], from: 20, to: 50)))
+    await store.loadEarlier()
+    #expect(api.cursors == [.newest(before: 50)])
+    #expect(store.transcript.items.map(\.id) == [.event(20), .event(21), .event(22), .event(50), .event(51), .event(52)])
+    #expect(store.loadingEdges.isEmpty)
+    #expect(store.history.edges([20, 21, 22, 50]) == [20: .earlier])
+
+    api.setPage(.at(2, before: 20), .success(try historyPage([ask(1), text(2, "the needle")], from: 0, to: 20)))
+    await store.reveal(2)
+    #expect(store.revealTarget == .event(2))
+    #expect(store.history.atStart)
+    store.revealShown()
+    #expect(store.revealTarget == nil)
+
+    conn.send(sse(event: text(53), id: 53))
+    try await waitFor("the live row") { store.transcript.items.last?.id == .event(53) }
+
+    conn.end()
+    try await waitFor("reconnecting") { store.isReconnecting }
+    clock.advance(by: .seconds(1))
+    let again = try await t.next()
+    #expect(again.after == "53", "the stream resumes after the last row it sent")
+    again.accept()
+    again.send(sse(event: syncMessage(detailJSON(events: [text(53), text(54)], from: 53, resultsBelow: 3), snapshot: true), id: 54))
+    try await waitFor("the fresh head") { store.events.last?.id == 54 }
+    #expect(store.events.map(\.id) == [1, 2, 20, 21, 22, 50, 51, 52, 53, 54])
+    #expect(store.history.spans == [HistorySpan(from: 0, to: nil)], "a head that meets the one held joins it")
+    try await waitFor("laid out") { store.transcript.items.last?.id == .event(54) }
+    #expect(store.transcript.items == Transcript.build(store.events, spans: store.history.spans))
+    #expect(api.calls("thread") == 1)
+  }
+
+  @Test func joinsASnapshotUnderTheHeadItHeld() async throws {
+    let api = FakeThreadAPI(try detail(events: [ask(20), text(21), done(22)], from: 20, resultsBelow: 1))
+    let (store, conn, t, clock) = try await openStore(api, frame: .milliseconds(16))
+    defer { store.stop() }
+
+    conn.end()
+    try await waitFor("reconnecting") { store.isReconnecting }
+    clock.advance(by: .seconds(1))
+    let again = try await t.next()
+    #expect(again.after == "22")
+    again.accept()
+    let snapshot = syncMessage(detailJSON(row("done", updated: 9), events: [ask(40), text(41), done(42)], from: 40, resultsBelow: 3), snapshot: true)
+    again.send(
+      sse(event: text(23), id: 23) + sse(event: snapshot, id: 42) + sse(event: text(41), id: 41) + sse(event: done(42), id: 42)
+        + sse(event: ask(43), id: 43))
+    try await waitFor("the snapshot") {
+      clock.advance(by: .milliseconds(16))
+      return store.events.last?.id == 43
+    }
+    #expect(store.events.map(\.id) == [20, 21, 22, 23, 40, 41, 42, 43], "each row once")
+    #expect(store.history.spans == [HistorySpan(from: 20, to: 24), HistorySpan(from: 40, to: nil)], "a row before the sync stays with the island")
+    #expect(store.history.turnCount == 4)
+    #expect(store.thread?.status == .done)
+    try await waitFor("laid out") { store.transcript.items.last?.id == .event(43) }
+    #expect(store.transcript.items == Transcript.build(store.events, spans: store.history.spans))
+    #expect(store.history.edges([20, 21, 22, 23, 40, 41, 42, 43]) == [20: .earlier, 40: .gap(after: 0)])
+
+    api.setPage(.newest(before: 20), .success(try historyPage([ask(10), done(11)], from: 0, to: 20)))
+    await store.loadEarlier()
+    api.setPage(.oldest(after: 23, before: 40), .success(try historyPage([ask(30), done(31)], from: 24, to: 40)))
+    await store.loadLater(after: 0)
+    #expect(api.cursors == [.newest(before: 20), .oldest(after: 23, before: 40)])
+    #expect(store.history.spans == [HistorySpan(from: 0, to: nil)])
+    #expect(store.events.map(\.id) == [10, 11, 20, 21, 22, 23, 30, 31, 40, 41, 42, 43])
+    #expect(store.transcript.items == Transcript.build(store.events, spans: store.history.spans))
+    #expect(api.calls("thread") == 1)
+  }
+
+  @Test func showsAFailedPageOnItsEdgeAndAsksOnceAtATime() async throws {
+    let api = FakeThreadAPI(try detail(events: [ask(50), text(51)], from: 50))
+    let (store, _, _, _) = try await openStore(api)
+    defer { store.stop() }
+
+    await store.loadEarlier()
+    #expect(store.edgeErrors[.earlier] != nil)
+    #expect(store.loadingEdges.isEmpty)
+
+    api.setPage(.newest(before: 50), .success(try historyPage([ask(1), text(2)], from: 0, to: 50)))
+    let gate = api.holdNextPage()
+    async let first: Void = store.loadEarlier()
+    try await waitFor("asking") { store.loadingEdges == [.earlier] }
+    #expect(store.edgeErrors[.earlier] == nil, "a retry clears the error")
+    await store.loadEarlier()
+    #expect(api.calls("history") == 2, "one request per edge")
+    gate.open()
+    await first
+    #expect(store.history.atStart)
+    #expect(store.transcript.items.map(\.id) == [.event(1), .event(2), .event(50), .event(51)])
+  }
+
+  @Test func loadsAClippedRowWhole() async throws {
+    let call = ev(50, "tool_use", #"{"id":"a","name":"Bash","input":{"command":"ls"}}"#)
+    let api = FakeThreadAPI(try detail(events: [
+      call, clippedRow(51, "tool_result", #"{"tool_use_id":"a","text":"cut…","is_error":false,"truncated":true}"#),
+      clippedRow(52, "assistant_text", #"{"text":"long…"}"#, bytes: 1_500_000),
+    ], from: 50))
+    let (store, _, _, _) = try await openStore(api)
+    defer { store.stop() }
+    #expect(store.clipped.keys.sorted() == [51, 52])
+    #expect(store.clipped[52]?.bytes == 1_500_000)
+    #expect(store.clippedResults == ["a": 51])
+
+    api.setRow(try decode(EventRow.self, text(52, "the whole reply")))
+    await store.showAll(52)
+    #expect(store.clipped.keys.sorted() == [51])
+    #expect(store.showingAll.isEmpty)
+    #expect(store.transcript.items.last == .text(eventID: 52, at: store.events.last!.createdAt, "the whole reply"))
+
+    await store.showAll(51)
+    #expect(store.showAllErrors[51] != nil, "the server had no such row")
+    #expect(store.clipped[51] != nil)
+  }
+
+  @Test func handsARevealToTheStoreItMakes() async throws {
+    let api = FakeThreadAPI(try detail(events: [ask(50), text(51)], from: 50))
+    api.setPage(.at(2, before: 50), .success(try historyPage([ask(1), text(2)], from: 0, to: 50)))
+    let t = ScriptedSSETransport(), clock = TestClock()
+    let client = OmniClient(port: 4799)
+    let registry = ThreadStoreRegistry { id in
+      ThreadStore(id: id, api: api, clock: clock, frame: .zero) { after in client.threadEvents(id, after: after, transport: t, clock: clock) }
+    }
+    registry.reveal("t1", at: 2)
+    let store = registry.acquire("t1")
+    defer { registry.release("t1") }
+    try await waitFor("the hit") { store.revealTarget == .event(2) }
+    #expect(api.cursors == [.at(2, before: 50)])
+
+    api.setPage(.at(1, before: 2), .success(try historyPage([], from: 0, to: 2)))
+    registry.reveal("t1", at: 51)
+    try await waitFor("a hit already held") { store.revealTarget == .event(51) }
+    #expect(api.cursors.count == 1, "nothing to load")
   }
 }

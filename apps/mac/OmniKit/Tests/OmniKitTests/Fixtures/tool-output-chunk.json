@@ -1,0 +1,11 @@
+{
+  "event_id": 5,
+  "tool_use_id": "call-test",
+  "offset": 0,
+  "text": "Exit code 1\nFAIL src/cart-0.test.ts > rounds the total (0 ms)\n    expected 10.05 to be 10.06\nFAIL src/cart-1.test.ts > rounds the total (1 ms)\n    expected 10.05 to be 10.06\nFAIL src/cart-2.test.ts > rounds the total (2 ms)\n    expected 10.05 to be 10.06\nFAIL src/cart-3.test.ts > rounds the total (3 ms)\n    expected 10.05 to be 10.06\nFAIL src/cart-4.test.ts > rounds the total (4 ms)\n    expected 1",
+  "next": 400,
+  "total": 11691,
+  "is_error": true,
+  "truncated": false,
+  "exit_code": 1
+}

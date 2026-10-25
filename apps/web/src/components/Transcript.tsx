@@ -6,6 +6,9 @@ import { useApp, useNow } from '../store.tsx';
 import { BranchFace, DelegationCard, RailItem, ROW_CARD } from './Delegation.tsx';
 import { PublishedCard } from './Published.tsx';
 import { CloudAgentCard } from './thread/CloudAgentCard.tsx';
+import { PRWakeList } from './thread/PRWatch.tsx';
+import { ClippedNote, HistoryCtx, HistoryEdgeRow } from './thread/HistoryEdgeRow.tsx';
+import { ToolOutput } from './thread/ToolOutput.tsx';
 import { QuestionCard } from './thread/QuestionCard.tsx';
 import { Markdown } from './Markdown.tsx';
 import { Button, CheckItem, copyText, Icon, IconButton, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
@@ -17,6 +20,7 @@ import { statusLabel } from '../status-line.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
+import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import {
   buildItems,
   buildTasks,
@@ -34,6 +38,9 @@ import {
   type UserP,
 } from '../transcript/fold.ts';
 import { agentStatus, delegations, splitGroup, TASK_END, withLive, type Branch } from '../transcript/delegation.ts';
+import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
+import { exitCodeOf, outputMeta } from '@omni/shared/tool-output.ts';
+import type { ThreadHistory } from '../pages/useThreadHistory.ts';
 
 export { toolLabel, toolSummary, type ToolCall };
 
@@ -64,6 +71,9 @@ function Pre({ children, tone, className = '' }: { children: ReactNode; tone?: '
     </pre>
   );
 }
+
+/** A call's output in the box a tool row shows it in. */
+const outputBox = (err?: boolean) => (text: string) => <Pre tone={err ? 'bad' : undefined}>{text || '(no output)'}</Pre>;
 
 function ToolInput({ c }: { c: ToolCall }) {
   const i = c.input;
@@ -170,6 +180,7 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
   const pending = task ? task.running : !c.result;
   const stopped = interruptedTool(c);
   const err = c.result?.is_error && !stopped;
+  const exit = c.result && (c.result.output?.exit_code ?? exitCodeOf(c.result.text));
   const summary = toolSummary(c, cwd);
   const mono = ['Bash', 'Read', 'Edit', 'Write', 'MultiEdit', 'Glob', 'Grep'].includes(c.name);
   const indent = depth > 0 || c.orphan;
@@ -192,7 +203,7 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
           <Loader size={11} className="text-fg-3" />
         ) : err ? (
           <span className="inline-flex shrink-0 items-center gap-1 font-num text-[11px] text-fg">
-            <StatusDot status="needs" size={7} /> error
+            <StatusDot status="needs" size={7} /> error{exit !== undefined && ` · exit ${exit}`}
           </span>
         ) : stopped ? (
           <span className="shrink-0 font-num text-[11px] text-fg-4">stopped</span>
@@ -201,14 +212,8 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
       {open && (
         <div className="fade-in mt-1 mb-2.5 ml-7 space-y-1.5">
           <ToolInput c={c} />
-          {c.result ? (
-            <>
-              <Pre tone={err ? 'bad' : undefined}>{c.result.text || '(no output)'}</Pre>
-              {c.result.truncated && <div className="text-[11px] text-fg-4">Output truncated</div>}
-            </>
-          ) : (
-            <div className="text-[11.5px] text-fg-4">{running ? 'Waiting for result' : 'No result recorded'}</div>
-          )}
+          <ClippedNote event={c.event} clipped={c.clipped} />
+          <ToolOutput call={c} running={running} box={outputBox(err)} />
         </div>
       )}
       {c.children.length > 0 && (open || (pending && (running || !!task))) && (
@@ -253,7 +258,9 @@ function AgentRow({ c, cwd, running }: { c: ToolCall; cwd?: string | null; runni
       {open && (
         <div className="fade-in mt-2 space-y-1.5 px-1">
           <ToolInput c={c} />
-          {c.result ? <Pre tone={err ? 'bad' : undefined}>{c.result.text || '(no output)'}</Pre> : null}
+          <ClippedNote event={c.event} clipped={c.clipped} />
+          {c.result && outputMeta(c.result) ? <ToolOutput call={c} running={running} box={outputBox(err)} /> : c.result ? <Pre tone={err ? 'bad' : undefined}>{c.result.text || '(no output)'}</Pre> : null}
+          {c.result && <ClippedNote event={c.result.event} clipped={c.result.clipped} />}
         </div>
       )}
       {c.children.length > 0 && (open || busy) && (
@@ -415,6 +422,7 @@ const SOURCE_LABEL: Record<string, string> = {
   capture: 'Captured',
   import: 'Imported',
   limit: 'After the usage limit',
+  'pr-watch': 'PR watch',
 };
 
 /** A message that waits for the thread's worktree (SetupCard). */
@@ -481,7 +489,7 @@ export function QueuedMessages({
     }
   };
   const save = async (d: EditDraft) => {
-    if (!d.prompt.trim()) return;
+    if (!d.prompt.trim() && !hasContext(items.find((m) => m.uuid === d.uuid)?.context)) return;
     update(d.uuid, (x) => ({ ...x, status: 'saving', error: undefined }));
     try {
       const res = await api.send<{ pending?: PendingMsg[] }>(path(`/${encodeURIComponent(d.uuid)}`), editBody(d), d.added, 'PATCH');
@@ -585,6 +593,7 @@ function EditBox({ draft: d, label, actions: a }: { draft: EditDraft; label: str
   const m = a.items.find((x) => x.uuid === d.uuid);
   const kept = (m?.attachments ?? []).filter((f) => d.keep.includes(f.name));
   const saving = d.status === 'saving';
+  const empty = !d.prompt.trim() && !hasContext(m?.context);
   const pick = useRef<HTMLInputElement>(null);
   return (
     <div className="flex flex-col items-end">
@@ -607,6 +616,7 @@ function EditBox({ draft: d, label, actions: a }: { draft: EditDraft; label: str
           }}
           className="w-full resize-none bg-transparent text-[14px] leading-[1.55] text-fg outline-none"
         />
+        <ContextChips records={m?.context} className="mt-2" />
         {kept.length + d.added.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {kept.map((f) => (
@@ -634,7 +644,7 @@ function EditBox({ draft: d, label, actions: a }: { draft: EditDraft; label: str
           <Button size="sm" variant="ghost" disabled={saving} onClick={() => a.close(d.uuid)}>
             Cancel
           </Button>
-          <Button size="sm" variant="primary" icon="check" busy={saving} disabled={!d.prompt.trim()} onClick={() => void a.save(d)}>
+          <Button size="sm" variant="primary" icon="check" busy={saving} disabled={empty} onClick={() => void a.save(d)}>
             Save
           </Button>
         </div>
@@ -714,9 +724,12 @@ function PendingBubble({ m, label, icon, children }: { m: PendingMsg; label: str
           <Icon name={icon} size={12} /> {label}
           {m.attachments?.length ? <span className="text-fg-4">· {plural(m.attachments.length, 'file')}</span> : null}
         </div>
-        <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
-          {m.text}
-        </div>
+        <ContextChips records={m.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
+        {(m.text || !hasContext(m.context)) && (
+          <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
+            {m.text}
+          </div>
+        )}
       </div>
       {children}
     </div>
@@ -843,12 +856,13 @@ function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'e
   );
 }
 
-function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: string }) {
+function UserBubble({ p, at, threadId, event, clipped }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped }) {
   const [more, setMore] = useState(false);
   // Where the pill whose description is open starts.
   const [about, setAbout] = useState<number | null>(null);
   const text = p.text ?? '';
-  const long = text.length > 1400;
+  // A clipped message shows all it came with; Show all under it loads the rest.
+  const long = !clipped && text.length > 1400;
   const cut = long && !more;
   const pieces = slashPieces(text, p.slash, cut ? 1200 : text.length);
   const open = pieces.find((x) => x.hit?.start === about)?.hit;
@@ -871,30 +885,35 @@ function UserBubble({ p, at, threadId }: { p: UserP; at: string; threadId: strin
         <span className="font-num text-[11px] text-fg-4">{clock(toDate(at))}</span>
       </div>
       {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} /> : null}
-      <div
-        className={`max-w-[92%] rounded-[22px] rounded-tr-lg px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%] ${
-          p.dropped ? 'border border-dashed border-line-strong' : 'bg-bubble'
-        }`}
-      >
-        {pieces.map(({ text: t, hit }, i) =>
-          hit ? (
-            <CommandPill key={i} label={t} cmd={hit} open={hit === open} onToggle={() => setAbout((a) => (a === hit.start ? null : hit.start))} />
-          ) : (
-            <Fragment key={i}>{t}</Fragment>
-          ),
-        )}
-        {cut && '...'}
-        {open && (
-          <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
-            {open.description || 'No description'} <span className="text-fg-4">· {SOURCE_TAG[open.source]}</span>
-          </span>
-        )}
-        {long && (
-          <button type="button" onClick={() => setMore((m) => !m)} className="mt-1 block text-[12px] font-medium text-fg-3 underline underline-offset-2">
-            {more ? 'Show less' : 'Show all'}
-          </button>
-        )}
-      </div>
+      <ContextChips records={p.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
+      {(text || !hasContext(p.context)) && (
+        <div
+          className={`max-w-[92%] rounded-[22px] rounded-tr-lg px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%] ${
+            p.dropped ? 'border border-dashed border-line-strong' : 'bg-bubble'
+          }`}
+        >
+          {pieces.map(({ text: t, hit }, i) =>
+            hit ? (
+              <CommandPill key={i} label={t} cmd={hit} open={hit === open} onToggle={() => setAbout((a) => (a === hit.start ? null : hit.start))} />
+            ) : (
+              <Fragment key={i}>{t}</Fragment>
+            ),
+          )}
+          {cut && '...'}
+          {open && (
+            <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
+              {open.description || 'No description'} <span className="text-fg-4">· {SOURCE_TAG[open.source]}</span>
+            </span>
+          )}
+          {long && (
+            <button type="button" onClick={() => setMore((m) => !m)} className="mt-1 block text-[12px] font-medium text-fg-3 underline underline-offset-2">
+              {more ? 'Show less' : 'Show all'}
+            </button>
+          )}
+          {p.items?.length ? <PRWakeList items={p.items} more={p.more} /> : null}
+        </div>
+      )}
+      <ClippedNote event={event} clipped={clipped} className="mt-1 justify-end" />
       <CopyMsg text={text} align="end" />
     </div>
   );
@@ -1039,8 +1058,10 @@ export const Transcript = memo(function Transcript({
   team,
   artifacts = NO_ARTIFACTS,
   reports = NO_REPORTS,
+  history = null,
 }: {
   threadId: string;
+  /** Every row held, anchors included. */
   events: EventRow[];
   running: boolean;
   cwd?: string | null;
@@ -1052,9 +1073,15 @@ export const Transcript = memo(function Transcript({
   artifacts?: Artifact[];
   /** Where each crew report the agent has not read is, by the thread that reported (`reportNotes`). */
   reports?: Map<string, string>;
+  /** The spans `events` holds whole and the loads on them; null shows `events` as the whole thread. */
+  history?: ThreadHistory | null;
 }) {
   const byId = useMemo(() => new Map(known.map((t) => [t.id, t])), [known]);
-  const { items, plan } = useMemo(() => buildItems(events), [events]);
+  const spans = history?.history.spans;
+  const { items, plan } = useMemo(() => buildItems(events, spans), [events, spans]);
+  const edges = useMemo(() => (spans ? historyEdges({ spans }, items.map((it) => it.key)) : null), [spans, items]);
+  // The first item is the thread's first message only when the start is held.
+  const fromStart = !spans || atStart({ spans });
   const pages = useMemo(() => publishedByGroup(items), [items]);
   const { tasks: live, feedLive } = useApp();
   const stored = useMemo(() => buildTasks(events), [events]);
@@ -1080,68 +1107,93 @@ export const Transcript = memo(function Transcript({
   // The turn is waiting on Ben's answer, not working: the card under it says so.
   const asking = last?.type === 'question' && last.q.state === 'pending';
 
-  return (
-    <TaskCtx.Provider value={tasks}>
-      <div className="space-y-4">
-        {items.map((it, idx) => {
-          switch (it.type) {
-            case 'user': {
-              const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} />;
-              return idx === 0 && team?.length ? [bubble, <DelegationCard key="team" branches={team} team reports={reports} />] : bubble;
-            }
-            case 'text':
-              return (
-                <div key={it.key} className="group/msg flex flex-col">
-                  <Markdown text={it.p.text ?? ''} />
-                  <CopyMsg text={it.p.text ?? ''} />
-                </div>
-              );
-            case 'tools': {
-              const { agents, rest, agentsFirst } = splitGroup(it.calls);
-              const cards = [
-                ...delegations(it.calls).map((d) => (
-                  <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} reports={reports} />
-                )),
-                ...(pages.get(it.key) ?? []).map((p) => (
-                  <PublishedCard key={`p${p.url}`} p={p} threadId={threadId} artifact={artifacts.findLast((a) => a.url === p.url)} />
-                )),
-              ];
-              const isLast = idx === lastIdx;
-              const group = rest.length ? (
-                <ToolGroup key={it.key} calls={rest} total={rest.length + rest.reduce((n, c) => n + countCalls(c), 0)} cwd={cwd} running={running} isLast={isLast} />
-              ) : null;
-              const subagents = agents.length ? (
-                <DelegationCard key={`a${it.key}`} agents={agents.map((c) => <AgentRow key={c.id} c={c} cwd={cwd} running={running} />)} />
-              ) : null;
-              const out = [...(agentsFirst ? [subagents, group] : [group, subagents]), ...cards].filter(Boolean);
-              // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
-              return plan?.after === it.key ? [...out, <PlanCard key="plan" todos={plan.todos} />] : out;
-            }
-            case 'result':
-              return <ResultLine key={it.key} p={it.p} />;
-            case 'error':
-              return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
-            case 'report':
-              return <ReportCard key={it.key} p={it.p} />;
-            case 'mod':
-              return <ModLog key={it.key} lines={it.lines} />;
-            case 'cloud':
-              return <CloudAgentCard key={it.key} p={it.p} />;
-            case 'switch':
-              return <SwitchLine key={it.key} it={it} running={running} />;
-            case 'question':
-              return <QuestionCard key={it.key} threadId={threadId} q={it.q} />;
-            default:
-              return null;
-          }
-        })}
-        {(showWorking || latestStatus) && !asking && (
-          <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
-            {running && <Loader size={13} />}
-            <span className="truncate">{latestStatus ?? 'Working'}</span>
+  const teamCard = team?.length ? <DelegationCard key="team" branches={team} team reports={reports} /> : null;
+  const edgeRow = (key: number) => {
+    const edge = edges?.get(key);
+    return edge && history ? <HistoryEdgeRow key={edge.type === 'earlier' ? 'earlier' : `gap:${edge.after}`} edge={edge} history={history} /> : null;
+  };
+
+  const item = (it: Item, idx: number): ReactNode => {
+    switch (it.type) {
+      case 'user': {
+        const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} />;
+        return idx === 0 && fromStart && teamCard ? [bubble, teamCard] : bubble;
+      }
+      case 'text':
+        return (
+          <div key={it.key} className="group/msg flex flex-col">
+            <Markdown text={it.p.text ?? ''} />
+            <ClippedNote event={it.key} clipped={it.clipped} />
+            <CopyMsg text={it.p.text ?? ''} />
           </div>
-        )}
-      </div>
-    </TaskCtx.Provider>
+        );
+      case 'tools': {
+        const { agents, rest, agentsFirst } = splitGroup(it.calls);
+        const cards = [
+          ...delegations(it.calls).map((d) => (
+            <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} reports={reports} />
+          )),
+          ...(pages.get(it.key) ?? []).map((p) => (
+            <PublishedCard key={`p${p.url}`} p={p} threadId={threadId} artifact={artifacts.findLast((a) => a.url === p.url)} />
+          )),
+        ];
+        const isLast = idx === lastIdx;
+        const group = rest.length ? (
+          <ToolGroup key={it.key} calls={rest} total={rest.length + rest.reduce((n, c) => n + countCalls(c), 0)} cwd={cwd} running={running} isLast={isLast} />
+        ) : null;
+        const subagents = agents.length ? (
+          <DelegationCard key={`a${it.key}`} agents={agents.map((c) => <AgentRow key={c.id} c={c} cwd={cwd} running={running} />)} />
+        ) : null;
+        const out = [...(agentsFirst ? [subagents, group] : [group, subagents]), ...cards].filter(Boolean);
+        // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
+        return plan?.after === it.key ? [...out, <PlanCard key="plan" todos={plan.todos} />] : out;
+      }
+      case 'result':
+        return <ResultLine key={it.key} p={it.p} />;
+      case 'error':
+        return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
+      case 'report':
+        return <ReportCard key={it.key} p={it.p} />;
+      case 'mod':
+        return <ModLog key={it.key} lines={it.lines} />;
+      case 'cloud':
+        return <CloudAgentCard key={it.key} p={it.p} />;
+      case 'switch':
+        return <SwitchLine key={it.key} it={it} running={running} />;
+      case 'question':
+        return <QuestionCard key={it.key} threadId={threadId} q={it.q} />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <HistoryCtx.Provider value={history}>
+      <TaskCtx.Provider value={tasks}>
+        <div className="space-y-4">
+          {!fromStart && teamCard}
+          {items.flatMap((it, idx) => {
+            const body = item(it, idx);
+            const shown = Array.isArray(body) ? body.length > 0 : !!body;
+            // data-key: the row useScrollAnchor keeps in place and a search hit scrolls to.
+            return [
+              edgeRow(it.key),
+              shown && (
+                <div key={it.key} data-key={it.key} className="space-y-4">
+                  {body}
+                </div>
+              ),
+            ];
+          })}
+          {edgeRow(-1)}
+          {(showWorking || latestStatus) && !asking && (
+            <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
+              {running && <Loader size={13} />}
+              <span className="truncate">{latestStatus ?? 'Working'}</span>
+            </div>
+          )}
+        </div>
+      </TaskCtx.Provider>
+    </HistoryCtx.Provider>
   );
 });

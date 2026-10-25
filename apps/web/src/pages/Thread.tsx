@@ -3,7 +3,9 @@ import { api, errorText, useApi, type HarnessWithRunning, type ModStatus, type S
 import { ReplyComposer } from '../components/Composer.tsx';
 import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
 import { LinkChannel } from '../link-previews.ts';
+import { ThreadIdCtx } from '../components/thread/ToolOutput.tsx';
 import { ArtifactsTab } from '../components/thread/panel/ArtifactsTab.tsx';
+import { ActionsTab } from '../components/thread/panel/ActionsTab.tsx';
 import { BrowserTab } from '../components/thread/panel/BrowserTab.tsx';
 import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
 import { DetailsTab } from '../components/thread/panel/DetailsTab.tsx';
@@ -15,6 +17,7 @@ import { HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx
 import { OPEN_PR_PROMPT, ThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { HeaderActions } from '../components/thread/HeaderActions.tsx';
+import { ContinueCrumbs } from '../components/ContinueLinks.tsx';
 import { Avatar, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { href } from '../router.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
@@ -29,6 +32,8 @@ import { readPref, useApp, usePageVisible, writePref } from '../store.tsx';
 import { useThreadInterruptKey } from './useThreadInterruptKey.ts';
 import { useThreadSession } from './useThreadSession.ts';
 import { useTranscriptScroll } from './useTranscriptScroll.ts';
+import { useReveal } from './useReveal.ts';
+import { tailId } from '@omni/shared/history.ts';
 
 // xterm.js is large; load it the first time the tab opens.
 const TerminalView = lazy(() => import('../components/TerminalView.tsx').then((m) => ({ default: m.TerminalView })));
@@ -48,7 +53,7 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
   );
 }
 
-export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifact?: number }) {
+export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; artifact?: number; at?: number }) {
   const { setOpenThread, mods, reloadChannels, needsYou, readResult, setPinned, setDone } = useApp();
   const modLines = useMemo(() => mods.filter((m) => m.thread_id === id), [mods, id]);
   // GET /api/harnesses, the same list the reply pills load. Until it arrives, canSteer uses the Cursor fallback.
@@ -60,6 +65,9 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     children,
     team,
     events,
+    history,
+    revealTarget,
+    clearReveal,
     files,
     shots,
     selectedArtifact,
@@ -77,6 +85,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     blocked,
     handoff,
     setHandoff,
+    links,
     live,
     load,
     applyThread,
@@ -88,8 +97,12 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     lastResult,
     betweenTurns,
     context,
-  } = useThreadSession(id, artifactParam);
-  const { scrollRef, contentRef, onScroll, showJump, jump, pin } = useTranscriptScroll(events, thread !== null);
+  } = useThreadSession(id, artifactParam, at);
+  const { scrollRef, contentRef, onScroll, showJump, jump, pin, release } = useTranscriptScroll(tailId(history.history), events, thread !== null);
+  useReveal(scrollRef, revealTarget, events, () => {
+    release();
+    clearReveal();
+  });
   const handoffTargets = useHandoffTargets(thread, blocked, handoff);
   const note = blockedNote(blocked, handoff, thread?.status);
   const known = useMemo(() => [...children, ...team], [children, team]);
@@ -166,7 +179,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
     return (
       <div className="px-6">
         {error ? (
-          <ErrorNote className="mt-6" onRetry={() => void load(true)}>
+          <ErrorNote className="mt-6" onRetry={() => void load()}>
             {error}
           </ErrorNote>
         ) : (
@@ -258,6 +271,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
             { id: 'changes', label: 'Changes' },
             { id: 'browser', label: 'Browser', badge: shots.length ? <span className="font-num text-[10.5px] text-fg-4">{shots.length}</span> : undefined },
             { id: 'terminal', label: 'Terminal' },
+            { id: 'actions', label: 'Actions' },
             { id: 'details', label: 'Details' },
           ]}
         />
@@ -266,13 +280,14 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
       <div className="min-h-0 flex-1">
         {panelTab === 'artifacts' && <ArtifactsTab artifacts={files} selected={selectedArtifact} onSelect={setSelected} />}
         {panelTab === 'changes' && <ChangesTab thread={thread} />}
-        {panelTab === 'browser' && <BrowserTab channelId={thread.channel_id} shots={shots} />}
+        {panelTab === 'browser' && <BrowserTab channelId={thread.channel_id} threadId={thread.id} shots={shots} />}
         {panelTab === 'terminal' && (
           <Suspense fallback={<Loading />}>
             <TerminalView threadId={thread.id} cwd={thread.cwd} />
           </Suspense>
         )}
-        {panelTab === 'details' && <DetailsTab thread={thread} channel={channel} parent={parent} children={children} init={init} lastResult={lastResult} warm={warm} />}
+        {panelTab === 'actions' && <ActionsTab thread={thread} />}
+        {panelTab === 'details' && <DetailsTab thread={thread} channel={channel} parent={parent} children={children} init={init} lastResult={lastResult} warm={warm} links={links} />}
       </div>
     </div>
   );
@@ -304,6 +319,7 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
                 </>
               )}
               {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-4">{thread.task_id}</span>}
+              <ContinueCrumbs links={links} />
             </div>
             <h1 className="truncate font-display text-[16px] leading-snug md:text-[18px]" title={thread.title}>
               {thread.title}
@@ -340,16 +356,13 @@ export function ThreadPage({ id, artifact: artifactParam }: { id: string; artifa
 
         {/* transcript */}
         <div className="relative min-h-0 flex-1">
-          <div ref={scrollRef} onScroll={onScroll} className="scroll-thin h-full overflow-y-auto">
+          <div ref={scrollRef} onScroll={onScroll} className="scroll-thin h-full overflow-y-auto [overflow-anchor:none]">
             <div ref={contentRef} className="mx-auto max-w-4xl px-4 pt-4 pb-10 md:px-6">
-              {error && (
-                <ErrorNote className="mb-3" onRetry={() => void load(false)}>
-                  {error}
-                </ErrorNote>
-              )}
               {/* Queued means waiting for a slot: nothing is working yet. */}
               <LinkChannel.Provider value={thread.channel_id}>
-                <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} />
+                <ThreadIdCtx.Provider value={id}>
+                  <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} />
+                </ThreadIdCtx.Provider>
               </LinkChannel.Provider>
               <SetupCard
                 thread={thread}

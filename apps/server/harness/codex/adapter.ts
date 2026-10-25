@@ -22,7 +22,7 @@ import { CodexClient } from './client.ts';
 import { codexBin } from './bin.ts';
 import { CODEX_BUILTINS } from './commands.ts';
 import { saveGeneratedImage } from './images.ts';
-import { PLAN_LIMIT_ID, codexLimit, normalizeItem, normalizePlan, normalizeRateLimits, normalizeStarted, turnErrorText } from './normalize.ts';
+import { PLAN_LIMIT_ID, codexLimit, commandUse, normalizeItem, normalizePlan, normalizeRateLimits, normalizeStarted, turnErrorText } from './normalize.ts';
 import { reviewTarget } from './review.ts';
 import type {
   CodexInput,
@@ -125,6 +125,8 @@ export const codexAdapter: HarnessAdapter = {
     let plans = 0;
     const outbox: Outgoing[] = [];
     const steering = new Set<Promise<void>>();
+    /** Commands whose call row went out when they started. */
+    const announced = new Set<string>();
 
     const emit = (rec: StreamRecord) => cb.record(rec);
     const accepted = (m: Outgoing) => {
@@ -164,10 +166,21 @@ export const codexAdapter: HarnessAdapter = {
           break;
         case 'item/started':
           for (const rec of normalizeStarted(p.item)) emit(rec);
+          // A command's row opens when it starts, so Ben can follow its output while it runs (apps/server/tool-tail.ts).
+          if (p.item?.type === 'commandExecution') {
+            announced.add(p.item.id);
+            cb.toolOutput?.(p.item.id);
+            emit(commandUse(p.item));
+          }
+          break;
+        case 'item/commandExecution/outputDelta':
+          if (typeof p.itemId === 'string' && typeof p.delta === 'string') cb.toolOutput?.(p.itemId, p.delta);
           break;
         case 'item/completed': {
           const saved = p.item?.type === 'imageGeneration' ? saveGeneratedImage(p.item, artifactsDir(thread.id)) : null;
-          for (const rec of normalizeItem(p.item, saved)) emit(rec);
+          // A command that announced itself has its call row already; only its result is left.
+          const recs = normalizeItem(p.item, saved);
+          for (const rec of announced.delete(p.item?.id) ? recs.filter((r) => r.kind !== 'tool_use') : recs) emit(rec);
           break;
         }
         case 'turn/plan/updated':

@@ -1,0 +1,9 @@
+{
+  "channel": "acme",
+  "prompt": "TOOL:20 tidy the cart",
+  "title": "Tidy the cart",
+  "base": {
+    "kind": "ref",
+    "ref": "main"
+  }
+}

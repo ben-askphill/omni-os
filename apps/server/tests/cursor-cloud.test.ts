@@ -1,9 +1,12 @@
-import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ChildProcess } from 'node:child_process';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fixture } from '@omni/test-fixtures';
+import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import type { AdapterContext, HarnessAdapter } from '../harness/adapter.ts';
+import { harnessText } from '../message-context/project.ts';
 import type { CloudAgentState, Record as StreamRecord } from '../stream.ts';
 import {
   CURSOR_CLOUD_FIX,
@@ -48,6 +51,9 @@ beforeAll(async () => {
   fake = await startFakeCursorApi();
   process.env.OMNI_CURSOR_API_URL = fake.url;
   process.env.OMNI_CURSOR_CLOUD_POLL_MS = '5';
+  // The static imports above already loaded config.ts (the message-context kinds read the uploads folder from it), before
+  // these env vars were set. The adapter gets a fresh config.
+  vi.resetModules();
   ({ cursorCloudAdapter: adapter } = await import('../harness/cursor-cloud/adapter.ts'));
 });
 beforeEach(() => {
@@ -313,6 +319,24 @@ describe('Cursor Cloud adapter', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('sends context as an excerpt it says it cannot open, with no path on the Mac', async () => {
+    const parsed = parseContexts([JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')).records[0].raw]);
+    if (!parsed.ok) throw new Error(parsed.error);
+    const s = boot();
+    // As runner/state.ts userLine writes it for this thread.
+    s.user(harnessText('tidy this reduce', parsed.value, { harness: 'cursor-cloud', cwd: '/tmp/omni-test' }), 'm1');
+    await waitFor(() => calls('POST', '/v1/agents').length === 1, 'create');
+    const text = (calls('POST', '/v1/agents')[0].body as { prompt: { text: string } }).prompt.text;
+    const sent = text.slice(text.indexOf('tidy this reduce'));
+    expect(sent).toContain('tidy this reduce\n\n<omni-context>');
+    expect(sent).toContain('You run as a Cursor cloud agent and cannot open it; work from the excerpt.');
+    expect(sent).toContain('+  return items.reduce((sum, n) => sum + n, 0);');
+    expect(sent).not.toContain('relative to your working directory');
+    expect(sent).not.toContain('Check:');
+    expect(text).not.toContain('/tmp/omni-test');
+    expect(sent).not.toMatch(/(^|[\s(])\/[A-Za-z]/m);
   });
 
   it('passes a picked model by id', async () => {

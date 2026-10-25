@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, errorText, useThreadStream, type Artifact, type Channel, type ContextUsage, type EventRow, type PendingMsg, type Thread, type ThreadDetail } from '../api.ts';
+import { api, errorText, useThreadStream, type Artifact, type Channel, type ContextUsage, type HistoryEvent, type PendingMsg, type Thread, type ThreadOpen } from '../api.ts';
 import type { InitP, ResultP } from '../components/thread/panel/DetailsTab.tsx';
 import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
 import { parsePayload } from '../format.ts';
+import { linksOf, linksWith, NO_LINKS, type ThreadLinks } from '../continue.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
+import { holds } from '../thread-history.ts';
+import { useThreadHistory } from './useThreadHistory.ts';
 
-export type PanelTab = 'artifacts' | 'changes' | 'browser' | 'terminal' | 'details';
+export type PanelTab = 'artifacts' | 'changes' | 'browser' | 'terminal' | 'actions' | 'details';
 
 /**
  * The later of two snapshots of the thread. A send's reply can land after the stream has already
@@ -17,14 +20,21 @@ export function newer(prev: Thread | null, next: Thread, reply = false): Thread 
   return prev.updated_at > next.updated_at || (reply && prev.updated_at === next.updated_at) ? prev : next;
 }
 
-/** Load, stream, and the thread fields the page renders. Panel chrome stays in the page. */
-export function useThreadSession(id: string, artifactParam: number | undefined) {
+/**
+ * Load, stream, and the thread fields the page renders. Panel chrome stays in the page. The rows are a bounded
+ * history (useThreadHistory): `events` is every row held, anchors included, which is what the turn state reads.
+ * `at`: an event to open the thread at, such as a search hit; `revealTarget` holds it until the screen scrolls there.
+ */
+export function useThreadSession(id: string, artifactParam: number | undefined, at?: number) {
   const [thread, setThread] = useState<Thread | null>(null);
   const [channel, setChannel] = useState<Channel | undefined>(undefined);
   const [parent, setParent] = useState<Thread | null>(null);
   const [children, setChildren] = useState<Thread[]>([]);
   const [team, setTeam] = useState<Thread[]>([]);
-  const [events, setEvents] = useState<EventRow[]>([]);
+  const history = useThreadHistory(id);
+  // Read only, like every events array the page passes around.
+  const events = history.history.rows as HistoryEvent[];
+  const [revealTarget, setRevealTarget] = useState<number | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -37,43 +47,16 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
   const [actionError, setActionError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [handoff, setHandoff] = useState<HandoffView | null>(null);
+  const [links, setLinks] = useState<ThreadLinks>(NO_LINKS);
   // The newest context reading the stream pushed. The meter loads its first one itself.
   const [context, setContext] = useState<ContextUsage | null>(null);
 
   const toast = useToast();
-  const lastId = useRef(0);
-  const seen = useRef(new Set<number>());
-  const pending = useRef<EventRow[]>([]);
-  const frame = useRef<number | undefined>(undefined);
-
-  const addEvents = useCallback((rows: EventRow[]) => {
-    const fresh = rows.filter((r) => !seen.current.has(r.id));
-    if (!fresh.length) return;
-    fresh.forEach((r) => {
-      seen.current.add(r.id);
-      if (r.id > lastId.current) lastId.current = r.id;
-    });
-    pending.current.push(...fresh);
-    if (frame.current !== undefined) return;
-    // Streams arrive in bursts; flush once per frame instead of once per event.
-    frame.current = requestAnimationFrame(() => {
-      frame.current = undefined;
-      const batch = pending.current;
-      pending.current = [];
-      setEvents((prev) => {
-        const next = prev.concat(batch);
-        if (batch.some((b, i) => (i ? b.id < batch[i - 1].id : prev.length > 0 && b.id < prev[prev.length - 1].id))) next.sort((a, b) => a.id - b.id);
-        return next;
-      });
-    });
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (frame.current !== undefined) cancelAnimationFrame(frame.current);
-    },
-    [],
-  );
+  const { prepare, open, append, snapshot, reveal } = history;
+  const atRef = useRef(at);
+  atRef.current = at;
+  // The `at` the first load or a later reveal already took, so each is scrolled to once.
+  const revealed = useRef<number | undefined>(undefined);
 
   const artifactIds = useRef(new Set<number>());
   const upsertArtifact = useCallback((a: Artifact) => {
@@ -81,43 +64,50 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     artifactIds.current.add(a.id);
     if (isNew && a.kind === 'html') {
       setSelected(a.id);
-      // Never pull Ben out of the shell mid-command, or out of the changes he is reading.
-      setPanelTab((t) => (t === 'terminal' || t === 'changes' ? t : 'artifacts'));
+      // Never pull Ben out of the shell mid-command, the changes he is reading or a run's output.
+      setPanelTab((t) => (t === 'terminal' || t === 'changes' || t === 'actions' ? t : 'artifacts'));
     }
     setArtifacts((prev) => (prev.some((x) => x.id === a.id) ? prev.map((x) => (x.id === a.id ? a : x)) : [...prev, a]));
   }, []);
   const artifactParamRef = useRef(artifactParam);
 
+  /** The thread's state from a detail: the first load's, or a stream sync's. */
+  const applyDetail = useCallback((d: ThreadOpen) => {
+    setThread((prev) => newer(prev, d.thread));
+    setQueued(d.pending ?? []);
+    if (d.live !== undefined) setWarm(d.live);
+    setBlocked(d.blocked ?? null);
+    setHandoff(d.handoff ?? null);
+    setChannel(d.channel);
+    setParent(d.parent);
+    setChildren(d.children);
+    setTeam(d.team ?? []);
+    setArtifacts(d.artifacts);
+    d.artifacts.forEach((a) => artifactIds.current.add(a.id));
+  }, []);
+
   const load = useCallback(
-    async (initial: boolean) => {
+    async () => {
       try {
-        const d = await api.get<ThreadDetail>(`/threads/${encodeURIComponent(id)}`);
-        setThread((prev) => newer(prev, d.thread));
-        setQueued(d.pending ?? []);
-        if (d.live !== undefined) setWarm(d.live);
-        setBlocked(d.blocked ?? null);
-        setHandoff(d.handoff ?? null);
-        setChannel(d.channel);
-        setParent(d.parent);
-        setChildren(d.children);
-        setTeam(d.team ?? []);
-        setArtifacts(d.artifacts);
-        d.artifacts.forEach((a) => artifactIds.current.add(a.id));
-        if (initial) {
-          const rows = d.events;
-          rows.forEach((r) => seen.current.add(r.id));
-          lastId.current = rows.length ? Math.max(...rows.map((r) => r.id)) : 0;
-          setEvents(rows);
-          setReady(true);
-          if (!artifactParamRef.current) {
-            const visible = d.artifacts.filter((a) => a.kind !== 'screenshot');
-            const html = [...visible].reverse().find((a) => a.kind === 'html');
-            const pick = html ?? visible[visible.length - 1];
-            if (pick) setSelected(pick.id);
-            else if (!visible.length) setPanelTab('details');
-          }
-        } else {
-          addEvents(d.events);
+        const d = await api.get<ThreadOpen>(`/threads/${encodeURIComponent(id)}?history=recent`);
+        const target = atRef.current;
+        // Before any state is set, so the thread first renders with the hit's page already held.
+        const opened = await prepare(d, target);
+        applyDetail(d);
+        setLinks(linksOf(d));
+        open(opened);
+        // Not held when its page failed: the reveal below tries again and says why.
+        if (target && holds(opened, target)) {
+          revealed.current = target;
+          setRevealTarget(target);
+        }
+        setReady(true);
+        if (!artifactParamRef.current) {
+          const visible = d.artifacts.filter((a) => a.kind !== 'screenshot');
+          const html = [...visible].reverse().find((a) => a.kind === 'html');
+          const pick = html ?? visible[visible.length - 1];
+          if (pick) setSelected(pick.id);
+          else if (!visible.length) setPanelTab('details');
         }
         setError(null);
       } catch (e) {
@@ -125,21 +115,33 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
         else setError(errorText(e));
       }
     },
-    [id, addEvents],
+    [id, prepare, open, applyDetail],
   );
 
   useEffect(() => {
-    void load(true);
+    void load();
   }, [load]);
+
+  // A search hit opened while the thread is already open: load its page if needed, then scroll to it.
+  useEffect(() => {
+    if (!ready || !at || revealed.current === at) return;
+    revealed.current = at;
+    void reveal(at).then((ok) => (ok ? setRevealTarget(at) : toast({ icon: 'alert', title: 'Could not load that message', body: 'The thread opened at its latest messages.' })));
+  }, [ready, at, reveal, toast]);
+  const clearReveal = useCallback(() => setRevealTarget(null), []);
 
   const live = useThreadStream(
     id,
     ready,
-    lastId,
+    history.lastId,
     (m) => {
       switch (m.type) {
         case 'event':
-          addEvents([m.event]);
+          append([m.event]);
+          break;
+        case 'sync':
+          applyDetail(m.detail);
+          if (m.snapshot) snapshot(m.detail);
           break;
         case 'artifact':
           upsertArtifact(m.artifact);
@@ -164,7 +166,6 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
         }
       }
     },
-    () => void load(false),
   );
 
   useFeed((e) => {
@@ -175,6 +176,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     // A member of a team this thread started: its delegation card shows the change.
     if (t.source === 'team' && children.some((c) => c.id === t.parent_id)) setTeam(upsert);
     if (parent && t.id === parent.id) setParent(t);
+    setLinks((prev) => linksWith(prev, id, t));
   });
 
   // Queued or running: the header interrupt and the composer treat both as busy.
@@ -245,6 +247,9 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     children,
     team,
     events,
+    history,
+    revealTarget,
+    clearReveal,
     files,
     shots,
     selectedArtifact,
@@ -262,6 +267,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined) 
     blocked,
     handoff,
     setHandoff,
+    links,
     live,
     load,
     applyThread,

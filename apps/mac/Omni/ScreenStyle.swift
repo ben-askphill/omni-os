@@ -46,7 +46,7 @@ struct LoadingNote: View {
 
   var body: some View {
     HStack(spacing: z(8)) {
-      Loader(size: 14)
+      Loader(size: 14, color: Tok.fg3)
       Text(label)
     }
     .font(.omni(size: 13))

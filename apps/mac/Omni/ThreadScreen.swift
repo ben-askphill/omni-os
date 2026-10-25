@@ -18,6 +18,7 @@ struct ThreadScreen: View {
       if let store, store.id == id {
         ThreadView(model: model, store: store)
           .id(ObjectIdentifier(store))
+          .environment(\.omniClient, model.client)
       } else {
         Color.clear
       }
@@ -74,7 +75,11 @@ private struct ThreadView: View {
         .readsShownResult(model: model, threadID: thread.id, status: thread.status)
         #if DEBUG
         .onAppear {
-          QAProbe.expand = { ui.expandAll(store.transcript.items) }
+          QAProbe.expand = {
+            ui.expandAll(store.transcript.items) {
+              store.clipped[$0.id] != nil || store.clippedResults[$0.callID] != nil || $0.result?.output != nil || $0.isPending
+            }
+          }
           QAProbe.editPending = { text in
             guard let m = store.pending.first(where: \.isEditable) else { return false }
             store.edits.open(m)
@@ -140,6 +145,7 @@ private struct ThreadHeader: View {
           .help(thread.title)
           .textSelection(.enabled)
         ModStatusLines(mods: model.store.mods.filter { $0.threadID == thread.id })
+        ContinueLinks(model: model, from: store.continuedFrom, continuedIn: store.continuedIn)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       if store.isReconnecting {
@@ -156,6 +162,7 @@ private struct ThreadHeader: View {
         ContextMeterButton(model: model, store: store, thread: thread)
       }
       HandOffButton(model: model, store: store)
+      ContinueButton(model: model, thread: thread)
       if !thread.archived {
         let on = thread.pinnedAt != nil
         Button {
@@ -345,10 +352,17 @@ private final class PinState {
   @ObservationIgnored private(set) var geometry: ScrollPin.Geometry?
   private(set) var showsJump = false
 
-  func eventsChanged(_ count: Int) -> Bool {
+  func eventsChanged(_ tail: Int) -> Bool {
     defer { sync() }
-    return pin.eventsChanged(count: count)
+    return pin.eventsChanged(tail: tail)
   }
+
+  func release(tail: Int) {
+    pin.release(tail: tail)
+    sync()
+  }
+
+  var isPinned: Bool { pin.isPinned }
 
   func geometryChanged(_ g: ScrollPin.Geometry) -> Bool {
     geometry = g
@@ -398,8 +412,8 @@ private struct TranscriptView: View {
       QAProbe.laidOut(store, g)
       #endif
     }
-    .onChange(of: store.events.count, initial: true) { _, count in
-      if pin.eventsChanged(count) { position.scrollTo(edge: .bottom) }
+    .onChange(of: store.history.tailID, initial: true) { _, tail in
+      if pin.eventsChanged(tail) { position.scrollTo(edge: .bottom) }
     }
     .overlay(alignment: .bottom) {
       NewActivityPill(pin: pin) {
@@ -409,9 +423,20 @@ private struct TranscriptView: View {
     }
     .modifier(ThreadLinks(model: model))
     .environment(\.linkScope, LinkScope(store: model.links, channel: store.thread?.channelID))
+    .environment(\.threadStore, store)
+    .environment(\.toolOutputAPI, model.client)
+    .holdsTopRow(
+      store: store, position: $position, following: { pin.isPinned }, viewport: { pin.geometry?.viewportHeight },
+      release: { pin.release(tail: store.history.tailID) })
     #if DEBUG
-    .onAppear { QAProbe.scroller = scroller }
-    .onDisappear { QAProbe.scroller = nil }
+    .onAppear {
+      QAProbe.scroller = scroller
+      QAProbe.store = store
+    }
+    .onDisappear {
+      QAProbe.scroller = nil
+      QAProbe.store = nil
+    }
     #endif
   }
 
@@ -428,7 +453,12 @@ private struct TranscriptView: View {
         position.scrollTo(y: max(0, g.offset - g.viewportHeight / 2))
         return true
       },
-      distanceFromBottom: { pin.geometry?.distanceFromBottom })
+      distanceFromBottom: { pin.geometry?.distanceFromBottom },
+      viewportHeight: { pin.geometry?.viewportHeight },
+      toItem: { id in
+        pin.release(tail: store.history.tailID)
+        position.scrollTo(id: id, anchor: .center)
+      })
   }
   #endif
 }
@@ -479,25 +509,42 @@ private struct TranscriptRows: View {
     let first = transcript.items.first?.id
     let live: TranscriptItemID? =
       if case .tools(let g)? = transcript.last, transcript.isLive(g, running: running) { .event(g.eventID) } else { nil }
+    let edges = store.history.edges(transcript.items.compactMap { if case .event(let k) = $0.id { k } else { nil } })
+    let atStart = store.history.atStart
     LazyVStack(alignment: .leading, spacing: z(16)) {
-      if let error = store.refreshError {
-        ErrorNote(text: error.message) { Task { await store.reload() } }
+      // The brief is in a page not loaded yet: the members go above it.
+      if !atStart, !members.isEmpty {
+        DelegationCard(delegation: Delegation(id: "team", lead: nil, branches: members), team: true, model: model, reports: reports)
+      }
+      if let first, case .event(let k) = first, let edge = edges[k], edge == .earlier {
+        HistoryEdgeRow(store: store, edge: edge)
       }
       ForEach(transcript.items) { item in
-        TranscriptRow(
-          item: item, live: item.id == live, running: running, cwd: cwd, threadID: store.id, model: model, ui: ui,
-          markdown: markdown, agents: agents, known: known, pages: pages, artifacts: store.artifacts, reports: reports
-        )
-        .copyMenu { TranscriptMarkdown.copyText(item, cwd: cwd) }
-        // A team lead's members, under its brief.
-        if item.id == first, case .user = item, !members.isEmpty {
-          DelegationCard(delegation: Delegation(id: "team", lead: nil, branches: members), team: true, model: model, reports: reports)
+        // One view per item, so a scroll to its id lands on what its frame reports.
+        VStack(alignment: .leading, spacing: z(16)) {
+          if case .event(let k) = item.id, let edge = edges[k], edge != .earlier {
+            HistoryEdgeRow(store: store, edge: edge)
+          }
+          TranscriptRow(
+            item: item, live: item.id == live, running: running, cwd: cwd, threadID: store.id, model: model, ui: ui,
+            markdown: markdown, agents: agents, known: known, pages: pages, artifacts: store.artifacts, reports: reports
+          )
+          .copyMenu { TranscriptMarkdown.copyText(item, cwd: cwd) }
+          .clippedNote(item)
+          // A team lead's members, under its brief.
+          if item.id == first, atStart, case .user = item, !members.isEmpty {
+            DelegationCard(delegation: Delegation(id: "team", lead: nil, branches: members), team: true, model: model, reports: reports)
+          }
         }
+        .tracksTopRow(item.id)
+      }
+      if let edge = edges[-1] {
+        HistoryEdgeRow(store: store, edge: edge)
       }
       if let line = store.workingLine {
         WorkingLine(text: line)
       }
-      if let t = store.thread, t.setup != nil {
+      if let t = store.thread, SetupCard.shows(t, model: model) {
         SetupCard(model: model, store: store, thread: t)
       }
       if let t = store.thread, t.limit != nil {
@@ -521,6 +568,7 @@ private struct TranscriptRows: View {
         NextThreadCard(model: model, store: store, thread: t, title: title, prompt: prompt)
       }
     }
+    .scrollTargetLayout()
   }
 }
 
@@ -610,6 +658,8 @@ enum QAProbe {
     let pageUp: () -> Bool
     /// How far the view is from the bottom of the transcript, once it is laid out.
     let distanceFromBottom: () -> Double?
+    let viewportHeight: () -> Double?
+    let toItem: (TranscriptItemID) -> Void
   }
 
   static var shownThread: String?
@@ -625,6 +675,8 @@ enum QAProbe {
   static var foldAll: (() -> Void)?
   /// Opens the edit of the first editable unsent message with this text. false when there is none.
   static var editPending: ((String) -> Bool)?
+  /// Opens the Set secret form of the webhook automation with this id. false when the page shows none.
+  static var openWebhookSecret: ((String) -> Bool)?
 
   static func laidOut(_ store: ThreadStore, _ g: ScrollPin.Geometry) {
     guard shownThread != store.id, store.loadState == .loaded, g.contentHeight > 0 else { return }

@@ -1,8 +1,11 @@
 // createThread, sendMessage, and postMessage. Slash commands are resolved here, then delivered.
 import { randomUUID } from 'node:crypto';
-import { channels, folders, messageRequests, outbox, requestFingerprint, threads, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
+import type { MessageContext } from '@omni/shared/message-context.ts';
+import { channels, folders, messageRequests, outbox, threadBasePicks, requestFingerprint, threads, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
+import { checkBase } from '../worktree-base.ts';
+import type { BasePick } from '@omni/shared/worktree-base.ts';
 import { prepareTurn, turnBlocked } from '../sync/guard.ts';
 import { parseSlash, resolveSlash, slashRecord, type SlashCommand, type SlashRecord } from '@omni/shared/slash.ts';
 import { listCommands, peekCommands } from '../commands.ts';
@@ -72,6 +75,8 @@ function slashFor(prompt: string, commands: () => SlashCommand[]): { text: strin
 // ---------- public API ----------
 
 export interface CreateThreadInput {
+  /** The new thread's id, when the caller fixed it in advance. A new uuid otherwise. */
+  id?: string;
   channel: string;
   prompt: string;
   role?: string | null;
@@ -85,6 +90,8 @@ export interface CreateThreadInput {
   automation?: string | null;
   /** A sidebar folder of the channel to file the thread in, by id or name. A name no folder has makes one. */
   folder?: string | null;
+  /** The base a new worktree thread's branch is cut from (worktree-base.ts). None, or a thread with no worktree: the repo's HEAD. */
+  base?: BasePick | null;
   /** Files Ben attached to the first message. Validate them with `checkUploads` before calling. */
   files?: File[];
 }
@@ -124,8 +131,10 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
 
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
 
-  const id = randomUUID();
+  const id = input.id ?? randomUUID();
   const remote = isRemoteHarness(harness);
+  // Refused before anything is made, so a ref that names nothing leaves the draft where it was typed.
+  const base = await checkBase(channel, input.base, { remote });
   const wd = await prepareWorkdir(channel, id, { remote });
   const thread = threads.create({
     id,
@@ -147,6 +156,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
     folder_id: filedIn?.id ?? null,
     setup: needsWorktree(channel, { remote }) ? 'preparing' : null,
   });
+  if (base) threadBasePicks.set(id, base);
   return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
 }
 
@@ -254,6 +264,8 @@ export function sendMessage(
     request?: Pick<MessageRequest, 'id' | 'request_id'>;
     /** Who the transcript says sent it, when not `from`: a thread's first prompt keeps the thread's source. */
     source?: string;
+    /** Records Ben attached, already normalized (thread-routes-api.ts). */
+    context?: MessageContext[];
   } = {},
 ): Thread {
   const thread = threads.get(threadId);
@@ -269,9 +281,10 @@ export function sendMessage(
 export function messageFor(
   thread: Thread,
   prompt: string,
-  opts: { uuid: string; requestId?: string; from?: 'ben' | 'conductor'; source?: string; mode?: SendMode; attachments?: Attachment[] },
+  opts: { uuid: string; requestId?: string; from?: 'ben' | 'conductor'; source?: string; mode?: SendMode; attachments?: Attachment[]; context?: MessageContext[] },
 ): Msg {
   const attachments = opts.attachments?.length ? opts.attachments : undefined;
+  const context = opts.context?.length ? opts.context : undefined;
   const { text, slash, commands } = slashFor(prompt, () => (threadCommands(thread.id) ?? peekCommands(thread.harness as HarnessId, thread.cwd)).commands);
   return {
     uuid: opts.uuid,
@@ -279,10 +292,11 @@ export function messageFor(
     text: withMentions(text, { cwd: thread.cwd, threadId: thread.id }),
     mode: opts.mode ?? 'steer',
     attachments,
+    contexts: context,
     commands,
     event: {
       kind: 'user',
-      payload: { text: prompt, source: opts.source ?? opts.from ?? 'ben', ...(slash && { slash }), ...(attachments && { attachments }) },
+      payload: { text: prompt, source: opts.source ?? opts.from ?? 'ben', ...(slash && { slash }), ...(attachments && { attachments }), ...(context && { context }) },
     },
   };
 }
@@ -352,7 +366,7 @@ async function deliverRequest(r: MessageRequest, undo: () => void) {
     await warmCommands(ready.harness, ready.cwd, r.prompt, r.thread_id);
     // Without a payload it came through the API, from Ben or the Conductor, or it is a worktree thread's first prompt.
     const source = r.request_id === START_REQUEST ? ready.source : undefined;
-    sendMessage(r.thread_id, r.prompt, { from: r.source as 'ben' | 'conductor', source, mode: r.mode, attachments: r.attachments ?? undefined, request: r });
+    sendMessage(r.thread_id, r.prompt, { from: r.source as 'ben' | 'conductor', source, mode: r.mode, attachments: r.attachments ?? undefined, context: r.context ?? undefined, request: r });
   } catch (err) {
     if (isShuttingDown()) messageRequests.park(r.id);
     else undo();
@@ -377,7 +391,7 @@ export async function postMessage(
   const mode = opts.mode ?? 'steer';
   const source = opts.from ?? 'ben';
   const files = (opts.attachments ?? []).map((a) => ({ name: a.name, size: a.size, sha256: '' }));
-  const fingerprint = opts.fingerprint ?? requestFingerprint({ prompt, mode, source, files });
+  const fingerprint = opts.fingerprint ?? requestFingerprint({ prompt, mode, source, files, context: opts.context });
   if (opts.requestId) {
     const again = acceptedAgain(threadId, opts.requestId, fingerprint);
     if (again) return again;
@@ -396,6 +410,7 @@ export async function postMessage(
     mode,
     source,
     attachments: opts.attachments ?? null,
+    context: opts.context ?? null,
     fingerprint,
     machine_id: outbox.machineId(),
   });
@@ -441,7 +456,9 @@ export function discardRequests(threadId: string, ids: string[]): Thread {
   if (chosen.length !== new Set(ids).size) throw refusal('Some of these messages are no longer waiting to be resumed.', 409);
   for (const r of chosen) {
     if (!messageRequests.mark(r.id, 'discarded')) continue;
-    const payload = r.payload ?? { text: r.prompt, source: r.source, ...(r.attachments?.length && { attachments: r.attachments }) };
+    const payload = r.payload ?? {
+      text: r.prompt, source: r.source, ...(r.attachments?.length && { attachments: r.attachments }), ...(r.context?.length && { context: r.context }),
+    };
     addEvent(threadId, r.kind, { ...payload, dropped: true });
   }
   emitThread(threadId);

@@ -160,11 +160,24 @@ struct StaticMark: View {
 }
 
 /// Loader in brand.tsx: a bead of the ring's own liquid travels around it. Not a spinner.
+/// Give a loader that can stay on screen a `color`: it then turns in Core Animation (LayerAnimations.swift). Without
+/// one it takes the foreground style, as in a button's busy state, and SwiftUI redraws it every frame.
 struct Loader: View {
   var size: CGFloat = 14
+  var color: Color?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
+    if let color {
+      LayerAnimation<LoaderLayers>(color: color)
+        .frame(width: z(size), height: z(size))
+        .accessibilityLabel("Loading")
+    } else {
+      redrawn
+    }
+  }
+
+  private var redrawn: some View {
     TimelineView(.animation(paused: reduceMotion)) { context in
       let t = context.date.timeIntervalSinceReferenceDate
       let a = reduceMotion ? 0 : (t.truncatingRemainder(dividingBy: 1.6) / 1.6) * 2 * .pi

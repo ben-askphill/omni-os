@@ -1,0 +1,321 @@
+import { readFileSync } from 'node:fs';
+import { fixture } from '@omni/test-fixtures';
+import { describe, expect, it } from 'vitest';
+import { annotate, browserAnnotation, cleanTitle, dragToRect, elementRect, rectInImage, shortUrl, type BrowserAnnotation, type Drag, type PixelRect } from '../message-context-browser.ts';
+import { blobIds, clampToHunk, diffSelection, selectRows, type DiffFileLike, type DiffSelection, type DiffSource } from '../message-context-diff.ts';
+import { CONTEXT_KINDS, parseContexts, readContexts } from '../message-context-kinds.ts';
+import { LINES_MAX, TEXT_MAX, plainText, selectExcerpt, terminalExcerpt, type TerminalExcerpt } from '../message-context-terminal.ts';
+import { CHANNEL_NAME_MAX, TITLE_MAX, cleanLine, referenceBody, shortId, threadReference, type ThreadIdentity, type ThreadReference } from '../message-context-thread.ts';
+import { CONTEXT_JSON_MAX, LABEL_MAX, contextDigest, contextKey, cutLabel, newContext, readContextsWith, type MessageContext } from '../message-context.ts';
+
+// The same corpus runs in the web tests and apps/mac/OmniKit/Tests/OmniKitTests/MessageContextTests.swift.
+const corpus = JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')) as {
+  kinds: string[];
+  records: { name: string; raw: unknown; expect: { as: 'known' | 'fallback'; why?: string; id: string; label: string; note: string } }[];
+  selections: {
+    name: string;
+    file: DiffFileLike;
+    from: number;
+    to: number;
+    source: Omit<DiffSource, 'blob_old' | 'blob_new'>;
+    expect: { ok: true; body: DiffSelection; label: string } | { ok: false; error: string };
+  }[];
+  parse: { name: string; raw: unknown; expect: { ok: true; records: MessageContext[] } | { ok: false; error: string } }[];
+  excerpts: {
+    name: string;
+    raw: string;
+    source: { thread: string; pid: number | null; cwd: string; at: string };
+    expect: { ok: true; body: TerminalExcerpt; label: string } | { ok: false; error: string };
+  }[];
+  drags: { name: string; drag: Drag; shown: { width: number; height: number }; viewport: { width: number; height: number }; expect: { ok: true; rect: PixelRect } | { ok: false; error: string } }[];
+  elementRects: { name: string; bounds: PixelRect; viewport: { width: number; height: number }; expect: PixelRect }[];
+  threadReferences: { name: string; thread: ThreadIdentity; current: string; at: string; expect: ThreadReference }[];
+  overlays: { name: string; rect: PixelRect; image: { width: number; height: number }; viewport: { width: number; height: number }; expect: PixelRect }[];
+};
+
+const known = (name: string) => corpus.records.find((r) => r.name === name)!.raw as MessageContext<'diff_selection', DiffSelection>;
+
+describe('the corpus', () => {
+  it('lists every kind, and each has a record it reads as known', () => {
+    expect(corpus.kinds).toEqual(Object.keys(CONTEXT_KINDS));
+    for (const [name, kind] of Object.entries(CONTEXT_KINDS)) {
+      expect(kind.kind).toBe(name);
+      expect(corpus.records.some((r) => (r.raw as { kind?: string })?.kind === name && r.expect.as === 'known')).toBe(true);
+    }
+  });
+});
+
+describe('readContexts', () => {
+  it.each(corpus.records.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    const [r] = readContexts([c.raw]);
+    expect({ as: r.as, ...(r.as === 'fallback' && { why: r.why }), id: r.record.id, label: r.record.label, note: r.record.note }).toEqual(c.expect);
+    if (r.as === 'known') {
+      expect(r.kind).toBe(r.record.kind);
+      expect(r.body).toEqual(r.record.body);
+    }
+  });
+
+  it('reads a non-list as no records', () => {
+    for (const raw of [null, undefined, 42, 'x', {}, { 0: known('a diff selection') }]) expect(readContexts(raw)).toEqual([]);
+  });
+
+  it('numbers fallback ids by position', () => {
+    expect(readContexts([known('a diff selection'), 'x', null]).map((r) => r.record.id)).toEqual([known('a diff selection').id, 'context-1', 'context-2']);
+  });
+
+  it('never throws on garbage', () => {
+    const bad: unknown[] = [
+      [null, 1, {}, [], 'x', true],
+      [{ kind: 'diff_selection', v: 1, body: null }],
+      [{ kind: 'diff_selection', v: 1, body: [] }],
+      [{ kind: 'diff_selection', v: 1, body: { path: 42, rows: 'x', source: [] } }],
+      [{ kind: 'diff_selection', v: 1, body: { path: 'a', rows: [null, 1, 'x', [], { kind: 'add', text: 1 }], source: {} } }],
+      [{ kind: 'diff_selection', v: 1, body: { path: 'a', rows: [{ kind: 'add', text: 'x', new: 1 }], source: { group: 'turn', from: {}, to: [] } } }],
+      [{ kind: 'diff_selection', v: -1, body: known('a diff selection').body }],
+      [{ kind: 'diff_selection', v: Number.NaN, body: known('a diff selection').body }],
+      [{ kind: 'constructor', v: 1 }, { kind: '__proto__', v: 1 }, { kind: 'hasOwnProperty', v: 1 }],
+    ];
+    for (const raw of bad) {
+      const read = readContextsWith(raw, CONTEXT_KINDS);
+      expect(read.every((r) => r.as === 'fallback')).toBe(true);
+    }
+  });
+});
+
+describe('parseContexts', () => {
+  it.each(corpus.parse.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    const r = parseContexts(c.raw);
+    if (c.expect.ok) expect(JSON.stringify(r)).toBe(JSON.stringify({ ok: true, value: c.expect.records }));
+    else expect(r).toEqual({ ok: false, error: c.expect.error });
+  });
+
+  it('refuses records over the JSON limit', () => {
+    const rows = Array.from({ length: 100 }, (_, i) => ({ kind: 'add', text: 'x'.repeat(400), old: null, new: i + 1 }));
+    const raw = [{ ...known('a diff selection'), body: { ...known('a diff selection').body, rows } }];
+    expect(parseContexts(raw)).toEqual({ ok: false, error: `context is longer than ${CONTEXT_JSON_MAX} characters as JSON` });
+  });
+
+  it('gives two clients sending the same records in a different key order the same digest', () => {
+    const a = known('a diff selection');
+    const b = JSON.parse(JSON.stringify(a, Object.keys({ ...a.body, ...a.body.source, ...a.body.rows[0], ...a }).reverse()));
+    expect(JSON.stringify(b)).not.toBe(JSON.stringify(a));
+    const [ra, rb] = [parseContexts([a]), parseContexts([b])];
+    if (!ra.ok || !rb.ok) throw new Error('both parse');
+    expect(contextDigest(rb.value)).toBe(contextDigest(ra.value));
+  });
+
+  it('gives the same records back when they are parsed again', () => {
+    const once = parseContexts([known('a diff selection')]);
+    if (!once.ok) throw new Error('parses');
+    expect(parseContexts(JSON.parse(JSON.stringify(once.value)))).toEqual(once);
+  });
+});
+
+describe('selectRows', () => {
+  it.each(corpus.selections.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    const r = selectRows(c.file, c.from, c.to, c.source);
+    if (!c.expect.ok) return expect(r).toEqual({ ok: false, error: c.expect.error });
+    expect(JSON.stringify(r)).toBe(JSON.stringify({ ok: true, value: c.expect.body }));
+    if (!r.ok) return;
+    expect(diffSelection.label(r.value)).toBe(c.expect.label);
+    expect(JSON.stringify(diffSelection.parse(r.value, 1))).toBe(JSON.stringify(r));
+  });
+});
+
+describe('clampToHunk', () => {
+  const { lines } = corpus.selections.find((c) => c.file.path === 'src/checkout.ts')!.file;
+
+  it('keeps to inside the hunk from is in', () => {
+    expect(clampToHunk(lines, 5, 11)).toEqual({ from: 5, to: 7 });
+    expect(clampToHunk(lines, 11, 2)).toEqual({ from: 11, to: 8 });
+    expect(clampToHunk(lines, 9, 13)).toEqual({ from: 9, to: 13 });
+    expect(clampToHunk(lines, 0, 13)).toEqual({ from: 0, to: 7 });
+  });
+});
+
+describe('blobIds', () => {
+  it('reads the index line, with or without a mode, and nulls all-zero ids', () => {
+    expect(blobIds(['diff --git a/a b/a', 'index fa9fb2e..a31fcc1 100644'])).toEqual({ blob_old: 'fa9fb2e', blob_new: 'a31fcc1' });
+    expect(blobIds(['index fa9fb2e..a31fcc1'])).toEqual({ blob_old: 'fa9fb2e', blob_new: 'a31fcc1' });
+    expect(blobIds(['new file mode 100644', 'index 0000000..097bbee'])).toEqual({ blob_old: null, blob_new: '097bbee' });
+    expect(blobIds(['new file mode 100644', '--- /dev/null'])).toEqual({ blob_old: null, blob_new: null });
+  });
+});
+
+describe('newContext', () => {
+  it('makes a record with the kind, its version and its label', () => {
+    const body = known('a diff selection').body;
+    expect(newContext(diffSelection, body, ' look here ', { id: () => 'id-1' })).toEqual({
+      id: 'id-1',
+      kind: 'diff_selection',
+      v: 1,
+      label: 'src/cart.ts:1-3',
+      note: 'look here',
+      body,
+    });
+    expect(newContext(diffSelection, body, '').id).toMatch(/\S/);
+  });
+});
+
+describe('contextKey', () => {
+  it('joins ids with a unit separator, and is empty for none', () => {
+    expect(contextKey([])).toBe('');
+    expect(contextKey([{ id: 'a' }, { id: 'b' }])).toBe('a\u001fb');
+  });
+});
+
+describe('cutLabel', () => {
+  it('keeps a short label and cuts a long one from the left, never inside a code point', () => {
+    expect(cutLabel('src/cart.ts:1-3')).toBe('src/cart.ts:1-3');
+    const long = `${'🛒/'.repeat(80)}cart.ts:1-3`;
+    const cut = cutLabel(long);
+    expect([...cut]).toHaveLength(LABEL_MAX);
+    expect(cut.startsWith('…🛒/')).toBe(true);
+    expect(cut.endsWith('cart.ts:1-3')).toBe(true);
+  });
+});
+
+describe('selectExcerpt', () => {
+  it.each(corpus.excerpts.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    const r = selectExcerpt(c.raw, { ...c.source, at: new Date(c.source.at) });
+    if (!c.expect.ok) return expect(r).toEqual({ ok: false, error: c.expect.error });
+    expect(JSON.stringify(r)).toBe(JSON.stringify({ ok: true, value: c.expect.body }));
+    if (!r.ok) return;
+    expect(terminalExcerpt.label(r.value)).toBe(c.expect.label);
+    expect(JSON.stringify(terminalExcerpt.parse(r.value, 1))).toBe(JSON.stringify(r));
+  });
+
+  it('makes text with no character the record refuses, whatever the terminal sent', () => {
+    const span = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => String.fromCharCode(from + i));
+    const noisy = [...span(0, 0x100), ...span(0x2028, 0x2030), ...span(0x2060, 0x206a)].join('');
+    const text = plainText(`\u001b[31m${noisy}\u001b]0;title\u0007`);
+    expect(terminalExcerpt.parse({ thread: 't', pid: null, cwd: '/', captured_at: '2026-10-24T09:30:15.250Z', text: `x${text}` }, 1).ok).toBe(true);
+  });
+
+  it('is unchanged by a second pass', () => {
+    for (const c of corpus.excerpts) expect(plainText(plainText(c.raw))).toBe(plainText(c.raw));
+  });
+
+  it('keeps the limits the record is parsed with', () => {
+    expect([LINES_MAX, TEXT_MAX]).toEqual([200, 8000]);
+  });
+});
+
+describe('dragToRect', () => {
+  it.each(corpus.drags.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    const r = dragToRect(c.drag, c.shown, c.viewport);
+    expect(r).toEqual(c.expect.ok ? { ok: true, value: c.expect.rect } : { ok: false, error: c.expect.error });
+  });
+
+  it('gives a rectangle every annotation record accepts, whatever the drag', () => {
+    const base = known('a browser annotation').body as unknown as BrowserAnnotation;
+    const edges = [-50, 0, 0.4, 7.9, 100, 357.5, 358, 900];
+    for (const x0 of edges) for (const x1 of edges) for (const y0 of edges) for (const y1 of edges) {
+      const r = dragToRect({ x0, y0, x1, y1 }, { width: 358, height: 200 }, base.viewport);
+      if (r.ok) expect(browserAnnotation.parse({ ...base, rect: r.value }, 1).ok).toBe(true);
+    }
+  });
+});
+
+describe('elementRect', () => {
+  it.each(corpus.elementRects.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    expect(elementRect(c.bounds, c.viewport)).toEqual(c.expect);
+  });
+
+  it('is a rectangle every annotation record accepts, for any box in the viewport', () => {
+    const base = known('a browser annotation').body as unknown as BrowserAnnotation;
+    const { width, height } = base.viewport;
+    for (const x of [0, 1, 639, width - 1]) for (const y of [0, 1, 300, height - 1]) for (const w of [1, 3, 8, 200]) for (const h of [1, 3, 8, 200]) {
+      const bounds = { x, y, width: Math.min(w, width - x), height: Math.min(h, height - y) };
+      expect(browserAnnotation.parse({ ...base, rect: elementRect(bounds, base.viewport) }, 1).ok).toBe(true);
+    }
+  });
+});
+
+describe('rectInImage', () => {
+  it.each(corpus.overlays.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    expect(rectInImage(c.rect, c.image, c.viewport)).toEqual(c.expect);
+  });
+});
+
+describe('browser_annotation', () => {
+  const { image, viewport, rect, ...rest } = known('a browser annotation').body as unknown as BrowserAnnotation;
+  const capture = { ...rest, image, viewport };
+
+  it('is annotate(capture, rect), checked as the route checks it', () => {
+    expect(annotate(capture, rect)).toEqual({ ok: true, value: { ...rest, viewport, rect, image } });
+    expect(annotate(capture, { ...rect, width: 0 }).ok).toBe(false);
+    expect(annotate(capture, { x: 1200, y: 0, width: 200, height: 20 })).toEqual({ ok: false, error: 'rect reaches outside the viewport' });
+  });
+
+  it('carries a picked element, labelled by its tag, and the same record parses again', () => {
+    const element = (known('a browser annotation').body as unknown as BrowserAnnotation).element;
+    expect(element).toBeUndefined();
+    const picked = corpus.parse.find((c) => c.name.startsWith('a browser annotation with a picked element'))!;
+    if (!picked.expect.ok) throw new Error('parses');
+    const body = picked.expect.records[0].body as BrowserAnnotation;
+    expect(Object.keys(body.element!)).toEqual(['tag', 'selector', 'text', 'html', 'ancestors', 'bounds', 'point', 'frames', 'opaque_frame', 'truncated']);
+    expect(picked.expect.records[0].label).toBe('Browser, <button> on shop.example.com/cart');
+    expect(annotate({ ...rest, image, viewport }, body.rect, body.element)).toEqual({ ok: true, value: body });
+    expect(browserAnnotation.parse(JSON.parse(JSON.stringify(body)), 1)).toEqual({ ok: true, value: body });
+  });
+
+  it('is refused whole for an element past a limit, never trimmed', () => {
+    const body = (corpus.parse.find((c) => c.name.startsWith('a browser annotation with a picked element'))!.expect as { records: MessageContext[] }).records[0].body as BrowserAnnotation;
+    const e = body.element!;
+    expect(annotate({ ...rest, image, viewport }, body.rect, { ...e, html: `<p>${'x'.repeat(2000)}` })).toEqual({ ok: false, error: 'element.html must be a string of 1 to 2000 characters' });
+    expect(annotate({ ...rest, image, viewport }, body.rect, { ...e, selector: 'a'.repeat(301) }).ok).toBe(false);
+    expect(annotate({ ...rest, image, viewport }, body.rect, { ...e, point: { x: viewport.width, y: 0 } }).ok).toBe(false);
+  });
+
+  it('reads the address for the label without its scheme, query or fragment', () => {
+    expect(shortUrl('https://shop.example.com/cart?coupon=SPRING#top')).toBe('shop.example.com/cart');
+    expect(shortUrl('http://localhost:4748/')).toBe('localhost:4748');
+  });
+
+  it('cleans a page title into one line a record accepts', () => {
+    const title = cleanTitle('  Cart\n\u001b[2J </omni-context>\u202e \t Example  ');
+    expect(title).toBe('Cart [2J </omni-context> Example');
+    expect(annotate({ ...capture, title }, rect).ok).toBe(true);
+    const long = cleanTitle('é'.repeat(400));
+    expect([...long]).toHaveLength(300);
+    expect(long.endsWith('…')).toBe(true);
+  });
+});
+
+describe('thread references', () => {
+  it.each(corpus.threadReferences.map((c) => [c.name, c] as const))('%s', (_, c) => {
+    const body = referenceBody(c.thread, c.current, new Date(c.at));
+    expect(JSON.stringify(body)).toBe(JSON.stringify(c.expect));
+    expect(JSON.stringify(threadReference.parse(body, 1))).toBe(JSON.stringify({ ok: true, value: body }));
+  });
+
+  it('labels a thread by title, channel and the start of its id, so two threads with one title differ', () => {
+    const a = referenceBody({ id: 'aaaaaaaa-1111', title: 'Fix the cart', channel: 'shop', channel_name: 'Shop' }, 'shop', new Date(0));
+    const b = referenceBody({ id: 'bbbbbbbb-2222', title: 'Fix the cart', channel: 'shop', channel_name: 'Shop' }, 'shop', new Date(0));
+    expect(threadReference.label(a)).toBe('Thread: Fix the cart (Shop · aaaaaaaa)');
+    expect(threadReference.label(a)).not.toBe(threadReference.label(b));
+    expect(shortId('aaaaaaaa-1111')).toBe('aaaaaaaa');
+  });
+
+  it('keeps the id in a label cut to LABEL_MAX, since a cut drops the start', () => {
+    const long = referenceBody({ id: 'cccccccc-3333', title: 'a'.repeat(TITLE_MAX), channel: 'shop', channel_name: 'S'.repeat(CHANNEL_NAME_MAX) }, 'shop', new Date(0));
+    const label = cutLabel(threadReference.label(long));
+    expect([...label]).toHaveLength(LABEL_MAX);
+    expect(label.endsWith('· cccccccc)')).toBe(true);
+  });
+
+  it('is refused for what a record cannot hold, by name', () => {
+    const ok = referenceBody({ id: 't', title: 'x', channel: 'c', channel_name: 'C' }, 'c', new Date(0));
+    expect(threadReference.parse({ ...ok, thread: '' }, 1)).toEqual({ ok: false, error: 'thread must be a string of 1 to 64 characters' });
+    expect(threadReference.parse({ ...ok, channel_name: 'a\u202eb' }, 1)).toEqual({ ok: false, error: 'channel_name must be plain text on one line' });
+    expect(threadReference.parse(ok, 2)).toEqual({ ok: false, error: 'thread_reference has no version 2' });
+    expect(threadReference.parse(null, 1)).toEqual({ ok: false, error: 'not an object' });
+  });
+
+  it('cleans outside strings the way a record needs them', () => {
+    expect(cleanLine(undefined, 10, 'none')).toBe('none');
+    expect(cleanLine('a\u0000b\n c', 10, 'none')).toBe('a b c');
+    expect([...cleanLine('é'.repeat(30), 10, 'none')]).toHaveLength(10);
+  });
+});

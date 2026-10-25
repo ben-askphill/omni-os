@@ -1,0 +1,31 @@
+{
+  "budget": {
+    "rows": 300,
+    "bytes": 262144,
+    "rowBytes": 32768,
+    "anchorBytes": 65536,
+    "anchors": 16
+  },
+  "fixture": {
+    "turns": 80,
+    "rows": 3472,
+    "payloadBytes": 8089037
+  },
+  "full": {
+    "rows": 3472,
+    "bytes": 8517329
+  },
+  "head": {
+    "rows": 262,
+    "bytes": 158053,
+    "anchors": 1,
+    "anchorBytes": 173,
+    "resultsBelow": 74
+  },
+  "pages": {
+    "count": 13,
+    "partial": 1,
+    "maxRows": 299,
+    "maxBytes": 178266
+  }
+}

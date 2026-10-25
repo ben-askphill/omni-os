@@ -116,4 +116,15 @@ describe('threadView', () => {
     // Each turn names the harness it ran on, not the one the thread is on now.
     expect(v.turns.map((t) => t.harness)).toEqual(['claude', 'codex']);
   });
+
+  it('shows the held turns only, keyed by their first row, with a clipped prompt marked', () => {
+    const start = id;
+    const events = [user('Old ask', 0), text('Old answer', 1), result(2), { ...user('Pasted log…', 3), clipped: { bytes: 160_000 } }, text('Read it.', 4), result(5)];
+    const from = start + 4;
+    const v = threadView({ events, spans: [{ from, to: null }], thread: thread('done'), artifacts: [], children: [] });
+    expect(v.turns.map((t) => t.key)).toEqual([from]);
+    expect(v.turns[0].prompts).toEqual([{ text: 'Pasted log…', key: from, clipped: { bytes: 160_000 } }]);
+    expect(v.turns[0].prose).toBe('Read it.');
+    expect(v.turns[0].proseClipped).toBeNull();
+  });
 });

@@ -8,7 +8,9 @@ import { turnFinished } from '../sync/files.ts';
 import { suggestNextThread, suggestReply } from './aux.ts';
 import { finishTurnSnapshot, settleSnapshots } from './snapshots.ts';
 import { pump, reportToParent } from './queue.ts';
+import { toolTails } from '../tool-tail.ts';
 import { endTasks } from './records.ts';
+import { stopPreparation } from './setup-action.ts';
 import { applyQueued } from './switch.ts';
 import {
   alive,
@@ -108,6 +110,7 @@ export function armIdle(live: Live) {
 export function teardown(live: Live) {
   clearTimeout(live.idleTimer);
   endTasks(live);
+  toolTails.endThread(live.threadId);
   clearMods(live);
   clearInterrupt(live);
   if (live.browser && browserHolder.get(live.channelId) === live.threadId) {
@@ -168,6 +171,12 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
  * or right away if the process has not started its first turn yet.
  */
 export function interruptThread(threadId: string) {
+  // A worktree still being prepared has no agent yet: Stop ends the preparation, its setup run included, and a
+  // lead's team with it, as for a lead that waits.
+  if (stopPreparation(threadId)) {
+    for (const m of threads.team(threadId)) if (m.status === 'running' || m.status === 'queued') interruptThread(m.id);
+    return threads.get(threadId);
+  }
   // Stop also means not now and not at the reset: a limit stop's continuation is dropped (limits.ts).
   if (threads.get(threadId)?.limit_state) threads.setLimit(threadId, null);
   const live = lives.get(threadId);

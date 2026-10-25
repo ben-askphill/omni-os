@@ -60,11 +60,13 @@ public struct NewThread: Encodable, Hashable, Sendable {
   public var source: ThreadSource?
   /// A sidebar folder of the channel to file it in, by id.
   public var folder: String?
+  /// Where a worktree thread's branch starts. nil for the repo's current commit.
+  public var base: BasePick?
 
   public init(
     channel: String, prompt: String, role: String? = nil, model: String? = nil, harness: HarnessID? = nil,
     effort: String? = nil, title: String? = nil, parentID: String? = nil, taskID: String? = nil, source: ThreadSource? = nil,
-    folder: String? = nil
+    folder: String? = nil, base: BasePick? = nil
   ) {
     self.channel = channel
     self.prompt = prompt
@@ -77,10 +79,11 @@ public struct NewThread: Encodable, Hashable, Sendable {
     self.taskID = taskID
     self.source = source
     self.folder = folder
+    self.base = base
   }
 
   enum CodingKeys: String, CodingKey {
-    case channel, prompt, role, model, harness, effort, title, source, folder
+    case channel, prompt, role, model, harness, effort, title, source, folder, base
     case parentID = "parent_id"
     case taskID = "task_id"
   }
@@ -125,7 +128,7 @@ public struct OmniClient: Sendable {
   public let baseURL: URL
   /// Sent as `Authorization: Bearer` on every request (apps/server/request-guard.ts).
   public let token: ServerToken
-  private let transport: any HTTPTransport
+  let transport: any HTTPTransport
 
   public init(baseURL: URL, token: ServerToken = .none, transport: any HTTPTransport = URLSessionTransport()) {
     self.baseURL = baseURL
@@ -287,6 +290,15 @@ public struct OmniClient: Sendable {
     _ method: String, _ path: String, query: [(String, String)] = [], body: (any Encodable & Sendable)? = nil,
     raw: (data: Data, contentType: String)? = nil
   ) async throws(OmniAPIError) -> T {
+    let (data, response) = try await exchange(request(method, path, query: query, body: body, raw: raw))
+    return try Self.decoded(data, response)
+  }
+
+  /// The request `send` makes: the token, JSON accepted, and a JSON body or `raw` as it is.
+  func request(
+    _ method: String, _ path: String, query: [(String, String)] = [], body: (any Encodable & Sendable)? = nil,
+    raw: (data: Data, contentType: String)? = nil
+  ) throws(OmniAPIError) -> URLRequest {
     var req = authorized(url(path, query: query))
     req.httpMethod = method
     req.cachePolicy = .reloadIgnoringLocalCacheData
@@ -302,14 +314,17 @@ public struct OmniClient: Sendable {
         throw .decoding("could not encode the request: \(error)")
       }
     }
+    return req
+  }
 
-    let (data, response) = try await exchange(req)
+  /// A 2xx answer as `T`. Anything but JSON is `.notJSON`.
+  static func decoded<T: Decodable>(_ data: Data, _ response: HTTPURLResponse) throws(OmniAPIError) -> T {
     let type = response.value(forHTTPHeaderField: "Content-Type")
-    guard Self.isJSON(type) else { throw .notJSON(status: response.statusCode, contentType: type) }
+    guard isJSON(type) else { throw .notJSON(status: response.statusCode, contentType: type) }
     do {
       return try OmniJSON.decoder().decode(T.self, from: data)
     } catch {
-      throw .decoding(Self.describe(error))
+      throw .decoding(describe(error))
     }
   }
 
@@ -322,10 +337,16 @@ public struct OmniClient: Sendable {
 
   /// Sends the request. A status outside 2xx throws with the server's message.
   private func exchange(_ req: URLRequest) async throws(OmniAPIError) -> (Data, HTTPURLResponse) {
-    let data: Data
-    let response: HTTPURLResponse
+    let (data, response) = try await deliver(req)
+    guard (200..<300).contains(response.statusCode) else { throw Self.failure(data, response) }
+    return (data, response)
+  }
+
+  /// Sends the request and hands back the answer whatever its status: only no answer at all throws. For a call whose
+  /// refusals carry more than `{error}`.
+  func deliver(_ req: URLRequest) async throws(OmniAPIError) -> (Data, HTTPURLResponse) {
     do {
-      (data, response) = try await transport.send(req)
+      return try await transport.send(req)
     } catch let e as URLError where e.code == .cancelled {
       throw .cancelled
     } catch is CancellationError {
@@ -333,11 +354,12 @@ public struct OmniClient: Sendable {
     } catch {
       throw .unreachable(error.localizedDescription)
     }
-    guard (200..<300).contains(response.statusCode) else {
-      let type = response.value(forHTTPHeaderField: "Content-Type")
-      throw .http(status: response.statusCode, message: Self.errorMessage(data, contentType: type, status: response.statusCode))
-    }
-    return (data, response)
+  }
+
+  /// A status outside 2xx as the error `send` throws.
+  static func failure(_ data: Data, _ response: HTTPURLResponse) -> OmniAPIError {
+    let type = response.value(forHTTPHeaderField: "Content-Type")
+    return .http(status: response.statusCode, message: errorMessage(data, contentType: type, status: response.statusCode))
   }
 
   static func isJSON(_ contentType: String?) -> Bool {

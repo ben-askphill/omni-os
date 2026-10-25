@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, rmSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { pickScript, type RawPick } from './browser-pick-script.ts';
 import { config, paths } from './config.ts';
 
 /**
@@ -41,6 +42,21 @@ export interface BrowserFrame {
 }
 
 export type BrowserEvent = { type: 'state'; state: BrowserState } | ({ type: 'frame' } & BrowserFrame);
+
+/**
+ * What the active page is at one moment, for a capture to compare before and after (browser-capture.ts). Anything that
+ * differs between the two means the screenshot may not show the page the record describes.
+ */
+export interface PageObservation {
+  tab: string | null;
+  url: string;
+  title: string;
+  /** Main-frame navigations so far. A reload to the same address still counts. */
+  navigations: number;
+  /** The viewport and scroll in CSS pixels. */
+  viewport: { width: number; height: number };
+  scroll: { x: number; y: number };
+}
 
 type Listener = (e: BrowserEvent) => void;
 
@@ -165,6 +181,8 @@ class ChannelBrowser {
   private starting: Promise<string> | null = null;
   /** Set while Omni opens a tab itself, so targetCreated does not attach it a second time. */
   private creating = false;
+  /** Main-frame navigations of the active page, counted for `observe`. */
+  private navigations = 0;
   /** The viewer's size while one is watching; null lays the page out at the window's size. */
   private viewport: { width: number; height: number; scale: number } | null = null;
   /** Threads whose MCP is attached. The browser stays up while any is. */
@@ -318,7 +336,10 @@ class ChannelBrowser {
         break;
       case 'Page.frameNavigated':
       case 'Page.navigatedWithinDocument':
-        if (msg.sessionId === this.session) void this.refreshHistory();
+        if (msg.sessionId === this.session) {
+          if (msg.method === 'Page.frameNavigated' && !p.frame?.parentId) this.navigations++;
+          void this.refreshHistory();
+        }
         break;
     }
   }
@@ -395,6 +416,40 @@ class ChannelBrowser {
       returnByValue: true,
     });
     return typeof result?.value === 'string' ? result.value : '';
+  }
+
+  /**
+   * The active page now, for a capture. The page's own address and title, not the tab strip's, which lag a navigation. The
+   * viewport is the window's inner size, scrollbar included, which is the area a screenshot covers.
+   */
+  async observe(): Promise<PageObservation> {
+    const [{ result }, { currentIndex, entries }] = await Promise.all([
+      this.page('Runtime.evaluate', { expression: '({ w: innerWidth, h: innerHeight, x: scrollX, y: scrollY })', returnByValue: true }),
+      this.page('Page.getNavigationHistory'),
+    ]);
+    const v = (result?.value ?? {}) as { w?: number; h?: number; x?: number; y?: number };
+    const entry = entries[currentIndex];
+    return {
+      tab: this.active,
+      url: entry?.url ?? '',
+      title: entry?.title ?? '',
+      navigations: this.navigations,
+      viewport: { width: Math.round(v.w ?? 0), height: Math.round(v.h ?? 0) },
+      scroll: { x: Math.round(v.x ?? 0), y: Math.round(v.y ?? 0) },
+    };
+  }
+
+  /** The element at a point of the viewport, described by pickScript, or null when the page gave nothing. Changes nothing on the page. */
+  async pick(x: number, y: number): Promise<RawPick | null> {
+    const { result } = await this.page('Runtime.evaluate', { expression: pickScript(x, y), returnByValue: true, silent: true, timeout: 2000 });
+    return result?.value && typeof result.value === 'object' ? (result.value as RawPick) : null;
+  }
+
+  /** The visible viewport as an image, at the display scale the page is laid out at. Changes nothing on the page. */
+  async shot(format: 'png' | 'jpeg', quality?: number): Promise<Buffer> {
+    this.touch();
+    const { data } = await this.page('Page.captureScreenshot', { format, ...(quality && { quality }), fromSurface: true });
+    return Buffer.from(data, 'base64');
   }
 
   async newTab(url = 'about:blank') {

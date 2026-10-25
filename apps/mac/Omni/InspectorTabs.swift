@@ -9,7 +9,11 @@ struct BrowserTab: View {
   let client: OmniClient
   let channel: String?
   let shots: [Artifact]
+  /// The thread whose reply box Annotate adds to.
+  let thread: String
+  let draft: DraftContextModel
   @State private var browser: ChannelBrowserModel?
+  @State private var annotate: BrowserAnnotateModel?
   @State private var showShots = false
 
   var body: some View {
@@ -33,14 +37,20 @@ struct BrowserTab: View {
         LiveBrowserView(model: browser, trailing: AnyView(
           Button(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))", systemImage: "photo") { showShots = true }
             .help(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))")
-        ))
+        ), annotating: annotate.map { Annotating(model: $0, client: client, draft: draft) })
       } else {
         Color.clear
       }
     }
     .frame(maxHeight: .infinity, alignment: .top)
     .onChange(of: channel, initial: true) { _, id in
-      if let id, browser?.channel != id { browser = ChannelBrowserModel(client: client, channel: id) }
+      if let id, browser?.channel != id {
+        browser = ChannelBrowserModel(client: client, channel: id)
+        annotate = BrowserAnnotateModel(client: client, channel: id, thread: thread)
+      }
+    }
+    .onChange(of: thread) { _, thread in
+      if let channel { annotate = BrowserAnnotateModel(client: client, channel: channel, thread: thread) }
     }
   }
 }
@@ -70,7 +80,7 @@ struct ScreenshotGrid: View {
                     ClientImage(client: client, url: client.artifactURL(shot)) { image in
                       image.resizable().scaledToFill()
                     } placeholder: {
-                      Loader(size: 14).foregroundStyle(Tok.fg3)
+                      Loader(size: 14, color: Tok.fg3)
                     }
                   }
                   .clipShape(RoundedRectangle(cornerRadius: z(12), style: .continuous))
@@ -133,7 +143,7 @@ private struct ShotViewer: View {
         ClientImage(client: client, url: client.artifactURL(list[index])) { image in
           image.resizable().scaledToFit()
         } placeholder: {
-          Loader(size: 14).foregroundStyle(Tok.fg3)
+          Loader(size: 14, color: Tok.fg3)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Tok.surface2)
@@ -216,6 +226,12 @@ struct DetailsTab: View {
                   HStack(spacing: z(6)) { StatusDot(status: parent.status, size: 6); Text(parent.title) }
                 }
                 .buttonStyle(.plain)
+              }
+            }
+            if let from = store.continuedFrom { row("Continued from") { ContinueLinkRow(model: model, link: from) } }
+            if !store.continuedIn.isEmpty {
+              row("Continued in") {
+                VStack(alignment: .leading, spacing: z(6)) { ForEach(store.continuedIn) { ContinueLinkRow(model: model, link: $0) } }
               }
             }
             if let mcp = session?.mcp, !mcp.isEmpty { row("MCP") { mcpList(mcp.map(MCPServer.init)) } }

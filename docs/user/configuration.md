@@ -6,7 +6,7 @@ Everything personal lives in `data/` (gitignored) or the Keychain. Tracked files
 
 | Where | What |
 | --- | --- |
-| `data/omni.config.json` | You, your folders, integrations (Hermes URL, central brain, the Tailscale login allowed through `tailscale serve`), Google sign-in (`auth`, see [Sign in with Google](google-sign-in.md)), automation on/off. Every field: `omni.config.example.json` |
+| `data/omni.config.json` | You, your folders, integrations (Hermes URL, central brain, the Tailscale login allowed through `tailscale serve`), Google sign-in (`auth`, see [Sign in with Google](google-sign-in.md)), automation on/off and this Mac's worktree retention policy. Every field: `omni.config.example.json` |
 | `data/crew/*.md` | Your own version of a crew charter; replaces the one in `crew/` with the same name |
 | `data/automations/*.yaml` | Your own automations; one with the same id as a shared one replaces it |
 | `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file |
@@ -32,13 +32,26 @@ Stored in the macOS Keychain under service `omni-os` (account `<scope>/<NAME>`).
 
 - Scope `global` goes to every thread as an env var.
 - Scope `channel:<slug>` goes only to that channel's threads and overrides a global with the same name.
-- Billing keys stay out of a harness and the terminal. Sync keys stay out of the terminal, and a global one stays out of a harness. `GROKBOT_WEBHOOK_URL` and `GROKBOT_WEBHOOK_AUTH` stay out of both, at any scope. See [Grok Bot](#grok-bot). So do `GOOGLE_OAUTH_CLIENT_SECRET` and `GOOGLE_OAUTH_WEB_CLIENT_SECRET`, the [Google sign-in](google-sign-in.md) client secrets.
+- Billing keys stay out of a harness and the terminal. Sync keys stay out of the terminal, and a global one stays out of a harness. `GROKBOT_WEBHOOK_URL`, `GROKBOT_WEBHOOK_AUTH`, webhook signing secrets (`OMNI_WEBHOOK_*`) and the Google sign-in client secrets (`GOOGLE_OAUTH_CLIENT_SECRET` and `GOOGLE_OAUTH_WEB_CLIENT_SECRET`) stay out of both, at any scope. See [Grok Bot](#grok-bot), [GitHub webhooks](automations.md#github-webhooks) and [Sign in with Google](google-sign-in.md).
+
+## Channel actions
+
+A channel's settings list its named actions: a name, a command, the secrets it needs (names only) and a port. Each thread runs them from its Actions tab. They are kept on this Mac and not synced.
+
+- The command runs with your login shell in the thread's checkout, with the terminal's environment plus `OMNI_THREAD_ID`, `OMNI_BRANCH` and `OMNI_ARTIFACTS_DIR`.
+- Secrets: only the names listed reach the run, read from the Keychain (the channel's value, else the global one). A missing one stops the run before it starts. Billing, sync and Grok Bot keys can't be listed.
+- Port: none, a free one per run, or a fixed one. A free one comes from 9300 to 9399, as `$OMNI_PORT` and `$PORT`, so two threads previewing at once never share one: `shopify theme dev --port $OMNI_PORT`. A fixed port that another run or another program holds stops the run with a message naming it. A command with `--port 9292` written in it is refused unless the action's port is set to 9292, so Omni knows about it.
+- Setup: one action per channel can run in every new worktree, once each time the worktree is prepared. Pick "Before the agent starts" to hold the agent until it succeeds, or "Alongside the agent" to start both together. A blocking setup that fails, or one you stop, leaves the thread at Setup failed with its output and your first message kept, and Retry setup runs it again. Opening a thread or sending it a follow-up never reruns it. Threads in the channel's own checkout, Hermes and Cursor Cloud threads get no setup.
+
+## Worktree storage
+
+Settings > Storage inventories worktrees and explains why each is kept or eligible for cleanup. Review the scan before removing them, or turn on automatic retention for this Mac. Retention is off by default and stays local in `data/omni.config.json`; the old `OMNI_WORKTREE_SWEEP` option no longer controls cleanup. The guards and what survives removal are in [Known limits](limits.md).
 
 ## Grok Bot
 
 Send to Grok Bot posts a thread's title and messages to a webhook. The context is the channel id and the thread id.
 
-The button is in the thread header on the Web UI and on the Mac app. The same action is in the thread's right-click menu on both, and in Thread options on a phone. The Conductor calls `send_to_grok_bot`.
+The button is in the thread header on the Web UI and on the Mac app. A narrow desktop web header puts it in More. The same action is in the thread's right-click menu on both, and in Thread options on a phone. The Conductor calls `send_to_grok_bot`.
 
 The URL and the Authorization value come from the Omni OS requests routine, on Grok Bot's Routines tab. Paste each one in either place.
 

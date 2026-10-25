@@ -15,10 +15,10 @@ final class TranscriptUI {
     if open.remove(key) == nil { open.insert(key) }
   }
 
-  /// Opens every group, and the calls that failed or have sub-calls (QA).
-  func expandAll(_ items: [TranscriptItem]) {
+  /// Opens every group, and the calls that failed, have sub-calls or match `also` (QA).
+  func expandAll(_ items: [TranscriptItem], also: (ToolCall) -> Bool = { _ in false }) {
     func visit(_ call: ToolCall) {
-      if call.isFailed || !call.children.isEmpty { open.insert("c\(call.id)") }
+      if call.isFailed || !call.children.isEmpty || also(call) { open.insert("c\(call.id)") }
       call.children.forEach(visit)
     }
     for case .tools(let group) in items {
@@ -86,7 +86,7 @@ struct ToolGroupView: View {
               .foregroundStyle(Tok.live)
               .fixedSize()
           }
-          if live || !working.isEmpty { Loader(size: 11).foregroundStyle(working.isEmpty ? Tok.fg3 : Tok.live) }
+          if live || !working.isEmpty { Loader(size: 11, color: working.isEmpty ? Tok.fg3 : Tok.live) }
         }
         .font(.omni(size: ThreadStyle.small))
         .padding(.horizontal, z(14))
@@ -162,13 +162,13 @@ struct ToolRowView: View {
               .fixedSize()
           }
           if agent {
-            Loader(size: 11).foregroundStyle(Tok.live)
+            Loader(size: 11, color: Tok.live)
           } else if pending && running {
-            Loader(size: 11).foregroundStyle(Tok.fg3)
+            Loader(size: 11, color: Tok.fg3)
           } else if call.isFailed {
             HStack(spacing: z(4)) {
               GlyphView(glyph: .needs, size: 7)
-              Text("error")
+              Text("error" + (call.result?.exitCode.map { " · exit \($0)" } ?? ""))
             }
             .font(.omni(size: 11))
             .foregroundStyle(Tok.fg)
@@ -223,16 +223,8 @@ struct ToolDetail: View {
   var body: some View {
     VStack(alignment: .leading, spacing: z(6)) {
       ToolInputView(input: ToolInput(call.use))
-      if let result = call.result {
-        Pre(text: result.text.isEmpty ? "(no output)" : result.text, tone: call.isFailed ? .bad : .plain)
-        if result.truncated {
-          Text("Output truncated").font(.omni(size: 11)).foregroundStyle(Tok.fg4)
-        }
-      } else {
-        Text(running ? "Waiting for result" : "No result recorded")
-          .font(.omni(size: ThreadStyle.mono))
-          .foregroundStyle(Tok.fg4)
-      }
+      ClippedNote(eventID: call.id)
+      ToolOutputView(call: call, running: running)
     }
   }
 }
@@ -313,8 +305,6 @@ struct CheckItem: View {
 private struct CheckBox: View {
   let done: Bool
   let active: Bool
-  @State private var pulse = false
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     let shape = RoundedRectangle(cornerRadius: z(6), style: .continuous)
@@ -326,14 +316,8 @@ private struct CheckBox: View {
         .stroke(Tok.onInk, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         .frame(width: z(12.6), height: z(12.6))
       if active {
-        Circle().fill(Tok.live)
+        LayerAnimation<PulseLayers>(color: Tok.live)
           .frame(width: z(7), height: z(7))
-          .opacity(pulse ? 0.45 : 1)
-          .scaleEffect(pulse ? 0.82 : 1)
-          .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { pulse = true }
-          }
       }
     }
     .frame(width: z(18), height: z(18))

@@ -1,0 +1,16 @@
+{
+  "id": "00000000-0000-4000-8000-000000000040",
+  "thread_id": "00000000-0000-4000-8000-000000000001",
+  "action_id": "00000000-0000-4000-8000-000000000038",
+  "name": "Theme preview",
+  "command": "echo \"Previewing on $OMNI_PORT\"; sleep 30",
+  "cwd": "/tmp/omni-fixtures/acme",
+  "port": 4799,
+  "state": "stopped",
+  "exit_code": null,
+  "error": "Stopped by Ben.",
+  "output": "Previewing on 9300\n",
+  "output_bytes": 19,
+  "started_at": "2026-01-05T09:00:00.000Z",
+  "ended_at": "2026-01-05T09:00:00.000Z"
+}

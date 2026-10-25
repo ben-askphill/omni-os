@@ -27,5 +27,8 @@
   "automations": {
     "weekly-review": { "enabled": true },
     "pr-babysitter": { "enabled": true, "channel": "omni-os" }
+  },
+  "worktrees": {
+    "retention": { "enabled": false, "idleDays": 14 }
   }
 }

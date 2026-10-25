@@ -1,6 +1,6 @@
 # Sync between two Macs
 
-Optional. Each Mac keeps its own SQLite as the source of truth; a Supabase project you own relays the changes between them (channels, sidebar folders, threads, events, artifacts, automation runs, settings) and holds thread files in a private bucket. With no credentials sync is off and Omni behaves as before. Why a relay and not a shared database: [ADR 0004](../adr/0004-supabase-sync.md).
+Optional. Each Mac keeps its own SQLite as the source of truth; a Supabase project you own relays the changes between them (channels, sidebar folders, threads, events, artifacts, automation runs and event deliveries, settings) and holds thread files in a private bucket. With no credentials sync is off and Omni behaves as before. Why a relay and not a shared database: [ADR 0004](../adr/0004-supabase-sync.md).
 
 ## One-time Supabase setup
 
@@ -23,6 +23,9 @@ Open the Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the URL an
 - Signing in to a different project or user starts that relay from the beginning and queues the history again.
 - Sidebar folders sync, along with which folder each thread sits in. Whether a folder shows open or closed stays per Mac. A relay set up before folders synced refuses them: paste `0001_changes.sql` in the SQL Editor again. Until then the rest keeps syncing and folders wait, counted as held.
 - Needs you is the same on both Macs: a result reviewed on one leaves the other's after the next sync, and a newer result stays unread. A relay set up before this refuses results and reads: paste `0001_changes.sql` again, as for folders. A thread marked done is done on both Macs, and a run on either brings it back.
+- Auto's routing reason and a model or harness switch queued for the next turn sync with the thread. A switch still waits for the running turn and its background tasks to end.
+- Published-page and GitHub webhook deliveries sync as `trigger_delivery`. A relay set up before these events existed needs `0001_changes.sql` run again, or deliveries wait as held while the rest keeps syncing. Only the Mac that owns automations starts their runs. Signing secrets stay in each Mac's Keychain. See [Automations](automations.md#event-automations).
+- Channel actions and worktree retention stay per Mac; sync does not copy them. See [Configuration](configuration.md#channel-actions) and [Known limits](limits.md).
 - A thread runs on one Mac at a time. Its row names the Mac running it (`run_machine`), so the other Mac shows it read-only until the run ends there, and an edit from the other Mac mid-run (a rename) never changes its status. After a crash, only the Mac that ran it marks it failed.
 - Scheduled automations run on one Mac: the Sync page says which, and "Run them here" moves them. The first Mac to finish a sync with no owner set takes them. Manual runs work on either Mac.
 - Copying `data/` to another Mac is fine: the folder remembers the Mac it was set up on (its hardware UUID), and on the next start the copy takes a new sync id and pulls the history again, logging one `[sync] this data folder was copied from another Mac` line. It never overwrites the Mac it came from, and scheduled automations stay there until you press "Run them here".
@@ -30,9 +33,10 @@ Open the Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the URL an
 
 ## Hand off a running thread
 
-Move a thread that is running on this Mac to your other Mac, which carries on where it was. Omni stops the turn here, uploads the session and the thread's files, and the other Mac resumes the same session with a note that the last turn was cut off, then sends the messages that were queued for it. This Mac shows the thread read-only while it runs there. The Conductor can do it too (`hand_off_thread`).
+Move a thread that is running on this Mac to your other Mac, which carries on where it was. Omni stops the turn here, uploads the session and the thread's files, and the other Mac resumes the same session with a note that the last turn was cut off, then sends the messages that were queued for it. This Mac shows the thread read-only while it runs there. The Conductor can list targets with `list_devices` and hand it off with `hand_off_thread`. On desktop web, use the header's Hand off button or the thread's right-click menu; a narrow header puts it in More. On a phone use Thread options. The Mac app also has it in the Thread menu.
 
 - Both Macs need sync on and Omni running. Tailscale is optional: Omni reads `tailscale status` to show whether the other Mac is up, and refuses one Tailscale sees as offline. The handoff itself goes through the relay, so without Tailscale the Mac shows as unknown and picks the thread up when it next syncs. Until then you can cancel, and the thread stays stopped here.
+- A delegated thread that reports to another thread cannot be handed off, nor can a thread while its delegated threads still run.
 - What travels: the session, the thread's files, and queued messages (their text, not their attachments).
 - A worktree thread also takes its branch's commits that are on no remote, and its uncommitted and untracked files, which arrive uncommitted. Files `.gitignore` covers stay on each Mac. The other Mac's own worktree for the thread must not have changes of its own, and the whole bundle must fit in 50 MB.
 - A thread in a shared folder (a repo without a worktree per thread, or your workspace) runs in that folder on the other Mac. Uncommitted changes in it stay on this Mac; the other Mac's agent is told so.

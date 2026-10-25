@@ -11,9 +11,11 @@ public struct EventRow: Decodable, Hashable, Sendable, Identifiable {
   public let payload: String
   public let content: EventPayload
   public let createdAt: Date
+  /// Set on a row a history page cut down to size. `OmniClient.threadEvent` reads it whole.
+  public let clipped: Clipped?
 
   enum CodingKeys: String, CodingKey {
-    case id, kind, payload
+    case id, kind, payload, clipped
     case threadID = "thread_id"
     case createdAt = "created_at"
   }
@@ -25,7 +27,13 @@ public struct EventRow: Decodable, Hashable, Sendable, Identifiable {
     kind = try c.decode(String.self, forKey: .kind)
     payload = try c.decode(String.self, forKey: .payload)
     createdAt = try c.decode(Date.self, forKey: .createdAt)
-    content = EventPayload(kind: kind, json: payload)
+    clipped = try c.decodeIfPresent(Clipped.self, forKey: .clipped)
+    var content = EventPayload(kind: kind, json: payload)
+    if case .toolResult(var r) = content {
+      r.eventID = id
+      content = .toolResult(r)
+    }
+    self.content = content
   }
 }
 
@@ -182,6 +190,11 @@ public struct UserMessage: Decodable, Hashable, Sendable {
   public let mode: SendMode?
   /// The agent never saw it.
   public let dropped: Bool?
+  /// A PR watch's wake: what it was for, and how many more there were. See `PRWakeItem`.
+  public let items: [PRWakeItem]?
+  public let more: Int?
+  /// Records Ben attached. A value this app can't read is no records, never a failed event.
+  public let context: MessageContextList?
 }
 
 /// kind `crew_report`: a child thread reporting back to its parent.
@@ -237,14 +250,29 @@ public struct ToolUse: Decodable, Hashable, Sendable {
 
 public struct ToolResult: Decodable, Hashable, Sendable {
   public let toolUseID: String
+  /// The whole text, or a compact row's first `ToolOutputLimit.preview` characters.
   public let text: String
   public let isError: Bool
   public let truncated: Bool
+  /// Set on a compact row (#225): the size of the saved output, which an open row reads in chunks.
+  public let output: ToolOutputMeta?
+  /// The tool_result row it came in, which its saved output is read by. `EventRow` sets it.
+  public internal(set) var eventID = 0
 
   enum CodingKeys: String, CodingKey {
-    case text, truncated
+    case text, truncated, output
     case toolUseID = "tool_use_id"
     case isError = "is_error"
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    toolUseID = try c.decode(String.self, forKey: .toolUseID)
+    text = try c.decode(String.self, forKey: .text)
+    isError = try c.decode(Bool.self, forKey: .isError)
+    truncated = try c.decode(Bool.self, forKey: .truncated)
+    // As `outputMeta`: an `output` that does not read leaves a whole row, still shown.
+    output = try? c.decodeIfPresent(ToolOutputMeta.self, forKey: .output)
   }
 }
 

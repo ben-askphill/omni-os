@@ -1,12 +1,20 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, errorText, useApi, type Artifact, type BranchChanges, type PendingMsg, type Thread } from '../api.ts';
 import { harnessLabel, OmniMark } from '../components/brand.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { SwitchLine } from '../components/Transcript.tsx';
 import { ASKING_LABEL, QuestionCard } from '../components/thread/QuestionCard.tsx';
+import { PRWakeList } from '../components/thread/PRWatch.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
+import { SetupCard } from '../components/thread/SetupCard.tsx';
+import { ClippedNote, HistoryCtx, HistoryEdgeRow } from '../components/thread/HistoryEdgeRow.tsx';
+import { useReveal } from '../pages/useReveal.ts';
+import { useScrollAnchor } from '../pages/useScrollAnchor.ts';
+import { atStart, historyEdges } from '@omni/shared/history.ts';
 import { handOff, HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx';
+import { MoContinueLinks } from '../components/ContinueLinks.tsx';
+import { sourceRefusal } from '../continue.ts';
 import { deviceRows } from '../handoff.ts';
 import { Button, ErrorNote, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';
 import { changesView } from '../changes.ts';
@@ -17,6 +25,7 @@ import { isOmnis, parkedLabel } from '../requests.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
+import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { needsCard } from './activity.ts';
 import { MoComposer, type ComposerChip } from './MoComposer.tsx';
 import { NeedsActions, NeedsCardView } from './NeedsCard.tsx';
@@ -222,7 +231,10 @@ function Pending({ thread, items, onPending }: { thread: Thread; items: PendingM
       {items.map((m) => (
         <div key={m.uuid} className="flex flex-col items-end gap-1.5 opacity-75">
           <span className="text-[12px] leading-[1.3] text-fg-3">{parkedLabel(m) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent')}</span>
-          <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">{m.text}</div>
+          <ContextChips records={m.context} align="end" className="w-full max-w-[86%]" />
+          {(m.text || !hasContext(m.context)) && (
+            <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">{m.text}</div>
+          )}
           {(m.delivery === 'uncertain' || (m.delivery && isOmnis(m))) && (
             <div className="flex gap-2">
               {m.delivery === 'uncertain' && (
@@ -350,10 +362,18 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
           {thread.branch && <MoListRow icon="diff" label="Changes" sub={prLabel ?? `On ${thread.branch}`} onClick={() => go(href.threadView(thread.id, prLabel ? 'pr' : 'changes'))} />}
           <MoListRow icon="browser" label="Browser" sub="Watch only" onClick={() => go(href.threadView(thread.id, 'browser'))} />
           <MoListRow icon="terminal" label="Terminal" sub="Read only" onClick={() => go(href.threadView(thread.id, 'terminal'))} />
+          <MoListRow icon="play" label="Actions" sub="Preview, checks, tests" onClick={() => go(href.threadView(thread.id, 'actions'))} />
           <MoListRow icon="info" label="Details" sub="Harness, model, session" onClick={() => go(href.threadView(thread.id, 'details'))} last />
         </MoGroup>
         <MoGroup>
           {targets.state === 'ready' && <MoListRow icon="share" label="Hand off to…" sub="Keep it running on another Mac" onClick={() => setHandingOff(true)} />}
+          <MoListRow
+            icon="branch"
+            label="Continue with another harness"
+            sub={sourceRefusal(thread.harness) ?? 'A new thread that picks up from here'}
+            disabled={!!sourceRefusal(thread.harness)}
+            onClick={() => (onClose(), shell.sheet({ name: 'continue', source: thread }))}
+          />
           <MoListRow icon="pin" label={thread.pinned_at ? 'Unpin from Activity' : 'Pin to Activity'} chevron={false} onClick={() => void pin()} />
           {(thread.done_at || canMarkDone(thread.status)) && (
             <MoListRow icon="check" label={thread.done_at ? 'Mark as not done' : 'Mark as done'} chevron={false} onClick={() => void done()} />
@@ -393,27 +413,32 @@ function useBranchChanges(thread: Thread | null, busy: boolean) {
 export function ThreadScreen() {
   const shell = useShell();
   const s = useThread();
-  const { thread, children, events, files, queued, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff } = s;
+  const { thread, children, events, history, revealTarget, clearReveal, files, queued, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff } = s;
   const { needsYou, channel } = useApp();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
-  const view = useMemo(() => (thread ? threadView({ events, thread, artifacts: files, children }) : null), [events, thread, files, children]);
+  const spans = history.history.spans;
+  const view = useMemo(() => (thread ? threadView({ events, spans, thread, artifacts: files, children }) : null), [events, spans, thread, files, children]);
+  const edges = useMemo(() => historyEdges({ spans }, view?.turns.map((t) => t.key) ?? []), [spans, view]);
   const changes = useBranchChanges(thread, slotBusy);
   const pr = useThreadPR(thread, slotBusy, true);
-  // Outcome first: open on the newest turn, its prompt at the top, and again when a new turn starts.
+  // Outcome first: open on the newest turn, its prompt at the top, and again when a new turn starts. Earlier turns
+  // loading above keep the reading position instead, and a search hit opens on the turn that holds it.
   const scroll = useRef<HTMLDivElement>(null);
   const newest = useRef<HTMLDivElement>(null);
-  const turns = view?.turns.length ?? 0;
+  const newestKey = view?.turns[view.turns.length - 1]?.key ?? 0;
   useEffect(() => {
     const el = scroll.current;
-    if (el && newest.current && ready) el.scrollTop = newest.current.offsetTop - el.offsetTop - 8;
-  }, [ready, turns]);
+    if (el && newest.current && ready && revealTarget === null) el.scrollTop = newest.current.offsetTop - el.offsetTop - 8;
+  }, [ready, newestKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useScrollAnchor(scroll, view, () => false, ready);
+  useReveal(scroll, revealTarget, view, clearReveal, false);
 
   if (notFound || (!thread && error)) {
     return (
       <>
         <MoHeader onBack={shell.back} title="Thread" />
-        {notFound ? <MoEmpty>This thread was deleted, or the link is wrong.</MoEmpty> : <ErrorNote className="mx-4" onRetry={() => void load(true)}>{error}</ErrorNote>}
+        {notFound ? <MoEmpty>This thread was deleted, or the link is wrong.</MoEmpty> : <ErrorNote className="mx-4" onRetry={() => void load()}>{error}</ErrorNote>}
       </>
     );
   }
@@ -493,6 +518,7 @@ export function ThreadScreen() {
         {t.error && <Clamped text={t.error} />}
         {t.cloud && <CloudAgentCard p={t.cloud} />}
         {t.prose && <MoProse text={t.prose} />}
+        {t.prose && t.proseClipped && <ClippedNote event={t.proseClipped.key} clipped={t.proseClipped.clipped} />}
         {delegated}
         {t.artifacts.map((a) => (
           <ArtifactCard key={a.id} a={a} sub={`#${ch?.name ?? thread.channel_id} · ${shortTime(a.updated_at, now)}`} onOpen={() => viewer(a)} />
@@ -516,47 +542,85 @@ export function ThreadScreen() {
           </>
         }
       />
-      <div ref={scroll} className="mo-scroll flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-2 pb-4">
-        {view.turns.map((t, i) => {
-          const last = i === view.turns.length - 1;
-          return (
-            <div key={t.key} ref={last ? newest : undefined} className="flex flex-col gap-4">
-              {t.prompts.map((p, k) => (
-                <MoBubble key={k} caption={i === 0 && k === 0 && thread.parent_id ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}` : k > 0 ? 'Sent while it ran' : undefined}>
-                  {p.text}
-                  {p.attachments?.length ? <span className="text-fg-3"> · {plural(p.attachments.length, 'file')}</span> : null}
-                </MoBubble>
-              ))}
-              {t.reports.map((r, k) => (
-                <Report key={k} role={r.role} taskId={r.task_id} text={r.text} />
-              ))}
-              {t.questions.map((q) => (
-                <QuestionCard key={q.id} threadId={thread.id} q={q} touch />
-              ))}
-              {turnBody(t, last)}
-              {t.switches.map((it) => (
-                <SwitchLine key={it.key} it={it} running={thread.status === 'running'} />
-              ))}
-            </div>
-          );
-        })}
-        <HandoffCard
-          thread={thread}
-          handoff={handoff}
-          mobile
-          onChanged={(a) => {
-            applyThread(a.thread, true);
-            setHandoff(a.handoff);
-          }}
-        />
-        {!view.turns.length && <MoEmpty>{thread.setup ? 'Preparing the worktree.' : 'Nothing here yet.'}</MoEmpty>}
-        {/* A question's card above is where Ben answers it. */}
-        {card && card.kind !== 'question' && <NeedsCardView card={card} inThread onRecovered={(r) => {
-              applyThread(r.thread, true);
-              setQueued(r.pending);
-            }} />}
-        {queued.length > 0 && <Pending thread={thread} items={queued} onPending={setQueued} />}
-        {actionError && <ErrorNote>{actionError}</ErrorNote>}
+      <div ref={scroll} className="mo-scroll min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-4 [overflow-anchor:none]">
+        <HistoryCtx.Provider value={history}>
+          <div className="flex flex-col gap-4">
+            <MoContinueLinks links={s.links} onOpen={(id) => shell.open(href.thread(id))} />
+            {view.turns.map((t, i) => {
+              const last = i === view.turns.length - 1;
+              const edge = edges.get(t.key);
+              return (
+                <Fragment key={t.key}>
+                  {edge && <HistoryEdgeRow edge={edge} history={history} touch />}
+                  <div data-key={t.key} ref={last ? newest : undefined} className="flex flex-col gap-4">
+                    {t.prompts.map((p, k) => (
+                      <Fragment key={k}>
+                        <MoBubble
+                          caption={
+                            p.source === 'pr-watch'
+                              ? 'PR watch'
+                              : i === 0 && k === 0 && thread.parent_id && atStart(history.history)
+                                ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`
+                                : k > 0
+                                  ? 'Sent while it ran'
+                                  : undefined
+                          }
+                          above={<ContextChips records={p.context} align="end" className="w-full max-w-[86%]" />}
+                        >
+                          {p.text || p.attachments?.length || !hasContext(p.context) ? (
+                            <>
+                              {p.text}
+                              {p.attachments?.length ? <span className="text-fg-3"> · {plural(p.attachments.length, 'file')}</span> : null}
+                            </>
+                          ) : null}
+                          {p.items?.length ? <PRWakeList items={p.items} more={p.more} /> : null}
+                        </MoBubble>
+                        <ClippedNote event={p.key} clipped={p.clipped} className="-mt-2.5 justify-end" />
+                      </Fragment>
+                    ))}
+                    {t.reports.map((r, k) => (
+                      <Report key={k} role={r.role} taskId={r.task_id} text={r.text} />
+                    ))}
+                    {t.questions.map((q) => (
+                      <QuestionCard key={q.id} threadId={thread.id} q={q} touch />
+                    ))}
+                    {turnBody(t, last)}
+                    {t.switches.map((it) => (
+                      <SwitchLine key={it.key} it={it} running={thread.status === 'running'} />
+                    ))}
+                  </div>
+                </Fragment>
+              );
+            })}
+            {edges.get(-1) && <HistoryEdgeRow edge={edges.get(-1)!} history={history} touch />}
+            <HandoffCard
+              thread={thread}
+              handoff={handoff}
+              mobile
+              onChanged={(a) => {
+                applyThread(a.thread, true);
+                setHandoff(a.handoff);
+              }}
+            />
+            {!view.turns.length && !thread.setup && <MoEmpty>Nothing here yet.</MoEmpty>}
+            <SetupCard
+              thread={thread}
+              mobile
+              onRetried={(t, pending) => {
+                // Retry keeps updated_at, so it must win a tie.
+                applyThread(t);
+                setQueued(pending);
+              }}
+            />
+            {/* A question's card above is where Ben answers it, and the setup card is where he retries setup. */}
+            {card && card.kind !== 'question' && card.kind !== 'setup' && <NeedsCardView card={card} inThread onRecovered={(r) => {
+                  applyThread(r.thread, true);
+                  setQueued(r.pending);
+                }} />}
+            {queued.length > 0 && <Pending thread={thread} items={queued} onPending={setQueued} />}
+            {actionError && <ErrorNote>{actionError}</ErrorNote>}
+          </div>
+        </HistoryCtx.Provider>
       </div>
       <MoComposer
         thread={thread}

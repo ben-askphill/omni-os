@@ -5,6 +5,8 @@ import { Chip, CopyButton, StatusDot } from '../../ui.tsx';
 import { duration, fullDate, plural } from '../../../format.ts';
 import { href } from '../../../router.ts';
 import { cloudAgentUrl } from '../../../cloud-agent.ts';
+import type { ThreadLinks } from '../../../continue.ts';
+import { ContinueLinkItem } from '../../ContinueLinks.tsx';
 
 export interface InitP {
   model?: string;
@@ -81,6 +83,7 @@ export function DetailsTab({
   init,
   lastResult,
   warm,
+  links,
 }: {
   thread: Thread;
   channel: Channel | undefined;
@@ -89,6 +92,7 @@ export function DetailsTab({
   init: InitP | null;
   lastResult: ResultP | null;
   warm: boolean | undefined;
+  links: ThreadLinks;
 }) {
   const cwd = init?.cwd || thread.cwd;
   const cloud = thread.harness === 'cursor-cloud';
@@ -153,6 +157,20 @@ export function DetailsTab({
             <a href={href.thread(parent.id)} className="inline-flex items-center gap-1.5 hover:underline">
               <StatusDot status={parent.status} size={6} /> {parent.title}
             </a>
+          </Row>
+        )}
+        {links.from && (
+          <Row k="Continued from">
+            <ContinueLinkItem link={links.from} carried />
+          </Row>
+        )}
+        {links.into.length > 0 && (
+          <Row k="Continued in">
+            <div className="flex flex-col gap-1">
+              {links.into.map((l) => (
+                <ContinueLinkItem key={l.id} link={l} />
+              ))}
+            </div>
           </Row>
         )}
         {init?.mcp && init.mcp.length > 0 && (

@@ -5,6 +5,7 @@ import { publishFeed, publishThread } from '../bus.ts';
 import { onToolResult } from '../published.ts';
 import { turnFinished } from '../sync/files.ts';
 import { observeToolResult } from '../tool-failures.ts';
+import { toolTails } from '../tool-tail.ts';
 import { type ModUi, type Record as StreamRecord, type TaskUpdate } from '../stream.ts';
 import { armIdle, clearInterrupt, endTurn, requeueHeld, teardown } from './session.ts';
 import { finishTurnSnapshot, startTurnSnapshot } from './snapshots.ts';
@@ -232,6 +233,7 @@ export function onRecord(live: Live, rec: StreamRecord) {
       const row = addEvent(id, rec.kind, rec.payload);
       if (opens) live.turnFrom = row.id - 1;
       if (rec.kind === 'tool_result') {
+        toolTails.end(id, rec.payload.tool_use_id);
         // Separate from transcript publishing: capture failure must not prevent result delivery.
         if (rec.payload.is_error) {
           try {

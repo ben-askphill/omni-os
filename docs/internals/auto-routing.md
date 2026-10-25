@@ -15,7 +15,7 @@ Auto picks a new thread's harness, model and effort from its first prompt (`apps
 Each lane is a reason to leave Claude Code's tier model. A lane whose harness is signed out or at 90% of a plan window yields, and the next is tried.
 
 1. **Image generation: Codex**, busy or not, since nothing else here makes images. Codex's `imageGeneration` item carries the PNG as base64; `codex/images.ts` writes it to the thread's artifacts and the transcript row keeps only the file name.
-2. **Connectors: Claude Code**, busy or not. Gmail, Calendar, Notion, Slack, Productive and the Portal are claude.ai connectors, which only Claude Code loads. Omni's own MCP servers reach every harness.
+2. **Connectors: Claude Code**, busy or not. Gmail, Calendar, Notion, Slack, Productive and the Portal are claude.ai connectors, which only Claude Code loads. Omni's own MCP servers reach Claude Code, Codex and Cursor Agent. Hermes and Cursor Cloud have no Omni MCP servers.
 3. **Review: Codex.** A second model family catches what the first misses in its own work.
 4. **Claude plan busy: Codex.**
 5. **Both plans busy, code: Composer.**
@@ -32,7 +32,7 @@ Not given a lane:
 
 ## What the benchmarks say
 
-Two public benchmarks, each with per-prompt results for a cheap, a middle and a strong model. `scripts/route-eval/fetch.sh` downloads both at pinned revisions; `npm run route-eval -- <file> --split test` prints everything below. Halves are split by id hash; only the dev half is fitted.
+Two public benchmarks, each with per-prompt results for a cheap, a middle and a strong model. `apps/server/scripts/route-eval/fetch.sh` downloads both at pinned revisions; from `apps/server`, `npm run route-eval -- <file> --split test` prints everything below. Halves are split by id hash; only the dev half is fitted.
 
 - **RouterBench** (Hu et al. 2024, arXiv:2403.12031): 36,497 single-turn prompts, Mixtral 8x7B / GPT-3.5 / GPT-4 as light / standard / heavy.
 - **SWE-bench Verified**: 500 GitHub issues with a human time-to-fix estimate, and the same Anthropic tool scaffold run with Claude 3.5 Haiku (40.6% resolved), 3.5 Sonnet (49.0%) and 4 Opus (73.2%).
@@ -65,7 +65,7 @@ What follows from them:
 
 ## Checking a change
 
-1. `scripts/route-eval/fetch.sh` (RouterBench's pickle is checked against a pinned SHA-256 before it is opened).
+1. From the repo root, `apps/server/scripts/route-eval/fetch.sh` (RouterBench's pickle is checked against a pinned SHA-256 before it is opened).
 2. From `apps/server`, after changing a cue or prior: `npm run route-fit -- <dir>/swebench.jsonl`, then commit `auto-weights.json`.
-3. `npm run route-eval -- <dir>/swebench.jsonl --split test` and the same for `routerbench.jsonl`. Report the p-value with any quality gain; a gain without one is noise.
+3. From `apps/server`, `npm run route-eval -- <dir>/swebench.jsonl --split test` and the same for `routerbench.jsonl`. Report the p-value with any quality gain; a gain without one is noise.
 4. `--scores <file>` scores any other router from JSONL of `{id, difficulty}`.

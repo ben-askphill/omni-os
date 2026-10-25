@@ -6,8 +6,13 @@ import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
 import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
+import type { DeliveryPage, DeliveryView } from '@omni/shared/automation-triggers.ts';
+import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/automation-events.ts';
+import type { ContinueLink } from '@omni/shared/continue.ts';
+import type { Clipped, HistoryHead } from '@omni/shared/history.ts';
+import { outputQuery, type OutputChunk } from '@omni/shared/tool-output.ts';
 
-export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult };
+export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, DeliveryView, DeliveryPage };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number };
@@ -116,6 +121,18 @@ export interface ThreadDetail {
   blocked?: string;
   /** A handoff to or from another synced Mac that is under way or just settled. Older servers leave it out. */
   handoff?: HandoffView | null;
+  /** The thread this one continues on another harness, and the threads that continue it. Older servers leave them out. */
+  continued_from?: ContinueLink | null;
+  continued_in?: ContinueLink[];
+}
+
+/** A row of a history page: one too big to page whole comes clipped, and GET /threads/:id/events/:eventId has it all. */
+export type HistoryEvent = EventRow & { clipped?: Clipped };
+
+/** GET /threads/:id?history=recent: the detail with the newest page of events. Older servers send every event and no `history`. */
+export interface ThreadOpen extends Omit<ThreadDetail, 'events'> {
+  events: HistoryEvent[];
+  history?: HistoryHead;
 }
 
 /** How a message reaches a busy thread: read at its next step, run after the turn, or interrupt then run. */
@@ -137,6 +154,8 @@ export interface PendingMsg {
   /** A crew report: the thread that reported. */
   thread_id?: string;
   attachments?: Attachment[];
+  /** Message context records (packages/shared/message-context.ts), as stored: read them with `readContexts`. */
+  context?: unknown;
   /** Sent through the API: the client's request id, and where the server's saved copy is (apps/server/db/repos/requests.ts). */
   request_id?: string;
   /** `recovered` and `uncertain` (shown with `state: 'held'`) wait on Ben after a restart. */
@@ -163,6 +182,8 @@ export interface SearchHit {
   status: string;
   updated_at: string;
   snippet: string;
+  /** The event the snippet is from; null for a title match. Older servers leave it out. */
+  event_id?: number | null;
 }
 
 export interface Checks {
@@ -277,23 +298,18 @@ export interface AutomationRun {
   status: string | null;
   title: string | null;
 }
-export interface AutomationTrigger {
-  event: 'pr_opened' | 'pr_checks_failed' | 'pr_conflict' | 'pr_review' | (string & {});
-  repo?: string;
-  drafts: boolean;
-  /** `any`: outside authors and fork PRs fire too. Unset, only the repo's owners, members and collaborators. */
-  trust?: 'any';
-}
+/** A PR change on GitHub, a page a thread published (`artifact_published`), or a signed GitHub webhook (`github_webhook`). */
+export type AutomationTrigger = PrTrigger | ArtifactTrigger | WebhookTrigger;
 export interface Automation {
   id: string;
   name: string;
   /** Empty for an event automation. */
   cron: string;
-  /** Set for an event automation: it runs when this happens on GitHub instead of on a schedule. */
+  /** Set for an event automation: it runs when this happens instead of on a schedule. */
   on?: AutomationTrigger;
-  /** The repo an event automation watches (its `on.repo`, else its channel's), null when there is none. */
+  /** The repo a PR automation watches (its `on.repo`, else its channel's), null when there is none. */
   repo?: string | null;
-  /** Why the last GitHub poll for an event automation failed. */
+  /** Why the last GitHub poll for a PR automation failed. */
   poll_error?: string | null;
   timezone: string;
   channel: string;
@@ -305,6 +321,12 @@ export interface Automation {
   error?: string;
   next?: string | null;
   runs: AutomationRun[];
+  /** Published pages or GitHub webhooks delivered to the automation, newest first, at most 5. Empty for the rest. */
+  deliveries: DeliveryView[];
+  /** Older deliveries exist: GET /automations/:id/deliveries pages through them. */
+  deliveries_more: boolean;
+  /** Set for a webhook automation: where GitHub posts, and whether this Mac holds the signing secret. `secret` is its Keychain name, never the value. */
+  webhook?: { path: string; secret: string; secret_set: boolean };
 }
 
 export interface SecretRow {
@@ -368,15 +390,20 @@ export type FeedEvent =
   | { type: 'channel'; id: string }
   /** Ben read a thread's result, here or in the Mac app: Needs you changed, nothing else did. */
   | { type: 'needs_you'; thread_id: string }
+  /** A delivery to this automation was saved or changed state. */
+  | { type: 'automation_delivery'; automation: string }
   | { type: 'reconnect' };
 
 // ---------- fetch helpers ----------
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** The parsed reply of a refused request, for the ones that carry more than an `error` (a 409's `code`). */
+  body: unknown;
+  constructor(message: string, status: number, body?: unknown) {
     super(message);
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -399,7 +426,7 @@ export async function pairBrowser(token: string): Promise<boolean> {
   return true;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   // FormData carries its own multipart content type, so never set one for it.
   const form = body instanceof FormData;
   let res: Response;
@@ -408,6 +435,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       method,
       headers: body !== undefined && !form ? { 'Content-Type': 'application/json' } : undefined,
       body: body === undefined ? undefined : form ? body : JSON.stringify(body),
+      signal,
     });
   } catch {
     throw new ApiError('Cannot reach the Omni server. Is it running?', 0);
@@ -430,13 +458,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
         : typeof data === 'string' && data
           ? data.slice(0, 300)
           : `Request failed (${res.status})`;
-    throw new ApiError(msg, res.status);
+    throw new ApiError(msg, res.status, data);
   }
   return data as T;
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>('GET', path),
+  get: <T>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, signal),
   post: <T>(path: string, body: unknown = {}) => request<T>('POST', path, body),
   /** Same body as `post` (or `patch`), plus attachments. Falls back to plain JSON when there are none. */
   send: <T>(path: string, body: Record<string, unknown>, files: File[], method: 'POST' | 'PATCH' = 'POST') => {
@@ -456,11 +484,26 @@ export const harnessesPath = (channel?: string | null) => (channel ? `/harnesses
 
 export const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** What a refused retry or skip (409) says is true of the delivery now, so the row can show it next to the reason. */
+export function refusedDelivery(e: unknown): DeliveryView | undefined {
+  const body = e instanceof ApiError && e.body && typeof e.body === 'object' ? (e.body as { delivery?: unknown }) : undefined;
+  const d = body?.delivery;
+  return d && typeof d === 'object' && typeof (d as { id?: unknown }).id === 'string' ? (d as DeliveryView) : undefined;
+}
+
 export const artifactUrl = (a: Pick<Artifact, 'id' | 'updated_at'>, download = false) =>
   `/api/artifacts/${a.id}/raw?v=${encodeURIComponent(a.updated_at)}${download ? '&download=1' : ''}`;
 
 export const uploadUrl = (threadId: string, a: Pick<Attachment, 'name'>, download = false) =>
   `/api/threads/${encodeURIComponent(threadId)}/uploads/${encodeURIComponent(a.name)}${download ? '?download=1' : ''}`;
+
+/** GET /threads/:id/events/:eventId/output: the chunk of a tool_result's saved text that starts at `offset` (#225). */
+export const getToolOutput = (threadId: string, eventId: number, offset: number, signal: AbortSignal) =>
+  api.get<OutputChunk>(`/threads/${encodeURIComponent(threadId)}/events/${eventId}/output?${outputQuery(offset)}`, signal);
+
+/** GET /threads/:id/tools/:toolUseId/tail: a running call's output. The stream ends with an `end` message, and the caller closes on it. */
+export const openToolTail = (threadId: string, toolUseId: string, onData: (data: unknown) => void) =>
+  openSSE(() => `/api/threads/${encodeURIComponent(threadId)}/tools/${encodeURIComponent(toolUseId)}/tail`, onData);
 
 // ---------- hooks ----------
 
@@ -604,13 +647,20 @@ export type StreamMessage =
   | { type: 'event'; event: EventRow }
   | { type: 'artifact'; artifact: Artifact }
   | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string; handoff?: HandoffView | null }
+  /**
+   * Sent once per connect, after any replayed rows (#224): the detail as GET /threads/:id has it now. `snapshot`: the
+   * gap was too big to replay, so `detail` carries the newest page and its head instead.
+   */
+  | { type: 'sync'; detail: ThreadOpen; snapshot: boolean }
   /** A new reading of the thread's context window. */
   | { type: 'context'; context: ContextUsage }
   | { type: 'mod_toast'; toast: ModToast };
 
-function classifyStream(d: unknown): StreamMessage | null {
+export function classifyStream(d: unknown): StreamMessage | null {
   if (!d || typeof d !== 'object') return null;
   const o = d as Record<string, unknown>;
+  if (o.kind === 'sync' && o.thread)
+    return { type: 'sync', detail: { ...o, events: Array.isArray(o.events) ? o.events : [] } as unknown as ThreadOpen, snapshot: o.catch_up === 'snapshot' && !!o.history };
   if (o.kind === 'artifact' && o.artifact) return { type: 'artifact', artifact: o.artifact as Artifact };
   if (o.kind === 'thread' && o.thread)
     return {
@@ -627,20 +677,12 @@ function classifyStream(d: unknown): StreamMessage | null {
 
 /**
  * Live stream for one thread. `lastId` is read on every (re)connect so no events are missed or
- * duplicated; the caller still dedupes by id. Starts only when `ready` is true (after the
- * initial GET has populated lastId).
+ * duplicated; the caller still dedupes by id. Each connect ends its catch-up with a `sync`, so a
+ * reconnect needs no refetch. Starts only when `ready` is true (after the initial GET has populated lastId).
  */
-export function useThreadStream(
-  threadId: string,
-  ready: boolean,
-  lastId: RefObject<number>,
-  onMessage: (m: StreamMessage) => void,
-  onReconnect: () => void,
-) {
+export function useThreadStream(threadId: string, ready: boolean, lastId: RefObject<number>, onMessage: (m: StreamMessage) => void) {
   const handler = useRef(onMessage);
-  const reconnect = useRef(onReconnect);
   handler.current = onMessage;
-  reconnect.current = onReconnect;
   // True until a connection actually drops, so a slow first byte does not read as "reconnecting".
   const [live, setLive] = useState(true);
 
@@ -653,10 +695,7 @@ export function useThreadStream(
         if (m) handler.current(m);
       },
       {
-        onOpen: (again) => {
-          setLive(true);
-          if (again) reconnect.current();
-        },
+        onOpen: () => setLive(true),
         onDown: () => setLive(false),
       },
     );

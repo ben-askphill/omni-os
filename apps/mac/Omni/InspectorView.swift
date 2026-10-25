@@ -3,7 +3,7 @@ import SwiftUI
 import WebKit
 
 extension View {
-  /// The thread's inspector: Artifacts, Changes, Browser, Terminal and Details in a side panel, its toggle in the toolbar.
+  /// The thread's inspector: Artifacts, Changes, Browser, Terminal, Actions and Details in a side panel, its toggle in the toolbar.
   func threadInspector(model: AppModel, store: ThreadStore) -> some View {
     modifier(ThreadInspector(model: model, store: store))
   }
@@ -67,7 +67,7 @@ private struct ThreadInspector: ViewModifier {
             }
           }
           .buttonStyle(.icon(size: 28, wide: count > 0))
-          .help(count > 0 ? "Artifacts, changes, browser, terminal, details (\(count))" : "Artifacts, changes, browser, terminal, details")
+          .help(count > 0 ? "Artifacts, changes, browser, terminal, actions, details (\(count))" : "Artifacts, changes, browser, terminal, actions, details")
         }
         .sharedBackgroundVisibility(.hidden)
       }
@@ -94,7 +94,7 @@ private struct ThreadInspector: ViewModifier {
           switch command {
           case .open: isOpen.wrappedValue = true
           case .close: isOpen.wrappedValue = false
-          case .artifacts, .changes, .browser, .terminal, .details:
+          case .artifacts, .changes, .browser, .terminal, .actions, .details:
             isOpen.wrappedValue = true
             picked.wrappedValue.tab = InspectorSelection.Tab(rawValue: command.rawValue) ?? .details
           case .turn:
@@ -136,7 +136,7 @@ private struct InspectorPanel: View {
     let files = store.files
     VStack(spacing: 0) {
       HStack(spacing: z(4)) {
-        // Five tabs do not fit a narrow panel: they scroll sideways, as the Web UI's Tabs do, rather than truncate.
+        // Six tabs do not fit a narrow panel: they scroll sideways, as the Web UI's Tabs do, rather than truncate.
         ScrollView(.horizontal) {
           SegmentedPill(
             selection: $selection.tab,
@@ -159,9 +159,11 @@ private struct InspectorPanel: View {
       case .changes:
         ChangesTab(client: model.client, store: store)
       case .browser:
-        BrowserTab(client: model.client, channel: store.thread?.channelID, shots: store.screenshots)
+        BrowserTab(client: model.client, channel: store.thread?.channelID, shots: store.screenshots, thread: store.id, draft: store.draftContext)
       case .terminal:
-        TerminalTab(client: model.client, thread: store.id, cwd: store.thread?.cwd)
+        TerminalTab(client: model.client, thread: store.id, cwd: store.thread?.cwd, draft: store.draftContext)
+      case .actions:
+        ActionsTab(client: model.client, thread: store.id)
       case .details:
         DetailsTab(model: model, store: store)
       }

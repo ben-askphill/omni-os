@@ -13,6 +13,7 @@ import { publishFeed } from './bus.ts';
 import { paths } from './config.ts';
 import { channels, completions, messageRequests, outbox, resultReads, threads, tx, type Thread } from './db.ts';
 import { HARNESS_META, isHarnessId } from './harness/types.ts';
+import { contextBlock, placeFor } from './message-context/project.ts';
 import { handoffView, offerOf, offers, phaseOf, replyOf, writeOffer, writeReply } from './handoff/records.ts';
 import { inOwnWorktree, packWorktree, unpackWorktree, type WorktreeBundle } from './handoff/worktree.ts';
 import { releaseForHandoff, runsHere, saveOwn, wake, type Msg } from './runner.ts';
@@ -23,6 +24,7 @@ import { prepareTurn } from './sync/guard.ts';
 import { toPortable } from './sync/paths.ts';
 import { activeWorker, onSynced, syncStatus, type SyncWorker } from './sync/worker.ts';
 import { reachabilityOf, tailnet } from './tailscale.ts';
+import { withWorkspace } from './workspace.ts';
 
 type Offered = Extract<HandoffOffer, { state: 'offered' }>;
 type Base = Pick<HandoffOffer, 'id' | 'thread' | 'from' | 'to'>;
@@ -64,8 +66,17 @@ function notResumable(t: Thread): string | null {
   return `${name} has not reported this thread's session yet, so another Mac could not resume it. Try again once it has replied.`;
 }
 
-/** What a message the turn never read said: Ben's own words for his, the whole prompt for one Omni wrote. */
-const textOf = (m: Msg) => (!m.byOmni && typeof m.event.payload.text === 'string' ? m.event.payload.text : m.text);
+/**
+ * What a message the turn never read said: Ben's own words for his, the whole prompt for one Omni wrote. Its context
+ * goes as text, unchecked: the other Mac sends it later, as a plain message.
+ */
+function textOf(m: Msg, t: Thread) {
+  const said = !m.byOmni && typeof m.event.payload.text === 'string' ? m.event.payload.text : m.text;
+  if (!m.contexts?.length) return said;
+  const place = placeFor(t);
+  const block = contextBlock(m.contexts, place.remote ? place : { remote: false, read: null });
+  return said ? `${said}\n\n${block}` : block;
+}
 
 /**
  * Ben's Hand off. Refuses with why, or writes the offer and returns at once: the rest runs in the background and
@@ -161,7 +172,7 @@ async function giveAway(offer: HandoffOffer, worker: SyncWorker) {
       bundle = await packWorktree(t.cwd, id, offer.id, worker.transport);
     } else left = await leftBehind(t.cwd, offer.from.name);
     tx(() => {
-      advance(b, { state: 'offered', queued: carried.map(textOf), bundle, leftBehind: left });
+      advance(b, { state: 'offered', queued: carried.map((m) => textOf(m, t)), bundle, leftBehind: left });
       // The other Mac sends them now. Here they leave the queue unsent, as a cancelled message does.
       for (const m of carried) if (m.requestId) messageRequests.mark(m.uuid, 'cancelled');
     });
@@ -262,10 +273,14 @@ async function take(offer: Offered, worker: SyncWorker) {
     const t = threads.get(id);
     // Not here yet, or the giving Mac's stopped row has not arrived: the next sync tries again.
     if (!t || busy(t)) return;
-    if (offer.bundle) {
+    const { bundle } = offer;
+    if (bundle) {
       const repo = channels.get(t.channel_id)?.repo_path;
       if (!t.branch || !repo || !existsSync(repo)) throw new Error(`the channel's repository is not on this Mac${repo ? `: ${repo}` : ''}`);
-      await unpackWorktree({ repo, dir: join(paths.worktrees, id), branch: t.branch, threadId: id, offerId: offer.id, bundle: offer.bundle, transport: worker.transport });
+      const dir = join(paths.worktrees, id);
+      const { branch } = t;
+      // Held like a start, so a cleanup never removes the folder while the handoff lays it out (workspace.ts).
+      await withWorkspace(dir, () => unpackWorktree({ repo, dir, branch, threadId: id, offerId: offer.id, bundle, transport: worker.transport }));
     }
     await prepareTurn(threads.get(id)!, false, true);
     // The download may have taken a while: hear of a Cancel on the other Mac before answering, not after.
