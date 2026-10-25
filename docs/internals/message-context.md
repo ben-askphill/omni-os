@@ -1,6 +1,6 @@
 # Message context
 
-A message can carry typed records next to Ben's text: lines picked in the Changes panel (`diff_selection`), terminal output (`terminal_excerpt`), browser annotations (`browser_annotation`), picked page elements and thread references. The user-facing account is in [Threads](../user/threads.md#point-the-agent-at-lines-of-a-diff).
+A message can carry typed records next to Ben's text: lines picked in the Changes panel (`diff_selection`), terminal output (`terminal_excerpt`), browser annotations (`browser_annotation`), an optional picked page element on that annotation, and thread references (`thread_reference`). The user-facing account is in [Threads](../user/threads.md#point-the-agent-at-lines-of-a-diff).
 
 ## The record
 
@@ -61,7 +61,7 @@ One file per layer and one registry line per layer. Nothing in the core changes.
 
 ## Thread references
 
-`thread_reference` is the fifth kind: another thread Ben points at by identity, not by transcript. Body: `{ thread, title, channel, channel_name, cross_channel, captured_at }` (`packages/shared/message-context-thread.ts`; Swift `ThreadReferenceContext`). The label is `Thread: <title> (<channel> · <first 8 of the id>)`, so two threads with one title differ and a long label, which loses its start, keeps the id.
+`thread_reference` is the fourth kind: another thread Ben points at by identity, not by transcript. Body: `{ thread, title, channel, channel_name, cross_channel, captured_at }` (`packages/shared/message-context-thread.ts`; Swift `ThreadReferenceContext`). The label is `Thread: <title> (<channel> · <first 8 of the id>)`, so two threads with one title differ and a long label, which loses its start, keeps the id.
 
 - **Stamped at send.** The client's record holds what Ben saw in the picker. `POST /api/threads/:id/messages` then calls `stampThreadReferences` (`apps/server/message-context/thread-reference.ts`) and stores the title, the channel's name and the time as the threads are at that moment, so a rename or archive later does not rewrite the sent message. The request fingerprint is of the records Ben sent, and the stamp comes after the retry check, so a retry after a rename or a delete still gets its first answer. A thread that is gone, or the thread itself, refuses the message with a sentence naming the record.
 - **Cross-channel is a choice.** The picker (`GET /api/thread-references?thread=&q=&scope=channel|all`, `apps/server/thread-references-api.ts`) lists the asking thread's channel by default and other channels only for `scope=all`, which the UI offers as its own control. A pick from there sets `cross_channel`. The route compares it with the real channels: a thread in another channel without the flag is refused, and the flag on a same-channel thread is written back as false.

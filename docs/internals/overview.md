@@ -25,6 +25,12 @@ Both clients open a thread with `GET /api/threads/:id?history=recent`: its newes
 
 Durable messages: a message is saved as a request before the client hears it was accepted, so a restart parks it instead of losing it. The states are in [CONTEXT.md](../../CONTEXT.md) under Delivery state.
 
+## Worktree preparation and cleanup
+
+Worktree preparation, continued-thread copying and cleanup share a hold on the working directory (`apps/server/workspace.ts`). A continued thread starts at the source's HEAD with its carried changes; it does not resolve the new-thread base picker. The channel's setup action runs after checkout, outside that hold, while `setup: preparing` still protects the directory.
+
+A running channel action also keeps its worktree from cleanup. Starting an action after cleanup restores the thread's branch through `inWorkspace` before launching the command. Automatic retention is opt-in per Mac; [Known limits](../user/limits.md) describes the removal guards.
+
 ## The channel browser
 
 The channel browser (`apps/server/browser.ts`) is one Chrome per channel that Omni launches on first use (a thread's MCP or the Browser panel) and closes after 5 idle minutes. The panel streams it with a CDP screencast and sends mouse, wheel and keys back (`/api/channels/:id/browser/*`). While someone watches, the page lays out at the viewer's size (`Emulation.setDeviceMetricsOverride`, sharp at the display's scale), so it reads like a real browser window in the panel; the last viewer to report a size wins, and with none watching the agent gets the 1280-wide desktop page back. Input goes in batches: a client queues while a batch is on its way and merges moves and scrolls. The frame is Chrome-like: tabs with favicons, the address bar, a loading bar, and Chrome's Cmd shortcuts (L, T, W, R, [, ], C, X, V; A and Z go to the page).
@@ -34,6 +40,7 @@ The channel browser (`apps/server/browser.ts`) is one Chrome per channel that Om
 The two clients are kept apart so a change to one cannot break the other:
 
 - `apps/web/` imports only `apps/web/`, `packages/shared/` and server types. It never imports `apps/mac/`.
+- Below 768px, `apps/web/src/mobile/MobileShell.tsx` replaces the desktop shell. Phone screens and their parents come from the hash route (`mobile/screens.ts`), and the thread screens share their loaded thread and stream. Check this layout separately from desktop.
 - `apps/mac/` imports only `apps/mac/` and `packages/shared/`. Its Swift code talks to the server over HTTP and SSE, never to `apps/web/`.
 - `packages/shared/` holds the pure TypeScript both need (slash grammar, `/` menu ranking, command pills) and imports only itself. The Mac app runs it through JavaScriptCore from a checked-in bundle: run `npm run build:slash` after changing a slash module.
 - `turbo boundaries` (part of `npm test`) fails on any import that crosses these lines: a file outside its package, a package that is not a declared dependency, or a dependency the tags in `turbo.json` deny.
@@ -48,7 +55,7 @@ An npm workspaces monorepo run with Turborepo (`turbo.json`). Each app and packa
 
 ```
 apps/server/                @omni/server: Hono API (*-api.ts), runner/, harness/ (claude, codex, cursor,
-                            hermes adapters), db/, sync/, sandbox, secrets, terminal, browser, artifacts,
+                            hermes, cursor-cloud adapters), db/, sync/, sandbox, secrets, terminal, browser, artifacts,
                             GitHub, scheduler; scripts/ for history import and sync backfill
 apps/mcp/                   @omni/mcp: omni.ts, the conductor tools; ask.ts, ask_user_question for every thread; threads.ts, read_referenced_thread for every thread but the conductor's
 apps/web/                   @omni/web: Web UI (React, Vite)

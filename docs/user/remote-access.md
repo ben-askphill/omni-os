@@ -19,6 +19,19 @@ Open that link on the phone (AirDrop it, or paste it). Or open the `.ts.net` add
 
 On an iPhone, open the `.ts.net` address in Safari and use Share, then Add to Home Screen. Omni then opens full screen with the phone layout: Activity, Channels and Library tabs, and a + button for a new delegation. A home-screen app can keep its own cookies apart from Safari's, so if it opens on the pairing screen, paste the token there once.
 
+## The phone layout
+
+Below 768px, the Web UI uses its phone layout, whether opened in a browser or saved to the home screen.
+
+- Activity puts Needs you cards first, then Running, Pinned, Recent threads and Done today. Answer a blocker from its card or tap it to open the thread.
+- Channels groups clients, internal and personal channels. A channel shows collapsible folders and ungrouped threads in Active and Recent tabs. Active means Needs you or running; both tab counts include folded folders. Folder order and context menus are managed on desktop.
+- Library lists artifacts with thumbnails. Open one full screen to read or share it.
+- The + button starts a thread with the Conductor or a channel, with model and effort choices, attachments and dictation.
+
+A thread shows each prompt and answer before its folded steps; tap the step count to open them. The thread menu opens Changes, PR, Browser, Terminal, Actions or Details full screen. The PR screen has checks and a slide to squash and merge. Browser is watch-only and supports annotations. Terminal is read-only with tap-to-select output for a message. Automations, Secrets, Sync, Storage and settings pages without a phone-specific screen use the desktop page under a back bar.
+
+Links and reloads return to the same screen. Back uses the parent screen when there is no in-app history. Home-screen setup does not add iOS Live Activities or a lock-screen view.
+
 ## Who can call the API
 
 Every `/api` request needs this install's token. The server makes it on first start: 32 random bytes in `data/api-token`, mode 0600, so only your macOS account can read it (`OMNI_TOKEN` in the server's environment replaces it, for tests and throwaway servers). A file rather than the Keychain: the Mac app and shell scripts read it without a Keychain prompt, and the Keychain would guard it from the same account the file mode already lets in. Delete the file and restart the server to rotate it; every browser then pairs again.

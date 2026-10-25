@@ -436,7 +436,7 @@ The inspector's fourth tab, like the Web UI's `TerminalView.tsx`: the thread's s
 
 ### Actions tab (#210)
 
-The inspector's Actions tab (`Omni/ActionsTab.swift`): the channel's actions with Run (Stop while one runs in this thread), the server's `blocked` reason, and the thread's runs newest first with their bounded output, the newest open. Run, Stop and Retry refusals (a taken fixed port is a 409) show inline. No push events: it polls GET /api/threads/:id/actions every second while a run runs, from a `.task` that ends when the tab leaves the screen. A new HTML artifact does not pull the inspector off it.
+The inspector's Actions tab (`Omni/ActionsTab.swift`): the channel's actions with Run (Stop while one runs in this thread), the server's `blocked` reason, and the thread's runs newest first with their bounded output, the newest open. Run, Stop and Retry refusals (a taken fixed port is a 409) show inline. A live action keeps its worktree from cleanup; Run on a removed worktree restores the thread's branch before the command starts. No push events: it polls GET /api/threads/:id/actions every second while a run runs, from a `.task` that ends when the tab leaves the screen. A new HTML artifact does not pull the inspector off it.
 
 ## Artifacts page (#69)
 
@@ -661,7 +661,7 @@ Wired (both composers):
 
 - The inspector's Changes tab (`Omni/ChangesTab.swift`), as the Web UI's `ChangesTab.tsx`: GET /api/threads/:id/changes (`apps/server/changes.ts`), the thread's checkout against the base commit Omni recorded (`thread_bases`, local), in committed, staged, unstaged and untracked groups. Loads when opened, when a turn ends and on Refresh. A thread with no checkout here (Hermes, no repo, another Mac) shows the server's reason.
 - OmniKit: `Changes.swift` (`BranchChanges`, `ChangesView`, `OmniClient.changes(forThread:)`); `DiffParser.swift` now numbers lines (`DiffLine`, `FileDiff.rows`), the same model as `apps/web/src/diff.ts`. `DiffFileView` in `DiffView.swift` draws one file for the PR page and the Changes tab (label, status badge, notice). Fixtures `changes.json`, `changes-unavailable.json`.
-- The inspector's tabs scroll sideways when the panel is too narrow for all five.
+- The inspector's tabs scroll sideways when the panel is too narrow to show them all.
 - QA step: `{"inspector": "changes"}`.
 
 ## This turn (#208)
@@ -680,7 +680,7 @@ Wired (both composers):
 
 ## Lines of a diff in a message (#209)
 
-- The record and its rules are [docs/internals/message-context.md](../../docs/internals/message-context.md). OmniKit ports the client half; `MessageContextTests` runs the shared corpus (`packages/test-fixtures/message-context.json`) through it, so the Swift reader and line picker can't drift from the TypeScript.
+- The record and its rules are [docs/internals/message-context.md](../../docs/internals/message-context.md), including terminal excerpts, browser annotations with picked elements, and thread references. OmniKit ports the client half; `MessageContextTests` runs the shared corpus (`packages/test-fixtures/message-context.json`) through it, so the Swift reader and line picker can't drift from the TypeScript.
 - Changes tab: `LinePicking` (LineSelectionDock.swift) wraps each view of the tab. A click on a line's numbers picks it, a Shift-click picks up to it within the hunk, a click on the only picked line clears it. `DiffFileView` takes the pick as `picking`; the PR page passes none and is unchanged. The dock (`LineSelectionDock`) shows the label, a note, Cancel and Add to Message (Return or Cmd-Return in the note, Esc cancels). Since base names the base sha and HEAD; This turn names the snapshots before and after the turn and its id. A reload that changes the picked file's lines drops the pick.
 - `ThreadStore.draftContext` is shared by the Changes tab, the reply box and every window on the thread. The reply box shows it in `DraftContextStrip` above the files; text or records alone can be sent, and a send settles only the records it carried.
 - Chips (`MessageContextChips.swift`) over sent and queued messages and in the reply box; a click opens the kind's detail and the note in a popover. Inline under the strip, it grew the reply box and pushed the window's content up under the title bar. A record this app can't read is a fallback chip: its label (or "Context from a newer Omni") and "This Omni can't show <kind> v<v>. Update Omni to see it." A message of context alone shows no empty bubble.

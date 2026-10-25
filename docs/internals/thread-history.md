@@ -7,6 +7,7 @@ A thread opens with its newest page of events. Older pages load as Ben scrolls u
 ## The routes
 
 - `GET /api/threads/:id?history=recent`: the usual detail, with `events` cut to the newest page and its anchors, plus `history: { from, to: null, results_below }`.
+- `GET /api/threads/:id/transcript`: the text transcript used by a continued thread's Carryover, separate from event paging. Referenced threads have their own bounded history route, described in [Message context](message-context.md#thread-references).
 - `GET /api/threads/:id/history?<cursor>`: `{ events, span }`. The cursor is `historyQuery` of a `HistoryCursor`: `before` and `after` bound it, `take=oldest` fills a gap upward, `at=<event id>` reveals one event.
 - `GET /api/threads/:id/events/:eventId`: one row, never clipped. "Show all" on a clipped row reads it.
 - `GET /api/threads/:id/events/:eventId/output?offset=&limit=`: a chunk of a `tool_result`'s saved text (#225).
