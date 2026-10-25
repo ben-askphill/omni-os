@@ -251,6 +251,10 @@ final class QARunner {
         case .openContext(let index):
           guard let toggle = ContextChipsProbe.toggle, toggle(index) else { throw QAScriptError("no context chip \(index) in the reply box") }
           try? await Task.sleep(for: .milliseconds(400))
+        case .referenceThread(let action):
+          guard let probe = ThreadReferenceProbe.current else { throw QAScriptError("the reply box has no thread reference button") }
+          try await probe.run(action)
+          try? await Task.sleep(for: .milliseconds(500))
         case .quickPrompt(let action):
           guard let quick = Self.quickPrompt else { throw QAScriptError("no Quick Prompt") }
           switch action {
@@ -504,6 +508,7 @@ final class QARunner {
     case .addTerminal(let note): "addTerminal \(note.prefix(40))"
     case .annotate(let action): "annotate \(action)"
     case .openContext(let index): "openContext \(index)"
+    case .referenceThread(let action): "referenceThread \(action)"
     case .quit: "quit"
     }
   }

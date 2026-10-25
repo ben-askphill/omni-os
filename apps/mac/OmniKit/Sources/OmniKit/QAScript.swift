@@ -88,7 +88,24 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"handOff": "<device id>"}`,
 /// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"selectLines": {"file": "<path>", "from": 1, "to": 3}}`,
 /// `{"addContext": "note"}`, `{"selectTerminal": true}`, `{"addTerminal": "note"}`, `{"annotate": "start"}` (or `add`, `cancel`, or
-/// `{"drag": [0.1, 0.2, 0.6, 0.5], "note": "text"}`, or `{"tap": [0.4, 0.3], "note": "text"}`), `{"openContext": 0}`, `{"quit": true}`.
+/// `{"drag": [0.1, 0.2, 0.6, 0.5], "note": "text"}`, or `{"tap": [0.4, 0.3], "note": "text"}`), `{"openContext": 0}`, `{"referenceThread": "open"}` (or `close`, `all`, `channel`, `{"search": "text"}`, `{"pick": 0}`), `{"quit": true}`.
+/// What a `referenceThread` step does to the reply box's picker.
+public enum QAReference: Hashable, Sendable {
+  case open, close, all, channel
+  case search(String)
+  case pick(Int)
+
+  init?(rawValue: String) {
+    switch rawValue {
+    case "open": self = .open
+    case "close": self = .close
+    case "all": self = .all
+    case "channel": self = .channel
+    default: return nil
+    }
+  }
+}
+
 public enum QAStep: Hashable, Sendable {
   case route(Route)
   case wait(QACondition, timeout: Duration)
@@ -152,6 +169,8 @@ public enum QAStep: Hashable, Sendable {
   case annotate(QAAnnotate)
   /// Clicks the reply box's context chip at this index, which opens or closes its inspector.
   case openContext(Int)
+  /// The reply box's thread reference picker: open or close its popover, pick a scope, search, or attach the row at an index.
+  case referenceThread(QAReference)
   case quit
 
   static let defaultTimeout = Duration.seconds(10)
@@ -246,7 +265,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "openContext", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "openContext", "referenceThread", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -385,6 +404,18 @@ public struct QAScript: Hashable, Sendable {
     case "openContext":
       guard let i = value as? Int, i >= 0 else { throw QAScriptError("openContext takes the chip's index, from 0") }
       return .openContext(i)
+    case "referenceThread":
+      switch value {
+      case let name as String:
+        guard let action = QAReference(rawValue: name) else { throw QAScriptError("referenceThread takes open, close, all, channel, {\"search\": text} or {\"pick\": index}") }
+        return .referenceThread(action)
+      case let o as [String: Any]:
+        if let q = o["search"] as? String { return .referenceThread(.search(q)) }
+        if let i = o["pick"] as? Int, i >= 0 { return .referenceThread(.pick(i)) }
+        throw QAScriptError("referenceThread takes {\"search\": text} or {\"pick\": index}")
+      default:
+        throw QAScriptError("referenceThread takes open, close, all, channel, {\"search\": text} or {\"pick\": index}")
+      }
     default:
       return .quit
     }

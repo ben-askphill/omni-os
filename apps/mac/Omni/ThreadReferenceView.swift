@@ -19,7 +19,7 @@ private struct ThreadReferenceDetail: View {
 
   private var when: String {
     OmniJSON.parseDate(reference.capturedAt).map {
-      $0.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour(.twoDigits(amPM: .omitted)).minute())
+      $0.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
     } ?? reference.capturedAt
   }
 

@@ -25,17 +25,26 @@ struct ThreadReferenceButton: View {
     .disabled(disabled)
     .help("Reference another thread")
     .accessibilityLabel("Reference another thread")
-    .popover(isPresented: $open, arrowEdge: .top) {
-      ThreadReferencePanel(picker: picker) { open = false }
+    // Anchored to a strip as wide as the list that starts at the button, so the list opens over the composer rather than
+    // hanging out of the window to the button's left.
+    .background(alignment: .leading) {
+      Color.clear
+        .frame(width: ThreadReferencePanel.width, height: 1)
+        .popover(isPresented: $open, arrowEdge: .top) { ThreadReferencePanel(picker: picker) { open = false } }
     }
     #if DEBUG
-    .onAppear { ThreadReferenceProbe.open = { open = $0 } }
-    .onDisappear { ThreadReferenceProbe.open = nil }
+    .onAppear {
+      let picker = picker
+      let open = $open
+      ThreadReferenceProbe.current = ThreadReferenceProbe(picker: picker, setOpen: { open.wrappedValue = $0 })
+    }
+    .onDisappear { ThreadReferenceProbe.current = nil }
     #endif
   }
 }
 
 struct ThreadReferencePanel: View {
+  static var width: CGFloat { z(360) }
   @Bindable var picker: ThreadReferencePicker
   let picked: () -> Void
   @FocusState private var searching: Bool
@@ -89,7 +98,7 @@ struct ThreadReferencePanel: View {
         .padding(.horizontal, z(16))
         .padding(.vertical, z(10))
     }
-    .frame(width: z(360))
+    .frame(width: Self.width)
     .background(Tok.elev)
     .task(id: SearchKey(query: picker.query, scope: picker.scope)) {
       // A beat after the last keystroke; the first search at once.
@@ -155,8 +164,26 @@ struct ThreadReferencePanel: View {
 }
 
 #if DEBUG
-/// QA: the open reply box's thread reference popover.
-@MainActor enum ThreadReferenceProbe {
-  static var open: ((Bool) -> Void)?
+/// The QA harness's way to the reply box's thread reference picker (`{"referenceThread": "open"}`).
+@MainActor struct ThreadReferenceProbe {
+  static var current: ThreadReferenceProbe?
+  let picker: ThreadReferencePicker
+  let setOpen: (Bool) -> Void
+
+  func run(_ action: QAReference) async throws(QAScriptError) {
+    switch action {
+    case .open:
+      picker.reset()
+      setOpen(true)
+    case .close: setOpen(false)
+    case .all: picker.scope = .all
+    case .channel: picker.scope = .channel
+    case .search(let q): picker.query = q
+    case .pick(let i):
+      guard picker.rows.indices.contains(i) else { throw QAScriptError("the picker has no row \(i)") }
+      guard picker.attach(picker.rows[i]) else { throw QAScriptError(picker.problem ?? "the pick was refused") }
+      setOpen(false)
+    }
+  }
 }
 #endif

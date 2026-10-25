@@ -91,11 +91,13 @@ public enum TerminalExcerptContext: MessageContextKind {
 
   private static let time = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
 
-  /// `2026-10-24T09:30:15.250Z`: that shape exactly, a real time, and written as `format` writes it.
+  /// `2026-10-24T09:30:15.250Z`: that shape exactly and a real time. The milliseconds are not compared after a round
+  /// trip through `Date`, which cannot hold most of them exactly (`.094` came back as `.093`); the seconds are, so
+  /// `2026-02-31T…` is refused.
   static func validTime(_ s: String) -> Bool {
     let shape = s.wholeMatch(of: #/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z/#) != nil
     guard shape, let date = try? time.parse(s) else { return false }
-    return format(date) == s
+    return format(date).prefix(19) == s.prefix(19)
   }
 
   static func format(_ date: Date) -> String { date.formatted(time) }

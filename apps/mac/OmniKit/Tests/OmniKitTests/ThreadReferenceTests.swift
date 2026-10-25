@@ -89,6 +89,16 @@ private actor FakeAPI: ThreadReferenceAPI {
     #expect(label.hasSuffix("· cccccccc)"))
   }
 
+  /// A real clock reading has milliseconds a `Date` cannot hold exactly; the record Ben's pick makes must still read back.
+  @Test func readsBackABodyMadeAtTheCurrentTime() throws {
+    for _ in 0..<500 {
+      let body = ThreadReferenceContext.referenceBody(.init(id: "e5bab466-8ab8-482a-87ae-845c97486b10", title: "Fix", channel: "inbox", channelName: "Inbox"), current: "conductor", at: Date())
+      let r = MessageContext.make(ThreadReferenceContext.self, body: body, note: "", id: "x")
+      #expect(ThreadReferenceContext.parse(r.body, v: 1) == body, "\(body.capturedAt)")
+    }
+    #expect(ThreadReferenceContext.check(try JSONValue(encoding: ThreadReferenceContext.Body(thread: "t", title: "x", channel: "c", channelName: "C", crossChannel: false, capturedAt: "2026-02-31T08:15:30.125Z")), v: 1).failureMessage != nil)
+  }
+
   @Test func registersAsAKind() throws {
     let body = ThreadReferenceContext.referenceBody(.init(id: "t2", title: "Nails", channel: "pink", channelName: "Pink"), current: "shop", at: Date(timeIntervalSince1970: 1_792_916_130.125))
     let r = MessageContext.make(ThreadReferenceContext.self, body: body, note: " the one ", id: "id-1")
