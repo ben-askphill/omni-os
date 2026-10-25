@@ -16,9 +16,13 @@ beforeAll(async () => {
 
 describe('cursor tools, secrets, attachments and crew reports', () => {
   it('loads Omni MCP servers from a per-thread plugin folder with no secret value', async () => {
-    const t = await H.start('CMD hi', { ...cursor, role: 'conductor' });
+    const t = await H.start('PARTIAL_OUTPUT CMD hi', { ...cursor, role: 'conductor' });
     await H.untilResults(t.id, 1);
     const dir = turnFor(t.id).plugin_dir as string;
+    expect(turnFor(t.id).stream_partial).toBe(true);
+    const replies = H.byKind(t.id, 'assistant_text').map((e) => String(e.p.text));
+    expect(replies).toHaveLength(3);
+    expect(replies.join('')).toContain('CMD hi');
     expect(dir).toBeTruthy();
 
     const mcp = JSON.parse(readFileSync(join(dir, '.mcp.json'), 'utf8'));

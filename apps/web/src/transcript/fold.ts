@@ -284,7 +284,12 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         break;
       case 'assistant_text':
         group = null;
-        items.push({ type: 'text', key: e.id, at: e.created_at, p: parsePayload<TextP>(e), ...(e.clipped && { clipped: e.clipped }) });
+        {
+          const p = parsePayload<TextP>(e);
+          const last = items[items.length - 1];
+          if (last?.type === 'text' && !last.clipped && !e.clipped) last.p.text += p.text;
+          else items.push({ type: 'text', key: e.id, at: e.created_at, p, ...(e.clipped && { clipped: e.clipped }) });
+        }
         break;
       case 'result': {
         const p = parsePayload<ResultP>(e);

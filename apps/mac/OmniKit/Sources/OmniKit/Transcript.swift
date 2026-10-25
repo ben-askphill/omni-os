@@ -413,7 +413,13 @@ public struct Transcript: Sendable {
 
   private mutating func close(_ item: TranscriptItem?) {
     open = nil
-    if let item { all.append(item) }
+    guard let item else { return }
+    if case .text(_, _, let text) = item,
+       case .text(let firstID, let firstAt, let previous)? = all.last {
+      all[all.count - 1] = .text(eventID: firstID, at: firstAt, previous + text)
+    } else {
+      all.append(item)
+    }
   }
 
   private mutating func addCall(_ use: ToolUse, _ e: EventRow) {
@@ -550,7 +556,11 @@ extension Transcript {
         rows.append(.item(.user(eventID: e.id, at: e.createdAt, m)))
       case .assistantText(let t):
         group = nil
-        rows.append(.item(.text(eventID: e.id, at: e.createdAt, t)))
+        if case .item(.text(let firstID, let firstAt, let previous))? = rows.last {
+          rows[rows.count - 1] = .item(.text(eventID: firstID, at: firstAt, previous + t))
+        } else {
+          rows.append(.item(.text(eventID: e.id, at: e.createdAt, t)))
+        }
       case .result(let r):
         if r.ok && (r.turns ?? 0) == 0 { break }
         group = nil

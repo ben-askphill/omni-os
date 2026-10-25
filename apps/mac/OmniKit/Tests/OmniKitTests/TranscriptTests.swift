@@ -51,6 +51,15 @@ private func recorded(_ name: String) throws -> [EventRow] {
     #expect(r.turns == 2)
   }
 
+  @Test func joinsStreamedAssistantChunksIntoOneMarkdownMessage() throws {
+    let e = try events([text("**live "), text("answer**")])
+    var t = Transcript()
+    t.update(Array(e.prefix(1)))
+    t.update(e)
+    #expect(t.items.count == 1)
+    guard case .text(1, _, "**live answer**") = t.items[0] else { Issue.record("chunks were not joined"); return }
+  }
+
   @Test func nestsSubAgentCallsUnderTheirTask() throws {
     let e = try events([
       use("t", "Task"), use("g", "Grep", parent: "t"), use("r", "Read", parent: "t"), use("x", "Read", parent: "g"),

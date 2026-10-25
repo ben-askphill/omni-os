@@ -102,7 +102,7 @@ export const cursorAdapter: HarnessAdapter = {
       if (addContext) prompt = `${ctx.systemPrompt}\n\n---\n\n${prompt}`;
       else if (addPolicy) prompt = `${TOOL_FAILURE_POLICY}\n\n---\n\n${prompt}`;
 
-      const args = ['-p', '--output-format', 'stream-json', '--model', modelId, '--trust', '--force', '--sandbox', 'disabled', '--approve-mcps', '--plugin-dir', pluginDir];
+      const args = ['-p', '--output-format', 'stream-json', '--stream-partial-output', '--model', modelId, '--trust', '--force', '--sandbox', 'disabled', '--approve-mcps', '--plugin-dir', pluginDir];
       if (chatId) args.push('--resume', chatId);
       args.push(prompt);
 
@@ -127,6 +127,10 @@ export const cursorAdapter: HarnessAdapter = {
         // Starting a process or opening its session does not mean it accepted the
         // prompt. Cursor echoes the input once read; model output is also evidence.
         const event = evt as { type?: string; subtype?: string; is_error?: boolean };
+        // With partial output enabled, Cursor sends timestamped text chunks as they
+        // arrive, then repeats buffered copies before tool calls and at the end.
+        // Persist only the chunks so the live transcript neither waits nor duplicates text.
+        if (event.type === 'assistant' && typeof (evt as { timestamp_ms?: unknown }).timestamp_ms !== 'number') return;
         const read = event.type === 'user' || event.type === 'assistant' || event.type === 'tool_call'
           || (event.type === 'result' && event.subtype === 'success' && !event.is_error);
         if (!accepted && read) {

@@ -680,7 +680,7 @@ private func historyPage(_ rows: [String], from: Int, to: Int?) throws -> Histor
     try await waitFor("the fresh head") { store.events.last?.id == 54 }
     #expect(store.events.map(\.id) == [1, 2, 20, 21, 22, 50, 51, 52, 53, 54])
     #expect(store.history.spans == [HistorySpan(from: 0, to: nil)], "a head that meets the one held joins it")
-    try await waitFor("laid out") { store.transcript.items.last?.id == .event(54) }
+    try await waitFor("laid out") { store.transcript.items == Transcript.build(store.events, spans: store.history.spans) }
     #expect(store.transcript.items == Transcript.build(store.events, spans: store.history.spans))
     #expect(api.calls("thread") == 1)
   }

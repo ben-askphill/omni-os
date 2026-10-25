@@ -79,7 +79,7 @@ async function runTurn() {
   // The prompt is the last argument.
   const prompt = argv[argv.length - 1] ?? '';
   const sessionId = resume || `chat_${randomUUID().slice(0, 8)}`;
-  log('turn', { model, resume: resume ?? null, prompt, plugin_dir: flagVal('--plugin-dir') ?? null });
+  log('turn', { model, resume: resume ?? null, prompt, plugin_dir: flagVal('--plugin-dir') ?? null, stream_partial: argv.includes('--stream-partial-output') });
   if (process.env.FAKE_CURSOR_TURN_FAIL === '1') {
     process.stderr.write('fake-cursor: turn input rejected\n');
     process.exit(1);
@@ -110,14 +110,22 @@ async function runTurn() {
     await delay(Number(prompt.match(/TOOL:(\d+)/)?.[1] ?? 3));
     write({ type: 'tool_call', subtype: 'completed', call_id, tool_call: { shellToolCall: { args, result: { success: { stdout: 'a\nb\n', stderr: '', exitCode: 0 } } } }, model_call_id });
   }
-  write({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: `ack: ${prompt}` }] } });
+  const reply = `ack: ${prompt}`;
+  // Cursor emits live chunks when --stream-partial-output is enabled, then a buffered
+  // full-text copy without timestamp_ms. Omni should show the chunks and drop the copy.
+  const cuts = [Math.floor(reply.length / 3), Math.floor((reply.length * 2) / 3)];
+  const chunks = prompt.includes('PARTIAL_OUTPUT')
+    ? [reply.slice(0, cuts[0]), reply.slice(cuts[0], cuts[1]), reply.slice(cuts[1])]
+    : [reply];
+  for (const text of chunks) write({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text }] }, timestamp_ms: Date.now() });
 
   if (prompt.includes('HANG')) {
     setInterval(() => {}, 1 << 30); // never emits a result; stay alive until killed
     return;
   }
   await delay(3);
-  write({ type: 'result', subtype: 'success', is_error: false, result: `ack: ${prompt}`, session_id: sessionId, request_id: 'req_1', usage: { inputTokens: 24000, outputTokens: 120, cacheReadTokens: 6000, cacheWriteTokens: 0 } });
+  write({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: reply }] } });
+  write({ type: 'result', subtype: 'success', is_error: false, result: reply, session_id: sessionId, request_id: 'req_1', usage: { inputTokens: 24000, outputTokens: 120, cacheReadTokens: 6000, cacheWriteTokens: 0 } });
   process.exit(0);
 }
 

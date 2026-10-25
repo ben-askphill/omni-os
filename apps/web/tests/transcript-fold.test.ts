@@ -68,6 +68,16 @@ describe('transcript fold', () => {
     expect(group?.calls.map((c) => c.summary)).toEqual(['two', 'second']);
   });
 
+  it('joins streamed assistant chunks into one Markdown message', () => {
+    const events = [
+      { id: 1, kind: 'assistant_text', payload: JSON.stringify({ text: '**live ' }), created_at: '2026-10-25T00:00:00Z' },
+      { id: 2, kind: 'assistant_text', payload: JSON.stringify({ text: 'answer**' }), created_at: '2026-10-25T00:00:01Z' },
+    ];
+    expect(buildItems(events).items).toEqual([
+      { type: 'text', key: 1, at: events[0].created_at, p: { text: '**live answer**' } },
+    ]);
+  });
+
   it('folds task rows onto the agent call', () => {
     const events: TranscriptEvent[] = [
       { id: 1, thread_id: 't', kind: 'task', payload: JSON.stringify({ task_id: 't1', event: 'started', tool_use_id: 'agent', background: true }), created_at: '2026-09-28T07:57:15.000Z' },
