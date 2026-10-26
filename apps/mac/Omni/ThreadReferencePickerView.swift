@@ -8,6 +8,9 @@ struct ThreadReferenceButton: View {
   let disabled: Bool
   @State private var picker: ThreadReferencePicker
   @State private var open = false
+  /// How far the button's right edge is from the window's left edge. A popover centres on its anchor, so the strip
+  /// shrinks until the list's left edge stays inside the window.
+  @State private var room: CGFloat = .infinity
 
   init(client: OmniClient, thread: OmniThread, draft: DraftContextModel, disabled: Bool) {
     self.disabled = disabled
@@ -25,11 +28,12 @@ struct ThreadReferenceButton: View {
     .disabled(disabled)
     .help("Reference another thread")
     .accessibilityLabel("Reference another thread")
+    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { room = max($0, 1) }
     // Anchored to a strip as wide as the list that ends at the button, so the list opens under the header rather than
     // hanging out of the window to the button's right.
     .background(alignment: .trailing) {
       Color.clear
-        .frame(width: ThreadReferencePanel.width, height: 1)
+        .frame(width: min(ThreadReferencePanel.width, max(1, 2 * (room - ThreadReferencePanel.width / 2 - z(12)))), height: 1)
         .popover(isPresented: $open, arrowEdge: .bottom) { ThreadReferencePanel(picker: picker) { open = false } }
     }
     #if DEBUG
