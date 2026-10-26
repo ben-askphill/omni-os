@@ -26,6 +26,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Message context](internals/message-context.md): diff lines, terminal excerpts, browser annotations, thread references and how to add a kind
 - [Glossary](../CONTEXT.md)
 - [Mac app notes](../apps/mac/NOTES.md)
+- [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages
 - [Screenshots on PRs](pr-screenshots.md)
 - Decisions: [0001 Codex app-server](adr/0001-codex-app-server.md) · [0002 Mac app is a client](adr/0002-mac-app-is-a-client.md) · [0003 Hermes remote harness](adr/0003-hermes-remote-harness.md) · [0004 Supabase sync](adr/0004-supabase-sync.md)
 
