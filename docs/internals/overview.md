@@ -2,7 +2,7 @@
 
 One Node server (`apps/server/`, Hono on `node:sqlite`) owns every thread, harness process, secret and automation. The Web UI and the Mac app are two clients of its `/api`. Words like channel, thread, turn and request are defined in [CONTEXT.md](../../CONTEXT.md). Decisions and their reasons are in the [ADRs](../adr/).
 
-Tool-failure diagnostics reuse the runner's normalized `tool_result` records and SQLite connection. Only `is_error` results enter the local failure ledger. The ledger stores allowlisted error categories and summaries, never arguments or raw error bodies. Existing transcripts retain their existing payload behavior. A thread, harness, session and call reference deduplicate repeated reports; missing call references fall back to event IDs. Groups combine harness, tool and category, so unrelated causes can share a group. Triage status and human-written guidance do not disable tools. A new occurrence reopens a fixed group while keeping its guidance. Retry links and recovery observations are explicit through `PATCH /api/tool-failures/occurrences/:id`; successful calls do not imply recovery. This diagnostic state deliberately stays out of sync, so one machine's tool installation and failures do not become another machine's guidance.
+Tool-failure diagnostics reuse the runner's normalized `tool_result` records and SQLite connection. Only `is_error` results enter the local failure ledger. The ledger stores allowlisted error categories and summaries, never arguments or raw error bodies. Existing transcripts retain their existing payload behavior. A shell failure that starts with `Exit code N` is classified from that code (124 timeout, 126 permission, 127 not found, else `command_exit`, or `not_found` when the next lines say the command was missing), not from keywords in the command's own output. A Cursor call rejected before it starts arrives as a completion only; the adapter still records the tool name from that event so the failure is not stored as `unknown`. A thread, harness, session and call reference deduplicate repeated reports; missing call references fall back to event IDs. Groups combine harness, tool and category, so unrelated causes can share a group. Triage status and human-written guidance do not disable tools. A new occurrence reopens a fixed group while keeping its guidance. Retry links and recovery observations are explicit through `PATCH /api/tool-failures/occurrences/:id`; successful calls do not imply recovery. This diagnostic state deliberately stays out of sync, so one machine's tool installation and failures do not become another machine's guidance.
 
 ## How a thread runs
 
@@ -68,7 +68,7 @@ automations/                shared automation YAML, cron or events (yours go in 
 prototypes/                 standalone experiments (not npm workspaces; see prototypes/README.md)
 omni.config.example.json    every field of data/omni.config.json
 mods/                       Claude Code mods loaded with OMNI_MODS=1 (omni-progress)
-scripts/                    shell shim, Mac build, QA stack, PR screenshots, launchd install
+scripts/                    shell shim, Mac build, QA stack, PR screenshots, launchd install, docs-daily
 docs/                       user guides (user/), architecture (internals/), ADRs (adr/), PR screenshot guide
 supabase/                   sync relay migration
 CONTEXT.md                  domain glossary (channel, thread, harness, crew...)
