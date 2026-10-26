@@ -65,6 +65,12 @@ private func decode(_ json: String) throws -> BrowserStreamMessage {
     #expect(BrowserTabInfo(id: "A", url: "about:blank", title: "about:blank").label == "New Tab")
   }
 
+  @Test func splitsTheAddressAtTheHost() {
+    #expect(BrowserTabInfo.splitAddress("localhost:4321/tv?key=1") == (host: "localhost:4321", path: "/tv?key=1"))
+    #expect(BrowserTabInfo.splitAddress("example.com") == (host: "example.com", path: ""))
+    #expect(BrowserTabInfo.splitAddress("a.com?x=1") == (host: "a.com", path: "?x=1"))
+  }
+
   @MainActor @Test func mergesQueuedMovesAndScrolls() {
     var q: [BrowserInput] = []
     for x in [1.0, 2, 3] { ChannelBrowserModel.enqueue(&q, .mouse(.mouseMoved, x: x, y: 0, button: "none", buttons: 0, clickCount: 0, modifiers: 0)) }

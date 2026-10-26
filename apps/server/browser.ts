@@ -65,6 +65,9 @@ const VIEWPORT = { width: 1280, height: 800 };
 const WINDOW_PAGE = { width: 1280, height: 713 };
 
 /** A viewer's size, clamped to what a page can sensibly lay out at. */
+/** Sharp enough that text reads like a native browser's; 100 costs several times the bytes for no visible gain. */
+const SCREENCAST_QUALITY = 95;
+
 export function clampViewport(width: number, height: number, scale = 1) {
   const clamp = (n: number, lo: number, hi: number) => Math.round(Math.min(hi, Math.max(lo, n || lo)));
   return { width: clamp(width, 320, 2560), height: clamp(height, 240, 1600), scale: Math.min(2, Math.max(1, scale || 1)) };
@@ -479,7 +482,7 @@ class ChannelBrowser {
   private async cast(on: boolean) {
     if (!this.session || on === this.casting) return;
     this.casting = on;
-    if (on) await this.page('Page.startScreencast', { format: 'jpeg', quality: 80, maxWidth: 2560 * 2, maxHeight: 1600 * 2, everyNthFrame: 1 }).catch(() => (this.casting = false));
+    if (on) await this.page('Page.startScreencast', { format: 'jpeg', quality: SCREENCAST_QUALITY, maxWidth: 2560 * 2, maxHeight: 1600 * 2, everyNthFrame: 1 }).catch(() => (this.casting = false));
     else await this.page('Page.stopScreencast').catch(() => {});
   }
 

@@ -31,6 +31,12 @@ public struct BrowserTabInfo: Codable, Hashable, Sendable, Identifiable {
     if s.hasSuffix("/"), s.dropLast().allSatisfy({ !"/?#".contains($0) }) { s.removeLast() }
     return s
   }
+
+  /// A displayed address split at the host, so the host reads dark and the path grey.
+  public static func splitAddress(_ shown: String) -> (host: String, path: String) {
+    guard let i = shown.firstIndex(where: { "/?#".contains($0) }) else { return (shown, "") }
+    return (String(shown[..<i]), String(shown[i...]))
+  }
 }
 
 /// A page viewport in CSS pixels.

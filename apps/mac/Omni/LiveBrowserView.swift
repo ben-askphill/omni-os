@@ -105,13 +105,17 @@ struct LiveBrowserView: View {
           .help("Reload (⌘R)")
       }
       HStack(spacing: z(7)) {
-        Image(systemName: s.url.hasPrefix("https://") ? "lock.fill" : s.url.isEmpty || s.url == "about:blank" ? "magnifyingglass" : "info.circle")
-          .font(.omni(size: 10.5, weight: .semibold))
-          .foregroundStyle(Tok.fg3)
         TextField("", text: editing ? $address : .constant(BrowserTabInfo.displayURL(address)), prompt: Text("Search Google or type a URL"))
           .textFieldStyle(.plain)
           .font(.omni(size: 13))
-          .foregroundStyle(Tok.fg)
+          .multilineTextAlignment(editing ? .leading : .center)
+          .foregroundStyle(editing ? Tok.fg : .clear)
+          .overlay {
+            if !editing, case let (host, path) = BrowserTabInfo.splitAddress(BrowserTabInfo.displayURL(address)), !host.isEmpty {
+              (Text(host).foregroundStyle(Tok.fg) + Text(path).foregroundStyle(Tok.fg4))
+                .font(.omni(size: 13)).lineLimit(1).truncationMode(.tail).allowsHitTesting(false)
+            }
+          }
           .focused($editing)
           .onSubmit {
             guard !address.trimmingCharacters(in: .whitespaces).isEmpty else { return }
@@ -124,9 +128,9 @@ struct LiveBrowserView: View {
           }
       }
       .padding(.horizontal, z(11))
-      .frame(height: z(30))
-      .background(editing ? Tok.bg : Tok.surface2, in: Capsule())
-      .overlay(Capsule().strokeBorder(editing ? Tok.lineStrong : .clear, lineWidth: 2))
+      .frame(height: z(34))
+      .background(Tok.bg, in: Capsule())
+      .overlay(Capsule().strokeBorder(editing ? Tok.lineStrong : Tok.line, lineWidth: editing ? 2 : 1))
       .contentShape(Capsule())
       .onTapGesture { editing = true }
       .padding(.leading, z(4))
@@ -176,7 +180,7 @@ struct BrowserTabStrip: View {
     let s = model.state
     let tabs = s.tabs.isEmpty ? [BrowserTabInfo(id: "blank", url: "", title: s.running ? "New Tab" : "Starting")] : s.tabs
     ScrollView(.horizontal, showsIndicators: false) {
-      HStack(alignment: .bottom, spacing: z(2)) {
+      HStack(alignment: .center, spacing: z(4)) {
         ForEach(tabs) { tab in
           let on = tab.id == s.active || tabs.count == 1
           HStack(spacing: z(7)) {
@@ -190,12 +194,12 @@ struct BrowserTabStrip: View {
                 .buttonStyle(.icon(size: 18))
             }
           }
-          .font(.omni(size: 12))
+          .font(.omni(size: 13))
           .foregroundStyle(on ? Tok.fg : Tok.fg3)
           .padding(.leading, z(11))
           .padding(.trailing, z(4))
           .frame(minWidth: z(60), maxWidth: z(208), minHeight: z(32))
-          .background(on ? Tok.bg : .clear, in: UnevenRoundedRectangle(topLeadingRadius: 12, topTrailingRadius: 12, style: .continuous))
+          .background(on ? Tok.surface3 : .clear, in: RoundedRectangle(cornerRadius: z(12), style: .continuous))
           .contentShape(Rectangle())
           .onTapGesture { if !on, s.running { model.perform(.tab(tab.id)) } }
           .help(tab.url)
@@ -204,7 +208,6 @@ struct BrowserTabStrip: View {
           .labelStyle(.iconOnly)
           .buttonStyle(.icon(size: 26))
           .disabled(!s.running)
-          .padding(.bottom, z(3))
       }
       .padding(.horizontal, z(8))
     }

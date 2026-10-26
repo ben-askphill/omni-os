@@ -52,6 +52,12 @@ export function displayUrl(url: string) {
   return url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/^([^/?#]+)\/$/, '$1');
 }
 
+/** A displayed address split at the host, so the host reads dark and the path grey. */
+export function splitAddress(shown: string): [string, string] {
+  const i = shown.search(/[/?#]/);
+  return i < 0 ? [shown, ''] : [shown.slice(0, i), shown.slice(i)];
+}
+
 /**
  * Adds an input event to the queue, merging it into the last one where that loses nothing:
  * consecutive moves keep only the newest, consecutive scrolls add up.
@@ -232,7 +238,7 @@ function TabStrip({ b }: { b: Browser }) {
   const tabs = s?.tabs.length ? s.tabs : [{ id: 'blank', url: '', title: s?.running ? 'New Tab' : 'Starting' }];
   return (
     <div
-      className="scroll-thin flex min-w-0 items-end gap-0.5 overflow-x-auto px-2 pt-0.5"
+      className="scroll-thin flex min-w-0 items-center gap-1 overflow-x-auto px-2 py-1"
       onDoubleClick={(e) => e.target === e.currentTarget && void b.action({ action: 'newTab' })}
       role="tablist"
       aria-label="Browser tabs"
@@ -253,7 +259,7 @@ function TabStrip({ b }: { b: Browser }) {
               }
             }}
             onClick={() => !on && s?.running && void b.action({ action: 'tab', id: t.id })}
-            className="group relative flex h-8 min-w-12 max-w-52 flex-1 cursor-default items-center gap-2 rounded-t-[12px] pr-1 pl-3 text-[12px] text-fg-3 hover:bg-surface-3/60 data-[on=true]:bg-bg data-[on=true]:text-fg"
+            className="group relative flex h-8 min-w-12 max-w-52 flex-1 cursor-default items-center gap-2 rounded-[12px] pr-1 pl-3 text-[13px] text-fg-3 hover:bg-surface-2 data-[on=true]:bg-surface-3 data-[on=true]:text-fg"
           >
             <Favicon tab={t} loading={on && s?.loading} />
             <span className="min-w-0 flex-1 truncate">{t.title || displayUrl(t.url) || 'New Tab'}</span>
@@ -273,7 +279,7 @@ function TabStrip({ b }: { b: Browser }) {
           </div>
         );
       })}
-      <IconButton icon="plus" label="New tab" size={14} className="mb-0.5 h-7 w-7" disabled={!s?.running} onClick={() => void b.action({ action: 'newTab' })} />
+      <IconButton icon="plus" label="New tab" size={14} className="h-7 w-7" disabled={!s?.running} onClick={() => void b.action({ action: 'newTab' })} />
     </div>
   );
 }
@@ -291,7 +297,7 @@ function Toolbar({ b, extra, address }: { b: Browser; extra?: ReactNode; address
     void b.action({ action: 'navigate', url });
     address.current?.blur();
   };
-  const secure = s?.url.startsWith('https://');
+  const [host, path] = splitAddress(displayUrl(url));
   return (
     <div className="flex items-center gap-0.5 px-1.5 py-1.5">
       <IconButton icon="chevronLeft" label="Back (⌘[)" disabled={!s?.canBack} onClick={() => void b.action({ action: 'back' })} />
@@ -302,7 +308,14 @@ function Toolbar({ b, extra, address }: { b: Browser; extra?: ReactNode; address
         <IconButton icon="refresh" label="Reload (⌘R)" size={15} disabled={!s?.running} onClick={() => void b.action({ action: 'reload' })} />
       )}
       <form onSubmit={go} className="relative ml-1 min-w-0 flex-1">
-        <Icon name={secure ? 'lock' : s?.url && s.url !== 'about:blank' ? 'info' : 'search'} size={12} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
+        {!editing && host && (
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center truncate px-4 text-[13px]" aria-hidden>
+            <span className="truncate">
+              <span className="text-fg">{host}</span>
+              <span className="text-fg-4">{path}</span>
+            </span>
+          </span>
+        )}
         <input
           ref={address}
           value={editing ? url : displayUrl(url)}
@@ -324,7 +337,7 @@ function Toolbar({ b, extra, address }: { b: Browser; extra?: ReactNode; address
           aria-label="Address and search bar"
           spellCheck={false}
           autoComplete="off"
-          className="h-8 w-full min-w-0 rounded-full bg-surface-2 pr-3 pl-8 text-[13px] text-fg outline-none placeholder:text-fg-4 hover:bg-surface-3 focus:bg-bg focus:shadow-[inset_0_0_0_2px_var(--line-strong)]"
+          className="h-9 w-full min-w-0 rounded-full border border-line bg-bg px-4 text-center text-[13px] text-fg outline-none placeholder:text-fg-4 hover:bg-surface-2 focus:bg-bg focus:text-left focus:shadow-[inset_0_0_0_2px_var(--line-strong)] [&:not(:focus)]:text-transparent [&:not(:focus)]:caret-transparent [&:not(:focus)]:placeholder:text-fg-4"
         />
       </form>
       {extra}
