@@ -327,7 +327,14 @@ async function start() {
   last = t0;
   setInterval(() => tick().catch((e) => console.error(e)), 1000);
 
+  // Only answer our own origin, so a DNS-rebinding page can't read the stream.
+  const hosts = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
   createServer(async (req, res) => {
+    const origin = req.headers.origin;
+    if (!hosts.has(req.headers.host ?? '') || (origin && !hosts.has(origin.replace(/^https?:\/\//, '')))) {
+      res.writeHead(403).end();
+      return;
+    }
     if (req.url === '/events') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
       send(res, 'snapshot', snapshot());
