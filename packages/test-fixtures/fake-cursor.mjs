@@ -13,6 +13,7 @@
 // Directives in the prompt:
 //   CMD     emit a nested shell tool_call before the reply
 //   TOOL:<ms> delay the CMD completion so tests can observe the started row
+//   REJECT  emit a glob tool_call that fails with no started event, as Cursor does for a too-broad pattern
 //   CRASH   exit(1) once the prompt is echoed, like the process dying mid-turn
 //   HANG    emit init + assistant but no result, and stay alive until killed
 //   ORPHAN  first leave a child behind that holds our stdout until it is killed (two minutes at most), like a
@@ -109,6 +110,10 @@ async function runTurn() {
     write({ type: 'tool_call', subtype: 'started', call_id, tool_call: { shellToolCall: { args } }, model_call_id });
     await delay(Number(prompt.match(/TOOL:(\d+)/)?.[1] ?? 3));
     write({ type: 'tool_call', subtype: 'completed', call_id, tool_call: { shellToolCall: { args, result: { success: { stdout: 'a\nb\n', stderr: '', exitCode: 0 } } } }, model_call_id });
+  }
+  if (prompt.includes('REJECT')) {
+    const args = { globPattern: '**/*', targetDirectory: '/w' };
+    write({ type: 'tool_call', subtype: 'completed', call_id: 'tc_2\nfc_2', tool_call: { globToolCall: { args, result: { error: { errorMessage: 'Glob pattern matches every file and is not allowed.' } } } }, model_call_id: 'req_1-0-abcd' });
   }
   const reply = `ack: ${prompt}`;
   // Cursor emits live chunks when --stream-partial-output is enabled, then a buffered

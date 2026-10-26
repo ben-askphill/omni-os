@@ -47,6 +47,13 @@ describe('cursor tracer', () => {
     expect(H.byKind(t.id, 'tool_result')[0].p).toMatchObject({ tool_use_id: 'tc_1', text: 'a\nb\n', is_error: false });
   });
 
+  it('names a call Cursor rejects before it starts, so its failure is not an orphan result', async () => {
+    const t = await H.start('REJECT find files', cursor);
+    await H.untilResults(t.id, 1);
+    expect(H.byKind(t.id, 'tool_use').map((e: Ev) => e.p)).toEqual([expect.objectContaining({ id: 'tc_2', name: 'Glob' })]);
+    expect(H.byKind(t.id, 'tool_result')[0].p).toMatchObject({ tool_use_id: 'tc_2', is_error: true });
+  });
+
   it('runs with full access and never leaks the Cursor api key', () => {
     const turn = H.cursorRequests().find((r: any) => r.method === 'turn');
     for (const r of H.cursorRequests()) expect(r.cursor_auth).toEqual([]);

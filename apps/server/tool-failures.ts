@@ -14,8 +14,18 @@ const DETAILS: Record<FailureCategory, string> = {
   not_found: 'Requested resource not found.', command_exit: 'Command returned a nonzero exit code.', unknown: 'Tool reported failure; raw details omitted.',
 };
 export function classifyFailure(text: string): FailureCategory {
+  // Every harness reports a failed shell call as "Exit code N" then the command's own output. That output
+  // (test logs, file contents) mentions timeouts, 404s or "unavailable" for reasons unrelated to the failure,
+  // so only the exit code and a missing-command notice count.
+  const exit = /^Exit code (\d+)/.exec(text);
+  if (exit) {
+    if (exit[1] === '127' || /command not found/.test(text.split('\n').slice(1, 3).join('\n'))) return 'not_found';
+    return exit[1] === '124' ? 'timeout' : 'command_exit';
+  }
+  // Claude Code's reply when Ben declines or interrupts a call.
+  if (/^The user doesn't want to proceed with this tool use/.test(text)) return 'permission';
   if (/\b(401|unauthorized|unauthenticated|authentication|invalid.api.key)\b/i.test(text)) return 'authentication';
-  if (/\b(403|forbidden|permission denied|EACCES|EPERM)\b/i.test(text)) return 'permission';
+  if (/\b(403|forbidden|permission denied|access denied|EACCES|EPERM)\b/i.test(text)) return 'permission';
   if (/\b(429|rate.limit|quota.exceeded)\b/i.test(text)) return 'rate_limit';
   if (/\b(timed? ?out|timeout|ETIMEDOUT)\b/i.test(text)) return 'timeout';
   if (/\b(ECONNREFUSED|ECONNRESET|ENOTFOUND|unavailable|502|503|504)\b/i.test(text)) return 'unavailable';

@@ -138,4 +138,15 @@ describe('adapter failure signals', () => {
   it('classifies known signals and safely falls back for arbitrary payloads', () => {
     for (const [text, category] of [['401', 'authentication'], ['EACCES', 'permission'], ['429', 'rate_limit'], ['ETIMEDOUT', 'timeout'], ['ECONNREFUSED', 'unavailable'], ['invalid argument', 'invalid_input'], ['ENOENT', 'not_found'], ['Exit code 1', 'command_exit'], ['PRIVATE PAYLOAD', 'unknown']]) expect(classifyFailure(text)).toBe(category);
   });
+  it('classifies a shell failure by its exit code, never by words in the command output', () => {
+    for (const [text, category] of [
+      ['Exit code 1\n✓ retries after a timeout\n× returns 404 when the service is unavailable', 'command_exit'],
+      ['Exit code 1\nnpm ERR! 429 rate limit\npermission denied: invalid input', 'command_exit'],
+      ['Exit code 127\n(eval):1: command not found: timeout', 'not_found'],
+      ['Exit code 1\n(eval):5: command not found: timeout\nexit 127', 'not_found'],
+      ['Exit code 124\n', 'timeout'],
+      ["The user doesn't want to proceed with this tool use. The tool use was rejected.", 'permission'],
+      ['Error: Access denied: path is not within any of the configured workspace roots.', 'permission'],
+    ]) expect(classifyFailure(text)).toBe(category);
+  });
 });

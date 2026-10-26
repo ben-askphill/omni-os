@@ -114,6 +114,7 @@ export const cursorAdapter: HarnessAdapter = {
       let accepted = false;
       let stderr = '';
       const calls = new CursorCallCounter();
+      const used = new Set<string>();
 
       const splitter = new LineSplitter();
       const handle = (line: string) => {
@@ -146,7 +147,19 @@ export const cursorAdapter: HarnessAdapter = {
           chatId = parsed.sessionId;
           if (chatId !== thread.session_id) cb.session(chatId);
         }
-        for (const r of parsed.records) cb.record(r);
+        for (const r of parsed.records) {
+          if (r.kind === 'tool_use') used.add(r.payload.id);
+          else if (r.kind === 'tool_result' && !used.has(r.payload.tool_use_id) && event.type === 'tool_call') {
+            // Cursor sends only the completion for a call it rejects before running (a glob that matches
+            // everything), so the result would have no row naming its tool. Add the row its start would have.
+            const use = normalizeCursor({ ...evt, subtype: 'started' }).records.find((u) => u.kind === 'tool_use');
+            if (use?.kind === 'tool_use' && use.payload.id === r.payload.tool_use_id) {
+              used.add(use.payload.id);
+              cb.record(use);
+            }
+          }
+          cb.record(r);
+        }
         if (parsed.result && accepted) {
           resultSeen = true;
           if (parsed.usage) {
