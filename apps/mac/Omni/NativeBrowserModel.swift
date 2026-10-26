@@ -255,12 +255,18 @@ final class NativeTab: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownloadD
     guard let url = action.request.url, let scheme = url.scheme?.lowercased() else { return .allow }
     if ["http", "https", "about", "blob", "data"].contains(scheme) { return .allow }
     // mailto:, tel: and the like belong to the app that handles them; anything else does not load.
-    if ["mailto", "tel", "sms", "facetime"].contains(scheme) { NSWorkspace.shared.open(url) }
+    // Only a click in the top frame opens another app: a script or a frame cannot launch one.
+    if ["mailto", "tel", "sms", "facetime"].contains(scheme),
+       action.navigationType == .linkActivated, action.sourceFrame.isMainFrame {
+      NSWorkspace.shared.open(url)
+    }
     return .cancel
   }
 
   func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse) async -> WKNavigationResponsePolicy {
-    response.canShowMIMEType ? .allow : .download
+    if response.canShowMIMEType { return .allow }
+    // A file the page cannot show downloads only when the top frame asked for it, never a subframe.
+    return response.isForMainFrame ? .download : .cancel
   }
 
   func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) { download.delegate = self }
@@ -349,10 +355,12 @@ final class NativeTab: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownloadD
       target = dir.appendingPathComponent("\(stem) \(n)" + (ext.isEmpty ? "" : ".\(ext)"))
       n += 1
     }
+    // WebKit quarantines the finished file, so Gatekeeper still checks it on first open.
+    owner?.say("Downloading \(target.lastPathComponent) to Downloads")
     return target
   }
 
-  func downloadDidFinish(_ download: WKDownload) { owner?.say(nil) }
+  func downloadDidFinish(_ download: WKDownload) { owner?.say("Saved to Downloads") }
   func download(_ download: WKDownload, didFailWithError error: any Error, resumeData: Data?) { owner?.say("A download failed: \(error.localizedDescription)") }
 }
 
