@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Omni Activity</title>
+<style>
+/* Tokens copied from apps/web/src/index.css (the Omni OS design system). */
+:root {
+  color-scheme: light dark;
+  --canvas: light-dark(#ffffff, #0c0d0f);
+  --bg: light-dark(#ffffff, #121316);
+  --surface: light-dark(#f7f7f6, #191b1e);
+  --surface-2: light-dark(#f1f1f0, #222428);
+  --surface-3: light-dark(#ecebe7, #2a2c31);
+  --elev: light-dark(#ffffff, #212429);
+  --fg: light-dark(#17181a, #eceae5);
+  --fg-2: light-dark(#3c3b37, #b8b7b1);
+  --fg-3: light-dark(#6f6e68, #908f89);
+  --fg-4: light-dark(#9d9c96, #6f6e69);
+  --line: light-dark(rgb(23 24 26 / 0.08), rgb(236 235 231 / 0.08));
+  --line-strong: light-dark(rgb(23 24 26 / 0.16), rgb(236 235 231 / 0.16));
+  --thumb: light-dark(#ffffff, rgb(255 255 255 / 0.14));
+  --ink: #17181a;
+  --live: light-dark(#2b3bff, #7280ff);
+  --vermilion: #ff4420;
+  --needs: var(--vermilion);
+  --done: #c6f52b;
+  --done-edge: light-dark(var(--ink), transparent);
+  --warn: light-dark(#b45309, #f5b544);
+  --wash: color-mix(in srgb, var(--fg) 6%, transparent);
+  --pane-edge: light-dark(rgb(23 24 26 / 0.07), rgb(255 255 255 / 0.09));
+  --shadow-menu:
+    0 0 0 0.5px light-dark(rgb(23 24 26 / 0.08), rgb(255 255 255 / 0.08)),
+    0 2px 4px light-dark(rgb(23 24 26 / 0.04), rgb(0 0 0 / 0.3)),
+    0 18px 44px -10px light-dark(rgb(23 24 26 / 0.2), rgb(0 0 0 / 0.65));
+  --shadow-thumb: 0 1px 2px light-dark(rgb(23 24 26 / 0.09), rgb(0 0 0 / 0.3)), 0 0 0 0.5px light-dark(rgb(23 24 26 / 0.05), rgb(255 255 255 / 0.06));
+  --ease-spring: cubic-bezier(0.24, 1.34, 0.38, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-pulse: 1400ms;
+  --font-sans: "SF Pro", "SF Pro Text", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --font-head: "SF Pro", "SF Pro Display", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --area: color-mix(in srgb, var(--live) 14%, transparent);
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--canvas);
+  color: var(--fg);
+  font: 14px/1.45 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+.wrap { max-width: 1320px; margin: 0 auto; padding: 20px 24px 40px; }
+
+/* ---------- top bar ---------- */
+.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mark { width: 26px; height: 26px; border-radius: 8px; background: var(--fg); display: grid; place-items: center; }
+.mark i { width: 10px; height: 10px; border-radius: 50%; border: 2.5px solid var(--canvas); }
+h1 { font: 600 20px/1.2 var(--font-head); letter-spacing: -0.01em; margin: 0; }
+.host { color: var(--fg-3); font-size: 13px; }
+.spacer { flex: 1; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px;
+  background: var(--surface-2); color: var(--fg-2); font: 500 12px/1 var(--font-sans);
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-4); flex: none; }
+.dot.live { background: var(--live); animation: pulse var(--dur-pulse) ease-in-out infinite; }
+.dot.ok { background: var(--done); box-shadow: 0 0 0 0.5px var(--done-edge); }
+.dot.warn { background: var(--warn); }
+.dot.critical { background: var(--needs); }
+@keyframes pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
+
+/* ---------- controls (one row, above everything they scope) ---------- */
+.controls { display: flex; align-items: center; gap: 8px; margin: 18px 0 14px; flex-wrap: wrap; }
+.seg { display: inline-flex; padding: 2px; border-radius: 999px; background: var(--surface-2); }
+.seg button {
+  appearance: none; border: 0; background: transparent; color: var(--fg-3); cursor: pointer;
+  height: 26px; padding: 0 12px; border-radius: 999px; font: 500 12px/1 var(--font-sans);
+  transition: color 160ms var(--ease-out), background 160ms var(--ease-out);
+}
+.seg button:hover { color: var(--fg); }
+.seg button[aria-pressed="true"] { background: var(--thumb); color: var(--fg); box-shadow: var(--shadow-thumb); }
+.btn {
+  appearance: none; border: 0; cursor: pointer; height: 30px; padding: 0 12px; border-radius: 999px;
+  background: var(--surface-2); color: var(--fg-2); font: 500 12px/1 var(--font-sans);
+}
+.btn:hover { background: var(--surface-3); color: var(--fg); }
+.at { color: var(--fg-3); font-size: 12px; min-width: 0; }
+:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+
+/* ---------- stat tiles ---------- */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile, .card { background: var(--surface); border-radius: 16px; box-shadow: 0 0 0 0.5px var(--pane-edge); }
+.tile { padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.label { font: 500 12px/1.2 var(--font-sans); color: var(--fg-3); display: flex; align-items: center; gap: 6px; }
+.big { font: 600 30px/1.1 var(--font-head); letter-spacing: -0.02em; margin-top: 6px; white-space: nowrap; }
+.big small { font: 500 13px/1 var(--font-sans); color: var(--fg-3); letter-spacing: 0; margin-left: 4px; }
+.sub { font-size: 12px; color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.spark { display: block; width: 100%; height: 30px; margin-top: 8px; }
+
+/* ---------- chart cards ---------- */
+.grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; margin-top: 12px; }
+.card { padding: 16px; min-width: 0; }
+.card-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+h2 { font: 600 14px/1.2 var(--font-head); margin: 0; }
+.card-head .note { color: var(--fg-4); font-size: 12px; }
+.chart { margin-top: 12px; }
+.chart + .chart { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.chart-head { display: flex; align-items: baseline; gap: 8px; }
+.chart-head .name { font: 500 12px/1.2 var(--font-sans); color: var(--fg-2); }
+.chart-head .val { margin-left: auto; font: 600 13px/1.2 var(--font-sans); color: var(--fg); }
+.chart-head .unit { color: var(--fg-3); font-weight: 500; }
+.plot { position: relative; margin-top: 6px; outline: none; border-radius: 6px; }
+.plot svg { display: block; width: 100%; overflow: visible; touch-action: none; }
+.plot .axis { font: 500 10px/1 var(--font-sans); fill: var(--fg-4); }
+.plot .grid-line { stroke: var(--line); stroke-width: 1; }
+.plot .base { stroke: var(--line-strong); stroke-width: 1; }
+.plot .bar { fill: var(--live); }
+.plot .bar.dim { opacity: 0.35; }
+.plot .area { fill: var(--area); }
+.plot .line { fill: none; stroke: var(--live); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.plot .hair { stroke: var(--fg-3); stroke-width: 1; }
+.plot .knob { fill: var(--live); stroke: var(--surface); stroke-width: 2; }
+
+/* ---------- table ---------- */
+.table-card { margin-top: 12px; padding: 0; overflow: hidden; }
+.table-card .card-head { padding: 14px 16px 6px; align-items: center; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  text-align: left; font: 500 12px/1.2 var(--font-sans); color: var(--fg-3); padding: 8px 16px;
+  border-bottom: 1px solid var(--line); white-space: nowrap; user-select: none;
+}
+th.num, td.num { text-align: right; }
+th button { all: unset; cursor: pointer; }
+th button:hover, th[aria-sort] button { color: var(--fg); }
+th[aria-sort="descending"] button::after { content: " ↓"; }
+td { padding: 7px 16px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--wash); }
+td .primary { color: var(--fg); font-weight: 500; }
+td .secondary { color: var(--fg-3); font-size: 12px; margin-left: 6px; }
+td.muted { color: var(--fg-3); }
+.tag {
+  display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px; font: 500 11px/1.3 var(--font-sans);
+  background: var(--surface-3); color: var(--fg-2); vertical-align: 1px;
+}
+.mono { font-family: var(--font-mono); font-size: 12px; }
+.meter { display: inline-block; width: 56px; height: 4px; border-radius: 2px; background: var(--surface-3); vertical-align: middle; margin-left: 8px; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--live); border-radius: 2px; }
+.empty { padding: 28px 16px; color: var(--fg-3); text-align: center; }
+
+/* ---------- footer strip (Activity Monitor's bottom pane) ---------- */
+.strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.strip > div { padding: 14px 16px; min-width: 0; }
+.strip > div + div { border-left: 1px solid var(--line); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 12px; margin-top: 8px; }
+.kv dt { color: var(--fg-3); }
+.kv dd { margin: 0; text-align: right; color: var(--fg); }
+.cores { display: flex; align-items: flex-end; gap: 3px; height: 40px; margin-top: 10px; }
+.cores span { flex: 1; background: var(--surface-3); border-radius: 2px; position: relative; height: 100%; overflow: hidden; }
+.cores span i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--live); border-radius: 2px 2px 0 0; transition: height 400ms var(--ease-out); }
+.stack { display: flex; height: 8px; gap: 2px; margin-top: 10px; border-radius: 4px; overflow: hidden; background: var(--surface-3); }
+.stack i { height: 100%; }
+.stack i:nth-child(1) { background: var(--live); }
+.stack i:nth-child(2) { background: var(--fg-2); }
+.stack i:nth-child(3) { background: var(--fg-4); }
+.key { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+
+@media (max-width: 1000px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .hide-md { display: none; }
+}
+@media (max-width: 760px) {
+  .wrap { padding: 16px 16px 32px; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .big { font-size: 24px; }
+  .strip { grid-template-columns: minmax(0, 1fr); }
+  .strip > div + div { border-left: 0; border-top: 1px solid var(--line); }
+  .hide-sm, td .secondary { display: none; }
+  td:first-child { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+  th, td { padding-left: 12px; padding-right: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="mark" aria-hidden="true"><i></i></div>
+    <h1>Activity</h1>
+    <span class="host" id="host"></span>
+    <span class="spacer"></span>
+    <span class="pill" id="status"><span class="dot"></span><span>Connecting</span></span>
+  </header>
+
+  <div class="controls" role="toolbar" aria-label="Dashboard controls">
+    <div class="seg" id="range" role="group" aria-label="Time window">
+      <button data-v="60">1 min</button>
+      <button data-v="300" aria-pressed="true">5 min</button>
+      <button data-v="900">15 min</button>
+    </div>
+    <button class="btn" id="pause" aria-pressed="false">Pause</button>
+    <span class="at" id="at"></span>
+  </div>
+
+  <section class="tiles" aria-label="Now">
+    <div class="tile">
+      <span class="label">Output tokens</span>
+      <span class="big" id="t-out">–</span>
+      <span class="sub" id="t-out-sub"></span>
+      <svg class="spark" id="s-out" aria-hidden="true"></svg>
+    </div>
+    <div class="tile">
+      <span class="label">Input tokens</span>
+      <span class="big" id="t-inp">–</span>
+      <span class="sub" id="t-inp-sub"></span>
+      <svg class="spark" id="s-inp" aria-hidden="true"></svg>
+    </div>
+    <div class="tile">
+      <span class="label">CPU</span>
+      <span class="big" id="t-cpu">–</span>
+      <span class="sub" id="t-cpu-sub"></span>
+      <svg class="spark" id="s-cpu" aria-hidden="true"></svg>
+    </div>
+    <div class="tile">
+      <span class="label">Memory <span class="dot" id="t-mem-dot"></span><span id="t-mem-pressure"></span></span>
+      <span class="big" id="t-mem">–</span>
+      <span class="sub" id="t-mem-sub"></span>
+      <svg class="spark" id="s-mem" aria-hidden="true"></svg>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <div class="card-head"><h2>Token throughput</h2><span class="note">tokens per second, every agent session on this Mac</span></div>
+      <div class="chart" data-key="out" data-kind="bar" data-fmt="tok" data-name="Output" data-h="96"></div>
+      <div class="chart" data-key="inp" data-kind="bar" data-fmt="tok" data-name="Input, fresh and cache writes" data-h="72"></div>
+      <div class="chart" data-key="cr" data-kind="bar" data-fmt="tok" data-name="Cache reads" data-h="72"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>System</h2></div>
+      <div class="chart" data-key="cpu" data-kind="area" data-fmt="pct" data-name="CPU" data-h="56"></div>
+      <div class="chart" data-key="mem" data-kind="area" data-fmt="bytes" data-name="Memory used" data-h="56"></div>
+      <div class="chart" data-key="netIn" data-kind="area" data-fmt="rate" data-name="Network received" data-h="44"></div>
+      <div class="chart" data-key="netOut" data-kind="area" data-fmt="rate" data-name="Network sent" data-h="44"></div>
+    </div>
+  </section>
+
+  <section class="card table-card">
+    <div class="card-head">
+      <div class="seg" id="view" role="group" aria-label="Table">
+        <button data-v="sessions" aria-pressed="true">Sessions</button>
+        <button data-v="procs">Processes</button>
+      </div>
+      <span class="note" id="table-note"></span>
+    </div>
+    <div class="scroll"><table id="table"></table></div>
+    <div class="strip">
+      <div>
+        <span class="label">CPU cores</span>
+        <div class="cores" id="cores" role="img"></div>
+        <dl class="kv" id="cpu-kv"></dl>
+      </div>
+      <div>
+        <span class="label">Memory</span>
+        <div class="stack" id="mem-stack" role="img"></div>
+        <dl class="kv" id="mem-kv"></dl>
+      </div>
+      <div>
+        <span class="label">Tokens, last 15 min</span>
+        <dl class="kv" id="tok-kv"></dl>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const HISTORY = 900;
+const BINS = 60;
+const state = {
+  history: [], sys: null, sessions: [], load: [0, 0, 0], cores: 0, host: '',
+  window: 300, hover: null, view: 'sessions', sort: 'cpu', paused: false, source: 'connecting',
+};
+const $ = (id) => document.getElementById(id);
+
+// ---------- formatting ----------
+const fmtNum = (v, d = 1) => {
+  const a = Math.abs(v);
+  if (a >= 1e9) return (v / 1e9).toFixed(d) + 'B';
+  if (a >= 1e6) return (v / 1e6).toFixed(d) + 'M';
+  if (a >= 1e4) return (v / 1e3).toFixed(0) + 'k';
+  if (a >= 1e3) return (v / 1e3).toFixed(d) + 'k';
+  return a >= 10 || v === 0 ? Math.round(v).toString() : v.toFixed(1);
+};
+const fmtBytes = (b) => {
+  if (b == null) return '–';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0;
+  while (b >= 1024 && i < u.length - 1) (b /= 1024), i++;
+  return (b >= 100 || i === 0 ? Math.round(b) : b.toFixed(1)) + ' ' + u[i];
+};
+const FMT = {
+  tok: (v) => [fmtNum(v), 'tok/s'],
+  pct: (v) => [Math.round(v).toString(), '%'],
+  bytes: (v) => fmtBytes(v).split(' '),
+  rate: (v) => { const [n, u] = fmtBytes(v).split(' '); return [n, u + '/s']; },
+};
+const clock = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const ago = (t) => {
+  const s = Math.max(0, Math.round(Date.now() / 1000 - t));
+  return s < 5 ? 'now' : s < 60 ? s + 's ago' : s < 3600 ? Math.floor(s / 60) + 'm ago' : Math.floor(s / 3600) + 'h ago';
+};
+const MODEL = (m) => {
+  if (!m) return '';
+  const c = /claude-(opus|sonnet|haiku|fable)-(\d+)-(\d+)/.exec(m);
+  return c ? c[1][0].toUpperCase() + c[1].slice(1) + ' ' + c[2] + '.' + c[3] : m;
+};
+function where(cwd) {
+  if (!cwd) return ['Unknown', ''];
+  const wt = /\/data\/worktrees\/([0-9a-f-]{8})[0-9a-f-]*(\/.*)?$/.exec(cwd);
+  if (wt) return ['Omni thread', wt[1] + (wt[2] ?? '')];
+  const parts = cwd.split('/').filter(Boolean);
+  return [parts.at(-1) ?? cwd, cwd.replace(/^\/(Users|home)\/[^/]+/, '~')];
+}
+
+// ---------- binning ----------
+function bins(key) {
+  const per = state.window / BINS;
+  const pts = state.history.slice(-state.window);
+  const out = [];
+  for (let i = 0; i < BINS; i++) {
+    const slice = pts.slice(Math.round(i * per), Math.round((i + 1) * per));
+    const vals = slice.map((p) => p[key]).filter((v) => v != null);
+    out.push({ v: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null, t: slice.at(-1)?.t ?? null });
+  }
+  return out;
+}
+function niceMax(v, fmt) {
+  if (fmt === 'pct') return 100;
+  if (fmt === 'bytes' && state.sys?.mem) return state.sys.mem.total;
+  if (!v) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  return [1, 2, 2.5, 5, 10].map((m) => m * p).find((m) => m >= v);
+}
+const avgLast = (key, n) => {
+  const vals = state.history.slice(-n).map((p) => p[key]).filter((v) => v != null);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+};
+const sumAll = (key) => state.history.reduce((a, p) => a + (p[key] ?? 0), 0);
+
+// ---------- charts ----------
+const PAD_R = 34;
+function chartSvg(el, data, opts) {
+  const w = Math.max(120, el.clientWidth);
+  const h = opts.h;
+  const pw = w - PAD_R;
+  const max = niceMax(Math.max(0, ...data.map((d) => d.v ?? 0)), opts.fmt);
+  const y = (v) => h - (v / max) * (h - 2);
+  const step = pw / BINS;
+  let g = `<line class="grid-line" x1="0" x2="${pw}" y1="${y(max).toFixed(1)}" y2="${y(max).toFixed(1)}"/>`;
+  g += `<line class="grid-line" x1="0" x2="${pw}" y1="${y(max / 2).toFixed(1)}" y2="${y(max / 2).toFixed(1)}"/>`;
+  const lbl = (v) => { const [n, u] = FMT[opts.fmt](v); return opts.fmt === 'pct' ? n + '%' : n + (opts.fmt === 'tok' ? '' : ' ' + u.replace('/s', '')); };
+  g += `<text class="axis" x="${w}" y="${y(max) + 3}" text-anchor="end">${lbl(max)}</text>`;
+  g += `<text class="axis" x="${w}" y="${y(max / 2) + 3}" text-anchor="end">${lbl(max / 2)}</text>`;
+  let marks = '';
+  if (opts.kind === 'bar') {
+    const bw = Math.max(1, step - 2);
+    const r = Math.min(2, bw / 2);
+    data.forEach((d, i) => {
+      if (!d.v) return;
+      const bh = Math.max(1.5, h - y(d.v));
+      const x = i * step + 1;
+      const top = h - bh;
+      const dim = opts.hover != null && opts.hover !== i ? ' dim' : '';
+      // Rounded top, square foot on the baseline.
+      marks += `<path class="bar${dim}" d="M${x},${h}V${top + r}q0,-${r} ${r},-${r}h${bw - 2 * r}q${r},0 ${r},${r}V${h}Z"/>`;
+    });
+  } else {
+    const pts = data.map((d, i) => (d.v == null ? null : [i * step + step / 2, y(d.v)]));
+    const runs = [];
+    let cur = [];
+    pts.forEach((p) => { if (p) cur.push(p); else if (cur.length) runs.push(cur), (cur = []); });
+    if (cur.length) runs.push(cur);
+    for (const run of runs) {
+      const line = run.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join('');
+      marks += `<path class="area" d="${line}L${run.at(-1)[0].toFixed(1)},${h}L${run[0][0].toFixed(1)},${h}Z"/>`;
+      marks += `<path class="line" d="${line}"/>`;
+    }
+  }
+  let hover = '';
+  if (opts.hover != null) {
+    const x = opts.hover * step + step / 2;
+    hover = `<line class="hair" x1="${x}" x2="${x}" y1="0" y2="${h}"/>`;
+    const d = data[opts.hover];
+    if (opts.kind === 'area' && d?.v != null) hover += `<circle class="knob" cx="${x}" cy="${y(d.v)}" r="4"/>`;
+  }
+  return `<svg viewBox="0 0 ${w} ${h}" height="${h}">${g}${marks}<line class="base" x1="0" x2="${pw}" y1="${h - 0.5}" y2="${h - 0.5}"/>${hover}</svg>`;
+}
+
+function sparkSvg(svg, key) {
+  const vals = state.history.slice(-120).map((p) => p[key]);
+  const w = svg.clientWidth || 200, h = 30;
+  const max = key === 'cpu' ? 100 : key === 'mem' ? (state.sys?.mem?.total ?? 1) : Math.max(1, ...vals.map((v) => v ?? 0));
+  const step = w / Math.max(1, vals.length - 1);
+  let d = '', started = false;
+  vals.forEach((v, i) => {
+    if (v == null) return;
+    d += (started ? 'L' : 'M') + (i * step).toFixed(1) + ',' + (h - 1 - (v / max) * (h - 3)).toFixed(1);
+    started = true;
+  });
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML = d ? `<path d="${d}" fill="none" stroke="var(--live)" stroke-width="1.5" stroke-linejoin="round"/>` : '';
+}
+
+function setupCharts() {
+  for (const el of document.querySelectorAll('.chart')) {
+    const head = document.createElement('div');
+    head.className = 'chart-head';
+    head.innerHTML = '<span class="name"></span><span class="val"><span class="n"></span> <span class="unit"></span></span>';
+    head.querySelector('.name').textContent = el.dataset.name;
+    const plot = document.createElement('div');
+    plot.className = 'plot';
+    plot.tabIndex = 0;
+    plot.setAttribute('role', 'img');
+    el.append(head, plot);
+    const at = (e) => {
+      const r = plot.getBoundingClientRect();
+      const i = Math.floor(((e.clientX - r.left) / (r.width - PAD_R)) * BINS);
+      state.hover = Math.max(0, Math.min(BINS - 1, i));
+      render();
+    };
+    plot.addEventListener('pointermove', at);
+    plot.addEventListener('pointerdown', at);
+    plot.addEventListener('pointerleave', () => { state.hover = null; render(); });
+    plot.addEventListener('blur', () => { state.hover = null; render(); });
+    plot.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const i = state.hover ?? BINS - 1;
+      state.hover = Math.max(0, Math.min(BINS - 1, i + (e.key === 'ArrowLeft' ? -1 : 1)));
+      render();
+    });
+  }
+}
+
+function renderCharts() {
+  for (const el of document.querySelectorAll('.chart')) {
+    const { key, kind, fmt, name } = el.dataset;
+    const data = bins(key);
+    const plot = el.querySelector('.plot');
+    plot.innerHTML = chartSvg(plot, data, { kind, fmt, h: +el.dataset.h, hover: state.hover });
+    const pick = state.hover != null ? data[state.hover]?.v : [...data].reverse().find((d) => d.v != null)?.v;
+    const [n, u] = pick == null ? ['–', ''] : FMT[fmt](pick);
+    el.querySelector('.n').textContent = n;
+    el.querySelector('.unit').textContent = u;
+    plot.setAttribute('aria-label', `${name}, last ${state.window / 60} minutes. Latest ${n} ${u}. Arrow keys step through time.`);
+  }
+  const t = state.hover != null ? bins('cpu')[state.hover]?.t : null;
+  $('at').textContent = t ? `At ${clock(t)}` + (state.window > 60 ? `, ${state.window / BINS}s average` : '') : '';
+}
+
+// ---------- tiles and footer ----------
+function renderTiles() {
+  const out = avgLast('out', 10), inp = avgLast('inp', 10);
+  $('t-out').innerHTML = `${fmtNum(out)}<small>tok/s</small>`;
+  $('t-inp').innerHTML = `${fmtNum(inp)}<small>tok/s</small>`;
+  $('t-out-sub').textContent = `10s average · ${fmtNum(sumAll('out'))} in 15 min`;
+  $('t-inp-sub').textContent = `10s average · ${fmtNum(sumAll('cr'))} cache reads in 15 min`;
+  const s = state.sys;
+  if (!s) return;
+  $('t-cpu').innerHTML = `${Math.round(s.user + s.system)}<small>%</small>`;
+  $('t-cpu-sub').textContent = `User ${s.user.toFixed(1)}% · System ${s.system.toFixed(1)}%`;
+  if (s.mem) {
+    const [n, u] = fmtBytes(s.mem.used).split(' ');
+    $('t-mem').innerHTML = `${n}<small>${u} of ${fmtBytes(s.mem.total)}</small>`;
+    $('t-mem-sub').textContent = `Swap ${fmtBytes(s.swap?.used ?? 0)} · Cached ${fmtBytes(s.mem.cached)}`;
+  }
+  const P = { normal: ['ok', 'Normal pressure'], warn: ['warn', 'Elevated pressure'], critical: ['critical', 'Critical pressure'] }[s.pressure];
+  $('t-mem-dot').className = 'dot ' + P[0];
+  $('t-mem-pressure').textContent = P[1];
+  for (const k of ['out', 'inp', 'cpu', 'mem']) sparkSvg($('s-' + k), k);
+}
+
+function kv(el, rows) {
+  el.replaceChildren(...rows.flatMap(([k, v, key]) => {
+    const dt = document.createElement('dt');
+    if (key) { const i = document.createElement('i'); i.className = 'key'; i.style.background = key; dt.append(i); }
+    dt.append(k);
+    const dd = document.createElement('dd');
+    dd.textContent = v;
+    return [dt, dd];
+  }));
+}
+
+function renderFooter() {
+  const s = state.sys;
+  if (!s) return;
+  $('cores').replaceChildren(...s.cores.map((c) => {
+    const span = document.createElement('span');
+    const i = document.createElement('i');
+    i.style.height = Math.max(2, c) + '%';
+    span.append(i);
+    span.title = c.toFixed(0) + '%';
+    return span;
+  }));
+  $('cores').setAttribute('aria-label', 'Per-core load: ' + s.cores.map((c) => Math.round(c) + '%').join(', '));
+  kv($('cpu-kv'), [
+    ['User', s.user.toFixed(1) + '%'],
+    ['System', s.system.toFixed(1) + '%'],
+    ['Idle', Math.max(0, 100 - s.user - s.system).toFixed(1) + '%'],
+    ['Load (1, 5, 15 min)', state.load.map((l) => l.toFixed(2)).join('  ')],
+  ]);
+  if (s.mem) {
+    const m = s.mem;
+    $('mem-stack').innerHTML = [m.app, m.wired, m.compressed].map((v) => `<i style="width:${(v / m.total) * 100}%"></i>`).join('');
+    $('mem-stack').setAttribute('aria-label', `App ${fmtBytes(m.app)}, wired ${fmtBytes(m.wired)}, compressed ${fmtBytes(m.compressed)} of ${fmtBytes(m.total)}`);
+    kv($('mem-kv'), [
+      ['App memory', fmtBytes(m.app), 'var(--live)'],
+      ['Wired', fmtBytes(m.wired), 'var(--fg-2)'],
+      ['Compressed', fmtBytes(m.compressed), 'var(--fg-4)'],
+      ['Cached files', fmtBytes(m.cached)],
+      ['Swap used', fmtBytes(s.swap?.used ?? 0)],
+    ]);
+  }
+  const active = state.sessions.filter((x) => Date.now() / 1000 - x.lastAt < 60).length;
+  kv($('tok-kv'), [
+    ['Output', fmtNum(sumAll('out'))],
+    ['Input, fresh and cache writes', fmtNum(sumAll('inp'))],
+    ['Cache reads', fmtNum(sumAll('cr'))],
+    ['Sessions active in the last minute', String(active)],
+    ['Sessions in the window', String(state.sessions.length)],
+  ]);
+}
+
+// ---------- table ----------
+function cell(text, cls) {
+  const td = document.createElement('td');
+  if (cls) td.className = cls;
+  if (text instanceof Node) td.append(text); else td.textContent = text;
+  return td;
+}
+function headRow(cols) {
+  const tr = document.createElement('tr');
+  for (const [label, cls, sortKey] of cols) {
+    const th = document.createElement('th');
+    if (cls) th.className = cls;
+    if (sortKey) {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.onclick = () => { state.sort = sortKey; render(); };
+      th.append(b);
+      if (state.sort === sortKey) th.setAttribute('aria-sort', 'descending');
+    } else th.textContent = label;
+    tr.append(th);
+  }
+  const thead = document.createElement('thead');
+  thead.append(tr);
+  return thead;
+}
+
+function renderTable() {
+  const table = $('table');
+  const tbody = document.createElement('tbody');
+  if (state.view === 'sessions') {
+    const rows = state.sessions;
+    $('table-note').textContent = `${rows.length} sessions with activity in the last 15 min`;
+    const top = Math.max(1, ...rows.map((r) => r.perMin));
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      const live = Date.now() / 1000 - r.lastAt < 30;
+      const name = document.createElement('span');
+      const dot = document.createElement('span');
+      dot.className = 'dot' + (live ? ' live' : '');
+      dot.style.display = 'inline-block';
+      dot.style.marginRight = '8px';
+      const [title, sub] = where(r.cwd);
+      const p = document.createElement('span'); p.className = 'primary'; p.textContent = title;
+      const s = document.createElement('span'); s.className = 'secondary mono'; s.textContent = sub;
+      name.append(dot, p, s);
+      const harness = document.createElement('span');
+      harness.textContent = MODEL(r.model);
+      const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = r.harness;
+      harness.append(tag);
+      const rate = document.createElement('span');
+      rate.textContent = fmtNum(r.perMin);
+      const meter = document.createElement('span'); meter.className = 'meter';
+      const fill = document.createElement('i'); fill.style.width = (r.perMin / top) * 100 + '%';
+      meter.append(fill); rate.append(meter);
+      tr.append(cell(name), cell(harness, 'hide-sm'), cell(rate, 'num'), cell(fmtNum(r.out), 'num'),
+        cell(fmtNum(r.inp), 'num hide-md'), cell(fmtNum(r.cr), 'num hide-sm'), cell(ago(r.lastAt), 'num muted'));
+      tbody.append(tr);
+    }
+    table.replaceChildren(headRow([
+      ['Session'], ['Model', 'hide-sm'], ['Tokens/min', 'num'], ['Output', 'num'],
+      ['Input', 'num hide-md'], ['Cache reads', 'num hide-sm'], ['Last active', 'num'],
+    ]), tbody);
+    if (!rows.length) tbody.innerHTML = '<tr><td colspan="7" class="empty">No agent sessions wrote tokens in the last 15 minutes.</td></tr>';
+  } else {
+    const procs = [...(state.sys?.procs ?? [])].sort((a, b) => b[state.sort] - a[state.sort]).slice(0, 20);
+    $('table-note').textContent = 'Top 20 · agent CLIs tagged';
+    for (const p of procs) {
+      const tr = document.createElement('tr');
+      const name = document.createElement('span');
+      const n = document.createElement('span'); n.className = 'primary'; n.textContent = p.name;
+      name.append(n);
+      if (p.agent) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'agent'; name.append(t); }
+      tr.append(cell(name), cell(p.cpu.toFixed(1), 'num'), cell(fmtBytes(p.mem), 'num'), cell(String(p.pid), 'num muted mono hide-sm'));
+      tbody.append(tr);
+    }
+    table.replaceChildren(headRow([['Process'], ['% CPU', 'num', 'cpu'], ['Memory', 'num', 'mem'], ['PID', 'num hide-sm']]), tbody);
+  }
+}
+
+// ---------- render loop ----------
+let queued = false;
+function render() {
+  if (queued) return;
+  queued = true;
+  requestAnimationFrame(() => {
+    queued = false;
+    renderCharts();
+    renderTiles();
+    renderFooter();
+    renderTable();
+    const st = $('status');
+    const [cls, text] = state.paused ? ['', 'Paused'] : {
+      live: ['live', 'Live'], demo: ['live', 'Demo data'], connecting: ['', 'Connecting'], lost: ['', 'Reconnecting'],
+    }[state.source];
+    st.querySelector('.dot').className = 'dot ' + cls;
+    st.lastChild.textContent = text;
+    $('host').textContent = state.host ? `${state.host} · ${state.cores} cores` : '';
+  });
+}
+
+function onSnapshot(s) {
+  Object.assign(state, { history: s.history, sys: s.sys, sessions: s.sessions, load: s.load, cores: s.cores, host: s.host });
+  render();
+}
+function onTick(m) {
+  const byT = new Map(state.history.map((p, i) => [p.t, i]));
+  for (const p of m.fix) if (byT.has(p.t)) state.history[byT.get(p.t)] = p;
+  state.history.push(m.point);
+  if (state.history.length > HISTORY) state.history.splice(0, state.history.length - HISTORY);
+  Object.assign(state, { sys: m.sys, sessions: m.sessions, load: m.load });
+  if (!state.paused) render();
+}
+
+// ---------- controls ----------
+function seg(id, onPick) {
+  $(id).addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    for (const x of $(id).children) x.setAttribute('aria-pressed', String(x === b));
+    onPick(b.dataset.v);
+    render();
+  });
+}
+seg('range', (v) => { state.window = +v; state.hover = null; });
+seg('view', (v) => { state.view = v; if (v === 'procs' && !['cpu', 'mem'].includes(state.sort)) state.sort = 'cpu'; });
+$('pause').onclick = () => {
+  state.paused = !state.paused;
+  $('pause').textContent = state.paused ? 'Resume' : 'Pause';
+  $('pause').setAttribute('aria-pressed', String(state.paused));
+  render();
+};
+window.addEventListener('resize', render);
+
+// ---------- data source ----------
+function demo() {
+  // Opened without the sampler: synthetic data in the same shapes, labelled "Demo data".
+  state.source = 'demo';
+  const now = Math.floor(Date.now() / 1000);
+  let burst = 0;
+  const gen = (t, i) => {
+    if (Math.random() < 0.06) burst = 6 + Math.random() * 14;
+    burst = Math.max(0, burst - 1);
+    const on = burst > 0;
+    return {
+      t,
+      out: on ? 40 + Math.random() * 220 : 0,
+      inp: on && Math.random() < 0.4 ? 200 + Math.random() * 3000 : 0,
+      cr: on && Math.random() < 0.4 ? 20000 + Math.random() * 120000 : 0,
+      cpu: 22 + 18 * Math.sin(i / 40) + Math.random() * 12 + (on ? 10 : 0),
+      mem: (15.5 + Math.sin(i / 200) * 0.6 + Math.random() * 0.05) * 2 ** 30,
+      netIn: 8000 + Math.random() * 40000 + (on ? 60000 : 0),
+      netOut: 4000 + Math.random() * 20000 + (on ? 30000 : 0),
+    };
+  };
+  const names = ['claude', 'codex', 'node', 'WindowServer', 'Omni', 'mds_stores', 'Safari', 'Xcode'];
+  const sysAt = (p) => ({
+    cores: Array.from({ length: 12 }, () => Math.min(100, p.cpu * (0.4 + Math.random() * 1.3))),
+    user: p.cpu * 0.68, system: p.cpu * 0.32, pressure: 'normal',
+    mem: { total: 24 * 2 ** 30, used: p.mem, app: p.mem * 0.52, wired: p.mem * 0.26, compressed: p.mem * 0.22, cached: 5.8 * 2 ** 30 },
+    swap: { total: 2 * 2 ** 30, used: 0.45 * 2 ** 30 }, netIn: p.netIn, netOut: p.netOut,
+    procs: names.map((n, i) => ({ pid: 400 + i * 37, cpu: Math.random() * (i < 2 ? 40 : 15), mem: (0.2 + Math.random() * 1.5) * 2 ** 30, name: n, agent: i < 2 })),
+  });
+  const sessions = [
+    { id: 'a', harness: 'Claude Code', model: 'claude-opus-5-5', cwd: '/Users/you/omni-os/data/worktrees/55ebe186-5c64-4f41/apps/web' },
+    { id: 'b', harness: 'Claude Code', model: 'claude-sonnet-5-5', cwd: '/Users/you/omni-os' },
+    { id: 'c', harness: 'Codex', model: 'gpt-5.5-codex', cwd: '/Users/you/omni-os/data/worktrees/c7063e01-ce6f-46f7' },
+  ].map((s, i) => ({ ...s, out: 20000 * (i + 1), inp: 90000 * (i + 1), cr: 4e6 * (i + 1), perMin: 0, lastAt: now - i * 50 }));
+  const hist = [];
+  for (let i = 0; i < HISTORY; i++) hist.push(gen(now - HISTORY + i + 1, i));
+  onSnapshot({ history: hist, sys: sysAt(hist.at(-1)), sessions, load: [3.1, 2.8, 2.6], cores: 12, host: 'Demo Mac' });
+  let i = HISTORY;
+  setInterval(() => {
+    const p = gen(Math.floor(Date.now() / 1000), i++);
+    sessions.forEach((s, k) => {
+      if (p.out && Math.random() < 0.5 / (k + 1)) { s.out += p.out; s.inp += p.inp; s.cr += p.cr; s.lastAt = p.t; s.perMin = p.out * 30 * Math.random(); }
+    });
+    onTick({ point: p, fix: [], sys: sysAt(p), sessions, load: [3.1, 2.8, 2.6] });
+  }, 1000);
+}
+
+function connect() {
+  if (location.protocol === 'file:' || new URLSearchParams(location.search).has('demo')) return demo();
+  const es = new EventSource('/events');
+  let opened = false;
+  es.addEventListener('snapshot', (e) => { opened = true; state.source = 'live'; onSnapshot(JSON.parse(e.data)); });
+  es.addEventListener('tick', (e) => { state.source = 'live'; onTick(JSON.parse(e.data)); });
+  es.onerror = () => {
+    if (!opened) { es.close(); return demo(); }
+    state.source = 'lost';
+    render();
+  };
+}
+
+setupCharts();
+connect();
+</script>
+</body>
+</html>
