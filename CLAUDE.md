@@ -43,7 +43,8 @@ You most likely run inside Omni itself, served from :4747 on the user's Mac.
 1. **Never touch :4747 or the main checkout's `data/`.** Don't restart, kill, test against or write to them. Use `scripts/qa-stack.sh up` for a throwaway server with its own data dir and fake CLIs.
 2. **Never kill by pattern.** No `pkill -f`, and no `kill` of a PID found by matching a name or path: other threads run their own stacks and fake CLIs. Stop what you started by its port and PID file (`QA_SERVER_PORT=<port> scripts/qa-stack.sh down`).
 3. **Install with dev deps.** Agent shells often set `NODE_ENV=production`, so use `npm install --include=dev`.
-4. **macOS has no `timeout` command.** Bound a slow command with your tool's own timeout, or `perl -e 'alarm 60; exec @ARGV' <cmd>`.
+4. **macOS has no GNU `timeout`.** Use your shell tool's own timeout setting, or `perl -e 'alarm shift; exec @ARGV' <seconds> <command>`.
+5. **macOS has no `timeout` command.** Bound a slow command with your tool's own timeout, or `perl -e 'alarm 60; exec @ARGV' <cmd>`.
 
 ## Hit every surface
 

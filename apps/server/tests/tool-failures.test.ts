@@ -135,6 +135,16 @@ describe('adapter failure signals', () => {
       expect(records.some((r) => r.kind === 'tool_result' && r.payload.is_error)).toBe(false);
     }
   });
+  it('classifies a shell result by its exit code, never by words in the command output', () => {
+    for (const [text, category] of [
+      ['Exit code 1\n× times out waiting for the card\nError: timed out after 25000ms', 'command_exit'],
+      ['Exit code 1\n× says unavailable for a thread that is gone\nECONNREFUSED', 'command_exit'],
+      ['Exit code 1\nls: x: No such file or directory', 'command_exit'],
+      ['Exit code 2\n429 rate limit, 401 unauthorized, invalid argument', 'command_exit'],
+      ['Exit code 124\n', 'timeout'], ['Exit code 126\n', 'permission'], ['Exit code 127\nzsh: command not found: timeout', 'not_found'],
+    ]) expect(classifyFailure(text)).toBe(category);
+    expect(classifyFailure("The user doesn't want to proceed with this tool use. The tool use was rejected.")).toBe('permission');
+  });
   it('classifies known signals and safely falls back for arbitrary payloads', () => {
     for (const [text, category] of [['401', 'authentication'], ['EACCES', 'permission'], ['429', 'rate_limit'], ['ETIMEDOUT', 'timeout'], ['ECONNREFUSED', 'unavailable'], ['invalid argument', 'invalid_input'], ['ENOENT', 'not_found'], ['Exit code 1', 'command_exit'], ['PRIVATE PAYLOAD', 'unknown']]) expect(classifyFailure(text)).toBe(category);
   });

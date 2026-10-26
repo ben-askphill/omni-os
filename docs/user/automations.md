@@ -1,6 +1,6 @@
 # Automations
 
-`automations/*.yaml` are shared examples (`morning-coffee`, `weekly-review`, `artifact-comments`, `brain-nightly`, `pr-babysitter`, `fix-failing-checks`, `tool-failure-triage`), all off until you turn them on. Turning one on or off in the UI writes `automations.<id>.enabled` to `data/omni.config.json`, never the YAML, and `automations.<id>.channel` there moves it to another channel. Your own automations go in `data/automations/`.
+`automations/*.yaml` are shared examples (`morning-coffee`, `weekly-review`, `artifact-comments`, `brain-nightly`, `pr-babysitter`, `fix-failing-checks`, `tool-failure-triage`, `docs-daily`), all off until you turn them on. Turning one on or off in the UI writes `automations.<id>.enabled` to `data/omni.config.json`, never the YAML, and `automations.<id>.channel` there moves it to another channel. Your own automations go in `data/automations/`.
 
 ```yaml
 name: Morning coffee
@@ -29,6 +29,10 @@ prompt: |
 - It never sets `avoid` or `replacement` and never disables a tool. It proposes those in its reply instead.
 
 The log is local to each Mac, and with sync on scheduled runs fire only on the Mac that owns automations, so that is the Mac whose failures get reviewed.
+
+## Docs daily
+
+`docs-daily` runs at 16:00 Europe/Amsterdam every day in the `omni-os` channel as a builder. It uses `scripts/docs-daily.sh` to fetch `ben-askphill/omni-os`, compare `origin/main` to the last processed SHA in `data/docs-daily/last-sha`, and exit when only documentation changed. Otherwise it updates docs in a scratch worktree, opens a `docs/auto-YYYY-MM-DD` PR, squash-merges when checks pass, and records the new SHA. The script aborts before merge if the diff is not docs-only; see `data/logs/docs-daily.log`. Scheduled runs use the Mac that owns automations; `catchup: true` runs a missed slot once Omni is back.
 
 ## Event automations
 

@@ -13,7 +13,7 @@
 // Directives in the prompt:
 //   CMD     emit a nested shell tool_call before the reply
 //   TOOL:<ms> delay the CMD completion so tests can observe the started row
-//   REJECT  emit a glob tool_call that fails with no started event, as Cursor does for a too-broad pattern
+//   REJECT  emit a glob tool_call that fails with no started event, as Cursor does for a call it refuses (a too-broad pattern)
 //   CRASH   exit(1) once the prompt is echoed, like the process dying mid-turn
 //   HANG    emit init + assistant but no result, and stay alive until killed
 //   ORPHAN  first leave a child behind that holds our stdout until it is killed (two minutes at most), like a

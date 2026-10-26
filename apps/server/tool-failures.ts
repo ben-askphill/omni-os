@@ -13,17 +13,23 @@ const DETAILS: Record<FailureCategory, string> = {
   timeout: 'Tool timed out.', unavailable: 'Service or connection unavailable.', invalid_input: 'Invalid tool input.',
   not_found: 'Requested resource not found.', command_exit: 'Command returned a nonzero exit code.', unknown: 'Tool reported failure; raw details omitted.',
 };
+// The exit codes a shell gives a command it could not run, and GNU timeout's own.
+const EXIT_CATEGORIES: Partial<Record<string, FailureCategory>> = { 124: 'timeout', 126: 'permission', 127: 'not_found' };
+
 export function classifyFailure(text: string): FailureCategory {
   // Every harness reports a failed shell call as "Exit code N" then the command's own output. That output
   // (test logs, file contents) mentions timeouts, 404s or "unavailable" for reasons unrelated to the failure,
-  // so only the exit code and a missing-command notice count.
+  // so only the exit code and a missing-command notice count. A test named "times out" or a log line saying
+  // "unavailable" says nothing about the tool.
   const exit = /^Exit code (\d+)/.exec(text);
   if (exit) {
-    if (exit[1] === '127' || /command not found/.test(text.split('\n').slice(1, 3).join('\n'))) return 'not_found';
-    return exit[1] === '124' ? 'timeout' : 'command_exit';
+    const known = EXIT_CATEGORIES[exit[1]];
+    if (known) return known;
+    if (/command not found/.test(text.split('\n').slice(1, 3).join('\n'))) return 'not_found';
+    return 'command_exit';
   }
   // Claude Code's reply when Ben declines or interrupts a call.
-  if (/^The user doesn't want to proceed with this tool use/.test(text)) return 'permission';
+  if (text.startsWith("The user doesn't want to proceed with this tool use")) return 'permission';
   if (/\b(401|unauthorized|unauthenticated|authentication|invalid.api.key)\b/i.test(text)) return 'authentication';
   if (/\b(403|forbidden|permission denied|access denied|EACCES|EPERM)\b/i.test(text)) return 'permission';
   if (/\b(429|rate.limit|quota.exceeded)\b/i.test(text)) return 'rate_limit';

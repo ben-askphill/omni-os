@@ -29,6 +29,8 @@ export interface CursorParsed {
   modelCallId?: string;
   /** An assistant event with no model call id: the turn's last, tool-free call. */
   untaggedReply?: boolean;
+  /** A completed nested call's tool_use. Cursor sends no started event for a call it rejects up front. */
+  use?: StreamRecord;
 }
 
 /**
@@ -81,6 +83,7 @@ export function normalizeCursor(evt: any): CursorParsed {
     case 'tool_call':
       if (evt.tool_call && typeof evt.tool_call === 'object') {
         out.records.push(...nestedToolCall(evt));
+        if (evt.subtype === 'completed' || evt.subtype === 'failed') out.use = nestedToolUse(evt) ?? undefined;
         break;
       }
       if (evt.subtype === 'completed' || evt.subtype === 'failed') {
@@ -165,37 +168,50 @@ function toolCall(evt: any): StreamRecord[] {
 }
 
 /** Cursor's live protobuf JSON envelope. Legacy flat events above remain completion-only. */
-function nestedToolCall(evt: any): StreamRecord[] {
+function nestedEntry(evt: any): { key: string; value: any; id: string } | null {
   const entry = Object.entries(evt.tool_call).find(([key]) => key.endsWith('ToolCall'));
-  if (!entry) return [];
-  const [key, value] = entry as [string, any];
+  if (!entry) return null;
   // Cursor joins its call id and function-call id with a newline. The first is shared by both events.
-  const id = String(evt.call_id ?? evt.toolCallId ?? evt.callId ?? '').split('\n')[0];
+  return { key: entry[0], value: entry[1], id: String(evt.call_id ?? evt.toolCallId ?? evt.callId ?? '').split('\n')[0] };
+}
+
+/** The tool_use a nested call opens with. Both its started and its completed event carry the args. */
+function nestedToolUse(evt: any): StreamRecord | null {
+  const entry = nestedEntry(evt);
+  if (!entry) return null;
+  const { key, value, id } = entry;
   const input = value?.args ?? {};
-  if (evt.subtype === 'started') {
-    const kind = key.slice(0, -'ToolCall'.length);
-    const aliases: Record<string, string> = { updateTodos: 'todos' };
-    const tool = aliases[kind] ?? kind;
-    // Reuse the flat adapter's Claude names without emitting any of its completion records.
-    const mapped = {
-      ...input,
-      command: input.command ?? input.path,
-      pattern: input.pattern ?? input.globPattern ?? input.path,
-      content: input.content ?? input.fileText,
-      server: input.server ?? input.providerIdentifier,
-      tool: input.tool ?? input.toolName ?? input.name,
-    };
-    const use = toolCall({ toolCallId: id, tool, input: mapped })[0];
-    if (use.kind === 'tool_use' && use.payload.name === tool) {
-      // New Cursor kinds keep their raw args and a readable name, never an anonymous "tool" row.
-      return [toolUse(id, kind.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()), input)];
-    }
-    if (use.kind === 'tool_use' && ['Grep', 'Glob'].includes(use.payload.name)) {
-      use.payload.input = { ...input, pattern: mapped.pattern ?? '' };
-    }
-    return [use];
+  const kind = key.slice(0, -'ToolCall'.length);
+  const aliases: Record<string, string> = { updateTodos: 'todos' };
+  const tool = aliases[kind] ?? kind;
+  // Reuse the flat adapter's Claude names without emitting any of its completion records.
+  const mapped = {
+    ...input,
+    command: input.command ?? input.path,
+    pattern: input.pattern ?? input.globPattern ?? input.path,
+    content: input.content ?? input.fileText,
+    server: input.server ?? input.providerIdentifier,
+    tool: input.tool ?? input.toolName ?? input.name,
+  };
+  const use = toolCall({ toolCallId: id, tool, input: mapped })[0];
+  if (use.kind === 'tool_use' && use.payload.name === tool) {
+    // New Cursor kinds keep their raw args and a readable name, never an anonymous "tool" row.
+    return toolUse(id, kind.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()), input);
   }
-  if (evt.subtype !== 'completed' && evt.subtype !== 'failed') return [];
+  if (use.kind === 'tool_use' && ['Grep', 'Glob'].includes(use.payload.name)) {
+    use.payload.input = { ...input, pattern: mapped.pattern ?? '' };
+  }
+  return use;
+}
+
+function nestedToolCall(evt: any): StreamRecord[] {
+  if (evt.subtype === 'started') {
+    const use = nestedToolUse(evt);
+    return use ? [use] : [];
+  }
+  const entry = nestedEntry(evt);
+  if (!entry || (evt.subtype !== 'completed' && evt.subtype !== 'failed')) return [];
+  const { value, id } = entry;
   // Documented at docs.cursor.com/en/cli/reference/output-format. The installed CLI also emits
   // shell result.failure/timeout/rejected/spawnError/permissionDenied alongside result.success.
   const result = value?.result ?? evt.result;

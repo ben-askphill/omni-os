@@ -54,6 +54,13 @@ describe('cursor tracer', () => {
     expect(H.byKind(t.id, 'tool_result')[0].p).toMatchObject({ tool_use_id: 'tc_2', is_error: true });
   });
 
+  it('opens a call Cursor rejects before starting it, so its failure has a named call', async () => {
+    const t = await H.start('CMD REJECT find files', cursor);
+    await H.untilResults(t.id, 1);
+    expect(H.byKind(t.id, 'tool_use').map((e: Ev) => [e.p.id, e.p.name])).toEqual([['tc_1', 'Bash'], ['tc_2', 'Glob']]);
+    expect(H.byKind(t.id, 'tool_result').find((e: Ev) => e.p.tool_use_id === 'tc_2')?.p).toMatchObject({ is_error: true });
+  });
+
   it('runs with full access and never leaks the Cursor api key', () => {
     const turn = H.cursorRequests().find((r: any) => r.method === 'turn');
     for (const r of H.cursorRequests()) expect(r.cursor_auth).toEqual([]);
