@@ -128,9 +128,13 @@ public enum BrowserAnnotationContext: MessageContextKind {
     public let image: Image
     /// The element Ben picked, when he picked one and the page could give it.
     public let element: Element?
+    /// What Ben drew with the toolbar, in order, the last on top. Nil when he drew nothing.
+    public let marks: [BrowserMarks.Mark]?
+    /// The screenshot with `marks` rendered on it by this client, as the server saved it: `annotation-<hex>-marked.png` or `.jpg`.
+    public let marked: Image?
 
     enum CodingKeys: String, CodingKey {
-      case thread, url, title, viewport, scroll, rect, image, element
+      case thread, url, title, viewport, scroll, rect, image, element, marks, marked
       case capturedAt = "captured_at"
     }
   }
@@ -151,6 +155,7 @@ public enum BrowserAnnotationContext: MessageContextKind {
   public static func label(_ b: Body) -> String {
     let at = Array(shortURL(b.url).unicodeScalars)
     let where_ = at.count > labelURLMax ? String(String.UnicodeScalarView(at.prefix(labelURLMax - 1))) + "…" : String(String.UnicodeScalarView(at))
+    if let marks = b.marks, !marks.isEmpty { return MessageContext.cutLabel("Browser, \(BrowserMarks.marksLabel(marks.count)) on \(where_)") }
     if let e = b.element { return MessageContext.cutLabel("Browser, <\(e.tag)> on \(where_)") }
     return MessageContext.cutLabel("Browser, \(b.rect.width)×\(b.rect.height) area on \(where_)")
   }
@@ -169,12 +174,12 @@ public enum BrowserAnnotationContext: MessageContextKind {
 
   // MARK: Parse
 
-  private static func whole(_ v: JSONValue?, _ lo: Int, _ hi: Int) -> Int? {
+  static func whole(_ v: JSONValue?, _ lo: Int, _ hi: Int) -> Int? {
     guard case .number(let n)? = v, let i = Int(exactly: n), i >= lo, i <= hi else { return nil }
     return i
   }
 
-  private static func plain(_ v: JSONValue?, _ at: String, _ max: Int) -> Result<String, CheckError> {
+  static func plain(_ v: JSONValue?, _ at: String, _ max: Int) -> Result<String, CheckError> {
     switch TerminalExcerptContext.plain(v, at, max) {
     case .success(let s): .success(s)
     case .failure(let e): .failure(CheckError(e.message))
@@ -263,17 +268,20 @@ public enum BrowserAnnotationContext: MessageContextKind {
         opaqueFrame: opaque, truncated: truncated))
   }
 
-  private static func image(_ v: JSONValue?) -> Result<Image, CheckError> {
-    guard case .object(let o)? = v else { return .failure(CheckError("image must be an object")) }
-    guard let name = o["name"]?.stringValue, let m = name.wholeMatch(of: #/annotation-[0-9a-f]{8,32}\.(png|jpg)/#) else {
-      return .failure(CheckError("image.name must be an annotation-<hex>.png or .jpg file name"))
+  /// `imageOf` in TypeScript. `at` names the field in an error: `image`, or `marked` for the screenshot with the marks on it.
+  private static func image(_ v: JSONValue?, _ at: String = "image") -> Result<Image, CheckError> {
+    guard case .object(let o)? = v else { return .failure(CheckError("\(at) must be an object")) }
+    let marked = at == "marked"
+    let named = marked ? #/annotation-[0-9a-f]{8,32}-marked\.(png|jpg)/# : #/annotation-[0-9a-f]{8,32}\.(png|jpg)/#
+    guard let name = o["name"]?.stringValue, let m = name.wholeMatch(of: named) else {
+      return .failure(CheckError("\(at).name must be an annotation-\(marked ? "<hex>-marked" : "<hex>").png or .jpg file name"))
     }
     let mime = o["mime"]?.stringValue
-    guard mime == (m.1 == "png" ? "image/png" : "image/jpeg"), let mime else { return .failure(CheckError("image.mime does not match the file name")) }
+    guard mime == (m.1 == "png" ? "image/png" : "image/jpeg"), let mime else { return .failure(CheckError("\(at).mime does not match the file name")) }
     guard let w = whole(o["width"], 1, sizeMax), let h = whole(o["height"], 1, sizeMax) else {
-      return .failure(CheckError("image.width and image.height must be whole pixels"))
+      return .failure(CheckError("\(at).width and \(at).height must be whole pixels"))
     }
-    guard let bytes = whole(o["bytes"], 1, imageBytesMax) else { return .failure(CheckError("image.bytes must be 1 to \(imageBytesMax)")) }
+    guard let bytes = whole(o["bytes"], 1, imageBytesMax) else { return .failure(CheckError("\(at).bytes must be 1 to \(imageBytesMax)")) }
     return .success(Image(name: name, mime: mime, width: w, height: h, bytes: bytes))
   }
 
@@ -338,19 +346,33 @@ public enum BrowserAnnotationContext: MessageContextKind {
       case .failure(let e): return .failure(e)
       }
     }
+    var drawn: [BrowserMarks.Mark] = []
+    switch BrowserMarks.marksOf(o["marks"], viewport: (vw, vh)) {
+    case .success(let m): drawn = m
+    case .failure(let e): return .failure(e)
+    }
+    var markedImage: Image?
+    if let raw = o["marked"], raw != .null {
+      switch image(raw, "marked") {
+      case .success(let i): markedImage = i
+      case .failure(let e): return .failure(e)
+      }
+    }
     return .success(
       Body(
         thread: thread, url: url, title: title, viewport: Viewport(width: vw, height: vh, scale: (scale * 100).rounded() / 100),
-        scroll: Scroll(x: sx, y: sy), rect: r, capturedAt: at, image: img, element: picked))
+        scroll: Scroll(x: sx, y: sy), rect: r, capturedAt: at, image: img, element: picked, marks: drawn.isEmpty ? nil : drawn, marked: markedImage))
   }
 
-  /// The capture with Ben's rectangle on it, and the element he picked if he did, checked as the route will check it.
-  public static func annotate(_ capture: Capture, rect: Rect, element: Element? = nil) -> Result<Body, CheckError> {
+  /// The capture with Ben's rectangle on it, the element he picked if he did and what he drew if he did, checked as the route will check it.
+  public static func annotate(_ capture: Capture, rect: Rect, element: Element? = nil, marks: [BrowserMarks.Mark] = [], marked: Image? = nil) -> Result<Body, CheckError> {
     guard var json = try? JSONValue(encoding: capture), case .object(var o) = json, let r = try? JSONValue(encoding: rect) else {
       return .failure(CheckError("the capture cannot be read"))
     }
     o["rect"] = r
     if let element { guard let e = try? JSONValue(encoding: element) else { return .failure(CheckError("the element cannot be read")) }; o["element"] = e }
+    if !marks.isEmpty { o["marks"] = .array(marks.map(\.json)) }
+    if let marked { guard let m = try? JSONValue(encoding: marked) else { return .failure(CheckError("the marked screenshot cannot be read")) }; o["marked"] = m }
     json = .object(o)
     return check(json, v: 1)
   }
@@ -358,7 +380,7 @@ public enum BrowserAnnotationContext: MessageContextKind {
   // MARK: Title
 
   /// JavaScript's `\s`.
-  private static func space(_ u: Unicode.Scalar) -> Bool {
+  static func isSpace(_ u: Unicode.Scalar) -> Bool {
     switch u.value {
     case 0x09...0x0d, 0x20, 0xa0, 0x1680, 0x2000...0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff: true
     default: false
@@ -370,7 +392,7 @@ public enum BrowserAnnotationContext: MessageContextKind {
     var out: [Unicode.Scalar] = []
     var gap = false
     for u in raw.unicodeScalars {
-      if space(u) || TerminalExcerptContext.forbidden(u) {
+      if isSpace(u) || TerminalExcerptContext.forbidden(u) {
         gap = true
       } else {
         if gap, !out.isEmpty { out.append(" ") }
@@ -443,6 +465,11 @@ extension Result where Failure == BrowserAnnotationContext.CheckError {
 /// The answer of `POST /api/channels/:id/browser/capture`.
 public struct BrowserCaptureReply: Decodable, Hashable, Sendable {
   public let capture: BrowserAnnotationContext.Capture
+}
+
+/// The answer of `POST /api/channels/:id/browser/capture/:name/marked`.
+public struct MarkedReply: Decodable, Hashable, Sendable {
+  public let marked: BrowserAnnotationContext.Image
 }
 
 /// The body of a refused `POST /api/channels/:id/browser/capture`.

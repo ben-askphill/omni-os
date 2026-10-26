@@ -429,12 +429,14 @@ export async function pairBrowser(token: string): Promise<boolean> {
 async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   // FormData carries its own multipart content type, so never set one for it.
   const form = body instanceof FormData;
+  // A Blob goes up as it is, with its own type: a rendered image, not JSON.
+  const blob = body instanceof Blob;
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
       method,
-      headers: body !== undefined && !form ? { 'Content-Type': 'application/json' } : undefined,
-      body: body === undefined ? undefined : form ? body : JSON.stringify(body),
+      headers: blob ? { 'Content-Type': body.type } : body !== undefined && !form ? { 'Content-Type': 'application/json' } : undefined,
+      body: body === undefined ? undefined : form || blob ? body : JSON.stringify(body),
       signal,
     });
   } catch {

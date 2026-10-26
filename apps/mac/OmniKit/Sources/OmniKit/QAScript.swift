@@ -31,6 +31,18 @@ public enum QAAnnotate: Hashable, Sendable {
   case drag(x0: Double, y0: Double, x1: Double, y1: Double, note: String)
   /// A tap at a fraction of the shown screenshot, which picks the element there; the note is written once it is picked.
   case tap(x: Double, y: Double, note: String)
+  /// A shape (`rect`, `ellipse`, `arrow` or `line`) dragged between two fractions of the shown screenshot.
+  case shape(tool: String, x0: Double, y0: Double, x1: Double, y1: Double)
+  /// A pen stroke through fractions of the shown screenshot.
+  case pen(points: [[Double]])
+  /// Words set down at a fraction of the shown screenshot.
+  case text(String, x: Double, y: Double)
+  /// The color and line width the next marks take, or the selected mark takes.
+  case style(color: String?, stroke: Int?)
+  /// Takes hold of the mark under a fraction of the shown screenshot and drags it by a fraction of the shown size.
+  case move(x: Double, y: Double, dx: Double, dy: Double)
+  case undo
+  case note(String)
   case add
   case cancel
 }
@@ -467,11 +479,12 @@ public struct QAScript: Hashable, Sendable {
   }
 
   private static func annotate(_ value: Any) throws(QAScriptError) -> QAAnnotate {
-    let usage = QAScriptError(#"annotate takes start, add, cancel, {"drag": [x0, y0, x1, y1], "note": text} or {"tap": [x, y], "note": text} with fractions from 0 to 1"#)
+    let usage = QAScriptError(#"annotate takes start, add, cancel, undo, {"drag": [x0, y0, x1, y1], "note": text}, {"tap": [x, y], "note": text}, {"shape": rect|ellipse|arrow|line, "from": [x, y], "to": [x, y]}, {"pen": [[x, y], ...]}, {"text": words, "at": [x, y]}, {"color": hex, "stroke": px}, {"move": [x, y], "by": [dx, dy]} or {"note": text} with fractions from 0 to 1"#)
     switch value as? String {
     case "start": return .start
     case "add": return .add
     case "cancel": return .cancel
+    case "undo": return .undo
     case nil: break
     default: throw usage
     }
@@ -482,6 +495,29 @@ public struct QAScript: Hashable, Sendable {
       guard n.count == count, n.allSatisfy({ (0...1).contains($0) }) else { throw usage }
       return n
     }
+    if let tool = d["shape"] as? String {
+      guard ["rect", "ellipse", "arrow", "line"].contains(tool) else { throw usage }
+      let a = try fractions(d["from"], 2), b = try fractions(d["to"], 2)
+      return .shape(tool: tool, x0: a[0], y0: a[1], x1: b[0], y1: b[1])
+    }
+    if let list = d["pen"] as? [Any] {
+      let points = try list.map { p throws(QAScriptError) in try fractions(p, 2) }
+      guard points.count >= 2 else { throw usage }
+      return .pen(points: points)
+    }
+    if let words = d["text"] as? String {
+      let at = try fractions(d["at"], 2)
+      return .text(words, x: at[0], y: at[1])
+    }
+    if d["color"] != nil || d["stroke"] != nil {
+      guard (d["color"] == nil || d["color"] is String), (d["stroke"] == nil || d["stroke"] is Int) else { throw usage }
+      return .style(color: d["color"] as? String, stroke: d["stroke"] as? Int)
+    }
+    if let at = d["move"] {
+      let from = try fractions(at, 2), by = try fractions(d["by"], 2)
+      return .move(x: from[0], y: from[1], dx: by[0], dy: by[1])
+    }
+    if d.count == 1, let words = d["note"] as? String { return .note(words) }
     let note = d["note"] ?? ""
     guard let note = note as? String else { throw usage }
     if d["tap"] != nil {

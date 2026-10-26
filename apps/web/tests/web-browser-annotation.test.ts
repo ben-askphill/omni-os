@@ -82,6 +82,29 @@ describe('a browser_annotation with a picked element', () => {
   });
 });
 
+describe('a browser_annotation with marks', () => {
+  const drawn = (corpus as unknown as { parse: { name: string; expect: { records: MessageContext<'browser_annotation', BrowserAnnotation>[] } }[] }).parse.find((c) =>
+    c.name.startsWith('a browser annotation with marks is rebuilt'),
+  )!.expect.records[0];
+  const html = renderToStaticMarkup(createElement(ContextInspector, { reading: readContexts([drawn])[0] }));
+
+  it('draws every mark over the screenshot as SVG in the viewport pixels, and says how many', () => {
+    expect(html).toContain(`viewBox="0 0 ${drawn.body.viewport.width} ${drawn.body.viewport.height}"`);
+    expect(html).toContain(`${drawn.body.marks!.length} mark`);
+    for (const m of drawn.body.marks!) expect(html).toContain(`stroke="${m.color}"`.replace('stroke=', m.type === 'text' ? 'fill=' : 'stroke='));
+  });
+
+  it('shows text marks as text, never as markup', () => {
+    const tagged = { ...drawn, body: { ...drawn.body, marks: [{ type: 'text' as const, color: '#ff4420' as const, stroke: 4, x: 10, y: 10, text: '<b>hi</b>' }] } };
+    const out = renderToStaticMarkup(createElement(ContextInspector, { reading: readContexts([tagged])[0] }));
+    expect(out).toContain('&lt;b&gt;hi&lt;/b&gt;');
+  });
+
+  it('keeps the dimmed area when no mark was drawn', () => {
+    expect(renderToStaticMarkup(createElement(ContextInspector, { reading: readContexts([record])[0] }))).not.toContain('<svg role="img"');
+  });
+});
+
 describe('when Annotate is on', () => {
   it('needs a running browser on a web page', () => {
     expect(canAnnotate({ running: true, url: 'https://shop.example.com/' })).toBe(true);

@@ -3,12 +3,12 @@
 // folder. It reads the page and changes nothing on it. The page is observed before the screenshot and again after, and a
 // navigation, a new tab, a resize or a scroll in between gives a stale result the client can retry, so the image and the
 // numbers always describe the same page.
-import { mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
-import { annotate, cleanTitle, type BrowserCapture } from '@omni/shared/message-context-browser.ts';
+import { annotate, cleanTitle, type AnnotationImage, type BrowserCapture } from '@omni/shared/message-context-browser.ts';
 import type { PageObservation } from './browser.ts';
 import { uploadsDir } from './config.ts';
 import { threads } from './db.ts';
@@ -111,17 +111,60 @@ export async function captureAnnotation(src: CaptureSource, threadId: string, no
 /** A discarded capture is deleted only while it can still be a draft's. */
 const DISCARD_WINDOW_MS = 6 * 3_600_000;
 
-/** Deletes a capture nothing was made of. False when it is not one, is gone or is old enough to have been sent. */
+const CAPTURE_NAME = /^annotation-([0-9a-f]{8,32})\.(png|jpg)$/;
+
+/** The files a capture's marked image may be saved as: one per encoding, so a second upload in the other one replaces the first. */
+const markedNames = (hex: string) => [`annotation-${hex}-marked.png`, `annotation-${hex}-marked.jpg`];
+
+/** Deletes a capture nothing was made of, and the marked image made of it. False when it is not one, is gone or is old enough to have been sent. */
 export function discardCapture(threadId: string, name: string, now = Date.now()): boolean {
-  if (!/^annotation-[0-9a-f]{8,32}\.(png|jpg)$/.test(name)) return false;
-  const file = join(uploadsDir(threadId), name);
+  const m = CAPTURE_NAME.exec(name);
+  if (!m) return false;
+  const dir = uploadsDir(threadId);
+  const file = join(dir, name);
   try {
     if (now - statSync(file).mtimeMs > DISCARD_WINDOW_MS) return false;
     rmSync(file);
+    for (const marked of markedNames(m[1])) rmSync(join(dir, marked), { force: true });
     return true;
   } catch {
     return false;
   }
+}
+
+/** What saving a marked image gives, or why not. */
+export type MarkedResult = { ok: true; marked: AnnotationImage } | { ok: false; status: number; error: string };
+
+/**
+ * Saves the screenshot `name` with Ben's marks rendered on it by his client, beside it as `annotation-<hex>-marked.png` or
+ * `.jpg`. The server cannot tell what is drawn on it, only that it is an image of the very size of the capture and small
+ * enough for every harness to take inline; the marks themselves are in the record, and are what the agent is told in words.
+ */
+export function saveMarked(threadId: string, name: string, body: Buffer, contentType: string, now = Date.now()): MarkedResult {
+  const m = CAPTURE_NAME.exec(name);
+  if (!m) return { ok: false, status: 400, error: 'That is not a capture.' };
+  const dir = uploadsDir(threadId);
+  const source = join(dir, name);
+  let original: Buffer;
+  try {
+    if (now - statSync(source).mtimeMs > DISCARD_WINDOW_MS) return { ok: false, status: 404, error: 'That capture is too old to mark. Annotate the page again.' };
+    original = readFileSync(source);
+  } catch {
+    return { ok: false, status: 404, error: 'That capture is no longer saved. Annotate the page again.' };
+  }
+  const type = contentType.split(';')[0].trim().toLowerCase();
+  const ext = type === 'image/png' ? 'png' : type === 'image/jpeg' ? 'jpg' : null;
+  if (!ext) return { ok: false, status: 415, error: 'Send the marked screenshot as image/png or image/jpeg.' };
+  if (body.length > MAX_INLINE_IMAGE) return { ok: false, status: 413, error: `The marked screenshot is over ${(MAX_INLINE_IMAGE / 1_000_000).toFixed(1)} MB.` };
+  const size = imageSize(body);
+  const isPng = body.length > 8 && body.readUInt32BE(0) === 0x89504e47;
+  if (!size || isPng !== (ext === 'png')) return { ok: false, status: 422, error: 'That is not the image it says it is.' };
+  const was = imageSize(original);
+  if (!was || was.width !== size.width || was.height !== size.height) return { ok: false, status: 422, error: 'The marked screenshot is not the size of the capture.' };
+  const saved = `annotation-${m[1]}-marked.${ext}`;
+  for (const old of markedNames(m[1])) if (old !== saved) rmSync(join(dir, old), { force: true });
+  writeFileSync(join(dir, saved), body);
+  return { ok: true, marked: { name: saved, mime: type as AnnotationImage['mime'], width: size.width, height: size.height, bytes: body.length } };
 }
 
 /** The capture routes under /api/channels/:id/browser, for the channel's own browser session. */
@@ -143,6 +186,15 @@ export function captureApi(browserFor: (c: Context) => CaptureSource, hooks: { c
     if (!r.ok) return c.json({ error: r.error, retryable: r.retryable, ...(r.stale && { stale: r.stale }) }, r.status as 409);
     hooks.captured?.(id, r.capture.image.name, r.page);
     return c.json({ capture: r.capture });
+  });
+
+  // The marked screenshot: the image as bytes, which is what a client has once it has drawn Ben's marks on the capture.
+  api.post('/:id/browser/capture/:name/marked', async (c) => {
+    const t = threadOf(c, c.req.query('thread') ?? '');
+    if (t.error) return t.error;
+    const r = saveMarked(t.thread.id, c.req.param('name'), Buffer.from(await c.req.arrayBuffer()), c.req.header('content-type') ?? '');
+    if (!r.ok) return c.json({ error: r.error }, r.status as 400);
+    return c.json({ marked: r.marked });
   });
 
   api.delete('/:id/browser/capture/:name', (c) => {

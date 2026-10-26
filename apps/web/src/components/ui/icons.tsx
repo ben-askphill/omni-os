@@ -72,6 +72,13 @@ const PATHS = {
   pin: 'M9 4h6M10 4v5.5L7 13v2h10v-2l-3-3.5V4M12 15v6',
   mic: 'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3',
   share: 'M12 15V3M7 8l5-5 5 5M5 13v7h14v-7',
+  // Annotation tools.
+  pointer: 'M5 3l14 7-6 2-2 6z',
+  square: 'M4 5h16v14H4z',
+  ellipse: 'M3 12a9 6 0 1 0 18 0a9 6 0 1 0-18 0',
+  arrowUpRight: 'M5 19 19 5M9 5h10v10',
+  line: 'M5 19 19 5',
+  type: 'M5 7V5h14v2M12 5v14M9 19h6',
 } as const;
 
 export type IconName = keyof typeof PATHS;

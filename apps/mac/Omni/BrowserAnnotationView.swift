@@ -93,7 +93,7 @@ struct MarkedScreenshot: View {
       }
       .clipShape(RoundedRectangle(cornerRadius: z(10), style: .continuous))
       .overlay(RoundedRectangle(cornerRadius: z(10), style: .continuous).strokeBorder(Tok.line))
-      .accessibilityLabel("Screenshot of \(annotation.title.isEmpty ? annotation.url : annotation.title), with the marked area outlined")
+      .accessibilityLabel("Screenshot of \(annotation.title.isEmpty ? annotation.url : annotation.title), with \(annotation.marks?.isEmpty == false ? "your marks" : "the marked area outlined")")
   }
 
   private struct Missing: View {
@@ -121,9 +121,17 @@ struct RectangleMark: View {
       let box = CGRect(
         x: geo.size.width * CGFloat(r.x) / CGFloat(vp.width), y: geo.size.height * CGFloat(r.y) / CGFloat(vp.height),
         width: geo.size.width * CGFloat(r.width) / CGFloat(vp.width), height: geo.size.height * CGFloat(r.height) / CGFloat(vp.height))
-      DimmedOutside(hole: box)
-      Rectangle().strokeBorder(.black.opacity(0.35), lineWidth: 4).frame(width: box.width, height: box.height).position(x: box.midX, y: box.midY)
-      Rectangle().strokeBorder(.white, lineWidth: 2).frame(width: box.width, height: box.height).position(x: box.midX, y: box.midY)
+      let marks = annotation.marks ?? []
+      // Drawn marks show as drawn; the dim and the outline stay for an element Ben picked, or when nothing was drawn.
+      if marks.isEmpty || annotation.element != nil {
+        DimmedOutside(hole: box)
+        Rectangle().strokeBorder(.black.opacity(0.35), lineWidth: 4).frame(width: box.width, height: box.height).position(x: box.midX, y: box.midY)
+        Rectangle().strokeBorder(.white, lineWidth: 2).frame(width: box.width, height: box.height).position(x: box.midX, y: box.midY)
+      }
+      if !marks.isEmpty {
+        let k = geo.size.width / CGFloat(max(1, vp.width))
+        Canvas { ctx, _ in ctx.withCGContext { BrowserMarks.draw(marks, in: $0, k: k) } }
+      }
     }
     .allowsHitTesting(false)
   }

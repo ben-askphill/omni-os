@@ -16,6 +16,11 @@ private actor Calls {
   func discard(_ name: String) { discarded.append(name) }
 }
 
+private actor Rendered {
+  var marks: [BrowserMarks.Mark] = []
+  func set(_ m: [BrowserMarks.Mark]) { marks = m }
+}
+
 @Suite struct BrowserAnnotateTests {
   @Test func capturesWithTheThreadAndReadsTheCapture() async throws {
     let t = StubTransport(body: try fixture("browser-capture.json"))
@@ -69,7 +74,8 @@ private actor Calls {
 
   @MainActor private func model(
     _ calls: Calls, fail: BrowserCaptureError? = nil,
-    pick: @escaping @Sendable (String, Int, Int) async throws(OmniAPIError) -> ElementPickReply = { _, _, _ in .unavailable(reason: "unreadable", message: "") }
+    pick: @escaping @Sendable (String, Int, Int) async throws(OmniAPIError) -> ElementPickReply = { _, _, _ in .unavailable(reason: "unreadable", message: "") },
+    mark: @escaping @Sendable (BrowserAnnotationContext.Capture, [BrowserMarks.Mark]) async throws(OmniAPIError) -> BrowserAnnotationContext.Image = { c, _ in c.image }
   ) throws -> BrowserAnnotateModel {
     let c = try capture()
     return BrowserAnnotateModel(
@@ -79,7 +85,7 @@ private actor Calls {
         if let fail { throw fail }
         return c
       },
-      discard: { await calls.discard($0) }, pick: pick)
+      discard: { await calls.discard($0) }, pick: pick, mark: mark)
   }
 
   @MainActor private func draft() throws -> DraftContextModel {
@@ -99,13 +105,13 @@ private actor Calls {
     // A drag too small says so and leaves no rectangle.
     m.drag(.init(x0: 10, y0: 10, x1: 12, y1: 12), shown: (1280, 713))
     #expect(m.rect == nil && m.error == "Draw a larger area.")
-    #expect(m.add(to: try draft()) == "Drag over the part of the page you mean.")
+    #expect(await m.add(to: try draft()) == "Mark the part of the page you mean.")
     // Shown at half size, the rectangle is in page pixels.
     m.drag(.init(x0: 160, y0: 48, x1: 400, y1: 128), shown: (640, 356.5))
     #expect(m.rect == .init(x: 320, y: 96, width: 480, height: 160) && m.error == nil)
     m.note = " the total looks wrong "
     let d = try draft()
-    #expect(m.add(to: d) == nil)
+    #expect(await m.add(to: d) == nil)
     let r = try #require(d.records.first)
     #expect(r.kind == "browser_annotation" && r.note == "the total looks wrong")
     #expect(r.label == "Browser, 480×160 area on shop.example.com/cart")
@@ -150,9 +156,99 @@ private actor Calls {
     m.drag(.init(x0: 0, y0: 0, x1: 640, y1: 356), shown: (1280, 713))
     let d = try draft()
     for i in 0..<MessageContext.maxCount { #expect(d.add(MessageContext(id: "r\(i)", kind: "x", v: 1, label: "", note: "", body: .null)) == nil) }
-    let why = m.add(to: d)
+    let why = await m.add(to: d)
     #expect(why?.hasPrefix("A message holds at most") == true && m.error == why)
     #expect(m.isActive && m.rect != nil)
+  }
+
+  // MARK: Marks
+
+  private func markedImage() throws -> BrowserAnnotationContext.Image {
+    try decodeFixture(MarkedReply.self, "browser-capture-marked.json").marked
+  }
+
+  @Test func uploadsTheMarkedScreenshotAsRawBytes() async throws {
+    let t = StubTransport(body: try fixture("browser-capture-marked.json"))
+    let bytes = Data([0x89, 0x50, 0x4e, 0x47])
+    let got = try await OmniClient(port: 4799, transport: t).uploadMarked(channel: "acme corp", thread: "t 1", name: "annotation-075e25f3d4051319.png", image: bytes, mime: "image/png")
+    let req = try #require(t.requests.first)
+    #expect(req.httpMethod == "POST" && req.value(forHTTPHeaderField: "Content-Type") == "image/png")
+    #expect(req.url?.absoluteString == "http://127.0.0.1:4799/api/channels/acme%20corp/browser/capture/annotation-075e25f3d4051319.png/marked?thread=t%201")
+    #expect(req.httpBody == bytes)
+    #expect(got.name == "annotation-075e25f3d4051319-marked.png" && got.width == 2560 && got.height == 1426)
+  }
+
+  @MainActor @Test func drawsMarksRendersThemAndAddsThemToTheDraft() async throws {
+    let calls = Calls()
+    let rendered = Rendered()
+    let marked = try markedImage()
+    let m = try model(calls, mark: { _, marks throws(OmniAPIError) in
+      await rendered.set(marks)
+      return marked
+    })
+    await m.start()
+    #expect(!m.hasMarking)
+    // Half size: a rectangle, an arrow and a stroke, then text.
+    m.chooseTool(.rect)
+    m.drawShape(.init(x0: 100, y0: 50, x1: 300, y1: 150), shown: (640, 356.5))
+    m.chooseTool(.arrow)
+    m.setColor("#3b82f6")
+    m.drawShape(.init(x0: 10, y0: 10, x1: 110, y1: 60), shown: (640, 356.5))
+    m.chooseTool(.pen)
+    m.drawStroke([(10, 10), (60, 40), (120, 20), (180, 90)], shown: (640, 356.5))
+    m.chooseTool(.text)
+    m.drawText("  Fix  this ", at: (100, 80), shown: (640, 356.5))
+    #expect(m.marks.count == 4 && m.hasMarking && m.rect == nil)
+    #expect(m.marks[1].color == "#3b82f6" && m.marks[0].color == "#ff4420")
+    // A too-short drag says so and makes nothing.
+    m.chooseTool(.line)
+    m.drawShape(.init(x0: 5, y0: 5, x1: 6, y1: 6), shown: (640, 356.5))
+    #expect(m.marks.count == 4 && m.error == "Drag a little further.")
+    m.note = "all of these"
+    let d = try draft()
+    #expect(await m.add(to: d) == nil)
+    #expect(await rendered.marks.count == 4)
+    let r = try #require(d.records.first)
+    #expect(r.label == "Browser, 4 marks on shop.example.com/cart" && r.note == "all of these")
+    let body = try #require(BrowserAnnotationContext.parse(r.body, v: 1))
+    #expect(body.marked == marked && body.marks?.count == 4)
+    // Without a dragged area the record's area is the box round the marks.
+    #expect(body.rect.width >= 8 && body.rect.height >= 8)
+    #expect(!m.isActive && m.marks.isEmpty)
+  }
+
+  @MainActor @Test func aFailedRenderKeepsTheMarksAndTheDraftEmpty() async throws {
+    let m = try model(Calls(), mark: { _, _ throws(OmniAPIError) in throw OmniAPIError.http(status: 413, message: "The marked screenshot is over 3.5 MB.") })
+    await m.start()
+    m.chooseTool(.rect)
+    m.drawShape(.init(x0: 100, y0: 50, x1: 300, y1: 150), shown: (640, 356.5))
+    let d = try draft()
+    #expect(await m.add(to: d) == "The marked screenshot is over 3.5 MB.")
+    #expect(m.isActive && m.marks.count == 1 && d.records.isEmpty && !m.adding)
+  }
+
+  @MainActor @Test func selectsMovesRecolorsAndDeletesAMark() async throws {
+    let m = try model(Calls())
+    await m.start()
+    m.chooseTool(.rect)
+    m.drawShape(.init(x0: 100, y0: 50, x1: 300, y1: 150), shown: (640, 356.5))
+    m.chooseTool(.select)
+    // The outline is hit; the middle is not.
+    #expect(!m.grab(at: (200, 100), shown: (640, 356.5)))
+    #expect(m.grab(at: (100, 100), shown: (640, 356.5)) && m.selected == 0)
+    m.moveGrabbed(dx: 20, dy: 10, shown: (640, 356.5))
+    m.moveGrabbed(dx: 50, dy: 10, shown: (640, 356.5))
+    #expect(m.marks[0].shape == .box(ellipse: false, x: 300, y: 120, width: 400, height: 200))
+    m.releaseGrab()
+    m.setColor("#2ec27e")
+    m.setStroke(8)
+    #expect(m.marks[0].color == "#2ec27e" && m.marks[0].stroke == 8)
+    m.deleteSelected()
+    #expect(m.marks.isEmpty && m.selected == nil)
+    m.chooseTool(.rect)
+    m.drawShape(.init(x0: 100, y0: 50, x1: 300, y1: 150), shown: (640, 356.5))
+    m.undo()
+    #expect(m.marks.isEmpty)
   }
 
   // MARK: Picking an element
@@ -197,7 +293,7 @@ private actor Calls {
     #expect(m.rect == .init(x: 320, y: 96, width: 481, height: 160))
     m.note = "this button"
     let d = try draft()
-    #expect(m.add(to: d) == nil)
+    #expect(await m.add(to: d) == nil)
     let r = try #require(d.records.first)
     #expect(r.label == "Browser, <button> on shop.example.com/cart")
     let body = try #require(BrowserAnnotationContext.parse(r.body, v: 1))
@@ -213,7 +309,7 @@ private actor Calls {
     m.drag(.init(x0: 160, y0: 48, x1: 400, y1: 128), shown: (640, 356.5))
     #expect(m.rect == .init(x: 320, y: 96, width: 480, height: 160) && m.notice == nil)
     let d = try draft()
-    #expect(m.add(to: d) == nil)
+    #expect(await m.add(to: d) == nil)
     let record = try #require(d.records.first)
     let body = try #require(BrowserAnnotationContext.parse(record.body, v: 1))
     #expect(body.element == nil)

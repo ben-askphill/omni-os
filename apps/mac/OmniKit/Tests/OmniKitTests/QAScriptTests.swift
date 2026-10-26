@@ -145,6 +145,22 @@ import OmniKit
     #expect(!QACondition.browserFrame.holds(in: QAFacts(serverState: "running", connection: "open", sidebarLoaded: true, channels: [])))
   }
 
+  @Test func readsTheMarkingSteps() throws {
+    let json = ##"[{"annotate": {"shape": "arrow", "from": [0.1, 0.2], "to": [0.5, 0.6]}}, {"annotate": {"pen": [[0.1, 0.1], [0.2, 0.3], [0.4, 0.2]]}}, {"annotate": {"text": "wrong total", "at": [0.3, 0.7]}}, {"annotate": {"color": "#3b82f6", "stroke": 8}}, {"annotate": {"move": [0.3, 0.4], "by": [0.1, 0]}}, {"annotate": "undo"}, {"annotate": {"note": "fix these"}}]"##
+    #expect(try QAScript(json: Data(json.utf8)).steps == [
+      .annotate(.shape(tool: "arrow", x0: 0.1, y0: 0.2, x1: 0.5, y1: 0.6)),
+      .annotate(.pen(points: [[0.1, 0.1], [0.2, 0.3], [0.4, 0.2]])),
+      .annotate(.text("wrong total", x: 0.3, y: 0.7)),
+      .annotate(.style(color: "#3b82f6", stroke: 8)),
+      .annotate(.move(x: 0.3, y: 0.4, dx: 0.1, dy: 0)),
+      .annotate(.undo),
+      .annotate(.note("fix these")),
+    ])
+    for bad in [#"[{"annotate": {"shape": "star", "from": [0, 0], "to": [1, 1]}}]"#, #"[{"annotate": {"shape": "line", "from": [0, 0]}}]"#, #"[{"annotate": {"pen": [[0, 0]]}}]"#, #"[{"annotate": {"text": "x", "at": [2, 0]}}]"#, #"[{"annotate": {"color": 3}}]"#, #"[{"annotate": {"move": [0, 0]}}]"#] {
+      #expect(throws: QAScriptError.self, "\(bad)") { try QAScript(json: Data(bad.utf8)) }
+    }
+  }
+
   @Test func sumsUpFrames() {
     let stats = QAFrameStats(gaps: [16, 17, 16, 50, 16, 34])
     #expect(stats.frames == 6)

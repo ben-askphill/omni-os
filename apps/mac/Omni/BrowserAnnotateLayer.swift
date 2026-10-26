@@ -15,8 +15,20 @@ struct Annotating {
 struct BrowserAnnotateLayer: View {
   let annotating: Annotating
   @State private var live: BrowserAnnotationContext.Drag?
+  @State private var gesture = Gesture.none
+  @State private var path: [CGPoint] = []
+  @State private var typing: CGPoint?
+  @State private var typed = ""
   @State private var shown = CGSize.zero
+  @State private var shapes = false
+  @State private var colors = false
+  @State private var strokes = false
+  @State private var shape = BrowserMarks.Tool.rect
   @FocusState private var noteFocused: Bool
+  @FocusState private var typingFocused: Bool
+
+  /// What the press that is going on does, decided by where it started.
+  private enum Gesture { case none, move, area, draw }
 
   private var model: BrowserAnnotateModel { annotating.model }
 
@@ -41,8 +53,9 @@ struct BrowserAnnotateLayer: View {
         failure(e)
       case .picking(let capture):
         header
+        toolbar
         screenshot(capture)
-        if model.rect != nil || model.error != nil || model.notice != nil || model.picking { panel }
+        if model.hasMarking || model.error != nil || model.notice != nil || model.picking { panel }
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -50,6 +63,11 @@ struct BrowserAnnotateLayer: View {
     .focusable()
     .focusEffectDisabled()
     .onExitCommand { model.cancel() }
+    .onKeyPress(keys: [.delete, .deleteForward]) { _ in
+      guard typing == nil, !noteFocused, model.selected != nil else { return .ignored }
+      model.deleteSelected()
+      return .handled
+    }
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Annotate this page")
   }
@@ -57,7 +75,7 @@ struct BrowserAnnotateLayer: View {
   private var header: some View {
     HStack(spacing: z(8)) {
       OmniIcon(name: "target", size: 14).foregroundStyle(Tok.fg3)
-      Text("Tap an element, or drag an area.")
+      Text("Mark up the page.")
         .font(.omni(size: 12, weight: .medium))
         .foregroundStyle(Tok.fg2)
       Spacer(minLength: 0)
@@ -101,26 +119,17 @@ struct BrowserAnnotateLayer: View {
         }
         .frame(width: size.width, height: size.height)
         marks(size, c)
+        drawing(size, c)
         Color.clear
           .contentShape(Rectangle())
           .gesture(
             DragGesture(minimumDistance: 0, coordinateSpace: .local)
-              .onChanged { g in
-                // A press that has not moved is a tap, which picks an element; only a drag draws.
-                guard Self.isDrag(g) else { return }
-                live = .init(x0: g.startLocation.x, y0: g.startLocation.y, x1: g.location.x, y1: g.location.y)
-              }
-              .onEnded { g in
-                live = nil
-                if Self.isDrag(g) {
-                  model.drag(.init(x0: g.startLocation.x, y0: g.startLocation.y, x1: g.location.x, y1: g.location.y), shown: (size.width, size.height))
-                } else {
-                  Task { await model.tap(at: (g.location.x, g.location.y), shown: (size.width, size.height)) }
-                }
-              }
+              .onChanged { g in press(g, size) }
+              .onEnded { g in release(g, size) }
           )
           .frame(width: size.width, height: size.height)
           .onHover { inside in if inside { NSCursor.crosshair.push() } else { NSCursor.pop() } }
+        if let at = typing { typeBox(at, size) }
       }
       .frame(width: size.width, height: size.height)
       .clipShape(RoundedRectangle(cornerRadius: z(8), style: .continuous))
@@ -158,26 +167,29 @@ struct BrowserAnnotateLayer: View {
       } else if model.picking {
         Text("Looking at the page…").font(.omni(size: 11.5)).foregroundStyle(Tok.fg3)
       }
-      if model.rect != nil {
+      if model.hasMarking {
         TextField("What about this?", text: $model.note, axis: .vertical)
           .textFieldStyle(.omni)
           .lineLimit(1...3)
           .focused($noteFocused)
-          .onSubmit { model.add(to: annotating.draft) }
+          .onSubmit { add() }
           .onKeyPress(.escape) {
             model.cancel()
             return .handled
           }
       }
       if let error = model.error { ErrorNote(text: error) }
-      if model.rect != nil {
+      if model.hasMarking {
         HStack(spacing: z(8)) {
           Spacer(minLength: 0)
-          Button("Redraw") { model.redraw() }
-            .buttonStyle(.pill(.ghost, height: 28))
-          Button("Add to Message") { model.add(to: annotating.draft) }
+          if model.rect != nil {
+            Button("Clear area") { model.redraw() }
+              .buttonStyle(.pill(.ghost, height: 28))
+          }
+          Button(model.adding ? "Adding…" : "Add to Message") { add() }
             .buttonStyle(.pill(.primary, height: 28))
-            .help("Puts the screenshot, the marked area and your note in the reply box")
+            .disabled(model.adding)
+            .help("Puts the screenshot, your marks and your note in the reply box")
         }
       }
     }
@@ -186,6 +198,239 @@ struct BrowserAnnotateLayer: View {
     .background(Tok.bg)
     .overlay(alignment: .top) { Tok.line.frame(height: 1) }
     .onChange(of: model.rect) { if model.rect != nil { noteFocused = true } }
+  }
+
+  private func add() { Task { await model.add(to: annotating.draft) } }
+
+  // MARK: Tools
+
+  private var toolbar: some View {
+    HStack(spacing: z(2)) {
+      toolButton("pointer", "Select", on: model.tool == .select) { model.chooseTool(.select) }
+      toolButton("pencil", "Pen", on: model.tool == .pen) { model.chooseTool(.pen) }
+      menuButton("Shapes", icon: shapeIcon(shape), on: model.tool.isShape, open: $shapes) {
+        HStack(spacing: z(2)) {
+          ForEach([BrowserMarks.Tool.rect, .ellipse, .arrow, .line], id: \.self) { t in
+            toolButton(shapeIcon(t), shapeName(t), on: shape == t) {
+              shape = t
+              model.chooseTool(t)
+              shapes = false
+            }
+          }
+        }
+        .padding(z(6))
+      }
+      toolButton("type", "Text", on: model.tool == .text) { model.chooseTool(.text) }
+      Tok.line.frame(width: 1, height: z(16)).padding(.horizontal, z(4))
+      menuButton("Color", icon: nil, swatch: BrowserMarks.cgColor(model.style.color), on: false, open: $colors) {
+        HStack(spacing: z(4)) {
+          ForEach(BrowserMarks.colors, id: \.hex) { c in
+            Button {
+              model.setColor(c.hex)
+              colors = false
+            } label: {
+              Circle()
+                .fill(Color(cgColor: BrowserMarks.cgColor(c.hex)))
+                .frame(width: z(20), height: z(20))
+                .overlay(Circle().strokeBorder(c.hex == model.style.color ? Tok.fg2 : Tok.lineStrong, lineWidth: c.hex == model.style.color ? 2 : 1).padding(c.hex == model.style.color ? -3 : 0))
+                .frame(width: z(28), height: z(28))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(c.name.capitalized)
+            .accessibilityLabel(c.name)
+          }
+        }
+        .padding(z(6))
+      }
+      menuButton("Line width", icon: nil, stroke: model.style.stroke, on: false, open: $strokes) {
+        HStack(spacing: z(2)) {
+          ForEach(BrowserMarks.strokes, id: \.self) { n in
+            Button {
+              model.setStroke(n)
+              strokes = false
+            } label: {
+              Capsule().fill(Tok.fg3).frame(width: z(24), height: CGFloat(n))
+                .frame(width: z(40), height: z(32))
+                .background(n == model.style.stroke ? Tok.surface3 : .clear, in: RoundedRectangle(cornerRadius: z(8)))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("\(n) px")
+            .accessibilityLabel("\(n) pixels")
+          }
+        }
+        .padding(z(6))
+      }
+      Spacer(minLength: 0)
+      toolButton("undo", "Undo the last mark", on: false, enabled: !model.marks.isEmpty) { model.undo() }
+      toolButton("trash", "Delete the selected mark", on: false, enabled: model.selected != nil) { model.deleteSelected() }
+    }
+    .padding(.horizontal, z(8))
+    .padding(.bottom, z(4))
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Annotation tools")
+  }
+
+  private func shapeIcon(_ t: BrowserMarks.Tool) -> String {
+    switch t {
+    case .ellipse: "ellipse"
+    case .arrow: "arrowUpRight"
+    case .line: "line"
+    default: "square"
+    }
+  }
+
+  private func shapeName(_ t: BrowserMarks.Tool) -> String {
+    switch t {
+    case .ellipse: "Ellipse"
+    case .arrow: "Arrow"
+    case .line: "Line"
+    default: "Rectangle"
+    }
+  }
+
+  private func toolButton(_ icon: String, _ label: String, on: Bool, enabled: Bool = true, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      OmniIcon(name: icon, size: 15)
+        .foregroundStyle(on ? Tok.fg : Tok.fg3)
+        .frame(width: z(30), height: z(28))
+        .background(on ? Tok.surface3 : .clear, in: RoundedRectangle(cornerRadius: z(8), style: .continuous))
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .disabled(!enabled)
+    .opacity(enabled ? 1 : 0.4)
+    .help(label)
+    .accessibilityLabel(label)
+    .accessibilityAddTraits(on ? .isSelected : [])
+  }
+
+  /// A face with a small chevron that opens a popover of choices.
+  private func menuButton<Content: View>(
+    _ label: String, icon: String?, swatch: CGColor? = nil, stroke: Int? = nil, on: Bool, open: Binding<Bool>, @ViewBuilder content: @escaping () -> Content
+  ) -> some View {
+    Button { open.wrappedValue.toggle() } label: {
+      HStack(spacing: z(2)) {
+        if let icon { OmniIcon(name: icon, size: 15) }
+        if let swatch { Circle().fill(Color(cgColor: swatch)).frame(width: z(16), height: z(16)).overlay(Circle().strokeBorder(Tok.lineStrong)) }
+        if let stroke { Capsule().fill(on ? Tok.fg : Tok.fg3).frame(width: z(16), height: max(2, CGFloat(stroke))) }
+        OmniIcon(name: "chevronDown", size: 11)
+      }
+      .foregroundStyle(on ? Tok.fg : Tok.fg3)
+      .padding(.horizontal, z(6))
+      .frame(height: z(28))
+      .background(on ? Tok.surface3 : .clear, in: RoundedRectangle(cornerRadius: z(8), style: .continuous))
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .help(label)
+    .accessibilityLabel(label)
+    .popover(isPresented: open, arrowEdge: .bottom, content: content)
+  }
+
+  // MARK: Gestures
+
+  private func at(_ p: CGPoint) -> (x: Double, y: Double) { (p.x, p.y) }
+  private func sized(_ s: CGSize) -> (width: Double, height: Double) { (s.width, s.height) }
+
+  private func press(_ g: DragGesture.Value, _ size: CGSize) {
+    if gesture == .none {
+      if typing != nil { commitText(size) }
+      switch model.tool {
+      case .select: gesture = model.grab(at: at(g.startLocation), shown: sized(size)) ? .move : .area
+      case .text: gesture = .draw
+      default: gesture = .draw
+      }
+    }
+    switch (gesture, model.tool) {
+    case (.move, _):
+      model.moveGrabbed(dx: g.translation.width, dy: g.translation.height, shown: sized(size))
+    case (.area, _):
+      // A press that has not moved is a tap, which picks an element; only a drag draws.
+      guard Self.isDrag(g) else { return }
+      live = .init(x0: g.startLocation.x, y0: g.startLocation.y, x1: g.location.x, y1: g.location.y)
+    case (.draw, .pen):
+      path.append(g.location)
+    case (.draw, let t) where t.isShape:
+      guard Self.isDrag(g) else { return }
+      live = .init(x0: g.startLocation.x, y0: g.startLocation.y, x1: g.location.x, y1: g.location.y)
+    default:
+      break
+    }
+  }
+
+  private func release(_ g: DragGesture.Value, _ size: CGSize) {
+    defer {
+      gesture = .none
+      live = nil
+      path = []
+    }
+    let drag = BrowserAnnotationContext.Drag(x0: g.startLocation.x, y0: g.startLocation.y, x1: g.location.x, y1: g.location.y)
+    switch (gesture, model.tool) {
+    case (.move, _):
+      model.releaseGrab()
+    case (.area, _):
+      if Self.isDrag(g) {
+        model.drag(drag, shown: sized(size))
+      } else {
+        Task { await model.tap(at: at(g.location), shown: sized(size)) }
+      }
+    case (.draw, .pen):
+      model.drawStroke(path.map { (x: $0.x, y: $0.y) } + [(x: g.location.x, y: g.location.y)], shown: sized(size))
+    case (.draw, .text):
+      typed = ""
+      typing = g.location
+      typingFocused = true
+    case (.draw, let t) where t.isShape:
+      if Self.isDrag(g) { model.drawShape(drag, shown: sized(size)) }
+    default:
+      break
+    }
+  }
+
+  private func commitText(_ size: CGSize) {
+    if let p = typing { model.drawText(typed, at: at(p), shown: sized(size)) }
+    typing = nil
+    typed = ""
+  }
+
+  /// Where the text goes, as a field over the screenshot at the point Ben tapped.
+  private func typeBox(_ p: CGPoint, _ size: CGSize) -> some View {
+    TextField("Type, then Return", text: $typed)
+      .textFieldStyle(.plain)
+      .font(.omni(size: CGFloat(BrowserMarks.textSize(model.style.stroke)) * size.width / max(1, CGFloat(viewportWidth)), weight: .semibold))
+      .foregroundStyle(Color(cgColor: BrowserMarks.cgColor(model.style.color)))
+      .focused($typingFocused)
+      .frame(width: max(z(140), size.width - p.x - z(8)), alignment: .leading)
+      .position(x: p.x + max(z(140), size.width - p.x - z(8)) / 2, y: p.y + z(10))
+      .onSubmit { commitText(size) }
+      .onKeyPress(.escape) {
+        typing = nil
+        typed = ""
+        return .handled
+      }
+  }
+
+  private var viewportWidth: Int {
+    if case .picking(let c) = model.phase { c.viewport.width } else { 1 }
+  }
+
+  /// The marks, and the one being drawn, over the screenshot.
+  private func drawing(_ size: CGSize, _ c: BrowserAnnotationContext.Capture) -> some View {
+    let vp = (width: c.viewport.width, height: c.viewport.height)
+    var all = model.marks
+    if let d = live, model.tool.isShape, gesture == .draw,
+       case .success(let m) = BrowserMarks.dragToMark(model.tool, drag: d, shown: sized(size), viewport: vp, style: model.style) { all.append(m) }
+    if gesture == .draw, model.tool == .pen, path.count > 1,
+       case .success(let m) = BrowserMarks.strokeToMark(path.map { (x: $0.x, y: $0.y) }, shown: sized(size), viewport: vp, style: model.style) { all.append(m) }
+    let k = size.width / CGFloat(max(1, c.viewport.width))
+    let selected = model.selected ?? -1
+    return Canvas { ctx, _ in
+      ctx.withCGContext { cg in BrowserMarks.draw(all, in: cg, k: k, selected: selected) }
+    }
+    .frame(width: size.width, height: size.height)
+    .allowsHitTesting(false)
   }
 }
 

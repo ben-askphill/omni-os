@@ -576,8 +576,42 @@ final class QARunner {
       a.model.note = note
       try? await Task.sleep(for: .milliseconds(500))
     case .add:
-      if let refused = a.model.add(to: a.draft) { throw QAScriptError(refused) }
+      if let refused = await a.model.add(to: a.draft) { throw QAScriptError(refused) }
       try? await Task.sleep(for: .milliseconds(400))
+    case .shape(let tool, let x0, let y0, let x1, let y1):
+      guard case .picking = a.model.phase, let t = BrowserMarks.Tool(rawValue: tool) else { throw QAScriptError("no screenshot is shown to draw on") }
+      let before = a.model.marks.count
+      a.model.chooseTool(t)
+      a.model.drawShape(.init(x0: x0 * 1000, y0: y0 * 1000, x1: x1 * 1000, y1: y1 * 1000), shown: (1000, 1000))
+      guard a.model.marks.count > before else { throw QAScriptError(a.model.error ?? "no shape") }
+      try? await Task.sleep(for: .milliseconds(300))
+    case .pen(let points):
+      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to draw on") }
+      let before = a.model.marks.count
+      a.model.chooseTool(.pen)
+      a.model.drawStroke(points.map { (x: $0[0] * 1000, y: $0[1] * 1000) }, shown: (1000, 1000))
+      guard a.model.marks.count > before else { throw QAScriptError(a.model.error ?? "no stroke") }
+      try? await Task.sleep(for: .milliseconds(300))
+    case .text(let words, let x, let y):
+      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to write on") }
+      let before = a.model.marks.count
+      a.model.chooseTool(.text)
+      a.model.drawText(words, at: (x * 1000, y * 1000), shown: (1000, 1000))
+      guard a.model.marks.count > before else { throw QAScriptError(a.model.error ?? "no text") }
+      try? await Task.sleep(for: .milliseconds(300))
+    case .style(let color, let stroke):
+      if let color { a.model.setColor(color) }
+      if let stroke { a.model.setStroke(stroke) }
+    case .move(let x, let y, let dx, let dy):
+      a.model.chooseTool(.select)
+      guard a.model.grab(at: (x * 1000, y * 1000), shown: (1000, 1000)) else { throw QAScriptError("no mark there") }
+      a.model.moveGrabbed(dx: dx * 1000, dy: dy * 1000, shown: (1000, 1000))
+      a.model.releaseGrab()
+      try? await Task.sleep(for: .milliseconds(300))
+    case .undo:
+      a.model.undo()
+    case .note(let words):
+      a.model.note = words
     case .cancel:
       a.model.cancel()
       try? await Task.sleep(for: .milliseconds(400))

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono } from 'hono';
@@ -236,6 +236,59 @@ describe('discardCapture', () => {
   });
 });
 
+describe('saveMarked', () => {
+  const MARKS = [{ type: 'arrow' as const, color: '#ff4420' as const, stroke: 4, x0: 200, y0: 300, x1: 420, y1: 180 }];
+
+  it('saves the screenshot with Ben\'s marks beside the capture, of the capture\'s size', T, async () => {
+    const t = await newThread();
+    const c = await must(fakeBrowser(), t.id);
+    const r = cap.saveMarked(t.id, c.image.name, png(2560, 1426, 900), 'image/png');
+    expect(r).toEqual({ ok: true, marked: { name: c.image.name.replace('.png', '-marked.png'), mime: 'image/png', width: 2560, height: 1426, bytes: 900 } });
+    expect(saved(t.id).sort()).toEqual([c.image.name, c.image.name.replace('.png', '-marked.png')].sort());
+    // The record the clients make from it is valid.
+    expect(annotate(c, { x: 150, y: 150, width: 300, height: 200 }, undefined, { marks: MARKS, marked: r.ok ? r.marked : undefined }).ok).toBe(true);
+  });
+
+  it('replaces an earlier marked image, in whichever encoding it was', T, async () => {
+    const t = await newThread();
+    const c = await must(fakeBrowser(), t.id);
+    cap.saveMarked(t.id, c.image.name, png(2560, 1426), 'image/png');
+    const again = cap.saveMarked(t.id, c.image.name, jpeg(2560, 1426), 'image/jpeg');
+    expect(again.ok && again.marked.name).toBe(c.image.name.replace('.png', '-marked.jpg'));
+    expect(saved(t.id).filter((f) => f.includes('-marked'))).toEqual([c.image.name.replace('.png', '-marked.jpg')]);
+  });
+
+  it('refuses what is not the capture\'s own image: another size, another type, not an image, too big, not a capture', T, async () => {
+    const t = await newThread();
+    const c = await must(fakeBrowser(), t.id);
+    const bad = (body: Buffer, type: string, name = c.image.name) => cap.saveMarked(t.id, name, body, type);
+    expect(bad(png(1280, 713), 'image/png')).toMatchObject({ ok: false, status: 422, error: expect.stringMatching(/not the size of the capture/) });
+    expect(bad(jpeg(2560, 1426), 'image/png')).toMatchObject({ ok: false, status: 422 });
+    expect(bad(png(2560, 1426), 'image/gif')).toMatchObject({ ok: false, status: 415 });
+    expect(bad(Buffer.from('<svg/>'), 'image/png')).toMatchObject({ ok: false, status: 422 });
+    expect(bad(png(2560, 1426, MAX_INLINE_IMAGE + 1), 'image/png')).toMatchObject({ ok: false, status: 413 });
+    expect(bad(png(2560, 1426), 'image/png', 'notes.png')).toMatchObject({ ok: false, status: 400 });
+    expect(bad(png(2560, 1426), 'image/png', 'annotation-0123456789abcdef.png')).toMatchObject({ ok: false, status: 404 });
+    expect(saved(t.id)).toEqual([c.image.name]);
+  });
+
+  it('is refused for a capture old enough to have been sent', T, async () => {
+    const t = await newThread();
+    const c = await must(fakeBrowser(), t.id);
+    const old = new Date(Date.now() - 7 * 3_600_000);
+    utimesSync(join(uploadsDir(t.id), c.image.name), old, old);
+    expect(cap.saveMarked(t.id, c.image.name, png(2560, 1426), 'image/png')).toMatchObject({ ok: false, status: 404 });
+  });
+
+  it('goes with the capture when it is discarded', T, async () => {
+    const t = await newThread();
+    const c = await must(fakeBrowser(), t.id);
+    cap.saveMarked(t.id, c.image.name, png(2560, 1426), 'image/png');
+    expect(cap.discardCapture(t.id, c.image.name)).toBe(true);
+    expect(saved(t.id)).toEqual([]);
+  });
+});
+
 describe('the capture routes', () => {
   const mount = (src: CaptureSource) => new Hono().route('/api/channels', cap.captureApi(() => src));
   const post = (app: Hono, channel: string, body: unknown) =>
@@ -267,6 +320,22 @@ describe('the capture routes', () => {
     expect((await post(mount(fakeBrowser()), 'shots', { thread: t.id })).status).toBe(400);
     expect((await post(mount(fakeBrowser()), 'shots', { thread: 'nope' })).status).toBe(404);
     expect(saved(t.id)).toEqual([]);
+  });
+
+  it('takes the marked screenshot as bytes, and answers with its image', T, async () => {
+    const t = await newThread();
+    const app = mount(fakeBrowser());
+    const { capture } = (await (await post(app, 'shots', { thread: t.id })).json()) as { capture: BrowserCapture };
+    const url = `/api/channels/shots/browser/capture/${capture.image.name}/marked?thread=${t.id}`;
+    const res = await app.request(url, { method: 'POST', headers: { 'content-type': 'image/png' }, body: png(2560, 1426, 700) });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // The Mac app decodes this (OmniKit's MarkedReply).
+    macFixture('browser-capture-marked.json', body);
+    expect(body).toEqual({ marked: { name: capture.image.name.replace('.png', '-marked.png'), mime: 'image/png', width: 2560, height: 1426, bytes: 700 } });
+    const wrong = await app.request(url, { method: 'POST', headers: { 'content-type': 'image/png' }, body: png(10, 10) });
+    expect(wrong.status).toBe(422);
+    expect((await app.request(`/api/channels/shots/browser/capture/${capture.image.name}/marked?thread=nope`, { method: 'POST', headers: { 'content-type': 'image/png' }, body: png(2560, 1426) })).status).toBe(404);
   });
 
   it('discards a capture that was never made into a record', T, async () => {
@@ -301,6 +370,26 @@ describe('a browser_annotation through the message route', () => {
     const elsewhere = await send(other.id, { prompt: 'look', context: [record(c)] });
     expect(elsewhere.status).toBe(400);
     expect((await elsewhere.json()).error).toMatch(/taken for another thread/);
+  });
+
+  it('takes marks and the marked screenshot, and refuses them once that file is gone', T, async () => {
+    const t = await newThread();
+    const c = await must(fakeBrowser(), t.id);
+    const marked = cap.saveMarked(t.id, c.image.name, png(2560, 1426, 800), 'image/png');
+    if (!marked.ok) throw new Error(marked.error);
+    const marks = [
+      { type: 'arrow' as const, color: '#ff4420' as const, stroke: 4, x0: 200, y0: 300, x1: 420, y1: 180 },
+      { type: 'text' as const, color: '#3b82f6' as const, stroke: 4, x: 500, y: 100, text: 'wrong total' },
+    ];
+    const body = annotate(c, { x: 150, y: 90, width: 400, height: 220 }, undefined, { marks, marked: marked.marked });
+    if (!body.ok) throw new Error(body.error);
+    const rec = newContext(browserAnnotation, body.value, 'these', { id: () => 'shot-1' });
+    expect(rec.label).toBe('Browser, 2 marks on shop.example.com/cart');
+    expect((await send(t.id, { prompt: 'look', context: [rec] })).status).toBe(200);
+    rmSync(join(uploadsDir(t.id), marked.marked.name));
+    const gone = await send(t.id, { prompt: 'look', context: [rec] });
+    expect(gone.status).toBe(400);
+    expect((await gone.json()).error).toMatch(/marked screenshot is no longer saved/);
   });
 
   it('is refused, saying so, when the screenshot is gone', T, async () => {

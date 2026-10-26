@@ -65,4 +65,32 @@ extension OmniClient {
   public func pickElement(channel: String, thread: String, name: String, x: Int, y: Int) async throws(OmniAPIError) -> ElementPickReply {
     try await send("POST", capturePath(channel, "/\(uriComponent(name))/element"), body: PickRequest(thread: thread, x: x, y: y))
   }
+
+  /// Saves the screenshot `name` with Ben's marks rendered on it by this client (apps/server/browser-capture.ts), and gives
+  /// the record's `marked` image. The server checks it is a PNG or JPEG of the capture's own size.
+  public func uploadMarked(channel: String, thread: String, name: String, image: Data, mime: String) async throws(OmniAPIError) -> BrowserAnnotationContext.Image {
+    let reply: MarkedReply = try await send("POST", capturePath(channel, "/\(uriComponent(name))/marked"), query: [("thread", thread)], raw: (image, mime))
+    return reply.marked
+  }
+
+  /// Renders Ben's marks onto the screenshot the server took, and saves the result beside it as the record's `marked` image.
+  /// The screenshot comes from the thread's uploads, so what is drawn on is the very image the record names.
+  public func uploadMarkedScreenshot(channel: String, capture: BrowserAnnotationContext.Capture, marks: [BrowserMarks.Mark]) async throws(OmniAPIError) -> BrowserAnnotationContext.Image {
+    var req = authorized(uploadURL(threadID: capture.thread, name: capture.image.name))
+    req.cachePolicy = .reloadIgnoringLocalCacheData
+    let data: Data
+    do {
+      let (body, response) = try await transport.send(req)
+      guard (200..<300).contains(response.statusCode) else { throw OmniAPIError.http(status: response.statusCode, message: "The screenshot could not be loaded to mark it.") }
+      data = body
+    } catch let e as OmniAPIError {
+      throw e
+    } catch {
+      throw OmniAPIError.unreachable(error.localizedDescription)
+    }
+    guard let drawn = BrowserMarks.render(image: data, marks: marks, viewportWidth: capture.viewport.width) else {
+      throw OmniAPIError.http(status: 0, message: "Could not render the marks onto the screenshot.")
+    }
+    return try await uploadMarked(channel: channel, thread: capture.thread, name: capture.image.name, image: drawn.data, mime: drawn.mime)
+  }
 }

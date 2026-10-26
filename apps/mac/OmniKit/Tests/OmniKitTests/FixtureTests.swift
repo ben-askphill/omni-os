@@ -104,6 +104,7 @@ private struct DeliveryRefusal: Decodable {
     "thread-handoff.json": { _ = try decodeFixture(ThreadDetail.self, "thread-handoff.json") },
     // Recorded by apps/server/tests/browser-capture.test.ts, which has no Chrome to capture.
     "browser-capture.json": { _ = try decodeFixture(BrowserCaptureReply.self, "browser-capture.json") },
+    "browser-capture-marked.json": { _ = try decodeFixture(MarkedReply.self, "browser-capture-marked.json") },
     "browser-capture-stale.json": { _ = try decodeFixture(BrowserCaptureFailureBody.self, "browser-capture-stale.json") },
     // Recorded by apps/server/tests/browser-pick.test.ts, as above.
     "browser-pick-element.json": { _ = try decodeFixture(ElementPickReply.self, "browser-pick-element.json") },

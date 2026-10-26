@@ -1,10 +1,13 @@
-// The browser_annotation kind of message context: a rectangle Ben drew on a screenshot of the channel's browser, with
-// the page it was taken of. The screenshot is a file in the thread's uploads folder and the record names it; the
-// rectangle is in the page's own CSS pixels, so it means the same thing on any client and at any display scale. The
-// server takes the screenshot and everything but the rectangle (`BrowserCapture`), so the rectangle is drawn on the very
-// image it describes and cannot disagree with it; the client adds the rectangle and the note.
+// The browser_annotation kind of message context: what Ben marked on a screenshot of the channel's browser, with the
+// page it was taken of. The screenshot is a file in the thread's uploads folder and the record names it. What he marked is
+// a rectangle (an area, or the box of an element he picked) and, when he drew with the toolbar, his marks
+// (message-context-marks.ts); all of it is in the page's own CSS pixels, so it means the same thing on any client and at
+// any display scale. The server takes the screenshot and everything but the marking (`BrowserCapture`), so the marks are
+// drawn on the very image they describe and cannot disagree with it; the client adds the marking and the note. With marks
+// the client also renders them onto the screenshot and the server keeps that as `marked`, the image the agent gets.
 // apps/mac/OmniKit/Sources/OmniKit/BrowserAnnotationContext.swift ports it.
 import { ID_MAX, cutLabel, overLimit, type MessageContextKind, type Parsed } from './message-context.ts';
+import { marksLabel, marksOf, type Mark } from './message-context-marks.ts';
 import { FORBIDDEN_CLASS, plain } from './message-context-terminal.ts';
 
 export interface PixelRect {
@@ -43,6 +46,10 @@ export interface BrowserAnnotation {
   image: AnnotationImage;
   /** The element Ben picked on the page. Absent when he marked an area, or the page could not give one: a record without it is valid. */
   element?: PickedElement;
+  /** What Ben drew with the toolbar, in order, the last on top. Absent when he drew nothing: a record without it is valid. */
+  marks?: Mark[];
+  /** The screenshot with `marks` rendered on it by the client, as the server saved it: `annotation-<hex>-marked.png` or `.jpg`. */
+  marked?: AnnotationImage;
 }
 
 /**
@@ -92,6 +99,7 @@ const SIZE_MAX = 20_000;
 export const RECT_MIN = 8;
 const LABEL_URL_MAX = 60;
 const IMAGE_NAME = /^annotation-[0-9a-f]{8,32}\.(png|jpg)$/;
+export const MARKED_NAME = /^annotation-[0-9a-f]{8,32}-marked\.(png|jpg)$/;
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -108,14 +116,14 @@ function rectOf(v: unknown, viewport: { width: number; height: number }): Parsed
   return { ok: true, value: { x, y, width, height } };
 }
 
-function imageOf(v: unknown): Parsed<AnnotationImage> {
-  if (!isObj(v)) return { ok: false, error: 'image must be an object' };
+function imageOf(v: unknown, at = 'image', pattern = IMAGE_NAME, shape = '<hex>'): Parsed<AnnotationImage> {
+  if (!isObj(v)) return { ok: false, error: `${at} must be an object` };
   const { name, mime, width, height, bytes } = v;
-  const m = typeof name === 'string' ? IMAGE_NAME.exec(name) : null;
-  if (!m) return { ok: false, error: 'image.name must be an annotation-<hex>.png or .jpg file name' };
-  if (mime !== (m[1] === 'png' ? 'image/png' : 'image/jpeg')) return { ok: false, error: 'image.mime does not match the file name' };
-  if (!whole(width, 1, SIZE_MAX) || !whole(height, 1, SIZE_MAX)) return { ok: false, error: 'image.width and image.height must be whole pixels' };
-  if (!whole(bytes, 1, IMAGE_BYTES_MAX)) return { ok: false, error: `image.bytes must be 1 to ${IMAGE_BYTES_MAX}` };
+  const m = typeof name === 'string' ? pattern.exec(name) : null;
+  if (!m) return { ok: false, error: `${at}.name must be an annotation-${shape}.png or .jpg file name` };
+  if (mime !== (m[1] === 'png' ? 'image/png' : 'image/jpeg')) return { ok: false, error: `${at}.mime does not match the file name` };
+  if (!whole(width, 1, SIZE_MAX) || !whole(height, 1, SIZE_MAX)) return { ok: false, error: `${at}.width and ${at}.height must be whole pixels` };
+  if (!whole(bytes, 1, IMAGE_BYTES_MAX)) return { ok: false, error: `${at}.bytes must be 1 to ${IMAGE_BYTES_MAX}` };
   return { ok: true, value: { name: name as string, mime: mime as AnnotationImage['mime'], width, height, bytes } };
 }
 
@@ -195,6 +203,10 @@ export const browserAnnotation: MessageContextKind<BrowserAnnotation> = {
     // Absent or null is a record of an area. Anything else must be a whole element: a half of one is refused, not trimmed.
     const element = body.element === undefined || body.element === null ? null : elementOf(body.element, viewport);
     if (element && !element.ok) return element;
+    const marks = marksOf(body.marks, viewport);
+    if (!marks.ok) return marks;
+    const marked = body.marked === undefined || body.marked === null ? null : imageOf(body.marked, 'marked', MARKED_NAME, '<hex>-marked');
+    if (marked && !marked.ok) return marked;
     return {
       ok: true,
       value: {
@@ -207,19 +219,31 @@ export const browserAnnotation: MessageContextKind<BrowserAnnotation> = {
         captured_at: body.captured_at,
         image: image.value,
         ...(element && { element: element.value }),
+        ...(marks.value.length > 0 && { marks: marks.value }),
+        ...(marked && { marked: marked.value }),
       },
     };
   },
   label(b) {
     const at = [...shortUrl(b.url)];
     const where = at.length > LABEL_URL_MAX ? `${at.slice(0, LABEL_URL_MAX - 1).join('')}…` : at.join('');
+    if (b.marks?.length) return cutLabel(`Browser, ${marksLabel(b.marks.length)} on ${where}`);
     return cutLabel(b.element ? `Browser, <${b.element.tag}> on ${where}` : `Browser, ${b.rect.width}×${b.rect.height} area on ${where}`);
   },
 };
 
-/** The capture with Ben's rectangle on it, and the element he picked if he did, checked as the route will check it. */
-export function annotate(capture: BrowserCapture, rect: PixelRect, element?: PickedElement): Parsed<BrowserAnnotation> {
-  return browserAnnotation.parse({ ...capture, rect, ...(element && { element }) }, 1);
+/** What Ben drew and the image it was rendered into, when he drew. */
+export interface Drawn {
+  marks?: readonly Mark[];
+  marked?: AnnotationImage;
+}
+
+/** The capture with Ben's rectangle on it, the element he picked if he did and what he drew if he did, checked as the route will check it. */
+export function annotate(capture: BrowserCapture, rect: PixelRect, element?: PickedElement, drawn: Drawn = {}): Parsed<BrowserAnnotation> {
+  return browserAnnotation.parse(
+    { ...capture, rect, ...(element && { element }), ...(!!drawn.marks?.length && { marks: drawn.marks }), ...(drawn.marked && { marked: drawn.marked }) },
+    1,
+  );
 }
 
 /** A title as a record holds it: whitespace collapsed, control characters dropped, cut to TITLE_MAX. */

@@ -70,6 +70,12 @@ public enum BrandPaths {
     "foldAll": "m7 20 5-5 5 5M7 4l5 5 5-5",
     "unfoldAll": "m7 15 5 5 5-5M7 9l5-5 5 5",
     "pin": "M9 4h6M10 4v5.5L7 13v2h10v-2l-3-3.5V4M12 15v6",
+    "pointer": "M5 3l14 7-6 2-2 6z",
+    "square": "M4 5h16v14H4z",
+    "ellipse": "M3 12a9 6 0 1 0 18 0a9 6 0 1 0-18 0",
+    "arrowUpRight": "M5 19 19 5M9 5h10v10",
+    "line": "M5 19 19 5",
+    "type": "M5 7V5h14v2M12 5v14M9 19h6",
   ]
 
   /// Simple Icons, verbatim. Never recolor them into a pop.
