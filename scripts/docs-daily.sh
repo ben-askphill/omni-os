@@ -270,9 +270,10 @@ merge_when_ready() {
       die "PR #$pr has merge conflicts; fix manually"
     fi
 
-    local failed=0
-    failed="$(gh pr checks "$pr" --repo "$repo_slug" 2>/dev/null | awk '$2=="fail"{f=1} END{print f+0}')"
-    if [[ "$failed" -eq 0 ]]; then
+    local failed=0 merge_state
+    merge_state="$(gh pr view "$pr" --repo "$repo_slug" --json mergeStateStatus -q '.mergeStateStatus' 2>/dev/null || echo UNKNOWN)"
+    failed="$(gh pr checks "$pr" --repo "$repo_slug" 2>/dev/null | awk '$2=="fail"{f=1} END{print f+0}' || echo 0)"
+    if [[ "$failed" -eq 0 ]] && [[ "$merge_state" == "CLEAN" || "$merge_state" == "UNKNOWN" ]]; then
       if gh pr merge "$pr" --repo "$repo_slug" --squash --delete-branch 2>>"$LOG_FILE"; then
         log "merge-when-ready: squashed and merged PR #$pr"
         return 0
