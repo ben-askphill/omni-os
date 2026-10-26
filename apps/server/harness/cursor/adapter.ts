@@ -114,6 +114,7 @@ export const cursorAdapter: HarnessAdapter = {
       let accepted = false;
       let stderr = '';
       const calls = new CursorCallCounter();
+      const opened = new Set<string>();
 
       const splitter = new LineSplitter();
       const handle = (line: string) => {
@@ -146,7 +147,12 @@ export const cursorAdapter: HarnessAdapter = {
           chatId = parsed.sessionId;
           if (chatId !== thread.session_id) cb.session(chatId);
         }
-        for (const r of parsed.records) cb.record(r);
+        // A call Cursor rejects up front only completes. Open it first so its result has a named call.
+        if (parsed.use?.kind === 'tool_use' && !opened.has(parsed.use.payload.id)) parsed.records.unshift(parsed.use);
+        for (const r of parsed.records) {
+          if (r.kind === 'tool_use') opened.add(r.payload.id);
+          cb.record(r);
+        }
         if (parsed.result && accepted) {
           resultSeen = true;
           if (parsed.usage) {

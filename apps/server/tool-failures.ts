@@ -13,7 +13,15 @@ const DETAILS: Record<FailureCategory, string> = {
   timeout: 'Tool timed out.', unavailable: 'Service or connection unavailable.', invalid_input: 'Invalid tool input.',
   not_found: 'Requested resource not found.', command_exit: 'Command returned a nonzero exit code.', unknown: 'Tool reported failure; raw details omitted.',
 };
+// The exit codes a shell gives a command it could not run, and GNU timeout's own.
+const EXIT_CATEGORIES: Partial<Record<string, FailureCategory>> = { 124: 'timeout', 126: 'permission', 127: 'not_found' };
+
 export function classifyFailure(text: string): FailureCategory {
+  // Every harness leads a shell result with its exit code. The rest is the command's own output, where
+  // a test named "times out" or a log line saying "unavailable" says nothing about the tool.
+  const exit = /^Exit code (\d+)/.exec(text);
+  if (exit) return EXIT_CATEGORIES[exit[1]] ?? 'command_exit';
+  if (text.startsWith("The user doesn't want to proceed with this tool use")) return 'permission';
   if (/\b(401|unauthorized|unauthenticated|authentication|invalid.api.key)\b/i.test(text)) return 'authentication';
   if (/\b(403|forbidden|permission denied|EACCES|EPERM)\b/i.test(text)) return 'permission';
   if (/\b(429|rate.limit|quota.exceeded)\b/i.test(text)) return 'rate_limit';
