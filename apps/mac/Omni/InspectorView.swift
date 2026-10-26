@@ -170,6 +170,7 @@ private struct InspectorPanel: View {
     }
     .frame(maxHeight: .infinity, alignment: .top)
     .background(Tok.surface)
+    .overlay(alignment: .leading) { Rectangle().fill(Tok.line).frame(width: 1) }
   }
 
   private func count(_ tab: InspectorSelection.Tab, files: Int) -> Int? {

@@ -51,7 +51,7 @@ export function HeaderActions({
     openMenu({ kind: 'thread', id: thread.id }, r.left, r.bottom + 6, handoff);
   };
   return (
-    <div className="flex shrink-0 items-center gap-1.5">
+    <div className="flex shrink-0 items-center gap-1">
       {reconnecting && (
         <span className="hidden items-center gap-1.5 font-num text-[11px] text-fg-3 sm:inline-flex" title="Reconnecting to the live stream">
           <span className="pulse h-1.5 w-1.5 rounded-full bg-fg-4" /> Reconnecting

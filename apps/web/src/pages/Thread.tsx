@@ -321,7 +321,7 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
               {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-4">{thread.task_id}</span>}
               <ContinueCrumbs links={links} />
             </div>
-            <h1 className="truncate font-display text-[16px] leading-snug md:text-[18px]" title={thread.title}>
+            <h1 className="mt-0.5 truncate font-display text-[16px] leading-snug md:text-[18px]" title={thread.title}>
               {thread.title}
             </h1>
             {modLines.length > 0 && <ModStatusLines lines={modLines} />}
@@ -449,7 +449,7 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
               writePref('threadPanelWidth', null);
             }}
           />
-          <div className="panel-in h-full overflow-hidden rounded-[18px] bg-surface">{panel}</div>
+          <div className="panel-in h-full overflow-hidden rounded-[18px] border border-line bg-surface">{panel}</div>
         </aside>
       )}
     </div>

@@ -112,7 +112,7 @@ private struct ThreadHeader: View {
     let channel = store.channel?.name ?? thread.channelID
     HStack(spacing: z(12)) {
       ChannelAvatar(name: channel, conductor: thread.channelID == SidebarSections.conductorID, icon: store.channel?.icon)
-      VStack(alignment: .leading, spacing: 1) {
+      VStack(alignment: .leading, spacing: z(4)) {
         HStack(spacing: z(4)) {
           Button("#\(channel)") { model.route = .channel(id: thread.channelID) }
             .buttonStyle(.plain)
@@ -148,86 +148,89 @@ private struct ThreadHeader: View {
         ContinueLinks(model: model, from: store.continuedFrom, continuedIn: store.continuedIn)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      if store.isReconnecting {
-        HStack(spacing: z(6)) {
-          GlyphView(glyph: .running, size: 6)
-          Text("Reconnecting")
+      // Packed tighter than the title, so the actions read as one cluster.
+      HStack(spacing: z(4)) {
+        if store.isReconnecting {
+          HStack(spacing: z(6)) {
+            GlyphView(glyph: .running, size: 6)
+            Text("Reconnecting")
+          }
+          .font(.omni(size: 11))
+          .foregroundStyle(Tok.fg3)
+          .help("Reconnecting to the live stream")
+          .accessibilityElement(children: .combine)
         }
-        .font(.omni(size: 11))
-        .foregroundStyle(Tok.fg3)
-        .help("Reconnecting to the live stream")
-        .accessibilityElement(children: .combine)
-      }
-      if ContextMeter.metered.contains(thread.harness) {
-        ContextMeterButton(model: model, store: store, thread: thread)
-      }
-      HandOffButton(model: model, store: store)
-      if !thread.archived {
-        ThreadReferenceButton(client: model.client, thread: thread, draft: store.draftContext, disabled: false)
-      }
-      if !thread.archived {
-        let on = thread.pinnedAt != nil
-        Button {
-          Task { await model.setThreadPinned(ThreadStub(thread), !on) }
-        } label: {
-          OmniIcon(name: "pin", size: 15)
+        if ContextMeter.metered.contains(thread.harness) {
+          ContextMeterButton(model: model, store: store, thread: thread)
         }
-        .buttonStyle(.icon(size: 28, active: on))
-        .help(on ? "Unpin from the sidebar" : "Pin to the sidebar")
-        .accessibilityLabel(on ? "Unpin thread" : "Pin thread")
-        .accessibilityAddTraits(on ? .isSelected : [])
-      }
-      if !thread.archived, ThreadStub(thread).canMarkDone {
-        let done = thread.doneAt != nil
-        Button {
-          Task { await model.setThreadDone(thread.id, !done) }
-        } label: {
-          OmniIcon(name: "check", size: 15)
+        HandOffButton(model: model, store: store)
+        if !thread.archived {
+          ThreadReferenceButton(client: model.client, thread: thread, draft: store.draftContext, disabled: false)
         }
-        .buttonStyle(.icon(size: 28, active: done))
-        .help(done ? "Marked done. Click to bring it back to Needs you." : "Mark as done: out of Needs you until something new happens here")
-        .accessibilityLabel(done ? "Mark as not done" : "Mark as done")
-        .accessibilityAddTraits(done ? .isSelected : [])
-      }
-      if thread.archived {
-        // Opened from its channel's Archived list or a search: put it back in the lists.
+        if !thread.archived {
+          let on = thread.pinnedAt != nil
+          Button {
+            Task { await model.setThreadPinned(ThreadStub(thread), !on) }
+          } label: {
+            OmniIcon(name: "pin", size: 15)
+          }
+          .buttonStyle(.icon(size: 28, active: on))
+          .help(on ? "Unpin from the sidebar" : "Pin to the sidebar")
+          .accessibilityLabel(on ? "Unpin thread" : "Pin thread")
+          .accessibilityAddTraits(on ? .isSelected : [])
+        }
+        if !thread.archived, ThreadStub(thread).canMarkDone {
+          let done = thread.doneAt != nil
+          Button {
+            Task { await model.setThreadDone(thread.id, !done) }
+          } label: {
+            OmniIcon(name: "check", size: 15)
+          }
+          .buttonStyle(.icon(size: 28, active: done))
+          .help(done ? "Marked done. Click to bring it back to Needs you." : "Mark as done: out of Needs you until something new happens here")
+          .accessibilityLabel(done ? "Mark as not done" : "Mark as done")
+          .accessibilityAddTraits(done ? .isSelected : [])
+        }
+        if thread.archived {
+          // Opened from its channel's Archived list or a search: put it back in the lists.
+          Button {
+            Task {
+              restoring = true
+              await model.setThreadArchived(thread.id, false)
+              restoring = false
+            }
+          } label: {
+            HStack(spacing: z(6)) {
+              if restoring { Loader(size: 12) } else { OmniIcon(name: "archive", size: 14) }
+              Text("Restore")
+            }
+          }
+          .buttonStyle(.pill(.secondary, height: 28))
+          .disabled(restoring)
+          .help("Archived. Restore it to its channel's thread list.")
+        }
         Button {
+          guard !sendingGrok else { return }
+          sendingGrok = true
           Task {
-            restoring = true
-            await model.setThreadArchived(thread.id, false)
-            restoring = false
+            grokNote = await grokBotResult(model, thread.id)
+            sendingGrok = false
+            showingGrokNote = true
           }
         } label: {
           HStack(spacing: z(6)) {
-            if restoring { Loader(size: 12) } else { OmniIcon(name: "archive", size: 14) }
-            Text("Restore")
+            if sendingGrok { Loader(size: 12) } else { OmniIcon(name: "external", size: 14) }
+            Text("Send to Grok Bot")
           }
         }
-        .buttonStyle(.pill(.secondary, height: 28))
-        .disabled(restoring)
-        .help("Archived. Restore it to its channel's thread list.")
-      }
-      Button {
-        guard !sendingGrok else { return }
-        sendingGrok = true
-        Task {
-          grokNote = await grokBotResult(model, thread.id)
-          sendingGrok = false
-          showingGrokNote = true
+        .buttonStyle(.pill(.ghost, height: 28))
+        .disabled(sendingGrok)
+        .help("Send this thread's text to Grok Bot")
+        if store.transcript.hasPendingQuestion {
+          StatusPill(glyph: .needs, label: QuestionState.pending.label)
+        } else {
+          StatusPill(status: thread.status)
         }
-      } label: {
-        HStack(spacing: z(6)) {
-          if sendingGrok { Loader(size: 12) } else { OmniIcon(name: "external", size: 14) }
-          Text("Send to Grok Bot")
-        }
-      }
-      .buttonStyle(.pill(.ghost, height: 28))
-      .disabled(sendingGrok)
-      .help("Send this thread's text to Grok Bot")
-      if store.transcript.hasPendingQuestion {
-        StatusPill(glyph: .needs, label: QuestionState.pending.label)
-      } else {
-        StatusPill(status: thread.status)
       }
     }
     .padding(.horizontal, z(24))

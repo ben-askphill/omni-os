@@ -77,7 +77,7 @@ private struct NeedsYouRow: View {
     } label: {
       HStack(alignment: .top, spacing: z(12)) {
         leading(glyph)
-        VStack(alignment: .leading, spacing: z(2)) {
+        VStack(alignment: .leading, spacing: z(5)) {
           HStack(spacing: z(8)) {
             Text(item.thread.title.isEmpty ? "Untitled" : item.thread.title)
               .font(.omni(size: 14))
