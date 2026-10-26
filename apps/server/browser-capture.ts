@@ -108,6 +108,52 @@ export async function captureAnnotation(src: CaptureSource, threadId: string, no
   return fail(413, `This page is too large to attach as an image (over ${(MAX_INLINE_IMAGE / 1_000_000).toFixed(1)} MB even as a JPEG). Make the browser window smaller and try again.`, false);
 }
 
+/** What a client that shows the page itself (the Mac app's own web view) says about it with the screenshot it took. */
+export interface NativePage {
+  url: string;
+  title: string;
+  viewport: { width: number; height: number };
+  scroll: { x: number; y: number };
+}
+
+/**
+ * Saves a screenshot the client took of its own web view, as `captureAnnotation` saves the server browser's: the same file
+ * name, the same record numbers, the same checks. The image must be of the viewport at one scale and under the inline
+ * limit; a client that sent a PNG too large for it is told so (413) and may send a JPEG.
+ */
+export function saveNativeCapture(threadId: string, page: NativePage, body: Buffer, contentType: string, now = new Date()): CaptureResult {
+  if (!/^https?:\/\//i.test(page.url)) return fail(422, 'Only a web page can be annotated. Open one in the browser first.', false);
+  const type = contentType.split(';')[0].trim().toLowerCase();
+  const enc = type === 'image/png' ? 'png' : type === 'image/jpeg' ? 'jpeg' : null;
+  if (!enc) return fail(415, 'Send the screenshot as image/png or image/jpeg.', false);
+  const size = imageSize(body);
+  const isPng = body.length > 8 && body.readUInt32BE(0) === 0x89504e47;
+  if (!size || isPng !== (enc === 'png')) return fail(422, 'That is not the image it says it is.', false);
+  const { viewport } = page;
+  if (!(viewport.width > 0 && viewport.height > 0)) return fail(422, 'The page has no size.', false);
+  const sx = size.width / viewport.width;
+  const sy = size.height / viewport.height;
+  if (!(sx > 0 && sx <= 8) || Math.abs(sx - sy) > 0.02 * sx) return fail(409, STALE_TEXT.viewport, true, 'viewport');
+  if (body.length > MAX_INLINE_IMAGE) return fail(413, `The screenshot is over ${(MAX_INLINE_IMAGE / 1_000_000).toFixed(1)} MB.`, false);
+  const name = `annotation-${randomBytes(8).toString('hex')}.${enc === 'png' ? 'png' : 'jpg'}`;
+  const capture: BrowserCapture = {
+    thread: threadId,
+    url: page.url,
+    title: cleanTitle(page.title),
+    viewport: { width: viewport.width, height: viewport.height, scale: round2(sx) },
+    scroll: { x: Math.max(0, Math.round(page.scroll.x)), y: Math.max(0, Math.round(page.scroll.y)) },
+    captured_at: now.toISOString(),
+    image: { name, mime: enc === 'png' ? 'image/png' : 'image/jpeg', width: size.width, height: size.height, bytes: body.length },
+  };
+  const whole = annotate(capture, { x: 0, y: 0, width: capture.viewport.width, height: capture.viewport.height });
+  if (!whole.ok) return fail(422, `This page cannot be attached: ${whole.error}.`, false);
+  const dir = uploadsDir(threadId);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, name), body);
+  // No server-side page was observed: a native pick is checked against what the client says in the pick itself.
+  return { ok: true, capture, page: { tab: null, url: page.url, title: page.title, navigations: 0, viewport, scroll: page.scroll } };
+}
+
 /** A discarded capture is deleted only while it can still be a draft's. */
 const DISCARD_WINDOW_MS = 6 * 3_600_000;
 
@@ -185,6 +231,27 @@ export function captureApi(browserFor: (c: Context) => CaptureSource, hooks: { c
     const r = await captureAnnotation(browserFor(c), id).catch((e: Error) => fail(502, `The browser could not be captured: ${e.message}`, true));
     if (!r.ok) return c.json({ error: r.error, retryable: r.retryable, ...(r.stale && { stale: r.stale }) }, r.status as 409);
     hooks.captured?.(id, r.capture.image.name, r.page);
+    return c.json({ capture: r.capture });
+  });
+
+  // A screenshot the client took of its own web view (the Mac app's native browser): the image as bytes, the page's numbers in the query.
+  api.post('/:id/browser/capture/native', async (c) => {
+    const q = z
+      .object({
+        thread: z.string().min(1).max(200),
+        url: z.string().min(1).max(4000),
+        title: z.string().max(1000).default(''),
+        vw: z.coerce.number().int().min(1).max(20_000),
+        vh: z.coerce.number().int().min(1).max(20_000),
+        sx: z.coerce.number().min(0).max(1_000_000).default(0),
+        sy: z.coerce.number().min(0).max(1_000_000).default(0),
+      })
+      .safeParse(c.req.query());
+    if (!q.success) return c.json({ error: 'The screenshot needs thread, url, vw and vh.', retryable: false }, 400);
+    const t = threadOf(c, q.data.thread);
+    if (t.error) return t.error;
+    const r = saveNativeCapture(t.thread.id, { url: q.data.url, title: q.data.title, viewport: { width: q.data.vw, height: q.data.vh }, scroll: { x: q.data.sx, y: q.data.sy } }, Buffer.from(await c.req.arrayBuffer()), c.req.header('content-type') ?? '');
+    if (!r.ok) return c.json({ error: r.error, retryable: r.retryable, ...(r.stale && { stale: r.stale }) }, r.status as 409);
     return c.json({ capture: r.capture });
   });
 

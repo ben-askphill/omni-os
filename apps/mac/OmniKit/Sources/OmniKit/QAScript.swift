@@ -171,6 +171,8 @@ public enum QAStep: Hashable, Sendable {
   case searchHit(Int)
   /// Zooms the artifact image preview to this scale, or back to fit with nil.
   case imageZoom(Double?)
+  /// Loads this address in the Browser tab's own web view (My browser) and waits for it to finish.
+  case nativeBrowser(String)
   /// Puts text in the reply box, as if typed.
   case type(String)
   /// Sends the reply box: nil is a plain reply, else the mode of the split button.
@@ -303,7 +305,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "searchHit", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "prMenu", "handOff", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "openContext", "referenceThread", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "searchHit", "imageZoom", "nativeBrowser", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "prMenu", "handOff", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "openContext", "referenceThread", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -393,6 +395,9 @@ public struct QAScript: Hashable, Sendable {
       if let name = value as? String, name == "fit" { return .imageZoom(nil) }
       guard let scale = value as? Double, scale > 0 else { throw QAScriptError(#"imageZoom takes a scale like 2, or "fit""#) }
       return .imageZoom(scale)
+    case "nativeBrowser":
+      guard let address = value as? String, !address.isEmpty else { throw QAScriptError("nativeBrowser takes the address to load") }
+      return .nativeBrowser(address)
     case "type":
       guard let text = value as? String else { throw QAScriptError("type takes the text for the reply box") }
       return .type(text)

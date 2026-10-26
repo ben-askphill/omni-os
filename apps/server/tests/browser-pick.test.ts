@@ -308,3 +308,34 @@ describe('the pick route', () => {
     expect(await res.json()).toMatchObject({ unavailable: { reason: 'unknown_capture' } });
   });
 });
+
+describe('the native pick routes', () => {
+  const app = () => new Hono().route('/api/channels', pick.pickApi(() => fakeBrowser()));
+  const native = (a: Hono, name: string, body: unknown) =>
+    a.request(`/api/channels/picks/browser/capture/${name}/element/native`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  it('hands out the page script for a point, the very one the server runs in its own Chrome', T, async () => {
+    const res = await app().request('/api/channels/picks/browser/pick-script?x=400&y=150');
+    expect(res.status).toBe(200);
+    const { script } = (await res.json()) as { script: string };
+    expect(script).toContain('const x = 400, y = 150;');
+    expect((await app().request('/api/channels/picks/browser/pick-script?x=1.5&y=2')).status).toBe(400);
+  });
+
+  it('bounds and checks what the Mac\'s page answered, as it does for the server\'s browser', T, async () => {
+    const t = await newThread();
+    const res = await native(app(), 'annotation-0123456789abcdef.png', { thread: t.id, ...POINT, viewport: VIEWPORT, raw: BUTTON });
+    expect(res.status).toBe(200);
+    expect(asElement((await res.json()) as ElementPick)).toMatchObject({ tag: 'button', bounds: { x: 320, y: 96, width: 481, height: 160 }, point: POINT });
+  });
+
+  it('says why when the page gave nothing usable, and refuses a thread of another channel or a point off the screenshot', T, async () => {
+    const t = await newThread();
+    const a = app();
+    expect(await (await native(a, 'x', { thread: t.id, ...POINT, viewport: VIEWPORT, raw: { ok: false, reason: 'nothing' } })).json()).toMatchObject({ unavailable: { reason: 'nothing' } });
+    expect(await (await native(a, 'x', { thread: t.id, ...POINT, viewport: VIEWPORT, raw: 'not a pick' })).json()).toMatchObject({ unavailable: { reason: 'unreadable' } });
+    const other = await newThread('elsewhere');
+    expect((await native(a, 'x', { thread: other.id, ...POINT, viewport: VIEWPORT, raw: BUTTON })).status).toBe(400);
+    expect((await native(a, 'x', { thread: t.id, x: 5000, y: 3, viewport: VIEWPORT, raw: BUTTON })).status).toBe(400);
+  });
+});

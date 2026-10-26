@@ -10,23 +10,17 @@ struct LiveBrowserView: View {
   var trailing: AnyView = AnyView(EmptyView())
   /// Annotate: the model, the client and the reply box's context. Nil shows no Annotate button.
   var annotating: Annotating?
-  @State private var address = ""
-  @FocusState private var editing: Bool
+  @State private var focusTick = 0
   @Environment(\.displayScale) private var displayScale
 
   var body: some View {
     let s = model.state
     VStack(spacing: 0) {
-      BrowserTabStrip(model: model)
+      BrowserTabStrip(state: s, perform: model.perform)
 
       VStack(spacing: 0) {
-        toolbar(s)
-        ZStack(alignment: .leading) {
-          Tok.line.frame(height: 1)
-          if s.loading { LoadingBar() }
-        }
-        .frame(height: 1)
-        .clipped()
+        BrowserToolbar(state: s, perform: model.perform, annotating: annotating, focusTick: focusTick, trailing: trailing)
+        BrowserLoadingRule(loading: s.loading)
 
         if let error = model.error {
           HStack(spacing: z(8)) {
@@ -84,70 +78,13 @@ struct LiveBrowserView: View {
       BrowserAnnotateProbe.browser = nil
       #endif
     }
-    .onChange(of: s.url, initial: true) { _, url in
-      if !editing { address = url == "about:blank" ? "" : url }
-    }
-  }
-
-  private func toolbar(_ s: BrowserState) -> some View {
-    HStack(spacing: z(2)) {
-      Button("Back", systemImage: "chevron.left") { model.perform(.back) }
-        .disabled(!s.canBack)
-        .help("Back (⌘[)")
-      Button("Forward", systemImage: "chevron.right") { model.perform(.forward) }
-        .disabled(!s.canForward)
-        .help("Forward (⌘])")
-      if s.loading {
-        Button("Stop loading", systemImage: "xmark") { model.perform(.stop) }
-      } else {
-        Button("Reload", systemImage: "arrow.clockwise") { model.perform(.reload) }
-          .disabled(!s.running)
-          .help("Reload (⌘R)")
-      }
-      HStack(spacing: z(7)) {
-        Image(systemName: s.url.hasPrefix("https://") ? "lock.fill" : s.url.isEmpty || s.url == "about:blank" ? "magnifyingglass" : "info.circle")
-          .font(.omni(size: 10.5, weight: .semibold))
-          .foregroundStyle(Tok.fg3)
-        TextField("", text: editing ? $address : .constant(BrowserTabInfo.displayURL(address)), prompt: Text("Search Google or type a URL"))
-          .textFieldStyle(.plain)
-          .font(.omni(size: 13))
-          .foregroundStyle(Tok.fg)
-          .focused($editing)
-          .onSubmit {
-            guard !address.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-            model.perform(.navigate(address))
-            editing = false
-          }
-          .onExitCommand {
-            address = s.url == "about:blank" ? "" : s.url
-            editing = false
-          }
-      }
-      .padding(.horizontal, z(11))
-      .frame(height: z(30))
-      .background(editing ? Tok.bg : Tok.surface2, in: Capsule())
-      .overlay(Capsule().strokeBorder(editing ? Tok.lineStrong : .clear, lineWidth: 2))
-      .contentShape(Capsule())
-      .onTapGesture { editing = true }
-      .padding(.leading, z(4))
-      if let annotating {
-        Button("Annotate", systemImage: "viewfinder") { Task { await annotating.model.start() } }
-          .disabled(!s.running || !s.url.lowercased().hasPrefix("http") || annotating.model.isActive)
-          .help("Annotate this page")
-      }
-      trailing
-    }
-    .labelStyle(.iconOnly)
-    .buttonStyle(.icon(size: 28))
-    .padding(.horizontal, z(6))
-    .padding(.vertical, z(6))
   }
 
   /// Chrome's own shortcuts from the page. True when handled here rather than sent to the page.
   private func shortcut(_ key: String, shift: Bool) -> Bool {
     let s = model.state
     switch key {
-    case "l": editing = true
+    case "l": focusTick += 1
     case "t": model.perform(.newTab)
     case "w": if let id = s.active { model.perform(.closeTab(id)) }
     case "r": model.perform(.reload)
@@ -165,91 +102,6 @@ struct LiveBrowserView: View {
     default: return false
     }
     return true
-  }
-}
-
-/// Chrome's tab strip: every tab with its icon, the active one joined to the toolbar under it.
-struct BrowserTabStrip: View {
-  let model: ChannelBrowserModel
-
-  var body: some View {
-    let s = model.state
-    let tabs = s.tabs.isEmpty ? [BrowserTabInfo(id: "blank", url: "", title: s.running ? "New Tab" : "Starting")] : s.tabs
-    ScrollView(.horizontal, showsIndicators: false) {
-      HStack(alignment: .bottom, spacing: z(2)) {
-        ForEach(tabs) { tab in
-          let on = tab.id == s.active || tabs.count == 1
-          HStack(spacing: z(7)) {
-            TabIcon(tab: tab, loading: on && s.loading)
-            Text(tab.label)
-              .lineLimit(1)
-              .frame(maxWidth: .infinity, alignment: .leading)
-            if s.running, tab.id != "blank" {
-              Button("Close tab", systemImage: "xmark") { model.perform(.closeTab(tab.id)) }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.icon(size: 18))
-            }
-          }
-          .font(.omni(size: 12))
-          .foregroundStyle(on ? Tok.fg : Tok.fg3)
-          .padding(.leading, z(11))
-          .padding(.trailing, z(4))
-          .frame(minWidth: z(60), maxWidth: z(208), minHeight: z(32))
-          .background(on ? Tok.bg : .clear, in: UnevenRoundedRectangle(topLeadingRadius: 12, topTrailingRadius: 12, style: .continuous))
-          .contentShape(Rectangle())
-          .onTapGesture { if !on, s.running { model.perform(.tab(tab.id)) } }
-          .help(tab.url)
-        }
-        Button("New tab", systemImage: "plus") { model.perform(.newTab) }
-          .labelStyle(.iconOnly)
-          .buttonStyle(.icon(size: 26))
-          .disabled(!s.running)
-          .padding(.bottom, z(3))
-      }
-      .padding(.horizontal, z(8))
-    }
-    .frame(height: z(34))
-  }
-}
-
-private struct TabIcon: View {
-  let tab: BrowserTabInfo
-  let loading: Bool
-
-  var body: some View {
-    Group {
-      if loading {
-        ProgressView().controlSize(.mini)
-      } else if let icon = tab.favicon, let url = URL(string: icon) {
-        AsyncImage(url: url) { phase in
-          if let image = phase.image { image.resizable().interpolation(.high).scaledToFit() } else { globe }
-        }
-      } else {
-        globe
-      }
-    }
-    .frame(width: z(15), height: z(15))
-  }
-
-  private var globe: some View {
-    Image(systemName: "globe").font(.omni(size: 12)).foregroundStyle(Tok.fg4)
-  }
-}
-
-/// A sliver sweeping under the address bar while the page loads.
-private struct LoadingBar: View {
-  @State private var sweep = false
-
-  var body: some View {
-    GeometryReader { geo in
-      Capsule()
-        .fill(Tok.fg3)
-        .frame(width: geo.size.width * 0.35)
-        .offset(x: sweep ? geo.size.width : -geo.size.width * 0.35)
-    }
-    .onAppear {
-      withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: false)) { sweep = true }
-    }
   }
 }
 

@@ -200,6 +200,16 @@ final class QARunner {
           guard let zoom = QAProbe.imageZoom else { throw QAScriptError("no image preview on screen") }
           if let scale { zoom.step(scale / zoom.scale) } else { zoom.fit() }
           try? await Task.sleep(for: .milliseconds(400))
+        case .nativeBrowser(let address):
+          guard let native = BrowserAnnotateProbe.native else { throw QAScriptError("the Browser tab is not showing My browser") }
+          native.perform(.navigate(address))
+          try? await Task.sleep(for: .milliseconds(300))
+          let deadline = ContinuousClock.now + .seconds(15)
+          while native.state.loading || native.state.url.isEmpty {
+            guard ContinuousClock.now < deadline else { throw QAScriptError("the page did not finish loading: \(native.state.url)") }
+            try? await Task.sleep(for: .milliseconds(100))
+          }
+          try? await Task.sleep(for: .milliseconds(500))
         case .sleep(let duration):
           try? await Task.sleep(for: duration)
         case .snapshot(let name):
@@ -508,6 +518,7 @@ final class QARunner {
     case .deliveries(let target): "deliveries \(target.automation)"
     case .searchHit(let i): "searchHit \(i)"
     case .imageZoom(let scale): "imageZoom \(scale.map { "\($0)" } ?? "fit")"
+    case .nativeBrowser(let address): "nativeBrowser \(address.prefix(60))"
     case .type(let text): "type \(text.prefix(40))"
     case .run(let run): "run \(run.harness.rawValue) \(run.model) \(run.effort)"
     case .send(let mode): "send \(mode?.rawValue ?? "reply")"
@@ -547,7 +558,7 @@ final class QARunner {
   private var facts: QAFacts {
     var f = model.qaFacts
     f.shownThread = QAProbe.shownThread
-    f.browserFrame = BrowserAnnotateProbe.browser?.frame != nil
+    f.browserFrame = BrowserAnnotateProbe.browser?.frame != nil || BrowserAnnotateProbe.native.map { $0.state.url.hasPrefix("http") && !$0.state.loading } == true
     return f
   }
 

@@ -440,5 +440,6 @@ struct BrowserAnnotateLayer: View {
 enum BrowserAnnotateProbe {
   static var annotating: Annotating?
   static var browser: ChannelBrowserModel?
+  static var native: NativeBrowserModel?
 }
 #endif

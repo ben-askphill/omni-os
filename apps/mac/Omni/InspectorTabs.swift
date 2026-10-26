@@ -14,7 +14,11 @@ struct BrowserTab: View {
   let draft: DraftContextModel
   @State private var browser: ChannelBrowserModel?
   @State private var annotate: BrowserAnnotateModel?
+  @State private var native: NativeBrowserModel?
+  @State private var nativeAnnotate: BrowserAnnotateModel?
   @State private var showShots = false
+  /// Whose browser the tab shows: this Mac's own, or the agent's Chrome on the server.
+  @AppStorage("browser.source") private var source = BrowserSource.mine
 
   var body: some View {
     Group {
@@ -33,11 +37,26 @@ struct BrowserTab: View {
           .padding(.bottom, z(8))
           ScreenshotGrid(client: client, shots: shots)
         }
-      } else if let browser {
-        LiveBrowserView(model: browser, trailing: AnyView(
-          Button(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))", systemImage: "photo") { showShots = true }
-            .help(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))")
-        ), annotating: annotate.map { Annotating(model: $0, client: client, draft: draft) })
+      } else if let browser, let native {
+        VStack(spacing: z(6)) {
+          Picker("Browser", selection: $source) {
+            Text("My browser").tag(BrowserSource.mine)
+            Text("Agent's browser").tag(BrowserSource.agent)
+          }
+          .pickerStyle(.segmented)
+          .labelsHidden()
+          .padding(.horizontal, z(8))
+          .help("My browser is a web view on this Mac. The agent's browser is the Chrome it drives, streamed from the server.")
+          let trailing = AnyView(
+            Button(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))", systemImage: "photo") { showShots = true }
+              .help(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))"))
+          switch source {
+          case .mine:
+            NativeBrowserView(model: native, trailing: trailing, annotating: nativeAnnotate.map { Annotating(model: $0, client: client, draft: draft) })
+          case .agent:
+            LiveBrowserView(model: browser, trailing: trailing, annotating: annotate.map { Annotating(model: $0, client: client, draft: draft) })
+          }
+        }
       } else {
         Color.clear
       }
@@ -47,12 +66,25 @@ struct BrowserTab: View {
       if let id, browser?.channel != id {
         browser = ChannelBrowserModel(client: client, channel: id)
         annotate = BrowserAnnotateModel(client: client, channel: id, thread: thread)
+        native = NativeBrowsers.model(for: id)
+        nativeAnnotate = native?.annotateModel(client: client, thread: thread)
       }
     }
     .onChange(of: thread) { _, thread in
-      if let channel { annotate = BrowserAnnotateModel(client: client, channel: channel, thread: thread) }
+      if let channel {
+        annotate = BrowserAnnotateModel(client: client, channel: channel, thread: thread)
+        nativeAnnotate = native?.annotateModel(client: client, thread: thread)
+      }
     }
   }
+}
+
+/// Which browser the Browser tab shows.
+enum BrowserSource: String {
+  /// A web view on this Mac, drawn natively.
+  case mine
+  /// The Chrome the agent drives, streamed from the server.
+  case agent
 }
 
 /// The channel browser's screenshots, newest first, and a viewer to page through them.

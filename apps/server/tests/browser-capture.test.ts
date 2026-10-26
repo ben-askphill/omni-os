@@ -289,6 +289,47 @@ describe('saveMarked', () => {
   });
 });
 
+describe('a native capture', () => {
+  const page = { url: 'https://shop.example.com/cart?coupon=SPRING', title: 'Your cart\n· Example Shop', viewport: { width: 1280, height: 713 }, scroll: { x: 0, y: 240 } };
+
+  it('saves the Mac web view\'s screenshot with the same record a server capture makes', T, async () => {
+    const t = await newThread();
+    const r = cap.saveNativeCapture(t.id, page, png(2560, 1426, 700), 'image/png');
+    if (!r.ok) throw new Error(r.error);
+    expect(r.capture).toMatchObject({ thread: t.id, url: page.url, title: 'Your cart · Example Shop', viewport: { width: 1280, height: 713, scale: 2 }, scroll: { x: 0, y: 240 }, image: { mime: 'image/png', width: 2560, height: 1426, bytes: 700 } });
+    expect(saved(t.id)).toEqual([r.capture.image.name]);
+  });
+
+  it('refuses what is not a web page, not an image, or not of the viewport, saving nothing', T, async () => {
+    const t = await newThread();
+    expect(cap.saveNativeCapture(t.id, { ...page, url: 'about:blank' }, png(2560, 1426), 'image/png')).toMatchObject({ ok: false, status: 422, retryable: false });
+    expect(cap.saveNativeCapture(t.id, page, png(2560, 1426), 'text/plain')).toMatchObject({ ok: false, status: 415 });
+    expect(cap.saveNativeCapture(t.id, page, jpeg(2560, 1426), 'image/png')).toMatchObject({ ok: false, status: 422 });
+    expect(cap.saveNativeCapture(t.id, page, png(2560, 900), 'image/png')).toMatchObject({ ok: false, status: 409, stale: 'viewport', retryable: true });
+    expect(cap.saveNativeCapture(t.id, page, png(2560, 1426, MAX_INLINE_IMAGE + 1), 'image/png')).toMatchObject({ ok: false, status: 413 });
+    expect(saved(t.id)).toEqual([]);
+  });
+
+  it('is taken as bytes with the page in the query, then marked and discarded like any capture', T, async () => {
+    const t = await newThread();
+    const app = new Hono().route('/api/channels', cap.captureApi(() => fakeBrowser()));
+    const q = new URLSearchParams({ thread: t.id, url: page.url, title: page.title, vw: '1280', vh: '713', sx: '0', sy: '240' });
+    const res = await app.request(`/api/channels/shots/browser/capture/native?${q}`, { method: 'POST', headers: { 'content-type': 'image/png' }, body: png(2560, 1426, 700) });
+    expect(res.status).toBe(200);
+    const { capture } = (await res.json()) as { capture: BrowserCapture };
+    expect(capture.viewport.scale).toBe(2);
+    const marked = await app.request(`/api/channels/shots/browser/capture/${capture.image.name}/marked?thread=${t.id}`, { method: 'POST', headers: { 'content-type': 'image/png' }, body: png(2560, 1426, 800) });
+    expect(marked.status).toBe(200);
+    const gone = await app.request(`/api/channels/shots/browser/capture/${capture.image.name}?thread=${t.id}`, { method: 'DELETE' });
+    expect(await gone.json()).toEqual({ removed: true });
+    expect(saved(t.id)).toEqual([]);
+    const other = await newThread('other');
+    const wrong = await app.request(`/api/channels/shots/browser/capture/native?${new URLSearchParams({ ...Object.fromEntries(q), thread: other.id })}`, { method: 'POST', headers: { 'content-type': 'image/png' }, body: png(2560, 1426) });
+    expect(wrong.status).toBe(400);
+    expect((await app.request('/api/channels/shots/browser/capture/native?thread=x', { method: 'POST', headers: { 'content-type': 'image/png' }, body: png(1, 1) })).status).toBe(400);
+  });
+});
+
 describe('the capture routes', () => {
   const mount = (src: CaptureSource) => new Hono().route('/api/channels', cap.captureApi(() => src));
   const post = (app: Hono, channel: string, body: unknown) =>

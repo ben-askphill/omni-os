@@ -21,7 +21,7 @@ import {
 import { FORBIDDEN_CLASS } from '@omni/shared/message-context-terminal.ts';
 import type { PageObservation } from './browser.ts';
 import { staleReason, type CaptureSource } from './browser-capture.ts';
-import type { RawPick } from './browser-pick-script.ts';
+import { pickScript, type RawPick } from './browser-pick-script.ts';
 import { threads } from './db.ts';
 
 /** The part of ChannelBrowser a pick uses, on top of what a capture uses, so a test can stand in for Chrome. */
@@ -135,6 +135,34 @@ export function pickApi(browserFor: (c: Context) => PickSource) {
     const r = await pickElement(browserFor(c), t.id, c.req.param('name'), { x: body.x, y: body.y });
     if (r === 'bad_point') return c.json({ error: 'That spot is outside the screenshot.' }, 400);
     return c.json(r);
+  });
+
+  // For a client that shows the page itself (the Mac app's native browser): the script to run in the page at a point...
+  api.get('/:id/browser/pick-script', (c) => {
+    const q = z.object({ x: z.coerce.number().int().min(0).max(100_000), y: z.coerce.number().int().min(0).max(100_000) }).safeParse(c.req.query());
+    if (!q.success) return c.json({ error: 'x and y are whole numbers.' }, 400);
+    return c.json({ script: pickScript(q.data.x, q.data.y) });
+  });
+
+  // ...and what the page answered, bounded and checked here as it is for the server's own browser.
+  api.post('/:id/browser/capture/:name/element/native', async (c) => {
+    const body = z
+      .object({
+        thread: z.string().min(1).max(200),
+        x: z.number().int().min(0).max(100_000),
+        y: z.number().int().min(0).max(100_000),
+        viewport: z.object({ width: z.number().int().min(1).max(20_000), height: z.number().int().min(1).max(20_000) }),
+        raw: z.unknown(),
+      })
+      .parse(await c.req.json());
+    const t = threads.get(body.thread);
+    if (!t) return c.json({ error: 'not found' }, 404);
+    if (t.channel_id !== c.req.param('id')) return c.json({ error: 'That thread is not in this channel.' }, 400);
+    if (body.x >= body.viewport.width || body.y >= body.viewport.height) return c.json({ error: 'That spot is outside the screenshot.' }, 400);
+    const raw = body.raw as RawPick | null;
+    if (isObj(raw) && raw.ok === false && raw.reason === 'nothing') return c.json(unavailable('nothing', 'Nothing could be picked at that spot.'));
+    const element = elementFrom(raw, { x: body.x, y: body.y }, body.viewport);
+    return c.json(element ? { element } : unavailable('unreadable', 'That part of the page could not be read.'));
   });
   return api;
 }
