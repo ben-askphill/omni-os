@@ -1,10 +1,11 @@
 import OmniKit
 import SwiftUI
 
-/// The thread header's Continue button, which opens `ContinueSheet`. Off for a thread whose files are not on this Mac.
-struct ContinueButton: View {
+/// The reply box's Fork thread button, which opens `ContinueSheet`. Off for a thread whose files are not on this Mac.
+struct ForkButton: View {
   let model: AppModel
   let thread: OmniThread
+  let disabled: Bool
   @State private var open = Self.firstOpen
 
   var body: some View {
@@ -12,12 +13,12 @@ struct ContinueButton: View {
     Button {
       open = true
     } label: {
-      OmniIcon(name: "split", size: 15)
+      OmniIcon(name: "branch", size: 15)
     }
-    .buttonStyle(.icon(size: 28))
-    .disabled(refusal != nil)
-    .help(refusal ?? "Continue with another harness: a new thread that picks up from here")
-    .accessibilityLabel("Continue with another harness")
+    .buttonStyle(.icon(size: 30))
+    .disabled(disabled || refusal != nil)
+    .help(refusal ?? "Fork thread: a new thread, on any harness, that picks up from here")
+    .accessibilityLabel("Fork thread")
     .sheet(isPresented: Binding(get: { open && refusal == nil }, set: { open = $0 })) {
       ContinueSheet(model: model, thread: thread)
     }

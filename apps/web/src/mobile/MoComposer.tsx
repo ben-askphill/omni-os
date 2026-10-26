@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { HarnessLogo } from '../components/brand.tsx';
 import { AttachmentStrip, useAttachments, useReplySend } from '../components/Composer.tsx';
-import { ThreadReferencePanel } from '../components/ThreadReference.tsx';
+import { sourceRefusal } from '../continue.ts';
 import { ErrorNote, Icon, type IconName } from '../components/ui.tsx';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { removeDraftContext, useDraftContext } from '../message-context/draft.ts';
@@ -36,7 +36,7 @@ function PlusSheet({
   thread,
   harnesses,
   onPick,
-  onReference,
+  onFork,
   onRun,
   onKeep,
   onClose,
@@ -44,7 +44,7 @@ function PlusSheet({
   thread: Thread;
   harnesses?: HarnessWithRunning[];
   onPick: (p: Pick) => void;
-  onReference: () => void;
+  onFork: () => void;
   onRun?: () => void;
   onKeep: () => void;
   onClose: () => void;
@@ -71,7 +71,7 @@ function PlusSheet({
       </div>
       <div className="px-3">
         <MoGroup>
-          <MoListRow icon="message" label="Reference a thread" sub="Attach another thread, not its messages" onClick={onReference} />
+          <MoListRow icon="branch" label="Fork thread" sub={sourceRefusal(thread.harness) ?? 'A new thread, on any harness, that picks up from here'} disabled={!!sourceRefusal(thread.harness)} onClick={onFork} />
         </MoGroup>
       </div>
       <div className="px-3 pt-2.5">
@@ -108,6 +108,7 @@ export function MoComposer({
   placeholder,
   onSent,
   onSwitched,
+  onFork,
 }: {
   thread: Thread;
   chips: ComposerChip[];
@@ -116,13 +117,14 @@ export function MoComposer({
   onSent: (t: Thread, mode?: SendMode) => void;
   /** The thread after its run switched. */
   onSwitched: (t: Thread) => void;
+  /** Opens the sheet that forks the thread. */
+  onFork: () => void;
 }) {
   const [text, setText] = useState(() => drafts.get(thread.id) ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plus, setPlus] = useState(false);
   const [runSheet, setRunSheet] = useState(false);
-  const [referencing, setReferencing] = useState(false);
   const [switching, setSwitching] = useState(false);
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>('/harnesses');
   const att = useAttachments();
@@ -271,9 +273,9 @@ export function MoComposer({
           thread={thread}
           harnesses={harnesses}
           onPick={pick}
-          onReference={() => {
+          onFork={() => {
             setPlus(false);
-            setReferencing(true);
+            onFork();
           }}
           onRun={
             harnesses
@@ -290,11 +292,6 @@ export function MoComposer({
           }}
           onClose={() => setPlus(false)}
         />
-      )}
-      {referencing && (
-        <MoSheet onClose={() => setReferencing(false)} label="Reference a thread" full>
-          <ThreadReferencePanel thread={thread} touch onPicked={() => setReferencing(false)} />
-        </MoSheet>
       )}
       {runSheet && harnesses && (
         <ModelSheet

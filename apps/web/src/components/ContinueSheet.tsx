@@ -19,6 +19,7 @@ import {
   startBody,
   startError,
   workspaceText,
+  sourceRefusal,
   type ContinueSource,
   type ContinueState,
   type ContinueTargets,
@@ -27,7 +28,7 @@ import {
 } from '../continue.ts';
 import { href, navigate } from '../router.ts';
 import { EffortPicker, ModelPicker } from './ModelPicker.tsx';
-import { Button, Chip, ErrorNote, Icon, Label, Loading, Modal, Toggle, type ChipTone } from './ui.tsx';
+import { Button, Chip, ErrorNote, Icon, IconButton, Label, Loading, Modal, Toggle, type ChipTone } from './ui.tsx';
 
 /**
  * One continue sheet's state, for the desktop and the phone: the picked run's preview, asked again whenever the run
@@ -99,6 +100,12 @@ export function openContinue(source: ContinueSource) {
   window.dispatchEvent(new CustomEvent<ContinueSource>(OPEN_EVENT, { detail: source }));
 }
 
+/** The reply box's button for it. Off where the harness cannot be a source, with the reason as its title. */
+export function ForkThreadButton({ thread, disabled }: { thread: ContinueSource; disabled?: boolean }) {
+  const refusal = sourceRefusal(thread.harness);
+  return <IconButton icon="branch" label="Fork thread" title={refusal ?? 'Fork thread: a new thread, on any harness, that picks up from here'} size={15} disabled={disabled || !!refusal} onClick={() => openContinue(thread)} />;
+}
+
 /** Mounted once in the desktop app, so the thread actions open the sheet for any thread, open or not. */
 export function ContinueSheetHost() {
   const [source, setSource] = useState<ContinueSource | null>(null);
@@ -110,12 +117,12 @@ export function ContinueSheetHost() {
   return source ? <ContinueSheet key={source.id} source={source} onClose={() => setSource(null)} /> : null;
 }
 
-/** "Continue with another harness": pick a local run, read what the new thread will be given, write the first message. */
+/** "Fork thread": pick a local run, read what the new thread will be given, write the first message. */
 export function ContinueSheet({ source, onClose }: { source: ContinueSource; onClose: () => void }) {
   const { data: catalog, error, reload } = useApi<HarnessWithRunning[]>('/harnesses');
   const targets = useMemo(() => (catalog ? continueTargets(catalog) : null), [catalog]);
   return (
-    <Modal open onClose={onClose} wide title="Continue with another harness">
+    <Modal open onClose={onClose} wide title="Fork thread">
       {targets ? (
         <ContinueForm source={source} targets={targets} onPickerOpen={reload} onClose={onClose} />
       ) : error ? (

@@ -1,7 +1,7 @@
 import OmniKit
 import SwiftUI
 
-/// The reply box's thread reference button and the picker it opens, as `ThreadReferenceButton` in ThreadReference.tsx: a
+/// The thread header's thread reference button and the picker it opens, as `ThreadReferenceButton` in ThreadReference.tsx: a
 /// search over thread titles and channels, this channel unless Ben switches to All channels. A pick adds a chip to the
 /// draft. Nothing is sent to, started in or changed on the picked thread. The `@` menu for files is untouched.
 struct ThreadReferenceButton: View {
@@ -21,16 +21,16 @@ struct ThreadReferenceButton: View {
     } label: {
       OmniIcon(name: "message", size: 15)
     }
-    .buttonStyle(.icon(size: 30))
+    .buttonStyle(.icon(size: 28))
     .disabled(disabled)
     .help("Reference another thread")
     .accessibilityLabel("Reference another thread")
-    // Anchored to a strip as wide as the list that starts at the button, so the list opens over the composer rather than
-    // hanging out of the window to the button's left.
-    .background(alignment: .leading) {
+    // Anchored to a strip as wide as the list that ends at the button, so the list opens under the header rather than
+    // hanging out of the window to the button's right.
+    .background(alignment: .trailing) {
       Color.clear
         .frame(width: ThreadReferencePanel.width, height: 1)
-        .popover(isPresented: $open, arrowEdge: .top) { ThreadReferencePanel(picker: picker) { open = false } }
+        .popover(isPresented: $open, arrowEdge: .bottom) { ThreadReferencePanel(picker: picker) { open = false } }
     }
     #if DEBUG
     .onAppear {

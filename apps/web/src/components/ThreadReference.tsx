@@ -135,7 +135,7 @@ export function ThreadReferencePanel({ thread, onPicked, touch }: { thread: Thre
   );
 }
 
-/** The reply box's button for it: opens the picker above the box. */
+/** The thread header's button for it: opens the picker under the header, its right edge on the button's. */
 export function ThreadReferenceButton({ thread, disabled }: { thread: Thread; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -147,7 +147,7 @@ export function ThreadReferenceButton({ thread, disabled }: { thread: Thread; di
         <div
           role="dialog"
           aria-label="Reference another thread"
-          className="fade-in absolute bottom-full left-0 z-30 mb-2 w-[min(23rem,calc(100vw-2rem))] rounded-[22px] bg-elev shadow-[var(--shadow-menu)]"
+          className="fade-in absolute top-full right-0 z-30 mt-2 w-[min(23rem,calc(100vw-2rem))] rounded-[22px] bg-elev shadow-[var(--shadow-menu)]"
         >
           <ThreadReferencePanel thread={thread} onPicked={() => setOpen(false)} />
         </div>

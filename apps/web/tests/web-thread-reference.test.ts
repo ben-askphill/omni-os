@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, createElement } from 'react';
+import { act, createElement, Fragment } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { readContexts } from '@omni/shared/message-context-kinds.ts';
 import type { Thread } from '../src/api.ts';
@@ -9,11 +9,12 @@ import { attachReference, type ReferenceCandidate } from '../src/message-context
 vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: [], crew: [], status: null }) }));
 
 import { ReplyComposer } from '../src/components/Composer.tsx';
+import { ThreadReferenceButton, ThreadReferencePanel } from '../src/components/ThreadReference.tsx';
 import { MoComposer } from '../src/mobile/MoComposer.tsx';
 import { ContextInspector } from '../src/message-context/ContextChips.tsx';
 import { addDraftContext, draftContext, settleDraftContext } from '../src/message-context/draft.ts';
 
-// The thread reference picker in both reply composers: it searches this channel by default, offers other channels only
+// The thread reference picker in the thread header (a sheet on a phone): it searches this channel by default, offers other channels only
 // from All channels, attaches a reference to the draft without displacing the `@` menu, and shows the captured identity.
 
 const thread = { id: 't1', channel_id: 'shop', title: 'Asking', status: 'done', harness: 'claude-code', model: 'claude-sonnet-5-5', effort: 'high' } as Thread;
@@ -75,8 +76,8 @@ const mount = async (phone: boolean) => {
   await act(async () =>
     root.render(
       phone
-        ? createElement(MoComposer, { thread, chips: [], placeholder: 'Follow up', onSent: () => {}, onSwitched: () => {} })
-        : createElement(ReplyComposer, { thread }),
+        ? createElement(Fragment, null, createElement(MoComposer, { thread, chips: [], placeholder: 'Follow up', onSent: () => {}, onSwitched: () => {}, onFork: () => {} }), createElement(ThreadReferencePanel, { thread, touch: true, onPicked: () => {} }))
+        : createElement(Fragment, null, createElement(ReplyComposer, { thread }), createElement(ThreadReferenceButton, { thread })),
     ),
   );
 };
@@ -92,12 +93,7 @@ const open = async (phone: boolean, typed = '') => {
       box.dispatchEvent(new Event('input', { bubbles: true }));
     });
   }
-  if (phone) {
-    await act(async () => button('Attach, model and effort')!.click());
-    await act(async () => byText('Reference a thread')!.click());
-  } else {
-    await act(async () => button('Reference another thread')!.click());
-  }
+  if (!phone) await act(async () => button('Reference another thread')!.click());
   await settle();
 };
 const rows = () => [...host.querySelectorAll<HTMLElement>('[role="listitem"]')];

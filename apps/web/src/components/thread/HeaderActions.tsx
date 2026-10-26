@@ -3,6 +3,7 @@ import type { Thread } from '../../api.ts';
 import { canMarkDone } from '../../needs-you.ts';
 import { openMenu } from '../ContextMenu.tsx';
 import { Button, IconButton, StatusPill } from '../ui.tsx';
+import { ThreadReferenceButton } from '../ThreadReference.tsx';
 import { ASKING_LABEL } from './QuestionCard.tsx';
 
 // Below this header width (the side panel open, a small window) pin, done, hand off and Send to Grok Bot fold into one More button and
@@ -57,6 +58,7 @@ export function HeaderActions({
         </span>
       )}
       {meter}
+      {!archived && <ThreadReferenceButton thread={thread} />}
       {!archived && (
         <IconButton
           icon="pin"

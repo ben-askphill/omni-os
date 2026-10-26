@@ -14,7 +14,6 @@ import { useScrollAnchor } from '../pages/useScrollAnchor.ts';
 import { atStart, historyEdges } from '@omni/shared/history.ts';
 import { handOff, HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx';
 import { MoContinueLinks } from '../components/ContinueLinks.tsx';
-import { sourceRefusal } from '../continue.ts';
 import { deviceRows } from '../handoff.ts';
 import { Button, ErrorNote, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';
 import { changesView } from '../changes.ts';
@@ -25,6 +24,7 @@ import { isOmnis, parkedLabel } from '../requests.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
+import { ThreadReferencePanel } from '../components/ThreadReference.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { needsCard } from './activity.ts';
 import { MoComposer, type ComposerChip } from './MoComposer.tsx';
@@ -262,6 +262,7 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
   const targets = useHandoffTargets(thread, blocked, handoff);
   // Set while the sheet lists the Macs the thread can go to.
   const [handingOff, setHandingOff] = useState(false);
+  const [referencing, setReferencing] = useState(false);
   const [sending, setSending] = useState<string | null>(null);
   const [grokBusy, setGrokBusy] = useState(false);
   const [grokError, setGrokError] = useState('');
@@ -330,6 +331,13 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
       shell.toast(errorText(e));
     }
   };
+  if (referencing) {
+    return (
+      <MoSheet onClose={onClose} label="Reference a thread" full>
+        <ThreadReferencePanel thread={thread} touch onPicked={onClose} />
+      </MoSheet>
+    );
+  }
   if (handingOff && targets.state === 'ready') {
     return (
       <MoSheet onClose={onClose} label="Hand off to">
@@ -368,11 +376,10 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
         <MoGroup>
           {targets.state === 'ready' && <MoListRow icon="share" label="Hand off to…" sub="Keep it running on another Mac" onClick={() => setHandingOff(true)} />}
           <MoListRow
-            icon="branch"
-            label="Continue with another harness"
-            sub={sourceRefusal(thread.harness) ?? 'A new thread that picks up from here'}
-            disabled={!!sourceRefusal(thread.harness)}
-            onClick={() => (onClose(), shell.sheet({ name: 'continue', source: thread }))}
+            icon="message"
+            label="Reference a thread"
+            sub="Attach another thread, not its messages"
+            onClick={() => setReferencing(true)}
           />
           <MoListRow icon="pin" label={thread.pinned_at ? 'Unpin from Activity' : 'Pin to Activity'} chevron={false} onClick={() => void pin()} />
           {(thread.done_at || canMarkDone(thread.status)) && (
@@ -628,6 +635,7 @@ export function ThreadScreen() {
         placeholder={(steers) => (conductor ? 'Reply to the Conductor' : !slotBusy ? 'Follow up' : steers ? `Steer ${theirs}` : 'Queue for after this turn')}
         onSent={(t) => applyThread(t, true)}
         onSwitched={(t) => applyThread(t)}
+        onFork={() => shell.sheet({ name: 'continue', source: thread })}
       />
       {menu && <MenuSheet thread={thread} prLabel={pr?.pr ? `PR #${pr.pr.number} · ${plural(changes?.files.length ?? 0, 'file')}` : null} onClose={() => setMenu(false)} />}
     </>

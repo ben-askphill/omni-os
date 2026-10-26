@@ -65,7 +65,7 @@ struct ContinueSheet: View {
 
   private var header: some View {
     VStack(alignment: .leading, spacing: z(4)) {
-      Text("Continue with another harness").font(.omni(size: 17, weight: .medium)).foregroundStyle(Tok.fg)
+      Text("Fork thread").font(.omni(size: 17, weight: .medium)).foregroundStyle(Tok.fg)
       Text(workspaceLine)
         .font(.omni(size: 12.5))
         .foregroundStyle(Tok.fg3)

@@ -267,7 +267,7 @@ final class QARunner {
           guard let toggle = ContextChipsProbe.toggle, toggle(index) else { throw QAScriptError("no context chip \(index) in the reply box") }
           try? await Task.sleep(for: .milliseconds(400))
         case .referenceThread(let action):
-          guard let probe = ThreadReferenceProbe.current else { throw QAScriptError("the reply box has no thread reference button") }
+          guard let probe = ThreadReferenceProbe.current else { throw QAScriptError("the thread header has no thread reference button") }
           try await probe.run(action)
           try? await Task.sleep(for: .milliseconds(500))
         case .quickPrompt(let action):

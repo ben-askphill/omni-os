@@ -30,7 +30,7 @@ The model and effort pickers in a thread's reply box move it to another model, e
 
 ## Continuing on another harness
 
-A switch keeps one thread. To leave a thread as it is and carry on in a new one, use **Continue with another harness** in the thread's menu. The new thread is linked both ways ("Continued from" and "Continued in"). It gets its own session on the harness, model and effort you pick, and its own worktree. The source thread, its session and its checkout stay as they were.
+A switch keeps one thread. To leave a thread as it is and carry on in a new one, use **Fork thread** (the branch icon in the reply box, or under + on a phone). The new thread is linked both ways ("Continued from" and "Continued in"). It gets its own session on the harness, model and effort you pick, and its own worktree. The source thread, its session and its checkout stay as they were.
 
 - Only an idle thread can be continued. Nothing may be running in it: no turn, background task or delegated thread, no queued messages, no scheduled limit resume, no open Terminal shell (the sheet offers to close it). The sheet still shows the preview and says what is in the way. Messages waiting for Resume don't block; the carryover lists them as not sent.
 - The preview shows the **carryover**, what the new session reads ahead of your message: the thread's goal, constraints, changed files, the checks it ran, then its history. The newest history is kept whole and older entries are shortened to their first line. Whatever does not fit the 24K-character budget is listed as left out, with where the new session can read it. Your message comes after the carryover and is never cut.

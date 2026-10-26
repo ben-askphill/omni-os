@@ -162,7 +162,9 @@ private struct ThreadHeader: View {
         ContextMeterButton(model: model, store: store, thread: thread)
       }
       HandOffButton(model: model, store: store)
-      ContinueButton(model: model, thread: thread)
+      if !thread.archived {
+        ThreadReferenceButton(client: model.client, thread: thread, draft: store.draftContext, disabled: false)
+      }
       if !thread.archived {
         let on = thread.pinnedAt != nil
         Button {

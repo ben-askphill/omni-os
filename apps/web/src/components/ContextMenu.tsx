@@ -9,8 +9,6 @@ import { canMarkDone } from '../needs-you.ts';
 import { navigate, href, openNewThread, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { handOff, useHandoffTargets } from './thread/Handoff.tsx';
-import { openContinue } from './ContinueSheet.tsx';
-import { sourceRefusal } from '../continue.ts';
 import { Icon, Loader, StatusDot, type IconName } from './ui.tsx';
 
 type Target = { kind: 'thread'; id: string } | { kind: 'channel'; id: string } | { kind: 'folder'; id: string };
@@ -244,7 +242,6 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
           { label: 'Rename thread', icon: 'pencil', run: () => setDraft(current ?? '') },
           ...(row && !row.parent_id ? [{ label: 'Move to folder', icon: 'folder' as const, run: () => setMoving(true) }] : []),
           ...(targets.state === 'ready' ? [{ label: 'Hand off to…', icon: 'share' as const, run: () => setHandingOff(true) }] : []),
-          ...(row ? [{ label: 'Continue with another harness…', icon: 'branch' as const, run: () => (openContinue(row), onClose()), off: sourceRefusal(row.harness) }] : []),
           { label: 'Send to Grok Bot', icon: 'external', run: () => void sendGrok() },
           { label: archived ? 'Unarchive thread' : 'Archive thread', icon: 'archive', run: toggleArchive },
         ]
