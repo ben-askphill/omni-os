@@ -30,6 +30,10 @@ prompt: |
 
 The log is local to each Mac, and with sync on scheduled runs fire only on the Mac that owns automations, so that is the Mac whose failures get reviewed.
 
+## Docs daily
+
+`docs-daily` runs at 16:00 Europe/Amsterdam every day in the `omni-os` channel as a builder. It uses `scripts/docs-daily.sh` to fetch `ben-askphill/omni-os`, compare `origin/main` to the last processed SHA in `data/docs-daily/last-sha`, and exit when only documentation changed. Otherwise it updates docs in a scratch worktree, opens a `docs/auto-YYYY-MM-DD` PR, squash-merges when checks pass, and records the new SHA. The script aborts before merge if the diff is not docs-only; see `data/logs/docs-daily.log`. Scheduled runs use the Mac that owns automations; `catchup: true` runs a missed slot once Omni is back.
+
 ## Event automations
 
 Replace `cron` with `on` and the automation runs when something happens instead of on a schedule: a change on a PR, a page a thread published, or a signed GitHub webhook.
