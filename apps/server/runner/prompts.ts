@@ -26,7 +26,7 @@ function designSystemLines(thread: Thread, channel: Channel) {
     '',
     '## Design system',
     `This channel has a design system${channel.design_system_name ? ` (${channel.design_system_name})` : ''}, a standalone HTML file at ${designSystemFile(thread.id)}.`,
-    `Read it before you write any HTML page, report, dashboard or diagram for this channel. Build the page on its tokens, type, spacing, components and tone, with the CSS inline so the page stays self-contained, and do not approximate or invent a style of your own. Skip it only when ${userName()} names a different style. Never copy the file itself into the artifacts folder.`,
+    `Read it before you write any HTML page, report, dashboard or diagram for this channel. It can be larger than one Read allows, so read it in parts or search it for the tokens and components you need. Build the page on its tokens, type, spacing, components and tone, with the CSS inline so the page stays self-contained, and do not approximate or invent a style of your own. Skip it only when ${userName()} names a different style. Never copy the file itself into the artifacts folder.`,
   ];
 }
 
@@ -74,7 +74,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
           '',
           '## Browser',
           config.browser
-            ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Screenshots land in ${browserOutDir(thread.id)} and show up in the thread.`
+            ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Screenshots land in ${browserOutDir(thread.id)} and show up in the thread. Give a screenshot a bare filename: the browser refuses paths outside that folder and your working directory, the artifacts folder and /tmp included, so copy the file afterwards if you need it elsewhere.`
             : '',
         ]),
     '',

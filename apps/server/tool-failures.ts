@@ -35,8 +35,10 @@ export function classifyFailure(text: string): FailureCategory {
   if (/\b(429|rate.limit|quota.exceeded)\b/i.test(text)) return 'rate_limit';
   if (/\b(timed? ?out|timeout|ETIMEDOUT)\b/i.test(text)) return 'timeout';
   if (/\b(ECONNREFUSED|ECONNRESET|ENOTFOUND|unavailable|502|503|504)\b/i.test(text)) return 'unavailable';
-  if (/\b(invalid (input|argument|parameter)|validation|schema)\b/i.test(text)) return 'invalid_input';
-  if (/\b(404|ENOENT|not found|no such file)\b/i.test(text)) return 'not_found';
+  // Claude Code's Read refuses a directory or a file over its size limit.
+  if (/\b(invalid (input|argument|parameter)s?|validation|schema|EISDIR|exceeds maximum allowed size)\b/i.test(text)) return 'invalid_input';
+  // Claude Code's Read says "File does not exist", wiki and browser MCPs "could not be found" and "does not match any elements".
+  if (/\b(404|ENOENT|not found|no such file|does not exist|could not be found|does not match any elements)\b/i.test(text)) return 'not_found';
   if (/\b(exit (code|status)|non.?zero)\b/i.test(text)) return 'command_exit';
   return 'unknown';
 }

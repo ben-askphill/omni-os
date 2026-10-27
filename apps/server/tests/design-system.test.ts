@@ -58,6 +58,8 @@ describe('channel design system', () => {
     expect(prompt).toContain('## Design system');
     expect(prompt).toContain(designSystemFile(t.id));
     expect(prompt).toContain('brand.html');
+    // The file can exceed what one Read allows.
+    expect(prompt).toContain('read it in parts');
     expect(buildSystemPrompt({ ...r.thread(t.id), harness: 'hermes' }, ch())).not.toContain('## Design system');
 
     await send('DELETE', '/api/channels/scratch/design-system');

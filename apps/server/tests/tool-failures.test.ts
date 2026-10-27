@@ -159,4 +159,14 @@ describe('adapter failure signals', () => {
       ['Error: Access denied: path is not within any of the configured workspace roots.', 'permission'],
     ]) expect(classifyFailure(text)).toBe(category);
   });
+  it('classifies Read and MCP misses that name no exit code', () => {
+    for (const [text, category] of [
+      ['File does not exist. Note: your current working directory is /repo.', 'not_found'],
+      ["EISDIR: illegal operation on a directory, read '/repo/projects'", 'invalid_input'],
+      ['File content (2.3MB) exceeds maximum allowed size (256KB). Use offset and limit parameters.', 'invalid_input'],
+      ['Error fetching wiki page content: Wiki page could not be found.', 'not_found'],
+      ['### Error\nError: "button[aria-label=x]" does not match any elements.', 'not_found'],
+      ['Invalid arguments for tool "browser_click"', 'invalid_input'],
+    ]) expect(classifyFailure(text)).toBe(category);
+  });
 });
