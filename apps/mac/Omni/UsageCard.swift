@@ -102,7 +102,7 @@ private struct UsageRow: View {
   }
 }
 
-/// A monthly cycle across both columns, as MonthCell in Sidebar.tsx: twenty bars, the percent, and "mo".
+/// A monthly cycle across both columns, as MonthCell in Sidebar.tsx: up to twenty bars, the percent, and "mo".
 private struct MonthCell: View {
   let month: MonthMeter
   let name: String
@@ -116,7 +116,7 @@ private struct MonthCell: View {
         .font(.omni(size: 10))
         .monospacedDigit()
         .foregroundStyle(Tok.fg2)
-        .frame(width: z(28), alignment: .trailing)
+        .frame(width: z(26), alignment: .trailing)
       Text("mo")
         .font(.omni(size: 10))
         .foregroundStyle(Tok.fg4)
@@ -135,19 +135,24 @@ private struct Bars: View {
   var count = 10
 
   var body: some View {
-    let on = meter.fraction > 0 ? max(1, Int((meter.fraction * Double(count)).rounded())) : 0
-    HStack(alignment: .bottom, spacing: z(2)) {
-      ForEach(0..<count, id: \.self) { i in
-        RoundedRectangle(cornerRadius: z(1.5))
-          .fill(i < on ? (meter.tone == .bad ? Tok.needs : Tok.fg) : Tok.fg.opacity(0.14))
-          .frame(height: i < on ? 10 : 5.5)
+    GeometryReader { geometry in
+      // Match the Web UI: reduce granularity before ticks become thinner than 3pt at the current zoom.
+      let visibleCount = max(1, min(count, Int((geometry.size.width + z(2)) / z(5))))
+      let on = meter.fraction > 0 ? max(1, Int((meter.fraction * Double(visibleCount)).rounded())) : 0
+      HStack(alignment: .bottom, spacing: z(2)) {
+        ForEach(0..<visibleCount, id: \.self) { i in
+          RoundedRectangle(cornerRadius: z(1.5))
+            .fill(i < on ? (meter.tone == .bad ? Tok.needs : Tok.fg) : Tok.fg.opacity(0.14))
+            .frame(height: i < on ? z(10) : z(5.5))
+        }
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
     .frame(height: z(10), alignment: .bottom)
   }
 }
 
-/// `Ticks` in ui.tsx: ten bars, the used ones full height in ink (vermilion past 90%), the rest short and faint.
+/// `Ticks` in ui.tsx: up to ten bars, the used ones full height in ink (vermilion past 90%), the rest short and faint.
 private struct Meter: View {
   let meter: UsageMeter?
   let label: String
@@ -161,7 +166,7 @@ private struct Meter: View {
           .font(.omni(size: 10))
           .monospacedDigit()
           .foregroundStyle(Tok.fg2)
-          .frame(width: z(28), alignment: .trailing)
+          .frame(width: z(26), alignment: .trailing)
       }
       .frame(maxWidth: .infinity)
       .help("\(label): \(meter.percent)% used, resets \(meter.resetLabel(now: now))")

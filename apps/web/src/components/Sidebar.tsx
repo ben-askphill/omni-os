@@ -23,11 +23,11 @@ function WindowCell({ w, label }: { w?: UsageWindow; label: string }) {
   const tone = pct >= 0.9 ? 'needs' : undefined;
   return (
     <div
-      className="flex flex-1 items-center gap-1.5"
+      className="flex min-w-0 flex-1 items-center gap-1.5"
       title={`${label}: ${Math.round(pct * 100)}% used, resets ${new Date(w!.resetsAt * 1000).toLocaleString('en-GB')} (${untilLabel(w!.resetsAt)})`}
     >
-      <Ticks value={pct} count={10} height={10} tone={tone} className="flex-1" label={`${label} usage`} />
-      <span className="w-7 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
+      <Ticks responsive value={pct} count={10} height={10} tone={tone} className="min-w-0 flex-1" label={`${label} usage`} />
+      <span className="w-[26px] shrink-0 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
     </div>
   );
 }
@@ -36,9 +36,9 @@ function WindowCell({ w, label }: { w?: UsageWindow; label: string }) {
 function MonthCell({ m, name }: { m: MonthlyUsage; name: string }) {
   const pct = windowPct(m)!;
   return (
-    <div className="flex flex-1 items-center gap-1.5" title={monthlyTitle(name, m)}>
-      <Ticks value={pct} count={20} height={10} tone={pct >= 0.9 ? 'needs' : undefined} className="flex-1" label={`${name} month usage`} />
-      <span className="w-7 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
+    <div className="flex min-w-0 flex-1 items-center gap-1.5" title={monthlyTitle(name, m)}>
+      <Ticks responsive value={pct} count={20} height={10} tone={pct >= 0.9 ? 'needs' : undefined} className="min-w-0 flex-1" label={`${name} month usage`} />
+      <span className="w-[26px] shrink-0 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
       <span className="text-[10px] text-fg-4">mo</span>
     </div>
   );
