@@ -449,6 +449,7 @@ struct ReportCard: View {
 struct PlanCard: View {
   let plan: Plan
   let threadId: String
+  let client: OmniClient
   @State private var updatingIndex: Int?
 
   var body: some View {
@@ -503,11 +504,7 @@ struct PlanCard: View {
     defer { updatingIndex = nil }
 
     do {
-      let _: Void = try await Omni.default.send(
-        "PATCH",
-        "/api/threads/\(threadId)/plan/steps/\(index)",
-        body: ["status": newStatus]
-      )
+      _ = try await client.setPlanStep(in: threadId, index: index, status: newStatus)
     } catch {
       print("Failed to update plan step:", error)
     }

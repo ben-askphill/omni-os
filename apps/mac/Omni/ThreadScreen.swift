@@ -622,7 +622,7 @@ private struct TranscriptRow: View {
         }
       }
     case .plan(let plan):
-      PlanCard(plan: plan, threadId: threadID)
+      PlanCard(plan: plan, threadId: threadID, client: model.client)
     case .result(_, let result):
       ResultLineView(result: result)
     case .error(_, let text):

@@ -220,4 +220,13 @@ extension OmniClient {
   public func discardRequests(in id: String, ids: [String]) async throws(OmniAPIError) -> RecoveryAnswer {
     try await send("POST", "/api/threads/\(uriComponent(id))/requests/discard", body: RequestIDs(ids: ids))
   }
+
+  /// Sets one plan step's status; the server records it as a plan_step_update event.
+  public func setPlanStep(in id: String, index: Int, status: String) async throws(OmniAPIError) -> RecoveryAnswer {
+    try await send("PATCH", "/api/threads/\(uriComponent(id))/plan/steps/\(index)", body: PlanStepStatus(status: status))
+  }
+}
+
+private struct PlanStepStatus: Encodable, Sendable {
+  let status: String
 }
