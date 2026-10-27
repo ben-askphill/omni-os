@@ -136,12 +136,22 @@ private struct InspectorPanel: View {
     let files = store.files
     VStack(spacing: 0) {
       HStack(spacing: z(4)) {
-        // Six tabs do not fit a narrow panel: they scroll sideways, as the Web UI's Tabs do, rather than truncate.
+        // Counts can widen the icon tabs. Keep them scrollable at the narrowest panel width.
         ScrollView(.horizontal) {
           SegmentedPill(
             selection: $selection.tab,
             counted: InspectorSelection.Tab.allCases.map { ($0, $0.title, count($0, files: files.count)) },
-            small: true)
+            small: true,
+            icon: { tab in
+              switch tab {
+              case .artifacts: "layers"
+              case .changes: "diff"
+              case .browser: "browser"
+              case .terminal: "terminal"
+              case .actions: "play"
+              case .details: "info"
+              }
+            })
             .fixedSize()
         }
         .scrollIndicators(.never)

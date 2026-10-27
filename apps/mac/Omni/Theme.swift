@@ -180,6 +180,7 @@ struct SegmentedPill<T: Hashable>: View {
   @Binding var selection: T
   let options: [(value: T, label: String, count: Int?)]
   var small = false
+  var icon: ((T) -> String)?
   @Namespace private var ns
 
   init(selection: Binding<T>, options: [(T, String)], small: Bool = false) {
@@ -188,10 +189,11 @@ struct SegmentedPill<T: Hashable>: View {
     self.small = small
   }
 
-  init(selection: Binding<T>, counted options: [(T, String, Int?)], small: Bool = false) {
+  init(selection: Binding<T>, counted options: [(T, String, Int?)], small: Bool = false, icon: ((T) -> String)? = nil) {
     _selection = selection
     self.options = options.map { ($0.0, $0.1, $0.2) }
     self.small = small
+    self.icon = icon
   }
 
   var body: some View {
@@ -202,7 +204,11 @@ struct SegmentedPill<T: Hashable>: View {
           withAnimation(Motion.spring) { selection = option.value }
         } label: {
           HStack(spacing: z(6)) {
-            Text(option.label)
+            if let icon {
+              OmniIcon(name: icon(option.value), size: small ? 13 : 14)
+            } else {
+              Text(option.label)
+            }
             if let count = option.count, count > 0 {
               Text("\(count)").foregroundStyle(Tok.fg4).monospacedDigit()
             }
@@ -222,6 +228,9 @@ struct SegmentedPill<T: Hashable>: View {
           .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(option.label)
+        .accessibilityValue(option.count.map { String($0) } ?? "")
+        .help(icon != nil ? option.label : "")
         .accessibilityAddTraits(on ? .isSelected : [])
       }
     }

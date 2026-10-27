@@ -18,7 +18,7 @@ import { OPEN_PR_PROMPT, ThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { HeaderActions } from '../components/thread/HeaderActions.tsx';
 import { ContinueCrumbs } from '../components/ContinueLinks.tsx';
-import { Avatar, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Tabs } from '../components/ui.tsx';
+import { Avatar, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Segmented } from '../components/ui.tsx';
 import { href } from '../router.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
 import { blockedNote } from '../handoff.ts';
@@ -261,20 +261,22 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
   const panel = (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-1 px-2.5 py-2.5">
-        <Tabs
-          className="min-w-0 flex-1"
-          size="sm"
-          value={panelTab}
-          onChange={setPanelTab}
-          tabs={[
-            { id: 'artifacts', label: 'Artifacts', badge: files.length ? <span className="font-num text-[10.5px] text-fg-4">{files.length}</span> : undefined },
-            { id: 'changes', label: 'Changes' },
-            { id: 'browser', label: 'Browser', badge: shots.length ? <span className="font-num text-[10.5px] text-fg-4">{shots.length}</span> : undefined },
-            { id: 'terminal', label: 'Terminal' },
-            { id: 'actions', label: 'Actions' },
-            { id: 'details', label: 'Details' },
-          ]}
-        />
+        <div className="scroll-thin min-w-0 flex-1 overflow-x-auto">
+          <Segmented
+            label="Thread inspector"
+            size="sm"
+            value={panelTab}
+            onChange={setPanelTab}
+            options={[
+              { id: 'artifacts', icon: 'layers', title: 'Artifacts', badge: files.length ? <span className="font-num text-[10.5px] text-fg-4">{files.length}</span> : undefined },
+              { id: 'changes', icon: 'diff', title: 'Changes' },
+              { id: 'browser', icon: 'browser', title: 'Browser', badge: shots.length ? <span className="font-num text-[10.5px] text-fg-4">{shots.length}</span> : undefined },
+              { id: 'terminal', icon: 'terminal', title: 'Terminal' },
+              { id: 'actions', icon: 'play', title: 'Actions' },
+              { id: 'details', icon: 'info', title: 'Details' },
+            ]}
+          />
+        </div>
         <IconButton icon="x" label="Close panel" onClick={togglePanel} />
       </div>
       <div className="min-h-0 flex-1">
