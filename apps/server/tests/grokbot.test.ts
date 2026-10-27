@@ -26,6 +26,23 @@ function leaked(secret: string) {
   return spies.some((spy) => spy.mock.calls.some((args: unknown[]) => args.map((part) => String(part)).join(' ').includes(secret)));
 }
 
+async function headerFor(auth: string): Promise<string> {
+  let header = '';
+  await sendToGrokBot(
+    { request: 'hello' },
+    deps(
+      {
+        fetch: async (_url, init) => {
+          header = new Headers(init?.headers).get('authorization') ?? '';
+          return new Response('', { status: 200 });
+        },
+      },
+      { [GROKBOT_WEBHOOK_URL]: URL, [GROKBOT_WEBHOOK_AUTH]: auth },
+    ),
+  );
+  return header;
+}
+
 function deps(over: Partial<GrokBotDeps> = {}, secrets: Record<string, string | null> = { [GROKBOT_WEBHOOK_URL]: URL, [GROKBOT_WEBHOOK_AUTH]: AUTH }): GrokBotDeps {
   return {
     secret: async (name) => secrets[name] ?? null,
@@ -36,7 +53,7 @@ function deps(over: Partial<GrokBotDeps> = {}, secrets: Record<string, string | 
 }
 
 describe('sendToGrokBot', () => {
-  it('posts the request with the auth value as the Authorization header', async () => {
+  it('posts the request with a bare key sent as Bearer', async () => {
     watchConsole();
     const seen: { url: string; init: RequestInit }[] = [];
     const result = await sendToGrokBot(
@@ -54,7 +71,7 @@ describe('sendToGrokBot', () => {
     expect(seen[0].init.method).toBe('POST');
     expect(seen[0].init.redirect).toBe('manual');
     const headers = new Headers(seen[0].init.headers);
-    expect(headers.get('authorization')).toBe(AUTH);
+    expect(headers.get('authorization')).toBe(`Bearer ${AUTH}`);
     expect(headers.get('content-type')).toBe('application/json');
     expect(JSON.parse(String(seen[0].init.body))).toEqual({
       request: 'Look at the cart',
@@ -96,7 +113,7 @@ describe('sendToGrokBot', () => {
       ),
     );
     expect(url).toBe(URL);
-    expect(auth).toBe(AUTH);
+    expect(auth).toBe(`Bearer ${AUTH}`);
   });
 
   it('uses the environment when the Keychain has nothing', async () => {
@@ -114,7 +131,37 @@ describe('sendToGrokBot', () => {
         { [GROKBOT_WEBHOOK_URL]: '   ', [GROKBOT_WEBHOOK_AUTH]: null },
       ),
     );
-    expect(auth).toBe('from-env-token');
+    expect(auth).toBe('Bearer from-env-token');
+  });
+
+  it('keeps a value that already starts with Bearer, in any case', async () => {
+    expect(await headerFor(`Bearer ${AUTH}`)).toBe(`Bearer ${AUTH}`);
+    expect(await headerFor(`bEaReR ${AUTH}`)).toBe(`bEaReR ${AUTH}`);
+  });
+
+  it('trims spaces, newlines and surrounding quotes before sending', async () => {
+    expect(await headerFor(` \n"${AUTH}"\r\n `)).toBe(`Bearer ${AUTH}`);
+    expect(await headerFor(`'${AUTH}'`)).toBe(`Bearer ${AUTH}`);
+    expect(await headerFor(`  "Bearer ${AUTH}"  `)).toBe(`Bearer ${AUTH}`);
+    expect(await headerFor(`'\nbEaReR ${AUTH}\n'`)).toBe(`bEaReR ${AUTH}`);
+  });
+
+  it('uses the environment when the Keychain value is only quotes and whitespace', async () => {
+    let auth = '';
+    await sendToGrokBot(
+      { request: 'hello' },
+      deps(
+        {
+          env: { [GROKBOT_WEBHOOK_URL]: URL, [GROKBOT_WEBHOOK_AUTH]: 'from-env-token' },
+          fetch: async (_url, init) => {
+            auth = new Headers(init?.headers).get('authorization') ?? '';
+            return new Response('', { status: 200 });
+          },
+        },
+        { [GROKBOT_WEBHOOK_URL]: URL, [GROKBOT_WEBHOOK_AUTH]: '"\n"' },
+      ),
+    );
+    expect(auth).toBe('Bearer from-env-token');
   });
 
   it('returns a clear error when the webhook is not configured, and does not call fetch', async () => {
@@ -169,22 +216,49 @@ describe('sendToGrokBot', () => {
     expect(result).toMatchObject({ ok: false, reason: 'invalid' });
   });
 
-  it('reports a non-2xx answer without the auth value', async () => {
+  it('tells a 401 to check the Authorization value and leaves the key out of the error and the log', async () => {
+    watchConsole();
+    let sent = '';
+    const result = await sendToGrokBot(
+      { request: 'hello' },
+      deps({
+        fetch: async (_url, init) => {
+          sent = new Headers(init?.headers).get('authorization') ?? '';
+          return new Response(JSON.stringify({ code: 'error', message: `Malformed Authorization header. Use Authorization: Bearer ${AUTH}.` }), {
+            status: 401,
+          });
+        },
+      }),
+    );
+    expect(sent).toBe(`Bearer ${AUTH}`);
+    expect(result).toEqual({
+      ok: false,
+      reason: 'rejected',
+      error: 'Grok Bot returned HTTP 401. Check that the Authorization value is the key from the Omni OS requests routine.',
+    });
+    expect(JSON.stringify(result)).not.toContain(AUTH);
+    expect(JSON.stringify(result)).not.toContain('Malformed');
+    expect(leaked(AUTH)).toBe(false);
+    expect(leaked(`Bearer ${AUTH}`)).toBe(false);
+  });
+
+  it('redacts the key when another status echoes it', async () => {
     watchConsole();
     const result = await sendToGrokBot(
       { request: 'hello' },
       deps({
-        fetch: async () => new Response(`denied ${AUTH}`, { status: 401 }),
+        fetch: async () => new Response(`denied ${AUTH} Bearer ${AUTH}`, { status: 500 }),
       }),
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toBe('rejected');
-      expect(result.error).toContain('HTTP 401');
+      expect(result.error).toContain('HTTP 500');
       expect(result.error).toContain('[redacted]');
       expect(result.error).not.toContain(AUTH);
     }
     expect(leaked(AUTH)).toBe(false);
+    expect(leaked(`Bearer ${AUTH}`)).toBe(false);
   });
 
   it('treats a redirect as a failure and does not follow it', async () => {

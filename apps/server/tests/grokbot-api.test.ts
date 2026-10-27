@@ -82,7 +82,7 @@ describe('POST /api/grokbot', () => {
     expect(res.status).toBe(200);
     expect(res.json).toEqual({ ok: true });
     expect(seen?.url).toBe(URL);
-    expect(new Headers(seen?.init.headers).get('authorization')).toBe(AUTH);
+    expect(new Headers(seen?.init.headers).get('authorization')).toBe(`Bearer ${AUTH}`);
     expect(JSON.parse(String(seen?.init.body))).toEqual({
       request: ['Cart drawer', 'User: Look at the cart', 'Assistant: The drawer sticks.'].join('\n\n'),
       source: 'omni-os',
@@ -112,6 +112,17 @@ describe('POST /api/grokbot', () => {
     expect(res.json.error).toContain(GROKBOT_WEBHOOK_URL);
     expect(res.json.error).toContain(GROKBOT_WEBHOOK_AUTH);
     expect(seen).toBeUndefined();
+  });
+
+  it('turns a 401 into a check of the Authorization value, without the key', async () => {
+    configure();
+    fetchResult = () =>
+      new Response(JSON.stringify({ code: 'error', message: `Malformed Authorization header. Use Authorization: Bearer ${AUTH}.` }), { status: 401 });
+    const res = await post({ request: 'hello' });
+    expect(res.status).toBe(502);
+    expect(res.json.error).toBe('Grok Bot returned HTTP 401. Check that the Authorization value is the key from the Omni OS requests routine.');
+    expect(res.json.error).not.toContain(AUTH);
+    expect(new Headers(seen?.init.headers).get('authorization')).toBe(`Bearer ${AUTH}`);
   });
 
   it('turns a non-2xx webhook answer into an error, without the auth value', async () => {

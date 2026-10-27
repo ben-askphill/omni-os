@@ -1,6 +1,6 @@
 // Sends one request to Ben's Grok Bot webhook. The URL and Authorization value come from the
 // Keychain (global secrets GROKBOT_WEBHOOK_URL and GROKBOT_WEBHOOK_AUTH) and fall back to the
-// process environment. Callers get a result. This function does not throw.
+// process environment. A bare key is sent as "Bearer <key>". Callers get a result. This function does not throw.
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { events, threads } from './db.ts';
@@ -88,17 +88,43 @@ function fail(reason: GrokBotFailureReason, error: string): GrokBotResult {
   return { ok: false, error, reason };
 }
 
-async function setting(name: string, deps: Required<Pick<GrokBotDeps, 'secret' | 'env'>>): Promise<string | null> {
+async function setting(
+  name: string,
+  deps: Required<Pick<GrokBotDeps, 'secret' | 'env'>>,
+  normalize: (raw: string) => string | null = (raw) => raw.trim() || null,
+): Promise<string | null> {
   let fromKeychain: string | null = null;
   try {
     fromKeychain = await deps.secret(name);
   } catch {
     fromKeychain = null;
   }
-  const key = fromKeychain?.trim();
-  if (key) return key;
-  const fromEnv = deps.env[name]?.trim();
-  return fromEnv || null;
+  for (const raw of [fromKeychain, deps.env[name]]) {
+    if (typeof raw !== 'string') continue;
+    const value = normalize(raw);
+    if (value) return value;
+  }
+  return null;
+}
+
+/** Trim spaces, newlines and surrounding quotes. Add `Bearer ` unless that scheme is already there. */
+function authorizationHeader(raw: string): string | null {
+  let value = raw.trim();
+  for (let i = 0; i < 2; i++) {
+    if (value.length < 2) break;
+    const quote = value[0];
+    if ((quote !== '"' && quote !== "'") || value[value.length - 1] !== quote) break;
+    value = value.slice(1, -1).trim();
+  }
+  if (!value) return null;
+  if (/^bearer /i.test(value)) return value;
+  return `Bearer ${value}`;
+}
+
+/** The header and the key inside it, so an error body that repeats either one can be scrubbed. */
+function authSecrets(header: string): string[] {
+  const key = /^bearer (.*)$/i.exec(header)?.[1]?.trim() ?? '';
+  return key && key !== header ? [header, key] : [header];
 }
 
 function webhookUrl(raw: string): URL | null {
@@ -114,8 +140,9 @@ function webhookUrl(raw: string): URL | null {
 
 /**
  * POST `{ request, source: "omni-os", context? }` to the webhook.
- * Keychain wins over the environment. The Authorization header is the auth value as stored.
- * A redirect is an error: following it would send the Authorization value to another host.
+ * Keychain wins over the environment. A bare key is sent as `Bearer <key>`. A value that
+ * already starts with `Bearer ` (any case) is sent unchanged, after trimming. A redirect is
+ * an error: following it would send the Authorization value to another host.
  */
 export async function sendToGrokBot(input: GrokBotInput, deps: GrokBotDeps = {}): Promise<GrokBotResult> {
   const secret = deps.secret ?? ((name: string) => globalSecret(name));
@@ -128,7 +155,7 @@ export async function sendToGrokBot(input: GrokBotInput, deps: GrokBotDeps = {})
   if (request.length > MAX_REQUEST) return fail('invalid', 'The text is too long to send.');
 
   const urlValue = await setting(GROKBOT_WEBHOOK_URL, { secret, env });
-  const auth = await setting(GROKBOT_WEBHOOK_AUTH, { secret, env });
+  const auth = await setting(GROKBOT_WEBHOOK_AUTH, { secret, env }, authorizationHeader);
   const missing = [!urlValue && GROKBOT_WEBHOOK_URL, !auth && GROKBOT_WEBHOOK_AUTH].filter((name): name is string => !!name);
   if (missing.length) {
     return fail(
@@ -139,7 +166,7 @@ export async function sendToGrokBot(input: GrokBotInput, deps: GrokBotDeps = {})
   const url = webhookUrl(urlValue!);
   if (!url) return fail('invalid', `${GROKBOT_WEBHOOK_URL} must be an http or https URL.`);
 
-  const hidden = [auth!, urlValue!];
+  const hidden = [...authSecrets(auth!), urlValue!];
   const payload: { request: string; source: typeof SOURCE; context?: Record<string, unknown> } = { request, source: SOURCE };
   if (input.context && Object.keys(input.context).length) payload.context = input.context;
 
@@ -170,6 +197,14 @@ export async function sendToGrokBot(input: GrokBotInput, deps: GrokBotDeps = {})
     return fail('rejected', 'Grok Bot redirected the request. Omni does not follow it.');
   }
   if (!res.ok) {
+    // 401 is a refused key. Leave the body out: it can repeat the key.
+    if (res.status === 401) {
+      await res.body?.cancel().catch(() => {});
+      return fail(
+        'rejected',
+        'Grok Bot returned HTTP 401. Check that the Authorization value is the key from the Omni OS requests routine.',
+      );
+    }
     const snippet = scrub((await res.text().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 180), hidden);
     const detail = snippet ? ` ${snippet}` : '';
     return fail('rejected', scrub(`Grok Bot returned HTTP ${res.status}.${detail}`, hidden));

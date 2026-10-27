@@ -58,4 +58,4 @@ The URL and the Authorization value come from the Omni OS requests routine, on G
 1. Settings, Secrets, scope Global. On the Web UI, Known global secrets lists `GROKBOT_WEBHOOK_URL` and `GROKBOT_WEBHOOK_AUTH`. The phone opens that same page. On the Mac app, Settings > Secrets shows Use GROKBOT_WEBHOOK_URL and Use GROKBOT_WEBHOOK_AUTH while the name field is empty.
 2. `.env`, as a fallback when the Keychain has no value for that name. Copy the empty lines from `.env.example` and fill them in. An empty value leaves Grok Bot off. `.env` stays untracked.
 
-When both are set, Omni uses the Keychain value. `GROKBOT_WEBHOOK_URL` is the routine's URL. `GROKBOT_WEBHOOK_AUTH` is the Authorization header, sent as stored. Omni leaves both values out of the log. A thread's harness and its terminal run without them.
+When both are set, Omni uses the Keychain value. `GROKBOT_WEBHOOK_URL` is the routine's URL. `GROKBOT_WEBHOOK_AUTH` can be the bare key or a value that already starts with `Bearer `. Either form works. Omni leaves both values out of the log. A thread's harness and its terminal run without them.
