@@ -38,8 +38,14 @@ struct OmniIcon: View {
   var body: some View {
     let d = BrandPaths.icons[name] ?? BrandPaths.icons["more"]!
     let side = z(size)
-    SVGShape(d)
-      .stroke(style: StrokeStyle(lineWidth: (name == "more" ? 3 : weight) * side / 24, lineCap: .round, lineJoin: .round))
+    Group {
+      if name == "grok" {
+        Image("GrokBot").renderingMode(.template).resizable()
+      } else {
+        SVGShape(d)
+          .stroke(style: StrokeStyle(lineWidth: (name == "more" ? 3 : weight) * side / 24, lineCap: .round, lineJoin: .round))
+      }
+    }
       .frame(width: side, height: side)
       .accessibilityHidden(true)
   }

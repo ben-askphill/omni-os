@@ -242,7 +242,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
           { label: 'Rename thread', icon: 'pencil', run: () => setDraft(current ?? '') },
           ...(row && !row.parent_id ? [{ label: 'Move to folder', icon: 'folder' as const, run: () => setMoving(true) }] : []),
           ...(targets.state === 'ready' ? [{ label: 'Hand off to…', icon: 'share' as const, run: () => setHandingOff(true) }] : []),
-          { label: 'Send to Grok Bot', icon: 'external', run: () => void sendGrok() },
+          { label: 'Send to Grok Bot', icon: 'grok', run: () => void sendGrok() },
           { label: archived ? 'Unarchive thread' : 'Archive thread', icon: 'archive', run: toggleArchive },
         ]
       : target.kind === 'folder'

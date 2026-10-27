@@ -386,7 +386,7 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
             <MoListRow icon="check" label={thread.done_at ? 'Mark as not done' : 'Mark as done'} chevron={false} onClick={() => void done()} />
           )}
           <MoListRow
-            icon={grokBusy ? <Loader size={18} /> : 'external'}
+            icon={grokBusy ? <Loader size={18} /> : 'grok'}
             label="Send to Grok Bot"
             sub={grokBusy ? 'Sending' : "This thread's text"}
             chevron={false}

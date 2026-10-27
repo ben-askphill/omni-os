@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { Thread } from '../../api.ts';
 import { canMarkDone } from '../../needs-you.ts';
 import { openMenu } from '../ContextMenu.tsx';
-import { Button, IconButton, StatusPill } from '../ui.tsx';
+import { Button, Icon, IconButton, StatusPill } from '../ui.tsx';
 import { ThreadReferenceButton } from '../ThreadReference.tsx';
 import { ASKING_LABEL } from './QuestionCard.tsx';
 
@@ -86,8 +86,8 @@ export function HeaderActions({
           Restore
         </Button>
       )}
-      <Button size="sm" variant="ghost" icon="external" busy={grok.busy} title="Send this thread's text to Grok Bot" className={FOLD} onClick={grok.run}>
-        Send to Grok Bot
+      <Button size="sm" variant="ghost" busy={grok.busy} aria-label="Send to Grok Bot" aria-busy={grok.busy} title="Send this thread's text to Grok Bot" className={`${FOLD} w-8 px-0`} onClick={grok.run}>
+        {!grok.busy && <Icon name="grok" size={24} />}
       </Button>
       <StatusPill status={asking ? 'needs' : thread.status} label={asking ? ASKING_LABEL : undefined} />
       {handoffReady && (

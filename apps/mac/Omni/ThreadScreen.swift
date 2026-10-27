@@ -218,12 +218,10 @@ private struct ThreadHeader: View {
             showingGrokNote = true
           }
         } label: {
-          HStack(spacing: z(6)) {
-            if sendingGrok { Loader(size: 12) } else { OmniIcon(name: "external", size: 14) }
-            Text("Send to Grok Bot")
-          }
+          if sendingGrok { Loader(size: 12) } else { OmniIcon(name: "grok", size: 24) }
         }
-        .buttonStyle(.pill(.ghost, height: 28))
+        .buttonStyle(.icon(size: 28))
+        .accessibilityLabel("Send to Grok Bot")
         .disabled(sendingGrok)
         .help("Send this thread's text to Grok Bot")
         if store.transcript.hasPendingQuestion {

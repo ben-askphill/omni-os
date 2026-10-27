@@ -166,11 +166,13 @@ private struct OpenInNewWindow: ViewModifier {
           }
           if let stub { MoveToFolderMenu(model: model, thread: stub) }
           HandOffMenu(model: model, threadID: threadID)
-          Button("Send to Grok Bot") {
+          Button {
             Task {
               grokNote = await grokBotResult(model, threadID)
               showingGrokNote = true
             }
+          } label: {
+            Label { Text("Send to Grok Bot") } icon: { OmniIcon(name: "grok") }
           }
           Button(archived ? "Unarchive Thread" : "Archive Thread") { Task { await model.setThreadArchived(threadID, !archived) } }
         }
