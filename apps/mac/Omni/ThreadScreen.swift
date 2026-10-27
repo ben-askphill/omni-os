@@ -218,7 +218,7 @@ private struct ThreadHeader: View {
             showingGrokNote = true
           }
         } label: {
-          if sendingGrok { Loader(size: 12) } else { OmniIcon(name: "grok", size: 24) }
+          if sendingGrok { Loader(size: 12) } else { OmniIcon(name: "grok", size: 15) }
         }
         .buttonStyle(.icon(size: 28))
         .accessibilityLabel("Send to Grok Bot")
