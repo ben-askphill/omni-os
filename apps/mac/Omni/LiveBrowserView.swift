@@ -179,8 +179,12 @@ struct BrowserTabStrip: View {
   var body: some View {
     let s = model.state
     let tabs = s.tabs.isEmpty ? [BrowserTabInfo(id: "blank", url: "", title: s.running ? "New Tab" : "Starting")] : s.tabs
+    GeometryReader { geo in
+    // Tabs share the strip like the web's, down to a minimum width, then the strip scrolls.
+    let gap = z(4), plus = z(26), pad = z(16)
+    let each = max(z(60), min(z(208), (geo.size.width - pad - plus - gap * CGFloat(tabs.count)) / CGFloat(tabs.count)))
     ScrollView(.horizontal, showsIndicators: false) {
-      HStack(alignment: .center, spacing: z(4)) {
+      HStack(alignment: .center, spacing: gap) {
         ForEach(tabs) { tab in
           let on = tab.id == s.active || tabs.count == 1
           HStack(spacing: z(7)) {
@@ -198,7 +202,7 @@ struct BrowserTabStrip: View {
           .foregroundStyle(on ? Tok.fg : Tok.fg3)
           .padding(.leading, z(11))
           .padding(.trailing, z(4))
-          .frame(minWidth: z(60), maxWidth: z(208), minHeight: z(32))
+          .frame(width: each, height: z(32))
           .background(on ? Tok.surface3 : .clear, in: RoundedRectangle(cornerRadius: z(12), style: .continuous))
           .contentShape(Rectangle())
           .onTapGesture { if !on, s.running { model.perform(.tab(tab.id)) } }
@@ -210,6 +214,7 @@ struct BrowserTabStrip: View {
           .disabled(!s.running)
       }
       .padding(.horizontal, z(8))
+    }
     }
     .frame(height: z(34))
   }

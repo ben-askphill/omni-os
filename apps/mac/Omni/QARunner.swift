@@ -42,6 +42,9 @@ final class QARunner {
       exit(2)
     }
     let launch = Launch(script: script, out: URL(filePath: out, directoryHint: .isDirectory))
+    // The real Omni may be running under the same bundle id, and macOS then opens no window for this second copy.
+    // Ignoring restored state makes it open its main window like a fresh launch. Registered, so nothing is saved.
+    UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true])
     do throws(QAScriptError) {
       _ = try QALaunch.serverPort(in: arguments)
     } catch {

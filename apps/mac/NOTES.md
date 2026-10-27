@@ -483,6 +483,7 @@ apps/mac/.xcode/Build/Products/Debug/Omni.app/Contents/MacOS/Omni -ApplePersiste
   -serverPort 4757 -repoPath "$PWD" -OmniQAScript "$S/qa/run.json" -OmniQAOut "$S/qa/run"
 ```
 
+- A QA run can start while the real Omni is open. Both share the bundle id, and macOS then opens no window for the second copy (every step that needs one failed with "the main window has not appeared"), so the run registers `ApplePersistenceIgnoreState` (`QARunner.launch`, in memory only, nothing saved) to open its own. A stack from `scripts/qa-stack.sh up` finishes onboarding (`POST /api/setup/complete`), so the main window is not covered by first-run onboarding; `QA_ONBOARDING=1` keeps it.
 - `-OmniQAScript` takes the JSON itself or a path to it; `-OmniQAOut` the folder for PNGs and `qa.json`. They are read from the raw arguments: UserDefaults would parse a JSON value as a property list.
 - Give every flag a value. A flag without one ahead of the others left the app with no window.
 - It refuses to run (exit 2, reason in `qa.json` and stderr) unless launch arguments set `-serverPort` (every one given) to a port other than 4747. `QALaunch.serverPort` checks the raw arguments before the app model exists, so nothing has talked to a server yet. A `{"port": 4747}` step is rejected, and server steps refuse while the port is 4747. So a QA run never talks to the live server and never saves settings.

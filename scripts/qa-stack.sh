@@ -11,7 +11,7 @@
 #
 # QA_SERVER_PORT (default 4757) and QA_WEB_PORT (default 4768) move the ports, QA_DIR the state dir
 # (default $TMPDIR/omni-qa-<server port>). QA_CLAUDE_BIN, QA_CODEX_BIN and QA_CURSOR_BIN swap a fake CLI for a real one
-# (a live turn spends that plan). QA_BROWSER=1 turns the channel browser on, so a thread's Browser tab launches a real
+# (a live turn spends that plan). QA_ONBOARDING=1 keeps the first-run onboarding that a fresh data dir shows. QA_BROWSER=1 turns the channel browser on, so a thread's Browser tab launches a real
 # headless Chrome on the stack's own profile dir. Otherwise threads run on fake-claude, so a prompt with directives such as
 # RICH, TOOL:<ms> or LIMIT drives a turn without spending a plan (see packages/test-fixtures/fake-claude.mjs).
 # Cursor Cloud threads talk to a fake Cursor API (packages/test-fixtures/fake-cursor-api.mjs) with a stand-in key, so
@@ -86,6 +86,11 @@ SH
   done
   api /channels >/dev/null 2>&1 || { tail -20 "$DIR/server.log" >&2; die "server not healthy after 30s"; }
   curl -fsS "$WEB" >/dev/null 2>&1 || { tail -20 "$DIR/web.log" >&2; die "vite not up after 30s"; }
+
+  # A fresh data dir is not onboarded, so the web and Mac clients cover everything with first-run onboarding.
+  # Finish it so the stack looks like an installed one; QA_ONBOARDING=1 leaves it to test onboarding itself.
+  [ -n "${QA_ONBOARDING:-}" ] || api /setup/complete -X POST -H 'content-type: application/json' -d '{}' >/dev/null \
+    || die "finishing onboarding failed"
 
   for ((i = 1; i <= seed; i++)); do
     local prompt="Sample thread $i"
