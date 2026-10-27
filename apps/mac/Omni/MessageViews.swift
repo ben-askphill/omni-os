@@ -448,6 +448,8 @@ struct ReportCard: View {
 /// The latest TodoWrite as a checklist, as PlanCard in Transcript.tsx.
 struct PlanCard: View {
   let plan: Plan
+  let threadId: String
+  @State private var updatingIndex: Int?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -464,8 +466,12 @@ struct PlanCard: View {
           .foregroundStyle(Tok.fg3)
       }
       .padding(.bottom, z(10))
-      ForEach(Array(plan.todos.enumerated()), id: \.offset) { _, todo in
-        CheckItem(state: todo.status ?? "pending", text: todo.label ?? "")
+      ForEach(Array(plan.todos.enumerated()), id: \.offset) { index, todo in
+        CheckItem(state: todo.status ?? "pending", text: todo.label ?? "") {
+          Task {
+            await toggleTodo(at: index, todo: todo)
+          }
+        }
       }
       if plan.active == nil && plan.allDone {
         Text("All done").font(.omni(size: 12)).foregroundStyle(Tok.fg4).padding(.top, z(6))
@@ -478,6 +484,33 @@ struct PlanCard: View {
     .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(22), style: .continuous))
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Plan")
+  }
+
+  private func toggleTodo(at index: Int, todo: Todo) async {
+    guard updatingIndex == nil else { return }
+
+    let newStatus: String
+    switch todo.status ?? "pending" {
+    case "completed":
+      newStatus = "pending"
+    case "pending":
+      newStatus = "in_progress"
+    default:
+      newStatus = "completed"
+    }
+
+    updatingIndex = index
+    defer { updatingIndex = nil }
+
+    do {
+      let _: Void = try await Omni.default.send(
+        "PATCH",
+        "/api/threads/\(threadId)/plan/steps/\(index)",
+        body: ["status": newStatus]
+      )
+    } catch {
+      print("Failed to update plan step:", error)
+    }
   }
 }
 

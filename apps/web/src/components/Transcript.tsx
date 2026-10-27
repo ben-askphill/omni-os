@@ -1025,9 +1025,28 @@ function ReportCard({ p }: { p: ReportP }) {
 }
 
 /** The latest TodoWrite as a live checklist (Bencho "chk"). */
-function PlanCard({ todos }: { todos: Todo[] }) {
+function PlanCard({ todos, threadId }: { todos: Todo[]; threadId: string }) {
+  const [updating, setUpdating] = useState<number | null>(null);
   const done = todos.filter((t) => t.status === 'completed').length;
   const active = todos.find((t) => t.status === 'in_progress');
+
+  const toggleTodo = async (index: number) => {
+    const todo = todos[index];
+    if (!todo || updating !== null) return;
+
+    const newStatus =
+      todo.status === 'completed' ? 'pending' : todo.status === 'pending' ? 'in_progress' : 'completed';
+
+    setUpdating(index);
+    try {
+      await api.patch(`/threads/${encodeURIComponent(threadId)}/plan/steps/${index}`, { status: newStatus });
+    } catch (err) {
+      console.error('Failed to update plan step:', err);
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   return (
     <section aria-label="Plan" className="rounded-[22px] bg-surface px-4 pt-3.5 pb-3">
       <div className="mb-2.5 flex items-center gap-3">
@@ -1038,7 +1057,7 @@ function PlanCard({ todos }: { todos: Todo[] }) {
         </span>
       </div>
       {todos.map((t, k) => (
-        <CheckItem key={k} state={t.status ?? 'pending'}>
+        <CheckItem key={k} state={t.status ?? 'pending'} onClick={() => toggleTodo(k)}>
           {t.status === 'in_progress' && t.activeForm ? t.activeForm : t.content}
         </CheckItem>
       ))}
@@ -1146,7 +1165,7 @@ export const Transcript = memo(function Transcript({
         ) : null;
         const out = [...(agentsFirst ? [subagents, group] : [group, subagents]), ...cards].filter(Boolean);
         // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
-        return plan?.after === it.key ? [...out, <PlanCard key="plan" todos={plan.todos} />] : out;
+        return plan?.after === it.key ? [...out, <PlanCard key="plan" todos={plan.todos} threadId={threadId} />] : out;
       }
       case 'result':
         return <ResultLine key={it.key} p={it.p} />;

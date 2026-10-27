@@ -303,6 +303,22 @@ threadActionsApi.patch('/:id/requests/:rid', async (c) => {
   }
 });
 
+/** Update a plan step's status. */
+threadActionsApi.patch('/:id/plan/steps/:index', async (c) => {
+  const threadId = c.req.param('id');
+  const index = Number(c.req.param('index'));
+  const body = await c.req.json().catch(() => ({}));
+  const { status } = z.object({ status: z.enum(['pending', 'in_progress', 'completed']) }).parse(body);
+
+  if (!threads.get(threadId)) return c.json({ error: 'not found' }, 404);
+  if (isNaN(index) || index < 0) return c.json({ error: 'invalid step index' }, 400);
+
+  // Add a plan_step_update event to record the status change
+  events.add(threadId, 'plan_step_update', { index, status });
+
+  return c.json(afterRecovery(threadId));
+});
+
 /** Take unsent messages out of the queue. The transcript never shows them; GET /requests keeps the record. */
 threadActionsApi.post('/:id/requests/cancel', async (c) => {
   const id = c.req.param('id');

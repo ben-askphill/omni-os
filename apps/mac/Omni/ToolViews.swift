@@ -281,6 +281,7 @@ struct ToolInputView: View {
 struct CheckItem: View {
   let state: String
   let text: String
+  var onTap: (() -> Void)? = nil
 
   var body: some View {
     let done = state == "completed"
@@ -297,6 +298,8 @@ struct CheckItem: View {
         .animation(.easeOut(duration: 0.3), value: done)
     }
     .padding(.vertical, z(3))
+    .contentShape(Rectangle())
+    .onTapGesture(perform: onTap ?? {})
     .accessibilityElement(children: .combine)
     .accessibilityValue(done ? "Done" : active ? "In progress" : "Not started")
   }

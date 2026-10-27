@@ -60,9 +60,9 @@ export function Ticks({ value, count = 24, height = 14, tone, label, className =
 }
 
 /** One animated to-do row (Bencho "chk"): box fills, tick draws, the label gets struck through. */
-export function CheckItem({ state, children }: { state: 'pending' | 'in_progress' | 'completed' | string; children: ReactNode }) {
+export function CheckItem({ state, children, onClick }: { state: 'pending' | 'in_progress' | 'completed' | string; children: ReactNode; onClick?: () => void }) {
   return (
-    <div data-state={state} className="flex items-start gap-2.5 py-[3px]">
+    <div data-state={state} className="flex items-start gap-2.5 py-[3px] cursor-pointer" onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick?.()}>
       <span className="chk-box mt-[1px]">
         <span className="chk-fill" />
         <svg viewBox="0 0 24 24" className="chk-tick" aria-hidden="true">

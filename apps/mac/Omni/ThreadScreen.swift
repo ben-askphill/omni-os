@@ -624,7 +624,7 @@ private struct TranscriptRow: View {
         }
       }
     case .plan(let plan):
-      PlanCard(plan: plan)
+      PlanCard(plan: plan, threadId: threadID)
     case .result(_, let result):
       ResultLineView(result: result)
     case .error(_, let text):
