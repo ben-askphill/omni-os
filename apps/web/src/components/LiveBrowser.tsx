@@ -284,7 +284,7 @@ function TabStrip({ b }: { b: Browser }) {
   );
 }
 
-function Toolbar({ b, extra, address }: { b: Browser; extra?: ReactNode; address: RefObject<HTMLInputElement | null> }) {
+function Toolbar({ b, extra, address, page }: { b: Browser; extra?: ReactNode; address: RefObject<HTMLInputElement | null>; page: RefObject<HTMLDivElement | null> }) {
   const s = b.state;
   const [url, setUrl] = useState('');
   const [editing, setEditing] = useState(false);
@@ -295,7 +295,8 @@ function Toolbar({ b, extra, address }: { b: Browser; extra?: ReactNode; address
     e.preventDefault();
     if (!url.trim()) return;
     void b.action({ action: 'navigate', url });
-    address.current?.blur();
+    // As in Chrome, the keys go back to the page.
+    page.current?.focus();
   };
   const [host, path] = splitAddress(displayUrl(url));
   return (
@@ -329,7 +330,7 @@ function Toolbar({ b, extra, address }: { b: Browser; extra?: ReactNode; address
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
               setUrl(s?.url === 'about:blank' ? '' : (s?.url ?? ''));
-              e.currentTarget.blur();
+              page.current?.focus();
               e.stopPropagation();
             }
           }}
@@ -350,8 +351,7 @@ function Toolbar({ b, extra, address }: { b: Browser; extra?: ReactNode; address
  * viewer reports it), so it reads like a normal browser window rather than a shrunk desktop.
  * Focus it (click) and keys go to the page, with Chrome's shortcuts on top.
  */
-function Viewport({ b, address }: { b: Browser; address: RefObject<HTMLInputElement | null> }) {
-  const box = useRef<HTMLDivElement>(null);
+function Viewport({ b, address, box }: { b: Browser; address: RefObject<HTMLInputElement | null>; box: RefObject<HTMLDivElement | null> }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const down = useRef(0);
   const { input, action, frame, copy } = b;
@@ -521,6 +521,7 @@ export function BrowserWatch({ b }: { b: Browser }) {
 export function LiveBrowser({ channelId, threadId, extra }: { channelId: string; threadId?: string; extra?: ReactNode }) {
   const b = useChannelBrowser(channelId);
   const address = useRef<HTMLInputElement>(null);
+  const page = useRef<HTMLDivElement>(null);
   const [annotating, setAnnotating] = useState(false);
   const close = useCallback(() => setAnnotating(false), []);
   const added = useAfterAdd(close);
@@ -534,7 +535,7 @@ export function LiveBrowser({ channelId, threadId, extra }: { channelId: string;
     <div className="flex h-full min-h-0 flex-col">
       <TabStrip b={b} />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] bg-bg">
-        <Toolbar b={b} extra={tools} address={address} />
+        <Toolbar b={b} extra={tools} address={address} page={page} />
         <div className="relative h-px shrink-0 overflow-hidden bg-line">
           {b.state?.loading && <div className="load-bar absolute inset-y-0 left-0 w-full bg-fg-3" />}
         </div>
@@ -548,7 +549,7 @@ export function LiveBrowser({ channelId, threadId, extra }: { channelId: string;
           </div>
         )}
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <Viewport b={b} address={address} />
+          <Viewport b={b} address={address} box={page} />
           {annotating && threadId && <AnnotateLayer channelId={channelId} threadId={threadId} onClose={close} onAdded={added} />}
         </div>
       </div>

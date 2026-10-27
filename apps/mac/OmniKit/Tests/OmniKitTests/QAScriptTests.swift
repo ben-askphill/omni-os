@@ -145,6 +145,14 @@ import OmniKit
     #expect(!QACondition.browserFrame.holds(in: QAFacts(serverState: "running", connection: "open", sidebarLoaded: true, channels: [])))
   }
 
+  @Test func readsTheBrowserAddressStep() throws {
+    let script = try QAScript(json: Data(#"[{"browserAddress": "example.com"}, {"browserAddress": {"type": "example.org", "escape": true}}, {"browserAddress": {"type": "a.b"}}]"#.utf8))
+    #expect(script.steps == [.browserAddress("example.com", escape: false), .browserAddress("example.org", escape: true), .browserAddress("a.b", escape: false)])
+    for bad in [#"[{"browserAddress": ""}]"#, #"[{"browserAddress": true}]"#, #"[{"browserAddress": {"escape": true}}]"#, #"[{"browserAddress": {"type": "x", "escape": "yes"}}]"#] {
+      #expect(throws: QAScriptError.self, "\(bad)") { try QAScript(json: Data(bad.utf8)) }
+    }
+  }
+
   @Test func readsTheMarkingSteps() throws {
     let json = ##"[{"annotate": {"shape": "arrow", "from": [0.1, 0.2], "to": [0.5, 0.6]}}, {"annotate": {"pen": [[0.1, 0.1], [0.2, 0.3], [0.4, 0.2]]}}, {"annotate": {"text": "wrong total", "at": [0.3, 0.7]}}, {"annotate": {"color": "#3b82f6", "stroke": 8}}, {"annotate": {"move": [0.3, 0.4], "by": [0.1, 0]}}, {"annotate": "undo"}, {"annotate": {"note": "fix these"}}]"##
     #expect(try QAScript(json: Data(json.utf8)).steps == [

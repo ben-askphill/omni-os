@@ -118,7 +118,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"prMenu": "name"}`, `{"handOff": "<device id>"}`,
 /// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"selectLines": {"file": "<path>", "from": 1, "to": 3}}`,
 /// `{"addContext": "note"}`, `{"selectTerminal": true}`, `{"addTerminal": "note"}`, `{"annotate": "start"}` (or `add`, `cancel`, or
-/// `{"drag": [0.1, 0.2, 0.6, 0.5], "note": "text"}`, or `{"tap": [0.4, 0.3], "note": "text"}`), `{"openContext": 0}`, `{"referenceThread": "open"}` (or `close`, `all`, `channel`, `{"search": "text"}`, `{"pick": 0}`), `{"quit": true}`.
+/// `{"drag": [0.1, 0.2, 0.6, 0.5], "note": "text"}`, or `{"tap": [0.4, 0.3], "note": "text"}`), `{"browserAddress": "example.com"}` (or `{"type": "example.com", "escape": true}`), `{"openContext": 0}`, `{"referenceThread": "open"}` (or `close`, `all`, `channel`, `{"search": "text"}`, `{"pick": 0}`), `{"quit": true}`.
 /// What a `referenceThread` step does to the reply box's picker.
 public enum QAReference: Hashable, Sendable {
   case open, close, all, channel
@@ -205,6 +205,9 @@ public enum QAStep: Hashable, Sendable {
   case addTerminal(String)
   /// The Browser tab's Annotate flow.
   case annotate(QAAnnotate)
+  /// Clicks the Browser tab's page, then its address bar, as the pointer does, types this key by key and presses Return
+  /// (or Escape, with `escape`), and checks where the keys went.
+  case browserAddress(String, escape: Bool)
   /// Clicks the reply box's context chip at this index, which opens or closes its inspector.
   case openContext(Int)
   /// The reply box's thread reference picker: open or close its popover, pick a scope, search, or attach the row at an index.
@@ -303,7 +306,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "searchHit", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "prMenu", "handOff", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "openContext", "referenceThread", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "searchHit", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "prMenu", "handOff", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "browserAddress", "openContext", "referenceThread", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -458,6 +461,12 @@ public struct QAScript: Hashable, Sendable {
       return .addTerminal(note)
     case "annotate":
       return .annotate(try annotate(value))
+    case "browserAddress":
+      if let text = value as? String, !text.isEmpty { return .browserAddress(text, escape: false) }
+      guard let o = value as? [String: Any], let text = o["type"] as? String, !text.isEmpty, o["escape"] == nil || o["escape"] is Bool else {
+        throw QAScriptError(#"browserAddress takes the text to type, or {"type": text, "escape": true}"#)
+      }
+      return .browserAddress(text, escape: o["escape"] as? Bool ?? false)
     case "openContext":
       guard let i = value as? Int, i >= 0 else { throw QAScriptError("openContext takes the chip's index, from 0") }
       return .openContext(i)

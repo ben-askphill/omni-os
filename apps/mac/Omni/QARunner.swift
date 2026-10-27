@@ -263,6 +263,8 @@ final class QARunner {
           try? await Task.sleep(for: .milliseconds(400))
         case .annotate(let action):
           try await annotate(action)
+        case .browserAddress(let text, let escape):
+          result.note = try await browserAddress(text, escape: escape)
         case .openContext(let index):
           guard let toggle = ContextChipsProbe.toggle, toggle(index) else { throw QAScriptError("no context chip \(index) in the reply box") }
           try? await Task.sleep(for: .milliseconds(400))
@@ -526,6 +528,7 @@ final class QARunner {
     case .selectTerminal: "selectTerminal"
     case .addTerminal(let note): "addTerminal \(note.prefix(40))"
     case .annotate(let action): "annotate \(action)"
+    case .browserAddress(let text, let escape): "browserAddress \(text)\(escape ? " escape" : "")"
     case .openContext(let index): "openContext \(index)"
     case .referenceThread(let action): "referenceThread \(action)"
     case .quit: "quit"
@@ -541,6 +544,74 @@ final class QARunner {
       }
       try? await Task.sleep(for: .milliseconds(100))
     }
+  }
+
+  /// Clicks the page, then the address bar, with mouse events through the window's own hit testing, types `text` a key
+  /// at a time and presses Return, then waits for the page to go there. With `escape`, presses Escape instead. Either
+  /// way the keys must end up with the page. Fails when a click or key lands anywhere else. Focus needs the key window,
+  /// so this step brings the app to the front.
+  private func browserAddress(_ text: String, escape: Bool) async throws(QAScriptError) -> String {
+    guard let browser = BrowserAnnotateProbe.browser, let bar = BrowserAnnotateProbe.address, let canvas = BrowserAnnotateProbe.canvas,
+      let window = canvas.window, let content = window.contentView
+    else { throw QAScriptError("the Browser tab is not showing") }
+    func click(_ at: NSPoint) {
+      let p = content.convert(content.isFlipped ? at : NSPoint(x: at.x, y: content.bounds.height - at.y), to: nil)
+      func event(_ type: NSEvent.EventType) -> NSEvent? {
+        NSEvent.mouseEvent(
+          with: type, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+          windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)
+      }
+      guard let down = event(.leftMouseDown), let up = event(.leftMouseUp) else { return }
+      // A control tracks the press until the release, which it reads from the queue, so the release goes there first.
+      NSApp.postEvent(up, atStart: false)
+      window.sendEvent(down)
+    }
+    func key(_ chars: String, code: UInt16) {
+      for type in [NSEvent.EventType.keyDown, .keyUp] {
+        if let e = NSEvent.keyEvent(
+          with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+          windowNumber: window.windowNumber, context: nil, characters: chars, charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)
+        { window.sendEvent(e) }
+      }
+    }
+    func holder() -> String {
+      let r = window.firstResponder
+      if r === canvas { return "the page" }
+      if let editor = r as? NSTextView, editor.isFieldEditor { return "a text field" }
+      return r.map { String(describing: type(of: $0)) } ?? "nothing"
+    }
+    NSApp.activate()
+    window.makeKeyAndOrderFront(nil)
+    try? await Task.sleep(for: .milliseconds(300))
+    let page = canvas.convert(canvas.bounds, to: nil)
+    click(NSPoint(x: page.midX, y: content.bounds.height - page.midY))
+    try? await Task.sleep(for: .milliseconds(300))
+    guard window.firstResponder === canvas else { throw QAScriptError("a click on the page left the keys with \(holder())") }
+    click(NSPoint(x: bar.midX, y: bar.midY))
+    try? await Task.sleep(for: .milliseconds(300))
+    guard let editor = window.firstResponder as? NSTextView, editor.isFieldEditor else {
+      throw QAScriptError("a click on the address bar left the keys with \(holder())")
+    }
+    editor.selectAll(nil)
+    for c in text { key(String(c), code: 0) }
+    try? await Task.sleep(for: .milliseconds(200))
+    guard editor.string == text else { throw QAScriptError("typed \(text), the address bar holds \(editor.string)") }
+    func until(_ seconds: Int, _ done: () -> Bool) async -> Bool {
+      let deadline = ContinuousClock.now + .seconds(seconds)
+      while !done() {
+        guard ContinuousClock.now < deadline else { return false }
+        try? await Task.sleep(for: .milliseconds(100))
+      }
+      return true
+    }
+    key(escape ? "\u{1b}" : "\r", code: escape ? 53 : 36)
+    let pressed = escape ? "Escape" : "Return"
+    guard await until(2, { window.firstResponder === canvas }) else { throw QAScriptError("\(pressed) left the keys with \(holder())") }
+    if escape { return "Escape gave the keys back to the page" }
+    guard await until(10, { browser.state.url.contains(text) }) else {
+      throw QAScriptError("Return did not go to \(text); the page is at \(browser.state.url)")
+    }
+    return "went to \(browser.state.url), keys with the page"
   }
 
   /// The model's facts and which transcript the thread screen has laid out.

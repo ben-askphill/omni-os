@@ -538,6 +538,7 @@ Steps (a list, or an object with the list under `steps`):
 | `{"annotate": {"color": "#3b82f6", "stroke": 8}}`, `{"annotate": {"move": [x, y], "by": [dx, dy]}}` | Sets the color and line width (or recolors the selected mark), or grabs the mark at a point and drags it |
 | `{"annotate": "undo"}`, `{"annotate": {"note": "text"}}` | Removes the last mark, or writes the note for a marks-only annotation |
 | `{"annotate": "add"}`, `{"annotate": "cancel"}` | Presses Add to Message (renders and uploads the marked screenshot first; fails with the reason when that or the reply box refuses it), or Cancel, which deletes the screenshot |
+| `{"browserAddress": "example.com"}`, `{"browserAddress": {"type": "example.com", "escape": true}}` | In the Browser tab, clicks the page, then the address bar, with mouse events through the window's hit testing, types the text key by key and presses Return (or Escape). Fails unless the bar takes the keys and Return or Escape hands them back to the page; Return must also reach the address. Focus needs the key window, so this step brings the app to the front. Needs a `QA_BROWSER=1` stack, as Annotate does |
 | `{"openContext": 0}` | Clicks the reply box's context chip at that index, which opens or closes its inspector |
 | `{"quit": true}` | Writes the report and exits |
 

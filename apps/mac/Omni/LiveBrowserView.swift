@@ -12,6 +12,8 @@ struct LiveBrowserView: View {
   var annotating: Annotating?
   @State private var address = ""
   @FocusState private var editing: Bool
+  /// Bumped to hand the keys back to the page: Return or Escape in the address bar, as in Chrome.
+  @State private var pageFocus = 0
   @Environment(\.displayScale) private var displayScale
 
   var body: some View {
@@ -45,7 +47,7 @@ struct LiveBrowserView: View {
             Tok.bg
             // While Annotate shows, the page is not given any input: it is hidden, and its keys go nowhere.
             let annotateOn = annotating?.model.isActive == true
-            BrowserCanvas(frame: model.frame, send: annotateOn ? { _ in } : model.send, shortcut: annotateOn ? { _, _ in true } : shortcut)
+            BrowserCanvas(frame: model.frame, focus: pageFocus, send: annotateOn ? { _ in } : model.send, shortcut: annotateOn ? { _, _ in true } : shortcut)
               .allowsHitTesting(!annotateOn)
               .accessibilityLabel(s.title.isEmpty ? "Browser page" : s.title)
             if model.frame == nil, model.error == nil {
@@ -105,30 +107,42 @@ struct LiveBrowserView: View {
           .help("Reload (⌘R)")
       }
       HStack(spacing: z(7)) {
-        TextField("", text: editing ? $address : .constant(BrowserTabInfo.displayURL(address)), prompt: Text("Search Google or type a URL"))
+        // Nothing on the field itself changes with focus: a new alignment while it edits ends the edit, so a click
+        // focused the bar and dropped the focus at once. The address at rest and the placeholder are drawn over it.
+        TextField("", text: $address)
           .textFieldStyle(.plain)
           .font(.omni(size: 13))
-          .multilineTextAlignment(editing ? .leading : .center)
           .foregroundStyle(editing ? Tok.fg : .clear)
-          .overlay {
-            if !editing, case let (host, path) = BrowserTabInfo.splitAddress(BrowserTabInfo.displayURL(address)), !host.isEmpty {
-              (Text(host).foregroundStyle(Tok.fg) + Text(path).foregroundStyle(Tok.fg4))
-                .font(.omni(size: 13)).lineLimit(1).truncationMode(.tail).allowsHitTesting(false)
+          .overlay(alignment: editing ? .leading : .center) {
+            Group {
+              if editing {
+                if address.isEmpty { Text("Search Google or type a URL").foregroundStyle(Tok.fg4) }
+              } else if case let (host, path) = BrowserTabInfo.splitAddress(BrowserTabInfo.displayURL(address)), !host.isEmpty {
+                Text(host).foregroundStyle(Tok.fg) + Text(path).foregroundStyle(Tok.fg4)
+              } else {
+                Text("Search Google or type a URL").foregroundStyle(Tok.fg4)
+              }
             }
+            .font(.omni(size: 13)).lineLimit(1).truncationMode(.tail).allowsHitTesting(false)
           }
           .focused($editing)
           .onSubmit {
             guard !address.trimmingCharacters(in: .whitespaces).isEmpty else { return }
             model.perform(.navigate(address))
             editing = false
+            pageFocus += 1
           }
           .onExitCommand {
             address = s.url == "about:blank" ? "" : s.url
             editing = false
+            pageFocus += 1
           }
       }
       .padding(.horizontal, z(11))
       .frame(height: z(34))
+      #if DEBUG
+      .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { BrowserAnnotateProbe.address = $0 }
+      #endif
       .background(Tok.bg, in: Capsule())
       .overlay(Capsule().strokeBorder(editing ? Tok.lineStrong : Tok.line, lineWidth: editing ? 2 : 1))
       .contentShape(Capsule())
@@ -260,13 +274,19 @@ private struct LoadingBar: View {
 /// the page once it has focus (a click gives it focus); Chrome's Cmd shortcuts go to `shortcut`.
 struct BrowserCanvas: NSViewRepresentable {
   let frame: BrowserFrame?
+  /// A new value gives the page the keys.
+  var focus = 0
   let send: (BrowserInput) -> Void
   let shortcut: (_ key: String, _ shift: Bool) -> Bool
 
   func makeNSView(context: Context) -> CanvasView {
     let v = CanvasView()
+    #if DEBUG
+    BrowserAnnotateProbe.canvas = v
+    #endif
     v.send = send
     v.shortcut = shortcut
+    v.focus = focus
     return v
   }
 
@@ -274,11 +294,17 @@ struct BrowserCanvas: NSViewRepresentable {
     v.send = send
     v.shortcut = shortcut
     v.show(frame)
+    if v.focus != focus {
+      v.focus = focus
+      // After SwiftUI has finished with the address bar's focus.
+      DispatchQueue.main.async { v.window?.makeFirstResponder(v) }
+    }
   }
 
   final class CanvasView: NSView {
     var send: (BrowserInput) -> Void = { _ in }
     var shortcut: (String, Bool) -> Bool = { _, _ in false }
+    var focus = 0
     private var frameInfo: BrowserFrame?
     private var lastMove = Date.distantPast
     private var tracking: NSTrackingArea?

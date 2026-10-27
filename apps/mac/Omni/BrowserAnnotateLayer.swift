@@ -440,5 +440,8 @@ struct BrowserAnnotateLayer: View {
 enum BrowserAnnotateProbe {
   static var annotating: Annotating?
   static var browser: ChannelBrowserModel?
+  /// The address bar, in window coordinates from the top left, and the page view, for `{"browserAddress": ...}`.
+  static var address: CGRect?
+  static weak var canvas: NSView?
 }
 #endif
