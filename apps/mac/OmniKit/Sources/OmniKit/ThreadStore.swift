@@ -96,8 +96,8 @@ public final class ThreadStore {
   public var cwd: String? { sessionCwd.flatMap { $0.isEmpty ? nil : $0 } ?? thread?.cwd }
   /// Running or waiting for a slot.
   public var running: Bool { thread?.status.isActive ?? false }
-  /// Its turn runs on this Mac and nothing is moving it yet, so it can be handed to another.
-  public var canHandOff: Bool { running && blocked == nil && !(handoff?.inFlight ?? false) && !handingOff }
+  /// Nothing blocks it here and nothing is moving it yet, so it can be handed to another: mid-turn, or between turns.
+  public var canHandOff: Bool { thread != nil && blocked == nil && !(handoff?.inFlight ?? false) && !handingOff }
   public var interrupting: Bool { stopping || pending.contains { $0.state == .sent && $0.mode == .interrupt } }
   /// The stream dropped and is not back yet.
   public var isReconnecting: Bool {

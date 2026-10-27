@@ -388,8 +388,8 @@ server.registerTool(
   'hand_off_thread',
   {
     description:
-      `Move a running thread to another of ${USER}'s Macs, only when ${USER} asks: it stops here and the other Mac resumes the same ` +
-      'session, then runs the messages that were queued for it. A worktree thread takes its commits and uncommitted changes along. ' +
+      `Move a thread to another of ${USER}'s Macs, only when ${USER} asks. A running turn stops here and the other Mac resumes the same ` +
+      'session, then runs the messages that were queued for it. An idle thread moves between turns: the next message runs on the other Mac. A worktree thread takes its commits and uncommitted changes along. ' +
       'It runs in the background after this answers; the thread shows where it is.',
     inputSchema: {
       thread_id: z.string(),

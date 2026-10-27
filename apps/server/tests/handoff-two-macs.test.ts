@@ -87,20 +87,21 @@ describe('handing a running thread to the other Mac', () => {
     fixtures.set('devices.json', body);
   });
 
-  it('refuses this Mac, an unknown or offline Mac, a thread not running here, and a session not reported yet', async () => {
+  it('refuses this Mac, an unknown or offline Mac, an archived thread, and a session not reported yet', async () => {
     const thread = (threadId: string, patch: Record<string, unknown>) =>
       a.db.threads.create({
         id: threadId, channel_id: 'shop', title: threadId, status: 'done', role: null, model: null, session_id: threadId, cwd: shared,
         branch: null, parent_id: null, task_id: null, source: 'manual', automation: null, ...(patch as object),
       });
-    thread('idle', {});
+    thread('archived', {});
+    a.db.threads.update('archived', { archived: 1 });
     thread('codex-new', { harness: 'codex' });
-    thread('delegated', { parent_id: 'idle' });
+    thread('delegated', { parent_id: 'archived' });
     const refusals = [
       [await handOff(a, id, 'mac-a'), /this Mac/],
       [await handOff(a, 'delegated', 'mac-b'), /reports to the thread that delegated it, so it stays on this Mac/],
       [await handOff(a, id, 'mac-z'), /No synced Mac/],
-      [await handOff(a, 'idle', 'mac-b'), /Only a thread running on this Mac/],
+      [await handOff(a, 'archived', 'mac-b'), /archived/],
       [await handOff(a, 'codex-new', 'mac-b'), /Codex has not reported this thread's session/],
     ] as const;
     a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: false, lastSeen: '2026-10-23T07:00:00Z' }]));
@@ -322,5 +323,43 @@ describe('a worktree thread', () => {
     expect(readFileSync(join(wtB, 'cart.css'), 'utf8')).toBe('.cart { color: red; }\n');
     // A's checkout is as A left it.
     expect(status(wtA)).toEqual([' M README.md', '?? notes.md']);
+  });
+});
+
+describe('an idle thread', () => {
+  it('goes between turns: B takes it without a continuation, and the next message runs there', T, async () => {
+    a.db.channels.create({ id: 'quiet', name: 'Quiet', kind: 'client', use_worktree: 0, base_dir: shared, notes: '' });
+    const t = await a.runner.createThread({ channel: 'quiet', prompt: 'check the footer' });
+    await waitFor(() => !['running', 'queued'].includes(a.thread(t.id).status), 'the turn to end', 20_000);
+    write(sessionFile(a, a.thread(t.id)), '{"type":"user","from":"mac-a"}\n');
+    const status = a.thread(t.id).status;
+
+    const res = await handOff(a, t.id, 'mac-b');
+    expect(res.status).toBe(200);
+    expect(res.body.handoff).toMatchObject({ outgoing: true, idle: true });
+    expect(res.body.handoff.state).toEqual({ phase: 'preparing', step: 'uploading' });
+
+    await offered(a, t.id);
+    await a.sync();
+    await b.sync();
+    const accepted = await eventually(async () => {
+      await a.sync();
+      await b.sync();
+      const d = await detail(a, t.id);
+      return d.handoff?.state.phase === 'accepted' && d;
+    }, 'B to take it');
+    expect(accepted.handoff.idle).toBe(true);
+    expect(accepted.blocked).toBeUndefined();
+    expect(a.thread(t.id).status).toBe(status);
+    // Nothing was cut off, so B sends no continuation and starts no turn. (The Macs share a fake claude log, which holds A's first turn.)
+    expect(b.spawns(t.id).filter((s) => s.resume)).toEqual([]);
+    expect(b.byKind(t.id, 'user').map((e) => e.p.source)).toEqual(['manual']);
+    const there = await detail(b, t.id);
+    expect(there.handoff).toMatchObject({ outgoing: false, idle: true, state: { phase: 'accepted' } });
+    expect(there.blocked).toBeUndefined();
+
+    const next = await b.json(`/threads/${t.id}/messages`, { body: { prompt: 'and the header' } });
+    expect(next.status).toBe(200);
+    await waitFor(() => b.spawns(t.id).some((s) => s.args.includes('--resume')), 'B to resume it for the next message', 20_000);
   });
 });

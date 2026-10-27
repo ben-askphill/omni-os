@@ -13,9 +13,13 @@ export const syncCarries = (s: Sync | null | undefined) => !!s && s.configured &
 /** A handoff that is still under way, so the thread is not this Mac's to give away again. */
 const inFlight = (h: HandoffView | null | undefined) => !!h && (h.state.phase === 'preparing' || h.state.phase === 'offered');
 
-/** Whether the thread is this Mac's to give away: running or queued here (`blocked` says it runs elsewhere), and not already handing off. */
+/**
+ * Whether the thread is this Mac's to give away: not running on another Mac or blocked (`blocked` says so), and not
+ * already handing off. A running turn is stopped and continued there; an idle thread goes between turns, and the next
+ * message runs on the other Mac.
+ */
 export const mayHandOff = (status: string | undefined, blocked: string | null | undefined, handoff: HandoffView | null | undefined) =>
-  (status === 'running' || status === 'queued') && !blocked && !inFlight(handoff);
+  !!status && !blocked && !inFlight(handoff);
 
 /** Where the picker stands. "Hand off to…" shows only when it is `ready`: there is a Mac to pick. */
 export type HandoffTargets = { state: 'loading' } | { state: 'none'; reason: string } | { state: 'ready'; devices: Device[] };
@@ -29,7 +33,7 @@ export function handoffTargets(v: {
   /** GET /api/devices, undefined while it loads. */
   devices: Device[] | null | undefined;
 }): HandoffTargets {
-  if (!mayHandOff(v.status, v.blocked, v.handoff)) return { state: 'none', reason: 'Only a thread running on this Mac can be handed off.' };
+  if (!mayHandOff(v.status, v.blocked, v.handoff)) return { state: 'none', reason: 'This thread is running on another Mac or being handed off already.' };
   if (!v.sync) return { state: 'loading' };
   if (!syncCarries(v.sync)) {
     return { state: 'none', reason: v.sync.configured && !v.sync.signedOut ? 'Sync is paused. Turn it back on to hand threads off.' : 'Sign in to sync on both Macs to hand threads between them.' };

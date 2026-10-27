@@ -290,7 +290,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
                 disabled={!d.pickable || !!sending}
                 aria-disabled={!d.pickable || undefined}
                 onClick={() => void sendTo(d.id)}
-                title={d.pickable ? `Stop the turn here and keep it running on ${d.name}` : `${d.name} is asleep or offline`}
+                title={d.pickable ? `Continue this thread on ${d.name}` : `${d.name} is asleep or offline`}
                 className="hov flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-left text-fg-2 hover:text-fg disabled:pointer-events-none disabled:opacity-45"
               >
                 {sending === d.id ? <Loader size={12} /> : <StatusDot status={d.dot} size={8} className="mx-[3px]" />}

@@ -1,4 +1,4 @@
-// Handing a running thread to another synced Mac. The records and their phases are in packages/shared/handoff.ts and
+// Handing a thread, running or idle, to another synced Mac. The records and their phases are in packages/shared/handoff.ts and
 // apps/server/handoff/records.ts; the relay carries everything, and Tailscale only says whether the other Mac is up.
 // The giving Mac stops the turn, uploads the session and packs the worktree, writing each step into its offer. The
 // taking Mac never acts as a change arrives: after every sync it reconciles from the records as they are, so a second
@@ -27,12 +27,12 @@ import { reachabilityOf, tailnet } from './tailscale.ts';
 import { withWorkspace } from './workspace.ts';
 
 type Offered = Extract<HandoffOffer, { state: 'offered' }>;
-type Base = Pick<HandoffOffer, 'id' | 'thread' | 'from' | 'to'>;
+type Base = Pick<HandoffOffer, 'id' | 'thread' | 'from' | 'to' | 'idle'>;
 
 const run = promisify(execFile);
 const refused = (message: string, status = 409) => Object.assign(new Error(message), { status });
 const iso = () => new Date().toISOString();
-const base = (o: HandoffOffer): Base => ({ id: o.id, thread: o.thread, from: o.from, to: o.to });
+const base = (o: HandoffOffer): Base => ({ id: o.id, thread: o.thread, from: o.from, to: o.to, idle: o.idle });
 const busy = (t: Pick<Thread, 'status'>) => t.status === 'running' || t.status === 'queued';
 
 /** The answer to a handoff request or a cancel: the thread, and its handoff as this Mac shows it. */
@@ -101,7 +101,9 @@ export async function handOff(threadId: string, to: string): Promise<HandoffResu
   if (why) throw refused(why);
   // Its report would wake the thread that delegated it on the other Mac, while that one may be running here.
   if (t.parent_id) throw refused('This thread reports to the thread that delegated it, so it stays on this Mac. Hand that thread off instead, once this one is done.');
-  if (!busy(t) || !runsHere(threadId)) throw refused('Only a thread running on this Mac can be handed off.');
+  // A running turn must be this Mac's to stop; an idle thread has none, so only the Mac that runs it elsewhere is refused.
+  if (busy(t) && !runsHere(threadId)) throw refused('This thread is running on another Mac, so only that Mac can hand it off.');
+  if (t.archived) throw refused('This thread is archived. Restore it, then hand it off.');
   if (threads.children(threadId).some(busy)) throw refused('Threads this one delegated are still running here. Hand it off once they finish.');
   const phase = phaseOf(threadId)?.phase;
   if (phase === 'preparing' || phase === 'offered') throw refused('This thread is already being handed off.');
@@ -111,8 +113,9 @@ export async function handOff(threadId: string, to: string): Promise<HandoffResu
     from: { id: self, name },
     to: { id: target.id, name: target.name },
     at: iso(),
+    idle: !busy(t),
     state: 'preparing',
-    step: 'stopping',
+    step: busy(t) ? 'stopping' : 'uploading',
   };
   writeOffer(offer);
   void giveAway(offer, worker).catch(logFailure(threadId));
@@ -288,15 +291,16 @@ async function take(offer: Offered, worker: SyncWorker) {
     const rows = tx(() => {
       if (!unanswered()) return [];
       writeReply(id, { offer: offer.id, at: iso(), state: 'accepted' });
+      // Between turns there is nothing to continue: the thread waits for Ben's next message here.
       return [
-        saveOwn(id, `handoff:${offer.id}`, continuation(offer)),
+        ...(offer.idle ? [] : [saveOwn(id, `handoff:${offer.id}`, continuation(offer))]),
         ...offer.queued.map((text, n) =>
           saveOwn(id, `handoff:${offer.id}:${n}`, { prompt: text, kind: 'user', payload: { text, source: 'ben' }, source: 'handoff', mode: 'queue' }),
         ),
       ].filter((r) => !!r);
     });
     for (const r of rows) wake(r);
-    if (rows.length) void worker.syncNow();
+    void worker.syncNow();
   } catch (err) {
     console.error(`[handoff] ${id}: could not pick it up:`, (err as Error).message);
     if (unanswered()) {

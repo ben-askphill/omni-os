@@ -48,6 +48,13 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
     #expect(try text(#"{"phase":"accepted"}"#, outgoing: false) == "Handed off from Ben's MacBook Air. Running on this Mac.")
   }
 
+  @Test func saysTheNextMessageContinuesAThreadHandedOffBetweenTurns() throws {
+    let json = handoffJSON(#"{"phase":"accepted"}"#).replacingOccurrences(of: #""leftBehind""#, with: #""idle":true,"leftBehind""#)
+    let given = try decode(HandoffView.self, json)
+    #expect(given.text() == "Handed off to Ben's MacBook Pro. Your next message continues it there.")
+    #expect(try view(#"{"phase":"accepted"}"#).idle == false)
+  }
+
   @Test func endsTheErrorWithOneFullStop() throws {
     let stopped = "The handoff to Ben's MacBook Pro failed: upload failed. The thread is stopped here; reply to continue it."
     #expect(try text(#"{"phase":"failed","error":"upload failed","where":"here"}"#) == stopped)

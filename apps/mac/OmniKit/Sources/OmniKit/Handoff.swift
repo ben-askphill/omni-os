@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// Handing a running thread to another synced Mac. The shapes and the banner text are packages/shared/handoff.ts;
+// Handing a thread, running or idle, to another synced Mac. The shapes and the banner text are packages/shared/handoff.ts;
 // apps/server/tests/mac-fixtures.test.ts holds both clients to the same JSON. When to offer it, the picker's rows and
 // the banner per phase follow apps/web/src/handoff.ts.
 
@@ -121,12 +121,26 @@ public struct HandoffView: Decodable, Hashable, Sendable {
   public let state: HandoffPhase
   /// Uncommitted changes in a shared folder that could not travel.
   public let leftBehind: String?
+  /// Handed off between turns: nothing was cut off, and Ben's next message continues it on the other Mac.
+  public let idle: Bool
 
   /// OFFER_PATIENCE_MS: how long an offer waits before the giving Mac says the other has not picked it up.
   public static let offerPatience: TimeInterval = 90
 
   enum CodingKeys: String, CodingKey {
-    case id, from, to, outgoing, at, state, leftBehind
+    case id, from, to, outgoing, at, state, leftBehind, idle
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    id = try c.decode(String.self, forKey: .id)
+    from = try c.decode(Mac.self, forKey: .from)
+    to = try c.decode(Mac.self, forKey: .to)
+    outgoing = try c.decode(Bool.self, forKey: .outgoing)
+    at = try c.decode(Date.self, forKey: .at)
+    state = try c.decode(HandoffPhase.self, forKey: .state)
+    leftBehind = try c.decodeIfPresent(String.self, forKey: .leftBehind)
+    idle = try c.decodeIfPresent(Bool.self, forKey: .idle) ?? false
   }
 
   /// The phase at `now`: an offer goes stale on screen once the patience runs out, without waiting for the server
@@ -146,11 +160,11 @@ public struct HandoffView: Decodable, Hashable, Sendable {
 
   /// The banner's one line at `now`.
   public func text(now: Date = .now) -> String {
-    Self.text(from: from, to: to, outgoing: outgoing, state: phase(now: now))
+    Self.text(from: from, to: to, outgoing: outgoing, state: phase(now: now), idle: idle)
   }
 
   /// `handoffText` in handoff.ts: one line for the banner, from the reading Mac's side.
-  public static func text(from: Mac, to: Mac, outgoing: Bool, state: HandoffPhase) -> String {
+  public static func text(from: Mac, to: Mac, outgoing: Bool, state: HandoffPhase, idle: Bool = false) -> String {
     let other = outgoing ? to.name : from.name
     switch state {
     case .preparing(let step):
@@ -160,6 +174,9 @@ public struct HandoffView: Decodable, Hashable, Sendable {
       if !outgoing { return "Picking this thread up from \(other)." }
       return stale ? "\(other) has not picked this thread up yet. It may be asleep or not running Omni." : "Waiting for \(other) to pick it up."
     case .accepted:
+      if idle {
+        return outgoing ? "Handed off to \(other). Your next message continues it there." : "Handed off from \(other). Your next message continues it here."
+      }
       return outgoing ? "Running on \(other). Handed off from this Mac." : "Handed off from \(other). Running on this Mac."
     case .failed(let error, let side):
       return outgoing || side == .here

@@ -19,6 +19,7 @@ const view = (state: HandoffPhase, outgoing = true, leftBehind: string | null = 
   at: '2026-10-23T11:59:00Z',
   state,
   leftBehind,
+  idle: false,
 });
 
 const base = { status: 'running', blocked: null, handoff: null, sync: SYNC, devices: [air] };
@@ -29,8 +30,12 @@ describe('when the thread offers "Hand off to…"', () => {
     expect(handoffTargets({ ...base, status: 'queued' }).state).toBe('ready');
   });
 
-  it('does not offer a thread that is not running here', () => {
-    for (const status of ['done', 'stopped', 'failed', undefined]) expect(handoffTargets({ ...base, status }).state).toBe('none');
+  it('offers an idle thread too, to continue on the other Mac from the next message', () => {
+    for (const status of ['done', 'stopped', 'failed']) expect(handoffTargets({ ...base, status }).state).toBe('ready');
+    expect(handoffTargets({ ...base, status: undefined }).state).toBe('none');
+  });
+
+  it('does not offer a thread that runs on another Mac', () => {
     expect(handoffTargets({ ...base, blocked: "This thread is running on Ben's MacBook Air." }).state).toBe('none');
   });
 
@@ -93,6 +98,9 @@ describe('the handoff banner', () => {
   it('turns to one quiet line once accepted or cancelled', () => {
     expect(handoffBanner(view({ phase: 'accepted' }), 'stopped')).toEqual({ size: 'line', tone: 'done', text: "Running on Ben's MacBook Air. Handed off from this Mac." });
     expect(handoffBanner(view({ phase: 'accepted' }, false), 'running')).toMatchObject({ size: 'line', text: "Handed off from Ben's MacBook Pro. Running on this Mac." });
+    const idle = { ...view({ phase: 'accepted' }), idle: true };
+    expect(handoffBanner(idle, 'done')).toMatchObject({ size: 'line', text: "Handed off to Ben's MacBook Air. Your next message continues it there." });
+    expect(handoffBanner({ ...idle, outgoing: false }, 'done')).toMatchObject({ text: "Handed off from Ben's MacBook Pro. Your next message continues it here." });
     expect(handoffBanner(view({ phase: 'cancelled' }), 'stopped')).toMatchObject({ size: 'line', tone: 'cancelled' });
   });
 

@@ -366,7 +366,7 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
           <MoListRow icon="info" label="Details" sub="Harness, model, session" onClick={() => go(href.threadView(thread.id, 'details'))} last />
         </MoGroup>
         <MoGroup>
-          {targets.state === 'ready' && <MoListRow icon="share" label="Hand off to…" sub="Keep it running on another Mac" onClick={() => setHandingOff(true)} />}
+          {targets.state === 'ready' && <MoListRow icon="share" label="Hand off to…" sub="Continue it on another Mac" onClick={() => setHandingOff(true)} />}
           <MoListRow
             icon="branch"
             label="Continue with another harness"

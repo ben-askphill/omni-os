@@ -35,7 +35,7 @@ function parseOffer(threadId: string, v: unknown): HandoffOffer | null {
     cancelled: () => true,
     failed: () => typeof o.error === 'string',
   }[o.state as HandoffOffer['state']];
-  return ok?.() ? (o as HandoffOffer) : null;
+  return ok?.() && (o.idle === undefined || typeof o.idle === 'boolean') ? (o as HandoffOffer) : null;
 }
 
 function parseReply(v: unknown): HandoffReply | null {
@@ -76,7 +76,7 @@ export function writeReply(threadId: string, reply: HandoffReply) {
  * accepted one shows while the run it started goes on, a failed one until the thread runs again, a cancelled one for a
  * minute, and none of them past a day.
  */
-export function handoffView(t: Pick<Thread, 'id' | 'status'>, now = Date.now()): HandoffView | null {
+export function handoffView(t: Pick<Thread, 'id' | 'status' | 'updated_at'>, now = Date.now()): HandoffView | null {
   const offer = offerOf(t.id);
   const self = outbox.machineId();
   if (!offer || !self || (offer.from.id !== self && offer.to.id !== self)) return null;
@@ -84,10 +84,13 @@ export function handoffView(t: Pick<Thread, 'id' | 'status'>, now = Date.now()):
   const state = handoffPhase(offer, reply, now);
   const since = now - Math.max(Date.parse(offer.at), reply?.offer === offer.id ? Date.parse(reply.at) : 0);
   const busy = t.status === 'running' || t.status === 'queued';
+  const idle = !!offer.idle;
+  // A thread handed off between turns shows its handoff until a turn has run since.
+  const settled = idle ? since < DAY && !busy && Date.parse(t.updated_at) <= Date.parse(reply?.at ?? '') : busy && since < DAY;
   const shown = {
     preparing: true,
     offered: true,
-    accepted: busy && since < DAY,
+    accepted: settled,
     failed: !busy && since < DAY,
     cancelled: since < MINUTE,
   }[state.phase];
@@ -100,6 +103,7 @@ export function handoffView(t: Pick<Thread, 'id' | 'status'>, now = Date.now()):
     at: offer.at,
     state,
     leftBehind: offer.state === 'offered' ? offer.leftBehind : null,
+    idle,
   };
 }
 
@@ -107,7 +111,7 @@ export function handoffView(t: Pick<Thread, 'id' | 'status'>, now = Date.now()):
  * Why no turn may start on this Mac while the thread is on its way, or null. The giving Mac holds it from the first
  * step, and the taking Mac until it answers. `taking`: the taking Mac's own pickup, which is what ends the wait.
  */
-export function handoffBlock(t: Pick<Thread, 'id' | 'status'>, taking = false, now = Date.now()): string | null {
+export function handoffBlock(t: Pick<Thread, 'id' | 'status' | 'updated_at'>, taking = false, now = Date.now()): string | null {
   const v = handoffView(t, now);
   if (!v) return null;
   const { phase } = v.state;

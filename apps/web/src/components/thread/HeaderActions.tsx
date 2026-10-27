@@ -92,7 +92,7 @@ export function HeaderActions({
         <IconButton
           icon="share"
           label="Hand off to another Mac"
-          title="Hand off to another Mac: stop the turn here and keep it running there"
+          title="Hand off to another Mac: a running turn carries on there, an idle thread continues there with your next message"
           aria-haspopup="menu"
           className={FOLD}
           onClick={(e) => menuAt(e.currentTarget, true)}

@@ -572,7 +572,7 @@ private func handoffAnswer(_ thread: String, _ state: String) throws -> HandoffA
 }
 
 @MainActor @Suite struct ThreadStoreHandoffTests {
-  @Test func canHandOffOnlyATurnRunningHere() async throws {
+  @Test func canHandOffUnlessBlockedOrUnderWay() async throws {
     let api = FakeThreadAPI(try blockedDetail())
     let (store, conn, _, _) = try await openStore(api)
     defer { store.stop() }
@@ -590,7 +590,7 @@ private func handoffAnswer(_ thread: String, _ state: String) throws -> HandoffA
     conn.send(sse(threadMessage(row("stopped", updated: 3))))
     try await waitFor("the stop") { store.thread?.status == .stopped }
     #expect(store.handoff == nil)
-    #expect(!store.canHandOff)
+    #expect(store.canHandOff, "an idle thread can go between turns")
   }
 
   @Test func anOlderThreadRowLeavesTheHandoffAsItWas() async throws {

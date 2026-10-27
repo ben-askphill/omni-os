@@ -53,7 +53,7 @@ struct HandOffButton: View {
         .buttonStyle(.icon(size: 28))
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Hand off to another Mac: stop the turn here and keep it running there")
+        .help("Hand off to another Mac: a running turn carries on there, an idle thread continues there with your next message")
         .accessibilityLabel("Hand off to another Mac")
         #if DEBUG
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { QAHandoffProbe.button = $0 }

@@ -1,4 +1,4 @@
-// Handing a running thread to another synced Mac. Server and web share these shapes; the Mac app mirrors them
+// Handing a thread to another synced Mac, running or idle. Server and web share these shapes; the Mac app mirrors them
 // (OmniKit Handoff.swift) and the fixtures in apps/server/tests/mac-fixtures.test.ts hold both to the same JSON.
 //
 // Everything travels as synced kv, one key per writer, so the two Macs never write the same key:
@@ -45,6 +45,8 @@ export type HandoffOffer = {
   from: { id: string; name: string };
   to: { id: string; name: string };
   at: string;
+  /** The thread had no turn running: nothing is cut off, and the other Mac continues with Ben's next message. Absent on offers from older builds. */
+  idle?: boolean;
 } & (
   | { state: 'preparing'; step: PrepareStep }
   | {
@@ -86,6 +88,8 @@ export interface HandoffView {
   at: string;
   state: HandoffPhase;
   leftBehind: string | null;
+  /** Handed off between turns, so nothing was running: it resumes with the next message, on whichever Mac it went to. */
+  idle: boolean;
 }
 
 export function handoffPhase(offer: HandoffOffer, reply: HandoffReply | null, now: number): HandoffPhase {
@@ -105,7 +109,7 @@ export function handoffPhase(offer: HandoffOffer, reply: HandoffReply | null, no
 }
 
 /** One line for the thread's handoff banner, from the reading Mac's side. */
-export function handoffText(h: Pick<HandoffView, 'from' | 'to' | 'outgoing' | 'state'>): string {
+export function handoffText(h: Pick<HandoffView, 'from' | 'to' | 'outgoing' | 'state'> & { idle?: boolean }): string {
   const s = h.state;
   const other = h.outgoing ? h.to.name : h.from.name;
   switch (s.phase) {
@@ -116,6 +120,7 @@ export function handoffText(h: Pick<HandoffView, 'from' | 'to' | 'outgoing' | 's
       if (!h.outgoing) return `Picking this thread up from ${other}.`;
       return s.stale ? `${other} has not picked this thread up yet. It may be asleep or not running Omni.` : `Waiting for ${other} to pick it up.`;
     case 'accepted':
+      if (h.idle) return h.outgoing ? `Handed off to ${other}. Your next message continues it there.` : `Handed off from ${other}. Your next message continues it here.`;
       return h.outgoing ? `Running on ${other}. Handed off from this Mac.` : `Handed off from ${other}. Running on this Mac.`;
     case 'failed':
       return h.outgoing || s.where === 'here'
