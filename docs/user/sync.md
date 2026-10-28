@@ -31,7 +31,7 @@ Open the Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the URL an
 - Copying `data/` to another Mac is fine: the folder remembers the Mac it was set up on (its hardware UUID), and on the next start the copy takes a new sync id and pulls the history again, logging one `[sync] this data folder was copied from another Mac` line. It never overwrites the Mac it came from, and scheduled automations stay there until you press "Run them here".
 
 
-## Hand off a running thread
+## Hand off a thread
 
 Move a thread to your other Mac. If a turn is running, the other Mac carries on where it was; if the thread is idle, it waits there for your next message. For a running turn Omni stops it here, uploads the session and the thread's files, and the other Mac resumes the same session with a note that the last turn was cut off, then sends the messages that were queued for it. This Mac shows the thread read-only while it runs there. An idle thread skips the note and the continue: the files and session move, and it shows "Handed off" until a turn runs. The Conductor can list targets with `list_devices` and hand it off with `hand_off_thread`. On desktop web, use the header's Hand off button or the thread's right-click menu; a narrow header puts it in More. On a phone use Thread options. The Mac app also has it in the Thread menu.
 

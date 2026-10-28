@@ -4,7 +4,7 @@ A thread is one task's conversation with one agent, from the first prompt throug
 
 ## Finding threads and clearing Needs you
 
-Running, Pinned and Recent threads in the desktop web and Mac sidebars list work across channels. Running includes queued threads and threads whose sub-agents still run; it hides when empty. Recent threads shows the five latest by activity, including pinned and running threads. Each section folds independently and remembers its state on that device. On a phone, these lists are in Activity, and a channel splits its folder and ungrouped threads between Active and Recent.
+Running, Pinned and Recent threads in the desktop web and Mac sidebars list work across channels. Running includes queued threads and threads whose sub-agents still run; it hides when empty. Recent threads shows the five latest by activity, including pinned and running threads. Conductor handoffs nest under their parent in those lists and in the Conductor's channel view (expand/collapse). Each section folds independently and remembers its state on that device. On a phone, these lists are in Activity, and a channel splits its folder and ungrouped threads between Active and Recent, with the same nesting.
 
 Needs you holds unread results and threads waiting for you to act. Opening a thread reads the result it shows, so a newer result stays unread. **Mark as done** clears any of those reasons without archiving the thread or changing how its last turn ended. It stays in its channel and folder with a grey check, muted title and Done chip. **Mark as not done** brings back its unread result and blockers. A new message, a run starting or Retry setup clears done; the flag syncs between Macs. Running and queued threads cannot be marked done.
 
@@ -12,7 +12,7 @@ On desktop web and Mac, use the check on a Needs you row, the thread header or t
 
 ## The composer
 
-- A new thread follows the channel and crew defaults until you pick a model or effort for that draft. Auto picks from the first prompt when no default is set. See [Harnesses](harnesses.md#auto) for precedence and the #conductor exception.
+- A new thread follows the channel and crew defaults until you pick a model or effort for that draft. Auto picks from the first prompt when no default is set. The Conductor role's charter is Auto; a saved #conductor channel default still wins. See [Harnesses](harnesses.md#auto).
 - `/` opens the menu of skills, slash commands and MCP prompts for the thread's harness.
 - `@` mentions artifacts and repo files.
 - After a finished turn, Haiku suggests your likely next reply. Tab fills it in; `OMNI_SUGGESTIONS=0` in `.env` turns it off.
@@ -27,7 +27,7 @@ On desktop web and Mac, use the check on a Needs you row, the thread header or t
 
 Cmd/Ctrl+Enter adds a newline. Pending messages show under the live output and enter the transcript at the point the agent actually read them. A queued message has **Steer now**, which sends it into the running turn instead of waiting for the turn to end (not on Cursor Agent or Cursor Cloud, which cannot steer). Interrupt (header button or Esc) stops the turn but keeps the process and its context. Steers already sent still run; queued ones are recorded as "Not sent". A CLI that does not stop within `OMNI_INTERRUPT_GRACE_MS` is killed. Only turns in progress count toward `OMNI_MAX_CONCURRENT`; warm idle processes do not.
 
-Cursor Agent and Cursor Cloud cannot steer; messages sent while they run wait for the next turn. A model, effort or harness switch picked during a turn also makes messages wait for that switch, even on a harness that can steer. See [Switching mid-thread](harnesses.md#switching-mid-thread). To start a separate linked thread with its own session and checkout, use [Fork thread](harnesses.md#continuing-on-another-harness) (branch icon in the reply box, or under + on a phone). To attach another thread without forking, use [Reference another thread](#point-the-agent-at-another-thread) in the header. To move a running thread to your other Mac, use [Hand off](sync.md#hand-off-a-running-thread).
+Cursor Agent and Cursor Cloud cannot steer; messages sent while they run wait for the next turn. A model, effort or harness switch picked during a turn also makes messages wait for that switch, even on a harness that can steer. See [Switching mid-thread](harnesses.md#switching-mid-thread). To start a separate linked thread with its own session and checkout, use [Fork thread](harnesses.md#continuing-on-another-harness) (branch icon in the reply box, or under + on a phone). To attach another thread without forking, use [Reference another thread](#point-the-agent-at-another-thread) in the header. To move a thread (running or idle) to your other Mac, use [Hand off](sync.md#hand-off-a-thread).
 
 Files can ride along with a message (paperclip, drag-and-drop or paste). They land in `data/threads/<id>/uploads/`, keeping their original names, and the agent gets every one by absolute path; images small enough for the API also go in as real image blocks. `OMNI_MAX_UPLOAD_MB` caps a single file.
 
@@ -38,6 +38,10 @@ To continue a thread in a terminal or Claude Desktop: `cd <cwd> && claude --resu
 The thread panel's Details tab lists **Running subagents** under Resume in terminal: every agent the thread started itself that is still working, such as an Agent call, a workflow, a fork or a teammate, with its kind and how long it has run. Click one to scroll the transcript to the call that started it, however far back. The Details tab shows how many run while another tab is open, and the section hides when none do. On a phone, the list is at the bottom of the thread's options sheet. Background shells and monitors are not listed, and neither are delegated threads: those are under Delegated threads, and their own agents show in their own thread.
 
 Claude Code reports its agents itself. Codex (multi-agent spawns), Cursor Agent (its task tool) and Hermes (`subagent.*` events) are mapped onto the same list. Cursor Cloud reports no sub-agents.
+
+## Plan steps
+
+When the agent posts a plan, click a step's checkbox to cycle it through pending, in progress and completed. The change is saved as a `plan_step_update` event and survives reloads. Desktop web, phone web and the Mac app all do this.
 
 ## Point the agent at lines of a diff
 

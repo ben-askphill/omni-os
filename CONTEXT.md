@@ -106,7 +106,7 @@ What a thread's next **Session** reads ahead of the user's message after the thr
 _Avoid_: Context transfer, migration
 
 **Handoff**:
-Moving a running **Thread** to another synced Mac on the same **Harness** and **Session**. Omni stops it here, transfers its session and files, then resumes it there. Tailscale checks reachability; the sync relay carries the handoff.
+Moving a **Thread** to another synced Mac on the same **Harness** and **Session**, whether a turn is running or the thread is idle. A running turn is stopped here, the session and files move, and the other Mac resumes it; an idle thread moves the same way and waits there for the next message. Tailscale checks reachability; the sync relay carries the handoff.
 _Avoid_: Handover (a harness switch), continued thread (a new thread)
 
 **Continued thread**:
