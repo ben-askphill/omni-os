@@ -64,6 +64,8 @@ describe('sync outbox', () => {
       { entity: 'channel', entity_id: 'volero', op: 'upsert' },
       { entity: 'thread', entity_id: 't1', op: 'upsert' },
       { entity: 'thread', entity_id: 't1', op: 'upsert' },
+      // The turn starting here makes this Mac the thread's holder (apps/server/handoff.ts Take over).
+      { entity: 'kv', entity_id: 'handoff.holder.t1', op: 'upsert' },
       { entity: 'event', entity_id: evUid, op: 'upsert' },
       { entity: 'artifact', entity_id: expect.any(String), op: 'upsert' },
       { entity: 'artifact', entity_id: expect.any(String), op: 'delete' },

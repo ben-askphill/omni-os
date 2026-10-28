@@ -1,6 +1,7 @@
 import type { RunName } from '@omni/shared/run-switch.ts';
 import { db, now, tx } from '../connection.ts';
 import { outbox, record } from '../sync.ts';
+import { kv } from './kv.ts';
 
 export type ThreadStatus = 'queued' | 'running' | 'done' | 'failed' | 'stopped' | 'imported';
 /** `team`: a member of a team, run under its lead thread and listed only there. */
@@ -133,6 +134,14 @@ export const THREAD_COLUMNS =
 /** Who runs a thread with this status: this machine while it is running or queued here and sync is set up, else nobody. */
 const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? outbox.machineId() : null);
 
+/**
+ * kv `handoff.holder.<thread>`: the Mac that holds the thread between turns, which Take over asks for it
+ * (apps/server/handoff.ts). Synced kv, not a column, since the row is last-writer-wins and a rename on the other Mac
+ * would undo it. Only the Mac it moves to writes it.
+ */
+const HOLDER = 'handoff.holder.';
+const isMachineId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9-]{1,100}$/.test(v);
+
 export const threads = {
   get: (id: string) => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE id = ?`).get(id) as unknown as Thread | undefined,
   /** A channel's threads, without team members: those are listed under their lead. */
@@ -218,6 +227,7 @@ export const threads = {
         t.branch, t.parent_id, t.task_id, t.source, t.automation, runMachine(t.status), t.folder_id ?? null, t.setup ?? null, ts, ts,
       );
       record('thread', t.id);
+      if (runMachine(t.status)) threads.hold(t.id);
       return threads.get(t.id)!;
     });
   },
@@ -244,9 +254,27 @@ export const threads = {
     // A run starting, or Ben retrying its setup, is news: a thread marked done comes back to Needs you when it ends.
     if (patch.status === 'running' || patch.status === 'queued' || patch.setup === 'preparing') sets.push('done_at = NULL');
     tx(() => {
-      if (db.prepare(`UPDATE threads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id).changes) record('thread', id);
+      if (!db.prepare(`UPDATE threads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id).changes) return;
+      record('thread', id);
+      if (patch.status && runMachine(patch.status)) threads.hold(id);
     });
     return threads.get(id);
+  },
+  /** This Mac holds the thread now: a turn starts here, or it took the thread over. Written once, since the relay keeps every write. */
+  hold(id: string) {
+    const self = outbox.machineId();
+    if (self && kv.get(HOLDER + id) !== self) kv.set(HOLDER + id, self);
+  },
+  /**
+   * The Mac that holds the thread: the one running it, or between turns the one that ran it last or took it since.
+   * Null when no Mac is known to, as for a thread that has not run since this build or with sync never set up.
+   */
+  holder(id: string): string | null {
+    const row = db.prepare('SELECT status, run_machine FROM threads WHERE id = ?').get(id) as { status: ThreadStatus; run_machine: string | null } | undefined;
+    if (!row) return null;
+    if (row.status === 'running' || row.status === 'queued') return row.run_machine;
+    const v = kv.get<unknown>(HOLDER + id);
+    return isMachineId(v) ? v : null;
   },
   /**
    * Pin it to the sidebar, or unpin it. Like a rename it keeps the thread's place in the lists: updated_at stays. The

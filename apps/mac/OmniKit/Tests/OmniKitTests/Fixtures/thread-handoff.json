@@ -119,7 +119,8 @@
       "stale": false
     },
     "leftBehind": null,
-    "idle": false
+    "idle": false,
+    "requested": false
   },
   "continued_from": null,
   "continued_in": [],
