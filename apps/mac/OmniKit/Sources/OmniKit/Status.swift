@@ -135,6 +135,14 @@ public struct ServerInfo: Decodable, Hashable, Sendable {
   public let port: Int
 }
 
+/// The Mac the server runs on. `here` is false for a browser that reaches it through Tailscale; the app's own
+/// loopback requests always get true.
+public struct DeviceInfo: Decodable, Hashable, Sendable {
+  /// Its ComputerName.
+  public let name: String
+  public let here: Bool
+}
+
 /// GET /api/status.
 public struct Status: Decodable, Hashable, Sendable {
   /// Harnesses with usage data. A harness with none yet is left out.
@@ -147,9 +155,11 @@ public struct Status: Decodable, Hashable, Sendable {
   /// Who uses this Omni. Older servers leave it out; a name that is empty means nobody set one yet.
   public let profile: Profile?
   public let server: ServerInfo?
+  /// Missing from older servers.
+  public let device: DeviceInfo?
 
   enum CodingKeys: String, CodingKey {
-    case usage, slots, running, queued, maxConcurrent, maxUploadMb, profile, server
+    case usage, slots, running, queued, maxConcurrent, maxUploadMb, profile, server, device
   }
 
   public init(from decoder: any Decoder) throws {
@@ -163,6 +173,7 @@ public struct Status: Decodable, Hashable, Sendable {
     maxUploadMb = try c.decode(Double.self, forKey: .maxUploadMb)
     profile = try c.decodeIfPresent(Profile.self, forKey: .profile)
     server = try c.decodeIfPresent(ServerInfo.self, forKey: .server)
+    device = try c.decodeIfPresent(DeviceInfo.self, forKey: .device)
   }
 }
 

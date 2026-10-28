@@ -146,7 +146,7 @@ describe('the server at boot', () => {
     const data = join(tmp, 'status');
     const s = boot(data);
     const port = await s.port();
-    const { server } = await api(port, '/status');
+    const { server, device } = await api(port, '/status');
     expect(server).toEqual({
       version: JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version,
       pid: s.pid,
@@ -155,7 +155,10 @@ describe('the server at boot', () => {
       gitHead: HEAD,
       startedAt: expect.any(String),
       port,
+      name: expect.any(String),
     });
+    // Over a real loopback socket, with no proxy in between.
+    expect(device).toEqual({ name: server.name, here: true });
     expect(lockPid(data)).toBe(s.pid);
 
     s.stop();

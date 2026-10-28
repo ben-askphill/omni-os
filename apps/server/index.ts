@@ -36,6 +36,7 @@ const { startSync } = await import('./sync/worker.ts');
 const { recoverHandoffs } = await import('./handoff.ts');
 const { startWorktreeRetention } = await import('./worktree-cleanup.ts');
 const { migrateLegacyConfig } = await import('./config-migrate.ts');
+const { computerName } = await import('./sync/devices.ts');
 
 // An install from before data/omni.config.json keeps its old settings and skips onboarding.
 migrateLegacyConfig();
@@ -51,6 +52,7 @@ const onBindError = (err: NodeJS.ErrnoException) => {
 const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
   server.off('error', onBindError);
   about.port = info.port;
+  void computerName().then((name) => (about.name = name));
   // A worktree the last server was still preparing never got checked, so nothing runs in it until Ben retries.
   const unprepared = threads.failPreparing("Omni stopped before this thread's worktree was ready.");
   if (unprepared) console.log(`[omni] ${unprepared} thread(s) were mid-setup: kept for Retry`);

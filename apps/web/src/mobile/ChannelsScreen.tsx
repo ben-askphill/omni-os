@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ChannelWithRunning, ConductorHandoffGroup, Thread, ThreadStub } from '../api.ts';
 import { OmniMark } from '../components/brand.tsx';
+import { DeviceLabel } from '../components/DeviceLabel.tsx';
 import { useLiveThreads } from '../components/ThreadList.tsx';
 import { Avatar, Icon, Segmented, StatusDot } from '../components/ui.tsx';
 import { inChannel, reasonOf } from '../needs-you.ts';
@@ -40,7 +41,7 @@ function Counts({ needs, running }: { needs: number; running: number }) {
 /** The Channels tab: the Conductor, then every channel by kind with what needs Ben and what runs in it. */
 export function ChannelsScreen() {
   const shell = useShell();
-  const { channels, needsYou, profile, channel } = useApp();
+  const { channels, needsYou, profile, channel, status } = useApp();
   const listed = channels.filter((c) => !c.archived && c.id !== 'conductor');
   const conductor = channel('conductor');
   const running = channels.reduce((n, c) => n + (c.running || 0), 0);
@@ -61,7 +62,19 @@ export function ChannelsScreen() {
         }
       />
       <MoScroll tabBar>
-        <MoTitle title="Channels" sub={`${listed.length} channels · ${running} ${running === 1 ? 'thread' : 'threads'} running`} />
+        <MoTitle
+          title="Channels"
+          sub={
+            <>
+              {`${listed.length} channels · ${running} ${running === 1 ? 'thread' : 'threads'} running`}
+              {status?.device && (
+                <div className="mt-1">
+                  <DeviceLabel device={status.device} />
+                </div>
+              )}
+            </>
+          }
+        />
         <div className="px-4">
           <MoGroup>
             <MoListRow

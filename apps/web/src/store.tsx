@@ -3,6 +3,7 @@ import { api, openSSE, errorText, taskHost, type BackgroundTask, type ChannelWit
 import { coalesced, withoutResult, withoutThread } from './needs-you.ts';
 import { withPin, type PinnedThread } from './pins.ts';
 import { pageTitle, type Route } from './router.ts';
+import { windowTitle } from './device.ts';
 import { createSyncNudge } from './sync-nudge.ts';
 
 interface AppState {
@@ -109,7 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const reloadStatus = useCallback(async () => {
     try {
       const s = await api.get<Status>('/status');
-      setStatus({ running: s.running, queued: s.queued, maxConcurrent: s.maxConcurrent, maxUploadMb: s.maxUploadMb, slots: s.slots ?? {} });
+      setStatus({ running: s.running, queued: s.queued, maxConcurrent: s.maxConcurrent, maxUploadMb: s.maxUploadMb, slots: s.slots ?? {}, device: s.device });
       setProfile(s.profile ?? { name: '' });
       if (s.usage) setUsage((prev) => ({ ...prev, ...s.usage }));
     } catch {
@@ -350,13 +351,13 @@ export function useNow(ms = 30_000) {
   return now;
 }
 
-/** The window title: the page's name, or the one given, then Omni. */
+/** The window title: the page's name, or the one given, then Omni, led by the Mac's name when it is not this one. */
 export function usePageTitle(route: Route, name?: string) {
-  const { channel } = useApp();
+  const { channel, status } = useApp();
+  const device = status?.device;
   useEffect(() => {
-    const t = name ?? pageTitle(route, (id) => channel(id)?.name);
-    document.title = t === 'Home' ? 'Omni' : `${t} · Omni`;
-  }, [route, channel, name]);
+    document.title = windowTitle(name ?? pageTitle(route, (id) => channel(id)?.name), device);
+  }, [route, channel, name, device]);
 }
 
 /** Back on the tab: ask the server to sync, so the other Mac's work shows up now rather than on its timer. */

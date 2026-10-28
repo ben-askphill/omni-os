@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { homedir, hostname, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { applyPage, earlierCursor, historyQuery, openHistory, revealCursor, type HistoryHead, type HistoryPage, type HistoryRow } from '@omni/shared/history.ts';
 import { newContext } from '@omni/shared/message-context.ts';
@@ -855,11 +855,20 @@ const parse = (name: Name, text: string): unknown => (name.endsWith('.sse') ? fr
 
 // ---------- recording ----------
 
-/** Swaps what changes from run to run (paths, ids, times, pids, the port) for stable stand-ins, across all files at once. */
+/** This Mac's ComputerName, as apps/server/sync/devices.ts reads it for GET /api/status. */
+function computerName(): string {
+  try {
+    return execFileSync('scutil', ['--get', 'ComputerName'], { encoding: 'utf8' }).trim() || hostname();
+  } catch {
+    return hostname();
+  }
+}
+
+/** Swaps what changes from run to run (paths, ids, times, pids, the port, the Mac's name) for stable stand-ins, across all files at once. */
 function normalize(files: Map<Name, string>): Map<Name, string> {
   const places: [string, string][] = [];
   for (const dir of new Set([realpathSync(tmp), tmp])) places.push([dir, '/tmp/omni-fixtures']);
-  places.push([ROOT, '/Users/omni/omni-os'], [homedir(), '/Users/omni']);
+  places.push([ROOT, '/Users/omni/omni-os'], [homedir(), '/Users/omni'], [JSON.stringify(computerName()), `"Omni's Mac"`]);
   const uuids = new Map<string, string>();
   const shas = new Map<string, string>();
   const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
