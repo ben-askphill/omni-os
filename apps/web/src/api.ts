@@ -109,6 +109,15 @@ export interface Status {
   maxUploadMb: number;
   /** Older servers leave it out. */
   profile?: Profile;
+  /** The Mac the server runs on, and whether this browser sits at it. Older servers leave it out. */
+  device?: Device;
+}
+
+export interface Device {
+  /** Its ComputerName. */
+  name: string;
+  /** False when this browser reaches it through tailscale serve from another device. */
+  here: boolean;
 }
 
 export interface ThreadDetail {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApi, type Automation, type SyncStatus } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { HARNESS_ROWS } from '../components/brand.tsx';
+import { DeviceLabel } from '../components/DeviceLabel.tsx';
 import { useTheme } from '../components/theme.tsx';
 import { Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { describeCron, describeEvent, relTime, windowPct } from '../format.ts';
@@ -49,7 +50,7 @@ function syncSub(s: SyncStatus | undefined, now: number) {
 /** Settings, pushed from the avatar on Channels: appearance, plan usage, automations and this Omni. */
 export function SettingsScreen() {
   const shell = useShell();
-  const { profile, usage } = useApp();
+  const { profile, usage, status } = useApp();
   const [theme, setTheme] = useTheme();
   const now = useNow(60_000);
   const automations = useApi<Automation[]>('/automations');
@@ -70,13 +71,22 @@ export function SettingsScreen() {
     window.addEventListener('focus', check);
     return () => window.removeEventListener('focus', check);
   }, []);
-  const host = location.hostname;
+  const host = status?.device?.name || location.hostname;
   const meters = HARNESS_ROWS.map((r) => ({ r, u: usage[r.id] })).filter(({ u }) => u?.five_hour || u?.monthly);
   const list = automations.data ?? [];
 
   return (
     <>
-      <MoHeader onBack={shell.back} title="Settings" sub={[profile?.name, host && `Omni on ${host}`].filter(Boolean).join(' · ')} />
+      <MoHeader
+        onBack={shell.back}
+        title="Settings"
+        sub={
+          <>
+            {profile?.name && `${profile.name} · `}
+            {status?.device ? <DeviceLabel device={status.device} /> : host && `Omni on ${host}`}
+          </>
+        }
+      />
       <MoScroll className="pt-2">
         <MoSection title="Appearance">
           <Segmented
