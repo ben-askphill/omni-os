@@ -175,6 +175,13 @@ final class QARunner {
           guard let handOff = QAHandoffProbe.handOff else { throw QAScriptError("no thread that can be handed off on screen") }
           await handOff(device)
           try? await Task.sleep(for: .milliseconds(600))
+        case .takeOver(let name):
+          guard let takeOver = QAHandoffProbe.takeOver else { throw QAScriptError("no Take Over over the reply box") }
+          takeOver.ask()
+          try await screen(name)
+          result.files = [name + ".png"]
+          await takeOver.confirm()
+          try? await Task.sleep(for: .milliseconds(600))
         case .scroll(let scroll):
           result.note = try await self.scroll(scroll)
         case .expand:
@@ -548,6 +555,7 @@ final class QARunner {
     case .handoffMenu(let name): "handoffMenu \(name)"
     case .prMenu(let name): "prMenu \(name)"
     case .handOff(let device): "handOff \(device)"
+    case .takeOver(let name): "takeOver \(name)"
     case .palette(let query): "palette \(query ?? "close")"
     case .quickPrompt(let action): "quickPrompt \(action)"
     case .selectLines(let file, let from, let to): "selectLines \(file) \(from)-\(to)"

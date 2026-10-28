@@ -185,8 +185,12 @@ private struct ReplyComposerView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: z(8)) {
       // The setup card in the transcript says why while the worktree is not ready, and the handoff card while the
-      // thread is on its way to or from another Mac: the server's block is then that card's own line.
-      if let b = store.blocked, thread.setup == nil, store.handoff?.inFlight != true { ErrorNote(text: b) }
+      // thread is on its way to or from another Mac: the server's block is then that card's own line. The Take Over
+      // note says the same as the block of a thread running on another Mac.
+      if let t = store.takeover { TakeoverNote(store: store, takeover: t) }
+      if let b = store.blocked, thread.setup == nil, store.handoff?.inFlight != true, store.takeover?.running != true {
+        ErrorNote(text: b)
+      }
       if let e = store.actionError { ErrorNote(text: e.message) }
       if let e = reply.sendError ?? omniError ?? switchError { ErrorNote(text: e) }
       shell

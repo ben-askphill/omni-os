@@ -76,17 +76,103 @@ struct HandOffButton: View {
   }
 }
 
+/// Take Over from <Mac>… in the thread's right-click, while its store is open and it can be taken now. It raises the
+/// reply box's confirm.
+struct TakeOverItem: View {
+  let model: AppModel
+  let threadID: String
+
+  var body: some View {
+    if let store = model.threads.store(threadID), store.canTakeOver, let takeover = store.takeover {
+      Button("Take Over from \(takeover.from.name)…") { store.askTakeOver() }
+    }
+  }
+}
+
+/// The note over the reply box on a thread another Mac holds, as TakeoverNote in Takeover.tsx: where it runs, then Take
+/// Over, or why it cannot be taken now. The pill, the Thread menu and the right-click all ask through the store, so
+/// this one confirm answers all three.
+struct TakeoverNote: View {
+  let store: ThreadStore
+  let takeover: Takeover
+  @State private var confirming = false
+
+  var body: some View {
+    let confirm = takeover.confirm
+    HStack(alignment: .firstTextBaseline, spacing: z(10)) {
+      GlyphView(glyph: takeover.running ? .running : .settled, size: 8)
+        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
+      VStack(alignment: .leading, spacing: z(2)) {
+        Text(takeover.note)
+        if let refused = takeover.refused {
+          Text(refused)
+            .font(.omni(size: 12))
+            .foregroundStyle(Tok.fg3)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .textSelection(.enabled)
+      if takeover.refused == nil {
+        Button {
+          store.askTakeOver()
+        } label: {
+          HStack(spacing: z(6)) {
+            if store.handingOff { Loader(size: 12) }
+            Text("Take Over")
+          }
+        }
+        .buttonStyle(.pill(.secondary, height: 26))
+        .disabled(!store.canTakeOver)
+        .help("Ask \(takeover.from.name) to hand this thread to this Mac")
+        #if DEBUG
+        .onAppear {
+          QAHandoffProbe.takeOver = QAHandoffProbe.TakeOver(
+            ask: { store.askTakeOver() },
+            confirm: {
+              confirming = false
+              await store.takeOver()
+            })
+        }
+        .onDisappear { QAHandoffProbe.takeOver = nil }
+        #endif
+      }
+    }
+    .font(.omni(size: 13))
+    .foregroundStyle(Tok.fg)
+    .padding(.horizontal, z(16))
+    .padding(.vertical, z(10))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(16), style: .continuous))
+    .accessibilityElement(children: .contain)
+    .onChange(of: store.takeOverAsks) { confirming = true }
+    .confirmationDialog(confirm.title, isPresented: $confirming) {
+      Button("Take Over") { Task { await store.takeOver() } }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text(confirm.body)
+    }
+  }
+}
+
 #if DEBUG
-/// Where the header's Hand Off button is, for the QA harness to click it, and the pick its menu makes.
+/// Where the header's Hand Off button is, for the QA harness to click it, the pick its menu makes, and the reply box's
+/// Take Over.
 @MainActor
 enum QAHandoffProbe {
+  struct TakeOver {
+    /// Presses the note's Take Over, which opens its confirm.
+    let ask: () -> Void
+    /// Presses Take Over in the confirm.
+    let confirm: () async -> Void
+  }
+
   static var button: CGRect?
   static var handOff: ((String) async -> Void)?
+  static var takeOver: TakeOver?
 }
 #endif
 
 /// Handoff.tsx: the thread's handoff at the end of the transcript, as `HandoffBanner` words it. A card with Cancel on
-/// the giving Mac while it is under way, and one quiet line once it settled.
+/// the Mac that started it while it is under way, and one quiet line once it settled.
 struct HandoffCard: View {
   let store: ThreadStore
   let handoff: HandoffView
@@ -125,7 +211,7 @@ struct HandoffCard: View {
         }
         .buttonStyle(.pill(.secondary, height: 28))
         .disabled(store.handingOff)
-        .help("Keep the thread on this Mac")
+        .help(handoff.outgoing ? "Keep the thread on this Mac" : "Leave the thread on \(handoff.from.name)")
       }
     }
     .padding(.horizontal, z(16))

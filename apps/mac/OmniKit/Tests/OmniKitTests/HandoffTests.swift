@@ -6,18 +6,29 @@ import OmniKit
 private let air = #"{"id":"m-air","name":"Ben's MacBook Air"}"#
 private let pro = #"{"id":"m-pro","name":"Ben's MacBook Pro"}"#
 
-func handoffJSON(_ state: String, outgoing: Bool = true, at: String = "2026-10-23T09:00:00.000Z", leftBehind: String? = nil) -> String {
+/// A handoff from the Air to the Pro. `idle` and `requested` are left out unless set, as older servers do.
+func handoffJSON(
+  _ state: String, outgoing: Bool = true, at: String = "2026-10-23T09:00:00.000Z", leftBehind: String? = nil, idle: Bool = false,
+  requested: Bool = false
+) -> String {
   let left = leftBehind.map { #""\#($0)""# } ?? "null"
-  return #"{"id":"o1","from":\#(air),"to":\#(pro),"outgoing":\#(outgoing),"at":"\#(at)","state":\#(state),"leftBehind":\#(left)}"#
+  let flags = (idle ? #","idle":true"# : "") + (requested ? #","requested":true"# : "")
+  return #"{"id":"o1","from":\#(air),"to":\#(pro),"outgoing":\#(outgoing),"at":"\#(at)","state":\#(state),"leftBehind":\#(left)\#(flags)}"#
 }
 
-private func view(_ state: String, outgoing: Bool = true) throws -> HandoffView {
-  try decode(HandoffView.self, handoffJSON(state, outgoing: outgoing))
+/// The Air holds the thread; the Pro, reading it, could take it.
+func takeoverJSON(running: Bool = true, refused: String? = nil) -> String {
+  let r = refused.map { #""\#($0)""# } ?? "null"
+  return #"{"from":\#(air),"to":\#(pro),"running":\#(running),"refused":\#(r)}"#
 }
 
-private func text(_ state: String, outgoing: Bool = true) throws -> String {
-  let v = try view(state, outgoing: outgoing)
-  return HandoffView.text(from: v.from, to: v.to, outgoing: v.outgoing, state: v.state)
+private func view(_ state: String, outgoing: Bool = true, idle: Bool = false, requested: Bool = false) throws -> HandoffView {
+  try decode(HandoffView.self, handoffJSON(state, outgoing: outgoing, idle: idle, requested: requested))
+}
+
+private func text(_ state: String, outgoing: Bool = true, idle: Bool = false, requested: Bool = false) throws -> String {
+  let v = try view(state, outgoing: outgoing, idle: idle, requested: requested)
+  return HandoffView.text(from: v.from, to: v.to, outgoing: v.outgoing, state: v.state, idle: v.idle, requested: v.requested)
 }
 
 private func device(_ reachability: String, lastSeen: String? = nil, name: String = "Ben's MacBook Pro") throws -> Device {
@@ -49,10 +60,31 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
   }
 
   @Test func saysTheNextMessageContinuesAThreadHandedOffBetweenTurns() throws {
-    let json = handoffJSON(#"{"phase":"accepted"}"#).replacingOccurrences(of: #""leftBehind""#, with: #""idle":true,"leftBehind""#)
-    let given = try decode(HandoffView.self, json)
-    #expect(given.text() == "Handed off to Ben's MacBook Pro. Your next message continues it there.")
+    #expect(try text(#"{"phase":"accepted"}"#, idle: true) == "Handed off to Ben's MacBook Pro. Your next message continues it there.")
     #expect(try view(#"{"phase":"accepted"}"#).idle == false)
+  }
+
+  @Test func saysWhoAskedWhenTakenOver() throws {
+    let accepted = #"{"phase":"accepted"}"#
+    #expect(try text(accepted, requested: true) == "Ben's MacBook Pro took this thread over. Running there.")
+    #expect(try text(accepted, outgoing: false, requested: true) == "Taken over from Ben's MacBook Air. Running on this Mac.")
+    #expect(try text(accepted, idle: true, requested: true) == "Ben's MacBook Pro took this thread over. The next message runs there.")
+    #expect(
+      try text(accepted, outgoing: false, idle: true, requested: true) == "Taken over from Ben's MacBook Air. Your next message continues it here.")
+  }
+
+  @Test func saysATakeOverIsWaitingOnTheMacThatHoldsIt() throws {
+    #expect(try text(#"{"phase":"requested","stale":false}"#, outgoing: false) == "Asking Ben's MacBook Air to hand this thread over.")
+    #expect(
+      try text(#"{"phase":"requested","stale":true}"#, outgoing: false)
+        == "Ben's MacBook Air has not answered. It may be asleep; it hands the thread over when it wakes.")
+    #expect(try text(#"{"phase":"expired"}"#, outgoing: false) == "Ben's MacBook Air did not answer within an hour, so the request expired.")
+  }
+
+  @Test func saysWhyATakeOverWasDeclinedOnBothMacs() throws {
+    let declined = #"{"phase":"declined","error":"crew threads stay with their parent"}"#
+    #expect(try text(declined) == "Ben's MacBook Pro asked for this thread, and it stays here: crew threads stay with their parent.")
+    #expect(try text(declined, outgoing: false) == "Ben's MacBook Air kept this thread: crew threads stay with their parent.")
   }
 
   @Test func endsTheErrorWithOneFullStop() throws {
@@ -61,10 +93,10 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
     #expect(try text(#"{"phase":"failed","error":"upload failed.","where":"there"}"#) == stopped, "the giving Mac says the same either way")
     #expect(
       try text(#"{"phase":"failed","error":"its worktree has changes","where":"there"}"#, outgoing: false)
-        == "Could not pick this thread up from Ben's MacBook Air: its worktree has changes.")
+        == "Could not pick this thread up from Ben's MacBook Air: its worktree has changes. It stays there.")
     #expect(
       try text(#"{"phase":"failed","error":"no session","where":"here"}"#, outgoing: false)
-        == "The handoff to Ben's MacBook Pro failed: no session. The thread is stopped here; reply to continue it.")
+        == "Ben's MacBook Air could not hand this thread over: no session. It stays there.")
   }
 
   @Test func saysItWasCancelled() throws {
@@ -80,6 +112,11 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
     #expect(try view(#"{"phase":"accepted"}"#).state == .accepted)
     #expect(try view(#"{"phase":"failed","error":"x","where":"there"}"#).state == .failed(error: "x", at: .there))
     #expect(try view(#"{"phase":"cancelled"}"#).state == .cancelled)
+    #expect(try view(#"{"phase":"requested","stale":true}"#).state == .requested(stale: true))
+    #expect(try view(#"{"phase":"declined","error":"x"}"#).state == .declined(error: "x"))
+    #expect(try view(#"{"phase":"expired"}"#).state == .expired)
+    #expect(try view(#"{"phase":"accepted"}"#, requested: true).requested)
+    #expect(try !view(#"{"phase":"accepted"}"#).requested, "older servers leave requested out")
     let left = try decode(HandoffView.self, handoffJSON(#"{"phase":"accepted"}"#, leftBehind: "~/phillbert has uncommitted changes"))
     #expect(left.leftBehind == "~/phillbert has uncommitted changes")
     #expect(left.from.name == "Ben's MacBook Air")
@@ -89,6 +126,9 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
   @Test func isInFlightUntilTakenOrCalledOff() throws {
     #expect(try view(#"{"phase":"preparing","step":"stopping"}"#).inFlight)
     #expect(try view(#"{"phase":"offered","stale":true}"#).inFlight)
+    #expect(try view(#"{"phase":"requested","stale":true}"#, outgoing: false).inFlight)
+    #expect(try !view(#"{"phase":"declined","error":"x"}"#).inFlight)
+    #expect(try !view(#"{"phase":"expired"}"#).inFlight)
     #expect(try !view(#"{"phase":"accepted"}"#).inFlight)
     #expect(try !view(#"{"phase":"failed","error":"x","where":"here"}"#).inFlight)
     #expect(try !view(#"{"phase":"cancelled"}"#).inFlight)
@@ -101,6 +141,13 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
     #expect(v.text(now: v.at.addingTimeInterval(91)).hasPrefix("Ben's MacBook Pro has not picked this thread up yet."))
     let taken = try view(#"{"phase":"accepted"}"#)
     #expect(taken.phase(now: taken.at.addingTimeInterval(3_600)) == .accepted)
+  }
+
+  @Test func aTakeOverGoesStaleOnScreenToo() throws {
+    let v = try view(#"{"phase":"requested","stale":false}"#, outgoing: false, requested: true)
+    #expect(v.phase(now: v.at.addingTimeInterval(89)) == .requested(stale: false))
+    #expect(v.phase(now: v.at.addingTimeInterval(91)) == .requested(stale: true))
+    #expect(v.text(now: v.at.addingTimeInterval(91)).hasPrefix("Ben's MacBook Air has not answered."))
   }
 
   @Test func aThreadDetailCarriesItsBlockAndHandoff() throws {
@@ -117,15 +164,57 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
     let d = try decode(ThreadDetail.self, #"{"thread":\#(threadJSON()),"events":[],"handoff":\#(handoffJSON(#"{"phase":"teleporting"}"#))}"#)
     #expect(d.handoff == nil)
     #expect(d.thread.id == "t1")
+    let m = try decode(ThreadStreamMessage.self, #"{"kind":"thread","thread":\#(threadJSON()),"handoff":\#(handoffJSON(#"{"phase":"teleporting"}"#))}"#)
+    guard case .thread(let t, nil, nil, nil, nil, nil) = m else { Issue.record("the stream's thread message still reads: \(m)"); return }
+    #expect(t.id == "t1")
   }
 
   @Test func theThreadStreamCarriesThemToo() throws {
     let m = try decode(
       ThreadStreamMessage.self,
       #"{"kind":"thread","thread":\#(threadJSON(status: "running")),"blocked":"Busy elsewhere.","handoff":\#(handoffJSON(#"{"phase":"preparing","step":"packing"}"#))}"#)
-    guard case .thread(_, nil, nil, let blocked, let handoff) = m else { Issue.record("not a thread: \(m)"); return }
+    guard case .thread(_, nil, nil, let blocked, let handoff, nil) = m else { Issue.record("not a thread: \(m)"); return }
     #expect(blocked == "Busy elsewhere.")
     #expect(handoff?.state == .preparing(.packing))
+  }
+}
+
+@Suite struct TakeoverTests {
+  @Test func decodesWhoHoldsItAndWhetherItCanBeTaken() throws {
+    let t = try decode(Takeover.self, takeoverJSON())
+    #expect((t.from.name, t.to.name) == ("Ben's MacBook Air", "Ben's MacBook Pro"))
+    #expect(t.running && t.refused == nil)
+    let refused = try decode(Takeover.self, takeoverJSON(running: false, refused: "Crew threads stay with their parent."))
+    #expect(refused.refused == "Crew threads stay with their parent.")
+  }
+
+  /// takeoverNote and takeoverConfirm in packages/shared/handoff.ts.
+  @Test func saysWhereItRunsAndWhatTakingItDoes() throws {
+    let running = try decode(Takeover.self, takeoverJSON())
+    #expect(running.note == "This thread is running on Ben's MacBook Air.")
+    #expect(running.confirm.title == "Take over from Ben's MacBook Air?")
+    #expect(
+      running.confirm.body
+        == "Ben's MacBook Air stops the current turn and hands the thread here. The agent continues on Ben's MacBook Pro where it was cut off.")
+    let idle = try decode(Takeover.self, takeoverJSON(running: false))
+    #expect(idle.note == "Last ran on Ben's MacBook Air.")
+    #expect(idle.confirm.title == "Take over from Ben's MacBook Air?")
+    #expect(idle.confirm.body == "Ben's MacBook Air sends its latest session and changes here. Your next message runs on Ben's MacBook Pro.")
+  }
+
+  @Test func theDetailAndTheStreamCarryIt() throws {
+    let d = try decode(ThreadDetail.self, #"{"thread":\#(threadJSON(status: "running")),"events":[],"takeover":\#(takeoverJSON())}"#)
+    #expect(d.takeover?.running == true)
+    #expect(try decode(ThreadDetail.self, #"{"thread":\#(threadJSON()),"events":[]}"#).takeover == nil, "older servers leave it out")
+    let m = try decode(ThreadStreamMessage.self, #"{"kind":"thread","thread":\#(threadJSON()),"takeover":\#(takeoverJSON(running: false))}"#)
+    guard case .thread(_, nil, nil, nil, nil, let takeover) = m else { Issue.record("not a thread: \(m)"); return }
+    #expect(takeover?.running == false)
+  }
+
+  @Test func oneThisAppCannotReadLeavesTheThreadReadable() throws {
+    let d = try decode(ThreadDetail.self, #"{"thread":\#(threadJSON()),"events":[],"takeover":{"from":"Mac A"}}"#)
+    #expect(d.takeover == nil)
+    #expect(d.thread.id == "t1")
   }
 }
 
@@ -142,6 +231,27 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
     #expect(try banner(#"{"phase":"offered","stale":false}"#) == .card(tone: .waiting, text: "Waiting for Ben's MacBook Pro to pick it up.", cancel: true))
     guard case .card(.alert, _, true)? = try banner(#"{"phase":"offered","stale":true}"#) else { Issue.record("a stale offer alerts"); return }
     #expect(try banner(#"{"phase":"offered","stale":false}"#, outgoing: false, status: .stopped) == .card(tone: .working, text: "Picking this thread up from Ben's MacBook Air.", cancel: false))
+  }
+
+  @Test func aTakeOverWaitsWithCancelAndAlertsOnceStale() throws {
+    #expect(
+      try banner(#"{"phase":"requested","stale":false}"#, outgoing: false)
+        == .card(tone: .waiting, text: "Asking Ben's MacBook Air to hand this thread over.", cancel: true))
+    guard case .card(.alert, _, true)? = try banner(#"{"phase":"requested","stale":true}"#, outgoing: false) else {
+      Issue.record("a stale Take over alerts and can still be called off"); return
+    }
+  }
+
+  @Test func aDeclinedOrExpiredTakeOverAlertsWithoutCancel() throws {
+    guard case .card(.alert, _, false)? = try banner(#"{"phase":"declined","error":"x"}"#, outgoing: false) else {
+      Issue.record("a declined Take over is an alert card"); return
+    }
+    guard case .card(.alert, _, false)? = try banner(#"{"phase":"declined","error":"x"}"#, status: .running) else {
+      Issue.record("the holding Mac says so while its turn runs on"); return
+    }
+    #expect(
+      try banner(#"{"phase":"expired"}"#, outgoing: false, status: .stopped)
+        == .card(tone: .alert, text: "Ben's MacBook Air did not answer within an hour, so the request expired.", cancel: false))
   }
 
   @Test func aFailureShowsUntilTheThreadRunsAgain() throws {
@@ -209,6 +319,19 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
       "GET /api/devices",
     ])
     #expect(try bodyJSON(t.requests[0]) == .object(["to": .string("m-pro")]))
+  }
+
+  @Test func takesOverWithAnEmptyBody() async throws {
+    let requested = handoffJSON(#"{"phase":"requested","stale":false}"#, outgoing: false, requested: true)
+    let t = StubTransport { _ in StubTransport.Reply(body: #"{"thread":\#(threadJSON(status: "running")),"handoff":\#(requested)}"#) }
+    let client = OmniClient(port: 4799, transport: t)
+    let a = try await client.takeOver("t 1")
+    #expect(a.handoff?.state == .requested(stale: false))
+    #expect(a.handoff?.requested == true)
+    #expect(t.requests.map { "\($0.httpMethod!) \($0.url!.absoluteString.replacingOccurrences(of: "http://127.0.0.1:4799", with: ""))" } == [
+      "POST /api/threads/t%201/takeover"
+    ])
+    #expect(try bodyJSON(t.requests[0]) == .object([:]))
   }
 }
 
