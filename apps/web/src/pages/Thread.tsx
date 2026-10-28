@@ -13,7 +13,8 @@ import { PANEL_MIN, THREAD_MIN, defaultPanelWidth, PanelResizeHandle } from '../
 import { NextThreadCard } from '../components/thread/NextThreadCard.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { LimitCard } from '../components/thread/LimitCard.tsx';
-import { HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx';
+import { HandoffCard, useHandoffTargets, type HandoffAnswer } from '../components/thread/Handoff.tsx';
+import { TakeoverNote } from '../components/thread/Takeover.tsx';
 import { OPEN_PR_PROMPT, ThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { HeaderActions } from '../components/thread/HeaderActions.tsx';
@@ -88,6 +89,7 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
     blocked,
     handoff,
     setHandoff,
+    takeover,
     links,
     live,
     load,
@@ -106,8 +108,12 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
     release();
     clearReveal();
   });
-  const handoffTargets = useHandoffTargets(thread, blocked, handoff);
-  const note = blockedNote(blocked, handoff, thread?.status);
+  const handoffTargets = useHandoffTargets(thread, { blocked, handoff, takeover });
+  const handedOff = (a: HandoffAnswer) => {
+    applyThread(a.thread, true);
+    setHandoff(a.handoff);
+  };
+  const note = blockedNote(blocked, handoff, thread?.status, takeover);
   const known = useMemo(() => [...children, ...team], [children, team]);
   const members = useMemo(() => teamOf(children), [children]);
   const reports = useMemo(() => reportNotes(queued), [queued]);
@@ -395,14 +401,7 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
                   setQueued(pending);
                 }}
               />
-              <HandoffCard
-                thread={thread}
-                handoff={handoff}
-                onChanged={(a) => {
-                  applyThread(a.thread, true);
-                  setHandoff(a.handoff);
-                }}
-              />
+              <HandoffCard thread={thread} handoff={handoff} onChanged={handedOff} />
               <QueuedMessages items={queued} starting={betweenTurns} threadId={id} onPending={setQueued} setup={thread.setup} canSteer={canSteer(thread.harness, harnesses)} />
               {!queued.length && (
                 <NextThreadCard
@@ -432,6 +431,7 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             {/* The setup card above says why while the worktree is not ready. */}
             {note && !thread.setup && <ErrorNote className="mb-2">{note}</ErrorNote>}
+            <TakeoverNote threadId={id} takeover={takeover} handoff={handoff} onChanged={handedOff} />
             <ReplyComposer
               thread={thread}
               canSteer={canSteer(thread.harness, harnesses)}

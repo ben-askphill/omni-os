@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Device, HandoffView } from '@omni/shared/handoff.ts';
 import { api, errorText, useApi, type SyncStatus, type Thread } from '../../api.ts';
-import { handoffBanner, handoffTargets, mayHandOff, syncCarries } from '../../handoff.ts';
+import { handoffBanner, handoffTargets, mayHandOff, syncCarries, type Holding } from '../../handoff.ts';
 import { Button, ErrorNote, Icon, Loader } from '../ui.tsx';
 
 /** POST /api/threads/:id/handoff and /handoff/cancel answer with both. */
@@ -10,11 +10,12 @@ export type HandoffAnswer = { thread: Thread; handoff: HandoffView | null };
 export const handOff = (threadId: string, to: string) => api.post<HandoffAnswer>(`/threads/${encodeURIComponent(threadId)}/handoff`, { to });
 
 /** The other Macs a thread could go to, asked for only while it is this Mac's to give away. */
-export function useHandoffTargets(thread: { status: string } | null | undefined, blocked: string | null | undefined, handoff: HandoffView | null | undefined) {
-  const may = !!thread && mayHandOff(thread.status, blocked, handoff);
+export function useHandoffTargets(thread: { status: string } | null | undefined, held: Omit<Holding, 'status'>) {
+  const v = { ...held, status: thread?.status };
+  const may = mayHandOff(v);
   const sync = useApi<SyncStatus>(may ? '/sync/status' : null);
   const devices = useApi<Device[]>(may && syncCarries(sync.data) ? '/devices' : null);
-  return handoffTargets({ status: thread?.status, blocked, handoff, sync: sync.data, devices: devices.data });
+  return handoffTargets({ ...v, sync: sync.data, devices: devices.data });
 }
 
 /**
@@ -75,7 +76,7 @@ export function HandoffCard({
         </div>
         {banner.cancel && (
           <Button size="sm" variant="secondary" icon="x" busy={busy} onClick={() => void cancel()} className="ml-auto shrink-0">
-            Cancel handoff
+            {handoff.state.phase === 'requested' ? 'Cancel request' : 'Cancel handoff'}
           </Button>
         )}
       </div>

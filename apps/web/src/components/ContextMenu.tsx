@@ -1,14 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import type { HandoffView } from '@omni/shared/handoff.ts';
+import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import { api, errorText, type Thread, type ThreadDetail } from '../api.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
 import { useToast } from './Toaster.tsx';
 import { draftKey, useFolders } from '../folders.tsx';
-import { deviceRows } from '../handoff.ts';
+import { deviceRows, mayTakeOver } from '../handoff.ts';
 import { canMarkDone } from '../needs-you.ts';
 import { navigate, href, openNewThread, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { handOff, useHandoffTargets } from './thread/Handoff.tsx';
+import { TakeoverConfirm } from './thread/Takeover.tsx';
 import { Icon, Loader, StatusDot, type IconName } from './ui.tsx';
 
 type Target = { kind: 'thread'; id: string } | { kind: 'channel'; id: string } | { kind: 'folder'; id: string };
@@ -46,6 +47,8 @@ function targetOf(el: EventTarget | null): Target | null {
  */
 export function ContextMenuHost() {
   const [open, setOpen] = useState<Open | null>(null);
+  // Take over's confirm outlives the menu, which closes on the first click outside it.
+  const [taking, setTaking] = useState<{ threadId: string; takeover: Takeover } | null>(null);
   useEffect(() => {
     const onMenu = (e: MouseEvent) => {
       if (e.defaultPrevented) return;
@@ -62,12 +65,27 @@ export function ContextMenuHost() {
       window.removeEventListener(OPEN_EVENT, onOpen);
     };
   }, []);
-  if (!open) return null;
-  // A new open starts fresh, even over one already showing.
-  return <Menu key={`${open.target.kind}:${open.target.id}:${open.x}:${open.y}:${!!open.handoff}`} open={open} onClose={() => setOpen(null)} />;
+  return (
+    <>
+      {/* A new open starts fresh, even over one already showing. */}
+      {open && (
+        <Menu
+          key={`${open.target.kind}:${open.target.id}:${open.x}:${open.y}:${!!open.handoff}`}
+          open={open}
+          onClose={() => setOpen(null)}
+          onTakeOver={(threadId, takeover) => {
+            setOpen(null);
+            setTaking({ threadId, takeover });
+          }}
+        />
+      )}
+      {/* The thread's stream brings the request to an open thread page. */}
+      {taking && <TakeoverConfirm threadId={taking.threadId} takeover={taking.takeover} onClose={() => setTaking(null)} onChanged={() => {}} />}
+    </>
+  );
 }
 
-function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
+function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; onTakeOver: (threadId: string, takeover: Takeover) => void }) {
   const { target } = open;
   const { channel, reloadChannels, setPinned, setDone } = useApp();
   const route = useRoute();
@@ -88,7 +106,8 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
   const toast = useToast();
   const [blocked, setBlocked] = useState<string | null>(null);
   const [handoff, setHandoff] = useState<HandoffView | null>(null);
-  const targets = useHandoffTargets(row, blocked, handoff);
+  const [takeover, setTakeover] = useState<Takeover | null>(null);
+  const targets = useHandoffTargets(row, { blocked, handoff, takeover });
   const folders = useFolders();
 
   // Ask for the thread's state so the item reads "Unarchive" on one that is.
@@ -103,6 +122,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
         setCurrent(d.thread.title);
         setBlocked(d.blocked ?? null);
         setHandoff(d.handoff ?? null);
+        setTakeover(d.takeover ?? null);
         setRow(d.thread);
       })
       .catch(() => {});
@@ -242,6 +262,9 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
           { label: 'Rename thread', icon: 'pencil', run: () => setDraft(current ?? '') },
           ...(row && !row.parent_id ? [{ label: 'Move to folder', icon: 'folder' as const, run: () => setMoving(true) }] : []),
           ...(targets.state === 'ready' ? [{ label: 'Hand off to…', icon: 'share' as const, run: () => setHandingOff(true) }] : []),
+          ...(takeover && mayTakeOver(takeover, handoff)
+            ? [{ label: `Take over from ${takeover.from.name}`, icon: 'download' as const, run: () => onTakeOver(target.id, takeover) }]
+            : []),
           { label: 'Send to Grok Bot', icon: 'grok', run: () => void sendGrok() },
           { label: archived ? 'Unarchive thread' : 'Archive thread', icon: 'archive', run: toggleArchive },
         ]

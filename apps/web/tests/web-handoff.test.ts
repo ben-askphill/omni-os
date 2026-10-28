@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Device, HandoffPhase, HandoffView } from '@omni/shared/handoff.ts';
-import { blockedNote, deviceRows, handoffBanner, handoffTargets } from '../src/handoff.ts';
+import type { Device, HandoffPhase, HandoffView, Takeover } from '@omni/shared/handoff.ts';
+import { blockedNote, deviceRows, handoffBanner, handoffTargets, mayTakeOver, takeoverShown } from '../src/handoff.ts';
 
 // What the Web UI shows for handing a thread to another synced Mac (apps/web/src/handoff.ts): when "Hand off to…" is
-// offered, which Macs can be picked and how each reads, and the banner per phase on the giving and the taking Mac.
+// offered, which Macs can be picked and how each reads, the banner per phase on the giving and the taking Mac, and when
+// Take over is on offer for a thread another Mac holds.
 
 const NOW = Date.parse('2026-10-23T12:00:00Z');
 const SYNC = { configured: true, enabled: true, signedOut: false };
@@ -20,9 +21,20 @@ const view = (state: HandoffPhase, outgoing = true, leftBehind: string | null = 
   state,
   leftBehind,
   idle: false,
+  requested: false,
 });
 
-const base = { status: 'running', blocked: null, handoff: null, sync: SYNC, devices: [air] };
+/** A Take over as the asking Mac (the Air) sees it: the Pro holds the thread. */
+const asked = (state: HandoffPhase): HandoffView => ({ ...view(state, false), requested: true });
+const held = (over: Partial<Takeover> = {}): Takeover => ({
+  from: { id: 'm-pro', name: "Ben's MacBook Pro" },
+  to: { id: 'm-air', name: "Ben's MacBook Air" },
+  running: true,
+  refused: null,
+  ...over,
+});
+
+const base = { status: 'running', blocked: null, handoff: null, takeover: null, sync: SYNC, devices: [air] };
 
 describe('when the thread offers "Hand off to…"', () => {
   it('offers a running or queued thread on this Mac when another synced Mac exists', () => {
@@ -39,9 +51,15 @@ describe('when the thread offers "Hand off to…"', () => {
     expect(handoffTargets({ ...base, blocked: "This thread is running on Ben's MacBook Air." }).state).toBe('none');
   });
 
+  it('does not offer a thread another Mac holds between turns: only that Mac hands it off, this one takes it over', () => {
+    expect(handoffTargets({ ...base, status: 'done', takeover: held({ running: false }) }).state).toBe('none');
+    expect(handoffTargets({ ...base, status: 'done', takeover: held({ running: false, refused: 'It has crew threads running.' }) }).state).toBe('none');
+  });
+
   it('does not offer it again while a handoff is under way, and does once that one settled', () => {
     expect(handoffTargets({ ...base, handoff: view({ phase: 'preparing', step: 'stopping' }) }).state).toBe('none');
     expect(handoffTargets({ ...base, handoff: view({ phase: 'offered', stale: true }) }).state).toBe('none');
+    expect(handoffTargets({ ...base, handoff: asked({ phase: 'requested', stale: false }) }).state).toBe('none');
     expect(handoffTargets({ ...base, handoff: view({ phase: 'cancelled' }) }).state).toBe('ready');
     expect(handoffTargets({ ...base, handoff: view({ phase: 'failed', error: 'no session', where: 'here' }) }).state).toBe('ready');
   });
@@ -112,12 +130,88 @@ describe('the handoff banner', () => {
   });
 });
 
+describe('the handoff banner for a Take over', () => {
+  it('on the asking Mac, is a card with Cancel while the other Mac has not answered, and an alert once it waited long', () => {
+    expect(handoffBanner(asked({ phase: 'requested', stale: false }), 'running')).toEqual({
+      size: 'card',
+      tone: 'waiting',
+      cancel: true,
+      text: "Asking Ben's MacBook Pro to hand this thread over.",
+    });
+    expect(handoffBanner(asked({ phase: 'requested', stale: true }), 'running')).toMatchObject({
+      size: 'card',
+      tone: 'alert',
+      cancel: true,
+      text: expect.stringMatching(/^Ben's MacBook Pro has not answered\. It may be asleep/),
+    });
+  });
+
+  it('shows a refusal or an expired request as an alert with nothing to cancel', () => {
+    expect(handoffBanner(asked({ phase: 'declined', error: 'It has crew threads running' }), 'running')).toEqual({
+      size: 'card',
+      tone: 'alert',
+      cancel: false,
+      text: "Ben's MacBook Pro kept this thread: It has crew threads running.",
+    });
+    expect(handoffBanner(asked({ phase: 'expired' }), 'done')).toEqual({
+      size: 'card',
+      tone: 'alert',
+      cancel: false,
+      text: "Ben's MacBook Pro did not answer within an hour, so the request expired.",
+    });
+  });
+
+  it('settles to one line in Take over words on both Macs', () => {
+    expect(handoffBanner(asked({ phase: 'accepted' }), 'running')).toEqual({ size: 'line', tone: 'done', text: "Taken over from Ben's MacBook Pro. Running on this Mac." });
+    expect(handoffBanner({ ...asked({ phase: 'accepted' }), outgoing: true }, 'stopped')).toMatchObject({ text: "Ben's MacBook Air took this thread over. Running there." });
+  });
+});
+
+describe('Take over', () => {
+  it('is on offer while another Mac holds the thread and nothing is moving it', () => {
+    expect(mayTakeOver(held(), null)).toBe(true);
+    expect(mayTakeOver(held({ running: false }), null)).toBe(true);
+    for (const state of [{ phase: 'accepted' }, { phase: 'cancelled' }, { phase: 'expired' }, { phase: 'declined', error: 'busy' }, { phase: 'failed', error: 'x', where: 'here' }] as HandoffPhase[]) {
+      expect(mayTakeOver(held(), asked(state))).toBe(true);
+    }
+  });
+
+  it('is not on offer when no other Mac holds it, when that Mac refuses for now, or while a request or handoff is under way', () => {
+    expect(mayTakeOver(null, null)).toBe(false);
+    expect(mayTakeOver(undefined, null)).toBe(false);
+    expect(mayTakeOver(held({ refused: 'It has crew threads running.' }), null)).toBe(false);
+    for (const state of [{ phase: 'requested', stale: true }, { phase: 'preparing', step: 'stopping' }, { phase: 'offered', stale: false }] as HandoffPhase[]) {
+      expect(mayTakeOver(held(), asked(state))).toBe(false);
+    }
+  });
+
+  it('shows its note with the refusal too, and hides it while the handoff card has the floor', () => {
+    const refused = held({ refused: 'It has crew threads running.' });
+    expect(takeoverShown(refused, null)).toBe(refused);
+    expect(takeoverShown(held(), asked({ phase: 'requested', stale: false }))).toBeNull();
+    expect(takeoverShown(null, null)).toBeNull();
+  });
+});
+
 describe('the note over the composer', () => {
   it('stays out while the handoff card says the same thing, and shows otherwise', () => {
     const waiting = view({ phase: 'offered', stale: false });
     const text = handoffBanner(waiting, 'stopped')!.text;
-    expect(blockedNote(text, waiting, 'stopped')).toBeNull();
-    expect(blockedNote('This thread is running on Ben\'s MacBook Air.', view({ phase: 'accepted' }), 'running')).toBe("This thread is running on Ben's MacBook Air.");
-    expect(blockedNote("Omni is still preparing this thread's worktree.", null, 'queued')).toBe("Omni is still preparing this thread's worktree.");
+    expect(blockedNote(text, waiting, 'stopped', null)).toBeNull();
+    expect(blockedNote('This thread is running on Ben\'s MacBook Air.', view({ phase: 'accepted' }), 'running', null)).toBe("This thread is running on Ben's MacBook Air.");
+    expect(blockedNote("Omni is still preparing this thread's worktree.", null, 'queued', null)).toBe("Omni is still preparing this thread's worktree.");
+  });
+
+  it('stays out while the Take over note says the thread runs on the other Mac', () => {
+    const running = "This thread is running on Ben's MacBook Pro.";
+    expect(blockedNote(running, null, 'running', held())).toBeNull();
+    expect(blockedNote(running, null, 'running', held({ refused: 'It has crew threads running.' }))).toBeNull();
+    expect(blockedNote(running, null, 'running', null)).toBe(running);
+  });
+
+  it('stays out while a Take over waits, since its card says why no turn starts here', () => {
+    const waiting = asked({ phase: 'requested', stale: false });
+    expect(blockedNote(handoffBanner(waiting, 'running')!.text, waiting, 'running', null)).toBeNull();
+    expect(blockedNote("This thread is running on Ben's MacBook Air.", waiting, 'running', null)).toBeNull();
   });
 });

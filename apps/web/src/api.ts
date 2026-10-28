@@ -5,7 +5,7 @@ import type { HarnessInfo, ModelEntry, HarnessId } from '@omni/server/harness/ty
 import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
 import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
-import type { HandoffView } from '@omni/shared/handoff.ts';
+import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import type { DeliveryPage, DeliveryView } from '@omni/shared/automation-triggers.ts';
 import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/automation-events.ts';
 import type { ContinueLink } from '@omni/shared/continue.ts';
@@ -127,6 +127,8 @@ export interface ThreadDetail {
   blocked?: string;
   /** A handoff to or from another synced Mac that is under way or just settled. Older servers leave it out. */
   handoff?: HandoffView | null;
+  /** Another synced Mac holds the thread, so this Mac can ask for it. Absent when this Mac holds it or a handoff is under way. */
+  takeover?: Takeover;
   /** The thread this one continues on another harness, and the threads that continue it. Older servers leave them out. */
   continued_from?: ContinueLink | null;
   continued_in?: ContinueLink[];
@@ -658,7 +660,7 @@ export function openSSE(
 export type StreamMessage =
   | { type: 'event'; event: EventRow }
   | { type: 'artifact'; artifact: Artifact }
-  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string; handoff?: HandoffView | null }
+  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string; handoff?: HandoffView | null; takeover?: Takeover }
   /**
    * Sent once per connect, after any replayed rows (#224): the detail as GET /threads/:id has it now. `snapshot`: the
    * gap was too big to replay, so `detail` carries the newest page and its head instead.
@@ -679,6 +681,7 @@ export function classifyStream(d: unknown): StreamMessage | null {
       type: 'thread', thread: o.thread as Thread, pending: o.pending as PendingMsg[] | undefined, live: typeof o.live === 'boolean' ? o.live : undefined,
       blocked: typeof o.blocked === 'string' ? o.blocked : undefined,
       handoff: o.handoff && typeof o.handoff === 'object' ? (o.handoff as HandoffView) : null,
+      takeover: o.takeover && typeof o.takeover === 'object' ? (o.takeover as Takeover) : undefined,
     };
   if (o.kind === 'context' && o.context) return { type: 'context', context: o.context as ContextUsage };
   if (o.kind === 'mod_toast' && typeof o.text === 'string')
