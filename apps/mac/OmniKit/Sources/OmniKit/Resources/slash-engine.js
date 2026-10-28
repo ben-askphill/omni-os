@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // ../../../packages/shared/slash.ts
+  // packages/shared/slash.ts
   var OMNI_COMMANDS = [
     { name: "clear", description: "Start a new thread with the same settings", source: "omni", mentionable: false },
     { name: "new", description: "Start a new thread with the same settings", source: "omni", mentionable: false },
@@ -88,7 +88,7 @@
     });
   }
 
-  // ../../../packages/shared/composer-slash.ts
+  // packages/shared/composer-slash.ts
   var HARNESS_NAME = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor Agent", hermes: "Hermes", "cursor-cloud": "Cursor Cloud" };
   var harnessName = (id) => HARNESS_NAME[id] ?? id;
   var menuCommands = (list, where) => [
@@ -141,7 +141,7 @@
   }
   var and = (xs) => xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`;
 
-  // ../../../packages/shared/slash-menu.ts
+  // packages/shared/slash-menu.ts
   var TYPING = /^(\s*)\/([A-Za-z0-9._:-]*)$/;
   var TYPING_MENTION = /(?<=\s)\/([A-Za-z0-9._:-]*)$/;
   var NAME_REST = /^[A-Za-z0-9._:-]*/;
@@ -208,7 +208,7 @@
     return { text: text.slice(0, at.start) + insert + after, caret: at.start + name.length + 2 };
   }
 
-  // ../../../packages/shared/mention-menu.ts
+  // packages/shared/mention-menu.ts
   var TYPING2 = /(?<![\w@/.-])@([A-Za-z0-9._\-/]*)$/;
   var NAME_REST2 = /^[A-Za-z0-9._\-/]*/;
   function fileQuery(text, caret) {
@@ -224,7 +224,7 @@
     return { text: text.slice(0, at.start) + put + after, caret: at.start + insert.length + 2 };
   }
 
-  // ../../../packages/shared/slash-pills.ts
+  // packages/shared/slash-pills.ts
   function slashPieces(text, slash, visible = text.length) {
     const end = Math.min(visible, text.length);
     const hits = [...slash?.command ? [slash.command] : [], ...slash?.mentions ?? []].filter((h) => text[h.start] === "/" && h.start < h.end && h.end <= end).sort((a, b) => a.start - b.start);

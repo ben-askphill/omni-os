@@ -148,6 +148,22 @@ describe('adapter failure signals', () => {
   it('classifies known signals and safely falls back for arbitrary payloads', () => {
     for (const [text, category] of [['401', 'authentication'], ['EACCES', 'permission'], ['429', 'rate_limit'], ['ETIMEDOUT', 'timeout'], ['ECONNREFUSED', 'unavailable'], ['invalid argument', 'invalid_input'], ['ENOENT', 'not_found'], ['Exit code 1', 'command_exit'], ['PRIVATE PAYLOAD', 'unknown']]) expect(classifyFailure(text)).toBe(category);
   });
+  it('records DesignSync login and missing-parameter failures under actionable categories', async () => {
+    const t = await h.start('hello');
+    await h.untilResults(t.id, 1);
+    const ctx = { thread_id: t.id, channel_id: 'scratch', session_id: h.thread(t.id).session_id, harness: 'claude-code' };
+    for (const [id, text, category] of [
+      ['design-login', 'DesignSync needs design-system authorization before accessing a project.', 'authentication'],
+      ['design-parameter', '<tool_use_error>finalize_plan requires: missing_field.</tool_use_error>', 'invalid_input'],
+    ]) {
+      observeToolResult(ctx, { tool_use_id: id, text, is_error: true, truncated: false }, { name: 'DesignSync' });
+      const group = (toolFailures.groups() as any[]).find((g) => g.tool === 'DesignSync' && g.category === category);
+      expect(group).toMatchObject({ occurrences: 1, status: 'open' });
+      expect(toolFailures.occurrences(group.group_id)).toEqual([expect.objectContaining({ call_id: id, category })]);
+    }
+    expect(classifyFailure('A project needs review before publication.')).toBe('unknown');
+    expect(classifyFailure('Exit code 1\nDesignSync needs design-system authorization')).toBe('command_exit');
+  });
   it('classifies a shell failure by its exit code, never by words in the command output', () => {
     for (const [text, category] of [
       ['Exit code 1\n✓ retries after a timeout\n× returns 404 when the service is unavailable', 'command_exit'],

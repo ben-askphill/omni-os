@@ -74,7 +74,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
           '',
           '## Browser',
           config.browser
-            ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Screenshots land in ${browserOutDir(thread.id)} and show up in the thread. Give a screenshot a bare filename: the browser refuses paths outside that folder and your working directory, the artifacts folder and /tmp included, so copy the file afterwards if you need it elsewhere.`
+            ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Omit the screenshot filename to save in ${browserOutDir(thread.id)} and show it in the thread. An explicit relative filename saves in the working directory instead. Read or copy the exact path returned by the tool; do not assume a named screenshot is in the browser folder. The browser refuses paths outside its output folder and working directory, including the artifacts folder and /tmp, so copy the file afterwards if you need it elsewhere.`
             : '',
         ]),
     '',

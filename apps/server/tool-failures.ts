@@ -30,6 +30,9 @@ export function classifyFailure(text: string): FailureCategory {
   }
   // Claude Code's reply when Ben declines or interrupts a call.
   if (text.startsWith("The user doesn't want to proceed with this tool use")) return 'permission';
+  // DesignSync's headless login and required-parameter replies do not use the usual error keywords.
+  if (/^DesignSync needs design-system authorization\b/.test(text)) return 'authentication';
+  if (/^<tool_use_error>\w+ requires:/.test(text)) return 'invalid_input';
   if (/\b(401|unauthorized|unauthenticated|authentication|invalid.api.key)\b/i.test(text)) return 'authentication';
   if (/\b(403|forbidden|permission denied|access denied|EACCES|EPERM)\b/i.test(text)) return 'permission';
   if (/\b(429|rate.limit|quota.exceeded)\b/i.test(text)) return 'rate_limit';
