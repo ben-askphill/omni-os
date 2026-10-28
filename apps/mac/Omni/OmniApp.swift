@@ -51,7 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     if let qa {
       // A QA run keeps its server's log, record and data in its out folder, away from the real ones.
       let options = qa.supervisorOptions(repo: settings.config.repo)
-      return AppModel(settings: settings, supervisor: ServerSupervisor(settings: settings, options: options))
+      return AppModel(
+        settings: settings, supervisor: ServerSupervisor(settings: settings, options: options), monitor: qa.monitor(settings: settings))
     }
     #endif
     return AppModel(settings: settings)

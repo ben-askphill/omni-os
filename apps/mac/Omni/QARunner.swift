@@ -23,6 +23,13 @@ final class QARunner {
         launcher: ServerLauncher(extraEnvironment: QAServer.environment(out: out, repo: repo)),
         logURL: out.appending(path: "server.log"), recordURL: out.appending(path: "server.json"))
     }
+
+    /// Off the real monitor's port, so a monitor Ben started by hand is not what the run attaches to.
+    static let monitorPort = 4891
+
+    @MainActor func monitor(settings: ServerSettings) -> ActivityMonitor {
+      ActivityMonitor(port: Self.monitorPort, config: { settings.config }, options: .init(logURL: out.appending(path: "monitor.log")))
+    }
   }
 
   /// Captured by the main window, since only a view can read it.
@@ -318,6 +325,7 @@ final class QARunner {
     if case .running(startedByApp: true, _) = model.supervisor.state {
       await model.stopServer()
     }
+    await model.monitor.stop()
     write()
     exit(report.ok ? 0 : 1)
   }

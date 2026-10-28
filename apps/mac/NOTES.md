@@ -60,6 +60,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `ServerLaunch.swift` | `ServerStartError`, `LoginShell`, `NodeResolver`, `NodeVersion`, `ServerEnvironment`, `ServerLauncher`, `ServerLaunch` |
 | `ServerProcess.swift` | `ServerProcess` (spawn into the log, log tail, liveness, group stop), `SpawnedServer` |
 | `ServerSupervisor.swift` | `ServerSupervisor` (the state machine), `ServerRecord` |
+| `ActivityMonitor.swift` | `ActivityMonitor`: starts `prototypes/activity-monitor/sampler.mjs` (port 4791) with the app, attaches to one already answering, stops its own on quit |
 | `Navigation.swift` | `SidebarItem` (a sidebar row and its route), `Route.title(channelName:)`, `Route.newThreadRoute` |
 | `AppModel.swift` | `AppModel` (settings, supervisor, client and store, the route), `ServerScreen`, `StartFailure`, `State.label` and `canStart` |
 | `SVGPath.swift` | `SVGPath.cgPath`: SVG path data to a `CGPath` (every command, compact numbers, packed arc flags) |
@@ -373,7 +374,7 @@ Main window:
 - Under the usage card, the footer: a dot (volt running, grey while the feed retries, vermilion not running or failed), `State.label` ("Started by the app", "Started outside the app", "Not running"), the port and "Reconnecting". It opens the Server menu.
 - The detail is the server screen while `model.serverScreen` is set, else the screen for the route. Automations has its screen (below). Unknown routes show "Nothing here" and Go Home.
 - The title follows the route (`#acme` on a channel), "Omni" while the server screen shows.
-- Toolbar (transparent, no title): the sidebar toggle, back and forward, "Reconnecting" while the feed retries, Open in New Window on a thread. New thread and search are in the sidebar, as on the web. Menus: File > New Thread (Cmd-N, in place of New Window), a Server menu (Check Again is Cmd-R), View > Hide Sidebar (Ctrl-Cmd-S, `SidebarToggleCommand`).
+- Toolbar (transparent, no title): the sidebar toggle, back and forward, "Reconnecting" while the feed retries, Open in New Window on a thread. The Activity Monitor button (chart icon) opens the monitor's dashboard in the browser, or starts the monitor first when it is not running; Server > Open Activity Monitor does the same. The monitor starts in `AppModel.launch()` and, unlike the Omni server, stops in `prepareToQuit`. New thread and search are in the sidebar, as on the web. Menus: File > New Thread (Cmd-N, in place of New Window), a Server menu (Check Again is Cmd-R), View > Hide Sidebar (Ctrl-Cmd-S, `SidebarToggleCommand`).
 - The look is the Web UI's, not the stock macOS one: the design system's tokens (`apps/web/src/index.css`) are `Tok` in `Theme.swift`, with its pill buttons, `SegmentedPill`, fields, chips and card shadows. `Brand.swift` draws the web's icons, wordmark, mark, Loader and harness logos from `BrandPaths`. Give a Loader that can stay on screen a `color` (see `LayerAnimations.swift`); one without takes the foreground style, for a button's brief busy state. The window is a white canvas with a custom sidebar (not a `List`), 252pt by default and 200 to 420pt by dragging its right edge (`SidebarResizeHandle`, saved as `sidebar.width`; double-click resets), as the web's `SidebarPane`, and the screen in a card inset 8pt, as the web's pane, its corners concentric with the window's (`ConcentricRectangle`, 8pt at least; the web uses 22px). Status is the only color: ultramarine running, vermilion needs you, volt done; vermilion is never text.
 
 Server screen (`ServerScreen`):
@@ -488,6 +489,7 @@ apps/mac/.xcode/Build/Products/Debug/Omni.app/Contents/MacOS/Omni -ApplePersiste
 - Give every flag a value. A flag without one ahead of the others left the app with no window.
 - It refuses to run (exit 2, reason in `qa.json` and stderr) unless launch arguments set `-serverPort` (every one given) to a port other than 4747. `QALaunch.serverPort` checks the raw arguments before the app model exists, so nothing has talked to a server yet. A `{"port": 4747}` step is rejected, and server steps refuse while the port is 4747. So a QA run never talks to the live server and never saves settings.
 - A server a QA run starts keeps its data, brain folder, log and record in the out folder and runs the fake CLIs (`QAServer.environment`: `OMNI_DATA_DIR`, `OMNI_BRAIN_DIR`, `OMNI_CLAUDE_BIN`, `OMNI_CODEX_BIN`, `OMNI_CURSOR_BIN`, `OMNI_BROWSER=0`). The run stops it before quitting.
+- The harness's activity monitor runs on port 4891 (`QARunner.monitorPort`), so it never meets one started by hand on 4791; its log is `monitor.log` in the out folder and `end()` stops it.
 - The app exits at `quit` or when the steps run out: 0 when every step passed, 1 otherwise.
 - `-appearance light` or `dark` sets the appearance for the run, to snapshot both.
 - `-OmniQAManualHistory YES` stops "Earlier messages" loading by itself, to snapshot the control.

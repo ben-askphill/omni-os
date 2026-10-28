@@ -256,16 +256,28 @@ public struct ServerLauncher: Sendable {
     guard fm.fileExists(atPath: repo.appending(path: "node_modules/tsx/package.json").path) else {
       throw .dependenciesMissing(path: repo.path)
     }
+    let (node, environment) = try await nodeAndEnvironment(config, extra: extraEnvironment)
+    // apps/server's start script is `tsx index.ts`. Loading tsx into node itself keeps it one
+    // process, so the pid is the server's.
+    return ServerLaunch(executable: node, arguments: ["--import", "tsx", "apps/server/index.ts"], directory: repo, environment: environment)
+  }
+
+  /// A plain Node script in the checkout, like the activity monitor. It needs no install, only Node 24.
+  public func prepareScript(_ config: ServerConfig, script: String, extra: [String: String] = [:]) async throws(ServerStartError) -> ServerLaunch {
+    let repo = config.repo
+    guard FileManager.default.fileExists(atPath: repo.appending(path: script).path) else {
+      throw .spawnFailed("\(script) is not in \(repo.path). Update the checkout")
+    }
+    let (node, environment) = try await nodeAndEnvironment(config, extra: extraEnvironment.merging(extra) { $1 })
+    return ServerLaunch(executable: node, arguments: [script], directory: repo, environment: environment)
+  }
+
+  private func nodeAndEnvironment(_ config: ServerConfig, extra: [String: String]) async throws(ServerStartError) -> (URL, [String: String]) {
     let home = appEnvironment["HOME"] ?? NSHomeDirectory()
     let loginPath = await loginShell.path() ?? ServerEnvironment.fallbackPath(home: home)
     let resolver = NodeResolver(override: config.node, nvmVersions: nvmVersions, environment: ServerEnvironment.minimal(appEnvironment))
     let node = try await resolver.resolve(path: loginPath)
     let path = ServerEnvironment.path(node: node.binary, loginPath: loginPath)
-    // apps/server's start script is `tsx index.ts`. Loading tsx into node itself keeps it one
-    // process, so the pid is the server's.
-    return ServerLaunch(
-      executable: node.binary, arguments: ["--import", "tsx", "apps/server/index.ts"], directory: repo,
-      environment: ServerEnvironment.child(app: appEnvironment, path: path, port: config.port, extra: extraEnvironment)
-    )
+    return (node.binary, ServerEnvironment.child(app: appEnvironment, path: path, port: config.port, extra: extra))
   }
 }

@@ -189,8 +189,40 @@ struct ServerMenuItems: View {
     Button("Check Again") { Task { await model.checkAgain() } }
       .keyboardShortcut(shortcuts ? KeyboardShortcut("r") : nil)
     Divider()
+    Button("Open Activity Monitor") { openMonitor(model.monitor) }
+      .disabled(!model.monitor.isRunning)
     Button("Open Log") { openLog(model) }
       .disabled(!logExists(model))
+  }
+}
+
+/// Opens the activity monitor's dashboard in the browser.
+@MainActor func openMonitor(_ monitor: ActivityMonitor) {
+  NSWorkspace.shared.open(monitor.url)
+}
+
+/// The toolbar button for the activity monitor. It waits for the monitor's server, and starts it again when it
+/// failed to start.
+struct ActivityMonitorButton: View {
+  let monitor: ActivityMonitor
+
+  var body: some View {
+    Button {
+      if monitor.isRunning { openMonitor(monitor) } else { monitor.start() }
+    } label: {
+      Label("Activity Monitor", systemImage: "chart.xyaxis.line")
+    }
+    .buttonStyle(.icon(size: 28))
+    .disabled(monitor.state == .starting)
+    .help(help)
+  }
+
+  private var help: String {
+    switch monitor.state {
+    case .running: "Open the activity monitor"
+    case .starting, .off: "Starting the activity monitor…"
+    case .failed(let message): "\(message) Click to try again."
+    }
   }
 }
 

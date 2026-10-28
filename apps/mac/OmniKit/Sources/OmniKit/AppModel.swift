@@ -87,6 +87,8 @@ public final class AppModel {
 
   public let settings: ServerSettings
   public let supervisor: ServerSupervisor
+  /// The activity monitor's local server, started with the app. The toolbar button opens its dashboard.
+  public let monitor: ActivityMonitor
   public private(set) var client: OmniClient
   public private(set) var store: WorkspaceStore
   /// The open threads' stores. Feed thread events are passed to `apply(feed:)`. Swapped on a port change.
@@ -126,13 +128,14 @@ public final class AppModel {
 
   /// - Parameter connect: makes the client and store for a port. `liveConnection` with the supervisor's token by default.
   public init(
-    settings: ServerSettings, supervisor: ServerSupervisor? = nil, attention: AttentionCenter? = nil,
+    settings: ServerSettings, supervisor: ServerSupervisor? = nil, monitor: ActivityMonitor? = nil, attention: AttentionCenter? = nil,
     connect: (@MainActor (_ port: Int) -> Connection)? = nil
   ) {
     self.settings = settings
     self.attention = attention ?? AttentionCenter()
     let supervisor = supervisor ?? ServerSupervisor(settings: settings)
     self.supervisor = supervisor
+    self.monitor = monitor ?? ActivityMonitor(config: { [settings] in settings.config })
     let connect = connect ?? { [token = supervisor.token] port in AppModel.liveConnection(port: port, token: token) }
     self.connect = connect
     config = settings.config
@@ -172,6 +175,7 @@ public final class AppModel {
     feed.start()
     store.start()
     checkServer()
+    monitor.start()
     watchers.append(Task { [weak self, settings] in
       for await config in Observations({ settings.config }) {
         guard let self else { return }

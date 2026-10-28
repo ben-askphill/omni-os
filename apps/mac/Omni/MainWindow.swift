@@ -97,6 +97,7 @@ struct MainWindow: View {
         .buttonStyle(.icon(size: 28))
         .help("Open in New Window")
       }
+      ActivityMonitorButton(monitor: model.monitor)
     }
     .sharedBackgroundVisibility(.hidden)
     if let notice = model.connectionNotice {

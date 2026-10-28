@@ -241,5 +241,7 @@ extension AppModel {
     }
     // The state the decision came from may be old: only a server the app started goes, whatever runs now.
     if stopServer { await self.stopServer(ownOnly: true) }
+    // The monitor is the app's own: it goes with it.
+    await monitor.stop()
   }
 }
