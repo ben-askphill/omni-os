@@ -45,7 +45,7 @@ struct BrowserLiveAnnotateLayer: View {
 
       // At the bottom centre: the hint, which the card replaces once something is marked, and a word once it went.
       VStack(spacing: 0) {
-        Spacer(minLength: z(8))
+        Spacer(minLength: z(Space.s4))
         if live.phase != .idle {
           LiveAnnotateCard(live: live, annotating: annotating, overChrome: $overChrome).frame(maxHeight: size.height * 0.72, alignment: .bottom)
         } else if let done = live.confirmation {
@@ -54,7 +54,7 @@ struct BrowserLiveAnnotateLayer: View {
           hint
         }
       }
-      .padding(z(8))
+      .padding(z(Space.s4))
       .frame(width: size.width, height: size.height)
     }
     .frame(width: size.width, height: size.height, alignment: .topLeading)
@@ -66,10 +66,10 @@ struct BrowserLiveAnnotateLayer: View {
   private var capturing: Bool { if case .capturing = live.phase { true } else { false } }
 
   private var hint: some View {
-    HStack(spacing: z(8)) {
-      OmniIcon(name: "target", size: 13).foregroundStyle(Tok.needs)
+    HStack(spacing: z(Space.s4)) {
+      OmniIcon(name: "target", size: 13).foregroundStyle(Tok.fg3)
       Text("Click an element or drag an area · ⌥-click uses the page")
-        .font(.omni(size: 12))
+        .font(.omni(size: TypeSize.twelve))
         .foregroundStyle(Tok.fg2)
         .lineLimit(1)
         .truncationMode(.tail)
@@ -77,26 +77,25 @@ struct BrowserLiveAnnotateLayer: View {
         .buttonStyle(.pill(.secondary, height: 24))
         .help("Stop annotating (Esc)")
     }
-    .padding(.leading, z(12))
-    .padding(.trailing, z(4))
+    .padding(.leading, z(Space.s6))
+    .padding(.trailing, z(Space.s2))
     .frame(height: z(32))
     .background(Tok.elev, in: Capsule())
-    .overlay(Capsule().strokeBorder(Tok.line))
-    .shadow(color: .black.opacity(0.12), radius: z(8), y: z(2))
+    .menuShadow(z(16))
     .onHover { overChrome = $0 }
   }
 
   private func confirmation(_ text: String) -> some View {
-    HStack(spacing: z(6)) {
+    HStack(spacing: z(Space.s3)) {
       OmniIcon(name: "check", size: 13)
       Text(text)
     }
-    .font(.omni(size: 12.5, weight: .medium))
+    .font(.omni(size: TypeSize.small, weight: .medium))
     .foregroundStyle(Tok.onInk)
-    .padding(.horizontal, z(14))
+    .padding(.horizontal, z(Space.s7))
     .frame(height: z(32))
     .background(Tok.fg, in: Capsule())
-    .shadow(color: .black.opacity(0.15), radius: z(8), y: z(2))
+    .menuShadow(z(16))
     .task(id: text) {
       try? await Task.sleep(for: .seconds(2))
       if !Task.isCancelled { live.dismissConfirmation() }
@@ -117,54 +116,53 @@ private struct InspectorTip: View {
 
   var body: some View {
     let s = element.styles
-    VStack(alignment: .leading, spacing: z(5)) {
-      HStack(alignment: .firstTextBaseline, spacing: z(8)) {
+    VStack(alignment: .leading, spacing: z(Space.s2)) {
+      HStack(alignment: .firstTextBaseline, spacing: z(Space.s4)) {
         Text(element.name)
-          .font(.omni(size: 12, weight: .semibold, design: .monospaced))
-          .foregroundStyle(Tok.needs)
+          .font(.omni(size: TypeSize.twelve, weight: .semibold, design: .monospaced))
+          .foregroundStyle(Tok.fg)
           .lineLimit(1)
           .truncationMode(.middle)
         Spacer(minLength: 0)
         Text(element.sizeLabel)
-          .font(.omni(size: 11.5).monospacedDigit())
+          .font(.omni(size: TypeSize.code).monospacedDigit())
           .foregroundStyle(Tok.fg3)
           .fixedSize()
       }
       if element.path.count > 1 {
         Text(element.breadcrumb)
-          .font(.omni(size: 11))
+          .font(.omni(size: TypeSize.meta))
           .foregroundStyle(Tok.fg4)
           .lineLimit(1)
           .truncationMode(.head)
       }
       if element.opaqueFrame {
         Text("A frame from another site: its inside cannot be read.")
-          .font(.omni(size: 11))
+          .font(.omni(size: TypeSize.meta))
           .foregroundStyle(Tok.fg3)
       }
       let rows = Self.rows(s)
       if !rows.isEmpty {
-        Grid(alignment: .leading, horizontalSpacing: z(10), verticalSpacing: z(2)) {
+        Grid(alignment: .leading, horizontalSpacing: z(Space.s5), verticalSpacing: z(Space.s1)) {
           ForEach(rows, id: \.label) { row in
             GridRow {
               Text(row.label).foregroundStyle(Tok.fg4)
-              HStack(spacing: z(5)) {
+              HStack(spacing: z(Space.s3)) {
                 if let swatch = row.swatch { Swatch(css: swatch) }
                 Text(row.value).foregroundStyle(Tok.fg2).lineLimit(1).truncationMode(.tail)
               }
             }
           }
         }
-        .font(.omni(size: 11, design: .monospaced))
-        .padding(.top, z(2))
+        .font(.omni(size: TypeSize.meta, design: .monospaced))
+        .padding(.top, z(Space.s1))
       }
     }
-    .padding(.horizontal, z(10))
-    .padding(.vertical, z(8))
+    .padding(.horizontal, z(Space.s5))
+    .padding(.vertical, z(Space.s4))
     .frame(width: width, alignment: .leading)
-    .background(Tok.elev, in: RoundedRectangle(cornerRadius: z(10), style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: z(10), style: .continuous).strokeBorder(Tok.lineStrong))
-    .shadow(color: .black.opacity(0.16), radius: z(10), y: z(3))
+    .background(Tok.elev, in: RoundedRectangle(cornerRadius: z(Radius.sm), style: .continuous))
+    .menuShadow(z(Radius.sm))
     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
     .offset(x: origin.x, y: origin.y)
   }
@@ -224,9 +222,8 @@ private struct LiveAnnotateCard: View {
       content
       ScrollView { content }
     }
-    .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(14), style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: z(14), style: .continuous).strokeBorder(Tok.line))
-    .shadow(color: .black.opacity(0.16), radius: z(14), y: z(4))
+    .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(Radius.md), style: .continuous))
+    .menuShadow(z(Radius.md))
     .onHover { overChrome = $0 }
     .onExitCommand { live.escape() }
     .accessibilityElement(children: .contain)
@@ -235,38 +232,38 @@ private struct LiveAnnotateCard: View {
 
   private var content: some View {
     @Bindable var live = live
-    return VStack(alignment: .leading, spacing: z(10)) {
+    return VStack(alignment: .leading, spacing: z(Space.s5)) {
       switch live.phase {
       case .idle:
         EmptyView()
       case .capturing(let target, _):
         let reading = if case .element = target { true } else { false }
-        HStack(spacing: z(8)) {
+        HStack(spacing: z(Space.s4)) {
           Loader(size: 12, color: Tok.fg3)
           Text(reading ? "Capturing and reading the element…" : "Capturing…")
-            .font(.omni(size: 12.5))
+            .font(.omni(size: TypeSize.small))
             .foregroundStyle(Tok.fg3)
           Spacer(minLength: 0)
           close
         }
       case .failed(let why):
-        HStack(alignment: .top, spacing: z(8)) {
-          ErrorNote(text: why).font(.omni(size: 12.5))
+        HStack(alignment: .top, spacing: z(Space.s4)) {
+          ErrorNote(text: why).font(.omni(size: TypeSize.small))
           close
         }
       case .marked(let m):
-        HStack(alignment: .top, spacing: z(10)) {
+        HStack(alignment: .top, spacing: z(Space.s5)) {
           CaptureCrop(client: annotating.client, capture: m.capture, rect: m.rect)
-          VStack(alignment: .leading, spacing: z(6)) {
+          VStack(alignment: .leading, spacing: z(Space.s3)) {
             if let e = m.element {
               PickedElementView(element: e)
             } else {
               Text("Area \(m.rect.width)×\(m.rect.height)")
-                .font(.omni(size: 12.5, weight: .medium))
+                .font(.omni(size: TypeSize.small, weight: .medium))
                 .foregroundStyle(Tok.fg)
-                .padding(.top, z(2))
+                .padding(.top, z(Space.s1))
             }
-            if let notice = m.notice { Text(notice).font(.omni(size: 11.5)).foregroundStyle(Tok.fg3) }
+            if let notice = m.notice { Text(notice).font(.omni(size: TypeSize.code)).foregroundStyle(Tok.fg3) }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
           close
@@ -280,8 +277,8 @@ private struct LiveAnnotateCard: View {
             live.escape()
             return .handled
           }
-        if let error = live.error { ErrorNote(text: error).font(.omni(size: 12.5)) }
-        HStack(spacing: z(8)) {
+        if let error = live.error { ErrorNote(text: error).font(.omni(size: TypeSize.small)) }
+        HStack(spacing: z(Space.s4)) {
           Button("Draw") { draw() }
             .buttonStyle(.pill(.ghost, height: 28))
             .help("Mark up this screenshot with the pen, shapes and text")
@@ -297,7 +294,7 @@ private struct LiveAnnotateCard: View {
         .onAppear { noteFocused = true }
       }
     }
-    .padding(z(12))
+    .padding(z(Space.s6))
   }
 
   private var close: some View {
@@ -338,8 +335,8 @@ private struct CaptureCrop: View {
     .frame(width: box.width, height: box.height, alignment: .topLeading)
     .clipped()
     .background(Tok.surface2)
-    .clipShape(RoundedRectangle(cornerRadius: z(8), style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: z(8), style: .continuous).strokeBorder(Tok.line))
+    .clipShape(RoundedRectangle(cornerRadius: z(Radius.xs), style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: z(Radius.xs), style: .continuous).strokeBorder(Tok.line))
     .accessibilityLabel("Screenshot of the marked part")
   }
 

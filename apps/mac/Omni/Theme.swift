@@ -46,6 +46,54 @@ enum Tok {
   }
 }
 
+/// The Claude Design system's type sizes (tokens/type.css), `--fs-*` in index.css. Points at actual size, for
+/// `Font.omni`.
+enum TypeSize {
+  static let label: CGFloat = 10.5
+  static let meta: CGFloat = 11
+  static let code: CGFloat = 11.5
+  /// `--fs-12`.
+  static let twelve: CGFloat = 12
+  static let small: CGFloat = 12.5
+  static let ui: CGFloat = 13
+  static let nav: CGFloat = 13.5
+  static let body: CGFloat = 14
+  static let prose: CGFloat = 14.5
+  static let subhead: CGFloat = 15
+  static let input: CGFloat = 16
+  static let heading: CGFloat = 17
+  static let title: CGFloat = 26
+  static let titleLarge: CGFloat = 30
+  static let display: CGFloat = 44
+}
+
+/// The spacing steps (tokens/space.css), `--sp-1` to `--sp-12` in index.css. Points at actual size, for `z(_:)`.
+enum Space {
+  static let s1: CGFloat = 2
+  static let s2: CGFloat = 4
+  static let s3: CGFloat = 6
+  static let s4: CGFloat = 8
+  static let s5: CGFloat = 10
+  static let s6: CGFloat = 12
+  static let s7: CGFloat = 14
+  static let s8: CGFloat = 16
+  static let s9: CGFloat = 20
+  static let s10: CGFloat = 24
+  static let s11: CGFloat = 32
+  static let s12: CGFloat = 40
+}
+
+/// The corner radii (tokens/space.css), `--r-*` in index.css. Points at actual size, for `z(_:)`. Pills are `Capsule`.
+enum Radius {
+  static let xs: CGFloat = 6
+  static let sm: CGFloat = 12
+  static let md: CGFloat = 14
+  static let lg: CGFloat = 18
+  static let xl: CGFloat = 20
+  static let xxl: CGFloat = 22
+  static let xxxl: CGFloat = 28
+}
+
 extension NSColor {
   convenience init(hex: UInt32, alpha: Double = 1) {
     self.init(srgbRed: CGFloat((hex >> 16) & 0xff) / 255, green: CGFloat((hex >> 8) & 0xff) / 255,

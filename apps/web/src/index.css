@@ -61,6 +61,49 @@
   --dur-pulse: 1400ms;
   --dur-ping: 1600ms;
   --type-caption: 500 12px/1.2 var(--font-sans);
+  /* Type sizes, line heights, spacing and radii from the Claude Design system (tokens/type.css, tokens/space.css),
+     the same steps as Theme.swift's TypeSize, Space and Radius. Use them as values (`text-[length:var(--fs-meta)]`):
+     Tailwind's own radius and text names mean other sizes. */
+  --fs-label: 10.5px;
+  --fs-meta: 11px;
+  --fs-code: 11.5px;
+  --fs-12: 12px;
+  --fs-small: 12.5px;
+  --fs-ui: 13px;
+  --fs-nav: 13.5px;
+  --fs-body: 14px;
+  --fs-prose: 14.5px;
+  --fs-subhead: 15px;
+  --fs-input: 16px;
+  --fs-heading: 17px;
+  --fs-title: 26px;
+  --fs-title-lg: 30px;
+  --fs-display: 44px;
+  --lh-tight: 1.1;
+  --lh-heading: 1.25;
+  --lh-ui: 1.4;
+  --lh-body: 1.45;
+  --lh-prose: 1.62;
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 10px;
+  --sp-6: 12px;
+  --sp-7: 14px;
+  --sp-8: 16px;
+  --sp-9: 20px;
+  --sp-10: 24px;
+  --sp-11: 32px;
+  --sp-12: 40px;
+  --r-xs: 6px;
+  --r-sm: 12px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 20px;
+  --r-2xl: 22px;
+  --r-3xl: 28px;
+  --r-pill: 999px;
 }
 :root[data-theme="light"] {
   color-scheme: light;

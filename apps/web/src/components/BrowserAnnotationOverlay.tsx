@@ -384,25 +384,25 @@ export function ElementInspector({ element: e, at, bounds }: { element: Inspecte
       ref={ref}
       role="tooltip"
       data-element-inspector
-      className="pointer-events-none absolute z-20 w-max max-w-[300px] rounded-xl bg-elev px-3 py-2 text-[11.5px] leading-[1.45] text-fg-2 shadow-[var(--shadow-menu)]"
+      className="pointer-events-none absolute z-20 w-max max-w-[300px] rounded-[var(--r-sm)] bg-elev px-[var(--sp-6)] py-[var(--sp-4)] text-[length:var(--fs-code)] leading-[var(--lh-body)] text-fg-2 shadow-[var(--shadow-menu)]"
       style={{ left, top, visibility: size.w ? 'visible' : 'hidden' }}
     >
-      <div className="flex items-baseline gap-2">
-        <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-fg">{elementName(e)}</span>
+      <div className="flex items-baseline gap-[var(--sp-4)]">
+        <span className="min-w-0 flex-1 truncate font-mono text-[length:var(--fs-12)] text-fg">{elementName(e)}</span>
         <span className="shrink-0 font-num text-fg-4">{`${e.size.width} × ${e.size.height}`}</span>
       </div>
       {e.path.length > 1 && (
-        <div className="mt-0.5 truncate font-mono text-[10.5px] text-fg-4" dir="rtl" title={e.path.join(' › ')}>
+        <div className="mt-[var(--sp-1)] truncate font-mono text-[length:var(--fs-label)] text-fg-4" dir="rtl" title={e.path.join(' › ')}>
           <bdi>{e.path.join(' › ')}</bdi>
         </div>
       )}
-      {e.opaque_frame && <div className="mt-1 text-fg-3">A frame from another site. Its contents cannot be read.</div>}
+      {e.opaque_frame && <div className="mt-[var(--sp-2)] text-fg-3">A frame from another site. Its contents cannot be read.</div>}
       {rows.length > 0 && (
-        <dl className="mt-1.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 border-t border-line pt-1.5">
+        <dl className="mt-[var(--sp-3)] grid grid-cols-[auto_minmax(0,1fr)] gap-x-[var(--sp-6)] gap-y-[var(--sp-1)] border-t border-line pt-[var(--sp-3)]">
           {rows.map((r) => (
             <div key={r.label} className="contents">
               <dt className="text-fg-4">{r.label}</dt>
-              <dd className="m-0 flex min-w-0 items-center gap-1.5 font-mono text-[11px]">
+              <dd className="m-0 flex min-w-0 items-center gap-[var(--sp-3)] font-mono text-[length:var(--fs-meta)]">
                 {r.swatch && <span className="h-2.5 w-2.5 shrink-0 rounded-[3px] shadow-[inset_0_0_0_1px_var(--line-strong)]" style={{ background: r.swatch }} />}
                 <span className="truncate">{r.value}</span>
               </dd>
@@ -418,7 +418,7 @@ export function ElementInspector({ element: e, at, bounds }: { element: Inspecte
 function Crop({ threadId, capture, rect }: { threadId: string; capture: BrowserCapture; rect: PixelRect }) {
   const k = Math.min(88 / rect.width, 64 / rect.height, 1.5);
   return (
-    <span className="relative block shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-[inset_0_0_0_1px_var(--line)]" style={{ width: Math.max(24, rect.width * k), height: Math.max(24, rect.height * k) }}>
+    <span className="relative block shrink-0 overflow-hidden rounded-[var(--r-xs)] bg-surface-2 shadow-[inset_0_0_0_1px_var(--line)]" style={{ width: Math.max(24, rect.width * k), height: Math.max(24, rect.height * k) }}>
       <img
         src={uploadUrl(threadId, capture.image)}
         alt="What goes with the message"
@@ -469,9 +469,9 @@ export function LiveAnnotateCard({ live, threadId, onDraw, onDone, onSent, phone
   };
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center p-3">
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center p-[var(--sp-6)]">
       {!sel ? (
-        <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-full bg-elev py-1 pr-1 pl-3 text-[12px] text-fg-2 shadow-[var(--shadow-menu)]" data-live-annotate-hint>
+        <div className="pointer-events-auto flex max-w-full items-center gap-[var(--sp-4)] rounded-[var(--r-pill)] bg-elev py-[var(--sp-2)] pr-[var(--sp-2)] pl-[var(--sp-6)] text-[length:var(--fs-12)] text-fg-2 shadow-[var(--shadow-menu)]" data-live-annotate-hint>
           <Icon name="annotate" size={13} className="shrink-0 text-fg-3" />
           <span className="min-w-0 truncate">
             {flash ?? (phone ? 'Tap an element or drag an area' : 'Click an element or drag an area')}
@@ -491,15 +491,15 @@ export function LiveAnnotateCard({ live, threadId, onDraw, onDone, onSent, phone
           role="group"
           aria-label="What you picked"
           data-live-annotate-card
-          className="pointer-events-auto w-full max-w-[440px] rounded-2xl bg-elev p-3 text-[12.5px] shadow-[var(--shadow-menu)]"
+          className="pointer-events-auto w-full max-w-[440px] rounded-[var(--r-md)] bg-elev p-[var(--sp-6)] text-[length:var(--fs-small)] shadow-[var(--shadow-menu)]"
           onKeyDown={(e) => e.stopPropagation()}
         >
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-[var(--sp-6)]">
             {ready && sel.capture && sel.rect ? (
               <Crop threadId={threadId} capture={sel.capture} rect={sel.rect} />
             ) : (
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-surface-2">
-                {sel.status === 'capturing' ? <span className="pulse h-1.5 w-1.5 rounded-full bg-fg-4" /> : <Icon name="alert" size={14} className="text-fg-3" />}
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[var(--r-xs)] bg-surface-2">
+                {sel.status === 'capturing' ? <span className="pulse h-1.5 w-1.5 rounded-[var(--r-pill)] bg-fg-4" /> : <Icon name="alert" size={14} className="text-fg-3" />}
               </span>
             )}
             <div className="min-w-0 flex-1">
@@ -507,19 +507,19 @@ export function LiveAnnotateCard({ live, threadId, onDraw, onDone, onSent, phone
                 <PickedElementDetails element={sel.element} className="" />
               ) : (
                 <>
-                  <div className="truncate font-mono text-[12px] text-fg">
+                  <div className="truncate font-mono text-[length:var(--fs-12)] text-fg">
                     {sel.kind === 'element' && sel.inspected ? elementName(sel.inspected) : sel.rect ? `Area ${sel.rect.width}×${sel.rect.height}` : 'Area'}
                   </div>
-                  <div className="mt-0.5 text-[11.5px] text-fg-3">
+                  <div className="mt-[var(--sp-1)] text-[length:var(--fs-code)] text-fg-3">
                     {sel.status === 'capturing' ? 'Taking the screenshot' : sel.status === 'failed' ? 'Could not take the screenshot' : 'The screenshot of this area goes with your message.'}
                   </div>
                 </>
               )}
             </div>
-            <IconButton icon="x" label="Clear" size={13} className="-mt-1 -mr-1 h-7 w-7" onClick={live.clear} />
+            <IconButton icon="x" label="Clear" size={13} className="-mt-[var(--sp-2)] -mr-[var(--sp-2)] h-7 w-7" onClick={live.clear} />
           </div>
-          {sel.notice && <div className="mt-2 text-[11.5px] text-fg-3">{sel.notice}</div>}
-          {sel.error && <ErrorNote className="mt-2">{sel.error}</ErrorNote>}
+          {sel.notice && <div className="mt-[var(--sp-4)] text-[length:var(--fs-code)] text-fg-3">{sel.notice}</div>}
+          {sel.error && <ErrorNote className="mt-[var(--sp-4)]">{sel.error}</ErrorNote>}
           {sel.status !== 'failed' && (
             <textarea
               ref={noteRef}
@@ -536,10 +536,10 @@ export function LiveAnnotateCard({ live, threadId, onDraw, onDone, onSent, phone
                   if (ready) void send();
                 }
               }}
-              className="mt-2.5 block w-full resize-none rounded-xl bg-surface px-3 py-2 text-[16px] leading-[1.45] outline-none placeholder:text-fg-4 focus:shadow-[inset_0_0_0_1px_var(--line-strong)] sm:text-[13px]"
+              className="mt-[var(--sp-5)] block w-full resize-none rounded-[var(--r-sm)] bg-surface px-[var(--sp-6)] py-[var(--sp-4)] text-[length:var(--fs-input)] leading-[var(--lh-body)] outline-none placeholder:text-fg-4 focus:shadow-[inset_0_0_0_1px_var(--line-strong)] sm:text-[length:var(--fs-ui)]"
             />
           )}
-          <div className="mt-2 flex items-center justify-end gap-1.5">
+          <div className="mt-[var(--sp-4)] flex items-center justify-end gap-[var(--sp-3)]">
             {sel.status === 'failed' ? (
               <Button size="sm" variant="primary" onClick={() => void live.select(sel.kind, sel.live, sel.point ?? undefined, sel.inspected)}>
                 Try again
