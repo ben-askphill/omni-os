@@ -210,6 +210,8 @@ private struct ChannelThreads: View {
 
   var body: some View {
     let threads = ThreadListing.merging(loaded: loaded ?? [], live: model.store.recent, channel: channel.id)
+    let nestedChildren = Set(channel.handoffs.flatMap { $0.children.map(\.id) })
+    let visibleThreads = threads.filter { !nestedChildren.contains($0.id) }
     VStack(alignment: .leading, spacing: z(32)) {
       NewThreadComposerView(model: model, channelID: channel.id)
         .id(channel.id)
@@ -219,11 +221,11 @@ private struct ChannelThreads: View {
       } else if loaded == nil {
         LoadingNote()
       } else if !channel.folders.isEmpty {
-        ThreadFolderList(model: model, channel: channel, threads: threads, prs: prs)
-      } else if threads.isEmpty {
+        ThreadFolderList(model: model, channel: channel, threads: visibleThreads, prs: prs, handoffs: channel.handoffs)
+      } else if visibleThreads.isEmpty {
         EmptyNote(symbol: "message", title: "No threads in this channel yet", message: "Start one above. Crew threads delegated by the Conductor land here too.")
       } else {
-        ThreadDayList(model: model, threads: threads, prs: prs)
+        ThreadDayList(model: model, threads: visibleThreads, prs: prs, handoffs: channel.handoffs)
       }
       if loaded != nil, !archived.isEmpty {
         ArchivedThreadsSection(model: model, threads: archived) { await load() }

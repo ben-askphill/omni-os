@@ -7,6 +7,7 @@ import { groupByDay, plural, relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useFeed, useNow } from '../store.tsx';
 import { Avatar, Button, Chip, DoneMark, Empty, ErrorNote, Icon, Loading, StatusDot } from './ui.tsx';
+import { ThreadHandoffs } from './ThreadHandoffs.tsx';
 
 /** Loads a thread list and keeps it current from /feed. With `archived`, the list holds archived threads only. */
 export function useLiveThreads(path: string, accept: (t: Thread) => boolean, limit = 500, archived = false) {
@@ -122,26 +123,32 @@ export function ThreadGroups({
   /** One channel's list: grouped by its sidebar folders when it has any. */
   channel?: ChannelWithRunning;
 }) {
+  const handoffs = channel?.id === 'conductor' ? channel.handoffs ?? [] : [];
+  const childIds = new Set(handoffs.flatMap((g) => g.children.map((child) => child.id)));
+  const visibleThreads = (threads ?? []).filter((t) => !childIds.has(t.id));
   if (error && !threads) return <ErrorNote onRetry={onRetry}>{error}</ErrorNote>;
   if (!threads && loading) return <Loading label="Loading threads" />;
-  if (channel?.folders?.length) return <FolderGroups threads={threads ?? []} channel={channel} prs={prs} />;
-  if (!threads?.length) return <>{empty ?? <Empty icon="message" title="No threads yet" />}</>;
+  if (channel?.folders?.length) return <FolderGroups threads={visibleThreads} channel={channel} prs={prs} handoffs={handoffs} />;
+  if (!visibleThreads.length) return <>{empty ?? <Empty icon="message" title="No threads yet" />}</>;
   return (
     <div className="space-y-4">
-      {groupByDay(threads, (t) => t.updated_at).map((g) => (
+      {groupByDay(visibleThreads, (t) => t.updated_at).map((g) => (
         <section key={g.label}>
           <h3 className="caption sticky top-0 z-[2] flex items-center gap-2 bg-bg px-3.5 py-2">
             {g.label}
             <span className="text-fg-4/70">{g.items.length}</span>
           </h3>
-          <Rows threads={g.items} showChannel={showChannel} prs={prs} />
+          <Rows threads={g.items} showChannel={showChannel} prs={prs} handoffs={handoffs} />
         </section>
       ))}
     </div>
   );
 }
 
-function Rows({ threads, showChannel, prs, draggable }: { threads: Thread[]; showChannel?: boolean; prs?: Record<string, BranchPRMark>; draggable?: boolean }) {
+function Rows({ threads, showChannel, prs, draggable, handoffs = [] }: {
+  threads: Thread[]; showChannel?: boolean; prs?: Record<string, BranchPRMark>; draggable?: boolean;
+  handoffs?: ChannelWithRunning['handoffs'];
+}) {
   return (
     <div className="rise">
       {threads.map((t, i) => (
@@ -159,7 +166,16 @@ function Rows({ threads, showChannel, prs, draggable }: { threads: Thread[]; sho
           }
           onDragEnd={draggable ? drag.end : undefined}
         >
-          <ThreadRow t={t} showChannel={showChannel} pr={t.branch ? prs?.[t.branch] : undefined} />
+          {handoffs.find((g) => g.parent.id === t.id)?.children.length ? (
+            <ThreadHandoffs
+              idPrefix="channel-content"
+              parent={t}
+              children={handoffs.find((g) => g.parent.id === t.id)!.children}
+              renderParent={<ThreadRow t={t} showChannel={showChannel} pr={t.branch ? prs?.[t.branch] : undefined} />}
+            />
+          ) : (
+            <ThreadRow t={t} showChannel={showChannel} pr={t.branch ? prs?.[t.branch] : undefined} />
+          )}
         </div>
       ))}
     </div>
@@ -170,7 +186,7 @@ function Rows({ threads, showChannel, prs, draggable }: { threads: Thread[]; sho
  * A channel's threads under its sidebar folders, in the sidebar's order and with its open or closed state, then the
  * threads in none under "No folder". Drop a thread on a folder to file it there, or on "No folder" to take it out.
  */
-function FolderGroups({ threads, channel, prs }: { threads: Thread[]; channel: ChannelWithRunning; prs?: Record<string, BranchPRMark> }) {
+function FolderGroups({ threads, channel, prs, handoffs = [] }: { threads: Thread[]; channel: ChannelWithRunning; prs?: Record<string, BranchPRMark>; handoffs?: ChannelWithRunning['handoffs'] }) {
   const { folders: groups, unfiled } = groupByFolder(threads, channel);
   return (
     <div className="space-y-4">
@@ -179,7 +195,7 @@ function FolderGroups({ threads, channel, prs }: { threads: Thread[]; channel: C
           <FolderHeader channel={channel} folder={g.folder} count={g.threads.length} running={g.threads.some((t) => t.status === 'running' || t.status === 'queued')} />
           {!g.folder.collapsed &&
             (g.threads.length ? (
-              <Rows threads={g.threads} prs={prs} draggable />
+              <Rows threads={g.threads} prs={prs} draggable handoffs={handoffs} />
             ) : (
               <div className="px-3.5 pb-1 text-[12.5px] leading-7 text-fg-4">No threads yet. Drag one here or use Move to folder.</div>
             ))}
@@ -188,7 +204,7 @@ function FolderGroups({ threads, channel, prs }: { threads: Thread[]; channel: C
       <section>
         <FolderHeader channel={channel} count={unfiled.length} running={false} />
         {unfiled.length ? (
-          <Rows threads={unfiled} prs={prs} draggable />
+          <Rows threads={unfiled} prs={prs} draggable handoffs={handoffs} />
         ) : (
           <div className="px-3.5 pb-1 text-[12.5px] leading-7 text-fg-4">Every thread is in a folder.</div>
         )}

@@ -4,9 +4,11 @@ import { useLiveThreads } from '../components/ThreadList.tsx';
 import { Segmented } from '../components/ui.tsx';
 import { plural } from '../format.ts';
 import { href } from '../router.ts';
-import { recentThreads } from '../sidebar-lists.ts';
+import { recentThreadGroups, recentThreads, runningThreadGroups, type ThreadRowGroup } from '../sidebar-lists.ts';
 import { useApp, useNow } from '../store.tsx';
 import { activityOf } from './activity.ts';
+import { rowOf, type RowItem } from './rows.ts';
+import { MobileHandoffGroup } from './ChannelsScreen.tsx';
 import { NeedsCardView } from './NeedsCard.tsx';
 import { MoEmpty, MoHeader, MoRound, MoRows, MoScroll, MoSection, MoTitle } from './parts.tsx';
 import { useShell } from './shell.tsx';
@@ -26,6 +28,10 @@ export function ActivityScreen() {
     () => activityOf({ recent: recent.data, needsYou, pinned, latest: recentThreads(channels), channel: (id) => channel(id), harness: harnessLabel, now }),
     [recent.data, needsYou, pinned, channels, channel, now],
   );
+  const runningGroups = useMemo(() => runningThreadGroups(channels), [channels]);
+  const latestGroups = useMemo(() => recentThreadGroups(channels), [channels]);
+  const runningCount = countGroupedRows(a.running, runningGroups);
+  const latestCount = countGroupedRows(a.latest, latestGroups, true);
   const open = (id: string) => shell.open(href.thread(id));
   const waiting = a.needs.some((n) => n.glyph === 'needs');
   const show = (f: Filter) => filter === 'all' || filter === f;
@@ -53,7 +59,7 @@ export function ActivityScreen() {
               options={[
                 { id: 'all', label: 'All' },
                 { id: 'needs', label: 'Needs you', badge: count(a.needs.length) },
-                { id: 'running', label: 'Running', badge: count(a.running.length) },
+                { id: 'running', label: 'Running', badge: count(runningCount) },
                 { id: 'done', label: 'Done', badge: count(a.doneToday.length) },
               ]}
             />
@@ -74,8 +80,8 @@ export function ActivityScreen() {
         )}
         {/* As the sidebar: Running (hidden under All while nothing runs), Pinned, then Recent threads. */}
         {(filter === 'running' || (filter === 'all' && a.running.length > 0)) && (
-          <MoSection title="Running" count={a.running.length}>
-            {a.running.length ? <MoRows items={a.running} onOpen={(r) => open(r.id)} /> : <MoEmpty>Nothing is running. Tap + to start something.</MoEmpty>}
+          <MoSection title="Running" count={runningCount}>
+            {a.running.length ? <ActivityThreadRows idPrefix="activity-running" items={a.running} groups={runningGroups} channel={channel} now={now} onOpen={(r) => open(r.id)} /> : <MoEmpty>Nothing is running. Tap + to start something.</MoEmpty>}
           </MoSection>
         )}
         {filter === 'all' && a.pinned.length > 0 && (
@@ -84,8 +90,8 @@ export function ActivityScreen() {
           </MoSection>
         )}
         {filter === 'all' && a.latest.length > 0 && (
-          <MoSection title="Recent threads" count={a.latest.length}>
-            <MoRows items={a.latest} onOpen={(r) => open(r.id)} />
+          <MoSection title="Recent threads" count={latestCount}>
+            <ActivityThreadRows idPrefix="activity-recent" items={a.latest} groups={latestGroups} channel={channel} now={now} includeInactiveChildren onOpen={(r) => open(r.id)} />
           </MoSection>
         )}
         {show('done') && (
@@ -99,5 +105,48 @@ export function ActivityScreen() {
         )}
       </MoScroll>
     </>
+  );
+}
+
+function countGroupedRows(items: RowItem[], groups: ThreadRowGroup[], includeInactiveChildren = false) {
+  const ids = new Set(items.map((item) => item.id));
+  const visible = groups.filter((group) => ids.has(group.thread.id) || group.children.some((child) => ids.has(child.id)));
+  const parentIds = new Set(visible.map((group) => group.thread.id));
+  const childIds = new Set(visible.flatMap((group) => group.children.map((child) => child.id)));
+  return visible.reduce((count, group) => count + 1 + (includeInactiveChildren ? group.children.length : group.children.filter((child) => ids.has(child.id)).length), 0)
+    + items.filter((item) => !parentIds.has(item.id) && !childIds.has(item.id)).length;
+}
+
+function ActivityThreadRows({ items, groups, channel, now, includeInactiveChildren = false, idPrefix, onOpen }: {
+  items: RowItem[];
+  groups: ThreadRowGroup[];
+  channel: (id: string) => { name: string; icon: string | null } | undefined;
+  now: number;
+  includeInactiveChildren?: boolean;
+  idPrefix: string;
+  onOpen: (item: RowItem) => void;
+}) {
+  const byID = new Map(items.map((item) => [item.id, item]));
+  const visibleGroups = groups.filter((group) => byID.has(group.thread.id) || group.children.some((child) => byID.has(child.id)));
+  const parentIDs = new Set(visibleGroups.map((group) => group.thread.id));
+  const childIDs = new Set(visibleGroups.flatMap((group) => group.children.map((child) => child.id)));
+  const ordinary = items.filter((item) => !parentIDs.has(item.id) && !childIDs.has(item.id));
+  return (
+    <div className="flex flex-col">
+      {visibleGroups.map((group, i) => {
+        const item = byID.get(group.thread.id) ?? rowOf(group.thread, channel(group.thread.channel_id), now);
+        const children = includeInactiveChildren ? group.children : group.children.filter((child) => byID.has(child.id));
+        if (!children.length) return <MoRows key={group.thread.id} items={[item]} onOpen={onOpen} />;
+        return <MobileHandoffGroup
+          key={group.thread.id}
+          item={item}
+          group={{ parent: group.thread, children }}
+          onOpen={onOpen}
+          last={i === visibleGroups.length - 1 && ordinary.length === 0}
+          idPrefix={idPrefix}
+        />;
+      })}
+      {ordinary.length > 0 && <MoRows items={ordinary} onOpen={onOpen} />}
+    </div>
   );
 }

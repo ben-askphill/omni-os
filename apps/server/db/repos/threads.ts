@@ -144,6 +144,17 @@ export const threads = {
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
   children: (parentId: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? ORDER BY created_at`).all(parentId) as unknown as Thread[],
+  /** Threads delegated from Conductor jobs, kept visible beside their parent in the originating channel. */
+  conductorHandoffChildren: () =>
+    db
+      .prepare(
+        `SELECT ${THREAD_COLUMNS.split(', ').map((c) => `child.${c}`).join(', ')}
+         FROM threads child JOIN threads parent ON parent.id = child.parent_id
+         WHERE parent.channel_id = 'conductor' AND parent.archived = 0
+           AND child.source = 'conductor' AND child.archived = 0
+         ORDER BY parent.updated_at DESC, child.created_at ASC`,
+      )
+      .all() as unknown as Thread[],
   /** A team lead's members, in the order they were handed out. */
   team: (leadId: string) =>
     db

@@ -81,7 +81,27 @@ const RECENT_PER_CHANNEL = 5;
 /** A folder lists at most this many of its threads in the sidebar; its count still says how many there are. */
 const THREADS_PER_FOLDER = 50;
 
-const stub = ({ id, channel_id, title, status, created_at, updated_at, folder_id, harness, done_at }: Thread) => ({ id, channel_id, title, status, created_at, updated_at, folder_id, harness, done_at });
+const stub = ({ id, channel_id, title, status, created_at, updated_at, folder_id, harness, done_at, parent_id, source }: Thread) => ({
+  id, channel_id, title, status, created_at, updated_at, folder_id, harness, done_at, parent_id, source,
+});
+
+/** Conductor jobs with their delegated child threads, including children in other channels. */
+function conductorHandoffs() {
+  const groups = new Map<string, { parent: Thread; children: Thread[] }>();
+  for (const child of threads.conductorHandoffChildren()) {
+    const parentID = child.parent_id;
+    if (!parentID) continue;
+    let group = groups.get(parentID);
+    if (!group) {
+      const parent = threads.get(parentID);
+      if (!parent) continue;
+      group = { parent, children: [] };
+      groups.set(parentID, group);
+    }
+    group.children.push(child);
+  }
+  return [...groups.values()].map(({ parent, children }) => ({ parent: stub(parent), children: children.map(stub) }));
+}
 
 /** Each folder with its count, how many of its threads run, and its newest threads, keyed by channel. */
 function foldersByChannel(list: Folder[], filed: Thread[]) {
@@ -124,7 +144,7 @@ const isRunning = (t: Thread) => t.status === 'running' || t.status === 'queued'
  * A channel plus its busy threads, its latest ones, and its folders with their threads, so the sidebar can list them
  * under the name. `running` counts only the running and queued ones.
  */
-const withActive = (ch: Channel, busy: Thread[], recent: Thread[], folders: Map<string, unknown[]>) => {
+const withActive = (ch: Channel, busy: Thread[], recent: Thread[], folders: Map<string, unknown[]>, handoffs: ReturnType<typeof conductorHandoffs>) => {
   const mine = busy.filter((t) => t.channel_id === ch.id && t.source !== 'team');
   return {
     ...publicChannel(ch),
@@ -132,6 +152,7 @@ const withActive = (ch: Channel, busy: Thread[], recent: Thread[], folders: Map<
     active: mine.map(stub),
     recent: recent.filter((t) => t.channel_id === ch.id).map(stub),
     folders: folders.get(ch.id) ?? [],
+    ...(ch.id === 'conductor' && handoffs.length ? { handoffs } : {}),
   };
 };
 
@@ -139,14 +160,15 @@ channelsApi.get('/', (c) => {
   const busy = busyThreads();
   const recent = threads.recentPerChannel(RECENT_PER_CHANNEL);
   const folders = foldersByChannel(folderRepo.all(), threads.filed());
-  return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy, recent, folders)));
+  const handoffs = conductorHandoffs();
+  return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy, recent, folders, handoffs)));
 });
 
 channelsApi.get('/:id', (c) => {
   const ch = channels.get(c.req.param('id'));
   if (!ch) return c.json({ error: 'not found' }, 404);
   const folders = foldersByChannel(folderRepo.byChannel(ch.id), threads.filed(ch.id));
-  return c.json(withActive(ch, busyThreads(), threads.byChannel(ch.id, RECENT_PER_CHANNEL), folders));
+  return c.json(withActive(ch, busyThreads(), threads.byChannel(ch.id, RECENT_PER_CHANNEL), folders, conductorHandoffs()));
 });
 
 channelsApi.post('/', async (c) => {

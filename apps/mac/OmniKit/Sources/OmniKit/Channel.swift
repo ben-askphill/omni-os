@@ -89,6 +89,8 @@ public struct ChannelWithRunning: Decodable, Hashable, Sendable, Identifiable {
   public internal(set) var recent: [ThreadStub]
   /// Its sidebar folders, in the server's order (`FolderRules.sorted`), each with its threads.
   public internal(set) var folders: [FolderWithThreads]
+  /// Cross-channel threads delegated by Conductor jobs, shown under their parent in Conductor's lists.
+  public let handoffs: [ConductorHandoffGroup]
 
   public var id: String { channel.id }
 
@@ -97,7 +99,7 @@ public struct ChannelWithRunning: Decodable, Hashable, Sendable, Identifiable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case running, active, recent, folders
+    case running, active, recent, folders, handoffs
   }
 
   public init(from decoder: any Decoder) throws {
@@ -107,7 +109,15 @@ public struct ChannelWithRunning: Decodable, Hashable, Sendable, Identifiable {
     active = try c.decodeIfPresent([ThreadStub].self, forKey: .active) ?? []
     recent = try c.decodeIfPresent([ThreadStub].self, forKey: .recent) ?? []
     folders = try c.decodeIfPresent([FolderWithThreads].self, forKey: .folders) ?? []
+    handoffs = try c.decodeIfPresent([ConductorHandoffGroup].self, forKey: .handoffs) ?? []
   }
+}
+
+/// A Conductor job with delegated threads that may live in other channels.
+public struct ConductorHandoffGroup: Decodable, Hashable, Sendable, Identifiable {
+  public let parent: ThreadStub
+  public let children: [ThreadStub]
+  public var id: String { parent.id }
 }
 
 /// The few thread fields the sidebar lists under a channel.
@@ -125,19 +135,24 @@ public struct ThreadStub: Decodable, Hashable, Sendable, Identifiable {
   public let harness: HarnessID?
   /// When Ben marked it done (out of Needs you), nil when he has not or from a server that does not send it.
   public internal(set) var doneAt: Date?
+  /// The thread this one reports to. Older servers leave it out on sidebar rows.
+  public let parentID: String?
+  /// The thread's origin, for distinguishing Conductor handoffs from other child relationships.
+  public let source: ThreadSource?
 
   enum CodingKeys: String, CodingKey {
-    case id, title, status, harness
+    case id, title, status, harness, source
     case channelID = "channel_id"
     case createdAt = "created_at"
     case updatedAt = "updated_at"
     case folderID = "folder_id"
     case doneAt = "done_at"
+    case parentID = "parent_id"
   }
 
   public init(
     id: String, channelID: String, title: String, status: ThreadStatus, createdAt: Date, updatedAt: Date? = nil,
-    folderID: String? = nil, harness: HarnessID? = nil, doneAt: Date? = nil
+    folderID: String? = nil, harness: HarnessID? = nil, doneAt: Date? = nil, parentID: String? = nil, source: ThreadSource? = nil
   ) {
     self.id = id
     self.channelID = channelID
@@ -148,13 +163,15 @@ public struct ThreadStub: Decodable, Hashable, Sendable, Identifiable {
     self.folderID = folderID
     self.harness = harness
     self.doneAt = doneAt
+    self.parentID = parentID
+    self.source = source
   }
 
   /// The sidebar's row for a thread it has the whole of.
   public init(_ t: OmniThread) {
     self.init(
       id: t.id, channelID: t.channelID, title: t.title, status: t.status, createdAt: t.createdAt, updatedAt: t.updatedAt,
-      folderID: t.folderID, harness: t.harness, doneAt: t.doneAt)
+      folderID: t.folderID, harness: t.harness, doneAt: t.doneAt, parentID: t.parentID, source: t.source)
   }
 
   /// A running or queued thread brings its own result, so it cannot be marked done yet; the server refuses it too.

@@ -55,7 +55,9 @@
         "updated_at": "2026-01-05T09:00:00.000Z",
         "folder_id": null,
         "harness": "claude-code",
-        "done_at": null
+        "done_at": null,
+        "parent_id": null,
+        "source": "manual"
       }
     ],
     "recent": [
@@ -68,7 +70,9 @@
         "updated_at": "2026-01-05T09:00:00.000Z",
         "folder_id": null,
         "harness": "claude-code",
-        "done_at": null
+        "done_at": null,
+        "parent_id": null,
+        "source": "manual"
       }
     ],
     "folders": []

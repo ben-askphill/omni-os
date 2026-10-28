@@ -6,7 +6,7 @@ vi.mock('@omni/server/db.ts', () => {
 });
 
 import type { ThreadStub } from '../src/api.ts';
-import { RECENT_THREADS, recentThreads, runningThreads } from '../src/sidebar-lists.ts';
+import { RECENT_THREADS, recentThreadGroups, recentThreads, runningThreadGroups, runningThreads } from '../src/sidebar-lists.ts';
 
 const t = (id: string, over: Partial<ThreadStub> = {}): ThreadStub => ({
   id,
@@ -93,5 +93,27 @@ describe('recentThreads', () => {
       ['a', 'a', 'done'],
       ['b', 'Renamed', 'running'],
     ]);
+  });
+});
+
+describe('Conductor handoff rows', () => {
+  const parent = t('job', { channel_id: 'conductor', title: 'Plan Q4 launch', source: 'conductor' });
+  const child = t('copy', { channel_id: 'marketing', title: 'Draft landing page', parent_id: 'job', source: 'conductor', status: 'running' });
+  const group = { parent, children: [child] };
+
+  it('keeps a running parent visible and nests its active child under it', () => {
+    const rows = runningThreadGroups([{ id: 'conductor', active: [], handoffs: [group] }, { id: 'marketing', active: [child] }]);
+    expect(rows.map((r) => [r.thread.id, r.children.map((c) => c.id)])).toEqual([['job', ['copy']]]);
+  });
+
+  it('uses a child activity to bring its parent into Recent threads', () => {
+    const rows = recentThreadGroups([{ id: 'conductor', recent: [], handoffs: [group] }, { id: 'marketing', recent: [child] }]);
+    expect(rows.map((r) => [r.thread.id, r.children.map((c) => c.id)])).toEqual([['job', ['copy']]]);
+  });
+
+  it('leaves non-Conductor child threads in their existing top-level rows', () => {
+    const ordinary = t('ordinary-child', { parent_id: 'job', source: 'manual', status: 'running' });
+    const rows = runningThreadGroups([{ id: 'conductor', active: [], handoffs: [group] }, { id: 'other', active: [ordinary] }]);
+    expect(rows.map((r) => r.thread.id)).toEqual(['ordinary-child']);
   });
 });

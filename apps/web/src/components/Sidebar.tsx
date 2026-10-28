@@ -5,7 +5,7 @@ import { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, drag, draftKey, freeName, useFold
 import { foldAllAction, openFolderIds } from '../sidebar-fold.ts';
 import { openMenu } from './ContextMenu.tsx';
 import { pinnedRows } from '../pins.ts';
-import { recentThreads, runningThreads } from '../sidebar-lists.ts';
+import { recentThreadGroups, runningThreadGroups } from '../sidebar-lists.ts';
 import { duration, monthlyTitle, plural, toDate, untilLabel, windowPct } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { readPref, useApp, useNow, writePref } from '../store.tsx';
@@ -13,6 +13,7 @@ import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { ThemeSwitch } from './theme.tsx';
 import { HARNESS_ROWS, HarnessLogo, Loader, OmniMark, SLOT_ROWS } from './brand.tsx';
 import { ChannelMark, DoneMark, ErrorNote, Icon, IconButton, Kbd, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
+import { ThreadHandoffs } from './ThreadHandoffs.tsx';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -163,7 +164,7 @@ function RunningBadge({ n }: { n: number }) {
  * with its channel), with its running sub-agents nested under it and its harness's logo after the title. Dragged onto
  * a folder it files there; onto its channel's name, back to the ungrouped list.
  */
-function ThreadLink({ t, active, tasks, onNavigate }: { t: ThreadStub; active: boolean; tasks: BackgroundTask[]; onNavigate?: () => void }) {
+function ThreadLink({ t, active, tasks, onNavigate, indent = true }: { t: ThreadStub; active: boolean; tasks: BackgroundTask[]; onNavigate?: () => void; indent?: boolean }) {
   const title = t.title || 'Untitled';
   const agents = tasks.length;
   // A thread whose turn ended still works while its sub-agents run.
@@ -183,7 +184,7 @@ function ThreadLink({ t, active, tasks, onNavigate }: { t: ThreadStub; active: b
         title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : t.done_at ? 'Marked done' : (STATUS_LABEL[t.status] ?? t.status)}`}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
-        className={`hov z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ml-[25px] ${
+        className={`hov z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${indent ? 'ml-[25px]' : ''} ${
           active ? 'font-medium text-fg [--hov:transparent]' : t.done_at ? 'text-fg-4 hover:text-fg' : 'text-fg-3 hover:text-fg'
         }`}
       >
@@ -201,6 +202,27 @@ function ThreadLink({ t, active, tasks, onNavigate }: { t: ThreadStub; active: b
         <AgentLink key={k.task_id} t={k} last={i === agents - 1} onNavigate={onNavigate} />
       ))}
     </>
+  );
+}
+
+function ChannelThreadEntry({ t, active, tasks, handoffs, onNavigate }: {
+  t: ThreadStub;
+  active: boolean;
+  tasks: BackgroundTask[];
+  handoffs: ChannelWithRunning['handoffs'];
+  onNavigate?: () => void;
+}) {
+  const group = handoffs?.find((g) => g.parent.id === t.id);
+  if (!group?.children.length) return <ThreadLink t={t} active={active} tasks={tasks} onNavigate={onNavigate} />;
+  return (
+    <ThreadHandoffs
+      idPrefix="channel-sidebar"
+      parent={group.parent}
+      children={group.children}
+      channelIndent
+      renderParent={<ThreadLink t={t} active={active} tasks={tasks} onNavigate={onNavigate} indent={false} />}
+      onNavigate={onNavigate}
+    />
   );
 }
 
@@ -357,7 +379,7 @@ function accepts(f: FolderWithThreads) {
  * closes it, double-click or F2 renames, Delete asks to delete, and the "…" button or a right-click opens its menu.
  * Drop a thread on it to file it; drop another folder on it to put that one just above.
  */
-function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThreads; openId: string | null; tasks: BackgroundTask[]; onNavigate?: () => void }) {
+function FolderRow({ f, openId, tasks, handoffs, onNavigate }: { f: FolderWithThreads; openId: string | null; tasks: BackgroundTask[]; handoffs: ChannelWithRunning['handoffs']; onNavigate?: () => void }) {
   const folders = useFolders();
   const [over, setOver] = useState<'thread' | 'folder' | null>(null);
   const [all, setAll] = useState(false);
@@ -455,7 +477,7 @@ function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThreads; ope
         </div>
       )}
       {shown.map((t) => (
-        <ThreadLink key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} onNavigate={onNavigate} />
+        <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} handoffs={handoffs} onNavigate={onNavigate} />
       ))}
       {open && !all && list.length > shown.length && (
         <button type="button" onClick={() => setAll(true)} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
@@ -572,9 +594,11 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   };
   // Rows appearing or leaving above the highlighted one move it, so they re-measure the thumb too.
   const openCopy = openThread && openThread.id === openId ? openThread : null;
-  const running = runningThreads(channels, openCopy);
+  const runningGroups = runningThreadGroups(channels, openCopy);
+  const running = runningGroups.map((g) => g.thread);
   const pins = pinnedRows(pinned, openCopy);
-  const recent = recentThreads(channels, openCopy);
+  const recentGroups = recentThreadGroups(channels, openCopy);
+  const recent = recentGroups.map((g) => g.thread);
   const sectionKey = (closed: boolean, list: ThreadStub[]) => (closed ? 'closed' : list.map((t) => t.id).join());
   const sectionsKey = [sectionKey(runningClosed, running), sectionKey(pinsClosed, pins), sectionKey(recentClosed, recent)].join('|');
   const rowsKey = channels
@@ -619,7 +643,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
     return (
       <>
         {(closed ? (c.folders ?? []) : foldersOf(c)).map((f) => (
-          <FolderRow key={f.id} f={f} openId={oid} tasks={tasks} onNavigate={onNavigate} />
+          <FolderRow key={f.id} f={f} openId={oid} tasks={tasks} handoffs={c.handoffs} onNavigate={onNavigate} />
         ))}
         {folders.editing === draftKey(c.id) && (
           <FolderNameField
@@ -629,7 +653,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
           />
         )}
         {shown.map((t) => (
-          <ThreadLink key={t.id} t={t} active={t.id === oid} tasks={agents(t.id)} onNavigate={onNavigate} />
+          <ChannelThreadEntry key={t.id} t={t} active={t.id === oid} tasks={agents(t.id)} handoffs={c.handoffs} onNavigate={onNavigate} />
         ))}
         {c.id === focused ? (
           <a href={href.channel(c.id)} onClick={onNavigate} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
@@ -719,6 +743,11 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
     />
   );
 
+  const sectionGroup = (group: { thread: ThreadStub; children: ThreadStub[] }, idPrefix: string) =>
+    group.children.length ? (
+      <ThreadHandoffs key={group.thread.id} idPrefix={idPrefix} parent={group.thread} children={group.children} renderParent={sectionLink(group.thread)} onNavigate={onNavigate} />
+    ) : sectionLink(group.thread);
+
   const channelLink = (c: ChannelWithRunning) => (
     <Fragment key={c.id}>
       {channelRow(
@@ -803,8 +832,8 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
           </div>
 
           {running.length > 0 && (
-            <ThreadSection label="Running" closed={runningClosed} onToggle={toggleRunning} count={running.length}>
-              {running.map((t) => sectionLink(t))}
+            <ThreadSection label="Running" closed={runningClosed} onToggle={toggleRunning} count={runningGroups.reduce((n, g) => n + 1 + g.children.length, 0)}>
+              {runningGroups.map((group) => sectionGroup(group, 'running'))}
             </ThreadSection>
           )}
 
@@ -815,8 +844,8 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
           )}
 
           {recent.length > 0 && (
-            <ThreadSection label="Recent threads" closed={recentClosed} onToggle={toggleRecent} count={recent.length}>
-              {recent.map((t) => sectionLink(t))}
+            <ThreadSection label="Recent threads" closed={recentClosed} onToggle={toggleRecent} count={recentGroups.reduce((n, g) => n + 1 + g.children.length, 0)}>
+              {recentGroups.map((group) => sectionGroup(group, 'recent'))}
             </ThreadSection>
           )}
 

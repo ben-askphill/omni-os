@@ -745,4 +745,21 @@ private func loaded(_ store: WorkspaceStore, _ api: FakeWorkspaceAPI) async thro
     let old = try channel("a", recent: [stub("a", created: "2026-10-01T00:00:00Z", updated: nil), stub("b", created: "2026-10-02T00:00:00Z", updated: nil)])
     #expect(SidebarSections.recent([old]).map(\.id) == ["b", "a"], "an older server sends no updated_at")
   }
+
+  @Test func conductorHandoffsNestAcrossChannelsAndKeepTheParentVisible() throws {
+    let parent = stub("job", status: "done").replacingOccurrences(of: #""channel_id":"acme""#, with: #""channel_id":"conductor""#)
+    let child = String(stub("copy", status: "running").dropLast()) + #", "parent_id":"job","source":"conductor"}"#
+    let handoff = #"{"parent":\#(parent),"children":[\#(child)]}"#
+    let conductor = #"{"id":"conductor","name":"Conductor","kind":"internal","use_worktree":0,"browser_headless":0,"archived":0,"created_at":"2026-10-01T00:00:00Z","active":[],"recent":[],"handoffs":[\#(handoff)]}"#
+    let destination = #"{"id":"marketing","name":"Marketing","kind":"client","use_worktree":0,"browser_headless":0,"archived":0,"created_at":"2026-10-01T00:00:00Z","active":[\#(child)],"recent":[\#(child)]}"#
+    let channels = try channelList(conductor, destination)
+
+    let running = SidebarSections.runningGroups(channels)
+    #expect(running.map(\.thread.id) == ["job"])
+    #expect(running.first?.children.map(\.id) == ["copy"])
+
+    let recent = SidebarSections.recentGroups(channels)
+    #expect(recent.map(\.thread.id) == ["job"])
+    #expect(recent.first?.children.map(\.id) == ["copy"])
+  }
 }

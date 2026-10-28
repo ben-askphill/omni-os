@@ -424,6 +424,17 @@ public struct SidebarSections: Hashable, Sendable {
     public let seeAll: Bool
   }
 
+  public struct ThreadRowGroup: Hashable, Sendable, Identifiable {
+    public let thread: ThreadStub
+    public let children: [ThreadStub]
+    public var id: String { thread.id }
+
+    public init(thread: ThreadStub, children: [ThreadStub]) {
+      self.thread = thread
+      self.children = children
+    }
+  }
+
   public static let conductorID = "conductor"
   public static let maxThreads = 5
   private static let kinds: [(kind: ChannelKind, label: String)] = [(.client, "Clients"), (.internal, "Internal"), (.personal, "Personal")]
@@ -511,6 +522,50 @@ public struct SidebarSections: Hashable, Sendable {
       return x != y ? x > y : newer(a, b)
     }
     return pinned(Array(list.prefix(limit)), open: open)
+  }
+
+  /// Running rows grouped under Conductor jobs. An active child keeps its parent visible after the parent stops.
+  public static func runningGroups(_ channels: [ChannelWithRunning], open: ThreadStub? = nil) -> [ThreadRowGroup] {
+    let candidates = running(channels, open: open)
+    let byID = Dictionary(candidates.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    let handoffs = channels.first(where: { $0.id == conductorID })?.handoffs ?? []
+    let childIDs = Set(handoffs.flatMap { $0.children.map(\.id) })
+    var groups = Dictionary(uniqueKeysWithValues: candidates.filter { !childIDs.contains($0.id) }.map { ($0.id, ThreadRowGroup(thread: $0, children: [])) })
+    for handoff in handoffs {
+      let children = handoff.children.filter { byID[$0.id] != nil && $0.status.isActive }
+      guard !children.isEmpty else { continue }
+      let parent = byID[handoff.parent.id] ?? handoff.parent
+      groups[parent.id] = ThreadRowGroup(thread: parent, children: children)
+    }
+    return groups.values.sorted { a, b in
+      a.thread.createdAt != b.thread.createdAt ? a.thread.createdAt > b.thread.createdAt : a.thread.id < b.thread.id
+    }
+  }
+
+  /// The five latest jobs and threads by activity, with their Conductor children nested under the parent.
+  public static func recentGroups(_ channels: [ChannelWithRunning], open: ThreadStub? = nil, limit: Int = recentThreads) -> [ThreadRowGroup] {
+    let candidates = unique(channels.map(\.recent)).sorted { a, b in
+      let (x, y) = (a.updatedAt ?? a.createdAt, b.updatedAt ?? b.createdAt)
+      return x != y ? x > y : newer(a, b)
+    }
+    let all = pinned(candidates, open: open)
+    let byID = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    let handoffs = channels.first(where: { $0.id == conductorID })?.handoffs ?? []
+    let childIDs = Set(handoffs.flatMap { $0.children.map(\.id) })
+    var groups = Dictionary(uniqueKeysWithValues: all.filter { !childIDs.contains($0.id) }.map { ($0.id, ThreadRowGroup(thread: $0, children: [])) })
+    var activity: [String: Date] = [:]
+    for handoff in handoffs {
+      let present = handoff.children.compactMap { byID[$0.id] }
+      guard byID[handoff.parent.id] != nil || !present.isEmpty else { continue }
+      let parent = byID[handoff.parent.id] ?? handoff.parent
+      groups[parent.id] = ThreadRowGroup(thread: parent, children: handoff.children)
+      activity[parent.id] = ([parent] + present).compactMap { $0.updatedAt ?? $0.createdAt }.max()
+    }
+    return groups.values.sorted { a, b in
+      let x = activity[a.thread.id] ?? a.thread.updatedAt ?? a.thread.createdAt
+      let y = activity[b.thread.id] ?? b.thread.updatedAt ?? b.thread.createdAt
+      return x != y ? x > y : newer(a.thread, b.thread)
+    }.prefix(limit).map { $0 }
   }
 
   /// The channel's folders in order, with the open thread under its own folder even past the listed ones.

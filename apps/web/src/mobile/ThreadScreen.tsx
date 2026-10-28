@@ -413,7 +413,7 @@ function useBranchChanges(thread: Thread | null, busy: boolean) {
 export function ThreadScreen() {
   const shell = useShell();
   const s = useThread();
-  const { thread, children, events, history, revealTarget, clearReveal, files, queued, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff } = s;
+  const { thread, parent, children, events, history, revealTarget, clearReveal, files, queued, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff } = s;
   const { needsYou, channel } = useApp();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
@@ -534,7 +534,7 @@ export function ThreadScreen() {
       <MoHeader
         onBack={shell.back}
         title={thread.title || 'Untitled'}
-        sub={sub}
+        sub={parent ? <span>{sub} · <a href={href.thread(parent.id)} className="text-fg-2 hover:text-fg" title={`Delegated from ${parent.title}`}>Parent: {parent.title}</a></span> : sub}
         right={
           <>
             <StatusPill status={view.asking || needs ? 'needs' : thread.status} label={view.asking ? ASKING_LABEL : needs ? 'Needs you' : undefined} />

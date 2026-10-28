@@ -126,12 +126,98 @@ struct PRMarkIcon: View {
   }
 }
 
+/// A Conductor job in a channel list with its delegated child threads under it.
+private struct ThreadHandoffListEntry: View {
+  let model: AppModel
+  let parent: OmniThread
+  let children: [ThreadStub]
+  let pr: BranchPRMark?
+  @State private var expanded: Bool
+
+  init(model: AppModel, parent: OmniThread, children: [ThreadStub], pr: BranchPRMark?) {
+    self.model = model
+    self.parent = parent
+    self.children = children
+    self.pr = pr
+    _expanded = State(initialValue: UserDefaults.standard.object(forKey: "sidebar.handoffs.\(parent.id)") as? Bool ?? true)
+  }
+
+  var body: some View {
+    VStack(spacing: 0) {
+      HStack(spacing: z(4)) {
+        ThreadListRow(model: model, thread: parent, pr: pr)
+          .onDrag {
+            model.folders.dragging = .thread(ThreadStub(parent))
+            return NSItemProvider(object: (parent.title.isEmpty ? "Untitled" : parent.title) as NSString)
+          }
+          .openInNewWindow(parent.id, model: model, title: parent.title, stub: ThreadStub(parent))
+        Button {
+          withAnimation(Motion.settle) {
+            expanded.toggle()
+            UserDefaults.standard.set(expanded, forKey: "sidebar.handoffs.\(parent.id)")
+          }
+        } label: {
+          OmniIcon(name: expanded ? "chevronDown" : "chevronRight", size: 12)
+            .foregroundStyle(Tok.fg4)
+            .frame(width: z(34), height: z(36))
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help("\(expanded ? "Hide" : "Show") delegated threads for \(parent.title)")
+        .accessibilityLabel("\(expanded ? "Collapse" : "Expand") delegated threads for \(parent.title)")
+        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+      }
+      if expanded {
+        VStack(spacing: 0) {
+          ForEach(Array(children.enumerated()), id: \.element.id) { index, child in
+            childRow(child, last: index == children.count - 1)
+          }
+        }
+        .padding(.leading, z(44))
+      }
+    }
+  }
+
+  private func childRow(_ child: ThreadStub, last: Bool) -> some View {
+    let channel = model.store.channel(child.channelID)?.name ?? child.channelID
+    return Button { model.route = .thread(id: child.id) } label: {
+      HStack(spacing: z(8)) {
+        ThreadStatusIcon(status: child.status, done: child.doneAt != nil)
+          .frame(width: z(10))
+        Text(child.title.isEmpty ? "Untitled" : child.title)
+          .lineLimit(1)
+          .frame(maxWidth: .infinity, alignment: .leading)
+        Text("#\(channel)")
+          .font(.omni(size: 10))
+          .foregroundStyle(Tok.fg4)
+          .lineLimit(1)
+          .padding(.horizontal, z(7))
+          .padding(.vertical, z(3))
+          .background(Tok.surface2, in: Capsule())
+      }
+      .font(.omni(size: 12))
+      .foregroundStyle(Tok.fg3)
+      .padding(.horizontal, z(9))
+      .frame(height: z(30))
+      .contentShape(Capsule())
+    }
+    .buttonStyle(RailRowStyle())
+    .overlay(alignment: .leading) {
+      Rectangle().fill(Tok.lineStrong).frame(width: z(1)).padding(.vertical, last ? z(15) : 0)
+    }
+    .help("\(child.title.isEmpty ? "Untitled" : child.title) · #\(channel) · \(child.status.label)")
+    .accessibilityLabel("\(child.title.isEmpty ? "Untitled" : child.title), #\(channel), \(child.status.label)")
+    .openInNewWindow(child.id, model: model, title: child.title, stub: child)
+  }
+}
+
 /// Threads in runs of a day, each under its date, as ThreadGroups in ThreadList.tsx.
 struct ThreadDayList: View {
   let model: AppModel
   let threads: [OmniThread]
   var showChannel = false
   var prs: [String: BranchPRMark] = [:]
+  var handoffs: [ConductorHandoffGroup] = []
 
   var body: some View {
     LazyVStack(alignment: .leading, spacing: z(12)) {
@@ -145,9 +231,13 @@ struct ThreadDayList: View {
           .omniCaption()
           .padding(.horizontal, z(10))
           .padding(.vertical, z(6))
-          ForEach(group.threads) {
-            ThreadListRow(model: model, thread: $0, showChannel: showChannel, pr: $0.branch.flatMap { prs[$0] })
-              .openInNewWindow($0.id, model: model, title: $0.title, stub: ThreadStub($0))
+          ForEach(group.threads) { thread in
+            if let handoff = handoffs.first(where: { $0.parent.id == thread.id }), !handoff.children.isEmpty {
+              ThreadHandoffListEntry(model: model, parent: thread, children: handoff.children, pr: thread.branch.flatMap { prs[$0] })
+            } else {
+              ThreadListRow(model: model, thread: thread, showChannel: showChannel, pr: thread.branch.flatMap { prs[$0] })
+                .openInNewWindow(thread.id, model: model, title: thread.title, stub: ThreadStub(thread))
+            }
           }
         }
       }
@@ -163,6 +253,7 @@ struct ThreadFolderList: View {
   let channel: ChannelWithRunning
   let threads: [OmniThread]
   var prs: [String: BranchPRMark] = [:]
+  var handoffs: [ConductorHandoffGroup] = []
 
   var body: some View {
     let groups = ThreadListing.byFolder(threads, in: channel)
@@ -176,7 +267,7 @@ struct ThreadFolderList: View {
             if g.threads.isEmpty {
               note("No threads yet. Drag one here or use Move to Folder.")
             } else {
-              rows(g.threads)
+      rows(g.threads)
             }
           }
         }
@@ -194,12 +285,16 @@ struct ThreadFolderList: View {
 
   private func rows(_ list: [OmniThread]) -> some View {
     ForEach(list) { t in
-      ThreadListRow(model: model, thread: t, pr: t.branch.flatMap { prs[$0] })
-        .onDrag {
-          model.folders.dragging = .thread(ThreadStub(t))
-          return NSItemProvider(object: (t.title.isEmpty ? "Untitled" : t.title) as NSString)
+      if let handoff = handoffs.first(where: { $0.parent.id == t.id }), !handoff.children.isEmpty {
+        ThreadHandoffListEntry(model: model, parent: t, children: handoff.children, pr: t.branch.flatMap { prs[$0] })
+      } else {
+        ThreadListRow(model: model, thread: t, pr: t.branch.flatMap { prs[$0] })
+          .onDrag {
+            model.folders.dragging = .thread(ThreadStub(t))
+            return NSItemProvider(object: (t.title.isEmpty ? "Untitled" : t.title) as NSString)
+          }
+          .openInNewWindow(t.id, model: model, title: t.title, stub: ThreadStub(t))
         }
-        .openInNewWindow(t.id, model: model, title: t.title, stub: ThreadStub(t))
     }
   }
 
