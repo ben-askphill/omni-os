@@ -25,9 +25,20 @@ public enum QAInspector: String, Hashable, Sendable {
 }
 
 /// What an annotate step does in the Browser tab: press Annotate and wait for the screenshot, draw a rectangle (in fractions
-/// of the shown screenshot, 0 to 1) and write the note, press Add to Message, or Cancel.
+/// of the shown screenshot, 0 to 1) and write the note, press Add to Message, or Cancel. The `live` steps drive live
+/// Annotate on the page itself, in fractions of the shown page.
 public enum QAAnnotate: Hashable, Sendable {
   case start
+  /// Turns live Annotate on.
+  case live
+  /// Moves the pointer over the page, and waits for the inspector's answer.
+  case hover(x: Double, y: Double)
+  /// A click on the page, then the note; waits until the card is ready.
+  case livePick(x: Double, y: Double, note: String)
+  /// A drag across the page, then the note; waits until the card is ready.
+  case liveDrag(x0: Double, y0: Double, x1: Double, y1: Double, note: String)
+  /// Presses the card's Send.
+  case send
   case drag(x0: Double, y0: Double, x1: Double, y1: Double, note: String)
   /// A tap at a fraction of the shown screenshot, which picks the element there; the note is written once it is picked.
   case tap(x: Double, y: Double, note: String)
@@ -117,8 +128,9 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"drag": "<thread title>", "over": "<folder>"}`, `{"file": "<thread title>", "into": "<folder>"}`,
 /// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"prMenu": "name"}`, `{"handOff": "<device id>"}`,
 /// `{"quickPrompt": "text"}` (or `{"send": true}`, `false`), `{"selectLines": {"file": "<path>", "from": 1, "to": 3}}`,
-/// `{"addContext": "note"}`, `{"selectTerminal": true}`, `{"addTerminal": "note"}`, `{"annotate": "start"}` (or `add`, `cancel`, or
-/// `{"drag": [0.1, 0.2, 0.6, 0.5], "note": "text"}`, or `{"tap": [0.4, 0.3], "note": "text"}`), `{"browserAddress": "example.com"}` (or `{"type": "example.com", "escape": true}`), `{"openContext": 0}`, `{"referenceThread": "open"}` (or `close`, `all`, `channel`, `{"search": "text"}`, `{"pick": 0}`), `{"quit": true}`.
+/// `{"addContext": "note"}`, `{"selectTerminal": true}`, `{"addTerminal": "note"}`, `{"annotate": "start"}` (or `add`, `cancel`, `live`, `send`, or
+/// `{"drag": [0.1, 0.2, 0.6, 0.5], "note": "text"}`, `{"tap": [0.4, 0.3], "note": "text"}`, `{"hover": [0.4, 0.3]}`, `{"livePick": [0.4, 0.3], "note": "text"}`,
+/// `{"liveDrag": [0.1, 0.2, 0.6, 0.5], "note": "text"}`), `{"browserAddress": "example.com"}` (or `{"type": "example.com", "escape": true}`), `{"openContext": 0}`, `{"referenceThread": "open"}` (or `close`, `all`, `channel`, `{"search": "text"}`, `{"pick": 0}`), `{"quit": true}`.
 /// What a `referenceThread` step does to the reply box's picker.
 public enum QAReference: Hashable, Sendable {
   case open, close, all, channel
@@ -498,9 +510,11 @@ public struct QAScript: Hashable, Sendable {
   }
 
   private static func annotate(_ value: Any) throws(QAScriptError) -> QAAnnotate {
-    let usage = QAScriptError(#"annotate takes start, add, cancel, undo, {"drag": [x0, y0, x1, y1], "note": text}, {"tap": [x, y], "note": text}, {"shape": rect|ellipse|arrow|line, "from": [x, y], "to": [x, y]}, {"pen": [[x, y], ...]}, {"text": words, "at": [x, y]}, {"color": hex, "stroke": px}, {"move": [x, y], "by": [dx, dy]} or {"note": text} with fractions from 0 to 1"#)
+    let usage = QAScriptError(#"annotate takes start, add, cancel, undo, live, send, {"drag": [x0, y0, x1, y1], "note": text}, {"tap": [x, y], "note": text}, {"hover": [x, y]}, {"livePick": [x, y], "note": text}, {"liveDrag": [x0, y0, x1, y1], "note": text}, {"shape": rect|ellipse|arrow|line, "from": [x, y], "to": [x, y]}, {"pen": [[x, y], ...]}, {"text": words, "at": [x, y]}, {"color": hex, "stroke": px}, {"move": [x, y], "by": [dx, dy]} or {"note": text} with fractions from 0 to 1"#)
     switch value as? String {
     case "start": return .start
+    case "live": return .live
+    case "send": return .send
     case "add": return .add
     case "cancel": return .cancel
     case "undo": return .undo
@@ -536,9 +550,21 @@ public struct QAScript: Hashable, Sendable {
       let from = try fractions(at, 2), by = try fractions(d["by"], 2)
       return .move(x: from[0], y: from[1], dx: by[0], dy: by[1])
     }
+    if d.count == 1, let at = d["hover"] {
+      let p = try fractions(at, 2)
+      return .hover(x: p[0], y: p[1])
+    }
     if d.count == 1, let words = d["note"] as? String { return .note(words) }
     let note = d["note"] ?? ""
     guard let note = note as? String else { throw usage }
+    if d["livePick"] != nil {
+      let at = try fractions(d["livePick"], 2)
+      return .livePick(x: at[0], y: at[1], note: note)
+    }
+    if d["liveDrag"] != nil {
+      let n = try fractions(d["liveDrag"], 4)
+      return .liveDrag(x0: n[0], y0: n[1], x1: n[2], y1: n[3], note: note)
+    }
     if d["tap"] != nil {
       let at = try fractions(d["tap"], 2)
       return .tap(x: at[0], y: at[1], note: note)

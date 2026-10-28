@@ -1,0 +1,31 @@
+{
+  "element": {
+    "tag": "button",
+    "id": "go",
+    "classes": [
+      "checkout",
+      "primary"
+    ],
+    "path": [
+      "body",
+      "main#cart",
+      "div.summary",
+      "button#go"
+    ],
+    "bounds": {
+      "x": 1200,
+      "y": 96,
+      "width": 80,
+      "height": 160
+    },
+    "size": {
+      "width": 480,
+      "height": 160
+    },
+    "styles": {
+      "display": "inline-flex",
+      "color": "rgb(255, 255, 255)"
+    },
+    "opaque_frame": false
+  }
+}

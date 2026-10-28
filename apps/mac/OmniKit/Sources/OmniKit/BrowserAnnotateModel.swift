@@ -88,6 +88,17 @@ public final class BrowserAnnotateModel {
 
   private var isFailed: Bool { if case .failed = phase { true } else { false } }
 
+  /// Opens on a capture live Annotate already took (its Draw), with the area or element marked there and the note so
+  /// far, instead of taking a screenshot of its own. Cancel deletes the capture, as after `start`.
+  public func open(_ capture: BrowserAnnotationContext.Capture, rect: BrowserAnnotationContext.Rect?, element: BrowserAnnotationContext.Element?, note: String = "") {
+    guard phase == .idle || isFailed else { return }
+    reset()
+    phase = .picking(capture)
+    self.rect = rect
+    self.element = element
+    self.note = note
+  }
+
   /// Ben's drag on the screenshot, shown `shown` points big. Too small a drag says so and keeps the last rectangle.
   public func drag(_ drag: BrowserAnnotationContext.Drag, shown: (width: Double, height: Double)) {
     guard case .picking(let c) = phase else { return }

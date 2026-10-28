@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, rmSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { pickScript, type RawPick } from './browser-pick-script.ts';
+import { inspectScript, pickScript, type RawInspect, type RawPick } from './browser-pick-script.ts';
 import { config, paths } from './config.ts';
 
 /**
@@ -39,6 +39,9 @@ export interface BrowserFrame {
   /** The page viewport in CSS pixels, so clients can map a click on the scaled image back. */
   width: number;
   height: number;
+  /** How far the page was scrolled in this frame, in CSS pixels, so an annotation drawn on an earlier frame can follow it. */
+  scrollX?: number;
+  scrollY?: number;
 }
 
 export type BrowserEvent = { type: 'state'; state: BrowserState } | ({ type: 'frame' } & BrowserFrame);
@@ -327,7 +330,12 @@ class ChannelBrowser {
       case 'Page.screencastFrame':
         if (msg.sessionId !== this.session) break;
         void this.send('Page.screencastFrameAck', { sessionId: p.sessionId }, msg.sessionId).catch(() => {});
-        this.lastFrame = { data: p.data, width: Math.round(p.metadata.deviceWidth), height: Math.round(p.metadata.deviceHeight) };
+        this.lastFrame = {
+          data: p.data,
+          width: Math.round(p.metadata.deviceWidth),
+          height: Math.round(p.metadata.deviceHeight),
+          ...(Number.isFinite(p.metadata.scrollOffsetX) && Number.isFinite(p.metadata.scrollOffsetY) && { scrollX: Math.round(p.metadata.scrollOffsetX), scrollY: Math.round(p.metadata.scrollOffsetY) }),
+        };
         this.emit({ type: 'frame', ...this.lastFrame });
         break;
       case 'Page.frameStartedLoading':
@@ -446,6 +454,12 @@ class ChannelBrowser {
   async pick(x: number, y: number): Promise<RawPick | null> {
     const { result } = await this.page('Runtime.evaluate', { expression: pickScript(x, y), returnByValue: true, silent: true, timeout: 2000 });
     return result?.value && typeof result.value === 'object' ? (result.value as RawPick) : null;
+  }
+
+  /** The element under the pointer for the hover inspector, described by inspectScript, or null when the page gave nothing. Changes nothing on the page. */
+  async inspect(x: number, y: number): Promise<RawInspect | null> {
+    const { result } = await this.page('Runtime.evaluate', { expression: inspectScript(x, y), returnByValue: true, silent: true, timeout: 1000 });
+    return result?.value && typeof result.value === 'object' ? (result.value as RawInspect) : null;
   }
 
   /** The visible viewport as an image, at the display scale the page is laid out at. Changes nothing on the page. */

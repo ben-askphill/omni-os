@@ -10,6 +10,11 @@ private struct PickRequest: Encodable, Sendable {
   let y: Int
 }
 
+private struct InspectRequest: Encodable, Sendable {
+  let x: Int
+  let y: Int
+}
+
 private struct ScriptReply: Decodable {
   let script: String
 }
@@ -105,6 +110,12 @@ extension OmniClient {
   /// holds answer `.unavailable` with its words: the screenshot and the marked area still go with the message.
   public func pickElement(channel: String, thread: String, name: String, x: Int, y: Int) async throws(OmniAPIError) -> ElementPickReply {
     try await send("POST", capturePath(channel, "/\(uriComponent(name))/element"), body: PickRequest(thread: thread, x: x, y: y))
+  }
+
+  /// The element under the pointer at (`x`, `y`), whole CSS pixels in the live page's viewport (apps/server/browser-pick.ts
+  /// `inspectApi`), for the live Annotate overlay's hover. It reads the page and changes nothing; nothing is saved.
+  public func inspectElement(channel: String, x: Int, y: Int) async throws(OmniAPIError) -> ElementInspectReply {
+    try await send("POST", "/api/channels/\(uriComponent(channel))/browser/inspect", body: InspectRequest(x: max(0, x), y: max(0, y)))
   }
 
   /// Saves the screenshot `name` with Ben's marks rendered on it by this client (apps/server/browser-capture.ts), and gives

@@ -20,6 +20,13 @@
     },
     "frames": [],
     "opaque_frame": false,
-    "truncated": false
+    "truncated": false,
+    "styles": {
+      "display": "inline-flex",
+      "color": "rgb(255, 255, 255)",
+      "background_color": "rgb(43, 59, 255)",
+      "font_size": "15px",
+      "padding": "8px 16px"
+    }
   }
 }

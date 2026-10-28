@@ -24,6 +24,7 @@ public enum BrowserAnnotationContext: MessageContextKind {
   public static let ancestorMax = 160
   public static let framesMax = 3
   public static let frameURLMax = 512
+  public static let styleValueMax = 120
 
   public struct Rect: Codable, Hashable, Sendable {
     public let x: Int
@@ -85,16 +86,112 @@ public enum BrowserAnnotationContext: MessageContextKind {
     public let opaqueFrame: Bool
     /// True when `text` or `html` was cut.
     public let truncated: Bool
+    /// A few of its computed styles. Nil on a pick made before Omni read them.
+    public let styles: Styles?
 
     enum CodingKeys: String, CodingKey {
-      case tag, selector, text, html, ancestors, bounds, point, frames, truncated
+      case tag, selector, text, html, ancestors, bounds, point, frames
       case opaqueFrame = "opaque_frame"
+      case truncated, styles
+    }
+  }
+
+  /// The computed styles a picked or hovered element reports (`ElementStyles` in TypeScript): the browser's own strings,
+  /// `rgb(23, 24, 26)` or `16px`. The keys are `ELEMENT_STYLE_KEYS`, in its order.
+  public struct Styles: Codable, Hashable, Sendable {
+    public var display: String?
+    public var position: String?
+    public var color: String?
+    public var backgroundColor: String?
+    public var fontFamily: String?
+    public var fontSize: String?
+    public var fontWeight: String?
+    public var lineHeight: String?
+    public var padding: String?
+    public var margin: String?
+    public var zIndex: String?
+
+    public enum CodingKeys: String, CodingKey, CaseIterable, Sendable {
+      case display, position, color
+      case backgroundColor = "background_color"
+      case fontFamily = "font_family"
+      case fontSize = "font_size"
+      case fontWeight = "font_weight"
+      case lineHeight = "line_height"
+      case padding, margin
+      case zIndex = "z_index"
+    }
+
+    public init() {}
+
+    public subscript(key key: CodingKeys) -> String? {
+      get {
+        switch key {
+        case .display: display
+        case .position: position
+        case .color: color
+        case .backgroundColor: backgroundColor
+        case .fontFamily: fontFamily
+        case .fontSize: fontSize
+        case .fontWeight: fontWeight
+        case .lineHeight: lineHeight
+        case .padding: padding
+        case .margin: margin
+        case .zIndex: zIndex
+        }
+      }
+      set {
+        switch key {
+        case .display: display = newValue
+        case .position: position = newValue
+        case .color: color = newValue
+        case .backgroundColor: backgroundColor = newValue
+        case .fontFamily: fontFamily = newValue
+        case .fontSize: fontSize = newValue
+        case .fontWeight: fontWeight = newValue
+        case .lineHeight: lineHeight = newValue
+        case .padding: padding = newValue
+        case .margin: margin = newValue
+        case .zIndex: zIndex = newValue
+        }
+      }
+    }
+
+    public var isEmpty: Bool { CodingKeys.allCases.allSatisfy { self[key: $0] == nil } }
+
+    /// `15px / 600 · Inter`: the size, the weight and the first family, as the inspector shows them. Nil without any.
+    public var font: String? {
+      let family = fontFamily.flatMap { Self.firstFamily($0) }
+      let size = [fontSize, fontWeight].compactMap { $0 }.joined(separator: " / ")
+      let line = [size.isEmpty ? nil : size, family].compactMap { $0 }.joined(separator: " · ")
+      return line.isEmpty ? nil : line
+    }
+
+    /// `block · relative`. Nil without either.
+    public var layout: String? {
+      let line = [display, position].compactMap { $0 }.joined(separator: " · ")
+      return line.isEmpty ? nil : line
+    }
+
+    /// The z-index worth showing: none when it is `auto`.
+    public var stacking: String? { zIndex == "auto" ? nil : zIndex }
+
+    /// The first family of a `font-family` list, unquoted: `"Inter Variable", sans-serif` is `Inter Variable`.
+    public static func firstFamily(_ list: String) -> String? {
+      let first = list.split(separator: ",", maxSplits: 1).first.map(String.init) ?? ""
+      let name = first.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+      return name.isEmpty ? nil : name
     }
   }
 
   public struct Scroll: Codable, Hashable, Sendable {
     public let x: Int
     public let y: Int
+
+    public init(x: Int, y: Int) {
+      self.x = x
+      self.y = y
+    }
   }
 
   /// What the server makes: everything about the page and the image, before Ben marks anything. The `capture` of
@@ -262,10 +359,31 @@ public enum BrowserAnnotationContext: MessageContextKind {
     guard case .bool(let opaque)? = o["opaque_frame"], case .bool(let truncated)? = o["truncated"] else {
       return .failure(CheckError("element.opaque_frame and element.truncated must be true or false"))
     }
+    let styles: Styles
+    switch Self.styles(o["styles"], "element.styles") {
+    case .success(let s): styles = s
+    case .failure(let e): return .failure(e)
+    }
     return .success(
       Element(
         tag: tag, selector: selector, text: text, html: html, ancestors: ancestors, bounds: bounds, point: Point(x: px, y: py), frames: frames,
-        opaqueFrame: opaque, truncated: truncated))
+        opaqueFrame: opaque, truncated: truncated, styles: styles.isEmpty ? nil : styles))
+  }
+
+  /// `stylesOf` in TypeScript: the known keys, each a string on one line of at most `styleValueMax`. A key this build does
+  /// not know is left out, so a newer client's extra style is not a refusal. Absent or null is none.
+  static func styles(_ v: JSONValue?, _ at: String = "styles") -> Result<Styles, CheckError> {
+    guard let v, v != .null else { return .success(Styles()) }
+    guard case .object(let o) = v else { return .failure(CheckError("\(at) must be an object")) }
+    var out = Styles()
+    for key in Styles.CodingKeys.allCases {
+      guard let raw = o[key.rawValue] else { continue }
+      switch plain(raw, "\(at).\(key.rawValue)", styleValueMax) {
+      case .success(let s): out[key: key] = s
+      case .failure(let e): return .failure(e)
+      }
+    }
+    return .success(out)
   }
 
   /// `imageOf` in TypeScript. `at` names the field in an error: `image`, or `marked` for the screenshot with the marks on it.
@@ -455,6 +573,71 @@ public enum BrowserAnnotationContext: MessageContextKind {
     let sy = image.height / viewport.height
     return Rect(x: Int((Double(r.x) * sx).rounded()), y: Int((Double(r.y) * sy).rounded()), width: Int((Double(r.width) * sx).rounded()), height: Int((Double(r.height) * sy).rounded()))
   }
+
+  // MARK: Live
+
+  /// A frame of the live page as the panel draws it (`LiveFrame` in TypeScript): its viewport in CSS pixels and, when the
+  /// server sends it, how far the page was scrolled.
+  public struct LiveFrame: Hashable, Sendable {
+    public var width: Double
+    public var height: Double
+    public var scroll: CGPoint?
+
+    public init(width: Double, height: Double, scroll: CGPoint? = nil) {
+      self.width = width
+      self.height = height
+      self.scroll = scroll
+    }
+  }
+
+  /// How far the capture's page is from the live frame's: the capture's CSS pixels per frame CSS pixel, and the scroll in between.
+  private static func liveShift(_ frame: LiveFrame, _ viewport: (width: Int, height: Int), _ scroll: Scroll) -> (s: Double, dx: Double, dy: Double) {
+    let s = frame.width > 0 ? Double(viewport.width) / frame.width : 1
+    let fs = frame.scroll ?? CGPoint(x: Double(scroll.x), y: Double(scroll.y))
+    return (s, fs.x - Double(scroll.x), fs.y - Double(scroll.y))
+  }
+
+  /// A point on the live page, in that frame's CSS pixels, as the same spot of the page in a capture taken just after:
+  /// moved by however far the page scrolled in between. Nil when the spot is out of the capture's view.
+  public static func livePointToCapture(_ p: CGPoint, frame: LiveFrame, viewport: (width: Int, height: Int), scroll: Scroll) -> Point? {
+    let (s, dx, dy) = liveShift(frame, viewport, scroll)
+    let x = ((p.x + dx) * s).rounded(.down)
+    let y = ((p.y + dy) * s).rounded(.down)
+    guard x >= 0, y >= 0, x < Double(viewport.width), y < Double(viewport.height) else { return nil }
+    return Point(x: Int(x), y: Int(y))
+  }
+
+  /// A rectangle Ben drew on the live page, in that frame's CSS pixels, as the same part of the page in a capture taken
+  /// just after: moved by the scroll in between, rounded outward and kept inside the capture's viewport. Nil when less
+  /// than `rectMin` of it is left in view either way.
+  public static func liveToCapture(_ r: CGRect, frame: LiveFrame, viewport: (width: Int, height: Int), scroll: Scroll) -> Rect? {
+    let (s, dx, dy) = liveShift(frame, viewport, scroll)
+    let x0 = max(0, ((r.origin.x + dx) * s).rounded(.down))
+    let y0 = max(0, ((r.origin.y + dy) * s).rounded(.down))
+    let x1 = min(Double(viewport.width), ((r.origin.x + r.size.width + dx) * s).rounded(.up))
+    let y1 = min(Double(viewport.height), ((r.origin.y + r.size.height + dy) * s).rounded(.up))
+    guard x1 - x0 >= Double(rectMin), y1 - y0 >= Double(rectMin) else { return nil }
+    return Rect(x: Int(x0), y: Int(y0), width: Int(x1 - x0), height: Int(y1 - y0))
+  }
+
+  /// The reverse, to draw a capture's rectangle over the live page as it is now: in the frame's CSS pixels, moved by
+  /// however far the page has scrolled since. Not clipped, so a part scrolled out of view is drawn out of view.
+  public static func captureToLive(_ r: Rect, viewport: (width: Int, height: Int), scroll: Scroll, frame: LiveFrame) -> CGRect {
+    let (s, dx, dy) = liveShift(frame, viewport, scroll)
+    return CGRect(x: Double(r.x) / s - dx, y: Double(r.y) / s - dy, width: Double(r.width) / s, height: Double(r.height) / s)
+  }
+
+  public static func livePointToCapture(_ p: CGPoint, frame: LiveFrame, capture c: Capture) -> Point? {
+    livePointToCapture(p, frame: frame, viewport: (c.viewport.width, c.viewport.height), scroll: c.scroll)
+  }
+
+  public static func liveToCapture(_ r: CGRect, frame: LiveFrame, capture c: Capture) -> Rect? {
+    liveToCapture(r, frame: frame, viewport: (c.viewport.width, c.viewport.height), scroll: c.scroll)
+  }
+
+  public static func captureToLive(_ r: Rect, capture c: Capture, frame: LiveFrame) -> CGRect {
+    captureToLive(r, viewport: (c.viewport.width, c.viewport.height), scroll: c.scroll, frame: frame)
+  }
 }
 
 extension Result where Failure == BrowserAnnotationContext.CheckError {
@@ -515,5 +698,84 @@ public enum ElementPickReply: Decodable, Hashable, Sendable {
       let u = try c.decode(Unavailable.self, forKey: .unavailable)
       self = .unavailable(reason: u.reason, message: u.message)
     }
+  }
+}
+
+/// What hovering the live page shows of the element under the pointer (`InspectedElement` in message-context-browser.ts,
+/// apps/server/browser-pick.ts `inspectApi`). It is shown and never sent: a pick (`Element`) is what goes with a message.
+public struct InspectedElement: Decodable, Hashable, Sendable {
+  public struct Size: Decodable, Hashable, Sendable {
+    public let width: Int
+    public let height: Int
+  }
+
+  /// The tag name, lowercase.
+  public let tag: String
+  /// Its id, or empty.
+  public let id: String
+  /// Its first few class names.
+  public let classes: [String]
+  /// Where it sits, outermost first, one `tag#id.class` step per level, the last being the element itself.
+  public let path: [String]
+  /// Its box clipped to the viewport, in the live page's CSS pixels from the viewport's top left.
+  public let bounds: BrowserAnnotationContext.Rect
+  /// Its own size in CSS pixels, before any clipping.
+  public let size: Size
+  public let styles: BrowserAnnotationContext.Styles
+  /// True when the pointer is over a frame from another site, which the page cannot read inside.
+  public let opaqueFrame: Bool
+
+  enum CodingKeys: String, CodingKey {
+    case tag, id, classes, path, bounds, size, styles
+    case opaqueFrame = "opaque_frame"
+  }
+
+  /// `button#go.checkout.primary`, as the inspector's first line names it.
+  public var name: String {
+    tag + (id.isEmpty ? "" : "#\(id)") + classes.map { ".\($0)" }.joined()
+  }
+
+  /// `480 × 160`.
+  public var sizeLabel: String { "\(size.width) × \(size.height)" }
+
+  /// The path as one line, outermost first.
+  public var breadcrumb: String { path.joined(separator: " › ") }
+}
+
+/// The answer of `POST /api/channels/:id/browser/inspect`: the element under the pointer, or why there is none. Never an
+/// error to show: the overlay only hides its tooltip.
+public enum ElementInspectReply: Decodable, Hashable, Sendable {
+  case element(InspectedElement)
+  case unavailable(reason: String, message: String)
+
+  private struct Unavailable: Decodable {
+    let reason: String
+    let message: String
+  }
+
+  enum CodingKeys: String, CodingKey { case element, unavailable }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    if let e = try c.decodeIfPresent(InspectedElement.self, forKey: .element) {
+      self = .element(e)
+    } else {
+      let u = try c.decode(Unavailable.self, forKey: .unavailable)
+      self = .unavailable(reason: u.reason, message: u.message)
+    }
+  }
+}
+
+/// A CSS color as the browser computes it, `rgb(43, 59, 255)` or `rgba(0, 0, 0, 0.5)`, as red, green, blue and alpha from
+/// 0 to 1, for the inspector's swatch. Nil for anything else (a keyword the page wrote, `color(srgb ...)`).
+public enum CSSColor {
+  public static func rgba(_ css: String) -> (red: Double, green: Double, blue: Double, alpha: Double)? {
+    let s = css.trimmingCharacters(in: .whitespaces).lowercased()
+    guard let open = s.firstIndex(of: "("), s.hasSuffix(")"), ["rgb", "rgba"].contains(String(s[..<open])) else { return nil }
+    let inner = s[s.index(after: open)..<s.index(before: s.endIndex)]
+    let parts = inner.split(whereSeparator: { $0 == "," || $0 == " " || $0 == "/" }).compactMap { Double($0) }
+    guard parts.count == 3 || parts.count == 4, parts.prefix(3).allSatisfy({ (0...255).contains($0) }) else { return nil }
+    let alpha = parts.count == 4 ? min(1, max(0, parts[3])) : 1
+    return (parts[0] / 255, parts[1] / 255, parts[2] / 255, alpha)
   }
 }

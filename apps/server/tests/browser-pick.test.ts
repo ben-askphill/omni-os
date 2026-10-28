@@ -7,8 +7,8 @@ import { annotate, type BrowserCapture, type ElementPick, type PickedElement } f
 import { startRunner } from './runner-boot.ts';
 import { macFixture } from './fixture-shape.ts';
 import type { PageObservation } from '../browser.ts';
-import type { RawPick } from '../browser-pick-script.ts';
-import type { PickSource } from '../browser-pick.ts';
+import type { RawInspect, RawPick } from '../browser-pick-script.ts';
+import type { InspectSource, PickSource } from '../browser-pick.ts';
 
 // Picking an element on a captured page: what the server makes of what the page says, which page it will answer for,
 // and the route. Chrome is a fake that answers observe, shot and pick, so each case sets exactly what the page does. The
@@ -60,6 +60,7 @@ const BUTTON: RawPick = {
   frames: [],
   opaque: false,
   truncated: false,
+  styles: { display: 'inline-flex', color: 'rgb(255, 255, 255)', background_color: 'rgb(43, 59, 255)', font_size: '15px', padding: '8px 16px' },
 };
 
 type Fake = PickSource & { page: PageObservation; answer: RawPick | null; asked: { x: number; y: number }[]; during?: (p: PageObservation) => void; fail?: boolean };
@@ -152,6 +153,105 @@ describe('elementFrom', () => {
       expect(pick.elementFrom(raw, POINT, VIEWPORT)).toBeNull();
     // The page is not asked to be well formed past what a record needs.
     expect(pick.elementFrom({ ...BUTTON, text: undefined, ancestors: 'x', frames: undefined, truncated: 'yes' }, POINT, VIEWPORT)).toMatchObject({ text: '', ancestors: [], frames: [], truncated: false });
+  });
+});
+
+describe('the computed styles on a pick', () => {
+  it('keeps the known ones, cleaned, cut and in the record\'s order', () => {
+    const e = pick.elementFrom({ ...BUTTON, styles: { z_index: 'auto', cursor: 'pointer', font_family: `"Inter",\n${'x'.repeat(300)}`, display: 'block', color: '' } }, POINT, VIEWPORT)!;
+    expect(Object.keys(e.styles!)).toEqual(['display', 'font_family', 'z_index']);
+    const family = e.styles!.font_family!;
+    expect(family).toHaveLength(120);
+    expect(family.startsWith('"Inter", xxx')).toBe(true);
+    expect(family.endsWith('…')).toBe(true);
+  });
+
+  it('leaves them out when the page gave none, so a record from before them is the same bytes', () => {
+    expect(pick.elementFrom({ ...BUTTON, styles: undefined }, POINT, VIEWPORT)).not.toHaveProperty('styles');
+    expect(pick.elementFrom({ ...BUTTON, styles: 'red' }, POINT, VIEWPORT)).not.toHaveProperty('styles');
+  });
+});
+
+/** What the inspect script answers over the same button. */
+const HOVER: RawInspect = {
+  ok: true,
+  tag: 'BUTTON',
+  id: 'go',
+  classes: ['checkout', 'primary'],
+  path: ['body', 'main#cart', 'div.summary', 'button#go'],
+  bounds: { x: 1200.5, y: 96.2, width: 479.8, height: 159.5 },
+  styles: { display: 'inline-flex', color: 'rgb(255, 255, 255)' },
+  opaque: false,
+  viewport: { width: 1280, height: 713 },
+};
+const inspector = (answer: RawInspect | null | (() => never), running = true): InspectSource => ({
+  running,
+  inspect: async () => (typeof answer === 'function' ? answer() : answer),
+});
+
+describe('inspectedFrom', () => {
+  it('clips the box to the viewport the page reported and keeps the element\'s own size', () => {
+    const e = pick.inspectedFrom(HOVER)!;
+    expect(e).toEqual({
+      tag: 'button',
+      id: 'go',
+      classes: ['checkout', 'primary'],
+      path: ['body', 'main#cart', 'div.summary', 'button#go'],
+      bounds: { x: 1200, y: 96, width: 80, height: 160 },
+      size: { width: 480, height: 160 },
+      styles: { display: 'inline-flex', color: 'rgb(255, 255, 255)' },
+      opaque_frame: false,
+    });
+  });
+
+  it('bounds every string and list a page could make huge', () => {
+    const e = pick.inspectedFrom({ ...HOVER, id: 'i'.repeat(500), classes: Array.from({ length: 40 }, (_, i) => `c${i}\u0007`), path: Array.from({ length: 40 }, () => 'div.'.repeat(80)) })!;
+    expect(e.id).toHaveLength(100);
+    expect(e.classes).toHaveLength(6);
+    expect(e.classes.every((c) => !c.includes('\u0007'))).toBe(true);
+    expect(e.path).toHaveLength(8);
+    expect(e.path.every((p) => [...p].length <= 80)).toBe(true);
+  });
+
+  it('gives nothing for an answer that is not an element, or one off the page', () => {
+    expect(pick.inspectedFrom(null)).toBeNull();
+    expect(pick.inspectedFrom({ ...HOVER, ok: false })).toBeNull();
+    expect(pick.inspectedFrom({ ...HOVER, viewport: undefined })).toBeNull();
+    expect(pick.inspectedFrom({ ...HOVER, tag: '<img onerror=x>' })).toBeNull();
+    expect(pick.inspectedFrom({ ...HOVER, bounds: { x: 2000, y: 0, width: 10, height: 10 } })).toBeNull();
+  });
+});
+
+describe('inspectElement', () => {
+  it('answers with the element under the pointer', async () => {
+    expect(await pick.inspectElement(inspector(HOVER), POINT)).toMatchObject({ element: { tag: 'button', id: 'go' } });
+  });
+
+  it('says why there is none instead of failing: nothing there, a browser that is off, throws or answers nonsense', async () => {
+    expect(await pick.inspectElement(inspector({ ok: false, reason: 'nothing' }), POINT)).toMatchObject({ unavailable: { reason: 'nothing' } });
+    expect(await pick.inspectElement(inspector(HOVER, false), POINT)).toMatchObject({ unavailable: { reason: 'stopped' } });
+    expect(await pick.inspectElement(inspector(() => { throw new Error('Runtime.evaluate timed out'); }), POINT)).toMatchObject({ unavailable: { reason: 'unreadable' } });
+    expect(await pick.inspectElement(inspector({ ok: true, tag: 42 } as RawInspect), POINT)).toMatchObject({ unavailable: { reason: 'unreadable' } });
+  });
+});
+
+describe('the inspect route', () => {
+  const post = (src: InspectSource, body: unknown) =>
+    new Hono().route('/api/channels', pick.inspectApi(() => src)).request('/api/channels/picks/browser/inspect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  it('answers 200 with the element or why there is none, for the Mac app to read', async () => {
+    const res = await post(inspector(HOVER), POINT);
+    expect(res.status).toBe(200);
+    macFixture('browser-inspect.json', await res.json());
+    const none = await post(inspector({ ok: false, reason: 'nothing' }), POINT);
+    expect(none.status).toBe(200);
+    macFixture('browser-inspect-unavailable.json', await none.json());
+  });
+
+  it('refuses a point that is not whole pixels', async () => {
+    expect((await post(inspector(HOVER), { x: 1.5, y: 2 })).status).toBe(400);
+    expect((await post(inspector(HOVER), { x: -1, y: 2 })).status).toBe(400);
+    expect((await post(inspector(HOVER), 'nope')).status).toBe(400);
   });
 });
 

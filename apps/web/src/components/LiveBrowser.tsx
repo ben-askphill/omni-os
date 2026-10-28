@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react';
 import { api, errorText, openSSE } from '../api.ts';
-import { AnnotateButton, AnnotateLayer, useAfterAdd } from './BrowserAnnotate.tsx';
+import { AnnotateButton, AnnotateLayer, canAnnotate, useAfterAdd, type AnnotateFrom } from './BrowserAnnotate.tsx';
+import { LiveAnnotateCard, LiveAnnotateOverlay, useLiveAnnotate } from './BrowserAnnotationOverlay.tsx';
 import { Button, Icon, IconButton } from './ui.tsx';
 
 export interface BrowserTabInfo {
@@ -22,11 +23,12 @@ export interface BrowserState {
   viewport?: { width: number; height: number };
 }
 
-/** A decoded page frame, and the page viewport in CSS pixels it shows. */
+/** A decoded page frame, and the page viewport in CSS pixels it shows, and its scroll when the server sent it. */
 interface Frame {
   bitmap: ImageBitmap;
   width: number;
   height: number;
+  scroll?: { x: number; y: number };
 }
 
 type Input = Record<string, unknown> & { type: string };
@@ -85,10 +87,16 @@ export function useChannelBrowser(channelId: string) {
   // Frames skip React: they are decoded off the main thread and drawn straight to the canvas.
   const frame = useRef<Frame | null>(null);
   const draw = useRef<(() => void) | null>(null);
+  // The frame's scroll does reach React, for the Annotate overlay only, and only when it changes.
+  const scroll = useRef<{ subscribe: (fn: () => void) => () => void; listeners: Set<() => void> }>(null!);
+  scroll.current ??= (() => {
+    const listeners = new Set<() => void>();
+    return { listeners, subscribe: (fn) => (listeners.add(fn), () => void listeners.delete(fn)) };
+  })();
 
   useEffect(() => {
     setError(null);
-    let pending: { data: string; width: number; height: number } | null = null;
+    let pending: { data: string; width: number; height: number; scroll?: { x: number; y: number } } | null = null;
     let decoding = false;
     let alive = true;
     const decode = async () => {
@@ -101,10 +109,12 @@ export function useChannelBrowser(channelId: string) {
         const bitmap = await createImageBitmap(blob);
         if (!alive) bitmap.close();
         else {
+          const was = frame.current?.scroll;
           frame.current?.bitmap.close();
-          frame.current = { bitmap, width: f.width, height: f.height };
+          frame.current = { bitmap, width: f.width, height: f.height, scroll: f.scroll };
           draw.current?.();
           setHasFrame(true);
+          if (was?.x !== f.scroll?.x || was?.y !== f.scroll?.y) scroll.current.listeners.forEach((fn) => fn());
         }
       } catch {
         // A bad frame: the next one replaces it.
@@ -115,7 +125,7 @@ export function useChannelBrowser(channelId: string) {
     const h = openSSE(
       () => `/api${base}/stream`,
       (d) => {
-        const m = d as { type: string; state?: BrowserState; data?: string; width?: number; height?: number; error?: string };
+        const m = d as { type: string; state?: BrowserState; data?: string; width?: number; height?: number; scrollX?: number; scrollY?: number; error?: string };
         if (m.type === 'state' && m.state) {
           setState(m.state);
           if (!m.state.running) {
@@ -124,7 +134,7 @@ export function useChannelBrowser(channelId: string) {
           }
         } else if (m.type === 'frame' && m.data) {
           // Only the newest frame waiting to decode counts.
-          pending = { data: m.data, width: m.width!, height: m.height! };
+          pending = { data: m.data, width: m.width!, height: m.height!, ...(typeof m.scrollX === 'number' && typeof m.scrollY === 'number' && { scroll: { x: m.scrollX, y: m.scrollY } }) };
           void decode();
         } else if (m.type === 'error') setError(m.error ?? 'The browser could not start');
       },
@@ -182,7 +192,7 @@ export function useChannelBrowser(channelId: string) {
     return text;
   }, [base]);
 
-  return { state, hasFrame, frame, draw, error, input, action, restart, copy, opened };
+  return { state, hasFrame, frame, draw, error, input, action, restart, copy, opened, scroll: scroll.current };
 }
 
 export type Browser = ReturnType<typeof useChannelBrowser>;
@@ -351,7 +361,7 @@ function Toolbar({ b, extra, address, page }: { b: Browser; extra?: ReactNode; a
  * viewer reports it), so it reads like a normal browser window rather than a shrunk desktop.
  * Focus it (click) and keys go to the page, with Chrome's shortcuts on top.
  */
-function Viewport({ b, address, box }: { b: Browser; address: RefObject<HTMLInputElement | null>; box: RefObject<HTMLDivElement | null> }) {
+function Viewport({ b, address, box, overlay }: { b: Browser; address: RefObject<HTMLInputElement | null>; box: RefObject<HTMLDivElement | null>; overlay?: ReactNode }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const down = useRef(0);
   const { input, action, frame, copy } = b;
@@ -404,8 +414,10 @@ function Viewport({ b, address, box }: { b: Browser; address: RefObject<HTMLInpu
     }
     if (event === 'mouseReleased') down.current &= ~(BUTTON_BITS[e.button] ?? 0);
     e.preventDefault();
+    // Under live Annotate a click reaches the page only with Option held, which is not meant for the page (Chrome would download a link).
+    const mods = overlay ? modifiers(e) & ~1 : modifiers(e);
     const button = event === 'mouseMoved' ? (down.current & 1 ? 'left' : down.current & 2 ? 'right' : down.current & 4 ? 'middle' : 'none') : (BUTTONS[e.button] ?? 'left');
-    input({ type: 'mouse', event, ...point(e), button, buttons: down.current, clickCount: event === 'mouseMoved' ? 0 : e.detail || 1, modifiers: modifiers(e) });
+    input({ type: 'mouse', event, ...point(e), button, buttons: down.current, clickCount: event === 'mouseMoved' ? 0 : e.detail || 1, modifiers: mods });
   };
 
   // React's onWheel is passive, and the panel must not scroll while the page does.
@@ -475,6 +487,7 @@ function Viewport({ b, address, box }: { b: Browser; address: RefObject<HTMLInpu
         role="img"
         aria-label={b.state?.title || 'Browser page'}
       />
+      {b.hasFrame && overlay}
       {!b.hasFrame && !b.error && (
         <div className="absolute inset-0 grid place-items-center p-6 text-center text-[12.5px] text-fg-3">
           <span className="flex items-center gap-2">
@@ -490,8 +503,9 @@ function Viewport({ b, address, box }: { b: Browser; address: RefObject<HTMLInpu
  * The channel browser to watch, on a phone: the frames and nothing else. It sends no input and no size, so the page
  * keeps the size its viewer on the Mac gave it.
  */
-export function BrowserWatch({ b }: { b: Browser }) {
-  const box = useRef<HTMLDivElement>(null);
+export function BrowserWatch({ b, box: given, children }: { b: Browser; box?: RefObject<HTMLDivElement | null>; children?: ReactNode }) {
+  const own = useRef<HTMLDivElement>(null);
+  const box = given ?? own;
   const canvas = useRef<HTMLCanvasElement>(null);
   const { paint } = usePaint(b, box, canvas);
   useEffect(() => {
@@ -504,6 +518,7 @@ export function BrowserWatch({ b }: { b: Browser }) {
   return (
     <div ref={box} className="relative min-h-0 flex-1 overflow-hidden">
       <canvas ref={canvas} className="absolute inset-0 block h-full w-full select-none" role="img" aria-label={b.state?.title || 'Browser page'} />
+      {b.hasFrame && children}
       {!b.hasFrame && (
         <div className="absolute inset-0 grid place-items-center p-6 text-center text-[13px] text-fg-3">
           {b.error ?? (b.state?.running ? 'Waiting for the page' : 'Starting the browser')}
@@ -522,15 +537,28 @@ export function LiveBrowser({ channelId, threadId, extra }: { channelId: string;
   const b = useChannelBrowser(channelId);
   const address = useRef<HTMLInputElement>(null);
   const page = useRef<HTMLDivElement>(null);
+  const live = useLiveAnnotate(b, channelId, threadId ?? '');
+  // Live Annotate is on, and the screenshot editor it hands a pick to with Draw.
   const [annotating, setAnnotating] = useState(false);
-  const close = useCallback(() => setAnnotating(false), []);
-  const added = useAfterAdd(close);
+  const [drawing, setDrawing] = useState<AnnotateFrom | null>(null);
+  const drawn = useAfterAdd(useCallback(() => setDrawing(null), []));
+  const { clear, inspect } = live;
+  const stop = useCallback(() => {
+    setAnnotating(false);
+    clear();
+    void inspect(null);
+  }, [clear, inspect]);
+  const usable = canAnnotate(b.state);
+  useEffect(() => {
+    if (annotating && !usable) stop();
+  }, [annotating, usable, stop]);
   const tools = (
     <>
-      {threadId && <AnnotateButton state={b.state} onClick={() => setAnnotating(true)} />}
+      {threadId && <AnnotateButton state={b.state} active={annotating} onClick={() => (annotating ? stop() : setAnnotating(true))} />}
       {extra}
     </>
   );
+  const on = annotating && !!threadId && !drawing;
   return (
     <div className="flex h-full min-h-0 flex-col">
       <TabStrip b={b} />
@@ -549,8 +577,19 @@ export function LiveBrowser({ channelId, threadId, extra }: { channelId: string;
           </div>
         )}
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <Viewport b={b} address={address} box={page} />
-          {annotating && threadId && <AnnotateLayer channelId={channelId} threadId={threadId} onClose={close} onAdded={added} />}
+          <Viewport b={b} address={address} box={page} overlay={on ? <LiveAnnotateOverlay b={b} box={page} live={live} drive /> : undefined} />
+          {on && threadId && (
+            <LiveAnnotateCard
+              live={live}
+              threadId={threadId}
+              onDone={stop}
+              onDraw={() => {
+                const from = live.handOff();
+                if (from) setDrawing(from);
+              }}
+            />
+          )}
+          {drawing && threadId && <AnnotateLayer channelId={channelId} threadId={threadId} from={drawing} onClose={() => setDrawing(null)} onAdded={drawn} />}
         </div>
       </div>
     </div>

@@ -77,16 +77,27 @@ public struct BrowserState: Codable, Hashable, Sendable {
   }
 }
 
-/// One JPEG of the page, and the page viewport in CSS pixels it shows.
+/// One JPEG of the page, the page viewport in CSS pixels it shows and, when the server sends it, how far the page was scrolled.
 public struct BrowserFrame: Hashable, Sendable {
   public var jpeg: Data
   public var width: Double
   public var height: Double
+  /// In CSS pixels, so a rectangle marked on an earlier frame can follow the page.
+  public var scrollX: Double?
+  public var scrollY: Double?
 
-  public init(jpeg: Data, width: Double, height: Double) {
+  public init(jpeg: Data, width: Double, height: Double, scrollX: Double? = nil, scrollY: Double? = nil) {
     self.jpeg = jpeg
     self.width = width
     self.height = height
+    self.scrollX = scrollX
+    self.scrollY = scrollY
+  }
+
+  /// The frame as live Annotate's geometry takes it.
+  public var live: BrowserAnnotationContext.LiveFrame {
+    let scroll = scrollX.flatMap { x in scrollY.map { CGPoint(x: x, y: $0) } }
+    return BrowserAnnotationContext.LiveFrame(width: width, height: height, scroll: scroll)
   }
 
   /// The page point under `point` in a view `size` points big showing the frame at full width.
@@ -103,7 +114,7 @@ public enum BrowserStreamMessage: Hashable, Sendable, Decodable {
   case frame(BrowserFrame)
   case error(String)
 
-  private enum Keys: String, CodingKey { case type, state, data, width, height, error }
+  private enum Keys: String, CodingKey { case type, state, data, width, height, scrollX, scrollY, error }
 
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: Keys.self)
@@ -113,7 +124,10 @@ public enum BrowserStreamMessage: Hashable, Sendable, Decodable {
     case "frame":
       let b64 = try c.decode(String.self, forKey: .data)
       guard let jpeg = Data(base64Encoded: b64) else { throw DecodingError.dataCorruptedError(forKey: .data, in: c, debugDescription: "not base64") }
-      self = .frame(BrowserFrame(jpeg: jpeg, width: try c.decode(Double.self, forKey: .width), height: try c.decode(Double.self, forKey: .height)))
+      self = .frame(
+        BrowserFrame(
+          jpeg: jpeg, width: try c.decode(Double.self, forKey: .width), height: try c.decode(Double.self, forKey: .height),
+          scrollX: try c.decodeIfPresent(Double.self, forKey: .scrollX), scrollY: try c.decodeIfPresent(Double.self, forKey: .scrollY)))
     case "error":
       self = .error(try c.decode(String.self, forKey: .error))
     case let other:

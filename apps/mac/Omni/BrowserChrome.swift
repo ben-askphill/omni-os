@@ -77,9 +77,19 @@ struct BrowserToolbar: View {
       .onTapGesture { editing = true }
       .padding(.leading, z(4))
       if let annotating {
-        Button("Annotate", systemImage: "viewfinder") { Task { await annotating.model.start() } }
-          .disabled(!s.running || !s.url.lowercased().hasPrefix("http") || annotating.model.isActive)
-          .help("Annotate this page")
+        let page = s.running && s.url.lowercased().hasPrefix("http")
+        if let live = annotating.live {
+          // Live Annotate is a mode: on, the page stays live under the inspector.
+          Button(live.isOn ? "Stop annotating" : "Annotate this page", systemImage: "viewfinder") { live.toggle() }
+            .buttonStyle(.icon(size: 28, active: live.isOn))
+            .disabled(!page || annotating.model.isActive)
+            .help(live.isOn ? "Stop annotating" : "Annotate this page")
+            .accessibilityAddTraits(live.isOn ? .isSelected : [])
+        } else {
+          Button("Annotate", systemImage: "viewfinder") { Task { await annotating.model.start() } }
+            .disabled(!page || annotating.model.isActive)
+            .help("Annotate this page")
+        }
       }
       trailing
     }

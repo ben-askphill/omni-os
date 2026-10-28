@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
 import { captureApi } from './browser-capture.ts';
-import { forget, pickApi, remember } from './browser-pick.ts';
+import { forget, inspectApi, pickApi, remember } from './browser-pick.ts';
 import { channelBrowser, existingBrowser, normalizeUrl, type BrowserEvent, type BrowserInput } from './browser.ts';
 import { config } from './config.ts';
 import { channels } from './db.ts';
@@ -22,6 +22,8 @@ function browserFor(c: Context) {
 browserApi.route('/', captureApi(browserFor, { captured: remember, discarded: forget }));
 // The element Ben taps on that screenshot (browser-pick.ts).
 browserApi.route('/', pickApi(browserFor));
+// What is under Ben's pointer on the live page while Annotate is on (browser-pick.ts).
+browserApi.route('/', inspectApi(browserFor));
 
 browserApi.get('/:id/browser', (c) => {
   const b = existingBrowser(c.req.param('id'));

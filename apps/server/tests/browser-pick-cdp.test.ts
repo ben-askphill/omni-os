@@ -266,3 +266,71 @@ describe.skipIf(!hasChrome)('picking an element in a real Chrome', () => {
     if (r.ok) expect(annotate(r.capture, { x: 0, y: 0, width: 100, height: 100 }).ok).toBe(true);
   });
 });
+
+// The live Annotate overlay: what hovering shows, the styles a pick carries, and the scroll a frame reports so a mark
+// drawn on it can follow the page.
+describe.skipIf(!hasChrome)('inspecting the live page in a real Chrome', () => {
+  const inspect = async (p: { x: number; y: number }) => {
+    const r = await pick.inspectElement(chrome, p);
+    if (!('element' in r)) throw new Error(`nothing inspected: ${JSON.stringify(r)}`);
+    return r.element;
+  };
+
+  it('shows the tag, id, classes, its place in the page, its box and computed styles, and no text or markup', T, async () => {
+    await load('/main', 1500);
+    const p = await centre('a.pay', [0.1, 0.5]);
+    const e = await inspect(p);
+    expect(e).toMatchObject({ tag: 'a', id: '', classes: ['pay', 'link'], opaque_frame: false });
+    expect(e.path).toEqual(['body', 'main#cart', 'section.summary', 'ul', 'li.line', 'a.pay.link']);
+    expect(e.styles).toMatchObject({ display: 'inline', font_size: '16px', color: expect.stringMatching(/^rgb/) });
+    expect(e.bounds.y).toBeGreaterThan(0);
+    expect(e.bounds.y).toBeLessThan(700);
+    expect(e.size.width).toBeGreaterThan(0);
+    expect(JSON.stringify(e)).not.toMatch(/Pay now|SECRET|token/);
+  });
+
+  it('never reads what was typed into a field', T, async () => {
+    await load('/main', 1500);
+    for (const sel of ['#card', '#notes']) expect(JSON.stringify(await inspect(await centre(sel)))).not.toMatch(/hunter2|private notes/);
+  });
+
+  it('goes into same-origin frames and open shadow roots, and stops at a frame from another site', T, async () => {
+    await load('/main', 0);
+    await inPage(`document.getElementById('inner').scrollIntoView()`);
+    await new Promise((r) => setTimeout(r, 150));
+    const framed = await inspect(await centreIn(['inner'], 'fbtn'));
+    expect(framed).toMatchObject({ tag: 'button', id: 'fbtn' });
+    expect(framed.path.at(-1)).toBe('button#fbtn');
+    const foreign = await inspect(await centre('#foreign'));
+    expect(foreign).toMatchObject({ tag: 'iframe', opaque_frame: true });
+    await inPage(`document.getElementById('host').scrollIntoView()`);
+    await new Promise((r) => setTimeout(r, 150));
+    const p = await inPage(`(() => { const b = document.getElementById('host').shadowRoot.querySelector('button').getBoundingClientRect(); return { x: Math.round(b.left + 10), y: Math.round(b.top + 10) }; })()`);
+    expect(await inspect(p)).toMatchObject({ tag: 'button', classes: ['shadowed'] });
+  });
+
+  it('puts the same computed styles on a pick, which the record keeps', T, async () => {
+    await load('/main', 1500);
+    const { capture, answer } = await pickAfterCapture(await centre('a.pay', [0.1, 0.5]));
+    const e = element(answer);
+    expect(e.styles).toMatchObject({ display: 'inline', font_size: '16px' });
+    const r = annotate(capture, e.bounds, e);
+    expect(r.ok && r.value.element?.styles).toEqual(e.styles);
+  });
+
+  it('sends the page\'s scroll with each screencast frame', T, async () => {
+    await load('/main', 0);
+    const frames: { scrollY?: number }[] = [];
+    const stop = chrome.watch((ev) => ev.type === 'frame' && frames.push(ev));
+    try {
+      await inPage('scrollTo(0, 1234)');
+      for (let i = 0; i < 50 && !frames.some((f) => f.scrollY === 1234); i++) {
+        await inPage(`document.body.style.background = '${i % 2 ? '#fff' : '#fefefe'}'`);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      expect(frames.some((f) => f.scrollY === 1234)).toBe(true);
+    } finally {
+      stop();
+    }
+  });
+});

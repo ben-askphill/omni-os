@@ -33,11 +33,30 @@ import { Button, ErrorNote, Icon, IconButton } from './ui.tsx';
 /** A page the server can capture: the browser is up and shows a web page. */
 export const canAnnotate = (s: { running: boolean; url: string } | null | undefined) => !!s?.running && /^https?:\/\//i.test(s.url);
 
-export function AnnotateButton({ state, onClick }: { state: { running: boolean; url: string } | null | undefined; onClick: () => void }) {
-  return <IconButton icon="annotate" label="Annotate this page" size={15} disabled={!canAnnotate(state)} onClick={onClick} />;
+/** Turns live Annotate on and off (BrowserAnnotationOverlay.tsx). */
+export function AnnotateButton({ state, active, onClick }: { state: { running: boolean; url: string } | null | undefined; active?: boolean; onClick: () => void }) {
+  return (
+    <IconButton
+      icon="annotate"
+      label={active ? 'Stop annotating' : 'Annotate this page'}
+      aria-pressed={!!active}
+      size={15}
+      active={active}
+      disabled={!canAnnotate(state)}
+      onClick={onClick}
+      className={active ? 'bg-surface-3' : ''}
+    />
+  );
 }
 
 type Phase = { at: 'capturing' } | { at: 'draw'; capture: BrowserCapture } | { at: 'failed'; message: string; retryable: boolean };
+
+/** A pick made on the live page (BrowserAnnotationOverlay.tsx), to draw on: its screenshot, which this layer then owns, and what was picked. */
+export interface AnnotateFrom {
+  capture: BrowserCapture;
+  rect: PixelRect;
+  element: PickedElement | null;
+}
 
 /** What the capture route said when it could not: its words, and whether asking again can work. */
 function failure(e: unknown): Phase {
@@ -64,17 +83,21 @@ function useFit(viewport: { width: number; height: number } | null) {
 
 /**
  * Over the browser's page area. It captures when it opens, then shows the screenshot to draw on. Leaving it any way but
- * Add to message deletes the screenshot it made. `onAdded` runs once the record is on the draft.
+ * Add to message deletes the screenshot it made. `onAdded` runs once the record is on the draft. `from` starts it on a
+ * live pick's screenshot instead, with the pick marked.
  */
-export function AnnotateLayer({ channelId, threadId, onClose, onAdded }: { channelId: string; threadId: string; onClose: () => void; onAdded: () => void }) {
-  const [phase, setPhase] = useState<Phase>({ at: 'capturing' });
+export function AnnotateLayer({ channelId, threadId, onClose, onAdded, from }: { channelId: string; threadId: string; onClose: () => void; onAdded: () => void; from?: AnnotateFrom }) {
+  const [phase, setPhase] = useState<Phase>(() => (from ? { at: 'draw', capture: from.capture } : { at: 'capturing' }));
   const [attempt, setAttempt] = useState(0);
   const capture = phase.at === 'draw' ? phase.capture : null;
   const base = `/channels/${encodeURIComponent(channelId)}/browser/capture`;
   const added = useRef(false);
 
   // One capture per attempt. One that lands after the layer closed is discarded, not shown.
+  // A live pick's screenshot is the first attempt's.
+  const given = !!from;
   useEffect(() => {
+    if (given && attempt === 0) return;
     let live = true;
     setPhase({ at: 'capturing' });
     api
@@ -87,7 +110,7 @@ export function AnnotateLayer({ channelId, threadId, onClose, onAdded }: { chann
     return () => {
       live = false;
     };
-  }, [base, threadId, attempt]);
+  }, [base, threadId, attempt, given]);
 
   // Whatever ends the layer, a screenshot nothing was made of goes with it.
   const latest = useRef<BrowserCapture | null>(null);
@@ -143,7 +166,7 @@ export function AnnotateLayer({ channelId, threadId, onClose, onAdded }: { chann
           </span>
         </div>
       ) : (
-        <Draw capture={phase.capture} channelId={channelId} threadId={threadId} onClose={onClose} onAdded={() => ((added.current = true), onAdded())} />
+        <Draw capture={phase.capture} channelId={channelId} threadId={threadId} onClose={onClose} onAdded={() => ((added.current = true), onAdded())} from={from?.capture === phase.capture ? from : undefined} />
       )}
     </div>
   );
@@ -160,16 +183,16 @@ type Gesture =
   | { kind: 'shape'; drag: Drag }
   | { kind: 'move'; index: number; from: [number, number]; was: Mark };
 
-function Draw({ capture, channelId, threadId, onClose, onAdded }: { capture: BrowserCapture; channelId: string; threadId: string; onClose: () => void; onAdded: () => void }) {
+function Draw({ capture, channelId, threadId, onClose, onAdded, from }: { capture: BrowserCapture; channelId: string; threadId: string; onClose: () => void; onAdded: () => void; from?: AnnotateFrom }) {
   const { viewport } = capture;
   const { box, scale, shown } = useFit(viewport);
   const stage = useRef<HTMLDivElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
-  const [rect, setRect] = useState<PixelRect | null>(null);
+  const [rect, setRect] = useState<PixelRect | null>(from?.rect ?? null);
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   // The element a tap picked, why a tap gave none, and a counter so a slow answer to an earlier tap is dropped.
-  const [element, setElement] = useState<PickedElement | null>(null);
+  const [element, setElement] = useState<PickedElement | null>(from?.element ?? null);
   const [notice, setNotice] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [adding, setAdding] = useState(false);

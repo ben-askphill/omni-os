@@ -1,7 +1,22 @@
 import { readFileSync } from 'node:fs';
 import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
-import { annotate, browserAnnotation, cleanTitle, dragToRect, elementRect, rectInImage, shortUrl, type BrowserAnnotation, type Drag, type PixelRect } from '../message-context-browser.ts';
+import {
+  annotate,
+  browserAnnotation,
+  captureToLive,
+  cleanTitle,
+  dragToRect,
+  elementRect,
+  livePointToCapture,
+  liveToCapture,
+  rectInImage,
+  shortUrl,
+  type BrowserAnnotation,
+  type Drag,
+  type LiveFrame,
+  type PixelRect,
+} from '../message-context-browser.ts';
 import { blobIds, clampToHunk, diffSelection, selectRows, type DiffFileLike, type DiffSelection, type DiffSource } from '../message-context-diff.ts';
 import { CONTEXT_KINDS, parseContexts, readContexts } from '../message-context-kinds.ts';
 import { LINES_MAX, TEXT_MAX, plainText, selectExcerpt, terminalExcerpt, type TerminalExcerpt } from '../message-context-terminal.ts';
@@ -31,7 +46,11 @@ const corpus = JSON.parse(readFileSync(fixture('message-context.json'), 'utf8'))
   elementRects: { name: string; bounds: PixelRect; viewport: { width: number; height: number }; expect: PixelRect }[];
   threadReferences: { name: string; thread: ThreadIdentity; current: string; at: string; expect: ThreadReference }[];
   overlays: { name: string; rect: PixelRect; image: { width: number; height: number }; viewport: { width: number; height: number }; expect: PixelRect }[];
+  livePoints: { name: string; point: { x: number; y: number }; frame: LiveFrame; capture: Capture; expect: { x: number; y: number } | null }[];
+  liveRects: { name: string; rect: PixelRect; frame: LiveFrame; capture: Capture; expect: PixelRect | null }[];
+  captureToLive: { name: string; rect: PixelRect; frame: LiveFrame; capture: Capture; expect: PixelRect }[];
 };
+type Capture = Pick<BrowserAnnotation, 'viewport' | 'scroll'>;
 
 const known = (name: string) => corpus.records.find((r) => r.name === name)!.raw as MessageContext<'diff_selection', DiffSelection>;
 
@@ -229,6 +248,34 @@ describe('elementRect', () => {
       const bounds = { x, y, width: Math.min(w, width - x), height: Math.min(h, height - y) };
       expect(browserAnnotation.parse({ ...base, rect: elementRect(bounds, base.viewport) }, 1).ok).toBe(true);
     }
+  });
+});
+
+// The live Annotate overlay draws on frames of the page and takes a screenshot just after: these move what Ben marked
+// on a frame onto that screenshot, and the screenshot's rectangle back over the frame as the page scrolls.
+describe('live frames and captures', () => {
+  it.each(corpus.livePoints.map((c) => [c.name, c] as const))('livePointToCapture: %s', (_, c) => {
+    expect(livePointToCapture(c.point, c.frame, c.capture)).toEqual(c.expect);
+  });
+  it.each(corpus.liveRects.map((c) => [c.name, c] as const))('liveToCapture: %s', (_, c) => {
+    expect(liveToCapture(c.rect, c.frame, c.capture)).toEqual(c.expect);
+  });
+  it.each(corpus.captureToLive.map((c) => [c.name, c] as const))('captureToLive: %s', (_, c) => {
+    expect(captureToLive(c.rect, c.capture, c.frame)).toEqual(c.expect);
+  });
+
+  it('gives a rectangle every annotation record accepts, wherever the page scrolled', () => {
+    const base = known('a browser annotation').body as unknown as BrowserAnnotation;
+    for (const dy of [-900, -300, -100, -4, 0, 3, 120, 700]) for (const y of [-20, 0, 96, 650]) for (const h of [4, 8, 160, 900]) {
+      const r = liveToCapture({ x: 320, y, width: 480, height: h }, { width: 1280, height: 713, scroll: { x: 0, y: base.scroll.y + dy } }, base);
+      if (r) expect(browserAnnotation.parse({ ...base, rect: r }, 1).ok).toBe(true);
+    }
+  });
+
+  it('round-trips a rectangle the page did not scroll from', () => {
+    const base = known('a browser annotation').body as unknown as BrowserAnnotation;
+    const frame = { width: 1280, height: 713, scroll: base.scroll };
+    expect(liveToCapture(captureToLive(base.rect, base, frame), frame, base)).toEqual(base.rect);
   });
 });
 
