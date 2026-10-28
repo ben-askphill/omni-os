@@ -17,6 +17,8 @@ OMNI_URL=https://<your-mac>.<tailnet>.ts.net scripts/omni.sh --pair
 
 Open that link on the phone (AirDrop it, or paste it). Or open the `.ts.net` address and paste the token from `data/api-token` into the pairing screen. The server itself stays on loopback; Tailscale is the door. The Mac has to be awake: `scripts/install-launchd.sh` keeps it from idle-sleeping while the server runs.
 
+Every client names the Mac its Omni runs on: the desktop sidebar's footer, the phone's Channels and Settings headers, and the Mac app's server line. A browser on another device gets a Remote chip, and its tab title starts with that Mac's name.
+
 On an iPhone, open the `.ts.net` address in Safari and use Share, then Add to Home Screen. Omni then opens full screen with the phone layout: Activity, Channels and Library tabs, and a + button for a new delegation. A home-screen app can keep its own cookies apart from Safari's, so if it opens on the pairing screen, paste the token there once.
 
 ## The phone layout
