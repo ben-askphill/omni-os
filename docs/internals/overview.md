@@ -35,6 +35,8 @@ A running channel action also keeps its worktree from cleanup. Starting an actio
 
 The channel browser (`apps/server/browser.ts`) is one Chrome per channel that Omni launches on first use (a thread's MCP or the Browser panel) and closes after 5 idle minutes. The panel streams it with a CDP screencast and sends mouse, wheel and keys back (`/api/channels/:id/browser/*`). While someone watches, the page lays out at the viewer's size (`Emulation.setDeviceMetricsOverride`, sharp at the display's scale), so it reads like a real browser window in the panel; the last viewer to report a size wins, and with none watching the agent gets the 1280-wide desktop page back. Input goes in batches: a client queues while a batch is on its way and merges moves and scrolls. The frame is Chrome-like: tabs with favicons, the address bar, a loading bar, and Chrome's Cmd shortcuts (L, T, W, R, [, ], C, X, V; A and Z go to the page).
 
+The Mac app also has a Web tab: Ben's own browser, a `WKWebView` per tab in the app (`NativeBrowserModel.swift`), drawn by the Mac rather than streamed. It shares the frame (`BrowserChrome.swift`) but nothing else with the channel browser: the agent can't see it, and its cookies live in the app's default website data store, never on the server. Annotate on it uploads the web view's own screenshot (`POST /api/channels/:id/browser/capture/native`) and runs the server's pick script in the page (`GET .../browser/pick-script`, then `POST .../capture/:name/element/native`, which cleans the answer as it does for Chrome's).
+
 ## Web UI and Mac app
 
 The two clients are kept apart so a change to one cannot break the other:

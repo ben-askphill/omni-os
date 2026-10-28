@@ -4,13 +4,15 @@ import Foundation
 /// (ThreadPage in apps/web/src/pages/Thread.tsx), with its first-artifact quirk fixed.
 public struct InspectorSelection: Equatable, Sendable {
   public enum Tab: String, CaseIterable, Sendable {
-    case artifacts, changes, browser, terminal, actions, details
+    /// `web` is the Mac's own browser (`NativeBrowserView`), which the Web UI has no tab for: a page cannot embed a native web view.
+    case artifacts, changes, browser, web, terminal, actions, details
 
     public var title: String {
       switch self {
       case .artifacts: "Artifacts"
       case .changes: "Changes"
       case .browser: "Browser"
+      case .web: "Web"
       case .terminal: "Terminal"
       case .actions: "Actions"
       case .details: "Details"
@@ -33,11 +35,11 @@ public struct InspectorSelection: Equatable, Sendable {
     return Self(tab: .details)
   }
 
-  /// A new HTML artifact is selected and shown, the first one too. The Terminal, Changes and Actions tabs stay put, so
-  /// a page landing never pulls Ben out of the shell mid-command, the changes he is reading or a run's output.
+  /// A new HTML artifact is selected and shown, the first one too. The Web, Terminal, Changes and Actions tabs stay put, so
+  /// a page landing never pulls Ben out of a page he is using, the shell mid-command, the changes he is reading or a run's output.
   public mutating func arrived(_ a: Artifact) {
     artifactID = a.id
-    if ![.terminal, .changes, .actions].contains(tab) { tab = .artifacts }
+    if ![.web, .terminal, .changes, .actions].contains(tab) { tab = .artifacts }
   }
 
   public mutating func open(artifact id: Int) {

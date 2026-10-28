@@ -440,8 +440,21 @@ struct BrowserAnnotateLayer: View {
 enum BrowserAnnotateProbe {
   static var annotating: Annotating?
   static var browser: ChannelBrowserModel?
+  /// The Web tab's own browser, while it shows.
+  static var native: NativeBrowserModel?
   /// The address bar, in window coordinates from the top left, and the page view, for `{"browserAddress": ...}`.
   static var address: CGRect?
   static weak var canvas: NSView?
+
+  /// What a browser view going away clears, unless the next one, which can appear first, has already taken its place.
+  static func release(browser model: ChannelBrowserModel, annotate: BrowserAnnotateModel?) {
+    if browser === model { browser = nil }
+    if let annotate, annotating?.model === annotate { annotating = nil }
+  }
+
+  static func release(native model: NativeBrowserModel, annotate: BrowserAnnotateModel?) {
+    if native === model { native = nil }
+    if let annotate, annotating?.model === annotate { annotating = nil }
+  }
 }
 #endif

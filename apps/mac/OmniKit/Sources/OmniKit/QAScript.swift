@@ -21,7 +21,7 @@ public enum QAAppearance: String, Hashable, Sendable {
 /// a screen per frame and reports how long the frames took.
 public enum QAInspector: String, Hashable, Sendable {
   /// `turn`: the Changes tab on This turn.
-  case open, close, artifacts, changes, turn, browser, terminal, actions, details
+  case open, close, artifacts, changes, turn, browser, web, terminal, actions, details
 }
 
 /// What an annotate step does in the Browser tab: press Annotate and wait for the screenshot, draw a rectangle (in fractions
@@ -109,10 +109,10 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"sleep": 1}`, `{"snapshot": "name"}`, `{"port": 4759}` (never 4747), `{"open": "settings"}`, `{"openThread": "<id>"}`,
 /// `{"settings": "secrets"}` (or `connection`, `profile`, `sync`, `storage`, `notifications`, `appearance`), `{"server": "start"}` (or `stop`, `check`),
 /// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`, `earlier`, `gap`), `{"expand": true}`, `{"meter": true}`, `{"modelPicker": true}` (or a search, `"cursor"`), `{"foldAll": true}`,
-/// `{"imageZoom": 2}` (or `"fit"`), `{"editPending": "text"}`, `{"webhookSecret": "<automation id>"}`, `{"searchHit": 0}`,
+/// `{"imageZoom": 2}` (or `"fit"`), `{"nativeBrowser": "<url>"}`, `{"editPending": "text"}`, `{"webhookSecret": "<automation id>"}`, `{"searchHit": 0}`,
 /// `{"deliveries": "<automation id>"}` (or `{"automation": "<id>", "open": "failed", "older": true}`),
 /// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
-/// `changes`, `turn`, `browser`, `terminal`, `actions`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
+/// `changes`, `turn`, `browser`, `web`, `terminal`, `actions`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
 /// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
 /// `{"drag": "<thread title>", "over": "<folder>"}`, `{"file": "<thread title>", "into": "<folder>"}`,
 /// `{"menu": "<folder>", "shot": "<name>"}`, or `"reset"`), `{"screen": "name"}`, `{"handoffMenu": "name"}`, `{"prMenu": "name"}`, `{"handOff": "<device id>"}`,
@@ -171,6 +171,8 @@ public enum QAStep: Hashable, Sendable {
   case searchHit(Int)
   /// Zooms the artifact image preview to this scale, or back to fit with nil.
   case imageZoom(Double?)
+  /// Loads this address in the Web tab's own web view and waits for it to finish.
+  case nativeBrowser(String)
   /// Puts text in the reply box, as if typed.
   case type(String)
   /// Sends the reply box: nil is a plain reply, else the mode of the split button.
@@ -306,7 +308,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "searchHit", "imageZoom", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "prMenu", "handOff", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "browserAddress", "openContext", "referenceThread", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "searchHit", "imageZoom", "nativeBrowser", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "prMenu", "handOff", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "browserAddress", "openContext", "referenceThread", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -396,6 +398,9 @@ public struct QAScript: Hashable, Sendable {
       if let name = value as? String, name == "fit" { return .imageZoom(nil) }
       guard let scale = value as? Double, scale > 0 else { throw QAScriptError(#"imageZoom takes a scale like 2, or "fit""#) }
       return .imageZoom(scale)
+    case "nativeBrowser":
+      guard let address = value as? String, !address.isEmpty else { throw QAScriptError("nativeBrowser takes the address to load") }
+      return .nativeBrowser(address)
     case "type":
       guard let text = value as? String else { throw QAScriptError("type takes the text for the reply box") }
       return .type(text)
@@ -410,7 +415,7 @@ public struct QAScript: Hashable, Sendable {
       return .send(name == "reply" ? nil : SendMode(rawValue: name))
     case "inspector":
       guard let name = value as? String, let to = QAInspector(rawValue: name) else {
-        throw QAScriptError("inspector takes open, close, artifacts, changes, turn, browser, terminal, actions or details")
+        throw QAScriptError("inspector takes open, close, artifacts, changes, turn, browser, web, terminal, actions or details")
       }
       return .inspector(to)
     case "webTitle":

@@ -55,6 +55,40 @@ struct BrowserTab: View {
   }
 }
 
+// MARK: Web
+
+/// Ben's own browser for the channel, a web view on this Mac (`NativeBrowserView`), in its own tab beside the agent's Browser:
+/// the agent cannot see or drive it, and Ben's logins never reach the server.
+struct WebTab: View {
+  let client: OmniClient
+  let channel: String?
+  /// The thread whose reply box Annotate adds to.
+  let thread: String
+  let draft: DraftContextModel
+  @State private var browser: NativeBrowserModel?
+  @State private var annotate: BrowserAnnotateModel?
+
+  var body: some View {
+    Group {
+      if let browser {
+        NativeBrowserView(model: browser, annotating: annotate.map { Annotating(model: $0, client: client, draft: draft) })
+      } else {
+        Color.clear
+      }
+    }
+    .frame(maxHeight: .infinity, alignment: .top)
+    .onChange(of: channel, initial: true) { _, id in
+      if let id, browser?.channel != id {
+        browser = NativeBrowsers.model(for: id)
+        annotate = browser?.annotateModel(client: client, thread: thread)
+      }
+    }
+    .onChange(of: thread) { _, thread in
+      annotate = browser?.annotateModel(client: client, thread: thread)
+    }
+  }
+}
+
 /// The channel browser's screenshots, newest first, and a viewer to page through them.
 struct ScreenshotGrid: View {
   let client: OmniClient

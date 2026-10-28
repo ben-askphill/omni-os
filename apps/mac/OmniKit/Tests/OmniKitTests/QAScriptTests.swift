@@ -74,6 +74,7 @@ import OmniKit
         {"searchHit": 0},
         {"imageZoom": 2},
         {"imageZoom": "fit"},
+        {"nativeBrowser": "http://localhost:4900/"},
         {"openThread": "t2"}
       ]
       """.utf8))
@@ -97,6 +98,7 @@ import OmniKit
       .searchHit(0),
       .imageZoom(2),
       .imageZoom(nil),
+      .nativeBrowser("http://localhost:4900/"),
       .openThread("t2"),
     ])
   }

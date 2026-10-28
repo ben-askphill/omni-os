@@ -3,7 +3,7 @@ import SwiftUI
 import WebKit
 
 extension View {
-  /// The thread's inspector: Artifacts, Changes, Browser, Terminal, Actions and Details in a side panel, its toggle in the toolbar.
+  /// The thread's inspector: Artifacts, Changes, Browser, Web, Terminal, Actions and Details in a side panel, its toggle in the toolbar.
   func threadInspector(model: AppModel, store: ThreadStore) -> some View {
     modifier(ThreadInspector(model: model, store: store))
   }
@@ -76,7 +76,7 @@ private struct ThreadInspector: ViewModifier {
           }
         }
         .buttonStyle(.icon(size: 28, wide: count > 0))
-        .help(count > 0 ? "Artifacts, changes, browser, terminal, actions, details (\(count))" : "Artifacts, changes, browser, terminal, actions, details")
+        .help(count > 0 ? "Artifacts, changes, browser, web, terminal, actions, details (\(count))" : "Artifacts, changes, browser, web, terminal, actions, details")
       }
       .sharedBackgroundVisibility(.hidden)
     }
@@ -99,7 +99,7 @@ private struct ThreadInspector: ViewModifier {
         switch command {
         case .open: isOpen.wrappedValue = true
         case .close: isOpen.wrappedValue = false
-        case .artifacts, .changes, .browser, .terminal, .actions, .details:
+        case .artifacts, .changes, .browser, .web, .terminal, .actions, .details:
           isOpen.wrappedValue = true
           picked.wrappedValue.tab = InspectorSelection.Tab(rawValue: command.rawValue) ?? .details
         case .turn:
@@ -152,6 +152,7 @@ private struct InspectorPanel: View {
               case .artifacts: "layers"
               case .changes: "diff"
               case .browser: "browser"
+              case .web: "globe"
               case .terminal: "terminal"
               case .actions: "play"
               case .details: "info"
@@ -175,6 +176,8 @@ private struct InspectorPanel: View {
         ChangesTab(client: model.client, store: store)
       case .browser:
         BrowserTab(client: model.client, channel: store.thread?.channelID, shots: store.screenshots, thread: store.id, draft: store.draftContext)
+      case .web:
+        WebTab(client: model.client, channel: store.thread?.channelID, thread: store.id, draft: store.draftContext)
       case .terminal:
         TerminalTab(client: model.client, thread: store.id, cwd: store.thread?.cwd, draft: store.draftContext)
       case .actions:

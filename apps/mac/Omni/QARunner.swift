@@ -2,6 +2,7 @@
 import AppKit
 import OmniKit
 import SwiftUI
+import WebKit
 
 /// Debug builds only. `-OmniQAScript <json or path> -OmniQAOut <dir>` runs a QA script (see `QAScript`)
 /// against the app. Snapshots render the app's own windows to PNG, with no screen recording permission.
@@ -65,6 +66,9 @@ final class QARunner {
   }
 
   static func start(_ launch: Launch, model: AppModel) {
+    // The Web tab starts empty, and Ben's own pages and logins stay out of the run.
+    UserDefaults.standard.removePersistentDomain(forName: "com.omni-os.mac.qa-web")
+    NativeBrowsers.qa = UserDefaults(suiteName: "com.omni-os.mac.qa-web")
     let runner = QARunner(model: model, out: launch.out)
     current = runner
     Task { await runner.run(launch.script) }
@@ -200,6 +204,16 @@ final class QARunner {
           guard let zoom = QAProbe.imageZoom else { throw QAScriptError("no image preview on screen") }
           if let scale { zoom.step(scale / zoom.scale) } else { zoom.fit() }
           try? await Task.sleep(for: .milliseconds(400))
+        case .nativeBrowser(let address):
+          guard let native = BrowserAnnotateProbe.native else { throw QAScriptError("the Web tab is not showing") }
+          native.perform(.navigate(address))
+          try? await Task.sleep(for: .milliseconds(300))
+          let deadline = ContinuousClock.now + .seconds(15)
+          while native.state.loading || native.state.url.isEmpty {
+            guard ContinuousClock.now < deadline else { throw QAScriptError("the page did not finish loading: \(native.state.url)") }
+            try? await Task.sleep(for: .milliseconds(100))
+          }
+          try? await Task.sleep(for: .milliseconds(500))
         case .sleep(let duration):
           try? await Task.sleep(for: duration)
         case .snapshot(let name):
@@ -510,6 +524,7 @@ final class QARunner {
     case .deliveries(let target): "deliveries \(target.automation)"
     case .searchHit(let i): "searchHit \(i)"
     case .imageZoom(let scale): "imageZoom \(scale.map { "\($0)" } ?? "fit")"
+    case .nativeBrowser(let address): "nativeBrowser \(address.prefix(60))"
     case .type(let text): "type \(text.prefix(40))"
     case .run(let run): "run \(run.harness.rawValue) \(run.model) \(run.effort)"
     case .send(let mode): "send \(mode?.rawValue ?? "reply")"
@@ -549,11 +564,20 @@ final class QARunner {
   /// Clicks the page, then the address bar, with mouse events through the window's own hit testing, types `text` a key
   /// at a time and presses Return, then waits for the page to go there. With `escape`, presses Escape instead. Either
   /// way the keys must end up with the page. Fails when a click or key lands anywhere else. Focus needs the key window,
-  /// so this step brings the app to the front.
+  /// so this step brings the app to the front. It drives the Web tab when that shows, else the Browser tab.
   private func browserAddress(_ text: String, escape: Bool) async throws(QAScriptError) -> String {
-    guard let browser = BrowserAnnotateProbe.browser, let bar = BrowserAnnotateProbe.address, let canvas = BrowserAnnotateProbe.canvas,
-      let window = canvas.window, let content = window.contentView
-    else { throw QAScriptError("the Browser tab is not showing") }
+    let shown: (page: NSView, url: () -> String)? =
+      if let native = BrowserAnnotateProbe.native, let web = native.webView, web.window != nil { (web, { native.state.url }) }
+      else if let browser = BrowserAnnotateProbe.browser, let canvas = BrowserAnnotateProbe.canvas { (canvas, { browser.state.url }) }
+      else { nil }
+    guard let shown, let bar = BrowserAnnotateProbe.address, let window = shown.page.window, let content = window.contentView
+    else { throw QAScriptError("neither the Browser tab nor the Web tab is showing") }
+    let canvas = shown.page, url = shown.url
+    /// The page has the keys: the canvas, or the web view or a view inside it.
+    func pageHasKeys() -> Bool {
+      guard let r = window.firstResponder as? NSView else { return false }
+      return r === canvas || r.isDescendant(of: canvas)
+    }
     func click(_ at: NSPoint) {
       let p = content.convert(content.isFlipped ? at : NSPoint(x: at.x, y: content.bounds.height - at.y), to: nil)
       func event(_ type: NSEvent.EventType) -> NSEvent? {
@@ -576,7 +600,7 @@ final class QARunner {
     }
     func holder() -> String {
       let r = window.firstResponder
-      if r === canvas { return "the page" }
+      if pageHasKeys() { return "the page" }
       if let editor = r as? NSTextView, editor.isFieldEditor { return "a text field" }
       return r.map { String(describing: type(of: $0)) } ?? "nothing"
     }
@@ -584,9 +608,11 @@ final class QARunner {
     window.makeKeyAndOrderFront(nil)
     try? await Task.sleep(for: .milliseconds(300))
     let page = canvas.convert(canvas.bounds, to: nil)
-    click(NSPoint(x: page.midX, y: content.bounds.height - page.midY))
+    // A web view takes no first click in a window that is not key, as in Safari, and the harness's window cannot become key
+    // while another app is in front. So the Web tab's page is given the keys directly; the address bar is still clicked.
+    if canvas is WKWebView { window.makeFirstResponder(canvas) } else { click(NSPoint(x: page.midX, y: content.bounds.height - page.midY)) }
     try? await Task.sleep(for: .milliseconds(300))
-    guard window.firstResponder === canvas else { throw QAScriptError("a click on the page left the keys with \(holder())") }
+    guard pageHasKeys() else { throw QAScriptError("a click on the page left the keys with \(holder())") }
     click(NSPoint(x: bar.midX, y: bar.midY))
     try? await Task.sleep(for: .milliseconds(300))
     guard let editor = window.firstResponder as? NSTextView, editor.isFieldEditor else {
@@ -606,12 +632,12 @@ final class QARunner {
     }
     key(escape ? "\u{1b}" : "\r", code: escape ? 53 : 36)
     let pressed = escape ? "Escape" : "Return"
-    guard await until(2, { window.firstResponder === canvas }) else { throw QAScriptError("\(pressed) left the keys with \(holder())") }
+    guard await until(2, pageHasKeys) else { throw QAScriptError("\(pressed) left the keys with \(holder())") }
     if escape { return "Escape gave the keys back to the page" }
-    guard await until(10, { browser.state.url.contains(text) }) else {
-      throw QAScriptError("Return did not go to \(text); the page is at \(browser.state.url)")
+    guard await until(10, { url().contains(text) }) else {
+      throw QAScriptError("Return did not go to \(text); the page is at \(url())")
     }
-    return "went to \(browser.state.url), keys with the page"
+    return "went to \(url()), keys with the page"
   }
 
   /// The model's facts and which transcript the thread screen has laid out.
@@ -619,6 +645,7 @@ final class QARunner {
     var f = model.qaFacts
     f.shownThread = QAProbe.shownThread
     f.browserFrame = BrowserAnnotateProbe.browser?.frame != nil
+      || BrowserAnnotateProbe.native.map { $0.state.url.hasPrefix("http") && !$0.state.loading } == true
     return f
   }
 
