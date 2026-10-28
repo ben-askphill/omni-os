@@ -8,7 +8,7 @@ export function DeviceLabel({ device, className = '' }: { device: Device; classN
     <span className={`inline-flex min-w-0 max-w-full items-center gap-1.5 align-middle ${className}`} title={deviceHint(device)}>
       <Icon name="monitor" size={13} className="shrink-0 text-fg-4" />
       <span className="min-w-0 truncate">{device.name}</span>
-      {!device.here && <Chip tone="live">Remote</Chip>}
+      {!device.here && <Chip tone="ink">Remote</Chip>}
     </span>
   );
 }

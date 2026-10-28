@@ -6,4 +6,4 @@ export function windowTitle(page: string, device: Device | undefined): string {
   return device && !device.here ? `${device.name} · ${title}` : title;
 }
 
-export const deviceHint = (d: Device) => (d.here ? `Omni runs on this Mac, ${d.name}` : `This browser reaches Omni on ${d.name} through Tailscale`);
+export const deviceHint = (d: Device) => (d.here ? `Omni runs on this Mac, ${d.name}` : `This browser is on another device. Omni runs on ${d.name}`);
