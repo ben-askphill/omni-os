@@ -24,7 +24,7 @@ private func harnesses() -> [HarnessInfo] {
 
 private func crew(_ extra: String = "") -> [CrewRole] {
   let json = """
-  [{"id":"conductor","name":"Conductor","description":"","model":"opus","channel":"conductor"},
+  [{"id":"conductor","name":"Conductor","description":"","model":"auto","channel":"conductor"},
    {"id":"builder","name":"Builder","description":"","harness":"codex","model":"gpt-x","effort":"high","channel":"acme"},
    {"id":"plain","name":"Plain","description":""},
    {"id":"ghost","name":"Ghost","description":"","harness":"nope","effort":"low"}\(extra)]
@@ -113,7 +113,7 @@ private let channels: Set<String> = ["conductor", "acme", "inbox"]
     // A role without run defaults leaves the channel's; one with any replaces them whole.
     #expect(pre("acme", role: "plain").model == "gpt-x")
     #expect(pre("acme", role: "builder") == NewThreadChoice(channel: "acme", role: "builder", harness: .codex, model: "gpt-x", effort: "high"))
-    #expect(pre("inbox", role: "conductor") == NewThreadChoice(channel: "inbox", role: "conductor", harness: .claudeCode, model: "opus", effort: ""))
+    #expect(pre("inbox", role: "conductor") == NewThreadChoice(channel: "inbox", role: "conductor", harness: .claudeCode, model: "auto", effort: ""))
   }
 
   @Test func aRoleOrChannelSetToAutoPreselectsAuto() {
@@ -355,7 +355,7 @@ private final class FakeNewThreadAPI: NewThreadAPI {
     home.update(crew: crew(), channels: channels, harnesses: harnesses(), defaults: auto)
     #expect(home.choice.isAuto)
     home.update(crew: crew(), channels: channels, harnesses: harnesses(), defaults: [:])
-    #expect(home.choice.model == "opus")
+    #expect(home.choice.isAuto)
   }
 
   @Test func serializesInheritedDefaultsWithoutPromotingThemToExplicitChoices() async throws {

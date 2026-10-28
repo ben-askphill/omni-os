@@ -119,11 +119,11 @@ describe('Conductor channel defaults', () => {
     await expect(start({ model: 'claude-retired-1' })).rejects.toThrow(/Unknown Claude Code model/);
   });
 
-  it('keeps the charter default when unset or used in another channel', async () => {
+  it('uses the Auto charter default when no channel default is saved', async () => {
     await save(null);
     const unset = await start();
-    expect(H.thread(unset.id)).toMatchObject({ model: 'claude-opus-5-5', auto_reason: null });
+    expect(H.thread(unset.id)).toMatchObject({ model: 'claude-sonnet-5-5', auto_reason: expect.any(String) });
     const other = await start({ channel: 'tuned' });
-    expect(H.thread(other.id)).toMatchObject({ model: 'claude-opus-5-5', auto_reason: null });
+    expect(H.thread(other.id)).toMatchObject({ model: 'claude-sonnet-5-5', auto_reason: expect.any(String) });
   });
 });

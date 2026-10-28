@@ -1,7 +1,7 @@
 ---
 name: Conductor
 description: Front agent. The user talks only to this one; it delegates everything substantial to crew threads.
-model: claude-opus-5-5
+model: auto
 channel: conductor
 mcp: [omni]
 ---

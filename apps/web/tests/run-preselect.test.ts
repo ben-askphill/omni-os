@@ -10,15 +10,15 @@ const harnesses = [
 ];
 
 describe('new-thread draft defaults', () => {
-  const conductor = { id: 'conductor', model: 'claude-opus-5-5' } as CrewRole;
+  const conductor = { id: 'conductor', model: 'auto' } as CrewRole;
   const channel = (over: Partial<Channel> = {}) => ({ id: 'conductor', default_model: 'auto', ...over }) as Channel;
 
   it('uses the saved Conductor default even when the role or catalog arrives later', () => {
     expect(draftRun(null, undefined, channel(), []).choice.model).toBe('auto');
     expect(draftRun(null, conductor, channel(), harnesses).choice.model).toBe('auto');
     expect(draftRun(null, conductor, channel({ default_model: 'claude-sonnet-5-5' }), harnesses).choice.model).toBe('claude-sonnet-5-5');
-    // With no saved run the charter still supplies its existing default.
-    expect(draftRun(null, conductor, channel({ default_model: null }), harnesses).choice.model).toBe('claude-opus-5-5');
+    // With no saved run the charter now asks for Auto too.
+    expect(draftRun(null, conductor, channel({ default_model: null }), harnesses).choice.model).toBe('auto');
   });
 
   it('follows settings changes until the current draft has an explicit model, effort or preset', () => {
@@ -36,9 +36,10 @@ describe('new-thread draft defaults', () => {
 
   it('preserves other channel defaults and explicit crew roles', () => {
     const acme = channel({ id: 'acme', default_harness: 'codex', default_model: 'gpt-5.6-sol', default_effort: 'high' });
+    const builder = { ...conductor, id: 'builder', model: 'claude-opus-5-5' };
     expect(draftRun(null, undefined, acme, harnesses)).toEqual({ choice: { harness: 'codex', model: 'gpt-5.6-sol' }, effort: 'high' });
-    expect(draftRun(null, conductor, acme, harnesses).choice.model).toBe('claude-opus-5-5');
-    expect(draftRun(null, { ...conductor, id: 'builder' }, channel(), harnesses).choice.model).toBe('claude-opus-5-5');
+    expect(draftRun(null, conductor, acme, harnesses).choice.model).toBe('auto');
+    expect(draftRun(null, builder, channel(), harnesses).choice.model).toBe('claude-opus-5-5');
   });
 
   it('leaves inherited runs to the server and only serializes deliberate choices', () => {

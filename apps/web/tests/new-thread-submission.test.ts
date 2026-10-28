@@ -27,7 +27,7 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   requests = [];
   state.channels = [{ id: 'conductor', name: 'Conductor', kind: 'system', default_model: 'auto' }] as Channel[];
-  state.crew = [{ id: 'conductor', name: 'Conductor', model: 'claude-opus-5-5' }] as CrewRole[];
+  state.crew = [{ id: 'conductor', name: 'Conductor', model: 'auto' }] as CrewRole[];
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     if (url === '/api/threads' && init?.method === 'POST') {
       requests.push(JSON.parse(init.body as string));
