@@ -4,6 +4,8 @@
 //   also be the owner's when the user config names one.
 // - A web page in a browser that holds the cookie cannot use it: a cross-site POST /api/threads would run a prompt
 //   with bypassPermissions, and a DNS-rebinding domain could read the responses as well.
+import type { IncomingMessage } from 'node:http';
+import { networkInterfaces } from 'node:os';
 import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { cookieName, tokenMatches } from './api-token.ts';
@@ -65,6 +67,23 @@ const PROXY_HEADERS = ['x-forwarded-host', 'x-forwarded-for', 'x-forwarded-proto
 /** The request came in through tailscale serve (or another proxy), whatever Host it names. */
 const cameThroughProxy = (c: Context, host: string) => viaTailnet(hostnameOf(host)) || PROXY_HEADERS.some((h) => c.req.header(h) !== undefined);
 
+const requestHost = (c: Context) => c.req.header('host') ?? new URL(c.req.url).host;
+
+/** Every address this Mac answers on: loopback, the LAN and its Tailscale address. */
+const ownAddresses = () => Object.values(networkInterfaces()).flatMap((list) => (list ?? []).map((a) => a.address.toLowerCase()));
+
+/**
+ * The request came from this Mac, so the client sits at the Mac the server runs on. tailscale serve runs on this Mac
+ * too, so through it the socket is always loopback and only the X-Forwarded-For address it sets says who connected.
+ * Requests built in-process (tests) have no socket and count as local unless they carry proxy headers.
+ */
+export function fromThisMac(c: Context): boolean {
+  const proxied = cameThroughProxy(c, requestHost(c));
+  const client = proxied ? c.req.header('x-forwarded-for')?.split(',')[0] : (c.env as { incoming?: IncomingMessage } | undefined)?.incoming?.socket.remoteAddress;
+  if (client === undefined) return !proxied;
+  return ownAddresses().includes(client.trim().toLowerCase().replace(/^::ffff:(?=\d+\.)/, ''));
+}
+
 /** Body types a cross-site page can send without a CORS preflight. JSON routes never take them. */
 const SIMPLE_TYPES = ['text/plain', 'application/x-www-form-urlencoded'];
 
@@ -81,7 +100,7 @@ const SIMPLE_TYPES = ['text/plain', 'application/x-www-form-urlencoded'];
  * The Mac app, apps/mcp/omni.ts, scripts and curl send no Origin or Sec-Fetch-Site, so the Host and token checks apply to them.
  */
 export const requestGuard: MiddlewareHandler = async (c, next) => {
-  const host = c.req.header('host') ?? new URL(c.req.url).host;
+  const host = requestHost(c);
   if (!hostAllowed(hostnameOf(host))) return refuse('host not allowed');
   if (c.req.header('sec-fetch-site') === 'cross-site') return refuse('cross-site request');
   const origin = c.req.header('origin');

@@ -6,6 +6,7 @@ import { bus, publishFeed, type FeedEvent } from './bus.ts';
 import { config } from './config.ts';
 import { needsYou, resultReads, search, threads, type Thread } from './db.ts';
 import { handoffView } from './handoff/records.ts';
+import { fromThisMac } from './request-guard.ts';
 import { getProfile } from './profile.ts';
 import { activeMods, activeTasks, queuedCount, runningCount, slotsByHarness } from './runner.ts';
 import { usageByHarness } from './usage.ts';
@@ -41,6 +42,7 @@ feedApi.get('/status', (c) =>
     maxUploadMb: config.maxUploadMb,
     profile: getProfile(),
     server: about,
+    device: { name: about.name, here: fromThisMac(c) },
   }),
 );
 

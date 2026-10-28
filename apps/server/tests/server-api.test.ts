@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, networkInterfaces, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 
@@ -42,9 +42,21 @@ describe('GET /api/status', () => {
       gitHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(),
       startedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/),
       port: r.config.port,
+      name: hostname(),
     });
     expect(Date.parse(body.server.startedAt)).toBeLessThanOrEqual(Date.now());
     expect(JSON.parse((await call('/api/status')).text).server).toEqual(body.server);
+  });
+
+  it('names this Mac, and says whether the browser sits at it or reaches it through tailscale serve', async () => {
+    const device = async (headers: Record<string, string>) => JSON.parse((await call('/api/status', { headers })).text).device;
+    const lan = Object.values(networkInterfaces()).flat().find((a) => a && a.family === 'IPv4' && !a.internal)?.address ?? '127.0.0.1';
+    expect(await device({})).toEqual({ name: hostname(), here: true });
+    expect(await device({ host: 'bens-mac.tail1234.ts.net' })).toEqual({ name: hostname(), here: false });
+    expect(await device({ host: 'bens-mac.tail1234.ts.net', 'x-forwarded-for': '100.101.102.103' })).toMatchObject({ here: false });
+    expect(await device({ host: '127.0.0.1:4747', 'x-forwarded-for': '100.101.102.103' })).toMatchObject({ here: false });
+    expect(await device({ host: 'bens-mac.tail1234.ts.net', 'x-forwarded-for': lan })).toMatchObject({ here: true });
+    expect(await device({ host: 'bens-mac.tail1234.ts.net', 'x-forwarded-for': '127.0.0.1' })).toMatchObject({ here: true });
   });
 
   it('has no commit when git cannot tell', () => {
