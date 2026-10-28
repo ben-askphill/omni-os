@@ -175,7 +175,7 @@ export async function requestTakeover(threadId: string): Promise<HandoffResult> 
     throw refused(holder ? 'This thread is already on its way between Macs.' : 'No Mac is known to hold this thread yet. Once it runs again, it can be taken over.');
   }
   if (take.refused) throw refused(take.refused);
-  writeRequest({ id: randomUUID(), thread: threadId, by: { id: self, name }, from: take.from, at: iso(), state: 'pending' });
+  writeRequest({ id: randomUUID(), thread: threadId, by: { id: self, name }, from: take.from, at: iso(), after: offerOf(threadId)?.id ?? null, state: 'pending' });
   void worker.syncNow();
   return result(threadId);
 }
@@ -404,6 +404,8 @@ async function take(offer: Offered, worker: SyncWorker) {
 function answer(asked: HandoffRequest, worker: SyncWorker) {
   const t = threads.get(asked.thread)!;
   if (offerOf(t.id)?.request === asked.id || threads.holder(t.id) !== worker.machineId || moving(phaseOf(t.id)?.phase)) return;
+  // Past the hour the asking Mac ends it, unless it sleeps too: then a Mac waking the next morning must not act on it.
+  if (requestPhase(asked, Date.now()).phase === 'expired') return;
   const from = { id: worker.machineId, name: deviceName(worker.machineId) ?? asked.from.name };
   const why = refusal(t, from.name);
   if (!why) return startGiving(t, from, asked.by, worker, asked.id);

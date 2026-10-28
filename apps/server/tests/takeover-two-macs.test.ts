@@ -378,7 +378,7 @@ describe('the holding Mac answers only what it may', () => {
     a.db.threads.update(tid, { archived: 1 });
     const own = { id: 'own-offer', thread: tid, from: MAC_A, to: MAC_B, at: new Date().toISOString(), idle: true };
     a.db.kv.set(`handoff.offer.${tid}`, { ...own, state: 'preparing', step: 'uploading' });
-    b.db.kv.set(`handoff.request.${tid}`, { id: 'asked-x', thread: tid, by: MAC_B, from: MAC_A, at: new Date().toISOString(), state: 'pending' });
+    b.db.kv.set(`handoff.request.${tid}`, { id: 'asked-x', thread: tid, by: MAC_B, from: MAC_A, at: new Date().toISOString(), after: null, state: 'pending' });
     await b.sync();
     await a.sync();
     expect(offer(a, tid)).toMatchObject({ id: 'own-offer', state: 'preparing' });
@@ -478,5 +478,28 @@ describe('Ben cancels, or A does not answer', () => {
     expect(d.takeover).toEqual({ from: MAC_A, to: MAC_B, running: false, refused: null });
     await a.sync();
     expect(offer(a, tid)).toBeUndefined();
+  });
+
+  it('past an hour A ignores the request even when B, asleep too, has not ended it yet', async () => {
+    const tid = heldByA('both-asleep');
+    await both();
+    expect((await takeOver(b, tid)).status).toBe(200);
+    b.db.kv.set(`handoff.request.${tid}`, { ...request(b, tid), at: new Date(Date.now() - 61 * 60_000).toISOString() });
+    // B's last sync before it sleeps sends the request still pending; it ends it only on the sync after.
+    await b.sync();
+    await a.sync();
+    expect(offer(a, tid)).toBeUndefined();
+  });
+
+  it('shows the request over an older offer whatever the two clocks say', async () => {
+    const tid = heldByA('skewed');
+    // The thread's last handoff, written by A with its clock ten minutes ahead of B's.
+    a.db.kv.set(`handoff.offer.${tid}`, { id: 'earlier', thread: tid, from: MAC_A, to: MAC_B, at: new Date(Date.now() + 10 * 60_000).toISOString(), state: 'cancelled' });
+    await both();
+    expect((await takeOver(b, tid)).status).toBe(200);
+    const d = await detail(b, tid);
+    expect(d.handoff).toMatchObject({ requested: true, state: { phase: 'requested', stale: false } });
+    expect(d.blocked).toBe('Asking Mac A to hand this thread over.');
+    expect((await cancel(b, tid)).status).toBe(200);
   });
 });

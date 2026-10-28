@@ -58,6 +58,7 @@ function parseOffer(threadId: string, v: unknown): HandoffOffer | null {
 function parseRequest(threadId: string, v: unknown): HandoffRequest | null {
   const r = v as any;
   if (!safeSegment(threadId) || !isId(r?.id) || r.thread !== threadId || !isParty(r.by) || !isParty(r.from) || !isTime(r.at)) return null;
+  if (r.after !== null && !isId(r.after)) return null;
   return r.state === 'pending' || r.state === 'cancelled' || r.state === 'expired' ? (r as HandoffRequest) : null;
 }
 
@@ -122,8 +123,7 @@ export function inFlight(threadId: string, now = Date.now()): boolean {
 function asking(threadId: string, offer: HandoffOffer | null, self: string, now: number): HandoffRequest | null {
   const r = requestOf(threadId);
   if (!r || r.by.id !== self || r.state === 'cancelled' || offer?.request === r.id) return null;
-  // The offer's time is by the other Mac's clock: close enough to pick which of the two to show, never to act on.
-  if (offer && (moving(phaseOf(threadId, now)?.phase) || Date.parse(offer.at) > Date.parse(r.at))) return null;
+  if (offer && (moving(phaseOf(threadId, now)?.phase) || offer.id !== r.after)) return null;
   if (threads.holder(threadId) === self) return null;
   return now - Date.parse(r.at) < REQUEST_TTL_MS + HOUR ? r : null;
 }

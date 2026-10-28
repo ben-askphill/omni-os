@@ -84,10 +84,19 @@ export interface HandoffRequest {
   from: { id: string; name: string };
   /** When it was asked, by the asking Mac's clock. Ending a request keeps it. */
   at: string;
+  /**
+   * The thread's offer on record when it was asked, or null. An offer with another id that does not answer the request
+   * came after it, which no comparison of two Macs' clocks can tell.
+   */
+  after: string | null;
   state: 'pending' | 'cancelled' | 'expired';
 }
 
-/** How long a request waits for the Mac that holds the thread, so one that wakes the next morning does not give it away. */
+/**
+ * How long a request waits for the Mac that holds the thread, so one that wakes the next morning does not give it away.
+ * Both Macs hold it to the asking Mac's time: the asking Mac ends the request, and the holding Mac, by its own clock,
+ * leaves one this old unanswered in case the asking Mac sleeps too. Two Macs' clocks differ by seconds, not an hour.
+ */
 export const REQUEST_TTL_MS = 60 * 60_000;
 
 export type HandoffReply = { offer: string; at: string } & ({ state: 'accepted' } | { state: 'failed'; error: string });
