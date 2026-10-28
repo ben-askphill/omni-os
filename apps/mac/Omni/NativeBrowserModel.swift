@@ -350,9 +350,16 @@ final class NativeTab: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownloadD
 
   // MARK: Downloads
 
+  /// A page can start a download by script as well as by a click, so every one asks first, naming the file and the site.
   func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String) async -> URL? {
     let dir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
     let base = (suggestedFilename as NSString).lastPathComponent
+    let ask = NSAlert()
+    ask.messageText = "Download \"\(base.isEmpty ? "a file" : base)\"?"
+    ask.informativeText = "\(download.originalRequest?.url?.host ?? response.url?.host ?? "This page") wants to save it to your Downloads folder."
+    ask.addButton(withTitle: "Download")
+    ask.addButton(withTitle: "Cancel")
+    guard ask.runModal() == .alertFirstButtonReturn else { return nil }
     var target = dir.appendingPathComponent(base.isEmpty ? "download" : base)
     var n = 1
     while FileManager.default.fileExists(atPath: target.path) {
