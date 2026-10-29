@@ -101,8 +101,6 @@ public final class Updater {
   }
 
   public func restartServer() async {
-    // A remote server restarts on its own machine.
-    guard !model.settings.config.endpoint.isRemote else { return }
     // What the click stood for: the window asked first only when the server was not the app's. A restart
     // that waits for turns must not stop a different server than the one that was agreed to.
     if !restart.step.isActive { host.mayStopOutsideServer = restartStopsOutsideServer }

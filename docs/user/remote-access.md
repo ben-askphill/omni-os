@@ -21,21 +21,6 @@ Every client names the Mac its Omni runs on: the desktop sidebar's footer, the p
 
 On an iPhone, open the `.ts.net` address in Safari and use Share, then Add to Home Screen. Omni then opens full screen with the phone layout: Activity, Channels and Library tabs, and a + button for a new delegation. A home-screen app can keep its own cookies apart from Safari's, so if it opens on the pairing screen, paste the token there once.
 
-## Run your agents on another machine
-
-Omni can run on a Linux box (or another Mac) while you keep using this Mac's app, the web UI and your phone. Every thread then runs there: its CLIs, worktrees, browser and terminal use that machine's CPU, memory and logins, and nothing runs on this Mac.
-
-1. On the box: install Omni (see [install](install.md)), log in the harness CLIs there, start the server and put it on your tailnet with `tailscale serve --bg 4747`. Its address is `https://<box>.<tailnet>.ts.net`.
-2. In the Mac app, open Settings > Connection. Under Remote server, set the URL to that address and paste the box's `data/api-token` as the token. The token goes into this Mac's login Keychain, one item per address (`com.omni-os.remote-token`), never into a file or UserDefaults.
-3. Web and phone: open the same `.ts.net` address and pair with the box's token, as in [From your phone](#from-your-phone).
-
-With a remote server set, the app starts, stops and restarts nothing: Start, Stop and Restart are for the server on this Mac, which the app leaves alone. The footer reads the box's name and "Remote", and when the box does not answer the window says why (no token saved, token refused, or cannot reach it) with Check Again. Clear the URL to go back to the server on this Mac.
-
-- Only an `https` address counts. The token travels over the TLS that `tailscale serve` provides, so the app skips the port proof it uses on loopback: the certificate names the host, and the token is one you pasted for that host.
-- The CLIs on the box need their own logins. For Claude Code, `claude setup-token` on the box gives a long-lived subscription token; save it as the global secret `CLAUDE_CODE_OAUTH_TOKEN`. Log Codex in on the box itself (`codex login --device-auth`) rather than copying `~/.codex/auth.json` from a Mac: both machines refreshing one login logs one of them out.
-- What the box cannot do: build or run the Mac app, Swift tests and Mac screenshots. Do those on a Mac.
-- If the box is off, so is Omni. Keep this Mac's install as a sync peer to fall back on.
-
 ## The phone layout
 
 Below 768px, the Web UI uses its phone layout, whether opened in a browser or saved to the home screen.

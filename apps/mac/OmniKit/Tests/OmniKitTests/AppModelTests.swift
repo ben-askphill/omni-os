@@ -39,8 +39,8 @@ private final class Rig {
         token: .fixed(testToken))
     )
     let http = self.http, sse = self.sse, clock = self.clock
-    return AppModel(settings: settings, supervisor: supervisor) { endpoint in
-      let client = OmniClient(endpoint: endpoint, transport: http)
+    return AppModel(settings: settings, supervisor: supervisor) { port in
+      let client = OmniClient(port: port, transport: http)
       return AppModel.Connection(
         client: client, store: WorkspaceStore(api: client, clock: clock),
         threads: ThreadStoreRegistry(client: client, transport: sse),

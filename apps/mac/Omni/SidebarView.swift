@@ -842,14 +842,10 @@ struct StatusFooter: View {
           .overlay(Circle().strokeBorder(model.supervisor.isRunning && model.connectionNotice == nil ? Tok.doneEdge : .clear, lineWidth: 1))
           .frame(width: z(7), height: z(7))
         VStack(alignment: .leading, spacing: 1) {
-          Text(model.serverLabel)
+          Text(state.label)
             .foregroundStyle(Tok.fg2)
           HStack(spacing: z(6)) {
-            if model.settings.remote != nil {
-              Text("\(model.store.status?.device?.name ?? model.settings.remote?.host() ?? "") · Remote")
-                .lineLimit(1)
-                .truncationMode(.middle)
-            } else if let name = model.store.status?.device?.name {
+            if let name = model.store.status?.device?.name {
               Text("\(name) · Port \(model.settings.port, format: .number.grouping(.never))")
                 .monospacedDigit()
                 .lineLimit(1)
@@ -876,12 +872,12 @@ struct StatusFooter: View {
     .buttonStyle(.plain)
     .menuIndicator(.hidden)
     .help("Server")
-    .accessibilityLabel("Server: \(model.serverLabel)")
+    .accessibilityLabel("Server: \(state.label)")
   }
 
   private func color(_ state: ServerSupervisor.State) -> Color {
     switch state {
-    case .running, .remote: model.connectionNotice == nil ? Tok.done : Tok.fg4
+    case .running: model.connectionNotice == nil ? Tok.done : Tok.fg4
     case .notRunning, .failed: Tok.needs
     default: Tok.fg4
     }

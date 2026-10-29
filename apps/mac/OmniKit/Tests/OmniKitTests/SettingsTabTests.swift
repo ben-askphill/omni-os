@@ -10,8 +10,8 @@ import OmniKit
     let supervisor = ServerSupervisor(
       settings: settings, options: .init(logURL: dir.path("server.log"), recordURL: dir.path("server.json"))
     )
-    let model = AppModel(settings: settings, supervisor: supervisor) { endpoint in
-      let client = OmniClient(endpoint: endpoint, transport: StubTransport(body: "[]"))
+    let model = AppModel(settings: settings, supervisor: supervisor) { port in
+      let client = OmniClient(port: port, transport: StubTransport(body: "[]"))
       let clock = TestClock()
       return AppModel.Connection(
         client: client, store: WorkspaceStore(api: client, clock: clock),
