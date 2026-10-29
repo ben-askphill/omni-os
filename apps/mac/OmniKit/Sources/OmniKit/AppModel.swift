@@ -152,7 +152,7 @@ public final class AppModel {
     let supervisor = supervisor ?? ServerSupervisor(settings: settings)
     self.supervisor = supervisor
     self.monitor = monitor ?? ActivityMonitor(config: { [settings] in settings.config })
-    let connect = connect ?? { [token = supervisor.token] endpoint in AppModel.liveConnection(endpoint, token: token) }
+    let connect = connect ?? { [supervisor] endpoint in AppModel.liveConnection(endpoint, token: supervisor.token(for: endpoint)) }
     self.connect = connect
     config = settings.config
     let c = connect(settings.config.endpoint)
