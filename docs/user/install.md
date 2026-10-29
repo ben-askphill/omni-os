@@ -53,7 +53,7 @@ For an agent doing the setup (the README has the prompt to paste). Run each step
 
    It builds in Release, installs to `~/Applications/Omni.app` and opens it. The first build fetches Swift packages from GitHub, so it takes a few minutes. Check: the script ends with `==> Opened Omni`. On a failure it prints the errors and the log path (`apps/mac/.xcode/build-release.log`); read the log before retrying.
 
-   Cloned somewhere other than `~/omni-os`? Pass the path on the first open, then set it for good in the app under **Settings > Connection > Repo**:
+   Cloned somewhere other than `~/omni-os`? Pass the path on the first open, then set it for good in the app under **Settings > Server > Repo**:
 
    ```bash
    scripts/build-mac.sh -- -repoPath "$PWD"

@@ -80,12 +80,15 @@ export interface UserConfig {
   user: { name: string; pronouns: string; email: string; timezone: string };
   workspace: { root: string; reposDir: string; githubOwner: string };
   integrations: { hermesUrl: string; centralBrainDir: string; tailscaleLogin?: string };
+  /** Where new threads run unless the composer picks another machine: a synced machine's id, or '' for this one. Older servers leave it out. */
+  runOn?: { device: string };
   automations: Record<string, { enabled?: boolean; channel?: string }>;
 }
 export type UserConfigPatch = {
   user?: Partial<UserConfig['user']>;
   workspace?: Partial<UserConfig['workspace']>;
   integrations?: Partial<UserConfig['integrations']>;
+  runOn?: { device?: string };
 };
 export interface SetupState {
   onboarded: boolean;

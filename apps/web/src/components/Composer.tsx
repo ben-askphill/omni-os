@@ -7,6 +7,7 @@ import { ErrorNote, Icon, IconButton, Kbd, Loader, Picker, type IconName, type P
 import { CrewMark, isCrewRole } from './brand.tsx';
 import { EffortPicker, ModelPicker, type ModelChoice } from './ModelPicker.tsx';
 import { BasePicker, useBasePick } from './BasePicker.tsx';
+import { RunOnPicker, useRunOn } from './RunOnPicker.tsx';
 import { baseRequest } from '../worktree-base.ts';
 import { currentRun, pickedRun, shownRun, threadChoice, threadRunLabels, type RunPick } from '../thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
@@ -436,6 +437,7 @@ export function NewThreadComposer({
   useFocusRequests(ref, true);
 
   const [base, setBase] = useBasePick(channel);
+  const runOn = useRunOn();
   const { choice, effort } = draftRun(picked, crew.find((r) => r.id === role), channels.find((c) => c.id === channel), harnesses ?? []);
 
   // Default the role once crew loads, if the conductor channel is selected. A preset keeps its own.
@@ -501,6 +503,7 @@ export function NewThreadComposer({
           role: role || undefined,
           ...draftRunRequest(picked ? { choice, effort } : null),
           ...baseRequest(base, choice.harness),
+          ...runOn.request,
           folder: folder && channel === preset?.channel ? folder.id : undefined,
         },
         att.files,
@@ -564,6 +567,7 @@ export function NewThreadComposer({
         )}
         {harnesses && <EffortPicker harnesses={harnesses} choice={choice} value={effort} onChange={(effort) => setPicked({ choice, effort })} />}
         <BasePicker channel={channel} harness={choice.harness} value={base} onChange={setBase} />
+        <RunOnPicker rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} />
         <AttachButton onPick={att.add} disabled={busy} />
         {folder && channel === preset?.channel && (
           <button

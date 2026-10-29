@@ -102,7 +102,7 @@ public final class AppModel {
   /// History, the Go to palette and composer focus.
   public let shell = ShellState()
   /// The tab the Settings window shows.
-  public var settingsTab = SettingsTab.connection
+  public var settingsTab = SettingsTab.server
   /// The onboarding sheet was asked for again from Settings > Profile. On first run the status opens it instead.
   public var setupRequested = false
   /// The last start that failed, until the server runs, Start is pressed again or the settings change.
@@ -117,6 +117,8 @@ public final class AppModel {
   public let links = LinkPreviewStore()
   /// The other synced Macs a running thread can be handed to. Follows the connection.
   public let devices = DevicesModel()
+  /// The saved default machine for new threads (Settings > Server). Follows the connection.
+  public let runOn = RunOnModel()
 
   @ObservationIgnored private let connect: @MainActor (_ port: Int) -> Connection
   @ObservationIgnored private var config: ServerConfig
@@ -146,6 +148,7 @@ public final class AppModel {
     folders.connect(store: c.store, api: c.client)
     links.connect(api: c.client)
     devices.connect(api: c.client)
+    runOn.connect(api: c.client)
     threads = c.threads
     feed = c.feed
     follow(c)
@@ -421,6 +424,7 @@ public final class AppModel {
       folders.connect(store: c.store, api: c.client)
       links.connect(api: c.client)
       devices.connect(api: c.client)
+      runOn.connect(api: c.client)
       threads = c.threads
       feed = c.feed
       follow(c)

@@ -31,7 +31,7 @@ import OmniKit
   @Test func opensSecretsInSettingsAndKeepsTheRoute() {
     let (model, dir) = model()
     defer { dir.remove() }
-    #expect(model.settingsTab == .connection)
+    #expect(model.settingsTab == .server)
     model.route = .channel(id: "acme")
     #expect(model.show(.secrets) == .secrets)
     #expect(model.route == .channel(id: "acme"))
@@ -43,7 +43,7 @@ import OmniKit
     defer { dir.remove() }
     #expect(model.show(.artifacts) == nil)
     #expect(model.route == .artifacts)
-    #expect(model.settingsTab == .connection)
+    #expect(model.settingsTab == .server)
   }
 
   @Test func aSettingsRouteIsNoStopInTheHistory() {

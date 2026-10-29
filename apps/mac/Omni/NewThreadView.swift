@@ -59,6 +59,11 @@ private struct NewThreadBox: View {
     let defaults: [String: RunDefaults]
   }
 
+  private struct RunOnInputs: Equatable {
+    let devices: [Device]
+    let saved: String
+  }
+
   private var lists: Lists {
     let channels = model.store.channels
     let own = channelHarnesses.flatMap { $0.channel == composer.choice.channel ? $0.list : nil }
@@ -119,6 +124,17 @@ private struct NewThreadBox: View {
       takePreset()
     }
     .onChange(of: model.shell.newThreadPreset) { takePreset() }
+    .onChange(of: RunOnInputs(devices: model.devices.devices, saved: model.runOn.saved), initial: true) { _, i in
+      composer.updateRunOn(devices: i.devices, saved: i.saved)
+    }
+    // Where the thread can run: the other machines (Tailscale's view changes as they sleep) and Settings' default.
+    .task(id: model.client.baseURL) {
+      await model.runOn.load()
+      while !Task.isCancelled {
+        await model.devices.refresh()
+        try? await Task.sleep(for: .seconds(30))
+      }
+    }
     // Cursor Cloud depends on the channel (it needs a GitHub repo), so the list is the channel's own.
     .onChange(of: composer.choice.channel, initial: true) { refreshHarnesses() }
     .task(id: composer.choice.channel) { await bases.load(channel: composer.choice.channel, api: model.client) }
@@ -183,6 +199,9 @@ private struct NewThreadBox: View {
         harnesses: composer.harnesses, harness: composer.choice.harness, model: composer.choice.model,
         pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest, openQuery: pickerQuery)
       EffortMenu(options: composer.effortOptions, value: composer.choice.effort, auto: composer.choice.isAuto, pick: composer.selectEffort)
+      if !composer.devices.isEmpty {
+        RunOnMenu(devices: composer.devices, pick: composer.runOn, select: composer.selectRunOn)
+      }
       if BaseRules.isOffered(bases.options, harness: composer.choice.harness), let options = bases.options {
         BasePicker(options: options, pick: composer.basePick, select: composer.selectBase)
       }
