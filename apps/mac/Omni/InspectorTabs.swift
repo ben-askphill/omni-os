@@ -437,27 +437,20 @@ struct Flow: Layout {
   var spacing: CGFloat = 4
 
   func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-    layout(in: proposal.width ?? .infinity, subviews).size
+    rows(in: proposal.width ?? .infinity, subviews).size
   }
 
   func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-    for (view, origin) in zip(subviews, layout(in: bounds.width, subviews).origins) {
-      view.place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
+    for (view, f) in zip(subviews, rows(in: bounds.width, subviews).frames) {
+      view.place(at: CGPoint(x: bounds.minX + f.minX, y: bounds.minY + f.minY), proposal: ProposedViewSize(f.size))
     }
   }
 
-  private func layout(in width: CGFloat, _ subviews: Subviews) -> (size: CGSize, origins: [CGPoint]) {
-    var origins: [CGPoint] = []
-    var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maxX: CGFloat = 0
-    for view in subviews {
-      let size = view.sizeThatFits(.unspecified)
-      if x > 0, x + size.width > width { x = 0; y += rowHeight + spacing; rowHeight = 0 }
-      origins.append(CGPoint(x: x, y: y))
-      x += size.width + spacing
-      rowHeight = max(rowHeight, size.height)
-      maxX = max(maxX, x - spacing)
+  /// OmniKit's `FlowRows`: a view wider than a row gets the row's width, so its text truncates.
+  private func rows(in width: CGFloat, _ subviews: Subviews) -> (size: CGSize, frames: [CGRect]) {
+    FlowRows.layout(count: subviews.count, width: width, spacing: spacing) { i, w in
+      subviews[i].sizeThatFits(ProposedViewSize(width: w, height: nil))
     }
-    return (CGSize(width: maxX, height: y + rowHeight), origins)
   }
 }
 

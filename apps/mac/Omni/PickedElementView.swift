@@ -22,17 +22,20 @@ struct PickedElementView: View {
           .padding(.horizontal, z(6))
           .padding(.vertical, z(1))
           .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(5), style: .continuous))
+          .fixedSize()
+        // Takes what the tag and Details leave, cut from the start so the element itself stays in view.
         Text(element.selector)
           .font(.omni(size: 11.5, design: .monospaced))
           .foregroundStyle(Tok.fg2)
           .lineLimit(1)
           .truncationMode(.head)
+          .frame(maxWidth: .infinity, alignment: .leading)
           .help(element.selector)
-        Spacer(minLength: 0)
         Button(open ? "Hide details" : "Details") { open.toggle() }
           .buttonStyle(.plain)
           .font(.omni(size: 11.5))
           .foregroundStyle(Tok.fg3)
+          .fixedSize()
           .accessibilityValue(open ? "expanded" : "collapsed")
       }
       if !element.text.isEmpty, !open {
@@ -80,7 +83,8 @@ struct PickedElementView: View {
           let value = styles[key: key] ?? ""
           HStack(spacing: z(4)) {
             if key == .color || key == .backgroundColor { Swatch(css: value) }
-            Text(key.rawValue.replacingOccurrences(of: "_", with: "-")).foregroundStyle(Tok.fg4)
+            // A chip as wide as the row keeps its property name and cuts the value (a long font stack).
+            Text(key.rawValue.replacingOccurrences(of: "_", with: "-")).foregroundStyle(Tok.fg4).lineLimit(1).layoutPriority(1)
             Text(value).foregroundStyle(Tok.fg2).lineLimit(1).truncationMode(.tail)
           }
           .font(.omni(size: 11, design: .monospaced))
