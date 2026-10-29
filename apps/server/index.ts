@@ -3,6 +3,7 @@ import { config, paths } from './config.ts';
 import { releaseLock, takeLock } from './lock.ts';
 import { about } from './about.ts';
 import { isLoopback } from './loopback.ts';
+import { checkSecretStore } from './secret-store.ts';
 
 // Boot order: the data dir's lock, then the database, then the port, and only then the threads.
 // So a second server on the same data, or on the same port, exits having changed nothing.
@@ -80,6 +81,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startWorktreeRetention();
   // Off unless the sync credentials are in the secret store; then it runs alongside, and a failure only logs.
   startSync().catch((err) => console.error('[sync] could not start:', (err as Error).message));
+  void checkSecretStore();
   if (!isLoopback(config.host)) {
     console.warn(`[omni] ${config.host} is not loopback. Anyone who can open the port can try the token; it, and the bodies, cross the network in plain HTTP.`);
   }

@@ -2,7 +2,7 @@ import { chmodSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fileStore, libsecretStore, pickSecretStore } from '../secret-store.ts';
+import { checkSecretStore, fileStore, libsecretStore, pickSecretStore } from '../secret-store.ts';
 
 describe('pickSecretStore', () => {
   it('uses the Keychain on a Mac and the file everywhere else', () => {
@@ -108,9 +108,34 @@ esac
     expect(calls).not.toContain('relay.example');
   });
 
-  it('fails a write when secret-tool is missing', async () => {
+  it('passes its boot check when a lookup finds nothing and says nothing', async () => {
+    expect(await libsecretStore.check!()).toBeNull();
+  });
+
+  it('says to install secret-tool when it is missing, on write and at boot', async () => {
     process.env.PATH = dir.replace(/[^/]+$/, 'nowhere');
-    await expect(libsecretStore.write('global/A', 'x')).rejects.toThrow();
+    await expect(libsecretStore.write('global/A', 'x')).rejects.toThrow(/secret-tool is not installed/);
     expect(await libsecretStore.read('global/A')).toBeNull();
+    expect(await libsecretStore.check!()).toMatch(/libsecret-tools/);
+  });
+
+  it('names the missing Secret Service and the way out when no keyring answers', async () => {
+    writeFileSync(join(dir, 'secret-tool'), '#!/bin/sh\necho "Cannot autolaunch D-Bus without X11 $DISPLAY" >&2\nexit 1\n', { mode: 0o755 });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const problem = await checkSecretStore(libsecretStore);
+    expect(problem).toMatch(/Secret Service did not answer \(Cannot autolaunch D-Bus/);
+    expect(problem).toMatch(/OMNI_SECRET_STORE=file/);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('[omni] secret store libsecret:'));
+    warn.mockRestore();
+    await expect(libsecretStore.write('global/A', 'x')).rejects.toThrow(/Secret Service did not answer/);
+  });
+});
+
+describe('checkSecretStore', () => {
+  it('stays quiet for a store with nothing to check', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await checkSecretStore(fileStore(join(mkdtempSync(join(tmpdir(), 'omni-secrets-')), 'secrets.json')))).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

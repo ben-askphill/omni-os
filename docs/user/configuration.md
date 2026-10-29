@@ -36,7 +36,9 @@ Values live in the server's secret store under service `omni-os`, account `<scop
 | `file` | Linux | `data/secrets.json`, mode 0600 |
 | `libsecret` | Never on its own | GNOME Keyring or KWallet, through `secret-tool` |
 
-- `OMNI_SECRET_STORE=keychain|file|libsecret` picks one. Linux defaults to the file because a headless server has no desktop session to unlock a keyring. Use `libsecret` only when the server always starts inside one: a server started from ssh or systemd can't read values saved from the desktop.
+- `OMNI_SECRET_STORE=keychain|file|libsecret` picks one, in `.env` or the server's environment. Linux defaults to the file because a headless server has no desktop session to unlock a keyring.
+- `libsecret` needs `secret-tool` (`libsecret-tools` on Debian and Ubuntu, `libsecret` on Fedora and Arch) and a running, unlocked GNOME Keyring or KWallet that the server reaches through `DBUS_SESSION_BUS_ADDRESS`. Start the server from the same session every time: one started over ssh or as a system service often can't reach the keyring a desktop login unlocked. A systemd user service in a logged-in session can.
+- At boot the server checks that the store answers and logs `[omni] secret store libsecret: ...` with the fix when it doesn't. Saving a secret then fails with the same message.
 - Values never sync, whatever the store, so set them on each machine. Switching stores leaves the old values behind; save them again.
 
 - Scope `global` goes to every thread as an env var.

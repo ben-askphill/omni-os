@@ -16,16 +16,20 @@ export interface SecretStore {
   read(account: string): Promise<string | null>;
   write(account: string, value: string): Promise<void>;
   remove(account: string): Promise<void>;
+  /** Why this store can't work here, or null when it answers. Checked once at boot, so a broken one shows in the log. */
+  check?(): Promise<string | null>;
 }
 
 /** The keychain service and the libsecret `service` attribute. */
 export const SERVICE = 'omni-os';
 const run = promisify(execFile);
+/** A locked keyring can wait on an unlock prompt nobody sees on a headless box. Give up rather than hang the request. */
+const TIMEOUT_MS = 15_000;
 
 /** Runs `cmd args`, writing `input` to its stdin so a value never shows up in `ps`. Fails on a non-zero exit or any stderr. */
 function piped(cmd: string, args: string[], input: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: ['pipe', 'ignore', 'pipe'] });
+    const child = spawn(cmd, args, { stdio: ['pipe', 'ignore', 'pipe'], timeout: TIMEOUT_MS });
     let err = '';
     child.stderr.on('data', (d) => (err += d));
     child.on('error', reject);
@@ -53,20 +57,47 @@ export const keychainStore: SecretStore = {
   },
 };
 
+const LIBSECRET_FIX =
+  'Run the server in a session where GNOME Keyring or KWallet is running and unlocked, with DBUS_SESSION_BUS_ADDRESS set, or set OMNI_SECRET_STORE=file.';
+
+/** A secret-tool failure as something the Secrets page and the log can act on. */
+function libsecretError(err: unknown): Error {
+  const e = err as NodeJS.ErrnoException & { killed?: boolean; signal?: string; stderr?: string };
+  if (e.code === 'ENOENT') return new Error('secret-tool is not installed. Install libsecret-tools (Debian, Ubuntu) or libsecret (Fedora, Arch).');
+  if (e.killed || e.signal === 'SIGTERM') return new Error(`secret-tool did not answer within ${TIMEOUT_MS / 1000}s; the keyring may be locked. ${LIBSECRET_FIX}`);
+  const detail = (e.stderr ?? e.message ?? '').toString().trim();
+  return new Error(`The Secret Service did not answer${detail ? ` (${detail})` : ''}. ${LIBSECRET_FIX}`);
+}
+
 export const libsecretStore: SecretStore = {
   kind: 'libsecret',
   async read(account) {
     try {
-      const { stdout } = await run('secret-tool', ['lookup', 'service', SERVICE, 'account', account]);
+      const { stdout } = await run('secret-tool', ['lookup', 'service', SERVICE, 'account', account], { timeout: TIMEOUT_MS });
       return stdout ? stdout.replace(/\n$/, '') : null;
     } catch {
       return null;
     }
   },
   // `secret-tool store` reads the value from stdin.
-  write: (account, value) => piped('secret-tool', ['store', `--label=${SERVICE} ${account}`, 'service', SERVICE, 'account', account], value),
+  async write(account, value) {
+    await piped('secret-tool', ['store', `--label=${SERVICE} ${account}`, 'service', SERVICE, 'account', account], value).catch((err) => {
+      throw libsecretError(err);
+    });
+  },
   async remove(account) {
-    await run('secret-tool', ['clear', 'service', SERVICE, 'account', account]).catch(() => {});
+    await run('secret-tool', ['clear', 'service', SERVICE, 'account', account], { timeout: TIMEOUT_MS }).catch(() => {});
+  },
+  // A lookup that finds nothing exits 1 with nothing on stderr. Anything on stderr means no Secret Service answered.
+  async check() {
+    try {
+      await run('secret-tool', ['lookup', 'service', SERVICE, 'account', '__omni_check__'], { timeout: TIMEOUT_MS });
+      return null;
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException & { killed?: boolean; stderr?: string };
+      if (e.code !== 'ENOENT' && !e.killed && !String(e.stderr ?? '').trim()) return null;
+      return libsecretError(err).message;
+    }
   },
 };
 
@@ -136,4 +167,11 @@ let current: SecretStore | null = null;
 /** This server's store, picked once. */
 export function secretStore(): SecretStore {
   return (current ??= secretStoreOf(pickSecretStore()));
+}
+
+/** Logs why this server's store can't hold secrets, once at boot. Quiet when it works. */
+export async function checkSecretStore(store = secretStore()): Promise<string | null> {
+  const problem = (await store.check?.()) ?? null;
+  if (problem) console.warn(`[omni] secret store ${store.kind}: ${problem}`);
+  return problem;
 }
