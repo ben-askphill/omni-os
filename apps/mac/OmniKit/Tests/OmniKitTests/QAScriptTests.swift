@@ -76,7 +76,8 @@ import OmniKit
         {"imageZoom": 2},
         {"imageZoom": "fit"},
         {"nativeBrowser": "http://localhost:4900/"},
-        {"openThread": "t2"}
+        {"openThread": "t2"},
+        {"takeOver": "takeover-confirm"}
       ]
       """.utf8))
     #expect(script.steps == [
@@ -102,6 +103,7 @@ import OmniKit
       .imageZoom(nil),
       .nativeBrowser("http://localhost:4900/"),
       .openThread("t2"),
+      .takeOver("takeover-confirm"),
     ])
   }
 
@@ -214,6 +216,7 @@ import OmniKit
     #"[{"folder": {"menu": "Specs", "shot": "../x"}}]"#,
     #"[{"folder": {"rename": "Specs", "delete": "Specs"}}]"#,
     #"[{"screen": ""}]"#,
+    #"[{"takeOver": "../x"}]"#,
     #"[{"deliveries": ""}]"#,
     #"[{"deliveries": {"open": "failed"}}]"#,
     #"[{"deliveries": {"automation": "x", "older": "yes"}}]"#,

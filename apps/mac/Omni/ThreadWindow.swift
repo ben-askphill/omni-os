@@ -166,6 +166,7 @@ private struct OpenInNewWindow: ViewModifier {
           }
           if let stub { MoveToFolderMenu(model: model, thread: stub) }
           HandOffMenu(model: model, threadID: threadID)
+          TakeOverItem(model: model, threadID: threadID)
           Button {
             Task {
               grokNote = await grokBotResult(model, threadID)

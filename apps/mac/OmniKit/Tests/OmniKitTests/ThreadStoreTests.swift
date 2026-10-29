@@ -163,11 +163,16 @@ final class FakeThreadAPI: ThreadAPI {
     set { state.withLock { $0.handoff = newValue } }
   }
 
-  /// The Macs the store asked to hand to, then "cancel" for each cancel.
+  /// The Macs the store asked to hand to, "take over" for each Take over and "cancel" for each cancel.
   var handoffs: [String] { state.withLock { $0.handoffs } }
 
   func handOff(_ id: String, to: String) async throws(OmniAPIError) -> HandoffAnswer {
     state.withLock { $0.handoffs.append(to) }
+    return try handoff.get()
+  }
+
+  func takeOver(_ id: String) async throws(OmniAPIError) -> HandoffAnswer {
+    state.withLock { $0.handoffs.append("take over") }
     return try handoff.get()
   }
 
@@ -563,12 +568,13 @@ private let turn = [
   }
 }
 
-private func blockedDetail(_ thread: String = row(), handoff: String? = nil) throws -> ThreadDetail {
-  try decode(ThreadDetail.self, #"{"thread":\#(thread),"events":[],"pending":[],"live":true,"handoff":\#(handoff ?? "null")}"#)
+private func blockedDetail(_ thread: String = row(), handoff: String? = nil, takeover: String? = nil) throws -> ThreadDetail {
+  let held = takeover.map { #","takeover":\#($0)"# } ?? ""
+  return try decode(ThreadDetail.self, #"{"thread":\#(thread),"events":[],"pending":[],"live":true,"handoff":\#(handoff ?? "null")\#(held)}"#)
 }
 
-private func handoffAnswer(_ thread: String, _ state: String) throws -> HandoffAnswer {
-  try decode(HandoffAnswer.self, #"{"thread":\#(thread),"handoff":\#(handoffJSON(state))}"#)
+private func handoffAnswer(_ thread: String, _ state: String, outgoing: Bool = true) throws -> HandoffAnswer {
+  try decode(HandoffAnswer.self, #"{"thread":\#(thread),"handoff":\#(handoffJSON(state, outgoing: outgoing))}"#)
 }
 
 @MainActor @Suite struct ThreadStoreHandoffTests {
@@ -625,6 +631,59 @@ private func handoffAnswer(_ thread: String, _ state: String) throws -> HandoffA
     #expect(store.handoff?.state == .cancelled)
     #expect(store.thread?.status == .stopped)
     #expect(api.handoffs == ["m-pro", "m-pro", "cancel"])
+  }
+
+  @Test func canTakeOverOnlyWhatAnotherMacHoldsAndTheServerAllows() async throws {
+    let api = FakeThreadAPI(try blockedDetail(takeover: takeoverJSON()))
+    let (store, conn, _, _) = try await openStore(api)
+    defer { store.stop() }
+    #expect(store.takeover?.from.name == "Ben's MacBook Air")
+    #expect(store.canTakeOver)
+    #expect(!store.canHandOff, "only the Mac that holds it can hand it off")
+
+    conn.send(sse(#"{"kind":"thread","thread":\#(row(updated: 1)),"takeover":\#(takeoverJSON(refused: "Crew threads stay with their parent."))}"#))
+    try await waitFor("the refusal") { store.takeover?.refused != nil }
+    #expect(!store.canTakeOver)
+    store.askTakeOver()
+    #expect(store.takeOverAsks == 0, "no confirm for a refused Take over")
+
+    conn.send(sse(#"{"kind":"thread","thread":\#(row(updated: 2)),"takeover":\#(takeoverJSON(running: false))}"#))
+    try await waitFor("the idle holder") { store.takeover?.running == false }
+    #expect(store.canTakeOver, "an idle thread can be taken between turns")
+    #expect(!store.canHandOff, "nor while it is idle there")
+    store.askTakeOver()
+    #expect(store.takeOverAsks == 1)
+
+    conn.send(sse(threadMessage(row("stopped", updated: 3))))
+    try await waitFor("the stop") { store.thread?.status == .stopped }
+    #expect(store.takeover == nil, "a thread message says this Mac holds it by leaving takeover out")
+    #expect(!store.canTakeOver)
+    #expect(store.canHandOff)
+  }
+
+  @Test func takesOverAndShowsTheRefusalAboveTheComposer() async throws {
+    let api = FakeThreadAPI(try blockedDetail(takeover: takeoverJSON()))
+    let (store, _, _, _) = try await openStore(api)
+    defer { store.stop() }
+
+    api.handoff = .failure(.http(status: 409, message: "Sync is paused on this Mac."))
+    await store.takeOver()
+    #expect(store.actionError?.message == "Sync is paused on this Mac.")
+    #expect(store.handoff == nil)
+    #expect(store.canTakeOver, "a refused Take over leaves the note as it was")
+
+    api.handoff = .success(try handoffAnswer(row(updated: 1), #"{"phase":"requested","stale":false}"#, outgoing: false))
+    await store.takeOver()
+    #expect(store.actionError == nil)
+    #expect(store.handoff?.state == .requested(stale: false))
+    #expect(store.takeover == nil, "the card says it from the answer on, not the note")
+    #expect(!store.canTakeOver)
+    #expect(!store.canHandOff)
+
+    api.handoff = .success(try handoffAnswer(row(updated: 2), #"{"phase":"cancelled"}"#, outgoing: false))
+    await store.cancelHandoff()
+    #expect(store.handoff?.state == .cancelled)
+    #expect(api.handoffs == ["take over", "take over", "cancel"])
   }
 }
 

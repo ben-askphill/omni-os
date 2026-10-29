@@ -390,13 +390,18 @@ server.registerTool(
     description:
       `Move a thread to another of ${USER}'s Macs, only when ${USER} asks. A running turn stops here and the other Mac resumes the same ` +
       'session, then runs the messages that were queued for it. An idle thread moves between turns: the next message runs on the other Mac. A worktree thread takes its commits and uncommitted changes along. ' +
+      'With to "here", take over a thread another Mac holds: that Mac hands it to this one on its next sync, the same way. ' +
       'It runs in the background after this answers; the thread shows where it is.',
     inputSchema: {
       thread_id: z.string(),
-      to: z.string().describe('The Mac, by id or name (ignoring case), from list_devices.'),
+      to: z.string().describe('The Mac, by id or name (ignoring case), from list_devices, or "here" to take the thread over from the Mac that holds it.'),
     },
   },
   async ({ thread_id, to }) => {
+    if (to.trim().toLowerCase() === 'here') {
+      const res = await call(`/threads/${thread_id}/takeover`, { method: 'POST', body: '{}' });
+      return text({ thread_id, to: 'here', handoff: res.handoff?.state ?? null });
+    }
     const devices: any[] = await call('/devices');
     const want = to.trim().toLowerCase();
     const named = devices.filter((d) => d.name.toLowerCase() === want);

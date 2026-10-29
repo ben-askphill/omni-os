@@ -280,6 +280,8 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
   public let blocked: String?
   /// A handoff of the thread to or from another Mac. Older servers leave it out; a phase this app does not know is nil.
   public let handoff: HandoffView?
+  /// Another Mac holds the thread and this one could take it over. Older servers leave it out.
+  public let takeover: Takeover?
   /// The thread this one continues, and the threads that continue it. Older servers leave them out.
   public let continuedFrom: ContinueLink?
   public let continuedIn: [ContinueLink]
@@ -287,7 +289,7 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
   public let history: HistoryHead?
 
   enum CodingKeys: String, CodingKey {
-    case thread, channel, events, artifacts, children, team, parent, pending, live, blocked, handoff, history
+    case thread, channel, events, artifacts, children, team, parent, pending, live, blocked, handoff, takeover, history
     case continuedFrom = "continued_from"
     case continuedIn = "continued_in"
   }
@@ -305,6 +307,7 @@ public struct ThreadDetail: Decodable, Hashable, Sendable {
     live = try c.decodeIfPresent(Bool.self, forKey: .live) ?? false
     blocked = try c.decodeIfPresent(String.self, forKey: .blocked)
     handoff = (try? c.decodeIfPresent(HandoffView.self, forKey: .handoff)) ?? nil
+    takeover = (try? c.decodeIfPresent(Takeover.self, forKey: .takeover)) ?? nil
     continuedFrom = try c.decodeIfPresent(ContinueLink.self, forKey: .continuedFrom)
     continuedIn = try c.decodeIfPresent([ContinueLink].self, forKey: .continuedIn) ?? []
     history = try c.decodeIfPresent(HistoryHead.self, forKey: .history)

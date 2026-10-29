@@ -5,7 +5,7 @@ import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
 import { parsePayload } from '../format.ts';
 import { linksOf, linksWith, NO_LINKS, type ThreadLinks } from '../continue.ts';
-import type { HandoffView } from '@omni/shared/handoff.ts';
+import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import { holds } from '../thread-history.ts';
 import { useThreadHistory } from './useThreadHistory.ts';
 
@@ -47,6 +47,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   const [actionError, setActionError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [handoff, setHandoff] = useState<HandoffView | null>(null);
+  const [takeover, setTakeover] = useState<Takeover | null>(null);
   const [links, setLinks] = useState<ThreadLinks>(NO_LINKS);
   // The newest context reading the stream pushed. The meter loads its first one itself.
   const [context, setContext] = useState<ContextUsage | null>(null);
@@ -78,6 +79,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     if (d.live !== undefined) setWarm(d.live);
     setBlocked(d.blocked ?? null);
     setHandoff(d.handoff ?? null);
+    setTakeover(d.takeover ?? null);
     setChannel(d.channel);
     setParent(d.parent);
     setChildren(d.children);
@@ -158,6 +160,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
           if (m.live !== undefined) setWarm(m.live);
           setBlocked(m.blocked ?? null);
           setHandoff(m.handoff ?? null);
+          setTakeover(m.takeover ?? null);
           break;
         case 'context':
           setContext(m.context);
@@ -274,6 +277,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     blocked,
     handoff,
     setHandoff,
+    takeover,
     links,
     live,
     load,

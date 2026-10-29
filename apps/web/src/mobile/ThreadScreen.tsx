@@ -12,9 +12,10 @@ import { ClippedNote, HistoryCtx, HistoryEdgeRow } from '../components/thread/Hi
 import { useReveal } from '../pages/useReveal.ts';
 import { useScrollAnchor } from '../pages/useScrollAnchor.ts';
 import { atStart, historyEdges } from '@omni/shared/history.ts';
-import { handOff, HandoffCard, useHandoffTargets } from '../components/thread/Handoff.tsx';
+import { handOff, HandoffCard, useHandoffTargets, type HandoffAnswer } from '../components/thread/Handoff.tsx';
+import { TakeoverConfirm, TakeoverNote } from '../components/thread/Takeover.tsx';
 import { MoContinueLinks } from '../components/ContinueLinks.tsx';
-import { deviceRows } from '../handoff.ts';
+import { deviceRows, mayTakeOver } from '../handoff.ts';
 import { Button, ErrorNote, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';
 import { changesView } from '../changes.ts';
 import { duration, plural, toDate } from '../format.ts';
@@ -276,11 +277,13 @@ function MoSubagentRow({ t, last, onJump }: { t: BackgroundTask; last: boolean; 
 function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: string | null; onClose: () => void }) {
   const shell = useShell();
   const { setPinned, setDone, reloadChannels, tasks } = useApp();
-  const { applyThread, blocked, handoff, setHandoff, jumpTo } = useThread();
+  const { applyThread, blocked, handoff, setHandoff, takeover, jumpTo } = useThread();
   const agents = useMemo(() => runningSubagents(tasks, thread.id), [tasks, thread.id]);
-  const targets = useHandoffTargets(thread, blocked, handoff);
+  const targets = useHandoffTargets(thread, { blocked, handoff, takeover });
   // Set while the sheet lists the Macs the thread can go to.
   const [handingOff, setHandingOff] = useState(false);
+  // Set while the sheet asks to take the thread over.
+  const [takingOver, setTakingOver] = useState(false);
   const [referencing, setReferencing] = useState(false);
   const [sending, setSending] = useState<string | null>(null);
   const [grokBusy, setGrokBusy] = useState(false);
@@ -357,6 +360,21 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
       </MoSheet>
     );
   }
+  if (takingOver && takeover && mayTakeOver(takeover, handoff)) {
+    return (
+      <TakeoverConfirm
+        threadId={thread.id}
+        takeover={takeover}
+        mobile
+        onClose={onClose}
+        onChanged={(a) => {
+          applyThread(a.thread, true);
+          setHandoff(a.handoff);
+          shell.toast(`Asked ${takeover.from.name} for this thread`);
+        }}
+      />
+    );
+  }
   if (handingOff && targets.state === 'ready') {
     return (
       <MoSheet onClose={onClose} label="Hand off to">
@@ -394,6 +412,9 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
         </MoGroup>
         <MoGroup>
           {targets.state === 'ready' && <MoListRow icon="share" label="Hand off to…" sub="Continue it on another Mac" onClick={() => setHandingOff(true)} />}
+          {takeover && mayTakeOver(takeover, handoff) && (
+            <MoListRow icon="download" label="Take over" sub={`Continue it on ${takeover.to.name}`} onClick={() => setTakingOver(true)} />
+          )}
           <MoListRow
             icon="message"
             label="Reference a thread"
@@ -456,7 +477,7 @@ function useBranchChanges(thread: Thread | null, busy: boolean) {
 export function ThreadScreen() {
   const shell = useShell();
   const s = useThread();
-  const { thread, parent, children, events, history, revealTarget, clearReveal, files, queued, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff } = s;
+  const { thread, parent, children, events, history, revealTarget, clearReveal, files, queued, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover } = s;
   const { needsYou, channel } = useApp();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
@@ -503,6 +524,10 @@ export function ThreadScreen() {
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
   const steps = (t: TurnView) => shell.open(href.threadView(thread.id, 'steps', t.key));
   const theirs = conductor ? 'the Conductor' : thread.role ? `the ${thread.role}` : 'the agent';
+  const handedOff = (a: HandoffAnswer) => {
+    applyThread(a.thread, true);
+    setHandoff(a.handoff);
+  };
 
   const openPR = async () => {
     try {
@@ -636,15 +661,7 @@ export function ThreadScreen() {
               );
             })}
             {edges.get(-1) && <HistoryEdgeRow edge={edges.get(-1)!} history={history} touch />}
-            <HandoffCard
-              thread={thread}
-              handoff={handoff}
-              mobile
-              onChanged={(a) => {
-                applyThread(a.thread, true);
-                setHandoff(a.handoff);
-              }}
-            />
+            <HandoffCard thread={thread} handoff={handoff} mobile onChanged={handedOff} />
             {!view.turns.length && !thread.setup && <MoEmpty>Nothing here yet.</MoEmpty>}
             <SetupCard
               thread={thread}
@@ -665,6 +682,7 @@ export function ThreadScreen() {
           </div>
         </HistoryCtx.Provider>
       </div>
+      <TakeoverNote threadId={thread.id} takeover={takeover} handoff={handoff} mobile onChanged={handedOff} />
       <MoComposer
         thread={thread}
         chips={chips}

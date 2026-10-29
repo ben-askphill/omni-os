@@ -67,13 +67,18 @@ public final class ThreadStore {
   public private(set) var connection = ConnectionState.connecting
   /// An interrupt was asked for and the turn has not ended yet.
   public private(set) var stopping = false
-  /// The last interrupt, handoff or cancel of one failed.
+  /// The last interrupt, handoff, Take over or cancel of one failed.
   public private(set) var actionError: OmniAPIError?
   /// Why a turn cannot start here, from the server. Nil when one can.
   public private(set) var blocked: String?
   /// A handoff of the thread to or from another Mac, kept current by its stream.
   public private(set) var handoff: HandoffView?
-  /// A handoff or its cancel was asked for and the server has not answered yet.
+  /// Another Mac holds the thread, from the server: the note over the reply box, with Take Over unless `refused`.
+  public private(set) var takeover: Takeover?
+  /// Bumped to ask for Take Over's confirm, which the reply box's note shows: the note itself, the Thread menu and the
+  /// right-click all go through here.
+  public private(set) var takeOverAsks = 0
+  /// A handoff, a Take over or its cancel was asked for and the server has not answered yet.
   public private(set) var handingOff = false
   /// The thread this one continues on another harness, and the threads that continue it. Kept current by the feed.
   public private(set) var continuedFrom: ContinueLink?
@@ -96,8 +101,14 @@ public final class ThreadStore {
   public var cwd: String? { sessionCwd.flatMap { $0.isEmpty ? nil : $0 } ?? thread?.cwd }
   /// Running or waiting for a slot.
   public var running: Bool { thread?.status.isActive ?? false }
-  /// Nothing blocks it here and nothing is moving it yet, so it can be handed to another: mid-turn, or between turns.
-  public var canHandOff: Bool { thread != nil && blocked == nil && !(handoff?.inFlight ?? false) && !handingOff }
+  /// This Mac holds it, nothing blocks it here and nothing is moving it yet, so it can be handed to another: mid-turn,
+  /// or between turns.
+  public var canHandOff: Bool { thread != nil && blocked == nil && takeover == nil && !(handoff?.inFlight ?? false) && !handingOff }
+  /// Another Mac holds it, the server says it can be taken now, and nothing is moving it yet.
+  public var canTakeOver: Bool {
+    guard let takeover else { return false }
+    return takeover.refused == nil && !(handoff?.inFlight ?? false) && !handingOff
+  }
   public var interrupting: Bool { stopping || pending.contains { $0.state == .sent && $0.mode == .interrupt } }
   /// The stream dropped and is not back yet.
   public var isReconnecting: Bool {
@@ -271,9 +282,21 @@ public final class ThreadStore {
     await handoffCall { api, id throws(OmniAPIError) in try await api.handOff(id, to: device) }
   }
 
-  /// Calls off a handoff this Mac started, while the other Mac has not taken it.
+  /// Calls off a handoff this Mac started while the other Mac has not taken it, or a Take over the holding Mac has not
+  /// started on.
   public func cancelHandoff() async {
     await handoffCall { api, id throws(OmniAPIError) in try await api.cancelHandoff(id) }
+  }
+
+  /// Opens Take Over's confirm on the reply box.
+  public func askTakeOver() {
+    guard canTakeOver else { return }
+    takeOverAsks += 1
+  }
+
+  /// Asks the Mac that holds the thread to hand it here. The banner follows the stream from the answer on.
+  public func takeOver() async {
+    await handoffCall { api, id throws(OmniAPIError) in try await api.takeOver(id) }
   }
 
   private func handoffCall(_ call: (any ThreadAPI, String) async throws(OmniAPIError) -> HandoffAnswer) async {
@@ -285,6 +308,8 @@ public final class ThreadStore {
       let a = try await call(api, id)
       merge(a.thread, isReply: true)
       handoff = a.handoff
+      // The server leaves `takeover` out while a handoff is under way; its stream may say so after this answer.
+      if a.handoff?.inFlight == true { takeover = nil }
     } catch {
       actionError = error
     }
@@ -337,6 +362,7 @@ public final class ThreadStore {
     merge(d.thread, pending: d.pending, live: d.live, isReply: false)
     blocked = d.blocked
     handoff = d.handoff
+    takeover = d.takeover
     channel = d.channel
     parent = d.parent
     continuedFrom = d.continuedFrom
@@ -541,10 +567,11 @@ public final class ThreadStore {
       switch m {
       case .event(let e): rows.append(e)
       case .artifact(let a): upsert(a)
-      case .thread(let t, let p, let live, let blocked, let handoff):
+      case .thread(let t, let p, let live, let blocked, let handoff, let takeover):
         if merge(t, pending: p, live: live, isReply: false) {
           self.blocked = blocked
           self.handoff = handoff
+          self.takeover = takeover
         }
       case .modToast(let t): show(t)
       case .context(let c): context = c

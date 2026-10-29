@@ -1,7 +1,8 @@
 import Foundation
 import Observation
 
-// Handing a thread, running or idle, to another synced Mac. The shapes and the banner text are packages/shared/handoff.ts;
+// Handing a thread, running or idle, to another synced Mac, and taking one over from another Mac. The shapes and the
+// banner text are packages/shared/handoff.ts;
 // apps/server/tests/mac-fixtures.test.ts holds both clients to the same JSON. When to offer it, the picker's rows and
 // the banner per phase follow apps/web/src/handoff.ts.
 
@@ -74,10 +75,16 @@ public struct PrepareStep: OpenEnum {
 
 /// `HandoffPhase` in handoff.ts, discriminated by `phase`.
 public enum HandoffPhase: Decodable, Hashable, Sendable {
+  /// A Take over the holding Mac has not started on. `stale`: it has not answered within `HandoffView.offerPatience`.
+  case requested(stale: Bool)
   case preparing(PrepareStep)
   /// `stale`: the other Mac has not answered within `HandoffView.offerPatience`. It may still take it.
   case offered(stale: Bool)
   case accepted
+  /// The holding Mac refused a Take over before anything stopped: the thread stays there.
+  case declined(error: String)
+  /// The holding Mac did not answer a Take over within an hour.
+  case expired
   case failed(error: String, at: Side)
   case cancelled
 
@@ -94,9 +101,12 @@ public enum HandoffPhase: Decodable, Hashable, Sendable {
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     switch try c.decode(String.self, forKey: .phase) {
+    case "requested": self = .requested(stale: try c.decodeIfPresent(Bool.self, forKey: .stale) ?? false)
     case "preparing": self = .preparing(try c.decode(PrepareStep.self, forKey: .step))
     case "offered": self = .offered(stale: try c.decodeIfPresent(Bool.self, forKey: .stale) ?? false)
     case "accepted": self = .accepted
+    case "declined": self = .declined(error: try c.decode(String.self, forKey: .error))
+    case "expired": self = .expired
     case "failed": self = .failed(error: try c.decode(String.self, forKey: .error), at: try c.decode(Side.self, forKey: .side))
     case "cancelled": self = .cancelled
     case let other:
@@ -123,12 +133,14 @@ public struct HandoffView: Decodable, Hashable, Sendable {
   public let leftBehind: String?
   /// Handed off between turns: nothing was cut off, and Ben's next message continues it on the other Mac.
   public let idle: Bool
+  /// Taken over: the taking Mac asked for it, rather than the giving Mac handing it off.
+  public let requested: Bool
 
-  /// OFFER_PATIENCE_MS: how long an offer waits before the giving Mac says the other has not picked it up.
+  /// OFFER_PATIENCE_MS: how long an offer, or a Take over, waits before the waiting Mac says the other has not answered.
   public static let offerPatience: TimeInterval = 90
 
   enum CodingKeys: String, CodingKey {
-    case id, from, to, outgoing, at, state, leftBehind, idle
+    case id, from, to, outgoing, at, state, leftBehind, idle, requested
   }
 
   public init(from decoder: any Decoder) throws {
@@ -141,32 +153,45 @@ public struct HandoffView: Decodable, Hashable, Sendable {
     state = try c.decode(HandoffPhase.self, forKey: .state)
     leftBehind = try c.decodeIfPresent(String.self, forKey: .leftBehind)
     idle = try c.decodeIfPresent(Bool.self, forKey: .idle) ?? false
+    requested = try c.decodeIfPresent(Bool.self, forKey: .requested) ?? false
   }
 
-  /// The phase at `now`: an offer goes stale on screen once the patience runs out, without waiting for the server
-  /// to say so again.
+  /// The phase at `now`: an offer or a Take over goes stale on screen once the patience runs out, without waiting for
+  /// the server to say so again.
   public func phase(now: Date = .now) -> HandoffPhase {
-    if case .offered(false) = state, now.timeIntervalSince(at) > Self.offerPatience { return .offered(stale: true) }
-    return state
+    guard now.timeIntervalSince(at) > Self.offerPatience else { return state }
+    switch state {
+    case .offered(false): return .offered(stale: true)
+    case .requested(false): return .requested(stale: true)
+    default: return state
+    }
   }
 
-  /// Preparing or offered: the thread is between Macs, and the giving Mac can still call it off.
+  /// Requested, preparing or offered: the thread is between Macs, and the Mac that started it can still call it off.
   public var inFlight: Bool {
     switch state {
-    case .preparing, .offered: true
+    case .requested, .preparing, .offered: true
     default: false
     }
   }
 
   /// The banner's one line at `now`.
   public func text(now: Date = .now) -> String {
-    Self.text(from: from, to: to, outgoing: outgoing, state: phase(now: now), idle: idle)
+    Self.text(from: from, to: to, outgoing: outgoing, state: phase(now: now), idle: idle, requested: requested)
   }
 
   /// `handoffText` in handoff.ts: one line for the banner, from the reading Mac's side.
-  public static func text(from: Mac, to: Mac, outgoing: Bool, state: HandoffPhase, idle: Bool = false) -> String {
+  public static func text(from: Mac, to: Mac, outgoing: Bool, state: HandoffPhase, idle: Bool = false, requested: Bool = false) -> String {
     let other = outgoing ? to.name : from.name
     switch state {
+    case .requested(let stale):
+      return stale
+        ? "\(from.name) has not answered. It may be asleep; it hands the thread over when it wakes."
+        : "Asking \(from.name) to hand this thread over."
+    case .declined(let error):
+      return outgoing ? "\(to.name) asked for this thread, and it stays here: \(sentence(error))" : "\(from.name) kept this thread: \(sentence(error))"
+    case .expired:
+      return "\(from.name) did not answer within an hour, so the request expired."
     case .preparing(let step):
       if !outgoing { return "\(other) is handing this thread to this Mac." }
       return "Handing off to \(to.name): \(step.doing)."
@@ -174,14 +199,19 @@ public struct HandoffView: Decodable, Hashable, Sendable {
       if !outgoing { return "Picking this thread up from \(other)." }
       return stale ? "\(other) has not picked this thread up yet. It may be asleep or not running Omni." : "Waiting for \(other) to pick it up."
     case .accepted:
+      if requested {
+        if idle { return outgoing ? "\(other) took this thread over. The next message runs there." : "Taken over from \(other). Your next message continues it here." }
+        return outgoing ? "\(other) took this thread over. Running there." : "Taken over from \(other). Running on this Mac."
+      }
       if idle {
         return outgoing ? "Handed off to \(other). Your next message continues it there." : "Handed off from \(other). Your next message continues it here."
       }
       return outgoing ? "Running on \(other). Handed off from this Mac." : "Handed off from \(other). Running on this Mac."
     case .failed(let error, let side):
-      return outgoing || side == .here
-        ? "The handoff to \(to.name) failed: \(sentence(error)) The thread is stopped here; reply to continue it."
-        : "Could not pick this thread up from \(other): \(sentence(error))"
+      if outgoing { return "The handoff to \(to.name) failed: \(sentence(error)) The thread is stopped here; reply to continue it." }
+      return side == .here
+        ? "\(other) could not hand this thread over: \(sentence(error)) It stays there."
+        : "Could not pick this thread up from \(other): \(sentence(error)) It stays there."
     case .cancelled:
       return "The handoff to \(to.name) was cancelled."
     }
@@ -192,14 +222,14 @@ public struct HandoffView: Decodable, Hashable, Sendable {
 }
 
 /// The thread's handoff banner, as `handoffBanner` in apps/web/src/handoff.ts. A card while it is under way or went
-/// wrong, with Cancel on the giving Mac while the other has not taken it; one quiet line once it settled.
+/// wrong, with Cancel on the Mac that started it while the other has not taken it; one quiet line once it settled.
 public enum HandoffBanner: Hashable, Sendable {
   public enum Tone: Hashable, Sendable {
     /// A card: the giving Mac is preparing, or the taking Mac is picking it up.
     case working
-    /// A card: the offer is out and the other Mac has not answered yet.
+    /// A card: the offer or the Take over is out and the other Mac has not answered yet.
     case waiting
-    /// A card: the offer went stale or the handoff failed.
+    /// A card: the offer or the Take over went stale, or the handoff failed, was declined or expired.
     case alert
     /// A line: the other Mac took it.
     case done
@@ -216,6 +246,10 @@ public enum HandoffBanner: Hashable, Sendable {
     guard let h else { return nil }
     let text = h.text(now: now)
     switch h.phase(now: now) {
+    case .requested(let stale):
+      self = .card(tone: stale ? .alert : .waiting, text: text, cancel: true)
+    case .declined, .expired:
+      self = .card(tone: .alert, text: text, cancel: false)
     case .preparing:
       self = .card(tone: .working, text: text, cancel: h.outgoing)
     case .offered(let stale):
@@ -231,7 +265,38 @@ public enum HandoffBanner: Hashable, Sendable {
   }
 }
 
-/// What POST /api/threads/:id/handoff and its cancel answer.
+/// GET /api/threads/:id `takeover`, and the thread stream's: another Mac holds the thread, the one running it now or,
+/// between turns, the one that ran it last or took it since. The server leaves it out while this Mac holds it, while
+/// no Mac is known to, and while a handoff or a Take over is under way.
+public struct Takeover: Decodable, Hashable, Sendable {
+  /// The Mac that holds it.
+  public let from: HandoffView.Mac
+  /// This Mac, which would take it.
+  public let to: HandoffView.Mac
+  /// A turn runs there now. Otherwise it is idle there.
+  public let running: Bool
+  /// Why it cannot be taken over now, or nil when it can.
+  public let refused: String?
+
+  enum CodingKeys: String, CodingKey {
+    case from, to, running, refused
+  }
+
+  /// `takeoverNote` in handoff.ts: the note over the reply box.
+  public var note: String { running ? "This thread is running on \(from.name)." : "Last ran on \(from.name)." }
+
+  /// `takeoverConfirm` in handoff.ts: what Take Over asks before it goes ahead, since it cuts a turn on another Mac.
+  public var confirm: (title: String, body: String) {
+    (
+      "Take over from \(from.name)?",
+      running
+        ? "\(from.name) stops the current turn and hands the thread here. The agent continues on \(to.name) where it was cut off."
+        : "\(from.name) sends its latest session and changes here. Your next message runs on \(to.name)."
+    )
+  }
+}
+
+/// What POST /api/threads/:id/handoff, /takeover and the cancel of either answer.
 public struct HandoffAnswer: Decodable, Hashable, Sendable {
   public let thread: OmniThread
   public let handoff: HandoffView?
@@ -265,6 +330,13 @@ extension OmniClient: DevicesAPI {
     try await send("POST", "/api/threads/\(uriComponent(id))/handoff", body: HandoffBody(to: to))
   }
 
+  /// Asks the Mac that holds the thread to hand it here. The server answers once the request is written; the holding
+  /// Mac's offer comes on the thread's stream.
+  public func takeOver(_ id: String) async throws(OmniAPIError) -> HandoffAnswer {
+    try await send("POST", "/api/threads/\(uriComponent(id))/takeover", body: NoBody())
+  }
+
+  /// Calls off a handoff this Mac started, or a Take over it asked for.
   public func cancelHandoff(_ id: String) async throws(OmniAPIError) -> HandoffAnswer {
     try await send("POST", "/api/threads/\(uriComponent(id))/handoff/cancel", body: NoBody())
   }

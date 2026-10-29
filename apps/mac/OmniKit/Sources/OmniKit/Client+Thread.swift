@@ -8,6 +8,7 @@ public protocol ThreadAPI: Sendable {
   func threadEvent(_ id: String, eventID: Int) async throws(OmniAPIError) -> EventRow
   func stopThread(_ id: String) async throws(OmniAPIError) -> OmniThread
   func handOff(_ id: String, to: String) async throws(OmniAPIError) -> HandoffAnswer
+  func takeOver(_ id: String) async throws(OmniAPIError) -> HandoffAnswer
   func cancelHandoff(_ id: String) async throws(OmniAPIError) -> HandoffAnswer
 }
 

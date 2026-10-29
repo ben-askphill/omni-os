@@ -25,8 +25,9 @@ registerHandler('kv', {
     return true;
   },
   notify(change) {
-    // A handoff record (apps/server/handoff/records.ts): the thread's banner, and whether a turn may start, follow it.
-    const thread = /^handoff\.(?:offer|reply)\.(.+)$/.exec(change.entity_id)?.[1];
+    // A handoff record (apps/server/handoff/records.ts) or the thread's holder: its banner, its Take over note, and whether
+    // a turn may start follow it.
+    const thread = /^handoff\.(?:offer|reply|request|holder)\.(.+)$/.exec(change.entity_id)?.[1];
     const t = thread && threads.get(thread);
     if (t) publishFeed({ type: 'thread', thread: t });
   },

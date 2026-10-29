@@ -102,6 +102,9 @@ private struct DeliveryRefusal: Decodable {
     // Recorded by apps/server/tests/handoff-two-macs.test.ts, which needs two Macs.
     "devices.json": { _ = try decodeFixture([Device].self, "devices.json") },
     "thread-handoff.json": { _ = try decodeFixture(ThreadDetail.self, "thread-handoff.json") },
+    // Recorded by apps/server/tests/takeover-two-macs.test.ts, as above.
+    "thread-takeover.json": { _ = try decodeFixture(ThreadDetail.self, "thread-takeover.json") },
+    "thread-takeover-requested.json": { _ = try decodeFixture(ThreadDetail.self, "thread-takeover-requested.json") },
     // Recorded by apps/server/tests/browser-capture.test.ts, which has no Chrome to capture.
     "browser-capture.json": { _ = try decodeFixture(BrowserCaptureReply.self, "browser-capture.json") },
     "browser-capture-marked.json": { _ = try decodeFixture(MarkedReply.self, "browser-capture-marked.json") },
@@ -286,6 +289,25 @@ private struct DeliveryRefusal: Decodable {
     #expect(h.state == .offered(stale: false))
     #expect(d.blocked == h.text(now: h.at), "the server's block while it waits is the card's line")
     #expect(HandoffBanner(h, status: d.thread.status, now: h.at) == .card(tone: .waiting, text: "Waiting for Mac B to pick it up.", cancel: true))
+  }
+
+  @Test func readsAThreadToTakeOver() throws {
+    let d = try decodeFixture(ThreadDetail.self, "thread-takeover.json")
+    let t = try #require(d.takeover, "the takeover decodes")
+    #expect((t.from.name, t.to.name) == ("Mac A", "Mac B"))
+    #expect(t.running && t.refused == nil)
+    #expect(d.blocked == t.note, "the server's block is the note's sentence")
+    #expect(d.handoff == nil)
+
+    let asked = try decodeFixture(ThreadDetail.self, "thread-takeover-requested.json")
+    let h = try #require(asked.handoff, "the request decodes")
+    #expect(!h.outgoing && h.requested)
+    #expect((h.from.name, h.to.name) == ("Mac A", "Mac B"))
+    #expect(h.state == .requested(stale: false))
+    #expect(asked.takeover == nil, "no note while the Take over waits")
+    #expect(
+      HandoffBanner(h, status: asked.thread.status, now: h.at)
+        == .card(tone: .waiting, text: "Asking Mac A to hand this thread over.", cancel: true))
   }
 
   @Test func readsAThreadMidTurn() throws {

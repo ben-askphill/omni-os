@@ -109,6 +109,10 @@ _Avoid_: Context transfer, migration
 Moving a **Thread** to another synced Mac on the same **Harness** and **Session**, whether a turn is running or the thread is idle. A running turn is stopped here, the session and files move, and the other Mac resumes it; an idle thread moves the same way and waits there for the next message. Tailscale checks reachability; the sync relay carries the handoff.
 _Avoid_: Handover (a harness switch), continued thread (a new thread)
 
+**Take over**:
+A **Handoff** asked for by the Mac that will take the **Thread**, rather than started by the one giving it. The Mac that holds the thread (running it, or between turns the one that ran it last) answers the request with the usual offer.
+_Avoid_: Force, steal (nothing runs without the holding Mac's answer)
+
 **Continued thread**:
 A new **Thread** started from an idle one (its source) on another local **Harness**, with a **Session** and worktree of its own and a **Carryover** ahead of the user's first message. The two are linked both ways. The source, its **Session** and its checkout stay as they were.
 _Avoid_: Continuation (what resuming a **Limit stop** sends), fork, child (a crew relation)

@@ -40,7 +40,7 @@ import {
   steerRequests,
   switchRun,
 } from './runner.ts';
-import { cancelHandoff, handOff } from './handoff.ts';
+import { cancelHandoff, handOff, requestTakeover, takeoverOf } from './handoff.ts';
 import { handoffView } from './handoff/records.ts';
 import { headPage } from './history.ts';
 import { liveMessage, openingMessages, parseAfter, STREAM_QUEUE_MAX, type DetailOf } from './stream-catch-up.ts';
@@ -153,7 +153,9 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
   };
   // Only when a turn cannot start here (a synced thread): why, for the composer to show.
   const blocked = turnBlocked(t, runsHere(t.id));
-  return blocked ? { ...detail, blocked } : detail;
+  // Only when another Mac holds it: the Take over note (packages/shared/handoff.ts Takeover).
+  const takeover = takeoverOf(t);
+  return { ...detail, ...(blocked && { blocked }), ...(takeover && { takeover }) };
 }
 
 /** Compact view for the conductor MCP. */
@@ -273,7 +275,16 @@ threadActionsApi.post('/:id/handoff', async (c) => {
   return c.json(await handOff(c.req.param('id'), to));
 });
 
-/** Cancel a handoff from this Mac before the other one picks the thread up. Its queued messages wait here for Resume. */
+/**
+ * Take over a thread another Mac holds: ask that Mac to hand it here. Answered as soon as the request is written; the
+ * thread's `handoff` then follows it, here and on the other Mac. A 409 says why it cannot be taken over.
+ */
+threadActionsApi.post('/:id/takeover', async (c) => c.json(await requestTakeover(c.req.param('id'))));
+
+/**
+ * Cancel this Mac's Take over before it has the thread, or a handoff from this Mac before the other one picks the thread
+ * up. A handoff's queued messages wait here for Resume.
+ */
 threadActionsApi.post('/:id/handoff/cancel', (c) => c.json(cancelHandoff(c.req.param('id'))));
 
 /** Drop messages a restart parked. Each stays in the transcript, marked as never sent. */
@@ -464,7 +475,16 @@ threadActionsApi.get('/:id/stream', (c) => {
     const onFeed = (e: any) => {
       if (e.type !== 'thread' || (e.thread as Thread).id !== id) return;
       const blocked = turnBlocked(e.thread as Thread, runsHere(id));
-      onEvent({ kind: 'thread', thread: e.thread, pending: pendingFor(id), live: isLive(id), handoff: handoffView(e.thread as Thread), ...(blocked && { blocked }) });
+      const takeover = takeoverOf(e.thread as Thread);
+      onEvent({
+        kind: 'thread',
+        thread: e.thread,
+        pending: pendingFor(id),
+        live: isLive(id),
+        handoff: handoffView(e.thread as Thread),
+        ...(blocked && { blocked }),
+        ...(takeover && { takeover }),
+      });
     };
     bus.on('feed', onFeed);
     const detach = () => {
