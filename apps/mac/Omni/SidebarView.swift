@@ -845,7 +845,7 @@ struct StatusFooter: View {
           Text(model.serverLabel)
             .foregroundStyle(Tok.fg2)
           HStack(spacing: z(6)) {
-            if model.settings.remote != nil {
+            if model.settings.mode == .remote {
               Text("\(model.store.status?.device?.name ?? model.settings.remote?.host() ?? "") · Remote")
                 .lineLimit(1)
                 .truncationMode(.middle)

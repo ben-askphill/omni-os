@@ -237,7 +237,7 @@ public final class AppModel {
   /// The status line's words. A remote server that does not answer is not connected, not "not running": it may
   /// well run, and nothing here would start it.
   public var serverLabel: String {
-    if settings.remote != nil, !supervisor.isRunning, supervisor.state.canStart { return "Not connected" }
+    if settings.mode == .remote, !supervisor.isRunning, supervisor.state.canStart { return "Not connected" }
     return supervisor.state.label
   }
 

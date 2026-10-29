@@ -55,7 +55,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `Markdown.swift` | `MarkdownDocument` and its blocks, `MarkdownText`, `MarkdownRun`, `MarkdownImage`, `MarkdownLink`. The only file that imports swift-markdown |
 | `Autolink.swift` | Internal. `Autolink.pieces`: the Web UI's bare URL, email and thread id links in a run of text |
 | `MarkdownCache.swift` | `MarkdownCache`: parsed markdown per event id and text |
-| `ServerSettings.swift` | `ServerSettings` (port, repo path, Node override and remote URL in UserDefaults), `ServerConfig`, `ServerEndpoint` (`local(port:)` or `remote(URL)`) |
+| `ServerSettings.swift` | `ServerSettings` (port, repo path, Node override, remote URL and `ServerMode` in UserDefaults; Remote needs a URL), `ServerConfig`, `ServerEndpoint` (`local(port:)` or `remote(URL)`) |
 | `RemoteToken.swift` | `RemoteTokenStore`: a remote server's token in the login Keychain, one item per origin |
 | `Spawn.swift` | Internal. posix_spawn in a new session (no controlling terminal, pgid is the pid), and `capture` for short commands with a timeout |
 | `ServerLaunch.swift` | `ServerStartError`, `LoginShell`, `NodeResolver`, `NodeVersion`, `ServerEnvironment`, `ServerLauncher`, `ServerLaunch` |
