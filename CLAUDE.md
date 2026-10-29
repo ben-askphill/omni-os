@@ -32,7 +32,7 @@ Local agent workspace. See README.md for what it does.
 - `npm run test:mac` (Swift), `npm run build:slash` after changing a slash module in `packages/shared/`, `npm run build:pick` after changing `packages/shared/browser-pick-*.ts`.
 - Conductor tools: `apps/mcp/omni.ts`, calls the local API.
 - `npm run dev` (server :4747 + vite :4748), `npm test`, `npm run typecheck`, all through turbo. One package: `npx turbo run test --filter=@omni/server`; one file: `cd apps/server && npx vitest run tests/<file>.test.ts`.
-- Never store secret values outside the Keychain. The `secrets` table holds names only.
+- Secret values go in the secret store (Keychain on a Mac, `data/secrets.json` on Linux, or libsecret via `OMNI_SECRET_STORE`). The `secrets` table holds names only.
 - `data/` is runtime state (db, thread dirs, worktrees, browser profiles). Never commit it.
 - A feature or fix with a visible change to the Web UI or Mac app ships with screenshots in the PR description (before/after, of desktop web, phone web and Mac). Take them against a throwaway server, never :4747, and upload with `scripts/pr-screenshots.sh`. See `docs/pr-screenshots.md`.
 

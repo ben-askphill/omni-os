@@ -16,7 +16,7 @@ Command Line Tools alone are not enough: `xcodebuild` needs full Xcode. Codex an
 
 ## Agent instructions
 
-For an agent doing the setup (the README has the prompt to paste). Run each step, run its check, and stop on a failed check instead of working around it. Don't run `sudo`, don't install Xcode for the user, and never write secret values anywhere but the Keychain.
+For an agent doing the setup (the README has the prompt to paste). Run each step, run its check, and stop on a failed check instead of working around it. Don't run `sudo`, don't install Xcode for the user, and never write secret values anywhere but the secret store (Keychain on a Mac, `data/secrets.json` on Linux).
 
 1. **Prerequisites.** Run every check in [What you need](#what-you-need). On a miss, give the user the fix and wait.
 

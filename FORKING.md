@@ -26,7 +26,7 @@ Or skip `npm run setup` and answer the same questions in the Web UI or the Mac a
 | `data/omni.db`: channels, threads, folders, secret names | The schema and migrations |
 | `data/threads`, `data/worktrees`, `data/browsers`: thread files, checkouts, browser logins | |
 | `.env`: server options | `.env.example` |
-| Keychain: secret values | |
+| Secret store: secret values (Keychain on a Mac, `data/secrets.json` on Linux) | |
 
 Your channels (clients, projects, repos, stores) are rows in `data/omni.db`, made in the app or by `npm run setup`.
 Omni seeds only `#conductor` and `#inbox`.
