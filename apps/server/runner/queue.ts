@@ -134,16 +134,22 @@ function begin(threadId: string, [first, ...rest]: Msg[]) {
 export function saveOwn(
   threadId: string,
   key: string,
-  m: Pick<MessageRequest, 'prompt' | 'kind' | 'payload' | 'source'> & { mode?: MessageRequest['mode']; context?: MessageRequest['context'] },
+  m: Pick<MessageRequest, 'prompt' | 'kind' | 'payload' | 'source'> & {
+    mode?: MessageRequest['mode'];
+    context?: MessageRequest['context'];
+    attachments?: MessageRequest['attachments'];
+  },
 ): MessageRequest | null {
   const mode = m.mode ?? 'steer';
+  const attachments = m.attachments?.length ? m.attachments : null;
+  const files = (attachments ?? []).map((a) => ({ name: a.name, size: a.size, sha256: '' }));
   const { row, fresh } = messageRequests.accept({
     thread_id: threadId,
     request_id: key,
     ...m,
     mode,
-    attachments: null,
-    fingerprint: requestFingerprint({ prompt: m.prompt, mode, source: m.source, files: [], context: m.context ?? undefined }),
+    attachments,
+    fingerprint: requestFingerprint({ prompt: m.prompt, mode, source: m.source, files, context: m.context ?? undefined }),
     machine_id: outbox.machineId(),
   });
   return fresh ? row : null;

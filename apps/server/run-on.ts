@@ -8,7 +8,8 @@
 //   delegated threads that ran here for a parent that runs elsewhere (runner/queue.ts reportToParent).
 // - `runon.accepted.<thread>.<message>`: durable acceptance, synced so a new holder never replays it.
 // - `runon.stop.<thread>.<sender>`: when this machine last asked the holder to stop it.
-// The holder reads them after each sync (reconcileRunOn) and sends each message once, keyed by its id.
+// The holder reads them after each sync (reconcileRunOn) and sends each message once, keyed by its id. Files Ben
+// attached go to Storage first (sync/files.ts sendSaved) and the holder fetches them before it sends the message.
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { randomUUID } from 'node:crypto';
 import { publishFeed } from './bus.ts';
@@ -19,7 +20,9 @@ import { fileReport } from './runner/queue.ts';
 import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
 import { safeSegment } from './sync/paths.ts';
 import { activeWorker, onSynced, syncStatus, type SyncWorker } from './sync/worker.ts';
+import { receiveUploads, sendSaved, type UploadRef } from './sync/files.ts';
 import { reachabilityOf, tailnet } from './tailscale.ts';
+import type { Attachment } from './uploads.ts';
 import { userConfig } from './user-config.ts';
 
 const THREAD = 'runon.thread.';
@@ -40,6 +43,8 @@ export interface Forwarded {
   from?: 'ben' | 'conductor';
   at: string;
   context?: MessageContext[];
+  /** Files Ben attached, in Storage by sha. */
+  files?: UploadRef[];
   /** A delegated thread's report to its parent, with the key it is saved under and its payload. */
   report?: { key: string; payload: Record<string, unknown> };
 }
@@ -111,21 +116,25 @@ function sent(threadId: string, self: string): Forwarded[] {
 
 /**
  * Ben's message to a routed thread that runs elsewhere: written for the holder to send, and answered as accepted.
- * The message shows in the transcript once the holder's turn syncs back. Attachments do not travel yet.
+ * The message shows in the transcript once the holder's turn syncs back. Its files are in Storage before the record
+ * is written, so the holder never sees a message whose files it cannot fetch.
  */
-export function forwardMessage(
+export async function forwardMessage(
   t: Thread,
   prompt: string,
-  opts: { mode: Forwarded['mode']; from: 'ben' | 'conductor'; requestId?: string; hasFiles: boolean; context?: MessageContext[] },
+  opts: { mode: Forwarded['mode']; from: 'ben' | 'conductor'; requestId?: string; attachments?: Attachment[]; context?: MessageContext[] },
 ) {
   const { mode, from } = opts;
   const self = outbox.machineId()!;
   const holder = remoteHolder(t)!;
-  if (opts.hasFiles) throw refused(`Files cannot go to ${deviceName(holder) ?? 'the other machine'} yet. Send the message without them, or Take over the thread here.`, 400);
   const id = opts.requestId && isId(opts.requestId) ? opts.requestId : randomUUID();
+  const files = await sendSaved(opts.attachments ?? []).catch((err) => {
+    throw refused(`Could not send the files to ${deviceName(holder) ?? 'the other machine'}: ${(err as Error).message}`, (err as { status?: number }).status ?? 503);
+  });
   const list = sent(t.id, self);
   const at = new Date().toISOString();
-  if (!list.some((m) => m.id === id)) kv.set(`${MSGS}${t.id}.${self}`, [...list, { id, prompt, mode, from, at, ...(opts.context?.length && { context: opts.context }) }].slice(-KEEP));
+  const m: Forwarded = { id, prompt, mode, from, at, ...(opts.context?.length && { context: opts.context }), ...(files.length && { files }) };
+  if (!list.some((x) => x.id === id)) kv.set(`${MSGS}${t.id}.${self}`, [...list, m].slice(-KEEP));
   void activeWorker()?.syncNow();
   publishFeed({ type: 'thread', thread: t });
   return { ...t, request: { id, request_id: id, state: 'accepted' as const, accepted_at: at }, forwarded_to: deviceName(holder) ?? holder };
@@ -155,8 +164,31 @@ const stopped = new Map<string, string>();
 /**
  * After each sync, on the machine that holds a routed thread: send what the other machines forwarded, each message
  * once (its id is the request id, so a second sync finds it saved), and stop a turn that a newer Stop asked for.
+ * A message whose files cannot be fetched yet waits for the next sync, and so does every later one to that thread.
+ * One pass at a time; a sync during a pass runs another after it.
  */
-export function reconcileRunOn(worker: SyncWorker, now = Date.now()) {
+export function reconcileRunOn(worker: SyncWorker, now = Date.now()): Promise<void> {
+  if (reconciling) {
+    again = true;
+    return reconciling;
+  }
+  reconciling = (async () => {
+    try {
+      do {
+        again = false;
+        await reconcileOnce(worker, now);
+      } while (again);
+    } finally {
+      reconciling = null;
+    }
+  })();
+  return reconciling;
+}
+
+let reconciling: Promise<void> | null = null;
+let again = false;
+
+async function reconcileOnce(worker: SyncWorker, now: number) {
   const self = worker.machineId;
   for (const [key, value] of kv.list<unknown>(MSGS)) {
     try {
@@ -174,8 +206,10 @@ export function reconcileRunOn(worker: SyncWorker, now = Date.now()) {
         if (kv.get(receipt)) continue;
         const mode = m.mode === 'queue' || m.mode === 'interrupt' ? m.mode : 'steer';
         const from = m.from === 'conductor' ? 'conductor' : 'ben';
+        const attachments = await receiveUploads(threadId, m.files);
+        if (kv.get(receipt)) continue;
         const row = tx(() => {
-          const row = saveOwn(threadId, `runon:${m.id}`, { prompt: m.prompt, kind: 'user', payload: null, source: from, mode, context: m.context });
+          const row = saveOwn(threadId, `runon:${m.id}`, { prompt: m.prompt, kind: 'user', payload: null, source: from, mode, context: m.context, attachments });
           kv.set(receipt, true);
           return row;
         });
@@ -198,4 +232,4 @@ export function reconcileRunOn(worker: SyncWorker, now = Date.now()) {
   }
 }
 
-onSynced((worker) => reconcileRunOn(worker));
+onSynced((worker) => void reconcileRunOn(worker));

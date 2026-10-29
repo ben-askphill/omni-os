@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -216,6 +216,41 @@ describe('remote preparation and takeover', () => {
     await waitFor(() => b.db.threads.holder(id) === 'box-b', 'B to take it back');
     await both();
     expect(userTexts(b, id).filter((t) => t === 'reply exactly once')).toHaveLength(1);
+  }, T.timeout);
+});
+
+describe('files sent to a thread run on another machine', () => {
+  const multipart = async (m: Mac, path: string, body: unknown, files: File[]) => {
+    const fd = new FormData();
+    fd.append('payload', JSON.stringify(body));
+    for (const f of files) fd.append('files', f, f.name);
+    const res = await m.app.request(`/api${path}`, { method: 'POST', body: fd });
+    return { status: res.status, body: (await res.json()) as any };
+  };
+  const onB = (id: string, name: string) => join(b.paths.threads, id, 'uploads', name);
+
+  it('go with the first message and with replies, and land on that machine', async () => {
+    const res = await multipart(a, '/threads', { channel: 'shop', prompt: 'read the brief', device: 'box-b' }, [new File(['FIRST BRIEF'], 'brief.txt', { type: 'text/plain' })]);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const id = res.body.id as string;
+    // The hub keeps a copy for its own transcript.
+    expect(readFileSync(join(a.paths.threads, id, 'uploads', 'brief.txt'), 'utf8')).toBe('FIRST BRIEF');
+    await both();
+    await b.untilResults(id, 1);
+    expect(readFileSync(onB(id, 'brief.txt'), 'utf8')).toBe('FIRST BRIEF');
+    expect(b.byKind(id, 'user')[0].p.attachments).toMatchObject([{ name: 'brief.txt', path: onB(id, 'brief.txt') }]);
+    expect(b.claudeTexts(id)[0]).toContain(onB(id, 'brief.txt'));
+    await both();
+
+    const reply = await multipart(a, `/threads/${id}/messages`, { prompt: 'and this screenshot', request_id: 'with-files' }, [
+      new File([new Uint8Array([137, 80, 78, 71, 1, 2, 3])], 'shot.png', { type: 'image/png' }),
+    ]);
+    expect(reply.status, JSON.stringify(reply.body)).toBe(200);
+    expect(reply.body.forwarded_to).toBe('Box B');
+    await both();
+    await b.untilResults(id, 2);
+    expect(b.byKind(id, 'user').at(-1)!.p.attachments).toMatchObject([{ name: 'shot.png', image: true, path: onB(id, 'shot.png') }]);
+    expect(b.claudeTexts(id).at(-1)).toContain(onB(id, 'shot.png'));
   }, T.timeout);
 });
 

@@ -39,7 +39,7 @@ Pick where a new thread runs: this machine, or any other synced machine, such as
 - An offline default stays selected in the composer. Sending reports why it cannot run there; choose This Mac explicitly to run locally.
 - The other machine cuts a worktree thread's worktree itself, from the channel's repo at the same path (or through its path map), so the repo must be cloned there.
 - Your later messages and Stop go to the machine running the thread. Skills and file mentions resolve on that machine, and attached text context goes with replies. Accepted replies do not replay after Take over. A thread the Conductor delegated there reports back to the Conductor on the hub.
-- Files do not travel yet: a new thread or a message with attachments for another machine is refused with why.
+- Files you attach go too, on the first message and on replies, up to 50 MB each. The hub keeps a copy for its transcript; the other machine fetches them before it sends the message, and a message whose files have not arrived waits for the next sync.
 - Take over brings the thread back to this machine; from then on it runs here.
 - If the other machine cannot start it, the thread stops here with why. A worktree thread's Retry runs it on this machine; any other keeps its first message for Resume.
 - Team members stay with their lead on the hub.
