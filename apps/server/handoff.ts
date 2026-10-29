@@ -23,7 +23,8 @@ import { releaseForHandoff, runsHere, saveOwn, wake, wakePrepared, type Msg } fr
 import { failSetup, setUpThread, START_REQUEST } from './runner/setup.ts';
 import { drop } from './runner/state.ts';
 import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
-import { sessionOnThisMac, uploadNow } from './sync/files.ts';
+import { receiveUploads, sessionOnThisMac, uploadNow, type UploadRef } from './sync/files.ts';
+import type { Attachment } from './uploads.ts';
 import { prepareTurn } from './sync/guard.ts';
 import { toPortable } from './sync/paths.ts';
 import { activeWorker, onSynced, syncStatus, type SyncWorker } from './sync/worker.ts';
@@ -133,10 +134,13 @@ export async function handOff(threadId: string, to: string): Promise<HandoffResu
 /**
  * Send a thread that has not run anywhere to another machine, to run there from its first message (run-on.ts): the
  * offer goes out ready, since there is no turn to stop, session to upload or worktree to pack. That machine cuts the
- * worktree itself. `to` must be a synced machine; the caller checks it.
+ * worktree itself. `to` must be a synced machine; the caller checks it. `files` are in Storage already.
  */
-export function sendNewThread(threadId: string, prompt: string, from: Mac, to: Mac) {
-  writeOffer({ id: randomUUID(), thread: threadId, from, to, at: iso(), idle: true, fresh: true, state: 'offered', queued: [prompt], bundle: null, leftBehind: null });
+export function sendNewThread(threadId: string, prompt: string, from: Mac, to: Mac, files: UploadRef[] = []) {
+  writeOffer({
+    id: randomUUID(), thread: threadId, from, to, at: iso(), idle: true, fresh: true, state: 'offered', queued: [prompt], bundle: null, leftBehind: null,
+    ...(files.length && { files }),
+  });
   void activeWorker()?.syncNow();
 }
 
@@ -394,6 +398,14 @@ async function take(offer: Offered, worker: SyncWorker) {
     const t = threads.get(id);
     // Not here yet, or the giving Mac's stopped row has not arrived: the next sync tries again.
     if (!t || busy(t)) return;
+    // A new thread's first files. One that cannot be fetched yet is tried again on the next sync.
+    let attachments: Attachment[] = [];
+    try {
+      if (offer.fresh) attachments = await receiveUploads(id, offer.files);
+    } catch (err) {
+      console.error(`[handoff] ${id}: its files are not here yet:`, (err as Error).message);
+      return;
+    }
     const { bundle } = offer;
     if (bundle) {
       const repo = channels.get(t.channel_id)?.repo_path;
@@ -426,6 +438,7 @@ async function take(offer: Offered, worker: SyncWorker) {
             payload: offer.fresh ? null : { text, source: 'ben' },
             source: offer.fresh ? 'ben' : 'handoff',
             mode: 'queue',
+            ...(offer.fresh && n === 0 && attachments.length && { attachments }),
           }),
         ),
       ].filter((r) => !!r);

@@ -64,6 +64,8 @@ export type HandoffOffer = {
       state: 'offered';
       /** Messages that were queued behind the stopped turn, delivered on the new Mac after the continue prompt. */
       queued: string[];
+      /** A fresh thread's first files, in Storage by sha (apps/server/sync/files.ts sendUploads). */
+      files?: { name: string; sha: string; size: number; mime: string; image: boolean }[];
       /** Storage path of a git bundle with the worktree's commits and uncommitted changes, for a worktree thread. */
       bundle: { path: string; base: string; wip: string } | null;
       /** Uncommitted changes in a shared repo folder that cannot travel, e.g. "~/phillbert has uncommitted changes". */

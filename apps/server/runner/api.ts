@@ -10,7 +10,7 @@ import { prepareTurn, turnBlocked } from '../sync/guard.ts';
 import { parseSlash, resolveSlash, slashRecord, type SlashCommand, type SlashRecord } from '@omni/shared/slash.ts';
 import { listCommands, peekCommands } from '../commands.ts';
 import { withMentions } from '../mentions.ts';
-import { saveUploads, type Attachment } from '../uploads.ts';
+import { fileKind, safeName, saveUploads, type Attachment } from '../uploads.ts';
 import { isRemoteHarness, type HarnessId } from '../harness/types.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
@@ -25,6 +25,7 @@ import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from '.
 import { dismissQuestions } from './questions.ts';
 import { forwardMessage, markRouted, remoteHolder, targetFor } from '../run-on.ts';
 import { sendNewThread } from '../handoff.ts';
+import { sendUploads } from '../sync/files.ts';
 
 // ---------- slash commands ----------
 
@@ -173,12 +174,19 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   // comes back to the parent (run-on.ts).
   const route = input.source === 'team' ? null : await targetFor(input.device);
   if (route) {
-    if (input.files?.length) throw refusal(`Files cannot go to ${route.to.name} yet. Start the thread without them, or run it on this machine.`, 400);
+    // In Storage before the thread is made, so a failed upload leaves nothing behind and the other machine finds them.
+    const bodies = await Promise.all((input.files ?? []).map(async (f) => new Uint8Array(await f.arrayBuffer())));
+    const sent = await sendUploads((input.files ?? []).map((f, i) => ({ name: safeName(f.name), ...fileKind(safeName(f.name), f.type), body: bodies[i] }))).catch((err) => {
+      throw refusal(`Could not send the files to ${route.to.name}: ${(err as Error).message}`, (err as { status?: number }).status ?? 503);
+    });
     // Stopped, not queued: no turn runs here, and the other machine must not wait for one to end.
     const { thread } = await openThread(input, 'stopped', true);
+    // Kept here too, so the hub's transcript can show them. A name taken already is not, in a new thread.
+    const saved = await saveUploads(thread.id, input.files ?? []);
+    const files = sent.map((f, i) => ({ ...f, name: saved[i]?.name ?? f.name }));
     tx(() => {
       markRouted(thread.id, route.to.id);
-      sendNewThread(thread.id, input.prompt, route.from, route.to);
+      sendNewThread(thread.id, input.prompt, route.from, route.to, files);
     });
     if (!input.title) void generateTitle(thread.id, input.prompt);
     emitThread(thread.id);
@@ -426,7 +434,7 @@ export async function postMessage(
   }
   // A thread routed to another machine runs there: the message goes to it (run-on.ts).
   if (remoteHolder(thread)) {
-    return forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, hasFiles: !!opts.attachments?.length, context: opts.context }) as PostedThread;
+    return (await forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, attachments: opts.attachments, context: opts.context })) as PostedThread;
   }
   // Refused before anything is saved: the other Mac runs it.
   const blocked = turnBlocked(thread, runsHere(threadId));
