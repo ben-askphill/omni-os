@@ -53,6 +53,11 @@ export type HandoffOffer = {
   idle?: boolean;
   /** The Take over request this offer answers, when the taking Mac asked for the thread. */
   request?: string;
+  /**
+   * A new thread sent to the other machine to run there from its first message (apps/server/run-on.ts): nothing ran
+   * here, so it is set up there (its worktree cut there) and `queued` holds the first prompt.
+   */
+  fresh?: boolean;
 } & (
   | { state: 'preparing'; step: PrepareStep }
   | {

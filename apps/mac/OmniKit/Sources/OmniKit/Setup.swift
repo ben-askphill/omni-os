@@ -22,24 +22,38 @@ public struct UserConfig: Codable, Hashable, Sendable {
     public var centralBrainDir = ""
     public init() {}
   }
+  /// Where new threads run unless the composer picks another machine (RunOn.swift).
+  public struct RunOn: Codable, Hashable, Sendable {
+    /// A synced machine's id, or "" for this one.
+    public var device = ""
+    public init(device: String = "") { self.device = device }
+  }
   public var onboardedAt: String?
   public var user = User()
   public var workspace = Workspace()
   public var integrations = Integrations()
+  /// nil from a server before run-on.
+  public var runOn: RunOn?
 
   public init() {}
 }
 
-/// What PUT /api/setup and POST /api/setup/complete take: the three sections, each sent whole.
+/// What PUT /api/setup and POST /api/setup/complete take: the sections to change, each sent whole. The server keeps
+/// a section left out.
 public struct SetupPatch: Encodable, Hashable, Sendable {
   public var user: UserConfig.User?
   public var workspace: UserConfig.Workspace?
   public var integrations: UserConfig.Integrations?
+  public var runOn: UserConfig.RunOn?
 
-  public init(user: UserConfig.User? = nil, workspace: UserConfig.Workspace? = nil, integrations: UserConfig.Integrations? = nil) {
+  public init(
+    user: UserConfig.User? = nil, workspace: UserConfig.Workspace? = nil, integrations: UserConfig.Integrations? = nil,
+    runOn: UserConfig.RunOn? = nil
+  ) {
     self.user = user
     self.workspace = workspace
     self.integrations = integrations
+    self.runOn = runOn
   }
 
   /// Trimmed, the name's inner runs of spaces collapsed, pronouns never empty.

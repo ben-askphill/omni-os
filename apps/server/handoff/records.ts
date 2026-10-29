@@ -51,7 +51,8 @@ function parseOffer(threadId: string, v: unknown): HandoffOffer | null {
     failed: () => typeof o.error === 'string',
     declined: () => typeof o.error === 'string',
   }[o.state as HandoffOffer['state']];
-  return ok?.() && (o.idle === undefined || typeof o.idle === 'boolean') && (o.request === undefined || isId(o.request)) ? (o as HandoffOffer) : null;
+  const flags = (o.idle === undefined || typeof o.idle === 'boolean') && (o.fresh === undefined || typeof o.fresh === 'boolean');
+  return ok?.() && flags && (o.request === undefined || isId(o.request)) ? (o as HandoffOffer) : null;
 }
 
 /** A Take over as the asking Mac wrote it, if it is one: it may come from the relay. */

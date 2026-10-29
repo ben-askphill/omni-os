@@ -26,6 +26,10 @@ public final class NewThreadComposerModel {
   /// The folder the thread is filed in, from "New thread here", until Ben takes it out. Only while its channel is picked.
   public private(set) var folder: (FolderRef, channel: String)?
   public var folderChip: FolderRef? { folder.flatMap { $0.channel == choice.channel ? $0.0 : nil } }
+  /// The other synced machines, in picker order. Empty hides the Run on picker.
+  public private(set) var devices: [Device] = []
+  /// Where the thread runs: a device id, or "" for this Mac. Settings' default until Ben picks.
+  public private(set) var runOn = ""
 
   public var canSend: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !sending }
   public var role: CrewRole? { crew.first { $0.id == choice.role } }
@@ -38,6 +42,8 @@ public final class NewThreadComposerModel {
   /// The pickers hold the preselected run (the role's or the channel's), not a preset or a pick, so they follow the
   /// lists as they load.
   @ObservationIgnored private var preselected = true
+  /// Ben picked where it runs, so the saved default no longer moves it.
+  @ObservationIgnored private var runOnPicked = false
   @ObservationIgnored private let api: any NewThreadAPI
   @ObservationIgnored private let drafts: DraftStore
   @ObservationIgnored private let readFile: @Sendable (StagedFile) throws -> UploadFile
@@ -64,6 +70,22 @@ public final class NewThreadComposerModel {
     var next = NewThreadRules.settled(choice, crew: crew, harnesses: harnesses)
     if preselected { next = NewThreadRules.preselecting(next, crew: crew, harnesses: harnesses, defaults: defaults) }
     if next != choice { choice = next }
+  }
+
+  /// Takes the other machines and the saved default as they load. A pick stays while its machine is listed, even when offline.
+  public func updateRunOn(devices: [Device], saved: String) {
+    if self.devices != devices { self.devices = devices }
+    if runOnPicked, runOn.isEmpty || devices.contains(where: { $0.id == runOn }) { return }
+    runOnPicked = false
+    let next = RunOnRules.resolved(saved, devices: devices)
+    if next != runOn { runOn = next }
+  }
+
+  /// Runs the thread on `device`, or on this Mac for "".
+  public func selectRunOn(_ device: String) {
+    guard device.isEmpty || devices.contains(where: { $0.id == device && $0.canTake }) else { return }
+    runOnPicked = true
+    runOn = device
   }
 
   /// Starts from a preset (`/clear` and `/new` in a thread): its role, harness, model and effort. A preset without a
@@ -149,6 +171,7 @@ public final class NewThreadComposerModel {
         : NewThreadRules.request(choice, prompt: prompt, harnesses: harnesses)
       request.folder = folderChip?.id
       request.base = BaseRules.sent(basePick, harness: choice.harness)
+      request.device = RunOnRules.sent(runOn, devices: devices)
       let thread = try await api.createThread(request, files: uploads)
       if text == raw { text = "" }
       folder = nil

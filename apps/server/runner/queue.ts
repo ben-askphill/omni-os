@@ -7,6 +7,7 @@ import { hardKill, requestInterrupt, stopStartup } from './session.ts';
 import { launch } from './spawn.ts';
 import { applyQueued, queuedRun } from './switch.ts';
 import { userName } from '../profile.ts';
+import { forwardReport } from '../run-on.ts';
 import { startTurnSnapshot } from './snapshots.ts';
 import {
   capFor,
@@ -133,7 +134,7 @@ function begin(threadId: string, [first, ...rest]: Msg[]) {
 export function saveOwn(
   threadId: string,
   key: string,
-  m: Pick<MessageRequest, 'prompt' | 'kind' | 'payload' | 'source'> & { mode?: MessageRequest['mode'] },
+  m: Pick<MessageRequest, 'prompt' | 'kind' | 'payload' | 'source'> & { mode?: MessageRequest['mode']; context?: MessageRequest['context'] },
 ): MessageRequest | null {
   const mode = m.mode ?? 'steer';
   const { row, fresh } = messageRequests.accept({
@@ -142,7 +143,7 @@ export function saveOwn(
     ...m,
     mode,
     attachments: null,
-    fingerprint: requestFingerprint({ prompt: m.prompt, mode, source: m.source, files: [] }),
+    fingerprint: requestFingerprint({ prompt: m.prompt, mode, source: m.source, files: [], context: m.context ?? undefined }),
     machine_id: outbox.machineId(),
   });
   return fresh ? row : null;
@@ -185,6 +186,21 @@ export function reportToParent(childId: string, status: string, text: string, co
     `Relay what matters to ${userName()} in one short update. Delegate follow-ups if needed. Do not redo the work.`;
   const key = `crew-report:${child.id}:${completion}`;
   if (waitingLead) return teamReported(parent.id, key, prompt, report);
+  // The parent runs on another machine (a delegation sent elsewhere, run-on.ts): the report goes to it there.
+  const holder = threads.holder(parent.id);
+  const self = outbox.machineId();
+  if (holder && self && holder !== self) return forwardReport(parent.id, key, prompt, report);
+  fileReport(parent.id, key, prompt, report);
+}
+
+/**
+ * A child's report, saved for its parent on this machine and sent: woken, or steered in when the parent is busy. Here,
+ * or on the machine that holds the parent when the child ran elsewhere (run-on.ts). A report saved before is not sent
+ * again.
+ */
+export function fileReport(parentId: string, key: string, prompt: string, report: Record<string, unknown>) {
+  const parent = threads.get(parentId);
+  if (!parent) return;
   const row = saveOwn(parent.id, key, { prompt, kind: 'crew_report', payload: report, source: 'crew' });
   if (!row) return;
   // Ben stopped the parent: the report waits for him rather than starting it again. A parent whose worktree is not

@@ -62,11 +62,13 @@ public struct NewThread: Encodable, Hashable, Sendable {
   public var folder: String?
   /// Where a worktree thread's branch starts. nil for the repo's current commit.
   public var base: BasePick?
+  /// Where it runs (RunOn.swift): a synced machine's id, "here" for this Mac, nil for Settings' default.
+  public var device: String?
 
   public init(
     channel: String, prompt: String, role: String? = nil, model: String? = nil, harness: HarnessID? = nil,
     effort: String? = nil, title: String? = nil, parentID: String? = nil, taskID: String? = nil, source: ThreadSource? = nil,
-    folder: String? = nil, base: BasePick? = nil
+    folder: String? = nil, base: BasePick? = nil, device: String? = nil
   ) {
     self.channel = channel
     self.prompt = prompt
@@ -80,10 +82,11 @@ public struct NewThread: Encodable, Hashable, Sendable {
     self.source = source
     self.folder = folder
     self.base = base
+    self.device = device
   }
 
   enum CodingKeys: String, CodingKey {
-    case channel, prompt, role, model, harness, effort, title, source, folder, base
+    case channel, prompt, role, model, harness, effort, title, source, folder, base, device
     case parentID = "parent_id"
     case taskID = "task_id"
   }

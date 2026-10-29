@@ -104,13 +104,20 @@ server.registerTool(
           'Where a repo channel\'s new worktree branch starts: omit or "head" for the repo\'s current commit, "remote-default" for origin\'s default branch (fetched first, the checkout is never moved), ' +
             'or the name of an existing branch, tag or commit. Ignored when the thread gets no worktree. Use it when the work must start from the latest origin, not a stale local checkout.',
         ),
+      device: z
+        .string()
+        .optional()
+        .describe(
+          `Where it runs: a synced machine by id or name from list_devices, or "here" for this machine. Omit to use ${USER}'s default from Settings. ` +
+            'A thread sent elsewhere runs on that machine and its report still comes back to you. No files travel.',
+        ),
     },
   },
-  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, create_folder, base }) => {
+  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, create_folder, base, device }) => {
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
     const t = await call('/threads', {
       method: 'POST',
-      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, folder, base: basePick(base), parent_id: SELF, source: 'conductor' }),
+      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, folder, base: basePick(base), parent_id: SELF, source: 'conductor', device: await deviceId(device) }),
     });
     return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch });
   },
@@ -374,12 +381,25 @@ server.registerTool(
   },
 );
 
+/** A machine named by id or name (from list_devices), "here", or nothing for the default, as POST /threads takes it. */
+async function deviceId(device: string | undefined): Promise<string | undefined> {
+  const want = device?.trim();
+  if (!want) return undefined;
+  if (want.toLowerCase() === 'here') return 'here';
+  const devices: any[] = await call('/devices');
+  const named = devices.filter((d) => d.name.toLowerCase() === want.toLowerCase());
+  const hit = devices.find((d) => d.id === want) ?? (named.length === 1 ? named[0] : null);
+  if (named.length > 1 && !hit) throw new Error(`${named.length} machines are called "${want}". Pass the id instead: ${named.map((d) => d.id).join(', ')}.`);
+  if (!hit) throw new Error(`No synced machine is called "${want}". Machines: ${devices.map((d) => `${d.name} (${d.id})`).join(', ') || 'none, sync is off'}.`);
+  return hit.id;
+}
+
 server.registerTool(
   'list_devices',
   {
     description:
-      `The other Macs ${USER} syncs Omni with, each with its id, name and whether Tailscale sees it up: online, offline or unknown ` +
-      '(no Tailscale to ask). A thread can be handed to any that is not offline. Empty while sync is off.',
+      `The other machines ${USER} syncs Omni with (Macs, or a Linux box), each with its id, name and whether Tailscale sees it up: online, offline or unknown ` +
+      '(no Tailscale to ask). A thread can be handed to any that is not offline, and delegate can run a new one there. Empty while sync is off.',
   },
   async () => text(await call('/devices')),
 );

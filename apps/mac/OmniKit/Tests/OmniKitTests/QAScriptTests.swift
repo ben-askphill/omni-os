@@ -196,8 +196,10 @@ import OmniKit
   }
 
   @Test func opensATabOfSettings() throws {
-    let script = try QAScript(json: Data(#"[{"settings": "secrets"}, {"settings": "sync"}, {"settings": "storage"}, {"settings": "appearance"}, {"settings": "connection"}, {"settings": "profile"}]"#.utf8))
-    #expect(script.steps == [.settings(.secrets), .settings(.sync), .settings(.storage), .settings(.appearance), .settings(.connection), .settings(.profile)])
+    let script = try QAScript(json: Data(#"[{"settings": "secrets"}, {"settings": "sync"}, {"settings": "storage"}, {"settings": "appearance"}, {"settings": "server"}, {"settings": "profile"}]"#.utf8))
+    #expect(script.steps == [.settings(.secrets), .settings(.sync), .settings(.storage), .settings(.appearance), .settings(.server), .settings(.profile)])
+    // The tab's name before it was Server.
+    #expect(try QAScript(json: Data(#"[{"settings": "connection"}]"#.utf8)).steps == [.settings(.server)])
     #expect(throws: QAScriptError.self) { try QAScript(json: Data(#"[{"settings": "garage"}]"#.utf8)) }
   }
 

@@ -2,7 +2,17 @@ import Foundation
 
 /// A tab of the Settings window.
 public enum SettingsTab: String, CaseIterable, Hashable, Sendable {
-  case connection, profile, secrets, sync, storage, notifications, appearance, quickPrompt
+  /// Where new threads run and this Mac's server. Was Connection.
+  case server, profile, secrets, sync, storage, notifications, appearance, quickPrompt
+
+  /// The tab by name, taking the old "connection" for Server so QA scripts written before the rename still work.
+  public init?(named name: String) {
+    if name == "connection" {
+      self = .server
+    } else {
+      self.init(rawValue: name)
+    }
+  }
 }
 
 extension Route {

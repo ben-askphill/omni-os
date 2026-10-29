@@ -31,6 +31,20 @@ Open the Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the URL an
 - Copying `data/` to another Mac is fine: the folder remembers the Mac it was set up on (its hardware UUID), and on the next start the copy takes a new sync id and pulls the history again, logging one `[sync] this data folder was copied from another Mac` line. It never overwrites the Mac it came from, and scheduled automations stay there until you press "Run them here".
 
 
+## Run a thread on another machine
+
+Pick where a new thread runs: this machine, or any other synced machine, such as a Linux box with more CPU and memory. The machine you talk to stays the hub. The thread is made there, goes to the other machine with its first message, runs there, and syncs back as it goes, so you watch it from the hub as usual (a few seconds behind).
+
+- The default is Settings > Server, Run new threads on (`runOn.device` in `data/omni.config.json`, per machine). The new-thread composer overrides it per thread, on desktop, phone and the Mac app. The Conductor's `delegate` takes `device` too (a machine's name or id, or `here`).
+- An offline default stays selected in the composer. Sending reports why it cannot run there; choose This Mac explicitly to run locally.
+- The other machine cuts a worktree thread's worktree itself, from the channel's repo at the same path (or through its path map), so the repo must be cloned there.
+- Your later messages and Stop go to the machine running the thread. Skills and file mentions resolve on that machine, and attached text context goes with replies. Accepted replies do not replay after Take over. A thread the Conductor delegated there reports back to the Conductor on the hub.
+- Files do not travel yet: a new thread or a message with attachments for another machine is refused with why.
+- Take over brings the thread back to this machine; from then on it runs here.
+- If the other machine cannot start it, the thread stops here with why. A worktree thread's Retry runs it on this machine; any other keeps its first message for Resume.
+- Team members stay with their lead on the hub.
+- The other machine needs its own harness logins. On a Linux box, use `claude setup-token` and save it as the global secret `CLAUDE_CODE_OAUTH_TOKEN`. For Codex, run `codex login --device-auth` there; never copy `~/.codex/auth.json` from a Mac, or the two keep logging each other out.
+
 ## Hand off a thread
 
 Move a thread to your other Mac. If a turn is running, the other Mac carries on where it was; if the thread is idle, it waits there for your next message. For a running turn Omni stops it here, uploads the session and the thread's files, and the other Mac resumes the same session with a note that the last turn was cut off, then sends the messages that were queued for it. This Mac shows the thread read-only while it runs there. An idle thread skips the note and the continue: the files and session move, and it shows "Handed off" until a turn runs. The Conductor can list targets with `list_devices` and hand it off with `hand_off_thread`. On desktop web, use the header's Hand off button or the thread's right-click menu; a narrow header puts it in More. On a phone use Thread options. The Mac app also has it in the Thread menu.

@@ -16,6 +16,8 @@ export interface PickerOption<T extends string> {
   channelIcon?: string | null;
   /** A mark to lead with instead of the avatar (a HarnessLogo or CrewMark). */
   lead?: ReactNode;
+  /** Listed but not pickable now, with `sub` saying why (a machine that is offline). */
+  disabled?: boolean;
 }
 
 export function Picker<T extends string>({
@@ -92,7 +94,7 @@ export function Picker<T extends string>({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const o = shown[cursor];
-      if (o) pick(o);
+      if (o && !o.disabled) pick(o);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -163,10 +165,12 @@ export function Picker<T extends string>({
                 role="option"
                 data-i={i}
                 aria-selected={o.value === value}
+                aria-disabled={o.disabled || undefined}
+                disabled={o.disabled}
                 data-cursor={i === cursor}
                 onMouseEnter={() => setCursor(i)}
                 onClick={() => pick(o)}
-                className="pik-row"
+                className="pik-row disabled:opacity-45"
               >
                 {o.lead ? (
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">{o.lead}</span>

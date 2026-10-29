@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type Thread } from '../api.ts';
 import { HarnessLogo, OmniMark } from '../components/brand.tsx';
 import { useBasePick, useBaseRows } from '../components/BasePicker.tsx';
+import { useRunOn } from '../components/RunOnPicker.tsx';
 import { AttachmentStrip, useAttachments } from '../components/Composer.tsx';
 import type { ModelChoice } from '../components/ModelPicker.tsx';
 import { Avatar, ErrorNote } from '../components/ui.tsx';
@@ -13,6 +14,7 @@ import { useApp } from '../store.tsx';
 import { useDictation, withPhrase } from './dictation.ts';
 import { BaseChip, BaseSheet } from './BaseSheet.tsx';
 import { ModelSheet, runLabel } from './ModelSheet.tsx';
+import { RunOnChip, RunOnSheet } from './RunOnSheet.tsx';
 import { MoRound, MoSheet } from './parts.tsx';
 import { useShell } from './shell.tsx';
 
@@ -35,6 +37,8 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
   const [picked, setPicked] = useState<{ target: string; choice: ModelChoice; effort: string } | null>(null);
   const [picking, setPicking] = useState(false);
   const [pickingBase, setPickingBase] = useState(false);
+  const [pickingMachine, setPickingMachine] = useState(false);
+  const runOn = useRunOn();
   const [base, setBase] = useBasePick(target);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +78,7 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
           role: role || undefined,
           ...draftRunRequest(picked?.target === target ? run : null),
           ...baseRequest(base, run?.choice.harness),
+          ...runOn.request,
         },
         att.files,
       );
@@ -119,15 +124,29 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
             placeholder={ch ? `Describe the task for #${ch.name}` : 'Ask the Conductor. It delegates to the crew.'}
             className="resize-none bg-transparent px-2 text-[16px] leading-[1.45] text-fg outline-none placeholder:text-fg-4"
           />
-          {baseRows && (
-            <BaseChip
-              rows={baseRows}
-              value={base}
-              onClick={() => {
-                reloadBases();
-                setPickingBase(true);
-              }}
-            />
+          {(baseRows || runOn.rows) && (
+            <div className="flex min-w-0 flex-wrap gap-1.5">
+              {baseRows && (
+                <BaseChip
+                  rows={baseRows}
+                  value={base}
+                  onClick={() => {
+                    reloadBases();
+                    setPickingBase(true);
+                  }}
+                />
+              )}
+              {runOn.rows && (
+                <RunOnChip
+                  rows={runOn.rows}
+                  value={runOn.pick}
+                  onClick={() => {
+                    runOn.reload();
+                    setPickingMachine(true);
+                  }}
+                />
+              )}
+            </div>
           )}
           <div className="flex items-center gap-1.5">
             <input
@@ -169,6 +188,7 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
         </p>
       </MoSheet>
       {pickingBase && baseRows && <BaseSheet rows={baseRows} value={base} onChange={setBase} onClose={() => setPickingBase(false)} />}
+      {pickingMachine && runOn.rows && <RunOnSheet rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} onClose={() => setPickingMachine(false)} />}
       {picking && harnesses && run && (
         <ModelSheet
           harnesses={harnesses}

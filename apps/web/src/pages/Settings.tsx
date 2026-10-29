@@ -1,15 +1,19 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { api, errorText, type SetupState, type UserConfigPatch } from '../api.ts';
+import { api, errorText, useApi, type SetupState, type SyncStatus, type UserConfigPatch } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setChannelAlerts, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
+import { DeviceLabel } from '../components/DeviceLabel.tsx';
 import { NAME_MAX, PronounsInput, TimezoneInput } from '../components/Onboarding.tsx';
+import { RUN_ON_HINT, runOnOptions, useRunOnSetting } from '../components/RunOnPicker.tsx';
 import { useTheme } from '../components/theme.tsx';
-import { Button, ErrorNote, Icon, Label, Loading, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
+import { Button, ErrorNote, Icon, Label, Loading, PageHeader, Picker, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
+import { relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 
 // Settings: the user config (data/omni.config.json) that onboarding wrote. Who you are, where your work lives and
 // the optional integrations. The Mac app's Profile tab (apps/mac/Omni/ProfileSettingsView.swift) edits the same file.
-// Under it, what stays in this browser (the Mac's Appearance and Notifications tabs) and the connection's status.
+// Under it, what stays in this browser (the Mac's Appearance and Notifications tabs), then Server: the machine Omni runs
+// on, where new threads run, sync and the connection, kept together.
 
 export { NAME_MAX };
 
@@ -35,7 +39,7 @@ export function SettingsPage() {
         {state ? <SettingsForm state={state} onSaved={setState} /> : !error && <Loading />}
         <AppearanceCard />
         <NotificationsCard />
-        <ConnectionCard />
+        <ServerCard state={state} />
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-surface p-4 md:p-5">
           <div className="min-w-0">
             <div className="font-display text-[15px]">Setup</div>
@@ -243,11 +247,44 @@ function NotificationsCard() {
   );
 }
 
-function ConnectionCard() {
+function syncLine(s: SyncStatus | undefined, now: number): { dot: string; text: string } {
+  if (!s) return { dot: 'settled', text: 'Reading sync' };
+  if (!s.configured) return { dot: 'idle', text: 'Off' };
+  if (s.signedOut) return { dot: 'needs', text: 'Signed out' };
+  if (s.lastError) return { dot: 'needs', text: `Failing: ${s.lastError}` };
+  if (!s.enabled) return { dot: 'idle', text: 'Paused' };
+  return { dot: 'done', text: s.lastSyncAt ? `Synced ${relTime(s.lastSyncAt, now)}` : 'Not synced yet' };
+}
+
+/** The machine Omni runs on and what it does for this browser: where new threads run, sync and the connection. */
+function ServerCard({ state }: { state: SetupState | null }) {
   const { feedLive, status } = useApp();
+  const runOn = useRunOnSetting(state);
+  const sync = useApi<SyncStatus>('/sync/status');
+  const synced = syncLine(sync.data, Date.now());
   return (
-    <Card title="Connection" subtitle="The server's port, repo and Node live in .env and the Mac app's Connection tab.">
+    <Card title="Server" subtitle="The machine Omni runs on. Its port, repo and Node live in .env and the Mac app's Server tab.">
+      <div>
+        <Label hint={runOn.offered ? RUN_ON_HINT : 'Only this machine for now. Sync another machine with this one to run threads there.'}>Run new threads on</Label>
+        <div className="flex flex-wrap items-center gap-3">
+          <Picker label="Run new threads on" value={runOn.pick} options={runOnOptions(runOn.rows)} onChange={(v) => void runOn.save(v)} disabled={runOn.loading || runOn.saving || !runOn.offered} />
+          {runOn.saving && <span className="text-[12.5px] text-fg-3">Saving</span>}
+        </div>
+        {runOn.error && <ErrorNote className="mt-2">{runOn.error}</ErrorNote>}
+      </div>
       <div className="space-y-2 text-[13px]">
+        {status?.device && (
+          <InfoRow label="Machine">
+            <DeviceLabel device={status.device} />
+          </InfoRow>
+        )}
+        <InfoRow label="Sync">
+          <StatusDot status={synced.dot} size={7} />
+          <span className="min-w-0 truncate">{synced.text}</span>
+          <a className="ml-auto shrink-0 text-fg-3 underline" href={href.sync()}>
+            Open Sync
+          </a>
+        </InfoRow>
         <InfoRow label="Address">
           <span className="truncate font-mono text-[12.5px]">{location.origin}</span>
         </InfoRow>

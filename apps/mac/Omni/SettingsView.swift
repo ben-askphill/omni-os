@@ -9,9 +9,9 @@ struct SettingsView: View {
 
   var body: some View {
     TabView(selection: $model.settingsTab) {
-      Tab("Connection", systemImage: "network", value: .connection) {
-        ConnectionSettings(settings: model.settings, model: model)
-          .frame(width: z(560), height: 520)
+      Tab("Server", systemImage: "server.rack", value: .server) {
+        ServerSettingsPage(settings: model.settings, model: model)
+          .frame(width: z(560), height: 680)
       }
       Tab("Profile", systemImage: "person", value: .profile) {
         ProfileSettings(model: model)
@@ -45,16 +45,18 @@ struct SettingsView: View {
   }
 }
 
-/// The port, the repo and the Node override. The model follows the settings, so a change applies at once:
-/// a new port reconnects, and any change checks the server again.
-struct ConnectionSettings: View {
+/// The Server tab: where new threads run, this Mac's server (port, repo, Node) and its status. The model follows the
+/// settings, so a change applies at once: a new port reconnects, and any change checks the server again.
+struct ServerSettingsPage: View {
   @Bindable var settings: ServerSettings
   let model: AppModel
 
   var body: some View {
     SettingsPage {
+      RunOnCard(model: model)
+
       SettingsCard(
-        title: "Server",
+        title: "This Mac's server",
         note: "The app looks for the server on this port and starts it from this repo. Leave Node empty to use the newest Node 24 or later it finds."
       ) {
         VStack(alignment: .leading, spacing: 0) {
@@ -112,6 +114,45 @@ struct ConnectionSettings: View {
     case .connecting: "Connecting"
     case .reconnecting: "Reconnecting"
     case .closed: "Closed"
+    }
+  }
+}
+
+/// Settings' default machine for new threads, saved on pick through PUT /api/setup. With no other machine synced
+/// there is nothing to pick, unless a saved machine has dropped out of sync: then This Mac stays pickable.
+private struct RunOnCard: View {
+  let model: AppModel
+
+  var body: some View {
+    let devices = model.devices.devices
+    let saved = model.runOn.saved
+    SettingsCard(
+      title: "Run new threads on",
+      note: "New threads run there unless the composer picks another machine. Replies and Stop follow the thread wherever it runs."
+    ) {
+      VStack(alignment: .leading, spacing: z(10)) {
+        HStack(spacing: z(8)) {
+          RunOnMenu(devices: devices, pick: saved) { device in Task { await model.runOn.save(device) } }
+            .disabled((devices.isEmpty && saved.isEmpty) || model.runOn.saving)
+            .opacity(devices.isEmpty && saved.isEmpty ? 0.45 : 1)
+          if model.runOn.saving { Loader(size: 14) }
+        }
+        if devices.isEmpty {
+          Text(
+            saved.isEmpty
+              ? "No other machine is synced, so threads run on this Mac. Set up Sync on both machines to pick one."
+              : "The saved machine isn't synced now, so new threads can't start there. Pick This Mac, or check Sync."
+          )
+          .font(.omni(size: 12))
+          .foregroundStyle(Tok.fg3)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+        if let error = model.runOn.error { ErrorNote(text: error) }
+      }
+    }
+    .task(id: model.client.baseURL) {
+      await model.runOn.load()
+      await model.devices.refresh()
     }
   }
 }

@@ -3,12 +3,14 @@ import { useApi, type Automation, type SyncStatus } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { HARNESS_ROWS } from '../components/brand.tsx';
 import { DeviceLabel } from '../components/DeviceLabel.tsx';
+import { RUN_ON_HINT, useRunOnSetting } from '../components/RunOnPicker.tsx';
 import { useTheme } from '../components/theme.tsx';
 import { Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { describeCron, describeEvent, relTime, windowPct } from '../format.ts';
 import { href, useRoute } from '../router.ts';
 import { useApp, useNow, useSecretStoreLabel } from '../store.tsx';
 import { MoEmpty, MoGroup, MoHeader, MoListRow, MoScroll, MoSection } from './parts.tsx';
+import { RunOnSheet } from './RunOnSheet.tsx';
 import { useShell } from './shell.tsx';
 
 function Meter({ name, pct, unit }: { name: string; pct: number | null; unit?: string }) {
@@ -47,7 +49,7 @@ function syncSub(s: SyncStatus | undefined, now: number) {
   return s.lastSyncAt ? `Synced ${relTime(s.lastSyncAt, now)}` : 'Not synced yet';
 }
 
-/** Settings, pushed from the avatar on Channels: appearance, plan usage, automations and this Omni. */
+/** Settings, pushed from the avatar on Channels: appearance, plan usage, automations and the server Omni runs on. */
 export function SettingsScreen() {
   const shell = useShell();
   const { profile, usage, status } = useApp();
@@ -64,6 +66,9 @@ export function SettingsScreen() {
     wasOnTop.current = onTop;
   }, [onTop, reloadAutomations]);
   const sync = useApi<SyncStatus>('/sync/status');
+  const runOn = useRunOnSetting();
+  const [pickingMachine, setPickingMachine] = useState(false);
+  const runOnRow = runOn.rows.find((r) => r.value === runOn.pick);
   const prefs = useNotificationPrefs();
   const [permission, setPermission] = useState<Permission>(permissionNow);
   useEffect(() => {
@@ -131,9 +136,20 @@ export function SettingsScreen() {
             <MoEmpty>{automations.error ?? (automations.loading ? 'Loading' : 'No automations. Add a YAML file to automations/ on the Mac.')}</MoEmpty>
           )}
         </MoSection>
-        <MoSection title="This Omni">
+        <MoSection title="Server">
           <MoGroup>
             <MoListRow icon="monitor" label={host || 'Omni'} sub={syncSub(sync.data, now)} onClick={() => shell.open(href.sync())} />
+            <MoListRow
+              icon="share"
+              label="Run new threads on"
+              sub={runOn.error ?? (runOn.offered ? (runOnRow?.label ?? 'This Mac') : 'This Mac. Sync another machine to pick it')}
+              right={runOn.saving ? 'Saving' : undefined}
+              onClick={() => {
+                runOn.reload();
+                setPickingMachine(true);
+              }}
+              disabled={runOn.loading || !runOn.offered}
+            />
             <MoListRow icon="key" label="Secrets" sub={`Names only; values stay in ${secretStore}`} onClick={() => shell.open(href.secrets())} />
             <MoListRow icon="archive" label="Storage" sub="Worktrees on this Mac and what can be cleaned up" onClick={() => shell.open(href.storage())} />
             <MoListRow
@@ -147,6 +163,16 @@ export function SettingsScreen() {
           </MoGroup>
         </MoSection>
       </MoScroll>
+      {pickingMachine && (
+        <RunOnSheet
+          title="Run new threads on"
+          note={RUN_ON_HINT}
+          rows={runOn.rows}
+          value={runOn.pick}
+          onChange={(pick) => void runOn.save(pick)}
+          onClose={() => setPickingMachine(false)}
+        />
+      )}
     </>
   );
 }
