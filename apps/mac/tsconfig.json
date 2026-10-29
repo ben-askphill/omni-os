@@ -2,6 +2,7 @@
   "extends": "@omni/typescript-config/base.json",
   "include": [
     "slash-engine",
+    "browser-pick",
     "scripts",
     "tests",
     "vitest.config.ts"

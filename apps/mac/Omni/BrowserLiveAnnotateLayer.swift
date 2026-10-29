@@ -1,14 +1,16 @@
 import OmniKit
 import SwiftUI
 
-/// Over the live page while live Annotate is on (`BrowserLiveAnnotateModel`): the hover outline and its inspector
-/// tooltip, the rubber band of a drag, the selection's outline (it follows the page's scroll), and at the bottom the hint
-/// or, once something is marked, the card. The page under it stays live: the canvas still gets the moves, the scrolling and the keys, and
-/// only the hint and the card take clicks.
+/// Over the live page while live Annotate is on (`BrowserLiveAnnotateModel`), in both browsers: the Browser tab's streamed
+/// Chrome and the Web tab's own web view. It draws the hover outline and its inspector tooltip, the rubber band of a drag,
+/// the selection's outline (it follows the page's scroll), and at the bottom the hint or, once something is marked, the
+/// card. The page under it stays live: its view still gets the moves, the scrolling and the keys, and only the hint and
+/// the card take clicks.
 struct BrowserLiveAnnotateLayer: View {
   let live: BrowserLiveAnnotateModel
   let annotating: Annotating
-  let frame: BrowserFrame
+  /// The page as it is drawn now: its viewport in CSS pixels and its scroll.
+  let frame: BrowserAnnotationContext.LiveFrame
   /// The page's address now: an outline on another page is not drawn.
   let url: String
   let size: CGSize
@@ -27,7 +29,7 @@ struct BrowserLiveAnnotateLayer: View {
     ZStack(alignment: .topLeading) {
       // Drawn over the page, never in the way of it.
       Group {
-        if let r = live.outline(in: frame.live, url: url) {
+        if let r = live.outline(in: frame, url: url) {
           Rectangle().strokeBorder(Tok.needs, lineWidth: 2).frame(width: shown(r).width, height: shown(r).height).offset(x: shown(r).minX, y: shown(r).minY)
         }
         if let band {
@@ -102,6 +104,70 @@ struct BrowserLiveAnnotateLayer: View {
     }
     .transition(.opacity)
   }
+}
+
+/// What live Annotate takes from a page view while it is on, in both browsers (`BrowserCanvas` in the Browser tab, the Web
+/// tab's `LiveInputView`). Points are the view's own, from its top left; page points and rectangles are the page's CSS
+/// pixels. Moves still reach the page; clicks, drags and Escape do not.
+struct LiveAnnotateInput {
+  /// The pointer moved to a view point over the page point (the page got the move too).
+  var hover: (_ at: CGPoint, _ page: CGPoint) -> Void
+  /// The pointer left the page.
+  var leave: () -> Void
+  /// The rectangle a drag is drawing, or nil once it ends.
+  var band: (CGRect?) -> Void
+  /// A press and release that moved less than `LiveAnnotateGesture.dragStart`.
+  var pick: (CGPoint) -> Void
+  var drag: (CGRect) -> Void
+  var scrolled: () -> Void
+  var escape: () -> Void
+  /// Option went down or up: held, the overlay steps aside and the page takes clicks.
+  var option: (Bool) -> Void
+
+  /// Input that drives `live`: hovering inspects, a click picks and a drag marks, on the page as `frame` has it then.
+  @MainActor static func driving(
+    _ live: BrowserLiveAnnotateModel, pointer: Binding<LivePointer>, frame: @escaping () -> BrowserAnnotationContext.LiveFrame?
+  ) -> LiveAnnotateInput {
+    LiveAnnotateInput(
+      hover: { at, page in
+        pointer.wrappedValue.at = at
+        if pointer.wrappedValue.overChrome { live.leave() } else { live.hover(at: page) }
+      },
+      leave: {
+        pointer.wrappedValue.at = nil
+        live.leave()
+      },
+      band: { pointer.wrappedValue.band = $0 },
+      pick: { page in
+        guard let f = frame() else { return }
+        Task { await live.pick(at: page, frame: f) }
+      },
+      drag: { rect in
+        guard let f = frame() else { return }
+        Task { await live.drag(rect, frame: f) }
+      },
+      scrolled: { live.scrolled() },
+      escape: { live.escape() },
+      option: { held in
+        pointer.wrappedValue.optionHeld = held
+        if held { live.leave() }
+      })
+  }
+}
+
+/// The pointer over the page while live Annotate is on, as the layer draws it. Each browser view keeps one, and starts it
+/// over whenever Annotate turns on or off.
+struct LivePointer: Equatable {
+  /// In view points. Nil while it is off the page.
+  var at: CGPoint?
+  /// A drag in progress, in view points.
+  var band: CGRect?
+  var optionHeld = false
+  /// Over the hint or the card, which cover the page.
+  var overChrome = false
+
+  /// Where the layer outlines what is under the pointer: nowhere while it is over the card or Option is held.
+  var shown: CGPoint? { overChrome || optionHeld ? nil : at }
 }
 
 /// What the hover found under the pointer, near it: the element's name and size, where it sits, and the styles that say

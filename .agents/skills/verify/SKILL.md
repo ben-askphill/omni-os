@@ -13,7 +13,7 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 - `npm test` (turbo boundaries, then every package's vitest), or one package: `npx turbo run test --filter=@omni/<server|web|shared|mac>`, or one file while iterating: `cd apps/server && npx vitest run tests/<file>.test.ts` (each package has its own `vitest.config.ts`).
 - A failing test: rerun it on `main` (`git stash; git checkout main; npx vitest run ...`) before treating it as yours. Lock, server-boot, sync-two-macs and mac-fixtures tests can fail on machines without a Mac setup.
 - `npm run build` for web changes. Run it alone, not chained after other commands.
-- Changed a slash module in `packages/shared/`: `npm run build:slash`.
+- Changed a slash module in `packages/shared/`: `npm run build:slash`. Changed `packages/shared/browser-pick-*.ts`: `npm run build:pick`.
 - Mac code (macOS only): `npm run test:mac`.
 
 ## 2. Run it
@@ -59,6 +59,7 @@ Known blockers:
 - `qa-stack.sh`'s `security` wrapper passes every call but the Cursor key to the real login Keychain, so saving a secret on a QA stack (Secrets, or a webhook's Set secret) writes it to Ben's Keychain. After `up`, overwrite `$QA_DIR/bin/security` with a stub (`-i` reads stdin and exits 0; `find-generic-password` prints a fixed value for the names you test) before saving any.
 - Mac QA runs read and write the real app's drafts (`~/Library/Application Support/Omni/Drafts`), so text or context left unsent in one run is in the reply box on the next. Delete that thread's `reply%3A<id>.txt` and `context%3A<id>.txt` (the id percent-encoded) between runs and after the last one.
 - The thread's Browser panel says "The live browser is off" on a default QA stack. Start it with `QA_BROWSER=1 scripts/qa-stack.sh up` (it launches a real Chrome for the channel).
+- A web view in a Mac QA window stops painting a few seconds after it loads (the window is never on screen), so `cacheDisplay` drew the Web tab's page blank. `snapshot` now lays each shown web view's own `takeSnapshot` over it while it draws. For the same reason the page's `requestAnimationFrame` and scroll events wait for a frame that never comes; `{"annotate": {"pageScroll": n}}` forces one.
 - The Mac QA step `{"annotate": {"hover": [x, y]}}` can fail with "nothing was inspected under the pointer" on a build that works: it sends one move and waits 5s. Run it again, and run the untouched build the same way, before treating it as yours.
 - Synthesized clicks in the Mac QA harness never focus a text field: the app is not active, so its window is not key, and a field ignores the first click in a non-key window. A step that tests focus must call `NSApp.activate()` first (see `browserAddress` in `QARunner.swift`).
 - Mac snapshots, and `screencapture` without screen recording permission (it fails), draw a Core Animation layer at its model value, so they can't show it moves. Prove a layer animation runs by building the view's file with a small `swiftc` harness that puts it in a window and prints `layer.presentation()` values a few times over a second.

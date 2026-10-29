@@ -39,6 +39,12 @@ public enum QAAnnotate: Hashable, Sendable {
   case liveDrag(x0: Double, y0: Double, x1: Double, y1: Double, note: String)
   /// Presses the card's Send.
   case send
+  /// Presses Escape with the page holding the keys: clears the card, else turns live Annotate off.
+  case escape
+  /// An Option-click on the page: the page takes it as a normal click, and nothing is marked.
+  case optionClick(x: Double, y: Double)
+  /// Scrolls the Web tab's page down by that many CSS pixels (up when negative), as a script on the page would.
+  case pageScroll(Double)
   case drag(x0: Double, y0: Double, x1: Double, y1: Double, note: String)
   /// A tap at a fraction of the shown screenshot, which picks the element there; the note is written once it is picked.
   case tap(x: Double, y: Double, note: String)
@@ -517,11 +523,12 @@ public struct QAScript: Hashable, Sendable {
   }
 
   private static func annotate(_ value: Any) throws(QAScriptError) -> QAAnnotate {
-    let usage = QAScriptError(#"annotate takes start, add, cancel, undo, live, send, {"drag": [x0, y0, x1, y1], "note": text}, {"tap": [x, y], "note": text}, {"hover": [x, y]}, {"livePick": [x, y], "note": text}, {"liveDrag": [x0, y0, x1, y1], "note": text}, {"shape": rect|ellipse|arrow|line, "from": [x, y], "to": [x, y]}, {"pen": [[x, y], ...]}, {"text": words, "at": [x, y]}, {"color": hex, "stroke": px}, {"move": [x, y], "by": [dx, dy]} or {"note": text} with fractions from 0 to 1"#)
+    let usage = QAScriptError(#"annotate takes start, add, cancel, undo, live, send, escape, {"drag": [x0, y0, x1, y1], "note": text}, {"tap": [x, y], "note": text}, {"hover": [x, y]}, {"optionClick": [x, y]}, {"pageScroll": px}, {"livePick": [x, y], "note": text}, {"liveDrag": [x0, y0, x1, y1], "note": text}, {"shape": rect|ellipse|arrow|line, "from": [x, y], "to": [x, y]}, {"pen": [[x, y], ...]}, {"text": words, "at": [x, y]}, {"color": hex, "stroke": px}, {"move": [x, y], "by": [dx, dy]} or {"note": text} with fractions from 0 to 1"#)
     switch value as? String {
     case "start": return .start
     case "live": return .live
     case "send": return .send
+    case "escape": return .escape
     case "add": return .add
     case "cancel": return .cancel
     case "undo": return .undo
@@ -560,6 +567,11 @@ public struct QAScript: Hashable, Sendable {
     if d.count == 1, let at = d["hover"] {
       let p = try fractions(at, 2)
       return .hover(x: p[0], y: p[1])
+    }
+    if d.count == 1, let n = d["pageScroll"] as? NSNumber, n !== kCFBooleanTrue, n !== kCFBooleanFalse { return .pageScroll(n.doubleValue) }
+    if d.count == 1, let at = d["optionClick"] {
+      let p = try fractions(at, 2)
+      return .optionClick(x: p[0], y: p[1])
     }
     if d.count == 1, let words = d["note"] as? String { return .note(words) }
     let note = d["note"] ?? ""

@@ -9,10 +9,10 @@ const root = resolve(fileURLToPath(import.meta.url), '../../../..');
 export const ENTRY = resolve(root, 'apps/mac/slash-engine/entry.ts');
 export const OUT = resolve(root, 'apps/mac/OmniKit/Sources/OmniKit/Resources/slash-engine.js');
 
-/** The bundle as text. Paths in comments are relative, so it is the same on every checkout. */
-export async function bundleSlashEngine() {
+/** An entry's bundle as text. Paths in comments are relative, so it is the same on every checkout. */
+export async function bundleForMac(entry: string) {
   const result = await build({
-    entryPoints: [ENTRY],
+    entryPoints: [entry],
     absWorkingDir: root,
     bundle: true,
     write: false,
@@ -24,6 +24,8 @@ export async function bundleSlashEngine() {
   });
   return result.outputFiles[0].text;
 }
+
+export const bundleSlashEngine = () => bundleForMac(ENTRY);
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   writeFileSync(OUT, await bundleSlashEngine());
