@@ -67,6 +67,13 @@ export const userConfigSchema = z.object({
       tailscaleLogin: z.string().trim().max(500).default(''),
     })
     .prefault({}),
+  /**
+   * Where new threads run unless the composer picks otherwise (apps/server/run-on.ts): a synced machine's sync id, or
+   * empty for this machine. Per machine, like the rest of this file.
+   */
+  runOn: z
+    .object({ device: z.string().trim().max(100).default('') })
+    .prefault({}),
   /** Per-machine overrides of the shared automation YAML (`enabled`, `channel`), so toggling one never edits the repo. */
   automations: z.record(z.string(), automationOverride).default({}),
   /** This Mac's worktree retention (apps/server/worktree-cleanup.ts). Off until turned on in Settings > Storage. */
@@ -91,6 +98,7 @@ export type UserConfigPatch = {
   user?: Partial<UserConfig['user']>;
   workspace?: Partial<UserConfig['workspace']>;
   integrations?: Partial<UserConfig['integrations']>;
+  runOn?: Partial<UserConfig['runOn']>;
   automations?: Record<string, AutomationOverride | null>;
 };
 
@@ -99,6 +107,7 @@ export const userConfigPatch = z.object({
   user: userConfigSchema.shape.user.unwrap().partial().optional(),
   workspace: userConfigSchema.shape.workspace.unwrap().partial().optional(),
   integrations: userConfigSchema.shape.integrations.unwrap().partial().optional(),
+  runOn: userConfigSchema.shape.runOn.unwrap().partial().optional(),
   automations: z.record(z.string(), automationOverride.nullable()).optional(),
 });
 
@@ -161,6 +170,7 @@ export function updateUserConfig(patch: UserConfigPatch): UserConfig {
     user: { ...cur.user, ...patch.user },
     workspace: { ...cur.workspace, ...patch.workspace },
     integrations: { ...cur.integrations, ...patch.integrations },
+    runOn: { ...cur.runOn, ...patch.runOn },
     automations,
   };
   if (patch.onboardedAt === null) delete next.onboardedAt;

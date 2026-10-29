@@ -50,6 +50,8 @@ const patchInput = userConfigPatch.omit({ automations: true, onboardedAt: true }
   const owner = p.workspace?.githubOwner;
   if (owner && !/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(owner)) ctx.addIssue({ code: 'custom', path: ['workspace', 'githubOwner'], message: 'A GitHub owner is a user or org name, like octocat.' });
   const hermes = p.integrations?.hermesUrl;
+  const device = p.runOn?.device;
+  if (device && !/^[A-Za-z0-9-]{1,100}$/.test(device)) ctx.addIssue({ code: 'custom', path: ['runOn', 'device'], message: 'Pick a synced machine, or this one.' });
   if (hermes && !/^https?:\/\/\S+$/.test(hermes)) ctx.addIssue({ code: 'custom', path: ['integrations', 'hermesUrl'], message: 'Hermes needs a URL like http://100.64.0.1:8642.' });
 });
 

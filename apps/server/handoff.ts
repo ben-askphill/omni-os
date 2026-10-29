@@ -14,11 +14,13 @@ import { requestPhase, type HandoffOffer, type HandoffRequest, type HandoffView,
 import { publishFeed } from './bus.ts';
 import { paths } from './config.ts';
 import { channels, completions, messageRequests, outbox, resultReads, threads, tx, type Thread } from './db.ts';
-import { HARNESS_META, isHarnessId } from './harness/types.ts';
+import { HARNESS_META, isHarnessId, isRemoteHarness, type HarnessId } from './harness/types.ts';
+import { needsWorktree, plannedWorktree } from './sandbox.ts';
 import { contextBlock, placeFor } from './message-context/project.ts';
 import { handoffView, inFlight, moving, offerOf, offers, phaseOf, replyOf, requestOf, requests, writeOffer, writeReply, writeRequest } from './handoff/records.ts';
 import { inOwnWorktree, packWorktree, unpackWorktree, type WorktreeBundle } from './handoff/worktree.ts';
 import { releaseForHandoff, runsHere, saveOwn, wake, type Msg } from './runner.ts';
+import { failSetup, setUpThread } from './runner/setup.ts';
 import { drop } from './runner/state.ts';
 import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
 import { sessionOnThisMac, uploadNow } from './sync/files.ts';
@@ -29,13 +31,13 @@ import { reachabilityOf, tailnet } from './tailscale.ts';
 import { withWorkspace } from './workspace.ts';
 
 type Offered = Extract<HandoffOffer, { state: 'offered' }>;
-type Base = Pick<HandoffOffer, 'id' | 'thread' | 'from' | 'to' | 'idle' | 'request'>;
+type Base = Pick<HandoffOffer, 'id' | 'thread' | 'from' | 'to' | 'idle' | 'request' | 'fresh'>;
 type Mac = HandoffOffer['from'];
 
 const run = promisify(execFile);
 const refused = (message: string, status = 409) => Object.assign(new Error(message), { status });
 const iso = () => new Date().toISOString();
-const base = (o: HandoffOffer): Base => ({ id: o.id, thread: o.thread, from: o.from, to: o.to, idle: o.idle, request: o.request });
+const base = (o: HandoffOffer): Base => ({ id: o.id, thread: o.thread, from: o.from, to: o.to, idle: o.idle, request: o.request, fresh: o.fresh });
 const busy = (t: Pick<Thread, 'status'>) => t.status === 'running' || t.status === 'queued';
 
 /** The answer to a handoff request or a cancel: the thread, and its handoff as this Mac shows it. */
@@ -126,6 +128,16 @@ export async function handOff(threadId: string, to: string): Promise<HandoffResu
   if (moving(phaseOf(threadId)?.phase)) throw refused('This thread is already being handed off.');
   startGiving(t, { id: self, name }, { id: target.id, name: target.name }, worker);
   return result(threadId);
+}
+
+/**
+ * Send a thread that has not run anywhere to another machine, to run there from its first message (run-on.ts): the
+ * offer goes out ready, since there is no turn to stop, session to upload or worktree to pack. That machine cuts the
+ * worktree itself. `to` must be a synced machine; the caller checks it.
+ */
+export function sendNewThread(threadId: string, prompt: string, from: Mac, to: Mac) {
+  writeOffer({ id: randomUUID(), thread: threadId, from, to, at: iso(), idle: true, fresh: true, state: 'offered', queued: [prompt], bundle: null, leftBehind: null });
+  void activeWorker()?.syncNow();
 }
 
 /** Write the offer, then give the thread away in the background. Nothing awaits before the write. */
@@ -253,11 +265,35 @@ async function giveAway(offer: HandoffOffer, worker: SyncWorker) {
 
 /** A handoff that went out and will not run there: the messages it carried wait here for Resume. Once per offer. */
 function restore(offer: Offered) {
+  if (offer.fresh) return restoreFresh(offer);
   const saved = offer.queued.filter((text, n) => {
     const row = saveOwn(offer.thread, `handoff-back:${offer.id}:${n}`, { prompt: text, kind: 'user', payload: { text, source: 'ben' }, source: 'handoff', mode: 'queue' });
     return row && messageRequests.mark(row.id, 'recovered');
   });
   if (saved.length) publishFeed({ type: 'needs_you', thread_id: offer.thread });
+}
+
+/**
+ * A new thread the other machine could not take or that Ben cancelled: its first prompt waits here, and the thread
+ * shows why. A worktree thread fails its setup, so Retry cuts the worktree here and sends the prompt; any other thread
+ * stops with the prompt kept for Resume.
+ */
+function restoreFresh(offer: Offered) {
+  const t = threads.get(offer.thread);
+  if (!t) return;
+  const reply = replyOf(offer.thread);
+  const why = reply?.offer === offer.id && reply.state === 'failed' ? reply.error : null;
+  const reason = why ? `${offer.to.name} could not start it: ${why}.` : `It was not sent to ${offer.to.name}.`;
+  offer.queued.forEach((text, n) => {
+    const row = saveOwn(offer.thread, `handoff-back:${offer.id}:${n}`, { prompt: text, kind: 'user', payload: { text, source: 'ben' }, source: 'handoff', mode: 'queue' });
+    if (row) messageRequests.park(row.id);
+  });
+  const channel = channels.get(t.channel_id);
+  const worktree = !!t.branch && !!channel && needsWorktree(channel, { remote: isRemoteHarness(t.harness as HarnessId) });
+  if (worktree) failSetup(offer.thread, `${reason} Retry runs it on this machine.`);
+  else threads.update(offer.thread, { status: 'stopped', updated_at: t.updated_at });
+  publishFeed({ type: 'needs_you', thread_id: offer.thread });
+  publishFeed({ type: 'thread', thread: threads.get(offer.thread)! });
 }
 
 /**
@@ -367,7 +403,12 @@ async function take(offer: Offered, worker: SyncWorker) {
       // Held like a start, so a cleanup never removes the folder while the handoff lays it out (workspace.ts).
       await withWorkspace(dir, () => unpackWorktree({ repo, dir, branch, threadId: id, offerId: offer.id, bundle, transport: worker.transport }));
     }
-    await prepareTurn(threads.get(id)!, false, true);
+    // A new thread's worktree is cut here by its setup, which then sends the first prompt. The hub made none.
+    const channel = channels.get(t.channel_id);
+    const setUp = !!offer.fresh && !!t.branch && !!channel && needsWorktree(channel, { remote: isRemoteHarness(t.harness as HarnessId) });
+    // In this machine's own worktrees folder, wherever the hub keeps its data.
+    if (setUp) threads.update(id, { cwd: plannedWorktree(id).cwd, updated_at: t.updated_at });
+    else await prepareTurn(threads.get(id)!, false, true);
     // The download may have taken a while: hear of a Cancel on the other Mac before answering, not after.
     await worker.syncNow();
     const rows = tx(() => {
@@ -379,11 +420,18 @@ async function take(offer: Offered, worker: SyncWorker) {
       return [
         ...(offer.idle ? [] : [saveOwn(id, `handoff:${offer.id}`, continuation(offer))]),
         ...offer.queued.map((text, n) =>
-          saveOwn(id, `handoff:${offer.id}:${n}`, { prompt: text, kind: 'user', payload: { text, source: 'ben' }, source: 'handoff', mode: 'queue' }),
+          saveOwn(id, `handoff:${offer.id}:${n}`, {
+            prompt: text,
+            kind: 'user',
+            payload: { text, source: offer.fresh ? t.source : 'ben' },
+            source: offer.fresh ? 'ben' : 'handoff',
+            mode: 'queue',
+          }),
         ),
       ].filter((r) => !!r);
     });
-    for (const r of rows) wake(r);
+    if (setUp) void setUpThread(id);
+    else for (const r of rows) wake(r);
     void worker.syncNow();
   } catch (err) {
     console.error(`[handoff] ${id}: could not pick it up:`, (err as Error).message);

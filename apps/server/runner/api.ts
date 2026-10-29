@@ -1,7 +1,7 @@
 // createThread, sendMessage, and postMessage. Slash commands are resolved here, then delivered.
 import { randomUUID } from 'node:crypto';
 import type { MessageContext } from '@omni/shared/message-context.ts';
-import { channels, folders, messageRequests, outbox, threadBasePicks, requestFingerprint, threads, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
+import { channels, folders, messageRequests, outbox, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
 import { checkBase } from '../worktree-base.ts';
@@ -23,6 +23,8 @@ import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
 import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
 import { dismissQuestions } from './questions.ts';
+import { forwardMessage, markRouted, remoteHolder, targetFor } from '../run-on.ts';
+import { sendNewThread } from '../handoff.ts';
 
 // ---------- slash commands ----------
 
@@ -94,13 +96,18 @@ export interface CreateThreadInput {
   base?: BasePick | null;
   /** Files Ben attached to the first message. Validate them with `checkUploads` before calling. */
   files?: File[];
+  /**
+   * The machine to run it on (run-on.ts): a synced machine's id, or "here". Left out, Settings' default. A thread for
+   * another machine is made here and sent there with its first prompt; nothing runs here.
+   */
+  device?: string | null;
 }
 
 /**
  * Resolve the run, make the workdir and write the row. Nothing is delivered yet. A thread that needs a worktree is
  * written as preparing, with the worktree's planned folder and branch: setUpThread makes them before anything runs.
  */
-async function openThread(input: CreateThreadInput, status: Thread['status'] = 'queued') {
+async function openThread(input: CreateThreadInput, status: Thread['status'] = 'queued', elsewhere = false) {
   const role = getCrew(input.role);
   const channelId = input.channel || role?.channel || 'inbox';
   const channel = channels.get(channelId);
@@ -154,13 +161,29 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
     source: input.source ?? 'manual',
     automation: input.automation ?? null,
     folder_id: filedIn?.id ?? null,
-    setup: needsWorktree(channel, { remote }) ? 'preparing' : null,
+    // A thread for another machine has its worktree made there (handoff.ts take).
+    setup: !elsewhere && needsWorktree(channel, { remote }) ? 'preparing' : null,
   });
   if (base) threadBasePicks.set(id, base);
   return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
 }
 
 export async function createThread(input: CreateThreadInput): Promise<Thread> {
+  // Team members stay with their lead, which runs once with all their replies. A delegated thread may go: its report
+  // comes back to the parent (run-on.ts).
+  const route = input.source === 'team' ? null : await targetFor(input.device);
+  if (route) {
+    if (input.files?.length) throw refusal(`Files cannot go to ${route.to.name} yet. Start the thread without them, or run it on this machine.`, 400);
+    // Stopped, not queued: no turn runs here, and the other machine must not wait for one to end.
+    const { thread } = await openThread(input, 'stopped', true);
+    tx(() => {
+      markRouted(thread.id, route.to.id);
+      sendNewThread(thread.id, input.prompt, route.from, route.to);
+    });
+    if (!input.title) void generateTitle(thread.id, input.prompt);
+    emitThread(thread.id);
+    return threads.get(thread.id)!;
+  }
   const { thread, harness, folder } = await openThread(input);
   const saved = await saveUploads(thread.id, input.files ?? []);
   const attachments = saved.length ? saved : undefined;
@@ -395,6 +418,10 @@ export async function postMessage(
   if (opts.requestId) {
     const again = acceptedAgain(threadId, opts.requestId, fingerprint);
     if (again) return again;
+  }
+  // A thread routed to another machine runs there: the message goes to it (run-on.ts).
+  if (remoteHolder(thread)) {
+    return forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, hasFiles: !!opts.attachments?.length }) as PostedThread;
   }
   // Refused before anything is saved: the other Mac runs it.
   const blocked = turnBlocked(thread, runsHere(threadId));

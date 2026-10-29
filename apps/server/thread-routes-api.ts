@@ -13,6 +13,7 @@ import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
 import { artifacts, channels, events, fileDigests, messageRequests, publicChannel, requestFingerprint, threads, type Thread } from './db.ts';
+import { forwardStop, remoteHolder } from './run-on.ts';
 import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
 import { continueLinks } from './continue.ts';
@@ -70,6 +71,7 @@ const createSchema = z.object({
   folder: z.string().max(200).nullish(),
   /** Where a new worktree thread's branch starts (worktree-base.ts). Left out: the repo's HEAD, as before. */
   base: basePick.nullish(),
+  device: z.string().max(100).nullish(),
 });
 
 threadRoutesApi.get('/', (c) =>
@@ -84,6 +86,7 @@ threadRoutesApi.get('/', (c) =>
 
 threadRoutesApi.post('/', async (c) => {
   const { data, files } = await readBody(c);
+  // run-on.ts: a synced machine's id, "here", or left out for Settings' default.
   const body = createSchema.parse(data);
   checkUploads(files);
   return c.json(await createThread({ ...body, files }));
@@ -450,7 +453,11 @@ threadActionsApi.post('/:id/run', async (c) => {
 });
 
 const interrupt = (c: Context) => {
-  const t = interruptThread(c.req.param('id')!);
+  const id = c.req.param('id')!;
+  // A routed thread running on another machine: that machine stops it (run-on.ts).
+  const routed = threads.get(id);
+  if (routed && remoteHolder(routed)) return c.json(forwardStop(routed));
+  const t = interruptThread(id);
   return t ? c.json(t) : c.json({ error: 'not found' }, 404);
 };
 threadActionsApi.post('/:id/stop', interrupt);
