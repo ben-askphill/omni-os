@@ -729,11 +729,71 @@ final class QARunner {
     case .undo:
       a.model.undo()
     case .note(let words):
-      a.model.note = words
+      // The live card's note while it shows, else the screenshot editor's.
+      if let live = a.live, live.isOn, !a.model.isActive, case .marked = live.phase { live.note = words } else { a.model.note = words }
     case .cancel:
       a.model.cancel()
       try? await Task.sleep(for: .milliseconds(400))
+    case .live:
+      guard let live = a.live else { throw QAScriptError("the Browser tab has no live Annotate") }
+      guard BrowserAnnotateProbe.browser?.state.url.lowercased().hasPrefix("http") == true else { throw QAScriptError("the browser is not on a web page") }
+      live.turnOn()
+      try? await Task.sleep(for: .milliseconds(500))
+    case .hover(let x, let y):
+      let (live, page) = try livePage(a)
+      page.mouseMoved(with: try page.event(.mouseMoved, x, y))
+      guard await Self.until(seconds: 5, { live.hovered != nil }) else { throw QAScriptError("nothing was inspected under the pointer") }
+      try? await Task.sleep(for: .milliseconds(400))
+    case .livePick(let x, let y, let note):
+      let (live, page) = try livePage(a)
+      page.mouseDown(with: try page.event(.leftMouseDown, x, y))
+      page.mouseUp(with: try page.event(.leftMouseUp, x, y))
+      try await liveCard(live, note: note)
+    case .liveDrag(let x0, let y0, let x1, let y1, let note):
+      let (live, page) = try livePage(a)
+      page.mouseDown(with: try page.event(.leftMouseDown, x0, y0))
+      page.mouseDragged(with: try page.event(.leftMouseDragged, (x0 + x1) / 2, (y0 + y1) / 2))
+      page.mouseDragged(with: try page.event(.leftMouseDragged, x1, y1))
+      page.mouseUp(with: try page.event(.leftMouseUp, x1, y1))
+      try await liveCard(live, note: note)
+    case .send:
+      guard let live = a.live, case .marked = live.phase else { throw QAScriptError("no live annotation is marked to send") }
+      if let why = await live.send() { throw QAScriptError(why) }
+      try? await Task.sleep(for: .milliseconds(600))
     }
+  }
+
+  /// Live Annotate and the page view it takes its input from, in fractions of the shown page.
+  private func livePage(_ a: Annotating) throws(QAScriptError) -> (BrowserLiveAnnotateModel, QALivePage) {
+    guard let live = a.live, live.isOn else { throw QAScriptError("live Annotate is not on") }
+    guard let canvas = BrowserAnnotateProbe.canvas, canvas.window != nil, let frame = BrowserAnnotateProbe.browser?.frame else {
+      throw QAScriptError("the Browser tab shows no page")
+    }
+    return (live, QALivePage(view: canvas, frame: frame))
+  }
+
+  /// Waits for the capture and the element after a click or drag, then writes the note. Fails with why the card says it failed.
+  private func liveCard(_ live: BrowserLiveAnnotateModel, note: String) async throws(QAScriptError) {
+    let settled = await Self.until(seconds: 20) {
+      switch live.phase {
+      case .marked, .failed: true
+      case .idle, .capturing: false
+      }
+    }
+    if case .failed(let why) = live.phase { throw QAScriptError(why) }
+    guard settled, case .marked = live.phase else { throw QAScriptError("the card never got its capture") }
+    live.note = note
+    // The cropped screenshot loads from the thread's uploads.
+    try? await Task.sleep(for: .milliseconds(900))
+  }
+
+  private static func until(seconds: Int, _ done: () -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + .seconds(seconds)
+    while !done() {
+      guard ContinuousClock.now < deadline else { return false }
+      try? await Task.sleep(for: .milliseconds(100))
+    }
+    return true
   }
 
   // MARK: Scrolling
@@ -1078,5 +1138,30 @@ private final class FrameClock: NSObject {
     done?.resume(returning: gaps)
     done = nil
   }
+}
+/// The Browser tab's page view, for live Annotate's steps: mouse events at fractions of the page it shows, which is
+/// drawn at the view's full width from its top.
+@MainActor
+struct QALivePage {
+  let view: NSView
+  let frame: BrowserFrame
+
+  func event(_ type: NSEvent.EventType, _ x: Double, _ y: Double) throws(QAScriptError) -> NSEvent {
+    guard let window = view.window, frame.width > 0 else { throw QAScriptError("the page view is not in a window") }
+    let width = view.bounds.width, height = width * frame.height / frame.width
+    // The canvas is flipped: y grows down from the page's top.
+    let at = view.convert(NSPoint(x: x * width, y: min(y, 0.999) * height), to: nil)
+    guard
+      let e = NSEvent.mouseEvent(
+        with: type, location: at, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+        context: nil, eventNumber: 0, clickCount: type == .mouseMoved ? 0 : 1, pressure: type == .leftMouseUp || type == .mouseMoved ? 0 : 1)
+    else { throw QAScriptError("can't make a mouse event") }
+    return e
+  }
+
+  func mouseMoved(with e: NSEvent) { view.mouseMoved(with: e) }
+  func mouseDown(with e: NSEvent) { view.mouseDown(with: e) }
+  func mouseDragged(with e: NSEvent) { view.mouseDragged(with: e) }
+  func mouseUp(with e: NSEvent) { view.mouseUp(with: e) }
 }
 #endif

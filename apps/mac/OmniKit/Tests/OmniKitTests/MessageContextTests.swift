@@ -273,6 +273,57 @@ private func parsed(_ json: String) throws -> DiffSelectionContext.Body {
     }
   }
 
+  private func liveFrame(_ v: JSONValue?) -> BrowserAnnotationContext.LiveFrame {
+    func num(_ x: JSONValue?) -> Double { if case .number(let n)? = x { n } else { 0 } }
+    let scroll = v?["scroll"].map { CGPoint(x: num($0["x"]), y: num($0["y"])) }
+    return .init(width: num(v?["width"]), height: num(v?["height"]), scroll: scroll)
+  }
+
+  private func liveCapture(_ v: JSONValue?) -> (viewport: (width: Int, height: Int), scroll: BrowserAnnotationContext.Scroll) {
+    ((int(v?["viewport"]?["width"]) ?? 0, int(v?["viewport"]?["height"]) ?? 0), .init(x: int(v?["scroll"]?["x"]) ?? 0, y: int(v?["scroll"]?["y"]) ?? 0))
+  }
+
+  private func cgRect(_ v: JSONValue?) -> CGRect {
+    func num(_ k: String) -> Double { if case .number(let n)? = v?[k] { n } else { 0 } }
+    return CGRect(x: num("x"), y: num("y"), width: num("width"), height: num("height"))
+  }
+
+  /// A point on the live page, as the same spot of a capture taken just after: each case is also run through the TypeScript.
+  @Test func mapsALivePointIntoTheCapture() throws {
+    let points = try cases("livePoints")
+    #expect(points.count >= 5)
+    for c in points {
+      let name = c["name"]?.stringValue ?? "?"
+      let p = cgRect(c["point"]).origin
+      let (viewport, scroll) = liveCapture(c["capture"])
+      let got = BrowserAnnotationContext.livePointToCapture(p, frame: liveFrame(c["frame"]), viewport: viewport, scroll: scroll)
+      #expect((try got.map { try JSONValue(encoding: $0) } ?? .null) == c["expect"], "\(name)")
+    }
+  }
+
+  @Test func mapsALiveRectangleIntoTheCapture() throws {
+    let rects = try cases("liveRects")
+    #expect(rects.count >= 5)
+    for c in rects {
+      let name = c["name"]?.stringValue ?? "?"
+      let (viewport, scroll) = liveCapture(c["capture"])
+      let got = BrowserAnnotationContext.liveToCapture(cgRect(c["rect"]), frame: liveFrame(c["frame"]), viewport: viewport, scroll: scroll)
+      #expect((try got.map { try JSONValue(encoding: $0) } ?? .null) == c["expect"], "\(name)")
+    }
+  }
+
+  @Test func drawsACapturesRectangleOnTheLivePage() throws {
+    let rects = try cases("captureToLive")
+    #expect(rects.count >= 2)
+    for c in rects {
+      let name = c["name"]?.stringValue ?? "?"
+      let r = try JSONDecoder().decode(BrowserAnnotationContext.Rect.self, from: JSONEncoder().encode(try #require(c["rect"])))
+      let (viewport, scroll) = liveCapture(c["capture"])
+      let got = BrowserAnnotationContext.captureToLive(r, viewport: viewport, scroll: scroll, frame: liveFrame(c["frame"]))
+      #expect(got == cgRect(c["expect"]), "\(name)")
+    }
+  }
+
   @Test func placesTheRectangleOnTheImage() throws {
     let overlays = try cases("overlays")
     #expect(overlays.count >= 2)

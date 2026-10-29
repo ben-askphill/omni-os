@@ -3,10 +3,12 @@ import OmniKit
 import SwiftUI
 
 /// What the Browser tab's Annotate needs: the model, the client that loads the screenshot, and the reply box's context.
+/// `live` is live Annotate on the agent's browser; the Web tab has none and annotates a screenshot straight away.
 struct Annotating {
   let model: BrowserAnnotateModel
   let client: OmniClient
   let draft: DraftContextModel
+  var live: BrowserLiveAnnotateModel?
 }
 
 /// Over the live page while Annotate is on, as `AnnotateLayer` in LiveBrowser.tsx: the captured screenshot to draw on, a

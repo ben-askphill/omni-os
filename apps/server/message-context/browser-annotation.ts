@@ -56,6 +56,7 @@ function elementLines(e: PickedElement): string {
     ...(e.frames.length ? [`inside frames (outermost first): ${e.frames.join(' > ')}`] : []),
     ...(e.opaque_frame ? ['This is a frame from another site. The page could not read inside it, so only the frame element is described.'] : []),
     ...(e.ancestors.length ? [`parents (nearest first): ${e.ancestors.join(' | ')}`] : []),
+    ...(e.styles && Object.keys(e.styles).length ? [`computed styles: ${Object.entries(e.styles).map(([k, v]) => `${k.replaceAll('_', '-')}: ${v}`).join('; ')}`] : []),
     `text: ${e.text || '(none)'}`,
     `markup: ${e.html}`,
     ...(e.truncated ? ['(text or markup was cut to a fixed size; this is not the whole element)'] : []),

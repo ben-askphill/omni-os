@@ -16,23 +16,65 @@ export interface RawPick {
   frames?: unknown;
   opaque?: unknown;
   truncated?: unknown;
+  styles?: unknown;
+}
+
+/** What the page's side may read of the element under the pointer for the hover inspector (`inspectScript`). */
+export interface RawInspect {
+  ok: boolean;
+  reason?: string;
+  tag?: unknown;
+  id?: unknown;
+  classes?: unknown;
+  path?: unknown;
+  bounds?: unknown;
+  styles?: unknown;
+  opaque?: unknown;
+  /** The main frame's innerWidth and innerHeight, which the box is clipped to. */
+  viewport?: unknown;
 }
 
 /** Budgets the script keeps to while it reads. The server cuts again to the record's own limits. */
 export const SCRIPT_BUDGET = { html: 2_000, text: 600, readText: 4_000, children: 6, depth: 2, attrs: 8, attr: 100, selector: 300, ancestors: 4, ancestor: 160, frames: 3 };
 
-// Written as one expression so Runtime.evaluate returns its value. `x` and `y` are in the main frame's viewport.
-export const pickScript = (x: number, y: number) => `(() => {
-  const B = ${JSON.stringify(SCRIPT_BUDGET)};
+// The computed styles both scripts read, as [record key, CSS property]: ELEMENT_STYLE_KEYS in
+// packages/shared/message-context-browser.ts, in its order.
+const STYLE_PROPS = [
+  ['display', 'display'],
+  ['position', 'position'],
+  ['color', 'color'],
+  ['background_color', 'background-color'],
+  ['font_family', 'font-family'],
+  ['font_size', 'font-size'],
+  ['font_weight', 'font-weight'],
+  ['line_height', 'line-height'],
+  ['padding', 'padding'],
+  ['margin', 'margin'],
+  ['z_index', 'z-index'],
+];
+
+/**
+ * The start of both scripts: the element at (x, y) of the main frame's viewport, through same-origin frames and open
+ * shadow roots. Leaves `el` (null for nothing), `doc` its document, `ox`/`oy` its frame's offset, `frames`, `shadows`
+ * and `opaque`, and the helpers `cut`, `flat`, `lower` and `styles`.
+ */
+const FIND = (x: number, y: number) => `
   const x = ${Math.round(x)}, y = ${Math.round(y)};
-  const KEEP = ['id', 'class', 'href', 'src', 'alt', 'title', 'role', 'name', 'type', 'placeholder', 'for', 'aria-label', 'data-testid', 'data-test'];
-  const SKIP_CHILDREN = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'TEXTAREA', 'OPTION', 'OPTGROUP']);
-  const VOID = new Set(['AREA', 'BASE', 'BR', 'COL', 'EMBED', 'HR', 'IMG', 'INPUT', 'LINK', 'META', 'SOURCE', 'TRACK', 'WBR']);
   const cut = (s, n) => (s.length > n ? s.slice(0, n - 1) + '\\u2026' : s);
   const flat = (s) => String(s).replace(/\\s+/g, ' ').trim();
   const lower = (el) => String(el.localName || el.tagName || '').toLowerCase();
+  const styles = (e) => {
+    const out = {};
+    let cs = null;
+    try { cs = (e.ownerDocument.defaultView || window).getComputedStyle(e); } catch (err) {}
+    if (!cs) return out;
+    for (const [key, prop] of ${JSON.stringify(STYLE_PROPS)}) {
+      const v = flat(cs.getPropertyValue(prop) || '');
+      if (v) out[key] = cut(v, 120);
+    }
+    return out;
+  };
 
-  // The element at (x, y), through same-origin frames and open shadow roots.
   let doc = document, ox = 0, oy = 0, el = null, opaque = false;
   const frames = [];
   const shadows = [];
@@ -56,7 +98,15 @@ export const pickScript = (x: number, y: number) => `(() => {
     frames.push(String(inner.URL || ''));
     doc = inner;
     el = null;
-  }
+  }`;
+
+// Written as one expression so Runtime.evaluate returns its value. `x` and `y` are in the main frame's viewport.
+export const pickScript = (x: number, y: number) => `(() => {
+  const B = ${JSON.stringify(SCRIPT_BUDGET)};
+  const KEEP = ['id', 'class', 'href', 'src', 'alt', 'title', 'role', 'name', 'type', 'placeholder', 'for', 'aria-label', 'data-testid', 'data-test'];
+  const SKIP_CHILDREN = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'TEXTAREA', 'OPTION', 'OPTGROUP']);
+  const VOID = new Set(['AREA', 'BASE', 'BR', 'COL', 'EMBED', 'HR', 'IMG', 'INPUT', 'LINK', 'META', 'SOURCE', 'TRACK', 'WBR']);
+${FIND(x, y)}
   if (!el) return { ok: false, reason: 'nothing' };
   if (frames.length > B.frames) return { ok: false, reason: 'deep' };
 
@@ -159,5 +209,40 @@ export const pickScript = (x: number, y: number) => `(() => {
     frames,
     opaque,
     truncated,
+    styles: styles(el),
+  };
+})()`;
+
+/**
+ * The hover inspector's script: what is under the pointer at (x, y), as a tag, id, a few classes, its place in the page
+ * as `tag#id.class` steps, its box and a few computed styles. Lighter than `pickScript` (no markup, no text), since it
+ * runs as the pointer moves. It changes nothing on the page and the server bounds what it returns (browser-pick.ts).
+ */
+export const inspectScript = (x: number, y: number) => `(() => {
+${FIND(x, y)}
+  if (!el) return { ok: false, reason: 'nothing' };
+  const classesOf = (e) => (e.getAttribute && e.getAttribute('class') || '').split(/\\s+/).filter(Boolean).slice(0, 6).map((c) => cut(c, 60));
+  const step = (e) => {
+    const id = e.getAttribute && e.getAttribute('id');
+    if (id) return lower(e) + '#' + cut(flat(id), 40);
+    return [lower(e), ...classesOf(e).slice(0, 2)].join('.');
+  };
+  const path = [];
+  for (let n = el; n && n.nodeType === 1 && path.length < 9; n = n.parentElement) {
+    if (n === doc.documentElement) break;
+    path.unshift(cut(step(n), 80));
+  }
+  if (path.length > 8) path.splice(0, path.length - 7, '\\u2026');
+  const r = el.getBoundingClientRect();
+  return {
+    ok: true,
+    tag: lower(el),
+    id: cut(flat(el.getAttribute && el.getAttribute('id') || ''), 100),
+    classes: classesOf(el),
+    path,
+    bounds: { x: ox + r.left, y: oy + r.top, width: r.width, height: r.height },
+    styles: styles(el),
+    opaque,
+    viewport: { width: innerWidth, height: innerHeight },
   };
 })()`;

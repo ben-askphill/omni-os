@@ -77,7 +77,17 @@ export interface PickedElement {
   opaque_frame: boolean;
   /** True when `text` or `html` was cut. */
   truncated: boolean;
+  /** A few of its computed styles, as the page reported them. Absent on a pick made before Omni read them: an element without it is valid. */
+  styles?: ElementStyles;
 }
+
+/**
+ * The computed styles a picked or hovered element reports, in this order: the few that answer "why does it look like
+ * this". Values are the browser's own computed strings (`rgb(23, 24, 26)`, `16px`), cut to STYLE_VALUE_MAX.
+ */
+export const ELEMENT_STYLE_KEYS = ['display', 'position', 'color', 'background_color', 'font_family', 'font_size', 'font_weight', 'line_height', 'padding', 'margin', 'z_index'] as const;
+export type ElementStyleKey = (typeof ELEMENT_STYLE_KEYS)[number];
+export type ElementStyles = Partial<Record<ElementStyleKey, string>>;
 
 /** What the server makes: everything about the page and the image, before Ben marks anything. */
 export type BrowserCapture = Omit<BrowserAnnotation, 'rect'>;
@@ -94,6 +104,7 @@ export const ANCESTORS_MAX = 4;
 export const ANCESTOR_MAX = 160;
 export const FRAMES_MAX = 3;
 export const FRAME_URL_MAX = 512;
+export const STYLE_VALUE_MAX = 120;
 const SIZE_MAX = 20_000;
 /** The smallest rectangle, per side, in CSS pixels. */
 export const RECT_MIN = 8;
@@ -168,11 +179,43 @@ export function elementOf(v: unknown, viewport: { width: number; height: number 
     frames.push(one.value);
   }
   if (typeof v.opaque_frame !== 'boolean' || typeof v.truncated !== 'boolean') return { ok: false, error: 'element.opaque_frame and element.truncated must be true or false' };
+  const styles = stylesOf(v.styles, 'element.styles');
+  if (!styles.ok) return styles;
   // Fixed key order, so a record is the same bytes wherever it was parsed.
   return {
     ok: true,
-    value: { tag: tag.value, selector: selector.value, text: text.value, html: html.value, ancestors, bounds: bounds.value, point: { x: pt.x, y: pt.y }, frames, opaque_frame: v.opaque_frame, truncated: v.truncated },
+    value: {
+      tag: tag.value,
+      selector: selector.value,
+      text: text.value,
+      html: html.value,
+      ancestors,
+      bounds: bounds.value,
+      point: { x: pt.x, y: pt.y },
+      frames,
+      opaque_frame: v.opaque_frame,
+      truncated: v.truncated,
+      ...(Object.keys(styles.value).length > 0 && { styles: styles.value }),
+    },
   };
+}
+
+/**
+ * Computed styles as a record holds them: the known keys in ELEMENT_STYLE_KEYS order, each a string on one line of at
+ * most STYLE_VALUE_MAX. A key this build does not know is left out, so a newer client's extra style is not a refusal.
+ * Absent or null is none.
+ */
+export function stylesOf(v: unknown, at = 'styles'): Parsed<ElementStyles> {
+  if (v === undefined || v === null) return { ok: true, value: {} };
+  if (!isObj(v)) return { ok: false, error: `${at} must be an object` };
+  const out: ElementStyles = {};
+  for (const key of ELEMENT_STYLE_KEYS) {
+    if (v[key] === undefined) continue;
+    const one = plain(v[key], `${at}.${key}`, STYLE_VALUE_MAX);
+    if (!one.ok) return one;
+    out[key] = one.value;
+  }
+  return { ok: true, value: out };
 }
 
 export const browserAnnotation: MessageContextKind<BrowserAnnotation> = {
@@ -302,4 +345,83 @@ export function rectInImage(rect: PixelRect, image: { width: number; height: num
   const sx = image.width / viewport.width;
   const sy = image.height / viewport.height;
   return { x: Math.round(rect.x * sx), y: Math.round(rect.y * sy), width: Math.round(rect.width * sx), height: Math.round(rect.height * sy) };
+}
+
+/**
+ * What hovering the live page shows of the element under the pointer (apps/server/browser-pick.ts `inspectApi`). It is
+ * shown in the panel and never sent: a pick (`PickedElement`) is what goes with a message. Every string is bounded by
+ * the server, and the page's own words are shown as text, never as markup.
+ */
+export interface InspectedElement {
+  /** The tag name, lowercase. */
+  tag: string;
+  /** Its id, or empty. */
+  id: string;
+  /** Its first few class names. */
+  classes: string[];
+  /** Where it sits, outermost first, one `tag#id.class` step per level, the last being the element itself. */
+  path: string[];
+  /** Its box clipped to the viewport, in CSS pixels from the viewport's top left. */
+  bounds: PixelRect;
+  /** Its own size in CSS pixels, before any clipping. */
+  size: { width: number; height: number };
+  styles: ElementStyles;
+  /** True when the pointer is over a frame from another site, which the page cannot read inside. */
+  opaque_frame: boolean;
+}
+
+export const INSPECT_CLASSES_MAX = 6;
+export const INSPECT_PATH_MAX = 8;
+export const INSPECT_STEP_MAX = 80;
+
+/** The server's answer to a hover: the element, or why there is none. Never an error: the overlay only hides its tooltip. */
+export type ElementInspect = { element: InspectedElement } | { unavailable: { reason: 'nothing' | 'unreadable' | 'stopped'; message: string } };
+
+/** A frame of the live page as the panel draws it: its viewport in CSS pixels and, when the server sends it, its scroll. */
+export interface LiveFrame {
+  width: number;
+  height: number;
+  scroll?: { x: number; y: number };
+}
+
+/** How far the capture's page is from the live frame's, in the capture's CSS pixels per frame CSS pixel and scroll. */
+function liveShift(frame: LiveFrame, capture: Pick<BrowserCapture, 'viewport' | 'scroll'>) {
+  const s = frame.width > 0 ? capture.viewport.width / frame.width : 1;
+  const fs = frame.scroll ?? capture.scroll;
+  return { s, dx: fs.x - capture.scroll.x, dy: fs.y - capture.scroll.y };
+}
+
+/**
+ * A point on the live page, in that frame's CSS pixels, as the same spot of the page in a capture taken just after:
+ * moved by however far the page scrolled in between. Null when the spot is out of the capture's view.
+ */
+export function livePointToCapture(p: { x: number; y: number }, frame: LiveFrame, capture: Pick<BrowserCapture, 'viewport' | 'scroll'>): { x: number; y: number } | null {
+  const { s, dx, dy } = liveShift(frame, capture);
+  const x = Math.floor((p.x + dx) * s);
+  const y = Math.floor((p.y + dy) * s);
+  return x >= 0 && y >= 0 && x < capture.viewport.width && y < capture.viewport.height ? { x, y } : null;
+}
+
+/**
+ * A rectangle Ben drew on the live page, in that frame's CSS pixels, as the same part of the page in a capture taken just
+ * after: moved by the scroll in between, rounded outward and kept inside the capture's viewport. Null when less than
+ * RECT_MIN of it is left in view either way.
+ */
+export function liveToCapture(rect: PixelRect, frame: LiveFrame, capture: Pick<BrowserCapture, 'viewport' | 'scroll'>): PixelRect | null {
+  const { s, dx, dy } = liveShift(frame, capture);
+  const { width: vw, height: vh } = capture.viewport;
+  const x0 = Math.max(0, Math.floor((rect.x + dx) * s));
+  const y0 = Math.max(0, Math.floor((rect.y + dy) * s));
+  const x1 = Math.min(vw, Math.ceil((rect.x + rect.width + dx) * s));
+  const y1 = Math.min(vh, Math.ceil((rect.y + rect.height + dy) * s));
+  return x1 - x0 >= RECT_MIN && y1 - y0 >= RECT_MIN ? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } : null;
+}
+
+/**
+ * The reverse, for drawing a capture's rectangle over the live page as it is now: in the frame's CSS pixels, moved by
+ * however far the page has scrolled since. Not clipped, so a part scrolled out of view is drawn out of view.
+ */
+export function captureToLive(rect: PixelRect, capture: Pick<BrowserCapture, 'viewport' | 'scroll'>, frame: LiveFrame): PixelRect {
+  const { s, dx, dy } = liveShift(frame, capture);
+  return { x: rect.x / s - dx, y: rect.y / s - dy, width: rect.width / s, height: rect.height / s };
 }

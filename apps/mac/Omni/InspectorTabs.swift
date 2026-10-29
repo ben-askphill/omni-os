@@ -12,8 +12,11 @@ struct BrowserTab: View {
   /// The thread whose reply box Annotate adds to.
   let thread: String
   let draft: DraftContextModel
+  /// Live Annotate's Send: a message to the thread now, as the reply box sends one.
+  let deliver: @Sendable (String, MessageContext, String) async throws(OmniAPIError) -> Void
   @State private var browser: ChannelBrowserModel?
   @State private var annotate: BrowserAnnotateModel?
+  @State private var live: BrowserLiveAnnotateModel?
   @State private var showShots = false
 
   var body: some View {
@@ -37,7 +40,7 @@ struct BrowserTab: View {
         LiveBrowserView(model: browser, trailing: AnyView(
           Button(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))", systemImage: "photo") { showShots = true }
             .help(shots.isEmpty ? "Screenshots" : "Screenshots (\(shots.count))")
-        ), annotating: annotate.map { Annotating(model: $0, client: client, draft: draft) })
+        ), annotating: annotate.map { Annotating(model: $0, client: client, draft: draft, live: live) })
       } else {
         Color.clear
       }
@@ -47,11 +50,21 @@ struct BrowserTab: View {
       if let id, browser?.channel != id {
         browser = ChannelBrowserModel(client: client, channel: id)
         annotate = BrowserAnnotateModel(client: client, channel: id, thread: thread)
+        replaceLive(channel: id, thread: thread)
       }
     }
     .onChange(of: thread) { _, thread in
-      if let channel { annotate = BrowserAnnotateModel(client: client, channel: channel, thread: thread) }
+      if let channel {
+        annotate = BrowserAnnotateModel(client: client, channel: channel, thread: thread)
+        replaceLive(channel: channel, thread: thread)
+      }
     }
+  }
+
+  /// A new live Annotate for another channel or thread. The old one turns off, deleting a capture it held.
+  private func replaceLive(channel: String, thread: String) {
+    live?.turnOff()
+    live = BrowserLiveAnnotateModel(client: client, channel: channel, thread: thread, deliver: deliver)
   }
 }
 
@@ -412,7 +425,7 @@ struct DetailsTab: View {
 }
 
 /// Views side by side, wrapping to the next line.
-private struct Flow: Layout {
+struct Flow: Layout {
   var spacing: CGFloat = 4
 
   func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

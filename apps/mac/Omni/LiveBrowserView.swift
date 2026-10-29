@@ -14,6 +14,12 @@ struct LiveBrowserView: View {
   @State private var focusAddress = 0
   /// Bumped to hand the keys back to the page: Return or Escape in the address bar, as in Chrome.
   @State private var pageFocus = 0
+  /// Live Annotate's pointer on the page view, the drag it is drawing and whether Option makes it step aside, in view points.
+  @State private var pointer: CGPoint?
+  @State private var band: CGRect?
+  @State private var optionHeld = false
+  /// The pointer is over the hint or the card, which cover the page.
+  @State private var overChrome = false
   @Environment(\.displayScale) private var displayScale
 
   var body: some View {
@@ -42,7 +48,10 @@ struct LiveBrowserView: View {
             Tok.bg
             // While Annotate shows, the page is not given any input: it is hidden, and its keys go nowhere.
             let annotateOn = annotating?.model.isActive == true
-            BrowserCanvas(frame: model.frame, focus: pageFocus, send: annotateOn ? { _ in } : model.send, shortcut: annotateOn ? { _, _ in true } : shortcut)
+            let live = annotateOn ? nil : annotating?.live.flatMap { $0.isOn ? $0 : nil }
+            BrowserCanvas(
+              frame: model.frame, focus: pageFocus, send: annotateOn ? { _ in } : model.send, shortcut: annotateOn ? { _, _ in true } : shortcut,
+              annotate: live.map(liveInput))
               .allowsHitTesting(!annotateOn)
               .accessibilityLabel(s.title.isEmpty ? "Browser page" : s.title)
             if model.frame == nil, model.error == nil {
@@ -54,6 +63,11 @@ struct LiveBrowserView: View {
               .foregroundStyle(Tok.fg3)
               .allowsHitTesting(false)
             }
+            if let annotating, let live, let frame = model.frame {
+              BrowserLiveAnnotateLayer(
+                live: live, annotating: annotating, frame: frame, url: s.url, size: geo.size, pointer: overChrome || optionHeld ? nil : pointer, band: band,
+                overChrome: $overChrome)
+            }
             if let annotating, annotating.model.isActive { BrowserAnnotateLayer(annotating: annotating) }
           }
           // The page follows this view's size, debounced while the panel is dragged.
@@ -62,6 +76,9 @@ struct LiveBrowserView: View {
             guard !Task.isCancelled else { return }
             model.resize(width: geo.size.width, height: geo.size.height, scale: displayScale)
           }
+          // The page scrolled under live Annotate: what the hover outlined moved, so it is asked again.
+          .onChange(of: model.frame?.scrollY) { annotating?.live?.scrolled() }
+          .onChange(of: model.frame?.scrollX) { annotating?.live?.scrolled() }
         }
       }
       .background(Tok.bg)
@@ -74,12 +91,51 @@ struct LiveBrowserView: View {
       BrowserAnnotateProbe.browser = model
       #endif
     }
+    // Live Annotate is for a web page: another address turns it off.
+    .onChange(of: s.url) { _, url in
+      if !url.lowercased().hasPrefix("http") { annotating?.live?.turnOff() }
+    }
+    .onChange(of: annotating?.live?.isOn) {
+      pointer = nil
+      band = nil
+      optionHeld = false
+      overChrome = false
+    }
     .onDisappear {
+      annotating?.live?.turnOff()
       model.stop()
       #if DEBUG
       BrowserAnnotateProbe.release(browser: model, annotate: annotating?.model)
       #endif
     }
+  }
+
+  /// What live Annotate takes from the page view while it is on. Moves still reach the page; clicks, drags and Escape do not.
+  private func liveInput(_ live: BrowserLiveAnnotateModel) -> BrowserCanvas.LiveInput {
+    BrowserCanvas.LiveInput(
+      hover: { at, page in
+        pointer = at
+        if overChrome { live.leave() } else { live.hover(at: page) }
+      },
+      leave: {
+        pointer = nil
+        live.leave()
+      },
+      band: { band = $0 },
+      pick: { page in
+        guard let frame = model.frame?.live else { return }
+        Task { await live.pick(at: page, frame: frame) }
+      },
+      drag: { page in
+        guard let frame = model.frame?.live else { return }
+        Task { await live.drag(page, frame: frame) }
+      },
+      scrolled: { live.scrolled() },
+      escape: { live.escape() },
+      option: { held in
+        optionHeld = held
+        if held { live.leave() }
+      })
   }
 
   /// Chrome's own shortcuts from the page. True when handled here rather than sent to the page.
@@ -115,6 +171,25 @@ struct BrowserCanvas: NSViewRepresentable {
   var focus = 0
   let send: (BrowserInput) -> Void
   let shortcut: (_ key: String, _ shift: Bool) -> Bool
+  /// Live Annotate, while it is on: presses and Escape go here and not to the page.
+  var annotate: LiveInput?
+
+  /// Points are the view's own, from its top left; page points and rectangles are the frame's CSS pixels.
+  struct LiveInput {
+    /// The pointer moved to a view point over the page point (the page got the move too).
+    var hover: (_ at: CGPoint, _ page: CGPoint) -> Void
+    /// The pointer left the page.
+    var leave: () -> Void
+    /// The rectangle a drag is drawing, or nil once it ends.
+    var band: (CGRect?) -> Void
+    /// A press and release that moved less than `dragStart`.
+    var pick: (CGPoint) -> Void
+    var drag: (CGRect) -> Void
+    var scrolled: () -> Void
+    var escape: () -> Void
+    /// Option went down or up: held, the overlay steps aside and the page takes clicks.
+    var option: (Bool) -> Void
+  }
 
   func makeNSView(context: Context) -> CanvasView {
     let v = CanvasView()
@@ -123,6 +198,7 @@ struct BrowserCanvas: NSViewRepresentable {
     #endif
     v.send = send
     v.shortcut = shortcut
+    v.annotate = annotate
     v.focus = focus
     return v
   }
@@ -130,6 +206,7 @@ struct BrowserCanvas: NSViewRepresentable {
   func updateNSView(_ v: CanvasView, context: Context) {
     v.send = send
     v.shortcut = shortcut
+    v.annotate = annotate
     v.show(frame)
     if v.focus != focus {
       v.focus = focus
@@ -141,7 +218,20 @@ struct BrowserCanvas: NSViewRepresentable {
   final class CanvasView: NSView {
     var send: (BrowserInput) -> Void = { _ in }
     var shortcut: (String, Bool) -> Bool = { _, _ in false }
+    var annotate: LiveInput? {
+      didSet {
+        guard (annotate == nil) != (oldValue == nil) else { return }
+        press = nil
+        optionHeld = false
+        window?.invalidateCursorRects(for: self)
+      }
+    }
     var focus = 0
+    /// Where a press live Annotate took started, in view points.
+    private var press: CGPoint?
+    private var optionHeld = false
+    /// How far a press moves before it is a drag and not a click, in points.
+    static let dragStart: CGFloat = 3
     private var frameInfo: BrowserFrame?
     private var lastMove = Date.distantPast
     private var tracking: NSTrackingArea?
@@ -218,7 +308,7 @@ struct BrowserCanvas: NSViewRepresentable {
 
     override func updateTrackingAreas() {
       if let tracking { removeTrackingArea(tracking) }
-      let t = NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self)
+      let t = NSTrackingArea(rect: bounds, options: [.mouseMoved, .mouseEnteredAndExited, .cursorUpdate, .activeInKeyWindow, .inVisibleRect], owner: self)
       addTrackingArea(t)
       tracking = t
       super.updateTrackingAreas()
@@ -231,9 +321,11 @@ struct BrowserCanvas: NSViewRepresentable {
       return f.pagePoint(p, in: imageRect.size)
     }
 
-    private static func modifiers(_ e: NSEvent) -> Int {
+    /// Live Annotate leaves Option out: it is how Ben clicks the page through the overlay, and Chrome would download a link
+    /// Alt-clicked.
+    private func modifiers(_ e: NSEvent) -> Int {
       var m: BrowserModifiers = []
-      if e.modifierFlags.contains(.option) { m.insert(.alt) }
+      if e.modifierFlags.contains(.option), annotate == nil { m.insert(.alt) }
       if e.modifierFlags.contains(.control) { m.insert(.control) }
       if e.modifierFlags.contains(.command) { m.insert(.command) }
       if e.modifierFlags.contains(.shift) { m.insert(.shift) }
@@ -242,22 +334,71 @@ struct BrowserCanvas: NSViewRepresentable {
 
     private func mouse(_ kind: BrowserInput.MouseEvent, _ e: NSEvent, button: String, buttons: Int) {
       guard let p = pagePoint(e) else { return }
-      send(.mouse(kind, x: p.x, y: p.y, button: button, buttons: buttons, clickCount: kind == .mouseMoved ? 0 : max(e.clickCount, 1), modifiers: Self.modifiers(e)))
+      send(.mouse(kind, x: p.x, y: p.y, button: button, buttons: buttons, clickCount: kind == .mouseMoved ? 0 : max(e.clickCount, 1), modifiers: modifiers(e)))
     }
 
     override func mouseDown(with e: NSEvent) {
       window?.makeFirstResponder(self)
+      // Live Annotate takes the press, unless Option makes it step aside.
+      if annotate != nil, !e.modifierFlags.contains(.option) {
+        press = convert(e.locationInWindow, from: nil)
+        return
+      }
+      press = nil
       mouse(.mousePressed, e, button: "left", buttons: 1)
     }
-    override func mouseUp(with e: NSEvent) { mouse(.mouseReleased, e, button: "left", buttons: 0) }
+    override func mouseUp(with e: NSEvent) {
+      guard let start = press else { return mouse(.mouseReleased, e, button: "left", buttons: 0) }
+      press = nil
+      let end = convert(e.locationInWindow, from: nil)
+      guard let annotate, let f = frameInfo, imageRect.width > 0 else { return }
+      annotate.band(nil)
+      let k = f.width / imageRect.width
+      if Self.isDrag(from: start, to: end) {
+        let r = Self.band(start, end)
+        annotate.drag(CGRect(x: r.minX * k, y: r.minY * k, width: r.width * k, height: r.height * k))
+      } else {
+        annotate.pick(CGPoint(x: end.x * k, y: end.y * k))
+      }
+    }
+
+    private static func isDrag(from a: CGPoint, to b: CGPoint) -> Bool { abs(b.x - a.x) + abs(b.y - a.y) > dragStart }
+    private static func band(_ a: CGPoint, _ b: CGPoint) -> CGRect { CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y)) }
     override func rightMouseDown(with e: NSEvent) {
       window?.makeFirstResponder(self)
       mouse(.mousePressed, e, button: "right", buttons: 2)
     }
     override func rightMouseUp(with e: NSEvent) { mouse(.mouseReleased, e, button: "right", buttons: 0) }
 
-    override func mouseMoved(with e: NSEvent) { moved(e, button: "none", buttons: 0) }
-    override func mouseDragged(with e: NSEvent) { moved(e, button: "left", buttons: 1) }
+    override func mouseMoved(with e: NSEvent) {
+      moved(e, button: "none", buttons: 0)
+      guard let annotate else { return }
+      option(e.modifierFlags.contains(.option))
+      let at = convert(e.locationInWindow, from: nil)
+      guard !optionHeld, let f = frameInfo, imageRect.contains(at), imageRect.width > 0 else { return annotate.leave() }
+      let k = f.width / imageRect.width
+      annotate.hover(at, CGPoint(x: at.x * k, y: at.y * k))
+    }
+    override func mouseDragged(with e: NSEvent) {
+      guard let start = press else { return moved(e, button: "left", buttons: 1) }
+      let at = convert(e.locationInWindow, from: nil)
+      if Self.isDrag(from: start, to: at) { annotate?.band(Self.band(start, at)) }
+    }
+    override func mouseExited(with e: NSEvent) { annotate?.leave() }
+    override func flagsChanged(with e: NSEvent) {
+      option(e.modifierFlags.contains(.option))
+      super.flagsChanged(with: e)
+    }
+    override func cursorUpdate(with e: NSEvent) {
+      (annotate != nil && !optionHeld ? NSCursor.crosshair : NSCursor.arrow).set()
+    }
+
+    private func option(_ held: Bool) {
+      guard let annotate, held != optionHeld else { return }
+      optionHeld = held
+      (held ? NSCursor.arrow : NSCursor.crosshair).set()
+      annotate.option(held)
+    }
     override func rightMouseDragged(with e: NSEvent) { moved(e, button: "right", buttons: 2) }
 
     /// At most 60 moves a second; the model merges whatever piles up while Chrome is busy.
@@ -272,17 +413,25 @@ struct BrowserCanvas: NSViewRepresentable {
       let scale = f.width / bounds.width
       // Precise deltas (trackpad) are points; a mouse wheel's are lines.
       let line: Double = e.hasPreciseScrollingDeltas ? 1 : 40
-      send(.wheel(x: p.x, y: p.y, deltaX: (-e.scrollingDeltaX * line * scale).rounded(), deltaY: (-e.scrollingDeltaY * line * scale).rounded(), modifiers: Self.modifiers(e)))
+      send(.wheel(x: p.x, y: p.y, deltaX: (-e.scrollingDeltaX * line * scale).rounded(), deltaY: (-e.scrollingDeltaY * line * scale).rounded(), modifiers: modifiers(e)))
+      annotate?.scrolled()
     }
 
     private func key(_ kind: BrowserInput.KeyEvent, _ e: NSEvent) {
-      let mods = BrowserModifiers(rawValue: Self.modifiers(e))
+      let mods = BrowserModifiers(rawValue: modifiers(e))
       let k = BrowserKeys.key(macKeyCode: e.keyCode, characters: e.characters, modifiers: mods)
       send(.key(kind, key: k.key, code: k.code, text: kind == .keyDown ? k.text : nil, keyCode: k.keyCode, modifiers: mods.rawValue))
     }
 
-    override func keyDown(with e: NSEvent) { key(.keyDown, e) }
-    override func keyUp(with e: NSEvent) { key(.keyUp, e) }
+    /// Escape is live Annotate's own while it is on: it clears the selection, else turns it off.
+    override func keyDown(with e: NSEvent) {
+      if let annotate, e.keyCode == 53 { return annotate.escape() }
+      key(.keyDown, e)
+    }
+    override func keyUp(with e: NSEvent) {
+      if annotate != nil, e.keyCode == 53 { return }
+      key(.keyUp, e)
+    }
 
     /// Cmd shortcuts arrive here before the menus see them. Chrome's own (address bar, tabs,
     /// reload, history, copy and paste) run in the panel; the rest (select all, undo) go to the page.

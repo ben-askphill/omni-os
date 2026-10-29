@@ -175,7 +175,9 @@ private struct InspectorPanel: View {
       case .changes:
         ChangesTab(client: model.client, store: store)
       case .browser:
-        BrowserTab(client: model.client, channel: store.thread?.channelID, shots: store.screenshots, thread: store.id, draft: store.draftContext)
+        BrowserTab(
+          client: model.client, channel: store.thread?.channelID, shots: store.screenshots, thread: store.id, draft: store.draftContext,
+          deliver: send)
       case .web:
         WebTab(client: model.client, channel: store.thread?.channelID, thread: store.id, draft: store.draftContext)
       case .terminal:
@@ -201,6 +203,18 @@ private struct InspectorPanel: View {
       default: 0
       }
     return n > 0 ? n : nil
+  }
+
+  /// Live Annotate's Send, the reply box's send: the same call and mode (`SendRules`), and the answer merged into the thread.
+  private var send: @Sendable (String, MessageContext, String) async throws(OmniAPIError) -> Void {
+    { @MainActor [model, store] prompt, record, request throws(OmniAPIError) in
+      let thread = store.thread
+      let caps = model.store.harnesses.first { $0.id == thread?.harness }?.capabilities
+      let canSteer = thread.map { SendRules.canSteer(harness: $0.harness, capabilities: caps) && RunSwitch.queued($0) == nil } ?? false
+      let mode = SendRules.mode(busy: thread?.status.isActive ?? false, canSteer: canSteer, shift: false)
+      let t = try await model.client.reply(to: store.id, prompt: prompt, mode: mode, files: [], requestID: request, context: [record])
+      store.merge(t, isReply: true)
+    }
   }
 }
 

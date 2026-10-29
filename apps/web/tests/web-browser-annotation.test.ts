@@ -72,6 +72,14 @@ describe('a browser_annotation with a picked element', () => {
     expect(open).toContain('Parents, nearest first');
   });
 
+  it('lists the computed styles the page reported, behind Details', () => {
+    const styles = { display: 'inline-flex', background_color: 'rgb(43, 59, 255)' };
+    const open = renderToStaticMarkup(createElement(PickedElementDetails, { element: { ...picked.body.element!, styles }, defaultOpen: true }));
+    expect(open).toContain('Computed styles');
+    expect(open).toContain('display: inline-flex\nbackground-color: rgb(43, 59, 255)');
+    expect(renderToStaticMarkup(createElement(PickedElementDetails, { element: picked.body.element!, defaultOpen: true }))).not.toContain('Computed styles');
+  });
+
   it('says a frame from another site cannot be read', () => {
     const frame = renderToStaticMarkup(createElement(PickedElementDetails, { element: { ...picked.body.element!, tag: 'iframe', opaque_frame: true } }));
     expect(frame).toContain('This is a frame from another site');

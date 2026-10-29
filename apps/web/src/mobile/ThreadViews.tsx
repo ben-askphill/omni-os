@@ -1,10 +1,11 @@
 // The screens pushed from a thread: its steps, changes and PR, the channel browser, the shell, details and a file.
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { turnCount } from '@omni/shared/history.ts';
 import { api, artifactUrl, errorText, useApi, type HarnessWithRunning, type PRDetail } from '../api.ts';
 import { HarnessMark, harnessLabel } from '../components/brand.tsx';
 import { ArtifactBody } from '../components/ArtifactViewer.tsx';
-import { AnnotateLayer, canAnnotate, useAfterAdd } from '../components/BrowserAnnotate.tsx';
+import { AnnotateLayer, canAnnotate, useAfterAdd, type AnnotateFrom } from '../components/BrowserAnnotate.tsx';
+import { LiveAnnotateCard, LiveAnnotateOverlay, useLiveAnnotate } from '../components/BrowserAnnotationOverlay.tsx';
 import { BrowserWatch, displayUrl, useChannelBrowser } from '../components/LiveBrowser.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { modelOf } from '../components/ModelPicker.tsx';
@@ -295,16 +296,50 @@ export function BrowserScreen() {
 function BrowserBody({ channelId, threadId, onBack }: { channelId: string; threadId: string; onBack: () => void }) {
   const b = useChannelBrowser(channelId);
   const url = b.state?.url ? displayUrl(b.state.url) : null;
+  const box = useRef<HTMLDivElement>(null);
+  const live = useLiveAnnotate(b, channelId, threadId);
+  // Live Annotate (tap to pick, drag an area), and the screenshot editor a pick goes to with Draw.
   const [annotating, setAnnotating] = useState(false);
-  const close = useCallback(() => setAnnotating(false), []);
-  const added = useAfterAdd(close);
+  const [drawing, setDrawing] = useState<AnnotateFrom | null>(null);
+  const { clear } = live;
+  const stop = useCallback(() => {
+    setAnnotating(false);
+    clear();
+  }, [clear]);
+  const sent = useAfterAdd(stop);
+  const drawn = useAfterAdd(useCallback(() => setDrawing(null), []));
+  const usable = canAnnotate(b.state);
+  useEffect(() => {
+    if (annotating && !usable) stop();
+  }, [annotating, usable, stop]);
+  const on = annotating && !drawing;
   return (
     <>
-      <MoHeader onBack={onBack} title="Browser" sub={[url, 'watch only'].filter(Boolean).join(' · ')} right={<MoRound icon="annotate" label="Annotate this page" disabled={!canAnnotate(b.state)} onClick={() => setAnnotating(true)} />} />
+      <MoHeader
+        onBack={onBack}
+        title="Browser"
+        sub={[url, 'watch only'].filter(Boolean).join(' · ')}
+        right={<MoRound icon="annotate" label={annotating ? 'Stop annotating' : 'Annotate this page'} ink={annotating} disabled={!usable} onClick={() => (annotating ? stop() : setAnnotating(true))} />}
+      />
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-3 pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] bg-surface">
-          <BrowserWatch b={b} />
-          {annotating && <AnnotateLayer channelId={channelId} threadId={threadId} onClose={close} onAdded={added} />}
+          <BrowserWatch b={b} box={box}>
+            {on && <LiveAnnotateOverlay b={b} box={box} live={live} drive={false} />}
+          </BrowserWatch>
+          {on && (
+            <LiveAnnotateCard
+              live={live}
+              threadId={threadId}
+              phone
+              onDone={stop}
+              onSent={sent}
+              onDraw={() => {
+                const from = live.handOff();
+                if (from) setDrawing(from);
+              }}
+            />
+          )}
+          {drawing && <AnnotateLayer channelId={channelId} threadId={threadId} from={drawing} onClose={() => setDrawing(null)} onAdded={drawn} />}
         </div>
         <p className="m-0 px-1 text-[13px] leading-[1.5] text-fg-3">The agent drives this browser. Logins and captchas are handled on the Mac.</p>
       </div>
