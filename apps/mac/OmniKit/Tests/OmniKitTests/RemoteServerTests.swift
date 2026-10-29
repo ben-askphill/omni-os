@@ -74,21 +74,6 @@ struct RemoteServerTests {
     let supervisor = ServerSupervisor(config: { config }, options: .init(remoteToken: { _ in "token" }, remoteTimeout: .seconds(2)))
     await supervisor.refresh()
     #expect(supervisor.state == .failed(message: ServerStartError.remoteUnreachable(host: "127.0.0.1").message, logTail: []))
-    #expect(supervisor.token(for: config.endpoint).value == "token")
-  }
-
-  @Test func eachEndpointKeepsItsOwnToken() {
-    let dir = TempDir("remote-token")
-    dir.write("repo/data/api-token", "local-token")
-    let origin = URL(string: "https://omarchy.ts.net")!
-    var config = ServerConfig(port: 4747, repo: dir.path("repo"))
-    let supervisor = ServerSupervisor(config: { config }, options: .init(remoteToken: { $0 == origin ? "remote-token" : nil }))
-    let local = supervisor.token(for: .local(port: 4747))
-    let remote = supervisor.token(for: .remote(origin))
-    // Switching the settings changes neither: a client keeps the token of the server it was made for.
-    config.remote = origin
-    #expect(local.value == "local-token")
-    #expect(remote.value == "remote-token")
-    #expect(supervisor.token(for: .remote(URL(string: "https://other.ts.net")!)).value == nil)
+    #expect(supervisor.token.value == "token")
   }
 }

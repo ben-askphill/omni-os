@@ -116,11 +116,9 @@ public struct ServerRecord: Codable, Hashable, Sendable {
   /// Where a server the app starts writes its output.
   public var logURL: URL { options.logURL }
 
-  /// The token of the local server on the configured repo and port. Clients send it; the probe checks the server
-  /// knows it. Never the remote token: `token(for:)` gives each endpoint its own.
+  /// The token of the server on the configured repo and port, or the one saved for the remote server. Clients send
+  /// it; the probe checks the server knows it.
   public nonisolated let token: ServerToken
-  @ObservationIgnored private nonisolated let remoteToken: @Sendable (URL) -> String?
-  @ObservationIgnored private nonisolated let fixedToken: ServerToken?
 
   @ObservationIgnored private let config: @MainActor () -> ServerConfig
   @ObservationIgnored private let options: Options
@@ -152,10 +150,15 @@ public struct ServerRecord: Codable, Hashable, Sendable {
     port = config().port
     let location = TokenLocation()
     tokenFile = location
-    location.current = ServerToken.file(repo: config().repo, environment: options.launcher.extraEnvironment)
-    token = options.token ?? ServerToken { location.current.flatMap { try? String(contentsOf: $0, encoding: .utf8) } }
-    remoteToken = options.remoteToken
-    fixedToken = options.token
+    location.current = Self.tokenSource(config(), options)
+    let remoteToken = options.remoteToken
+    token = options.token ?? ServerToken {
+      switch location.current {
+      case .file(let url)?: try? String(contentsOf: url, encoding: .utf8)
+      case .remote(let origin)?: remoteToken(origin)
+      case nil: nil
+      }
+    }
     session = Self.session(timeout: options.probeTimeout)
     remoteSession = Self.session(timeout: options.remoteTimeout)
   }
@@ -169,17 +172,9 @@ public struct ServerRecord: Codable, Hashable, Sendable {
     return URLSession(configuration: c)
   }
 
-  /// The token a client for `endpoint` sends, bound to it when the client is made: the local server's file, or the
-  /// Keychain item for that one remote origin. A client for one server never sends another's token, even while a
-  /// settings change has not been checked yet.
-  public nonisolated func token(for endpoint: ServerEndpoint) -> ServerToken {
-    switch endpoint {
-    case .local: return token
-    case .remote(let origin):
-      if let fixedToken { return fixedToken }
-      let read = remoteToken
-      return ServerToken { read(origin) }
-    }
+  private static func tokenSource(_ config: ServerConfig, _ options: Options) -> TokenLocation.Source {
+    if let remote = config.remote { return .remote(remote) }
+    return .file(ServerToken.file(repo: config.repo, environment: options.launcher.extraEnvironment))
   }
 
   public convenience init(settings: ServerSettings, options: Options = Options()) {
@@ -235,6 +230,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
 
   /// A remote server is never the app's to start or stop, so there is no target and no exit to watch.
   private func detectRemote(_ origin: URL, port: Int) async {
+    tokenFile.current = .remote(origin)
     let host = origin.host() ?? origin.absoluteString
     let found = await probeRemote(origin, host: host)
     guard config().remote == origin else { return }
@@ -251,7 +247,6 @@ public struct ServerRecord: Codable, Hashable, Sendable {
   /// GET /api/status with the saved token, over TLS. No proof first: the certificate says who the host is, and
   /// the token is one Ben pasted for that host, not this Mac's own.
   private func probeRemote(_ origin: URL, host: String) async -> Result<Status, ServerStartError> {
-    let token = token(for: .remote(origin))
     guard token.value != nil else { return .failure(.remoteNoToken(host: host)) }
     let client = OmniClient(baseURL: origin, token: token, transport: URLSessionTransport(session: remoteSession))
     do throws(OmniAPIError) {
@@ -397,7 +392,7 @@ public struct ServerRecord: Codable, Hashable, Sendable {
   /// Omni, once the listener proves it holds the token: the HMAC of a fresh nonce, so a program squatting on the
   /// port learns nothing it could use. Only then does the token go to it, for /api/status.
   private func probe(_ port: Int) async -> Probe {
-    tokenFile.current = ServerToken.file(repo: config().repo, environment: options.launcher.extraEnvironment)
+    tokenFile.current = Self.tokenSource(config(), options)
     let anonymous = OmniClient(port: port, transport: URLSessionTransport(session: session))
     let client = OmniClient(port: port, token: token, transport: URLSessionTransport(session: session))
     do throws(OmniAPIError) {
