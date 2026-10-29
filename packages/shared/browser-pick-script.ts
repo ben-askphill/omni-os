@@ -1,9 +1,13 @@
-// The script that reads one element out of the channel browser's page for an element pick (browser-pick.ts). It runs in
-// the page, through Runtime.evaluate, finds what is at a point and returns a bounded description of it: never the DOM.
-// It changes nothing on the page. Everything it returns is the page's own data and is cleaned and checked again on the
-// server, so a page that tampers with the script's results gets a refused pick, not a larger record.
+// The scripts that read the page for Annotate: one element for a pick, and the element under the pointer for the hover
+// inspector. Both browsers run these very scripts, so they report the same fields: the server in the channel's Chrome
+// through Runtime.evaluate (apps/server/browser.ts), the Mac app in the Web tab's own web view, in an isolated content
+// world (apps/mac/browser-pick/entry.ts bundles this file). Each finds what is at a point and returns a bounded
+// description of it, never the DOM, and changes nothing on the page. Everything it returns is the page's own data and is
+// cleaned and checked again (browser-pick-read.ts), so a page that tampers with the results gets a refused pick, not a
+// larger record.
+import { ELEMENT_STYLE_KEYS } from './message-context-browser.ts';
 
-/** What the page's side may read of one element, before the server bounds and checks it. */
+/** What the page's side may read of one element, before browser-pick-read.ts bounds and checks it. */
 export interface RawPick {
   ok: boolean;
   reason?: string;
@@ -34,24 +38,11 @@ export interface RawInspect {
   viewport?: unknown;
 }
 
-/** Budgets the script keeps to while it reads. The server cuts again to the record's own limits. */
+/** Budgets the script keeps to while it reads. browser-pick-read.ts cuts again to the record's own limits. */
 export const SCRIPT_BUDGET = { html: 2_000, text: 600, readText: 4_000, children: 6, depth: 2, attrs: 8, attr: 100, selector: 300, ancestors: 4, ancestor: 160, frames: 3 };
 
-// The computed styles both scripts read, as [record key, CSS property]: ELEMENT_STYLE_KEYS in
-// packages/shared/message-context-browser.ts, in its order.
-const STYLE_PROPS = [
-  ['display', 'display'],
-  ['position', 'position'],
-  ['color', 'color'],
-  ['background_color', 'background-color'],
-  ['font_family', 'font-family'],
-  ['font_size', 'font-size'],
-  ['font_weight', 'font-weight'],
-  ['line_height', 'line-height'],
-  ['padding', 'padding'],
-  ['margin', 'margin'],
-  ['z_index', 'z-index'],
-];
+// The computed styles both scripts read, as [record key, CSS property], in the record's order.
+const STYLE_PROPS = ELEMENT_STYLE_KEYS.map((key) => [key, key.replaceAll('_', '-')]);
 
 /**
  * The start of both scripts: the element at (x, y) of the main frame's viewport, through same-origin frames and open

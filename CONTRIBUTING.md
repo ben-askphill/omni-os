@@ -26,6 +26,7 @@ If you already run Omni for real on :4747, do not develop against it. Use the th
 | `cd apps/server && npx vitest run tests/<file>.test.ts` | One file |
 | `npx turbo run test --affected` | Only what changed against `main` |
 | `npm run build:slash` | Rebuild the Mac app's slash bundle after changing a slash module in `packages/shared/` |
+| `npm run build:pick` | Rebuild the Mac app's page reader after changing `packages/shared/browser-pick-script.ts` or `browser-pick-read.ts` |
 
 ## Run it without touching your real data
 

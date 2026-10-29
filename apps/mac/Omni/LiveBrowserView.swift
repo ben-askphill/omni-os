@@ -14,12 +14,8 @@ struct LiveBrowserView: View {
   @State private var focusAddress = 0
   /// Bumped to hand the keys back to the page: Return or Escape in the address bar, as in Chrome.
   @State private var pageFocus = 0
-  /// Live Annotate's pointer on the page view, the drag it is drawing and whether Option makes it step aside, in view points.
-  @State private var pointer: CGPoint?
-  @State private var band: CGRect?
-  @State private var optionHeld = false
-  /// The pointer is over the hint or the card, which cover the page.
-  @State private var overChrome = false
+  /// Live Annotate's pointer on the page view, the drag it is drawing and whether Option makes it step aside.
+  @State private var pointer = LivePointer()
   @Environment(\.displayScale) private var displayScale
 
   var body: some View {
@@ -51,7 +47,7 @@ struct LiveBrowserView: View {
             let live = annotateOn ? nil : annotating?.live.flatMap { $0.isOn ? $0 : nil }
             BrowserCanvas(
               frame: model.frame, focus: pageFocus, send: annotateOn ? { _ in } : model.send, shortcut: annotateOn ? { _, _ in true } : shortcut,
-              annotate: live.map(liveInput))
+              annotate: live.map { LiveAnnotateInput.driving($0, pointer: $pointer, frame: { model.frame?.live }) })
               .allowsHitTesting(!annotateOn)
               .accessibilityLabel(s.title.isEmpty ? "Browser page" : s.title)
             if model.frame == nil, model.error == nil {
@@ -65,8 +61,8 @@ struct LiveBrowserView: View {
             }
             if let annotating, let live, let frame = model.frame {
               BrowserLiveAnnotateLayer(
-                live: live, annotating: annotating, frame: frame, url: s.url, size: geo.size, pointer: overChrome || optionHeld ? nil : pointer, band: band,
-                overChrome: $overChrome)
+                live: live, annotating: annotating, frame: frame.live, url: s.url, size: geo.size, pointer: pointer.shown, band: pointer.band,
+                overChrome: $pointer.overChrome)
             }
             if let annotating, annotating.model.isActive { BrowserAnnotateLayer(annotating: annotating) }
           }
@@ -95,12 +91,7 @@ struct LiveBrowserView: View {
     .onChange(of: s.url) { _, url in
       if !url.lowercased().hasPrefix("http") { annotating?.live?.turnOff() }
     }
-    .onChange(of: annotating?.live?.isOn) {
-      pointer = nil
-      band = nil
-      optionHeld = false
-      overChrome = false
-    }
+    .onChange(of: annotating?.live?.isOn) { pointer = LivePointer() }
     .onDisappear {
       annotating?.live?.turnOff()
       model.stop()
@@ -108,34 +99,6 @@ struct LiveBrowserView: View {
       BrowserAnnotateProbe.release(browser: model, annotate: annotating?.model)
       #endif
     }
-  }
-
-  /// What live Annotate takes from the page view while it is on. Moves still reach the page; clicks, drags and Escape do not.
-  private func liveInput(_ live: BrowserLiveAnnotateModel) -> BrowserCanvas.LiveInput {
-    BrowserCanvas.LiveInput(
-      hover: { at, page in
-        pointer = at
-        if overChrome { live.leave() } else { live.hover(at: page) }
-      },
-      leave: {
-        pointer = nil
-        live.leave()
-      },
-      band: { band = $0 },
-      pick: { page in
-        guard let frame = model.frame?.live else { return }
-        Task { await live.pick(at: page, frame: frame) }
-      },
-      drag: { page in
-        guard let frame = model.frame?.live else { return }
-        Task { await live.drag(page, frame: frame) }
-      },
-      scrolled: { live.scrolled() },
-      escape: { live.escape() },
-      option: { held in
-        optionHeld = held
-        if held { live.leave() }
-      })
   }
 
   /// Chrome's own shortcuts from the page. True when handled here rather than sent to the page.
@@ -172,24 +135,7 @@ struct BrowserCanvas: NSViewRepresentable {
   let send: (BrowserInput) -> Void
   let shortcut: (_ key: String, _ shift: Bool) -> Bool
   /// Live Annotate, while it is on: presses and Escape go here and not to the page.
-  var annotate: LiveInput?
-
-  /// Points are the view's own, from its top left; page points and rectangles are the frame's CSS pixels.
-  struct LiveInput {
-    /// The pointer moved to a view point over the page point (the page got the move too).
-    var hover: (_ at: CGPoint, _ page: CGPoint) -> Void
-    /// The pointer left the page.
-    var leave: () -> Void
-    /// The rectangle a drag is drawing, or nil once it ends.
-    var band: (CGRect?) -> Void
-    /// A press and release that moved less than `dragStart`.
-    var pick: (CGPoint) -> Void
-    var drag: (CGRect) -> Void
-    var scrolled: () -> Void
-    var escape: () -> Void
-    /// Option went down or up: held, the overlay steps aside and the page takes clicks.
-    var option: (Bool) -> Void
-  }
+  var annotate: LiveAnnotateInput?
 
   func makeNSView(context: Context) -> CanvasView {
     let v = CanvasView()
@@ -218,20 +164,16 @@ struct BrowserCanvas: NSViewRepresentable {
   final class CanvasView: NSView {
     var send: (BrowserInput) -> Void = { _ in }
     var shortcut: (String, Bool) -> Bool = { _, _ in false }
-    var annotate: LiveInput? {
+    var annotate: LiveAnnotateInput? {
       didSet {
         guard (annotate == nil) != (oldValue == nil) else { return }
-        press = nil
-        optionHeld = false
+        gesture = LiveAnnotateGesture()
         window?.invalidateCursorRects(for: self)
       }
     }
     var focus = 0
-    /// Where a press live Annotate took started, in view points.
-    private var press: CGPoint?
-    private var optionHeld = false
-    /// How far a press moves before it is a drag and not a click, in points.
-    static let dragStart: CGFloat = 3
+    /// The press live Annotate took, in view points, and whether Option makes it step aside.
+    private var gesture = LiveAnnotateGesture()
     private var frameInfo: BrowserFrame?
     private var lastMove = Date.distantPast
     private var tracking: NSTrackingArea?
@@ -340,30 +282,19 @@ struct BrowserCanvas: NSViewRepresentable {
     override func mouseDown(with e: NSEvent) {
       window?.makeFirstResponder(self)
       // Live Annotate takes the press, unless Option makes it step aside.
-      if annotate != nil, !e.modifierFlags.contains(.option) {
-        press = convert(e.locationInWindow, from: nil)
-        return
-      }
-      press = nil
+      if annotate != nil, gesture.down(at: convert(e.locationInWindow, from: nil), option: e.modifierFlags.contains(.option)) { return }
       mouse(.mousePressed, e, button: "left", buttons: 1)
     }
     override func mouseUp(with e: NSEvent) {
-      guard let start = press else { return mouse(.mouseReleased, e, button: "left", buttons: 0) }
-      press = nil
-      let end = convert(e.locationInWindow, from: nil)
+      guard let mark = gesture.up(at: convert(e.locationInWindow, from: nil)) else { return mouse(.mouseReleased, e, button: "left", buttons: 0) }
       guard let annotate, let f = frameInfo, imageRect.width > 0 else { return }
       annotate.band(nil)
       let k = f.width / imageRect.width
-      if Self.isDrag(from: start, to: end) {
-        let r = Self.band(start, end)
-        annotate.drag(CGRect(x: r.minX * k, y: r.minY * k, width: r.width * k, height: r.height * k))
-      } else {
-        annotate.pick(CGPoint(x: end.x * k, y: end.y * k))
+      switch mark {
+      case .area(let r): annotate.drag(CGRect(x: r.minX * k, y: r.minY * k, width: r.width * k, height: r.height * k))
+      case .pick(let p): annotate.pick(CGPoint(x: p.x * k, y: p.y * k))
       }
     }
-
-    private static func isDrag(from a: CGPoint, to b: CGPoint) -> Bool { abs(b.x - a.x) + abs(b.y - a.y) > dragStart }
-    private static func band(_ a: CGPoint, _ b: CGPoint) -> CGRect { CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y)) }
     override func rightMouseDown(with e: NSEvent) {
       window?.makeFirstResponder(self)
       mouse(.mousePressed, e, button: "right", buttons: 2)
@@ -375,14 +306,13 @@ struct BrowserCanvas: NSViewRepresentable {
       guard let annotate else { return }
       option(e.modifierFlags.contains(.option))
       let at = convert(e.locationInWindow, from: nil)
-      guard !optionHeld, let f = frameInfo, imageRect.contains(at), imageRect.width > 0 else { return annotate.leave() }
+      guard !gesture.optionHeld, let f = frameInfo, imageRect.contains(at), imageRect.width > 0 else { return annotate.leave() }
       let k = f.width / imageRect.width
       annotate.hover(at, CGPoint(x: at.x * k, y: at.y * k))
     }
     override func mouseDragged(with e: NSEvent) {
-      guard let start = press else { return moved(e, button: "left", buttons: 1) }
-      let at = convert(e.locationInWindow, from: nil)
-      if Self.isDrag(from: start, to: at) { annotate?.band(Self.band(start, at)) }
+      guard gesture.press != nil else { return moved(e, button: "left", buttons: 1) }
+      if let band = gesture.band(to: convert(e.locationInWindow, from: nil)) { annotate?.band(band) }
     }
     override func mouseExited(with e: NSEvent) { annotate?.leave() }
     override func flagsChanged(with e: NSEvent) {
@@ -390,12 +320,11 @@ struct BrowserCanvas: NSViewRepresentable {
       super.flagsChanged(with: e)
     }
     override func cursorUpdate(with e: NSEvent) {
-      (annotate != nil && !optionHeld ? NSCursor.crosshair : NSCursor.arrow).set()
+      (annotate != nil && !gesture.optionHeld ? NSCursor.crosshair : NSCursor.arrow).set()
     }
 
     private func option(_ held: Bool) {
-      guard let annotate, held != optionHeld else { return }
-      optionHeld = held
+      guard let annotate, gesture.option(held) else { return }
       (held ? NSCursor.arrow : NSCursor.crosshair).set()
       annotate.option(held)
     }
@@ -425,11 +354,11 @@ struct BrowserCanvas: NSViewRepresentable {
 
     /// Escape is live Annotate's own while it is on: it clears the selection, else turns it off.
     override func keyDown(with e: NSEvent) {
-      if let annotate, e.keyCode == 53 { return annotate.escape() }
+      if let annotate, e.keyCode == LiveAnnotateGesture.escapeKey { return annotate.escape() }
       key(.keyDown, e)
     }
     override func keyUp(with e: NSEvent) {
-      if annotate != nil, e.keyCode == 53 { return }
+      if annotate != nil, e.keyCode == LiveAnnotateGesture.escapeKey { return }
       key(.keyUp, e)
     }
 

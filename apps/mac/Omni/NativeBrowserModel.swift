@@ -4,8 +4,9 @@ import OmniKit
 import WebKit
 
 /// The Web tab: the Mac app's own browser for a channel, real `WKWebView`s in the app, so a page is drawn by the Mac and not
-/// streamed. Ben browses, logs in and annotates here; the agent keeps driving the channel's server-side Chrome in the Browser
-/// tab (`ChannelBrowserModel`) and cannot see this one. A channel's tabs last for the app's run and, as addresses, across
+/// streamed. Ben browses, logs in and annotates here, live as in the Browser tab: the page is read in the web view itself,
+/// with the scripts and readers the server uses for its Chrome (`BrowserPickEngine`). The agent keeps driving the channel's
+/// server-side Chrome in the Browser tab (`ChannelBrowserModel`) and cannot see this one. A channel's tabs last for the app's run and, as addresses, across
 /// launches. Logins are the app's default website data store, so they are shared by every channel and kept across launches;
 /// the artifact, thumbnail and diagram web views use a non-persistent store and never see them.
 @MainActor @Observable
@@ -20,10 +21,17 @@ final class NativeBrowserModel {
   @ObservationIgnored private let store: WKWebsiteDataStore
   /// Pages Ben has seen load, restored next launch.
   @ObservationIgnored private let defaults: UserDefaults
-  /// Where the page is read by Annotate's pick: its own world, so nothing the page defines can change the answer.
+  /// Where Annotate reads the page: its own world, so nothing the page defines can change the answer or see it asked.
   @ObservationIgnored private let pickWorld = WKContentWorld.world(name: "omni-pick")
   /// The page as the last capture saw it, which a pick is only answered for while it holds.
   @ObservationIgnored private var captured: NativePageSnapshot?
+  /// How far the active tab's page is scrolled, in CSS pixels, as its page reports it (`ScrollRelay`), so live Annotate's
+  /// outline follows the page. Nil until the page has said.
+  private(set) var scroll: CGPoint?
+  /// Counts the active page's scrolls, its own or a box's inside it, so live Annotate asks again what is under the pointer.
+  private(set) var scrolls = 0
+  /// The tab `scroll` is of.
+  @ObservationIgnored private var scrolledTab: String?
   /// The Web tab that shows the page. A web view can be in one window at a time, so a second window showing this channel's
   /// Web tab takes it and the first offers to take it back. Nil when no Web tab shows it, and the next one to look takes it.
   private(set) var host: UUID?
@@ -60,6 +68,8 @@ final class NativeBrowserModel {
       config.websiteDataStore = store
       config.applicationNameForUserAgent = "Version/18.0 Safari/605.1.15"
       config.preferences.isElementFullscreenEnabled = true
+      // A popup's configuration is its opener's, with this script and handler already on it.
+      ScrollRelay.install(on: config.userContentController, world: pickWorld, owner: self)
     }
     let tab = NativeTab(owner: self, configuration: config)
     tabs.append(tab)
@@ -124,6 +134,10 @@ final class NativeBrowserModel {
     let kept = tabs.filter { $0.web.url?.absoluteString.hasPrefix("http") == true }
     defaults.set(kept.compactMap { $0.web.url?.absoluteString }, forKey: Self.key(channel))
     if let i = kept.firstIndex(where: { $0.id == active }) { defaults.set(i, forKey: Self.key(channel) + ".active") }
+    if active != scrolledTab {
+      scrolledTab = active
+      askScroll()
+    }
   }
 
   // MARK: Annotate
@@ -176,26 +190,39 @@ final class NativeBrowserModel {
     return capture
   }
 
-  /// What is at (`x`, `y`) of the screenshot, read from the page itself with the script the server uses for its own browser.
-  /// Only while the page is as the screenshot saw it.
-  func pick(client: OmniClient, thread: String, name: String, x: Int, y: Int) async throws(OmniAPIError) -> ElementPickReply {
+  /// The element under the pointer at (`x`, `y`) of the page's viewport, read from the page itself for live Annotate's
+  /// hover, with the script and reader the server uses for its own browser. Changes nothing on the page.
+  func inspect(x: Int, y: Int) async -> ElementInspectReply {
+    let engine = BrowserPickEngine.shared
+    guard let web = webView, web.url?.absoluteString.lowercased().hasPrefix("http") == true, let script = engine.inspectScript(x: x, y: y) else {
+      return .unavailable(reason: "stopped", message: "There is no page here.")
+    }
+    let answer = try? await web.evaluateJavaScript(script, in: nil, contentWorld: pickWorld)
+    return engine.inspectReply(raw: BrowserPickEngine.json(answer))
+  }
+
+  /// What is at (`x`, `y`) of the screenshot, read from the page itself with the script and reader the server uses for its
+  /// own browser. Only while the page is as the screenshot saw it, before the page is asked and after.
+  func pick(x: Int, y: Int) async -> ElementPickReply {
     let note = " The screenshot and the area you mark still go with your message."
     guard let web = webView, let was = captured else { return .unavailable(reason: "unknown_capture", message: "This screenshot is too old to look elements up in." + note) }
     guard let now = await look(), now.matches(was) else { return .unavailable(reason: "stale", message: "The page changed after the screenshot." + note) }
-    let script = try await client.pickScript(channel: channel, x: x, y: y)
+    let engine = BrowserPickEngine.shared
+    guard x < was.viewportWidth, y < was.viewportHeight, let script = engine.pickScript(x: x, y: y) else {
+      return .unavailable(reason: "unreadable", message: "That part of the page could not be read." + note)
+    }
     let answer: Any?
     do {
       answer = try await web.evaluateJavaScript(script, in: nil, contentWorld: pickWorld)
     } catch {
       return .unavailable(reason: "unreadable", message: "That part of the page could not be read." + note)
     }
-    guard let answer, JSONSerialization.isValidJSONObject(answer), let raw = try? JSONSerialization.data(withJSONObject: answer) else {
-      return .unavailable(reason: "unreadable", message: "That part of the page could not be read." + note)
-    }
-    return try await client.pickElementNative(channel: channel, thread: thread, name: name, x: x, y: y, viewport: (was.viewportWidth, was.viewportHeight), raw: raw)
+    guard let after = await look(), after.matches(was) else { return .unavailable(reason: "stale", message: "The page changed after the screenshot." + note) }
+    return engine.pickReply(raw: BrowserPickEngine.json(answer), x: x, y: y, viewport: (was.viewportWidth, was.viewportHeight))
   }
 
-  /// The Annotate flow for a thread, taking the page from this web view and not from the server's Chrome.
+  /// The screenshot editor for a thread, taking the page from this web view and not from the server's Chrome. Live Annotate
+  /// opens it on its own capture for Draw.
   func annotateModel(client: OmniClient, thread: String) -> BrowserAnnotateModel {
     let channel = channel
     return BrowserAnnotateModel(
@@ -205,11 +232,89 @@ final class NativeBrowserModel {
         return try await self.capture(client: client, thread: thread)
       },
       discard: { name in await client.discardCapture(channel: channel, thread: thread, name: name) },
-      pick: { [weak self] name, x, y throws(OmniAPIError) in
+      pick: { [weak self] _, x, y in
         guard let self else { return .unavailable(reason: "stale", message: "The browser was closed.") }
-        return try await self.pick(client: client, thread: thread, name: name, x: x, y: y)
+        return await self.pick(x: x, y: y)
       },
       mark: { capture, marks throws(OmniAPIError) in try await client.uploadMarkedScreenshot(channel: channel, capture: capture, marks: marks) })
+  }
+
+  /// Live Annotate for a thread, on this web view: the hover and the pick read the page here, the capture is this web
+  /// view's screenshot, and Send is the reply box's (`deliver`), as in the Browser tab.
+  func liveModel(client: OmniClient, thread: String, deliver: @escaping @Sendable (String, MessageContext, String) async throws(OmniAPIError) -> Void) -> BrowserLiveAnnotateModel {
+    let channel = channel
+    return BrowserLiveAnnotateModel(
+      thread: thread,
+      inspect: { [weak self] x, y in
+        guard let self else { return .unavailable(reason: "stopped", message: "The browser was closed.") }
+        return await self.inspect(x: x, y: y)
+      },
+      capture: { [weak self] thread throws(BrowserCaptureError) in
+        guard let self else { throw BrowserCaptureError(message: "The browser was closed.", retryable: false) }
+        return try await self.capture(client: client, thread: thread)
+      },
+      discard: { name in await client.discardCapture(channel: channel, thread: thread, name: name) },
+      pick: { [weak self] _, x, y in
+        guard let self else { return .unavailable(reason: "stale", message: "The browser was closed.") }
+        return await self.pick(x: x, y: y)
+      },
+      deliver: deliver)
+  }
+
+  // MARK: Scroll
+
+  /// A page scrolled, and says how far its window is. Only the active tab's counts.
+  fileprivate func scrolled(_ web: WKWebView?, to p: CGPoint) {
+    guard let web, web === webView else { return }
+    if scroll != p { scroll = p }
+    scrolls &+= 1
+  }
+
+  /// Asks the active tab's page how far it is scrolled, after a switch of tabs, when it has not moved to say so itself.
+  private func askScroll() {
+    scroll = nil
+    guard let web = webView else { return }
+    Task {
+      guard let r = try? await web.evaluateJavaScript("[Math.round(scrollX), Math.round(scrollY)]", in: nil, contentWorld: pickWorld) as? [Any],
+        r.count == 2, let x = (r[0] as? NSNumber)?.doubleValue, let y = (r[1] as? NSNumber)?.doubleValue
+      else { return }
+      scrolled(web, to: CGPoint(x: x, y: y))
+    }
+  }
+}
+
+/// Tells the model when a page scrolls (its window, or a box inside it) and how far its window is, from a script in
+/// Annotate's own content world: the page cannot see the script or the handler. Once for the scroll events of one frame
+/// (a page fires them once a frame; not `requestAnimationFrame`, which stops while the window is hidden). Held weakly,
+/// since the web view keeps the handler.
+@MainActor
+private final class ScrollRelay: NSObject, WKScriptMessageHandler {
+  weak var owner: NativeBrowserModel?
+  static let name = "omniScroll"
+  static let source = """
+    (() => {
+      let queued = false;
+      const post = () => {
+        queued = false;
+        webkit.messageHandlers.omniScroll.postMessage([Math.round(scrollX), Math.round(scrollY)]);
+      };
+      addEventListener('scroll', () => { if (!queued) { queued = true; queueMicrotask(post); } }, { passive: true, capture: true });
+      post();
+    })();
+    """
+
+  init(owner: NativeBrowserModel) { self.owner = owner }
+
+  static func install(on content: WKUserContentController, world: WKContentWorld, owner: NativeBrowserModel) {
+    content.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world))
+    content.add(ScrollRelay(owner: owner), contentWorld: world, name: name)
+  }
+
+  func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+    guard let pair = message.body as? [Any], pair.count == 2, let x = (pair[0] as? NSNumber)?.doubleValue, let y = (pair[1] as? NSNumber)?.doubleValue,
+      x.isFinite, y.isFinite
+    else { return }
+    owner?.scrolled(message.webView, to: CGPoint(x: x, y: y))
   }
 }
 

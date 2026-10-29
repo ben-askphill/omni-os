@@ -71,20 +71,23 @@ struct BrowserTab: View {
 // MARK: Web
 
 /// Ben's own browser for the channel, a web view on this Mac (`NativeBrowserView`), in its own tab beside the agent's Browser:
-/// the agent cannot see or drive it, and Ben's logins never reach the server.
+/// the agent cannot see or drive it, and Ben's logins never reach the server. Annotate is live here too.
 struct WebTab: View {
   let client: OmniClient
   let channel: String?
   /// The thread whose reply box Annotate adds to.
   let thread: String
   let draft: DraftContextModel
+  /// Live Annotate's Send: a message to the thread now, as the reply box sends one.
+  let deliver: @Sendable (String, MessageContext, String) async throws(OmniAPIError) -> Void
   @State private var browser: NativeBrowserModel?
   @State private var annotate: BrowserAnnotateModel?
+  @State private var live: BrowserLiveAnnotateModel?
 
   var body: some View {
     Group {
       if let browser {
-        NativeBrowserView(model: browser, annotating: annotate.map { Annotating(model: $0, client: client, draft: draft) })
+        NativeBrowserView(model: browser, annotating: annotate.map { Annotating(model: $0, client: client, draft: draft, live: live) })
       } else {
         Color.clear
       }
@@ -93,12 +96,17 @@ struct WebTab: View {
     .onChange(of: channel, initial: true) { _, id in
       if let id, browser?.channel != id {
         browser = NativeBrowsers.model(for: id)
-        annotate = browser?.annotateModel(client: client, thread: thread)
+        replace(thread: thread)
       }
     }
-    .onChange(of: thread) { _, thread in
-      annotate = browser?.annotateModel(client: client, thread: thread)
-    }
+    .onChange(of: thread) { _, thread in replace(thread: thread) }
+  }
+
+  /// Annotate for another channel or thread. The old live Annotate turns off, deleting a capture it held.
+  private func replace(thread: String) {
+    live?.turnOff()
+    annotate = browser?.annotateModel(client: client, thread: thread)
+    live = browser?.liveModel(client: client, thread: thread, deliver: deliver)
   }
 }
 

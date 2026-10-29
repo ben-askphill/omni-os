@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, rmSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { inspectScript, pickScript, type RawInspect, type RawPick } from './browser-pick-script.ts';
+import { inspectScript, pickScript, type RawInspect, type RawPick } from '@omni/shared/browser-pick-script.ts';
 import { config, paths } from './config.ts';
 
 /**
