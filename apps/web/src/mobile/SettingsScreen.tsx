@@ -8,7 +8,7 @@ import { useTheme } from '../components/theme.tsx';
 import { Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { describeCron, describeEvent, relTime, windowPct } from '../format.ts';
 import { href, useRoute } from '../router.ts';
-import { useApp, useNow } from '../store.tsx';
+import { useApp, useNow, useSecretStoreLabel } from '../store.tsx';
 import { MoEmpty, MoGroup, MoHeader, MoListRow, MoScroll, MoSection } from './parts.tsx';
 import { RunOnSheet } from './RunOnSheet.tsx';
 import { useShell } from './shell.tsx';
@@ -77,6 +77,7 @@ export function SettingsScreen() {
     return () => window.removeEventListener('focus', check);
   }, []);
   const host = status?.device?.name || location.hostname;
+  const secretStore = useSecretStoreLabel();
   const meters = HARNESS_ROWS.map((r) => ({ r, u: usage[r.id] })).filter(({ u }) => u?.five_hour || u?.monthly);
   const list = automations.data ?? [];
 
@@ -149,7 +150,7 @@ export function SettingsScreen() {
               }}
               disabled={runOn.loading || !runOn.offered}
             />
-            <MoListRow icon="key" label="Secrets" sub="Names only; values stay in the Mac's Keychain" onClick={() => shell.open(href.secrets())} />
+            <MoListRow icon="key" label="Secrets" sub={`Names only; values stay in ${secretStore}`} onClick={() => shell.open(href.secrets())} />
             <MoListRow icon="archive" label="Storage" sub="Worktrees on this Mac and what can be cleaned up" onClick={() => shell.open(href.storage())} />
             <MoListRow
               icon="bell"

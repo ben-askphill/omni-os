@@ -735,8 +735,9 @@ final class QARunner {
       a.model.cancel()
       try? await Task.sleep(for: .milliseconds(400))
     case .live:
-      guard let live = a.live else { throw QAScriptError("the Browser tab has no live Annotate") }
-      guard BrowserAnnotateProbe.browser?.state.url.lowercased().hasPrefix("http") == true else { throw QAScriptError("the browser is not on a web page") }
+      guard let live = a.live else { throw QAScriptError("the browser tab has no live Annotate") }
+      let url = BrowserAnnotateProbe.native?.state.url ?? BrowserAnnotateProbe.browser?.state.url ?? ""
+      guard url.lowercased().hasPrefix("http") else { throw QAScriptError("the browser is not on a web page") }
       live.turnOn()
       try? await Task.sleep(for: .milliseconds(500))
     case .hover(let x, let y):
@@ -760,16 +761,46 @@ final class QARunner {
       guard let live = a.live, case .marked = live.phase else { throw QAScriptError("no live annotation is marked to send") }
       if let why = await live.send() { throw QAScriptError(why) }
       try? await Task.sleep(for: .milliseconds(600))
+    case .escape:
+      let (live, page) = try livePage(a)
+      let before = live.phase
+      page.escape()
+      try? await Task.sleep(for: .milliseconds(300))
+      if before == .idle {
+        guard !live.isOn else { throw QAScriptError("Escape left live Annotate on") }
+      } else {
+        guard live.isOn, live.phase == .idle else { throw QAScriptError("Escape did not clear the card") }
+      }
+    case .optionClick(let x, let y):
+      let (live, page) = try livePage(a)
+      let before = live.phase
+      page.mouseDown(with: try page.event(.leftMouseDown, x, y, option: true))
+      page.mouseUp(with: try page.event(.leftMouseUp, x, y, option: true))
+      try? await Task.sleep(for: .milliseconds(800))
+      guard live.phase == before else { throw QAScriptError("an Option-click marked the page") }
+    case .pageScroll(let dy):
+      guard let web = BrowserAnnotateProbe.native?.webView, web.window != nil else { throw QAScriptError("the Web tab shows no page") }
+      _ = try? await web.evaluateJavaScript("scrollBy(0, \(dy))", in: nil, contentWorld: .defaultClient)
+      // The page fires its scroll event at its next frame, which a window on screen gets at once and the harness's does not.
+      let frame = WKSnapshotConfiguration()
+      frame.afterScreenUpdates = true
+      _ = try? await web.takeSnapshot(configuration: frame)
+      try? await Task.sleep(for: .milliseconds(600))
     }
   }
 
-  /// Live Annotate and the page view it takes its input from, in fractions of the shown page.
+  /// Live Annotate and the page view it takes its input from, in fractions of the shown page: the Web tab's input layer
+  /// when it shows, else the Browser tab's canvas.
   private func livePage(_ a: Annotating) throws(QAScriptError) -> (BrowserLiveAnnotateModel, QALivePage) {
     guard let live = a.live, live.isOn else { throw QAScriptError("live Annotate is not on") }
+    if BrowserAnnotateProbe.native != nil {
+      guard let input = BrowserAnnotateProbe.liveInput as? LiveInputView, input.window != nil else { throw QAScriptError("the Web tab shows no live Annotate layer") }
+      return (live, QALivePage(view: input, frame: .init(width: input.bounds.width, height: input.bounds.height)))
+    }
     guard let canvas = BrowserAnnotateProbe.canvas, canvas.window != nil, let frame = BrowserAnnotateProbe.browser?.frame else {
       throw QAScriptError("the Browser tab shows no page")
     }
-    return (live, QALivePage(view: canvas, frame: frame))
+    return (live, QALivePage(view: canvas, frame: frame.live))
   }
 
   /// Waits for the capture and the element after a click or drag, then writes the note. Fails with why the card says it failed.
@@ -964,6 +995,8 @@ final class QARunner {
     try? await Task.sleep(for: .milliseconds(400))
     let windows = Self.windows
     guard !windows.isEmpty else { throw QAScriptError("no window to snapshot") }
+    let pages = await Self.paintWebViews(in: windows)
+    defer { pages.forEach { $0.removeFromSuperview() } }
     pending = []
     var blank: [String] = []
     var others = 0
@@ -991,6 +1024,36 @@ final class QARunner {
     }
     if !blank.isEmpty { throw QAScriptError("blank: \(blank.joined(separator: ", "))") }
     return pending
+  }
+
+  /// WebKit stops painting a web view a few seconds after its window is last on screen, and the harness's windows are
+  /// not, so `cacheDisplay` draws a page that has sat a while as blank. Each shown web view gets its own snapshot laid just
+  /// over it, under whatever is drawn over the page (live Annotate's outline, tooltip and card). Remove them once drawn.
+  private static func paintWebViews(in windows: [NSWindow]) async -> [NSView] {
+    var laid: [NSView] = []
+    for window in windows {
+      guard let root = window.contentView else { continue }
+      let shown = descendants(of: root).compactMap { $0 as? WKWebView }.filter { web in
+        guard !web.isHiddenOrHasHiddenAncestor, web.bounds.width > 0, web.bounds.height > 0 else { return false }
+        var v: NSView? = web
+        while let view = v {
+          if view.alphaValue == 0 || view.layer?.opacity == 0 { return false }
+          v = view.superview
+        }
+        return true
+      }
+      for web in shown {
+        let config = WKSnapshotConfiguration()
+        config.afterScreenUpdates = true
+        guard let image = try? await web.takeSnapshot(configuration: config), let superview = web.superview else { continue }
+        let view = NSImageView(frame: web.frame)
+        view.image = image
+        view.imageScaling = .scaleAxesIndependently
+        superview.addSubview(view, positioned: .above, relativeTo: web)
+        laid.append(view)
+      }
+    }
+    return laid
   }
 
   /// The window's frame view, title bar and toolbar included, drawn the way AppKit caches a view.
@@ -1143,17 +1206,18 @@ private final class FrameClock: NSObject {
 /// drawn at the view's full width from its top.
 @MainActor
 struct QALivePage {
+  /// The Browser tab's canvas or the Web tab's input layer.
   let view: NSView
-  let frame: BrowserFrame
+  let frame: BrowserAnnotationContext.LiveFrame
 
-  func event(_ type: NSEvent.EventType, _ x: Double, _ y: Double) throws(QAScriptError) -> NSEvent {
+  func event(_ type: NSEvent.EventType, _ x: Double, _ y: Double, option: Bool = false) throws(QAScriptError) -> NSEvent {
     guard let window = view.window, frame.width > 0 else { throw QAScriptError("the page view is not in a window") }
     let width = view.bounds.width, height = width * frame.height / frame.width
-    // The canvas is flipped: y grows down from the page's top.
+    // Both views are flipped: y grows down from the page's top.
     let at = view.convert(NSPoint(x: x * width, y: min(y, 0.999) * height), to: nil)
     guard
       let e = NSEvent.mouseEvent(
-        with: type, location: at, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+        with: type, location: at, modifierFlags: option ? .option : [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
         context: nil, eventNumber: 0, clickCount: type == .mouseMoved ? 0 : 1, pressure: type == .leftMouseUp || type == .mouseMoved ? 0 : 1)
     else { throw QAScriptError("can't make a mouse event") }
     return e
@@ -1163,5 +1227,25 @@ struct QALivePage {
   func mouseDown(with e: NSEvent) { view.mouseDown(with: e) }
   func mouseDragged(with e: NSEvent) { view.mouseDragged(with: e) }
   func mouseUp(with e: NSEvent) { view.mouseUp(with: e) }
+
+  /// Escape, with the page holding the keys, through the path a key press takes there.
+  func escape() {
+    guard let window = view.window else { return }
+    for type in [NSEvent.EventType.keyDown, .keyUp] {
+      guard
+        let e = NSEvent.keyEvent(
+          with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+          characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: LiveAnnotateGesture.escapeKey)
+      else { continue }
+      if let input = view as? LiveInputView {
+        // The web view holds the keys; the input layer sees Escape on its way there.
+        if let page = input.page { window.makeFirstResponder(page) }
+        if !input.takes(type, keyCode: e.keyCode, option: false, window: window.windowNumber) { window.sendEvent(e) }
+      } else {
+        window.makeFirstResponder(view)
+        type == .keyDown ? view.keyDown(with: e) : view.keyUp(with: e)
+      }
+    }
+  }
 }
 #endif

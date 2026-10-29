@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { config, paths, ROOT } from './config.ts';
+import { secretStore } from './secret-store.ts';
 
 /** The commit checked out at root, or null when git can't say. */
 export function gitHead(root: string): string | null {
@@ -27,4 +28,6 @@ export const about = {
   startedAt: new Date().toISOString(),
   port: config.port,
   name: hostname(),
+  /** Where secret values live on this server (secret-store.ts): keychain, libsecret or file. */
+  secretStore: secretStore().kind,
 };

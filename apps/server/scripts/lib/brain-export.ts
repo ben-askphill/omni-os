@@ -209,7 +209,7 @@ export function makeRedactor(secretValues: Iterable<string>): (s: string) => str
   };
 }
 
-/** Values of env vars whose names look like secrets (the .env file and the Keychain secrets the server injects). */
+/** Values of env vars whose names look like secrets (the .env file and the secret store secrets the server injects). */
 export function envSecretValues(env: NodeJS.ProcessEnv): string[] {
   return Object.entries(env)
     .filter(([k, v]) => v && SECRET_NAME.test(k.toUpperCase()))

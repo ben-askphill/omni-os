@@ -58,7 +58,7 @@ const patchInput = userConfigPatch.omit({ automations: true, onboardedAt: true }
 setupApi.get('/', (c) => c.json(setupState()));
 
 // JSON only, as links-api.ts: a page in a browser cannot send that cross-origin without a preflight, so it cannot
-// point the Hermes URL (and with it the Keychain token) or the workspace somewhere else.
+// point the Hermes URL (and with it the secret store token) or the workspace somewhere else.
 setupApi.use('*', async (c, next) => {
   if (c.req.method !== 'GET' && !/^application\/json\b/i.test(c.req.header('content-type') ?? '')) return c.json({ error: 'send JSON' }, 415);
   await next();

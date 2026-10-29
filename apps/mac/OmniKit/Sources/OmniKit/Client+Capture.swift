@@ -15,10 +15,6 @@ private struct InspectRequest: Encodable, Sendable {
   let y: Int
 }
 
-private struct ScriptReply: Decodable {
-  let script: String
-}
-
 private struct RemovedReply: Decodable {
   let removed: Bool
 }
@@ -79,25 +75,6 @@ extension OmniClient {
       if case .http(let status, let message) = error { throw BrowserCaptureError(message: message, retryable: status == 409, stale: status == 409 ? "viewport" : nil) }
       throw BrowserCaptureError(message: error.message, retryable: true)
     }
-  }
-
-  /// The script that reads the element at (`x`, `y`) out of a page (apps/server/browser-pick-script.ts), to run in the web view.
-  public func pickScript(channel: String, x: Int, y: Int) async throws(OmniAPIError) -> String {
-    let reply: ScriptReply = try await send("GET", "/api/channels/\(uriComponent(channel))/browser/pick-script", query: [("x", String(x)), ("y", String(y))])
-    return reply.script
-  }
-
-  /// What the web view's page answered to `pickScript`, as JSON: the server bounds and checks it as it does for its own browser.
-  public func pickElementNative(channel: String, thread: String, name: String, x: Int, y: Int, viewport: (width: Int, height: Int), raw: Data) async throws(OmniAPIError) -> ElementPickReply {
-    let head = "{\"thread\":\(Self.jsonString(thread)),\"x\":\(x),\"y\":\(y),\"viewport\":{\"width\":\(viewport.width),\"height\":\(viewport.height)},\"raw\":"
-    var body = Data(head.utf8)
-    body.append(raw)
-    body.append(Data("}".utf8))
-    return try await send("POST", capturePath(channel, "/\(uriComponent(name))/element/native"), raw: (body, "application/json"))
-  }
-
-  private static func jsonString(_ s: String) -> String {
-    (try? String(data: JSONEncoder().encode(s), encoding: .utf8)) ?? "\"\""
   }
 
   /// Deletes a capture nothing was made of. Best effort: a capture left behind is only a file in the uploads folder.

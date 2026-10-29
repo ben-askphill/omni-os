@@ -1,5 +1,5 @@
 // Sends one request to Ben's Grok Bot webhook. The URL and Authorization value come from the
-// Keychain (global secrets GROKBOT_WEBHOOK_URL and GROKBOT_WEBHOOK_AUTH) and fall back to the
+// secret store (global secrets GROKBOT_WEBHOOK_URL and GROKBOT_WEBHOOK_AUTH) and fall back to the
 // process environment. A bare key is sent as "Bearer <key>". Callers get a result. This function does not throw.
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -24,7 +24,7 @@ export interface GrokBotInput {
 
 export interface GrokBotDeps {
   fetch?: typeof fetch;
-  /** Keychain read. Defaults to the global secret of that name. */
+  /** Secret store read. Defaults to the global secret of that name. */
   secret?: (name: string) => Promise<string | null>;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
@@ -140,7 +140,7 @@ function webhookUrl(raw: string): URL | null {
 
 /**
  * POST `{ request, source: "omni-os", context? }` to the webhook.
- * Keychain wins over the environment. A bare key is sent as `Bearer <key>`. A value that
+ * The secret store wins over the environment. A bare key is sent as `Bearer <key>`. A value that
  * already starts with `Bearer ` (any case) is sent unchanged, after trimming. A redirect is
  * an error: following it would send the Authorization value to another host.
  */

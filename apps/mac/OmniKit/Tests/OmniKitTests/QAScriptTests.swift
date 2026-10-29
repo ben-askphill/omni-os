@@ -176,12 +176,12 @@ import OmniKit
   }
 
   @Test func readsTheLiveAnnotateSteps() throws {
-    let json = #"[{"annotate": "live"}, {"annotate": {"hover": [0.4, 0.3]}}, {"annotate": {"livePick": [0.5, 0.2], "note": "why blue?"}}, {"annotate": {"liveDrag": [0.1, 0.2, 0.6, 0.5]}}, {"annotate": "send"}]"#
+    let json = #"[{"annotate": "live"}, {"annotate": {"hover": [0.4, 0.3]}}, {"annotate": {"livePick": [0.5, 0.2], "note": "why blue?"}}, {"annotate": {"liveDrag": [0.1, 0.2, 0.6, 0.5]}}, {"annotate": "send"}, {"annotate": {"optionClick": [0.2, 0.8]}}, {"annotate": {"pageScroll": -120}}, {"annotate": "escape"}]"#
     #expect(try QAScript(json: Data(json.utf8)).steps == [
       .annotate(.live), .annotate(.hover(x: 0.4, y: 0.3)), .annotate(.livePick(x: 0.5, y: 0.2, note: "why blue?")),
-      .annotate(.liveDrag(x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.5, note: "")), .annotate(.send),
+      .annotate(.liveDrag(x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.5, note: "")), .annotate(.send), .annotate(.optionClick(x: 0.2, y: 0.8)), .annotate(.pageScroll(-120)), .annotate(.escape),
     ])
-    for bad in [#"[{"annotate": {"hover": [0.5]}}]"#, #"[{"annotate": {"hover": [0.5, 0.5], "note": "x"}}]"#, #"[{"annotate": {"livePick": [2, 0]}}]"#, #"[{"annotate": {"liveDrag": [0, 0, 1]}}]"#, #"[{"annotate": {"livePick": [0, 0], "note": 1}}]"#] {
+    for bad in [#"[{"annotate": {"hover": [0.5]}}]"#, #"[{"annotate": {"hover": [0.5, 0.5], "note": "x"}}]"#, #"[{"annotate": {"optionClick": [0.5, 2]}}]"#, #"[{"annotate": {"optionClick": [0.5, 0.5], "note": "x"}}]"#, #"[{"annotate": {"pageScroll": "down"}}]"#, #"[{"annotate": {"pageScroll": true}}]"#, #"[{"annotate": {"livePick": [2, 0]}}]"#, #"[{"annotate": {"liveDrag": [0, 0, 1]}}]"#, #"[{"annotate": {"livePick": [0, 0], "note": 1}}]"#] {
       #expect(throws: QAScriptError.self, "\(bad)") { try QAScript(json: Data(bad.utf8)) }
     }
   }

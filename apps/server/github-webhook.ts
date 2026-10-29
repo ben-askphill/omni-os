@@ -1,5 +1,5 @@
 // What a signed GitHub webhook posted to an automation's endpoint becomes (`on: github_webhook`): the signature check,
-// the fields kept from the payload and the run's prompt. Pure, no db, no Keychain, so it is tested directly
+// the fields kept from the payload and the run's prompt. Pure, no db, no secret store, so it is tested directly
 // (tests/github-webhook.test.ts). apps/server/github-webhook-api.ts is the route that saves the delivery.
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { TriggerDelivery } from '@omni/shared/automation-triggers.ts';
@@ -11,7 +11,7 @@ export const WEBHOOK_MAX_BYTES = 1024 * 1024;
 /** Where GitHub posts an automation's events. The guard (request-guard.ts) lets these through without the API token. */
 export const webhookPath = (automation: string) => `/api/hooks/github/${automation}`;
 
-/** Keychain names for webhook signing secrets start with this. They never reach a thread (secrets.ts). */
+/** Secret names for webhook signing secrets start with this. They never reach a thread (secrets.ts). */
 export const WEBHOOK_SECRET_PREFIX = 'OMNI_WEBHOOK_';
 
 /** The global secret that holds an automation's signing secret: `OMNI_WEBHOOK_` and its id, upper snake case. */

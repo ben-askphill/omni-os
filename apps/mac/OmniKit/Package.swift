@@ -11,7 +11,7 @@ let package = Package(
   targets: [
     .target(
       name: "OmniKit", dependencies: [.product(name: "Markdown", package: "swift-markdown")],
-      resources: [.copy("Resources/slash-engine.js")]),
+      resources: [.copy("Resources/slash-engine.js"), .copy("Resources/browser-pick.js")]),
     .testTarget(name: "OmniKitTests", dependencies: ["OmniKit"], resources: [.copy("Fixtures")]),
   ]
 )

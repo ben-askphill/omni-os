@@ -104,6 +104,8 @@ export interface SetupState {
 }
 
 export interface Status {
+  /** Which server this is. Only the fields the web reads. */
+  server?: { secretStore?: string };
   usage: HarnessUsage;
   slots: Partial<Record<HarnessId, HarnessSlot>>;
   running: number;
@@ -345,7 +347,7 @@ export interface Automation {
   deliveries: DeliveryView[];
   /** Older deliveries exist: GET /automations/:id/deliveries pages through them. */
   deliveries_more: boolean;
-  /** Set for a webhook automation: where GitHub posts, and whether this Mac holds the signing secret. `secret` is its Keychain name, never the value. */
+  /** Set for a webhook automation: where GitHub posts, and whether this Mac holds the signing secret. `secret` is its secret name, never the value. */
   webhook?: { path: string; secret: string; secret_set: boolean };
 }
 

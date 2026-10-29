@@ -1,0 +1,470 @@
+{
+  "point": {
+    "x": 400,
+    "y": 150
+  },
+  "viewport": {
+    "width": 1280,
+    "height": 713
+  },
+  "picks": [
+    {
+      "name": "a button, its box outward to whole pixels",
+      "raw": {
+        "ok": true,
+        "tag": "button",
+        "selector": "#cart > div.summary > button.checkout",
+        "text": "Check out · €48,50",
+        "html": "<button id=\"go\" class=\"checkout\" type=\"submit\">Check out · €48,50</button>",
+        "ancestors": [
+          "<div class=\"summary\">",
+          "<main id=\"cart\">"
+        ],
+        "bounds": {
+          "x": 320.4,
+          "y": 96.2,
+          "width": 479.8,
+          "height": 159.5
+        },
+        "frames": [],
+        "opaque": false,
+        "truncated": false,
+        "styles": {
+          "display": "inline-flex",
+          "color": "rgb(255, 255, 255)",
+          "background_color": "rgb(43, 59, 255)",
+          "font_size": "15px",
+          "padding": "8px 16px"
+        }
+      },
+      "reply": {
+        "element": {
+          "tag": "button",
+          "selector": "#cart > div.summary > button.checkout",
+          "text": "Check out · €48,50",
+          "html": "<button id=\"go\" class=\"checkout\" type=\"submit\">Check out · €48,50</button>",
+          "ancestors": [
+            "<div class=\"summary\">",
+            "<main id=\"cart\">"
+          ],
+          "bounds": {
+            "x": 320,
+            "y": 96,
+            "width": 481,
+            "height": 160
+          },
+          "point": {
+            "x": 400,
+            "y": 150
+          },
+          "frames": [],
+          "opaque_frame": false,
+          "truncated": false,
+          "styles": {
+            "display": "inline-flex",
+            "color": "rgb(255, 255, 255)",
+            "background_color": "rgb(43, 59, 255)",
+            "font_size": "15px",
+            "padding": "8px 16px"
+          }
+        }
+      }
+    },
+    {
+      "name": "a frame from another site, clipped to the viewport, unknown styles left out",
+      "raw": {
+        "ok": true,
+        "tag": "IFRAME",
+        "selector": "#pay > iframe:nth-of-type(2)",
+        "text": "",
+        "html": "<iframe src=\"https://pay.example.net/widget\" title=\"Payment\">…</iframe>",
+        "ancestors": [
+          "<section id=\"pay\">"
+        ],
+        "bounds": {
+          "x": 1100,
+          "y": 600,
+          "width": 400,
+          "height": 300
+        },
+        "frames": [],
+        "opaque": true,
+        "truncated": false,
+        "styles": {
+          "display": "block",
+          "z_index": "auto",
+          "cursor": "pointer"
+        }
+      },
+      "reply": {
+        "element": {
+          "tag": "iframe",
+          "selector": "#pay > iframe:nth-of-type(2)",
+          "text": "",
+          "html": "<iframe src=\"https://pay.example.net/widget\" title=\"Payment\">…</iframe>",
+          "ancestors": [
+            "<section id=\"pay\">"
+          ],
+          "bounds": {
+            "x": 1100,
+            "y": 600,
+            "width": 180,
+            "height": 113
+          },
+          "point": {
+            "x": 400,
+            "y": 150
+          },
+          "frames": [],
+          "opaque_frame": true,
+          "truncated": false,
+          "styles": {
+            "display": "block",
+            "z_index": "auto"
+          }
+        }
+      }
+    },
+    {
+      "name": "inside a shadow root of a same-origin frame, control characters dropped",
+      "raw": {
+        "ok": true,
+        "tag": "span",
+        "selector": "shop-cart#c >>> div.total > span.amount",
+        "text": "Total\u001b[2J\n\n  €48‮,50\t",
+        "html": "<span class=\"amount\">\nTotal\u0000</span>",
+        "ancestors": [
+          "<div class=\"total\">"
+        ],
+        "bounds": {
+          "x": 12,
+          "y": 40,
+          "width": 2,
+          "height": 2
+        },
+        "frames": [
+          "https://shop.example.com/embed/cart"
+        ],
+        "opaque": false,
+        "truncated": false,
+        "styles": {}
+      },
+      "reply": {
+        "element": {
+          "tag": "span",
+          "selector": "shop-cart#c >>> div.total > span.amount",
+          "text": "Total [2J €48 ,50",
+          "html": "<span class=\"amount\"> Total </span>",
+          "ancestors": [
+            "<div class=\"total\">"
+          ],
+          "bounds": {
+            "x": 12,
+            "y": 40,
+            "width": 2,
+            "height": 2
+          },
+          "point": {
+            "x": 400,
+            "y": 150
+          },
+          "frames": [
+            "https://shop.example.com/embed/cart"
+          ],
+          "opaque_frame": false,
+          "truncated": false
+        }
+      }
+    },
+    {
+      "name": "nothing at the spot",
+      "raw": {
+        "ok": false,
+        "reason": "nothing"
+      },
+      "reply": {
+        "unavailable": {
+          "reason": "nothing",
+          "message": "Nothing could be picked at that spot. The screenshot and the area you mark still go with your message."
+        }
+      }
+    },
+    {
+      "name": "an answer that is not an element",
+      "raw": "not a pick",
+      "reply": {
+        "unavailable": {
+          "reason": "unreadable",
+          "message": "That part of the page could not be read. The screenshot and the area you mark still go with your message."
+        }
+      }
+    },
+    {
+      "name": "a tag no element has",
+      "raw": {
+        "ok": true,
+        "tag": "Button onclick=",
+        "selector": "#cart > div.summary > button.checkout",
+        "text": "Check out · €48,50",
+        "html": "<button id=\"go\" class=\"checkout\" type=\"submit\">Check out · €48,50</button>",
+        "ancestors": [
+          "<div class=\"summary\">",
+          "<main id=\"cart\">"
+        ],
+        "bounds": {
+          "x": 320.4,
+          "y": 96.2,
+          "width": 479.8,
+          "height": 159.5
+        },
+        "frames": [],
+        "opaque": false,
+        "truncated": false,
+        "styles": {
+          "display": "inline-flex",
+          "color": "rgb(255, 255, 255)",
+          "background_color": "rgb(43, 59, 255)",
+          "font_size": "15px",
+          "padding": "8px 16px"
+        }
+      },
+      "reply": {
+        "unavailable": {
+          "reason": "unreadable",
+          "message": "That part of the page could not be read. The screenshot and the area you mark still go with your message."
+        }
+      }
+    }
+  ],
+  "inspects": [
+    {
+      "name": "a button, clipped to the viewport the page reported",
+      "raw": {
+        "ok": true,
+        "tag": "BUTTON",
+        "id": "go",
+        "classes": [
+          "checkout",
+          "primary"
+        ],
+        "path": [
+          "body",
+          "main#cart",
+          "div.summary",
+          "button#go"
+        ],
+        "bounds": {
+          "x": 1200.5,
+          "y": 96.2,
+          "width": 479.8,
+          "height": 159.5
+        },
+        "styles": {
+          "display": "inline-flex",
+          "color": "rgb(255, 255, 255)"
+        },
+        "opaque": false,
+        "viewport": {
+          "width": 1280,
+          "height": 713
+        }
+      },
+      "reply": {
+        "element": {
+          "tag": "button",
+          "id": "go",
+          "classes": [
+            "checkout",
+            "primary"
+          ],
+          "path": [
+            "body",
+            "main#cart",
+            "div.summary",
+            "button#go"
+          ],
+          "bounds": {
+            "x": 1200,
+            "y": 96,
+            "width": 80,
+            "height": 160
+          },
+          "size": {
+            "width": 480,
+            "height": 160
+          },
+          "styles": {
+            "display": "inline-flex",
+            "color": "rgb(255, 255, 255)"
+          },
+          "opaque_frame": false
+        }
+      }
+    },
+    {
+      "name": "a frame from another site",
+      "raw": {
+        "ok": true,
+        "tag": "iframe",
+        "id": "",
+        "classes": [],
+        "path": [
+          "body",
+          "section#pay",
+          "iframe"
+        ],
+        "bounds": {
+          "x": 1100,
+          "y": 600,
+          "width": 400,
+          "height": 300
+        },
+        "styles": {
+          "display": "block"
+        },
+        "opaque": true,
+        "viewport": {
+          "width": 1280,
+          "height": 713
+        }
+      },
+      "reply": {
+        "element": {
+          "tag": "iframe",
+          "id": "",
+          "classes": [],
+          "path": [
+            "body",
+            "section#pay",
+            "iframe"
+          ],
+          "bounds": {
+            "x": 1100,
+            "y": 600,
+            "width": 180,
+            "height": 113
+          },
+          "size": {
+            "width": 400,
+            "height": 300
+          },
+          "styles": {
+            "display": "block"
+          },
+          "opaque_frame": true
+        }
+      }
+    },
+    {
+      "name": "every string and list bounded",
+      "raw": {
+        "ok": true,
+        "tag": "BUTTON",
+        "id": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
+        "classes": [
+          "c0\u0007",
+          "c1\u0007",
+          "c2\u0007",
+          "c3\u0007",
+          "c4\u0007",
+          "c5\u0007",
+          "c6\u0007",
+          "c7\u0007",
+          "c8\u0007"
+        ],
+        "path": [
+          "div.level-0",
+          "div.level-1",
+          "div.level-2",
+          "div.level-3",
+          "div.level-4",
+          "div.level-5",
+          "div.level-6",
+          "div.level-7",
+          "div.level-8",
+          "div.level-9"
+        ],
+        "bounds": {
+          "x": 1200.5,
+          "y": 96.2,
+          "width": 479.8,
+          "height": 159.5
+        },
+        "styles": {
+          "display": "inline-flex",
+          "color": "rgb(255, 255, 255)"
+        },
+        "opaque": false,
+        "viewport": {
+          "width": 1280,
+          "height": 713
+        }
+      },
+      "reply": {
+        "element": {
+          "tag": "button",
+          "id": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii…",
+          "classes": [
+            "c3",
+            "c4",
+            "c5",
+            "c6",
+            "c7",
+            "c8"
+          ],
+          "path": [
+            "div.level-2",
+            "div.level-3",
+            "div.level-4",
+            "div.level-5",
+            "div.level-6",
+            "div.level-7",
+            "div.level-8",
+            "div.level-9"
+          ],
+          "bounds": {
+            "x": 1200,
+            "y": 96,
+            "width": 80,
+            "height": 160
+          },
+          "size": {
+            "width": 480,
+            "height": 160
+          },
+          "styles": {
+            "display": "inline-flex",
+            "color": "rgb(255, 255, 255)"
+          },
+          "opaque_frame": false
+        }
+      }
+    },
+    {
+      "name": "nothing under the pointer",
+      "raw": {
+        "ok": false,
+        "reason": "nothing"
+      },
+      "reply": {
+        "unavailable": {
+          "reason": "nothing",
+          "message": "Nothing is under the pointer."
+        }
+      }
+    },
+    {
+      "name": "an answer that is not an element",
+      "raw": {
+        "ok": true,
+        "tag": 42
+      },
+      "reply": {
+        "unavailable": {
+          "reason": "unreadable",
+          "message": "That part of the page could not be read."
+        }
+      }
+    }
+  ]
+}

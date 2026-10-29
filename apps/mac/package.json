@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:mac": "swift test --package-path OmniKit",
     "build:slash": "tsx scripts/build-slash-engine.ts",
+    "build:pick": "tsx scripts/build-browser-pick.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

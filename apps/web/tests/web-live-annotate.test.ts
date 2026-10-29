@@ -107,6 +107,7 @@ let page: HTMLDivElement;
 let calls: { method: string; url: string; body: unknown }[];
 let input: ReturnType<typeof vi.fn>;
 let failSend: boolean;
+let answer: PickedElement;
 let onDone: ReturnType<typeof vi.fn<() => void>>;
 
 function fakeBrowser(): Browser {
@@ -138,6 +139,7 @@ beforeEach(async () => {
   calls = [];
   input = vi.fn();
   failSend = false;
+  answer = PICKED;
   onDone = vi.fn<() => void>();
   settleDraftContext('t1', draftContext('t1').map((r) => r.id));
   vi.stubGlobal(
@@ -148,7 +150,7 @@ beforeEach(async () => {
       calls.push({ method, url, body });
       if (url === '/api/channels/c1/browser/inspect') return Response.json({ element: HOVERED });
       if (url === '/api/channels/c1/browser/capture' && method === 'POST') return Response.json({ capture: CAPTURE });
-      if (url.endsWith('/element')) return Response.json({ element: PICKED });
+      if (url.endsWith('/element')) return Response.json({ element: answer });
       if (method === 'DELETE') return Response.json({ removed: true });
       if (url === '/api/threads/t1/messages') return failSend ? Response.json({ error: 'The thread is gone.' }, { status: 404 }) : Response.json({ id: 't1' });
       throw new Error(`Unexpected request: ${method} ${url}`);
@@ -272,6 +274,22 @@ describe('the live Annotate overlay', () => {
     await act(async () => button('Add to message').click());
     expect(draftContext('t1')).toEqual([expect.objectContaining({ kind: 'browser_annotation', label: 'Browser, <button> on shop.example.com/cart' })]);
     expect(calls.some((c) => c.url === '/api/threads/t1/messages')).toBe(false);
+  });
+
+  it('keeps a long selector to the card\'s width: cut from the start so the element shows, and whole in its title', async () => {
+    const selector = `html > body > main.Kd82aZ_main > ${'div.QI8oKG_container.Fzcv4W_inset:nth-of-type(5) > '.repeat(6)}div.QI8oKG_descriptionContainer.ImRUSq_root:nth-of-type(3)`;
+    answer = { ...PICKED, tag: 'div', selector, text: 'Purpose-built for planning and building products. '.repeat(8) };
+    await pointer('pointerdown', 200, 100);
+    await pointer('pointerup', 200, 100);
+    await picked();
+    // An inline-size container takes its width from the panel, never from what is in it.
+    expect(card()!.className).toContain('@container');
+    const shown = card()!.querySelector<HTMLElement>(`[title="${selector}"]`)!;
+    expect(shown.dir).toBe('rtl');
+    expect(shown.className).toContain('truncate');
+    expect(shown.querySelector('bdi')!.textContent).toBe(selector);
+    expect(card()!.querySelector('[data-picked-element] .line-clamp-2')!.textContent).toBe(answer.text);
+    for (const name of ['Draw', 'Add to message', 'Send']) expect(button(name)).toBeTruthy();
   });
 
   it('deletes the screenshot of a pick that is cleared, and Escape clears it, then turns Annotate off', async () => {

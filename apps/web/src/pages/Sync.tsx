@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, useApi, type SyncSetupResult, type SyncStatus } from '../api.ts';
 import { Button, CopyButton, ErrorNote, Icon, InlineConfirm, Label, Loading, PageHeader, Segmented, StatusDot } from '../components/ui.tsx';
 import { plural, relTime } from '../format.ts';
+import { useSecretStoreLabel } from '../store.tsx';
 
 // Settings, Sync: sign in to the Supabase relay, see what is waiting, sync now, pause, sign out, and the path map.
 // The Mac app's Sync tab (apps/mac/Omni/SyncSettingsView.swift) shows the same.
@@ -20,6 +21,7 @@ function stateOf(s: Status): { label: string; dot: string } {
 export function SyncPage() {
   const res = useApi<Status>('/sync/status');
   const { reload } = res;
+  const store = useSecretStoreLabel();
 
   // The worker runs on its own; poll so the numbers move while the page is open.
   useEffect(() => {
@@ -38,7 +40,7 @@ export function SyncPage() {
           </span>
           <div>
             Channels, threads, transcripts, artifacts, automation runs and settings go through an append-only change log. Each Mac keeps its own database; Supabase
-            only relays. Secrets, browser profiles, worktrees and logs never leave this Mac. The URL, anon key and sign-in token live in the Keychain; the password is
+            only relays. Secrets, browser profiles, worktrees and logs never leave this Mac. The URL, anon key and sign-in token live in {store}; the password is
             used once and dropped.
           </div>
         </div>
@@ -72,6 +74,7 @@ function StatusCard({ s, onChange }: { s: Status; onChange: () => void }) {
   const [busy, setBusy] = useState<'now' | 'pause' | 'owner' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const state = stateOf(s);
+  const store = useSecretStoreLabel();
 
   const run = async (what: 'now' | 'pause' | 'owner', fn: () => Promise<unknown>) => {
     setBusy(what);
@@ -160,7 +163,7 @@ function StatusCard({ s, onChange }: { s: Status; onChange: () => void }) {
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-        <span className="text-[12px] text-fg-3">Signing out removes the credentials from the Keychain. History stays on this Mac.</span>
+        <span className="text-[12px] text-fg-3">Signing out removes the credentials from {store}. History stays on this Mac.</span>
         <InlineConfirm label="Sign out" icon="lock" confirmLabel="Sign out" doneLabel="Signed out" busyLabel="Signing out" onConfirm={async () => {
           await api.post('/sync/disable', { forget: true });
           onChange();

@@ -34,6 +34,8 @@ describe('GET /api/status', () => {
     expect(res.status).toBe(200);
     const body = JSON.parse(res.text);
     expect(body).toMatchObject({ usage: expect.any(Object), slots: expect.any(Object), running: 0, queued: 0, maxConcurrent: 8, maxUploadMb: 25 });
+    // After startRunner, so config.ts sees its data dir.
+    const { pickSecretStore } = await import('../secret-store.ts');
     expect(body.server).toEqual({
       version: JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version,
       pid: process.pid,
@@ -43,6 +45,7 @@ describe('GET /api/status', () => {
       startedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/),
       port: r.config.port,
       name: hostname(),
+      secretStore: pickSecretStore(),
     });
     expect(Date.parse(body.server.startedAt)).toBeLessThanOrEqual(Date.now());
     expect(JSON.parse((await call('/api/status')).text).server).toEqual(body.server);

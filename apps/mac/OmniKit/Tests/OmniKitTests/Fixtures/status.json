@@ -54,7 +54,8 @@
     "gitHead": "0000000000000000000000000000000000000000",
     "startedAt": "2026-01-05T09:00:00.000Z",
     "port": 4799,
-    "name": "Omni's Mac"
+    "name": "Omni's Mac",
+    "secretStore": "keychain"
   },
   "device": {
     "name": "Omni's Mac",

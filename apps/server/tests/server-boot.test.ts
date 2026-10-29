@@ -56,6 +56,8 @@ function boot(data: string, port = 0) {
       OMNI_CODEX_BIN: join(tmp, 'no-codex'),
       OMNI_CURSOR_BIN: join(tmp, 'no-cursor-agent'),
       OMNI_BROWSER: '0',
+      // Secrets in the data dir, never this Mac's Keychain.
+      OMNI_SECRET_STORE: 'file',
       OMNI_BRAIN_DIR: brain,
       OMNI_DEFAULT_MODEL: 'sonnet',
       OMNI_KEEPALIVE_SECONDS: '60',
@@ -156,6 +158,7 @@ describe('the server at boot', () => {
       startedAt: expect.any(String),
       port,
       name: expect.any(String),
+      secretStore: 'file',
     });
     // Over a real loopback socket, with no proxy in between.
     expect(device).toEqual({ name: server.name, here: true });

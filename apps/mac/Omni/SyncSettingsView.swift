@@ -11,7 +11,7 @@ struct SyncSettings: View {
   var body: some View {
     Group {
       if let sync {
-        SyncForm(sync: sync)
+        SyncForm(sync: sync, storeLabel: model.store.status?.secretStoreLabel ?? SecretStore.keychain.label)
       } else {
         Loader(size: 18).frame(maxWidth: .infinity, maxHeight: .infinity).background(Tok.bg)
       }
@@ -35,13 +35,15 @@ struct SyncSettings: View {
 
 struct SyncForm: View {
   @Bindable var sync: SyncModel
+  /// Where the server keeps the credentials, like "the server Mac's Keychain".
+  let storeLabel: String
   @State private var confirmingSignOut = false
 
   var body: some View {
     SettingsPage {
       SettingsIntro(
         icon: "refresh",
-        text: Text("Sync keeps this Mac's history in step with your other Mac through your own Supabase project. Each Mac keeps its own database; Supabase only relays the changes. The sign-in token lives in the Keychain, and the password is never stored.")
+        text: Text("Sync keeps this Mac's history in step with your other Mac through your own Supabase project. Each Mac keeps its own database; Supabase only relays the changes. The sign-in token lives in \(storeLabel), and the password is never stored.")
       )
 
       switch sync.loadState {
@@ -61,7 +63,7 @@ struct SyncForm: View {
       Button("Sign Out", role: .destructive) { Task { await sync.signOut() } }
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("Omni stops syncing and removes the relay URL, the key and the sign-in token from the Keychain. The history on this Mac stays.")
+      Text("Omni stops syncing and removes the relay URL, the key and the sign-in token from \(storeLabel). The history on this Mac stays.")
     }
   }
 
@@ -133,7 +135,7 @@ struct SyncForm: View {
         ErrorNote(text: error)
       }
       HStack(alignment: .firstTextBaseline, spacing: z(12)) {
-        Text("Signing out removes the credentials from the Keychain. History stays on this Mac.")
+        Text("Signing out removes the credentials from \(storeLabel). History stays on this Mac.")
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
           .fixedSize(horizontal: false, vertical: true)

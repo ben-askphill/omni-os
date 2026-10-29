@@ -179,7 +179,7 @@ private struct InspectorPanel: View {
           client: model.client, channel: store.thread?.channelID, shots: store.screenshots, thread: store.id, draft: store.draftContext,
           deliver: send)
       case .web:
-        WebTab(client: model.client, channel: store.thread?.channelID, thread: store.id, draft: store.draftContext)
+        WebTab(client: model.client, channel: store.thread?.channelID, thread: store.id, draft: store.draftContext, deliver: send)
       case .terminal:
         TerminalTab(client: model.client, thread: store.id, cwd: store.thread?.cwd, draft: store.draftContext)
       case .actions:

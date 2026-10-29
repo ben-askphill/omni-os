@@ -2,8 +2,8 @@ import AppKit
 import OmniKit
 import SwiftUI
 
-/// What the Browser tab's Annotate needs: the model, the client that loads the screenshot, and the reply box's context.
-/// `live` is live Annotate on the agent's browser; the Web tab has none and annotates a screenshot straight away.
+/// What Annotate needs in the Browser and Web tabs: the screenshot editor's model, the client that loads the screenshot,
+/// and the reply box's context. `live` is live Annotate on that tab's page, which opens the editor for Draw.
 struct Annotating {
   let model: BrowserAnnotateModel
   let client: OmniClient
@@ -447,6 +447,8 @@ enum BrowserAnnotateProbe {
   /// The address bar, in window coordinates from the top left, and the page view, for `{"browserAddress": ...}`.
   static var address: CGRect?
   static weak var canvas: NSView?
+  /// The Web tab's live Annotate input layer, over its web view while live Annotate is on.
+  static weak var liveInput: NSView?
 
   /// What a browser view going away clears, unless the next one, which can appear first, has already taken its place.
   static func release(browser model: ChannelBrowserModel, annotate: BrowserAnnotateModel?) {
