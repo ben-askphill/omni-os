@@ -11,7 +11,7 @@ struct SettingsView: View {
     TabView(selection: $model.settingsTab) {
       Tab("Connection", systemImage: "network", value: .connection) {
         ConnectionSettings(settings: model.settings, model: model)
-          .frame(width: z(560), height: 520)
+          .frame(width: z(560), height: 760)
       }
       Tab("Profile", systemImage: "person", value: .profile) {
         ProfileSettings(model: model)
@@ -45,17 +45,21 @@ struct SettingsView: View {
   }
 }
 
-/// The port, the repo and the Node override. The model follows the settings, so a change applies at once:
-/// a new port reconnects, and any change checks the server again.
+/// The remote server, then the port, the repo and the Node override. The model follows the settings, so a change
+/// applies at once: a new port or remote server reconnects, and any change checks the server again.
 struct ConnectionSettings: View {
   @Bindable var settings: ServerSettings
   let model: AppModel
 
   var body: some View {
     SettingsPage {
+      RemoteServerCard(settings: settings, model: model)
+
       SettingsCard(
-        title: "Server",
-        note: "The app looks for the server on this port and starts it from this repo. Leave Node empty to use the newest Node 24 or later it finds."
+        title: settings.remote == nil ? "Server" : "Server on this Mac",
+        note: settings.remote == nil
+          ? "The app looks for the server on this port and starts it from this repo. Leave Node empty to use the newest Node 24 or later it finds."
+          : "Not used while a remote server is set. Clear the remote URL to go back to the server on this Mac."
       ) {
         VStack(alignment: .leading, spacing: 0) {
           FieldLabel(text: "Port")
@@ -86,7 +90,10 @@ struct ConnectionSettings: View {
 
       SettingsCard(title: "Status") {
         InfoRows {
-          InfoRow("Server", value: model.supervisor.state.label)
+          InfoRow("Server", value: model.serverLabel)
+          if let name = model.store.status?.device?.name {
+            InfoRow("Machine", value: name)
+          }
           InfoRow("Feed", value: feedLabel)
           InfoRow(label: "Log") {
             Button("Open Log") { openLog(model) }
@@ -113,6 +120,103 @@ struct ConnectionSettings: View {
     case .reconnecting: "Reconnecting"
     case .closed: "Closed"
     }
+  }
+}
+
+/// An Omni on another machine, like a Linux box behind `tailscale serve`. Its URL and its token, which goes in
+/// this Mac's Keychain. The app then runs every thread there and starts nothing here.
+struct RemoteServerCard: View {
+  @Bindable var settings: ServerSettings
+  let model: AppModel
+  @State private var draft = ""
+  @State private var token = ""
+  @State private var saved: String?
+  @State private var error: String?
+  @State private var hasToken = false
+  @FocusState private var urlFocused: Bool
+  private let store = RemoteTokenStore()
+
+  var body: some View {
+    SettingsCard(
+      title: "Remote server",
+      note: "Run every thread on another machine's Omni, like a Linux box on your tailnet. Use its https address from tailscale serve. Leave empty for the server on this Mac."
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        FieldLabel(text: "URL")
+        TextField("URL", text: $draft, prompt: Text("https://omarchy.tailnet.ts.net"))
+          .textFieldStyle(.omniMono)
+          .focused($urlFocused)
+          .onSubmit(commit)
+        if !draft.trimmingCharacters(in: .whitespaces).isEmpty, ServerSettings.remote(draft) == nil {
+          ErrorNote(text: "Use an https address with no path, like https://omarchy.tailnet.ts.net.")
+            .padding(.top, z(8))
+        }
+      }
+      if let origin = settings.remote {
+        VStack(alignment: .leading, spacing: 0) {
+          FieldLabel(text: "Token")
+          SecureField("Token", text: $token, prompt: Text(hasToken ? "Saved in the Keychain. Paste to replace" : "Paste data/api-token from that machine"))
+            .textFieldStyle(.omniMono)
+            .privacySensitive()
+            .onSubmit { save(origin) }
+        }
+        if let error { ErrorNote(text: error) }
+        HStack(spacing: z(10)) {
+          Button("Save Token") { save(origin) }
+            .buttonStyle(.pill(.primary, height: 34))
+            .disabled(token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          if hasToken {
+            Button("Remove Token") { remove(origin) }
+              .buttonStyle(.pill(.secondary, height: 34))
+          }
+          if let saved { DoneNote(text: saved) }
+          Spacer(minLength: 0)
+        }
+      }
+    }
+    .onAppear {
+      draft = settings.remoteURL
+      refreshToken()
+    }
+    .onChange(of: settings.remoteURL) { _, new in
+      if !urlFocused { draft = new }
+      refreshToken()
+    }
+    .onChange(of: urlFocused) { _, now in
+      if !now { commit() }
+    }
+    .onDisappear(perform: commit)
+  }
+
+  /// A URL that is not one is kept in the field with its note, and applies nothing until it is fixed or cleared.
+  private func commit() {
+    let value = draft.trimmingCharacters(in: .whitespaces)
+    guard value.isEmpty || ServerSettings.remote(value) != nil else { return }
+    let normal = ServerSettings.remote(value)?.absoluteString ?? ""
+    if normal != settings.remoteURL { settings.remoteURL = normal }
+    draft = normal
+  }
+
+  private func save(_ origin: URL) {
+    saved = nil
+    guard store.save(token, for: origin) else { return error = "Could not save the token in the Keychain." }
+    error = nil
+    token = ""
+    saved = "Saved"
+    refreshToken()
+    Task { await model.checkAgain() }
+  }
+
+  private func remove(_ origin: URL) {
+    saved = nil
+    guard store.delete(origin) else { return error = "Could not remove the token from the Keychain." }
+    error = nil
+    refreshToken()
+    Task { await model.checkAgain() }
+  }
+
+  private func refreshToken() {
+    hasToken = settings.remote.map(store.has) ?? false
   }
 }
 

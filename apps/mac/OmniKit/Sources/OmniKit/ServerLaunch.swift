@@ -24,6 +24,12 @@ public enum ServerStartError: Error, Hashable, Sendable, LocalizedError {
   case notAnswering(port: Int)
   /// The app's server runs on another port, the one it had before a settings change.
   case startedElsewhere(port: Int)
+  /// A remote server is set, with no token saved for it.
+  case remoteNoToken(host: String)
+  case remoteUnreachable(host: String)
+  /// The remote server refused the saved token.
+  case remoteRejected(host: String)
+  case remoteNotOmni(host: String, detail: String)
 
   public var message: String {
     switch self {
@@ -41,6 +47,10 @@ public enum ServerStartError: Error, Hashable, Sendable, LocalizedError {
     case .noAnswer(let seconds): "The server did not answer within \(seconds) seconds."
     case .notAnswering(let port): "The server the app started holds port \(port) but does not answer. Stop it, then start again."
     case .startedElsewhere(let port): "The app's server still runs on port \(port). Set the port back to \(port) and stop it first."
+    case .remoteNoToken(let host): "No token saved for \(host). Paste the token from data/api-token on that machine in Settings > Connection."
+    case .remoteUnreachable(let host): "Cannot reach \(host). Check that the machine is on, Omni runs there, tailscale serve points at it and this Mac is on the tailnet."
+    case .remoteRejected(let host): "\(host) refused the saved token. Paste the current one from data/api-token on that machine in Settings > Connection."
+    case .remoteNotOmni(let host, let detail): "\(host) answers, but not as an Omni server: \(sentence(detail))"
     }
   }
 

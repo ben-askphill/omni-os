@@ -250,7 +250,7 @@ public enum QACondition: Hashable, Sendable {
   /// The Browser tab shows a frame of the page.
   case browserFrame
 
-  static let serverStates: Set = ["unknown", "checking", "notRunning", "starting", "running", "failed", "stopping"]
+  static let serverStates: Set = ["unknown", "checking", "notRunning", "starting", "running", "remote", "failed", "stopping"]
   static let connectionStates: Set = ["connecting", "open", "reconnecting", "closed"]
 
   public init(_ text: String) throws(QAScriptError) {
@@ -696,6 +696,7 @@ extension ServerSupervisor.State {
     case .notRunning: "notRunning"
     case .starting: "starting"
     case .running: "running"
+    case .remote: "remote"
     case .failed: "failed"
     case .stopping: "stopping"
     }

@@ -21,6 +21,10 @@ struct ServerView: View {
         notRunning(port: port, repo: repo)
       case .failed(let message, let logTail):
         failed(message: message, logTail: logTail)
+      case .lookingRemote(let host):
+        progress("Connecting to \(host)")
+      case .remoteFailed(let host, let message):
+        remoteFailed(host: host, message: message)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -119,6 +123,41 @@ struct ServerView: View {
   }
 }
 
+extension ServerView {
+  /// A remote server is started on its own machine, so this offers only a check and Settings.
+  fileprivate func remoteFailed(host: String, message: String) -> some View {
+    VStack(spacing: z(16)) {
+      GlyphView(glyph: .needs, size: 14)
+        .frame(width: z(48), height: z(48))
+        .background(Tok.surface2, in: Circle())
+      VStack(spacing: z(6)) {
+        Text("Not connected to \(host)")
+          .font(.omni(size: 22, weight: .medium))
+          .tracking(-0.22)
+          .foregroundStyle(Tok.fg)
+        Text(message)
+          .font(.omni(size: 13.5))
+          .foregroundStyle(Tok.fg2)
+          .multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
+          .textSelection(.enabled)
+      }
+      HStack(spacing: z(8)) {
+        Button("Check Again") { Task { await model.checkAgain() } }
+          .buttonStyle(.pill(.primary, height: 34))
+          .keyboardShortcut(.defaultAction)
+        SettingsLink { Text("Settings") }
+          .buttonStyle(.pill(.ghost, height: 34))
+      }
+    }
+    .padding(z(32))
+    .frame(maxWidth: z(520))
+    .omniCard(28)
+    .cardShadow(28)
+    .padding(z(32))
+  }
+}
+
 struct ServerDetails: View {
   let port: Int
   let repo: String
@@ -180,7 +219,11 @@ struct ServerMenuItems: View {
 
   var body: some View {
     let state = model.supervisor.state
-    Text("Port \(model.settings.port, format: .number.grouping(.never)): \(state.label)")
+    if model.settings.remote != nil {
+      Text(model.serverLabel)
+    } else {
+      Text("Port \(model.settings.port, format: .number.grouping(.never)): \(state.label)")
+    }
     Divider()
     Button("Start Server") { Task { await model.startServer() } }
       .disabled(!state.canStart)

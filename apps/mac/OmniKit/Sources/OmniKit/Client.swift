@@ -142,6 +142,14 @@ public struct OmniClient: Sendable {
     self.init(baseURL: url, token: token, transport: transport)
   }
 
+  /// The local server on its port, or a remote one at its origin.
+  public init(endpoint: ServerEndpoint, token: ServerToken = .none, transport: any HTTPTransport = URLSessionTransport()) {
+    switch endpoint {
+    case .local(let port): self.init(port: port, token: token, transport: transport)
+    case .remote(let origin): self.init(baseURL: origin, token: token, transport: transport)
+    }
+  }
+
   /// `url` is on this server: the same scheme, host and port as `baseURL`. Only those requests get the token.
   public func isOwn(_ url: URL) -> Bool {
     url.scheme?.lowercased() == baseURL.scheme?.lowercased() && url.host()?.lowercased() == baseURL.host()?.lowercased()

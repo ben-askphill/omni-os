@@ -46,15 +46,22 @@ public struct ServerToken: Sendable {
   }
 }
 
-/// Where the supervisor keeps the token file of the server it watches, so clients made before the repo or data
-/// dir changed still read the right one.
+/// Where the supervisor reads the token of the server it watches, so clients made before the repo, data dir or
+/// remote server changed still read the right one.
 final class TokenLocation: @unchecked Sendable {
-  private let lock = NSLock()
-  private var url: URL?
+  enum Source: Hashable {
+    /// The local server's `api-token`.
+    case file(URL)
+    /// The token saved in the Keychain for a remote origin.
+    case remote(URL)
+  }
 
-  var current: URL? {
-    get { lock.withLock { url } }
-    set { lock.withLock { url = newValue } }
+  private let lock = NSLock()
+  private var source: Source?
+
+  var current: Source? {
+    get { lock.withLock { source } }
+    set { lock.withLock { source = newValue } }
   }
 }
 

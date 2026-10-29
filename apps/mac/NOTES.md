@@ -55,11 +55,12 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `Markdown.swift` | `MarkdownDocument` and its blocks, `MarkdownText`, `MarkdownRun`, `MarkdownImage`, `MarkdownLink`. The only file that imports swift-markdown |
 | `Autolink.swift` | Internal. `Autolink.pieces`: the Web UI's bare URL, email and thread id links in a run of text |
 | `MarkdownCache.swift` | `MarkdownCache`: parsed markdown per event id and text |
-| `ServerSettings.swift` | `ServerSettings` (port, repo path, Node override in UserDefaults), `ServerConfig` |
+| `ServerSettings.swift` | `ServerSettings` (port, repo path, Node override and remote URL in UserDefaults), `ServerConfig`, `ServerEndpoint` (`local(port:)` or `remote(URL)`) |
+| `RemoteToken.swift` | `RemoteTokenStore`: a remote server's token in the login Keychain, one item per origin |
 | `Spawn.swift` | Internal. posix_spawn in a new session (no controlling terminal, pgid is the pid), and `capture` for short commands with a timeout |
 | `ServerLaunch.swift` | `ServerStartError`, `LoginShell`, `NodeResolver`, `NodeVersion`, `ServerEnvironment`, `ServerLauncher`, `ServerLaunch` |
 | `ServerProcess.swift` | `ServerProcess` (spawn into the log, log tail, liveness, group stop), `SpawnedServer` |
-| `ServerSupervisor.swift` | `ServerSupervisor` (the state machine), `ServerRecord` |
+| `ServerSupervisor.swift` | `ServerSupervisor` (the state machine), `ServerRecord`. With a remote server it only checks `GET /api/status` there (state `remote`) and starts or stops nothing |
 | `ActivityMonitor.swift` | `ActivityMonitor`: starts `prototypes/activity-monitor/sampler.mjs` (port 4791) with the app, attaches to one already answering, stops its own on quit |
 | `Navigation.swift` | `SidebarItem` (a sidebar row and its route), `Route.title(channelName:)`, `Route.newThreadRoute` |
 | `AppModel.swift` | `AppModel` (settings, supervisor, client and store, the route), `ServerScreen`, `StartFailure`, `State.label` and `canStart` |

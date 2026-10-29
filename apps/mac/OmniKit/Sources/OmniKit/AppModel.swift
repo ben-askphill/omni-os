@@ -20,12 +20,26 @@ public enum ServerScreen: Hashable, Sendable {
   case starting(port: Int)
   case stopping(port: Int)
   case failed(message: String, logTail: [String])
+  /// The first check of a remote server has not answered yet.
+  case lookingRemote(host: String)
+  /// A remote server that does not answer or refuses the token. Nothing here can start it.
+  case remoteFailed(host: String, message: String)
 
   /// nil when the route should show: the server runs, or the feed is open whatever the last check said.
-  public init?(state: ServerSupervisor.State, connection: ConnectionState, startFailure: StartFailure?, port: Int, repo: String) {
+  public init?(
+    state: ServerSupervisor.State, connection: ConnectionState, startFailure: StartFailure?, port: Int, repo: String, remote: String? = nil
+  ) {
     if connection == .open, state != .stopping { return nil }
+    if let remote {
+      switch state {
+      case .running, .remote: return nil
+      case .failed(let message, _): self = .remoteFailed(host: remote, message: message)
+      default: self = .lookingRemote(host: remote)
+      }
+      return
+    }
     switch state {
-    case .running: return nil
+    case .running, .remote: return nil
     case .unknown, .checking: self = .looking(port: port)
     case .notRunning:
       if let startFailure {
@@ -46,6 +60,7 @@ extension ServerSupervisor.State {
     switch self {
     case .running(true, _): "Started by the app"
     case .running(false, _): "Started outside the app"
+    case .remote(let host, _): "Remote on \(host)"
     case .notRunning, .failed: "Not running"
     case .starting: "Starting"
     case .stopping: "Stopping"
@@ -118,7 +133,7 @@ public final class AppModel {
   /// The other synced Macs a running thread can be handed to. Follows the connection.
   public let devices = DevicesModel()
 
-  @ObservationIgnored private let connect: @MainActor (_ port: Int) -> Connection
+  @ObservationIgnored private let connect: @MainActor (_ endpoint: ServerEndpoint) -> Connection
   @ObservationIgnored private var config: ServerConfig
   @ObservationIgnored private var lastConnection = ConnectionState.connecting
   @ObservationIgnored private var watchers: [Task<Void, Never>] = []
@@ -126,20 +141,21 @@ public final class AppModel {
   /// The workspace's subscription on `feed`. Dropped before the feed is replaced.
   @ObservationIgnored private var feedTicket: UUID?
 
-  /// - Parameter connect: makes the client and store for a port. `liveConnection` with the supervisor's token by default.
+  /// - Parameter connect: makes the client and store for the local port or the remote server. `liveConnection` with
+  ///   the supervisor's token by default.
   public init(
     settings: ServerSettings, supervisor: ServerSupervisor? = nil, monitor: ActivityMonitor? = nil, attention: AttentionCenter? = nil,
-    connect: (@MainActor (_ port: Int) -> Connection)? = nil
+    connect: (@MainActor (_ endpoint: ServerEndpoint) -> Connection)? = nil
   ) {
     self.settings = settings
     self.attention = attention ?? AttentionCenter()
     let supervisor = supervisor ?? ServerSupervisor(settings: settings)
     self.supervisor = supervisor
     self.monitor = monitor ?? ActivityMonitor(config: { [settings] in settings.config })
-    let connect = connect ?? { [token = supervisor.token] port in AppModel.liveConnection(port: port, token: token) }
+    let connect = connect ?? { [token = supervisor.token] endpoint in AppModel.liveConnection(endpoint, token: token) }
     self.connect = connect
     config = settings.config
-    let c = connect(settings.port)
+    let c = connect(settings.config.endpoint)
     client = c.client
     ImageSource.client = c.client
     store = c.store
@@ -159,11 +175,11 @@ public final class AppModel {
   }
 
   /// A client with its own ephemeral session, so nothing is cached or proxied, and the one feed.
-  public static func liveConnection(port: Int, token: ServerToken) -> Connection {
+  public static func liveConnection(_ endpoint: ServerEndpoint, token: ServerToken) -> Connection {
     let c = URLSessionConfiguration.ephemeral
     c.requestCachePolicy = .reloadIgnoringLocalCacheData
     c.connectionProxyDictionary = [:]
-    let client = OmniClient(port: port, token: token, transport: URLSessionTransport(session: URLSession(configuration: c)))
+    let client = OmniClient(endpoint: endpoint, token: token, transport: URLSessionTransport(session: URLSession(configuration: c)))
     let feed = AppFeed(source: client.feedEvents())
     return Connection(client: client, store: WorkspaceStore(api: client), feed: feed)
   }
@@ -207,7 +223,7 @@ public final class AppModel {
   public var serverScreen: ServerScreen? {
     ServerScreen(
       state: supervisor.state, connection: store.connection, startFailure: startFailure, port: settings.port,
-      repo: settings.effectiveRepoPath
+      repo: settings.effectiveRepoPath, remote: settings.config.endpoint.host
     )
   }
 
@@ -217,6 +233,13 @@ public final class AppModel {
   }
 
   public var logURL: URL { supervisor.logURL }
+
+  /// The status line's words. A remote server that does not answer is not connected, not "not running": it may
+  /// well run, and nothing here would start it.
+  public var serverLabel: String {
+    if settings.remote != nil, !supervisor.isRunning, supervisor.state.canStart { return "Not connected" }
+    return supervisor.state.label
+  }
 
   /// The thread the route shows, once its store has it, for the sidebar to keep in view.
   public var openThread: ThreadStub? {
@@ -405,16 +428,16 @@ public final class AppModel {
 
   private func settingsChanged(_ new: ServerConfig) {
     guard new != config else { return }
-    let portChanged = new.port != config.port
+    let endpointChanged = new.endpoint != config.endpoint
     config = new
     startFailure = nil
-    if portChanged {
+    if endpointChanged {
       unfollow()
       feed.stop()
       store.stop()
       threads.stopAll()
       attention.reset()
-      let c = connect(new.port)
+      let c = connect(new.endpoint)
       client = c.client
       ImageSource.client = c.client
       store = c.store

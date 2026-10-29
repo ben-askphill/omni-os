@@ -8,15 +8,38 @@ public struct ServerConfig: Hashable, Sendable {
   public var repo: URL
   /// The Node binary from Settings. nil to detect one.
   public var node: URL?
+  /// An Omni on another machine, like a Linux box on the tailnet. While set, the app connects there and starts,
+  /// stops and restarts nothing: `port`, `repo` and `node` are for the local server only.
+  public var remote: URL?
 
-  public init(port: Int, repo: URL, node: URL? = nil) {
+  public init(port: Int, repo: URL, node: URL? = nil, remote: URL? = nil) {
     self.port = port
     self.repo = repo
     self.node = node
+    self.remote = remote
+  }
+
+  /// Where the app's client points: the remote server, or the local one on `port`.
+  public var endpoint: ServerEndpoint { remote.map(ServerEndpoint.remote) ?? .local(port: port) }
+}
+
+/// The server the app talks to.
+public enum ServerEndpoint: Hashable, Sendable {
+  case local(port: Int)
+  /// An `https` origin, like `https://omarchy.tailnet.ts.net` behind `tailscale serve`.
+  case remote(URL)
+
+  public var isRemote: Bool {
+    if case .remote = self { true } else { false }
+  }
+
+  /// The remote server's host name, for the window and menus.
+  public var host: String? {
+    if case .remote(let url) = self { url.host() } else { nil }
   }
 }
 
-/// The server settings: port, repo path and Node override, kept in UserDefaults.
+/// The server settings: port, repo path, Node override and remote server, kept in UserDefaults.
 ///
 /// Launch arguments win for the run, as in `-serverPort 4757 -repoPath /path -nodePath /path`, and while any
 /// of them is given nothing is saved. So a QA run never changes the settings Ben saved.
@@ -26,6 +49,7 @@ public final class ServerSettings {
     public static let port = "serverPort"
     public static let repoPath = "repoPath"
     public static let nodePath = "nodePath"
+    public static let remoteURL = "remoteURL"
   }
 
   nonisolated public static let defaultPort = 4747
@@ -52,6 +76,14 @@ public final class ServerSettings {
     didSet { save(nodePath, Key.nodePath) }
   }
 
+  /// As typed. Empty for the local server. Only an `https` URL counts: read `remote`.
+  public var remoteURL: String {
+    didSet { save(remoteURL, Key.remoteURL) }
+  }
+
+  /// The remote server's origin, when `remoteURL` is one.
+  public var remote: URL? { Self.remote(remoteURL) }
+
   /// Launch arguments set the values: changes last for this run only.
   public let isVolatile: Bool
 
@@ -60,7 +92,9 @@ public final class ServerSettings {
 
   public var config: ServerConfig {
     let node = nodePath.trimmingCharacters(in: .whitespaces)
-    return ServerConfig(port: port, repo: URL(filePath: expand(effectiveRepoPath)), node: node.isEmpty ? nil : URL(filePath: expand(node)))
+    return ServerConfig(
+      port: port, repo: URL(filePath: expand(effectiveRepoPath)), node: node.isEmpty ? nil : URL(filePath: expand(node)), remote: remote
+    )
   }
 
   /// - Parameter arguments: the launch arguments' values, NSArgumentDomain by default.
@@ -68,13 +102,29 @@ public final class ServerSettings {
     let arguments = arguments ?? UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
     self.defaults = defaults
     self.home = home
-    isVolatile = [Key.port, Key.repoPath, Key.nodePath].contains { arguments[$0] != nil }
+    isVolatile = [Key.port, Key.repoPath, Key.nodePath, Key.remoteURL].contains { arguments[$0] != nil }
 
     func value(_ key: String) -> Any? { arguments[key] ?? defaults.object(forKey: key) }
     let ports = [arguments[Key.port], defaults.object(forKey: Key.port)].compactMap { Self.int($0) }
     port = ports.first(where: Self.validPort) ?? Self.defaultPort
     repoPath = Self.effective(repoPath: value(Key.repoPath) as? String)
     nodePath = value(Key.nodePath) as? String ?? ""
+    // A QA run sets the port and must never land on a remote server Ben saved.
+    remoteURL = arguments[Key.remoteURL] as? String ?? (isVolatile ? "" : defaults.string(forKey: Key.remoteURL) ?? "")
+  }
+
+  /// `https://host[:port]` with no path, query or credentials, as the origin the app sends the token to. The
+  /// token goes only over TLS: `tailscale serve` gives the box a certificate, so plain http is refused.
+  public static func remote(_ text: String) -> URL? {
+    let t = text.trimmingCharacters(in: .whitespaces)
+    guard !t.isEmpty, let c = URLComponents(string: t), c.scheme?.lowercased() == "https", let host = c.host, !host.isEmpty,
+      c.user == nil, c.password == nil, c.query == nil, c.fragment == nil, c.path.isEmpty || c.path == "/"
+    else { return nil }
+    var origin = URLComponents()
+    origin.scheme = "https"
+    origin.host = host.lowercased()
+    origin.port = c.port
+    return origin.url
   }
 
   private func save(_ value: Any, _ key: String) {
