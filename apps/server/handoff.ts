@@ -19,8 +19,8 @@ import { needsWorktree, plannedWorktree } from './sandbox.ts';
 import { contextBlock, placeFor } from './message-context/project.ts';
 import { handoffView, inFlight, moving, offerOf, offers, phaseOf, replyOf, requestOf, requests, writeOffer, writeReply, writeRequest } from './handoff/records.ts';
 import { inOwnWorktree, packWorktree, unpackWorktree, type WorktreeBundle } from './handoff/worktree.ts';
-import { releaseForHandoff, runsHere, saveOwn, wake, type Msg } from './runner.ts';
-import { failSetup, setUpThread } from './runner/setup.ts';
+import { releaseForHandoff, runsHere, saveOwn, wake, wakePrepared, type Msg } from './runner.ts';
+import { failSetup, setUpThread, START_REQUEST } from './runner/setup.ts';
 import { drop } from './runner/state.ts';
 import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
 import { sessionOnThisMac, uploadNow } from './sync/files.ts';
@@ -420,10 +420,10 @@ async function take(offer: Offered, worker: SyncWorker) {
       return [
         ...(offer.idle ? [] : [saveOwn(id, `handoff:${offer.id}`, continuation(offer))]),
         ...offer.queued.map((text, n) =>
-          saveOwn(id, `handoff:${offer.id}:${n}`, {
+          saveOwn(id, offer.fresh ? START_REQUEST : `handoff:${offer.id}:${n}`, {
             prompt: text,
             kind: 'user',
-            payload: { text, source: offer.fresh ? t.source : 'ben' },
+            payload: offer.fresh ? null : { text, source: 'ben' },
             source: offer.fresh ? 'ben' : 'handoff',
             mode: 'queue',
           }),
@@ -431,7 +431,10 @@ async function take(offer: Offered, worker: SyncWorker) {
       ].filter((r) => !!r);
     });
     if (setUp) void setUpThread(id);
-    else for (const r of rows) wake(r);
+    else for (const r of rows) {
+      if (offer.fresh) await wakePrepared(r);
+      else wake(r);
+    }
     void worker.syncNow();
   } catch (err) {
     console.error(`[handoff] ${id}: could not pick it up:`, (err as Error).message);

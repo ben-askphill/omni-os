@@ -398,6 +398,11 @@ async function deliverRequest(r: MessageRequest, undo: () => void) {
   }
 }
 
+/** Prepare a durable incoming message through the same ordered path as a local API reply. */
+export function wakePrepared(r: MessageRequest): Promise<void> {
+  return inOrder(r.thread_id, () => deliverRequest(r, () => messageRequests.park(r.id)));
+}
+
 /**
  * `sendMessage` for the API. The message is saved first (db/repos/requests.ts), so once this returns it survives a
  * restart. A message that names a command then waits, within a bound, for the thread's command list. Messages to
@@ -421,7 +426,7 @@ export async function postMessage(
   }
   // A thread routed to another machine runs there: the message goes to it (run-on.ts).
   if (remoteHolder(thread)) {
-    return forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, hasFiles: !!opts.attachments?.length }) as PostedThread;
+    return forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, hasFiles: !!opts.attachments?.length, context: opts.context }) as PostedThread;
   }
   // Refused before anything is saved: the other Mac runs it.
   const blocked = turnBlocked(thread, runsHere(threadId));

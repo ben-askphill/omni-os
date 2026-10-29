@@ -6,13 +6,15 @@
 // - `runon.thread.<thread>`: the machine this one sent the thread to. Marks a routed thread; written once.
 // - `runon.msgs.<thread>.<sender>`: the messages this machine forwarded, newest last, capped. Also the reports of
 //   delegated threads that ran here for a parent that runs elsewhere (runner/queue.ts reportToParent).
+// - `runon.accepted.<thread>.<message>`: durable acceptance, synced so a new holder never replays it.
 // - `runon.stop.<thread>.<sender>`: when this machine last asked the holder to stop it.
 // The holder reads them after each sync (reconcileRunOn) and sends each message once, keyed by its id.
+import type { MessageContext } from '@omni/shared/message-context.ts';
 import { randomUUID } from 'node:crypto';
 import { publishFeed } from './bus.ts';
-import { kv, messageRequests, outbox, threads, type Thread } from './db.ts';
+import { kv, outbox, threads, tx, type Thread } from './db.ts';
 import { inFlight } from './handoff/records.ts';
-import { interruptThread, saveOwn, wake } from './runner.ts';
+import { interruptThread, saveOwn, wakePrepared } from './runner.ts';
 import { fileReport } from './runner/queue.ts';
 import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
 import { safeSegment } from './sync/paths.ts';
@@ -37,6 +39,7 @@ export interface Forwarded {
   /** Who wrote it here: Ben, or the Conductor. */
   from?: 'ben' | 'conductor';
   at: string;
+  context?: MessageContext[];
   /** A delegated thread's report to its parent, with the key it is saved under and its payload. */
   report?: { key: string; payload: Record<string, unknown> };
 }
@@ -113,7 +116,7 @@ function sent(threadId: string, self: string): Forwarded[] {
 export function forwardMessage(
   t: Thread,
   prompt: string,
-  opts: { mode: Forwarded['mode']; from: 'ben' | 'conductor'; requestId?: string; hasFiles: boolean },
+  opts: { mode: Forwarded['mode']; from: 'ben' | 'conductor'; requestId?: string; hasFiles: boolean; context?: MessageContext[] },
 ) {
   const { mode, from } = opts;
   const self = outbox.machineId()!;
@@ -122,7 +125,7 @@ export function forwardMessage(
   const id = opts.requestId && isId(opts.requestId) ? opts.requestId : randomUUID();
   const list = sent(t.id, self);
   const at = new Date().toISOString();
-  if (!list.some((m) => m.id === id)) kv.set(`${MSGS}${t.id}.${self}`, [...list, { id, prompt, mode, from, at }].slice(-KEEP));
+  if (!list.some((m) => m.id === id)) kv.set(`${MSGS}${t.id}.${self}`, [...list, { id, prompt, mode, from, at, ...(opts.context?.length && { context: opts.context }) }].slice(-KEEP));
   void activeWorker()?.syncNow();
   publishFeed({ type: 'thread', thread: t });
   return { ...t, request: { id, request_id: id, state: 'accepted' as const, accepted_at: at }, forwarded_to: deviceName(holder) ?? holder };
@@ -166,13 +169,19 @@ export function reconcileRunOn(worker: SyncWorker, now = Date.now()) {
           if (typeof m.report.key === 'string' && m.report.payload && typeof m.report.payload === 'object') fileReport(threadId, m.report.key, m.prompt, m.report.payload);
           continue;
         }
-        if (messageRequests.byRequestId(threadId, `runon:${m.id}`)) continue;
+        // Requests are local; this receipt travels with the thread when another machine takes over.
+        const receipt = `runon.accepted.${threadId}.${m.id}`;
+        if (kv.get(receipt)) continue;
         const mode = m.mode === 'queue' || m.mode === 'interrupt' ? m.mode : 'steer';
         const from = m.from === 'conductor' ? 'conductor' : 'ben';
-        const row = saveOwn(threadId, `runon:${m.id}`, { prompt: m.prompt, kind: 'user', payload: { text: m.prompt, source: from }, source: from, mode });
+        const row = tx(() => {
+          const row = saveOwn(threadId, `runon:${m.id}`, { prompt: m.prompt, kind: 'user', payload: null, source: from, mode, context: m.context });
+          kv.set(receipt, true);
+          return row;
+        });
         if (row) {
           threads.setDone(threadId, false);
-          wake(row);
+          void wakePrepared(row).catch((err) => console.error(`[run-on] ${key}:`, (err as Error).message));
         }
       }
     } catch (err) {

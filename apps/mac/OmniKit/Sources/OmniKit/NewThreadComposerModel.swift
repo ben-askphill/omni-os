@@ -72,10 +72,10 @@ public final class NewThreadComposerModel {
     if next != choice { choice = next }
   }
 
-  /// Takes the other machines and the saved default as they load. A pick stays while its machine can take the thread.
+  /// Takes the other machines and the saved default as they load. A pick stays while its machine is listed, even when offline.
   public func updateRunOn(devices: [Device], saved: String) {
     if self.devices != devices { self.devices = devices }
-    if runOnPicked, runOn.isEmpty || devices.contains(where: { $0.id == runOn && $0.canTake }) { return }
+    if runOnPicked, runOn.isEmpty || devices.contains(where: { $0.id == runOn }) { return }
     runOnPicked = false
     let next = RunOnRules.resolved(saved, devices: devices)
     if next != runOn { runOn = next }

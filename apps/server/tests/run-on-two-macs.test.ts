@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { newContext } from '@omni/shared/message-context.ts';
+import { terminalExcerpt, selectExcerpt } from '@omni/shared/message-context-terminal.ts';
 import { MemoryTransport } from '../sync/transport.ts';
-import { tailscaleStatus, waitFor } from './support.ts';
+import { FAKE_CODEX, tailscaleStatus, waitFor } from './support.ts';
 import { bootMac, type Mac } from './two-macs.ts';
 
 // Run on: Mac A is the hub Ben talks to and Box B the machine with the CPU. A new thread for B is made on A, goes out
@@ -40,7 +42,8 @@ const both = async () => {
 const userTexts = (m: Mac, id: string) => m.byKind(id, 'user').map((e) => e.p.text as string);
 
 beforeAll(async () => {
-  a = await bootMac('mac-a', 'Mac A', relay);
+  a = await bootMac('mac-a', 'Mac A', relay, { OMNI_CODEX_BIN: FAKE_CODEX });
+  await (await import('../harness/catalog-service.ts')).loadCatalog();
   a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: true }]));
   a.db.channels.create({ id: 'shop', name: 'Shop', kind: 'client', use_worktree: 0, base_dir: shared, notes: '' });
   // A repo at the same path on both machines, for a worktree thread.
@@ -48,7 +51,8 @@ beforeAll(async () => {
   execFileSync('git', ['init', '-q', '-b', 'main', repo]);
   git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'init');
   a.db.channels.create({ id: 'code', name: 'Code', kind: 'internal', use_worktree: 1, repo_path: repo, notes: '' });
-  b = await bootMac('box-b', 'Box B', relay);
+  b = await bootMac('box-b', 'Box B', relay, { OMNI_CODEX_BIN: FAKE_CODEX });
+  await (await import('../harness/catalog-service.ts')).loadCatalog();
   b.tailnet(tailscaleStatus(NODE_B, [{ ...NODE_A, online: true }]));
   for (const m of [a, b]) {
     await m.sync();
@@ -138,6 +142,83 @@ describe('a delegated thread run on another machine', () => {
   }, T.timeout);
 });
 
+describe('remote preparation and takeover', () => {
+  it('resolves skills and mentions for fresh prompts and replies, and carries context', async () => {
+    writeFileSync(join(shared, 'remote-notes.txt'), 'REMOTE FILE CONTENT');
+    const res = await a.json('/threads', { body: { channel: 'shop', prompt: '/tdd read @remote-notes.txt', device: 'box-b' } });
+    expect(res.status).toBe(200);
+    const id = res.body.id;
+    await both();
+    await b.untilResults(id, 1);
+    expect(b.byKind(id, 'user')[0].p).toMatchObject({ source: 'manual', slash: { command: { name: 'tdd' } } });
+    expect(b.claudeTexts(id)[0]).toContain(join(shared, 'remote-notes.txt'));
+    await both();
+    const excerpt = selectExcerpt('REMOTE TERMINAL CONTEXT', { thread: id, cwd: shared, pid: 42, at: new Date() });
+    if (!excerpt.ok) throw new Error(excerpt.error);
+    const context = newContext(terminalExcerpt, excerpt.value, 'check this output');
+    expect((await a.json(`/threads/${id}/messages`, { body: { prompt: '/tdd check @remote-notes.txt', context: [context], request_id: 'prepared-reply' } })).status).toBe(200);
+    await both();
+    await b.untilResults(id, 2);
+    expect(b.byKind(id, 'user').at(-1)!.p).toMatchObject({ slash: { command: { name: 'tdd' } }, context: [{ kind: 'terminal_excerpt', note: 'check this output' }] });
+    expect(b.claudeTexts(id).at(-1)).toContain('REMOTE TERMINAL CONTEXT');
+    expect(b.claudeTexts(id).at(-1)).toContain(join(shared, 'remote-notes.txt'));
+  }, T.timeout);
+
+  it('passes Codex the skill file for fresh remote prompts and replies', async () => {
+    const res = await a.json('/threads', { body: { channel: 'shop', prompt: '/tdd remote codex', harness: 'codex', model: 'gpt-5.6-sol', device: 'box-b' } });
+    expect(res.status).toBe(200);
+    const id = res.body.id;
+    await both();
+    await b.untilResults(id, 1);
+    await both();
+    expect((await a.json(`/threads/${id}/messages`, { body: { prompt: '/tdd follow up', request_id: 'codex-skill' } })).status).toBe(200);
+    await both();
+    await b.untilResults(id, 2);
+    const inputs = b.codexRequests().filter((r) => r.method === 'turn/start' && r.thread_id === id).map((r) => r.params.input);
+    expect(inputs).toHaveLength(2);
+    for (const input of inputs) expect(input).toContainEqual({ type: 'skill', name: 'tdd', path: '/Users/dev/.agents/skills/tdd/SKILL.md' });
+  }, T.timeout);
+
+  it('prepares a fresh worktree prompt after setup', async () => {
+    const res = await a.json('/threads', { body: { channel: 'code', prompt: '/tdd remote worktree', device: 'box-b' } });
+    const id = res.body.id;
+    await both();
+    await b.untilResults(id, 1);
+    expect(b.byKind(id, 'user')[0].p).toMatchObject({ source: 'manual', slash: { command: { name: 'tdd' } } });
+  }, T.timeout);
+
+  it('never replays a delivered reply after takeover or a handoff back', async () => {
+    const res = await a.json('/threads', { body: { channel: 'shop', prompt: 'start remote', device: 'box-b' } });
+    const id = res.body.id;
+    await both();
+    await b.untilResults(id, 1);
+    await both();
+    await a.json(`/threads/${id}/messages`, { body: { prompt: 'reply exactly once', request_id: 'no-replay' } });
+    await both();
+    await b.untilResults(id, 2);
+    await both();
+    expect(a.db.messageRequests.byRequestId(id, 'runon:no-replay')).toBeUndefined();
+    const t = b.thread(id);
+    const session = join(b.home, '.claude', 'projects', b.files.claudeProjectDir(t.cwd), `${t.session_id}.jsonl`);
+    mkdirSync(dirname(session), { recursive: true });
+    writeFileSync(session, '{"type":"user","from":"box-b"}\n');
+    expect((await a.json(`/threads/${id}/takeover`, { body: {} })).status).toBe(200);
+    for (let n = 0; n < 100 && a.db.threads.holder(id) !== 'mac-a'; n++) { await both(); await new Promise((r) => setTimeout(r, 20)); }
+    await waitFor(() => a.db.threads.holder(id) === 'mac-a', 'A to take over');
+    await both();
+    await both();
+    expect(userTexts(a, id).filter((t) => t === 'reply exactly once')).toHaveLength(1);
+    expect(a.db.messageRequests.byRequestId(id, 'runon:no-replay')).toBeUndefined();
+    expect(a.runner.isLive(id)).toBe(false);
+    expect(a.db.kv.get(`runon.accepted.${id}.no-replay`)).toBe(true);
+    expect((await a.json(`/threads/${id}/handoff`, { body: { to: 'box-b' } })).status).toBe(200);
+    for (let n = 0; n < 100 && b.db.threads.holder(id) !== 'box-b'; n++) { await both(); await new Promise((r) => setTimeout(r, 20)); }
+    await waitFor(() => b.db.threads.holder(id) === 'box-b', 'B to take it back');
+    await both();
+    expect(userTexts(b, id).filter((t) => t === 'reply exactly once')).toHaveLength(1);
+  }, T.timeout);
+});
+
 describe('picking where a thread runs', () => {
   it('runs here when asked, or when no default is set', async () => {
     for (const device of ['here', undefined]) {
@@ -156,6 +237,11 @@ describe('picking where a thread runs', () => {
     const offline = await a.json('/threads', { body: { channel: 'shop', prompt: 'x', device: 'box-b' } });
     expect(offline.status).toBe(409);
     expect(offline.body.error).toMatch(/Box B is offline/);
+    expect((await a.json('/setup', { method: 'PUT', body: { runOn: { device: 'box-b' } } })).status).toBe(200);
+    const count = a.db.threads.list({}).length;
+    expect((await a.json('/threads', { body: { channel: 'shop', prompt: 'offline default' } })).status).toBe(409);
+    expect(a.db.threads.list({})).toHaveLength(count);
+    await a.json('/setup', { method: 'PUT', body: { runOn: { device: '' } } });
     a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: true }]));
   }, T.timeout);
 });

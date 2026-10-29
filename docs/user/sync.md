@@ -36,8 +36,9 @@ Open the Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the URL an
 Pick where a new thread runs: this machine, or any other synced machine, such as a Linux box with more CPU and memory. The machine you talk to stays the hub. The thread is made there, goes to the other machine with its first message, runs there, and syncs back as it goes, so you watch it from the hub as usual (a few seconds behind).
 
 - The default is Settings > Server, Run new threads on (`runOn.device` in `data/omni.config.json`, per machine). The new-thread composer overrides it per thread, on desktop, phone and the Mac app. The Conductor's `delegate` takes `device` too (a machine's name or id, or `here`).
+- An offline default stays selected in the composer. Sending reports why it cannot run there; choose This Mac explicitly to run locally.
 - The other machine cuts a worktree thread's worktree itself, from the channel's repo at the same path (or through its path map), so the repo must be cloned there.
-- Your later messages and Stop go to the machine running the thread. A thread the Conductor delegated there reports back to the Conductor on the hub.
+- Your later messages and Stop go to the machine running the thread. Skills and file mentions resolve on that machine, and attached text context goes with replies. Accepted replies do not replay after Take over. A thread the Conductor delegated there reports back to the Conductor on the hub.
 - Files do not travel yet: a new thread or a message with attachments for another machine is refused with why.
 - Take over brings the thread back to this machine; from then on it runs here.
 - If the other machine cannot start it, the thread stops here with why. A worktree thread's Retry runs it on this machine; any other keeps its first message for Resume.

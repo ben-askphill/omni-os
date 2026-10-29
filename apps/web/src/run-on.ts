@@ -1,4 +1,4 @@
-import { canTake, type Device } from '@omni/shared/handoff.ts';
+import type { Device } from '@omni/shared/handoff.ts';
 import { deviceRow } from './handoff.ts';
 
 // Where a new thread runs: this machine, or another synced one (apps/server/run-on.ts). The desktop composer's Run on
@@ -31,18 +31,18 @@ export function runOnRows(devices: Device[], { now = Date.now(), asDefault = fal
   ];
 }
 
-/** The pick that is still on offer: a machine that is listed and not offline. Anything else is this one. */
-const live = (id: string | null | undefined, devices: Device[]) => (id && devices.some((d) => d.id === id && canTake(d)) ? id : HERE);
+/** Keep a listed machine selected while it is offline, so sending reports the server's refusal. */
+const listed = (id: string | null | undefined, devices: Device[]) => (id && devices.some((d) => d.id === id) ? id : HERE);
 
 /**
  * What a new thread starts on: Settings' default (`runOn.device`, '' for this machine), or This Mac when that machine
- * is gone or offline. The server falls back the same way for a default that is gone; an offline one it would refuse.
+ * is gone. An offline default stays selected and the server refuses the send.
  */
-export const runOnDefault = (setting: string | null | undefined, devices: Device[]) => live(setting, devices);
+export const runOnDefault = (setting: string | null | undefined, devices: Device[]) => listed(setting, devices);
 
 /** The composer's pick while it still holds, else the default. */
 export const runOnPick = (picked: string | null, setting: string | null | undefined, devices: Device[]) =>
-  picked && live(picked, devices) === picked ? picked : runOnDefault(setting, devices);
+  picked && listed(picked, devices) === picked ? picked : runOnDefault(setting, devices);
 
 /** Whether there is anything to pick: another synced machine. Sync off or no peers hides the picker. */
 export const offersRunOn = (devices: Device[] | null | undefined): devices is Device[] => !!devices?.length;

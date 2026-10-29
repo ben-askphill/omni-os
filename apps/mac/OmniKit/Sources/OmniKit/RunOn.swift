@@ -9,9 +9,9 @@ public enum RunOnRules {
   /// What POST /api/threads takes for this Mac.
   public static let here = "here"
 
-  /// The machine the composer starts on: the saved default while it is listed and can take a thread, else this Mac.
+  /// The machine the composer starts on: the saved default while it is listed, even when offline, else this Mac.
   public static func resolved(_ saved: String, devices: [Device]) -> String {
-    devices.contains { $0.id == saved && $0.canTake } ? saved : ""
+    devices.contains { $0.id == saved } ? saved : ""
   }
 
   /// NewThread's `device`: nil while no other machine is listed (the picker is hidden and the server's default

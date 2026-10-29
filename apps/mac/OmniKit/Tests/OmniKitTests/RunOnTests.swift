@@ -13,7 +13,7 @@ private func setupState(device: String?) -> String {
 }
 
 @Suite struct RunOnRulesTests {
-  @Test func startsOnTheSavedMachineOnlyWhileItIsListedAndCanTakeIt() throws {
+  @Test func keepsTheSavedMachineWhileOffline() throws {
     let box = try machine("omarchy")
     let asleep = try machine("mini", "offline")
     let unsure = try machine("studio", "unknown")
@@ -21,7 +21,7 @@ private func setupState(device: String?) -> String {
     #expect(RunOnRules.resolved("studio", devices: [unsure]) == "studio", "Tailscale can't tell: the server decides")
     #expect(RunOnRules.resolved("", devices: [box]) == "")
     #expect(RunOnRules.resolved("gone", devices: [box]) == "", "a machine sync no longer lists")
-    #expect(RunOnRules.resolved("mini", devices: [box, asleep]) == "", "an offline machine would be refused")
+    #expect(RunOnRules.resolved("mini", devices: [box, asleep]) == "mini", "keep the target so the server refuses the send")
     #expect(RunOnRules.resolved("omarchy", devices: []) == "")
   }
 
@@ -111,7 +111,7 @@ private func setupState(device: String?) -> String {
     #expect(m.runOn == "", "a pick wins over the default")
     m.selectRunOn("mini")
     m.updateRunOn(devices: [box, try machine("mini", "offline")], saved: "omarchy")
-    #expect(m.runOn == "omarchy", "the picked machine went offline: back to the default")
+    #expect(m.runOn == "mini", "keep an offline pick until Ben changes it")
   }
 
   @Test func refusesAnOfflinePick() throws {

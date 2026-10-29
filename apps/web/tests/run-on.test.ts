@@ -24,19 +24,19 @@ describe('where a new thread runs', () => {
     expect(runOnRows([mini], { now, asDefault: true }).every((r) => !r.disabled)).toBe(true);
   });
 
-  it("starts on Settings' default, or This Mac when that machine is gone or offline", () => {
+  it("starts on Settings' default, or This Mac when that machine is gone", () => {
     expect(runOnDefault('', [omarchy])).toBe(HERE);
     expect(runOnDefault(undefined, [omarchy])).toBe(HERE);
     expect(runOnDefault('omarchy-id', [omarchy])).toBe('omarchy-id');
     expect(runOnDefault('removed-id', [omarchy])).toBe(HERE);
-    expect(runOnDefault('mini-id', [omarchy, mini])).toBe(HERE);
+    expect(runOnDefault('mini-id', [omarchy, mini])).toBe('mini-id');
     expect(runOnDefault('air-id', [unsure])).toBe('air-id');
   });
 
   it('keeps a pick while its machine is still on offer', () => {
     expect(runOnPick(HERE, 'omarchy-id', [omarchy])).toBe(HERE);
     expect(runOnPick('omarchy-id', '', [omarchy])).toBe('omarchy-id');
-    expect(runOnPick('omarchy-id', '', [{ ...omarchy, reachability: 'offline' }])).toBe(HERE);
+    expect(runOnPick('omarchy-id', '', [{ ...omarchy, reachability: 'offline' }])).toBe('omarchy-id');
     expect(runOnPick(null, 'omarchy-id', [omarchy])).toBe('omarchy-id');
   });
 
