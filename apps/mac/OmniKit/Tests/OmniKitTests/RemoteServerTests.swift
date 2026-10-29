@@ -28,49 +28,25 @@ struct RemoteServerTests {
     #expect(ServerSettings.remote("omarchy") == nil)
   }
 
-  @Test func aRemoteURLAloneChangesNothingUntilRemoteIsPicked() {
+  @Test func aRemoteURLIsTheEndpointAndIsKept() {
     defer { defaults.removePersistentDomain(forName: suite) }
     let s = settings()
-    let origin = URL(string: "https://omarchy.ts.net")!
-    s.remoteURL = "https://omarchy.ts.net"
-    #expect(s.mode == .local)
     #expect(s.config.endpoint == .local(port: 4747))
-
-    s.mode = .remote
+    s.remoteURL = "https://omarchy.ts.net"
+    let origin = URL(string: "https://omarchy.ts.net")!
     #expect(s.config.endpoint == .remote(origin))
     #expect(s.config.endpoint.host == "omarchy.ts.net")
-    let next = settings()
-    #expect(next.mode == .remote)
-    #expect(next.config.remote == origin)
+    #expect(settings().config.remote == origin)
 
-    // Back to this Mac keeps the URL for the next switch.
-    s.mode = .local
+    s.remoteURL = "http://omarchy.ts.net"
     #expect(s.config.endpoint == .local(port: 4747))
-    #expect(settings().remoteURL == "https://omarchy.ts.net")
-  }
-
-  @Test func remoteNeedsAURL() {
-    defer { defaults.removePersistentDomain(forName: suite) }
-    let s = settings()
-    s.mode = .remote
-    #expect(s.mode == .local)
-
-    s.remoteURL = "https://omarchy.ts.net"
-    s.mode = .remote
-    s.remoteURL = ""
-    #expect(s.mode == .local)
-    #expect(settings().mode == .local)
   }
 
   @Test func aQARunNeverUsesTheSavedRemote() {
     defer { defaults.removePersistentDomain(forName: suite) }
-    let saved = settings()
-    saved.remoteURL = "https://omarchy.ts.net"
-    saved.mode = .remote
+    settings().remoteURL = "https://omarchy.ts.net"
     let qa = settings(["serverPort": "4757"])
     #expect(qa.config.endpoint == .local(port: 4757))
-    let remoteQA = settings(["serverPort": "4757", "remoteURL": "https://box.ts.net", "serverMode": "remote"])
-    #expect(remoteQA.config.endpoint == .remote(URL(string: "https://box.ts.net")!))
   }
 
   @Test func theWindowNamesTheRemoteHost() {

@@ -11,7 +11,7 @@ struct SettingsView: View {
     TabView(selection: $model.settingsTab) {
       Tab("Connection", systemImage: "network", value: .connection) {
         ConnectionSettings(settings: model.settings, model: model)
-          .frame(width: z(560), height: 820)
+          .frame(width: z(560), height: 760)
       }
       Tab("Profile", systemImage: "person", value: .profile) {
         ProfileSettings(model: model)
@@ -53,27 +53,13 @@ struct ConnectionSettings: View {
 
   var body: some View {
     SettingsPage {
-      SettingsCard(
-        title: "Use",
-        note: settings.mode == .remote
-          ? "Every thread runs on the remote server. The server on this Mac is left as it is."
-          : "Every thread runs on this Mac. Switch to Remote to run them on the remote server below."
-      ) {
-        SegmentedPill(selection: $settings.mode, options: [(ServerMode.local, "This Mac"), (ServerMode.remote, "Remote")])
-        if settings.remote == nil {
-          Text("Set a remote URL below to switch to Remote.")
-            .font(.omni(size: 12.5))
-            .foregroundStyle(Tok.fg3)
-        }
-      }
-
       RemoteServerCard(settings: settings, model: model)
 
       SettingsCard(
-        title: "Server on this Mac",
-        note: settings.mode == .remote
-          ? "Not used in Remote mode."
-          : "The app looks for the server on this port and starts it from this repo. Leave Node empty to use the newest Node 24 or later it finds."
+        title: settings.remote == nil ? "Server" : "Server on this Mac",
+        note: settings.remote == nil
+          ? "The app looks for the server on this port and starts it from this repo. Leave Node empty to use the newest Node 24 or later it finds."
+          : "Not used while a remote server is set. Clear the remote URL to go back to the server on this Mac."
       ) {
         VStack(alignment: .leading, spacing: 0) {
           FieldLabel(text: "Port")
@@ -153,7 +139,7 @@ struct RemoteServerCard: View {
   var body: some View {
     SettingsCard(
       title: "Remote server",
-      note: "Another machine's Omni, like a Linux box on your tailnet. Use its https address from tailscale serve. Used only in Remote mode."
+      note: "Run every thread on another machine's Omni, like a Linux box on your tailnet. Use its https address from tailscale serve. Leave empty for the server on this Mac."
     ) {
       VStack(alignment: .leading, spacing: 0) {
         FieldLabel(text: "URL")

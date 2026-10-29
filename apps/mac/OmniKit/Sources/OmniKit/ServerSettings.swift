@@ -39,16 +39,7 @@ public enum ServerEndpoint: Hashable, Sendable {
   }
 }
 
-/// Which server the app uses. The remote URL is kept either way, so switching back and forth is one click.
-public enum ServerMode: String, Hashable, Sendable, CaseIterable {
-  /// The server on this Mac, on `port`, started from `repo`.
-  case local
-  /// The server at the remote URL.
-  case remote
-}
-
-/// The server settings: port, repo path, Node override, remote server and which of the two to use, kept in
-/// UserDefaults.
+/// The server settings: port, repo path, Node override and remote server, kept in UserDefaults.
 ///
 /// Launch arguments win for the run, as in `-serverPort 4757 -repoPath /path -nodePath /path`, and while any
 /// of them is given nothing is saved. So a QA run never changes the settings Ben saved.
@@ -59,7 +50,6 @@ public final class ServerSettings {
     public static let repoPath = "repoPath"
     public static let nodePath = "nodePath"
     public static let remoteURL = "remoteURL"
-    public static let mode = "serverMode"
   }
 
   nonisolated public static let defaultPort = 4747
@@ -86,24 +76,13 @@ public final class ServerSettings {
     didSet { save(nodePath, Key.nodePath) }
   }
 
-  /// As typed. Only an `https` URL counts: read `remote`. Clearing it goes back to the local server.
+  /// As typed. Empty for the local server. Only an `https` URL counts: read `remote`.
   public var remoteURL: String {
-    didSet {
-      save(remoteURL, Key.remoteURL)
-      if remote == nil, mode == .remote { mode = .local }
-    }
+    didSet { save(remoteURL, Key.remoteURL) }
   }
 
-  /// The remote server's origin, when `remoteURL` is one, whichever mode is on.
+  /// The remote server's origin, when `remoteURL` is one.
   public var remote: URL? { Self.remote(remoteURL) }
-
-  /// Local or remote. Remote needs a remote URL first: without one it stays local.
-  public var mode: ServerMode {
-    didSet {
-      if mode == .remote, remote == nil { return mode = .local }
-      save(mode.rawValue, Key.mode)
-    }
-  }
 
   /// Launch arguments set the values: changes last for this run only.
   public let isVolatile: Bool
@@ -114,8 +93,7 @@ public final class ServerSettings {
   public var config: ServerConfig {
     let node = nodePath.trimmingCharacters(in: .whitespaces)
     return ServerConfig(
-      port: port, repo: URL(filePath: expand(effectiveRepoPath)), node: node.isEmpty ? nil : URL(filePath: expand(node)),
-      remote: mode == .remote ? remote : nil
+      port: port, repo: URL(filePath: expand(effectiveRepoPath)), node: node.isEmpty ? nil : URL(filePath: expand(node)), remote: remote
     )
   }
 
@@ -124,7 +102,7 @@ public final class ServerSettings {
     let arguments = arguments ?? UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
     self.defaults = defaults
     self.home = home
-    isVolatile = [Key.port, Key.repoPath, Key.nodePath, Key.remoteURL, Key.mode].contains { arguments[$0] != nil }
+    isVolatile = [Key.port, Key.repoPath, Key.nodePath, Key.remoteURL].contains { arguments[$0] != nil }
 
     func value(_ key: String) -> Any? { arguments[key] ?? defaults.object(forKey: key) }
     let ports = [arguments[Key.port], defaults.object(forKey: Key.port)].compactMap { Self.int($0) }
@@ -132,10 +110,7 @@ public final class ServerSettings {
     repoPath = Self.effective(repoPath: value(Key.repoPath) as? String)
     nodePath = value(Key.nodePath) as? String ?? ""
     // A QA run sets the port and must never land on a remote server Ben saved.
-    let url = arguments[Key.remoteURL] as? String ?? (isVolatile ? "" : defaults.string(forKey: Key.remoteURL) ?? "")
-    remoteURL = url
-    let mode = (arguments[Key.mode] as? String ?? (isVolatile ? nil : defaults.string(forKey: Key.mode))).flatMap(ServerMode.init) ?? .local
-    self.mode = mode == .remote && Self.remote(url) == nil ? .local : mode
+    remoteURL = arguments[Key.remoteURL] as? String ?? (isVolatile ? "" : defaults.string(forKey: Key.remoteURL) ?? "")
   }
 
   /// `https://host[:port]` with no path, query or credentials, as the origin the app sends the token to. The

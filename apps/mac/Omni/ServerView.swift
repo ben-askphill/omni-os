@@ -219,19 +219,11 @@ struct ServerMenuItems: View {
 
   var body: some View {
     let state = model.supervisor.state
-    if model.settings.mode == .remote {
+    if model.settings.remote != nil {
       Text(model.serverLabel)
     } else {
       Text("Port \(model.settings.port, format: .number.grouping(.never)): \(state.label)")
     }
-    Divider()
-    // The same switch as Settings > Connection. Remote needs a URL there first.
-    Picker("Use Server", selection: Binding(get: { model.settings.mode }, set: { model.settings.mode = $0 })) {
-      Text("This Mac").tag(ServerMode.local)
-      Text(model.settings.remote?.host().map { "Remote: \($0)" } ?? "Remote (set a URL in Settings)").tag(ServerMode.remote)
-        .selectionDisabled(model.settings.remote == nil)
-    }
-    .pickerStyle(.inline)
     Divider()
     Button("Start Server") { Task { await model.startServer() } }
       .disabled(!state.canStart)
