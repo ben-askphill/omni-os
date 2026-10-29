@@ -372,7 +372,7 @@ private struct WebhookPanel: View {
         Text(webhook.secretStatus)
           .font(.omni(size: 12.5))
           .foregroundStyle(webhook.secretSet ? Tok.fg2 : Tok.warn)
-          .help("Kept in the Keychain as \(webhook.secret). GitHub signs each delivery with it.")
+          .help("Kept in the server's secret store as \(webhook.secret). GitHub signs each delivery with it.")
         Spacer(minLength: z(8))
         if automations.savingSecret.contains(automation.id) { Loader(size: 12) }
         Button(webhook.secretAction, action: edit)
@@ -392,7 +392,7 @@ private struct WebhookPanel: View {
       Button("Remove", role: .destructive) { Task { await automations.removeWebhookSecret(for: automation) } }
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("Omni deletes it from this Mac's Keychain. GitHub deliveries are refused until you set it again.")
+      Text("Omni deletes it from the server's secret store. GitHub deliveries are refused until you set it again.")
     }
   }
 }
@@ -412,7 +412,7 @@ private struct WebhookSecretSheet: View {
       Text(webhook.secretSet ? "Replace the signing secret" : "Set the signing secret")
         .font(.omni(size: 17, weight: .medium))
         .foregroundStyle(Tok.fg)
-      Text("Paste the secret from the GitHub webhook that posts to \(Text(webhook.path).font(.omni(size: 12, design: .monospaced))) for \(name). Omni keeps it in this Mac's Keychain and never shows it again.")
+      Text("Paste the secret from the GitHub webhook that posts to \(Text(webhook.path).font(.omni(size: 12, design: .monospaced))) for \(name). Omni keeps it in the server's secret store and never shows it again.")
         .font(.omni(size: 12.5))
         .foregroundStyle(Tok.fg3)
         .fixedSize(horizontal: false, vertical: true)

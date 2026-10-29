@@ -47,7 +47,7 @@ struct ProfileSettings: View {
         }
         SettingsCard(title: "Integrations", note: "Optional. Leave a field empty to turn it off.") {
           VStack(alignment: .leading, spacing: z(14)) {
-            Row("Hermes URL", hint: "A Hermes API server on your tailnet. Its token is the Keychain secret HERMES_API_KEY.") {
+            Row("Hermes URL", hint: "A Hermes API server on your tailnet. Its token is the global secret HERMES_API_KEY.") {
               TextField("Hermes URL", text: $form.integrations.hermesUrl, prompt: Text(verbatim: "http://100.64.0.1:8642")).textFieldStyle(.omniMono)
             }
             Row("Central brain folder", hint: "A git repo of notes that the brain-nightly automation exports thread digests into.") {

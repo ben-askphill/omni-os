@@ -3,11 +3,11 @@ import { api, errorText, useApi, type SecretRow } from '../api.ts';
 import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, PageHeader, Picker, StatusDot, type PickerOption } from '../components/ui.tsx';
 import { relTime } from '../format.ts';
 import { href } from '../router.ts';
-import { useApp } from '../store.tsx';
+import { useApp, useSecretStoreLabel } from '../store.tsx';
 
 const NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
 
-/** Names Omni looks up itself. Values still go to the Keychain; this only fills the form. */
+/** Names Omni looks up itself. Values still go to the secret store; this only fills the form. */
 const KNOWN_GLOBALS: { name: string; blurb: string }[] = [
   { name: 'HERMES_API_KEY', blurb: 'Hermes API bearer token. Global. Sent on HTTP requests, not in a shell environment.' },
   { name: 'GROKBOT_WEBHOOK_URL', blurb: 'Grok Bot webhook URL from the Omni OS requests routine. Global. Send to Grok Bot posts here. Stays on the server.' },
@@ -21,8 +21,9 @@ function scopeLabel(scope: string, name: (id: string) => string | undefined) {
 }
 
 export function SecretsPage() {
-  const { channels, channel } = useApp();
+  const { channels, channel, status } = useApp();
   const res = useApi<SecretRow[]>('/secrets');
+  const store = useSecretStoreLabel();
 
   const [scope, setScope] = useState('global');
   const [name, setName] = useState('');
@@ -90,14 +91,21 @@ export function SecretsPage() {
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      <PageHeader width="max-w-2xl" title="Secrets" subtitle="API keys and tokens for the crew. Stored in the macOS Keychain, never in the database." />
+      <PageHeader width="max-w-2xl" title="Secrets" subtitle={`API keys and tokens for the crew. Stored in ${store}, never in the database.`} />
       <div className="mx-auto max-w-2xl space-y-5 px-4 pt-5 pb-16 md:px-8">
         <div className="flex gap-3 rounded-[20px] bg-surface p-4 text-[12.5px] leading-relaxed text-fg-2">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
             <Icon name="lock" size={15} />
           </span>
           <div>
-            Values live in the Keychain under the service <span className="font-mono text-[12px]">omni-os</span>. A thread gets them as environment variables when it
+            Values live in {store}
+            {status?.secretStore !== 'file' && (
+              <>
+                {' '}
+                under the service <span className="font-mono text-[12px]">omni-os</span>
+              </>
+            )}
+            . A thread gets them as environment variables when it
             runs. A channel secret overrides a global one with the same name. Sync credentials and the Grok Bot webhook stay on the server, so a thread never sees them.
             Omni never shows a value again after you save it. To change one, save it again with the same name.
           </div>

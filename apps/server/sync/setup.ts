@@ -6,8 +6,8 @@ import type { PathMap } from './paths.ts';
 import { setActiveWorker, startSync, syncConfigured, type SyncWorker } from './worker.ts';
 
 // Turning sync on and off from Settings. Sign-in is Ben's one Supabase user, by password or by an emailed code.
-// Only the project URL, the anon key and the refresh token are kept, all three in the Keychain. The password
-// and the code are used once and dropped: they never reach the db, a log or the Keychain.
+// Only the project URL, the anon key and the refresh token are kept, all three in the secret store. The password
+// and the code are used once and dropped: they never reach the db, a log or the secret store.
 
 export interface SetupRequest {
   url: string;
@@ -35,7 +35,7 @@ export interface SyncAuth {
 
 export interface SetupDeps {
   auth: (url: string, anonKey: string) => SyncAuth;
-  /** A global secret into the Keychain. */
+  /** A global secret into the secret store. */
   storeSecret: (name: string, value: string) => Promise<void>;
   deleteSecret: (name: string) => Promise<void>;
   /** Start the server's worker from the stored credentials, or null when sync is off. */
@@ -136,7 +136,7 @@ function authFailed(err: unknown): never {
   throw new SetupError(e.message || 'sign-in failed', refused ? 401 : 502);
 }
 
-/** Stop syncing. With forget, also remove the credentials from the Keychain, so it takes a new sign-in. */
+/** Stop syncing. With forget, also remove the credentials from the secret store, so it takes a new sign-in. */
 export async function disableSync(opts: { forget?: boolean }, deps: SetupDeps) {
   await setActiveWorker(null);
   kv.set('sync.enabled', false);

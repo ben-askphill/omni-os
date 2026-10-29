@@ -110,9 +110,10 @@ export function mapUsageEvents(body: unknown): { events: CursorUsageEvent[]; tot
 /** Where a token comes from. Each is read fresh on every call: cursor-agent and the IDE keep theirs refreshed. */
 export type TokenSource = () => Promise<string | null>;
 
-/** cursor-agent's login, in the Keychain. Read with `security`, the way Omni reads its own secrets. */
+/** cursor-agent's login, in the Keychain. Read with `security`, the way Omni reads its own secrets. Mac only. */
 export const keychainToken: TokenSource = () =>
   new Promise((resolve) => {
+    if (process.platform !== 'darwin') return resolve(null);
     execFile('security', ['find-generic-password', '-s', 'cursor-access-token', '-w'], { timeout: 5000 }, (err, stdout) => {
       const v = err ? '' : String(stdout).trim();
       resolve(v || null);

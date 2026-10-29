@@ -73,7 +73,7 @@ Auto is the first entry in the model picker and the default for a new thread. Om
 
 Hermes is an always-on agent on your own Linux server. Omni does not spawn it. The Hermes API server listens on the server's Tailscale address and is not public. A thread talks to it at `OMNI_HERMES_URL`, the server's Tailscale address and port (set it in Settings or `npm run setup`; empty means Hermes is off). The Mac must be on the tailnet.
 
-The bearer token is the Keychain secret `HERMES_API_KEY` (global). It is not an env var, not a database column and not written to logs.
+The bearer token is the global secret `HERMES_API_KEY`. It is not an env var, not a database column and not written to logs.
 
 | Piece | What |
 | --- | --- |
@@ -91,7 +91,7 @@ A Cursor Cloud thread is a [Cursor cloud agent](https://cursor.com/docs/cloud-ag
 
 It needs two things, and the model picker says which is missing:
 
-- The secret `CURSOR_API_KEY`, globally or on the channel, made at cursor.com/dashboard under Integrations. A key only in the Keychain (service `omni-os`, account `global/CURSOR_API_KEY`) works too. Omni sends it only to the Cloud Agents API, on the Authorization header: never to the local `cursor` harness (`apps/server/harness/env-guard.ts` strips it there) and never into a process environment or a log.
+- The secret `CURSOR_API_KEY`, globally or on the channel, made at cursor.com/dashboard under Integrations. A key only in the secret store (service `omni-os`, account `global/CURSOR_API_KEY`) works too. Omni sends it only to the Cloud Agents API, on the Authorization header: never to the local `cursor` harness (`apps/server/harness/env-guard.ts` strips it there) and never into a process environment or a log.
 - The channel's GitHub repo, set in its settings. Cursor also needs access to that repo through its GitHub integration.
 
 | Piece | What |

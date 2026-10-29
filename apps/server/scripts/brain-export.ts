@@ -17,17 +17,15 @@
 // Run it on one Mac only. The cursor syncs, so the follow-up automation should gate on the kv key
 // automations.owner like the other scheduled automations (docs/adr/0004-supabase-sync.md).
 
-import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { promisify } from 'node:util';
 import { config, paths } from '../config.ts';
+import { secretStore } from '../secret-store.ts';
 import { resolved } from '../user-config.ts';
 import { CURSOR_KEY, emptyCursor, envSecretValues, makeRedactor, plan, type Cursor, type SkipReason } from './lib/brain-export.ts';
 
-const run = promisify(execFile);
 
 interface Args {
   out: string;
@@ -76,21 +74,18 @@ function parseArgs(argv: string[]): Args {
   return a;
 }
 
-/** Every secret value Omni stored, read from the Keychain by the names in the secrets table. Never logged. */
-async function keychainValues(ro: DatabaseSync): Promise<string[]> {
+/** Every secret value Omni stored, read from the secret store by the names in the secrets table. Never logged. */
+async function storedValues(ro: DatabaseSync): Promise<string[]> {
   const rows = ro.prepare('SELECT scope, name FROM secrets').all() as unknown as { scope: string; name: string }[];
+  const store = secretStore();
   const values: string[] = [];
   let missing = 0;
   for (const r of rows) {
-    try {
-      const { stdout } = await run('security', ['find-generic-password', '-s', 'omni-os', '-a', `${r.scope}/${r.name}`, '-w']);
-      const v = stdout.replace(/\n$/, '');
-      if (v) values.push(v);
-    } catch {
-      missing++;
-    }
+    const v = await store.read(`${r.scope}/${r.name}`);
+    if (v) values.push(v);
+    else missing++;
   }
-  console.log(`redaction: ${values.length} Omni secret values loaded from the Keychain${missing ? `, ${missing} unreadable` : ''}`);
+  console.log(`redaction: ${values.length} Omni secret values loaded from the ${store.kind} store${missing ? `, ${missing} unreadable` : ''}`);
   return values;
 }
 
@@ -106,7 +101,7 @@ async function main() {
   const stored = ro.prepare('SELECT value FROM kv WHERE key = ?').get(CURSOR_KEY) as { value: string } | undefined;
   const cursor: Cursor = stored ? JSON.parse(stored.value) : emptyCursor();
 
-  const redact = makeRedactor([...(await keychainValues(ro)), ...envSecretValues(process.env)]);
+  const redact = makeRedactor([...(await storedValues(ro)), ...envSecretValues(process.env)]);
   const planned = plan(ro, { channel: args.channel, since: args.since, cursor, redact, timezone: config.timezone, home: homedir(), user: resolved.name() });
 
   const skips: Partial<Record<SkipReason, number>> = {};

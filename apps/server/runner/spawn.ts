@@ -126,7 +126,7 @@ async function spawnLive(live: Live, thread: Thread) {
   try {
     secretEnv = await secretsEnv(channel.id);
     // The catalog probe reads the same global key. A channel secret of the same name already won above.
-    // A key in the Keychain with no row in Secrets counts too. Each goes only to its own harness's HTTP client.
+    // A key in the secret store with no row in Secrets counts too. Each goes only to its own harness's HTTP client.
     const keyName = thread.harness === 'hermes' ? 'HERMES_API_KEY' : thread.harness === 'cursor-cloud' ? 'CURSOR_API_KEY' : null;
     if (keyName && !secretEnv[keyName]) {
       const key = await globalSecret(keyName);

@@ -6,7 +6,7 @@ Omni runs on the Mac where your agents work. Set that machine up first; the Web 
 
 | Need | Check | Fix |
 | --- | --- | --- |
-| macOS | `uname` prints `Darwin` | The Mac app and Keychain secrets are Mac-only. The server and Web UI also run on Linux |
+| macOS | `uname` prints `Darwin` | The Mac app is Mac-only. The server and Web UI also run on Linux, with secrets in `data/secrets.json` ([Configuration](configuration.md#secrets)) |
 | Node 24+ and npm | `node -v` | `nvm install 24` or `brew install node` |
 | Claude Code, signed in | `claude --version` | `npm install -g @anthropic-ai/claude-code`, then `claude` and `/login` |
 | `gh`, signed in (GitHub panel, PR automations) | `gh auth status` | `brew install gh && gh auth login` |

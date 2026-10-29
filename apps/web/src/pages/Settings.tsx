@@ -146,7 +146,7 @@ function SettingsForm({ state, onSaved }: { state: SetupState; onSaved: (s: Setu
         </Row>
       </Card>
       <Card title="Integrations" subtitle="Optional. Leave a field empty to turn it off.">
-        <Row label="Hermes URL" htmlFor="set-hermes" hint="A Hermes API server on your tailnet. Its token is the Keychain secret HERMES_API_KEY.">
+        <Row label="Hermes URL" htmlFor="set-hermes" hint="A Hermes API server on your tailnet. Its token is the global secret HERMES_API_KEY.">
           <input id="set-hermes" className="field w-full font-mono !text-[13px]" value={hermesUrl} placeholder="http://100.64.0.1:8642" spellCheck={false} onChange={field(setHermesUrl)} />
         </Row>
         <Row label="Central brain folder" htmlFor="set-brain" hint="A git repo of notes that the brain-nightly automation exports thread digests into.">

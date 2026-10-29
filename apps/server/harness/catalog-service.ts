@@ -150,7 +150,7 @@ async function probeCursorHarness(cap: number): Promise<HarnessInfo> {
   return cursorHarness(await probeCursor().catch((): CursorProbe => ({ available: false, models: [] })), cap);
 }
 
-/** GET /v1/capabilities with the Keychain bearer token. Missing key or any failure is unavailable. */
+/** GET /v1/capabilities with the stored bearer token. Missing key or any failure is unavailable. */
 export async function probeHermesHarness(cap: number): Promise<HarnessInfo> {
   const unavailable: HermesProbe = { available: false };
   try {

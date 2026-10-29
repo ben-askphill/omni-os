@@ -77,7 +77,7 @@ function TriggerChips({ a, channelName }: { a: Automation; channelName: (id: str
   );
 }
 
-/** Where GitHub posts, and the signing secret it is checked against. The value goes to this Mac's Keychain and never comes back. */
+/** Where GitHub posts, and the signing secret it is checked against. The value goes to the server's secret store and never comes back. */
 function WebhookPanel({ id, webhook, onChanged }: { id: string; webhook: NonNullable<Automation['webhook']>; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
@@ -137,7 +137,7 @@ function WebhookPanel({ id, webhook, onChanged }: { id: string; webhook: NonNull
             )}
             {webhook.secret_set ? (
               <span className="mt-0.5 block truncate text-[11.5px] text-fg-4" title={webhook.secret}>
-                Keychain <span className="font-mono">{webhook.secret}</span>
+                Secret <span className="font-mono">{webhook.secret}</span>
               </span>
             ) : (
               <span className="mt-0.5 block text-[11.5px] text-fg-4">GitHub deliveries are refused until you set the same secret you gave the hook on GitHub.</span>

@@ -133,6 +133,8 @@ public struct ServerInfo: Decodable, Hashable, Sendable {
   public let gitHead: String?
   public let startedAt: Date
   public let port: Int
+  /// Where the server keeps secret values. nil from servers that only ran on a Mac, which used the Keychain.
+  public let secretStore: SecretStore?
 }
 
 /// The Mac the server runs on. `here` is false for a browser that reaches it through Tailscale; the app's own
