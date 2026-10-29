@@ -384,7 +384,7 @@ export function ElementInspector({ element: e, at, bounds }: { element: Inspecte
       ref={ref}
       role="tooltip"
       data-element-inspector
-      className="pointer-events-none absolute z-20 w-max max-w-[300px] rounded-[var(--r-sm)] bg-elev px-[var(--sp-6)] py-[var(--sp-4)] text-[length:var(--fs-code)] leading-[var(--lh-body)] text-fg-2 shadow-[var(--shadow-menu)]"
+      className="pointer-events-none absolute z-20 w-max max-w-[min(300px,calc(100%-8px))] rounded-[var(--r-sm)] bg-elev px-[var(--sp-6)] py-[var(--sp-4)] text-[length:var(--fs-code)] leading-[var(--lh-body)] text-fg-2 shadow-[var(--shadow-menu)]"
       style={{ left, top, visibility: size.w ? 'visible' : 'hidden' }}
     >
       <div className="flex items-baseline gap-[var(--sp-4)]">
@@ -392,7 +392,7 @@ export function ElementInspector({ element: e, at, bounds }: { element: Inspecte
         <span className="shrink-0 font-num text-fg-4">{`${e.size.width} × ${e.size.height}`}</span>
       </div>
       {e.path.length > 1 && (
-        <div className="mt-[var(--sp-1)] truncate font-mono text-[length:var(--fs-label)] text-fg-4" dir="rtl" title={e.path.join(' › ')}>
+        <div className="mt-[var(--sp-1)] truncate text-left font-mono text-[length:var(--fs-label)] text-fg-4" dir="rtl" title={e.path.join(' › ')}>
           <bdi>{e.path.join(' › ')}</bdi>
         </div>
       )}
@@ -491,10 +491,12 @@ export function LiveAnnotateCard({ live, threadId, onDraw, onDone, onSent, phone
           role="group"
           aria-label="What you picked"
           data-live-annotate-card
-          className="pointer-events-auto w-full max-w-[440px] rounded-[var(--r-md)] bg-elev p-[var(--sp-6)] text-[length:var(--fs-small)] shadow-[var(--shadow-menu)]"
+          className="@container pointer-events-auto w-full max-w-[440px] min-w-0 rounded-[var(--r-md)] bg-elev p-[var(--sp-6)] text-[length:var(--fs-small)] shadow-[var(--shadow-menu)]"
           onKeyDown={(e) => e.stopPropagation()}
         >
-          <div className="flex items-start gap-[var(--sp-6)]">
+          {/* Its width is the panel's, never its content's. Narrower than 22rem inside, the crop and Clear sit above the
+              details, which then have the whole width. */}
+          <div className="flex items-start gap-[var(--sp-6)] @max-[22rem]:flex-wrap @max-[22rem]:gap-[var(--sp-4)]">
             {ready && sel.capture && sel.rect ? (
               <Crop threadId={threadId} capture={sel.capture} rect={sel.rect} />
             ) : (
@@ -502,7 +504,7 @@ export function LiveAnnotateCard({ live, threadId, onDraw, onDone, onSent, phone
                 {sel.status === 'capturing' ? <span className="pulse h-1.5 w-1.5 rounded-[var(--r-pill)] bg-fg-4" /> : <Icon name="alert" size={14} className="text-fg-3" />}
               </span>
             )}
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 @max-[22rem]:order-last @max-[22rem]:basis-full">
               {sel.element ? (
                 <PickedElementDetails element={sel.element} className="" />
               ) : (
@@ -516,7 +518,7 @@ export function LiveAnnotateCard({ live, threadId, onDraw, onDone, onSent, phone
                 </>
               )}
             </div>
-            <IconButton icon="x" label="Clear" size={13} className="-mt-[var(--sp-2)] -mr-[var(--sp-2)] h-7 w-7" onClick={live.clear} />
+            <IconButton icon="x" label="Clear" size={13} className="-mt-[var(--sp-2)] -mr-[var(--sp-2)] h-7 w-7 @max-[22rem]:ml-auto" onClick={live.clear} />
           </div>
           {sel.notice && <div className="mt-[var(--sp-4)] text-[length:var(--fs-code)] text-fg-3">{sel.notice}</div>}
           {sel.error && <ErrorNote className="mt-[var(--sp-4)]">{sel.error}</ErrorNote>}
@@ -539,23 +541,25 @@ export function LiveAnnotateCard({ live, threadId, onDraw, onDone, onSent, phone
               className="mt-[var(--sp-5)] block w-full resize-none rounded-[var(--r-sm)] bg-surface px-[var(--sp-6)] py-[var(--sp-4)] text-[length:var(--fs-input)] leading-[var(--lh-body)] outline-none placeholder:text-fg-4 focus:shadow-[inset_0_0_0_1px_var(--line-strong)] sm:text-[length:var(--fs-ui)]"
             />
           )}
-          <div className="mt-[var(--sp-4)] flex items-center justify-end gap-[var(--sp-3)]">
+          {/* Where the three don't fit on one line, Add to message and Send go above Draw. */}
+          <div className="mt-[var(--sp-4)] flex flex-wrap-reverse items-center justify-end gap-[var(--sp-3)]">
             {sel.status === 'failed' ? (
               <Button size="sm" variant="primary" onClick={() => void live.select(sel.kind, sel.live, sel.point ?? undefined, sel.inspected)}>
                 Try again
               </Button>
             ) : (
               <>
-                <Button size="sm" variant="ghost" icon="pencil" disabled={!ready || !!busy} onClick={onDraw}>
+                <Button size="sm" variant="ghost" icon="pencil" className="mr-auto" disabled={!ready || !!busy} onClick={onDraw}>
                   Draw
                 </Button>
-                <span className="flex-1" />
-                <Button size="sm" icon="plus" disabled={!ready || !!busy} onClick={add}>
-                  Add to message
-                </Button>
-                <Button size="sm" variant="primary" icon="send" disabled={!ready} busy={busy === 'sending'} onClick={() => void send()}>
-                  Send
-                </Button>
+                <span className="flex flex-wrap justify-end gap-[var(--sp-3)]">
+                  <Button size="sm" icon="plus" disabled={!ready || !!busy} onClick={add}>
+                    Add to message
+                  </Button>
+                  <Button size="sm" variant="primary" icon="send" disabled={!ready} busy={busy === 'sending'} onClick={() => void send()}>
+                    Send
+                  </Button>
+                </span>
               </>
             )}
           </div>

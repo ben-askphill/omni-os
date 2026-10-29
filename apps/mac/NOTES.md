@@ -495,6 +495,7 @@ apps/mac/.xcode/Build/Products/Debug/Omni.app/Contents/MacOS/Omni -ApplePersiste
 - The harness's activity monitor runs on port 4891 (`QARunner.monitorPort`), so it never meets one started by hand on 4791; its log is `monitor.log` in the out folder and `end()` stops it.
 - The app exits at `quit` or when the steps run out: 0 when every step passed, 1 otherwise.
 - `-appearance light` or `dark` sets the appearance for the run, to snapshot both.
+- `-threadInspector.width 340` sets the inspector's width for the run, to snapshot a panel at its narrowest (340) or wide (about 680 in the 1100-point window). The argument wins over the saved width.
 - `-OmniQAManualHistory YES` stops "Earlier messages" loading by itself, to snapshot the control.
 - `-OmniQALoadMore YES` presses an open tool row's Load more once, after its first chunk, to snapshot a press.
 - A long thread to page through: `OMNI_DATA_DIR=<the QA server's data dir> npx tsx apps/server/scripts/seed-long-thread.ts` prints its id; `pelican` searches to its oldest turn.

@@ -318,7 +318,7 @@ private struct LiveAnnotateCard: View {
           close
         }
       case .marked(let m):
-        HStack(alignment: .top, spacing: z(Space.s5)) {
+        CardHeader(spacing: z(Space.s5), stackBelow: z(352)) {
           CaptureCrop(client: annotating.client, capture: m.capture, rect: m.rect)
           VStack(alignment: .leading, spacing: z(Space.s3)) {
             if let e = m.element {
@@ -344,23 +344,46 @@ private struct LiveAnnotateCard: View {
             return .handled
           }
         if let error = live.error { ErrorNote(text: error).font(.omni(size: TypeSize.small)) }
-        HStack(spacing: z(Space.s4)) {
-          Button("Draw") { draw() }
-            .buttonStyle(.pill(.ghost, height: 28))
-            .help("Mark up this screenshot with the pen, shapes and text")
-          Spacer(minLength: 0)
-          Button("Add to Message") { _ = live.add(to: annotating.draft) }
-            .buttonStyle(.pill(.secondary, height: 28))
-            .help("Puts the screenshot and your note in the reply box")
-          Button(live.sending ? "Sending…" : "Send") { send() }
-            .buttonStyle(.pill(.primary, height: 28))
-            .help("Sends your note with the screenshot now")
+        // Where the three don't fit on one line, Add to Message and Send go above Draw, as on the web.
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: z(Space.s4)) {
+            drawButton
+            Spacer(minLength: 0)
+            addButton
+            sendButton
+          }
+          VStack(alignment: .leading, spacing: z(Space.s3)) {
+            HStack(spacing: z(Space.s4)) {
+              Spacer(minLength: 0)
+              addButton
+              sendButton
+            }
+            drawButton
+          }
         }
         .disabled(live.sending)
         .onAppear { noteFocused = true }
       }
     }
     .padding(z(Space.s6))
+  }
+
+  private var drawButton: some View {
+    Button("Draw") { draw() }
+      .buttonStyle(.pill(.ghost, height: 28))
+      .help("Mark up this screenshot with the pen, shapes and text")
+  }
+
+  private var addButton: some View {
+    Button("Add to Message") { _ = live.add(to: annotating.draft) }
+      .buttonStyle(.pill(.secondary, height: 28))
+      .help("Puts the screenshot and your note in the reply box")
+  }
+
+  private var sendButton: some View {
+    Button(live.sending ? "Sending…" : "Send") { send() }
+      .buttonStyle(.pill(.primary, height: 28))
+      .help("Sends your note with the screenshot now")
   }
 
   private var close: some View {
@@ -377,6 +400,30 @@ private struct LiveAnnotateCard: View {
   private func draw() {
     guard let (m, note) = live.handOff() else { return }
     annotating.model.open(m.capture, rect: m.rect, element: m.element, note: note)
+  }
+}
+
+/// The card's top: the crop, what was marked and Close, laid out by OmniKit's `LiveAnnotateCardHeader`.
+private struct CardHeader: Layout {
+  var spacing: CGFloat
+  var stackBelow: CGFloat
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    frames(in: proposal.width, subviews).size
+  }
+
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    for (view, f) in zip(subviews, frames(in: bounds.width, subviews).frames) {
+      view.place(at: CGPoint(x: bounds.minX + f.minX, y: bounds.minY + f.minY), proposal: ProposedViewSize(f.size))
+    }
+  }
+
+  private func frames(in width: CGFloat?, _ subviews: Subviews) -> (size: CGSize, frames: [CGRect]) {
+    guard subviews.count == 3 else { return (.zero, subviews.map { _ in .zero }) }
+    return LiveAnnotateCardHeader.layout(
+      width: width, spacing: spacing, stackBelow: stackBelow,
+      crop: subviews[0].sizeThatFits(.unspecified), close: subviews[2].sizeThatFits(.unspecified)
+    ) { subviews[1].sizeThatFits(ProposedViewSize(width: $0, height: nil)) }
   }
 }
 
