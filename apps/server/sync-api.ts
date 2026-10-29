@@ -8,7 +8,7 @@ import { syncNow, syncStatus } from './sync/worker.ts';
 
 const body = async (c: Context): Promise<unknown> => c.req.json().catch(() => ({}));
 
-/** The routes, with the Keychain, Supabase Auth and the worker start swappable for tests. */
+/** The routes, with the secret store, Supabase Auth and the worker start swappable for tests. */
 export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
   const app = new Hono();
 
@@ -38,7 +38,7 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
     return c.json(result.state === 'signed_in' ? { ...result, status: syncStatus() } : result);
   });
 
-  /** Pause syncing. {forget: true} also removes the credentials from the Keychain. */
+  /** Pause syncing. {forget: true} also removes the credentials from the secret store. */
   app.post('/disable', async (c) => {
     const b = (await body(c)) as { forget?: unknown };
     await disableSync({ forget: b?.forget === true }, deps);

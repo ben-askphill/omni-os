@@ -142,7 +142,7 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
           htmlFor={`act-secrets-${id}`}
           hint={
             <>
-              Names only, separated by commas or spaces. The command reads each one as $NAME. Values stay in the Keychain under{' '}
+              Names only, separated by commas or spaces. The command reads each one as $NAME. Values stay in the server's secret store under{' '}
               <a className="underline underline-offset-2" href={href.secrets()}>
                 Secrets
               </a>

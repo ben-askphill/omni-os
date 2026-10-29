@@ -5,6 +5,7 @@ import { withPin, type PinnedThread } from './pins.ts';
 import { pageTitle, type Route } from './router.ts';
 import { windowTitle } from './device.ts';
 import { createSyncNudge } from './sync-nudge.ts';
+import { secretStoreKind, secretStoreLabel, type SecretStoreKind } from '@omni/shared/secret-store.ts';
 
 interface AppState {
   channels: ChannelWithRunning[];
@@ -19,7 +20,7 @@ interface AppState {
   updateChannels: (fn: (list: ChannelWithRunning[]) => ChannelWithRunning[]) => void;
   crew: CrewRole[];
   usage: HarnessUsage;
-  status: Omit<Status, 'usage'> | null;
+  status: (Omit<Status, 'usage' | 'server'> & { secretStore: SecretStoreKind }) | null;
   /** The name Omni calls the user by, null until the first status load. Empty when nobody set it yet. */
   profile: Profile | null;
   /** Save profile fields (PUT /api/profile) and show them at once. */
@@ -57,7 +58,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pinned, setPinnedList] = useState<PinnedThread[]>([]);
   const [crew, setCrew] = useState<CrewRole[]>([]);
   const [usage, setUsage] = useState<HarnessUsage>({});
-  const [status, setStatus] = useState<Omit<Status, 'usage'> | null>(null);
+  const [status, setStatus] = useState<(Omit<Status, 'usage' | 'server'> & { secretStore: SecretStoreKind }) | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [setupWanted, setSetupWanted] = useState(false);
   const [feedLive, setFeedLive] = useState(false);
@@ -110,7 +111,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const reloadStatus = useCallback(async () => {
     try {
       const s = await api.get<Status>('/status');
-      setStatus({ running: s.running, queued: s.queued, maxConcurrent: s.maxConcurrent, maxUploadMb: s.maxUploadMb, slots: s.slots ?? {}, device: s.device });
+      setStatus({ running: s.running, queued: s.queued, maxConcurrent: s.maxConcurrent, maxUploadMb: s.maxUploadMb, slots: s.slots ?? {}, device: s.device, secretStore: secretStoreKind(s.server?.secretStore) });
       setProfile(s.profile ?? { name: '' });
       if (s.usage) setUsage((prev) => ({ ...prev, ...s.usage }));
     } catch {
@@ -385,4 +386,9 @@ export function usePageVisible() {
     return () => document.removeEventListener('visibilitychange', on);
   }, []);
   return visible;
+}
+
+/** Where the server keeps secret values, as a sentence names it: "the server Mac's Keychain". */
+export function useSecretStoreLabel(): string {
+  return secretStoreLabel(useApp().status?.secretStore ?? 'keychain');
 }

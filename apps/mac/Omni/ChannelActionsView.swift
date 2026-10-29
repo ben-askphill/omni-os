@@ -149,7 +149,7 @@ struct ChannelActionsView: View {
           .accessibilityLabel("Command")
       }
       VStack(alignment: .leading, spacing: 0) {
-        FieldLabel(text: "Secrets", hint: "Names the command reads as $NAME, separated by commas. Values stay in the Keychain.")
+        FieldLabel(text: "Secrets", hint: "Names the command reads as $NAME, separated by commas. Values stay in the server's secret store.")
         TextField("", text: draft.secrets, prompt: Text("SHOPIFY_CLI_THEME_TOKEN"))
           .textFieldStyle(.omniMono)
           .autocorrectionDisabled()

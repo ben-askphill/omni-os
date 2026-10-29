@@ -215,7 +215,7 @@ export function createSupabaseTransport(opts: SupabaseTransportOptions): SyncTra
   let userId: string | null = null;
   let refreshToken = opts.refreshToken;
   let signingIn: Promise<void> | null = null;
-  /** Stores one at a time, in rotation order: a slow store finishing last would leave a used token in the Keychain. */
+  /** Stores one at a time, in rotation order: a slow store finishing last would leave a used token in the secret store. */
   let storing: Promise<void> = Promise.resolve();
 
   function keep(token: string | undefined) {

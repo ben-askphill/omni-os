@@ -1,7 +1,7 @@
 import OmniKit
 import SwiftUI
 
-/// Names the Secrets form can fill in. The value is still typed and stored in the Keychain.
+/// Names the Secrets form can fill in. The value is still typed and stored in the server's secret store.
 private struct KnownGlobalSecret: Identifiable {
   let name: String
   let help: String
@@ -23,7 +23,7 @@ struct SecretsSettings: View {
   var body: some View {
     Group {
       if let secrets {
-        SecretsForm(secrets: secrets)
+        SecretsForm(secrets: secrets, store: model.store.status?.server?.secretStore ?? .keychain)
       } else {
         Loader(size: 18).frame(maxWidth: .infinity, maxHeight: .infinity).background(Tok.bg)
       }
@@ -43,6 +43,8 @@ struct SecretsSettings: View {
 
 struct SecretsForm: View {
   @Bindable var secrets: SecretsModel
+  /// Where the server keeps the values.
+  let store: SecretStore
   @State private var confirming: SecretRow?
   @FocusState private var valueFocused: Bool
 
@@ -50,7 +52,7 @@ struct SecretsForm: View {
     SettingsPage {
       SettingsIntro(
         icon: "lock",
-        text: Text("Values live in the Keychain under the service \(Text("omni-os").monospaced()). A thread gets them as environment variables when it runs. A channel secret overrides a global one with the same name. Sync credentials and the Grok Bot webhook stay on the server, so a thread never sees them. Omni never shows a value again after you save it. To change one, save it again with the same name.")
+        text: Text("Values live in \(store.label)\(store == .file ? Text("") : Text(" under the service \(Text("omni-os").monospaced())")). A thread gets them as environment variables when it runs. A channel secret overrides a global one with the same name. Sync credentials and the Grok Bot webhook stay on the server, so a thread never sees them. Omni never shows a value again after you save it. To change one, save it again with the same name.")
       )
 
       SettingsCard(title: "Add or replace") {
@@ -134,7 +136,7 @@ struct SecretsForm: View {
       Button("Delete", role: .destructive) { Task { await secrets.delete(row) } }
       Button("Cancel", role: .cancel) {}
     } message: { _ in
-      Text("Omni removes the value from the Keychain. Threads that start after this run without it.")
+      Text("Omni removes the value from \(store.label). Threads that start after this run without it.")
     }
   }
 

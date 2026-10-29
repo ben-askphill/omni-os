@@ -35,7 +35,7 @@ Nothing extra. Omni runs each thread through the official CLI of the harness you
 
 ## Quick start
 
-Needs macOS, Node 24+, `gh` signed in, and Xcode for the Mac app. The server and Web UI also run on Linux, without the Mac app and Keychain secrets.
+Needs macOS, Node 24+, `gh` signed in, and Xcode for the Mac app. The server and Web UI also run on Linux, without the Mac app; secrets go to a 0600 file there instead of the Keychain.
 
 **Let an agent do it.** Open Claude Code, Codex or Cursor in an empty terminal and paste this. Swap `<you>` for your GitHub owner, or point it at an existing clone.
 
@@ -70,7 +70,7 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 - **Channels** per client or project, each with its own icon, default harness, model and effort, a design system file for the agent, and facts like the repo, Shopify store and Portal slug
 - **Threads** per task, dated, full-text searchable and resumable. Running and Recent threads keep work reachable across channels; Mark done clears a thread from Needs you until something new happens. Steer, queue or interrupt while one runs, or pick a model or harness for its next turn
 - **Composer**: `/` menu for skills, slash commands and MCP prompts per harness, `@` to mention artifacts and repo files, attachments, and chips for diff lines, terminal output, browser annotations and other threads, plus suggested next replies
-- **Sandbox per thread**: its own git worktree in repo channels, a choice of base commit, channel setup and named actions, a persistent browser shown live in the Browser panel, a real terminal, and Keychain secrets as env. Hermes and Cursor Cloud run remotely without these local tools
+- **Sandbox per thread**: its own git worktree in repo channels, a choice of base commit, channel setup and named actions, a persistent browser shown live in the Browser panel, a real terminal, and secrets from the Keychain (or a 0600 file on Linux) as env. Hermes and Cursor Cloud run remotely without these local tools
 - **Artifacts** rendered inline, an Artifacts page across channels, and cards for pages a thread published to claude.ai
 - **GitHub panel** per repo channel: PRs, checks, diff and merge. Watch PR wakes the thread for failing checks or new review feedback
 - **Conductor and crew**: one front agent that delegates to roles (builder, researcher, store-ops, inbox), alone or as a team

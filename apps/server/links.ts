@@ -475,7 +475,7 @@ export function isApiHost(host: string, extra?: string) {
 }
 
 const secretCache = new Map<string, { at: number; env: Promise<Record<string, string>> }>();
-/** A channel's secrets (global overridden by its own), read from the Keychain at most once a minute. */
+/** A channel's secrets (global overridden by its own), read from the secret store at most once a minute. */
 function channelSecrets(channelId: string | undefined) {
   const key = channelId ?? '';
   const hit = secretCache.get(key);

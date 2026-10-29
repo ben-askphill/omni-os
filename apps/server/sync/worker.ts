@@ -311,7 +311,7 @@ export async function syncNow(): Promise<SyncResult | null> {
   return active ? active.syncNow() : null;
 }
 
-/** True when all three sync credentials are named in the secrets table. Reads names only, never the Keychain. */
+/** True when all three sync credentials are named in the secrets table. Reads names only, never the secret store. */
 export function syncConfigured(): boolean {
   const names = new Set(listSecrets().filter((s) => s.scope === 'global').map((s) => s.name));
   return Object.values(SYNC_SECRETS).every((n) => names.has(n));
@@ -341,8 +341,8 @@ function baseStatus(entities = registeredEntities()): SyncStatus {
 export const syncStatus = (): SyncStatus => (active ? active.status() : baseStatus());
 
 /**
- * Boot: start syncing when the credentials are in the Keychain and kv `sync.enabled` is not false.
- * With no credentials this reads nothing from the Keychain, arms nothing, and the server runs as it did before sync.
+ * Boot: start syncing when the credentials are in the secret store and kv `sync.enabled` is not false.
+ * With no credentials this reads nothing from the secret store, arms nothing, and the server runs as it did before sync.
  */
 export async function startSync(): Promise<SyncWorker | null> {
   if (!syncConfigured() || kv.get<boolean>('sync.enabled') === false) return null;
