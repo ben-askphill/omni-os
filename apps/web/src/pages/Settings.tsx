@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { api, errorText, type SetupState, type UserConfigPatch } from '../api.ts';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { pageFields, SETTING_PAGES, settingHint, settingPlaceholder, settingProblem, type SettingField, type SettingPage } from '@omni/shared/settings.ts';
+import { api, errorText, type SetupState, type UserConfig, type UserConfigPatch } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setChannelAlerts, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
-import { NAME_MAX, PronounsInput, TimezoneInput } from '../components/Onboarding.tsx';
+import { PronounsInput, TimezoneInput } from '../components/Onboarding.tsx';
 import { SettingsNav } from '../components/SettingsNav.tsx';
 import { useTheme } from '../components/theme.tsx';
 import { Button, ErrorNote, Icon, Loading, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
@@ -16,8 +17,6 @@ import { Advanced, Card, Row, SwitchRow } from './settings-parts.tsx';
 // Machines: this machine, where new threads run, Sync and Storage. Secrets: the keys the crew gets.
 // General and Workspace edit the user config (data/omni.config.json) that onboarding wrote; the Mac app's General
 // and Workspace tabs (apps/mac/Omni/ProfileSettingsView.swift) edit the same file.
-
-export { NAME_MAX };
 
 const SUBTITLE: Record<SettingsSection, string> = {
   general: 'Who you are, how Omni looks in this browser, and what it tells you.',
@@ -79,7 +78,7 @@ function GeneralSection() {
   return (
     <>
       {error && <ErrorNote>{error}</ErrorNote>}
-      {state ? <ConfigForm part="you" state={state} onSaved={setState} /> : !error && <Loading />}
+      {state ? <ConfigForm part="general" state={state} onSaved={setState} /> : !error && <Loading />}
       <AppearanceCard />
       <NotificationsCard />
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-surface p-4 md:p-5">
@@ -120,58 +119,36 @@ function ConfigNote({ path, children }: { path?: string; children: ReactNode }) 
   );
 }
 
-/** General's You card, or Workspace's folders and integrations. Each saves its own part of the config, so the other stays as it is. */
-function ConfigForm({ part, state, onSaved }: { part: 'you' | 'workspace'; state: SetupState; onSaved: (s: SetupState) => void }) {
+/**
+ * General's You card, or Workspace's folders and integrations, drawn from the shared settings contract
+ * (@omni/shared/settings.ts), so a new field there shows here with no change to this file. Each part saves its own
+ * fields, so the other stays as it is.
+ */
+function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupState; onSaved: (s: SetupState) => void }) {
   const { reloadProfile } = useApp();
-  const c = state.config;
-  const [name, setName] = useState(c.user.name);
-  const [pronouns, setPronouns] = useState(c.user.pronouns);
-  const [email, setEmail] = useState(c.user.email);
-  const [timezone, setTimezone] = useState(c.user.timezone);
-  const [root, setRoot] = useState(c.workspace.root);
-  const [reposDir, setReposDir] = useState(c.workspace.reposDir);
-  const [githubOwner, setGithubOwner] = useState(c.workspace.githubOwner);
-  const [hermesUrl, setHermesUrl] = useState(c.integrations.hermesUrl);
-  const [centralBrainDir, setCentralBrainDir] = useState(c.integrations.centralBrainDir);
+  const fields = useMemo(() => pageFields(part), [part]);
+  const page = SETTING_PAGES[part];
+  const [values, setValues] = useState(() => formValues(fields, state.config));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   // The Mac app or `npm run setup` can change the file while this page is open.
-  useEffect(() => {
-    setName(c.user.name);
-    setPronouns(c.user.pronouns);
-    setEmail(c.user.email);
-    setTimezone(c.user.timezone);
-    setRoot(c.workspace.root);
-    setReposDir(c.workspace.reposDir);
-    setGithubOwner(c.workspace.githubOwner);
-    setHermesUrl(c.integrations.hermesUrl);
-    setCentralBrainDir(c.integrations.centralBrainDir);
-  }, [c]);
+  useEffect(() => setValues(formValues(fields, state.config)), [fields, state.config]);
 
-  const patch: UserConfigPatch =
-    part === 'you'
-      ? { user: { name: name.trim(), pronouns: pronouns.trim() || 'they/them', email: email.trim(), timezone: timezone.trim() } }
-      : {
-          workspace: { root: root.trim(), reposDir: reposDir.trim(), githubOwner: githubOwner.trim() },
-          integrations: { hermesUrl: hermesUrl.trim(), centralBrainDir: centralBrainDir.trim() },
-        };
-  const current = part === 'you' ? { user: c.user } : { workspace: c.workspace, integrations: c.integrations };
-  const dirty = JSON.stringify(patch) !== JSON.stringify(current);
+  const patch = formPatch(fields, values);
+  const dirty = JSON.stringify(patch) !== JSON.stringify(formPatch(fields, formValues(fields, state.config)));
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
-    if (part === 'you') {
-      if (!name.trim()) return setError('Enter a name.');
-      if (name.trim().length > NAME_MAX) return setError(`Keep it under ${NAME_MAX} characters.`);
-    }
+    const problem = fields.map((f) => settingProblem(f, values[fieldId(f)] ?? '', 'form')).find(Boolean);
+    if (problem) return setError(problem);
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
       onSaved(await api.put<SetupState>('/setup', patch));
-      if (part === 'you') await reloadProfile();
+      if (part === 'general') await reloadProfile();
       setSaved(true);
     } catch (err) {
       setError(errorText(err));
@@ -180,51 +157,29 @@ function ConfigForm({ part, state, onSaved }: { part: 'you' | 'workspace'; state
     }
   };
 
-  const edited = () => setSaved(false);
-  const field = (set: (v: string) => void) => (e: { target: { value: string } }) => (set(e.target.value), edited());
+  const set = (f: SettingField) => (v: string) => (setValues((cur) => ({ ...cur, [fieldId(f)]: v })), setSaved(false));
+  const rows = (list: readonly SettingField[]) =>
+    pairHalves(list).map((group) =>
+      group.length === 1 ? (
+        <ConfigField key={fieldId(group[0])} field={group[0]} value={values[fieldId(group[0])] ?? ''} fallbacks={state.fallbacks} onChange={set(group[0])} />
+      ) : (
+        <div key={fieldId(group[0])} className="grid gap-4 sm:grid-cols-2">
+          {group.map((f) => (
+            <ConfigField key={fieldId(f)} field={f} value={values[fieldId(f)] ?? ''} fallbacks={state.fallbacks} onChange={set(f)} />
+          ))}
+        </div>
+      ),
+    );
+  const advanced = fields.filter((f) => f.advanced);
 
   return (
     <form onSubmit={save} className="space-y-5">
-      {part === 'you' ? (
-        <Card title="You">
-          <Row label="Name" htmlFor="set-name" hint="Used in the greeting on Home and told to every agent, so a thread knows who it works for.">
-            <input id="set-name" className="field w-full max-w-sm" value={name} maxLength={NAME_MAX} autoComplete="name" placeholder="Your name" onChange={field(setName)} />
-          </Row>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Row label="Pronouns" htmlFor="set-pronouns">
-              <PronounsInput id="set-pronouns" value={pronouns} onChange={(v) => (setPronouns(v), edited())} />
-            </Row>
-            <Row label="Timezone" htmlFor="set-tz" hint={`Empty uses the server's: ${state.fallbacks.timezone}.`}>
-              <TimezoneInput id="set-tz" value={timezone} onChange={(v) => (setTimezone(v), edited())} />
-            </Row>
-          </div>
-          <Row label="Email" htmlFor="set-email">
-            <input id="set-email" className="field w-full max-w-sm" type="email" value={email} autoComplete="email" placeholder="you@example.com" onChange={field(setEmail)} />
-          </Row>
-        </Card>
-      ) : (
-        <>
-          <Card title="Workspace">
-            <Row label="Workspace folder" htmlFor="set-root" hint="Threads without a repo run here; its CLAUDE.md and skills load in every Claude thread.">
-              <input id="set-root" className="field w-full font-mono !text-[13px]" value={root} placeholder={state.fallbacks.workspaceRoot} spellCheck={false} onChange={field(setRoot)} />
-            </Row>
-            <Row label="Repos folder" htmlFor="set-repos">
-              <input id="set-repos" className="field w-full font-mono !text-[13px]" value={reposDir} placeholder={state.fallbacks.reposDir} spellCheck={false} onChange={field(setReposDir)} />
-            </Row>
-            <Row label="GitHub owner" htmlFor="set-gh" hint="Your GitHub user or org.">
-              <input id="set-gh" className="field w-full max-w-sm font-mono !text-[13px]" value={githubOwner} placeholder="octocat" spellCheck={false} autoCapitalize="off" onChange={field(setGithubOwner)} />
-            </Row>
-          </Card>
-          <Advanced summary="Hermes URL and central brain folder">
-            <p className="text-[12.5px] text-fg-3">Optional integrations. Leave a field empty to turn it off.</p>
-            <Row label="Hermes URL" htmlFor="set-hermes" hint="A Hermes API server on your tailnet. Its token is the global secret HERMES_API_KEY.">
-              <input id="set-hermes" className="field w-full font-mono !text-[13px]" value={hermesUrl} placeholder="http://100.64.0.1:8642" spellCheck={false} onChange={field(setHermesUrl)} />
-            </Row>
-            <Row label="Central brain folder" htmlFor="set-brain" hint="A git repo of notes that the brain-nightly automation exports thread digests into.">
-              <input id="set-brain" className="field w-full font-mono !text-[13px]" value={centralBrainDir} placeholder="~/central-brain" spellCheck={false} onChange={field(setCentralBrainDir)} />
-            </Row>
-          </Advanced>
-        </>
+      <Card title={page.title}>{rows(fields.filter((f) => !f.advanced))}</Card>
+      {advanced.length > 0 && (
+        <Advanced summary={page.advanced?.summary}>
+          {page.advanced?.note && <p className="text-[12.5px] text-fg-3">{page.advanced.note}</p>}
+          {rows(advanced)}
+        </Advanced>
       )}
       <div className="flex items-center gap-3">
         <Button type="submit" variant="primary" busy={saving} disabled={!dirty}>
@@ -234,6 +189,60 @@ function ConfigForm({ part, state, onSaved }: { part: 'you' | 'workspace'; state
       </div>
       {error && <ErrorNote>{error}</ErrorNote>}
     </form>
+  );
+}
+
+const fieldId = (f: SettingField) => `${f.section}.${f.key}`;
+
+const formValues = (fields: readonly SettingField[], c: UserConfig): Record<string, string> =>
+  Object.fromEntries(fields.map((f) => [fieldId(f), (c[f.section] as Record<string, string | undefined>)[f.key] ?? f.default]));
+
+/** The fields as PUT /api/setup takes them: trimmed, an empty one with a default (pronouns) back to it. */
+function formPatch(fields: readonly SettingField[], values: Record<string, string>): UserConfigPatch {
+  const patch: Partial<Record<SettingField['section'], Record<string, string>>> = {};
+  for (const f of fields) (patch[f.section] ??= {})[f.key] = (values[fieldId(f)] ?? '').trim() || f.default;
+  return patch;
+}
+
+/** Consecutive half-width fields share a row. */
+function pairHalves(fields: readonly SettingField[]): SettingField[][] {
+  const out: SettingField[][] = [];
+  for (const f of fields) {
+    const last = out.at(-1);
+    if (f.half && last?.[0]?.half && last.length < 2) last.push(f);
+    else out.push([f]);
+  }
+  return out;
+}
+
+const MONO = new Set<SettingField['input']>(['folder', 'url', 'owner']);
+const NARROW = new Set<SettingField['input']>(['text', 'email', 'owner']);
+
+function ConfigField({ field: f, value, fallbacks, onChange }: { field: SettingField; value: string; fallbacks: SetupState['fallbacks']; onChange: (v: string) => void }) {
+  const id = `set-${f.key}`;
+  const input =
+    f.input === 'pronouns' ? (
+      <PronounsInput id={id} value={value} onChange={onChange} />
+    ) : f.input === 'timezone' ? (
+      <TimezoneInput id={id} value={value} onChange={onChange} />
+    ) : (
+      <input
+        id={id}
+        className={`field w-full${NARROW.has(f.input) ? ' max-w-sm' : ''}${MONO.has(f.input) ? ' font-mono !text-[13px]' : ''}`}
+        type={f.input === 'email' ? 'email' : 'text'}
+        value={value}
+        maxLength={f.max}
+        autoComplete={f.autoComplete}
+        placeholder={settingPlaceholder(f, fallbacks)}
+        spellCheck={MONO.has(f.input) ? false : undefined}
+        autoCapitalize={f.input === 'owner' ? 'off' : undefined}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  return (
+    <Row label={f.label} htmlFor={id} hint={settingHint(f, fallbacks)}>
+      {input}
+    </Row>
   );
 }
 

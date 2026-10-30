@@ -1,3 +1,4 @@
+import type { TurnState } from '@omni/shared/changes.ts';
 import { db, now } from '../connection.ts';
 
 /**
@@ -5,7 +6,7 @@ import { db, now } from '../connection.ts';
  * `capturing`: the turn ended and its after snapshot is being saved. `ready`: both are saved. `failed`: one could not
  * be, `error` says why. A failed snapshot never changes the turn's own Result.
  */
-export type TurnSnapshotState = 'running' | 'capturing' | 'ready' | 'failed';
+export type TurnSnapshotState = TurnState;
 
 /** An untracked file a snapshot left out, and why: binary or too large to save. */
 export interface SkippedFile {

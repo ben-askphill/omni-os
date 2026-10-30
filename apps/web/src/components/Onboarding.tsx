@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { NAME_MAX } from '@omni/shared/settings.ts';
 import { api, errorText, type SetupState, type UserConfigPatch } from '../api.ts';
 import { navigate, href } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -11,7 +12,8 @@ export { PronounsInput, TimezoneInput } from './onboarding-parts.tsx';
 // Onboarding: five short screens on first run (no data/omni.config.json yet), or again from Settings. It writes the
 // user config through /api/setup; the Mac app (OnboardingSheet.swift) and `npm run setup` ask the same questions.
 
-export const NAME_MAX = 60;
+export { NAME_MAX };
+
 export function Onboarding() {
   const { setupOpen } = useApp();
   return setupOpen ? <Wizard /> : null;
