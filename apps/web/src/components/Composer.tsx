@@ -19,6 +19,7 @@ import { draftRun, draftRunRequest, newThreadBody, otherModel, sameSettings, typ
 import { asksAuto } from '../thread-run.ts';
 import { parseSlash, type SlashCommand } from '@omni/shared/slash.ts';
 import { requestIdFor, sendKey, type PendingRequest } from '../requests.ts';
+import { beginSend } from '../sending.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { ForkThreadButton } from './ContinueSheet.tsx';
@@ -802,10 +803,16 @@ export function useReplySend(threadId: string) {
       const request = requestIdFor(lastRequest.current, sendKey(prompt, mode, files, ids));
       lastRequest.current = request;
       const body = { prompt, ...(mode && { mode }), ...(context.length ? { context } : {}), request_id: request.id };
-      const t = await api.send<Thread>(`/threads/${encodeURIComponent(threadId)}/messages`, body, files);
-      lastRequest.current = null;
-      settleDraftContext(threadId, ids);
-      return t;
+      // In the thread at once, files and all, while the upload and the server's checks run (sending.ts).
+      const done = beginSend(threadId, request.id, prompt, files);
+      try {
+        const t = await api.send<Thread>(`/threads/${encodeURIComponent(threadId)}/messages`, body, files);
+        lastRequest.current = null;
+        settleDraftContext(threadId, ids);
+        return t;
+      } finally {
+        done();
+      }
     },
     [threadId],
   );
@@ -871,14 +878,18 @@ export function ReplyComposer({
     if (!canSend || busy) return;
     setBusy(true);
     setError(null);
+    // The box empties now: the message shows in the thread while it goes, and comes back here if it fails.
+    const files = att.files;
+    drafts.delete(key);
+    setText('');
+    att.clear();
     try {
-      const t = await sendReply(prompt, mode, att.files, context);
-      // Keep anything typed while the send was in flight.
-      if (drafts.get(key) === raw) drafts.delete(key);
-      if (latest.current === raw) setText('');
-      att.clear();
+      const t = await sendReply(prompt, mode, files, context);
       onSent?.(t, mode);
     } catch (e) {
+      // Unless Ben started a new message meanwhile.
+      if (!latest.current || latest.current === raw) update(raw);
+      att.add(files);
       setError(errorText(e));
     } finally {
       setBusy(false);

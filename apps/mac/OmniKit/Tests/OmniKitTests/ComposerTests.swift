@@ -256,6 +256,55 @@ private func record(_ id: String, note: String = "") -> MessageContext {
     #expect(DraftContextModel(threadID: "t1", drafts: DraftStore(directory: dir.url)).records.map(\.id) == ["r2"])
   }
 
+  @Test func aSendShowsInTheThreadAtOnceWithItsFiles() async throws {
+    let dir = TempDir("drafts")
+    let api = FakeReplyAPI()
+    let gate = Gate()
+    api.gate = gate
+    let m = make(api, dir)
+    m.text = "look at this"
+    m.addFiles([file("shot.png")])
+    let sending = Task { await m.send(mode: nil) }
+    try await waitFor("the send to be out") { !api.sent.isEmpty }
+    #expect(m.text == "" && m.files.isEmpty, "the box empties as it goes")
+    let out = m.outgoing.messages
+    #expect(out.map(\.text) == ["look at this"])
+    #expect(out.first?.attachments.map(\.name) == ["shot.png"])
+    #expect(out.first?.attachments.first?.image == true)
+    #expect(out.first?.requestID == api.sent.first?.requestID)
+    gate.open()
+    #expect(await sending.value != nil)
+    #expect(m.outgoing.messages.isEmpty)
+    #expect(m.text == "" && m.files.isEmpty)
+  }
+
+  @Test func aFailedSendComesBackUnlessANewMessageWasStarted() async throws {
+    let dir = TempDir("drafts")
+    let api = FakeReplyAPI()
+    api.failWith = .http(status: 500, message: "boom")
+    let gate = Gate()
+    api.gate = gate
+    let m = make(api, dir)
+    m.text = "first"
+    m.addFiles([file("a.txt")])
+    let sending = Task { await m.send(mode: nil) }
+    try await waitFor("the send to be out") { !api.sent.isEmpty }
+    m.text = "second"
+    gate.open()
+    #expect(await sending.value == nil)
+    #expect(m.outgoing.messages.isEmpty)
+    #expect(m.text == "second")
+    #expect(m.files.map(\.name) == ["a.txt"])
+  }
+
+  @Test func theServersPendingRowReplacesTheLocalOne() {
+    let model = SendingModel()
+    model.begin(.init(requestID: "r1", text: "hi", files: []))
+    #expect(model.shown(besides: []).map(\.requestID) == ["r1"])
+    let row = try! OmniJSON.decoder().decode(PendingMsg.self, from: Data(#"{"uuid":"u1","kind":"user","text":"hi","mode":"steer","state":"sent","request_id":"r1"}"#.utf8))
+    #expect(model.shown(besides: [row]).isEmpty)
+  }
+
   @Test func openPRQueuesWhileBusyAndLeavesTheDraftAlone() async {
     let dir = TempDir("drafts")
     let api = FakeReplyAPI()

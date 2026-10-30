@@ -561,6 +561,7 @@ private struct TranscriptRows: View {
           store: store, client: model.client, items: store.pending.filter { !$0.isParked }, starting: store.betweenTurns, setup: store.thread?.setup,
           canSteer: store.thread.map { t in SendRules.canSteer(harness: t.harness, capabilities: model.store.harnesses.first { $0.id == t.harness }?.capabilities) } ?? false)
       }
+      SendingMessagesView(store: store, client: model.client)
       if store.pending.contains(where: \.isParked) {
         ParkedMessagesView(store: store, client: model.client, items: store.pending.filter(\.isParked), setup: store.thread?.setup)
       }

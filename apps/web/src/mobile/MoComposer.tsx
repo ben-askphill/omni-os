@@ -156,15 +156,20 @@ export function MoComposer({
     const mode: SendMode | undefined = busyThread ? (steers ? 'steer' : 'queue') : undefined;
     setBusy(true);
     setError(null);
+    // The box empties now: the message shows in the thread while it goes, and comes back here if it fails.
+    const raw = text;
+    const files = att.files;
+    setText('');
+    drafts.delete(thread.id);
+    att.clear();
     try {
-      const t = await send(prompt, mode, att.files, context);
-      if ((drafts.get(thread.id) ?? '') === text) {
-        drafts.delete(thread.id);
-        setText('');
-      }
-      att.clear();
+      const t = await send(prompt, mode, files, context);
       onSent(t, mode);
     } catch (e) {
+      // Unless Ben started a new message meanwhile.
+      const now = ref.current?.value ?? '';
+      if (!now || now === raw) update(raw);
+      att.add(files);
       setError(errorText(e));
     } finally {
       setBusy(false);

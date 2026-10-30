@@ -61,6 +61,8 @@ public final class ThreadStore {
   public let edits: PendingEditsModel
   /// Records waiting in the reply box, which the Changes tab adds to.
   public let draftContext: DraftContextModel
+  /// Replies on their way to the server, shown until `pending` lists them.
+  public let sending = SendingModel()
   /// A CLI process is attached, so the next message starts at once. nil until the server says.
   public private(set) var warm: Bool?
   public private(set) var loadState = LoadState.loading

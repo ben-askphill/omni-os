@@ -153,6 +153,8 @@ struct AttachmentsView: View {
   let threadID: String
   let items: [Attachment]
   let client: OmniClient
+  /// The files are still on this Mac, at their `path`: a message on its way to the server (`SendingModel`).
+  var local = false
   @State private var preview: URL?
   @State private var loading: String?
 
@@ -171,14 +173,20 @@ struct AttachmentsView: View {
   }
 
   private func thumbnail(_ a: Attachment) -> some View {
-    ClientImage(client: client, url: client.uploadURL(threadID: threadID, name: a.name)) { phase in
-      switch phase {
-      case .success(let image):
-        image.resizable().scaledToFit()
-      case .failure:
-        OmniIcon(name: "image", size: 16).foregroundStyle(Tok.fg4).frame(width: z(80), height: z(60))
-      default:
-        ProgressView().controlSize(.small).frame(width: z(80), height: z(60))
+    Group {
+      if local {
+        LocalImage(url: URL(fileURLWithPath: a.path))
+      } else {
+        ClientImage(client: client, url: client.uploadURL(threadID: threadID, name: a.name)) { phase in
+          switch phase {
+          case .success(let image):
+            image.resizable().scaledToFit()
+          case .failure:
+            OmniIcon(name: "image", size: 16).foregroundStyle(Tok.fg4).frame(width: z(80), height: z(60))
+          default:
+            ProgressView().controlSize(.small).frame(width: z(80), height: z(60))
+          }
+        }
       }
     }
     .frame(maxWidth: z(Attachment.thumbnailBox.width), maxHeight: z(Attachment.thumbnailBox.height))
@@ -210,6 +218,10 @@ struct AttachmentsView: View {
 
   /// Quick Look needs a file, so the upload is fetched into a temporary folder first.
   private func open(_ a: Attachment) {
+    if local {
+      preview = URL(fileURLWithPath: a.path)
+      return
+    }
     guard loading == nil else { return }
     loading = a.name
     Task {
@@ -224,6 +236,26 @@ struct AttachmentsView: View {
       } catch {
         NSSound.beep()
       }
+    }
+  }
+}
+
+/// A picture from a file on this Mac, read off the main thread.
+private struct LocalImage: View {
+  let url: URL
+  @State private var image: NSImage?
+
+  var body: some View {
+    Group {
+      if let image {
+        Image(nsImage: image).resizable().scaledToFit()
+      } else {
+        ProgressView().controlSize(.small).frame(width: z(80), height: z(60))
+      }
+    }
+    .task(id: url) {
+      let url = url
+      image = await Task.detached { NSImage(contentsOf: url) }.value
     }
   }
 }
@@ -572,7 +604,7 @@ struct QueuedMessagesView: View {
         } else if m.isEditable {
           PendingRow(store: store, client: client, m: m, label: m.label(lead: false, setup: setup), icon: "clock", canSteer: canSteer) { EmptyView() }
         } else {
-          PendingBubble(m: m, label: m.label(lead: i == lead, setup: setup), icon: m.state == .sent ? "send" : "clock")
+          PendingBubble(m: m, label: m.label(lead: i == lead, setup: setup), icon: m.state == .sent ? "send" : "clock", threadID: store.id, client: client)
         }
       }
       if let error = store.edits.error {
@@ -583,27 +615,64 @@ struct QueuedMessagesView: View {
   }
 }
 
-/// A message the agent has not read: the line over it and its dashed bubble.
+/// Ben's replies still on their way to the server, with the files he picked, until it lists them (`SendingModel`).
+struct SendingMessagesView: View {
+  let store: ThreadStore
+  let client: OmniClient
+
+  var body: some View {
+    let items = store.sending.shown(besides: store.pending)
+    if !items.isEmpty {
+      VStack(alignment: .trailing, spacing: z(12)) {
+        ForEach(items) { m in
+          PendingBubble(text: m.text, attachments: m.attachments, context: nil, label: "Sending", icon: "send", threadID: store.id, client: client, local: true)
+        }
+      }
+      .padding(.top, z(4))
+    }
+  }
+}
+
+/// A message the agent has not read: the line over it, its files and its dashed bubble.
 struct PendingBubble: View {
-  let m: PendingMsg
+  let text: String
+  let attachments: [Attachment]
+  let context: MessageContextList?
   let label: String
   let icon: String
+  let threadID: String
+  let client: OmniClient
+  /// The files are still on this Mac (`SendingModel`).
+  var local = false
+
+  init(m: PendingMsg, label: String, icon: String, threadID: String, client: OmniClient) {
+    self.init(text: m.text, attachments: m.attachments ?? [], context: m.context, label: label, icon: icon, threadID: threadID, client: client)
+  }
+
+  init(text: String, attachments: [Attachment], context: MessageContextList?, label: String, icon: String, threadID: String, client: OmniClient, local: Bool = false) {
+    self.text = text
+    self.attachments = attachments
+    self.context = context
+    self.label = label
+    self.icon = icon
+    self.threadID = threadID
+    self.client = client
+    self.local = local
+  }
 
   var body: some View {
     VStack(alignment: .trailing, spacing: z(4)) {
-      HStack(spacing: z(4)) {
-        IconLabel(label, icon: icon, size: 12)
-        if let files = m.attachments, !files.isEmpty {
-          Text("· \(Format.plural(files.count, "file"))").foregroundStyle(Tok.fg4)
-        }
+      IconLabel(label, icon: icon, size: 12)
+        .font(.omni(size: 11.5, weight: .medium))
+        .foregroundStyle(Tok.fg3)
+      if !attachments.isEmpty {
+        AttachmentsView(threadID: threadID, items: attachments, client: client, local: local)
       }
-      .font(.omni(size: 11.5, weight: .medium))
-      .foregroundStyle(Tok.fg3)
-      if let context = m.context, !context.isEmpty {
+      if let context, !context.isEmpty {
         MessageContextChips(readings: ContextReading.read(context, kinds: contextKinds))
       }
-      if !m.text.isEmpty || m.context?.isEmpty != false {
-        Text(m.text)
+      if !text.isEmpty || context?.isEmpty != false {
+        Text(text)
           .font(.omni(size: ThreadStyle.prose))
           .lineSpacing(5)
           .foregroundStyle(Tok.fg)
@@ -641,7 +710,7 @@ struct PendingRow<Extra: View>: View {
       PendingEditBox(store: store, client: client, m: m, draft: d, label: label)
     } else {
       VStack(alignment: .trailing, spacing: z(6)) {
-        PendingBubble(m: m, label: label, icon: icon)
+        PendingBubble(m: m, label: label, icon: icon, threadID: store.id, client: client)
         HStack(spacing: z(4)) {
           extra
           let off = edits.busy != nil
@@ -878,7 +947,7 @@ struct ParkedMessagesView: View {
         let icon = m.delivery == .uncertain ? "alert" : "clock"
         if m.isOmnis {
           VStack(alignment: .trailing, spacing: z(6)) {
-            PendingBubble(m: m, label: m.label(lead: false, setup: setup), icon: icon)
+            PendingBubble(m: m, label: m.label(lead: false, setup: setup), icon: icon, threadID: store.id, client: client)
             HStack(spacing: z(4)) {
               sendAgain(m, off: off)
               Button { discard(m) } label: {
