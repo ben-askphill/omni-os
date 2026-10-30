@@ -109,7 +109,7 @@ describe.each([false, true])('the picker, phone=%s', (phone) => {
     expect(host.textContent).toContain('Thread: Fix the cart total (Shop · 7d3e91a0)');
     expect(host.querySelector('textarea')!.value).toBe('look at');
     // Only the draft changed: nothing was posted anywhere.
-    expect((fetch as ReturnType<typeof vi.fn>).mock.calls.every(([u, init]) => !init?.method || init.method === 'GET')).toBe(true);
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true);
   });
 
   it('shows two threads of one title apart by their id', async () => {

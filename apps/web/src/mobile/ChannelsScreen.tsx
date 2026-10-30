@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { ChannelWithRunning, ConductorHandoffGroup, Thread, ThreadStub } from '../api.ts';
+import type { ChannelWithRunning, ConductorHandoffGroup, Thread } from '../api.ts';
 import { OmniMark } from '../components/brand.tsx';
 import { DeviceLabel } from '../components/DeviceLabel.tsx';
 import { useLiveThreads } from '../components/ThreadList.tsx';

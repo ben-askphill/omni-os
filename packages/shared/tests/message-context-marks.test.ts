@@ -28,7 +28,6 @@ import { browserAnnotation, annotate, type BrowserCapture } from '../message-con
 type Case = { name: string; op: string; expect: unknown } & Record<string, unknown>;
 const corpus = JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')) as { marks: Case[] };
 const vp = { width: 1280, height: 713 };
-const style: MarkStyle = { color: '#ff4420', stroke: 4 };
 
 describe('the marks corpus', () => {
   for (const c of corpus.marks) {

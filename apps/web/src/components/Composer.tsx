@@ -5,7 +5,7 @@ import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset, take
 import { useApp } from '../store.tsx';
 import { ErrorNote, Icon, IconButton, Kbd, Loader, Picker, type IconName, type PickerOption } from './ui.tsx';
 import { CrewMark, isCrewRole } from './brand.tsx';
-import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
+import { ModelPicker } from './ModelPicker.tsx';
 import { BasePicker, useBasePick } from './BasePicker.tsx';
 import { RunOnPicker, useRunOn } from './RunOnPicker.tsx';
 import { baseRequest } from '../worktree-base.ts';

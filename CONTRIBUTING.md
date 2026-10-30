@@ -19,7 +19,9 @@ If you already run Omni for real on :4747, do not develop against it. Use the th
 | Command | What |
 | --- | --- |
 | `npm test` | `turbo boundaries`, then every package's vitest suite |
-| `npm run typecheck` | `tsc` in every package |
+| `npm run typecheck` | `tsc` in every package, with `noUnusedLocals` and `noUnusedParameters` on |
+| `npm run unused` | Knip: unused files, dependencies and binaries (`knip.json`). Unused exports are not checked yet |
+| `npm run check` | Typecheck, knip, then `npm test`; the CI workflow runs the same three (`scripts/ci-workflow.yml`, to be moved to `.github/workflows/ci.yml`) |
 | `npm run test:mac` | The Mac app's Swift tests (OmniKit, headless). Needs Xcode |
 | `npm run test:all` | vitest plus the Swift tests |
 | `npx turbo run test --filter=@omni/web` | One package (`server`, `web`, `shared`, `mac`) |
