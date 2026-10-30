@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, errorText, useThreadStream, type Artifact, type Channel, type ContextUsage, type HistoryEvent, type PendingMsg, type Thread, type ThreadOpen } from '../api.ts';
-import type { InitP, ResultP } from '../components/thread/panel/DetailsTab.tsx';
 import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
-import { parsePayload } from '../format.ts';
 import { linksOf, linksWith, NO_LINKS, type ThreadLinks } from '../continue.ts';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import { holds } from '../thread-history.ts';
+import { useInterrupt, useTurnState } from './threadTurn.ts';
 import { useThreadHistory } from './useThreadHistory.ts';
 
 export type PanelTab = 'artifacts' | 'changes' | 'browser' | 'terminal' | 'actions' | 'details';
@@ -41,10 +40,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   const [ready, setReady] = useState(false);
   const [selected, setSelected] = useState<number | undefined>(artifactParam);
   const [panelTab, setPanelTab] = useState<PanelTab>('artifacts');
-  const [stopping, setStopping] = useState(false);
   const [queued, setQueued] = useState<PendingMsg[]>([]);
   const [warm, setWarm] = useState<boolean | undefined>(undefined);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [handoff, setHandoff] = useState<HandoffView | null>(null);
   const [takeover, setTakeover] = useState<Takeover | null>(null);
@@ -192,59 +189,13 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   const slotBusy = thread?.status === 'running' || thread?.status === 'queued';
   // Running only. Queued is waiting for a slot, so the transcript does not show a working turn.
   const turnInProgress = thread?.status === 'running';
-  // Also covers "Interrupt and send" while the server really interrupts: that message stays sent until the agent reads it.
-  const interrupting = stopping || queued.some((m) => m.state === 'sent' && m.mode === 'interrupt');
-
-  const interrupt = useCallback(async () => {
-    setStopping(true);
-    setActionError(null);
-    try {
-      await api.post(`/threads/${encodeURIComponent(id)}/stop`);
-    } catch (e) {
-      setActionError(errorText(e));
-      setStopping(false);
-    }
-  }, [id]);
-
-  // "Interrupting" lasts until the turn ends. Queued steers can keep the thread running past the
-  // interrupt, so a new result also clears it, and a timer covers a lost update.
-  const lastResultId = useMemo(() => {
-    for (let k = events.length - 1; k >= 0; k--) if (events[k].kind === 'result') return events[k].id;
-    return 0;
-  }, [events]);
-  useEffect(() => {
-    if (!slotBusy) setStopping(false);
-  }, [slotBusy]);
-  useEffect(() => setStopping(false), [lastResultId]);
-  useEffect(() => {
-    if (!stopping) return;
-    const t = setTimeout(() => setStopping(false), 15_000);
-    return () => clearTimeout(t);
-  }, [stopping]);
+  const { interrupting, interrupt, actionError, setActionError } = useInterrupt(id, slotBusy, queued, events);
+  const { init, lastResult, betweenTurns } = useTurnState(events);
 
   const applyThread = useCallback((next: Thread, reply = false) => {
     setThread((prev) => newer(prev, next, reply));
   }, []);
 
-  const init = useMemo(() => {
-    for (let k = events.length - 1; k >= 0; k--) if (events[k].kind === 'init') return parsePayload<InitP>(events[k]);
-    return null;
-  }, [events]);
-  const lastResult = useMemo(() => {
-    for (let k = events.length - 1; k >= 0; k--) if (events[k].kind === 'result') return parsePayload<ResultP>(events[k]);
-    return null;
-  }, [events]);
-  // No activity since the last turn ended, so the first sent message starts the next turn instead of steering one.
-  const betweenTurns = useMemo(() => {
-    for (let k = events.length - 1; k >= 0; k--) {
-      const e = events[k];
-      if (e.kind === 'result' || e.kind === 'error') return true;
-      if (e.kind === 'user' || e.kind === 'crew_report') {
-        if (!parsePayload<{ dropped?: boolean }>(e).dropped) return false;
-      } else if (e.kind === 'tool_use' || e.kind === 'tool_result' || e.kind === 'assistant_text') return false;
-    }
-    return true;
-  }, [events]);
   const files = useMemo(() => artifacts.filter((a) => a.kind !== 'screenshot'), [artifacts]);
   const shots = useMemo(() => artifacts.filter((a) => a.kind === 'screenshot'), [artifacts]);
   const selectedArtifact = files.find((a) => a.id === selected) ?? files[files.length - 1];
