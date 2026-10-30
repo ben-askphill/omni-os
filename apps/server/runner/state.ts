@@ -111,6 +111,8 @@ export interface Live {
   /** Ask the harness for a full context reading. Null when it can't. */
   requestContext: (() => boolean) | null;
   sessionId: string;
+  /** The harness it was spawned for. A switch synced from another machine changes the thread's, not this process's. */
+  harness?: string;
   /** A turn is in progress. Holds a concurrency slot. */
   turn: boolean;
   /** The CLI itself is inside a turn: between its init and its result. False in the gap between two queued turns. */

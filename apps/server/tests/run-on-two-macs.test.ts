@@ -142,6 +142,64 @@ describe('a delegated thread run on another machine', () => {
   }, T.timeout);
 });
 
+describe('a thread delegated on the other machine', () => {
+  // A parent that runs on B delegates there: the child is made on B, never routed from A, and its worktree is only on
+  // B. It stays on B (it reports to its parent there), so A sends it everything, after a switch or a limit stop too.
+  const delegated = async (prompt: string) => {
+    const parent = await b.runner.createThread({ channel: 'shop', prompt: 'plan on B', device: 'here' });
+    await b.untilResults(parent.id, 1);
+    const child = await b.runner.createThread({ channel: 'code', prompt, parent_id: parent.id, source: 'conductor', harness: 'codex', model: 'gpt-5.6-sol', device: 'here' });
+    await b.untilResults(child.id, 1);
+    // The turn ends at the plan's usage limit, as records.ts limitStop leaves it.
+    b.db.threads.setLimit(child.id, { state: 'limited', resets_at: '2026-10-30T01:47:00.000Z', id: `stop-${child.id}`, machine: 'box-b' });
+    b.db.threads.update(child.id, { status: 'failed' });
+    for (let n = 0; n < 5 && !a.db.threads.limit(child.id); n++) await both();
+    expect(a.db.kv.get(`runon.thread.${child.id}`)).toBeUndefined();
+    expect(a.db.threads.holder(child.id)).toBe('box-b');
+    return child.id;
+  };
+
+  it('switches harness and sends the next message to that machine, not a worktree here', async () => {
+    const id = await delegated('fix the cart on B');
+    expect(existsSync(join(b.paths.worktrees, id))).toBe(true);
+    // The switch Ben picked on A, then his message.
+    expect((await a.json(`/threads/${id}/run`, { body: { harness: 'claude-code', model: '', effort: '' } })).status).toBe(200);
+    const res = await a.json(`/threads/${id}/messages`, { body: { prompt: 'Resume', request_id: 'after-switch' } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.forwarded_to).toBe('Box B');
+    expect(a.runner.isLive(id)).toBe(false);
+    expect(existsSync(join(a.paths.worktrees, id))).toBe(false);
+
+    await both();
+    await b.untilResults(id, 2);
+    expect(b.thread(id).harness).toBe('claude-code');
+    expect(b.claudeTexts(id).at(-1)).toContain('Resume');
+    // The message moved it on, so the stop is gone on both.
+    await both();
+    expect(b.db.threads.limit(id)).toBeUndefined();
+    expect(a.db.threads.limit(id)).toBeUndefined();
+  }, T.timeout);
+
+  it("offers the limit stop's Resume on the hub and sends it to that machine", async () => {
+    const id = await delegated('fix the footer on B');
+    // Not "the other Mac's" on A: A acts for B.
+    expect(a.thread(id).limit_elsewhere).toBe(0);
+    const res = await a.json(`/threads/${id}/limit/resume`, { body: {} });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(a.runner.isLive(id)).toBe(false);
+    expect(existsSync(join(a.paths.worktrees, id))).toBe(false);
+
+    await both();
+    await b.untilResults(id, 2);
+    expect(b.byKind(id, 'user').at(-1)!.p).toMatchObject({ text: 'Continue where you left off.', source: 'limit' });
+    await both();
+    expect(a.db.threads.limit(id)).toBeUndefined();
+    // A second sync acts on nothing twice.
+    await both();
+    expect(b.byKind(id, 'user').filter((e) => e.p.source === 'limit')).toHaveLength(1);
+  }, T.timeout);
+});
+
 describe('remote preparation and takeover', () => {
   it('resolves skills and mentions for fresh prompts and replies, and carries context', async () => {
     writeFileSync(join(shared, 'remote-notes.txt'), 'REMOTE FILE CONTENT');
