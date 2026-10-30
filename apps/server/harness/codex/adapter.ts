@@ -343,7 +343,8 @@ export const codexAdapter: HarnessAdapter = {
         model: thread.model || undefined,
         cwd: thread.cwd,
         approvalPolicy: 'never',
-        sandbox: 'danger-full-access',
+        // A delegate-only role (the Conductor) reads but cannot change anything, so it hands the work off.
+        sandbox: ctx.role?.delegateOnly ? 'read-only' : 'danger-full-access',
         developerInstructions: ctx.systemPrompt,
         config: threadConfig(mcp.mcpServers),
       };

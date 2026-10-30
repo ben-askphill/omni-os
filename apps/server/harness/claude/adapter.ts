@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { apiToken } from '../../api-token.ts';
 import { config, paths, artifactsDir, threadDir } from '../../config.ts';
 import type { Thread } from '../../db.ts';
+import { DELEGATE_ONLY_DENIED } from '../../crew.ts';
 import { ASK_TIMEOUT_SEC } from '../../sandbox.ts';
 import { parseEvent, LineSplitter } from '../../stream.ts';
 import { harnessEnv } from '../env-guard.ts';
@@ -106,7 +107,8 @@ export const claudeAdapter: HarnessAdapter = {
     if (thread.cwd !== config.brainDir && existsSync(config.brainDir)) args.push('--add-dir', config.brainDir);
     if (mcpFile) args.push('--mcp-config', mcpFile);
     // Its own AskUserQuestion cannot be answered in -p mode: agents ask with Omni's ask_user_question instead.
-    args.push('--disallowedTools', 'AskUserQuestion');
+    // A delegate-only role (the Conductor) also loses every tool that does work, so it can only hand it off.
+    args.push('--disallowedTools', ['AskUserQuestion', ...(ctx.role?.delegateOnly ? DELEGATE_ONLY_DENIED : [])].join(','));
     for (const dir of modDirs()) args.push('--plugin-dir', dir);
     args.push(resume ? '--resume' : '--session-id', thread.session_id);
 

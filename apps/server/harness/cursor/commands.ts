@@ -94,7 +94,7 @@ export function probeCursorCommands(cwd: string): Promise<SlashCommand[] | null>
 }
 
 /** Where Cursor Agent keeps its state, found the way it finds it. */
-function cursorConfigDir(env: NodeJS.ProcessEnv): string {
+export function cursorConfigDir(env: NodeJS.ProcessEnv): string {
   if (env.CURSOR_CONFIG_DIR?.trim()) return env.CURSOR_CONFIG_DIR;
   if (env.XDG_CONFIG_HOME?.trim()) return join(env.XDG_CONFIG_HOME, 'cursor');
   return join(homedir(), '.cursor');

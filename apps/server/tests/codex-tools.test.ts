@@ -19,11 +19,11 @@ describe('codex tools, secrets and crew reports', () => {
     const cfg = start.params.config;
     // Dotted keys merge into Ben's config.toml; a whole mcp_servers table would replace his servers.
     expect(cfg['mcp_servers.omni']).toMatchObject({ command: expect.any(String), args: expect.any(Array) }); // the conductor tools
-    expect(cfg['mcp_servers.omni-browser']).toMatchObject({ command: process.execPath, args: expect.arrayContaining([expect.stringMatching(/@playwright\/mcp\/cli\.js$/)]) });
+    // The conductor is delegate-only: browser work goes to a crewmate, so it gets no browser.
+    expect(cfg['mcp_servers.omni-browser']).toBeUndefined();
     expect(cfg.mcp_servers).toBeUndefined();
     // ask_user_question waits for Ben, far past Codex's 60 second default for an MCP call.
     expect(cfg['mcp_servers.omni-ask']).toMatchObject({ command: expect.any(String), args: [expect.stringMatching(/apps\/mcp\/ask\.ts$/)], tool_timeout_sec: 86_400 });
-    expect(cfg['mcp_servers.omni-browser'].tool_timeout_sec).toBeUndefined();
     expect(cfg['shell_environment_policy.inherit']).toBe('all');
     expect(cfg.forced_login_method).toBe('chatgpt');
   });

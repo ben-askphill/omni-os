@@ -14,8 +14,8 @@ function publishedLines(channelId: string) {
     '## Published artifacts',
     'When you publish a page with the Artifact tool, write it into OMNI_ARTIFACTS_DIR and publish it from there, so Omni links the file to its claude.ai URL. To change a page that is already published, republish it to its url rather than creating a new one.',
     ...(pages.length
-      ? ['Pages this channel already published, newest first:', ...pages.map((a) => `- ${a.name}: ${a.url} (thread "${a.thread_title}")`)]
-      : []),
+    ? ['Pages this channel already published, newest first:', ...pages.map((a) => `- ${a.name}: ${a.url} (thread "${a.thread_title}")`)]
+    : []),
   ];
 }
 
@@ -30,10 +30,40 @@ function designSystemLines(thread: Thread, channel: Channel) {
   ];
 }
 
+/** Where to put files and pages, and the browser: only for a role that does work itself. */
+function workspaceLines(thread: Thread, channel: Channel) {
+  const remote = isRemoteHarness(thread.harness);
+  const name = userName();
+  return [
+      '',
+      '## Artifacts',
+      remote
+        ? 'OMNI_ARTIFACTS_DIR does not exist on this machine. Return artifacts as links or as text in your reply.'
+        : `Write any HTML page, report, diagram, CSV or document meant for ${name} into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).\nOmni renders files there inline in the thread. Write guides, how-tos, reports, proposals and any document with headings, tables or code blocks as a self-contained .html file (inline CSS, readable in light and dark mode, table cells that wrap), never as Markdown: Omni's Markdown renderer has layout bugs. Use .md only for a short plain note ${name} will paste somewhere else. Mention the filename in your reply.`,
+      ...designSystemLines(thread, channel),
+      ...(thread.harness === 'claude-code' ? publishedLines(channel.id) : []),
+      ...(remote
+        ? []
+        : [
+            '',
+            '## Browser',
+            config.browser
+              ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Omit the screenshot filename to save in ${browserOutDir(thread.id)} and show it in the thread. An explicit relative filename saves in the working directory instead. Read or copy the exact path returned by the tool; do not assume a named screenshot is in the browser folder. The browser refuses paths outside its output folder and working directory, including the artifacts folder and /tmp, so copy the file afterwards if you need it elsewhere.`
+              : '',
+          ]),
+  ];
+}
+
+/** The Conductor's rule, in place of the usual "delegate when asked": delegation comes first, always. */
+const delegateOnlyRule = (name: string) =>
+  `You route work; you never do it. Every request that needs work (code, files, commands, browsing, research, store or inbox changes) goes to a crew role with Omni's delegate tool before anything else, however small it looks. You have no shell, file editing, browser or subagent tools, by design: if you catch yourself planning to do the work, delegate it instead. Answer directly only what you can from the omni tools and the conversation: status, a crew report, a question about Omni itself, or a decision ${name} has to make.`;
+
 export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false) {
   const remote = isRemoteHarness(thread.harness);
   const cloud = thread.harness === 'cursor-cloud';
   const name = userName();
+  // A delegate-only role has no browser or file tools, so the sections on using them would only mislead it.
+  const hands = !role?.delegateOnly;
   const lines = [
     '# Omni OS context',
     TOOL_FAILURE_POLICY,
@@ -58,25 +88,10 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       ? [
           '',
           '## Thread delegation',
-          `Use Omni's delegate tool when ${name} asks you to hand work to another crew role. For work that has independent parts, use delegate_team so the member threads run in parallel and the lead returns one combined report. First call list_crew and list_channels when you need valid ids. Give each delegated thread a self-contained brief because it cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.`,
+          `${role.delegateOnly ? delegateOnlyRule(name) : `Use Omni's delegate tool when ${name} asks you to hand work to another crew role.`} For work that has independent parts, use delegate_team so the member threads run in parallel and the lead returns one combined report. First call list_crew and list_channels when you need valid ids. Give each delegated thread a self-contained brief because it cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.`,
         ]
       : []),
-    '',
-    '## Artifacts',
-    remote
-      ? 'OMNI_ARTIFACTS_DIR does not exist on this machine. Return artifacts as links or as text in your reply.'
-      : `Write any HTML page, report, diagram, CSV or document meant for ${name} into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).\nOmni renders files there inline in the thread. Write guides, how-tos, reports, proposals and any document with headings, tables or code blocks as a self-contained .html file (inline CSS, readable in light and dark mode, table cells that wrap), never as Markdown: Omni's Markdown renderer has layout bugs. Use .md only for a short plain note ${name} will paste somewhere else. Mention the filename in your reply.`,
-    ...designSystemLines(thread, channel),
-    ...(thread.harness === 'claude-code' ? publishedLines(channel.id) : []),
-    ...(remote
-      ? []
-      : [
-          '',
-          '## Browser',
-          config.browser
-            ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Omit the screenshot filename to save in ${browserOutDir(thread.id)} and show it in the thread. An explicit relative filename saves in the working directory instead. Read or copy the exact path returned by the tool; do not assume a named screenshot is in the browser folder. The browser refuses paths outside its output folder and working directory, including the artifacts folder and /tmp, so copy the file afterwards if you need it elsewhere.`
-            : '',
-        ]),
+    ...(hands ? workspaceLines(thread, channel) : []),
     '',
     ...(cloud
       ? [

@@ -67,6 +67,7 @@ function log(method, extra) {
       thread_id: process.env.OMNI_THREAD_ID ?? null,
       cursor_auth: AUTH_VARS.filter((k) => k in process.env),
       env_probe: Object.keys(process.env).filter((k) => k.startsWith('PROBE_')),
+      cursor_config_dir: process.env.CURSOR_CONFIG_DIR ?? null,
       ...extra,
     }) + '\n',
   );

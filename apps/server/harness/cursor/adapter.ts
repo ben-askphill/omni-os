@@ -5,11 +5,13 @@
 // only; the transcript shows only what Ben typed. Cursor can't steer, so the runner queues
 // a steer and stops the thread by killing the holder (the next message resumes the chat).
 import { spawn, type ChildProcess } from 'node:child_process';
+import { join } from 'node:path';
 import { apiToken } from '../../api-token.ts';
 import { TOOL_FAILURE_POLICY } from '../../tool-failure-policy.ts';
 import { closePipesAfterExit } from '../../child.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
-import { writeCursorPlugin } from '../../sandbox.ts';
+import { writeCursorDenyConfig, writeCursorPlugin } from '../../sandbox.ts';
+import { cursorConfigDir } from './commands.ts';
 import { describeAttachments, type Attachment } from '../../uploads.ts';
 import { LineSplitter } from '../../stream.ts';
 import { harnessEnv } from '../env-guard.ts';
@@ -69,6 +71,9 @@ export const cursorAdapter: HarnessAdapter = {
       OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),
       OMNI_CHANNEL: thread.channel_id,
     }, ctx.secretEnv);
+    // A delegate-only role (the Conductor) may not edit files or run commands. Ask mode is no help: under --force it
+    // blocks nothing, and without --force it blocks the omni tools too. Deny rules hold under --force and leave MCP alone.
+    if (ctx.role?.delegateOnly) env.CURSOR_CONFIG_DIR = writeCursorDenyConfig(join(threadDir(thread.id), 'cursor-config'), cursorConfigDir(env));
     const resume = ctx.resume || thread.session_id !== thread.id;
     let chatId: string | null = resume ? thread.session_id : null;
     const modelId = thread.model ? cursorModelId(thread.model, thread.effort || '') : 'auto';

@@ -32,7 +32,7 @@ afterAll(async () => {
 
 const posts = () => fake.calls.filter((c) => c.method === 'POST' && c.path === '/v1/runs');
 
-function boot(opts: { key?: string; resume?: boolean; sessionId?: string; prompt?: string } = {}) {
+function boot(opts: { key?: string; resume?: boolean; sessionId?: string; prompt?: string; role?: AdapterContext['role'] } = {}) {
   const records: StreamRecord[] = [];
   let session: string | null = null;
   const threadId = 'tid';
@@ -79,6 +79,7 @@ function boot(opts: { key?: string; resume?: boolean; sessionId?: string; prompt
     browserBusy: false,
     omniUrl: 'http://127.0.0.1:9',
     resume: !!opts.resume,
+    role: opts.role,
   } as AdapterContext;
   const sessionHandle = hermesAdapter.spawn(ctx, {
     record: (r) => records.push(r),
@@ -273,6 +274,16 @@ describe('Hermes adapter', () => {
     expect(resultOf(s.records)[0].payload).toMatchObject({ ok: false });
     expect(fake.calls.length).toBe(before);
     await waitFor(() => s.child.exitCode != null || s.child.signalCode != null, 'holder exit');
+  });
+
+  it('fails the turn for a delegate-only role without starting a run, for a thread that was on Hermes already', async () => {
+    const before = fake.calls.length;
+    const s = boot({ role: { id: 'conductor', name: 'Conductor', description: '', mcp: ['omni'], delegateOnly: true, charter: 'x' } });
+    s.user('fix the cart', 'm1');
+    await waitFor(() => resultOf(s.records).length === 1, 'refusal');
+    expect(String(s.records.find((r) => r.kind === 'error')?.payload.text)).toMatch(/^Conductor only routes work/);
+    expect(resultOf(s.records)[0].payload).toMatchObject({ ok: false });
+    expect(fake.calls.length).toBe(before);
   });
 
   // Reads the holder's environment from /proc. macOS has no /proc and does not show another process's environment.
