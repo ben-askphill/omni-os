@@ -533,6 +533,15 @@ export function ThreadScreen() {
   }, [ready, newestKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useScrollAnchor(scroll, view, () => false, ready);
   useReveal(scroll, revealTarget, view, clearReveal, false);
+  // Held rows are bounded (#411): the oldest go freely while the newest turn is on screen, as following does on desktop.
+  const { follows } = history;
+  useEffect(() => {
+    follows.current = () => {
+      const el = scroll.current;
+      const turn = newest.current;
+      return !el || !turn || turn.offsetTop - el.offsetTop < el.scrollTop + el.clientHeight;
+    };
+  }, [follows]);
 
   if (notFound || (!thread && error)) {
     return (

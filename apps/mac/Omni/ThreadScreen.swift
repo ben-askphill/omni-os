@@ -420,6 +420,7 @@ private struct TranscriptView: View {
     .onChange(of: store.history.tailID, initial: true) { _, tail in
       if pin.eventsChanged(tail) { position.scrollTo(edge: .bottom) }
     }
+    .onAppear { store.follows = { [pin] in pin.isPinned } }
     .overlay(alignment: .bottom) {
       NewActivityPill(pin: pin) {
         pin.jump()

@@ -151,6 +151,9 @@ public final class ThreadStore {
   @ObservationIgnored private var stopTimer: Task<Void, Never>?
   @ObservationIgnored private var inbox: [ThreadStreamMessage] = []
   @ObservationIgnored private var toastSeq = 0
+  /// Whether the screen follows the newest row. While it does, live rows past `History.Retain` drop the oldest held
+  /// rows (#411); while Ben reads older rows, only the hard limit does. The screen sets it.
+  @ObservationIgnored public var follows: @MainActor () -> Bool = { true }
   @ObservationIgnored private var artifactIDs: Set<Int> = []
   @ObservationIgnored private var started = false
   @ObservationIgnored private var ended = false
@@ -625,6 +628,7 @@ public final class ThreadStore {
 
   private func add(_ rows: [EventRow]) {
     guard history.append(live: rows) else { return }
+    history.bound(follows: follows())
     if rows.contains(where: { $0.clipped != nil }) { clippedChanged() }
     historyChanged()
   }

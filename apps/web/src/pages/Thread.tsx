@@ -103,7 +103,11 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
     betweenTurns,
     context,
   } = useThreadSession(id, artifactParam, at);
-  const { scrollRef, contentRef, onScroll, showJump, jump, pin, release } = useTranscriptScroll(tailId(history.history), events, thread !== null);
+  const { scrollRef, contentRef, onScroll, showJump, jump, pin, release, following } = useTranscriptScroll(tailId(history.history), events, thread !== null);
+  const { follows } = history;
+  useEffect(() => {
+    follows.current = following;
+  }, [follows, following]);
   useReveal(scrollRef, revealTarget, events, () => {
     release();
     clearReveal();

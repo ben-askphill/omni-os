@@ -25,7 +25,10 @@ import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import {
   buildItems,
   buildTasks,
+  keepSame,
+  same,
   str,
+  type FoldPlan,
   type Item,
   toolLabel,
   toolSummary,
@@ -1113,6 +1116,98 @@ function PlanCard({ todos, threadId }: { todos: Todo[]; threadId: string }) {
 
 // ---------- transcript ----------
 
+interface ItemRowProps {
+  it: Item;
+  threadId: string;
+  cwd?: string | null;
+  running: boolean;
+  /** The newest item that is not a mod line. */
+  isLast: boolean;
+  /** The team card's members, on the first item when it is the thread's first message. */
+  team?: Branch[];
+  reports: Map<string, string>;
+  byId: Map<string, Thread>;
+  artifacts: Artifact[];
+  /** The published pages whose card goes under this group. */
+  pages?: Published[];
+  /** The plan, on the group of the latest TodoWrite. */
+  plan?: FoldPlan;
+}
+
+/**
+ * One item and the cards that go with it. Unchanged items keep their object across folds (`keepSame`), so a row
+ * whose props are the same skips rendering when the stream brings new rows (#411). `pages` and `plan` are rebuilt
+ * on every fold and compare by value.
+ */
+const ItemRow = memo(
+  function ItemRow({ it, threadId, cwd, running, isLast, team, reports, byId, artifacts, pages, plan }: ItemRowProps) {
+    const body = ((): ReactNode => {
+      switch (it.type) {
+        case 'user': {
+          const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} />;
+          return team ? [bubble, <DelegationCard key="team" branches={team} team reports={reports} />] : bubble;
+        }
+        case 'text':
+          return (
+            <div key={it.key} className="group/msg flex flex-col">
+              <Markdown text={it.p.text ?? ''} />
+              <ClippedNote event={it.key} clipped={it.clipped} />
+              <CopyMsg text={it.p.text ?? ''} />
+            </div>
+          );
+        case 'tools': {
+          const { agents, rest, agentsFirst } = splitGroup(it.calls);
+          const cards = [
+            ...delegations(it.calls).map((d) => (
+              <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} reports={reports} />
+            )),
+            ...(pages ?? []).map((p) => <PublishedCard key={`p${p.url}`} p={p} threadId={threadId} artifact={artifacts.findLast((a) => a.url === p.url)} />),
+          ];
+          const group = rest.length ? (
+            <ToolGroup key={it.key} calls={rest} total={rest.length + rest.reduce((n, c) => n + countCalls(c), 0)} cwd={cwd} running={running} isLast={isLast} />
+          ) : null;
+          const subagents = agents.length ? (
+            <DelegationCard key={`a${it.key}`} agents={agents.map((c) => <AgentRow key={c.id} c={c} cwd={cwd} running={running} />)} />
+          ) : null;
+          const out = [...(agentsFirst ? [subagents, group] : [group, subagents]), ...cards].filter(Boolean);
+          // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
+          return plan ? [...out, <PlanCard key="plan" todos={plan.todos} threadId={threadId} />] : out;
+        }
+        case 'result':
+          return <ResultLine key={it.key} p={it.p} />;
+        case 'error':
+          return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
+        case 'report':
+          return <ReportCard key={it.key} p={it.p} />;
+        case 'mod':
+          return <ModLog key={it.key} lines={it.lines} />;
+        case 'cloud':
+          return <CloudAgentCard key={it.key} p={it.p} />;
+        case 'switch':
+          return <SwitchLine key={it.key} it={it} running={running} />;
+        case 'question':
+          return <QuestionCard key={it.key} threadId={threadId} q={it.q} />;
+        default:
+          return null;
+      }
+    })();
+    const shown = Array.isArray(body) ? body.length > 0 : !!body;
+    // data-key: the row useScrollAnchor keeps in place and a search hit scrolls to.
+    return shown ? (
+      <div data-key={it.key} className="space-y-4">
+        {body}
+      </div>
+    ) : null;
+  },
+  (a, b) => {
+    for (const k of Object.keys(b) as (keyof ItemRowProps)[]) {
+      if (k === 'pages' || k === 'plan' ? !same(a[k], b[k]) : a[k] !== b[k]) return false;
+    }
+    return Object.keys(a).length === Object.keys(b).length;
+  },
+);
+
+
 export const Transcript = memo(function Transcript({
   threadId,
   events,
@@ -1142,7 +1237,13 @@ export const Transcript = memo(function Transcript({
 }) {
   const byId = useMemo(() => new Map(known.map((t) => [t.id, t])), [known]);
   const spans = history?.history.spans;
-  const { items, plan } = useMemo(() => buildItems(events, spans), [events, spans]);
+  // The last fold's items, whose unchanged ones the next fold keeps (`keepSame`).
+  const held = useRef<Item[]>([]);
+  const { items, plan } = useMemo(() => {
+    const built = buildItems(events, spans);
+    held.current = keepSame(held.current, built.items);
+    return { items: held.current, plan: built.plan };
+  }, [events, spans]);
   const edges = useMemo(() => (spans ? historyEdges({ spans }, items.map((it) => it.key)) : null), [spans, items]);
   // The first item is the thread's first message only when the start is held.
   const fromStart = !spans || atStart({ spans });
@@ -1171,84 +1272,33 @@ export const Transcript = memo(function Transcript({
   // The turn is waiting on Ben's answer, not working: the card under it says so.
   const asking = last?.type === 'question' && last.q.state === 'pending';
 
-  const teamCard = team?.length ? <DelegationCard key="team" branches={team} team reports={reports} /> : null;
   const edgeRow = (key: number) => {
     const edge = edges?.get(key);
     return edge && history ? <HistoryEdgeRow key={edge.type === 'earlier' ? 'earlier' : `gap:${edge.after}`} edge={edge} history={history} /> : null;
-  };
-
-  const item = (it: Item, idx: number): ReactNode => {
-    switch (it.type) {
-      case 'user': {
-        const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} />;
-        return idx === 0 && fromStart && teamCard ? [bubble, teamCard] : bubble;
-      }
-      case 'text':
-        return (
-          <div key={it.key} className="group/msg flex flex-col">
-            <Markdown text={it.p.text ?? ''} />
-            <ClippedNote event={it.key} clipped={it.clipped} />
-            <CopyMsg text={it.p.text ?? ''} />
-          </div>
-        );
-      case 'tools': {
-        const { agents, rest, agentsFirst } = splitGroup(it.calls);
-        const cards = [
-          ...delegations(it.calls).map((d) => (
-            <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} reports={reports} />
-          )),
-          ...(pages.get(it.key) ?? []).map((p) => (
-            <PublishedCard key={`p${p.url}`} p={p} threadId={threadId} artifact={artifacts.findLast((a) => a.url === p.url)} />
-          )),
-        ];
-        const isLast = idx === lastIdx;
-        const group = rest.length ? (
-          <ToolGroup key={it.key} calls={rest} total={rest.length + rest.reduce((n, c) => n + countCalls(c), 0)} cwd={cwd} running={running} isLast={isLast} />
-        ) : null;
-        const subagents = agents.length ? (
-          <DelegationCard key={`a${it.key}`} agents={agents.map((c) => <AgentRow key={c.id} c={c} cwd={cwd} running={running} />)} />
-        ) : null;
-        const out = [...(agentsFirst ? [subagents, group] : [group, subagents]), ...cards].filter(Boolean);
-        // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
-        return plan?.after === it.key ? [...out, <PlanCard key="plan" todos={plan.todos} threadId={threadId} />] : out;
-      }
-      case 'result':
-        return <ResultLine key={it.key} p={it.p} />;
-      case 'error':
-        return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
-      case 'report':
-        return <ReportCard key={it.key} p={it.p} />;
-      case 'mod':
-        return <ModLog key={it.key} lines={it.lines} />;
-      case 'cloud':
-        return <CloudAgentCard key={it.key} p={it.p} />;
-      case 'switch':
-        return <SwitchLine key={it.key} it={it} running={running} />;
-      case 'question':
-        return <QuestionCard key={it.key} threadId={threadId} q={it.q} />;
-      default:
-        return null;
-    }
   };
 
   return (
     <HistoryCtx.Provider value={history}>
       <TaskCtx.Provider value={tasks}>
         <div className="space-y-4">
-          {!fromStart && teamCard}
-          {items.flatMap((it, idx) => {
-            const body = item(it, idx);
-            const shown = Array.isArray(body) ? body.length > 0 : !!body;
-            // data-key: the row useScrollAnchor keeps in place and a search hit scrolls to.
-            return [
-              edgeRow(it.key),
-              shown && (
-                <div key={it.key} data-key={it.key} className="space-y-4">
-                  {body}
-                </div>
-              ),
-            ];
-          })}
+          {!fromStart && team?.length ? <DelegationCard key="team" branches={team} team reports={reports} /> : null}
+          {items.flatMap((it, idx) => [
+            edgeRow(it.key),
+            <ItemRow
+              key={it.key}
+              it={it}
+              threadId={threadId}
+              cwd={cwd}
+              running={running}
+              isLast={idx === lastIdx}
+              team={idx === 0 && fromStart && team?.length ? team : undefined}
+              reports={reports}
+              byId={byId}
+              artifacts={artifacts}
+              pages={pages.get(it.key)}
+              plan={plan?.after === it.key ? plan : undefined}
+            />,
+          ])}
           {edgeRow(-1)}
           {(showWorking || latestStatus) && !asking && (
             <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
