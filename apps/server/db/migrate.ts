@@ -324,6 +324,9 @@ export function migrate() {
   // The claude.ai page an artifact was published as (packages/shared/published.ts), and what the publish said it was.
   ensureColumn('artifacts', 'url', 'TEXT');
   ensureColumn('artifacts', 'description', 'TEXT');
+  // The newest file per page and a thread's files in order (db/repos/artifacts.ts ARTIFACT_SQL), without a table scan.
+  db.exec(`CREATE INDEX IF NOT EXISTS artifacts_url ON artifacts(url, updated_at, id) WHERE url IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS artifacts_thread ON artifacts(thread_id, created_at);`);
   // Sync matches these rows on uid, never on the local integer id. Old rows get one once; the index then makes the check free.
   // Queue order for durable requests (db/repos/requests.ts); a row saved before reordering existed keeps its arrival order.
   ensureColumn('message_requests', 'pos', 'INTEGER');
