@@ -14,6 +14,7 @@ import { channelFolders, channelThreads, useChannelFold } from './sidebar/channe
 import { ThreadHandoffs } from './ThreadHandoffs.tsx';
 import { FolderNameField, FolderRow, AddFolderButton } from './sidebar/FolderRows.tsx';
 import { ChannelThreadEntry, NavLink, RunningBadge, SectionLink, ThreadLink, ThreadSection, useSectionFold } from './sidebar/SidebarRows.tsx';
+import { ChannelListLink, WorkspaceLinks } from './sidebar/SidebarLinks.tsx';
 import { UsageCard } from './sidebar/UsageCard.tsx';
 
 /** Past this many threads a channel shows "N more" (or "See all threads" when highlighted) and links to its full list. */
@@ -119,14 +120,14 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
           <ChannelThreadEntry key={t.id} t={t} active={t.id === oid} tasks={agents(t.id)} handoffs={c.handoffs} onNavigate={onNavigate} />
         ))}
         {c.id === focused ? (
-          <a href={href.channel(c.id)} onClick={onNavigate} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
+          <ChannelListLink channelId={c.id} onNavigate={onNavigate}>
             See all threads
-          </a>
+          </ChannelListLink>
         ) : (
           list.length > shown.length && (
-            <a href={href.channel(c.id)} onClick={onNavigate} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-4 transition-colors hover:text-fg-2">
+            <ChannelListLink channelId={c.id} onNavigate={onNavigate}>
               {list.length - shown.length} more
-            </a>
+            </ChannelListLink>
           )
         )}
       </>
@@ -253,20 +254,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
             Add channel
           </NavLink>
 
-          <div>
-            <div className="caption px-3 pt-1 pb-2">Workspace</div>
-            <div className="space-y-px">
-              <NavLink to={href.artifacts()} icon="layers" active={route.name === 'artifacts'} onNavigate={onNavigate}>
-                Artifacts
-              </NavLink>
-              <NavLink to={href.automations()} icon="zap" active={route.name === 'automations'} onNavigate={onNavigate}>
-                Automations
-              </NavLink>
-              <NavLink to={href.settingsPage()} icon="sliders" active={route.name === 'settings'} onNavigate={onNavigate}>
-                Settings
-              </NavLink>
-            </div>
-          </div>
+          <WorkspaceLinks onNavigate={onNavigate} />
         </div>
       </div>
 
