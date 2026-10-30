@@ -211,7 +211,7 @@ For the thread screen (part C). What parts A and B leave ready and what they do 
 
 ## Thread screen (#63 part C)
 
-`ThreadScreen.swift` (screen, header, scroll pin, pill), `MessageViews.swift` (user bubble, result, error, report and working lines), `PendingMessageViews.swift` (queued, parked and unsent-edit rows), `ToolViews.swift` (groups, calls, plan, `TranscriptUI` open state), `MarkdownView.swift`, `ThreadStyle.swift`. `#/t/<id>` opens it from the sidebar, links and QA.
+`ThreadScreen.swift` (screen, header, scroll pin, pill), `ChannelMarks.swift` (channel avatar, mark and error note), `MessageViews.swift` (user bubble, result, error, report and working lines), `PendingMessageViews.swift` (queued, parked and unsent-edit rows), `ToolViews.swift` (groups, calls, plan, `TranscriptUI` open state), `MarkdownView.swift`, `ThreadStyle.swift`. `#/t/<id>` opens it from the sidebar, links and QA.
 
 - QA: `{"wait": "thread:<id>"}` waits for the laid-out transcript and notes the open time; `{"scroll": "top"|"bottom"|"through"|"nudge"}` (`nudge`: a short trackpad swipe up from the bottom, then opens the tool groups so the content grows, noting how far from the bottom the view is after each) and `{"expand": true}` (opens tool groups and failed or nested calls) work on the open thread. On a channel screen, `{"expand": true}` opens its Archived list.
 - Measured on this Mac: a 2,000-event thread opens in about 65 ms; a scroll through it ran 87 frames, mean 19 ms, worst 33 ms.
