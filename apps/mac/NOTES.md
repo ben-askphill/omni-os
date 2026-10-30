@@ -343,7 +343,9 @@ The live tests send `OMNI_TOKEN` as the API token, so run them in the shell that
 | --- | --- |
 | `OmniApp.swift` | `@main`. One `Window("Omni", id: "main")`, the `Settings` scene, the menus. `AppDelegate` owns the one `AppModel`, calls `launch()`, and `didBecomeActive()` on activation. Closing the window quits the app; the server keeps running. |
 | `MainWindow.swift` | `NavigationSplitView` of the sidebar and the detail, the toolbar, `RoutePlaceholder`, `Route.symbol` |
-| `SidebarView.swift` | The sidebar, `ThreadRow`, `ThreadStatusIcon`, `StatusFooter` |
+| `SidebarView.swift` | The sidebar screen and its section, channel and folder rows |
+| `SidebarRows.swift` | `RailRowStyle`, `NavRow`, `ThreadRow`, `ThreadStatusIcon` |
+| `SidebarChrome.swift` | `SidebarResizeHandle`, `SearchPill`, `StatusFooter` |
 | `SidebarFolders.swift` | Folder rows, the inline name field, folder and Move to Folder menus, drops, the delete confirm |
 | `ServerView.swift` | The server screen, `ServerDetails`, `LogTail`, `ServerMenuItems`, `confirmStop` |
 | `SettingsView.swift` | The Settings tabs (`model.settingsTab`), the Connection pane, `PathField`, the folder and file pickers |
