@@ -171,7 +171,7 @@ private struct NewThreadBox: View {
         Text(e).font(.omni(size: 12)).foregroundStyle(Tok.fg).padding(.horizontal, z(16)).padding(.bottom, z(4))
       }
       footer
-      SlashHintView(model: menu) {}
+      SlashHintView(model: menu)
         .padding(.horizontal, z(16))
         .padding(.bottom, menu.hint == nil ? 0 : 10)
         .padding(.top, menu.hint == nil ? 0 : 2)
