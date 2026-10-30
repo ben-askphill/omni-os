@@ -575,7 +575,6 @@ export function ThreadScreen() {
   };
   const report = latest?.artifacts.find((a) => a.kind === 'html' || a.kind === 'markdown' || a.kind === 'pdf') ?? latest?.artifacts[0];
   const chips: ComposerChip[] = [];
-  if (slotBusy) chips.push({ label: interrupting ? 'Stopping' : 'Stop', icon: 'stop', onClick: () => void interrupt(), disabled: interrupting });
   if (report) chips.push({ label: 'Open report', icon: 'file', onClick: () => viewer(report) });
   if (pr?.pr) chips.push({ label: `Review #${pr.pr.number}`, icon: 'pr', diff: [pr.pr.additions, pr.pr.deletions], onClick: () => shell.open(href.threadView(thread.id, 'pr')) });
   else if (changes?.files.length) {
@@ -724,6 +723,8 @@ export function ThreadScreen() {
       <MoComposer
         thread={thread}
         chips={chips}
+        // Nothing runs while the worktree is prepared, so there is nothing to stop.
+        stop={slotBusy && !thread.setup ? { busy: interrupting, run: () => void interrupt() } : null}
         placeholder={(steers) => (conductor ? 'Reply to the Conductor' : !slotBusy ? 'Follow up' : steers ? `Steer ${theirs}` : 'Queue for after this turn')}
         onSent={(t) => applyThread(t, true)}
         onSwitched={(t) => applyThread(t)}

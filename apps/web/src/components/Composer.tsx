@@ -199,6 +199,24 @@ function AttachButton({ onPick, disabled }: { onPick: (files: File[]) => void; d
 }
 
 /** Bencho "cmd" go button: quiet until there is something to send, then ink. */
+/** Where Send sits, while a turn runs and the box is empty: stops the turn. Esc does the same. */
+function StopButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
+  const label = busy ? 'Stopping' : 'Stop';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-label={label}
+      aria-keyshortcuts="Escape"
+      title="Stop the agent (Esc). Messages already sent still run."
+      className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out active:scale-[.92] disabled:opacity-60"
+    >
+      {busy ? <Loader size={16} /> : <Icon name="stop" size={16} strokeWidth={2} />}
+    </button>
+  );
+}
+
 function SendButton({ armed, busy, onClick, children }: { armed: boolean; busy: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
@@ -828,10 +846,13 @@ export function ReplyComposer({
   onSent,
   onChanged,
   extra,
+  stop,
 }: {
   thread: Thread;
   /** When false (e.g. Cursor), a busy thread offers only Queue and Interrupt; Cmd+Enter queues. */
   canSteer?: boolean;
+  /** Set while a turn runs that can be stopped: an empty box shows Stop where Send sits. */
+  stop?: { busy: boolean; run: () => void } | null;
   onSent?: (t: Thread, mode?: SendMode) => void;
   /** The thread after `/rename` or a run switch. */
   onChanged?: (t: Thread) => void;
@@ -990,6 +1011,8 @@ export function ReplyComposer({
             <SendButton armed={slash.armed} busy={busy} onClick={() => void runOmni()}>
               {slash.label ?? 'Send'}
             </SendButton>
+          ) : stop && !canSend && !att.files.length ? (
+            <StopButton busy={stop.busy} onClick={stop.run} />
           ) : busyThread ? (
             <SteerButton disabled={!canSend} busy={busy} canSteer={steers} onSend={sendVia} />
           ) : (

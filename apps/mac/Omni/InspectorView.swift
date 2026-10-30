@@ -56,16 +56,9 @@ private struct ThreadInspector: ViewModifier {
       .clipped()
     }
     .toolbar {
-      // .primaryAction is the leading cluster, right after Back and Forward. Interrupt and the
-      // panel belong to this thread, so the spacer takes them to the trailing edge, Interrupt first.
+      // .primaryAction is the leading cluster, right after Back and Forward. The panel belongs to
+      // this thread, so the spacer takes it to the trailing edge. Stop is the reply box's send button.
       ToolbarSpacer(.flexible, placement: .primaryAction)
-      // Nothing runs while the worktree is prepared, so there is nothing to interrupt.
-      if store.running && store.thread?.setup == nil {
-        ToolbarItem(placement: .primaryAction) {
-          InterruptButton(store: store).buttonStyle(.icon(size: 28, wide: store.interrupting))
-        }
-        .sharedBackgroundVisibility(.hidden)
-      }
       ToolbarItem(placement: .primaryAction) {
         Button {
           open.toggle()
