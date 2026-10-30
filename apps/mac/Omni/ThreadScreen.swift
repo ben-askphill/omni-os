@@ -98,15 +98,13 @@ private struct ThreadView: View {
   }
 }
 
-/// Channel, parent and task over the title, and the status, as the header in Thread.tsx.
+/// Channel, parent and task over the title, then the context meter, Done, the status and the ⋯ menu, as the header in
+/// Thread.tsx. The inspector's toggle is in the toolbar.
 private struct ThreadHeader: View {
   let model: AppModel
   let store: ThreadStore
   let thread: OmniThread
   @State private var restoring = false
-  @State private var sendingGrok = false
-  @State private var grokNote = ""
-  @State private var showingGrokNote = false
 
   var body: some View {
     let channel = store.channel?.name ?? thread.channelID
@@ -163,22 +161,6 @@ private struct ThreadHeader: View {
         if ContextMeter.metered.contains(thread.harness) {
           ContextMeterButton(model: model, store: store, thread: thread)
         }
-        HandOffButton(model: model, store: store)
-        if !thread.archived {
-          ThreadReferenceButton(client: model.client, thread: thread, draft: store.draftContext, disabled: false)
-        }
-        if !thread.archived {
-          let on = thread.pinnedAt != nil
-          Button {
-            Task { await model.setThreadPinned(ThreadStub(thread), !on) }
-          } label: {
-            OmniIcon(name: "pin", size: 15)
-          }
-          .buttonStyle(.icon(size: 28, active: on))
-          .help(on ? "Unpin from the sidebar" : "Pin to the sidebar")
-          .accessibilityLabel(on ? "Unpin thread" : "Pin thread")
-          .accessibilityAddTraits(on ? .isSelected : [])
-        }
         if !thread.archived, ThreadStub(thread).canMarkDone {
           let done = thread.doneAt != nil
           Button {
@@ -209,38 +191,68 @@ private struct ThreadHeader: View {
           .disabled(restoring)
           .help("Archived. Restore it to its channel's thread list.")
         }
-        if model.store.status?.grokBot == true {
-          Button {
-            guard !sendingGrok else { return }
-            sendingGrok = true
-            Task {
-              grokNote = await grokBotResult(model, thread.id)
-              sendingGrok = false
-              showingGrokNote = true
-            }
-          } label: {
-            if sendingGrok { Loader(size: 12) } else { OmniIcon(name: "grok", size: 15) }
-          }
-          .buttonStyle(.icon(size: 28))
-          .accessibilityLabel("Send to Grok Bot")
-          .disabled(sendingGrok)
-          .help("Send this thread's text to Grok Bot")
-        }
         if store.transcript.hasPendingQuestion {
           StatusPill(glyph: .needs, label: QuestionState.pending.label)
         } else {
           StatusPill(status: thread.status)
         }
+        ThreadOverflowMenu(model: model, store: store, thread: thread)
       }
     }
     .padding(.horizontal, z(24))
     .padding(.top, z(12))
     .padding(.bottom, z(8))
-    .alert("Grok Bot", isPresented: $showingGrokNote) {
-      Button("OK", role: .cancel) {}
-    } message: {
-      Text(grokNote)
+  }
+}
+
+/// The thread header's ⋯: the thread's actions from packages/shared/thread-actions.ts, as the right-click lists them, so
+/// pin, rename, move, archive, fork, reference, hand off and Send to Grok Bot are two clicks away at any window width.
+private struct ThreadOverflowMenu: View {
+  let model: AppModel
+  let store: ThreadStore
+  let thread: OmniThread
+  @State private var prompts = ThreadActionPrompts()
+
+  var body: some View {
+    Menu {
+      ThreadActionItems(model: model, threadID: thread.id, title: thread.title, stub: ThreadStub(thread), archived: thread.archived, prompts: prompts)
+    } label: {
+      OmniIcon(name: "more", size: 15)
     }
+    .menuStyle(.button)
+    .buttonStyle(.icon(size: 28))
+    .menuIndicator(.hidden)
+    .fixedSize()
+    .help("Thread actions")
+    .accessibilityLabel("Thread actions")
+    .threadActionPrompts(prompts, model: model, threadID: thread.id, arrowEdge: .bottom)
+    // Tailscale's view of the other Mac changes as it sleeps and wakes, so ask again while the thread could go: Hand off
+    // to… shows in the menu only while one can take it.
+    .task(id: store.canHandOff) {
+      guard store.canHandOff else { return }
+      while !Task.isCancelled {
+        await model.devices.refresh()
+        try? await Task.sleep(for: .seconds(30))
+      }
+    }
+    #if DEBUG
+    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { QAHandoffProbe.button = $0 }
+    .onChange(of: model.devices.targets(store) != nil, initial: true) { _, ready in
+      QAHandoffProbe.handOff = ready ? { [store] in await store.handOff(to: $0) } : nil
+    }
+    .onAppear {
+      let picker = ThreadReferencePicker(threadID: thread.id, channelID: thread.channelID, api: model.client, draft: store.draftContext)
+      let prompts = prompts
+      ThreadReferenceProbe.current = ThreadReferenceProbe(picker: picker) { open in
+        prompts.referencing = open ? ReferencePick(picker: picker) : nil
+      }
+    }
+    .onDisappear {
+      QAHandoffProbe.button = nil
+      QAHandoffProbe.handOff = nil
+      ThreadReferenceProbe.current = nil
+    }
+    #endif
   }
 }
 

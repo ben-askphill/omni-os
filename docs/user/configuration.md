@@ -60,9 +60,9 @@ Storage, under Settings > Machines, inventories worktrees and explains why each 
 
 Send to Grok Bot posts a thread's title and messages to a webhook. The context is the channel id and the thread id.
 
-The button is in the thread header on the Web UI and on the Mac app. A narrow desktop web header puts it in More. The same action is in the thread's right-click menu on both, and in Thread options on a phone. The Conductor calls `send_to_grok_bot`.
+The action is in the thread's menu on the Web UI and the Mac app: the ⋯ in the thread header, or a right-click on the thread. On a phone it is in Thread options. The Conductor calls `send_to_grok_bot`.
 
-The button and the menu items show only once `GROKBOT_WEBHOOK_URL` is set, as a global secret or in `.env`. `GET /api/status` reports this as `grokBot`. Without it nothing of Grok Bot shows.
+The menu items show only once `GROKBOT_WEBHOOK_URL` is set, as a global secret or in `.env`. `GET /api/status` reports this as `grokBot`. Without it nothing of Grok Bot shows.
 
 The URL and the Authorization value come from the Omni OS requests routine, on Grok Bot's Routines tab. Paste each one in either place.
 

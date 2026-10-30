@@ -2,7 +2,7 @@
 
 A thread is one task's conversation with one agent, from the first prompt through every follow-up. Threads are dated, full-text searchable (Search page) and resumable any time. Rename or archive one from its menu or with `/rename`.
 
-A thread's menu is the same list on every surface: right-click the thread on desktop web or in the Mac app, or tap the thread's options on a phone. It has at most ten actions in three groups. **Organize**: Pin, Mark as done, Rename, Move to folder, Archive. **Continue**: Fork thread, Reference a thread, Hand off to another Mac, or Take over from the Mac that holds it. **Send to**: Grok Bot, shown only when its webhook URL is set. An action that does not apply to the thread right now is left out.
+A thread's menu is the same list on every surface: the ⋯ in the thread header or a right-click on the thread on desktop web and in the Mac app, or the thread's options on a phone. It has at most ten actions in three groups. **Organize**: Pin, Mark as done, Rename, Move to folder, Archive. **Continue**: Fork thread, Reference a thread, Hand off to another Mac, or Take over from the Mac that holds it. **Send to**: Grok Bot, shown only when its webhook URL is set. An action that does not apply to the thread right now is left out.
 
 ## Finding threads and clearing Needs you
 
@@ -10,7 +10,7 @@ Running and Pinned in the desktop web and Mac sidebars list work across channels
 
 Needs you holds unread results and threads waiting for you to act. Opening a thread reads the result it shows, so a newer result stays unread. **Mark as done** clears any of those reasons without archiving the thread or changing how its last turn ended. It stays in its channel and folder with a grey check, muted title and Done chip. **Mark as not done** brings back its unread result and blockers. A new message, a run starting or Retry setup clears done; the flag syncs between Macs. Running and queued threads cannot be marked done.
 
-On desktop web and Mac, use the check on a Needs you row, the thread header or the thread's right-click menu. When the desktop web thread header is narrower than 48rem (the side panel open, or a small window), Pin, Mark done, Hand off and Send to Grok Bot fold into its Thread actions (⋯) menu. On a phone, Mark done is on Activity blocker cards and in Thread options. The Conductor can use `mark_thread_done` when you ask it to.
+On desktop web and Mac, use the check on a Needs you row, the check in the thread header, or the thread's menu. The thread header keeps only the context meter, Mark as done, the status, the thread menu (⋯) and, on desktop web, the side panel toggle; Pin, Reference, Hand off and Send to Grok Bot are in the menu. On a phone, Mark done is on Activity blocker cards and in Thread options. The Conductor can use `mark_thread_done` when you ask it to.
 
 ## The composer
 
@@ -124,4 +124,4 @@ A thread with an open PR can watch its checks and its reviews: **Watch PR** in t
 
 ## Send to Grok Bot
 
-The thread header and the right-click menu send the title and the messages. On a phone, Thread options has the same action. The context is the channel id and the thread id. The Conductor tool is `send_to_grok_bot`. The action shows only on a server with a Grok Bot webhook URL. Where the webhook URL and Authorization value go: [Configuration](configuration.md#grok-bot).
+Send to Grok Bot in the thread's menu (the header's ⋯ or a right-click) sends the title and the messages. On a phone, Thread options has the same action. The context is the channel id and the thread id. The Conductor tool is `send_to_grok_bot`. The action shows only on a server with a Grok Bot webhook URL. Where the webhook URL and Authorization value go: [Configuration](configuration.md#grok-bot).

@@ -213,7 +213,7 @@ public enum QAStep: Hashable, Sendable {
   case folder(QAFolderAction)
   /// The main window to `<name>.png` with the app's windows over it drawn in, such as a sheet or an open menu.
   case screen(String)
-  /// Clicks the open thread's Hand Off button and writes `<name>.png` while its menu is open.
+  /// Clicks the open thread's ⋯ menu, which has Hand off to…, and writes `<name>.png` while it is open.
   case handoffMenu(String)
   /// Clicks the reply box's PR button and writes `<name>.png` while its menu is open.
   case prMenu(String)
