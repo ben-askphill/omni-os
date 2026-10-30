@@ -134,7 +134,7 @@ export function MoDiff({ add, del }: { add: number; del: number }) {
 /** One thread in a list: Activity, a channel, search. */
 export function MoRow({ it, onOpen, last }: { it: RowItem; onOpen: () => void; last?: boolean }) {
   return (
-    <button type="button" onClick={onOpen} className="mo-row flex w-full items-center gap-3 px-1 py-2.5 text-left">
+    <button type="button" onClick={onOpen} className="mo-row flex min-w-0 w-full items-center gap-3 px-1 py-2.5 text-left">
       <MoAvatar role={it.role} channel={it.channelId} channelIcon={it.channelIcon} state={it.status} />
       <span className={`-mb-2.5 flex min-w-0 flex-1 flex-col gap-0.5 pb-2.5 ${last ? '' : 'border-b border-line'}`}>
         <span className="flex items-baseline gap-2">
