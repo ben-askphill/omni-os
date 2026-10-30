@@ -1,4 +1,4 @@
-// The sidebar's Running and Recent threads sections, read off the channel list. Pure, so the rules are tested on their
+// The sidebar's Running section and the phone's Recent threads, read off the channel list. Pure, so the rules are tested on their
 // own (apps/web/tests/sidebar-lists.test.ts); SidebarSections.running and .recent in OmniKit keep the Mac app's the same.
 import type { ChannelWithRunning, ConductorHandoffGroup, ThreadStub } from './api.ts';
 

@@ -5,12 +5,11 @@ import { DEFAULT_FOLDER_NAME, FOLDER_NAME_MAX, drag, draftKey, freeName, useFold
 import { foldAllAction, openFolderIds } from '../sidebar-fold.ts';
 import { openMenu } from './ContextMenu.tsx';
 import { pinnedRows } from '../pins.ts';
-import { recentThreadGroups, runningThreadGroups } from '../sidebar-lists.ts';
+import { runningThreadGroups } from '../sidebar-lists.ts';
 import { duration, monthlyTitle, plural, toDate, untilLabel, windowPct } from '../format.ts';
 import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
 import { readPref, useApp, useNow, writePref } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
-import { ThemeSwitch } from './theme.tsx';
 import { HARNESS_ROWS, HarnessLogo, Loader, OmniMark, SLOT_ROWS } from './brand.tsx';
 import { ChannelMark, DoneMark, ErrorNote, Icon, IconButton, Kbd, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
 import { ThreadHandoffs } from './ThreadHandoffs.tsx';
@@ -253,7 +252,7 @@ function AgentLink({ t, last, onNavigate }: { t: BackgroundTask; last: boolean; 
 }
 
 /**
- * A thread in the Running, Pinned or Recent threads section, flush with the channels: its status, its title and its
+ * A thread in the Running or Pinned section, flush with the channels: its status, its title and its
  * channel's name. In Pinned the name gives way on hover to the button that unpins it. It opens the thread as its row
  * under its channel does, and a right-click gives the same menu. Open, it reads bold; the thumb stays on its row under
  * its channel.
@@ -311,7 +310,7 @@ function useSectionFold(pref: string): [closed: boolean, toggle: () => void] {
 }
 
 /**
- * Running, Pinned or Recent threads: a caption that folds its rows away, with the count beside it while folded. The
+ * Running or Pinned: a caption that folds its rows away, with the count beside it while folded. The
  * caller leaves it out when it has nothing to list.
  */
 function ThreadSection({ label, closed, onToggle, count, children }: { label: string; closed: boolean; onToggle: () => void; count: number; children: ReactNode }) {
@@ -558,10 +557,9 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
     void folders.collapseAll(openFolderIds(channels));
   };
 
-  // Running, Pinned and Recent threads each fold on their own.
+  // Running and Pinned each fold on their own.
   const [runningClosed, toggleRunning] = useSectionFold('sidebar.runningCollapsed');
   const [pinsClosed, togglePins] = useSectionFold('sidebar.pinnedCollapsed');
-  const [recentClosed, toggleRecent] = useSectionFold('sidebar.recentCollapsed');
 
   const activeChannel = route.name === 'channel' ? route.id : null;
   const openId = route.name === 'thread' ? route.id : null;
@@ -598,10 +596,8 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   const runningGroups = runningThreadGroups(channels, openCopy);
   const running = runningGroups.map((g) => g.thread);
   const pins = pinnedRows(pinned, openCopy);
-  const recentGroups = recentThreadGroups(channels, openCopy);
-  const recent = recentGroups.map((g) => g.thread);
   const sectionKey = (closed: boolean, list: ThreadStub[]) => (closed ? 'closed' : list.map((t) => t.id).join());
-  const sectionsKey = [sectionKey(runningClosed, running), sectionKey(pinsClosed, pins), sectionKey(recentClosed, recent)].join('|');
+  const sectionsKey = [sectionKey(runningClosed, running), sectionKey(pinsClosed, pins)].join('|');
   const rowsKey = channels
     .flatMap((c) =>
       collapsed.has(c.id)
@@ -844,12 +840,6 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
             </ThreadSection>
           )}
 
-          {recent.length > 0 && (
-            <ThreadSection label="Recent threads" closed={recentClosed} onToggle={toggleRecent} count={recentGroups.reduce((n, g) => n + 1 + g.children.length, 0)}>
-              {recentGroups.map((group) => sectionGroup(group, 'recent'))}
-            </ThreadSection>
-          )}
-
           {channelsError && <ErrorNote>{channelsError}</ErrorNote>}
 
           {GROUPS.map((g) => {
@@ -896,10 +886,6 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
 
       <div className="space-y-2.5 px-3 pt-1 pb-3">
         <UsageCard />
-        <div className="flex items-center justify-between pl-2">
-          <span className="caption">Theme</span>
-          <ThemeSwitch />
-        </div>
         {status?.device && (
           <div className="flex pl-2 text-[11px] text-fg-3">
             <DeviceLabel device={status.device} />

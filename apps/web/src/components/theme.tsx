@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { readPref, writePref } from '../store.tsx';
-import { Segmented } from './ui.tsx';
 
 export type ThemePref = 'system' | 'light' | 'dark';
 
@@ -40,23 +39,4 @@ export function useTheme() {
     };
   }, []);
   return [t, setTheme] as const;
-}
-
-export function ThemeSwitch({ className = '' }: { className?: string }) {
-  const [t, set] = useTheme();
-  return (
-    <Segmented
-      radio
-      size="sm"
-      label="Theme"
-      value={t}
-      onChange={set}
-      className={className}
-      options={[
-        { id: 'light', icon: 'sun', title: 'Light' },
-        { id: 'system', icon: 'monitor', title: 'Match system' },
-        { id: 'dark', icon: 'moon', title: 'Dark' },
-      ]}
-    />
-  );
 }

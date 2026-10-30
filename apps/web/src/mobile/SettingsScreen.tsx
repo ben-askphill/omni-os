@@ -101,8 +101,8 @@ export function SettingsScreen() {
             value={theme}
             onChange={setTheme}
             options={[
+              { id: 'system', label: 'Match system', icon: 'monitor' },
               { id: 'light', label: 'Light', icon: 'sun' },
-              { id: 'system', label: 'Auto', icon: 'monitor' },
               { id: 'dark', label: 'Dark', icon: 'moon' },
             ]}
           />
