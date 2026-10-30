@@ -24,6 +24,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Auto routing](internals/auto-routing.md): how Auto picks a model, and the benchmarks that check it
 - [Thread history](internals/thread-history.md): how a long thread opens on its newest page, the budgets, and what clients hold
 - [Message context](internals/message-context.md): diff lines, terminal excerpts, browser annotations, thread references and how to add a kind
+- [Delivery contract](internals/delivery.md): what an accepted message, wake or Stop is promised on any machine, and the known gaps with their expected-fail tests
 - [Glossary](../CONTEXT.md)
 - [Mac app notes](../apps/mac/NOTES.md)
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages
