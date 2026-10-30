@@ -13,6 +13,7 @@ import { ClippedNote, HistoryCtx, HistoryEdgeRow } from '../components/thread/Hi
 import { useReveal } from '../pages/useReveal.ts';
 import { useScrollAnchor } from '../pages/useScrollAnchor.ts';
 import { atStart, historyEdges } from '@omni/shared/history.ts';
+import { threadMenu, type ThreadActionId } from '@omni/shared/thread-actions.ts';
 import { handOff, HandoffCard, useHandoffTargets, type HandoffAnswer } from '../components/thread/Handoff.tsx';
 import { TakeoverConfirm, TakeoverNote } from '../components/thread/Takeover.tsx';
 import { MoContinueLinks } from '../components/ContinueLinks.tsx';
@@ -25,6 +26,7 @@ import { ArtifactThumb } from '../pages/Artifacts.tsx';
 import { canMarkDone, reasonOf } from '../needs-you.ts';
 import { isOmnis, parkedLabel } from '../requests.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
+import { useFolders } from '../folders.tsx';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { ThreadReferencePanel } from '../components/ThreadReference.tsx';
@@ -32,7 +34,7 @@ import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { needsCard } from './activity.ts';
 import { MoComposer, type ComposerChip } from './MoComposer.tsx';
 import { NeedsActions, NeedsCardView } from './NeedsCard.tsx';
-import { MoAvatar, MoBubble, MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSection, MoSheet, MoStripes } from './parts.tsx';
+import { MoAvatar, MoBubble, MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRadio, MoRound, MoSection, MoSheet, MoStripes } from './parts.tsx';
 import { shortTime } from './rows.ts';
 import { useShell, useThread } from './shell.tsx';
 import { threadView, type NowDoing, type PlanView, type TurnView } from './thread-view.ts';
@@ -308,10 +310,14 @@ function MoSubagentRow({ t, last, onJump }: { t: BackgroundTask; last: boolean; 
   );
 }
 
+/** Actions that open another sheet carry a chevron; the rest act and close. */
+const OPENS = new Set<ThreadActionId>(['rename', 'move', 'fork', 'reference', 'handoff', 'takeover']);
+
 function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: string | null; onClose: () => void }) {
   const shell = useShell();
-  const { setPinned, setDone, reloadChannels, tasks, status } = useApp();
+  const { setPinned, setDone, reloadChannels, tasks, status, channel } = useApp();
   const { applyThread, blocked, handoff, setHandoff, takeover, jumpTo } = useThread();
+  const folders = useFolders();
   const agents = useMemo(() => runningSubagents(tasks, thread.id), [tasks, thread.id]);
   const targets = useHandoffTargets(thread, { blocked, handoff, takeover });
   // Set while the sheet lists the Macs the thread can go to.
@@ -319,6 +325,9 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
   // Set while the sheet asks to take the thread over.
   const [takingOver, setTakingOver] = useState(false);
   const [referencing, setReferencing] = useState(false);
+  // Set while the sheet shows the title field, and while it lists the folders the thread can move to.
+  const [draft, setDraft] = useState<string | null>(null);
+  const [moving, setMoving] = useState(false);
   const [sending, setSending] = useState<string | null>(null);
   const [grokBusy, setGrokBusy] = useState(false);
   const [grokError, setGrokError] = useState('');
@@ -387,6 +396,73 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
       shell.toast(errorText(e));
     }
   };
+  const rename = async () => {
+    const next = (draft ?? '').replace(/\s+/g, ' ').trim();
+    onClose();
+    if (!next || next === thread.title) return;
+    try {
+      applyThread(await api.patch<Thread>(`/threads/${encodeURIComponent(thread.id)}`, { title: next }), true);
+      await reloadChannels();
+      shell.toast('Renamed');
+    } catch (e) {
+      shell.toast(errorText(e));
+    }
+  };
+  const moveTo = (folderId: string | null) => {
+    onClose();
+    void folders.moveThread({ id: thread.id, channel_id: thread.channel_id, title: thread.title, status: thread.status, created_at: thread.created_at, folder_id: thread.folder_id }, folderId);
+  };
+  if (draft !== null) {
+    return (
+      <MoSheet onClose={onClose} label="Rename thread">
+        <div className="px-5 pt-2.5 pb-2 text-[15px] leading-[1.3] font-medium">Rename thread</div>
+        <form
+          className="flex items-center gap-2 px-3 pb-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void rename();
+          }}
+        >
+          <input
+            autoFocus
+            value={draft}
+            maxLength={200}
+            enterKeyHint="done"
+            aria-label="Thread title"
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => setDraft(e.target.value)}
+            className="h-11 min-w-0 flex-1 rounded-full bg-surface-2 px-4 text-[16px] text-fg outline-none placeholder:text-fg-4"
+          />
+          <Button type="submit">Save</Button>
+        </form>
+      </MoSheet>
+    );
+  }
+  if (moving) {
+    const choices = (channel(thread.channel_id)?.folders ?? []).filter((f) => !f.id.startsWith('tmp-'));
+    const rows = [{ id: null as string | null, name: 'No folder' }, ...choices];
+    return (
+      <MoSheet onClose={onClose} label="Move to folder">
+        <div className="px-5 pt-2.5 pb-2 text-[15px] leading-[1.3] font-medium">Move to folder</div>
+        <div className="flex flex-col gap-2.5 px-3">
+          <MoGroup>
+            {rows.map((f, i) => (
+              <MoListRow
+                key={f.id ?? ''}
+                icon={f.id ? 'folder' : 'minus'}
+                label={f.name}
+                right={<MoRadio on={(thread.folder_id ?? null) === f.id} />}
+                chevron={false}
+                onClick={() => moveTo(f.id)}
+                last={i === rows.length - 1}
+              />
+            ))}
+          </MoGroup>
+          {!choices.length && <p className="m-0 px-2 text-[12.5px] leading-[1.4] text-fg-3">This channel has no folders yet. Add one from Channels.</p>}
+        </div>
+      </MoSheet>
+    );
+  }
   if (referencing) {
     return (
       <MoSheet onClose={onClose} label="Reference a thread" full>
@@ -433,6 +509,32 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
       </MoSheet>
     );
   }
+  const takeOverNow = takeover && mayTakeOver(takeover, handoff) ? takeover : null;
+  // The thread's actions, from the list the desktop menu and the Mac app render too.
+  const menu = threadMenu({
+    row: true,
+    archived: !!thread.archived,
+    pinned: !!thread.pinned_at,
+    done: !!thread.done_at,
+    settled: canMarkDone(thread.status),
+    child: !!thread.parent_id,
+    harness: thread.harness,
+    handOff: targets.state === 'ready',
+    takeOverFrom: takeOverNow?.from.name ?? null,
+    grokBot: !!status?.grokBot,
+  });
+  const runs: Record<ThreadActionId, () => void> = {
+    pin: () => void pin(),
+    done: () => void done(),
+    rename: () => setDraft(thread.title ?? ''),
+    move: () => setMoving(true),
+    archive: () => void archive(),
+    fork: () => (onClose(), shell.sheet({ name: 'continue', source: thread })),
+    reference: () => setReferencing(true),
+    handoff: () => setHandingOff(true),
+    takeover: () => setTakingOver(true),
+    grok: () => void sendGrok(),
+  };
   return (
     <MoSheet onClose={onClose} label="Thread options">
       <div className="truncate px-5 pt-2.5 pb-2 text-[15px] leading-[1.3] font-medium">{thread.title || 'Untitled'}</div>
@@ -444,33 +546,24 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
           <MoListRow icon="play" label="Actions" sub="Preview, checks, tests" onClick={() => go(href.threadView(thread.id, 'actions'))} />
           <MoListRow icon="info" label="Details" sub="Harness, model, session" onClick={() => go(href.threadView(thread.id, 'details'))} last />
         </MoGroup>
-        <MoGroup>
-          {targets.state === 'ready' && <MoListRow icon="share" label="Hand off to…" sub="Continue it on another Mac" onClick={() => setHandingOff(true)} />}
-          {takeover && mayTakeOver(takeover, handoff) && (
-            <MoListRow icon="download" label="Take over" sub={`Continue it on ${takeover.to.name}`} onClick={() => setTakingOver(true)} />
-          )}
-          <MoListRow
-            icon="message"
-            label="Reference a thread"
-            sub="Attach another thread, not its messages"
-            onClick={() => setReferencing(true)}
-          />
-          <MoListRow icon="pin" label={thread.pinned_at ? 'Unpin from Activity' : 'Pin to Activity'} chevron={false} onClick={() => void pin()} />
-          {(thread.done_at || canMarkDone(thread.status)) && (
-            <MoListRow icon="check" label={thread.done_at ? 'Mark as not done' : 'Mark as done'} chevron={false} onClick={() => void done()} />
-          )}
-          {status?.grokBot && (
-            <MoListRow
-              icon={grokBusy ? <Loader size={18} /> : 'grok'}
-              label="Send to Grok Bot"
-              sub={grokBusy ? 'Sending' : "This thread's text"}
-              chevron={false}
-              disabled={grokBusy}
-              onClick={() => void sendGrok()}
-            />
-          )}
-          <MoListRow icon="archive" label={thread.archived ? 'Restore thread' : 'Archive thread'} chevron={false} onClick={() => void archive()} last />
-        </MoGroup>
+        {menu.map((g) => (
+          <MoSection key={g.id} title={g.title} pad={false}>
+            <MoGroup>
+              {g.items.map((it, i) => (
+                <MoListRow
+                  key={it.id}
+                  icon={it.id === 'grok' && grokBusy ? <Loader size={18} /> : it.icon}
+                  label={it.label}
+                  sub={it.off ?? (it.id === 'grok' && grokBusy ? 'Sending' : it.hint)}
+                  chevron={OPENS.has(it.id)}
+                  disabled={!!it.off || (it.id === 'grok' && grokBusy)}
+                  onClick={runs[it.id]}
+                  last={i === g.items.length - 1}
+                />
+              ))}
+            </MoGroup>
+          </MoSection>
+        ))}
         {grokError && <ErrorNote>{grokError}</ErrorNote>}
         {agents.length > 0 && (
           <MoSection title="Running subagents" count={agents.length} pad={false}>

@@ -24,10 +24,12 @@ struct HandOffItems: View {
 struct HandOffMenu: View {
   let model: AppModel
   let threadID: String
+  /// The Thread menu's title case, or the right-click's label from the shared thread menu.
+  var title = "Hand Off to…"
 
   var body: some View {
     if let store = model.threads.store(threadID), let devices = model.devices.targets(store) {
-      Menu("Hand Off to…") {
+      Menu(title) {
         HandOffItems(store: store, devices: devices)
       }
     }
@@ -81,10 +83,12 @@ struct HandOffButton: View {
 struct TakeOverItem: View {
   let model: AppModel
   let threadID: String
+  /// The right-click's label from the shared thread menu, in place of "Take Over from <Mac>…".
+  var title: String?
 
   var body: some View {
     if let store = model.threads.store(threadID), store.canTakeOver, let takeover = store.takeover {
-      Button("Take Over from \(takeover.from.name)…") { store.askTakeOver() }
+      Button(title ?? "Take Over from \(takeover.from.name)…") { store.askTakeOver() }
     }
   }
 }

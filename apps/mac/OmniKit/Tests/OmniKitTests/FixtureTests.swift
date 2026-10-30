@@ -95,6 +95,7 @@ private struct DeliveryRefusal: Decodable {
     "channel-actions.json": { _ = try decodeFixture([ChannelAction].self, "channel-actions.json") },
     "channel-action.json": { _ = try decodeFixture(ChannelAction.self, "channel-action.json") },
     "thread-actions.json": { _ = try decodeFixture(ThreadActions.self, "thread-actions.json") },
+    "thread-menu.json": { _ = try decodeFixture([ThreadMenuGroup].self, "thread-menu.json") },
     "action-run.json": { _ = try decodeFixture(ActionRun.self, "action-run.json") },
     "action-run-stopped.json": { _ = try decodeFixture(ActionRun.self, "action-run-stopped.json") },
     "thread-context.json": { _ = try decodeFixture(ThreadDetail.self, "thread-context.json") },

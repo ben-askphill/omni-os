@@ -240,6 +240,53 @@
     return pieces;
   }
 
+  // packages/shared/continue.ts
+  function continueSourceRefusal(harness) {
+    if (harness === "hermes") return "This thread runs on the Hermes server, so its files are not on this Mac to continue from.";
+    if (harness === "cursor-cloud") return "This thread runs on Cursor's machines, so its files are not on this Mac to continue from.";
+    return null;
+  }
+
+  // packages/shared/thread-actions.ts
+  var THREAD_ACTION_GROUPS = [
+    { id: "organize", title: "Organize" },
+    { id: "continue", title: "Continue" },
+    { id: "send", title: "Send to" }
+  ];
+  var THREAD_ACTIONS = [
+    // Archived threads are out of the lists, so out of Pinned too.
+    { id: "pin", group: "organize", icon: "pin", when: (f) => f.row && !f.archived, label: (f) => f.pinned ? "Unpin thread" : "Pin thread" },
+    { id: "done", group: "organize", icon: "check", when: (f) => f.row && (f.done || f.settled), label: (f) => f.done ? "Mark as not done" : "Mark as done" },
+    { id: "rename", group: "organize", icon: "pencil", when: () => true, label: () => "Rename thread" },
+    { id: "move", group: "organize", icon: "folder", when: (f) => f.row && !f.child, label: () => "Move to folder" },
+    { id: "archive", group: "organize", icon: "archive", when: () => true, label: (f) => f.archived ? "Unarchive thread" : "Archive thread" },
+    {
+      id: "fork",
+      group: "continue",
+      icon: "branch",
+      when: (f) => f.row,
+      label: () => "Fork thread",
+      hint: "A new thread, on any harness, that picks up from here",
+      off: (f) => f.harness ? continueSourceRefusal(f.harness) : null
+    },
+    { id: "reference", group: "continue", icon: "message", when: (f) => f.row && !f.archived, label: () => "Reference a thread", hint: "Attach another thread, not its messages" },
+    { id: "handoff", group: "continue", icon: "share", when: (f) => f.handOff, label: () => "Hand off to\u2026", hint: "Continue it on another Mac" },
+    { id: "takeover", group: "continue", icon: "download", when: (f) => !!f.takeOverFrom, label: (f) => `Take over from ${f.takeOverFrom}` },
+    { id: "grok", group: "send", icon: "grok", when: (f) => f.grokBot, label: () => "Send to Grok Bot", hint: "This thread's text" }
+  ];
+  function threadMenu(f) {
+    return THREAD_ACTION_GROUPS.map((g) => ({
+      ...g,
+      items: THREAD_ACTIONS.filter((a) => a.group === g.id && a.when(f)).map((a) => {
+        const item = { id: a.id, label: a.label(f), icon: a.icon };
+        if (a.hint) item.hint = a.hint;
+        const off = a.off?.(f);
+        if (off) item.off = off;
+        return item;
+      })
+    })).filter((g) => g.items.length > 0);
+  }
+
   // apps/mac/slash-engine/entry.ts
   var call = (f) => (json) => JSON.stringify(f(JSON.parse(json)) ?? null);
   globalThis.OmniSlash = {
@@ -253,6 +300,7 @@
     pieces: call(({ text, slash, visible }) => slashPieces(text, slash, visible)),
     fileQuery: call(({ text, caret }) => fileQuery(text, caret)),
     pickFile: call(({ text, at, insert }) => pickFile(text, at, insert)),
-    omniCommands: call(() => OMNI_COMMANDS)
+    omniCommands: call(() => OMNI_COMMANDS),
+    threadMenu: call((facts) => threadMenu(facts))
   };
 })();

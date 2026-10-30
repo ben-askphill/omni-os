@@ -1,0 +1,74 @@
+[
+  {
+    "id": "organize",
+    "title": "Organize",
+    "items": [
+      {
+        "id": "pin",
+        "label": "Pin thread",
+        "icon": "pin"
+      },
+      {
+        "id": "done",
+        "label": "Mark as done",
+        "icon": "check"
+      },
+      {
+        "id": "rename",
+        "label": "Rename thread",
+        "icon": "pencil"
+      },
+      {
+        "id": "move",
+        "label": "Move to folder",
+        "icon": "folder"
+      },
+      {
+        "id": "archive",
+        "label": "Archive thread",
+        "icon": "archive"
+      }
+    ]
+  },
+  {
+    "id": "continue",
+    "title": "Continue",
+    "items": [
+      {
+        "id": "fork",
+        "label": "Fork thread",
+        "icon": "branch",
+        "hint": "A new thread, on any harness, that picks up from here"
+      },
+      {
+        "id": "reference",
+        "label": "Reference a thread",
+        "icon": "message",
+        "hint": "Attach another thread, not its messages"
+      },
+      {
+        "id": "handoff",
+        "label": "Hand off to…",
+        "icon": "share",
+        "hint": "Continue it on another Mac"
+      },
+      {
+        "id": "takeover",
+        "label": "Take over from Studio",
+        "icon": "download"
+      }
+    ]
+  },
+  {
+    "id": "send",
+    "title": "Send to",
+    "items": [
+      {
+        "id": "grok",
+        "label": "Send to Grok Bot",
+        "icon": "grok",
+        "hint": "This thread's text"
+      }
+    ]
+  }
+]
