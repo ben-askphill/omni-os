@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { href, navigate, parseHash } from '../src/router.ts';
+import { href, navigate, parseHash, startNewThread } from '../src/router.ts';
 
 // The web tests run in node: stand in a location and history that keep the hash the way a browser does.
 const loc = { hash: '' };
@@ -76,5 +76,34 @@ describe('parseHash', () => {
     expect(parseHash(href.threadAt('t 1', 3021))).toEqual({ name: 'thread', id: 't 1', at: 3021 });
     expect(parseHash('#/t/t1?at=2.5')).toEqual({ name: 'thread', id: 't1' });
     expect(parseHash('#/t/t1?at=-3')).toEqual({ name: 'thread', id: 't1' });
+  });
+});
+
+describe('startNewThread', () => {
+  const from = (h: string, open: { id: string; channel_id: string } | null = null) => {
+    loc.hash = h;
+    startNewThread(parseHash(h), open);
+    return loc.hash;
+  };
+
+  it('opens the open thread\'s channel from a thread', () => {
+    expect(from('#/t/t1', { id: 't1', channel_id: 'acme' })).toBe('#/c/acme');
+    expect(from('#/t/t1/changes', { id: 't1', channel_id: 'a b' })).toBe('#/c/a%20b');
+  });
+
+  it('opens Home from a thread whose channel is not known yet', () => {
+    expect(from('#/t/t1')).toBe('#/');
+    expect(from('#/t/t1', { id: 't0', channel_id: 'acme' })).toBe('#/');
+  });
+
+  it('keeps a channel\'s threads, and leaves its other tabs for them', () => {
+    expect(from('#/c/acme')).toBe('#/c/acme');
+    expect(from('#/c/acme/prs/3')).toBe('#/c/acme');
+    expect(from('#/c/acme/settings')).toBe('#/c/acme');
+  });
+
+  it('opens Home from a page outside any channel', () => {
+    expect(from('#/secrets')).toBe('#/');
+    expect(from('#/')).toBe('#/');
   });
 });

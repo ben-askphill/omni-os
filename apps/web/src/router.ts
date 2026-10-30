@@ -169,6 +169,18 @@ export function takeComposerFocus() {
   return v;
 }
 
+/**
+ * New thread from the sidebar or the palette: the current channel's composer, the open thread's channel on a thread,
+ * else Home's. `open` is the store's open thread, which counts only while it is the one the route shows.
+ */
+export function startNewThread(route: Route, open: { id: string; channel_id: string } | null) {
+  const channel = route.name === 'channel' ? route.id : route.name === 'thread' && open?.id === route.id ? open.channel_id : null;
+  if (channel) {
+    if (route.name !== 'channel' || route.tab !== 'threads') navigate(`/c/${encodeURIComponent(channel)}`);
+  } else if (route.name !== 'home') navigate('/');
+  requestComposerFocus();
+}
+
 // ---------- a new thread from a thread (`/clear`) ----------
 
 let preset: NewThreadPreset | null = null;

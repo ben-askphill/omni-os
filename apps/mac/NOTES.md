@@ -62,7 +62,7 @@ Notes from the tracer, #62 (parts A to D), for whoever builds the next screens. 
 | `ServerProcess.swift` | `ServerProcess` (spawn into the log, log tail, liveness, group stop), `SpawnedServer` |
 | `ServerSupervisor.swift` | `ServerSupervisor` (the state machine), `ServerRecord` |
 | `ActivityMonitor.swift` | `ActivityMonitor`: starts `prototypes/activity-monitor/sampler.mjs` (port 4791) with the app, attaches to one already answering, stops its own on quit |
-| `Navigation.swift` | `SidebarItem` (a sidebar row and its route), `Route.title(channelName:)`, `Route.newThreadRoute` |
+| `Navigation.swift` | `SidebarItem` (a sidebar row and its route), `Route.title(channelName:)`, `Route.newThreadRoute(threadChannel:)` |
 | `AppModel.swift` | `AppModel` (settings, supervisor, client and store, the route), `ServerScreen`, `StartFailure`, `State.label` and `canStart` |
 | `SVGPath.swift` | `SVGPath.cgPath`: SVG path data to a `CGPath` (every command, compact numbers, packed arc flags) |
 | `BrandPaths.swift` | `BrandPaths`: the Web UI's icon paths (`ui.tsx`), harness logos and wordmark (`brand.tsx`), generated from those files; `BrandPathsTests` keeps them in step |
