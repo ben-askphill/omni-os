@@ -38,6 +38,7 @@
 //   FAKE_CODEX_TURN_FAIL=1    turn/start rejects before accepting input
 //   FAKE_CODEX_STEER_FAIL=1   turn/steer rejects before accepting input
 //   FAKE_CODEX_STEER_COMPLETE=1  complete immediately after accepting a steer
+//   FAKE_CODEX_SILENT=<m,...>    never answer these methods, but stay up, like a wedged process
 //   CODEX_HOME=<dir>          personal skills are read from <dir>/skills, as Codex does
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -50,6 +51,7 @@ if (argv[0] !== 'app-server') {
 }
 
 const LOG = process.env.FAKE_CODEX_LOG || null;
+const SILENT = new Set((process.env.FAKE_CODEX_SILENT || '').split(',').filter(Boolean));
 const API_VARS = ['OPENAI_API_KEY', 'CODEX_API_KEY', 'OPENAI_BASE_URL'];
 const log = (method, params) => {
   if (!LOG) return;
@@ -445,6 +447,7 @@ function onMessage(msg) {
   const { id, method, params } = msg;
   if (method === undefined) return; // a response; the client never sends those
   log(method, params);
+  if (SILENT.has(method)) return;
   if (NEEDS_PARAMS.test(method) && (params == null || typeof params !== 'object')) {
     return fail(id, 'Invalid request: missing field `params`');
   }
