@@ -247,8 +247,12 @@ async function boot(): Promise<number> {
     env: {
       PATH: `${bin}:${process.env.PATH}`,
       HOME: process.env.HOME,
+      // Channel actions run in $SHELL, else /bin/zsh, which a Linux box may not have.
+      SHELL: '/bin/sh',
       TMPDIR: tmpdir(),
       OMNI_DATA_DIR: data,
+      // The fake `security` above, on Linux too, where the default store is secrets.json.
+      OMNI_SECRET_STORE: 'keychain',
       OMNI_TOKEN: process.env.OMNI_TOKEN,
       OMNI_PORT: '0',
       OMNI_HOST: '127.0.0.1',
