@@ -1,11 +1,9 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { startRunner } from './runner-boot.ts';
 
-// Known delivery gap (docs/internals/delivery.md, gap 2): a PR watch wakes a thread on this machine while another
-// machine holds it between turns. turnBlocked (sync/guard.ts) refuses a turn only while the other machine runs the
-// thread, or a handoff is under way, not while it holds an idle one, so pr-watch/worker.ts deliver starts the turn here.
-// Expected to fail until #399 makes the holder the one owner a wake is checked against. When #399 lands, this test
-// passes, `it.fails` fails, and #399 turns it into a plain `it`.
+// Delivery contract (docs/internals/delivery.md, promise 2): a PR watch polled here wakes a thread only on the machine
+// that owns it. One another machine holds between turns waits here for Resume (sync/guard.ts wakeBlocked); a turn
+// here would fork the session that machine holds. Closed by #399, which was gap 2 until then.
 
 let H: Awaited<ReturnType<typeof startRunner>>;
 let W: typeof import('../pr-watch/worker.ts');
@@ -26,14 +24,14 @@ beforeAll(async () => {
 });
 
 describe('PR watch on a thread another machine holds (#399)', () => {
-  it.fails('does not start a turn here for a thread that mac-b holds between turns', { timeout: 20_000 }, async () => {
+  it('does not start a turn here for a thread that mac-b holds between turns', { timeout: 20_000 }, async () => {
     const t = await H.start('build the feature');
     await H.untilResults(t.id, 1);
     S.prWatches.start(t.id, REPO, 1, H.db.outbox.machineId(), W.BASE_S, new Date(NOW).toISOString());
     // The thread then moved to mac-b, which ran a turn there and now holds it, idle. Only mac-b writes this record;
     // here it stands in for mac-b's synced write.
     H.db.kv.set(`handoff.holder.${t.id}`, 'mac-b');
-    expect(H.db.threads.holder(t.id)).toBe('mac-b');
+    expect(H.db.assignments.holder(t.id)).toBe('mac-b');
 
     const woken: string[] = [];
     const deps: import('../pr-watch/worker.ts').PRWatchDeps = {
@@ -58,5 +56,7 @@ describe('PR watch on a thread another machine holds (#399)', () => {
     // The wake is mac-b's to run, or held for Resume: never a turn here, which would fork the session mac-b holds.
     expect(woken).toEqual([]);
     expect(H.spawns(t.id)).toHaveLength(1);
+    const parked = H.db.messageRequests.parked(t.id);
+    expect(parked.map((r) => r.state)).toEqual(['recovered']);
   });
 });

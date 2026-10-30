@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, sep } from 'node:path';
 import { threadDir, uploadsDir } from '../config.ts';
 import { db, kv, threads, type Thread } from '../db.ts';
-import { isRemoteHarness } from '../harness/types.ts';
+import { isProviderHarness } from '../harness/types.ts';
 import { safeName, uniqueName, type Attachment } from '../uploads.ts';
 import { safeRel, safeSegment } from './paths.ts';
 import type { SyncTransport } from './transport.ts';
@@ -618,7 +618,7 @@ export type ResumeOutcome = 'ready' | 'failed' | 'timed-out' | 'skipped';
 export async function beforeResume(t: Thread): Promise<ResumeOutcome> {
   const opts = hookOpts();
   // A thread that never ran has no session anywhere; Hermes and Cursor Cloud keep theirs off this Mac.
-  if (!opts || !t.has_run || isRemoteHarness(t.harness)) return 'skipped';
+  if (!opts || !t.has_run || isProviderHarness(t.harness)) return 'skipped';
   const fence = new AbortController();
   const fenced = { ...opts, signal: fence.signal };
   // A job still queued behind another of this thread's jobs when the fence closes never starts.

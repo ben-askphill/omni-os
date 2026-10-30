@@ -31,7 +31,7 @@ export {
 
 export { wakePrepared, acceptedAgain, createTeam, createThread, discardRequests, postMessage, resumeRequests, sendMessage } from './runner/api.ts';
 export { ALREADY_SENT, cancelRequests, editRequest, reorderRequests, steerRequests } from './runner/pending.ts';
-export { interruptThread, releaseForHandoff, shutdownAll, stopThread } from './runner/session.ts';
+export { fenceStale, interruptThread, releaseForHandoff, shutdownAll, stopThread } from './runner/session.ts';
 export { retrySetup } from './runner/setup.ts';
 export { switchRun } from './runner/switch.ts';
 export { cancelLimitResume, clearLimit, fireDue, limitClock, resumeLimitNow, scheduleLimitResume, startLimits } from './runner/limits.ts';

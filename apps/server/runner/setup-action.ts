@@ -3,7 +3,7 @@
 // on a thread being prepared ends the attempt here, whichever step it is on, and keeps the first prompt for Retry.
 import { startRun, stopRun } from '../actions.ts';
 import { channelActions, threadSetupRuns, threads, type Thread } from '../db.ts';
-import { isRemoteHarness } from '../harness/types.ts';
+import { isProviderHarness } from '../harness/types.ts';
 
 const STOPPED = 'Stopped by Ben before the agent started.';
 
@@ -42,7 +42,7 @@ export interface SetupHold {
  * thread that runs off this Mac never gets one, and nor does a thread without a worktree, which never comes here.
  */
 export async function runSetupAction(t: Thread): Promise<SetupHold | null> {
-  const action = isRemoteHarness(t.harness) ? undefined : channelActions.setupFor(t.channel_id);
+  const action = isProviderHarness(t.harness) ? undefined : channelActions.setupFor(t.channel_id);
   if (action && !stops.has(t.id)) {
     let started: Awaited<ReturnType<typeof startRun>>;
     try {

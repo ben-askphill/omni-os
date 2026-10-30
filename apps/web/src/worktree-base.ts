@@ -6,8 +6,8 @@ import { shortSha } from './changes.ts';
 
 export { HEAD_PICK };
 
-/** Harnesses that run off this Mac get no worktree, so there is no base to pick. Mirrors isRemoteHarness in apps/server/harness/types.ts. */
-export const isRemoteHarness = (harness: string | null | undefined) => harness === 'hermes' || harness === 'cursor-cloud';
+/** Harnesses that run on a remote provider get no worktree, so there is no base to pick. Mirrors isProviderHarness in apps/server/harness/types.ts. */
+export const isProviderHarness = (harness: string | null | undefined) => harness === 'hermes' || harness === 'cursor-cloud';
 
 /** One row of the picker. `key` is what the picker holds; `pick` is what the request sends. */
 export interface BaseOption {
@@ -57,7 +57,7 @@ export const rowFor = (rows: BaseOption[], pick: BasePick) => rows.find((r) => r
 
 /** The `base` for the POST /threads body: nothing for the default, and nothing for a harness that gets no worktree. */
 export function baseRequest(pick: BasePick, harness: string | null | undefined): { base?: BasePick } {
-  return pick.kind === 'head' || isRemoteHarness(harness) ? {} : { base: pick };
+  return pick.kind === 'head' || isProviderHarness(harness) ? {} : { base: pick };
 }
 
 /** "Branching from origin/main @ a1b2c3d" once the base is a commit, else the pick in words. Null for a thread with no worktree. */

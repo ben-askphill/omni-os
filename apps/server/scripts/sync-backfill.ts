@@ -20,6 +20,7 @@ const LABEL: Record<BackfillCount['entity'], string> = {
   limit_stop: 'usage limit stops',
   trigger_delivery: 'event automation deliveries',
   remote_command: 'commands for threads on other machines',
+  assignment: 'which machine runs each thread',
   kv: 'settings (kv)',
 };
 

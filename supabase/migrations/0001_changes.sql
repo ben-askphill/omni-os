@@ -21,7 +21,7 @@ create table if not exists public.changes (
 -- machine running a thread). Keep it in step with SyncEntity in server/db/sync.ts.
 alter table public.changes drop constraint if exists changes_entity_check;
 alter table public.changes add constraint changes_entity_check
-  check (entity in ('channel', 'folder', 'thread', 'event', 'artifact', 'automation_run', 'kv', 'completion', 'result_read', 'limit_stop', 'trigger_delivery', 'remote_command'));
+  check (entity in ('channel', 'folder', 'thread', 'event', 'artifact', 'automation_run', 'kv', 'completion', 'result_read', 'limit_stop', 'trigger_delivery', 'remote_command', 'assignment'));
 
 create index if not exists changes_user_seq on public.changes (user_id, seq);
 

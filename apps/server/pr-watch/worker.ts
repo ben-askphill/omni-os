@@ -6,7 +6,7 @@
 import { createHash } from 'node:crypto';
 import { messageRequests, outbox, threads, tx, type MessageRequest } from '../db.ts';
 import { emitThread, runsHere, saveOwn, wake } from '../runner.ts';
-import { turnBlocked } from '../sync/guard.ts';
+import { wakeBlocked } from '../sync/guard.ts';
 import { checkLog, observePR } from './gh.ts';
 import { MAX_WAKE_ITEMS } from '@omni/shared/pr-watch.ts';
 import { checkCounts, SOURCES, type EvidenceDeps, type PRObservation, type WatchEvent } from './sources.ts';
@@ -130,13 +130,13 @@ function save(w: PRWatchRow, obs: PRObservation, events: WatchEvent[], prompt: s
 }
 
 /**
- * Wake the thread, unless this Mac may not start a turn in it (it runs on the other Mac, its worktree is not ready):
- * then the wake waits for Resume, like a crew report to a parent that cannot run.
+ * Wake the thread, unless this Mac may not start a turn in it (another machine holds it, running or between turns,
+ * or its worktree is not ready): then the wake waits for Resume, like a crew report to a parent that cannot run.
  */
 function deliver(row: MessageRequest, deps: PRWatchDeps) {
   const t = threads.get(row.thread_id);
   if (!t) return;
-  if (t.setup || turnBlocked(t, runsHere(t.id))) {
+  if (wakeBlocked(t, runsHere(t.id))) {
     messageRequests.mark(row.id, 'recovered');
     return emitThread(t.id);
   }

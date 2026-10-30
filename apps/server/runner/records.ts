@@ -20,6 +20,7 @@ import {
   eventPayload,
   hasBackground,
   isShuttingDown,
+  ownTurn,
   publishMods,
   send,
   track,
@@ -258,7 +259,7 @@ export function onRecord(live: Live, rec: StreamRecord) {
 export function openTurn(live: Live) {
   live.turn = true;
   clearTimeout(live.idleTimer);
-  threads.update(live.threadId, { status: 'running' });
+  ownTurn(live.threadId);
   // Already under way, so nothing waits for this one: its before snapshot may hold the turn's first edits.
   startTurnSnapshot(live);
   emitThread(live.threadId);

@@ -5,7 +5,7 @@
 // edits and restarts. It is a before/after snapshot: commits, pulls and other git operations made during
 // the turn are part of it.
 import { turnSnapshots, type SkippedFile, type Thread, type TurnSnapshot } from './db.ts';
-import { isRemoteHarness, remoteWhere } from './harness/types.ts';
+import { isProviderHarness, providerWhere } from './harness/types.ts';
 import type { ChangedFile, TurnChanges, TurnView } from '@omni/shared/changes.ts';
 import { changesCheckout, commitsGroup, gitOr } from './changes.ts';
 import { captureTree, commitCheckpoint } from './checkpoint.ts';
@@ -28,7 +28,7 @@ export interface Snapshot {
  */
 export async function snapshotCheckout(t: Thread | undefined): Promise<{ dir: string } | { reason: string }> {
   if (!t) return { reason: 'The thread is gone.' };
-  if (isRemoteHarness(t.harness)) return { reason: `This thread runs ${remoteWhere(t.harness)}, so its files are not on this Mac.` };
+  if (isProviderHarness(t.harness)) return { reason: `This thread runs ${providerWhere(t.harness)}, so its files are not on this Mac.` };
   if (!t.branch) return { reason: 'Turns are saved only for a thread with a worktree of its own.' };
   return changesCheckout(t);
 }
