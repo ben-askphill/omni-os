@@ -112,7 +112,7 @@ public final class SlashEngine: @unchecked Sendable {
     let hit: SlashHit?
   }
 
-  private func call<In: Encodable, Out: Decodable>(_ name: String, _ input: In) -> Out? {
+  func call<In: Encodable, Out: Decodable>(_ name: String, _ input: In) -> Out? {
     guard let data = try? OmniJSON.encoder().encode(input), let json = String(data: data, encoding: .utf8) else { return nil }
     let text: String? = lock.withLock {
       context.exception = nil

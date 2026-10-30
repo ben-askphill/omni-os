@@ -264,12 +264,13 @@ struct ChannelRowChrome<Content: View>: View {
 struct MoveToFolderMenu: View {
   let model: AppModel
   let thread: ThreadStub
+  var title = "Move to Folder"
 
   var body: some View {
     if let channel = model.store.channel(thread.channelID) {
       let current = model.folders.folder(of: thread)
       let choices = channel.folders.filter { !$0.isStandIn }
-      Menu("Move to Folder") {
+      Menu(title) {
         ForEach(choices) { f in
           Toggle(
             f.name,

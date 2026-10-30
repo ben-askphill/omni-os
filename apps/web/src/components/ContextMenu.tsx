@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
+import { threadMenu, type ThreadActionId } from '@omni/shared/thread-actions.ts';
 import { api, errorText, type Thread, type ThreadDetail } from '../api.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
 import { useToast } from './Toaster.tsx';
@@ -8,6 +9,8 @@ import { deviceRows, mayTakeOver } from '../handoff.ts';
 import { canMarkDone } from '../needs-you.ts';
 import { navigate, href, openNewThread, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
+import { openContinue } from './ContinueSheet.tsx';
+import { ThreadReferencePanel } from './ThreadReference.tsx';
 import { handOff, useHandoffTargets } from './thread/Handoff.tsx';
 import { TakeoverConfirm } from './thread/Takeover.tsx';
 import { Icon, Loader, StatusDot, type IconName } from './ui.tsx';
@@ -101,6 +104,8 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
   const [moving, setMoving] = useState(false);
   // Set while the menu lists the Macs a running thread can be handed to.
   const [handingOff, setHandingOff] = useState(!!open.handoff);
+  // Set while the menu shows the thread reference picker.
+  const [referencing, setReferencing] = useState(false);
   const [sending, setSending] = useState<string | null>(null);
   const sendingGrok = useRef(false);
   const toast = useToast();
@@ -131,19 +136,27 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
     };
   }, [target.kind, target.id]);
 
-  // Keep the menu inside the window.
+  // Keep the menu inside the window, also as the reference picker's list comes in and grows it.
   useLayoutEffect(() => {
-    const r = ref.current?.getBoundingClientRect();
-    if (!r) return;
-    setPos({ x: Math.max(8, Math.min(open.x, window.innerWidth - r.width - 8)), y: Math.max(8, Math.min(open.y, window.innerHeight - r.height - 8)) });
-  }, [open.x, open.y, archived, error, moving, handingOff, targets.state]);
+    const el = ref.current;
+    if (!el) return;
+    const place = () => {
+      const r = el.getBoundingClientRect();
+      setPos({ x: Math.max(8, Math.min(open.x, window.innerWidth - r.width - 8)), y: Math.max(8, Math.min(open.y, window.innerHeight - r.height - 8)) });
+    };
+    place();
+    const watch = new ResizeObserver(place);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [open.x, open.y]);
 
   // Keyboard: the first item takes the focus, arrows move it.
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>('[role="menuitem"], [role="menuitemradio"]')?.focus();
   }, [moving, row, handingOff, targets.state]);
   const onKey = (e: ReactKeyboardEvent) => {
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    // The reference picker's search and list keep their own keys.
+    if (referencing || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
     const items = [...(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]') ?? [])];
     const i = items.indexOf(document.activeElement as HTMLElement);
     e.preventDefault();
@@ -249,51 +262,68 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
     }
   };
 
-  // `off`: why the item cannot run here, shown under it.
-  const items: { label: string; icon: IconName; run: () => void; off?: string | null }[] =
+  // The thread's actions, from the list the phone and the Mac app render too. `off`: why one cannot run here, shown under it.
+  type Item = { id?: ThreadActionId; label: string; icon: IconName; run: () => void; hint?: string; off?: string | null };
+  const takeOverNow = takeover && mayTakeOver(takeover, handoff) ? takeover : null;
+  const runs: Record<ThreadActionId, () => void> = {
+    pin: () => void togglePin(),
+    done: () => void toggleDone(),
+    rename: () => setDraft(current ?? ''),
+    move: () => setMoving(true),
+    archive: () => void toggleArchive(),
+    fork: () => (row && openContinue(row), onClose()),
+    reference: () => setReferencing(true),
+    handoff: () => setHandingOff(true),
+    takeover: () => takeOverNow && onTakeOver(target.id, takeOverNow),
+    grok: () => void sendGrok(),
+  };
+  const groups: { title?: string; items: Item[] }[] =
     target.kind === 'thread'
-      ? [
-          // Archived threads are out of the lists, so out of Pinned too.
-          ...(row && !archived ? [{ label: row.pinned_at ? 'Unpin thread' : 'Pin thread', icon: 'pin' as const, run: () => void togglePin() }] : []),
-          // A running thread brings its own result; done waits until it ends.
-          ...(row && (row.done_at || canMarkDone(row.status))
-            ? [{ label: row.done_at ? 'Mark as not done' : 'Mark as done', icon: 'check' as const, run: () => void toggleDone() }]
-            : []),
-          { label: 'Rename thread', icon: 'pencil', run: () => setDraft(current ?? '') },
-          ...(row && !row.parent_id ? [{ label: 'Move to folder', icon: 'folder' as const, run: () => setMoving(true) }] : []),
-          ...(targets.state === 'ready' ? [{ label: 'Hand off to…', icon: 'share' as const, run: () => setHandingOff(true) }] : []),
-          ...(takeover && mayTakeOver(takeover, handoff)
-            ? [{ label: `Take over from ${takeover.from.name}`, icon: 'download' as const, run: () => onTakeOver(target.id, takeover) }]
-            : []),
-          ...(status?.grokBot ? [{ label: 'Send to Grok Bot', icon: 'grok' as const, run: () => void sendGrok() }] : []),
-          { label: archived ? 'Unarchive thread' : 'Archive thread', icon: 'archive', run: toggleArchive },
-        ]
-      : target.kind === 'folder'
-        ? folder
-          ? [
-              { label: 'New thread here', icon: 'plus', run: () => (openNewThread({ channel: folder.channel_id, folder: { id: folder.id, name: folder.name } }), onClose()) },
-              { label: 'Rename', icon: 'pencil', run: () => (folders.setEditing(folder.id), onClose()) },
-              { label: 'Duplicate', icon: 'copy', run: () => (void folders.duplicate(folder.id), onClose()) },
-              { label: 'Delete', icon: 'trash', run: () => (folders.askDelete(folder.id), onClose()) },
-            ]
-          : []
-        : [
-            { label: 'New folder', icon: 'folderPlus', run: () => (folders.setEditing(draftKey(target.id)), onClose()) },
-            { label: 'Channel settings', icon: 'sliders', run: () => (navigate(href.settings(target.id)), onClose()) },
-          ];
+      ? threadMenu({
+          row: !!row,
+          archived: !!archived,
+          pinned: !!row?.pinned_at,
+          done: !!row?.done_at,
+          settled: !!row && canMarkDone(row.status),
+          child: !!row?.parent_id,
+          harness: row?.harness ?? null,
+          handOff: targets.state === 'ready',
+          takeOverFrom: takeOverNow?.from.name ?? null,
+          grokBot: !!status?.grokBot,
+        }).map((g) => ({ title: g.title, items: g.items.map((it) => ({ ...it, run: runs[it.id] })) }))
+      : [
+          {
+            items:
+              target.kind === 'folder'
+                ? folder
+                  ? [
+                      { label: 'New thread here', icon: 'plus', run: () => (openNewThread({ channel: folder.channel_id, folder: { id: folder.id, name: folder.name } }), onClose()) },
+                      { label: 'Rename', icon: 'pencil', run: () => (folders.setEditing(folder.id), onClose()) },
+                      { label: 'Duplicate', icon: 'copy', run: () => (void folders.duplicate(folder.id), onClose()) },
+                      { label: 'Delete', icon: 'trash', run: () => (folders.askDelete(folder.id), onClose()) },
+                    ]
+                  : []
+                : [
+                    { label: 'New folder', icon: 'folderPlus', run: () => (folders.setEditing(draftKey(target.id)), onClose()) },
+                    { label: 'Channel settings', icon: 'sliders', run: () => (navigate(href.settings(target.id)), onClose()) },
+                  ],
+          },
+        ];
   const title = target.kind === 'channel' ? `#${channel(target.id)?.name ?? ''}` : folder ? folder.name : undefined;
 
   return (
     <div
       ref={ref}
       role="menu"
-      aria-label={target.kind === 'thread' ? (moving ? 'Move to folder' : handingOff ? 'Hand off to' : 'Thread actions') : target.kind === 'folder' ? 'Folder actions' : 'Channel actions'}
+      aria-label={target.kind === 'thread' ? (moving ? 'Move to folder' : handingOff ? 'Hand off to' : referencing ? 'Reference a thread' : 'Thread actions') : target.kind === 'folder' ? 'Folder actions' : 'Channel actions'}
       style={{ left: pos.x, top: pos.y }}
       onKeyDown={onKey}
-      className="pop-in fixed z-[60] min-w-[190px] max-w-[280px] rounded-[16px] bg-elev p-1.5 shadow-[var(--shadow-menu)]"
+      className={`pop-in fixed z-[60] ${referencing ? 'max-h-[calc(100vh-1rem)] w-[min(23rem,calc(100vw-1rem))] overflow-y-auto rounded-[22px]' : 'min-w-[190px] max-w-[280px] rounded-[16px] p-1.5'} bg-elev shadow-[var(--shadow-menu)]`}
     >
       {title && <div className="caption truncate px-2.5 pt-1 pb-1.5 text-fg-4">{title}</div>}
-      {handingOff ? (
+      {referencing && row ? (
+        <ThreadReferencePanel thread={row} onPicked={onClose} />
+      ) : handingOff ? (
         <>
           <div className="caption truncate px-2.5 pt-1 pb-1.5 text-fg-4">Hand off to</div>
           {!row || targets.state === 'loading' ? (
@@ -355,25 +385,32 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
           className="h-8 w-[260px] rounded-[10px] bg-surface px-2.5 text-[13px] text-fg outline-none"
         />
       ) : (
-      items.map((it) => (
-        <button
-          key={it.label}
-          role="menuitem"
-          aria-disabled={!!it.off || undefined}
-          onClick={it.off ? undefined : it.run}
-          className={`${it.off ? 'opacity-45' : 'hov hover:text-fg'} flex min-h-8 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[13px] text-fg-2`}
-        >
-          <Icon name={it.icon} size={14} className="text-fg-3" />
-          {it.off ? (
-            <span className="flex min-w-0 flex-col py-1.5">
-              <span>{it.label}</span>
-              <span className="text-[11.5px] leading-snug text-fg-4">{it.off}</span>
-            </span>
-          ) : (
-            it.label
-          )}
-        </button>
-      )))}
+        groups.map((g, gi) => (
+          <div key={g.title ?? gi} role={g.title ? 'group' : undefined} aria-label={g.title}>
+            {g.title && <div className={`caption truncate px-2.5 pb-1 text-fg-4 ${gi ? 'mt-1 border-t border-line pt-2' : 'pt-1'}`}>{g.title}</div>}
+            {g.items.map((it) => (
+              <button
+                key={it.label}
+                role="menuitem"
+                aria-disabled={!!it.off || undefined}
+                title={it.off ? undefined : it.hint}
+                onClick={it.off ? undefined : it.run}
+                className={`${it.off ? 'opacity-45' : 'hov hover:text-fg'} flex min-h-8 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[13px] text-fg-2`}
+              >
+                <Icon name={it.icon} size={14} className="text-fg-3" />
+                {it.off ? (
+                  <span className="flex min-w-0 flex-col py-1.5">
+                    <span>{it.label}</span>
+                    <span className="text-[11.5px] leading-snug text-fg-4">{it.off}</span>
+                  </span>
+                ) : (
+                  it.label
+                )}
+              </button>
+            ))}
+          </div>
+        ))
+      )}
       {error && <div className="px-2.5 py-1.5 text-[12px] leading-snug break-words text-pretty text-fg-3">{error}</div>}
     </div>
   );

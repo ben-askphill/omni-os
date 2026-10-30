@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { applyPage, earlierCursor, historyQuery, openHistory, revealCursor, type HistoryHead, type HistoryPage, type HistoryRow } from '@omni/shared/history.ts';
 import { newContext } from '@omni/shared/message-context.ts';
 import { diffSelection, selectRows } from '@omni/shared/message-context-diff.ts';
+import { EVERY_ACTION_FACTS, threadMenu } from '@omni/shared/thread-actions.ts';
 import { diff, shapeOf, tagOf } from './fixture-shape.ts';
 import { FAKE_CLAUDE, diffFile, fakeAlive } from './support.ts';
 
@@ -132,6 +133,9 @@ const NAMES = [
   'action-run.json',
   'action-run-stopped.json',
   'thread-actions.json',
+  // Not the server's: the shared thread action menu (packages/shared/thread-actions.ts) for a thread every action applies
+  // to, which the Mac app runs through its slash engine bundle.
+  'thread-menu.json',
   // The storage scan over the worktrees above, once it has finished.
   'worktree-scan.json',
   // A cleanup of two of them that removes one and keeps the other, then this Mac's retention policy turned on.
@@ -758,6 +762,7 @@ async function scenario() {
   const again = (await call('POST', `/threads/${id}/action-runs/${previewing.id}/retry`, {})) as Run;
   keep('thread-actions.json', await get(`/threads/${id}/actions`));
   await call('POST', `/threads/${id}/action-runs/${again.id}/stop`, {});
+  keep('thread-menu.json', threadMenu(EVERY_ACTION_FACTS));
 
   // Two archived worktree threads in a repo with an origin, so that both can be cleaned up.
   const gadgetsOrigin = join(tmp, 'gadgets.git');
