@@ -20,10 +20,9 @@ struct SidebarView: View {
   /// saved as `sidebar.collapsedChannels`, one id per line.
   @State private var collapsed = Set(
     (UserDefaults.standard.string(forKey: collapsedChannelsKey) ?? "").split(separator: "\n").map(String.init))
-  /// Running, Pinned and Recent threads each fold on their own, apart from the channels.
+  /// Running and Pinned each fold on their own, apart from the channels.
   @AppStorage(runningCollapsedKey) private var runningClosed = false
   @AppStorage(pinnedCollapsedKey) private var pinsClosed = false
-  @AppStorage(recentCollapsedKey) private var recentClosed = false
 
   private func setChannel(_ id: String, open: Bool) {
     guard collapsed.contains(id) == open else { return }
@@ -117,11 +116,6 @@ struct SidebarView: View {
             threadSection("Pinned", closed: $pinsClosed, threads: pins.map { .init(thread: $0, children: []) }, unpin: true)
           }
 
-          let recent = SidebarSections.recentGroups(model.store.channels, open: model.openThread)
-          if !recent.isEmpty {
-            threadSection("Recent threads", closed: $recentClosed, threads: recent)
-          }
-
           if let error = channelsError {
             ErrorNote(text: error)
           }
@@ -199,7 +193,7 @@ struct SidebarView: View {
       .accessibilityAddTraits(on ? .isSelected : [])
   }
 
-  /// Running, Pinned or Recent threads, as ThreadSection in Sidebar.tsx: threads from any channel under a caption
+  /// Running or Pinned, as ThreadSection in Sidebar.tsx: threads from any channel under a caption
   /// that folds them away, with the count beside it while folded. The caller leaves it out when it lists nothing. A
   /// thread here still shows under its own channel too.
   private func threadSection(_ label: String, closed: Binding<Bool>, threads: [SidebarSections.ThreadRowGroup], unpin: Bool = false) -> some View {
@@ -526,7 +520,6 @@ let sidebarWidthKey = "sidebar.width"
 let collapsedChannelsKey = "sidebar.collapsedChannels"
 let pinnedCollapsedKey = "sidebar.pinnedCollapsed"
 let runningCollapsedKey = "sidebar.runningCollapsed"
-let recentCollapsedKey = "sidebar.recentCollapsed"
 let handoffsCollapsedKey = "sidebar.handoffsCollapsed"
 
 /// Tracks the pointer over a row, for a button laid over it that shows on hover.
@@ -680,7 +673,7 @@ struct ThreadRow: View {
   }
 }
 
-/// SectionLink in Sidebar.tsx: a thread in Running, Pinned or Recent threads, flush with the channels. In Pinned its
+/// SectionLink in Sidebar.tsx: a thread in Running or Pinned, flush with the channels. In Pinned its
 /// channel's name gives way on hover to the button that unpins it.
 private struct SectionRow: View {
   let thread: ThreadStub
