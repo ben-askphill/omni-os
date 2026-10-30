@@ -30,6 +30,7 @@
     "done_at": null,
     "setup": "failed",
     "setup_error": "git worktree add failed: fatal: invalid reference: HEAD",
+    "resume_blocked": null,
     "limit_state": null,
     "limit_resets_at": null,
     "limit_elsewhere": 0,

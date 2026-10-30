@@ -110,6 +110,9 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
   public let setup: ThreadSetup?
   /// Why the worktree could not be prepared, while `setup` is failed.
   public let setupError: String?
+  /// Why this Mac did not resume the thread's session: the other machine's newer one could not be brought here, so the
+  /// copy here may miss turns (apps/server/runner/spawn.ts). Nil once a turn starts. Older servers leave it out.
+  public let resumeBlocked: String?
   /// Its last turn stopped at the usage limit, on either Mac (it syncs). Older servers leave it out.
   public let limit: ThreadLimit?
   /// When the harness said that limit resets. Nil when it did not say: only Resume now is offered.
@@ -126,6 +129,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     case queuedModel = "queued_model"
     case queuedEffort = "queued_effort"
     case setupError = "setup_error"
+    case resumeBlocked = "resume_blocked"
     case limit = "limit_state"
     case limitResetsAt = "limit_resets_at"
     case limitElsewhere = "limit_elsewhere"
@@ -178,6 +182,7 @@ public struct OmniThread: Decodable, Hashable, Sendable, Identifiable {
     doneAt = try c.decodeIfPresent(Date.self, forKey: .doneAt)
     setup = try c.decodeIfPresent(ThreadSetup.self, forKey: .setup)
     setupError = try c.decodeIfPresent(String.self, forKey: .setupError)
+    resumeBlocked = try c.decodeIfPresent(String.self, forKey: .resumeBlocked)
     limit = try c.decodeIfPresent(ThreadLimit.self, forKey: .limit)
     limitResetsAt = try c.decodeIfPresent(Date.self, forKey: .limitResetsAt)
     limitElsewhere = (try? c.decodeFlag(.limitElsewhere)) ?? false

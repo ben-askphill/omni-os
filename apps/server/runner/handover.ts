@@ -15,6 +15,8 @@ export interface HandoverInput {
   to: RunName;
   /** `fresh`: a new session reads the whole thread. `resumed`: the harness's earlier session reads what it missed. */
   session: 'fresh' | 'resumed';
+  /** Ben started the thread with fresh context on the same run, since its session could not be resumed here. */
+  restart?: boolean;
   user: string;
   thread: { title: string; cwd: string; branch: string | null };
   /** File names in the thread's artifacts folder, newest first. */
@@ -78,7 +80,9 @@ export function buildHandover(i: HandoverInput): Handover {
   const shown = [...kept, ...(cutAt >= 0 ? [{ index: cutAt, text: note }] : [])].sort((a, b) => a.index - b.index).map((e) => e.text);
   const todos = fresh ? openTodos(readRows(i.events)) : [];
 
-  const intro = fresh
+  const intro = fresh && i.restart
+    ? `This Omni thread ran on ${named(i.to)} until now. Its earlier session could not be resumed here, so ${i.user} started it again in a new session. You are taking over the same task in the same working directory.`
+    : fresh
     ? `This Omni thread ran on ${named(i.from)} until now. ${i.user} switched it to ${named(i.to)}. You are taking over the same task in the same working directory.`
     : `You ran this thread earlier. While it ran on ${named(i.from)}, this happened. Catch up, then continue.`;
   const facts = [

@@ -605,8 +605,8 @@ export function sessionOnThisMac(t: Thread): boolean {
 
 /**
  * How the session download before a resume ended. `ready`: it finished, whether or not there was anything to bring.
- * `failed`: it threw, and the harness starts on what is here. `timed-out`: it outlived resumeTimeoutMs, queued or
- * running, and was cancelled. `skipped`: sync is off, the thread never ran, or Hermes or Cursor keeps its session.
+ * `failed`: it threw. `timed-out`: it outlived resumeTimeoutMs, queued or running, and was cancelled. After either, the
+ * runner does not resume the copy here, which may miss turns another machine ran (runner/spawn.ts). `skipped`: sync is off, the thread never ran, or Hermes or Cursor keeps its session.
  */
 export type ResumeOutcome = 'ready' | 'failed' | 'timed-out' | 'skipped';
 
@@ -633,7 +633,7 @@ export async function beforeResume(t: Thread): Promise<ResumeOutcome> {
   const late = new Promise<ResumeOutcome>((resolve) => (timer = setTimeout(() => resolve('timed-out'), hookDefaults.resumeTimeoutMs)));
   try {
     const outcome = await Promise.race([job, late]);
-    if (outcome === 'timed-out') console.error(`[sync] session download for ${t.id} is slow; starting without it`);
+    if (outcome === 'timed-out') console.error(`[sync] session download for ${t.id} timed out`);
     return outcome;
   } finally {
     clearTimeout(timer);

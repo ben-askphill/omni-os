@@ -101,6 +101,8 @@ const NAMES = [
   'limit-scheduled.json',
   'limit-cancelled.json',
   'limit-resumed.json',
+  // That thread, once done, started with fresh context: its next turn gets a new session (#400).
+  'session-fresh.json',
   // The retried worktree thread's branch changes, every group, and a thread with no repo to read.
   'changes.json',
   'changes-unavailable.json',
@@ -711,6 +713,8 @@ async function scenario() {
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
+  const fresh = keep('session-fresh.json', await call('POST', `/threads/${capped.id}/session/fresh`, {})) as { thread: { resume_blocked: string | null } };
+  expect(fresh.thread.resume_blocked).toBeNull();
 
   // Bounded history: a first turn whose prompt and answer are too big for a row, then a short one. The client opens on
   // the head, loads the page above it, then reveals the first message and reads it whole, as a search hit would.

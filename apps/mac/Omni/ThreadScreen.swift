@@ -460,6 +460,9 @@ private struct TranscriptRows: View {
       if let t = store.thread, SetupCard.shows(t, model: model) {
         SetupCard(model: model, store: store, thread: t)
       }
+      if let t = store.thread, t.resumeBlocked != nil {
+        StaleSessionCard(model: model, store: store, thread: t)
+      }
       if let t = store.thread, t.limit != nil {
         LimitCard(model: model, store: store, thread: t)
       }

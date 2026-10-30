@@ -216,6 +216,18 @@ extension OmniClient {
     try await send("POST", "/api/threads/\(uriComponent(id))/setup/retry", body: RequestIDs(ids: nil))
   }
 
+  /// A thread this Mac did not resume because its latest session could not be brought here: download it again and
+  /// send what waits. With nothing waiting, the next message tries it. A 409 while the thread runs.
+  public func retryResume(in id: String) async throws(OmniAPIError) -> RecoveryAnswer {
+    try await send("POST", "/api/threads/\(uriComponent(id))/session/retry", body: RequestIDs(ids: nil))
+  }
+
+  /// Starts the thread's next turn in a new session that reads the thread so far, instead of resuming the session
+  /// here, and sends what waits. A 409 while the thread runs.
+  public func startFresh(in id: String) async throws(OmniAPIError) -> RecoveryAnswer {
+    try await send("POST", "/api/threads/\(uriComponent(id))/session/fresh", body: RequestIDs(ids: nil))
+  }
+
   /// Drops parked messages. Each stays in the transcript, marked as never sent.
   public func discardRequests(in id: String, ids: [String]) async throws(OmniAPIError) -> RecoveryAnswer {
     try await send("POST", "/api/threads/\(uriComponent(id))/requests/discard", body: RequestIDs(ids: ids))

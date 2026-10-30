@@ -167,6 +167,13 @@ export function takeHandover(live: Live, thread: Thread): { thread: Thread; resu
   return { thread, resume: !fresh };
 }
 
+/** Whether the next spawn resumes the harness's earlier session, as takeHandover will decide. */
+export function resumesSession(live: Live, thread: Thread): boolean {
+  if (!thread.has_run) return false;
+  const { handover } = threads.sessionState(thread.id);
+  return !handover || !live.inflight.length || !!handover.since || !!handover.started;
+}
+
 /** A native session now exists, so a pending command-first handover can resume it after the process exits. */
 export function sessionStarted(live: Live) {
   const { handover } = threads.sessionState(live.threadId);
@@ -188,6 +195,7 @@ export function handOverWith(live: Live, m: Msg, thread = threads.get(live.threa
     from: handover.from,
     to,
     session,
+    restart: !!handover.fresh,
     user: userName(),
     thread,
     uploadsDir: uploadsDir(thread.id),

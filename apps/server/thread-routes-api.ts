@@ -37,6 +37,8 @@ import {
   resumeLimitNow,
   resumeRequests,
   retrySetup,
+  retryResume,
+  startFresh,
   scheduleLimitResume,
   runsHere,
   steerRequests,
@@ -170,6 +172,8 @@ threadRoutesApi.get('/:id/summary', (c) => {
     id: t.id, title: t.title, status: t.status, channel: t.channel_id, role: t.role, task_id: t.task_id,
     updated_at: t.updated_at, last_reply: events.lastRunText(t.id) || events.lastAssistantText(t.id),
     artifacts: artifacts.byThread(t.id).map((a) => a.name),
+    // Why this machine did not resume it (runner/spawn.ts), for recover_thread_session. Only while it holds.
+    ...(t.resume_blocked && { resume_blocked: t.resume_blocked }),
     // The agents it spawned that still run, as the thread panel's Running subagents list shows them.
     running_subagents: activeTasks()
       .filter((k) => k.thread_id === t.id && k.subagent)
@@ -242,6 +246,20 @@ threadActionsApi.post('/:id/setup/retry', (c) => {
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
   retrySetup(id);
   return c.json(afterRecovery(id));
+});
+
+/**
+ * A thread this machine did not resume because its latest session could not be brought here (runner/spawn.ts):
+ * download it again and send what waits, or start with fresh context, a new session that reads the thread so far.
+ * Each sends the messages waiting for Resume; with none, Ben's next message goes the chosen way. A 409 while it runs.
+ */
+threadActionsApi.post('/:id/session/retry', async (c) => {
+  await retryResume(c.req.param('id'));
+  return c.json(afterRecovery(c.req.param('id')));
+});
+threadActionsApi.post('/:id/session/fresh', async (c) => {
+  await startFresh(c.req.param('id'));
+  return c.json(afterRecovery(c.req.param('id')));
 });
 
 /**
