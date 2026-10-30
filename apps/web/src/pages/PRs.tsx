@@ -1,14 +1,11 @@
 import { useState, type CSSProperties } from 'react';
 import { api, errorText, useApi, type Channel, type Checks, type PRDetail as PRDetailT, type PRSummary, type Thread } from '../api.ts';
-import { DiffViewer } from '../components/DiffViewer.tsx';
-import { Markdown } from '../components/Markdown.tsx';
-import { Avatar, Button, Chip, StatusDot, Empty, ErrorNote, Icon, IconLink, LinkButton, Loading, Picker, SlideToConfirm, Tabs, Toggle, type PickerOption } from '../components/ui.tsx';
-import { fullDate, relTime } from '../format.ts';
+import { Button, Chip, StatusDot, Empty, ErrorNote, Icon, IconLink, LinkButton, Loading, Tabs } from '../components/ui.tsx';
+import { relTime } from '../format.ts';
 import { href, navigate } from '../router.ts';
+import { PRDetailTabBody, type DetailTab } from './PRDetailTabs.tsx';
+import { PRMergePanel } from './PRMergePanel.tsx';
 import { LinkChannel } from '../link-previews.ts';
-
-/** GitHub hides HTML comments (PR templates, bots); react-markdown would print them. */
-const ghBody = (s: string | null | undefined) => (s ?? '').replace(/<!--[\s\S]*?-->/g, '').trim();
 
 function NoRepo({ channel }: { channel: Channel }) {
   return (
@@ -17,6 +14,8 @@ function NoRepo({ channel }: { channel: Channel }) {
     </Empty>
   );
 }
+
+export { checkTone } from './PRDetailTabs.tsx';
 
 export function ChecksSummary({ c }: { c: Checks }) {
   if (!c.passed && !c.failed && !c.pending) return <span className="text-[12px] text-fg-4">no checks</span>;
@@ -102,33 +101,9 @@ export function PRList({ channel }: { channel: Channel }) {
   );
 }
 
-/** A check run's state as a glyph: done, needs (failed) or running. */
-export function checkTone(state: string) {
-  if (['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(state)) return 'done';
-  if (['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(state)) return 'needs';
-  return 'running';
-}
-function checkGlyph(state: string) {
-  const t = checkTone(state);
-  return t === 'done' ? '✓' : t === 'needs' ? '✗' : '•';
-}
-
-type DetailTab = 'conversation' | 'checks' | 'files' | 'diff';
-type MergeMethod = 'squash' | 'merge' | 'rebase';
-
-const MERGE_METHODS: PickerOption<MergeMethod>[] = [
-  { value: 'squash', label: 'Squash and merge', sub: 'One commit on the base branch', avatar: false },
-  { value: 'merge', label: 'Merge commit', sub: 'Keep every commit plus a merge commit', avatar: false },
-  { value: 'rebase', label: 'Rebase and merge', sub: 'Replay the commits, no merge commit', avatar: false },
-];
-
 export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
   const q = useApi<PRDetailT>(channel.github_repo ? `/channels/${encodeURIComponent(channel.id)}/prs/${n}` : null);
   const [tab, setTab] = useState<DetailTab>('conversation');
-  const [method, setMethod] = useState<MergeMethod>('squash');
-  const [deleteBranch, setDeleteBranch] = useState(true);
-  const [mergeError, setMergeError] = useState<string | null>(null);
-  const [merged, setMerged] = useState<string | null>(null);
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
@@ -155,24 +130,6 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
     );
   }
   const p = q.data;
-  const open = !p.state || p.state === 'OPEN';
-
-  // Thrown errors spring the slider back; the message stays visible under it.
-  const doMerge = async () => {
-    setMergeError(null);
-    try {
-      const r = await api.post<{ ok: boolean; output: string }>(`/channels/${encodeURIComponent(channel.id)}/prs/${n}/merge`, {
-        method,
-        delete_branch: deleteBranch,
-        confirm: true,
-      });
-      setMerged(r.output?.trim() || 'Merged.');
-      q.reload();
-    } catch (e) {
-      setMergeError(errorText(e));
-      throw e;
-    }
-  };
 
   const askReview = async () => {
     setReviewBusy(true);
@@ -189,10 +146,6 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
       setReviewBusy(false);
     }
   };
-
-  const failed = p.checkRuns.filter((c) => checkTone(c.state) === 'needs').length;
-  const warnings = [failed > 0 && `${failed} checks failing`, p.isDraft && 'Still a draft', p.reviewDecision === 'CHANGES_REQUESTED' && 'Changes requested'].filter(Boolean) as string[];
-  const conflicting = p.mergeable === 'CONFLICTING';
 
   return (
     <div className="mx-auto max-w-5xl px-4 pt-6 pb-16 md:px-8">
@@ -225,49 +178,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
       </div>
       {reviewError && <ErrorNote className="mt-2">{reviewError}</ErrorNote>}
 
-      {open && !merged && (
-        <section aria-label="Merge" className="mt-5 rounded-[24px] bg-surface p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-display text-[15px]">Merge</span>
-            <Picker label="Merge method" value={method} onChange={setMethod} options={MERGE_METHODS} className="ml-1" />
-            <label className="flex items-center gap-2 pl-1 text-[13px] text-fg-2">
-              <Toggle checked={deleteBranch} onChange={setDeleteBranch} label="Delete branch after merge" />
-              Delete branch
-            </label>
-          </div>
-          <div className="mt-2 text-[12.5px] text-fg-3">
-            <span className="font-mono text-[11.5px] text-fg-2">{p.headRefName}</span> into <span className="font-mono text-[11.5px] text-fg-2">{p.baseRefName}</span> on{' '}
-            <span className="font-mono text-[11.5px] text-fg-2">{channel.github_repo}</span>
-            {deleteBranch ? ', then the branch is deleted.' : '.'} Runs gh pr merge and cannot be undone from here.
-          </div>
-          {(warnings.length > 0 || conflicting) && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {conflicting && <Chip tone="needs">Has conflicts</Chip>}
-              {warnings.map((w) => (
-                <Chip key={w} tone="needs">
-                  {w}
-                </Chip>
-              ))}
-            </div>
-          )}
-          <SlideToConfirm
-            className="mt-4"
-            label={conflicting ? 'Resolve conflicts first' : `Slide to ${MERGE_METHODS.find((m) => m.value === method)?.label.toLowerCase()}`}
-            busyLabel="Merging"
-            doneLabel="Merged"
-            disabled={conflicting}
-            onConfirm={doMerge}
-          />
-          {mergeError && <ErrorNote className="mt-3">{mergeError}</ErrorNote>}
-        </section>
-      )}
-      {merged && (
-        <div className="pop-in mt-5 flex items-start gap-2.5 rounded-[20px] bg-surface px-4 py-3 text-[13px] text-fg">
-          <StatusDot status="done" size={9} className="mt-1 shrink-0" />
-          <span className="whitespace-pre-wrap">{merged}</span>
-        </div>
-      )}
-
+      <PRMergePanel channel={channel} p={p} n={n} onMerged={q.reload} />
       <Tabs
         className="mt-6"
         value={tab}
@@ -282,67 +193,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
 
       <LinkChannel.Provider value={channel.id}>
         <div className="mt-4">
-          {tab === 'conversation' && (
-            <div className="space-y-4">
-              <div className="rounded-[20px] bg-surface px-5 py-4">
-                {ghBody(p.body) ? <Markdown text={ghBody(p.body)} /> : <div className="text-[13px] text-fg-3">No description.</div>}
-              </div>
-              {[...(p.reviews ?? []).filter((r) => r.body?.trim() || r.state !== 'COMMENTED').map((r) => ({ kind: 'review' as const, who: r.author?.login, at: r.submittedAt, body: r.body, state: r.state })),
-                ...(p.comments ?? []).map((c) => ({ kind: 'comment' as const, who: c.author?.login, at: c.createdAt, body: c.body, state: '' }))]
-                .sort((a, b) => ((a.at ?? '') < (b.at ?? '') ? -1 : 1))
-                .map((c, i) => (
-                  <div key={i} className="rounded-[20px] bg-surface">
-                    <div className="flex items-center gap-2 px-4 pt-3 text-[12.5px] text-fg-3">
-                      <Avatar name={c.who ?? '?'} size={22} />
-                      <span className="font-medium text-fg-2">{c.who ?? 'unknown'}</span>
-                      {c.kind === 'review' && <Chip tone={c.state === 'APPROVED' ? 'done' : c.state === 'CHANGES_REQUESTED' ? 'needs' : 'default'}>{c.state.toLowerCase().replace(/_/g, ' ')}</Chip>}
-                      {c.at && <span className="ml-auto font-num text-[11px] text-fg-4">{fullDate(c.at)}</span>}
-                    </div>
-                    {ghBody(c.body) && (
-                      <div className="px-4 pt-2 pb-3.5">
-                        <Markdown text={ghBody(c.body)} />
-                      </div>
-                    )}
-                  </div>
-                ))}
-            </div>
-          )}
-          {tab === 'checks' &&
-            (p.checkRuns.length ? (
-              <div className="overflow-hidden rounded-[20px] bg-surface p-1.5">
-                {p.checkRuns.map((c, i) => (
-                  <div key={i} className="flex h-10 items-center gap-2.5 rounded-2xl px-3 text-[13px]">
-                    <span className={`w-3 font-mono ${checkTone(c.state)}`}>{checkGlyph(c.state)}</span>
-                    <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                    <span className={`font-num text-[11px] ${checkTone(c.state)}`}>{c.state.toLowerCase().replace(/_/g, ' ') || 'pending'}</span>
-                    {c.url && (
-                      <IconLink href={c.url} icon="external" label="Open check" size={13} newTab />
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-[13px] text-fg-3">No checks on this PR.</div>
-            ))}
-          {tab === 'files' && (
-            <div className="overflow-hidden rounded-[20px] bg-surface p-1.5">
-              {(p.files ?? []).map((f) => (
-                <button
-                  type="button"
-                  key={f.path}
-                  onClick={() => setTab('diff')}
-                  className="hov flex h-9 w-full min-w-0 items-center gap-2 rounded-2xl px-3 text-left text-[12.5px] [--hov:var(--surface-2)]"
-                >
-                  <Icon name="file" size={13} className="text-fg-4" />
-                  <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{f.path}</span>
-                  <span className="font-num text-[11px] text-fg-2">+{f.additions}</span>
-                  <span className="font-num text-[11px] text-fg-3">-{f.deletions}</span>
-                </button>
-              ))}
-              {!p.files?.length && <div className="px-3.5 py-2 text-[13px] text-fg-3">No files.</div>}
-            </div>
-          )}
-          {tab === 'diff' && <DiffViewer diff={p.diff ?? ''} />}
+          <PRDetailTabBody tab={tab} p={p} onFiles={() => setTab('diff')} />
         </div>
       </LinkChannel.Provider>
     </div>
