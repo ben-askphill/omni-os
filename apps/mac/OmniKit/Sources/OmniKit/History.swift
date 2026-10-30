@@ -220,7 +220,7 @@ public struct History: Equatable, Sendable {
     }
 
     if floor > below.from {
-      let dropped = under.count { $0.kind == "result" && $0.id >= below.from }
+      let dropped = under.count(where: { $0.kind == "result" && $0.id >= below.from })
       below = Below(from: floor, results: below.results + dropped)
     }
     rows = under.filter { anchors.contains($0.id) } + kept
