@@ -5,13 +5,15 @@ import SwiftUI
 private struct KnownGlobalSecret: Identifiable {
   let name: String
   let help: String
+  /// Shown only once the server has a Grok Bot webhook URL.
+  var grok = false
   var id: String { name }
 }
 
 private let knownGlobalSecrets = [
   KnownGlobalSecret(name: "HERMES_API_KEY", help: "The Hermes API bearer token. Global. Sent on HTTP requests, not in a shell environment."),
-  KnownGlobalSecret(name: "GROKBOT_WEBHOOK_URL", help: "Grok Bot webhook URL from the Omni OS requests routine. Global. Send to Grok Bot posts here. Stays on the server."),
-  KnownGlobalSecret(name: "GROKBOT_WEBHOOK_AUTH", help: "Authorization value for that webhook, pasted as Grok Bot shows it. Global. Stays on the server."),
+  KnownGlobalSecret(name: "GROKBOT_WEBHOOK_URL", help: "Grok Bot webhook URL from the Omni OS requests routine. Global. Send to Grok Bot posts here. Stays on the server.", grok: true),
+  KnownGlobalSecret(name: "GROKBOT_WEBHOOK_AUTH", help: "Authorization value for that webhook, pasted as Grok Bot shows it. Global. Stays on the server.", grok: true),
 ]
 
 /// The Secrets tab, like the Web UI's Secrets page. A new model per client and per visit: it loads the list
@@ -23,7 +25,7 @@ struct SecretsSettings: View {
   var body: some View {
     Group {
       if let secrets {
-        SecretsForm(secrets: secrets, store: model.store.status?.server?.secretStore ?? .keychain)
+        SecretsForm(secrets: secrets, store: model.store.status?.server?.secretStore ?? .keychain, grokBot: model.store.status?.grokBot == true)
       } else {
         Loader(size: 18).frame(maxWidth: .infinity, maxHeight: .infinity).background(Tok.bg)
       }
@@ -45,6 +47,8 @@ struct SecretsForm: View {
   @Bindable var secrets: SecretsModel
   /// Where the server keeps the values.
   let store: SecretStore
+  /// The server has a Grok Bot webhook URL. Without it the form names nothing of Grok Bot.
+  var grokBot = false
   @State private var confirming: SecretRow?
   @FocusState private var valueFocused: Bool
 
@@ -52,7 +56,7 @@ struct SecretsForm: View {
     SettingsPage {
       SettingsIntro(
         icon: "lock",
-        text: Text("Values live in \(store.label)\(store == .file ? Text("") : Text(" under the service \(Text("omni-os").monospaced())")). A thread gets them as environment variables when it runs. A channel secret overrides a global one with the same name. Sync credentials and the Grok Bot webhook stay on the server, so a thread never sees them. Omni never shows a value again after you save it. To change one, save it again with the same name.")
+        text: Text("Values live in \(store.label)\(store == .file ? Text("") : Text(" under the service \(Text("omni-os").monospaced())")). A thread gets them as environment variables when it runs. A channel secret overrides a global one with the same name. Sync credentials\(grokBot ? " and the Grok Bot webhook" : "") stay on the server, so a thread never sees them. Omni never shows a value again after you save it. To change one, save it again with the same name.")
       )
 
       SettingsCard(title: "Add or replace") {
@@ -80,7 +84,7 @@ struct SecretsForm: View {
             .onSubmit { valueFocused = true }
           if secrets.name.isEmpty {
             VStack(alignment: .leading, spacing: z(6)) {
-              ForEach(knownGlobalSecrets) { known in
+              ForEach(knownGlobalSecrets.filter { !$0.grok || grokBot }) { known in
                 Button {
                   secrets.scope = .global
                   secrets.name = known.name

@@ -60,5 +60,6 @@
   "device": {
     "name": "Omni's Mac",
     "here": true
-  }
+  },
+  "grokBot": false
 }

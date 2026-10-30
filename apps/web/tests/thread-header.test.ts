@@ -12,7 +12,7 @@ const ALWAYS = ['Reference another thread', 'Thread actions', 'Interrupt', 'Arti
 
 const thread = (over: Partial<Thread> = {}) => ({ id: 't1', title: 'A thread', status: 'running', archived: 0, pinned_at: null, done_at: null, ...over }) as Thread;
 
-const render = (t: Thread) =>
+const render = (t: Thread, grok: { busy: boolean; run: () => void } | null = { busy: false, run: () => {} }) =>
   renderToStaticMarkup(
     createElement(HeaderActions, {
       thread: t,
@@ -23,7 +23,7 @@ const render = (t: Thread) =>
       onDone: () => {},
       onRestore: () => {},
       restoring: false,
-      grok: { busy: false, run: () => {} },
+      grok,
       interrupt: { busy: false, run: () => {} },
       panelOpen: true,
       onPanel: () => {},
@@ -50,5 +50,9 @@ describe('the thread header keeps the title wide when it is narrow', () => {
     const all = buttons(render(thread({ status: 'done' })));
     for (const name of ['Pin thread', 'Mark as done', 'Hand off to another Mac', 'Send to Grok Bot']) expect(all.find((b) => b.name === name)?.cls.split(' ')).toContain(FOLD);
     expect(all.find((b) => b.name === 'Thread actions')?.cls.split(' ')).toContain(UNFOLD);
+  });
+
+  it('leaves Send to Grok Bot out when the server has no webhook', () => {
+    expect(buttons(render(thread(), null)).map((b) => b.name)).not.toContain('Send to Grok Bot');
   });
 });

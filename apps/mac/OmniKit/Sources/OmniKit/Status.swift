@@ -159,9 +159,11 @@ public struct Status: Decodable, Hashable, Sendable {
   public let server: ServerInfo?
   /// Missing from older servers.
   public let device: DeviceInfo?
+  /// A Grok Bot webhook URL is set on the server. Without it the app hides Send to Grok Bot. False from older servers.
+  public let grokBot: Bool
 
   enum CodingKeys: String, CodingKey {
-    case usage, slots, running, queued, maxConcurrent, maxUploadMb, profile, server, device
+    case usage, slots, running, queued, maxConcurrent, maxUploadMb, profile, server, device, grokBot
   }
 
   public init(from decoder: any Decoder) throws {
@@ -176,6 +178,7 @@ public struct Status: Decodable, Hashable, Sendable {
     profile = try c.decodeIfPresent(Profile.self, forKey: .profile)
     server = try c.decodeIfPresent(ServerInfo.self, forKey: .server)
     device = try c.decodeIfPresent(DeviceInfo.self, forKey: .device)
+    grokBot = try c.decodeIfPresent(Bool.self, forKey: .grokBot) ?? false
   }
 }
 

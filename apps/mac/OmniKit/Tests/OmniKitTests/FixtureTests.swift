@@ -176,6 +176,7 @@ private struct DeliveryRefusal: Decodable {
     #expect(status.server?.dataDir.isEmpty == false)
     #expect(status.device?.name == "Omni's Mac" && status.device?.here == true)
     #expect(status.server?.secretStore == .keychain)
+    #expect(status.grokBot == false)
 
     let channels = try decodeFixture([ChannelWithRunning].self, "channels.json")
     #expect(channels.map(\.kind).contains(.system))

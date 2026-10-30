@@ -122,4 +122,4 @@ A thread with an open PR can watch its checks and its reviews: **Watch PR** in t
 
 ## Send to Grok Bot
 
-The thread header and the right-click menu send the title and the messages. On a phone, Thread options has the same action. The context is the channel id and the thread id. The Conductor tool is `send_to_grok_bot`. Where the webhook URL and Authorization value go: [Configuration](configuration.md#grok-bot).
+The thread header and the right-click menu send the title and the messages. On a phone, Thread options has the same action. The context is the channel id and the thread id. The Conductor tool is `send_to_grok_bot`. The action shows only on a server with a Grok Bot webhook URL. Where the webhook URL and Authorization value go: [Configuration](configuration.md#grok-bot).

@@ -87,7 +87,7 @@ export function ContextMenuHost() {
 
 function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; onTakeOver: (threadId: string, takeover: Takeover) => void }) {
   const { target } = open;
-  const { channel, reloadChannels, setPinned, setDone } = useApp();
+  const { channel, reloadChannels, setPinned, setDone, status } = useApp();
   const route = useRoute();
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: open.x, y: open.y });
@@ -265,7 +265,7 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
           ...(takeover && mayTakeOver(takeover, handoff)
             ? [{ label: `Take over from ${takeover.from.name}`, icon: 'download' as const, run: () => onTakeOver(target.id, takeover) }]
             : []),
-          { label: 'Send to Grok Bot', icon: 'grok', run: () => void sendGrok() },
+          ...(status?.grokBot ? [{ label: 'Send to Grok Bot', icon: 'grok' as const, run: () => void sendGrok() }] : []),
           { label: archived ? 'Unarchive thread' : 'Archive thread', icon: 'archive', run: toggleArchive },
         ]
       : target.kind === 'folder'

@@ -174,3 +174,22 @@ describe('POST /api/grokbot', () => {
     expect((await post({ context: ['nope'] })).status).toBe(400);
   });
 });
+
+describe('GET /api/status grokBot', () => {
+  const grokBot = async () => ((await (await app.request('/api/status')).json()) as { grokBot?: boolean }).grokBot;
+
+  it('is false without a webhook URL, and true once the environment or a global secret has one', async () => {
+    expect(await grokBot()).toBe(false);
+    process.env[GROKBOT_WEBHOOK_URL] = '  ';
+    expect(await grokBot()).toBe(false);
+    process.env[GROKBOT_WEBHOOK_URL] = URL;
+    expect(await grokBot()).toBe(true);
+    delete process.env[GROKBOT_WEBHOOK_URL];
+    h.db.db.prepare('INSERT INTO secrets (scope, name) VALUES (?, ?)').run('global', GROKBOT_WEBHOOK_URL);
+    try {
+      expect(await grokBot()).toBe(true);
+    } finally {
+      h.db.db.prepare('DELETE FROM secrets WHERE scope = ? AND name = ?').run('global', GROKBOT_WEBHOOK_URL);
+    }
+  });
+});

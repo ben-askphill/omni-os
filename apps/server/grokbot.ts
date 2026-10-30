@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { events, threads } from './db.ts';
 import { GROKBOT_WEBHOOK_AUTH, GROKBOT_WEBHOOK_URL } from './harness/env-guard.ts';
-import { globalSecret } from './secrets.ts';
+import { globalSecret, hasSecret } from './secrets.ts';
 
 const SOURCE = 'omni-os';
 const TIMEOUT_MS = 15_000;
@@ -47,6 +47,14 @@ function speaker(kind: string): string {
       return unreachable;
     }
   }
+}
+
+/**
+ * Whether this machine has a Grok Bot webhook URL: a global secret or the environment. GET /api/status reports it
+ * as `grokBot`, and the clients hide Send to Grok Bot without it. Reads the names table, never the secret store.
+ */
+export function grokBotConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  return hasSecret('global', GROKBOT_WEBHOOK_URL) || !!env[GROKBOT_WEBHOOK_URL]?.trim();
 }
 
 /** Title plus the thread's messages. Null when there is nothing to send. Tool calls stay out. */

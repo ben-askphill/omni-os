@@ -62,9 +62,11 @@ Send to Grok Bot posts a thread's title and messages to a webhook. The context i
 
 The button is in the thread header on the Web UI and on the Mac app. A narrow desktop web header puts it in More. The same action is in the thread's right-click menu on both, and in Thread options on a phone. The Conductor calls `send_to_grok_bot`.
 
+The button and the menu items show only once `GROKBOT_WEBHOOK_URL` is set, as a global secret or in `.env`. `GET /api/status` reports this as `grokBot`. Without it nothing of Grok Bot shows.
+
 The URL and the Authorization value come from the Omni OS requests routine, on Grok Bot's Routines tab. Paste each one in either place.
 
-1. Settings, Secrets, scope Global. On the Web UI, Known global secrets lists `GROKBOT_WEBHOOK_URL` and `GROKBOT_WEBHOOK_AUTH`. The phone opens that same page. On the Mac app, Settings > Secrets shows Use GROKBOT_WEBHOOK_URL and Use GROKBOT_WEBHOOK_AUTH while the name field is empty.
+1. Settings, Secrets, scope Global. Type `GROKBOT_WEBHOOK_URL` as the name and paste the URL, then do the same for `GROKBOT_WEBHOOK_AUTH`. Once the URL is saved, Known global secrets on the Web UI (the phone opens the same page) lists both names, and the Mac app's Settings > Secrets offers Use GROKBOT_WEBHOOK_URL and Use GROKBOT_WEBHOOK_AUTH while the name field is empty.
 2. `.env`, as a fallback when the secret store has no value for that name. Copy the empty lines from `.env.example` and fill them in. An empty value leaves Grok Bot off. `.env` stays untracked.
 
 When both are set, Omni uses the secret store's value. `GROKBOT_WEBHOOK_URL` is the routine's URL. `GROKBOT_WEBHOOK_AUTH` can be the bare key or a value that already starts with `Bearer `. Either form works. Omni leaves both values out of the log. A thread's harness and its terminal run without them.
