@@ -440,8 +440,6 @@ public enum ContinueRules {
     return nil
   }
 
-  /// The line under the message box when it starts with a slash command, which runs first: the Carryover then goes
-  /// with the next message, as a run switch's handover does. Nil otherwise.
   /// A history entry as a preview row shows it beside its label (`entryText`): without the speaker tag, and a tool
   /// call without its list dash. A crew report and an earlier Carryover keep theirs.
   public static func entryText(_ e: CarryoverEntry) -> String {
@@ -453,8 +451,10 @@ public enum ContinueRules {
     return e.text.replacingOccurrences(of: #"^\[[^\]\n]*\] "#, with: "", options: .regularExpression)
   }
 
+  /// The line under the message box when it starts with a slash command, leading spaces aside (`slashHint`), which
+  /// runs first: the Carryover then goes with the next message, as a run switch's handover does. Nil otherwise.
   public static func slashHint(_ text: String) -> String? {
-    text.hasPrefix("/") ? "A slash command runs first. The carryover goes with your next message." : nil
+    text.drop(while: \.isWhitespace).hasPrefix("/") ? "A slash command runs first. The carryover goes with your next message." : nil
   }
 
   /// "12.3k of 24k characters".
