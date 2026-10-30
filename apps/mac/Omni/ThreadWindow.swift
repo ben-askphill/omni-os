@@ -122,8 +122,9 @@ struct CopyThreadMarkdownCommand: View {
 }
 
 extension View {
-  /// Open in New Window in the context menu, and on an Option-click.
-  /// - Parameter stub: a sidebar row's thread, which also gets "Move to Folder".
+  /// Open in New Window and the thread's actions (packages/shared/thread-actions.ts) in the context menu, and Open in
+  /// New Window on an Option-click.
+  /// - Parameter stub: a sidebar row's thread, which gives the menu its state: pin, done, move, fork and reference.
   /// - Parameter archived: the thread is archived, so the menu offers Unarchive.
   func openInNewWindow(_ threadID: String, model: AppModel? = nil, title: String = "", stub: ThreadStub? = nil, archived: Bool = false) -> some View {
     modifier(OpenInNewWindow(threadID: threadID, model: model, title: title, stub: stub, archived: archived))
@@ -132,7 +133,7 @@ extension View {
 
 private struct OpenInNewWindow: ViewModifier {
   let threadID: String
-  /// With a model the menu also archives the thread.
+  /// With a model the menu also has the thread's actions.
   let model: AppModel?
   /// The thread's title, which the rename alert starts from.
   let title: String
@@ -143,41 +144,21 @@ private struct OpenInNewWindow: ViewModifier {
   @State private var draft = ""
   @State private var grokNote = ""
   @State private var showingGrokNote = false
+  /// The thread Fork thread continues, once its detail has come.
+  @State private var forking: OmniThread?
+  @State private var referencing: ReferencePick?
 
   func body(content: Content) -> some View {
     content
       .contextMenu {
         Button("Open in New Window") { openWindow(id: ThreadWindow.id, value: threadID) }
         if let model {
-          Divider()
-          Button("Rename Thread...") {
-            draft = title
-            renaming = true
-          }
-          // Archived threads are out of the lists, so out of Pinned too. Pinning needs the row; unpinning only the id.
-          if !archived, let pin = model.store.pinned.first(where: { $0.id == threadID }) ?? stub {
-            let on = model.store.pinned.contains { $0.id == threadID }
-            Button(on ? "Unpin Thread" : "Pin Thread") { Task { await model.setThreadPinned(pin, !on) } }
-          }
-          // A running thread brings its own result; done waits until it ends.
-          if !archived, let stub, stub.canMarkDone {
-            let done = stub.doneAt != nil
-            Button(done ? "Mark as Not Done" : "Mark as Done") { Task { await model.setThreadDone(threadID, !done) } }
-          }
-          if let stub { MoveToFolderMenu(model: model, thread: stub) }
-          HandOffMenu(model: model, threadID: threadID)
-          TakeOverItem(model: model, threadID: threadID)
-          if model.store.status?.grokBot == true {
-            Button {
-              Task {
-                grokNote = await grokBotResult(model, threadID)
-                showingGrokNote = true
-              }
-            } label: {
-              Label { Text("Send to Grok Bot") } icon: { OmniIcon(name: "grok") }
+          // The groups and items of packages/shared/thread-actions.ts, as the Web UI's menus list them.
+          ForEach(SlashEngine.shared.threadMenu(facts(model))) { group in
+            Section(group.title) {
+              ForEach(group.items) { menuItem(model, $0) }
             }
           }
-          Button(archived ? "Unarchive Thread" : "Archive Thread") { Task { await model.setThreadArchived(threadID, !archived) } }
         }
       }
       .alert("Rename Thread", isPresented: $renaming) {
@@ -192,8 +173,87 @@ private struct OpenInNewWindow: ViewModifier {
       } message: {
         Text(grokNote)
       }
+      .sheet(item: $forking) { thread in
+        if let model { ContinueSheet(model: model, thread: thread) }
+      }
+      .popover(item: $referencing, arrowEdge: .trailing) { pick in
+        ThreadReferencePanel(picker: pick.picker) { referencing = nil }
+      }
       .simultaneousGesture(
         TapGesture().modifiers(.option).onEnded { openWindow(id: ThreadWindow.id, value: threadID) }
       )
   }
+
+  /// The row the menu acts on: the sidebar's, the pinned one, or the open thread's.
+  private func row(_ model: AppModel) -> ThreadStub? {
+    stub ?? model.store.pinned.first { $0.id == threadID } ?? model.threads.store(threadID)?.thread.map { ThreadStub($0) }
+  }
+
+  /// What the menu knows. Where the turn runs comes only from the thread's open store, so a row whose thread is not
+  /// open leaves Hand Off and Take Over out.
+  private func facts(_ model: AppModel) -> ThreadMenuFacts {
+    var f = ThreadMenuFacts(
+      stub: row(model), archived: archived, pinned: model.store.pinned.contains { $0.id == threadID }, grokBot: model.store.status?.grokBot == true)
+    let store = model.threads.store(threadID)
+    f.handOff = model.devices.targets(store) != nil
+    if let store, store.canTakeOver { f.takeOverFrom = store.takeover?.from.name }
+    return f
+  }
+
+  @ViewBuilder
+  private func menuItem(_ model: AppModel, _ item: ThreadMenuItem) -> some View {
+    switch item.id {
+    case .pin:
+      if let pin = row(model) {
+        let on = model.store.pinned.contains { $0.id == threadID }
+        Button(item.label) { Task { await model.setThreadPinned(pin, !on) } }
+      }
+    case .done:
+      Button(item.label) { Task { await model.setThreadDone(threadID, row(model)?.doneAt == nil) } }
+    case .rename:
+      Button(item.label) {
+        draft = title
+        renaming = true
+      }
+    case .move:
+      if let row = row(model) { MoveToFolderMenu(model: model, thread: row, title: item.label) }
+    case .archive:
+      Button(item.label) { Task { await model.setThreadArchived(threadID, !archived) } }
+    case .fork:
+      Button {
+        Task { forking = try? await model.client.thread(threadID).thread }
+      } label: {
+        Text(item.label)
+        if let off = item.off { Text(off) }
+      }
+      .disabled(item.off != nil)
+    case .reference:
+      if let row = row(model) {
+        Button(item.label) {
+          let draft = model.threads.store(threadID)?.draftContext ?? DraftContextModel(threadID: threadID)
+          referencing = ReferencePick(
+            picker: ThreadReferencePicker(threadID: threadID, channelID: row.channelID, api: model.client, draft: draft))
+        }
+      }
+    case .handOff:
+      HandOffMenu(model: model, threadID: threadID, title: item.label)
+    case .takeOver:
+      TakeOverItem(model: model, threadID: threadID, title: item.label)
+    case .grok:
+      Button {
+        Task {
+          grokNote = await grokBotResult(model, threadID)
+          showingGrokNote = true
+        }
+      } label: {
+        Label { Text(item.label) } icon: { OmniIcon(name: item.icon) }
+      }
+    }
+  }
+}
+
+/// The thread reference picker the right-click opens, for a thread whose header may not be on screen.
+private struct ReferencePick: Identifiable {
+  let id = UUID()
+  let picker: ThreadReferencePicker
 }
