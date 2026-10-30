@@ -143,6 +143,14 @@ public struct Attachment: Decodable, Hashable, Sendable {
   /// Renders as an image in the transcript.
   public let image: Bool
 
+  public init(name: String, path: String, size: Int, mime: String, image: Bool) {
+    self.name = name
+    self.path = path
+    self.size = size
+    self.mime = mime
+    self.image = image
+  }
+
   /// The largest a thumbnail shows, as `max-h-44 max-w-[14rem]` in Transcript.tsx.
   public static let thumbnailBox = CGSize(width: 224, height: 176)
 }

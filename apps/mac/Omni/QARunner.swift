@@ -268,9 +268,19 @@ final class QARunner {
           guard let composer = QAComposerProbe.current else { throw QAScriptError("no reply box is showing") }
           try composer.run(run)
           try? await Task.sleep(for: .milliseconds(800))
-        case .send(let mode):
+        case .send(let mode, let wait):
           guard let composer = QAComposerProbe.current else { throw QAScriptError("no reply box is showing") }
-          try await composer.send(mode)
+          if wait {
+            try await composer.send(mode)
+          } else {
+            Task { try? await composer.send(mode) }
+            try? await Task.sleep(for: .milliseconds(300))
+          }
+        case .attach(let path):
+          guard let composer = QAComposerProbe.current else { throw QAScriptError("no reply box is showing") }
+          guard let file = StagedFile.at(URL(fileURLWithPath: path)) else { throw QAScriptError("no file at \(path)") }
+          composer.attach(file)
+          try? await Task.sleep(for: .milliseconds(300))
         case .inspector(let command):
           guard let inspect = InspectorProbe.command else { throw QAScriptError("no thread is open") }
           inspect(command)
@@ -546,7 +556,8 @@ final class QARunner {
     case .nativeBrowser(let address): "nativeBrowser \(address.prefix(60))"
     case .type(let text): "type \(text.prefix(40))"
     case .run(let run): "run \(run.harness.rawValue) \(run.model) \(run.effort)"
-    case .send(let mode): "send \(mode?.rawValue ?? "reply")"
+    case .send(let mode, _): "send \(mode?.rawValue ?? "reply")"
+    case .attach(let path): "attach \((path as NSString).lastPathComponent)"
     case .inspector(let command): "inspector \(command.rawValue)"
     case .webTitle(let title): "webTitle \(title)"
     case .channel(let action): "channel \(action.rawValue)"

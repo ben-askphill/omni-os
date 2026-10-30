@@ -18,7 +18,7 @@ struct ReplyComposerHost: View {
   }
 
   var body: some View {
-    let reply = box.model ?? ReplyComposerModel(threadID: store.id, api: model.client, context: store.draftContext)
+    let reply = box.model ?? ReplyComposerModel(threadID: store.id, api: model.client, context: store.draftContext, outgoing: store.sending)
     box.model = reply
     let menu = box.menu ?? SlashMenuModel(
       commands: SlashCommandsStore(api: model.client, source: .thread(store.id)),
@@ -210,7 +210,8 @@ private struct ReplyComposerView: View {
           guard reply.canSend else { throw QAScriptError("the reply box has nothing to send") }
           guard let t = await reply.send(mode: mode) else { throw QAScriptError(reply.sendError ?? "the send failed") }
           store.merge(t, isReply: true)
-        })
+        },
+        attach: { reply.addFiles([$0]) })
     }
     .onDisappear { QAComposerProbe.current = nil }
     #endif
@@ -626,6 +627,7 @@ enum QAComposerProbe {
     let setText: (String) -> Void
     let run: (Run) throws(QAScriptError) -> Void
     let send: (SendMode?) async throws(QAScriptError) -> Void
+    let attach: (StagedFile) -> Void
   }
 
   static var current: Hooks?

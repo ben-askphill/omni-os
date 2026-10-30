@@ -128,7 +128,7 @@ public enum QAServerAction: String, Hashable, Sendable {
 /// `{"appearance": "dark"}` (or `light`), `{"scroll": "top"}` (or `bottom`, `through`, `nudge`, `earlier`, `gap`), `{"expand": true}`, `{"meter": true}`, `{"modelPicker": true}` (or a search, `"cursor"`), `{"foldAll": true}`,
 /// `{"imageZoom": 2}` (or `"fit"`), `{"nativeBrowser": "<url>"}`, `{"editPending": "text"}`, `{"webhookSecret": "<automation id>"}`, `{"searchHit": 0}`, `{"subagent": 0}`,
 /// `{"deliveries": "<automation id>"}` (or `{"automation": "<id>", "open": "failed", "older": true}`),
-/// `{"type": "text"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`), `{"inspector": "artifacts"}` (or
+/// `{"type": "text"}`, `{"attach": "<path>"}`, `{"send": "reply"}` (or `steer`, `queue`, `interrupt`, or `{"mode": "reply", "wait": false}`), `{"inspector": "artifacts"}` (or
 /// `changes`, `turn`, `browser`, `web`, `terminal`, `actions`, `details`, `open`, `close`), `{"webTitle": "BLOCKED"}`, `{"palette": "query"}` (or `false`), `{"channel": "create"}` (or `edit`, `archive`, `unarchive`),
 /// `{"folder": {"new": "<channel id>"}}` (or `{"new": "<channel id>", "name": "<folder>"}` to make it, `{"rename": "<folder>"}`, `{"delete": "<folder>"}`, `{"here": "<folder>"}`,
 /// `{"drag": "<thread title>", "over": "<folder>"}`, `{"file": "<thread title>", "into": "<folder>"}`,
@@ -195,8 +195,11 @@ public enum QAStep: Hashable, Sendable {
   case nativeBrowser(String)
   /// Puts text in the reply box, as if typed.
   case type(String)
-  /// Sends the reply box: nil is a plain reply, else the mode of the split button.
-  case send(SendMode?)
+  /// Sends the reply box: nil is a plain reply, else the mode of the split button. Without `wait`, the next step
+  /// runs while the send is still going, to snapshot the message on its way.
+  case send(SendMode?, wait: Bool = true)
+  /// Stages this file in the reply box, as the paperclip, a drop or a paste does.
+  case attach(String)
   /// Changes the next run through the same callback as the reply box pickers.
   case run(Run)
   /// Opens or closes the thread inspector, or picks its tab.
@@ -330,7 +333,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "searchHit", "subagent", "imageZoom", "nativeBrowser", "type", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "prMenu", "handOff", "takeOver", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "browserAddress", "openContext", "referenceThread", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "searchHit", "subagent", "imageZoom", "nativeBrowser", "type", "attach", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "prMenu", "handOff", "takeOver", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "browserAddress", "openContext", "referenceThread", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -434,10 +437,14 @@ public struct QAScript: Hashable, Sendable {
         let model = d["model"] as? String else { throw QAScriptError("run takes harness, model and optional effort") }
       return .run(Run(harness: HarnessID(rawValue: harness), model: model, effort: d["effort"] as? String ?? ""))
     case "send":
-      guard let name = value as? String, ["reply", "steer", "queue", "interrupt"].contains(name) else {
-        throw QAScriptError("send takes reply, steer, queue or interrupt")
+      let d = value as? [String: Any]
+      guard let name = (d?["mode"] ?? value) as? String, ["reply", "steer", "queue", "interrupt"].contains(name) else {
+        throw QAScriptError(#"send takes reply, steer, queue or interrupt, or {"mode": "reply", "wait": false}"#)
       }
-      return .send(name == "reply" ? nil : SendMode(rawValue: name))
+      return .send(name == "reply" ? nil : SendMode(rawValue: name), wait: d?["wait"] as? Bool ?? true)
+    case "attach":
+      guard let path = value as? String, !path.isEmpty else { throw QAScriptError("attach takes the path of a file") }
+      return .attach(path)
     case "inspector":
       guard let name = value as? String, let to = QAInspector(rawValue: name) else {
         throw QAScriptError("inspector takes open, close, artifacts, changes, turn, browser, web, terminal, actions or details")

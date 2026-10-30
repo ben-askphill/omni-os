@@ -101,7 +101,8 @@ private struct NewThreadBox: View {
           guard composer.canSend else { throw QAScriptError("the new thread box has nothing to send") }
           guard let t = await composer.send() else { throw QAScriptError(composer.sendError ?? "the send failed") }
           model.route = .thread(id: t.id)
-        })
+        },
+        attach: { composer.addFiles([$0]) })
     }
     .onDisappear {
       if QAComposerProbe.owner == ObjectIdentifier(composer) { QAComposerProbe.current = nil }

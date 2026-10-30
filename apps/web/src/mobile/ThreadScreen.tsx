@@ -2,7 +2,8 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from '
 import { api, errorText, useApi, type Artifact, type BackgroundTask, type BranchChanges, type PendingMsg, type Thread } from '../api.ts';
 import { harnessLabel, OmniMark } from '../components/brand.tsx';
 import { Markdown } from '../components/Markdown.tsx';
-import { SwitchLine } from '../components/Transcript.tsx';
+import { Attachments, SwitchLine } from '../components/Transcript.tsx';
+import { useSending } from '../sending.ts';
 import { ASKING_LABEL, QuestionCard } from '../components/thread/QuestionCard.tsx';
 import { PRWakeList } from '../components/thread/PRWatch.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
@@ -233,6 +234,7 @@ function Pending({ thread, items, onPending }: { thread: Thread; items: PendingM
       {items.map((m) => (
         <div key={m.uuid} className="flex flex-col items-end gap-1.5 opacity-75">
           <span className="text-[12px] leading-[1.3] text-fg-3">{parkedLabel(m) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent')}</span>
+          {m.attachments?.length ? <Attachments threadId={thread.id} items={m.attachments} /> : null}
           <ContextChips records={m.context} align="end" className="w-full max-w-[86%]" />
           {(m.text || !hasContext(m.context)) && (
             <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">{m.text}</div>
@@ -253,6 +255,38 @@ function Pending({ thread, items, onPending }: { thread: Thread; items: PendingM
           )}
         </div>
       ))}
+    </>
+  );
+}
+
+/** Ben's replies still on their way to the server, with the files he picked, until it lists them (sending.ts). */
+function Sending({ threadId, pending }: { threadId: string; pending: PendingMsg[] }) {
+  const items = useSending(threadId, pending);
+  // Ben just sent it: bring it into view, wherever he had scrolled to.
+  const last = useRef<HTMLDivElement>(null);
+  const newest = items[items.length - 1]?.request_id;
+  useEffect(() => {
+    const el = last.current;
+    if (!newest || !el) return;
+    const show = () => el.scrollIntoView({ block: 'end' });
+    show();
+    // Its pictures load after it lands, and grow it.
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(show);
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [newest]);
+  return (
+    <>
+      {items.map((m) => {
+        const urls = new Map(m.files.map((f) => [f.attachment.name, f.url]));
+        return (
+          <div key={m.request_id} ref={m.request_id === newest ? last : undefined} className="flex flex-col items-end gap-1.5 opacity-75">
+            <span className="text-[12px] leading-[1.3] text-fg-3">Sending</span>
+            {m.files.length ? <Attachments threadId={threadId} items={m.files.map((f) => f.attachment)} href={(a) => urls.get(a.name) ?? ''} /> : null}
+            {m.text && <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">{m.text}</div>}
+          </div>
+        );
+      })}
     </>
   );
 }
@@ -633,14 +667,14 @@ export function ThreadScreen() {
                                   ? 'Sent while it ran'
                                   : undefined
                           }
-                          above={<ContextChips records={p.context} align="end" className="w-full max-w-[86%]" />}
-                        >
-                          {p.text || p.attachments?.length || !hasContext(p.context) ? (
+                          above={
                             <>
-                              {p.text}
-                              {p.attachments?.length ? <span className="text-fg-3"> · {plural(p.attachments.length, 'file')}</span> : null}
+                              {p.attachments?.length ? <Attachments threadId={thread.id} items={p.attachments} /> : null}
+                              <ContextChips records={p.context} align="end" className="w-full max-w-[86%]" />
                             </>
-                          ) : null}
+                          }
+                        >
+                          {p.text || !hasContext(p.context) ? p.text : null}
                           {p.items?.length ? <PRWakeList items={p.items} more={p.more} /> : null}
                         </MoBubble>
                         <ClippedNote event={p.key} clipped={p.clipped} className="-mt-2.5 justify-end" />
@@ -678,6 +712,7 @@ export function ThreadScreen() {
                   setQueued(r.pending);
                 }} />}
             {queued.length > 0 && <Pending thread={thread} items={queued} onPending={setQueued} />}
+            <Sending threadId={thread.id} pending={queued} />
             {actionError && <ErrorNote>{actionError}</ErrorNote>}
           </div>
         </HistoryCtx.Provider>

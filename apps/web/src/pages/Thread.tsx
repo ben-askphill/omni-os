@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, errorText, useApi, type HarnessWithRunning, type ModStatus, type SendMode, type Thread } from '../api.ts';
 import { ReplyComposer } from '../components/Composer.tsx';
-import { QueuedMessages, Transcript } from '../components/Transcript.tsx';
+import { QueuedMessages, SendingMessages, Transcript } from '../components/Transcript.tsx';
 import { LinkChannel } from '../link-previews.ts';
 import { ThreadIdCtx } from '../components/thread/ToolOutput.tsx';
 import { ArtifactsTab } from '../components/thread/panel/ArtifactsTab.tsx';
@@ -403,6 +403,7 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
               />
               <HandoffCard thread={thread} handoff={handoff} onChanged={handedOff} />
               <QueuedMessages items={queued} starting={betweenTurns} threadId={id} onPending={setQueued} setup={thread.setup} canSteer={canSteer(thread.harness, harnesses)} />
+              <SendingMessages threadId={id} pending={queued} />
               {!queued.length && (
                 <NextThreadCard
                   thread={thread}

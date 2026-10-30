@@ -13,6 +13,7 @@ import { QuestionCard } from './thread/QuestionCard.tsx';
 import { Markdown } from './Markdown.tsx';
 import { Button, CheckItem, copyText, Icon, IconButton, Loader, Modal, StatusDot, StatusPill, Ticks } from './ui.tsx';
 import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf, requestIdFor } from '../requests.ts';
+import { useSending } from '../sending.ts';
 import { canMove, canSteerNow, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE, type EditDraft } from '../pending-edits.ts';
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
@@ -362,21 +363,25 @@ function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; 
 
 // ---------- other items ----------
 
-/** What Ben attached to a message: images as thumbnails that open full size, everything else as a download. */
-export function Attachments({ threadId, items }: { threadId: string; items: Attachment[] }) {
+/**
+ * What Ben attached to a message: images as thumbnails that open full size, everything else as a download.
+ * `href` stands in for the server's copy while a message is still on its way (sending.ts).
+ */
+export function Attachments({ threadId, items, href }: { threadId: string; items: Attachment[]; href?: (a: Attachment) => string }) {
   const [open, setOpen] = useState<Attachment | null>(null);
   if (!items.length) return null;
+  const src = (a: Attachment, download = false) => href?.(a) ?? uploadUrl(threadId, a, download);
   return (
     <div className="mb-1.5 flex flex-wrap justify-end gap-1.5">
       {items.map((a) =>
         a.image ? (
           <button key={a.name} type="button" onClick={() => setOpen(a)} className="press overflow-hidden rounded-2xl bg-surface p-1" title={`${a.name} · ${bytes(a.size)}`}>
-            <img src={uploadUrl(threadId, a)} alt={a.name} loading="lazy" className="max-h-44 w-auto max-w-[14rem] rounded-xl object-cover shadow-[inset_0_0_0_1px_var(--line)]" />
+            <img src={src(a)} alt={a.name} loading="lazy" className="max-h-44 w-auto max-w-[14rem] rounded-xl object-cover shadow-[inset_0_0_0_1px_var(--line)]" />
           </button>
         ) : (
           <a
             key={a.name}
-            href={uploadUrl(threadId, a, true)}
+            href={src(a, true)}
             download={a.name}
             className="hov flex h-11 max-w-[16rem] items-center gap-2 rounded-2xl bg-surface px-2 text-[12.5px] [--hov:var(--surface-2)]"
             title={`${a.name} · ${bytes(a.size)}`}
@@ -407,7 +412,7 @@ export function Attachments({ threadId, items }: { threadId: string; items: Atta
       >
         {open && (
           <div className="bg-surface-2">
-            <img src={uploadUrl(threadId, open)} alt={open.name} className="mx-auto max-h-[78vh] w-auto" />
+            <img src={src(open)} alt={open.name} className="mx-auto max-h-[78vh] w-auto" />
           </div>
         )}
       </Modal>
@@ -518,7 +523,7 @@ export function QueuedMessages({
     const d = drafts.find((x) => x.uuid === m.uuid && x.status !== 'stale');
     if (d) return <EditBox key={m.uuid} draft={d} label={label} actions={actions} />;
     return (
-      <PendingBubble key={m.uuid} m={m} label={label} icon={icon}>
+      <PendingBubble key={m.uuid} m={m} label={label} icon={icon} threadId={threadId}>
         <PendingActions m={m} actions={actions}>
           {extra}
         </PendingActions>
@@ -541,7 +546,7 @@ export function QueuedMessages({
         ) : threadId && isEditable(m) ? (
           ownRow(m, setup ? SETUP_LABEL : pendingLabel(m, false), 'clock')
         ) : (
-          <PendingBubble key={m.uuid ?? i} m={m} label={setup ? SETUP_LABEL : pendingLabel(m, m === lead)} icon={m.state === 'sent' ? 'send' : 'clock'} />
+          <PendingBubble key={m.uuid ?? i} m={m} label={setup ? SETUP_LABEL : pendingLabel(m, m === lead)} icon={m.state === 'sent' ? 'send' : 'clock'} threadId={threadId} />
         ),
       )}
       {parked.length > 0 && threadId && <ParkedMessages threadId={threadId} items={parked} onPending={onPending} row={ownRow} busy={busy} setup={setup} />}
@@ -716,14 +721,54 @@ function StaleEdit({ threadId, draft: d, onClose }: { threadId: string; draft: E
   );
 }
 
-function PendingBubble({ m, label, icon, children }: { m: PendingMsg; label: string; icon: 'send' | 'clock' | 'alert'; children?: ReactNode }) {
+/** Ben's replies still on their way to the server, shown with the files he picked until it lists them (sending.ts). */
+export function SendingMessages({ threadId, pending }: { threadId: string; pending: readonly PendingMsg[] }) {
+  const items = useSending(threadId, pending);
+  if (!items.length) return null;
+  return (
+    <div className="mt-5 flex flex-col gap-3">
+      {items.map((m) => {
+        const urls = new Map(m.files.map((f) => [f.attachment.name, f.url]));
+        return (
+          <PendingBubble
+            key={m.request_id}
+            m={{ text: m.text, attachments: m.files.map((f) => f.attachment) }}
+            label="Sending"
+            icon="send"
+            threadId={threadId}
+            href={(a) => urls.get(a.name) ?? ''}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function PendingBubble({
+  m,
+  label,
+  icon,
+  threadId,
+  href,
+  children,
+}: {
+  m: Pick<PendingMsg, 'text' | 'attachments' | 'context'>;
+  label: string;
+  icon: 'send' | 'clock' | 'alert';
+  /** Shows the files themselves, as on a sent message. Without it, only how many. */
+  threadId?: string;
+  href?: (a: Attachment) => string;
+  children?: ReactNode;
+}) {
+  const files = m.attachments ?? [];
   return (
     <div className="flex flex-col items-end">
       <div className="flex w-full flex-col items-end opacity-70">
         <div className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-fg-3">
           <Icon name={icon} size={12} /> {label}
-          {m.attachments?.length ? <span className="text-fg-4">· {plural(m.attachments.length, 'file')}</span> : null}
+          {files.length && !threadId ? <span className="text-fg-4">· {plural(files.length, 'file')}</span> : null}
         </div>
+        {threadId && files.length ? <Attachments threadId={threadId} items={files} href={href} /> : null}
         <ContextChips records={m.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
         {(m.text || !hasContext(m.context)) && (
           <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
