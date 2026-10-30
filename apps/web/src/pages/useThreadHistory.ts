@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { appendLive, emptyHistory, tailId, type History, type HistoryPage } from '@omni/shared/history.ts';
+import { appendLive, boundHistory, emptyHistory, tailId, type History, type HistoryPage } from '@omni/shared/history.ts';
 import { api, type HistoryEvent, type ThreadOpen } from '../api.ts';
 import { headOf, historyLoader, joinSnapshot, opening } from '../thread-history.ts';
 
@@ -43,6 +43,11 @@ export function useThreadHistory(threadId: string) {
     },
     [update],
   );
+  /**
+   * Whether the view follows the newest row. While it does, live rows past RETAIN drop the oldest held rows (#411);
+   * while Ben reads older rows, only the hard limit does. The view sets it.
+   */
+  const follows = useRef<() => boolean>(() => true);
   const pending = useRef<HistoryEvent[]>([]);
   const frame = useRef<number | undefined>(undefined);
   /** Rows from the live stream. Streams arrive in bursts; they go in once per frame instead of once per row. */
@@ -54,7 +59,7 @@ export function useThreadHistory(threadId: string) {
         frame.current = undefined;
         const batch = pending.current;
         pending.current = [];
-        update((h) => appendLive(h, batch));
+        update((h) => boundHistory(appendLive(h, batch), follows.current()));
       });
     },
     [update],
@@ -79,7 +84,7 @@ export function useThreadHistory(threadId: string) {
   );
 
   return useMemo(
-    () => ({ history, lastId, prepare, open, append, snapshot, ...loader }),
+    () => ({ history, lastId, follows, prepare, open, append, snapshot, ...loader }),
     // `version` re-renders the controls when a load starts, lands or fails.
     [history, version, prepare, open, append, snapshot, loader], // eslint-disable-line react-hooks/exhaustive-deps
   );

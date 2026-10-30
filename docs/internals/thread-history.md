@@ -87,6 +87,16 @@ Both clients hold one `History` and fold it with its spans (`buildItems(events, 
 - Mac: `.scrollTargetLayout()` alone did not hold the row. At the top edge the lazy stack keeps its offset and the page pushes the row down, so `holdsTopRow` (`TranscriptAnchor.swift`) scrolls it back after the layout.
 - A reveal (`?at=` on the web, `ThreadStoreRegistry.reveal` on the Mac) reads from the start of the hit's turn, so the hit's group folds as it would in the full thread.
 
+## A thread held open
+
+Live rows only add, so a thread left open while its agent works would hold every row it streamed (#411). After each live batch, `boundHistory` (`History.bound` on the Mac) checks `RETAIN`: once the client holds more than `rows + slack` (2,000) rows while Ben follows the newest, or `hard` (6,000) while he reads older ones, it drops the oldest down to 1,500. The cut goes at a turn start and keeps the anchors a head page would carry (parent calls, the newest `init` and `result`). The head span starts at the cut, `below` counts the dropped results, and "Earlier messages" loads them back. The slack makes it a step every 500 rows, not one per frame, which matters on the Mac: a span change lays the transcript out again.
+
+The view says whether it follows: `useTranscriptScroll`'s `following` on the desktop, the newest turn being on screen on the phone, `ScrollPin.isPinned` on the Mac. Each sets `follows` on the history (`useThreadHistory`, `ThreadStore`).
+
+The web fold still runs over every held row each frame, but no longer redoes the work for rows that did not change. `buildItems` parses each row's payload once (a `WeakMap` by row), and the transcript passes each fold through `keepSame`, which keeps an item the previous fold made when it is equal, so its memoized `ItemRow` skips rendering. The Mac's `Transcript.update` already lays out only the new tail.
+
+`apps/web/tests/live-history.test.ts` streams 320 turns into an open thread and checks the bound, the turn count, the fold against the whole thread's, and loading the dropped rows back. `apps/web/tests/live-history-measure.test.ts` times each frame (`OMNI_MEASURE=1`, see its header). With the same 320 turns (13,764 rows), the last frames went from 0.8 ms to append, 10 ms to fold and 34 to 48 ms to render the desktop transcript, with 14,026 rows held and the heap growing from 54 to 264 MiB, to 0.02 ms, 0.2 ms and 1 ms, with 1,507 rows held and the heap ending at 85 MiB.
+
 ## Tool output
 
 A tool's output is the bulk of a thread, and a client only needs it once Ben opens the row. So history never sends it whole (#225). Where the other kinds wait until they are too big, a `tool_result` is made compact as soon as its text is longer than `TOOL_OUTPUT.preview` (1,024 characters): `compactRow` in `apps/server/tool-output.ts` keeps the first 1,024 characters in `text`, sets `truncated: true` and adds `output: { chars, lines, exit_code? }` for what it left out. A result that fits travels as it was stored. A compact row is never `clipped`.

@@ -1156,6 +1156,512 @@
           ]
         ]
       }
+    },
+    {
+      "name": "bound-cuts-at-a-turn-start-and-keeps-anchors",
+      "steps": [
+        {
+          "op": "open",
+          "events": [
+            {
+              "id": 10,
+              "thread_id": "t",
+              "kind": "init",
+              "payload": "{\"text\":\"row 10\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 20,
+              "thread_id": "t",
+              "kind": "tool_use",
+              "payload": "{\"id\":\"a\",\"name\":\"Agent\",\"input\":{}}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 30,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 30\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 40,
+              "thread_id": "t",
+              "kind": "result",
+              "payload": "{\"text\":\"row 40\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 50,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 50\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 60,
+              "thread_id": "t",
+              "kind": "tool_use",
+              "payload": "{\"id\":\"b\",\"name\":\"Agent\",\"input\":{},\"parent\":\"a\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 70,
+              "thread_id": "t",
+              "kind": "result",
+              "payload": "{\"text\":\"row 70\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 80,
+              "thread_id": "t",
+              "kind": "result",
+              "payload": "{\"text\":\"row 80\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            }
+          ],
+          "head": {
+            "from": 10,
+            "to": null,
+            "results_below": 2
+          }
+        },
+        {
+          "op": "live",
+          "rows": [
+            {
+              "id": 90,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 90\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 100,
+              "thread_id": "t",
+              "kind": "result",
+              "payload": "{\"text\":\"row 100\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 110,
+              "thread_id": "t",
+              "kind": "tool_use",
+              "payload": "{\"id\":\"c\",\"name\":\"Agent\",\"input\":{},\"parent\":\"b\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 120,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 120\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            }
+          ]
+        },
+        {
+          "op": "bound",
+          "follows": true,
+          "retain": {
+            "rows": 4,
+            "slack": 2,
+            "hard": 8
+          }
+        },
+        {
+          "op": "bound",
+          "follows": false,
+          "retain": {
+            "rows": 4,
+            "slack": 2,
+            "hard": 8
+          }
+        }
+      ],
+      "reveal": [
+        50,
+        110
+      ],
+      "keys": [
+        90,
+        100,
+        110,
+        120
+      ],
+      "expect": {
+        "ids": [
+          10,
+          20,
+          60,
+          90,
+          100,
+          110,
+          120
+        ],
+        "clipped": [],
+        "spans": [
+          {
+            "from": 90,
+            "to": null
+          }
+        ],
+        "atStart": false,
+        "tailId": 120,
+        "turnCount": 6,
+        "earlier": [
+          {
+            "take": "newest",
+            "before": 90
+          }
+        ],
+        "later": [
+          null
+        ],
+        "reveal": [
+          {
+            "id": 50,
+            "cursor": {
+              "at": 50,
+              "before": 90
+            },
+            "span": -1
+          },
+          {
+            "id": 110,
+            "cursor": null,
+            "span": 0
+          }
+        ],
+        "edges": [
+          [
+            90,
+            {
+              "type": "earlier"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "bound-cuts-one-long-turn-only-while-following",
+      "steps": [
+        {
+          "op": "open",
+          "events": [
+            {
+              "id": 1,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 1\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 2,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 2\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 3,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 3\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 4,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 4\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 5,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 5\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 6,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 6\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 7,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 7\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 8,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 8\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 9,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 9\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 10,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 10\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            }
+          ],
+          "head": {
+            "from": 0,
+            "to": null,
+            "results_below": 0
+          }
+        },
+        {
+          "op": "bound",
+          "follows": false,
+          "retain": {
+            "rows": 4,
+            "slack": 2,
+            "hard": 20
+          }
+        },
+        {
+          "op": "bound",
+          "follows": true,
+          "retain": {
+            "rows": 4,
+            "slack": 2,
+            "hard": 20
+          }
+        }
+      ],
+      "reveal": [
+        3,
+        8
+      ],
+      "keys": [
+        7,
+        8,
+        9,
+        10
+      ],
+      "expect": {
+        "ids": [
+          7,
+          8,
+          9,
+          10
+        ],
+        "clipped": [],
+        "spans": [
+          {
+            "from": 7,
+            "to": null
+          }
+        ],
+        "atStart": false,
+        "tailId": 10,
+        "turnCount": 0,
+        "earlier": [
+          {
+            "take": "newest",
+            "before": 7
+          }
+        ],
+        "later": [
+          null
+        ],
+        "reveal": [
+          {
+            "id": 3,
+            "cursor": {
+              "at": 3,
+              "before": 7
+            },
+            "span": -1
+          },
+          {
+            "id": 8,
+            "cursor": null,
+            "span": 0
+          }
+        ],
+        "edges": [
+          [
+            7,
+            {
+              "type": "earlier"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "bound-drops-older-islands",
+      "steps": [
+        {
+          "op": "open",
+          "events": [
+            {
+              "id": 500,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 500\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 510,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 510\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 520,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 520\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            }
+          ],
+          "head": {
+            "from": 500,
+            "to": null,
+            "results_below": 9
+          }
+        },
+        {
+          "op": "page",
+          "page": {
+            "events": [
+              {
+                "id": 100,
+                "thread_id": "t",
+                "kind": "assistant_text",
+                "payload": "{\"text\":\"row 100\"}",
+                "created_at": "2026-10-24T10:00:00.000Z"
+              },
+              {
+                "id": 110,
+                "thread_id": "t",
+                "kind": "assistant_text",
+                "payload": "{\"text\":\"row 110\"}",
+                "created_at": "2026-10-24T10:00:00.000Z"
+              },
+              {
+                "id": 120,
+                "thread_id": "t",
+                "kind": "result",
+                "payload": "{\"text\":\"row 120\"}",
+                "created_at": "2026-10-24T10:00:00.000Z"
+              }
+            ],
+            "span": {
+              "from": 100,
+              "to": 121
+            }
+          }
+        },
+        {
+          "op": "live",
+          "rows": [
+            {
+              "id": 530,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 530\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            },
+            {
+              "id": 540,
+              "thread_id": "t",
+              "kind": "assistant_text",
+              "payload": "{\"text\":\"row 540\"}",
+              "created_at": "2026-10-24T10:00:00.000Z"
+            }
+          ]
+        },
+        {
+          "op": "bound",
+          "follows": true,
+          "retain": {
+            "rows": 3,
+            "slack": 1,
+            "hard": 99
+          }
+        }
+      ],
+      "reveal": [
+        110,
+        510
+      ],
+      "keys": [
+        520,
+        530,
+        540
+      ],
+      "expect": {
+        "ids": [
+          120,
+          520,
+          530,
+          540
+        ],
+        "clipped": [],
+        "spans": [
+          {
+            "from": 520,
+            "to": null
+          }
+        ],
+        "atStart": false,
+        "tailId": 540,
+        "turnCount": 9,
+        "earlier": [
+          {
+            "take": "newest",
+            "before": 520
+          }
+        ],
+        "later": [
+          null
+        ],
+        "reveal": [
+          {
+            "id": 110,
+            "cursor": {
+              "at": 110,
+              "before": 520
+            },
+            "span": -1
+          },
+          {
+            "id": 510,
+            "cursor": {
+              "at": 510,
+              "before": 520
+            },
+            "span": -1
+          }
+        ],
+        "edges": [
+          [
+            520,
+            {
+              "type": "earlier"
+            }
+          ]
+        ]
+      }
     }
   ]
 }
