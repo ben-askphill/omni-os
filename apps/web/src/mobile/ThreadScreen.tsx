@@ -4,6 +4,7 @@ import { harnessLabel } from '../components/brand.tsx';
 import { ASKING_LABEL } from '../components/thread/QuestionCard.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
+import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
 import { HistoryCtx, HistoryEdgeRow } from '../components/thread/HistoryEdgeRow.tsx';
 import { historyEdges } from '@omni/shared/history.ts';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
@@ -132,6 +133,15 @@ export function ThreadScreen() {
               mobile
               onRetried={(t, pending) => {
                 // Retry keeps updated_at, so it must win a tie.
+                applyThread(t);
+                setQueued(pending);
+              }}
+            />
+            <StaleSessionCard
+              thread={thread}
+              mobile
+              onChanged={(t, pending) => {
+                // Keeps updated_at, so it must win a tie.
                 applyThread(t);
                 setQueued(pending);
               }}

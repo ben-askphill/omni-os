@@ -8,6 +8,7 @@ import { PanelResizeHandle } from '../components/thread/panel/PanelResizeHandle.
 import { NextThreadCard } from '../components/thread/NextThreadCard.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { LimitCard } from '../components/thread/LimitCard.tsx';
+import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
 import { TakeoverNote } from '../components/thread/Takeover.tsx';
 import { ThreadPR } from '../components/thread/ThreadPR.tsx';
@@ -182,6 +183,14 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
                 thread={thread}
                 onRetried={(t, pending) => {
                   // Retry keeps updated_at, so it must win a tie, like a rename.
+                  applyThread(t);
+                  setQueued(pending);
+                }}
+              />
+              <StaleSessionCard
+                thread={thread}
+                onChanged={(t, pending) => {
+                  // Keeps updated_at, so it must win a tie, like Retry.
                   applyThread(t);
                   setQueued(pending);
                 }}

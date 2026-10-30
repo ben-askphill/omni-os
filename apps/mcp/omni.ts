@@ -259,6 +259,25 @@ server.registerTool(
 );
 
 server.registerTool(
+  'recover_thread_session',
+  {
+    description:
+      `A thread whose get_thread shows resume_blocked did not resume on this machine: the newer session another machine left could not be ` +
+      'downloaded, so resuming the copy here could miss turns that ran there. Its messages wait. "retry" downloads the session again and sends them; ' +
+      `"fresh" starts the next turn in a new session that reads the thread so far from Omni's transcript (the agent's own session memory is lost). ` +
+      `Retry first; use fresh only when ${USER} asks or retrying keeps failing. Refused while the thread runs.`,
+    inputSchema: {
+      thread_id: z.string(),
+      action: z.enum(['retry', 'fresh']),
+    },
+  },
+  async ({ thread_id, action }) => {
+    const res = await call(`/threads/${thread_id}/session/${action}`, { method: 'POST', body: '{}' });
+    return text({ thread_id, status: res.thread?.status, resume_blocked: res.thread?.resume_blocked ?? null, waiting: res.pending?.length ?? 0 });
+  },
+);
+
+server.registerTool(
   'switch_thread_run',
   {
     description:

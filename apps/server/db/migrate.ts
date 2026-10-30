@@ -302,6 +302,9 @@ export function migrate() {
   // A worktree thread's preparation (apps/server/runner/setup.ts): preparing or failed, with why; null once it is ready. Local, not synced.
   ensureColumn('threads', 'setup', 'TEXT');
   ensureColumn('threads', 'setup_error', 'TEXT');
+  // Why this machine did not resume the thread's session (apps/server/runner/spawn.ts): the other machine's newer
+  // session could not be brought here. Null once a turn starts. Local, not synced: it is about this machine's copy.
+  ensureColumn('threads', 'resume_blocked', 'TEXT');
   // A turn the harness stopped at its usage limit (apps/server/runner/limits.ts): limited, or scheduled to resume at the
   // reset time it reported. limit_id keys the one continuation; limit_machine is the Mac that ran the turn and the
   // only one that resumes it. Synced on its own (apps/server/sync/handlers/limit-stop.ts), never with the thread row;

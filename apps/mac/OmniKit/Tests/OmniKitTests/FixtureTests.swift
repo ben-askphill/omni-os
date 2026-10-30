@@ -74,6 +74,7 @@ private struct DeliveryRefusal: Decodable {
     "thread-report-held.json": { _ = try decodeFixture(ThreadDetail.self, "thread-report-held.json") },
     "thread-setup-failed.json": { _ = try decodeFixture(ThreadDetail.self, "thread-setup-failed.json") },
     "setup-retried.json": { _ = try decodeFixture(RecoveryAnswer.self, "setup-retried.json") },
+    "session-fresh.json": { _ = try decodeFixture(RecoveryAnswer.self, "session-fresh.json") },
     "worktree-scan.json": { _ = try decodeFixture(WorktreeScanReply.self, "worktree-scan.json") },
     "worktree-cleanup.json": { _ = try decodeFixture(WorktreeScanReply.self, "worktree-cleanup.json") },
     "worktree-retention.json": { _ = try decodeFixture(WorktreeScanReply.self, "worktree-retention.json") },

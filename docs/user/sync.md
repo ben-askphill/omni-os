@@ -19,6 +19,7 @@ Open Settings > Machines (web `#/settings/machines`, the old `#/sync` still land
 
 - Path map: paths travel with the home folder as `~`. When the other Mac keeps a folder somewhere else, map it under Advanced in Settings > Machines, like `~/work` to `~/code`.
 - Files: after a Mac's first sync, Omni uploads the files and session files of every thread it wrote last, in the background (the log counts progress every 50 threads). After that, a thread's files go up after each turn. The bucket fills a few minutes after the rows.
+- Before a thread resumes, Omni downloads its latest session file. When that download fails or takes over 15 seconds, the thread does not resume the copy on this Mac, which may miss turns the other Mac ran. A "Session not up to date" card says why, and your message waits. Try again downloads it again; Start with fresh context starts a new session that reads the thread so far. Both are on desktop, phone and the Mac app.
 - `npm run sync:backfill`: queue every existing row again, for instance after restoring a database. It is idempotent and skips rows the other Mac wrote last.
 - Signing in to a different project or user starts that relay from the beginning and queues the history again.
 - Sidebar folders sync, along with which folder each thread sits in. Whether a folder shows open or closed stays per Mac. A relay set up before folders synced refuses them: paste `0001_changes.sql` in the SQL Editor again. Until then the rest keeps syncing and folders wait, counted as held.
