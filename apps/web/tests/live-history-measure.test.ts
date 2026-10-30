@@ -50,7 +50,8 @@ describe.runIf(process.env.OMNI_MEASURE === '1')('a thread held open for a long 
     const frames: { append: number; fold: number; render: number; phone: number; heap?: number }[] = [];
     for (let i = 0; i < live.length; i += 8) {
       const t0 = performance.now();
-      h = appendLive(h, live.slice(i, i + 8));
+      // Copies, so the parsed-payload WeakMap can drop rows the bound cut; the source array stays alive all run.
+      h = appendLive(h, live.slice(i, i + 8).map((r) => ({ ...r })));
       if (bound) h = boundHistory(h, true);
       const t1 = performance.now();
       buildItems(h.rows as EventRow[], h.spans);
