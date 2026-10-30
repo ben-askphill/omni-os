@@ -5,7 +5,7 @@ import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset, take
 import { useApp } from '../store.tsx';
 import { ErrorNote, Icon, IconButton, Kbd, Loader, Picker, type IconName, type PickerOption } from './ui.tsx';
 import { CrewMark, isCrewRole } from './brand.tsx';
-import { EffortPicker, ModelPicker, type ModelChoice } from './ModelPicker.tsx';
+import { ModelPicker, type ModelChoice } from './ModelPicker.tsx';
 import { BasePicker, useBasePick } from './BasePicker.tsx';
 import { RunOnPicker, useRunOn } from './RunOnPicker.tsx';
 import { baseRequest } from '../worktree-base.ts';
@@ -216,17 +216,8 @@ function SendButton({ armed, busy, onClick, children }: { armed: boolean; busy: 
   );
 }
 
-function Hint({ tab = false }: { tab?: boolean }) {
-  return (
-    <span className="hidden items-center gap-3.5 pr-1 text-[11.5px] text-fg-4 sm:inline-flex">
-      {tab && <span>⇥ use suggestion</span>}
-      <span>↵ send</span>
-      <span>{isMac ? '⌘↵' : 'Ctrl ↵'} newline</span>
-      <span>/ commands</span>
-      <span>@ files</span>
-    </span>
-  );
-}
+/** A composer's placeholder, with the two keys that open a menu. */
+const withKeys = (text: string) => `${text} · / commands, @ files`;
 
 /**
  * Enter sends, Shift+Cmd/Ctrl+Enter interrupts, Cmd/Ctrl+Enter inserts a newline (Shift+Enter keeps the
@@ -448,6 +439,8 @@ export function NewThreadComposer({
   }, [crew]);
 
   const roleObj = crew.find((r) => r.id === role);
+  // The Conductor channel runs the Conductor, and with no crew there is nothing to pick.
+  const showRole = crew.length > 0 && channel !== 'conductor';
   const visibleChannels = channels.filter((c) => !c.archived);
 
   const onRole = (r: string) => {
@@ -549,12 +542,12 @@ export function NewThreadComposer({
           if (enterKey(e, text, update)) void submit();
         }}
         rows={big ? 3 : 2}
-        placeholder={placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task')}
+        placeholder={withKeys(placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task'))}
         className={`block max-h-[220px] w-full resize-none bg-transparent px-4 pt-3 pb-1 leading-[1.8] outline-none placeholder:text-fg-4 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
       />
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
         {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
-        <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />
+        {showRole && <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />}
         {harnesses && (
           <ModelPicker
             harnesses={harnesses}
@@ -564,9 +557,9 @@ export function NewThreadComposer({
             onChange={(c) => {
               setPicked({ choice: c, effort: '' }); // changing the model resets effort to the default
             }}
+            effort={{ value: effort, onChange: (effort) => setPicked({ choice, effort }) }}
           />
         )}
-        {harnesses && <EffortPicker harnesses={harnesses} choice={choice} value={effort} onChange={(effort) => setPicked({ choice, effort })} />}
         <BasePicker channel={channel} harness={choice.harness} value={base} onChange={setBase} />
         <RunOnPicker rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} />
         <AttachButton onPick={att.add} disabled={busy} />
@@ -584,7 +577,6 @@ export function NewThreadComposer({
           </button>
         )}
         <div className="ml-auto flex items-center gap-2.5">
-          <Hint />
           <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>
             Start
           </SendButton>
@@ -592,7 +584,7 @@ export function NewThreadComposer({
       </div>
       {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
       <div aria-live="polite">{hint && !menus.open && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
-      {roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
+      {showRole && roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
       {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
     </div>
   );
@@ -792,8 +784,8 @@ function ThreadRunPills({
         disabled={switching}
         className={ring}
         onChange={(c) => pick(c)}
+        effort={{ value: shown.effort, onChange: (effort) => pick({ effort }) }}
       />
-      <EffortPicker harnesses={harnesses} choice={choice} value={shown.effort} disabled={switching} className={ring} onChange={(effort) => pick({ effort })} />
     </span>
   );
 }
@@ -985,7 +977,7 @@ export function ReplyComposer({
           void submit(busyThread ? busyMode : undefined);
         }}
         rows={1}
-        placeholder={!busyThread ? (suggestion ?? 'Reply') : steers ? 'Steer the agent. It reads this at its next step.' : 'Queue a message. It runs after this turn.'}
+        placeholder={suggestion ? `${suggestion} · ⇥ to use` : withKeys(!busyThread ? 'Reply' : steers ? 'Steer the agent. It reads this at its next step.' : 'Queue a message. It runs after this turn.')}
         className="block max-h-[220px] min-h-[60px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.8] outline-none placeholder:text-fg-4"
       />
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
@@ -994,7 +986,6 @@ export function ReplyComposer({
         <ForkThreadButton thread={thread} disabled={busy} />
         <ThreadRunPills thread={thread} openRequest={pillRequest} onSwitched={(t) => onChanged?.(t)} onError={setError} />
         <div className="ml-auto flex items-center gap-2.5">
-          <Hint tab={!!suggestion} />
           {omni ? (
             <SendButton armed={slash.armed} busy={busy} onClick={() => void runOmni()}>
               {slash.label ?? 'Send'}

@@ -37,28 +37,6 @@ extension View {
   }
 }
 
-/// Hint in Composer.tsx: the keys, quiet, beside the send button.
-struct ComposerHints: View {
-  /// The reply box shows a suggestion that Tab takes.
-  var tab = false
-
-  var body: some View {
-    HStack(spacing: z(14)) {
-      if tab { Text("⇥ use suggestion") }
-      Text("↵ send")
-      Text("⌘↵ newline")
-      Text("/ commands")
-      Text("@ files")
-    }
-    .font(.omni(size: 11.5))
-    .foregroundStyle(Tok.fg4)
-    .lineLimit(1)
-    .fixedSize()
-    .padding(.trailing, z(4))
-    .accessibilityHidden(true)
-  }
-}
-
 /// AttachButton in Composer.tsx: the paperclip as an icon button.
 struct AttachButton: View {
   let disabled: Bool

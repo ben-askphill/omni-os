@@ -23,7 +23,8 @@ function opensUp(btn: HTMLElement | null) {
  * One model pill whose list starts with Auto, then groups models under each harness, with a sticky header naming the
  * plan, one search across all groups, and the harness default marked "(default)". A harness that
  * isn't installed or logged in shows disabled with the command that fixes it. `onOpen` fires as
- * the list opens, so the caller can refetch and a fresh login shows up without a reload.
+ * the list opens, so the caller can refetch and a fresh login shows up without a reload. With `effort`, the pill also
+ * reads the effort ("Sonnet 5.5 · high") and the list ends with the picked model's levels, as the phone's model sheet.
  */
 export function ModelPicker({
   harnesses,
@@ -37,6 +38,7 @@ export function ModelPicker({
   label,
   disabled,
   className = '',
+  effort,
 }: {
   harnesses: HarnessWithRunning[];
   value: ModelChoice;
@@ -55,6 +57,8 @@ export function ModelPicker({
   disabled?: boolean;
   /** On the wrapper, around the pill and its list. */
   className?: string;
+  /** The effort picked for `value`, "" for the model's default, and where a pick goes. */
+  effort?: { value: string; onChange: (v: string) => void };
 }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const [up, setUp] = useState(false);
@@ -110,6 +114,8 @@ export function ModelPicker({
   };
 
   const buttonLabel = label ?? (auto ? 'Auto' : current.m ? current.m.label : placeholder);
+  const levels = effort && !auto ? modelOf(harnesses, value) : null;
+  const effortShown = levels?.efforts.length ? effort!.value || levels.model?.defaultEffort || 'default' : null;
 
   return (
     <div ref={wrap} className={`relative ${className}`}>
@@ -119,7 +125,11 @@ export function ModelPicker({
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={disabled}
-        aria-label={auto ? 'Model: Auto' : `Model: ${label ?? current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}`}
+        aria-label={
+          auto
+            ? 'Model: Auto'
+            : `Model: ${label ?? current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}${effortShown ? `, effort ${effortShown}` : ''}`
+        }
         onClick={() => {
           if (!open) {
             onOpen?.();
@@ -139,7 +149,11 @@ export function ModelPicker({
           </span>
         )}
         <span className="min-w-0 truncate">{buttonLabel}</span>
-        {current.h && <span className="hidden shrink-0 text-fg-4 sm:inline">· {current.h.name}</span>}
+        {effortShown ? (
+          <span className="shrink-0 text-fg-3">· {effortShown}</span>
+        ) : (
+          current.h && <span className="hidden shrink-0 text-fg-4 sm:inline">· {current.h.name}</span>
+        )}
         <Icon name="chevronDown" size={13} className="text-fg-4" />
       </button>
       {open && (
@@ -220,6 +234,29 @@ export function ModelPicker({
               </div>
             ))}
           </div>
+          {levels && levels.efforts.length > 0 && (
+            <div className="mt-1 border-t border-line px-2 pt-2 pb-1">
+              <div className="caption mb-1.5 px-1">Effort for {levels.model?.label ?? 'this model'}</div>
+              <div role="radiogroup" aria-label="Effort" className="flex flex-wrap gap-1">
+                {['', ...levels.efforts].map((e) => (
+                  <button
+                    key={e || 'default'}
+                    type="button"
+                    role="radio"
+                    aria-checked={effort!.value === e}
+                    onClick={() => {
+                      effort!.onChange(e);
+                      setOpen(false);
+                      btn.current?.focus();
+                    }}
+                    className="press h-7 rounded-full px-2.5 text-[12px] text-fg-2 transition-colors hover:bg-surface-3 hover:text-fg aria-checked:bg-fg aria-checked:text-on-ink"
+                  >
+                    {e || (levels.model?.defaultEffort ? `Default (${levels.model.defaultEffort})` : 'Default')}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

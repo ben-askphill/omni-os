@@ -20,6 +20,10 @@ private func file(_ name: String, size: Int = 10, modified: Double = 0) -> Stage
     #expect(SendRules.placeholder(busy: false, canSteer: false) == "Reply")
   }
 
+  @Test func namesTheMenuKeysInThePlaceholder() {
+    #expect(SendRules.withKeys("Reply") == "Reply · / commands, @ files")
+  }
+
   @Test func sendKeysOnlyPickAModeWhileBusy() {
     #expect(SendRules.mode(busy: false, canSteer: true, shift: false) == nil)
     #expect(SendRules.mode(busy: false, canSteer: true, shift: true) == nil)
