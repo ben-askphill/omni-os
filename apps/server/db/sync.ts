@@ -3,11 +3,11 @@ import { db, now, tx } from './connection.ts';
 
 /**
  * What the sync relay carries. Events, artifacts, automation runs, completions and trigger deliveries are keyed by their uid, a
- * result_read and a limit_stop by their thread's id, the rest by id or key.
+ * result_read and a limit_stop by their thread's id, a remote_command by its command id, the rest by id or key.
  */
 export type SyncEntity =
   | 'channel' | 'folder' | 'thread' | 'event' | 'artifact' | 'automation_run' | 'kv' | 'completion' | 'result_read' | 'limit_stop'
-  | 'trigger_delivery';
+  | 'trigger_delivery' | 'remote_command';
 export type SyncOp = 'upsert' | 'delete';
 
 export interface OutboxRow {
@@ -77,6 +77,7 @@ function seed(machineId: string) {
   q('result_read', 'SELECT thread_id AS k FROM result_reads ORDER BY thread_id');
   q('limit_stop', 'SELECT id AS k FROM threads WHERE limit_state IS NOT NULL ORDER BY created_at, rowid');
   q('trigger_delivery', 'SELECT uid AS k FROM trigger_deliveries ORDER BY created_at, uid');
+  q('remote_command', 'SELECT id AS k FROM remote_commands ORDER BY created_at, id');
   q('kv', `SELECT key AS k FROM kv WHERE key NOT LIKE 'sync.%' ORDER BY key`);
   db.prepare(
     `INSERT OR REPLACE INTO sync_meta (entity, entity_id, ts, machine_id)

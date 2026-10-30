@@ -38,6 +38,8 @@ export interface UserP {
   mode?: 'steer' | 'queue' | 'interrupt';
   /** The run ended before the agent saw this message. */
   dropped?: boolean;
+  /** Why the machine running the thread did not take it, when `dropped` is from there (apps/server/remote-outcomes.ts). */
+  undelivered?: string;
   /** The harness command the message starts with and its Mentions, as they resolved when sent. */
   slash?: SlashRecord;
   /** A PR watch's wake: what it was for (the first few), and how many more there were. */
@@ -84,6 +86,8 @@ export interface ReportP {
   channel?: string;
   status?: string;
   dropped?: boolean;
+  /** Why the machine running the parent did not take it, when `dropped` is from there. */
+  undelivered?: string;
 }
 
 /** Where a Cursor cloud agent's run stands: the server's CloudAgentState (apps/server/stream.ts). */

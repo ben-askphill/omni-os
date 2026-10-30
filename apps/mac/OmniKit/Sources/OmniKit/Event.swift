@@ -198,6 +198,8 @@ public struct UserMessage: Decodable, Hashable, Sendable {
   public let mode: SendMode?
   /// The agent never saw it.
   public let dropped: Bool?
+  /// Why the machine running the thread did not take it, when `dropped` is from there (run-on.ts).
+  public let undelivered: String?
   /// A PR watch's wake: what it was for, and how many more there were. See `PRWakeItem`.
   public let items: [PRWakeItem]?
   public let more: Int?
@@ -215,9 +217,11 @@ public struct CrewReport: Decodable, Hashable, Sendable {
   public let channel: String?
   public let status: String?
   public let dropped: Bool?
+  /// Why the machine running the parent did not take it, when `dropped` is from there.
+  public let undelivered: String?
 
   enum CodingKeys: String, CodingKey {
-    case text, title, role, channel, status, dropped
+    case text, title, role, channel, status, dropped, undelivered
     case taskID = "task_id"
     case threadID = "thread_id"
   }

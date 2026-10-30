@@ -1,4 +1,4 @@
-// Queues every existing row (channels, threads, events, artifacts, automation runs, kv) for the sync relay.
+// Queues every existing row (channels, threads, events, artifacts, automation runs, remote commands, kv) for the sync relay.
 //
 //   npm run sync:backfill
 //
@@ -19,6 +19,7 @@ const LABEL: Record<BackfillCount['entity'], string> = {
   result_read: 'read results (Needs you)',
   limit_stop: 'usage limit stops',
   trigger_delivery: 'event automation deliveries',
+  remote_command: 'commands for threads on other machines',
   kv: 'settings (kv)',
 };
 

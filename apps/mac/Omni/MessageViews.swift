@@ -86,11 +86,11 @@ struct UserBubbleView: View {
           .fontWeight(.medium)
           .foregroundStyle(message.mode == .interrupt ? Tok.fg2 : Tok.fg3)
       }
-      if message.dropped == true {
-        IconLabel("Not sent", icon: "x")
+      if let label = message.droppedLabel {
+        IconLabel(label, icon: "x")
           .fontWeight(.medium)
           .foregroundStyle(Tok.fg3)
-          .help("The run ended before the agent read this message")
+          .help(message.droppedHelp)
       }
       Text(Format.clock(at))
         .font(.omni(size: 11))
@@ -427,7 +427,7 @@ struct ReportCard: View {
           Text("Not delivered")
             .font(.omni(size: 11.5, weight: .medium))
             .foregroundStyle(Tok.fg3)
-            .help("The run ended before the agent read this report")
+            .help(report.undelivered ?? "The run ended before the agent read this report")
         }
         if let task = report.taskID, !task.isEmpty {
           Text(task).font(.omni(size: ThreadStyle.mono, design: .monospaced)).foregroundStyle(Tok.fg3)
