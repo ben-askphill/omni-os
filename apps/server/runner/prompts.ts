@@ -48,7 +48,7 @@ function workspaceLines(thread: Thread, channel: Channel) {
             '',
             '## Browser',
             config.browser
-              ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Omit the screenshot filename to save in ${browserOutDir(thread.id)} and show it in the thread. An explicit relative filename saves in the working directory instead. Read or copy the exact path returned by the tool; do not assume a named screenshot is in the browser folder. The browser refuses paths outside its output folder and working directory, including the artifacts folder and /tmp, so copy the file afterwards if you need it elsewhere.`
+              ? `The "omni-browser" MCP is this thread's browser. It keeps this channel's logins between threads.${config.browserLive ? ` ${name} sees it live in the thread's Browser panel and can click and type in it too, so ask ${objectPronoun()} to take over there when a page needs a login or a captcha.` : ''} Omit the screenshot filename to save in ${browserOutDir(thread.id)} and show it in the thread. An explicit relative filename saves in the working directory instead. Read or copy the exact path returned by the tool; do not assume a named screenshot is in the browser folder. The browser refuses paths outside its output folder and working directory, including the artifacts folder and /tmp, so copy the file afterwards if you need it elsewhere. It blocks file: URLs too: to look at a local HTML file, serve its folder over http on a free port and open that.`
               : '',
           ]),
   ];
@@ -83,6 +83,10 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       : thread.branch
         ? `- You are in a dedicated git worktree on branch ${thread.branch}. Commit here; open a PR when asked.`
         : '',
+    // zsh slips recur in every harness's shell calls: an unquoted glob that matches nothing, a word that starts with =.
+    !remote && /zsh$/.test(process.env.SHELL ?? '')
+      ? `- Shell commands run in zsh: quote glob arguments (--include='*.ts'), and never start a word with = (zsh reads echo === as a command lookup).${process.platform === 'darwin' ? ' The command-line tools are BSD, not GNU.' : ''}`
+      : '',
     channel.notes ? `- Channel notes: ${channel.notes}` : '',
     ...(role?.mcp.includes('omni')
       ? [
@@ -129,7 +133,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     lines.push(
       '',
       '## Team lead',
-      'You lead a team. Your members have already done the work in their own threads, and their replies are in your first message. Combine them into one answer: lead with the verdict, keep what each member found that matters, link the member threads, and say where they disagree. Do not redo their work.',
+      'You lead a team. Your members have already done the work in their own threads, and their replies are in your first message. Combine them into one answer: lead with the verdict, keep what each member found that matters, link the member threads, and say where they disagree. Do not redo their work. Their replies are all you get: read_referenced_thread cannot open member threads.',
     );
   }
   if (role) lines.push('', `## Your role: ${role.name}`, role.charter);
