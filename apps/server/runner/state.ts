@@ -1,6 +1,4 @@
 // Live processes, the queue's waiting maps, and the helpers the lifecycle modules share.
-import { readFileSync } from 'node:fs';
-import type { ChildProcess } from 'node:child_process';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import type { HandoverP } from '@omni/shared/run-switch.ts';
 import type { DeliveryPhase } from '../delivery.ts';
@@ -8,12 +6,12 @@ import { about } from '../about.ts';
 import { config } from '../config.ts';
 import { events, messageRequests, threads, type DeliveryState, type MessageRequest } from '../db.ts';
 import { publishFeed, publishThread } from '../bus.ts';
-import { describeAttachments, inlinable, messageContent, type Attachment } from '../uploads.ts';
+import type { Attachment } from '../uploads.ts';
 import { contextAttachments, harnessText } from '../message-context/project.ts';
 import type { CommandList } from '../commands.ts';
 import { handOverWith } from './switch.ts';
 import { CAPABILITIES, type HarnessId } from '../harness/types.ts';
-import type { CommandUse, HarnessAdapter } from '../harness/adapter.ts';
+import type { CommandUse, HarnessAdapter, HarnessSession, OutgoingMessage } from '../harness/adapter.ts';
 import { claudeAdapter } from '../harness/claude/adapter.ts';
 import { codexAdapter } from '../harness/codex/adapter.ts';
 import { cursorAdapter } from '../harness/cursor/adapter.ts';
@@ -102,14 +100,8 @@ export interface PendingMsg {
 export interface Live {
   threadId: string;
   channelId: string;
-  /** null while secrets and the MCP config are prepared; inflight is written right after spawn. */
-  child: ChildProcess | null;
-  /** The adapter's stdin encoder, set right after spawn. */
-  write: ((obj: unknown) => boolean) | null;
-  /** Flush buffered adapter stdout on close. */
-  flush: (() => void) | null;
-  /** Ask the harness for a full context reading. Null when it can't. */
-  requestContext: (() => boolean) | null;
+  /** The harness session. null while secrets and the MCP config are prepared; inflight is sent right after spawn. */
+  session: HarnessSession | null;
   sessionId: string;
   /** The harness it was spawned for. A switch synced from another machine changes the thread's, not this process's. */
   harness?: string;
@@ -221,8 +213,6 @@ export function addEvent(threadId: string, kind: string, payload: unknown) {
   return row;
 }
 
-export const alive = (c: ChildProcess) => c.exitCode === null && c.signalCode === null;
-
 /** Every task still running, oldest first, for the sidebar and /api/tasks. */
 export const activeTasks = (): ActiveTask[] =>
   [...lives.values()].flatMap((l) => [...l.tasks.values()]).sort((a, b) => a.started_at.localeCompare(b.started_at));
@@ -268,13 +258,13 @@ export const runsHere = (threadId: string) => lives.has(threadId) || waiting.inc
 /** A warm claude process exists for this thread. */
 export const isLive = (threadId: string) => {
   const l = lives.get(threadId);
-  return !!l?.child && !l.closing;
+  return !!l?.session && !l.closing;
 };
 
 /** Ask a warm process for a fresh context reading. False when there is none to ask. */
 export function refreshContext(threadId: string): boolean {
   const l = lives.get(threadId);
-  return !!l?.child && !l.closing && !!l.requestContext?.();
+  return !!l?.session && !l.closing && !!l.session.requestContext?.();
 }
 
 /** The current process's commands, MCP prompts included. A closing process may belong to the previous harness. */
@@ -373,56 +363,33 @@ export function unread(live: Live, msgs: Msg[]) {
 }
 
 /** startup: no child yet, or init has not arrived. running: the CLI has begun a turn. */
-export const deliveryPhase = (live: Live): DeliveryPhase => (live.child && live.initSeen ? 'running' : 'startup');
+export const deliveryPhase = (live: Live): DeliveryPhase => (live.session && live.initSeen ? 'running' : 'startup');
 
 export const hasBackground = (live: Live) => [...live.tasks.values()].some((t) => t.background);
 
 // ---------- process ----------
 
-export function writeLine(live: Live, obj: unknown) {
-  return live.write ? live.write(obj) : false;
-}
-
-/**
- * Attachments add a note naming every file and where it is on disk, and images small enough for the
- * API ride along as real image blocks, so the agent sees them without a Read.
- */
-function messageBody(text: string, attachments: Attachment[]): string | ReturnType<typeof messageContent> {
-  if (!attachments.length) return text;
-  return messageContent(
-    `${text}\n\n${describeAttachments(attachments)}`,
-    attachments.filter(inlinable).map((a) => ({ mime: a.mime, data: readFileSync(a.path).toString('base64') })),
-  );
-}
-
-export const userLine = (live: Live, m: Msg) => {
-  // Context is projected here, as the harness gets it, so a check of the file holds now, not when it was sent. A thread
-  // deleted meanwhile (by sync, from the other Mac) has no checkout to place it in; never throw on the write path.
+/** A message as the harness gets it. Context is projected here, so a check of the file holds now, not when it was sent. */
+export function outgoing(live: Live, m: Msg): OutgoingMessage {
+  // A thread deleted meanwhile (by sync, from the other Mac) has no checkout to place it in; never throw on the write path.
   const thread = threads.get(live.threadId);
   const text = thread ? harnessText(m.text, m.contexts, thread) : m.text;
   // The images its context items name travel as attachments, so each harness takes them its own way.
   const attachments = [...(m.attachments ?? []), ...contextAttachments(m.contexts)];
-  return {
-    type: 'user',
-    message: { role: 'user', content: messageBody(text, attachments) },
-    parent_tool_use_id: null,
-    session_id: live.sessionId,
-    uuid: m.uuid,
-    // Side channel for adapters that need the raw text, attachment paths and commands (Codex sends
-    // images as localImage paths and skills as skill items). The Claude adapter strips this before
-    // writing to its stdin.
-    _omni: { text, attachments, commands: m.commands ?? [] },
-  };
-};
+  return { uuid: m.uuid, text, attachments, commands: m.commands ?? [] };
+}
 
-/** stdin is gone: kill it so the close handler fails the turn and records what was not delivered. */
-export const crash = (live: Live) => live.child && alive(live.child) && live.child.kill('SIGKILL');
+/** Hand a message to the session. False when it can't take it. */
+export const deliver = (live: Live, m: Msg) => !!live.session?.send(outgoing(live, m));
+
+/** The session can't take input: kill it so the exit fails the turn and records what was not delivered. */
+export const crash = (live: Live) => live.session?.alive && live.session.end('kill');
 
 /** Write a message to the harness. Before the process exists it waits in inflight, and spawn writes it. */
 export function send(live: Live, m: Msg) {
   if (live.handoverDue) handOverWith(live, m);
   live.inflight.push(m);
-  if (!live.child) return;
+  if (!live.session) return;
   // The checkout before this turn is still being saved: written once it is (runner/snapshots.ts).
   if (live.gate) {
     (live.gated ??= []).push(m);
@@ -430,5 +397,5 @@ export function send(live: Live, m: Msg) {
   }
   // Marked first: a write that fails can still have reached the harness.
   track(m, 'sent');
-  if (!writeLine(live, userLine(live, m))) crash(live);
+  if (!deliver(live, m)) crash(live);
 }

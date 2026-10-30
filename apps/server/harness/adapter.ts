@@ -1,13 +1,13 @@
 // The harness adapter interface the runner drives. The runner keeps everything that
 // isn't harness-specific — queueing, send modes, keepalive, slots, crew reports, titles,
-// events and the feed — and each adapter owns its CLI's process and protocol, translating
-// to and from Omni's records. Claude Code's behaviour moves behind this unchanged.
-import type { ChildProcess } from 'node:child_process';
+// events and the feed — and each adapter owns its CLI's process (if it has one) and protocol,
+// translating Omni's messages into it and its output into Omni's records.
 import type { SlashCommand } from '@omni/shared/slash.ts';
 import type { Channel, Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
 import type { ContextUsage, CursorTurnUsage } from '@omni/shared/context-meter.ts';
 import type { ContextHint, Record as StreamRecord, Usage } from '../stream.ts';
+import type { Attachment } from '../uploads.ts';
 import type { HarnessCapabilities, HarnessId } from './types.ts';
 
 /** Everything an adapter needs to start a thread's process. */
@@ -42,7 +42,27 @@ export interface CommandUse {
   path?: string;
 }
 
-/** The runner subscribes to these as the harness process runs. */
+/** One message the runner hands a harness: Ben's text with its context projected in, and what came with it. */
+export interface OutgoingMessage {
+  uuid: string;
+  text: string;
+  /** Uploads plus the images its context items name. */
+  attachments: Attachment[];
+  /** The harness commands the text names. */
+  commands: CommandUse[];
+}
+
+/**
+ * How the runner ends a session, gentlest first. Each maps to a signal a process gets; a session with no
+ * process of its own (Cursor, Hermes, Cursor Cloud) ends at once and reports that signal as its exit.
+ * - `close`: no more input. A process finishes and exits on its own (stdin ends). Cursor Cloud leaves its agent working.
+ * - `stop`: the hard stop (SIGINT). A remote harness cancels the run.
+ * - `terminate`: a `close` that took too long (SIGTERM).
+ * - `kill`: at once (SIGKILL).
+ */
+export type EndMode = 'close' | 'stop' | 'terminate' | 'kill';
+
+/** The runner subscribes to these as the harness session runs. */
 export interface AdapterCallbacks {
   /** One Omni record produced by the harness. */
   record: (rec: StreamRecord) => void;
@@ -69,20 +89,33 @@ export interface AdapterCallbacks {
    * output only when it ends never calls this.
    */
   toolOutput?: (toolUseId: string, text?: string) => void;
+  /** The session ended: a process's exit code or signal, or the signal its end mode stands for. Reported once, after its last record. */
+  exit: (code: number | null, signal: NodeJS.Signals | null) => void;
+  /** The harness could not be started. Its `exit` still follows. */
+  spawnError?: (err: Error) => void;
+  /** What the harness process printed on stderr, for the exit report. */
+  stderr?: (text: string) => void;
 }
 
-/** A running harness process, wired to the runner. */
+/** A running harness session, wired to the runner. */
 export interface HarnessSession {
-  /** The OS process, for signals (interrupt/kill) and stdin end. */
-  child: ChildProcess;
   /**
-   * Translate a runner stdin object — a Claude-shaped `user` line or `control_request` —
-   * into the harness's protocol and write it. Returns false if the pipe is gone.
+   * The OS process that runs the whole session, when there is one (Claude Code, Codex). Cursor starts a process per
+   * turn, and Hermes and Cursor Cloud are HTTP APIs, so they have none.
    */
-  write(obj: unknown): boolean;
-  /** Flush any buffered stdout on close. */
-  flush?: () => void;
-  /** Ask the process for a full context reading, answered through `context`. False if it can't. */
+  readonly pid?: number;
+  /** False once the session has ended or is ending. */
+  readonly alive: boolean;
+  /** Hand the harness a message: it starts a turn, steers the running one or waits its turn. False if the session can't take it. */
+  send(m: OutgoingMessage): boolean;
+  /**
+   * Stop the running turn and keep the session. The harness answers with a `control` record carrying `requestId`.
+   * False if the session can't take the request.
+   */
+  interrupt(requestId: string): boolean;
+  /** End the session (see EndMode). Calling it again escalates; `exit` reports the end. */
+  end(mode: EndMode): void;
+  /** Ask for a full context reading, answered through `context`. False if it can't. */
   requestContext?: () => boolean;
 }
 

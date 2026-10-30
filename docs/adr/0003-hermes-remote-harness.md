@@ -8,7 +8,7 @@ The runner still wants a child process per thread, for queueing, steer, interrup
 
 - A Hermes thread does not get an Omni worktree, browser profile or artifacts directory. Those exist only on the Mac. The system prompt names the channel's repo, store and notes, and tells Hermes to work on its own clone and open PRs. `OMNI_ARTIFACTS_DIR` is not a path it can write to; artifacts come back as links or text.
 - Attachments stay on the Mac. The message describes them and says they were not transferred. Uploading bytes is a later change.
-- Steer is `POST /steer` while the run is going, and a queue when Hermes answers 409. Interrupt and killing the holder are `POST /stop`. The event stream is SSE; if it drops, Omni reads `GET /v1/runs/{id}` once rather than trusting a silent close.
+- Steer is `POST /steer` while the run is going, and a queue when Hermes answers 409. Interrupt and ending the session are `POST /stop`. The event stream is SSE; if it drops, Omni reads `GET /v1/runs/{id}` once rather than trusting a silent close.
 - Every create sends `Idempotency-Key` (the message uuid) so a retry cannot start a second run. HTTP 429, the server's own concurrency cap, is backed off and retried with the same key.
 - The plan meter stays empty. Token counts and the serving model ride on the run's result. This bills the Anthropic API, not Ben's Claude, ChatGPT or Cursor plan.
 - Availability is `GET /v1/capabilities` returning 200. No key, a 401 or an unreachable URL all look the same in the picker: set `HERMES_API_KEY` in Secrets and set `OMNI_HERMES_URL` and connect this Mac to Tailscale.

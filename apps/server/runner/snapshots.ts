@@ -9,7 +9,7 @@ import { config } from '../config.ts';
 import { completions, threads, turnSnapshots } from '../db.ts';
 import { snapshot, snapshotCheckout, turnRef } from '../turns.ts';
 import { isRemoteHarness } from '../harness/types.ts';
-import { crash, emitThread, lives, track, userLine, writeLine, type Live } from './state.ts';
+import { crash, deliver, emitThread, lives, track, type Live } from './state.ts';
 
 /** Each thread's last queued save. */
 const chains = new Map<string, Promise<void>>();
@@ -79,12 +79,12 @@ export function startTurnSnapshot(live: Live) {
 /** Write the messages a warm process held back while the checkout was saved. */
 function release(live: Live) {
   const held = live.gated?.splice(0) ?? [];
-  if (lives.get(live.threadId) !== live || !live.child || live.closing) return;
+  if (lives.get(live.threadId) !== live || !live.session || live.closing) return;
   for (const m of held) {
     // Dropped while it waited (the process was stopped).
     if (!live.inflight.includes(m)) continue;
     track(m, 'sent');
-    if (!writeLine(live, userLine(live, m))) {
+    if (!deliver(live, m)) {
       crash(live);
       break;
     }

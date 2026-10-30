@@ -6,7 +6,6 @@ import { worktreeProblem, writeDesignSystem, writeMcpConfig } from '../sandbox.t
 import { inWorkspace } from '../workspace.ts';
 import { attachThread, detachThread } from '../browser.ts';
 import { globalSecret, secretsEnv } from '../secrets.ts';
-import { closePipesAfterExit } from '../child.ts';
 import { recordUsage } from '../usage.ts';
 import { toolTails } from '../tool-tail.ts';
 import { recordContext, recordContextHint } from '../context.ts';
@@ -19,7 +18,7 @@ import { runnableCommands } from '@omni/shared/slash.ts';
 import { buildSystemPrompt } from './prompts.ts';
 import { onExit, onRecord } from './records.ts';
 import { abortStart } from './session.ts';
-import { adapterFor, addEvent, browserHolder, cliLabel, crash, emitThread, lives, omniUrl, track, userLine, writeLine, type Live, type Msg } from './state.ts';
+import { adapterFor, addEvent, browserHolder, cliLabel, crash, deliver, emitThread, lives, omniUrl, track, type Live, type Msg } from './state.ts';
 import { failSetup } from './setup.ts';
 import { sessionStarted, takeHandover } from './switch.ts';
 import { startTurnSnapshot } from './snapshots.ts';
@@ -32,10 +31,7 @@ export function launch(threadId: string, first: Msg): Live | undefined {
   const live: Live = {
     threadId,
     channelId: thread.channel_id,
-    child: null,
-    write: null,
-    flush: null,
-    requestContext: null,
+    session: null,
     sessionId: thread.session_id,
     harness: thread.harness,
     turn: true,
@@ -70,7 +66,7 @@ export function launch(threadId: string, first: Msg): Live | undefined {
     console.error(`[runner] ${threadId} crashed:`, err);
     if (lives.get(threadId) !== live) return;
     addEvent(threadId, 'error', { text: `Omni failed to run this thread: ${(err as Error).message}` });
-    if (live.child) crash(live);
+    if (live.session) crash(live);
     else abortStart(live, 'failed');
   });
   return live;
@@ -158,7 +154,7 @@ async function spawnLive(live: Live, thread: Thread) {
     resume: run.resume,
     handoverPending: !!threads.sessionState(thread.id).handover,
   };
-  const session = adapterFor(thread.harness).spawn(ctx, {
+  live.session = adapterFor(thread.harness).spawn(ctx, {
     record: (rec) => {
       // Claude chooses its id before spawning. Its user replay confirms that the session accepted input.
       if (thread.harness === 'claude-code' && rec.kind === 'replay') sessionStarted(live);
@@ -180,30 +176,18 @@ async function spawnLive(live: Live, thread: Thread) {
       addCursorTurn(thread.id, u);
       afterCursorTurn();
     },
-  });
-  const child = session.child;
-  live.child = child;
-  live.write = session.write;
-  live.flush = session.flush ?? null;
-  live.requestContext = session.requestContext ?? null;
-
-  child.stderr?.setEncoding('utf8');
-  child.stderr?.on('data', (d: string) => (live.stderr = (live.stderr + d).slice(-8000)));
-  child.on('error', (err) => {
-    live.spawnFailed = true;
-    addEvent(thread.id, 'error', { text: `Could not start ${cliLabel(thread.harness)}: ${err.message}` });
-  });
-  // 'close' waits for every pipe, and a process the CLI started can hold them open after it exits.
-  closePipesAfterExit(child);
-  child.on('close', (code, signal) => {
-    live.flush?.();
-    onExit(live, code, signal);
+    stderr: (d) => (live.stderr = (live.stderr + d).slice(-8000)),
+    spawnError: (err) => {
+      live.spawnFailed = true;
+      addEvent(thread.id, 'error', { text: `Could not start ${cliLabel(thread.harness)}: ${err.message}` });
+    },
+    exit: (code, signal) => onExit(live, code, signal),
   });
 
-  // Messages go in as stream-json lines, so leading dashes or huge pastes never get parsed as flags.
+  // Messages go in through the session, never as CLI args, so leading dashes or huge pastes never get parsed as flags.
   for (const m of live.inflight) {
     track(m, 'sent');
-    if (!writeLine(live, userLine(live, m))) {
+    if (!deliver(live, m)) {
       crash(live);
       break;
     }

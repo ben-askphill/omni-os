@@ -16,8 +16,9 @@ import { usageFor } from '../../usage.ts';
 import { fromCodexTokenUsage } from '@omni/shared/context-meter.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
 import { harnessEnv } from '../env-guard.ts';
+import { processSession } from '../session.ts';
 import { CAPABILITIES } from '../types.ts';
-import type { AdapterCallbacks, AdapterContext, CommandUse, HarnessAdapter, HarnessSession } from '../adapter.ts';
+import type { AdapterCallbacks, AdapterContext, CommandUse, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
 import { CodexClient } from './client.ts';
 import { codexBin } from './bin.ts';
 import { CODEX_BUILTINS } from './commands.ts';
@@ -26,6 +27,7 @@ import { PLAN_LIMIT_ID, codexLimit, commandUse, normalizeItem, normalizePlan, no
 import { reviewTarget } from './review.ts';
 import type {
   CodexInput,
+  CodexItem,
   CodexTurn,
   ErrorNotification,
   PlanUpdate,
@@ -36,12 +38,18 @@ import type {
   TurnError,
 } from './protocol.ts';
 
-interface Outgoing {
-  text: string;
-  uuid: string;
-  attachments: Attachment[];
-  commands: CommandUse[];
+interface Outgoing extends OutgoingMessage {
   accepted?: boolean;
+}
+
+/** The notification params Omni reads. Each method sends its own subset. */
+interface NoteParams {
+  turn?: CodexTurn;
+  turnId?: string;
+  item?: CodexItem;
+  itemId?: unknown;
+  delta?: unknown;
+  rateLimits?: RateLimits;
 }
 
 /**
@@ -68,13 +76,6 @@ const BUILTINS = new Set(CODEX_BUILTINS.map((c) => c.name));
 
 /** The Codex built-in a message starts with. A built-in is never a Mention, and has no skill file. */
 const builtinOf = (m: Outgoing) => m.commands.find((c) => !c.path && BUILTINS.has(c.name));
-
-const omniOf = (obj: any): Outgoing => ({
-  text: String(obj?._omni?.text ?? ''),
-  uuid: String(obj?.uuid ?? ''),
-  attachments: (obj?._omni?.attachments ?? []) as Attachment[],
-  commands: (obj?._omni?.commands ?? []) as CommandUse[],
-});
 
 /**
  * Per-thread overrides, as config.toml keys: Omni's MCP servers next to Ben's own (a dotted
@@ -152,7 +153,7 @@ export const codexAdapter: HarnessAdapter = {
     }
 
     function onNote(n: RpcNotification) {
-      const p = (n.params ?? {}) as Record<string, any>;
+      const p = (n.params ?? {}) as NoteParams;
       switch (n.method) {
         case 'turn/started':
           // Also covers a turn Codex starts by itself. A review announces itself under an id its
@@ -161,13 +162,14 @@ export const codexAdapter: HarnessAdapter = {
           // Notifications can arrive in the same stdout chunk as the request's answer,
           // before its promise runs. A started turn also confirms that Codex took its input.
           if (startingMessage) accepted(startingMessage);
-          if (builtin !== 'review') currentTurnId ??= (p.turn as CodexTurn | undefined)?.id ?? null;
+          if (builtin !== 'review') currentTurnId ??= p.turn?.id ?? null;
           turnBegan();
           break;
         case 'item/started':
+          if (!p.item) break;
           for (const rec of normalizeStarted(p.item)) emit(rec);
           // A command's row opens when it starts, so Ben can follow its output while it runs (apps/server/tool-tail.ts).
-          if (p.item?.type === 'commandExecution') {
+          if (p.item.type === 'commandExecution') {
             announced.add(p.item.id);
             cb.toolOutput?.(p.item.id);
             emit(commandUse(p.item));
@@ -177,17 +179,18 @@ export const codexAdapter: HarnessAdapter = {
           if (typeof p.itemId === 'string' && typeof p.delta === 'string') cb.toolOutput?.(p.itemId, p.delta);
           break;
         case 'item/completed': {
-          const saved = p.item?.type === 'imageGeneration' ? saveGeneratedImage(p.item, artifactsDir(thread.id)) : null;
+          if (!p.item) break;
+          const saved = p.item.type === 'imageGeneration' ? saveGeneratedImage(p.item, artifactsDir(thread.id)) : null;
           // A command that announced itself has its call row already; only its result is left.
           const recs = normalizeItem(p.item, saved);
-          for (const rec of announced.delete(p.item?.id) ? recs.filter((r) => r.kind !== 'tool_use') : recs) emit(rec);
+          for (const rec of announced.delete(p.item.id) ? recs.filter((r) => r.kind !== 'tool_use') : recs) emit(rec);
           break;
         }
         case 'turn/plan/updated':
-          for (const rec of normalizePlan(p as PlanUpdate, `plan-${p.turnId ?? currentTurnId}-${++plans}`)) emit(rec);
+          for (const rec of normalizePlan(n.params as PlanUpdate, `plan-${p.turnId ?? currentTurnId}-${++plans}`)) emit(rec);
           break;
         case 'error': {
-          const e = p as ErrorNotification;
+          const e = n.params as ErrorNotification;
           const text = turnErrorText(String(e.error?.message ?? ''));
           // A retry shows as progress; a final error ends the turn, below.
           if (e.willRetry) emit({ kind: 'status', payload: { text } });
@@ -195,7 +198,7 @@ export const codexAdapter: HarnessAdapter = {
           break;
         }
         case 'turn/completed': {
-          const turn = p.turn as CodexTurn | undefined;
+          const turn = p.turn;
           // A steer answer can share this stdout chunk. Let its delivery receipt run
           // before the result, or the runner would keep its unread message inflight.
           if (steering.size) void Promise.allSettled([...steering]).then(() => completeTurn(turn));
@@ -203,13 +206,13 @@ export const codexAdapter: HarnessAdapter = {
           break;
         }
         case 'account/rateLimits/updated': {
-          const rl = p.rateLimits as RateLimits | undefined;
+          const rl = p.rateLimits;
           // Only the plan's bucket; a reserve model's has its own.
           if (rl && (rl.limitId ?? PLAN_LIMIT_ID) === PLAN_LIMIT_ID) cb.usage(normalizeRateLimits(rl, usageFor('codex')));
           break;
         }
         case 'thread/tokenUsage/updated': {
-          const c = fromCodexTokenUsage(p, model || null);
+          const c = fromCodexTokenUsage(n.params, model || null);
           if (c) cb.context?.(c);
           break;
         }
@@ -363,31 +366,25 @@ export const codexAdapter: HarnessAdapter = {
       pump();
     })();
 
-    return {
-      child: client.child,
-      write(obj: unknown) {
-        const o = obj as { type?: string; request?: { subtype?: string }; request_id?: string };
-        if (o?.type === 'user') {
-          const m = omniOf(o);
-          // Mid-turn goes in as a steer; otherwise it starts (or is queued for) the next turn. A
-          // built-in runs as a turn of its own, and nothing steers into one.
-          if (turnActive && !builtin && !builtinOf(m)) {
-            const sent = steer(m);
-            steering.add(sent);
-            void sent.finally(() => steering.delete(sent));
-          }
-          else {
-            outbox.push(m);
-            pump();
-          }
-          return true;
-        }
-        if (o?.type === 'control_request' && o.request?.subtype === 'interrupt') {
-          void interrupt(String(o.request_id ?? ''));
-          return true;
+    return processSession(client.child, cb, {
+      send(m) {
+        const o: Outgoing = { ...m };
+        // Mid-turn goes in as a steer; otherwise it starts (or is queued for) the next turn. A
+        // built-in runs as a turn of its own, and nothing steers into one.
+        if (turnActive && !builtin && !builtinOf(o)) {
+          const sent = steer(o);
+          steering.add(sent);
+          void sent.finally(() => steering.delete(sent));
+        } else {
+          outbox.push(o);
+          pump();
         }
         return true;
       },
-    };
+      interrupt(requestId) {
+        void interrupt(requestId);
+        return true;
+      },
+    });
   },
 };
