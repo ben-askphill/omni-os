@@ -244,7 +244,8 @@ private struct ReplyComposerView: View {
         AttachmentStrip(files: reply.files, remove: reply.removeFile)
       }
       ComposerTextView(
-        text: $reply.text, placeholder: suggestion ?? SendRules.placeholder(busy: busyThread, canSteer: canSteer), running: busyThread,
+        text: $reply.text, placeholder: suggestion.map { "\($0) · ⇥ to use" } ?? SendRules.withKeys(SendRules.placeholder(busy: busyThread, canSteer: canSteer)),
+        running: busyThread,
         interrupting: store.interrupting, focusTick: focusTick, callbacks: callbacks, caretRequest: caret,
         scale: UIZoom.settings.scale
       )
@@ -282,7 +283,6 @@ private struct ReplyComposerView: View {
         ThreadPRSlot(model: model, thread: thread, busy: busyThread, opening: reply.openingPR) { Task { await openPR() } }
       }
       HStack(spacing: z(10)) {
-        ComposerHints(tab: suggestion != nil)
         if let omni = menu.reply, omni.action != .send {
           SendButton(title: omni.label ?? "Send", armed: omni.armed, sending: omniBusy) { runOmni() }
         } else if busyThread {
@@ -297,9 +297,9 @@ private struct ReplyComposerView: View {
     .padding(.top, z(6))
   }
 
-  /// The model and effort the thread runs on. A pick switches its next turn. While a turn runs it waits for that turn:
-  /// the pickers show it, ringed, after a "Next turn" chip whose click keeps the current run. Separate views, so the
-  /// footer wraps between them in a narrow window.
+  /// The model and effort the thread runs on, in one pill. A pick switches its next turn. While a turn runs it waits
+  /// for that turn: the pill shows it, ringed, after a "Next turn" chip whose click keeps the current run. Separate
+  /// views, so the footer wraps between them in a narrow window.
   @ViewBuilder private var runPickers: some View {
     let harnesses = fetchedHarnesses ?? model.store.harnesses
     let shown = RunSwitch.shown(thread)
@@ -310,11 +310,10 @@ private struct ReplyComposerView: View {
     ModelPickerButton(
       harnesses: harnesses, harness: shown.harness, model: RunSwitch.shownModel(shown, harnesses: harnesses),
       pick: { switchRun(RunSwitch.picking(harness: $0, model: $1, from: shown, harnesses: harnesses)) },
-      refresh: refreshHarnesses, openRequest: pickerRequest, offersAuto: false, autoReason: queued ? nil : thread.autoReason, disabledHelp: disabled)
-      .overlay(ring)
-    EffortMenu(
-      options: EffortRules.options(for: EffortRules.model(harness: shown.harness, model: shown.model, in: harnesses)),
-      value: shown.effort, disabledHelp: disabled) { switchRun(RunSwitch.picking(effort: $0, from: shown)) }
+      refresh: refreshHarnesses, openRequest: pickerRequest, offersAuto: false, autoReason: queued ? nil : thread.autoReason, disabledHelp: disabled,
+      effort: EffortPick(
+        options: EffortRules.options(for: EffortRules.model(harness: shown.harness, model: shown.model, in: harnesses)),
+        value: shown.effort) { switchRun(RunSwitch.picking(effort: $0, from: shown)) })
       .overlay(ring)
   }
 

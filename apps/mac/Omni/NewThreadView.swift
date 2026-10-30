@@ -73,9 +73,12 @@ private struct NewThreadBox: View {
   }
 
   private var placeholder: String {
-    if composer.fixedChannel == NewThreadRules.conductor { return "Ask the Conductor. It delegates to the crew." }
-    return composer.choice.channel == NewThreadRules.conductor ? "Ask the Conductor anything. It delegates to the crew." : "Describe the task"
+    if composer.fixedChannel == NewThreadRules.conductor { return SendRules.withKeys("Ask the Conductor. It delegates to the crew.") }
+    return SendRules.withKeys(composer.choice.channel == NewThreadRules.conductor ? "Ask the Conductor anything. It delegates to the crew." : "Describe the task")
   }
+
+  /// The Conductor channel runs the Conductor, and with no crew there is nothing to pick (`showRole` in Composer.tsx).
+  private var showsRole: Bool { !composer.crew.isEmpty && composer.choice.channel != NewThreadRules.conductor }
 
   private var range: ClosedRange<CGFloat> { big ? 96...360 : 60...260 }
 
@@ -173,7 +176,7 @@ private struct NewThreadBox: View {
         .padding(.bottom, menu.hint == nil ? 0 : 10)
         .padding(.top, menu.hint == nil ? 0 : 2)
       // The role's charter, inside the card, as Composer.tsx.
-      if let role = composer.role, !role.description.isEmpty {
+      if showsRole, let role = composer.role, !role.description.isEmpty {
         Text(role.description)
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
@@ -195,11 +198,11 @@ private struct NewThreadBox: View {
   private var footer: some View {
     ComposerFooterLayout {
       if composer.fixedChannel == nil { channelMenu }
-      roleMenu
+      if showsRole { roleMenu }
       ModelPickerButton(
         harnesses: composer.harnesses, harness: composer.choice.harness, model: composer.choice.model,
-        pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest, openQuery: pickerQuery)
-      EffortMenu(options: composer.effortOptions, value: composer.choice.effort, auto: composer.choice.isAuto, pick: composer.selectEffort)
+        pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest, openQuery: pickerQuery,
+        effort: EffortPick(options: composer.effortOptions, value: composer.choice.effort, pick: composer.selectEffort))
       if !composer.devices.isEmpty {
         RunOnMenu(devices: composer.devices, pick: composer.runOn, select: composer.selectRunOn)
       }
@@ -217,10 +220,7 @@ private struct NewThreadBox: View {
         .accessibilityLabel("In folder \(folder.name). Remove")
       }
       DictateButton { focusTick += 1 }
-      HStack(spacing: z(10)) {
-        ComposerHints()
-        SendButton(title: "Start", armed: composer.canSend, sending: composer.sending) { start() }
-      }
+      SendButton(title: "Start", armed: composer.canSend, sending: composer.sending) { start() }
     }
     .padding(.horizontal, z(8))
     .padding(.bottom, z(8))
@@ -383,6 +383,13 @@ struct EffortMenu: View {
   }
 }
 
+/// The effort `ModelPickerButton` folds in: the levels for its model, the one picked ("" for the default), and where a pick goes.
+struct EffortPick {
+  let options: [EffortOption]
+  let value: String
+  let pick: (String) -> Void
+}
+
 /// The model pill and its list: Auto first, then models under each harness with its plan, one search, the default
 /// marked, and a harness that isn't installed or logged in shown disabled with the command that fixes it (`ModelPicker.tsx`).
 struct ModelPickerButton: View {
@@ -404,8 +411,19 @@ struct ModelPickerButton: View {
   var autoReason: String? = nil
   /// Why it can't be picked now. nil when it can.
   var disabledHelp: String? = nil
+  /// The effort for the picked model: the pill then reads "Sonnet 5.5 · high" and the list ends with its levels.
+  var effort: EffortPick? = nil
   @State private var open = false
   @State private var query = ""
+
+  /// The levels the list offers, and the level the pill shows. nil for Auto or a model without levels.
+  private var effortShown: (options: [EffortOption], label: String)? {
+    guard let effort, !AutoRun.isAuto(model), !effort.options.isEmpty else { return nil }
+    let label = effort.value.isEmpty
+      ? EffortRules.model(harness: harness, model: model, in: harnesses)?.defaultEffort ?? "default"
+      : effort.value
+    return (effort.options, label)
+  }
 
   private var current: (harness: HarnessInfo?, model: ModelEntry?) {
     let h = harnesses.first { $0.id == harness }
@@ -428,7 +446,7 @@ struct ModelPickerButton: View {
     .disabled(disabledHelp != nil)
     .opacity(disabledHelp != nil ? 0.45 : 1)
     .help(disabledHelp ?? autoReason ?? "Model")
-    .accessibilityLabel(AutoRun.isAuto(model) ? "Model: Auto" : "Model: \(autoReason == nil ? "" : "Auto · ")\(c.model?.label ?? "none")\(c.harness.map { " on \($0.name)" } ?? "")")
+    .accessibilityLabel(AutoRun.isAuto(model) ? "Model: Auto" : "Model: \(autoReason == nil ? "" : "Auto · ")\(c.model?.label ?? "none")\(c.harness.map { " on \($0.name)" } ?? "")\(effortShown.map { ", effort \($0.label)" } ?? "")")
     .popover(isPresented: $open, arrowEdge: .bottom) { list }
     .onChange(of: openRequest) {
       query = openQuery
@@ -444,7 +462,8 @@ struct ModelPickerButton: View {
 
   private func pill(_ c: (harness: HarnessInfo?, model: ModelEntry?), harness: Bool) -> some View {
     let auto = AutoRun.isAuto(model)
-    return PickerPill(text: auto ? "Auto" : title(c), secondary: harness && c.model != nil ? c.harness?.name : nil) {
+    let secondary = effortShown?.label ?? (harness && c.model != nil ? c.harness?.name : nil)
+    return PickerPill(text: auto ? "Auto" : title(c), secondary: secondary) {
       if !auto, let h = c.harness {
         PillAvatar(fill: Tok.bg) { HarnessLogo(harness: h.id.rawValue, size: 13).foregroundStyle(Tok.fg) }
       } else {
@@ -480,9 +499,44 @@ struct ModelPickerButton: View {
         .padding(.bottom, z(6))
       }
       .frame(height: z(320))
+      if let shown = effortShown, let effort { effortRow(shown.options, effort: effort) }
     }
     .frame(width: z(340))
     .background(Tok.elev)
+  }
+
+  /// The phone's model sheet ends with the same levels: Default, then the model's own.
+  private func effortRow(_ options: [EffortOption], effort: EffortPick) -> some View {
+    let name = EffortRules.model(harness: harness, model: model, in: harnesses)?.label ?? "this model"
+    return VStack(alignment: .leading, spacing: z(6)) {
+      Text("Effort for \(name)").omniCaption().padding(.horizontal, z(4))
+      HStack(spacing: z(4)) {
+        ForEach(options) { o in
+          let on = o.value == effort.value
+          Button {
+            effort.pick(o.value)
+            open = false
+          } label: {
+            Text(o.label)
+              .font(.omni(size: 12))
+              .foregroundStyle(on ? Tok.onInk : Tok.fg2)
+              .lineLimit(1)
+              .padding(.horizontal, z(10))
+              .frame(height: z(28))
+              .background(on ? Tok.fg : .clear, in: Capsule())
+              .contentShape(Capsule())
+          }
+          .buttonStyle(.plain)
+          .accessibilityAddTraits(on ? .isSelected : [])
+        }
+      }
+    }
+    .padding(.horizontal, z(8))
+    .padding(.vertical, z(8))
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .overlay(alignment: .top) { Rectangle().fill(Tok.line).frame(height: 1) }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Effort")
   }
 
   private func header(_ h: HarnessInfo) -> some View {
