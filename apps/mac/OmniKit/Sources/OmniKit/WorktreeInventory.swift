@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// The worktree storage inventory (Settings > Storage), as GET /api/worktrees/scan sends it. Mirrors
+// The worktree storage inventory (Settings > Machines > Storage), as GET /api/worktrees/scan sends it. Mirrors
 // packages/shared/worktree-inventory.ts, which the Web UI's Storage page uses.
 
 /// Decodes a string enum, answering `fallback` for a value a newer server sent that this app does not know.

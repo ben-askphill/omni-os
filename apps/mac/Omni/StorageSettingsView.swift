@@ -1,9 +1,10 @@
 import OmniKit
 import SwiftUI
 
-/// The Storage tab, like the Web UI's Storage page: the inventory of data/worktrees, the cleanup of what can go and this
-/// Mac's retention policy. A new model per client and per visit. It shows the last scan and scans only when Scan is
-/// pressed; closing the tab stops following a running scan or cleanup.
+/// The Storage part of the Machines tab (a tab of its own before #404), like the Web UI's Settings, Machines, Storage:
+/// the inventory of data/worktrees, the cleanup of what can go and this Mac's retention policy. A new model per client
+/// and per visit. It shows the last scan and scans only when Scan is pressed; closing the tab stops following a
+/// running scan or cleanup.
 struct StorageSettings: View {
   let model: AppModel
   @State private var inventory: WorktreeInventoryModel?
@@ -13,7 +14,7 @@ struct StorageSettings: View {
       if let inventory {
         StorageForm(inventory: inventory)
       } else {
-        Loader(size: 18).frame(maxWidth: .infinity, maxHeight: .infinity).background(Tok.bg)
+        LoadingNote()
       }
     }
     .task(id: model.client.baseURL) {
@@ -34,7 +35,7 @@ struct StorageForm: View {
   @State private var reviewing: CleanupPreview?
 
   var body: some View {
-    SettingsPage {
+    VStack(alignment: .leading, spacing: z(16)) {
       SettingsIntro(
         icon: "folder",
         text: Text(
@@ -64,6 +65,7 @@ struct StorageForm: View {
         }
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   // MARK: Scan

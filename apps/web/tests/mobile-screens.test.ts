@@ -20,7 +20,9 @@ describe('the phone layout\'s screens', () => {
     expect(screenOf(route(href.threadView('t1', 'terminal')))).toBe('terminal');
     expect(screenOf(route(href.threadView('t1', 'actions')))).toBe('actions');
     expect(screenOf(route(href.settingsPage()))).toBe('settings');
-    expect(screenOf(route(href.workspaceSettings()))).toBe('page');
+    expect(screenOf(route(href.settingsSection('general')))).toBe('page');
+    expect(screenOf(route(href.settingsSection('machines')))).toBe('page');
+    expect(screenOf(route('#/sync'))).toBe('page');
     expect(screenOf(route(href.automations()))).toBe('page');
     expect(screenOf(route('#/nowhere'))).toBe('notfound');
   });
@@ -37,6 +39,7 @@ describe('the phone layout\'s screens', () => {
     expect(keys('#/t/t1?artifact=4')).toEqual(['/t/t1', '/t/t1?artifact=4']);
     expect(keys('#/c/volero/prs/812')).toEqual(['/c/volero', '/c/volero/prs/812']);
     expect(keys('#/automations')).toEqual(['/settings', '/automations']);
+    expect(keys('#/settings/secrets')).toEqual(['/settings', '/settings/secrets']);
   });
 
   it('puts a cold link on the tab its parents lead to', () => {

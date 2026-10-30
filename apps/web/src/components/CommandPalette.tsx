@@ -55,9 +55,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: 'p:home', group: 'Go to', label: 'Home', lead: lead('home'), run: () => go(href.home()) },
       { id: 'p:artifacts', group: 'Go to', label: 'Artifacts', lead: lead('layers'), run: () => go(href.artifacts()) },
       { id: 'p:automations', group: 'Go to', label: 'Automations', lead: lead('zap'), run: () => go(href.automations()) },
-      { id: 'p:secrets', group: 'Go to', label: 'Secrets', lead: lead('key'), run: () => go(href.secrets()) },
-      { id: 'p:sync', group: 'Go to', label: 'Sync', sub: 'History across your Macs', lead: lead('refresh'), run: () => go(href.sync()) },
-      { id: 'p:settings', group: 'Go to', label: 'Settings', sub: 'Your name', lead: lead('sliders'), run: () => go(href.settingsPage()) },
+      { id: 'p:settings', group: 'Go to', label: 'Settings', sub: 'General: you, theme, notifications', lead: lead('sliders'), run: () => go(href.settingsPage()) },
+      { id: 'p:workspace', group: 'Go to', label: 'Workspace', sub: 'Settings: folders and GitHub owner', lead: lead('folder'), run: () => go(href.settingsSection('workspace')) },
+      { id: 'p:machines', group: 'Go to', label: 'Machines', sub: 'Settings: this machine, sync and storage', lead: lead('monitor'), run: () => go(href.settingsSection('machines')) },
+      { id: 'p:secrets', group: 'Go to', label: 'Secrets', sub: 'Settings', lead: lead('key'), run: () => go(href.settingsSection('secrets')) },
       { id: 'p:new-channel', group: 'Go to', label: 'Add channel', lead: lead('hash'), run: () => go(href.newChannel()) },
       ...channels.map<Item>((c) => ({
         id: `c:${c.id}`,

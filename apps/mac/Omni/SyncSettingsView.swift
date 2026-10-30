@@ -2,8 +2,9 @@ import AppKit
 import OmniKit
 import SwiftUI
 
-/// The Sync tab, like the Web UI's Sync page. A new model per client and per visit; a password or code typed
-/// and not sent goes when the tab or the window closes. The status reloads every 5 seconds while it shows.
+/// The Sync part of the Machines tab (a tab of its own before #404), like the Web UI's Settings, Machines, Sync. A new
+/// model per client and per visit; a password or code typed and not sent goes when the tab or the window closes. The
+/// status reloads every 5 seconds while it shows.
 struct SyncSettings: View {
   let model: AppModel
   @State private var sync: SyncModel?
@@ -13,7 +14,7 @@ struct SyncSettings: View {
       if let sync {
         SyncForm(sync: sync, storeLabel: model.store.status?.secretStoreLabel ?? SecretStore.keychain.label)
       } else {
-        Loader(size: 18).frame(maxWidth: .infinity, maxHeight: .infinity).background(Tok.bg)
+        LoadingNote()
       }
     }
     .task(id: model.client.baseURL) {
@@ -40,7 +41,7 @@ struct SyncForm: View {
   @State private var confirmingSignOut = false
 
   var body: some View {
-    SettingsPage {
+    VStack(alignment: .leading, spacing: z(16)) {
       SettingsIntro(
         icon: "refresh",
         text: Text("Sync keeps this Mac's history in step with your other Mac through your own Supabase project. Each Mac keeps its own database; Supabase only relays the changes. The sign-in token lives in \(storeLabel), and the password is never stored.")
@@ -59,6 +60,7 @@ struct SyncForm: View {
         }
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .confirmationDialog("Sign out of sync on this Mac?", isPresented: $confirmingSignOut) {
       Button("Sign Out", role: .destructive) { Task { await sync.signOut() } }
       Button("Cancel", role: .cancel) {}

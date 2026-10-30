@@ -6,10 +6,7 @@ import { ChannelPage } from './Channel.tsx';
 import { NewChannelPage } from './ChannelSettings.tsx';
 import { HomePage } from './Home.tsx';
 import { SearchPage } from './Search.tsx';
-import { SecretsPage } from './Secrets.tsx';
 import { SettingsPage } from './Settings.tsx';
-import { StoragePage } from './Storage.tsx';
-import { SyncPage } from './Sync.tsx';
 import { ThreadPage } from './Thread.tsx';
 
 /** The desktop page for a route. The phone shows the ones it has no screen of its own for. */
@@ -26,14 +23,8 @@ export function Page({ route }: { route: Route }) {
       return <SearchPage q={route.q} />;
     case 'automations':
       return <AutomationsPage />;
-    case 'secrets':
-      return <SecretsPage />;
-    case 'sync':
-      return <SyncPage />;
-    case 'storage':
-      return <StoragePage />;
     case 'settings':
-      return <SettingsPage />;
+      return <SettingsPage section={route.section} />;
     case 'artifacts':
       return <ArtifactsPage />;
     case 'new-channel':

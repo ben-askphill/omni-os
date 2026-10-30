@@ -15,9 +15,9 @@ Optional. Each Mac keeps its own SQLite as the source of truth; a Supabase proje
 
 ## On each Mac
 
-Open the Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the URL and key, sign in as that same user. The first sign-in queues this Mac's existing history, and the other Mac pulls it. The URL, the key and the sign-in token go to the secret store, the Keychain on a Mac and `data/secrets.json` on Linux (global scope, never passed to threads); the password is used once and not stored. Sign Out stops syncing and removes them; Pause keeps them.
+Open Settings > Machines (web `#/settings/machines`, the old `#/sync` still lands there; the Mac app's Machines tab; the phone's Settings, Machines). Under Sync, paste the URL and key, sign in as that same user. The first sign-in queues this Mac's existing history, and the other Mac pulls it. The URL, the key and the sign-in token go to the secret store, the Keychain on a Mac and `data/secrets.json` on Linux (global scope, never passed to threads); the password is used once and not stored. Sign Out stops syncing and removes them; Pause keeps them.
 
-- Path map: paths travel with the home folder as `~`. When the other Mac keeps a folder somewhere else, map it on the Sync page, like `~/work` to `~/code`.
+- Path map: paths travel with the home folder as `~`. When the other Mac keeps a folder somewhere else, map it under Sync in Settings > Machines, like `~/work` to `~/code`.
 - Files: after a Mac's first sync, Omni uploads the files and session files of every thread it wrote last, in the background (the log counts progress every 50 threads). After that, a thread's files go up after each turn. The bucket fills a few minutes after the rows.
 - `npm run sync:backfill`: queue every existing row again, for instance after restoring a database. It is idempotent and skips rows the other Mac wrote last.
 - Signing in to a different project or user starts that relay from the beginning and queues the history again.
@@ -27,7 +27,7 @@ Open the Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the URL an
 - Published-page and GitHub webhook deliveries sync as `trigger_delivery`. A relay set up before these events existed needs `0001_changes.sql` run again, or deliveries wait as held while the rest keeps syncing. Only the Mac that owns automations starts their runs. Signing secrets stay in each Mac's secret store. See [Automations](automations.md#event-automations).
 - Channel actions and worktree retention stay per Mac; sync does not copy them. See [Configuration](configuration.md#channel-actions) and [Known limits](limits.md).
 - A thread runs on one Mac at a time. Its row names the Mac running it (`run_machine`), so the other Mac shows it read-only until the run ends there, and an edit from the other Mac mid-run (a rename) never changes its status. After a crash, only the Mac that ran it marks it failed.
-- Scheduled automations run on one Mac: the Sync page says which, and "Run them here" moves them. The first Mac to finish a sync with no owner set takes them. Manual runs work on either Mac.
+- Scheduled automations run on one Mac: Sync in Settings > Machines says which, and "Run them here" moves them. The first Mac to finish a sync with no owner set takes them. Manual runs work on either Mac.
 - Copying `data/` to another Mac is fine: the folder remembers the Mac it was set up on (its hardware UUID), and on the next start the copy takes a new sync id and pulls the history again, logging one `[sync] this data folder was copied from another Mac` line. It never overwrites the Mac it came from, and scheduled automations stay there until you press "Run them here".
 
 
@@ -35,7 +35,7 @@ Open the Web UI Sync page (`#/sync`) or Mac app Settings, Sync. Paste the URL an
 
 Pick where a new thread runs: this machine, or any other synced machine, such as a Linux box with more CPU and memory. The machine you talk to stays the hub. The thread is made there, goes to the other machine with its first message, runs there, and syncs back as it goes, so you watch it from the hub as usual (a few seconds behind).
 
-- The default is Settings > Server, Run new threads on (`runOn.device` in `data/omni.config.json`, per machine). The new-thread composer overrides it per thread, on desktop, phone and the Mac app. The Conductor's `delegate` takes `device` too (a machine's name or id, or `here`).
+- The default is Settings > Machines, Run new threads on (`runOn.device` in `data/omni.config.json`, per machine). The new-thread composer overrides it per thread, on desktop, phone and the Mac app. The Conductor's `delegate` takes `device` too (a machine's name or id, or `here`).
 - An offline default stays selected in the composer. Sending reports why it cannot run there; choose This Mac explicitly to run locally.
 - The other machine cuts a worktree thread's worktree itself, from the channel's repo at the same path (or through its path map), so the repo must be cloned there.
 - Your later messages and Stop go to the machine running the thread. Skills and file mentions resolve on that machine, and attached text context goes with replies. Accepted replies do not replay after Take over. A thread the Conductor delegated there reports back to the Conductor on the hub.

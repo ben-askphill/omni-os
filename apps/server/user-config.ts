@@ -76,7 +76,7 @@ export const userConfigSchema = z.object({
     .prefault({}),
   /** Per-machine overrides of the shared automation YAML (`enabled`, `channel`), so toggling one never edits the repo. */
   automations: z.record(z.string(), automationOverride).default({}),
-  /** This Mac's worktree retention (apps/server/worktree-cleanup.ts). Off until turned on in Settings > Storage. */
+  /** This Mac's worktree retention (apps/server/worktree-cleanup.ts). Off until turned on in Settings > Machines. */
   worktrees: z
     .object({
       retention: z

@@ -32,7 +32,7 @@ describe('navigate', () => {
       href.threadView('t1', 'steps', 41),
       href.search('q'),
       href.settingsPage(),
-      href.workspaceSettings(),
+      href.settingsSection('workspace'),
     ]) {
       navigate(h);
       expect(loc.hash).toBe(h);
@@ -57,8 +57,19 @@ describe('navigate', () => {
 describe('parseHash', () => {
   it('reads the phone layout\'s routes', () => {
     expect(parseHash('#/channels')).toEqual({ name: 'channels' });
-    expect(parseHash('#/settings/workspace')).toEqual({ name: 'settings', page: 'workspace' });
+    expect(parseHash('#/settings/workspace')).toEqual({ name: 'settings', section: 'workspace' });
+    expect(parseHash('#/settings/machines')).toEqual({ name: 'settings', section: 'machines' });
     expect(parseHash('#/settings')).toEqual({ name: 'settings' });
+    expect(parseHash('#/settings/nope')).toEqual({ name: 'notfound', path: '/settings/nope' });
+  });
+
+  it('keeps the pages Settings replaced reachable at their old hashes', () => {
+    expect(parseHash('#/secrets')).toEqual({ name: 'settings', section: 'secrets' });
+    expect(parseHash('#/sync')).toEqual({ name: 'settings', section: 'machines' });
+    expect(parseHash('#/storage')).toEqual({ name: 'settings', section: 'machines' });
+    expect(parseHash('#/toString')).toEqual({ name: 'notfound', path: '/toString' });
+    expect(href.settingsSection('machines')).toBe('#/settings/machines');
+    expect(href.settingsSection('general')).toBe('#/settings/general');
   });
 
   it('reads a thread\'s own views, its steps for one turn, and its artifact', () => {

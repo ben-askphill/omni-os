@@ -11,7 +11,7 @@ public enum SidebarItem: Hashable, Sendable {
   case newChannel
   case artifacts
   case automations
-  case secrets
+  /// Opens the Settings window on General and never shows as selected: Settings is a window, not a screen.
   case settings
 
   /// The row a route selects, nil for a route with none, like search.
@@ -23,7 +23,6 @@ public enum SidebarItem: Hashable, Sendable {
     case .newChannel: self = .newChannel
     case .artifacts: self = .artifacts
     case .automations: self = .automations
-    case .secrets: self = .secrets
     case .settings: self = .settings
     case .search, .notFound: return nil
     }
@@ -37,8 +36,7 @@ public enum SidebarItem: Hashable, Sendable {
     case .newChannel: .newChannel
     case .artifacts: .artifacts
     case .automations: .automations
-    case .secrets: .secrets
-    case .settings: .settings
+    case .settings: .settings(.general)
     }
   }
 }
@@ -52,7 +50,6 @@ extension Route {
     case .thread: "Thread"
     case .search: "Search"
     case .automations: "Automations"
-    case .secrets: "Secrets"
     case .settings: "Settings"
     case .artifacts: "Artifacts"
     case .newChannel: "New channel"

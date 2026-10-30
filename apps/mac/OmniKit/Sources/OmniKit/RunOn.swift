@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 // Where a new thread runs: this Mac, or another synced machine (apps/server/run-on.ts). The composer picks per thread;
-// Settings > Server saves the default (user config `runOn.device`). A pick is a device id from GET /api/devices, or ""
+// Settings > Machines saves the default (user config `runOn.device`). A pick is a device id from GET /api/devices, or ""
 // for this Mac.
 
 public enum RunOnRules {
@@ -39,7 +39,7 @@ public enum RunOnRules {
   }
 }
 
-/// The calls Settings > Server makes for the default. `OmniClient` is one; tests pass a fake.
+/// The calls Settings > Machines makes for the default. `OmniClient` is one; tests pass a fake.
 public protocol RunOnAPI: Sendable {
   func setup() async throws(OmniAPIError) -> SetupState
   func saveSetup(_ patch: SetupPatch) async throws(OmniAPIError) -> SetupState
@@ -47,7 +47,7 @@ public protocol RunOnAPI: Sendable {
 
 extension OmniClient: RunOnAPI {}
 
-/// The saved default machine for new threads. Follows the connection; read by the composer and Settings > Server.
+/// The saved default machine for new threads. Follows the connection; read by the composer and Settings > Machines.
 @MainActor @Observable
 public final class RunOnModel {
   /// A device id, or "" for this Mac.

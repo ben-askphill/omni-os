@@ -864,15 +864,6 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
               <NavLink to={href.automations()} icon="zap" active={route.name === 'automations'} onNavigate={onNavigate}>
                 Automations
               </NavLink>
-              <NavLink to={href.secrets()} icon="key" active={route.name === 'secrets'} onNavigate={onNavigate}>
-                Secrets
-              </NavLink>
-              <NavLink to={href.sync()} icon="refresh" active={route.name === 'sync'} onNavigate={onNavigate}>
-                Sync
-              </NavLink>
-              <NavLink to={href.storage()} icon="archive" active={route.name === 'storage'} onNavigate={onNavigate}>
-                Storage
-              </NavLink>
               <NavLink to={href.settingsPage()} icon="sliders" active={route.name === 'settings'} onNavigate={onNavigate}>
                 Settings
               </NavLink>

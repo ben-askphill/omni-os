@@ -46,7 +46,7 @@ struct SidebarView: View {
 
   private var selected: SidebarItem? { SidebarItem(route: model.route) }
 
-  /// Secrets opens Settings on its tab and leaves the window where it was.
+  /// Settings opens its window on General and leaves the main window where it was.
   private func pick(_ item: SidebarItem) {
     withAnimation(Motion.spring) {
       if model.show(item.route) != nil { openSettings() }
@@ -149,7 +149,6 @@ struct SidebarView: View {
             VStack(spacing: 1) {
               row(.artifacts) { NavRow(title: "Artifacts", icon: "layers", active: selected == .artifacts) }
               row(.automations) { NavRow(title: "Automations", icon: "zap", active: selected == .automations) }
-              row(.secrets) { NavRow(title: "Secrets", icon: "key", active: false) }
               row(.settings) { NavRow(title: "Settings", icon: "sliders", active: false) }
             }
           }

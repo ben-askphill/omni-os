@@ -76,7 +76,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startTriggerDeliveries();
   startPRWatch();
   startCatalogRefresh();
-  // With this Mac's retention policy on (Settings > Storage), removes idle worktrees that hold nothing unsaved, now and daily.
+  // With this Mac's retention policy on (Settings > Machines), removes idle worktrees that hold nothing unsaved, now and daily.
   startWorktreeRetention();
   // Off unless the sync credentials are in the secret store; then it runs alongside, and a failure only logs.
   startSync().catch((err) => console.error('[sync] could not start:', (err as Error).message));

@@ -12,7 +12,7 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 | `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file |
 | Secret store | Secret values: the Keychain on a Mac, `data/secrets.json` on Linux. The database keeps their names only |
 
-`npm run setup` or the first-run screens write `data/omni.config.json` ([Install](install.md#set-up-by-hand)). Change it later in **Settings** (web, `#/settings`) or **Settings > Profile** (Mac). Your name goes into the Home greeting and every agent's prompt.
+`npm run setup` or the first-run screens write `data/omni.config.json` ([Install](install.md#set-up-by-hand)). Change it later in Settings, the same sections on desktop web, phone web and the Mac app: General (you, theme, notifications, run setup again), Workspace (your folders, GitHub owner, integrations), Machines (this machine, where new threads run, Sync, Storage) and Secrets. On the web, Settings is `#/settings` and each section has its own hash (`#/settings/machines`); the old `#/secrets`, `#/sync` and `#/storage` still open the section that holds them. Automations stays a page of its own. Your name goes into the Home greeting and every agent's prompt.
 
 An install from before the config file existed writes one at its first boot from the old defaults and skips onboarding, so it keeps behaving as before.
 
@@ -28,7 +28,7 @@ Optional. Copy `.env.example` to `.env` (gitignored) and uncomment what you need
 
 ## Secrets
 
-Values live in the server's secret store under service `omni-os`, account `<scope>/<NAME>`. The database keeps names only. Manage them on the Secrets page (web) or **Settings > Secrets** (Mac). The Secrets page says which store this server uses.
+Values live in the server's secret store under service `omni-os`, account `<scope>/<NAME>`. The database keeps names only. Manage them in Settings > Secrets on every surface. That section says which store this server uses.
 
 | Store | Default on | Where |
 | --- | --- | --- |
@@ -54,7 +54,7 @@ A channel's settings list its named actions: a name, a command, the secrets it n
 
 ## Worktree storage
 
-Settings > Storage inventories worktrees and explains why each is kept or eligible for cleanup. Review the scan before removing them, or turn on automatic retention for this Mac. Retention is off by default and stays local in `data/omni.config.json`; the old `OMNI_WORKTREE_SWEEP` option no longer controls cleanup. The guards and what survives removal are in [Known limits](limits.md).
+Storage, under Settings > Machines, inventories worktrees and explains why each is kept or eligible for cleanup. Review the scan before removing them, or turn on automatic retention for this Mac. Retention is off by default and stays local in `data/omni.config.json`; the old `OMNI_WORKTREE_SWEEP` option no longer controls cleanup. The guards and what survives removal are in [Known limits](limits.md).
 
 ## Grok Bot
 
@@ -66,7 +66,7 @@ The button and the menu items show only once `GROKBOT_WEBHOOK_URL` is set, as a 
 
 The URL and the Authorization value come from the Omni OS requests routine, on Grok Bot's Routines tab. Paste each one in either place.
 
-1. Settings, Secrets, scope Global. Type `GROKBOT_WEBHOOK_URL` as the name and paste the URL, then do the same for `GROKBOT_WEBHOOK_AUTH`. Once the URL is saved, Known global secrets on the Web UI (the phone opens the same page) lists both names, and the Mac app's Settings > Secrets offers Use GROKBOT_WEBHOOK_URL and Use GROKBOT_WEBHOOK_AUTH while the name field is empty.
+1. Settings, Secrets, scope Global. Type `GROKBOT_WEBHOOK_URL` as the name and paste the URL, then do the same for `GROKBOT_WEBHOOK_AUTH`. Once the URL is saved, Known global secrets on the Web UI (the phone opens the same section) lists both names, and the Mac app's Settings > Secrets offers Use GROKBOT_WEBHOOK_URL and Use GROKBOT_WEBHOOK_AUTH while the name field is empty.
 2. `.env`, as a fallback when the secret store has no value for that name. Copy the empty lines from `.env.example` and fill them in. An empty value leaves Grok Bot off. `.env` stays untracked.
 
 When both are set, Omni uses the secret store's value. `GROKBOT_WEBHOOK_URL` is the routine's URL. `GROKBOT_WEBHOOK_AUTH` can be the bare key or a value that already starts with `Bearer `. Either form works. Omni leaves both values out of the log. A thread's harness and its terminal run without them.

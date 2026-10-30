@@ -2,46 +2,43 @@ import AppKit
 import OmniKit
 import SwiftUI
 
+/// The Appearance card of the General tab (a tab of its own before #404): the theme, as the Web UI's Appearance
+/// card, and the zoom.
 struct AppearanceSettingsView: View {
   @Bindable var appearance: AppearanceSettings
   @Bindable var zoom: ZoomSettings
 
   var body: some View {
-    Form {
-      Section {
-        Picker("Appearance", selection: $appearance.appearance) {
-          ForEach(Appearance.allCases, id: \.self) { Text($0.label).tag($0) }
+    SettingsCard(title: "Appearance", note: "Applies to every Omni window at once.") {
+      VStack(alignment: .leading, spacing: z(14)) {
+        VStack(alignment: .leading, spacing: 0) {
+          FieldLabel(text: "Theme")
+          Picker("Theme", selection: $appearance.appearance) {
+            ForEach(Appearance.allCases, id: \.self) { Text($0.label).tag($0) }
+          }
+          .pickerStyle(.radioGroup)
+          .labelsHidden()
         }
-        .pickerStyle(.radioGroup)
-      } footer: {
-        Text("Applies to every Omni window at once.")
-          .foregroundStyle(.secondary)
-      }
-
-      Section {
-        Picker("Zoom", selection: $zoom.scale) {
-          ForEach(ZoomSettings.levels, id: \.self) { Text(ZoomSettings.label($0)).tag($0) }
+        VStack(alignment: .leading, spacing: 0) {
+          FieldLabel(text: "Zoom", hint: "Text, icons and spacing in every window. View > Zoom In (⌘=), Zoom Out (⌘-) and Actual Size (⌘0) change it too.")
+          Picker("Zoom", selection: $zoom.scale) {
+            ForEach(ZoomSettings.levels, id: \.self) { Text(ZoomSettings.label($0)).tag($0) }
+          }
+          .labelsHidden()
+          .fixedSize()
         }
-      } footer: {
-        Text("Text, icons and spacing in every window. View > Zoom In (⌘=), Zoom Out (⌘-) and Actual Size (⌘0) change it too.")
-          .foregroundStyle(.secondary)
-      }
-
-      if appearance.isVolatile {
-        Section {
+        if appearance.isVolatile {
           Label("A launch argument sets the appearance, so changes last until the app quits.", systemImage: "info.circle")
-            .foregroundStyle(.secondary)
+            .font(.omni(size: 12))
+            .foregroundStyle(Tok.fg3)
         }
-      }
-
-      if zoom.isVolatile {
-        Section {
+        if zoom.isVolatile {
           Label("A launch argument sets the zoom, so changes last until the app quits.", systemImage: "info.circle")
-            .foregroundStyle(.secondary)
+            .font(.omni(size: 12))
+            .foregroundStyle(Tok.fg3)
         }
       }
     }
-    .formStyle(.grouped)
   }
 }
 

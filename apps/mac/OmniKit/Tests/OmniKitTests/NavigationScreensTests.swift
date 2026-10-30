@@ -32,27 +32,27 @@ private func listThread(_ id: String, title: String? = nil, channel: String = "a
   @Test func visitingTheCurrentRouteAddsNothing() {
     var h = NavigationHistory()
     h.visit(.home)
-    h.visit(.secrets)
-    h.visit(.secrets)
-    #expect(h.entries == [.home, .secrets])
+    h.visit(.search(query: "x"))
+    h.visit(.search(query: "x"))
+    #expect(h.entries == [.home, .search(query: "x")])
   }
 
   @Test func visitingAfterBackDropsWhatWasAhead() {
     var h = NavigationHistory()
-    h.visit(.secrets)
+    h.visit(.search(query: "x"))
     h.visit(.artifacts)
     _ = h.back()
     h.visit(.automations)
-    #expect(h.entries == [.home, .secrets, .automations])
+    #expect(h.entries == [.home, .search(query: "x"), .automations])
     #expect(!h.canGoForward)
   }
 
   @Test func showingTheRouteBackGaveDoesNotAddAnEntry() {
     var h = NavigationHistory()
-    h.visit(.secrets)
+    h.visit(.search(query: "x"))
     let r = h.back()!
     h.visit(r)
-    #expect(h.entries == [.home, .secrets] && h.index == 0)
+    #expect(h.entries == [.home, .search(query: "x")] && h.index == 0)
   }
 
   @Test func keepsTheLatestHundred() {

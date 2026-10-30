@@ -1,4 +1,4 @@
-// Removes worktrees from data/worktrees: the ones Ben confirms after reviewing them in Settings > Storage and, when
+// Removes worktrees from data/worktrees: the ones Ben confirms after reviewing them in Settings > Machines and, when
 // this Mac's retention policy is on, the ones a daily pass finds idle long enough. Each is checked again right before
 // it goes, with its folder held (workspace.ts) the way a turn, a terminal or a checkout holds it, so whichever starts
 // first wins. Removal is a `git worktree move` aside, then `git worktree remove` without --force: the branch stays, and
