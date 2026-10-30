@@ -152,6 +152,9 @@ type Name = (typeof NAMES)[number];
 const tmp = mkdtempSync(join(tmpdir(), 'omni-mac-fixtures-'));
 const data = join(tmp, 'data');
 const fakeLog = join(tmp, 'fake-claude.jsonl');
+// Reply suggestions land only while this file exists (FAKE_CLAUDE_SUGGEST_GATE): the lists and streams record a done
+// thread with none, and needs-you.json with one. Left to timing, a loaded machine got them the other way round.
+const suggestGate = join(tmp, 'suggest-gate');
 const got = new Map<Name, string>();
 let child: ChildProcess | undefined;
 
@@ -273,6 +276,7 @@ async function boot(): Promise<number> {
       OMNI_WEB_DIST: join(tmp, 'no-web'),
       OMNI_AUTOMATIONS_DIR: automationsDir,
       FAKE_CLAUDE_LOG: fakeLog,
+      FAKE_CLAUDE_SUGGEST_GATE: suggestGate,
       FAKE_CLAUDE_LATENCY_MS: '10',
       FAKE_CLAUDE_CRASH_ON: 'CRASH_NOW',
       // Pages of 6 rows, 8 KB, 1 KB a row: a short thread still shows every history shape.
@@ -603,7 +607,14 @@ async function scenario() {
 
   // Needs you now holds every kind: done, failed and stopped results, a question, failed Setup, parked requests and a limit stop.
   type Item = { thread: Thread; result: { uid: string; status: string } | null; blockers: { kind: string }[] };
+  writeFileSync(suggestGate, '');
+  await eventually(async () => {
+    const { items } = (await get('/needs-you')) as { items: (Item & { thread: { suggestion: string | null } })[] };
+    // Automation runs and threads whose answer asks for no reply get none, so one done thread with a suggestion is enough.
+    return items.some((i) => i.result?.status === 'done' && i.thread.suggestion);
+  }, 'a done thread\'s reply suggestion');
   const inbox = keep('needs-you.json', await get('/needs-you')) as { items: Item[] };
+  rmSync(suggestGate);
   expect(new Set(inbox.items.flatMap((i) => (i.result ? [i.result.status] : [])))).toEqual(new Set(['done', 'failed', 'stopped']));
   expect(new Set(inbox.items.flatMap((i) => i.blockers.map((b) => b.kind)))).toEqual(new Set(['question', 'setup', 'recovered', 'limited']));
   // Ben reads the stopped parent's result: its held crew report still needs him. The uid is this run's.

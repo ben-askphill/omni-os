@@ -314,8 +314,10 @@ describe('files that change here while the relay is slow', () => {
     a.put(`${chatA}/store.db-wal`, 'wal 1');
     expect(await a.files.pushSession(onA, a.opts)).toBe(3);
     expect(await b.files.pullSession(onB, b.opts)).toBe(3);
-    a.put(`${chatA}/store.db`, 'db 2');
-    a.put(`${chatA}/store.db-wal`, 'wal 2');
+    // Same length as before, and maybe in the same millisecond: a later mtime is what tells A they changed.
+    const later = new Date(Date.now() + 60_000);
+    utimesSync(a.put(`${chatA}/store.db`, 'db 2'), later, later);
+    utimesSync(a.put(`${chatA}/store.db-wal`, 'wal 2'), later, later);
     expect(await a.files.pushSession(onA, a.opts)).toBe(2);
 
     // Cursor on B writes its database while B is still fetching the newer -wal: a db and -wal from two Macs would be
