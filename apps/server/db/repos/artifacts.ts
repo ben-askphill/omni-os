@@ -20,6 +20,18 @@ export interface Artifact {
 /** The columns clients read, without sync's uid. */
 export const ARTIFACT_COLUMNS = 'id, thread_id, path, name, kind, size, url, description, created_at, updated_at';
 
+const A_COLUMNS = ARTIFACT_COLUMNS.split(', ').map((c) => `a.${c}`).join(', ');
+
+/** The reads by page and by thread. Each runs on an index from db/migrate.ts; tests/artifact-plans.test.ts checks the plans. */
+export const ARTIFACT_SQL = {
+  published: `SELECT ${A_COLUMNS}, t.title AS thread_title, t.channel_id FROM artifacts a JOIN threads t ON t.id = a.thread_id
+    WHERE a.url IS NOT NULL AND (? IS NULL OR t.channel_id = ?)
+      AND a.id = (SELECT b.id FROM artifacts b WHERE b.url = a.url ORDER BY b.updated_at DESC, b.id DESC LIMIT 1)
+    ORDER BY a.updated_at DESC LIMIT ?`,
+  byUrl: `SELECT ${ARTIFACT_COLUMNS} FROM artifacts WHERE url = ? ORDER BY updated_at DESC, id DESC LIMIT 1`,
+  byThread: `SELECT ${ARTIFACT_COLUMNS} FROM artifacts WHERE thread_id = ? ORDER BY created_at`,
+};
+
 export const artifacts = {
   upsert(a: { thread_id: string; path: string; name: string; kind: string; size: number }) {
     return tx(() => {
@@ -47,28 +59,17 @@ export const artifacts = {
     });
   },
   /** The latest file per published page, newest first: in one channel, or everywhere. */
-  published(channelId?: string, limit = 20) {
-    const cols = ARTIFACT_COLUMNS.split(', ').map((c) => `a.${c}`).join(', ');
-    return db
-      .prepare(
-        `SELECT ${cols}, t.title AS thread_title, t.channel_id FROM artifacts a JOIN threads t ON t.id = a.thread_id
-         WHERE a.url IS NOT NULL AND (? IS NULL OR t.channel_id = ?)
-           AND a.id = (SELECT b.id FROM artifacts b WHERE b.url = a.url ORDER BY b.updated_at DESC, b.id DESC LIMIT 1)
-         ORDER BY a.updated_at DESC LIMIT ?`,
-      )
-      .all(channelId ?? null, channelId ?? null, limit) as unknown as (Artifact & { thread_title: string; channel_id: string })[];
-  },
+  published: (channelId?: string, limit = 20) =>
+    db.prepare(ARTIFACT_SQL.published).all(channelId ?? null, channelId ?? null, limit) as unknown as (Artifact & { thread_title: string; channel_id: string })[],
   /** The newest file published at a claude.ai URL, for naming a link to it. */
-  byUrl: (url: string) =>
-    db.prepare(`SELECT ${ARTIFACT_COLUMNS} FROM artifacts WHERE url = ? ORDER BY updated_at DESC, id DESC LIMIT 1`).get(url) as unknown as Artifact | undefined,
-  byThread: (threadId: string) =>
-    db.prepare(`SELECT ${ARTIFACT_COLUMNS} FROM artifacts WHERE thread_id = ? ORDER BY created_at`).all(threadId) as unknown as Artifact[],
+  byUrl: (url: string) => db.prepare(ARTIFACT_SQL.byUrl).get(url) as unknown as Artifact | undefined,
+  byThread: (threadId: string) => db.prepare(ARTIFACT_SQL.byThread).all(threadId) as unknown as Artifact[],
   get: (id: number) => db.prepare(`SELECT ${ARTIFACT_COLUMNS} FROM artifacts WHERE id = ?`).get(id) as unknown as Artifact | undefined,
   uidOf: (id: number) => (db.prepare('SELECT uid FROM artifacts WHERE id = ?').get(id) as { uid: string } | undefined)?.uid ?? null,
   recent: (limit = 60) =>
     db
       .prepare(
-        `SELECT ${ARTIFACT_COLUMNS.split(', ').map((c) => `a.${c}`).join(', ')}, t.title AS thread_title, t.channel_id
+        `SELECT ${A_COLUMNS}, t.title AS thread_title, t.channel_id
          FROM artifacts a JOIN threads t ON t.id = a.thread_id
          WHERE a.kind != 'screenshot' ORDER BY a.updated_at DESC LIMIT ?`,
       )
