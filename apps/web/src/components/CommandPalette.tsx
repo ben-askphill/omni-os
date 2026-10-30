@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useApi, type Thread } from '../api.ts';
 import { relTime } from '../format.ts';
-import { href, navigate, requestComposerFocus, useRoute } from '../router.ts';
+import { href, navigate, startNewThread, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { setTheme } from './theme.tsx';
 import { Avatar, Icon, Kbd, StatusDot, Thumb, useSlidingThumb, type IconName } from './ui.tsx';
@@ -28,7 +28,7 @@ const lead = (icon: IconName) => (
 
 /** ⌘K: jump to a page, channel or recent thread, or search everything. */
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { channels } = useApp();
+  const { channels, openThread } = useApp();
   const route = useRoute();
   const [q, setQ] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -48,12 +48,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     const words = s.split(/\s+/).filter(Boolean);
     const match = (i: Item) => !words.length || words.every((w) => `${i.label} ${i.sub ?? ''}`.toLowerCase().includes(w));
 
-    const newThread = () => {
-      if (route.name === 'channel') {
-        if (route.tab !== 'threads') navigate(`/c/${encodeURIComponent(route.id)}`);
-      } else if (route.name !== 'home') navigate('/');
-      requestComposerFocus();
-    };
+    const newThread = () => startNewThread(route, openThread);
 
     const base: Item[] = [
       { id: 'a:new', group: 'Actions', label: 'New thread', sub: 'Start a task', lead: lead('plus'), run: newThread },
@@ -108,7 +103,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       });
     }
     return list;
-  }, [q, channels, recent.data, route]);
+  }, [q, channels, recent.data, route, openThread]);
 
   useEffect(() => setCursor(0), [q]);
   const safeCursor = Math.min(cursor, Math.max(0, items.length - 1));

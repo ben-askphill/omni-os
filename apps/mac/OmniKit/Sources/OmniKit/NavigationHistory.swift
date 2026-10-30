@@ -72,9 +72,9 @@ extension AppModel {
     if let r = shell.history.forward() { route = r }
   }
 
-  /// New thread from the palette or ⌘N: the channel's threads or Home, with the composer focused.
+  /// New thread from the sidebar, toolbar, palette or ⌘N: the current channel's threads or Home, with the composer focused.
   public func startNewThread() {
-    route = route.newThreadRoute
+    route = route.newThreadRoute(threadChannel: openThread?.channelID)
     shell.requestComposerFocus()
   }
 

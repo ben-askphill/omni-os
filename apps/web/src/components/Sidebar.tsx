@@ -7,7 +7,7 @@ import { openMenu } from './ContextMenu.tsx';
 import { pinnedRows } from '../pins.ts';
 import { runningThreadGroups } from '../sidebar-lists.ts';
 import { duration, monthlyTitle, plural, toDate, untilLabel, windowPct } from '../format.ts';
-import { href, navigate, requestComposerFocus, useHash, useRoute } from '../router.ts';
+import { href, startNewThread, useHash, useRoute } from '../router.ts';
 import { readPref, useApp, useNow, writePref } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { HARNESS_ROWS, HarnessLogo, Loader, OmniMark, SLOT_ROWS } from './brand.tsx';
@@ -802,10 +802,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
           type="button"
           onClick={() => {
             onNavigate?.();
-            if (route.name === 'channel') {
-              if (route.tab !== 'threads') navigate(`/c/${encodeURIComponent(route.id)}`);
-            } else if (route.name !== 'home') navigate('/');
-            requestComposerFocus();
+            startNewThread(route, openThread);
           }}
           className="press flex h-10 w-full items-center justify-center gap-2 rounded-full bg-fg text-[13px] font-medium text-on-ink transition-colors hover:bg-fg/88"
         >

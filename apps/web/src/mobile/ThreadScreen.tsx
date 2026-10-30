@@ -581,6 +581,7 @@ export function ThreadScreen() {
     if (!slotBusy) chips.push({ label: 'Open PR', icon: 'pr', onClick: () => void openPR() });
   }
   if (!slotBusy && !conductor) chips.push({ label: 'Ask the Conductor', icon: 'delegate', onClick: () => shell.sheet({ name: 'new' }) });
+  if (!conductor) chips.push({ label: 'New thread', icon: 'plus', onClick: () => shell.sheet({ name: 'new', channel: thread.channel_id }) });
 
   const sub = conductor ? `Conductor · ${plural(crew.length, 'crew thread')}` : [`#${ch?.name ?? thread.channel_id}`, thread.role, harnessLabel(thread.harness)].filter(Boolean).join(' · ');
   // A Conductor thread needs Ben while any thread it delegated does.
