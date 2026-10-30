@@ -2,56 +2,51 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { Thread } from '../src/api.ts';
-import { FOLD, HeaderActions, UNFOLD } from '../src/components/thread/HeaderActions.tsx';
+import { HeaderActions } from '../src/components/thread/HeaderActions.tsx';
 
-// The thread header's buttons (components/thread/HeaderActions.tsx). With the side panel open the header gets narrow,
-// and every button that always shows takes width from the title. A new header button folds into the More menu
-// below the breakpoint, or is added to ALWAYS here on purpose.
-
-const ALWAYS = ['Reference another thread', 'Thread actions', 'Artifacts, changes, browser, terminal, actions, details'];
+// The thread header's buttons (components/thread/HeaderActions.tsx): Done (Restore on an archived thread), the thread
+// menu and the panel toggle. Everything else the thread can do is in the thread menu, so a new header button is a
+// choice made here on purpose.
 
 const thread = (over: Partial<Thread> = {}) => ({ id: 't1', title: 'A thread', status: 'running', archived: 0, pinned_at: null, done_at: null, ...over }) as Thread;
 
-const render = (t: Thread, grok: { busy: boolean; run: () => void } | null = { busy: false, run: () => {} }) =>
+const render = (t: Thread) =>
   renderToStaticMarkup(
     createElement(HeaderActions, {
       thread: t,
       meter: null,
       reconnecting: false,
-      handoffReady: true,
-      onPin: () => {},
       onDone: () => {},
       onRestore: () => {},
       restoring: false,
-      grok,
       panelOpen: true,
       onPanel: () => {},
       artifactCount: 0,
     }),
   );
 
-/** Each button's accessible name (its aria-label, or its text) and its class. */
-const buttons = (html: string) =>
-  [...html.matchAll(/<button([^>]*)>(.*?)<\/button>/g)].map(([, attrs, body]) => ({
-    name: /aria-label="([^"]*)"/.exec(attrs)?.[1] ?? body.replace(/<[^>]+>/g, '').trim(),
-    cls: /class="([^"]*)"/.exec(attrs)?.[1] ?? '',
-  }));
+/** Each button's accessible name: its aria-label, or its text. */
+const buttons = (html: string) => [...html.matchAll(/<button([^>]*)>(.*?)<\/button>/g)].map(([, attrs, body]) => /aria-label="([^"]*)"/.exec(attrs)?.[1] ?? body.replace(/<[^>]+>/g, '').trim());
 
-describe('the thread header keeps the title wide when it is narrow', () => {
-  it('folds every button but the thread reference, More and the panel toggle', () => {
-    for (const t of [thread(), thread({ pinned_at: '2026-10-24T08:00:00Z' }), thread({ status: 'done', done_at: '2026-10-24T08:00:00Z' })]) {
-      const shown = buttons(render(t)).filter((b) => !b.cls.split(' ').includes(FOLD));
-      expect(shown.map((b) => b.name).filter((n) => !ALWAYS.includes(n))).toEqual([]);
+const MENU = 'Thread actions';
+const PANEL = 'Artifacts, changes, browser, terminal, actions, details';
+
+describe('the thread header', () => {
+  it('shows the thread menu and the panel toggle, at any width, on any thread', () => {
+    for (const t of [thread(), thread({ status: 'done' }), thread({ status: 'done', done_at: '2026-10-24T08:00:00Z' }), thread({ archived: 1 })]) {
+      expect(buttons(render(t))).toEqual(expect.arrayContaining([MENU, PANEL]));
     }
   });
 
-  it('folds pin, done, hand off and Send to Grok Bot, which the More menu offers', () => {
-    const all = buttons(render(thread({ status: 'done' })));
-    for (const name of ['Pin thread', 'Mark as done', 'Hand off to another Mac', 'Send to Grok Bot']) expect(all.find((b) => b.name === name)?.cls.split(' ')).toContain(FOLD);
-    expect(all.find((b) => b.name === 'Thread actions')?.cls.split(' ')).toContain(UNFOLD);
+  it('adds only Done, or Restore on an archived thread', () => {
+    expect(buttons(render(thread()))).toEqual([MENU, PANEL]);
+    expect(buttons(render(thread({ status: 'done' })))).toEqual(['Mark as done', MENU, PANEL]);
+    expect(buttons(render(thread({ status: 'done', done_at: '2026-10-24T08:00:00Z' })))).toEqual(['Mark as not done', MENU, PANEL]);
+    expect(buttons(render(thread({ archived: 1 })))).toEqual(['Restore', MENU, PANEL]);
   });
 
-  it('leaves Send to Grok Bot out when the server has no webhook', () => {
-    expect(buttons(render(thread(), null)).map((b) => b.name)).not.toContain('Send to Grok Bot');
+  it('leaves pin, reference, hand off and Send to Grok Bot to the thread menu', () => {
+    const names = buttons(render(thread({ status: 'done', pinned_at: '2026-10-24T08:00:00Z' })));
+    for (const gone of ['Pin thread', 'Unpin thread', 'Reference another thread', 'Hand off to another Mac', 'Send to Grok Bot']) expect(names).not.toContain(gone);
   });
 });

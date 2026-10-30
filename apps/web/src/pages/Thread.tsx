@@ -13,7 +13,7 @@ import { PANEL_MIN, THREAD_MIN, defaultPanelWidth, PanelResizeHandle } from '../
 import { NextThreadCard } from '../components/thread/NextThreadCard.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { LimitCard } from '../components/thread/LimitCard.tsx';
-import { HandoffCard, useHandoffTargets, type HandoffAnswer } from '../components/thread/Handoff.tsx';
+import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
 import { TakeoverNote } from '../components/thread/Takeover.tsx';
 import { OPEN_PR_PROMPT, ThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
@@ -21,9 +21,7 @@ import { HeaderActions } from '../components/thread/HeaderActions.tsx';
 import { ContinueCrumbs } from '../components/ContinueLinks.tsx';
 import { Avatar, Empty, ErrorNote, Icon, IconButton, LinkButton, Loading, Segmented } from '../components/ui.tsx';
 import { href } from '../router.ts';
-import { sendThreadToGrokBot } from '../grokbot.ts';
 import { blockedNote } from '../handoff.ts';
-import { useToast } from '../components/Toaster.tsx';
 import { shownResult } from '../needs-you.ts';
 import { reportNotes } from '../requests.ts';
 import { canSteer } from '../steer.ts';
@@ -57,7 +55,7 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
 }
 
 export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; artifact?: number; at?: number }) {
-  const { setOpenThread, mods, tasks, reloadChannels, needsYou, readResult, setPinned, setDone, status } = useApp();
+  const { setOpenThread, mods, tasks, reloadChannels, needsYou, readResult, setDone } = useApp();
   const modLines = useMemo(() => mods.filter((m) => m.thread_id === id), [mods, id]);
   // GET /api/harnesses, the same list the reply pills load. Until it arrives, canSteer uses the Cursor fallback.
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
@@ -112,7 +110,6 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
     release();
     clearReveal();
   });
-  const handoffTargets = useHandoffTargets(thread, { blocked, handoff, takeover });
   const handedOff = (a: HandoffAnswer) => {
     applyThread(a.thread, true);
     setHandoff(a.handoff);
@@ -130,9 +127,6 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
   });
   const [prBusy, setPrBusy] = useState(false);
   const [restoring, setRestoring] = useState(false);
-  const [grokBusy, setGrokBusy] = useState(false);
-  const grokLock = useRef(false);
-  const toast = useToast();
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootWidth, setRootWidth] = useState(0);
 
@@ -233,17 +227,6 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
     }
   };
 
-  // Pinned or not, from the header: the sidebar shows it at once, and the thread's copy follows the server's answer.
-  const togglePin = async () => {
-    setActionError(null);
-    const on = !thread?.pinned_at;
-    try {
-      applyThread(await setPinned(thread!, on), true);
-    } catch (e) {
-      setActionError(errorText(e));
-    }
-  };
-
   // Done or not, from the header: out of Needs you at once, and the thread's copy follows the server's answer.
   const toggleDone = async () => {
     setActionError(null);
@@ -252,18 +235,6 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
     } catch (e) {
       setActionError(errorText(e));
     }
-  };
-
-  const sendGrok = async () => {
-    if (grokLock.current) return;
-    grokLock.current = true;
-    setGrokBusy(true);
-    setActionError(null);
-    const result = await sendThreadToGrokBot(thread.id);
-    grokLock.current = false;
-    setGrokBusy(false);
-    if (result.ok) toast({ title: 'Sent to Grok Bot', icon: 'external' });
-    else setActionError(result.error);
   };
 
   const togglePanel = () =>
@@ -364,12 +335,9 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
               />
             }
             reconnecting={!live && ready}
-            handoffReady={handoffTargets.state === 'ready'}
-            onPin={() => void togglePin()}
             onDone={() => void toggleDone()}
             onRestore={() => void restore()}
             restoring={restoring}
-            grok={status?.grokBot ? { busy: grokBusy, run: () => void sendGrok() } : null}
             panelOpen={panelOpen}
             onPanel={togglePanel}
             artifactCount={artifactCount}

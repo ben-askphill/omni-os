@@ -36,48 +36,6 @@ struct HandOffMenu: View {
   }
 }
 
-/// The thread header's Hand Off button. It also keeps the list of Macs fresh while the thread could go.
-struct HandOffButton: View {
-  let model: AppModel
-  let store: ThreadStore
-
-  var body: some View {
-    ZStack {
-      if let devices = model.devices.targets(store) {
-        Menu {
-          Section("Hand Off to") {
-            HandOffItems(store: store, devices: devices)
-          }
-        } label: {
-          OmniIcon(name: "share", size: 15)
-        }
-        .menuStyle(.button)
-        .buttonStyle(.icon(size: 28))
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Hand off to another Mac: a running turn carries on there, an idle thread continues there with your next message")
-        .accessibilityLabel("Hand off to another Mac")
-        #if DEBUG
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { QAHandoffProbe.button = $0 }
-        .onAppear { QAHandoffProbe.handOff = { [store] in await store.handOff(to: $0) } }
-        .onDisappear {
-          QAHandoffProbe.button = nil
-          QAHandoffProbe.handOff = nil
-        }
-        #endif
-      }
-    }
-    // Tailscale's view of the other Mac changes as it sleeps and wakes, so ask again while the thread could go.
-    .task(id: store.canHandOff) {
-      guard store.canHandOff else { return }
-      while !Task.isCancelled {
-        await model.devices.refresh()
-        try? await Task.sleep(for: .seconds(30))
-      }
-    }
-  }
-}
-
 /// Take Over from <Mac>… in the thread's right-click, while its store is open and it can be taken now. It raises the
 /// reply box's confirm.
 struct TakeOverItem: View {
@@ -158,8 +116,8 @@ struct TakeoverNote: View {
 }
 
 #if DEBUG
-/// Where the header's Hand Off button is, for the QA harness to click it, the pick its menu makes, and the reply box's
-/// Take Over.
+/// Where the thread header's ⋯ menu is, for the QA harness to click it (Hand off to… is in it), a hand off to a Mac,
+/// and the reply box's Take Over.
 @MainActor
 enum QAHandoffProbe {
   struct TakeOver {

@@ -16,14 +16,13 @@ import { TakeoverConfirm } from './thread/Takeover.tsx';
 import { Icon, Loader, StatusDot, type IconName } from './ui.tsx';
 
 type Target = { kind: 'thread'; id: string } | { kind: 'channel'; id: string } | { kind: 'folder'; id: string };
-/** `handoff`: open straight on the list of Macs the thread can go to, as the thread header's button does. */
-type Open = { target: Target; x: number; y: number; handoff?: boolean };
+type Open = { target: Target; x: number; y: number };
 
 const OPEN_EVENT = 'omni:context-menu';
 
-/** Open the menu for `target` at a point, as a right-click there would: the "…" button on a folder, or a key. */
-export function openMenu(target: Target, x: number, y: number, handoff?: boolean) {
-  window.dispatchEvent(new CustomEvent<Open>(OPEN_EVENT, { detail: { target, x, y, handoff } }));
+/** Open the menu for `target` at a point, as a right-click there would: the "…" button on a folder or the thread header, or a key. */
+export function openMenu(target: Target, x: number, y: number) {
+  window.dispatchEvent(new CustomEvent<Open>(OPEN_EVENT, { detail: { target, x, y } }));
 }
 
 const THREAD_HREF = /^#\/t\/([^/?]+)/;
@@ -73,7 +72,7 @@ export function ContextMenuHost() {
       {/* A new open starts fresh, even over one already showing. */}
       {open && (
         <Menu
-          key={`${open.target.kind}:${open.target.id}:${open.x}:${open.y}:${!!open.handoff}`}
+          key={`${open.target.kind}:${open.target.id}:${open.x}:${open.y}`}
           open={open}
           onClose={() => setOpen(null)}
           onTakeOver={(threadId, takeover) => {
@@ -103,7 +102,7 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
   // Set while the menu lists the folders a thread can move to.
   const [moving, setMoving] = useState(false);
   // Set while the menu lists the Macs a running thread can be handed to.
-  const [handingOff, setHandingOff] = useState(!!open.handoff);
+  const [handingOff, setHandingOff] = useState(false);
   // Set while the menu shows the thread reference picker.
   const [referencing, setReferencing] = useState(false);
   const [sending, setSending] = useState<string | null>(null);

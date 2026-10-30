@@ -9,12 +9,12 @@ import { attachReference, type ReferenceCandidate } from '../src/message-context
 vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: [], crew: [], status: null }) }));
 
 import { ReplyComposer } from '../src/components/Composer.tsx';
-import { ThreadReferenceButton, ThreadReferencePanel } from '../src/components/ThreadReference.tsx';
+import { ThreadReferencePanel } from '../src/components/ThreadReference.tsx';
 import { MoComposer } from '../src/mobile/MoComposer.tsx';
 import { ContextInspector } from '../src/message-context/ContextChips.tsx';
 import { addDraftContext, draftContext, settleDraftContext } from '../src/message-context/draft.ts';
 
-// The thread reference picker in the thread header (a sheet on a phone): it searches this channel by default, offers other channels only
+// The thread reference picker in the thread menu (a sheet on a phone): it searches this channel by default, offers other channels only
 // from All channels, attaches a reference to the draft without displacing the `@` menu, and shows the captured identity.
 
 const thread = { id: 't1', channel_id: 'shop', title: 'Asking', status: 'done', harness: 'claude-code', model: 'claude-sonnet-5-5', effort: 'high' } as Thread;
@@ -77,11 +77,10 @@ const mount = async (phone: boolean) => {
     root.render(
       phone
         ? createElement(Fragment, null, createElement(MoComposer, { thread, chips: [], placeholder: 'Follow up', onSent: () => {}, onSwitched: () => {}, onFork: () => {} }), createElement(ThreadReferencePanel, { thread, touch: true, onPicked: () => {} }))
-        : createElement(Fragment, null, createElement(ReplyComposer, { thread }), createElement(ThreadReferenceButton, { thread })),
+        : createElement(Fragment, null, createElement(ReplyComposer, { thread }), createElement(ThreadReferencePanel, { thread, onPicked: () => {} })),
     ),
   );
 };
-const button = (label: string) => host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
 const byText = (text: string) => [...host.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent?.includes(text));
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 200))));
 const open = async (phone: boolean, typed = '') => {
@@ -93,7 +92,6 @@ const open = async (phone: boolean, typed = '') => {
       box.dispatchEvent(new Event('input', { bubbles: true }));
     });
   }
-  if (!phone) await act(async () => button('Reference another thread')!.click());
   await settle();
 };
 const rows = () => [...host.querySelectorAll<HTMLElement>('[role="listitem"]')];
