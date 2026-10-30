@@ -169,7 +169,7 @@ export function takeComposerFocus() {
   return v;
 }
 
-// ---------- a new thread from a thread (`/clear`, "New thread on another model") ----------
+// ---------- a new thread from a thread (`/clear`) ----------
 
 let preset: NewThreadPreset | null = null;
 // Counts presets, so a composer already open on the channel (the folder's "New thread here") remounts to read it.

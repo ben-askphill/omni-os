@@ -167,6 +167,8 @@ private struct ReplyComposerView: View {
   @State private var picking = false
   @State private var switching = false
   @State private var switchError: String?
+  /// Bumped to open the model pill: `/model`, `/effort` and `/fast`.
+  @State private var pickerRequest = 0
   /// The harness list fetched when the model list opens, newer than the store's.
   @State private var fetchedHarnesses: [HarnessInfo]?
 
@@ -255,7 +257,7 @@ private struct ReplyComposerView: View {
           .padding(.bottom, z(4))
       }
       footer
-      SlashHintView(model: menu) { newThreadOnAnotherModel() }
+      SlashHintView(model: menu)
         .padding(.horizontal, z(16))
         .padding(.bottom, menu.hint == nil ? 0 : 10)
         .padding(.top, menu.hint == nil ? 0 : 2)
@@ -308,7 +310,7 @@ private struct ReplyComposerView: View {
     ModelPickerButton(
       harnesses: harnesses, harness: shown.harness, model: RunSwitch.shownModel(shown, harnesses: harnesses),
       pick: { switchRun(RunSwitch.picking(harness: $0, model: $1, from: shown, harnesses: harnesses)) },
-      refresh: refreshHarnesses, offersAuto: false, autoReason: queued ? nil : thread.autoReason, disabledHelp: disabled)
+      refresh: refreshHarnesses, openRequest: pickerRequest, offersAuto: false, autoReason: queued ? nil : thread.autoReason, disabledHelp: disabled)
       .overlay(ring)
     EffortMenu(
       options: EffortRules.options(for: EffortRules.model(harness: shown.harness, model: shown.model, in: harnesses)),
@@ -370,6 +372,11 @@ private struct ReplyComposerView: View {
   private func runOmni() {
     guard let omni = menu.reply, omni.action != .send, omni.armed, !omniBusy else { return }
     let raw = reply.text
+    if omni.action == .pickModel {
+      reply.text = ""
+      pickerRequest += 1
+      return
+    }
     omniBusy = true
     omniError = nil
     Task {
@@ -388,12 +395,6 @@ private struct ReplyComposerView: View {
         omniError = error.localizedDescription
       }
     }
-  }
-
-  /// The hint under `/model`, `/effort` and `/fast` offers a new thread that picks its model.
-  private func newThreadOnAnotherModel() {
-    reply.text = ""
-    model.openNewThread(.otherModel(thread))
   }
 
   private func send(_ mode: SendMode?) {

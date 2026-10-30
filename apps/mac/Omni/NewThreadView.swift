@@ -311,7 +311,7 @@ private struct NewThreadBox: View {
       edited: { menu.update(text: $0, caret: $1) })
   }
 
-  /// A preset waiting for this channel's composer (`/clear`, `/new`, "New thread on another model"): take it once.
+  /// A preset waiting for this channel's composer (`/clear`, `/new`, a suggested thread): take it once.
   private func takePreset() {
     guard let preset = model.shell.newThreadPreset, preset.channel == composer.fixedChannel else { return }
     model.shell.newThreadPreset = nil
@@ -394,7 +394,7 @@ struct ModelPickerButton: View {
   var placeholder = "Model"
   let pick: (HarnessID, String) -> Void
   let refresh: () -> Void
-  /// Bumped to open the list, for "New thread on another model".
+  /// Bumped to open the list: a preset that picks the model, or `/model` in a thread's reply box.
   var openRequest = 0
   /// The search the list opens with on `openRequest`.
   var openQuery = ""
