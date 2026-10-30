@@ -13,7 +13,6 @@ import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { HARNESS_ROWS, HarnessLogo, Loader, OmniMark, SLOT_ROWS } from './brand.tsx';
 import { ChannelMark, DoneMark, ErrorNote, Icon, IconButton, Kbd, STATUS_LABEL, StatusDot, Thumb, Ticks, useSlidingThumb, Wordmark, type IconName } from './ui.tsx';
 import { ThreadHandoffs } from './ThreadHandoffs.tsx';
-import { DeviceLabel } from './DeviceLabel.tsx';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -526,7 +525,7 @@ const GROUPS: { kind: string; label: string }[] = [
 export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => void; onSearch: () => void; onClose?: () => void }) {
   const route = useRoute();
   const hash = useHash();
-  const { channels, channelsError, openThread, tasks, pinned, status } = useApp();
+  const { channels, channelsError, openThread, tasks, pinned } = useApp();
   const folders = useFolders();
   const listRef = useRef<HTMLDivElement>(null);
   // The channel whose name a thread is being dragged over, to take it out of its folder.
@@ -872,13 +871,9 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
         </div>
       </div>
 
-      <div className="space-y-2.5 px-3 pt-1 pb-3">
+      {/* The machine's name moved to Settings, Machines (#405). */}
+      <div className="px-3 pt-1 pb-3">
         <UsageCard />
-        {status?.device && (
-          <div className="flex pl-2 text-[11px] text-fg-3">
-            <DeviceLabel device={status.device} />
-          </div>
-        )}
       </div>
     </nav>
   );

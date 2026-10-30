@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 // The worktree storage inventory (Settings > Machines > Storage), as GET /api/worktrees/scan sends it. Mirrors
-// packages/shared/worktree-inventory.ts, which the Web UI's Storage page uses.
+// packages/shared/worktree-inventory.ts, which the Web UI's Settings, Machines uses.
 
 /// Decodes a string enum, answering `fallback` for a value a newer server sent that this app does not know.
 func decodeTolerant<T: RawRepresentable>(_ decoder: any Decoder, _ fallback: T) throws -> T where T.RawValue == String {
@@ -231,7 +231,7 @@ public enum ByteSize {
   }
 }
 
-/// The Storage tab: the last scan, Scan and Cancel, the cleanup and this Mac's retention policy, and a poll while a scan
+/// The Storage part of the Machines tab: the last scan, Scan and Cancel, the cleanup and this Mac's retention policy, and a poll while a scan
 /// or a cleanup runs. It scans only when Ben presses Scan and removes only what he reviewed; retention passes are the
 /// server's.
 @MainActor @Observable

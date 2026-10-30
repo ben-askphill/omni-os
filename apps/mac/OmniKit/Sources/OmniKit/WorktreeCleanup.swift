@@ -2,7 +2,7 @@ import Foundation
 
 // Worktree cleanup (Settings > Machines > Storage): what a cleanup Ben starts or this Mac's retention policy would remove, and
 // what a run removed, kept or failed to remove. The `cleanup` of GET /api/worktrees/scan. Mirrors
-// packages/shared/worktree-cleanup.ts, which the Web UI's Storage page uses.
+// packages/shared/worktree-cleanup.ts, which the Web UI's Settings, Machines uses.
 
 /// This Mac's retention policy. Off by default and never synced: each Mac decides for its own disk. When on, a
 /// scheduled pass removes the worktrees of archived, merged or deleted threads idle for at least `idleDays`.

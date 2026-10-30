@@ -312,19 +312,22 @@ function RetentionCard({ cleanup, scanning, onChange }: { cleanup: CleanupState;
         </div>
         <Toggle checked={policy.enabled} onChange={(on) => save({ enabled: on })} disabled={busy} label="Remove idle worktrees on a schedule" />
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-fg-2">
-        After
-        <Picker
-          label="Days idle"
-          value={String(policy.idleDays)}
-          options={days.map((d) => ({ value: String(d), label: plural(d, 'day'), avatar: false as const }))}
-          onChange={(v) => save({ idleDays: Number(v) })}
-          disabled={busy}
-        />
-        without a turn or message
-      </div>
+      {/* The idle days only matter with the schedule on, so the picker shows with it (#405). */}
+      {policy.enabled && (
+        <div className="flex flex-wrap items-center gap-2 text-[13px] text-fg-2">
+          After
+          <Picker
+            label="Days idle"
+            value={String(policy.idleDays)}
+            options={days.map((d) => ({ value: String(d), label: plural(d, 'day'), avatar: false as const }))}
+            onChange={(v) => save({ idleDays: Number(v) })}
+            disabled={busy}
+          />
+          without a turn or message
+        </div>
+      )}
       <p className="text-[12.5px] leading-relaxed text-fg-3">
-        Only this Mac: the setting is not synced. It covers worktrees of archived, merged or deleted threads with nothing unsaved, idle at least that long. It runs a
+        Only this Mac: the setting is not synced. It covers worktrees of archived, merged or deleted threads with nothing unsaved, idle at least {plural(policy.idleDays, 'day')}. It runs a
         minute after Omni starts, then daily.
       </p>
       <p className="text-[12.5px] text-fg-2" role="status">

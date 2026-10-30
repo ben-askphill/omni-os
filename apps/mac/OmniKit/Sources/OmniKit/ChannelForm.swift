@@ -23,8 +23,49 @@ public struct ChannelForm: Hashable, Sendable {
   public private(set) var defaultModel = ""
   public private(set) var defaultEffort = ""
   public private(set) var idTouched = false
+  /// Whether a save sends the GitHub repo. Only when its field shows (detection failed, or Change): otherwise the
+  /// server reads it from the repo path, on create and when the path moves (#405).
+  public var sendsGithubRepo = false
 
   public init() {}
+
+  // MARK: Values Omni works out (#405)
+
+  /// Id, GitHub repo and base directory fill themselves in. Each shows as a field only when Omni could not work it
+  /// out or Change was pressed, as `AutoValue` in ChannelSettings.tsx.
+  public enum AutoField: Hashable, Sendable { case id, githubRepo, baseDir }
+
+  public var hasRepo: Bool { !repoPath.trimmingCharacters(in: .whitespaces).isEmpty }
+
+  /// The repo path differs from the saved channel's (or there is no saved channel).
+  public func repoChanged(from saved: Channel?) -> Bool {
+    (saved?.repoPath ?? "") != repoPath.trimmingCharacters(in: .whitespaces)
+  }
+
+  /// A name with no letters or digits gives no usable id.
+  public func idFailed(isNew: Bool) -> Bool {
+    isNew && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !idValid
+  }
+
+  /// The saved repo path gave no GitHub repo.
+  public func githubFailed(saved: Channel?) -> Bool {
+    guard let saved, let path = saved.repoPath, !path.isEmpty else { return false }
+    return (saved.githubRepo ?? "").isEmpty && !repoChanged(from: saved)
+  }
+
+  /// Whether the field shows, rather than the worked-out value with Change.
+  public func shows(_ field: AutoField, isNew: Bool, saved: Channel?, editing: Set<AutoField>) -> Bool {
+    switch field {
+    case .id: isNew && (idFailed(isNew: isNew) || editing.contains(.id))
+    case .githubRepo: hasRepo && (githubFailed(saved: saved) || editing.contains(.githubRepo))
+    case .baseDir: !hasRepo && (!baseDir.trimmingCharacters(in: .whitespaces).isEmpty || editing.contains(.baseDir))
+    }
+  }
+
+  /// Advanced opens by itself when a value needs typing.
+  public func needsAdvanced(isNew: Bool, saved: Channel?) -> Bool {
+    idFailed(isNew: isNew) || githubFailed(saved: saved)
+  }
 
   public init(channel c: Channel) {
     id = c.id
@@ -143,7 +184,8 @@ public struct ChannelForm: Hashable, Sendable {
     return nil
   }
 
-  /// PATCH body. Empty text goes as null, so clearing a field clears it. A system channel keeps its kind.
+  /// PATCH body. Empty text goes as null, so clearing a field clears it. A system channel keeps its kind. The GitHub
+  /// repo goes only with `sendsGithubRepo`.
   public func body(system: Bool) -> JSONValue {
     func text(_ s: String) -> JSONValue {
       let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -152,7 +194,6 @@ public struct ChannelForm: Hashable, Sendable {
     var o: [String: JSONValue] = [
       "name": .string(name.trimmingCharacters(in: .whitespacesAndNewlines)),
       "repo_path": text(repoPath),
-      "github_repo": text(githubRepo),
       "use_worktree": .number(useWorktree ? 1 : 0),
       "base_dir": text(baseDir),
       "store_domain": Self.domain(storeDomain),
@@ -165,6 +206,7 @@ public struct ChannelForm: Hashable, Sendable {
       "default_effort": text(defaultEffort),
     ]
     if !system { o["kind"] = .string(kind.rawValue) }
+    if sendsGithubRepo { o["github_repo"] = text(githubRepo) }
     return .object(o)
   }
 

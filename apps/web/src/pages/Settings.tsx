@@ -9,7 +9,7 @@ import { navigate, SETTINGS_LABEL, settingsHash, useHash, type SettingsSection }
 import { useApp } from '../store.tsx';
 import { MachinesSection } from './Machines.tsx';
 import { SecretsSection } from './Secrets.tsx';
-import { Card, Row, SwitchRow } from './settings-parts.tsx';
+import { Advanced, Card, Row, SwitchRow } from './settings-parts.tsx';
 
 // Settings: one page with four sections, the same four as the Mac app's tabs and the phone's Settings list (#404).
 // General: who you are, theme, notifications and running setup again. Workspace: your folders and integrations.
@@ -215,14 +215,15 @@ function ConfigForm({ part, state, onSaved }: { part: 'you' | 'workspace'; state
               <input id="set-gh" className="field w-full max-w-sm font-mono !text-[13px]" value={githubOwner} placeholder="octocat" spellCheck={false} autoCapitalize="off" onChange={field(setGithubOwner)} />
             </Row>
           </Card>
-          <Card title="Integrations" subtitle="Optional. Leave a field empty to turn it off.">
+          <Advanced summary="Hermes URL and central brain folder">
+            <p className="text-[12.5px] text-fg-3">Optional integrations. Leave a field empty to turn it off.</p>
             <Row label="Hermes URL" htmlFor="set-hermes" hint="A Hermes API server on your tailnet. Its token is the global secret HERMES_API_KEY.">
               <input id="set-hermes" className="field w-full font-mono !text-[13px]" value={hermesUrl} placeholder="http://100.64.0.1:8642" spellCheck={false} onChange={field(setHermesUrl)} />
             </Row>
             <Row label="Central brain folder" htmlFor="set-brain" hint="A git repo of notes that the brain-nightly automation exports thread digests into.">
               <input id="set-brain" className="field w-full font-mono !text-[13px]" value={centralBrainDir} placeholder="~/central-brain" spellCheck={false} onChange={field(setCentralBrainDir)} />
             </Row>
-          </Card>
+          </Advanced>
         </>
       )}
       <div className="flex items-center gap-3">
@@ -295,22 +296,24 @@ function NotificationsCard() {
       {prefs.enabled && permission === 'denied' && (
         <ErrorNote>The browser blocks notifications for Omni. Allow them in the site settings (the icon left of the address), then come back.</ErrorNote>
       )}
-      <div className={prefs.enabled ? '' : 'pointer-events-none opacity-55'}>
-        <div className="caption mb-2">Channels</div>
-        <p className="mb-2 text-[12.5px] text-fg-3">A channel turned off still lists its results in Needs you, without a notification.</p>
-        {listed.length === 0 && <p className="text-[12.5px] text-fg-3">No channels yet.</p>}
-        <div className="space-y-1.5">
-          {listed.map((c) => (
-            <div key={c.id} className="flex items-center gap-3 rounded-[16px] bg-bg px-4 py-2.5">
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium">{c.name}</div>
-                <div className="truncate font-mono text-[11.5px] text-fg-3">#{c.id}</div>
+      {/* One switch per channel grows with the sidebar, so the list folds shut like Advanced (#405). */}
+      <Advanced title="Channels" summary={`${listed.filter((c) => !prefs.muted.includes(c.id)).length} of ${listed.length} notify`}>
+        <div className={`space-y-3 ${prefs.enabled ? '' : 'pointer-events-none opacity-55'}`}>
+          <p className="text-[12.5px] text-fg-3">A channel turned off still lists its results in Needs you, without a notification.</p>
+          {listed.length === 0 && <p className="text-[12.5px] text-fg-3">No channels yet.</p>}
+          <div className="space-y-1.5">
+            {listed.map((c) => (
+              <div key={c.id} className="flex items-center gap-3 rounded-[16px] bg-bg px-4 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-medium">{c.name}</div>
+                  <div className="truncate font-mono text-[11.5px] text-fg-3">#{c.id}</div>
+                </div>
+                <Toggle checked={!prefs.muted.includes(c.id)} onChange={(on) => setChannelAlerts(c.id, on)} label={`Notify for ${c.name}`} disabled={!prefs.enabled} />
               </div>
-              <Toggle checked={!prefs.muted.includes(c.id)} onChange={(on) => setChannelAlerts(c.id, on)} label={`Notify for ${c.name}`} disabled={!prefs.enabled} />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      </Advanced>
     </Card>
   );
 }
