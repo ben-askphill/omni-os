@@ -1,7 +1,7 @@
 import { db, threads, type LimitStop } from '../../db.ts';
 import { publishFeed } from '../../bus.ts';
 import { claim, registerHandler } from '../apply.ts';
-import { remoteHolder } from '../../run-on-holder.ts';
+import { remoteHolder } from '../../ownership.ts';
 
 // A thread's limit stop between Macs (apps/server/runner/limits.ts), keyed by the thread's id and apart from the thread
 // row, which never carries it: last writer wins on the stop alone. The Mac that ran the turn records it, schedules

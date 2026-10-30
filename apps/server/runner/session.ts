@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { resolveDelivery } from '../delivery.ts';
 import { config } from '../config.ts';
 import { events, threads, type ThreadStatus } from '../db.ts';
+import { lostTo } from '../ownership.ts';
+import { machineName } from '../sync/guard.ts';
 import { detachThread } from '../browser.ts';
 import { turnFinished } from '../sync/files.ts';
 import { suggestNextThread, suggestReply } from './aux.ts';
@@ -13,6 +15,7 @@ import { endTasks } from './records.ts';
 import { stopPreparation } from './setup-action.ts';
 import { applyQueued } from './switch.ts';
 import {
+  addEvent,
   browserHolder,
   clearMods,
   deliveryPhase,
@@ -168,6 +171,26 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
  * the process stays warm and steers already sent still run next. Hard kill if it does not stop in time,
  * or right away if the process has not started its first turn yet.
  */
+/**
+ * Generation fencing, after each sync (run-on.ts): a turn running or queued here whose thread another machine was
+ * assigned since it started is stale. It is stopped and the thread says so; a warm idle process is just closed. The
+ * handoff and Take over paths stop a turn before the thread moves, so this catches only a move they did not see,
+ * such as Ben's reply on the other machine while this one was offline.
+ */
+export function fenceStale() {
+  for (const id of new Set([...lives.keys(), ...waiting])) {
+    const live = lives.get(id);
+    const lost = lostTo(id, live?.generation);
+    if (!lost) continue;
+    if (live && !live.turn && !waiting.includes(id)) {
+      closeLive(live);
+      continue;
+    }
+    addEvent(id, 'error', { text: `This thread moved to ${machineName(lost.machine)} while it ran here, so the turn was stopped.` });
+    interruptThread(id);
+  }
+}
+
 export function interruptThread(threadId: string) {
   // A worktree still being prepared has no agent yet: Stop ends the preparation, its setup run included, and a
   // lead's team with it, as for a lead that waits.

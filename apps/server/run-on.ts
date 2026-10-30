@@ -9,8 +9,8 @@
 // holder reads them after each sync (reconcileRunOn) and acts on each once: a message's command id is the request id
 // (`runon:<id>`), so a second sync finds it saved. Files Ben attached go to Storage first (sync/files.ts sendSaved)
 // and the holder fetches them before it sends the message.
-// Synced kv records, from the thread's routing and from machines on an older version:
-// - `runon.thread.<thread>`: the machine this one sent the thread to. Marks a routed thread; written once.
+// Which machine holds a thread is its assignment (apps/server/ownership.ts); a thread sent elsewhere is assigned to
+// that machine, marked routed, before its offer goes out. Synced kv records from machines on an older version:
 // - `runon.msgs.<thread>.<sender>` and `runon.stop.<thread>.<sender>`: the arrays an older version forwards with.
 //   Read here, never written, while machines run mixed versions.
 // - `runon.accepted.<thread>.<message>`: durable acceptance, synced so a new holder never replays it.
@@ -21,8 +21,8 @@ import { kv, outbox, remoteCommands, threads, tx, type RemoteCommand, type Threa
 import { reportCommandId } from './db/repos/remote-commands.ts';
 import { inFlight } from './handoff/records.ts';
 import { COMMAND_WINDOW_MS, expiryReason, recordOutcome } from './remote-outcomes.ts';
-import { remoteHolder } from './run-on-holder.ts';
-import { cancelLimitResume, interruptThread, resumeLimitNow, saveOwn, scheduleLimitResume, wakePrepared } from './runner.ts';
+import { holderOf, remoteHolder } from './ownership.ts';
+import { cancelLimitResume, fenceStale, interruptThread, resumeLimitNow, saveOwn, scheduleLimitResume, wakePrepared } from './runner.ts';
 import { fileReport } from './runner/queue.ts';
 import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
 import { safeSegment } from './sync/paths.ts';
@@ -32,7 +32,7 @@ import { reachabilityOf, tailnet } from './tailscale.ts';
 import type { Attachment } from './uploads.ts';
 import { userConfig } from './user-config.ts';
 
-export { markRouted, remoteHolder, routedTo } from './run-on-holder.ts';
+export { assignRouted, remoteHolder } from './ownership.ts';
 
 const MSGS = 'runon.msgs.';
 const STOP = 'runon.stop.';
@@ -139,7 +139,7 @@ export async function forwardMessage(
 
 /** A delegated thread's report for a parent that another machine holds: that machine files it on its next sync. */
 export function forwardReport(parentId: string, key: string, prompt: string, payload: Record<string, unknown>) {
-  const holder = threads.holder(parentId);
+  const holder = holderOf(parentId);
   if (!holder) return;
   send({ id: reportCommandId(parentId, key), thread_id: parentId, kind: 'report', target: holder, prompt, mode: 'steer', report_key: key, report: payload });
 }
@@ -194,9 +194,11 @@ let again = false;
 
 async function reconcileOnce(worker: SyncWorker, now: number) {
   const self = worker.machineId;
+  // A turn here whose thread another machine took meanwhile stops before anything more is delivered to it.
+  fenceStale();
   for (const c of remoteCommands.pending()) {
     try {
-      const holds = threads.holder(c.thread_id) === self && !inFlight(c.thread_id);
+      const holds = holderOf(c.thread_id) === self && !inFlight(c.thread_id);
       const due = Date.parse(c.expires_at);
       if (holds) {
         // A message this machine saved before (its receipt travelled with the thread) is accepted however old it is.
@@ -285,7 +287,7 @@ async function legacyMessages(self: string, now: number) {
   for (const [key, value] of kv.list<unknown>(MSGS)) {
     try {
       const [threadId] = key.slice(MSGS.length).split('.');
-      if (!safeSegment(threadId) || threads.holder(threadId) !== self || inFlight(threadId) || !Array.isArray(value)) continue;
+      if (!safeSegment(threadId) || holderOf(threadId) !== self || inFlight(threadId) || !Array.isArray(value)) continue;
       for (const m of value as Forwarded[]) {
         if (!isId(m?.id) || typeof m.prompt !== 'string' || typeof m.at !== 'string' || !fresh(m.at, now)) continue;
         if (m.report) {
@@ -323,7 +325,7 @@ async function legacyMessages(self: string, now: number) {
 function legacyStops(self: string, now: number) {
   for (const [key, value] of kv.list<unknown>(STOP)) {
     const [threadId] = key.slice(STOP.length).split('.');
-    if (!safeSegment(threadId) || typeof value !== 'string' || !fresh(value, now, STOP_FRESH_MS) || threads.holder(threadId) !== self) continue;
+    if (!safeSegment(threadId) || typeof value !== 'string' || !fresh(value, now, STOP_FRESH_MS) || holderOf(threadId) !== self) continue;
     if (stopped.get(key) === value) continue;
     stopped.set(key, value);
     const t = threads.get(threadId);

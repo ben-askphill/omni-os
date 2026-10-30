@@ -11,7 +11,7 @@ import { parseSlash, resolveSlash, slashRecord, type SlashCommand, type SlashRec
 import { listCommands, peekCommands } from '../commands.ts';
 import { withMentions } from '../mentions.ts';
 import { fileKind, safeName, saveUploads, type Attachment } from '../uploads.ts';
-import { isRemoteHarness, remoteWhere, type HarnessId } from '../harness/types.ts';
+import { isProviderHarness, providerWhere, type HarnessId } from '../harness/types.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
 import { usageByHarness } from '../usage.ts';
@@ -23,7 +23,8 @@ import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
 import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
 import { dismissQuestions } from './questions.ts';
-import { forwardMessage, markRouted, remoteHolder, targetFor } from '../run-on.ts';
+import { forwardMessage, targetFor } from '../run-on.ts';
+import { assignRouted, remoteHolder } from '../ownership.ts';
 import { sendNewThread } from '../handoff.ts';
 import { sendUploads } from '../sync/files.ts';
 
@@ -136,12 +137,12 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const images = (input.files ?? []).some((f) => f.type.startsWith('image/'));
   const auto = 'auto' in run ? routeTask(profileTask(input.prompt), { catalog: getCatalog(), usage: usageByHarness(), images }) : null;
   const { harness, model, effort } = auto ?? (run as Resolved);
-  if (role?.delegateOnly && isRemoteHarness(harness)) throw new Error(remoteDelegateOnlyRefusal(role.name, remoteWhere(harness)));
+  if (role?.delegateOnly && isProviderHarness(harness)) throw new Error(remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
 
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
 
   const id = input.id ?? randomUUID();
-  const remote = isRemoteHarness(harness);
+  const remote = isProviderHarness(harness);
   // Refused before anything is made, so a ref that names nothing leaves the draft where it was typed.
   const base = await checkBase(channel, input.base, { remote });
   const wd = await prepareWorkdir(channel, id, { remote });
@@ -186,7 +187,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     const saved = await saveUploads(thread.id, input.files ?? []);
     const files = sent.map((f, i) => ({ ...f, name: saved[i]?.name ?? f.name }));
     tx(() => {
-      markRouted(thread.id, route.to.id);
+      assignRouted(thread.id, route.to.id);
       sendNewThread(thread.id, input.prompt, route.from, route.to, files);
     });
     if (!input.title) void generateTitle(thread.id, input.prompt);

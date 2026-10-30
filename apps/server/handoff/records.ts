@@ -10,14 +10,14 @@ import {
   type HandoffView,
 } from '@omni/shared/handoff.ts';
 import { publishFeed } from '../bus.ts';
-import { kv, outbox, threads, type Thread } from '../db.ts';
+import { assignments, kv, outbox, threads, type Thread } from '../db.ts';
 import { safeSegment } from '../sync/paths.ts';
 
 // A thread on its way between Macs, as synced kv records, each with one writer so no key ever has two at once:
 // `handoff.offer.<thread>` from the Mac giving it away, `handoff.reply.<thread>` from the Mac taking it, and
-// `handoff.request.<thread>` from the Mac asking for it (Take over). The Mac that holds it between turns is a fourth,
-// `handoff.holder.<thread>` (db/repos/threads.ts). What both Macs show, and whether a turn may start, is read from
-// them (packages/shared/handoff.ts handoffPhase and requestPhase).
+// `handoff.request.<thread>` from the Mac asking for it (Take over). Which Mac holds it is its assignment
+// (db/repos/assignments.ts). What both Macs show, and whether a turn may start, is read from them
+// (packages/shared/handoff.ts handoffPhase and requestPhase).
 
 const OFFER = 'handoff.offer.';
 const REPLY = 'handoff.reply.';
@@ -125,7 +125,7 @@ function asking(threadId: string, offer: HandoffOffer | null, self: string, now:
   const r = requestOf(threadId);
   if (!r || r.by.id !== self || r.state === 'cancelled' || offer?.request === r.id) return null;
   if (offer && (moving(phaseOf(threadId, now)?.phase) || offer.id !== r.after)) return null;
-  if (threads.holder(threadId) === self) return null;
+  if (assignments.holder(threadId) === self) return null;
   return now - Date.parse(r.at) < REQUEST_TTL_MS + HOUR ? r : null;
 }
 

@@ -10,7 +10,7 @@ import { TOOL_FAILURE_POLICY } from '../../tool-failure-policy.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
 import { HERMES_FIX } from '../catalog.ts';
 import { detachedSession } from '../session.ts';
-import { CAPABILITIES, remoteWhere } from '../types.ts';
+import { CAPABILITIES, providerWhere } from '../types.ts';
 import { remoteDelegateOnlyRefusal } from '../../crew.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
 import { HermesClient, HermesHttpError, sleep } from './client.ts';
@@ -248,7 +248,7 @@ export const hermesAdapter: HarnessAdapter = {
 
     // Hermes gets no omni tools and takes no per-run tool limits, so a delegate-only role (the Conductor) could only
     // do the work itself. Thread creation refuses it; this covers a thread that was already on Hermes.
-    const refused = !apiKey ? HERMES_FIX : ctx.role?.delegateOnly ? remoteDelegateOnlyRefusal(ctx.role.name, remoteWhere('hermes')) : null;
+    const refused = !apiKey ? HERMES_FIX : ctx.role?.delegateOnly ? remoteDelegateOnlyRefusal(ctx.role.name, providerWhere('hermes')) : null;
     if (refused) {
       const session = detachedSession(cb, {
         send(m) {

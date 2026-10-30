@@ -486,4 +486,13 @@ export function migrate() {
   );
   CREATE INDEX IF NOT EXISTS remote_commands_thread ON remote_commands(thread_id, created_at);
   CREATE INDEX IF NOT EXISTS remote_commands_open ON remote_commands(expires_at) WHERE state = 'sent';`);
+  // #399 Who runs a thread (db/repos/assignments.ts): the one record every delivery decision reads. The machine
+  // that holds it and a generation that counts the moves; synced by generation (sync/handlers/assignment.ts).
+  db.exec(`CREATE TABLE IF NOT EXISTS assignments (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+    machine TEXT NOT NULL,
+    generation INTEGER NOT NULL,
+    routed INTEGER NOT NULL DEFAULT 0,
+    at TEXT NOT NULL
+  );`);
 }

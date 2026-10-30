@@ -8,6 +8,8 @@ import { launch } from './spawn.ts';
 import { applyQueued, queuedRun } from './switch.ts';
 import { userName } from '../profile.ts';
 import { forwardReport } from '../run-on.ts';
+import { heldElsewhere, lostTo } from '../ownership.ts';
+import { machineName, wakeBlocked } from '../sync/guard.ts';
 import { startTurnSnapshot } from './snapshots.ts';
 import {
   capFor,
@@ -16,7 +18,10 @@ import {
   deliveryCaps,
   isShuttingDown,
   lives,
+  ownTurn,
+  refusal,
   requestMsg,
+  runsHere,
   runningByHarness,
   send,
   track,
@@ -29,10 +34,18 @@ import {
 
 export function deliver(threadId: string, m: Msg) {
   if (isShuttingDown()) throw new Error('Omni is shutting down');
+  let live = lives.get(threadId);
+  // Generation fencing: a process here whose thread another machine took meanwhile is not the one to run this. A turn
+  // still running was stopped at the last sync (fenceStale); a warm idle process is closed, and the turn starts fresh.
+  const lost = live && lostTo(threadId, live.generation);
+  if (lost && live) {
+    if (live.turn && !live.closing) throw refusal(`This thread moved to ${machineName(lost.machine)} while it ran here.`, 409);
+    closeLive(live);
+    live = undefined;
+  }
   clearSuggestion(threadId);
   // The thread moves on: a limit stop it had, and the continuation scheduled for it, no longer apply (limits.ts).
   if (threads.get(threadId)?.limit_state) threads.setLimit(threadId, null);
-  let live = lives.get(threadId);
   const caps = deliveryCaps(threadId);
   // Interrupt and send while the process is still starting: stop it like Interrupt does and start fresh with this message.
   if (live?.turn && !live.closing && resolveDelivery(m.mode, caps, deliveryPhase(live)) === 'stop-startup') {
@@ -126,7 +139,7 @@ function begin(threadId: string, [first, ...rest]: Msg[]) {
   if (warm) {
     clearTimeout(warm.idleTimer);
     warm.turn = true;
-    threads.update(threadId, { status: 'running' });
+    ownTurn(threadId);
     startTurnSnapshot(warm);
     send(warm, first);
   } else if (!launch(threadId, first)) return;
@@ -162,9 +175,15 @@ export function saveOwn(
   return fresh ? row : null;
 }
 
-/** Hand a saved message to the runner. While Omni shuts down it is parked for Resume after the restart instead. */
+/**
+ * Hand a saved message of Omni's own (a crew report, a PR watch, a team's go) to the runner. The delivery boundary for
+ * wakes: one this machine may not run (sync/guard.ts wakeBlocked: another machine holds the thread, its worktree is
+ * not ready) waits for Resume, as it does while Omni shuts down.
+ */
 export function wake(r: MessageRequest) {
-  if (isShuttingDown()) {
+  const t = threads.get(r.thread_id);
+  if (!t) return;
+  if (isShuttingDown() || wakeBlocked(t, runsHere(t.id))) {
     messageRequests.park(r.id);
     return emitThread(r.thread_id);
   }
@@ -199,10 +218,9 @@ export function reportToParent(childId: string, status: string, text: string, co
     `Relay what matters to ${userName()} in one short update. Delegate follow-ups if needed. Do not redo the work.`;
   const key = `crew-report:${child.id}:${completion}`;
   if (waitingLead) return teamReported(parent.id, key, prompt, report);
-  // The parent runs on another machine (a delegation sent elsewhere, run-on.ts): the report goes to it there.
-  const holder = threads.holder(parent.id);
-  const self = outbox.machineId();
-  if (holder && self && holder !== self) return forwardReport(parent.id, key, prompt, report);
+  // The parent is on another machine (a delegation sent elsewhere, run-on.ts), or on its way to one: the report goes
+  // to it there, and whichever machine holds the parent at its next sync files it.
+  if (heldElsewhere(parent.id)) return forwardReport(parent.id, key, prompt, report);
   fileReport(parent.id, key, prompt, report);
 }
 

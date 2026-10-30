@@ -18,7 +18,7 @@ import { changesCheckout, git, gitOr, parseNameStatus, real, threadBase } from '
 import { threadDir, uploadsDir } from './config.ts';
 import { asksAuto } from './harness/auto.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
-import { isHarnessId, isRemoteHarness, remoteWhere } from './harness/types.ts';
+import { isHarnessId, isProviderHarness, providerWhere } from './harness/types.ts';
 import { userName } from './profile.ts';
 import { resumeRequests } from './runner/api.ts';
 import { saveStart, setUpThread } from './runner/setup.ts';
@@ -53,7 +53,7 @@ const runOf = (t: Thread): Run => ({ harness: t.harness, model: t.model ?? '', e
  */
 export function sourceBlock(t: Thread): ContinueBlock | null {
   const block = (code: ContinueBlock['code'], message: string): ContinueBlock => ({ code, message });
-  if (isRemoteHarness(t.harness)) return block('remote', continueSourceRefusal(t.harness) ?? `This thread runs ${remoteWhere(t.harness)}, so its files are not on this Mac.`);
+  if (isProviderHarness(t.harness)) return block('remote', continueSourceRefusal(t.harness) ?? `This thread runs ${providerWhere(t.harness)}, so its files are not on this Mac.`);
   if (t.setup === 'preparing') return block('setup', "Omni is still preparing this thread's worktree.");
   if (t.setup === 'failed') return block('setup', "This thread's worktree could not be prepared. Retry it first.");
   const elsewhere = turnBlocked(t, runsHere(t.id));
@@ -114,7 +114,7 @@ type Checkout =
  * with no repo is folder work. Writes only git objects and a temporary index.
  */
 async function readCheckout(t: Thread): Promise<Checkout | ContinueBlock> {
-  if (isRemoteHarness(t.harness)) return { kind: 'folder' };
+  if (isProviderHarness(t.harness)) return { kind: 'folder' };
   const repo = channels.get(t.channel_id)?.repo_path;
   const shared = !t.branch && !!repo && real(t.cwd) === real(repo);
   if (!t.branch && !shared) return { kind: 'folder' };

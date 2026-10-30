@@ -71,14 +71,14 @@ describe('a thread run on another machine', () => {
     id = res.body.id;
     // Nothing runs on the hub: the thread waits for the other machine.
     expect(a.runner.isLive(id)).toBe(false);
-    expect(a.db.kv.get(`runon.thread.${id}`)).toBe('box-b');
+    expect(a.db.assignments.get(id)).toMatchObject({ machine: 'box-b', routed: true });
     expect(a.db.kv.get<any>(`handoff.offer.${id}`)).toMatchObject({ state: 'offered', fresh: true, queued: ['TOOL:60000 audit the checkout'], to: { id: 'box-b' } });
 
     await both();
     await waitFor(() => b.runner.isLive(id), 'the thread to start on B');
     await b.untilTool(id);
     expect(userTexts(b, id)).toEqual(['TOOL:60000 audit the checkout']);
-    expect(b.db.threads.holder(id)).toBe('box-b');
+    expect(b.db.assignments.holder(id)).toBe('box-b');
 
     // The hub shows the run as it syncs back, once its own edits (the title) have gone round.
     for (let n = 0; n < 5 && a.thread(id).status !== 'running'; n++) await both();
@@ -159,8 +159,8 @@ describe('a thread delegated on the other machine', () => {
     b.db.threads.setLimit(child.id, { state: 'limited', resets_at: '2026-10-30T01:47:00.000Z', id: `stop-${child.id}`, machine: 'box-b' });
     b.db.threads.update(child.id, { status: 'failed' });
     for (let n = 0; n < 5 && !a.db.threads.limit(child.id); n++) await both();
-    expect(a.db.kv.get(`runon.thread.${child.id}`)).toBeUndefined();
-    expect(a.db.threads.holder(child.id)).toBe('box-b');
+    expect(a.db.assignments.get(child.id)?.routed).toBe(false);
+    expect(a.db.assignments.holder(child.id)).toBe('box-b');
     return child.id;
   };
 
@@ -266,8 +266,8 @@ describe('remote preparation and takeover', () => {
     mkdirSync(dirname(session), { recursive: true });
     writeFileSync(session, '{"type":"user","from":"box-b"}\n');
     expect((await a.json(`/threads/${id}/takeover`, { body: {} })).status).toBe(200);
-    for (let n = 0; n < 100 && a.db.threads.holder(id) !== 'mac-a'; n++) { await both(); await new Promise((r) => setTimeout(r, 20)); }
-    await waitFor(() => a.db.threads.holder(id) === 'mac-a', 'A to take over');
+    for (let n = 0; n < 100 && a.db.assignments.holder(id) !== 'mac-a'; n++) { await both(); await new Promise((r) => setTimeout(r, 20)); }
+    await waitFor(() => a.db.assignments.holder(id) === 'mac-a', 'A to take over');
     await both();
     await both();
     expect(userTexts(a, id).filter((t) => t === 'reply exactly once')).toHaveLength(1);
@@ -275,8 +275,8 @@ describe('remote preparation and takeover', () => {
     expect(a.runner.isLive(id)).toBe(false);
     expect(a.db.kv.get(`runon.accepted.${id}.no-replay`)).toBe(true);
     expect((await a.json(`/threads/${id}/handoff`, { body: { to: 'box-b' } })).status).toBe(200);
-    for (let n = 0; n < 100 && b.db.threads.holder(id) !== 'box-b'; n++) { await both(); await new Promise((r) => setTimeout(r, 20)); }
-    await waitFor(() => b.db.threads.holder(id) === 'box-b', 'B to take it back');
+    for (let n = 0; n < 100 && b.db.assignments.holder(id) !== 'box-b'; n++) { await both(); await new Promise((r) => setTimeout(r, 20)); }
+    await waitFor(() => b.db.assignments.holder(id) === 'box-b', 'B to take it back');
     await both();
     expect(userTexts(b, id).filter((t) => t === 'reply exactly once')).toHaveLength(1);
   }, T.timeout);
@@ -323,7 +323,7 @@ describe('picking where a thread runs', () => {
       const res = await a.json('/threads', { body: { channel: 'shop', prompt: 'TOOL:60000 local work', ...(device ? { device } : {}) } });
       expect(res.status).toBe(200);
       await waitFor(() => a.runner.isLive(res.body.id), 'the thread to run on A');
-      expect(a.db.kv.get(`runon.thread.${res.body.id}`)).toBeUndefined();
+      expect(a.db.assignments.get(res.body.id)?.routed).toBeFalsy();
       await a.json(`/threads/${res.body.id}/stop`, { body: {} });
     }
   }, T.timeout);

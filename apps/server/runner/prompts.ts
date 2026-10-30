@@ -2,7 +2,7 @@
 import { config, artifactsDir, browserOutDir, designSystemFile } from '../config.ts';
 import { artifacts, type Channel, type Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
-import { isRemoteHarness } from '../harness/types.ts';
+import { isProviderHarness } from '../harness/types.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
 import { TOOL_FAILURE_POLICY } from '../tool-failure-policy.ts';
 
@@ -21,7 +21,7 @@ function publishedLines(channelId: string) {
 
 /** The channel's design system, as a file the agent reads before it writes a page. Local harnesses only. */
 function designSystemLines(thread: Thread, channel: Channel) {
-  if (!channel.design_system || isRemoteHarness(thread.harness)) return [];
+  if (!channel.design_system || isProviderHarness(thread.harness)) return [];
   return [
     '',
     '## Design system',
@@ -32,7 +32,7 @@ function designSystemLines(thread: Thread, channel: Channel) {
 
 /** Where to put files and pages, and the browser: only for a role that does work itself. */
 function workspaceLines(thread: Thread, channel: Channel) {
-  const remote = isRemoteHarness(thread.harness);
+  const remote = isProviderHarness(thread.harness);
   const name = userName();
   return [
       '',
@@ -59,7 +59,7 @@ const delegateOnlyRule = (name: string) =>
   `You route work; you never do it. Every request that needs work (code, files, commands, browsing, research, store or inbox changes) goes to a crew role with Omni's delegate tool before anything else, however small it looks. You have no shell, file editing, browser or subagent tools, by design: if you catch yourself planning to do the work, delegate it instead. Answer directly only what you can from the omni tools and the conversation: status, a crew report, a question about Omni itself, or a decision ${name} has to make.`;
 
 export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false) {
-  const remote = isRemoteHarness(thread.harness);
+  const remote = isProviderHarness(thread.harness);
   const cloud = thread.harness === 'cursor-cloud';
   const name = userName();
   // A delegate-only role has no browser or file tools, so the sections on using them would only mislead it.

@@ -11,14 +11,14 @@ import { toolTails } from '../tool-tail.ts';
 import { recordContext, recordContextHint } from '../context.ts';
 import { addCursorTurn, afterCursorTurn } from '../cursor-usage.ts';
 import { beforeResume } from '../sync/files.ts';
-import { isRemoteHarness, type HarnessId } from '../harness/types.ts';
+import { isProviderHarness, type HarnessId } from '../harness/types.ts';
 import type { AdapterContext } from '../harness/adapter.ts';
 import { invalidateCommands } from '../commands.ts';
 import { runnableCommands } from '@omni/shared/slash.ts';
 import { buildSystemPrompt } from './prompts.ts';
 import { onExit, onRecord } from './records.ts';
 import { abortStart } from './session.ts';
-import { adapterFor, addEvent, browserHolder, cliLabel, crash, deliver, emitThread, lives, omniUrl, track, type Live, type Msg } from './state.ts';
+import { adapterFor, addEvent, browserHolder, cliLabel, crash, deliver, emitThread, lives, omniUrl, ownTurn, track, type Live, type Msg } from './state.ts';
 import { failSetup } from './setup.ts';
 import { sessionStarted, takeHandover } from './switch.ts';
 import { startTurnSnapshot } from './snapshots.ts';
@@ -59,7 +59,7 @@ export function launch(threadId: string, first: Msg): Live | undefined {
     done,
   };
   lives.set(threadId, live);
-  threads.update(threadId, { status: 'running' });
+  ownTurn(threadId);
   startTurnSnapshot(live);
   spawnLive(live, thread).catch((err) => {
     // Never let one broken thread take the whole server down.
@@ -97,7 +97,7 @@ async function spawnLive(live: Live, thread: Thread) {
   const role = getCrew(thread.role);
 
   // Hermes and Cursor Cloud are not on this Mac: they must not take the channel's browser profile or see local MCP config.
-  const remote = isRemoteHarness(thread.harness);
+  const remote = isProviderHarness(thread.harness);
   // Every local harness starts here, so this is the one check that a worktree thread never runs anywhere else. It waits
   // out a cleanup of the folder, and checks the branch out again if one removed it (apps/server/workspace.ts).
   const problem = remote ? null : await inWorkspace(thread, (missing) => missing ?? workdirProblem(thread, channel.repo_path));

@@ -29,6 +29,7 @@ const SOURCES: [SyncEntity, string][] = [
   ['limit_stop', 'SELECT id AS k, created_at AS o1, rowid AS o2 FROM threads WHERE limit_state IS NOT NULL'],
   ['trigger_delivery', 'SELECT uid AS k, created_at AS o1, uid AS o2 FROM trigger_deliveries'],
   ['remote_command', 'SELECT id AS k, created_at AS o1, id AS o2 FROM remote_commands'],
+  ['assignment', 'SELECT thread_id AS k, at AS o1, thread_id AS o2 FROM assignments'],
   ['kv', `SELECT key AS k, key AS o1, 0 AS o2 FROM kv WHERE key NOT LIKE 'sync.%'`],
 ];
 

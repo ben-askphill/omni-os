@@ -4,7 +4,7 @@ import type { HandoverP } from '@omni/shared/run-switch.ts';
 import type { DeliveryPhase } from '../delivery.ts';
 import { about } from '../about.ts';
 import { config } from '../config.ts';
-import { events, messageRequests, threads, type DeliveryState, type MessageRequest } from '../db.ts';
+import { assignments, events, messageRequests, threads, type DeliveryState, type MessageRequest } from '../db.ts';
 import { publishFeed, publishThread } from '../bus.ts';
 import type { Attachment } from '../uploads.ts';
 import { contextAttachments, harnessText } from '../message-context/project.ts';
@@ -153,6 +153,8 @@ export interface Live {
   handoverDue?: boolean;
   /** Set while the thread is handed to another Mac (session.ts releaseForHandoff): what the process never read goes here, not dropped. */
   released?: Msg[];
+  /** The thread's assignment generation when this process last started a turn (ownership.ts lostTo): a later one means it moved. */
+  generation?: number;
 }
 
 /** A sub-agent, background shell or workflow still running in some thread's process. */
@@ -254,6 +256,16 @@ export function slotsByHarness(): Record<string, { running: number; cap: number 
 
 /** This Mac runs the thread: a process is attached, or it waits for a slot. */
 export const runsHere = (threadId: string) => lives.has(threadId) || waiting.includes(threadId);
+
+/**
+ * A turn starts here: the status write claims the thread for this machine (db/repos/threads.ts), and the process
+ * remembers the generation it runs on, so a move since then shows it as stale (ownership.ts lostTo).
+ */
+export function ownTurn(threadId: string) {
+  threads.update(threadId, { status: 'running' });
+  const live = lives.get(threadId);
+  if (live) live.generation = assignments.get(threadId)?.generation;
+}
 
 /** A warm claude process exists for this thread. */
 export const isLive = (threadId: string) => {

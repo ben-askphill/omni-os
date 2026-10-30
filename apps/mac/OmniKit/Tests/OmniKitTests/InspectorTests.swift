@@ -153,7 +153,7 @@ private func list(_ items: [(Int, String)]) throws -> [Artifact] { try items.map
     #expect(ThreadDetails.remoteWorkspace(.hermes) == "Hermes server, not an Omni worktree")
     #expect(ThreadDetails.remoteWorkspace(.cursor) == nil)
     #expect(HarnessID(rawValue: "cursor-cloud") == .cursorCloud)
-    #expect(HarnessID.cursorCloud.isRemote && HarnessID.hermes.isRemote && !HarnessID.cursor.isRemote)
+    #expect(HarnessID.cursorCloud.runsOnProvider && HarnessID.hermes.runsOnProvider && !HarnessID.cursor.runsOnProvider)
     #expect(BrandPaths.harnessLogo["cursor-cloud"] == "cursor")
   }
 
