@@ -6,6 +6,7 @@ import { bus, publishFeed, type FeedEvent } from './bus.ts';
 import { config } from './config.ts';
 import { needsYou, resultReads, search, threads, type Thread } from './db.ts';
 import { handoffView } from './handoff/records.ts';
+import { grokBotConfigured } from './grokbot.ts';
 import { fromThisMac } from './request-guard.ts';
 import { getProfile } from './profile.ts';
 import { activeMods, activeTasks, queuedCount, runningCount, slotsByHarness } from './runner.ts';
@@ -43,6 +44,8 @@ feedApi.get('/status', (c) =>
     profile: getProfile(),
     server: about,
     device: { name: about.name, here: fromThisMac(c) },
+    /** A Grok Bot webhook URL is set, so the clients offer Send to Grok Bot. */
+    grokBot: grokBotConfigured(),
   }),
 );
 

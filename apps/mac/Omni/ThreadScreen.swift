@@ -209,21 +209,23 @@ private struct ThreadHeader: View {
           .disabled(restoring)
           .help("Archived. Restore it to its channel's thread list.")
         }
-        Button {
-          guard !sendingGrok else { return }
-          sendingGrok = true
-          Task {
-            grokNote = await grokBotResult(model, thread.id)
-            sendingGrok = false
-            showingGrokNote = true
+        if model.store.status?.grokBot == true {
+          Button {
+            guard !sendingGrok else { return }
+            sendingGrok = true
+            Task {
+              grokNote = await grokBotResult(model, thread.id)
+              sendingGrok = false
+              showingGrokNote = true
+            }
+          } label: {
+            if sendingGrok { Loader(size: 12) } else { OmniIcon(name: "grok", size: 15) }
           }
-        } label: {
-          if sendingGrok { Loader(size: 12) } else { OmniIcon(name: "grok", size: 15) }
+          .buttonStyle(.icon(size: 28))
+          .accessibilityLabel("Send to Grok Bot")
+          .disabled(sendingGrok)
+          .help("Send this thread's text to Grok Bot")
         }
-        .buttonStyle(.icon(size: 28))
-        .accessibilityLabel("Send to Grok Bot")
-        .disabled(sendingGrok)
-        .help("Send this thread's text to Grok Bot")
         if store.transcript.hasPendingQuestion {
           StatusPill(glyph: .needs, label: QuestionState.pending.label)
         } else {

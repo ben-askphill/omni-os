@@ -57,7 +57,7 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
 }
 
 export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; artifact?: number; at?: number }) {
-  const { setOpenThread, mods, tasks, reloadChannels, needsYou, readResult, setPinned, setDone } = useApp();
+  const { setOpenThread, mods, tasks, reloadChannels, needsYou, readResult, setPinned, setDone, status } = useApp();
   const modLines = useMemo(() => mods.filter((m) => m.thread_id === id), [mods, id]);
   // GET /api/harnesses, the same list the reply pills load. Until it arrives, canSteer uses the Cursor fallback.
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
@@ -365,7 +365,7 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
             onDone={() => void toggleDone()}
             onRestore={() => void restore()}
             restoring={restoring}
-            grok={{ busy: grokBusy, run: () => void sendGrok() }}
+            grok={status?.grokBot ? { busy: grokBusy, run: () => void sendGrok() } : null}
             // Nothing runs while the worktree is prepared, so there is nothing to interrupt.
             interrupt={slotBusy && !thread.setup ? { busy: interrupting, run: () => void interrupt() } : null}
             panelOpen={panelOpen}

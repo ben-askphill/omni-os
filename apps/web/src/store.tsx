@@ -21,6 +21,8 @@ interface AppState {
   crew: CrewRole[];
   usage: HarnessUsage;
   status: (Omit<Status, 'usage' | 'server'> & { secretStore: SecretStoreKind }) | null;
+  /** Re-read GET /api/status, as after a secret that changes what it reports. */
+  reloadStatus: () => Promise<void>;
   /** The name Omni calls the user by, null until the first status load. Empty when nobody set it yet. */
   profile: Profile | null;
   /** Save profile fields (PUT /api/profile) and show them at once. */
@@ -111,7 +113,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const reloadStatus = useCallback(async () => {
     try {
       const s = await api.get<Status>('/status');
-      setStatus({ running: s.running, queued: s.queued, maxConcurrent: s.maxConcurrent, maxUploadMb: s.maxUploadMb, slots: s.slots ?? {}, device: s.device, secretStore: secretStoreKind(s.server?.secretStore) });
+      setStatus({ running: s.running, queued: s.queued, maxConcurrent: s.maxConcurrent, maxUploadMb: s.maxUploadMb, slots: s.slots ?? {}, device: s.device, grokBot: !!s.grokBot, secretStore: secretStoreKind(s.server?.secretStore) });
       setProfile(s.profile ?? { name: '' });
       if (s.usage) setUsage((prev) => ({ ...prev, ...s.usage }));
     } catch {
@@ -272,6 +274,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       crew,
       usage,
       status,
+      reloadStatus,
       profile,
       saveProfile,
       reloadProfile,
@@ -289,7 +292,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openThread,
       setOpenThread,
     }),
-    [channels, channelsLoaded, channelsError, reloadChannels, pinned, setPinned, crew, usage, status, profile, saveProfile, reloadProfile, setupOpen, openSetup, closeSetup, feedLive, tasks, mods, subscribe, needsYou, readResult, setDone, openThread],
+    [channels, channelsLoaded, channelsError, reloadChannels, pinned, setPinned, crew, usage, status, reloadStatus, profile, saveProfile, reloadProfile, setupOpen, openSetup, closeSetup, feedLive, tasks, mods, subscribe, needsYou, readResult, setDone, openThread],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

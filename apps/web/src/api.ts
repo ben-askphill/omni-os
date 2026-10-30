@@ -116,6 +116,8 @@ export interface Status {
   profile?: Profile;
   /** The Mac the server runs on, and whether this browser sits at it. Older servers leave it out. */
   device?: Device;
+  /** A Grok Bot webhook URL is set on this server. Without it the clients hide Send to Grok Bot. Older servers leave it out. */
+  grokBot?: boolean;
 }
 
 export interface Device {

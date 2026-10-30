@@ -310,7 +310,7 @@ function MoSubagentRow({ t, last, onJump }: { t: BackgroundTask; last: boolean; 
 
 function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: string | null; onClose: () => void }) {
   const shell = useShell();
-  const { setPinned, setDone, reloadChannels, tasks } = useApp();
+  const { setPinned, setDone, reloadChannels, tasks, status } = useApp();
   const { applyThread, blocked, handoff, setHandoff, takeover, jumpTo } = useThread();
   const agents = useMemo(() => runningSubagents(tasks, thread.id), [tasks, thread.id]);
   const targets = useHandoffTargets(thread, { blocked, handoff, takeover });
@@ -459,14 +459,16 @@ function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: stri
           {(thread.done_at || canMarkDone(thread.status)) && (
             <MoListRow icon="check" label={thread.done_at ? 'Mark as not done' : 'Mark as done'} chevron={false} onClick={() => void done()} />
           )}
-          <MoListRow
-            icon={grokBusy ? <Loader size={18} /> : 'grok'}
-            label="Send to Grok Bot"
-            sub={grokBusy ? 'Sending' : "This thread's text"}
-            chevron={false}
-            disabled={grokBusy}
-            onClick={() => void sendGrok()}
-          />
+          {status?.grokBot && (
+            <MoListRow
+              icon={grokBusy ? <Loader size={18} /> : 'grok'}
+              label="Send to Grok Bot"
+              sub={grokBusy ? 'Sending' : "This thread's text"}
+              chevron={false}
+              disabled={grokBusy}
+              onClick={() => void sendGrok()}
+            />
+          )}
           <MoListRow icon="archive" label={thread.archived ? 'Restore thread' : 'Archive thread'} chevron={false} onClick={() => void archive()} last />
         </MoGroup>
         {grokError && <ErrorNote>{grokError}</ErrorNote>}
