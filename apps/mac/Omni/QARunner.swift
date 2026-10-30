@@ -441,10 +441,10 @@ final class QARunner {
     try await shootMenu(at: NSPoint(x: frame.minX + 60, y: frame.midY), button: .rightMouseDown, shot: shot, what: folder.name)
   }
 
-  /// Clicks the thread header's Hand Off button and shoots the screen while its menu is open.
+  /// Clicks the thread header's ⋯ menu button and shoots the screen while the menu is open.
   private func handoffMenu(shot: String) async throws(QAScriptError) {
-    guard let frame = QAHandoffProbe.button else { throw QAScriptError("no Hand Off button on screen") }
-    try await shootMenu(at: NSPoint(x: frame.midX, y: frame.midY), button: .leftMouseDown, shot: shot, what: "the Hand Off button")
+    guard let frame = QAHandoffProbe.button else { throw QAScriptError("no thread actions button on screen") }
+    try await shootMenu(at: NSPoint(x: frame.midX, y: frame.midY), button: .leftMouseDown, shot: shot, what: "the thread actions button")
   }
 
   /// Clicks `spot` (global, top-left origin) in the main window, shoots the screen once a menu opens, then closes it.
