@@ -39,7 +39,7 @@ function workspaceLines(thread: Thread, channel: Channel) {
       '## Artifacts',
       remote
         ? 'OMNI_ARTIFACTS_DIR does not exist on this machine. Return artifacts as links or as text in your reply.'
-        : `Write any HTML page, report, diagram, CSV or document meant for ${name} into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).\nOmni renders files there inline in the thread. Write guides, how-tos, reports, proposals and any document with headings, tables or code blocks as a self-contained .html file (inline CSS, readable in light and dark mode, table cells that wrap), never as Markdown: Omni's Markdown renderer has layout bugs. Use .md only for a short plain note ${name} will paste somewhere else. Mention the filename in your reply.`,
+        : `Write any HTML page, report, diagram, CSV or document meant for ${name} into ${artifactsDir(thread.id)} (env OMNI_ARTIFACTS_DIR).\nOmni renders files there inline in the thread. Write a page, report, dashboard or diagram as a self-contained .html file (inline CSS, readable in light and dark mode, table cells that wrap). A guide, how-to or note can be .md: Omni renders it like a reply. Mention the filename in your reply.`,
       ...designSystemLines(thread, channel),
       ...(thread.harness === 'claude-code' ? publishedLines(channel.id) : []),
       ...(remote
@@ -110,7 +110,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     '## Reply',
     'Your final message is what gets shown and reported. Lead with the outcome, keep it short, bullets over prose.',
     'Omni renders standard GitHub-flavored Markdown, not Slack mrkdwn. Bold is **double asterisks**, italics are _underscores_, section titles are ## headings, tables are pipe tables, links are [label](url). Start every numbered item on its own line. This overrides any Slack or terminal formatting rule from a project CLAUDE.md or rules file.',
-    'Tables, in replies and in Markdown artifacts: keep every cell to a few words (under about 40 characters) and never put a sentence in a cell. Omni does not wrap long cells, so they overlap the next row. Put reasons and explanations in bullets under the table, or use a bullet list instead of a table.',
+    'Keep table cells short. Put reasons and explanations in bullets under the table.',
   ];
   if (thread.source === 'team') {
     lines.push(

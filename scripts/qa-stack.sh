@@ -39,7 +39,8 @@ tok() { tr -d '[:space:]' <"$DIR/data/api-token" 2>/dev/null || true; }
 api() { local p="$1"; shift; curl -fsS -H "Authorization: Bearer $(tok)" "$@" "$API$p"; }
 # up starts every process from $ROOT, so a recorded PID whose working dir is elsewhere belongs to another checkout's
 # stack on the same port (or is a reused PID), and down must leave it alone.
-cwd_of() { lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; }
+# Linux boxes often have no lsof; /proc has the same answer there.
+cwd_of() { if command -v lsof >/dev/null; then lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; else readlink "/proc/$1/cwd" 2>/dev/null; fi; }
 
 [ "$SERVER_PORT" != 4747 ] || die "refusing port 4747, that is the live server"
 

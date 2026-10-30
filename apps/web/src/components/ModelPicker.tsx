@@ -13,6 +13,12 @@ const AUTO_NOTE = 'Picks a model for each task';
 /** The open list's height: the search field and the 320px list. */
 const LIST_HEIGHT = 380;
 
+/** Under a thread the pill sits at the bottom of the page, so the list opens upward when it has no room below. */
+function opensUp(btn: HTMLElement | null) {
+  const r = btn?.getBoundingClientRect();
+  return !!r && window.innerHeight - r.bottom < LIST_HEIGHT && r.top > window.innerHeight - r.bottom;
+}
+
 /**
  * One model pill whose list starts with Auto, then groups models under each harness, with a sticky header naming the
  * plan, one search across all groups, and the harness default marked "(default)". A harness that
@@ -25,6 +31,7 @@ export function ModelPicker({
   onChange,
   onOpen,
   defaultOpen,
+  openRequest = 0,
   placeholder = 'Model',
   offerAuto = true,
   label,
@@ -35,8 +42,10 @@ export function ModelPicker({
   value: ModelChoice;
   onChange: (v: ModelChoice) => void;
   onOpen?: () => void;
-  /** Start with the list open, as "New thread on another model" does. */
+  /** Start with the list open. */
   defaultOpen?: boolean;
+  /** Bumped to open the list, as `/model` in a thread's reply box does. */
+  openRequest?: number;
   /** The pill's label when no model is picked. */
   placeholder?: string;
   /** List Auto first. A thread's own pill leaves it out: Auto picks the run as a thread starts. */
@@ -77,6 +86,15 @@ export function ModelPicker({
   }, []);
 
   useEffect(() => {
+    if (!openRequest) return;
+    onOpen?.();
+    setQ('');
+    setUp(opensUp(btn.current));
+    setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest]);
+
+  useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
       if (!wrap.current?.contains(e.target as Node)) setOpen(false);
@@ -105,9 +123,7 @@ export function ModelPicker({
         onClick={() => {
           if (!open) {
             onOpen?.();
-            // Under a thread the pill sits at the bottom of the page, so the list opens upward when it has no room below.
-            const r = btn.current?.getBoundingClientRect();
-            setUp(!!r && window.innerHeight - r.bottom < LIST_HEIGHT && r.top > window.innerHeight - r.bottom);
+            setUp(opensUp(btn.current));
           }
           setOpen(!open);
         }}

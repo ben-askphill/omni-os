@@ -8,12 +8,12 @@ Running and Pinned in the desktop web and Mac sidebars list work across channels
 
 Needs you holds unread results and threads waiting for you to act. Opening a thread reads the result it shows, so a newer result stays unread. **Mark as done** clears any of those reasons without archiving the thread or changing how its last turn ended. It stays in its channel and folder with a grey check, muted title and Done chip. **Mark as not done** brings back its unread result and blockers. A new message, a run starting or Retry setup clears done; the flag syncs between Macs. Running and queued threads cannot be marked done.
 
-On desktop web and Mac, use the check on a Needs you row, the thread header or the thread's right-click menu. In a narrow desktop web header, Pin, Mark done, Hand off and Send to Grok Bot move into the More menu. On a phone, Mark done is on Activity blocker cards and in Thread options. The Conductor can use `mark_thread_done` when you ask it to.
+On desktop web and Mac, use the check on a Needs you row, the thread header or the thread's right-click menu. When the desktop web thread header is narrower than 48rem (the side panel open, or a small window), Pin, Mark done, Hand off and Send to Grok Bot fold into its Thread actions (⋯) menu. On a phone, Mark done is on Activity blocker cards and in Thread options. The Conductor can use `mark_thread_done` when you ask it to.
 
 ## The composer
 
 - A new thread follows the channel and crew defaults until you pick a model or effort for that draft. Auto picks from the first prompt when no default is set. The Conductor role's charter is Auto; a saved #conductor channel default still wins. See [Harnesses](harnesses.md#auto).
-- `/` opens the menu of skills, slash commands and MCP prompts for the thread's harness.
+- `/` opens the menu of skills, slash commands and MCP prompts for the thread's harness. In a thread's reply box, `/model`, `/effort` and `/fast` open the model pill; what you pick runs from the next turn.
 - `@` mentions artifacts and repo files.
 - After a finished turn, Haiku suggests your likely next reply. Tab fills it in; `OMNI_SUGGESTIONS=0` in `.env` turns it off.
 

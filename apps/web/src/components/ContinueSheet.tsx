@@ -95,7 +95,7 @@ export function BlockNote({ block, onRecheck, onCloseTerminal, closing }: { bloc
 
 const OPEN_EVENT = 'omni:continue-thread';
 
-/** Open the sheet that continues `source` on another harness, as the thread actions' item does. */
+/** Open the sheet that continues `source` on another harness, as the reply box's Fork button does. */
 export function openContinue(source: ContinueSource) {
   window.dispatchEvent(new CustomEvent<ContinueSource>(OPEN_EVENT, { detail: source }));
 }
@@ -106,7 +106,7 @@ export function ForkThreadButton({ thread, disabled }: { thread: ContinueSource;
   return <IconButton icon="branch" label="Fork thread" title={refusal ?? 'Fork thread: a new thread, on any harness, that picks up from here'} size={15} disabled={disabled || !!refusal} onClick={() => openContinue(thread)} />;
 }
 
-/** Mounted once in the desktop app, so the thread actions open the sheet for any thread, open or not. */
+/** Mounted once in the desktop app, so the reply box's Fork button opens the sheet. */
 export function ContinueSheetHost() {
   const [source, setSource] = useState<ContinueSource | null>(null);
   useEffect(() => {

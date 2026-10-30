@@ -594,7 +594,7 @@ The slash grammar, ranking, hints and pills are the TypeScript in `packages/shar
 - `SlashEngine.shared` (OmniKit): `query`, `sections`, `pick`, `reply`, `newThreadHint`, `pieces`, `omniCommands`. All offsets are UTF-16 units. `String.index(utf16Offset:)` and `utf16Offset(of:)` (in `SlashTypes.swift`) are the only place they become Swift indices; `AttributedString` has the same pair in `SlashMenuView.swift`.
 - `SlashCommandsStore` (`@MainActor @Observable`): the list for a `CommandsSource` (`.thread(id)` or `.newThread(harness:channel:)`), fetched as `useCommands` does: cached, then `wait=1`; an older `fetchedAt` never replaces a newer list; a failure with no list is `.unavailable`. Set `source` when the new-thread picker changes.
 - `SlashMenuModel`: open/closed, sections, highlight, Esc dismissal, keys, pick, `reply` (what Send does) and `hint`. It loads the list on focus and when the menu opens.
-- `OmniCommands.run(action, in: thread, client:)` does `/clear`, `/new` (new thread, or `.openNewThread(preset)` when there is no prompt) and `/rename`. `/model`, `/effort` and `/fast` do nothing: the hint points at the reply box's model and effort pickers, and still offers `NewThreadPreset.otherModel(thread)`. Attachments on `/clear <prompt>` are not sent.
+- `OmniCommands.run(action, in: thread, client:)` does `/clear`, `/new` (new thread, or `.openNewThread(preset)` when there is no prompt) and `/rename`. `/model`, `/effort` and `/fast` return nil: the composer opens its model picker (`ModelPickerButton.openRequest`), whose pick switches the next turn. Attachments on `/clear <prompt>` are not sent.
 - Pills in user bubbles already use `SlashPiece.split` (native); a test pins it to the engine's `pieces`.
 
 Wiring it into the composer (apps/mac/Omni/SlashMenuDemo.swift is a working example, Debug only, `-OmniQASlashDemo YES`):
@@ -602,14 +602,14 @@ Wiring it into the composer (apps/mac/Omni/SlashMenuDemo.swift is a working exam
 1. `let menu = SlashMenuModel(commands: SlashCommandsStore(api: client, source: .thread(id)), placement: .reply, harness: thread.harness.rawValue)`. For the new-thread composer use `placement: .newThread` and `.newThread(harness:channel:)`; update `menu.harness` and `commands.source` when the picker changes.
 2. On the composer's container (the view around the text view): `.slashMenu(menu)` (`below: true` near the top of the page). It draws the menu and takes the arrows, Return, Tab and Esc while open.
 3. Feed it: `menu.setFocused(focused)` and `menu.update(text:, caret:)` on every text or selection change (caret is a UTF-16 offset). Set `menu.onEdit = { text, caret in ... }` to write the picked text back and move the caret.
-4. Under the text: `SlashHintView(model: menu) { open new thread on another model }`.
+4. Under the text: `SlashHintView(model: menu)`.
 5. Send: `if let r = menu.reply, r.action != .send` then the button reads `r.label ?? "Send"`, is enabled by `r.armed`, and runs `OmniCommands.run(r.action, in: thread, client:)`; clear the draft after. For a plain send the button is enabled by non-empty text as before.
 
 The overlay sits above the composer, like the Web UI's, not at the caret: `TextEditor` gives no caret rectangle. If the keys do not reach `.onKeyPress` because the text view takes them first, move the modifier's key closure to the text view's own handler and call `menu.handle(_:)`.
 Wired (both composers):
 
 - `ComposerCallbacks` got `slash` (arrows, Return, Tab from the text view's `doCommandBy`, Esc from `cancelOperation`; not while an input method composes) and `edited` (text and caret on every change, selection move and focus). `CaretRequest` sets the caret after a pick. `.slashMenu(menu)` is on the composer's shell for its overlay; its key handler never sees the keys because the AppKit text view takes them first.
-- Reply box: `menu.reply` decides the Send button (`Rename`, `New thread`, ...) and Return; `runOmni()` calls `OmniKit.OmniCommands.run` (qualified: the app has its own `OmniCommands: Commands`). `/model`, `/effort`, `/fast` show the hint (switch with the pickers below) with "New thread on another model".
+- Reply box: `menu.reply` decides the Send button (`Rename`, `New thread`, ...) and Return; `runOmni()` calls `OmniKit.OmniCommands.run` (qualified: the app has its own `OmniCommands: Commands`). `/model`, `/effort`, `/fast` arm Send as "Pick model", which clears the text and opens the model picker.
 - New thread: `.slashMenu(menu, below: true)`; `menu.commands.source` and `menu.harness` follow the pickers. `AppModel.openNewThread(preset)` puts the preset in `shell.newThreadPreset` and opens the channel; that channel's composer takes it (`NewThreadComposerModel.apply`) and opens the model list for `pickModel`.
 - QA: `{"type": ...}` also focuses the box. In this environment, opening a thread with `{"route": "#/t/<id>"}` crashes the app (window constraint loop) on main too; use `{"openThread": "<id>"}` and read `-window1.png`.
 

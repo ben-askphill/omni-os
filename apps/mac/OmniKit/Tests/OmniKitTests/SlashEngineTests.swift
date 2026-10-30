@@ -96,7 +96,7 @@ private let engine = SlashEngine.shared
 
     for name in ["model", "effort", "fast"] {
       let r = engine.reply("/\(name)", list: ready, harness: "codex")
-      #expect(r.action == .fixed && !r.armed && r.hint == "Switch the model and effort with the pills below. The next turn uses them.")
+      #expect(r.action == .pickModel && r.armed && r.label == "Pick model" && r.hint == "Opens the model pill below. The next turn runs on what you pick.")
     }
   }
 

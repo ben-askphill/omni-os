@@ -49,7 +49,7 @@ public final class ShellState {
   public var paletteQuery = ""
   /// Bumped to ask the composer on screen to take focus.
   public private(set) var composerFocus = 0
-  /// The settings a new-thread composer takes when it opens (`/clear`, `/new`, "New thread on another model"). The
+  /// The settings a new-thread composer takes when it opens (`/clear`, `/new`, a suggested thread). The
   /// composer of that channel clears it.
   public var newThreadPreset: NewThreadPreset?
 

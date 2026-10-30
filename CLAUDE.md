@@ -50,7 +50,7 @@ You most likely run inside Omni itself, served from :4747 on the user's Mac.
 Most misses are a change that works where it was tested and is missing elsewhere. Before calling a change done, say which of these applied:
 
 - **Clients**: desktop web, phone web and the Mac app, in the same PR (see "Every surface, every time").
-- **Harnesses**: Claude Code, Codex, Cursor Agent and Hermes each have an adapter in `apps/server/harness/`. Decide per harness, even if the answer is "not supported".
+- **Harnesses**: Claude Code, Codex, Cursor Agent, Cursor Cloud and Hermes each have an adapter in `apps/server/harness/`. Decide per harness, even if the answer is "not supported".
 - **Agents**: something a user can do is usually something the Conductor should reach through `apps/mcp/omni.ts`.
 - **Sync**: new state that should reach the other Mac needs a handler in `apps/server/sync/handlers/`, and a new entity also needs adding to the check in `supabase/migrations/0001_changes.sql`.
 - **Mac contract**: a change to JSON the Mac app reads updates `apps/server/tests/mac-fixtures.test.ts`.

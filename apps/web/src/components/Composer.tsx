@@ -15,7 +15,7 @@ import { SlashMenu, optionId, useCommands } from './SlashMenu.tsx';
 import { FileMenu, useFileMenu } from './FileMenu.tsx';
 import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '@omni/shared/slash-menu.ts';
 import { menuCommands, newThreadHint, replySlash } from '@omni/shared/composer-slash.ts';
-import { draftRun, draftRunRequest, newThreadBody, otherModel, sameSettings, type DraftRun } from '../new-thread-preset.ts';
+import { draftRun, draftRunRequest, newThreadBody, sameSettings, type DraftRun } from '../new-thread-preset.ts';
 import { asksAuto } from '../thread-run.ts';
 import { parseSlash, type SlashCommand } from '@omni/shared/slash.ts';
 import { requestIdFor, sendKey, type PendingRequest } from '../requests.ts';
@@ -413,7 +413,7 @@ export function NewThreadComposer({
 }) {
   const { channels, crew } = useApp();
   const key = `new:${channelId ?? '*'}`;
-  // Set up from the thread Ben came from, when `/clear` or "New thread on another model" opened this.
+  // Set up from the thread Ben came from, when `/clear` opened this.
   const [preset] = useState(() => (channelId ? peekNewThreadPreset(channelId) : null));
   useEffect(() => {
     if (!preset) return;
@@ -729,7 +729,18 @@ const finePointer = () => typeof matchMedia !== 'undefined' && matchMedia('(poin
  * thread, or says why not. While a turn runs the pick waits for it (`queued_*`), so the pills show it with a "Next
  * turn" chip whose x drops it.
  */
-function ThreadRunPills({ thread, onSwitched, onError }: { thread: Thread; onSwitched: (t: Thread) => void; onError: (text: string | null) => void }) {
+function ThreadRunPills({
+  thread,
+  openRequest,
+  onSwitched,
+  onError,
+}: {
+  thread: Thread;
+  /** Bumped to open the model list: `/model`, `/effort` and `/fast`. */
+  openRequest: number;
+  onSwitched: (t: Thread) => void;
+  onError: (text: string | null) => void;
+}) {
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>('/harnesses');
   const [switching, setSwitching] = useState(false);
   const shown = shownRun(thread);
@@ -774,6 +785,7 @@ function ThreadRunPills({ thread, onSwitched, onError }: { thread: Thread; onSwi
       <ModelPicker
         harnesses={harnesses}
         onOpen={reload}
+        openRequest={openRequest}
         offerAuto={false}
         label={labels.model}
         value={choice}
@@ -904,6 +916,7 @@ export function ReplyComposer({
   // ----- Omni commands, and hints for commands that stay text -----
   const slash = useMemo(() => replySlash(text, list, thread.harness), [text, list, thread.harness]);
   const omni = slash.action.kind !== 'send';
+  const [pillRequest, setPillRequest] = useState(0);
 
   /** Clear what was sent, unless Ben typed more while it was in flight. */
   const sent = (raw: string) => {
@@ -916,6 +929,11 @@ export function ReplyComposer({
     const { action } = slash;
     if (!slash.armed || busy) return;
     const raw = text;
+    if (action.kind === 'pick-model') {
+      sent(raw);
+      setPillRequest((n) => n + 1);
+      return;
+    }
     if (action.kind === 'new-thread' && !action.prompt) {
       sent(raw);
       openNewThread(sameSettings(thread));
@@ -939,11 +957,6 @@ export function ReplyComposer({
     } finally {
       setBusy(false);
     }
-  };
-
-  const otherModelThread = () => {
-    sent(text);
-    openNewThread(otherModel(thread));
   };
 
   return (
@@ -979,7 +992,7 @@ export function ReplyComposer({
         {extra}
         <AttachButton onPick={att.add} disabled={busy} />
         <ForkThreadButton thread={thread} disabled={busy} />
-        <ThreadRunPills thread={thread} onSwitched={(t) => onChanged?.(t)} onError={setError} />
+        <ThreadRunPills thread={thread} openRequest={pillRequest} onSwitched={(t) => onChanged?.(t)} onError={setError} />
         <div className="ml-auto flex items-center gap-2.5">
           <Hint tab={!!suggestion} />
           {omni ? (
@@ -998,14 +1011,7 @@ export function ReplyComposer({
       {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
       <div aria-live="polite">
         {slash.hint && !menus.open && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pb-2.5 text-[12px] text-fg-3">
-            <span>{slash.hint}</span>
-            {slash.action.kind === 'fixed' && (
-              <button type="button" onClick={otherModelThread} className="font-medium text-fg-2 underline-offset-2 hover:text-fg hover:underline">
-                New thread on another model
-              </button>
-            )}
-          </div>
+          <div className="px-4 pb-2.5 text-[12px] text-fg-3">{slash.hint}</div>
         )}
       </div>
       {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}

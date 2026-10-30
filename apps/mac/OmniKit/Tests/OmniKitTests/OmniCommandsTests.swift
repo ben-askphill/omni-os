@@ -43,13 +43,12 @@ private let thread = try! OmniJSON.decoder().decode(OmniThread.self, from: Data(
     #expect(try bodyJSON(req) == .object(["title": .string("New name")]))
   }
 
-  @Test func sendAndFixedDoNothing() async throws {
+  @Test func sendAndPickModelDoNothing() async throws {
     let t = StubTransport(body: "{}")
     let client = OmniClient(port: 4799, transport: t)
     #expect(try await OmniCommands.run(.send, in: thread, client: client) == nil)
-    #expect(try await OmniCommands.run(.fixed, in: thread, client: client) == nil)
+    #expect(try await OmniCommands.run(.pickModel, in: thread, client: client) == nil)
     #expect(t.requests.isEmpty)
-    #expect(NewThreadPreset.otherModel(thread) == NewThreadPreset(channel: "acme", role: "", pickModel: true))
   }
 
   @Test func aSuggestedThreadDecodesAndItsEditCarriesThePrompt() throws {

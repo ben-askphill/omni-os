@@ -5,10 +5,10 @@
     { name: "clear", description: "Start a new thread with the same settings", source: "omni", mentionable: false },
     { name: "new", description: "Start a new thread with the same settings", source: "omni", mentionable: false },
     { name: "rename", argumentHint: "<title>", description: "Rename this thread", source: "omni", mentionable: false },
-    // A thread's model and effort are fixed, so these offer a new thread instead.
-    { name: "model", description: "Fixed per thread, so it offers a new thread on another model", source: "omni", mentionable: false },
-    { name: "effort", description: "Fixed per thread, so it offers a new thread with another effort", source: "omni", mentionable: false },
-    { name: "fast", description: "Fixed per thread, so it offers a new thread on a faster model", source: "omni", mentionable: false }
+    // The composer's pills switch a thread's model and effort for its next turn, so these open them.
+    { name: "model", description: "Pick the model for the next turn", source: "omni", mentionable: false },
+    { name: "effort", description: "Pick the effort for the next turn", source: "omni", mentionable: false },
+    { name: "fast", description: "Pick a faster model for the next turn", source: "omni", mentionable: false }
   ];
   var OMNI_NAMES = new Set(OMNI_COMMANDS.map((c) => c.name));
   var TITLE_MAX = 200;
@@ -114,7 +114,7 @@
           return { action: { kind: "rename", title }, armed: !!title && !hint, label: "Rename", hint };
         }
         default:
-          return { action: { kind: "fixed" }, armed: false, label: null, hint: "Switch the model and effort with the pills below. The next turn uses them." };
+          return { action: { kind: "pick-model" }, armed: true, label: "Pick model", hint: "Opens the model pill below. The next turn runs on what you pick." };
       }
     }
     return { action: { kind: "send" }, armed: !!text.trim(), label: null, hint: textHint(text, r, list, harness, "reply") };
