@@ -122,8 +122,6 @@ export function summarize(items: WorktreeItem[]): InventorySummary {
   return s;
 }
 
-export const VERDICT_LABEL: Record<WorktreeVerdict, string> = { eligible: 'Eligible', kept: 'Kept', unknown: 'Unknown' };
-
 export const KIND_LABEL: Record<WorktreeKind, string> = {
   managed: 'Thread worktree',
   orphan: 'Leftover folder',

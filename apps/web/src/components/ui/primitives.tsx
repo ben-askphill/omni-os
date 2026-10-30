@@ -107,6 +107,7 @@ export function Chip({ children, tone = 'default', className = '', title }: { ch
 
 // Every icon a channel can pick is one this file draws.
 const _channelGlyphsDrawn: readonly IconName[] = CHANNEL_GLYPHS;
+void _channelGlyphsDrawn;
 
 /** A channel's own icon (an emoji, a design system icon or an uploaded SVG), or nothing when it has none. */
 export function ChannelMark({ icon, size }: { icon: string | null | undefined; size: number }) {

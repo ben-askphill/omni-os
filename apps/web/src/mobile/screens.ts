@@ -87,8 +87,6 @@ export function screenOf(r: Route): ScreenKey {
 
 export const specOf = (r: Route) => SCREENS[screenOf(r)];
 
-/** A route's path, its key as a layer. */
-export const pathOf = (hash: string) => hash.replace(/^#/, '').split('?')[0] || '/';
 
 /**
  * The pushed screens a route shows, bottom first, ending with the route itself; empty for a tab root. Each one under

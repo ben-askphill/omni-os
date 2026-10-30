@@ -1,0 +1,71 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreBinaries": [
+    "swift",
+    "flock",
+    "scutil",
+    "ioreg",
+    "pgrep"
+  ],
+  "ignore": [
+    ".claude/**",
+    "docs/**",
+    "prototypes/**",
+    "mods/**",
+    "**/fixtures/**",
+    "apps/mac/OmniKit/Sources/OmniKit/Resources/*.js"
+  ],
+  "workspaces": {
+    "apps/server": {
+      "entry": [
+        "scripts/*.ts",
+        "scripts/route-eval/*.ts",
+        "tests/**/*.test.ts"
+      ],
+      "ignoreDependencies": [
+        "@playwright/mcp"
+      ]
+    },
+    "apps/mcp": {
+      "entry": [
+        "omni.ts",
+        "ask.ts",
+        "threads.ts"
+      ]
+    },
+    "apps/web": {
+      "entry": [
+        "tests/**/*.test.ts"
+      ]
+    },
+    "apps/mac": {
+      "entry": [
+        "scripts/*.ts",
+        "slash-engine/entry.ts",
+        "browser-pick/entry.ts",
+        "tests/**/*.test.ts"
+      ],
+      "ignoreDependencies": [
+        "mermaid",
+        "@omni/test-fixtures"
+      ]
+    },
+    "packages/shared": {
+      "entry": [
+        "*.ts",
+        "scripts/*.ts",
+        "tests/**/*.test.ts"
+      ]
+    },
+    "packages/test-fixtures": {
+      "entry": [
+        "*.{mjs,mts,ts}"
+      ]
+    }
+  },
+  "exclude": [
+    "exports",
+    "types",
+    "duplicates"
+  ]
+}

@@ -166,7 +166,7 @@ export function AnnotateLayer({ channelId, threadId, onClose, onAdded, from }: {
           </span>
         </div>
       ) : (
-        <Draw capture={phase.capture} channelId={channelId} threadId={threadId} onClose={onClose} onAdded={() => ((added.current = true), onAdded())} from={from?.capture === phase.capture ? from : undefined} />
+        <Draw capture={phase.capture} channelId={channelId} threadId={threadId} onAdded={() => ((added.current = true), onAdded())} from={from?.capture === phase.capture ? from : undefined} />
       )}
     </div>
   );
@@ -183,7 +183,7 @@ type Gesture =
   | { kind: 'shape'; drag: Drag }
   | { kind: 'move'; index: number; from: [number, number]; was: Mark };
 
-function Draw({ capture, channelId, threadId, onClose, onAdded, from }: { capture: BrowserCapture; channelId: string; threadId: string; onClose: () => void; onAdded: () => void; from?: AnnotateFrom }) {
+function Draw({ capture, channelId, threadId, onAdded, from }: { capture: BrowserCapture; channelId: string; threadId: string; onAdded: () => void; from?: AnnotateFrom }) {
   const { viewport } = capture;
   const { box, scale, shown } = useFit(viewport);
   const stage = useRef<HTMLDivElement>(null);

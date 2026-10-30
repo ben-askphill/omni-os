@@ -104,8 +104,6 @@ export function cleanupPreview(items: WorktreeItem[], trigger: CleanupTrigger, p
   return { trigger, candidates, bytes: candidates.reduce((n, c) => n + (c.bytes ?? 0), 0) };
 }
 
-export const OUTCOME_LABEL: Record<CleanupOutcome, string> = { removed: 'Removed', kept: 'Kept', failed: 'Failed' };
-
 export const CLEANUP_BECAUSE_LABEL: Record<CleanupBecause, string> = {
   archived: 'Its thread is archived',
   merged: 'Its branch is merged and the thread is idle',
