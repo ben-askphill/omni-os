@@ -318,7 +318,7 @@ export function MobileHandoffGroup({ item, group, onOpen, last, idPrefix = 'mobi
   const panel = `${idPrefix}-handoffs-${group.parent.id}`;
   return (
     <div>
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 items-center gap-1">
         <MoRow it={item} last={false} onOpen={() => onOpen(item)} />
         <button
           type="button"
