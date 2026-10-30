@@ -5,50 +5,14 @@ import { execFile } from 'node:child_process';
 import { existsSync, lstatSync, openSync, readSync, closeSync, realpathSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { promisify } from 'node:util';
+import type { BranchChanges, ChangeGroup, ChangeKind, ChangedFile, ChangeStatus, DiffOmitted } from '@omni/shared/changes.ts';
 import { channels, threadBases, type Thread, type ThreadBase } from './db.ts';
 import { plannedWorktree, worktreeProblem } from './sandbox.ts';
 import { isRemoteHarness, remoteWhere } from './harness/types.ts';
 
 const run = promisify(execFile);
 
-/** `turn`: what one turn changed, between its before and after snapshots (apps/server/turns.ts). */
-export type ChangeKind = 'committed' | 'staged' | 'unstaged' | 'untracked' | 'turn';
-export type ChangeStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed' | 'unmerged';
-/** Why a file's diff text was left out: binary, too big for one file, past the response's budget, a symlink, or git gave none. */
-export type DiffOmitted = 'binary' | 'too_large' | 'limit' | 'symlink' | 'unavailable';
-
-export interface ChangedFile {
-  path: string;
-  /** The path before a rename or copy, else null. */
-  old_path: string | null;
-  status: ChangeStatus;
-  /** Lines added and removed, null when git cannot count them (binary) or the file was too big to read. */
-  additions: number | null;
-  deletions: number | null;
-  binary: boolean;
-  /** Set when `diff` is empty on purpose. */
-  omitted: DiffOmitted | null;
-  /** This file's part of a unified diff, from its `diff --git` line. Empty when omitted. */
-  diff: string;
-}
-
-export interface ChangeGroup {
-  kind: ChangeKind;
-  files: ChangedFile[];
-  /** More files changed than are listed. */
-  truncated: boolean;
-}
-
-export type BranchChanges =
-  | { available: false; reason: string }
-  | {
-      available: true;
-      cwd: string;
-      branch: string | null;
-      head: string;
-      base: Omit<ThreadBase, 'thread_id'>;
-      groups: ChangeGroup[];
-    };
+export type { BranchChanges, ChangeGroup, ChangeKind, ChangedFile, ChangeStatus, DiffOmitted } from '@omni/shared/changes.ts';
 
 /** Files listed per group. */
 export const MAX_FILES = 400;

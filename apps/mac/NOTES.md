@@ -703,6 +703,7 @@ Wired (both composers):
 
 - The Changes tab has two views: Since base (#207) and This turn. This turn reads GET /api/threads/:id/turns (`apps/server/turns.ts`): a worktree thread's saved turns, newest first, and one turn's diff between the snapshots Omni saved before and after it (hidden refs `refs/omni/turns/<thread>/<turn>/before|after`, rows in the local `turn_snapshots` table). A picker chooses the turn; the header shows HEAD moving during it and says the diff is a before/after snapshot (commits and pulls included, ignored files not saved). A turn still saving polls every 1.5s; a failed save shows its reason, never a failed Result.
 - OmniKit: `TurnChanges`, `TurnView`, `TurnSide`, `TurnState`, `TurnChangesView`, `OmniClient.turns(forThread:turn:)` in `Changes.swift`. Fixtures `turns.json`, `turns-unavailable.json`.
+- Shared contracts (#408): the Changes types are `packages/shared/changes.ts`, which the server and the web import. The settings fields (labels, hints, placeholders, defaults, checks) are `packages/shared/settings.ts`, which the server builds its schema from and the web's Settings form draws. `mac-fixtures.test.ts` holds `Changes.swift`, `Setup.swift` and `ProfileSettingsView.swift` to them: the recorded changes and turns answers must match the shared types, the Swift structs must read the same keys and values, and Profile settings must show each field with the shared label, hint and placeholder.
 - QA step: `{"inspector": "turn"}` opens the Changes tab on This turn.
 
 ## Hand off to another Mac

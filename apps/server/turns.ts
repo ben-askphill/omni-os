@@ -4,9 +4,10 @@
 // are never touched, and the refs keep them from garbage collection, so the turn's diff reads the same after later
 // edits and restarts. It is a before/after snapshot: commits, pulls and other git operations made during
 // the turn are part of it.
-import { turnSnapshots, type SkippedFile, type Thread, type TurnSnapshot, type TurnSnapshotState } from './db.ts';
+import { turnSnapshots, type SkippedFile, type Thread, type TurnSnapshot } from './db.ts';
 import { isRemoteHarness, remoteWhere } from './harness/types.ts';
-import { changesCheckout, commitsGroup, gitOr, type ChangeGroup, type ChangedFile } from './changes.ts';
+import type { ChangedFile, TurnChanges, TurnView } from '@omni/shared/changes.ts';
+import { changesCheckout, commitsGroup, gitOr } from './changes.ts';
 import { captureTree, commitCheckpoint } from './checkpoint.ts';
 
 export const TURN_REFS = 'refs/omni/turns';
@@ -44,28 +45,8 @@ export async function snapshot(dir: string, ref: string): Promise<Snapshot> {
   return { sha, head, skipped };
 }
 
-/** One side of a turn, as the clients get it. */
-export interface TurnSide {
-  /** The snapshot commit, kept under `ref`. */
-  sha: string;
-  ref: string;
-  /** HEAD at that moment. A different HEAD after means the turn committed, pulled or switched commits. */
-  head: string;
-}
-
-/** One turn's saved diff, without its files (GET /api/threads/:id/turns). */
-export interface TurnView {
-  id: string;
-  n: number;
-  state: TurnSnapshotState;
-  error: string | null;
-  before: TurnSide | null;
-  after: TurnSide | null;
-  /** The Result the turn ended with, the same id as in Needs you. Null while it runs, or when it left none. */
-  completion_uid: string | null;
-  started_at: string;
-  ended_at: string | null;
-}
+/** One turn's saved diff, as the clients get it (GET /api/threads/:id/turns). */
+export type { TurnChanges, TurnSide, TurnView } from '@omni/shared/changes.ts';
 
 export function turnView(s: TurnSnapshot): TurnView {
   return {
@@ -79,18 +60,6 @@ export function turnView(s: TurnSnapshot): TurnView {
     started_at: s.started_at,
     ended_at: s.ended_at,
   };
-}
-
-/** GET /api/threads/:id/turns: the thread's saved turns, newest first, and the diff of one of them. */
-export interface TurnChanges {
-  /** False when this thread's turns are not saved here; `reason` says why. */
-  available: boolean;
-  reason: string | null;
-  turns: TurnView[];
-  /** The turn shown: the one asked for, else the newest. */
-  turn: TurnView | null;
-  /** Its files, once both snapshots are saved: one `turn` group. */
-  groups: ChangeGroup[];
 }
 
 const parseSkipped = (s: string | null): SkippedFile[] => {
