@@ -370,7 +370,7 @@ public struct QAScript: Hashable, Sendable {
       return .open(window)
     case "settings":
       guard let name = value as? String, let tab = SettingsTab(named: name) else {
-        throw QAScriptError("settings takes server, profile, secrets, sync, storage, notifications, appearance or quickPrompt")
+        throw QAScriptError("settings takes general, workspace, machines or secrets (or a tab's old name: server, profile, sync, storage, notifications, appearance, quickPrompt)")
       }
       return .settings(tab)
     case "openThread":

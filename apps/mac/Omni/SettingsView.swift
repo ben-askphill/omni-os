@@ -2,6 +2,8 @@ import AppKit
 import OmniKit
 import SwiftUI
 
+/// The Settings window: General, Workspace, Machines and Secrets, the same four sections as the Web UI's Settings
+/// page and the phone's Settings list (#404). ⌘, and the sidebar's Settings row both open General.
 struct SettingsView: View {
   @Bindable var model: AppModel
   let appearance: AppearanceSettings
@@ -9,45 +11,51 @@ struct SettingsView: View {
 
   var body: some View {
     TabView(selection: $model.settingsTab) {
-      Tab("Server", systemImage: "server.rack", value: .server) {
-        ServerSettingsPage(settings: model.settings, model: model)
-          .frame(width: z(560), height: 680)
+      Tab("General", systemImage: "person", value: .general) {
+        GeneralSettingsPage(model: model, appearance: appearance, quickPrompt: quickPrompt)
+          .frame(width: z(560), height: 720)
       }
-      Tab("Profile", systemImage: "person", value: .profile) {
-        ProfileSettings(model: model)
-          .frame(width: z(560), height: 420)
+      Tab("Workspace", systemImage: "folder", value: .workspace) {
+        SettingsPage { ProfileSettings(model: model, part: .workspace) }
+          .frame(width: z(560), height: 560)
+      }
+      Tab("Machines", systemImage: "desktopcomputer", value: .machines) {
+        MachinesSettingsPage(settings: model.settings, model: model)
+          .frame(width: z(560), height: 720)
       }
       Tab("Secrets", systemImage: "key", value: .secrets) {
         SecretsSettings(model: model)
           .frame(width: z(560), height: 680)
       }
-      Tab("Sync", systemImage: "arrow.triangle.2.circlepath", value: .sync) {
-        SyncSettings(model: model)
-          .frame(width: z(560), height: 680)
-      }
-      Tab("Storage", systemImage: "internaldrive", value: .storage) {
-        StorageSettings(model: model)
-          .frame(width: z(560), height: 680)
-      }
-      Tab("Notifications", systemImage: "bell", value: .notifications) {
-        NotificationSettingsView(model: model, attention: model.attention)
-          .frame(width: z(560), height: 600)
-      }
-      Tab("Appearance", systemImage: "circle.lefthalf.filled", value: .appearance) {
-        AppearanceSettingsView(appearance: appearance, zoom: UIZoom.settings)
-          .frame(width: 560, height: 360)
-      }
-      Tab("Quick Prompt", systemImage: "command", value: .quickPrompt) {
-        QuickPromptSettingsView(controller: quickPrompt, settings: quickPrompt.settings)
-          .frame(width: z(560), height: 600)
-      }
     }
   }
 }
 
-/// The Server tab: where new threads run, this Mac's server (port, repo, Node) and its status. The model follows the
-/// settings, so a change applies at once: a new port reconnects, and any change checks the server again.
-struct ServerSettingsPage: View {
+/// The General tab: who you are and Run setup again (the Profile tab before #404), then this Mac's appearance,
+/// notifications and Quick Prompt, which were tabs of their own. The last three stay on this Mac and never sync.
+struct GeneralSettingsPage: View {
+  let model: AppModel
+  let appearance: AppearanceSettings
+  let quickPrompt: QuickPromptController
+
+  var body: some View {
+    SettingsPage {
+      ProfileSettings(model: model, part: .general)
+      AppearanceSettingsView(appearance: appearance, zoom: UIZoom.settings)
+      NotificationSettingsView(model: model, attention: model.attention)
+      QuickPromptSettingsView(controller: quickPrompt, settings: quickPrompt.settings)
+      SettingsIntro(
+        icon: "info",
+        text: Text("Your name and email live in \(Text("data/omni.config.json").monospaced()) on this Mac with the Workspace tab's folders, and never go into git. Appearance, notifications and Quick Prompt stay on this Mac.")
+      )
+    }
+  }
+}
+
+/// The Machines tab: where new threads run, this Mac's server (port, repo, Node) and its status, then Sync and
+/// Storage, which were tabs of their own. The model follows the settings, so a change applies at once: a new port
+/// reconnects, and any change checks the server again.
+struct MachinesSettingsPage: View {
   @Bindable var settings: ServerSettings
   let model: AppModel
 
@@ -105,6 +113,12 @@ struct ServerSettingsPage: View {
           }
         }
       }
+
+      SettingsPart(title: "Sync", note: "History across your Macs, relayed through your own Supabase project.")
+      SyncSettings(model: model)
+
+      SettingsPart(title: "Storage", note: "The worktrees Omni made for threads, what they use, and which are safe to clean up.")
+      StorageSettings(model: model)
     }
   }
 

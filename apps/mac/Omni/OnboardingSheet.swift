@@ -3,7 +3,7 @@ import OmniKit
 import SwiftUI
 
 /// Onboarding, as Onboarding.tsx: five screens on first run (the status says `onboarded: false`, because the server
-/// has no data/omni.config.json yet), or again from Settings > Profile. It writes the user config through /api/setup;
+/// has no data/omni.config.json yet), or again from Settings > General. It writes the user config through /api/setup;
 /// `npm run setup` asks the same questions in a terminal.
 struct OnboardingSupport: ViewModifier {
   let model: AppModel
@@ -253,7 +253,7 @@ struct OnboardingSheet: View {
     Task {
       defer { busy = false }
       do {
-        // Skipping still writes the file, so this is not asked again; Settings > Profile has every field.
+        // Skipping still writes the file, so this is not asked again; Settings > General and Workspace have every field.
         try await finish(.empty)
       } catch {
         self.error = error.localizedDescription

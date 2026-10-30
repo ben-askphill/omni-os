@@ -1,6 +1,6 @@
 import Foundation
 
-// Worktree cleanup (Settings > Storage): what a cleanup Ben starts or this Mac's retention policy would remove, and
+// Worktree cleanup (Settings > Machines > Storage): what a cleanup Ben starts or this Mac's retention policy would remove, and
 // what a run removed, kept or failed to remove. The `cleanup` of GET /api/worktrees/scan. Mirrors
 // packages/shared/worktree-cleanup.ts, which the Web UI's Storage page uses.
 
@@ -165,7 +165,7 @@ public struct ByTrigger<Value: Decodable & Hashable & Sendable>: Decodable, Hash
   private enum CodingKeys: String, CodingKey { case manual, retention }
 }
 
-/// What Settings > Storage shows of cleanup, beside the scan.
+/// What Settings > Machines shows of cleanup, beside the scan.
 public struct CleanupState: Decodable, Hashable, Sendable {
   public let policy: RetentionPolicy
   /// What each kind of cleanup would remove now. Nil before the first scan and while one runs.

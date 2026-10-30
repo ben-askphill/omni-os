@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { harnessLabel, OmniMark } from '../components/brand.tsx';
+import { HARNESS_ROWS, harnessLabel, OmniMark } from '../components/brand.tsx';
 import { useLiveThreads } from '../components/ThreadList.tsx';
 import { Segmented } from '../components/ui.tsx';
-import { plural } from '../format.ts';
+import { plural, windowPct } from '../format.ts';
 import { href } from '../router.ts';
 import { recentThreadGroups, recentThreads, runningThreadGroups, type ThreadRowGroup } from '../sidebar-lists.ts';
 import { useApp, useNow } from '../store.tsx';
@@ -20,7 +20,7 @@ const count = (n: number) => <span className="text-[11px] text-fg-4 tabular-nums
 /** Home on a phone: what needs Ben first, answerable in place, then what runs and what finished today. */
 export function ActivityScreen() {
   const shell = useShell();
-  const { needsYou, pinned, channels, channel } = useApp();
+  const { needsYou, pinned, channels, channel, usage } = useApp();
   const recent = useLiveThreads('/recent?limit=60', acceptAll, 60);
   const now = useNow(60_000);
   const [filter, setFilter] = useState<Filter>('all');
@@ -51,6 +51,7 @@ export function ActivityScreen() {
       <MoScroll tabBar>
         <div>
           <MoTitle title="Activity" sub={`${date} · ${a.running.length} running · ${a.needs.length} ${a.needs.length === 1 ? 'needs' : 'need'} you`} />
+          <UsageMeters usage={usage} />
           <div className="px-4">
             <Segmented
               label="Filter"
@@ -105,6 +106,31 @@ export function ActivityScreen() {
         )}
       </MoScroll>
     </>
+  );
+}
+
+/** Each plan's fullest window, as the sidebar's usage card shows on the desktop. Hidden until a harness reports one. */
+function UsageMeters({ usage }: { usage: ReturnType<typeof useApp>['usage'] }) {
+  const meters = HARNESS_ROWS.map((r) => {
+    const u = usage[r.id];
+    const five = windowPct(u?.five_hour);
+    return { id: r.id, name: r.name, pct: five ?? windowPct(u?.monthly), unit: five === null ? 'mo' : '5h' };
+  }).filter((m) => m.pct !== null);
+  if (!meters.length) return null;
+  return (
+    <div className="mb-3.5 flex flex-wrap gap-2 px-4" aria-label="Plan usage">
+      {meters.map((m) => (
+        <span key={m.id} className="inline-flex items-center gap-2 rounded-full bg-surface py-1.5 pr-3 pl-3 text-[12px] tabular-nums">
+          <span>{m.name}</span>
+          <span className="h-1.5 w-12 overflow-hidden rounded-full bg-surface-3">
+            <span className={`block h-full rounded-full ${m.pct! > 0.9 ? 'bg-warn' : 'bg-fg'}`} style={{ width: `${m.pct! * 100}%` }} />
+          </span>
+          <span className="text-fg-3">
+            {Math.round(m.pct! * 100)}% <span className="text-fg-4">{m.unit}</span>
+          </span>
+        </span>
+      ))}
+    </div>
   );
 }
 

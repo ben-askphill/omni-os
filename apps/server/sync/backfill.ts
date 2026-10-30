@@ -38,7 +38,7 @@ const SOURCES: [SyncEntity, string][] = [
  */
 export function backfill(opts: { onProgress?: (count: BackfillCount) => void } = {}): BackfillCount[] {
   const self = outbox.machineId();
-  if (!self) throw new Error('sync is not set up on this machine: sign in from Settings, Sync first');
+  if (!self) throw new Error('sync is not set up on this machine: sign in from Settings, Machines first');
   const now = new Date().toISOString();
   const out: BackfillCount[] = [];
   for (const [entity, select] of SOURCES) {

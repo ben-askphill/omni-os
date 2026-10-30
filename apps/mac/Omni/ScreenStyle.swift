@@ -248,7 +248,25 @@ extension SettingsCard where Trailing == EmptyView {
   }
 }
 
-/// The intro card on the web's Sync and Secrets pages: an icon in a bg circle and fg-2 text on the surface.
+/// A heading between the parts of a tab that gathers what were tabs of their own (Sync and Storage under Machines),
+/// as the web's `PartHeading` in `settings-parts.tsx`.
+struct SettingsPart: View {
+  let title: String
+  let note: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: z(4)) {
+      Text(title).font(.omni(size: 20, weight: .medium)).tracking(-0.2).foregroundStyle(Tok.fg)
+      Text(note).font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(.top, z(8))
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityAddTraits(.isHeader)
+  }
+}
+
+/// The intro card on the web's Settings sections: an icon in a bg circle and fg-2 text on the surface.
 struct SettingsIntro: View {
   let icon: String
   let text: Text

@@ -12,9 +12,10 @@ public enum Route: Hashable, Sendable {
   case thread(id: String, artifact: Int? = nil)
   case search(query: String)
   case automations
-  case secrets
-  /// The workspace Settings page (`#/settings`): the user's name. A channel's own tab is `.channel(_, .settings)`.
-  case settings
+  /// A Settings section (`#/settings/<tab>`, `#/settings` is General), which opens the Settings window on that tab
+  /// rather than a screen of the main window. The pages Settings replaced (`#/secrets`, `#/sync`, `#/storage`)
+  /// parse to the tab that holds them now. A channel's own tab is `.channel(_, .settings)`.
+  case settings(SettingsTab)
   case artifacts
   case newChannel
   case notFound(path: String)
@@ -63,8 +64,15 @@ public enum Route: Hashable, Sendable {
     switch (a, b) {
     case ("search", _): self = .search(query: query.first("q") ?? "")
     case ("automations", nil): self = .automations
-    case ("secrets", nil): self = .secrets
-    case ("settings", nil): self = .settings
+    case ("secrets", nil): self = .settings(.secrets)
+    case ("sync", nil), ("storage", nil): self = .settings(.machines)
+    case ("settings", nil): self = .settings(.general)
+    case ("settings", let name?) where c == nil:
+      if let tab = SettingsTab(rawValue: name) {
+        self = .settings(tab)
+      } else {
+        self = .notFound(path: pathPart)
+      }
     case ("artifacts", nil): self = .artifacts
     case ("new-channel", nil): self = .newChannel
     default: self = .notFound(path: pathPart)
@@ -83,8 +91,8 @@ public enum Route: Hashable, Sendable {
     case .thread(let id, _): "#/t/\(uriComponent(id))"
     case .search(let q): "#/search?q=\(uriComponent(q))"
     case .automations: "#/automations"
-    case .secrets: "#/secrets"
-    case .settings: "#/settings"
+    case .settings(.general): "#/settings"
+    case .settings(let tab): "#/settings/\(tab.rawValue)"
     case .artifacts: "#/artifacts"
     case .newChannel: "#/new-channel"
     case .notFound(let path): "#\(path)"

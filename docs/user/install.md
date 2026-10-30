@@ -53,7 +53,7 @@ For an agent doing the setup (the README has the prompt to paste). Run each step
 
    It builds in Release, installs to `~/Applications/Omni.app` and opens it. The first build fetches Swift packages from GitHub, so it takes a few minutes. Check: the script ends with `==> Opened Omni`. On a failure it prints the errors and the log path (`apps/mac/.xcode/build-release.log`); read the log before retrying.
 
-   Cloned somewhere other than `~/omni-os`? Pass the path on the first open, then set it for good in the app under **Settings > Server > Repo**:
+   Cloned somewhere other than `~/omni-os`? Pass the path on the first open, then set it for good in the app under **Settings > Machines > Repo**:
 
    ```bash
    scripts/build-mac.sh -- -repoPath "$PWD"
@@ -82,7 +82,7 @@ npm run setup
 4. **First channel**: a client or project with an optional repo and Shopify store, or skip
 5. **Done**: saves `data/omni.config.json` and, in the apps, opens #conductor with a welcome message
 
-Running it again is safe: every answer defaults to what is saved. `npm run setup -- --yes --name Ada --email ada@example.com` answers it without prompts (`--help` lists the flags). Skip it and the Web UI or Mac app asks on first open instead. Change anything later in **Settings** (web) or **Settings > Profile** (Mac), where **Run setup again** walks the screens once more. What the file holds: [Configuration](configuration.md).
+Running it again is safe: every answer defaults to what is saved. `npm run setup -- --yes --name Ada --email ada@example.com` answers it without prompts (`--help` lists the flags). Skip it and the Web UI or Mac app asks on first open instead. Change anything later in **Settings > General** and **Workspace** on any surface; General has **Run setup again**, which walks the screens once more. What the file holds: [Configuration](configuration.md).
 
 ## Start it
 

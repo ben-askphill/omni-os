@@ -11,14 +11,14 @@ import {
   type RetentionPolicy,
 } from '@omni/shared/worktree-cleanup.ts';
 import { api, errorText, useApi } from '../api.ts';
-import { Button, Chip, ConfirmDialog, ErrorNote, Icon, Loading, PageHeader, Picker, StatusDot, Toggle } from '../components/ui.tsx';
+import { Button, Chip, ConfirmDialog, ErrorNote, Icon, Loading, Picker, StatusDot, Toggle } from '../components/ui.tsx';
 import { plural, relTime } from '../format.ts';
 import { href } from '../router.ts';
 
-// Settings, Storage: the worktrees Omni made in data/worktrees, what each uses on disk, why each must stay or may go,
-// and the cleanup that removes the ones that may: reviewed here, or on a schedule with this Mac's retention policy.
-// The scan and a cleanup run on the server; this page starts them and polls while either runs.
-// The Mac app's Storage tab (apps/mac/Omni/StorageSettingsView.swift) shows the same.
+// Settings, Machines, Storage: the worktrees Omni made in data/worktrees, what each uses on disk, why each must stay
+// or may go, and the cleanup that removes the ones that may: reviewed here, or on a schedule with this Mac's
+// retention policy. The scan and a cleanup run on the server; this section starts them and polls while either runs.
+// The Mac app's Machines tab (apps/mac/Omni/StorageSettingsView.swift) shows the same.
 
 interface Inventory {
   scan: WorktreeScan | null;
@@ -36,7 +36,7 @@ const GROUPS: { verdict: WorktreeVerdict; title: string; note: string }[] = [
   { verdict: 'unknown', title: 'Unknown', note: 'A check failed, so nothing is claimed. Scan again.' },
 ];
 
-export function StoragePage() {
+export function StorageSection() {
   const res = useApi<Inventory>('/worktrees/scan');
   const { reload } = res;
   const cleaning = !!res.data && Object.values(res.data.cleanup.runs).some((r) => r?.state === 'running');
@@ -50,33 +50,30 @@ export function StoragePage() {
 
   const scan = res.data?.scan ?? null;
   return (
-    <div className="scroll-thin h-full overflow-y-auto">
-      <PageHeader width="max-w-2xl" title="Storage" subtitle="The worktrees Omni made for threads, what they use, and which are safe to clean up." />
-      <div className="mx-auto max-w-2xl space-y-5 px-4 pt-5 pb-16 md:px-8">
-        <div className="flex gap-3 rounded-[20px] bg-surface p-4 text-[12.5px] leading-relaxed text-fg-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
-            <Icon name="archive" size={15} />
-          </span>
-          <div>
-            The worktrees in <code>data/worktrees</code>, and a cleanup for the ones that are safe to remove. {CLEANUP_NOTE} {PRUNE_NOTE}
-          </div>
+    <>
+      <div className="flex gap-3 rounded-[20px] bg-surface p-4 text-[12.5px] leading-relaxed text-fg-2">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
+          <Icon name="archive" size={15} />
+        </span>
+        <div>
+          The worktrees in <code>data/worktrees</code>, and a cleanup for the ones that are safe to remove. {CLEANUP_NOTE} {PRUNE_NOTE}
         </div>
-
-        {res.error ? (
-          <ErrorNote onRetry={reload}>{res.error}</ErrorNote>
-        ) : !res.data ? (
-          <Loading />
-        ) : (
-          <>
-            <ScanCard scan={scan} cleaning={cleaning} onChange={reload} />
-            <CleanupCard cleanup={res.data.cleanup} scan={scan} onChange={reload} />
-            <RetentionCard cleanup={res.data.cleanup} scanning={scan?.state === 'running'} onChange={reload} />
-            {scan && res.data.summary && <Summary summary={res.data.summary} />}
-            {scan && <Items scan={scan} />}
-          </>
-        )}
       </div>
-    </div>
+
+      {res.error ? (
+        <ErrorNote onRetry={reload}>{res.error}</ErrorNote>
+      ) : !res.data ? (
+        <Loading />
+      ) : (
+        <>
+          <ScanCard scan={scan} cleaning={cleaning} onChange={reload} />
+          <CleanupCard cleanup={res.data.cleanup} scan={scan} onChange={reload} />
+          <RetentionCard cleanup={res.data.cleanup} scanning={scan?.state === 'running'} onChange={reload} />
+          {scan && res.data.summary && <Summary summary={res.data.summary} />}
+          {scan && <Items scan={scan} />}
+        </>
+      )}
+    </>
   );
 }
 

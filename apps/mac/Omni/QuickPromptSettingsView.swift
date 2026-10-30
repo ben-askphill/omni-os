@@ -2,8 +2,8 @@ import OmniKit
 import ServiceManagement
 import SwiftUI
 
-/// The Quick Prompt tab: the switch, the shortcut, Wispr Flow, and opening Omni at login so the shortcut is
-/// there from the start of the day.
+/// The Quick Prompt cards of the General tab (a tab of its own before #404): the switch, the shortcut, Wispr Flow,
+/// and opening Omni at login so the shortcut is there from the start of the day.
 struct QuickPromptSettingsView: View {
   let controller: QuickPromptController
   @Bindable var settings: QuickPromptSettings
@@ -11,13 +11,11 @@ struct QuickPromptSettingsView: View {
   @State private var loginError: String?
 
   var body: some View {
-    SettingsPage {
-      SettingsIntro(
-        icon: "target",
-        text: Text("Press the shortcut in any app to open a small prompt over it. Say or type what you need and press Return: it starts a Conductor thread without bringing Omni forward. ⌘Return sends and opens the thread.")
-      )
-
-      SettingsCard(title: "Quick Prompt") {
+    VStack(alignment: .leading, spacing: z(16)) {
+      SettingsCard(
+        title: "Quick Prompt",
+        note: "Press the shortcut in any app to open a small prompt over it. Say or type what you need and press Return: it starts a Conductor thread without bringing Omni forward. ⌘Return sends and opens the thread."
+      ) {
         SettingsToggle(
           title: "Open with a shortcut",
           detail: "Omni keeps running after its last window closes while this is on, so the shortcut always answers.",
@@ -64,6 +62,7 @@ struct QuickPromptSettingsView: View {
           .foregroundStyle(Tok.fg3)
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private func setAtLogin(_ on: Bool) {

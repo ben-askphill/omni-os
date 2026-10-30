@@ -51,8 +51,10 @@ public enum Palette {
       page("p:home", .goTo, "Home", nil, "house", .go(.home)),
       page("p:artifacts", .goTo, "Artifacts", nil, "square.stack.3d.up", .go(.artifacts)),
       page("p:automations", .goTo, "Automations", nil, "bolt", .go(.automations)),
-      page("p:secrets", .goTo, "Secrets", nil, "key", .go(.secrets)),
-      page("p:settings", .goTo, "Settings", "Your name", "slider.horizontal.3", .go(.settings)),
+      page("p:settings", .goTo, "Settings", "General: you, theme, notifications", "slider.horizontal.3", .go(.settings(.general))),
+      page("p:workspace", .goTo, "Workspace", "Settings: folders and GitHub owner", "folder", .go(.settings(.workspace))),
+      page("p:machines", .goTo, "Machines", "Settings: this Mac, sync and storage", "desktopcomputer", .go(.settings(.machines))),
+      page("p:secrets", .goTo, "Secrets", "Settings", "key", .go(.settings(.secrets))),
       page("p:new-channel", .goTo, "Add channel", nil, "plus", .go(.newChannel)),
     ]
     for c in channels {

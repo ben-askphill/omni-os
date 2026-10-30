@@ -61,8 +61,8 @@ class Cancelled extends Error {}
 function syncProblem(): string {
   const status = syncStatus();
   if (!status.machineId || !status.configured) return 'Sync is not set up on this Mac. Moving a thread between Macs needs sync on both.';
-  if (!status.enabled) return 'Sync is paused on this Mac. Resume it on the Sync page to move threads between Macs.';
-  return 'Sync is set up on this Mac but not running, so the other Mac cannot be told. Check the Sync page, then try again.';
+  if (!status.enabled) return 'Sync is paused on this Mac. Resume it in Settings, Machines to move threads between Macs.';
+  return 'Sync is set up on this Mac but not running, so the other Mac cannot be told. Check Settings, Machines, then try again.';
 }
 
 /** Why the thread's harness could not resume it on another Mac, or null when it can. */

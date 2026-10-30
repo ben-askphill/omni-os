@@ -162,7 +162,7 @@ const REALTIME_RETRY_MS = 5_000;
 export class SyncSignedOutError extends Error {
   readonly code = 'signed_out';
   constructor(detail: string) {
-    super(`signed out of the relay (${detail}): sign in again in Settings, Sync`);
+    super(`signed out of the relay (${detail}): sign in again in Settings, Machines`);
   }
 }
 

@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, useApi, type SyncSetupResult, type SyncStatus } from '../api.ts';
-import { Button, CopyButton, ErrorNote, Icon, InlineConfirm, Label, Loading, PageHeader, Segmented, StatusDot } from '../components/ui.tsx';
+import { Button, CopyButton, ErrorNote, Icon, InlineConfirm, Label, Loading, Segmented, StatusDot } from '../components/ui.tsx';
 import { plural, relTime } from '../format.ts';
 import { useSecretStoreLabel } from '../store.tsx';
 
-// Settings, Sync: sign in to the Supabase relay, see what is waiting, sync now, pause, sign out, and the path map.
-// The Mac app's Sync tab (apps/mac/Omni/SyncSettingsView.swift) shows the same.
+// Settings, Machines, Sync: sign in to the Supabase relay, see what is waiting, sync now, pause, sign out, and the
+// path map. The Mac app's Machines tab (apps/mac/Omni/SyncSettingsView.swift) shows the same.
 
 type Status = SyncStatus;
 
@@ -18,7 +18,7 @@ function stateOf(s: Status): { label: string; dot: string } {
   return { label: s.pending ? 'Waiting to push' : 'Up to date', dot: 'done' };
 }
 
-export function SyncPage() {
+export function SyncSection() {
   const res = useApi<Status>('/sync/status');
   const { reload } = res;
   const store = useSecretStoreLabel();
@@ -31,33 +31,30 @@ export function SyncPage() {
 
   const s = res.data;
   return (
-    <div className="scroll-thin h-full overflow-y-auto">
-      <PageHeader width="max-w-2xl" title="Sync" subtitle="History across your Macs, relayed through your own Supabase project." />
-      <div className="mx-auto max-w-2xl space-y-5 px-4 pt-5 pb-16 md:px-8">
-        <div className="flex gap-3 rounded-[20px] bg-surface p-4 text-[12.5px] leading-relaxed text-fg-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
-            <Icon name="refresh" size={15} />
-          </span>
-          <div>
-            Channels, threads, transcripts, artifacts, automation runs and settings go through an append-only change log. Each Mac keeps its own database; Supabase
-            only relays. Secrets, browser profiles, worktrees and logs never leave this Mac. The URL, anon key and sign-in token live in {store}; the password is
-            used once and dropped.
-          </div>
+    <>
+      <div className="flex gap-3 rounded-[20px] bg-surface p-4 text-[12.5px] leading-relaxed text-fg-2">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
+          <Icon name="refresh" size={15} />
+        </span>
+        <div>
+          Channels, threads, transcripts, artifacts, automation runs and settings go through an append-only change log. Each Mac keeps its own database; Supabase
+          only relays. Secrets, browser profiles, worktrees and logs never leave this Mac. The URL, anon key and sign-in token live in {store}; the password is
+          used once and dropped.
         </div>
-
-        {res.error ? (
-          <ErrorNote onRetry={reload}>{res.error}</ErrorNote>
-        ) : !s ? (
-          <Loading />
-        ) : (
-          <>
-            {s.configured && <StatusCard s={s} onChange={reload} />}
-            {(!s.configured || s.signedOut) && <SignInForm again={s.configured} onDone={reload} />}
-            <PathMapEditor />
-          </>
-        )}
       </div>
-    </div>
+
+      {res.error ? (
+        <ErrorNote onRetry={reload}>{res.error}</ErrorNote>
+      ) : !s ? (
+        <Loading />
+      ) : (
+        <>
+          {s.configured && <StatusCard s={s} onChange={reload} />}
+          {(!s.configured || s.signedOut) && <SignInForm again={s.configured} onDone={reload} />}
+          <PathMapEditor />
+        </>
+      )}
+    </>
   );
 }
 

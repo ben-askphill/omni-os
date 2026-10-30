@@ -1,5 +1,5 @@
 // Where a thread runs: this machine, or another synced one (a Linux box with the CPU to spare), picked per thread in
-// the composer with Settings > Server's default (user config `runOn.device`). This machine stays the hub Ben talks
+// the composer with Settings > Machines' default (user config `runOn.device`). This machine stays the hub Ben talks
 // to: a thread sent elsewhere is created here, goes out as a fresh handoff offer (handoff.ts sendNewThread), runs on
 // the other machine, and syncs back as it goes. Ben's later messages, and Stop, are forwarded to whichever machine
 // holds it, as synced kv records with one writer each:
@@ -66,8 +66,8 @@ const fresh = (at: string, now: number, within = FRESH_MS) => now - Date.parse(a
 function syncProblem(): string {
   const status = syncStatus();
   if (!status.machineId || !status.configured) return 'Sync is not set up on this machine. Running a thread on another machine needs sync on both.';
-  if (!status.enabled) return 'Sync is paused on this machine. Resume it on the Sync page to run threads on another machine.';
-  return 'Sync is set up but not running, so the other machine cannot be told. Check the Sync page, then try again.';
+  if (!status.enabled) return 'Sync is paused on this machine. Resume it in Settings, Machines to run threads on another machine.';
+  return 'Sync is set up but not running, so the other machine cannot be told. Check Settings, Machines, then try again.';
 }
 
 /**

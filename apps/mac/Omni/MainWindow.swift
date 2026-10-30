@@ -53,7 +53,7 @@ struct MainWindow: View {
     .frame(minWidth: 720, minHeight: 460)
     .environment(\.colorScheme, .dark)
     .onChange(of: model.route) { old, new in
-      // A route that lives in Settings, such as #/secrets from a script, opens it there instead.
+      // A route that lives in Settings, such as #/settings/secrets from a script, opens it there instead.
       guard let tab = new.settingsTab else { return }
       model.route = old
       model.settingsTab = tab
@@ -235,7 +235,6 @@ extension Route {
     case .thread: "text.bubble"
     case .search: "magnifyingglass"
     case .automations: "bolt"
-    case .secrets: "key"
     case .settings: "slider.horizontal.3"
     case .artifacts: "square.stack.3d.up"
     case .newChannel: "plus"
