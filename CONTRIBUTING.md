@@ -30,6 +30,12 @@ If you already run Omni for real on :4747, do not develop against it. Use the th
 | `npm run build:slash` | Rebuild the Mac app's slash bundle after changing a slash module in `packages/shared/` |
 | `npm run build:pick` | Rebuild the Mac app's page reader after changing `packages/shared/browser-pick-script.ts` or `browser-pick-read.ts` |
 
+`npm test` runs on macOS and Linux and needs Node 24 and git. It runs two packages at a time, each on half the cores. On a small machine, pass a lower cap: `npx turbo run test --concurrency=1 -- --maxWorkers=2`. Some tests need more and skip without it:
+
+- The Swift tests (`npm run test:mac`) and the Mac app's QA harness need macOS with Xcode. On Linux, say in the PR that the Mac app was not built or checked.
+- The real-Chrome tests in `apps/server/tests/browser-pick-cdp.test.ts` skip when no Chrome or Chromium is installed.
+- The real-CLI tests run only on request, with the CLIs signed in: `OMNI_LIVE_COMMANDS=1` for `commands-live`, `OMNI_LIVE_CODEX=1` for `codex-live`.
+
 ## Run it without touching your real data
 
 ```bash

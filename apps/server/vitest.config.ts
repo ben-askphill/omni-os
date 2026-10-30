@@ -5,6 +5,9 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
+    // Half the cores, not all but one: npm test runs two packages at once, and the server suite's files each boot
+    // servers and fake CLIs. Unbounded, a whole run was killed with exit 137. Override with --maxWorkers.
+    maxWorkers: '50%',
     setupFiles: ['tests/setup.ts'],
     // Never let a test touch the real data/omni.db. Tests that need db.ts mock it.
     // OMNI_CURSOR_DASHBOARD: no test calls Cursor's real dashboard; tests that need it pass a fake.
