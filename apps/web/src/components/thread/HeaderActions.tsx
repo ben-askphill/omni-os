@@ -6,8 +6,8 @@ import { Button, Icon, IconButton, StatusPill } from '../ui.tsx';
 import { ThreadReferenceButton } from '../ThreadReference.tsx';
 import { ASKING_LABEL } from './QuestionCard.tsx';
 
-// Below this header width (the side panel open, a small window) pin, done, hand off and Send to Grok Bot (when set up) fold into one More button and
-// Interrupt drops its label, so the title keeps its room. The header is the @container; 3xl is 48rem.
+// Below this header width (the side panel open, a small window) pin, done, hand off and Send to Grok Bot (when set up) fold into one More button,
+// so the title keeps its room. The header is the @container; 3xl is 48rem.
 export const FOLD = '@max-3xl:hidden';
 export const UNFOLD = '@3xl:hidden';
 
@@ -21,7 +21,6 @@ export function HeaderActions({
   onRestore,
   restoring,
   grok,
-  interrupt,
   panelOpen,
   onPanel,
   artifactCount,
@@ -37,8 +36,6 @@ export function HeaderActions({
   restoring: boolean;
   /** Null when this server has no Grok Bot webhook: the button stays out. */
   grok: { busy: boolean; run: () => void } | null;
-  /** Set while a turn runs that can be interrupted. */
-  interrupt: { busy: boolean; run: () => void } | null;
   panelOpen: boolean;
   onPanel: () => void;
   artifactCount: number;
@@ -105,21 +102,6 @@ export function HeaderActions({
       )}
       {/* The thread menu holds pin, done, hand off and Send to Grok Bot, and more. */}
       {!archived && <IconButton icon="more" label="Thread actions" aria-haspopup="menu" className={UNFOLD} onClick={(e) => menuAt(e.currentTarget)} />}
-      {interrupt && (
-        <Button
-          size="sm"
-          variant="secondary"
-          icon="stop"
-          onClick={interrupt.run}
-          busy={interrupt.busy}
-          title="Interrupt the agent (Esc). Messages already sent still run."
-          aria-label={interrupt.busy ? 'Interrupting' : 'Interrupt'}
-          aria-keyshortcuts="Escape"
-          className="@max-3xl:px-2"
-        >
-          <span className="@max-3xl:sr-only">{interrupt.busy ? 'Interrupting' : 'Interrupt'}</span>
-        </Button>
-      )}
       <span className="relative">
         <IconButton icon="panel" label="Artifacts, changes, browser, terminal, actions, details" active={panelOpen} onClick={onPanel} />
         {artifactCount > 0 && (

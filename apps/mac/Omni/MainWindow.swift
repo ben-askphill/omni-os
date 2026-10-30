@@ -86,7 +86,7 @@ struct MainWindow: View {
       .buttonStyle(.icon(size: 28))
       .disabled(!model.shell.history.canGoForward)
       .help("Forward (⌘])")
-      // After Forward. The thread's Interrupt and panel toggle are .primaryAction, and a flexible
+      // After Forward. The thread's panel toggle is .primaryAction, and a flexible
       // spacer in that cluster sends the items after it to the trailing edge.
       if model.serverScreen == nil, case .thread(let id, _) = model.route {
         Button {

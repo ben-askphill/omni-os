@@ -366,8 +366,6 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
             onRestore={() => void restore()}
             restoring={restoring}
             grok={status?.grokBot ? { busy: grokBusy, run: () => void sendGrok() } : null}
-            // Nothing runs while the worktree is prepared, so there is nothing to interrupt.
-            interrupt={slotBusy && !thread.setup ? { busy: interrupting, run: () => void interrupt() } : null}
             panelOpen={panelOpen}
             onPanel={togglePanel}
             artifactCount={artifactCount}
@@ -436,6 +434,8 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
             <ReplyComposer
               thread={thread}
               canSteer={canSteer(thread.harness, harnesses)}
+              // Nothing runs while the worktree is prepared, so there is nothing to stop.
+              stop={slotBusy && !thread.setup ? { busy: interrupting, run: () => void interrupt() } : null}
               onSent={(t) => {
                 applyThread(t, true);
                 pin();

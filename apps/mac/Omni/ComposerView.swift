@@ -4,7 +4,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// The reply box pinned under a thread. It is the one line `ReplyComposerHost` in ThreadScreen.swift;
-/// `ReplyComposer` in Composer.tsx is the behavior. Interrupt lives in the thread toolbar, beside the panel.
+/// `ReplyComposer` in Composer.tsx is the behavior. While a turn runs and the box is empty, Send is Stop.
 struct ReplyComposerHost: View {
   let model: AppModel
   let store: ThreadStore
@@ -30,29 +30,6 @@ struct ReplyComposerHost: View {
     .padding(.top, z(4))
     .padding(.bottom, z(16))
     .frame(maxWidth: .infinity)
-  }
-}
-
-/// Interrupt in the toolbar. It reads Interrupting until the turn stops.
-struct InterruptButton: View {
-  let store: ThreadStore
-
-  var body: some View {
-    Button {
-      Task { await store.interrupt() }
-    } label: {
-      if store.interrupting {
-        HStack(spacing: z(6)) {
-          Loader(size: 13)
-          Text("Interrupting")
-        }
-      } else {
-        Label("Interrupt", systemImage: "stop.fill")
-      }
-    }
-    .disabled(store.interrupting)
-    .help("Interrupt the agent (Esc). Messages already sent still run.")
-    .accessibilityLabel(store.interrupting ? "Interrupting" : "Interrupt")
   }
 }
 
@@ -285,6 +262,9 @@ private struct ReplyComposerView: View {
       HStack(spacing: z(10)) {
         if let omni = menu.reply, omni.action != .send {
           SendButton(title: omni.label ?? "Send", armed: omni.armed, sending: omniBusy) { runOmni() }
+        } else if store.running && thread.setup == nil && !reply.canSend && reply.files.isEmpty && !reply.sending {
+          // Nothing runs while the worktree is prepared, so there is nothing to stop.
+          StopButton(stopping: store.interrupting) { Task { await store.interrupt() } }
         } else if busyThread {
           SteerButton(canSteer: canSteer, enabled: reply.canSend, sending: reply.sending) { send($0) }
         } else {
@@ -480,6 +460,32 @@ struct SendButton: View {
     .animation(.easeOut(duration: 0.15), value: armed)
     .help(title)
     .accessibilityLabel(title)
+  }
+}
+
+/// StopButton in Composer.tsx: Send's place while a turn runs and the box is empty. Esc and Cmd-period do the same.
+/// It reads Stopping until the turn stops.
+struct StopButton: View {
+  let stopping: Bool
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      Group {
+        if stopping { Loader(size: 16) } else { OmniIcon(name: "stop", size: 16, weight: 2) }
+      }
+      .foregroundStyle(Tok.onInk)
+      .frame(width: z(34), height: z(34))
+      .background(Tok.fg, in: Circle())
+      .contentShape(Circle())
+    }
+    .buttonStyle(PressScale())
+    .opacity(stopping ? 0.6 : 1)
+    .fixedSize()
+    .layoutPriority(1)
+    .disabled(stopping)
+    .help("Stop the agent (Esc). Messages already sent still run.")
+    .accessibilityLabel(stopping ? "Stopping" : "Stop")
   }
 }
 

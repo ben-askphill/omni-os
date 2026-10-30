@@ -109,9 +109,12 @@ export function MoComposer({
   onSent,
   onSwitched,
   onFork,
+  stop,
 }: {
   thread: Thread;
   chips: ComposerChip[];
+  /** Set while a turn runs that can be stopped: an empty box shows Stop where Send sits. */
+  stop?: { busy: boolean; run: () => void } | null;
   /** A function gets whether a busy thread steers, so it can say queue where the harness cannot steer. */
   placeholder: string | ((steers: boolean) => string);
   onSent: (t: Thread, mode?: SendMode) => void;
@@ -256,7 +259,9 @@ export function MoComposer({
             aria-label={hint}
             className="min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-4"
           />
-          {canSend || !mic.supported ? (
+          {stop && !canSend && !att.files.length && !mic.on ? (
+            <MoRound ink icon="stop" label={stop.busy ? 'Stopping' : 'Stop'} onClick={stop.run} disabled={stop.busy} />
+          ) : canSend || !mic.supported ? (
             <MoRound ink icon="send" label={!busyThread ? 'Send' : next ? 'Send after this turn' : 'Send to the running turn'} onClick={() => void submit()} disabled={!canSend || busy} />
           ) : (
             <MoRound quiet={!mic.on} ink={mic.on} icon={mic.on ? 'stop' : 'mic'} label={mic.on ? 'Stop dictating' : 'Dictate'} onClick={mic.toggle} />
