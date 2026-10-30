@@ -74,10 +74,15 @@ export function deviceRow(d: Device, now = Date.now()): DeviceRow {
   }
 }
 
-/** Online Macs first, then the ones Tailscale cannot vouch for, then the asleep ones; by name within each. */
+/**
+ * Online Macs first, then the ones Tailscale cannot vouch for, then the asleep ones; by name within each, numbers in
+ * order ("Mac 2" before "Mac 10"), as the Mac app's `localizedStandardCompare` sorts them.
+ */
 export function deviceRows(devices: Device[], now = Date.now()): DeviceRow[] {
   const rank = { online: 0, unknown: 1, offline: 2 } as const;
-  return [...devices].sort((a, b) => rank[a.reachability] - rank[b.reachability] || a.name.localeCompare(b.name)).map((d) => deviceRow(d, now));
+  return [...devices]
+    .sort((a, b) => rank[a.reachability] - rank[b.reachability] || a.name.localeCompare(b.name, undefined, { numeric: true }))
+    .map((d) => deviceRow(d, now));
 }
 
 /**

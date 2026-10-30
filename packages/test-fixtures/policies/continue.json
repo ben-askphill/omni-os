@@ -1,0 +1,60 @@
+{
+  "about": "Continue eligibility and the sheet's lines. packages/shared/continue.ts and apps/web/src/continue.ts run it in apps/web/tests/client-policies.test.ts; apps/mac/OmniKit/Sources/OmniKit/Continue.swift runs it in ClientPolicyTests.swift. A model of \"\" means the harness's default.",
+  "refusals": [
+    { "harness": "claude-code", "target": null, "source": null },
+    { "harness": "codex", "target": null, "source": null },
+    { "harness": "cursor", "target": null, "source": null },
+    { "harness": "hermes", "target": "Hermes runs on its own server, so this thread's files cannot move there.", "source": "This thread runs on the Hermes server, so its files are not on this Mac to continue from." },
+    { "harness": "cursor-cloud", "target": "Cursor Cloud works on its own clone of the repo, so it cannot start from this thread's checkout.", "source": "This thread runs on Cursor's machines, so its files are not on this Mac to continue from." }
+  ],
+  "catalog": [
+    { "id": "claude-code", "name": "Claude Code", "plan": "Claude plan", "capabilities": { "warmProcess": true, "steer": true, "inlineImages": true, "usage": "five-hour-week" }, "available": true, "cap": 4, "running": 0,
+      "models": [{ "id": "opus", "label": "Opus", "efforts": ["low", "high"], "defaultEffort": "high" }, { "id": "sonnet", "label": "Sonnet", "default": true, "efforts": ["low", "high"], "defaultEffort": "high" }] },
+    { "id": "hermes", "name": "Hermes", "plan": "Hermes", "capabilities": { "warmProcess": false, "steer": false, "inlineImages": false, "usage": "none" }, "available": true, "cap": 4, "running": 0,
+      "models": [{ "id": "h1", "label": "H1", "default": true }] },
+    { "id": "codex", "name": "Codex", "plan": "ChatGPT plan", "capabilities": { "warmProcess": false, "steer": false, "inlineImages": false, "usage": "none" }, "available": true, "cap": 4, "running": 0,
+      "models": [{ "id": "gpt-x", "label": "GPT X", "efforts": ["high"] }, { "id": "gpt-y", "label": "GPT Y", "default": true, "efforts": ["high"] }] },
+    { "id": "cursor", "name": "Cursor Agent", "plan": "Cursor plan", "capabilities": { "warmProcess": false, "steer": false, "inlineImages": false, "usage": "none" }, "available": false, "fix": "cursor-agent login", "cap": 4, "running": 0,
+      "models": [{ "id": "auto", "label": "Auto", "default": true }] },
+    { "id": "cursor-cloud", "name": "Cursor Cloud", "plan": "Cursor plan", "capabilities": { "warmProcess": false, "steer": false, "inlineImages": false, "usage": "none" }, "available": true, "cap": 4, "running": 0,
+      "models": [{ "id": "c1", "label": "C1", "default": true }] }
+  ],
+  "targets": [
+    { "case": "opens on the first ready local harness that is not the source's", "source": "claude-code", "unavailable": [],
+      "offered": ["claude-code", "codex", "cursor"], "refused": ["hermes", "cursor-cloud"], "initial": { "harness": "codex", "model": "gpt-y" } },
+    { "case": "from Codex it opens on Claude Code", "source": "codex", "unavailable": [],
+      "offered": ["claude-code", "codex", "cursor"], "refused": ["hermes", "cursor-cloud"], "initial": { "harness": "claude-code", "model": "sonnet" } },
+    { "case": "a harness that is not ready stays offered but is not opened on", "source": "claude-code", "unavailable": ["codex"],
+      "offered": ["claude-code", "codex", "cursor"], "refused": ["hermes", "cursor-cloud"], "initial": { "harness": "claude-code", "model": "sonnet" } },
+    { "case": "the source's own harness when it is the only one ready", "source": "codex", "unavailable": ["claude-code"],
+      "offered": ["claude-code", "codex", "cursor"], "refused": ["hermes", "cursor-cloud"], "initial": { "harness": "codex", "model": "gpt-y" } },
+    { "case": "nothing to open on when no local harness is ready", "source": "codex", "unavailable": ["claude-code", "codex"],
+      "offered": ["claude-code", "codex", "cursor"], "refused": ["hermes", "cursor-cloud"], "initial": null }
+  ],
+  "slashHints": [
+    { "text": "/compact", "hint": "A slash command runs first. The carryover goes with your next message." },
+    { "text": "  /review the diff", "hint": "A slash command runs first. The carryover goes with your next message." },
+    { "text": "fix /src/cart.ts", "hint": null },
+    { "text": "", "hint": null }
+  ],
+  "sizes": [
+    { "chars": 950, "budget": 24000, "text": "950 of 24k characters" },
+    { "chars": 12345, "budget": 24000, "text": "12.3k of 24k characters" },
+    { "chars": 1000, "budget": 2500, "text": "1k of 2.5k characters" },
+    { "chars": 23960, "budget": 24000, "text": "24k of 24k characters" }
+  ],
+  "carried": [
+    { "stats": { "entries": 1, "condensed": 0, "omitted": 0, "chars": 900, "budget": 24000, "files": 0, "attachments": 0 }, "text": "Carried 1 entry." },
+    { "stats": { "entries": 12, "condensed": 3, "omitted": 40, "chars": 23000, "budget": 24000, "files": 1, "attachments": 2 }, "text": "Carried 12 entries (3 shortened), 40 older left out, 1 changed file, 2 attachments." },
+    { "stats": { "entries": 0, "condensed": 0, "omitted": 0, "chars": 600, "budget": 24000, "files": 5, "attachments": 1 }, "text": "Carried 0 entries, 5 changed files, 1 attachment." }
+  ],
+  "entries": [
+    { "who": "user", "text": "[Ben] fix the cart", "shown": "fix the cart" },
+    { "who": "agent", "text": "[Codex] done", "shown": "done" },
+    { "who": "tool", "text": "  - Bash: npm test\n    Result: ok", "shown": "Bash: npm test\nResult: ok" },
+    { "who": "report", "text": "[Crew report: QA, done] all green", "shown": "[Crew report: QA, done] all green" },
+    { "who": "omni", "text": "[Omni] Switched to Codex", "shown": "Switched to Codex" },
+    { "who": "omni", "text": "[Carried over from \"Old\" on Claude Code (Opus)] the goal", "shown": "[Carried over from \"Old\" on Claude Code (Opus)] the goal" },
+    { "who": "error", "text": "[Error] it broke", "shown": "it broke" }
+  ]
+}
