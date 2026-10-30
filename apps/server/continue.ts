@@ -27,7 +27,7 @@ import { invalid, runName } from './runner/switch.ts';
 import { plannedWorktree, prepareWorkdir } from './sandbox.ts';
 import { turnBlocked } from './sync/guard.ts';
 import { getTerminal } from './terminal.ts';
-import { checkoutTree } from './turns.ts';
+import { captureTree } from './checkpoint.ts';
 
 /** Tests reach in here: `captured` runs between the capture and the final check, with the new thread's id. */
 export const continueHooks = { captured: async (_threadId: string) => {} };
@@ -121,7 +121,7 @@ async function readCheckout(t: Thread): Promise<Checkout | ContinueBlock> {
   const at = await changesCheckout(t);
   if ('reason' in at) return { code: 'checkout', message: at.reason };
   try {
-    const snap = await checkoutTree(at.dir);
+    const snap = await captureTree(at.dir, 'text');
     const base = await threadBase(t.id, at.dir);
     if (t.branch) {
       const changed = await diffFiles(at.dir, base.sha, snap.tree);
