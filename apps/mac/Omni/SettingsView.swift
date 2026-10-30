@@ -132,7 +132,8 @@ private struct RunOnCard: View {
     ) {
       VStack(alignment: .leading, spacing: z(10)) {
         HStack(spacing: z(8)) {
-          RunOnMenu(devices: devices, pick: saved) { device in Task { await model.runOn.save(device) } }
+          // A saved machine sync no longer lists shows as This Mac, where the server runs it.
+          RunOnMenu(devices: devices, pick: RunOnRules.resolved(saved, devices: devices)) { device in Task { await model.runOn.save(device) } }
             .disabled((devices.isEmpty && saved.isEmpty) || model.runOn.saving)
             .opacity(devices.isEmpty && saved.isEmpty ? 0.45 : 1)
           if model.runOn.saving { Loader(size: 14) }
