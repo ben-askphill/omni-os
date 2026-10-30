@@ -66,7 +66,7 @@ describe('a thread held open for a long session', () => {
   it('keeps the parent call of a background agent whose calls outlive the cut', () => {
     // The background agent starts in turn 70 and its calls land in turns 71 and 72: cut right after turn 70.
     const rows = all.slice(0, longRows({ turns: 73, ...opts }).length);
-    const turn71 = rows.findIndex((r, i) => i > 0 && rows[i - 1].kind === TURN_END && results(rows.slice(0, i)) === 71);
+    const turn71 = rows.findIndex((_r, i) => i > 0 && rows[i - 1].kind === TURN_END && results(rows.slice(0, i)) === 71);
     const h = boundHistory(openHistory(rows, { from: 0, to: null, results_below: 0 }), true, { rows: rows.length - turn71, slack: 1, hard: 1e9 });
     expect(h.spans[0].from).toBe(rows[turn71].id);
     const parent = h.rows.find((r) => r.kind === 'tool_use' && JSON.parse(r.payload).id === 'call-bg-70');
