@@ -540,19 +540,24 @@ struct ModelPickerButton: View {
   }
 
   private func header(_ h: HarnessInfo) -> some View {
-    HStack {
+    HStack(spacing: z(8)) {
       HStack(spacing: z(6)) {
         HarnessLogo(harness: h.id.rawValue, size: 12)
         Text(h.name).lineLimit(1)
       }
       .omniCaption()
-      Spacer()
-      Text(h.available ? "Bills your \(h.plan)" : "Unavailable").font(.omni(size: 11.5)).foregroundStyle(Tok.fg4)
+      .layoutPriority(1)
+      Text(h.available ? "Bills your \(h.plan)" : "Unavailable")
+        .font(.omni(size: 11.5))
+        .foregroundStyle(Tok.fg4)
+        .lineLimit(1)
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
     .padding(.horizontal, z(12))
     .padding(.top, z(8))
     .padding(.bottom, z(4))
     .frame(maxWidth: .infinity)
+    .fixedSize(horizontal: false, vertical: true)
     .background(Tok.elev)
   }
 
@@ -566,7 +571,7 @@ struct ModelPickerButton: View {
         OmniIcon(name: "zap", size: 13)
       }
     }
-    .buttonStyle(.plain)
+    .buttonStyle(PickerRowButtonStyle())
     .padding(.top, z(4))
     .accessibilityAddTraits(selected ? .isSelected : [])
   }
@@ -581,12 +586,12 @@ struct ModelPickerButton: View {
         title.font(.omni(size: 13)).lineLimit(1)
         if let note { Text(note).font(.omni(size: 11.5)).foregroundStyle(Tok.fg4).lineLimit(1) }
       }
-      Spacer(minLength: z(4))
+      .frame(maxWidth: .infinity, alignment: .leading)
       PickMark(on: selected)
     }
     .padding(.horizontal, z(8))
-    .padding(.vertical, z(6))
-    .frame(minHeight: z(40))
+    .frame(height: z(note == nil ? 40 : 56), alignment: .leading)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .contentShape(RoundedRectangle(cornerRadius: z(16), style: .continuous))
   }
 
@@ -619,10 +624,17 @@ struct ModelPickerButton: View {
             HarnessLogo(harness: h.id.rawValue, size: 13)
           }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PickerRowButtonStyle())
         .accessibilityAddTraits(selected ? .isSelected : [])
       }
     }
+  }
+}
+
+/// The row's button. `.plain` in a popover still pads some rows, which opened a blank gap under them.
+private struct PickerRowButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
   }
 }
 
