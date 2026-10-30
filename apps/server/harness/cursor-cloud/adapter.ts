@@ -1,6 +1,6 @@
 // Cursor Cloud behind the harness adapter interface: each thread is one Cursor cloud agent, launched through the
 // Cloud Agents API on the channel's GitHub repo, and each message is a run on it. Like Hermes it has no local CLI, so
-// a holder process stands in as the runner's child. The first message carries Omni's context; later ones go as
+// the session has no process. The first message carries Omni's context; later ones go as
 // follow-up runs. The run is read every few seconds for its status, branch and PR, and its final reply ends the turn.
 // The agent keeps going when Omni quits; only Stop cancels its run. The key never reaches a process environment.
 import { readFileSync } from 'node:fs';
@@ -9,24 +9,11 @@ import { userName } from '../../profile.ts';
 import type { Attachment } from '../../uploads.ts';
 import type { CloudAgentState } from '../../stream.ts';
 import { CURSOR_CLOUD_FIX, CURSOR_CLOUD_NO_REPO, CURSOR_CLOUD_REJECTED, CURSOR_CLOUD_UNREACHABLE } from '../catalog.ts';
-import { harnessEnv } from '../env-guard.ts';
-import { spawnHolder } from '../holder.ts';
+import { detachedSession } from '../session.ts';
 import { CAPABILITIES } from '../types.ts';
-import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
+import type { AdapterCallbacks, AdapterContext, EndMode, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
 import { CursorCloudClient, CursorCloudError, type CursorImage, type CursorRun } from './client.ts';
 import { TERMINAL, agentUrl, changed, endRecords, stateOf, statusText } from './normalize.ts';
-
-interface Outgoing {
-  text: string;
-  uuid: string;
-  attachments: Attachment[];
-}
-
-const omniOf = (obj: any): Outgoing => ({
-  text: String(obj?._omni?.text ?? ''),
-  uuid: String(obj?.uuid ?? ''),
-  attachments: (obj?._omni?.attachments ?? []) as Attachment[],
-});
 
 /** What the API takes as an image: up to five PNG, JPEG, GIF or WebP files of 15 MB or less. */
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
@@ -36,7 +23,7 @@ const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const MAX_POLL_FAILURES = 30;
 
 /** The prompt: Ben's text, images that fit the API's limits, and a note for files that stay on the Mac. */
-function composePrompt(m: Outgoing): { text: string; images?: CursorImage[] } {
+function composePrompt(m: OutgoingMessage): { text: string; images?: CursorImage[] } {
   const images: CursorImage[] = [];
   const left: Attachment[] = [];
   for (const a of m.attachments) {
@@ -95,11 +82,9 @@ export const cursorCloudAdapter: HarnessAdapter = {
     // The session id becomes the agent id once the agent exists, so a resumed thread follows up on it.
     let created = thread.session_id === agentId;
 
-    // The key is an HTTP header, never an env var: strip it even when the shell exported it.
-    const holder = spawnHolder(harnessEnv('cursor-cloud', {}));
-
-    const outbox: Outgoing[] = [];
-    let holderDead = false;
+    // The key is an HTTP header, never an env var: no process runs for this session.
+    const outbox: OutgoingMessage[] = [];
+    let gone = false;
     let turnActive = false;
     let turnAbort: AbortController | null = null;
     /** The run this turn follows, for Stop. */
@@ -203,11 +188,11 @@ export const cursorCloudAdapter: HarnessAdapter = {
     }
 
     function pump() {
-      if (turnActive || holderDead || !outbox.length) return;
+      if (turnActive || gone || !outbox.length) return;
       runTurn(outbox.shift()!);
     }
 
-    function runTurn(m: Outgoing) {
+    function runTurn(m: OutgoingMessage) {
       turnActive = true;
       stopRequested = false;
       init();
@@ -252,7 +237,7 @@ export const cursorCloudAdapter: HarnessAdapter = {
           } else {
             run = await followUp(prompt, ac);
           }
-          if (holderDead) return;
+          if (gone) return;
           if (!run) {
             cb.record({ kind: 'result', payload: { ok: false, subtype: 'cancelled', turns: 1 } });
             return;
@@ -260,64 +245,60 @@ export const cursorCloudAdapter: HarnessAdapter = {
           const ended = await follow(run, ac);
           for (const rec of endRecords(state ?? stateOf(base(), ended), ended)) cb.record(rec);
         } catch (e) {
-          if (holderDead || ac.signal.aborted) return;
+          if (gone || ac.signal.aborted) return;
           cb.record({ kind: 'error', payload: { text: failText(e, apiKey, repo) } });
           cb.record({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } });
         } finally {
           if (turnAbort === ac) turnAbort = null;
           activeRun = null;
           turnActive = false;
-          if (!holderDead) pump();
+          if (!gone) pump();
         }
       })();
     }
 
-    holder.on('exit', (_code, signal) => {
-      holderDead = true;
+    const onEnd = (mode: EndMode) => {
+      gone = true;
       const run = activeRun;
       turnAbort?.abort();
-      // SIGINT is the runner's hard stop: Ben wants the run stopped. Quitting Omni or closing an idle thread ends
-      // stdin instead, and leaves the agent working on Cursor's machines.
-      if (signal === 'SIGINT' && run) void client.cancelRun(agentId, run).catch(() => {});
-    });
+      // `stop` is the runner's hard stop: Ben wants the run stopped. Quitting Omni or closing an idle thread ends the
+      // session another way, and leaves the agent working on Cursor's machines.
+      if (mode === 'stop' && run) void client.cancelRun(agentId, run).catch(() => {});
+    };
 
-    const refuse = (text: string) => ({
-      child: holder,
-      write(obj: unknown) {
-        if ((obj as { type?: string })?.type === 'user') {
-          const m = omniOf(obj);
+    const refuse = (text: string) => {
+      const session = detachedSession(cb, {
+        send(m) {
           cb.record({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
           cb.record({ kind: 'error', payload: { text } });
           cb.record({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } });
-          holder.kill('SIGTERM');
-        }
-        return !!holder.stdin && !holder.stdin.destroyed;
-      },
-    });
+          session.end('terminate');
+          return true;
+        },
+        interrupt: () => true,
+        onEnd,
+      });
+      return session;
+    };
     if (!repo) return refuse(`Cursor Cloud is not available in this channel. ${CURSOR_CLOUD_NO_REPO}.`);
     if (!apiKey) return refuse(`Cursor Cloud is not available. ${CURSOR_CLOUD_FIX}.`);
 
-    return {
-      child: holder,
-      write(obj: unknown) {
-        if (holderDead || !holder.stdin || holder.stdin.destroyed) return false;
-        const o = obj as { type?: string; request?: { subtype?: string }; request_id?: string };
-        if (o?.type === 'user') {
-          // Cursor Cloud can't steer, so the runner only writes between turns. A message that still lands mid-run waits.
-          outbox.push(omniOf(obj));
-          pump();
-          return true;
-        }
-        if (o?.type === 'control_request' && o.request?.subtype === 'interrupt') {
-          // Ack now so the runner's grace timer doesn't kill the holder while the cancel goes out.
-          cb.record({ kind: 'control', payload: { request_id: String(o.request_id ?? ''), subtype: 'success', still_queued: [] } });
-          if (!turnActive) return true;
-          stopRequested = true;
-          void cancel();
-          return true;
-        }
+    return detachedSession(cb, {
+      send(m) {
+        // Cursor Cloud can't steer, so the runner only writes between turns. A message that still lands mid-run waits.
+        outbox.push(m);
+        pump();
         return true;
       },
-    };
+      interrupt(requestId) {
+        // Ack now so the runner's grace timer doesn't end the session while the cancel goes out.
+        cb.record({ kind: 'control', payload: { request_id: requestId, subtype: 'success', still_queued: [] } });
+        if (!turnActive) return true;
+        stopRequested = true;
+        void cancel();
+        return true;
+      },
+      onEnd,
+    });
   },
 };

@@ -1,38 +1,24 @@
 // Hermes behind the harness adapter interface. Hermes is an HTTP API on another machine,
-// not a CLI, so a holder process stands in as the runner's child (the same trick Cursor
-// uses for one-process-per-turn). The runner keeps its queue, steer, interrupt and keepalive.
+// not a CLI, so the session has no process: ending it stops the remote run. The runner keeps
+// its queue, steer, interrupt and keepalive.
 // Omni's system prompt goes as `instructions` on the first run of a session. The transcript
 // replay is only what Ben typed. A stable session id (`omni-<thread id>`) continues the
 // same remote conversation, which keeps its own context.
 import { randomUUID } from 'node:crypto';
 import { config } from '../../config.ts';
 import { TOOL_FAILURE_POLICY } from '../../tool-failure-policy.ts';
-import type { Attachment } from '../../uploads.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
 import { HERMES_FIX } from '../catalog.ts';
-import { harnessEnv } from '../env-guard.ts';
-import { spawnHolder } from '../holder.ts';
+import { detachedSession } from '../session.ts';
 import { CAPABILITIES, remoteWhere } from '../types.ts';
 import { remoteDelegateOnlyRefusal } from '../../crew.ts';
-import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
+import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
 import { HermesClient, HermesHttpError, sleep } from './client.ts';
 import { userName } from '../../profile.ts';
 import { applyHermesEvent, emptyHermesNorm, eventFromRun, type HermesNormState } from './normalize.ts';
 
-interface Outgoing {
-  text: string;
-  uuid: string;
-  attachments: Attachment[];
-}
-
-const omniOf = (obj: any): Outgoing => ({
-  text: String(obj?._omni?.text ?? ''),
-  uuid: String(obj?.uuid ?? ''),
-  attachments: (obj?._omni?.attachments ?? []) as Attachment[],
-});
-
 /** Hermes cannot read Mac paths, so attachments are described and explicitly not uploaded. */
-function composeInput(m: Outgoing): string {
+function composeInput(m: OutgoingMessage): string {
   if (!m.attachments.length) return m.text;
   const lines = [
     m.text,
@@ -69,12 +55,9 @@ export const hermesAdapter: HarnessAdapter = {
     const sessionId = sessionIdOf(thread);
     if (sessionId !== thread.session_id) cb.session(sessionId);
 
-    // The holder is what the runner signals and waits on. The API key is an HTTP header, not
-    // an env var: strip it even when the shell exported it, so the holder cannot see it.
-    const holder = spawnHolder(harnessEnv('hermes', {}));
-
-    const outbox: Outgoing[] = [];
-    let holderDead = false;
+    // The API key is an HTTP header, never an env var: no process runs for this session.
+    const outbox: OutgoingMessage[] = [];
+    let ended = false;
     let ready = false;
     let turnActive = false;
     let runId: string | null = null;
@@ -85,9 +68,9 @@ export const hermesAdapter: HarnessAdapter = {
     let sendPolicy = ctx.resume;
     let client: HermesClient | null = null;
     const seenSeq = new Set<number>();
-    // Survives the turn's finally. A holder exit can land after that finally cleared `runId`.
+    // Survives the turn's finally. The session's end can land after that finally cleared `runId`.
     let activeRunId: string | null = null;
-    // True once this run has a terminal event, so a later holder exit does not stop a finished run.
+    // True once this run has a terminal event, so a later end does not stop a finished run.
     let settled = true;
     let stopRequested = false;
 
@@ -113,7 +96,7 @@ export const hermesAdapter: HarnessAdapter = {
     }
 
     function pump() {
-      if (!ready || turnActive || holderDead || !outbox.length) return;
+      if (!ready || turnActive || ended || !outbox.length) return;
       runTurn(outbox.shift()!);
     }
 
@@ -134,7 +117,7 @@ export const hermesAdapter: HarnessAdapter = {
 
       const readOnce = async () => {
         for await (const evt of client!.events(id, ac.signal)) {
-          if (holderDead) return true;
+          if (ended) return true;
           if (applyRaw(evt)) {
             settled = true;
             return true;
@@ -147,17 +130,17 @@ export const hermesAdapter: HarnessAdapter = {
       try {
         done = await readOnce();
       } catch {
-        if (holderDead || ac.signal.aborted) return;
+        if (ended || ac.signal.aborted) return;
       }
-      if (done || holderDead) return;
+      if (done || ended) return;
       // The stream can drop on a proxy timeout. One reconnect, then GET if it still has no ending.
       // Replayed events are skipped by seq so the transcript does not double.
       try {
         done = await readOnce();
       } catch {
-        if (holderDead || ac.signal.aborted) return;
+        if (ended || ac.signal.aborted) return;
       }
-      if (done || holderDead) return;
+      if (done || ended) return;
 
       for (let i = 0; i < 3; i++) {
         const run = await client!.getRun(id, ac.signal);
@@ -175,7 +158,7 @@ export const hermesAdapter: HarnessAdapter = {
       void client!.stop(id).catch(() => {});
     }
 
-    function runTurn(m: Outgoing) {
+    function runTurn(m: OutgoingMessage) {
       turnActive = true;
       stopRequested = false;
       ensureInit();
@@ -188,7 +171,7 @@ export const hermesAdapter: HarnessAdapter = {
 
       void (async () => {
         try {
-          if (holderDead) return;
+          if (ended) return;
           let input = composeInput(m);
           if (sendPolicy) input = `${TOOL_FAILURE_POLICY}\n\n---\n\n${input}`;
           const key = m.uuid || randomUUID();
@@ -212,7 +195,7 @@ export const hermesAdapter: HarnessAdapter = {
           runId = created.run_id;
           activeRunId = created.run_id;
           settled = false;
-          if (holderDead) {
+          if (ended) {
             stopActive();
             return;
           }
@@ -220,24 +203,24 @@ export const hermesAdapter: HarnessAdapter = {
           if (stopRequested) void client!.stop(created.run_id).catch(() => {});
           await follow(created.run_id, ac, startedAt, emptyHermesNorm());
         } catch (e) {
-          if (holderDead || ac.signal.aborted) return;
+          if (ended || ac.signal.aborted) return;
           emit({ kind: 'error', payload: { text: failText(e, baseUrl, apiKey) } }, startedAt);
           emit({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } }, startedAt);
         } finally {
           if (runAbort === ac) runAbort = null;
           runId = null;
           turnActive = false;
-          if (holderDead) stopActive();
-          if (!holderDead) pump();
+          if (ended) stopActive();
+          if (!ended) pump();
         }
       })();
     }
 
-    async function steer(m: Outgoing) {
+    async function steer(m: OutgoingMessage) {
       const id = runId;
       if (!id || !client) {
         outbox.unshift(m);
-        if (!turnActive && !holderDead) pump();
+        if (!turnActive && !ended) pump();
         return;
       }
       try {
@@ -247,68 +230,60 @@ export const hermesAdapter: HarnessAdapter = {
         // 409: the run already finished. Queue it as the next run instead of dropping Ben's text.
         if (e instanceof HermesHttpError && (e.status === 409 || e.status === 400)) {
           outbox.unshift(m);
-          if (!turnActive && !holderDead) pump();
+          if (!turnActive && !ended) pump();
           return;
         }
-        if (holderDead) return;
+        if (ended) return;
         outbox.unshift(m);
-        if (!turnActive && !holderDead) pump();
+        if (!turnActive && !ended) pump();
       }
     }
 
-    holder.on('exit', () => {
-      holderDead = true;
+    // Ending the session is how the runner stops a thread that will not wind down. Stop the remote run too.
+    const onEnd = () => {
+      ended = true;
       runAbort?.abort();
-      // Killing the holder is how the runner stops a thread that will not wind down. Stop the remote run too.
       stopActive();
-    });
+    };
 
     // Hermes gets no omni tools and takes no per-run tool limits, so a delegate-only role (the Conductor) could only
     // do the work itself. Thread creation refuses it; this covers a thread that was already on Hermes.
     const refused = !apiKey ? HERMES_FIX : ctx.role?.delegateOnly ? remoteDelegateOnlyRefusal(ctx.role.name, remoteWhere('hermes')) : null;
     if (refused) {
-      return {
-        child: holder,
-        write(obj: unknown) {
-          const o = obj as { type?: string };
-          if (o?.type === 'user') {
-            const m = omniOf(obj);
-            cb.record({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
-            cb.record({ kind: 'error', payload: { text: refused } });
-            cb.record({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } });
-            holder.kill('SIGTERM');
-          }
-          return !!holder.stdin && !holder.stdin.destroyed;
+      const session = detachedSession(cb, {
+        send(m) {
+          cb.record({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
+          cb.record({ kind: 'error', payload: { text: refused } });
+          cb.record({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } });
+          session.end('terminate');
+          return true;
         },
-      };
+        interrupt: () => true,
+        onEnd,
+      });
+      return session;
     }
 
     client = new HermesClient(baseUrl, apiKey);
     ready = true;
 
-    return {
-      child: holder,
-      write(obj: unknown) {
-        if (holderDead || !holder.stdin || holder.stdin.destroyed) return false;
-        const o = obj as { type?: string; request?: { subtype?: string }; request_id?: string };
-        if (o?.type === 'user') {
-          const m = omniOf(obj);
-          if (turnActive) void steer(m);
-          else {
-            outbox.push(m);
-            pump();
-          }
-          return true;
-        }
-        if (o?.type === 'control_request' && o.request?.subtype === 'interrupt') {
-          // Ack immediately so the runner's grace timer does not kill the holder before Hermes stops.
-          cb.record({ kind: 'control', payload: { request_id: String(o.request_id ?? ''), subtype: 'success', still_queued: [] } });
-          stopRequested = true;
-          if (runId && client) void client.stop(runId).catch(() => {});
-          return true;
+    return detachedSession(cb, {
+      send(m) {
+        if (turnActive) void steer(m);
+        else {
+          outbox.push(m);
+          pump();
         }
         return true;
       },
-    };
+      interrupt(requestId) {
+        // Ack immediately so the runner's grace timer does not end the session before Hermes stops.
+        cb.record({ kind: 'control', payload: { request_id: requestId, subtype: 'success', still_queued: [] } });
+        stopRequested = true;
+        if (runId && client) void client.stop(runId).catch(() => {});
+        return true;
+      },
+      onEnd,
+    });
   },
 };

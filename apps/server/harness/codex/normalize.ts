@@ -5,6 +5,7 @@
 import type { Record as StreamRecord } from '../../stream.ts';
 import type { CodexItem, PlanUpdate, RateLimitWindow, RateLimits, TurnError } from './protocol.ts';
 import type { Usage } from '../../stream.ts';
+import { toolResult as result } from '../tool-result.ts';
 
 /** Codex plan statuses mapped to the TodoWrite ones the checklist renders. */
 const PLAN_STATUS: Record<string, string> = {
@@ -47,16 +48,8 @@ export function diffToEdits(diff: string): { old_string: string; new_string: str
   return edits;
 }
 
-const MAX_RESULT = 16_000;
-const clip = (s: string) => (s.length > MAX_RESULT ? s.slice(0, MAX_RESULT) : s);
-const truncated = (s: string) => s.length > MAX_RESULT;
-
 const asCommand = (c: string | string[]) => (Array.isArray(c) ? c.join(' ') : c);
 
-const result = (id: string, text: string, isError: boolean): StreamRecord => ({
-  kind: 'tool_result',
-  payload: { tool_use_id: id, text: clip(text), is_error: isError, truncated: truncated(text) },
-});
 
 /** A command's call row. The adapter sends it when the command starts, so its row is there while it runs (#225). */
 export function commandUse(item: CodexItem): StreamRecord {
@@ -299,6 +292,14 @@ export function turnErrorText(message: string): string {
 /** The kind Codex gives a turn the plan's usage limit refused. */
 const USAGE_LIMIT = 'usageLimitExceeded';
 
+/** The API's error body, as the message may carry it: the limit's kind and when it resets. */
+interface LimitBody {
+  type?: unknown;
+  resets_at?: unknown;
+  resets_in_seconds?: unknown;
+  error?: LimitBody;
+}
+
 /**
  * A failed turn's error, when it is the plan's usage limit: the reset time the API's body gives (`resets_at`, or
  * `resets_in_seconds` from now), else the latest reset among the plan's windows that are full. Null when it is some
@@ -307,7 +308,7 @@ const USAGE_LIMIT = 'usageLimitExceeded';
 export function codexLimit(error: TurnError | null | undefined, usage: Usage | null, now = Date.now()): { resets_at: number | null } | null {
   if (!error) return null;
   const info = error.codexErrorInfo;
-  let body: any = null;
+  let body: LimitBody | null = null;
   try {
     body = JSON.parse(error.message);
   } catch {

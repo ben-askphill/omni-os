@@ -1,11 +1,10 @@
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ChildProcess } from 'node:child_process';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fixture } from '@omni/test-fixtures';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
-import type { AdapterContext, HarnessAdapter } from '../harness/adapter.ts';
+import type { AdapterContext, HarnessAdapter, HarnessSession } from '../harness/adapter.ts';
 import { harnessText } from '../message-context/project.ts';
 import type { CloudAgentState, Record as StreamRecord } from '../stream.ts';
 import {
@@ -33,19 +32,7 @@ import { waitFor } from './support.ts';
 type Fake = Awaited<ReturnType<typeof startFakeCursorApi>>;
 let fake: Fake;
 let adapter: HarnessAdapter;
-/** The env each holder process was started with, from the mocked holder. */
-const holderEnvs: (NodeJS.ProcessEnv | undefined)[] = [];
-const kids: ChildProcess[] = [];
-
-vi.mock('../harness/holder.ts', async (orig) => {
-  const real = await orig<typeof import('../harness/holder.ts')>();
-  return {
-    spawnHolder: (env?: NodeJS.ProcessEnv) => {
-      holderEnvs.push(env);
-      return real.spawnHolder(env);
-    },
-  };
-});
+const sessions: HarnessSession[] = [];
 
 beforeAll(async () => {
   fake = await startFakeCursorApi();
@@ -58,11 +45,10 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   fake.reset();
-  holderEnvs.length = 0;
 });
 afterEach(() => {
-  for (const c of kids) if (c.exitCode == null && c.signalCode == null) c.kill('SIGKILL');
-  kids.length = 0;
+  for (const s of sessions) s.end('kill');
+  sessions.length = 0;
 });
 afterAll(async () => {
   delete process.env.OMNI_CURSOR_API_URL;
@@ -75,6 +61,7 @@ const AGENT_ID = `bc-${THREAD_ID}`;
 
 function boot(opts: { key?: string; repo?: string | null; sessionId?: string; model?: string; title?: string } = {}) {
   const records: StreamRecord[] = [];
+  const exits: [number | null, NodeJS.Signals | null][] = [];
   let session: string | null = null;
   const ctx = {
     thread: {
@@ -128,12 +115,13 @@ function boot(opts: { key?: string; repo?: string | null; sessionId?: string; mo
     session: (id) => {
       session = id;
     },
+    exit: (code, signal) => exits.push([code, signal]),
   });
-  kids.push(handle.child);
+  sessions.push(handle);
   const user = (text: string, uuid: string, attachments: { name: string; path: string; size: number; mime: string; image: boolean }[] = []) =>
-    handle.write({ type: 'user', uuid, _omni: { text, attachments } });
-  const interrupt = (id = 'int-1') => handle.write({ type: 'control_request', request_id: id, request: { subtype: 'interrupt' } });
-  return { records, session: () => session, child: handle.child, user, interrupt };
+    handle.send({ uuid, text, attachments, commands: [] });
+  const interrupt = (id = 'int-1') => handle.interrupt(id);
+  return { records, exits, session: () => session, handle, user, interrupt };
 }
 
 const results = (records: StreamRecord[]) => records.filter((r) => r.kind === 'result').map((r) => r.payload as { ok: boolean; subtype: string });
@@ -194,7 +182,7 @@ describe('Cursor Cloud adapter', () => {
     const first = boot();
     first.user('first', 'm1');
     await waitFor(() => results(first.records).length === 1, 'first result');
-    first.child.kill('SIGTERM');
+    first.handle.end('terminate');
 
     const s = boot({ sessionId: AGENT_ID });
     s.user('next', 'm2');
@@ -208,9 +196,11 @@ describe('Cursor Cloud adapter', () => {
     const first = boot();
     first.user('CLOUD:SLOW long job', 'm1');
     await waitFor(() => states(first.records).some((x) => x.status === 'RUNNING'), 'running');
-    // Quitting Omni ends stdin: the agent keeps working on Cursor's side.
-    first.child.stdin?.end();
-    await waitFor(() => first.child.exitCode !== null || first.child.signalCode !== null, 'holder gone');
+    // Quitting Omni closes the session: the agent keeps working on Cursor's side.
+    first.handle.end('close');
+    await waitFor(() => first.exits.length === 1, 'session gone');
+    expect(first.exits).toEqual([[0, null]]);
+    expect(first.handle.alive).toBe(false);
     expect(calls('POST', /\/cancel$/)).toHaveLength(0);
 
     const s = boot({ sessionId: AGENT_ID });
@@ -241,8 +231,12 @@ describe('Cursor Cloud adapter', () => {
     const s = boot();
     s.user('CLOUD:HOLD wait', 'm1');
     await waitFor(() => states(s.records).some((x) => x.status === 'RUNNING'), 'running');
-    s.child.kill('SIGINT');
+    s.handle.end('stop');
     await waitFor(() => calls('POST', /\/cancel$/).length === 1, 'cancel sent');
+    await waitFor(() => s.exits.length === 1, 'session gone');
+    expect(s.exits).toEqual([[null, 'SIGINT']]);
+    // The runner gets no records from the turn it stopped: it marks the turn stopped itself.
+    expect(results(s.records)).toEqual([]);
   });
 
   it('maps an agent that errors or expires to a failed turn with the reason', async () => {
@@ -283,21 +277,12 @@ describe('Cursor Cloud adapter', () => {
     expect(fake.calls).toHaveLength(0);
   });
 
-  it('keeps the key out of the holder process environment', async () => {
-    const saved = process.env.CURSOR_API_KEY;
-    process.env.CURSOR_API_KEY = 'from-the-shell';
-    try {
-      const s = boot();
-      s.user('go', 'm1');
-      await waitFor(() => results(s.records).length === 1, 'result');
-      expect(holderEnvs).toHaveLength(1);
-      const env = holderEnvs[0]!;
-      expect(env.CURSOR_API_KEY).toBeUndefined();
-      expect(Object.values(env)).not.toContain('test-cursor-key');
-    } finally {
-      if (saved === undefined) delete process.env.CURSOR_API_KEY;
-      else process.env.CURSOR_API_KEY = saved;
-    }
+  it('runs no local process, so the key reaches no process environment', async () => {
+    const s = boot();
+    expect(s.handle.pid).toBeUndefined();
+    s.user('go', 'm1');
+    await waitFor(() => results(s.records).length === 1, 'result');
+    expect(s.handle.alive).toBe(true);
   });
 
   it('uploads images that fit and describes the rest without their Mac paths', async () => {
@@ -325,7 +310,7 @@ describe('Cursor Cloud adapter', () => {
     const parsed = parseContexts([JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')).records[0].raw]);
     if (!parsed.ok) throw new Error(parsed.error);
     const s = boot();
-    // As runner/state.ts userLine writes it for this thread.
+    // As runner/state.ts outgoing projects it for this thread.
     s.user(harnessText('tidy this reduce', parsed.value, { harness: 'cursor-cloud', cwd: '/tmp/omni-test' }), 'm1');
     await waitFor(() => calls('POST', '/v1/agents').length === 1, 'create');
     const text = (calls('POST', '/v1/agents')[0].body as { prompt: { text: string } }).prompt.text;

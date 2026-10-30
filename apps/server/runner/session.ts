@@ -13,7 +13,6 @@ import { endTasks } from './records.ts';
 import { stopPreparation } from './setup-action.ts';
 import { applyQueued } from './switch.ts';
 import {
-  alive,
   browserHolder,
   clearMods,
   deliveryPhase,
@@ -25,7 +24,6 @@ import {
   setShuttingDown,
   waiting,
   waitingMsgs,
-  writeLine,
   hasBackground,
   track,
   unread,
@@ -34,10 +32,10 @@ import {
 } from './state.ts';
 
 export function requestInterrupt(live: Live) {
-  if (live.interrupt || !live.child) return;
+  if (live.interrupt || !live.session) return;
   const id = `omni_int_${randomUUID().slice(0, 8)}`;
   live.interrupt = { id, acked: false };
-  if (!writeLine(live, { type: 'control_request', request_id: id, request: { subtype: 'interrupt' } })) return hardKill(live);
+  if (!live.session.interrupt(id)) return hardKill(live);
   // The CLI normally winds the turn down within a second. If not, fall back to killing it.
   live.interruptTimer = setTimeout(() => live.turn && live.interrupt?.id === id && hardKill(live), config.interruptGraceMs);
 }
@@ -52,16 +50,16 @@ export function clearInterrupt(live: Live) {
  * for a fresh process, and so do the ones held for after this turn. Undelivered steers are dropped on exit.
  */
 export function hardKill(live: Live) {
-  const child = live.child;
-  if (!child || live.closing) return;
+  const session = live.session;
+  if (!session || live.closing) return;
   live.closing = true;
   clearTimeout(live.idleTimer);
   const id = live.threadId;
   requeueHeld(live);
-  if (alive(child)) {
+  if (session.alive) {
     live.hardStop = true;
-    child.kill('SIGINT');
-    setTimeout(() => alive(child) && child.kill('SIGKILL'), 5000);
+    session.end('stop');
+    setTimeout(() => session.alive && session.end('kill'), 5000);
   }
   emitThread(id);
 }
@@ -79,18 +77,18 @@ export function requeueHeld(live: Live) {
 export function stopStartup(live: Live) {
   drop(live.threadId, live.held);
   live.held = [];
-  if (live.child) hardKill(live);
+  if (live.session) hardKill(live);
   else abortStart(live, 'stopped');
 }
 
-/** End stdin; the CLI exits on its own. */
+/** No more input; the CLI exits on its own. */
 export function closeLive(live: Live) {
-  if (live.closing || !live.child) return;
+  const session = live.session;
+  if (live.closing || !session) return;
   live.closing = true;
   clearTimeout(live.idleTimer);
-  live.child.stdin?.end();
-  const child = live.child;
-  setTimeout(() => alive(child) && child.kill('SIGTERM'), 10_000).unref();
+  session.end('close');
+  setTimeout(() => session.alive && session.end('terminate'), 10_000).unref();
   emitThread(live.threadId);
 }
 
@@ -245,7 +243,7 @@ export async function releaseForHandoff(threadId: string): Promise<Msg[]> {
   const read: Msg[] = [];
   if (live) {
     live.released = read;
-    if (!live.child) abortStart(live, 'stopped');
+    if (!live.session) abortStart(live, 'stopped');
     else if (!live.closing) hardKill(live);
     await live.exited;
   }
@@ -271,8 +269,8 @@ export async function shutdownAll() {
     for (const live of all) {
       clearTimeout(live.idleTimer);
       clearInterrupt(live);
-      const child = live.child;
-      if (!child) {
+      const session = live.session;
+      if (!session) {
         abortStart(live, 'stopped');
         continue;
       }
@@ -280,9 +278,9 @@ export async function shutdownAll() {
       drop(live.threadId, live.held);
       live.held = [];
       live.closing = true;
-      child.stdin?.end();
-      const term = setTimeout(() => alive(child) && child.kill('SIGTERM'), 3000);
-      const kill = setTimeout(() => alive(child) && child.kill('SIGKILL'), 5000);
+      session.end('close');
+      const term = setTimeout(() => session.alive && session.end('terminate'), 3000);
+      const kill = setTimeout(() => session.alive && session.end('kill'), 5000);
       void live.exited.then(() => (clearTimeout(term), clearTimeout(kill)));
     }
     await Promise.all(all.map((l) => l.exited));

@@ -4,11 +4,8 @@
 // Reasoning is dropped, the way Cursor's thinking is. Tool names follow Claude Code's
 // where the transcript already knows how to render them.
 import type { Record as StreamRecord } from '../../stream.ts';
+import { toolResult } from '../tool-result.ts';
 import type { HermesRun, HermesRuntime, HermesUsage } from './client.ts';
-
-const MAX_RESULT = 16_000;
-const clip = (s: string) => (s.length > MAX_RESULT ? s.slice(0, MAX_RESULT) : s);
-const truncated = (s: string) => s.length > MAX_RESULT;
 
 const DISPLAY: Record<string, string> = {
   terminal: 'Bash',
@@ -98,10 +95,6 @@ const safeParse = (s: string): unknown => {
 };
 
 const toolUse = (id: string, name: string, input: unknown): StreamRecord => ({ kind: 'tool_use', payload: { id, name, input, parent: null } });
-
-function toolResult(id: string, text: string, isError: boolean): StreamRecord {
-  return { kind: 'tool_result', payload: { tool_use_id: id, text: clip(text), is_error: isError, truncated: truncated(text) } };
-}
 
 function takeOpen(state: HermesNormState, tool: string): string | null {
   for (let i = state.open.length - 1; i >= 0; i--) {
