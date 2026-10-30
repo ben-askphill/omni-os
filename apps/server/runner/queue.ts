@@ -3,7 +3,7 @@ import { resolveDelivery } from '../delivery.ts';
 import { events, messageRequests, outbox, requestFingerprint, threads, tx, type MessageRequest } from '../db.ts';
 import { publishThread } from '../bus.ts';
 import { clearSuggestion } from './aux.ts';
-import { hardKill, requestInterrupt, stopStartup } from './session.ts';
+import { closeLive, hardKill, requestInterrupt, stopStartup } from './session.ts';
 import { launch } from './spawn.ts';
 import { applyQueued, queuedRun } from './switch.ts';
 import { userName } from '../profile.ts';
@@ -100,6 +100,13 @@ export function pump() {
       continue;
     }
     const harness = threads.get(id)?.harness ?? 'claude-code';
+    // Switched on another machine (a thread that runs here for it, run-on.ts): the warm process is the old harness's.
+    const warm = lives.get(id);
+    if (warm && !warm.turn && warm.harness && warm.harness !== harness) {
+      closeLive(warm);
+      i++;
+      continue;
+    }
     // Harness at its cap: leave this thread queued and try others (arrival order within a harness).
     if ((running[harness] ?? 0) >= capFor(harness)) {
       i++;

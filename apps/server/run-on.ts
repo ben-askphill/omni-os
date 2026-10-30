@@ -5,7 +5,8 @@
 // holds it, as synced kv records with one writer each:
 // - `runon.thread.<thread>`: the machine this one sent the thread to. Marks a routed thread; written once.
 // - `runon.msgs.<thread>.<sender>`: the messages this machine forwarded, newest last, capped. Also the reports of
-//   delegated threads that ran here for a parent that runs elsewhere (runner/queue.ts reportToParent).
+//   delegated threads that ran here for a parent that runs elsewhere (runner/queue.ts reportToParent), and Ben's
+//   actions on its usage-limit stop, which the holder owns (runner/limits.ts).
 // - `runon.accepted.<thread>.<message>`: durable acceptance, synced so a new holder never replays it.
 // - `runon.stop.<thread>.<sender>`: when this machine last asked the holder to stop it.
 // The holder reads them after each sync (reconcileRunOn) and sends each message once, keyed by its id. Files Ben
@@ -15,7 +16,8 @@ import { randomUUID } from 'node:crypto';
 import { publishFeed } from './bus.ts';
 import { kv, outbox, threads, tx, type Thread } from './db.ts';
 import { inFlight } from './handoff/records.ts';
-import { interruptThread, saveOwn, wakePrepared } from './runner.ts';
+import { remoteHolder } from './run-on-holder.ts';
+import { cancelLimitResume, interruptThread, resumeLimitNow, saveOwn, scheduleLimitResume, wakePrepared } from './runner.ts';
 import { fileReport } from './runner/queue.ts';
 import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
 import { safeSegment } from './sync/paths.ts';
@@ -25,7 +27,8 @@ import { reachabilityOf, tailnet } from './tailscale.ts';
 import type { Attachment } from './uploads.ts';
 import { userConfig } from './user-config.ts';
 
-const THREAD = 'runon.thread.';
+export { markRouted, remoteHolder, routedTo } from './run-on-holder.ts';
+
 const MSGS = 'runon.msgs.';
 const STOP = 'runon.stop.';
 /** Messages a sender keeps in its record. The holder has sent older ones long before. */
@@ -47,30 +50,17 @@ export interface Forwarded {
   files?: UploadRef[];
   /** A delegated thread's report to its parent, with the key it is saved under and its payload. */
   report?: { key: string; payload: Record<string, unknown> };
+  /** Ben's Resume, Resume at reset or its cancel on the thread's limit stop, for the holder to act on as its own. */
+  limit?: LimitAction;
 }
+
+export type LimitAction = 'resume' | 'schedule' | 'cancel';
 
 type Mac = { id: string; name: string };
 
 const refused = (message: string, status = 409) => Object.assign(new Error(message), { status });
 const isId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9-]{1,100}$/.test(v);
 const fresh = (at: string, now: number, within = FRESH_MS) => now - Date.parse(at) < within;
-
-/** The machine a thread was sent to, when it was routed. */
-export const routedTo = (threadId: string): string | null => {
-  const v = kv.get<unknown>(THREAD + threadId);
-  return isId(v) ? v : null;
-};
-
-/**
- * The machine that runs a routed thread now, when that is not this one: where Ben's messages and Stop go. Null for a
- * thread that was never routed, one taken back here, or one on its way between machines (the handoff decides then).
- */
-export function remoteHolder(t: Pick<Thread, 'id'>): string | null {
-  const self = outbox.machineId();
-  if (!self || !routedTo(t.id) || inFlight(t.id)) return null;
-  const holder = threads.holder(t.id) ?? routedTo(t.id);
-  return holder && holder !== self ? holder : null;
-}
 
 /** Why this machine cannot reach another now, said as Settings would. */
 function syncProblem(): string {
@@ -102,11 +92,6 @@ export async function targetFor(asked: string | null | undefined): Promise<{ fro
     throw refused(`${target.name} is offline on Tailscale${reach.lastSeen ? `, last seen ${reach.lastSeen}` : ''}. Wake it, or run this thread here.`);
   }
   return { from: { id: self, name }, to: { id: target.id, name: target.name } };
-}
-
-/** Mark the thread as routed to `to`. Its offer goes out separately (handoff.ts sendNewThread). */
-export function markRouted(threadId: string, to: string) {
-  kv.set(THREAD + threadId, to);
 }
 
 function sent(threadId: string, self: string): Forwarded[] {
@@ -149,6 +134,22 @@ export function forwardReport(parentId: string, key: string, prompt: string, pay
     kv.set(`${MSGS}${parentId}.${self}`, [...list, { id, prompt, mode: 'steer', at: new Date().toISOString(), report: { key, payload } }].slice(-KEEP));
   }
   void activeWorker()?.syncNow();
+}
+
+/**
+ * Ben's action on the limit stop of a routed thread that runs elsewhere: the holder ran the turn, so it owns the stop
+ * and acts on it at its next sync, and the stop's new state syncs back. Refused here for what the holder would refuse.
+ */
+export function forwardLimit(t: Thread, action: LimitAction): Thread {
+  const l = threads.limit(t.id);
+  if (!l) throw refused('This thread is not waiting on a usage limit.');
+  if (action === 'schedule' && !l.limit_resets_at) throw refused('The harness did not say when its limit resets, so this thread can only be resumed by hand.');
+  const self = outbox.machineId()!;
+  const list = sent(t.id, self);
+  kv.set(`${MSGS}${t.id}.${self}`, [...list, { id: randomUUID(), prompt: '', mode: 'steer' as const, at: new Date().toISOString(), limit: action }].slice(-KEEP));
+  void activeWorker()?.syncNow();
+  publishFeed({ type: 'thread', thread: t });
+  return t;
 }
 
 /** Ben's Stop on a routed thread that runs elsewhere: the holder stops it at its next sync. */
@@ -204,6 +205,11 @@ async function reconcileOnce(worker: SyncWorker, now: number) {
         // Requests are local; this receipt travels with the thread when another machine takes over.
         const receipt = `runon.accepted.${threadId}.${m.id}`;
         if (kv.get(receipt)) continue;
+        if (m.limit) {
+          kv.set(receipt, true);
+          actOnLimit(threadId, m.limit);
+          continue;
+        }
         const mode = m.mode === 'queue' || m.mode === 'interrupt' ? m.mode : 'steer';
         const from = m.from === 'conductor' ? 'conductor' : 'ben';
         const attachments = await receiveUploads(threadId, m.files);
@@ -229,6 +235,17 @@ async function reconcileOnce(worker: SyncWorker, now: number) {
     stopped.set(key, value);
     const t = threads.get(threadId);
     if (t && (t.status === 'running' || t.status === 'queued')) interruptThread(threadId);
+  }
+}
+
+/** A limit action another machine forwarded, as if Ben took it here. One the stop no longer allows is dropped. */
+function actOnLimit(threadId: string, action: LimitAction) {
+  try {
+    if (action === 'resume') resumeLimitNow(threadId);
+    else if (action === 'schedule') scheduleLimitResume(threadId);
+    else if (action === 'cancel') cancelLimitResume(threadId);
+  } catch (err) {
+    console.log(`[run-on] ${threadId}: limit ${action} not taken: ${(err as Error).message}`);
   }
 }
 

@@ -13,7 +13,7 @@ import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
 import { artifacts, channels, events, fileDigests, messageRequests, publicChannel, requestFingerprint, threads, type Thread } from './db.ts';
-import { forwardStop, remoteHolder } from './run-on.ts';
+import { forwardLimit, forwardStop, remoteHolder, type LimitAction } from './run-on.ts';
 import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
 import { continueLinks } from './continue.ts';
@@ -246,28 +246,20 @@ threadActionsApi.post('/:id/setup/retry', (c) => {
 /**
  * A turn the harness stopped at its usage limit (apps/server/runner/limits.ts). Schedule its one continuation for the
  * reset time the harness reported (a 409 when it reported none), cancel that, or send it now. Scheduling or
- * cancelling twice changes nothing; the continuation is sent at most once.
+ * cancelling twice changes nothing; the continuation is sent at most once. A thread that runs on another machine
+ * has its stop there, so the action goes to that machine (run-on.ts).
  */
-threadActionsApi.post('/:id/limit/schedule', (c) => {
-  const id = c.req.param('id');
-  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  scheduleLimitResume(id);
+const limitAction = (action: LimitAction, local: (id: string) => unknown) => (c: Context) => {
+  const id = c.req.param('id')!;
+  const t = threads.get(id);
+  if (!t) return c.json({ error: 'not found' }, 404);
+  if (remoteHolder(t)) forwardLimit(t, action);
+  else local(id);
   return c.json(afterRecovery(id));
-});
-
-threadActionsApi.post('/:id/limit/cancel', (c) => {
-  const id = c.req.param('id');
-  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  cancelLimitResume(id);
-  return c.json(afterRecovery(id));
-});
-
-threadActionsApi.post('/:id/limit/resume', (c) => {
-  const id = c.req.param('id');
-  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  resumeLimitNow(id);
-  return c.json(afterRecovery(id));
-});
+};
+threadActionsApi.post('/:id/limit/schedule', limitAction('schedule', scheduleLimitResume));
+threadActionsApi.post('/:id/limit/cancel', limitAction('cancel', cancelLimitResume));
+threadActionsApi.post('/:id/limit/resume', limitAction('resume', resumeLimitNow));
 
 /**
  * Hand the running thread to another synced Mac: `{to}`, that Mac's id from GET /api/devices. Answered as soon as the

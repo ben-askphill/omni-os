@@ -1,12 +1,14 @@
 import { db, threads, type LimitStop } from '../../db.ts';
 import { publishFeed } from '../../bus.ts';
 import { claim, registerHandler } from '../apply.ts';
+import { remoteHolder } from '../../run-on-holder.ts';
 
 // A thread's limit stop between Macs (apps/server/runner/limits.ts), keyed by the thread's id and apart from the thread
 // row, which never carries it: last writer wins on the stop alone. The Mac that ran the turn records it, schedules
 // or cancels it and takes it to send the continuation; either Mac clears it with a message, Stop or archive. The
 // other Mac keeps a copy marked limit_elsewhere, so its Needs you lists the blocker with the reset time while only
-// the owner resumes it. A stop whose thread has not arrived yet waits in sync_deferred.
+// the owner resumes it. A thread that runs on the stop's machine for good (run-on.ts) is not elsewhere: Ben's actions
+// here go to that machine. A stop whose thread has not arrived yet waits in sync_deferred.
 
 const STATES = new Set(['limited', 'scheduled']);
 const threadHere = db.prepare('SELECT 1 FROM threads WHERE id = ?');
@@ -31,12 +33,14 @@ registerHandler('limit_stop', {
     }
     // Owned by the Mac that ran the turn, which is the sender for every write but a clear.
     const machine = l.limit_machine ?? change.machine_id;
+    const t = threads.get(change.entity_id)!;
+    const elsewhere = machine !== ctx.machineId && remoteHolder(t) !== machine;
     db.prepare('UPDATE threads SET limit_state = ?, limit_resets_at = ?, limit_id = ?, limit_machine = ?, limit_elsewhere = ? WHERE id = ?').run(
       l.limit_state!,
       l.limit_resets_at ?? null,
       l.limit_id!,
       machine,
-      machine === ctx.machineId ? 0 : 1,
+      elsewhere ? 1 : 0,
       change.entity_id,
     );
     return true;

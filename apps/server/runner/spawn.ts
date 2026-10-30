@@ -37,6 +37,7 @@ export function launch(threadId: string, first: Msg): Live | undefined {
     flush: null,
     requestContext: null,
     sessionId: thread.session_id,
+    harness: thread.harness,
     turn: true,
     cliTurn: false,
     replayed: false,
