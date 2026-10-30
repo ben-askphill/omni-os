@@ -837,15 +837,9 @@ struct StatusFooter: View {
           Text(state.label)
             .foregroundStyle(Tok.fg2)
           HStack(spacing: z(6)) {
-            if let name = model.store.status?.device?.name {
-              Text("\(name) · Port \(model.settings.port, format: .number.grouping(.never))")
-                .monospacedDigit()
-                .lineLimit(1)
-                .truncationMode(.middle)
-            } else {
-              Text("Port \(model.settings.port, format: .number.grouping(.never))")
-                .monospacedDigit()
-            }
+            // The machine's name moved to Settings, Machines (#405).
+            Text("Port \(model.settings.port, format: .number.grouping(.never))")
+              .monospacedDigit()
             if let notice = model.connectionNotice {
               Text(notice)
             }

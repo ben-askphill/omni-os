@@ -17,7 +17,7 @@ Optional. Each Mac keeps its own SQLite as the source of truth; a Supabase proje
 
 Open Settings > Machines (web `#/settings/machines`, the old `#/sync` still lands there; the Mac app's Machines tab; the phone's Settings, Machines). Under Sync, paste the URL and key, sign in as that same user. The first sign-in queues this Mac's existing history, and the other Mac pulls it. The URL, the key and the sign-in token go to the secret store, the Keychain on a Mac and `data/secrets.json` on Linux (global scope, never passed to threads); the password is used once and not stored. Sign Out stops syncing and removes them; Pause keeps them.
 
-- Path map: paths travel with the home folder as `~`. When the other Mac keeps a folder somewhere else, map it under Sync in Settings > Machines, like `~/work` to `~/code`.
+- Path map: paths travel with the home folder as `~`. When the other Mac keeps a folder somewhere else, map it under Advanced in Settings > Machines, like `~/work` to `~/code`.
 - Files: after a Mac's first sync, Omni uploads the files and session files of every thread it wrote last, in the background (the log counts progress every 50 threads). After that, a thread's files go up after each turn. The bucket fills a few minutes after the rows.
 - `npm run sync:backfill`: queue every existing row again, for instance after restoring a database. It is idempotent and skips rows the other Mac wrote last.
 - Signing in to a different project or user starts that relay from the beginning and queues the history again.

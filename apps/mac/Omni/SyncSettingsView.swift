@@ -56,7 +56,6 @@ struct SyncForm: View {
         if let status = sync.status {
           if status.configured { statusSection(status) }
           if status.needsSignIn { signInSection(signedOut: status.signedOut) }
-          if status.configured { pathMapSection }
         }
       }
     }
@@ -241,10 +240,30 @@ struct SyncForm: View {
   private func signIn() {
     Task { await sync.signIn() }
   }
+}
 
-  // MARK: Path map
+/// The sync path map, under the Machines tab's Advanced since #405, as the web's `PathMapEditor`. Its own model,
+/// loaded once: the Sync part above polls the status. Shown once sync is set up.
+struct SyncPathMap: View {
+  let model: AppModel
+  @State private var sync: SyncModel?
 
-  private var pathMapSection: some View {
+  var body: some View {
+    Group {
+      if let sync, sync.status?.configured == true { SyncPathMapCard(sync: sync) }
+    }
+    .task(id: model.client.baseURL) {
+      let sync = SyncModel(client: model.client)
+      self.sync = sync
+      await sync.load()
+    }
+  }
+}
+
+private struct SyncPathMapCard: View {
+  @Bindable var sync: SyncModel
+
+  var body: some View {
     SettingsCard(
       title: "Path map",
       note: "Paths travel with your home folder as ~. When the other Mac keeps a folder somewhere else, map it here: ~/work to ~/code turns its ~/work/volero into ~/code/volero on this Mac."

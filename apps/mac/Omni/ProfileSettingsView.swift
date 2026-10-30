@@ -58,8 +58,11 @@ struct ProfileSettings: View {
               }
             }
           }
-          SettingsCard(title: "Integrations", note: "Optional. Leave a field empty to turn it off.") {
+          // The developer integrations fold under Advanced, as on the web (#405).
+          AdvancedFold(summary: "Hermes URL and central brain folder") {
             VStack(alignment: .leading, spacing: z(14)) {
+              Text("Optional integrations. Leave a field empty to turn it off.")
+                .font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
               Row("Hermes URL", hint: "A Hermes API server on your tailnet. Its token is the global secret HERMES_API_KEY.") {
                 TextField("Hermes URL", text: $form.integrations.hermesUrl, prompt: Text(verbatim: "http://100.64.0.1:8642")).textFieldStyle(.omniMono)
               }

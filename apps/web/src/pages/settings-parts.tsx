@@ -1,7 +1,35 @@
-import type { ReactNode } from 'react';
-import { Label, Toggle } from '../components/ui.tsx';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Icon, Label, Toggle } from '../components/ui.tsx';
 
-// The pieces the Settings sections share: a card, a labelled field, a status row and a switch row.
+// The pieces the Settings sections and channel settings share: a card, a labelled field, a status row, a switch
+// row and the Advanced fold.
+
+/**
+ * Advanced: the developer and rarely changed items of a form, folded shut so the everyday ones stand alone (#405).
+ * `open` forces it open, for a value Omni could not work out and needs typed. `title` names a fold that is not
+ * Advanced (a long list). The Mac app's `AdvancedFold` matches.
+ */
+export function Advanced({ title = 'Advanced', summary, open: forced = false, children }: { title?: string; summary?: string; open?: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(forced);
+  useEffect(() => {
+    if (forced) setOpen(true);
+  }, [forced]);
+  return (
+    <section className="rounded-[20px] shadow-[inset_0_0_0_1px_var(--line)]">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full min-w-0 items-center gap-2 rounded-[20px] px-4 py-3 text-left hover:bg-surface md:px-5"
+      >
+        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={14} className="shrink-0 text-fg-3" />
+        <span className="shrink-0 font-display text-[15px]">{title}</span>
+        {summary && !open && <span className="min-w-0 truncate text-[12.5px] text-fg-3">{summary}</span>}
+      </button>
+      {open && <div className="space-y-4 px-4 pt-1 pb-4 md:px-5 md:pb-5">{children}</div>}
+    </section>
+  );
+}
 
 export function Card({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
   return (

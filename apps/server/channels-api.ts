@@ -193,7 +193,10 @@ channelsApi.patch('/:id', async (c) => {
   delete (body as any).id;
   const runError = runDefaultsError(body, current);
   if (runError) return c.json({ error: runError }, 400);
-  if (body.repo_path && !body.github_repo && !current.github_repo) body.github_repo = await detectRepo(body.repo_path);
+  // Read the GitHub repo from the path when none is typed and there is none yet, or when the path moves without one
+  // typed (the clients leave it out unless detection failed or it was edited, #405).
+  const moved = body.repo_path && body.repo_path !== current.repo_path && body.github_repo === undefined;
+  if (body.repo_path && !body.github_repo && (!current.github_repo || moved)) body.github_repo = await detectRepo(body.repo_path);
   const updated = channels.update(id, body as any)!;
   publishFeed({ type: 'channel', id });
   return c.json(publicChannel(updated));

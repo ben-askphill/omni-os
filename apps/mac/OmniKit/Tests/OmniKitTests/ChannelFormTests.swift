@@ -47,7 +47,7 @@ import OmniKit
     let json = try encoded(f.body(system: false))
     #expect(json == .object([
       "name": .string("Acme"), "kind": .string("internal"),
-      "repo_path": .null, "github_repo": .null, "use_worktree": .number(1), "base_dir": .null,
+      "repo_path": .null, "use_worktree": .number(1), "base_dir": .null,
       "store_domain": .string("acme.myshopify.com"), "portal_slug": .null, "browser_headless": .number(1),
       "notes": .string("Be brief"), "icon": .null,
       "default_harness": .null, "default_model": .null, "default_effort": .null,
@@ -187,6 +187,45 @@ import OmniKit
 
   private func encoded(_ value: some Encodable) throws -> JSONValue {
     try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
+  }
+
+  @Test func workedOutValuesShowAsFieldsOnlyWhenDetectionFails() throws {
+    let base = #"{"id":"acme","name":"Acme","kind":"client","use_worktree":1,"browser_headless":1,"archived":0,"created_at":"2026-01-05T09:00:00.000Z","repo_path":"/code/acme""#
+    let detected = try decode(Channel.self, base + #","github_repo":"acme/theme"}"#)
+    let failed = try decode(Channel.self, base + "}")
+
+    // A detected GitHub repo stays text with Change; a failed one shows its field and opens Advanced.
+    var f = ChannelForm(channel: detected)
+    #expect(!f.shows(.githubRepo, isNew: false, saved: detected, editing: []))
+    #expect(f.shows(.githubRepo, isNew: false, saved: detected, editing: [.githubRepo]))
+    #expect(!f.needsAdvanced(isNew: false, saved: detected))
+    f = ChannelForm(channel: failed)
+    #expect(f.shows(.githubRepo, isNew: false, saved: failed, editing: []))
+    #expect(f.needsAdvanced(isNew: false, saved: failed))
+    // A moved repo path is read again on save, so it is no failure yet.
+    f.repoPath = "/code/other"
+    #expect(!f.githubFailed(saved: failed))
+    // Left out of the body unless its field showed, so the server reads it from the path.
+    #expect(try encoded(f.body(system: false))["github_repo"] == nil)
+    f.sendsGithubRepo = true
+    f.githubRepo = " "
+    #expect(try encoded(f.body(system: false))["github_repo"] == .null)
+
+    // The id follows the name; a name with no letters or digits is a failure.
+    var n = ChannelForm()
+    n.setName("Acme")
+    #expect(!n.shows(.id, isNew: true, saved: nil, editing: []))
+    n.setName("!!")
+    #expect(n.shows(.id, isNew: true, saved: nil, editing: []) && n.needsAdvanced(isNew: true, saved: nil))
+    #expect(!ChannelForm(channel: detected).shows(.id, isNew: false, saved: detected, editing: [.id]))
+
+    // The base directory shows only without a repo, when set or on Change.
+    #expect(!n.shows(.baseDir, isNew: true, saved: nil, editing: []))
+    #expect(n.shows(.baseDir, isNew: true, saved: nil, editing: [.baseDir]))
+    n.baseDir = "~/Omni"
+    #expect(n.shows(.baseDir, isNew: true, saved: nil, editing: []))
+    n.repoPath = "/code/acme"
+    #expect(!n.shows(.baseDir, isNew: true, saved: nil, editing: [.baseDir]))
   }
 
   @Test func readsTheDesignSystemTheServerSends() throws {

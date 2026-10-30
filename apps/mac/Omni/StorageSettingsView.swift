@@ -138,18 +138,21 @@ struct StorageForm: View {
     return SettingsCard(title: "Retention on This Mac") {
       SettingsToggle(
         title: "Remove idle worktrees on a schedule",
-        detail: "Only this Mac: the setting is not synced. It covers worktrees of archived, merged or deleted threads with nothing unsaved, idle at least that long. It runs a minute after Omni starts, then daily.",
+        detail: "Only this Mac: the setting is not synced. It covers worktrees of archived, merged or deleted threads with nothing unsaved, idle at least \(Format.plural(policy.idleDays, "day")). It runs a minute after Omni starts, then daily.",
         isOn: Binding(get: { policy.enabled }, set: { on in Task { await inventory.setRetention(enabled: on) } })
       )
       .disabled(inventory.isBusy)
-      VStack(alignment: .leading, spacing: 0) {
-        FieldLabel(text: "After")
-        Picker("After", selection: Binding(get: { policy.idleDays }, set: { days in Task { await inventory.setRetention(idleDays: days) } })) {
-          ForEach(policy.dayChoices, id: \.self) { Text(Format.plural($0, "day")).tag($0) }
+      // The idle days only matter with the schedule on, so the picker shows with it (#405).
+      if policy.enabled {
+        VStack(alignment: .leading, spacing: 0) {
+          FieldLabel(text: "After")
+          Picker("After", selection: Binding(get: { policy.idleDays }, set: { days in Task { await inventory.setRetention(idleDays: days) } })) {
+            ForEach(policy.dayChoices, id: \.self) { Text(Format.plural($0, "day")).tag($0) }
+          }
+          .labelsHidden()
+          .fixedSize()
+          .disabled(inventory.isBusy)
         }
-        .labelsHidden()
-        .fixedSize()
-        .disabled(inventory.isBusy)
       }
       if let line = inventory.retentionNote {
         Text(line).font(.omni(size: 12.5)).foregroundStyle(Tok.fg2).fixedSize(horizontal: false, vertical: true)
