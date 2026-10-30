@@ -106,6 +106,8 @@ private struct DeliveryRefusal: Decodable {
     // Recorded by apps/server/tests/takeover-two-macs.test.ts, as above.
     "thread-takeover.json": { _ = try decodeFixture(ThreadDetail.self, "thread-takeover.json") },
     "thread-takeover-requested.json": { _ = try decodeFixture(ThreadDetail.self, "thread-takeover-requested.json") },
+    // Recorded by apps/server/tests/delivery-gap-run-on.test.ts, as above.
+    "thread-undelivered.json": { _ = try decodeFixture(ThreadDetail.self, "thread-undelivered.json") },
     // Recorded by apps/server/tests/browser-capture.test.ts, which has no Chrome to capture.
     "browser-capture.json": { _ = try decodeFixture(BrowserCaptureReply.self, "browser-capture.json") },
     "browser-capture-marked.json": { _ = try decodeFixture(MarkedReply.self, "browser-capture-marked.json") },
@@ -294,6 +296,16 @@ private struct DeliveryRefusal: Decodable {
     #expect(h.state == .offered(stale: false))
     #expect(d.blocked == h.text(now: h.at), "the server's block while it waits is the card's line")
     #expect(HandoffBanner(h, status: d.thread.status, now: h.at) == .card(tone: .waiting, text: "Waiting for Mac B to pick it up.", cancel: true))
+  }
+
+  @Test func readsAReplyTheOtherMachineDidNotTake() throws {
+    let d = try decodeFixture(ThreadDetail.self, "thread-undelivered.json")
+    let notTaken = d.events.compactMap { e -> UserMessage? in
+      if case .user(let m) = e.content, m.dropped == true { m } else { nil }
+    }
+    let m = try #require(notTaken.first, "the reply the other machine did not take decodes")
+    #expect(m.droppedLabel == "Not delivered")
+    #expect(m.undelivered == "Box B did not take it within 24 hours.")
   }
 
   @Test func readsAThreadToTakeOver() throws {

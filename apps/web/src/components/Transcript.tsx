@@ -123,8 +123,8 @@ function UserBubble({ p, at, threadId, event, clipped }: { p: UserP; at: string;
           </span>
         )}
         {p.dropped && (
-          <span className="inline-flex items-center gap-1 font-medium" title="The run ended before the agent read this message">
-            <Icon name="x" size={11} /> Not sent
+          <span className="inline-flex items-center gap-1 font-medium" title={p.undelivered ?? 'The run ended before the agent read this message'}>
+            <Icon name="x" size={11} /> {p.undelivered ? 'Not delivered' : 'Not sent'}
           </span>
         )}
         <span className="font-num text-[11px] text-fg-4">{clock(toDate(at))}</span>
@@ -244,7 +244,7 @@ function ReportCard({ p }: { p: ReportP }) {
         </span>
         <span className="font-medium">Report from {p.role ?? 'crew'}</span>
         {p.dropped && (
-          <span className="text-[11.5px] font-medium text-fg-3" title="The run ended before the agent read this report">
+          <span className="text-[11.5px] font-medium text-fg-3" title={p.undelivered ?? 'The run ended before the agent read this report'}>
             Not delivered
           </span>
         )}

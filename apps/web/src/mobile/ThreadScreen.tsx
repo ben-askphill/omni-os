@@ -202,12 +202,17 @@ function Delegation({ kids }: { kids: Thread[] }) {
   );
 }
 
-function Report({ role, taskId, text }: { role?: string | null; taskId?: string | null; text: string }) {
+function Report({ role, taskId, text, dropped, undelivered }: { role?: string | null; taskId?: string | null; text: string; dropped?: boolean; undelivered?: string }) {
   return (
-    <div className="flex flex-col gap-2.5 rounded-[20px] bg-surface p-3.5">
+    <div className={`flex flex-col gap-2.5 rounded-[20px] bg-surface p-3.5 ${dropped ? 'opacity-60' : ''}`}>
       <div className="flex items-center gap-2 text-[13px] leading-none font-medium">
         <MoAvatar role={role} size={26} />
         Report from {role || 'the crew'}
+        {dropped && (
+          <span className="text-[11.5px] font-normal text-fg-3" title={undelivered ?? 'The run ended before the agent read this report'}>
+            Not delivered
+          </span>
+        )}
         <span className="flex-1" />
         {taskId && <span className="font-mono text-[11.5px] font-normal text-fg-3">{taskId}</span>}
       </div>
@@ -763,8 +768,12 @@ export function ThreadScreen() {
                       <Fragment key={k}>
                         <MoBubble
                           caption={
-                            p.source === 'pr-watch'
-                              ? 'PR watch'
+                            p.dropped
+                              ? p.undelivered
+                                ? `Not delivered · ${p.undelivered}`
+                                : 'Not sent'
+                              : p.source === 'pr-watch'
+                                ? 'PR watch'
                               : i === 0 && k === 0 && thread.parent_id && atStart(history.history)
                                 ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`
                                 : k > 0
@@ -785,7 +794,7 @@ export function ThreadScreen() {
                       </Fragment>
                     ))}
                     {t.reports.map((r, k) => (
-                      <Report key={k} role={r.role} taskId={r.task_id} text={r.text} />
+                      <Report key={k} role={r.role} taskId={r.task_id} text={r.text} dropped={r.dropped} undelivered={r.undelivered} />
                     ))}
                     {t.questions.map((q) => (
                       <QuestionCard key={q.id} threadId={thread.id} q={q} touch />

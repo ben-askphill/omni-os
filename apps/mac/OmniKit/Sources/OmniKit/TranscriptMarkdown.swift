@@ -37,8 +37,9 @@ public enum TranscriptMarkdown {
     switch item {
     case .user(_, _, let m):
       var head = "**\(m.author)**"
-      if m.dropped == true {
-        head += " · Not sent"
+      if let label = m.droppedLabel {
+        head += " · " + label
+        if let why = m.undelivered { head += ": " + why }
       } else if let send = m.sendLabel {
         head += " · " + send
       }

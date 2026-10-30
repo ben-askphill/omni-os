@@ -108,6 +108,21 @@ private func pending(_ state: String, mode: String = "steer", kind: String = "us
   }
 
   @Test(arguments: [
+    (#"{"text":"x","dropped":true}"#, "Not sent"),
+    (#"{"text":"x","dropped":true,"undelivered":"Box B did not take it within 24 hours."}"#, "Not delivered"),
+    (#"{"text":"x","mode":"steer"}"#, nil),
+  ] as [(String, String?)])
+  func labelsAMessageTheAgentNeverRead(_ json: String, _ want: String?) throws {
+    #expect(try message(json).droppedLabel == want)
+  }
+
+  @Test func saysWhyTheOtherMachineDidNotTakeIt() throws {
+    let m = try message(#"{"text":"x","dropped":true,"undelivered":"Box B did not take it within 24 hours."}"#)
+    #expect(m.droppedHelp == "Box B did not take it within 24 hours.")
+    #expect(try message(#"{"text":"x","dropped":true}"#).droppedHelp == "The run ended before the agent read this message")
+  }
+
+  @Test(arguments: [
     ("project", "project"), ("personal", "personal"), ("plugin", "plugin"), ("mcp", "mcp"), ("builtin", "built-in"),
     ("omni", "omni"), ("other", "other"),
   ])

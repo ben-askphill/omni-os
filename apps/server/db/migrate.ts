@@ -459,4 +459,31 @@ export function migrate() {
   CREATE INDEX IF NOT EXISTS trigger_deliveries_thread ON trigger_deliveries(thread_id) WHERE thread_id IS NOT NULL;`);
   // #228 A retry is the next attempt of the same delivery row: 1 for the first go. Each attempt has its own thread id.
   ensureColumn('trigger_deliveries', 'attempt', 'INTEGER NOT NULL DEFAULT 1');
+  // #398 Commands for a thread that runs on another machine (db/repos/remote-commands.ts): one row per forwarded
+  // message, crew report, limit action and Stop, with the outcome the holder gave it. Synced (sync/handlers/remote-command.ts);
+  // a row's state only moves forward, so the sender's "sent" never undoes the holder's answer.
+  db.exec(`CREATE TABLE IF NOT EXISTS remote_commands (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    sender TEXT NOT NULL,
+    target TEXT NOT NULL,
+    target_name TEXT NOT NULL,
+    prompt TEXT NOT NULL DEFAULT '',
+    mode TEXT,
+    source TEXT,
+    context TEXT,
+    files TEXT,
+    report_key TEXT,
+    report TEXT,
+    limit_action TEXT,
+    state TEXT NOT NULL,
+    reason TEXT,
+    acked_by TEXT,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS remote_commands_thread ON remote_commands(thread_id, created_at);
+  CREATE INDEX IF NOT EXISTS remote_commands_open ON remote_commands(expires_at) WHERE state = 'sent';`);
 }

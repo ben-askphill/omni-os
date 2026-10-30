@@ -62,6 +62,13 @@ extension UserMessage {
     }
   }
 
+  /// The header's word for a message the agent never read: "Not delivered" when the machine running the thread did
+  /// not take it, else "Not sent".
+  public var droppedLabel: String? { dropped == true ? (undelivered == nil ? "Not sent" : "Not delivered") : nil }
+
+  /// What that label's help says: why the other machine did not take it, or that the run ended first.
+  public var droppedHelp: String { undelivered ?? "The run ended before the agent read this message" }
+
   /// How it reached a busy thread. Nothing for a message the agent never read.
   public var sendLabel: String? {
     guard dropped != true else { return nil }

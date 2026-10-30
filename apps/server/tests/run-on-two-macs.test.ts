@@ -10,7 +10,7 @@ import { FAKE_CODEX, tailscaleStatus, waitFor } from './support.ts';
 import { bootMac, type Mac } from './two-macs.ts';
 
 // Run on: Mac A is the hub Ben talks to and Box B the machine with the CPU. A new thread for B is made on A, goes out
-// as a fresh handoff offer, and runs on B; Ben's next message and Stop on A reach B through synced kv records. Two
+// as a fresh handoff offer, and runs on B; Ben's next message and Stop on A reach B as synced remote commands. Two
 // real servers in one process with fake claude and one in-memory relay; a machine hears of the other only on sync.
 
 const relay = new MemoryTransport();
@@ -102,9 +102,14 @@ describe('a thread run on another machine', () => {
 
   it('forwards Stop', async () => {
     expect((await a.json(`/threads/${id}/stop`, { body: {} })).status).toBe(200);
-    expect(a.db.kv.get(`runon.stop.${id}.mac-a`)).toBeTruthy();
+    const stop = a.db.remoteCommands.forThread(id).find((c) => c.kind === 'stop')!;
+    expect(stop).toMatchObject({ state: 'sent', target: 'box-b' });
     await both();
     await waitFor(() => !['running', 'queued'].includes(b.thread(id).status), 'B to stop the turn');
+    // The holder answers it, and the hub hears: Stop has a receipt like any command.
+    expect(b.db.remoteCommands.get(stop.id)).toMatchObject({ state: 'accepted', acked_by: 'box-b' });
+    await both();
+    expect(a.db.remoteCommands.get(stop.id)?.state).toBe('accepted');
   }, T.timeout);
 });
 

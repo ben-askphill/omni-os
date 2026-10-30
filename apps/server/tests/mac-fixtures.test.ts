@@ -34,7 +34,8 @@ const HINT = `The server JSON the Mac app reads changed shape. If that is on pur
 /**
  * Every fixture this test owns. The Swift tests decode each one. A few come from elsewhere: sync-status.json is checked
  * by sync-setup.test.ts, and those that take two Macs by their own tests: devices.json and thread-handoff.json by
- * handoff-two-macs.test.ts, thread-takeover.json and thread-takeover-requested.json by takeover-two-macs.test.ts.
+ * handoff-two-macs.test.ts, thread-takeover.json and thread-takeover-requested.json by takeover-two-macs.test.ts, and
+ * thread-undelivered.json by delivery-gap-run-on.test.ts.
  */
 const NAMES = [
   'harnesses.json',

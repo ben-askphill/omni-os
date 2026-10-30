@@ -34,5 +34,7 @@ export { actionRuns, channelActions, threadSetupRuns } from './db/repos/channel-
 export type { SkippedFile, TurnSnapshot, TurnSnapshotState } from './db/repos/turn-snapshots.ts';
 export { turnSnapshots } from './db/repos/turn-snapshots.ts';
 export { continuations, type Continuation } from './db/repos/continuations.ts';
+export type { RemoteCommand, RemoteCommandKind, RemoteCommandState } from './db/repos/remote-commands.ts';
+export { isCommandAhead, remoteCommands } from './db/repos/remote-commands.ts';
 export type { SyncEntity, SyncOp, OutboxRow } from './db/sync.ts';
 export { SEED_TS, outbox, syncMeta } from './db/sync.ts';
