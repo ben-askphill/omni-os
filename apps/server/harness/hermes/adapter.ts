@@ -12,7 +12,8 @@ import type { Record as StreamRecord } from '../../stream.ts';
 import { HERMES_FIX } from '../catalog.ts';
 import { harnessEnv } from '../env-guard.ts';
 import { spawnHolder } from '../holder.ts';
-import { CAPABILITIES } from '../types.ts';
+import { CAPABILITIES, remoteWhere } from '../types.ts';
+import { remoteDelegateOnlyRefusal } from '../../crew.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession } from '../adapter.ts';
 import { HermesClient, HermesHttpError, sleep } from './client.ts';
 import { userName } from '../../profile.ts';
@@ -262,7 +263,10 @@ export const hermesAdapter: HarnessAdapter = {
       stopActive();
     });
 
-    if (!apiKey) {
+    // Hermes gets no omni tools and takes no per-run tool limits, so a delegate-only role (the Conductor) could only
+    // do the work itself. Thread creation refuses it; this covers a thread that was already on Hermes.
+    const refused = !apiKey ? HERMES_FIX : ctx.role?.delegateOnly ? remoteDelegateOnlyRefusal(ctx.role.name, remoteWhere('hermes')) : null;
+    if (refused) {
       return {
         child: holder,
         write(obj: unknown) {
@@ -270,7 +274,7 @@ export const hermesAdapter: HarnessAdapter = {
           if (o?.type === 'user') {
             const m = omniOf(obj);
             cb.record({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
-            cb.record({ kind: 'error', payload: { text: HERMES_FIX } });
+            cb.record({ kind: 'error', payload: { text: refused } });
             cb.record({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } });
             holder.kill('SIGTERM');
           }

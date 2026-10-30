@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { channels, folders, messageRequests, outbox, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
-import { getCrew } from '../crew.ts';
+import { getCrew, remoteDelegateOnlyRefusal } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
 import { checkBase } from '../worktree-base.ts';
 import type { BasePick } from '@omni/shared/worktree-base.ts';
@@ -11,7 +11,7 @@ import { parseSlash, resolveSlash, slashRecord, type SlashCommand, type SlashRec
 import { listCommands, peekCommands } from '../commands.ts';
 import { withMentions } from '../mentions.ts';
 import { fileKind, safeName, saveUploads, type Attachment } from '../uploads.ts';
-import { isRemoteHarness, type HarnessId } from '../harness/types.ts';
+import { isRemoteHarness, remoteWhere, type HarnessId } from '../harness/types.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
 import { usageByHarness } from '../usage.ts';
@@ -136,6 +136,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const images = (input.files ?? []).some((f) => f.type.startsWith('image/'));
   const auto = 'auto' in run ? routeTask(profileTask(input.prompt), { catalog: getCatalog(), usage: usageByHarness(), images }) : null;
   const { harness, model, effort } = auto ?? (run as Resolved);
+  if (role?.delegateOnly && isRemoteHarness(harness)) throw new Error(remoteDelegateOnlyRefusal(role.name, remoteWhere(harness)));
 
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
 

@@ -118,6 +118,17 @@ describe('Hermes through the runner', () => {
     }
   });
 
+  it('refuses the delegate-only conductor on Hermes before it makes a thread, and still runs a crew role there', async () => {
+    const before = H.db.threads.list({}).length;
+    await expect(H.runner.createThread({ channel: 'scratch', prompt: 'fix the cart', role: 'conductor', harness: 'hermes', model: 'hermes' })).rejects.toThrow(
+      /Conductor only routes work, with Omni's delegate tools, and a thread that runs on the Hermes server does not get them/,
+    );
+    expect(H.db.threads.list({}).length).toBe(before);
+    const t = await H.runner.createThread({ channel: 'repo', prompt: 'look into it', role: 'researcher', harness: 'hermes', model: 'hermes' });
+    await H.untilResults(t.id, 1);
+    expect(H.thread(t.id).status).toBe('done');
+  });
+
   it('rejects an effort Hermes does not have', async () => {
     await expect(H.runner.createThread({ channel: 'scratch', prompt: 'x', harness: 'hermes', model: 'hermes', effort: 'high' })).rejects.toThrow(/effort/);
   });

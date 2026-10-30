@@ -55,6 +55,14 @@ describe('codex tracer', () => {
     expect(String(start.params.developerInstructions)).toContain('Omni OS');
   });
 
+  it('runs a delegate-only role (the Conductor) in a read-only sandbox', async () => {
+    const t = await H.start('hello', { ...codex, role: 'conductor' });
+    await H.untilResults(t.id, 1);
+    const start = H.codexRequests().filter((r) => r.method === 'thread/start').at(-1);
+    expect(start.params.sandbox).toBe('read-only');
+    expect(String(start.params.developerInstructions)).toContain('You route work; you never do it.');
+  });
+
   it("keeps the usage card on the plan's rate limits, not a reserve model's", async () => {
     const t = await H.start('hello', codex);
     await H.untilResults(t.id, 1);
