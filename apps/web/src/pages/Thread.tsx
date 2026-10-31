@@ -10,7 +10,6 @@ import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { LimitCard } from '../components/thread/LimitCard.tsx';
 import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
-import { TakeoverNote } from '../components/thread/Takeover.tsx';
 import { ThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
@@ -234,7 +233,6 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             {/* The setup card above says why while the worktree is not ready. */}
             {note && !thread.setup && <ErrorNote className="mb-2">{note}</ErrorNote>}
-            <TakeoverNote threadId={id} takeover={takeover} handoff={handoff} onChanged={handedOff} />
             <ReplyComposer
               thread={thread}
               canSteer={canSteer(thread.harness, harnesses)}
@@ -249,6 +247,7 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
               extra={
                 thread.branch ? <ThreadPR thread={thread} slotBusy={slotBusy} busy={prBusy} onOpen={openPR} /> : undefined
               }
+              machine={{ blocked, handoff, takeover, onChanged: handedOff }}
             />
           </div>
         </div>

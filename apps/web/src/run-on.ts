@@ -1,8 +1,9 @@
-import type { Device } from '@omni/shared/handoff.ts';
-import { deviceRow } from './handoff.ts';
+import type { Device, HandoffView, Takeover } from '@omni/shared/handoff.ts';
+import { deviceRow, mayTakeOver, takeoverShown, type HandoffTargets } from './handoff.ts';
 
-// Where a new thread runs: this machine, or another synced one (apps/server/run-on.ts). The desktop composer's Run on
-// pill, the phone's new-thread chip and both Settings pages read these. A pick is a device id, or HERE.
+// Where a thread runs: this machine, or another synced one (apps/server/run-on.ts). The Machine chip on both composers
+// (a new thread's Run on, an open thread's Hand off and Take over), the phone's sheet and both Settings pages read
+// these. A pick is a device id, or HERE.
 
 /** This machine, as POST /api/threads takes it. */
 export const HERE = 'here';
@@ -55,3 +56,35 @@ export const runOnSetting = (pick: string) => (pick === HERE ? '' : pick);
 
 /** Settings' saved default as a pick: a machine that is no longer synced shows as this one, where the server runs it. */
 export const settingPick = (setting: string | null | undefined, devices: Device[]) => (setting && devices.some((d) => d.id === setting) ? setting : HERE);
+
+/**
+ * The Machine chip on an existing thread, in the same rows as a new thread's. `holds`: this machine has the thread,
+ * and picking another hands it off. `held`: another machine has it (`takeover`), listed first and selected, and picking
+ * This Mac takes it over, or is disabled with why. Null when there is nothing to pick: one machine, the targets still
+ * loading, or a handoff under way (the handoff card says so).
+ */
+export type ThreadMachine = { kind: 'holds'; rows: RunOnRow[]; value: string } | { kind: 'held'; rows: RunOnRow[]; value: string; takeover: Takeover };
+
+export function threadMachine(
+  v: { targets: HandoffTargets; takeover: Takeover | null | undefined; handoff: HandoffView | null | undefined; running: boolean },
+  now = Date.now(),
+): ThreadMachine | null {
+  const t = takeoverShown(v.takeover, v.handoff);
+  if (t) {
+    const can = mayTakeOver(t, v.handoff);
+    return {
+      kind: 'held',
+      value: t.from.id,
+      takeover: t,
+      rows: [
+        { value: t.from.id, label: t.from.name, sub: t.running ? 'Running there now' : 'Last ran there', disabled: false },
+        { value: HERE, label: HERE_LABEL, sub: t.refused ?? (t.running ? 'Take over: stops there, continues here' : 'Take over: next message runs here'), disabled: !can },
+      ],
+    };
+  }
+  if (v.targets.state !== 'ready') return null;
+  const rows = runOnRows(v.targets.devices, { now });
+  rows[0] = { ...rows[0]!, sub: v.running ? 'Running here now' : 'Runs here' };
+  for (const r of rows.slice(1)) if (!r.disabled) r.sub = `Hand off: ${r.sub}`;
+  return { kind: 'holds', value: HERE, rows };
+}

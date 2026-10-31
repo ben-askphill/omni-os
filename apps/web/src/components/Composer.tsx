@@ -23,6 +23,7 @@ import { DropHint, enterKey, SendButton, shell, StopButton, useAutosize, useFocu
 import { joinMenus, useNewThreadMenus, useSlashMenu } from './composer/menus.tsx';
 import { pickerOptions } from './composer/pickerOptions.tsx';
 import { finePointer, SteerButton, ThreadRunPills } from './composer/ReplyControls.tsx';
+import { ThreadMachineChip, type MachineHeld } from './composer/MachineChip.tsx';
 
 export { AttachmentStrip, useAttachments };
 
@@ -242,10 +243,13 @@ export function ReplyComposer({
   onChanged,
   extra,
   stop,
+  machine,
 }: {
   thread: Thread;
   /** When false (e.g. Cursor), a busy thread offers only Queue and Interrupt; Cmd+Enter queues. */
   canSteer?: boolean;
+  /** The thread's handoff state, for the Machine chip next to the model pill. Without it the chip is left out. */
+  machine?: MachineHeld;
   /** Set while a turn runs that can be stopped: an empty box shows Stop where Send sits. */
   stop?: { busy: boolean; run: () => void } | null;
   onSent?: (t: Thread, mode?: SendMode) => void;
@@ -401,6 +405,7 @@ export function ReplyComposer({
         <AttachButton onPick={att.add} disabled={busy} />
         <ForkThreadButton thread={thread} disabled={busy} />
         <ThreadRunPills thread={thread} openRequest={pillRequest} onSwitched={(t) => onChanged?.(t)} onError={setError} />
+        {machine && <ThreadMachineChip thread={thread} held={machine} disabled={busy} onError={setError} />}
         <div className="ml-auto flex items-center gap-2.5">
           {omni ? (
             <SendButton armed={slash.armed} busy={busy} onClick={() => void runOmni()}>

@@ -226,8 +226,8 @@ private struct ThreadOverflowMenu: View {
     .help("Thread actions")
     .accessibilityLabel("Thread actions")
     .threadActionPrompts(prompts, model: model, threadID: thread.id, arrowEdge: .bottom)
-    // Tailscale's view of the other Mac changes as it sleeps and wakes, so ask again while the thread could go: Hand off
-    // to… shows in the menu only while one can take it.
+    // Tailscale's view of the other Mac changes as it sleeps and wakes, so ask again while the thread could go: the
+    // Machine chip lists a Mac only while one can take it.
     .task(id: store.canHandOff) {
       guard store.canHandOff else { return }
       while !Task.isCancelled {

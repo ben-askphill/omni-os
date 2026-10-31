@@ -1,20 +1,14 @@
 import { useEffect, useLayoutEffect, useState, type RefObject } from 'react';
-import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import { api, type Thread, type ThreadDetail } from '../api.ts';
 import { draftKey, type useFolders } from '../folders.tsx';
-import { deviceRows } from '../handoff.ts';
 import { navigate, href, openNewThread } from '../router.ts';
-import { type useHandoffTargets } from './thread/Handoff.tsx';
-import { Icon, Loader, StatusDot, type IconName } from './ui.tsx';
+import { Icon, type IconName } from './ui.tsx';
 
 /** A thread's row and the state that decides its menu, asked for once the menu opens so "Unarchive" reads right. */
 export function useThreadRow(kind: string, id: string) {
   const [archived, setArchived] = useState<boolean | null>(null);
   const [current, setCurrent] = useState<string | null>(null);
   const [row, setRow] = useState<Thread | null>(null);
-  const [blocked, setBlocked] = useState<string | null>(null);
-  const [handoff, setHandoff] = useState<HandoffView | null>(null);
-  const [takeover, setTakeover] = useState<Takeover | null>(null);
   useEffect(() => {
     if (kind !== 'thread') return;
     let live = true;
@@ -24,9 +18,6 @@ export function useThreadRow(kind: string, id: string) {
         if (!live) return;
         setArchived(!!d.thread.archived);
         setCurrent(d.thread.title);
-        setBlocked(d.blocked ?? null);
-        setHandoff(d.handoff ?? null);
-        setTakeover(d.takeover ?? null);
         setRow(d.thread);
       })
       .catch(() => {});
@@ -34,7 +25,7 @@ export function useThreadRow(kind: string, id: string) {
       live = false;
     };
   }, [kind, id]);
-  return { archived, current, row, blocked, handoff, takeover };
+  return { archived, current, row };
 }
 
 /** Keep the menu inside the window, also as the reference picker's list comes in and grows it. */
@@ -95,40 +86,6 @@ const CAPTION = 'caption truncate px-2.5 pt-1 pb-1.5 text-fg-4';
 
 export function MenuCaption({ children }: { children: string }) {
   return <div className={CAPTION}>{children}</div>;
-}
-
-/** The Macs a running thread can be handed to. */
-export function HandoffList({ targets, loaded, sending, onPick }: { targets: ReturnType<typeof useHandoffTargets>; loaded: boolean; sending: string | null; onPick: (id: string) => void }) {
-  return (
-    <>
-      <MenuCaption>Hand off to</MenuCaption>
-      {!loaded || targets.state === 'loading' ? (
-        <div className="flex h-8 items-center gap-2 px-2.5 text-[12px] text-fg-4">
-          <Loader size={12} /> Looking for your other Macs
-        </div>
-      ) : targets.state === 'none' ? (
-        <div className="px-2.5 py-1.5 text-[12px] text-fg-4">{targets.reason}</div>
-      ) : (
-        deviceRows(targets.devices).map((d) => (
-          <button
-            key={d.id}
-            role="menuitem"
-            disabled={!d.pickable || !!sending}
-            aria-disabled={!d.pickable || undefined}
-            onClick={() => onPick(d.id)}
-            title={d.pickable ? `Continue this thread on ${d.name}` : `${d.name} is asleep or offline`}
-            className="hov flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-left text-fg-2 hover:text-fg disabled:pointer-events-none disabled:opacity-45"
-          >
-            {sending === d.id ? <Loader size={12} /> : <StatusDot status={d.dot} size={8} className="mx-[3px]" />}
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[13px] leading-snug">{d.name}</span>
-              <span className="truncate text-[11.5px] leading-snug text-fg-4">{d.label}</span>
-            </span>
-          </button>
-        ))
-      )}
-    </>
-  );
 }
 
 /** The folders a thread can move to, its own marked. */

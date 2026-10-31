@@ -1,16 +1,12 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import type { Takeover } from '@omni/shared/handoff.ts';
 import { threadMenu, type ThreadActionId } from '@omni/shared/thread-actions.ts';
 import { useFolders } from '../folders.tsx';
-import { mayTakeOver } from '../handoff.ts';
 import { canMarkDone } from '../needs-you.ts';
 import { useApp } from '../store.tsx';
 import { openContinue } from './ContinueSheet.tsx';
 import { useThreadMenuActions } from './useThreadMenuActions.ts';
 import { ThreadReferencePanel } from './ThreadReference.tsx';
-import { useHandoffTargets } from './thread/Handoff.tsx';
-import { TakeoverConfirm } from './thread/Takeover.tsx';
-import { FolderChoices, HandoffList, MenuGroups, containerItems, focusFirstItem, moveFocus, useMenuDismiss, useMenuPlacement, useThreadRow, type MenuItem } from './ContextMenuParts.tsx';
+import { FolderChoices, MenuGroups, containerItems, focusFirstItem, moveFocus, useMenuDismiss, useMenuPlacement, useThreadRow, type MenuItem } from './ContextMenuParts.tsx';
 
 type Target = { kind: 'thread'; id: string } | { kind: 'channel'; id: string } | { kind: 'folder'; id: string };
 type Open = { target: Target; x: number; y: number };
@@ -46,8 +42,6 @@ function targetOf(el: EventTarget | null): Target | null {
  */
 export function ContextMenuHost() {
   const [open, setOpen] = useState<Open | null>(null);
-  // Take over's confirm outlives the menu, which closes on the first click outside it.
-  const [taking, setTaking] = useState<{ threadId: string; takeover: Takeover } | null>(null);
   useEffect(() => {
     const onMenu = (e: MouseEvent) => {
       if (e.defaultPrevented) return;
@@ -64,27 +58,11 @@ export function ContextMenuHost() {
       window.removeEventListener(OPEN_EVENT, onOpen);
     };
   }, []);
-  return (
-    <>
-      {/* A new open starts fresh, even over one already showing. */}
-      {open && (
-        <Menu
-          key={`${open.target.kind}:${open.target.id}:${open.x}:${open.y}`}
-          open={open}
-          onClose={() => setOpen(null)}
-          onTakeOver={(threadId, takeover) => {
-            setOpen(null);
-            setTaking({ threadId, takeover });
-          }}
-        />
-      )}
-      {/* The thread's stream brings the request to an open thread page. */}
-      {taking && <TakeoverConfirm threadId={taking.threadId} takeover={taking.takeover} onClose={() => setTaking(null)} onChanged={() => {}} />}
-    </>
-  );
+  // A new open starts fresh, even over one already showing.
+  return open ? <Menu key={`${open.target.kind}:${open.target.id}:${open.x}:${open.y}`} open={open} onClose={() => setOpen(null)} /> : null;
 }
 
-function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; onTakeOver: (threadId: string, takeover: Takeover) => void }) {
+function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
   const { target } = open;
   const { channel, status } = useApp();
   const ref = useRef<HTMLDivElement>(null);
@@ -92,13 +70,10 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
   const [draft, setDraft] = useState<string | null>(null);
   // Set while the menu lists the folders a thread can move to.
   const [moving, setMoving] = useState(false);
-  // Set while the menu lists the Macs a running thread can be handed to.
-  const [handingOff, setHandingOff] = useState(false);
   // Set while the menu shows the thread reference picker.
   const [referencing, setReferencing] = useState(false);
-  const { archived, current, row, blocked, handoff, takeover } = useThreadRow(target.kind, target.id);
-  const { error, sending, toggleArchive, rename: renameTo, togglePin, toggleDone, sendGrok, sendTo } = useThreadMenuActions({ id: target.id, row, archived, current, onClose });
-  const targets = useHandoffTargets(row, { blocked, handoff, takeover });
+  const { archived, current, row } = useThreadRow(target.kind, target.id);
+  const { error, toggleArchive, rename: renameTo, togglePin, toggleDone, sendGrok } = useThreadMenuActions({ id: target.id, row, archived, current, onClose });
   const folders = useFolders();
 
   const pos = useMenuPlacement(ref, open.x, open.y);
@@ -106,7 +81,7 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
   // Keyboard: the first item takes the focus, arrows move it.
   useEffect(() => {
     focusFirstItem(ref);
-  }, [moving, row, handingOff, targets.state]);
+  }, [moving, row]);
   const onKey = (e: ReactKeyboardEvent) => {
     // The reference picker's search and list keep their own keys.
     if (referencing || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
@@ -125,7 +100,6 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
   };
 
   // The thread's actions, from the list the phone and the Mac app render too. `off`: why one cannot run here, shown under it.
-  const takeOverNow = takeover && mayTakeOver(takeover, handoff) ? takeover : null;
   const runs: Record<ThreadActionId, () => void> = {
     pin: () => void togglePin(),
     done: () => void toggleDone(),
@@ -134,8 +108,6 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
     archive: () => void toggleArchive(),
     fork: () => (row && openContinue(row), onClose()),
     reference: () => setReferencing(true),
-    handoff: () => setHandingOff(true),
-    takeover: () => takeOverNow && onTakeOver(target.id, takeOverNow),
     grok: () => void sendGrok(),
   };
   const groups: { title?: string; items: MenuItem[] }[] =
@@ -148,8 +120,6 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
           settled: !!row && canMarkDone(row.status),
           child: !!row?.parent_id,
           harness: row?.harness ?? null,
-          handOff: targets.state === 'ready',
-          takeOverFrom: takeOverNow?.from.name ?? null,
           grokBot: !!status?.grokBot,
         }).map((g) => ({ title: g.title, items: g.items.map((it) => ({ ...it, run: runs[it.id] })) }))
       : [{ items: containerItems(target, folders, onClose) }];
@@ -159,7 +129,7 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
     <div
       ref={ref}
       role="menu"
-      aria-label={target.kind === 'thread' ? (moving ? 'Move to folder' : handingOff ? 'Hand off to' : referencing ? 'Reference a thread' : 'Thread actions') : target.kind === 'folder' ? 'Folder actions' : 'Channel actions'}
+      aria-label={target.kind === 'thread' ? (moving ? 'Move to folder' : referencing ? 'Reference a thread' : 'Thread actions') : target.kind === 'folder' ? 'Folder actions' : 'Channel actions'}
       style={{ left: pos.x, top: pos.y }}
       onKeyDown={onKey}
       className={`pop-in fixed z-[60] ${referencing ? 'max-h-[calc(100vh-1rem)] w-[min(23rem,calc(100vw-1rem))] overflow-y-auto rounded-[22px]' : 'min-w-[190px] max-w-[280px] rounded-[16px] p-1.5'} bg-elev shadow-[var(--shadow-menu)]`}
@@ -167,8 +137,6 @@ function Menu({ open, onClose, onTakeOver }: { open: Open; onClose: () => void; 
       {title && <div className="caption truncate px-2.5 pt-1 pb-1.5 text-fg-4">{title}</div>}
       {referencing && row ? (
         <ThreadReferencePanel thread={row} onPicked={onClose} />
-      ) : handingOff ? (
-        <HandoffList targets={targets} loaded={!!row} sending={sending} onPick={(id) => void sendTo(id)} />
       ) : moving && row ? (
         <FolderChoices current={row.folder_id ?? null} choices={choices} onPick={moveTo} />
       ) : draft !== null ? (
