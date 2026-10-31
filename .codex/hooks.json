@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node '/home/brosenb/.t3/worktrees/omni-os/t3-0f53d37d/.codex/hooks/verify-on-stop.mjs'",
+            "command": "node '/home/brosenb/omni-os/.codex/hooks/verify-on-stop.mjs'",
             "timeout": 15
           }
         ]
