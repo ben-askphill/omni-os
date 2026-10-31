@@ -27,6 +27,16 @@ import { resolveRun } from '../harness/resolve.ts';
 import { startFakeCursorApi } from '@omni/test-fixtures/fake-cursor-api.mjs';
 import { waitFor } from './support.ts';
 
+// The imports above reach db.ts (message-context -> thread-history). Without a data dir of its own that opens, and
+// migrates, the shared data/omni.db, and two test workers migrating it at once fail ("trigger ... already exists").
+// Hoisted so it is set before the static imports load.
+const DATA_DIR = vi.hoisted(() => {
+  const { mkdtempSync } = require('node:fs') as typeof import('node:fs');
+  const dir = mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'omni-cloud-data-'));
+  process.env.OMNI_DATA_DIR = dir;
+  return dir;
+});
+
 // The Cursor Cloud harness against a fake Cloud Agents API on 127.0.0.1. Nothing here calls Cursor.
 
 type Fake = Awaited<ReturnType<typeof startFakeCursorApi>>;
@@ -54,6 +64,7 @@ afterAll(async () => {
   delete process.env.OMNI_CURSOR_API_URL;
   delete process.env.OMNI_CURSOR_CLOUD_POLL_MS;
   await fake.close();
+  rmSync(DATA_DIR, { recursive: true, force: true });
 });
 
 const THREAD_ID = '6f1c2d3e-4a5b-4c6d-8e7f-901234567890';
