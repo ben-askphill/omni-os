@@ -395,6 +395,15 @@ async function deviceId(device: string | undefined): Promise<string | undefined>
 }
 
 server.registerTool(
+  'set_automations_machine',
+  {
+    description: 'Choose the synced machine for all scheduled and event-triggered automations. The choice syncs to other machines. Run now still uses the connected machine.',
+    inputSchema: { device: z.string().trim().min(1).describe('Machine id or name from list_devices, or here.') },
+  },
+  async ({ device }) => text(await call('/sync/automations-owner', { method: 'POST', body: JSON.stringify({ device: await deviceId(device) }) })),
+);
+
+server.registerTool(
   'list_devices',
   {
     description:

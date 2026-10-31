@@ -3,6 +3,10 @@ import Foundation
 /// `{}`, what the Web UI's api.post sends when there is nothing to say.
 private struct EmptyBody: Encodable, Sendable {}
 
+private struct AutomationMachineBody: Encodable, Sendable {
+  let device: String
+}
+
 private struct ForgetBody: Encodable, Sendable {
   let forget: Bool
 }
@@ -42,6 +46,11 @@ extension OmniClient {
 
   public func enableSync() async throws(OmniAPIError) -> SyncStatus {
     let reply: StatusReply = try await send("POST", "/api/sync/enable", body: EmptyBody())
+    return reply.status
+  }
+
+  public func setAutomationsMachine(_ device: String) async throws(OmniAPIError) -> SyncStatus {
+    let reply: StatusReply = try await send("POST", "/api/sync/automations-owner", body: AutomationMachineBody(device: device.isEmpty ? "here" : device))
     return reply.status
   }
 

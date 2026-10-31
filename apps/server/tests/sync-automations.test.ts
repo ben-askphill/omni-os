@@ -77,6 +77,30 @@ describe('with sync on', () => {
     expect(await automations.fireScheduled(nightly())).not.toBeNull();
   });
 
+  it('can select a known remote machine, including one without an online connection', async () => {
+    r.db.kv.set('devices.mac-b', { name: 'Other machine', tailscale: null, at: new Date().toISOString() });
+    const res = await app.request('/api/sync/automations-owner', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ device: 'mac-b' }),
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as any).status.automations).toEqual({ owner: 'mac-b', isThisMac: false });
+    expect(await automations.fireScheduled(nightly())).toBeNull();
+    await worker.syncNow();
+    expect(relay.changes.filter((c) => c.entity_id === 'automations.owner').at(-1)?.data).toEqual({ value: 'mac-b' });
+    await takeOver();
+  });
+
+  it('rejects invalid and unknown targets without changing the owner', async () => {
+    const before = r.db.kv.get('automations.owner');
+    for (const body of [null, [], { device: 4 }, { device: '' }, { device: 'missing' }]) {
+      const res = await app.request('/api/sync/automations-owner', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+      });
+      expect(res.status).toBe(400);
+      expect(r.db.kv.get('automations.owner')).toBe(before);
+    }
+  });
+
   it('two claims at once settle on the later one on both Macs', async () => {
     // mac-b claimed a moment after mac-a's claim above: later wins, so mac-b owns them.
     await fromB('mac-b', new Date(Date.now() + 5_000).toISOString());

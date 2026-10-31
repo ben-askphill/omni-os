@@ -73,6 +73,7 @@ struct AutomationsList: View {
         }
         .padding(.top, z(40))
         .padding(.bottom, z(24))
+        AutomationMachinePanel(model: model, refreshing: automations.isRefreshing).padding(.bottom, z(12))
         content
       }
     }
@@ -131,6 +132,50 @@ struct AutomationsList: View {
         .onDisappear { QAProbe.showDeliveries = nil }
         #endif
       }
+    }
+  }
+}
+
+private struct AutomationMachinePanel: View {
+  let model: AppModel
+  let refreshing: Bool
+  @State private var status: SyncStatus?
+  @State private var saving = false
+  @State private var error: String?
+
+  private var pick: String {
+    guard let owner = status?.automations, !owner.isThisMac else { return "" }
+    return owner.owner ?? ""
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: z(10)) {
+      Text("Run automations on").font(.omni(size: 13, weight: .medium))
+      RunOnMenu(devices: model.devices.devices, pick: pick, select: { device in
+        saving = true
+        error = nil
+        Task {
+          do { status = try await model.client.setAutomationsMachine(device) }
+          catch { self.error = error.localizedDescription }
+          saving = false
+        }
+      }, allowOffline: true)
+      .disabled(saving || status?.machineId == nil)
+      .help("The machine that runs scheduled and event-triggered automations.")
+      Text("Scheduled and event-triggered runs use this machine after sync. It must be awake with Omni running. Run now uses the connected machine.")
+        .font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
+      if let status, status.machineId == nil {
+        Text("Sync another machine to choose where automations run.").font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
+      }
+      if let error { ErrorNote(text: error) }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(z(20))
+    .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(24), style: .continuous))
+    .task(id: refreshing) {
+      do { status = try await model.client.syncStatus() }
+      catch { self.error = error.localizedDescription }
+      await model.devices.refresh()
     }
   }
 }

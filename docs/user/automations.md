@@ -17,6 +17,12 @@ prompt: |
 
 `timezone` defaults to your timezone from the config (`OMNI_TZ` wins, else the system's). Both folders are watched; edits apply without a restart. The Mac has to be awake at the scheduled time, unless the automation sets `catchup: true`: then a missed slot runs once Omni is back.
 
+## Choose a machine
+
+In Automations, use "Run automations on" to choose this machine or another synced machine. The choice applies to all scheduled and event-triggered automations and reaches the other machines through sync. The selected machine needs the automation definitions, channel folders and credentials it uses, and must be awake with Omni running. Offline machines can be selected for future runs. This does not move a running thread. "Run now" runs on the connected machine.
+
+The Conductor can make the same choice with `set_automations_machine`, using an id or name from `list_devices`, or `here`.
+
 ## Tool-failure triage
 
 `tool-failure-triage` reviews the tool-failure log (`GET /api/tool-failures`) at 08:30 on weekdays in the `omni-os` channel as a builder:

@@ -1,7 +1,10 @@
+import type { Device } from '@omni/shared/handoff.ts';
+import { runOnOptions } from '../components/RunOnPicker.tsx';
+import { runOnRows } from '../run-on.ts';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
-import { api, errorText, useApi, type Automation, type Thread } from '../api.ts';
+import { api, errorText, useApi, type Automation, type Thread, type SyncStatus } from '../api.ts';
 import { DeliveryHistory } from '../components/DeliveryHistory.tsx';
-import { Button, Chip, CopyButton, Empty, ErrorNote, Icon, InlineConfirm, Loading, PageHeader, StatusDot, Toggle } from '../components/ui.tsx';
+import { Button, Chip, CopyButton, Empty, ErrorNote, Icon, InlineConfirm, Loading, PageHeader, Picker, StatusDot, Toggle } from '../components/ui.tsx';
 import { artifactChannels, describeArtifactSource, describeCron, describeEvent, describeWebhookSource, nextRunLabel, relTime, shortPath } from '../format.ts';
 import { href, navigate } from '../router.ts';
 import { useApp, useFeed } from '../store.tsx';
@@ -355,6 +358,45 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
   );
 }
 
+function AutomationMachine({ refreshing }: { refreshing: boolean }) {
+  const status = useApi<SyncStatus>('/sync/status');
+  const devices = useApi<Device[]>('/devices');
+  const reloadStatus = status.reload;
+  const reloadDevices = devices.reload;
+  useEffect(() => {
+    if (refreshing) { reloadStatus(); reloadDevices(); }
+  }, [refreshing, reloadStatus, reloadDevices]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const owner = status.data?.automations;
+  const pick = owner?.isThisMac ? 'here' : owner?.owner ?? 'here';
+  const options = runOnOptions(runOnRows(devices.data ?? [], { asDefault: true }));
+  if (pick !== 'here' && !options.some((o) => o.value === pick)) {
+    options.push({ value: pick, label: pick, sub: 'Machine unavailable', icon: 'monitor', avatar: false, disabled: true });
+  }
+  const save = async (device: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.post('/sync/automations-owner', { device });
+      status.reload();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="relative z-10 rounded-[24px] bg-surface p-4 md:p-5">
+      <div className="mb-2 text-[13px] font-medium">Run automations on</div>
+      <Picker label="Run automations on" value={pick} options={options} onChange={(v) => void save(v)} disabled={saving || !status.data?.machineId || !devices.data} />
+      <p className="mt-2 text-[12.5px] text-fg-3">Scheduled and event-triggered runs use this machine after sync. It must be awake with Omni running. Run now uses the connected machine.</p>
+      {status.data && !status.data.machineId && <p className="mt-2 text-[12.5px] text-fg-3">Sync another machine to choose where automations run.</p>}
+      {(error || status.error || devices.error) && <ErrorNote className="mt-2">{error || status.error || devices.error}</ErrorNote>}
+    </div>
+  );
+}
+
 export function AutomationsPage() {
   const res = useApi<Automation[]>('/automations');
   const { reload } = res;
@@ -382,6 +424,7 @@ export function AutomationsPage() {
         actions={<Button size="sm" variant="ghost" icon="refresh" onClick={reload} busy={res.loading && !!res.data} aria-label="Refresh" />}
       />
       <div className="rise mx-auto max-w-3xl space-y-3 px-4 pt-2 pb-16 md:px-8">
+        <AutomationMachine refreshing={res.loading} />
         {res.error ? (
           <ErrorNote onRetry={reload}>{res.error}</ErrorNote>
         ) : !res.data ? (

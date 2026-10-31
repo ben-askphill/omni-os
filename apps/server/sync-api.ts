@@ -1,7 +1,8 @@
 // /api/sync: the sync status, a manual sync, and sign-in from Settings. Its own app so tests can call it without starting the server.
 import { Hono, type Context } from 'hono';
-import { kv } from './db.ts';
-import { claimAutomations } from './sync/owner.ts';
+import { kv, outbox } from './db.ts';
+import { claimAutomations, OWNER_KEY } from './sync/owner.ts';
+import { deviceRecord } from './sync/devices.ts';
 import { pathMap } from './sync/paths.ts';
 import { checkPathMap, checkSetup, defaultSetupDeps, disableSync, enableSync, SetupError, setupSync, type SetupDeps } from './sync/setup.ts';
 import { syncNow, syncStatus } from './sync/worker.ts';
@@ -51,8 +52,20 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
     return c.json({ ok: true, status: syncStatus() });
   });
 
-  /** Run the scheduled automations on this Mac from now on, and not on the other. 409 before sync is set up here. */
-  app.post('/automations-owner', (c) => {
+  /** Choose the synced execution owner. An empty body keeps the legacy claim-this-machine action. */
+  app.post('/automations-owner', async (c) => {
+    const raw = await body(c);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return c.json({ error: 'Expected an object' }, 400);
+    const b = raw as { device?: unknown };
+    if (b.device !== undefined && (typeof b.device !== 'string' || !b.device.trim()))
+      return c.json({ error: 'device must be a machine id or here' }, 400);
+    const target = b.device;
+    if (target && target !== 'here' && target !== outbox.machineId()) {
+      if (!outbox.machineId()) return c.json({ error: 'Sync is not set up on this machine' }, 409);
+      if (!deviceRecord(target)) return c.json({ error: 'Unknown synced machine' }, 400);
+      kv.set(OWNER_KEY, target);
+      return c.json({ ok: true, status: syncStatus() });
+    }
     if (!claimAutomations()) return c.json({ error: 'Sync is not set up on this Mac' }, 409);
     return c.json({ ok: true, status: syncStatus() });
   });

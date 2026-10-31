@@ -59,6 +59,8 @@ private final class SyncServer: Sendable {
     let s = try OmniJSON.decoder().decode(SyncStatus.self, from: Data(try statusJSON().utf8))
     #expect(s.configured && s.enabled && !s.running && !s.signedOut)
     #expect(s.machineId == "3f9c2a1e7b4d")
+    #expect(s.automations?.owner == "3f9c2a1e7b4d")
+    #expect(s.automations?.isThisMac == true)
     #expect(s.lastSyncAt == OmniJSON.parseDate("2026-09-28T09:15:02.123Z"))
     #expect(s.lastError == nil)
     #expect((s.pending, s.held, s.deferred, s.cursor) == (2, 0, 1, 418))
@@ -100,6 +102,16 @@ private final class SyncServer: Sendable {
     #expect(try bodyJSON(w[0]) == .object([:]))
     #expect(try bodyJSON(w[1]) == .object(["forget": .bool(false)]))
     #expect(try bodyJSON(w[2]) == .object(["forget": .bool(true)]))
+  }
+
+  @Test func choosesTheAutomationsMachine() async throws {
+    let server = try SyncServer()
+    _ = try await server.client.setAutomationsMachine("mac-b")
+    _ = try await server.client.setAutomationsMachine("")
+    let writes = server.writes
+    #expect(writes.map { $0.url!.path } == ["/api/sync/automations-owner", "/api/sync/automations-owner"])
+    #expect(try bodyJSON(writes[0]) == .object(["device": .string("mac-b")]))
+    #expect(try bodyJSON(writes[1]) == .object(["device": .string("here")]))
   }
 
   @Test func setupSendsOnlyWhatIsGiven() async throws {

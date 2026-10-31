@@ -8,6 +8,7 @@ struct RunOnMenu: View {
   /// A device id, or "" for this Mac.
   let pick: String
   let select: (String) -> Void
+  var allowOffline = false
 
   var body: some View {
     let label = RunOnRules.label(pick, devices: devices)
@@ -18,7 +19,7 @@ struct RunOnMenu: View {
           ForEach(devices) { d in
             Text(d.canTake ? d.name : "\(d.name) · Offline")
               .tag(d.id)
-              .selectionDisabled(!d.canTake)
+              .selectionDisabled(!allowOffline && !d.canTake)
           }
         }
       }

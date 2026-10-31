@@ -28,6 +28,12 @@ public struct SyncStatus: Decodable, Hashable, Sendable {
   /// Remote changes that could not apply yet, retried after each pull.
   public let deferred: Int
   /// The last relay change this Mac has.
+  public struct AutomationsOwner: Decodable, Hashable, Sendable {
+    public let owner: String?
+    public let isThisMac: Bool
+  }
+  public let automations: AutomationsOwner?
+
   public let cursor: Int
 
   public enum Phase: Hashable, Sendable {
