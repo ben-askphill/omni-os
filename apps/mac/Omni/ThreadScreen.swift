@@ -476,7 +476,7 @@ private struct TranscriptRows: View {
       }
       SendingMessagesView(store: store, client: model.client)
       if store.pending.contains(where: \.isParked) {
-        ParkedMessagesView(store: store, client: model.client, items: store.pending.filter(\.isParked), setup: store.thread?.setup)
+        ParkedMessagesView(store: store, client: model.client, items: store.pending.filter(\.isParked), setup: store.thread?.setup, sessionBlocked: store.thread?.resumeBlocked != nil)
       }
       if !store.edits.stale.isEmpty {
         StaleEditsView(store: store, client: model.client)

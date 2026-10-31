@@ -218,7 +218,7 @@ export function Pending({ thread, items, onPending }: { thread: Thread; items: P
     <>
       {items.map((m) => (
         <div key={m.uuid} className="flex flex-col items-end gap-1.5 opacity-75">
-          <span className="text-[12px] leading-[1.3] text-fg-3">{parkedLabel(m) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent')}</span>
+          <span className="text-[12px] leading-[1.3] text-fg-3">{parkedLabel(m, !!thread.resume_blocked) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent')}</span>
           {m.attachments?.length ? <Attachments threadId={thread.id} items={m.attachments} /> : null}
           <ContextChips records={m.context} align="end" className="w-full max-w-[86%]" />
           {(m.text || !hasContext(m.context)) && (
