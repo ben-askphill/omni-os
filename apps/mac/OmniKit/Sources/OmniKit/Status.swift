@@ -12,8 +12,9 @@ public struct HarnessID: OpenEnum, CodingKeyRepresentable {
   /// A Cursor cloud agent, launched through Cursor's API on its own Linux machines.
   public static let cursorCloud: Self = "cursor-cloud"
 
-  /// Runs off this Mac: no worktree, terminal session or local files.
-  public var isRemote: Bool { self == .hermes || self == .cursorCloud }
+  /// Runs on a remote provider (the Hermes server, Cursor's cloud): no worktree, terminal session or local files
+  /// anywhere. A thread another synced Mac runs is a different thing: that one still has an Omni worktree, there.
+  public var runsOnProvider: Bool { self == .hermes || self == .cursorCloud }
 
   public var codingKey: any CodingKey { Key(stringValue: rawValue) }
   public init?<T: CodingKey>(codingKey: T) { self.init(rawValue: codingKey.stringValue) }

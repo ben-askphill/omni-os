@@ -6,6 +6,8 @@ Tool-failure diagnostics reuse the runner's normalized `tool_result` records and
 
 ## How a thread runs
 
+The states a thread's process, its messages and its owner machine move through, and who owns each, are drawn in [Execution and ownership state](execution-state.md); `apps/server/runner/controller.ts` is the one writer of a process's state, and `apps/server/compose.ts` is where the runner is wired to routing, handoff and publishing.
+
 Each Claude Code thread gets one long-lived `claude -p --input-format stream-json --output-format stream-json` process. Messages go in on stdin, the process runs many turns and stays warm for `OMNI_KEEPALIVE_SECONDS` (default 10 minutes) after the last one, so a follow-up starts instantly. While background agents of that thread are still running, it stays up to `OMNI_TASK_KEEPALIVE_SECONDS` (default 4 hours). It is launched with:
 
 | Piece | What |
@@ -44,7 +46,7 @@ The two clients are kept apart so a change to one cannot break the other:
 - `apps/web/` imports only `apps/web/`, `packages/shared/` and server types. It never imports `apps/mac/`.
 - Below 768px, `apps/web/src/mobile/MobileShell.tsx` replaces the desktop shell. Phone screens and their parents come from the hash route (`mobile/screens.ts`), and the thread screens share their loaded thread and stream. Check this layout separately from desktop.
 - `apps/mac/` imports only `apps/mac/` and `packages/shared/`. Its Swift code talks to the server over HTTP and SSE, never to `apps/web/`.
-- `packages/shared/` holds the pure TypeScript both need (slash grammar, `/` menu ranking, command pills) and imports only itself. The Mac app runs it through JavaScriptCore from checked-in bundles: run `npm run build:slash` after changing a slash module, `npm run build:pick` after changing `browser-pick-script.ts` or `browser-pick-read.ts`.
+- `packages/shared/` holds the pure TypeScript both need (slash grammar, `/` menu ranking, command pills) and imports only itself. It also holds wire contracts the server and the web both import, such as the Changes panel's types (`changes.ts`) and the user config's fields (`settings.ts`). The Mac's Swift copies of those are checked against them by `apps/server/tests/mac-fixtures.test.ts`. The Mac app runs it through JavaScriptCore from checked-in bundles: run `npm run build:slash` after changing a slash module, `npm run build:pick` after changing `browser-pick-script.ts` or `browser-pick-read.ts`.
 - `turbo boundaries` (part of `npm test`) fails on any import that crosses these lines: a file outside its package, a package that is not a declared dependency, or a dependency the tags in `turbo.json` deny.
 - `apps/server/tests/mac-fixtures.test.ts` pins the JSON the Mac app reads from the server, so a server change that would break the app fails `npm test`.
 - Some screens copy a Web UI rule (transcript grouping, status line, format helpers). Those are ported to Swift with their own tests, not imported. A Web UI change to one of them should say whether the Mac app needs it too ([ADR 0002](../adr/0002-mac-app-is-a-client.md)).

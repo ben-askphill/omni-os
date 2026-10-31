@@ -8,6 +8,7 @@ import { readDesignSystem } from '@omni/shared/design-system.ts';
 import { bytes, lastGrapheme, slugify } from '../format.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
+import { Advanced } from './settings-parts.tsx';
 
 interface FormState {
   id: string;
@@ -53,6 +54,24 @@ function Field({ label, hint, children, htmlFor }: { label: string; hint?: React
         {label}
       </Label>
       {children}
+    </div>
+  );
+}
+
+/** A value Omni worked out, shown as text with Change, which swaps in the field. */
+function AutoValue({ label, value, note, onEdit }: { label: string; value: string; note?: string; onEdit?: () => void }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 text-[13px]">
+      <span className="w-28 shrink-0 text-fg-3">{label}</span>
+      <span className="min-w-0 flex-1 truncate">
+        <span className="font-mono text-[12.5px]">{value}</span>
+        {note && <span className="text-fg-3"> · {note}</span>}
+      </span>
+      {onEdit && (
+        <Button type="button" size="sm" variant="ghost" onClick={onEdit}>
+          Change
+        </Button>
+      )}
     </div>
   );
 }
@@ -250,6 +269,17 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
   };
 
   const idValid = /^[a-z0-9-]{2,40}$/.test(f.id);
+  // The values Omni works out (#405). Each shows as a field only when detection failed or you asked to change it.
+  const [editing, setEditing] = useState<{ id?: boolean; github?: boolean; base?: boolean }>({});
+  const hasRepo = !!f.repo_path.trim();
+  const repoChanged = (existing?.repo_path ?? '') !== f.repo_path.trim();
+  /** A name with no letters or digits gives no usable id. */
+  const idFailed = isNew && !!f.name.trim() && !idValid;
+  /** The saved repo path gave no GitHub repo (`gh repo view` found none). */
+  const githubFailed = !!existing?.repo_path && !existing.github_repo && !repoChanged;
+  const showId = isNew && (idFailed || !!editing.id);
+  const showGithub = hasRepo && (githubFailed || !!editing.github);
+  const showBase = !hasRepo && (!!f.base_dir.trim() || !!editing.base);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -260,7 +290,6 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
     const body: Record<string, unknown> = {
       name: f.name.trim(),
       repo_path: orNull(f.repo_path),
-      github_repo: orNull(f.github_repo),
       use_worktree: f.use_worktree ? 1 : 0,
       base_dir: orNull(f.base_dir),
       store_domain: orNull(f.store_domain)?.replace(/^https?:\/\//, '').replace(/\/.*$/, '') ?? null,
@@ -273,6 +302,8 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
       default_effort: orNull(f.run.effort),
     };
     if (!isSystem) body.kind = f.kind;
+    // Left out unless typed, so the server reads it from the repo path: on create, and when the path changes.
+    if (showGithub) body.github_repo = orNull(f.github_repo);
     try {
       if (isNew) {
         const ch = await api.post<Channel>('/channels', { id: f.id, ...body });
@@ -282,6 +313,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         const ch = await api.patch<Channel>(`/channels/${encodeURIComponent(existing.id)}`, body);
         await reloadChannels();
         setF(fromChannel(ch));
+        setEditing({});
         setSaved(true);
       }
     } catch (err) {
@@ -308,29 +340,9 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       <Section title="Basics">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Name" htmlFor="ch-name">
-            <input id="ch-name" className="field" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Acme" autoFocus={isNew} />
-          </Field>
-          <Field
-            label="Id"
-            htmlFor="ch-id"
-            hint={isNew ? 'Lowercase slug, used in URLs and by the Conductor. Cannot change later.' : 'Fixed after creation.'}
-          >
-            <input
-              id="ch-id"
-              className="field font-mono !text-[13px]"
-              value={f.id}
-              disabled={!isNew}
-              onChange={(e) => {
-                setIdTouched(true);
-                set('id', e.target.value.toLowerCase());
-              }}
-              placeholder="acme"
-              aria-invalid={isNew && !!f.id && !idValid}
-            />
-          </Field>
-        </div>
+        <Field label="Name" htmlFor="ch-name">
+          <input id="ch-name" className="field" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Acme" autoFocus={isNew} />
+        </Field>
         <Field label="Icon" htmlFor="ch-icon" hint="Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG or pick an icon. Empty uses the first letter.">
           <IconPicker value={f.icon} name={f.name || f.id} onChange={(v) => set('icon', v)} />
         </Field>
@@ -366,25 +378,12 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
       </Section>
 
       <Section title="Code">
-        <Field label="Repo path" htmlFor="ch-repo" hint="Absolute path to a local git repo. Enables per-thread worktrees and the PRs tab.">
+        <Field label="Repo path" htmlFor="ch-repo" hint="Absolute path to a local git repo. Omni reads its GitHub repo from it, and it enables per-thread worktrees and the PRs tab.">
           <input id="ch-repo" className="field font-mono !text-[13px]" value={f.repo_path} onChange={(e) => set('repo_path', e.target.value)} placeholder="~/code/acme-theme" spellCheck={false} />
-        </Field>
-        <Field label="GitHub repo" htmlFor="ch-gh" hint="owner/name. Auto-detected from the repo path when left empty.">
-          <input id="ch-gh" className="field font-mono !text-[13px]" value={f.github_repo} onChange={(e) => set('github_repo', e.target.value)} placeholder="acme/acme-theme" spellCheck={false} />
-        </Field>
-        <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
-          <div>
-            <div className="text-[13px] font-medium text-fg">Worktree per thread</div>
-            <div className="text-[12px] text-fg-3">Each thread gets its own branch (omni/...) so parallel work never collides. Off runs in the repo itself.</div>
-          </div>
-          <Toggle checked={f.use_worktree} onChange={(v) => set('use_worktree', v)} label="Worktree per thread" disabled={!f.repo_path.trim()} />
-        </div>
-        <Field label="Base directory" htmlFor="ch-base" hint="Where threads run when there is no repo. Defaults to your workspace folder (Settings), so its CLAUDE.md and skills load.">
-          <input id="ch-base" className="field font-mono !text-[13px]" value={f.base_dir} onChange={(e) => set('base_dir', e.target.value)} placeholder="~/Omni" spellCheck={false} />
         </Field>
       </Section>
 
-      <Section title="Store and browser">
+      <Section title="Store">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Store domain" htmlFor="ch-store" hint="The myshopify domain, e.g. acme.myshopify.com">
             <input id="ch-store" className="field font-mono !text-[13px]" value={f.store_domain} onChange={(e) => set('store_domain', e.target.value)} placeholder="acme.myshopify.com" spellCheck={false} />
@@ -393,6 +392,65 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             <input id="ch-portal" className="field font-mono !text-[13px]" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="acme" spellCheck={false} />
           </Field>
         </div>
+      </Section>
+
+      {/* Id, GitHub repo and base directory fill themselves in; each shows as a field only when Omni could not work
+          it out or you choose to change it, and a failure opens the fold (#405). */}
+      <Advanced summary="Id, GitHub repo, worktrees and the browser window" open={idFailed || githubFailed}>
+        {showId ? (
+          <Field label="Id" htmlFor="ch-id" hint="Lowercase slug, used in URLs and by the Conductor. Cannot change later.">
+            <input
+              id="ch-id"
+              className="field font-mono !text-[13px]"
+              value={f.id}
+              onChange={(e) => {
+                setIdTouched(true);
+                set('id', e.target.value.toLowerCase());
+              }}
+              placeholder="acme"
+              aria-invalid={!!f.id && !idValid}
+            />
+          </Field>
+        ) : (
+          <AutoValue
+            label="Id"
+            value={f.id || 'Type a name first'}
+            note={isNew ? 'From the name' : 'Fixed after creation'}
+            onEdit={isNew ? () => setEditing((e) => ({ ...e, id: true })) : undefined}
+          />
+        )}
+        {hasRepo &&
+          (showGithub ? (
+            <Field
+              label="GitHub repo"
+              htmlFor="ch-gh"
+              hint={githubFailed ? 'Omni could not read it from the repo path. Type owner/name, or leave it empty to try again on save.' : 'owner/name. Empty reads it from the repo path again.'}
+            >
+              <input id="ch-gh" className="field font-mono !text-[13px]" value={f.github_repo} onChange={(e) => set('github_repo', e.target.value)} placeholder="acme/acme-theme" spellCheck={false} />
+            </Field>
+          ) : (
+            <AutoValue
+              label="GitHub repo"
+              value={!repoChanged && existing?.github_repo ? existing.github_repo : 'Read from the repo path on save'}
+              note={!repoChanged && existing?.github_repo ? 'From the repo path' : undefined}
+              onEdit={() => setEditing((e) => ({ ...e, github: true }))}
+            />
+          ))}
+        {!hasRepo &&
+          (showBase ? (
+            <Field label="Base directory" htmlFor="ch-base" hint="Where threads run when there is no repo. Empty uses your workspace folder (Settings), so its CLAUDE.md and skills load.">
+              <input id="ch-base" className="field font-mono !text-[13px]" value={f.base_dir} onChange={(e) => set('base_dir', e.target.value)} placeholder="~/Omni" spellCheck={false} />
+            </Field>
+          ) : (
+            <AutoValue label="Base directory" value="Your workspace folder" note="No repo, so threads run there" onEdit={() => setEditing((e) => ({ ...e, base: true }))} />
+          ))}
+        <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
+          <div>
+            <div className="text-[13px] font-medium text-fg">Worktree per thread</div>
+            <div className="text-[12px] text-fg-3">Each thread gets its own branch (omni/...) so parallel work never collides. Off runs in the repo itself.</div>
+          </div>
+          <Toggle checked={f.use_worktree} onChange={(v) => set('use_worktree', v)} label="Worktree per thread" disabled={!hasRepo} />
+        </div>
         <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
           <div>
             <div className="text-[13px] font-medium text-fg">Show the browser window</div>
@@ -400,7 +458,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
           </div>
           <Toggle checked={f.showBrowser} onChange={(v) => set('showBrowser', v)} label="Show the browser window" />
         </div>
-      </Section>
+      </Advanced>
 
       {error && <ErrorNote>{error}</ErrorNote>}
 

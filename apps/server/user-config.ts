@@ -10,7 +10,21 @@ import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSyn
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
+import {
+  isTimezone,
+  NAME_MAX,
+  SETTING_SECTIONS,
+  sectionFields,
+  settingProblem,
+  type SettingField,
+  type SettingSection,
+  type UserConfig,
+  type UserConfigPatch,
+} from '@omni/shared/settings.ts';
 import { DEFAULT_RETENTION, RETENTION_DAYS } from '@omni/shared/worktree-cleanup.ts';
+
+export { isTimezone, NAME_MAX };
+export type { AutomationOverride, UserConfig, UserConfigPatch } from '@omni/shared/settings.ts';
 
 /** The repo root, the same as config.ts's ROOT (kept here so this module does not import config.ts). */
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -19,64 +33,32 @@ const dataDir = () => (process.env.OMNI_DATA_DIR ? resolve(ROOT, process.env.OMN
 /** Where the file lives. OMNI_CONFIG moves it, like OMNI_DATA_DIR moves the rest. */
 export const configPath = () => (process.env.OMNI_CONFIG ? resolve(ROOT, process.env.OMNI_CONFIG) : join(dataDir(), 'omni.config.json'));
 
-export const NAME_MAX = 60;
+/** The fields, their defaults and checks are @omni/shared/settings.ts; this builds the schema the file is read with. */
+const fieldSchema = (f: SettingField) =>
+  z
+    .string()
+    .trim()
+    .superRefine((v, ctx) => {
+      const problem = settingProblem(f, v, 'file');
+      if (problem) ctx.addIssue({ code: 'custom', message: problem });
+    })
+    .default(f.default);
 
-/** A folder as typed: `~/x`, `/abs/x` or relative to home. One line, no control characters, since prompts quote it. */
-const folder = z
-  .string()
-  .trim()
-  .max(1024)
-  .refine((p) => !/[\u0000-\u001f\u007f`$]/.test(p), 'A folder path cannot contain control characters, backticks or $.')
-  .default('');
+const sectionSchema = (section: SettingSection) =>
+  z.object(Object.fromEntries(sectionFields(section).map((f) => [f.key, fieldSchema(f)])) as Record<string, ReturnType<typeof fieldSchema>>);
 
 const automationOverride = z.object({ enabled: z.boolean().optional(), channel: z.string().optional() });
 
-export const userConfigSchema = z.object({
+const schema = z.object({
   version: z.literal(1).default(1),
-  /** Set when onboarding (web, Mac or `npm run setup`) finished. Missing means both clients show the wizard. */
   onboardedAt: z.string().optional(),
-  user: z
-    .object({
-      name: z.string().trim().max(NAME_MAX, `Keep the name under ${NAME_MAX} characters.`).default(''),
-      pronouns: z.string().trim().max(40).default('they/them'),
-      email: z.string().trim().max(200).default(''),
-      /** IANA zone. Empty means the system's. */
-      timezone: z.string().trim().default(''),
-    })
-    .prefault({}),
-  workspace: z
-    .object({
-      /** The folder non-repo threads run in, added to every Claude thread with its CLAUDE.md. Empty means ~/Omni. */
-      root: folder,
-      /** Where the person keeps their git checkouts. Empty means ~/code. */
-      reposDir: folder,
-      /** GitHub user or org that owns their repos and their fork of Omni. */
-      githubOwner: z.string().trim().default(''),
-    })
-    .prefault({}),
-  integrations: z
-    .object({
-      /** Hermes API server, like http://100.x.y.z:8642. Empty means Hermes is off. */
-      hermesUrl: z.string().trim().default(''),
-      /** A second-brain git repo the brain-export automation writes digests into. Empty means off. */
-      centralBrainDir: folder,
-      /**
-       * Tailscale logins allowed in through `tailscale serve`, comma separated, like ada@example.com. Set, a request on
-       * a *.ts.net or 100.64.0.0/10 Host needs a matching Tailscale-User-Login header as well as the token. Empty skips it.
-       */
-      tailscaleLogin: z.string().trim().max(500).default(''),
-    })
-    .prefault({}),
-  /**
-   * Where new threads run unless the composer picks otherwise (apps/server/run-on.ts): a synced machine's sync id, or
-   * empty for this machine. Per machine, like the rest of this file.
-   */
-  runOn: z
-    .object({ device: z.string().trim().max(100).default('') })
-    .prefault({}),
-  /** Per-machine overrides of the shared automation YAML (`enabled`, `channel`), so toggling one never edits the repo. */
+  user: sectionSchema('user').prefault({}),
+  workspace: sectionSchema('workspace').prefault({}),
+  integrations: sectionSchema('integrations').prefault({}),
+  /** Per machine, like the rest of this file (apps/server/run-on.ts). */
+  runOn: z.object({ device: z.string().trim().max(100).default('') }).prefault({}),
   automations: z.record(z.string(), automationOverride).default({}),
-  /** This Mac's worktree retention (apps/server/worktree-cleanup.ts). Off until turned on in Settings > Machines. */
+  /** Off until turned on in Settings > Machines. */
   worktrees: z
     .object({
       retention: z
@@ -89,27 +71,29 @@ export const userConfigSchema = z.object({
     .prefault({}),
 });
 
-export type UserConfig = z.infer<typeof userConfigSchema>;
-export type AutomationOverride = z.infer<typeof automationOverride>;
+/** Reads a saved file (or a part of one) into a full UserConfig, defaults filled in. */
+export const userConfigSchema = { parse: (v: unknown): UserConfig => schema.parse(v) as UserConfig };
 
-/** A partial update: any section, any subset of its fields. */
-export type UserConfigPatch = {
-  onboardedAt?: string | null;
-  user?: Partial<UserConfig['user']>;
-  workspace?: Partial<UserConfig['workspace']>;
-  integrations?: Partial<UserConfig['integrations']>;
-  runOn?: Partial<UserConfig['runOn']>;
-  automations?: Record<string, AutomationOverride | null>;
-};
-
+/** A partial update: any section, any subset of its fields. A client's save also goes through `checkSettingFields`. */
 export const userConfigPatch = z.object({
   onboardedAt: z.string().nullish(),
-  user: userConfigSchema.shape.user.unwrap().partial().optional(),
-  workspace: userConfigSchema.shape.workspace.unwrap().partial().optional(),
-  integrations: userConfigSchema.shape.integrations.unwrap().partial().optional(),
-  runOn: userConfigSchema.shape.runOn.unwrap().partial().optional(),
+  user: sectionSchema('user').partial().optional(),
+  workspace: sectionSchema('workspace').partial().optional(),
+  integrations: sectionSchema('integrations').partial().optional(),
+  runOn: schema.shape.runOn.unwrap().partial().optional(),
   automations: z.record(z.string(), automationOverride.nullable()).optional(),
 });
+
+/** A client's save, each text field checked as `settingProblem(.., 'save')` says. For a zod superRefine. */
+export function checkSettingFields(p: Partial<Record<SettingSection, Record<string, string | undefined>>>, ctx: z.RefinementCtx) {
+  for (const section of SETTING_SECTIONS) {
+    for (const f of sectionFields(section)) {
+      const v = p[section]?.[f.key];
+      const problem = v === undefined ? null : settingProblem(f, v, 'save');
+      if (problem) ctx.addIssue({ code: 'custom', path: [section, f.key], message: problem });
+    }
+  }
+}
 
 const defaults = (): UserConfig => userConfigSchema.parse({});
 
@@ -203,15 +187,6 @@ export function systemTimezone() {
     return 'UTC';
   }
 }
-
-export const isTimezone = (tz: string) => {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 /** What a fresh install falls back to, shown as placeholders in onboarding. */
 export const fallbacks = () => ({

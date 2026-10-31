@@ -10,7 +10,7 @@ import { FAKE_CODEX, tailscaleStatus, waitFor } from './support.ts';
 import { bootMac, type Mac } from './two-macs.ts';
 
 // Run on: Mac A is the hub Ben talks to and Box B the machine with the CPU. A new thread for B is made on A, goes out
-// as a fresh handoff offer, and runs on B; Ben's next message and Stop on A reach B through synced kv records. Two
+// as a fresh handoff offer, and runs on B; Ben's next message and Stop on A reach B as synced remote commands. Two
 // real servers in one process with fake claude and one in-memory relay; a machine hears of the other only on sync.
 
 const relay = new MemoryTransport();
@@ -71,14 +71,14 @@ describe('a thread run on another machine', () => {
     id = res.body.id;
     // Nothing runs on the hub: the thread waits for the other machine.
     expect(a.runner.isLive(id)).toBe(false);
-    expect(a.db.kv.get(`runon.thread.${id}`)).toBe('box-b');
+    expect(a.db.assignments.get(id)).toMatchObject({ machine: 'box-b', routed: true });
     expect(a.db.kv.get<any>(`handoff.offer.${id}`)).toMatchObject({ state: 'offered', fresh: true, queued: ['TOOL:60000 audit the checkout'], to: { id: 'box-b' } });
 
     await both();
     await waitFor(() => b.runner.isLive(id), 'the thread to start on B');
     await b.untilTool(id);
     expect(userTexts(b, id)).toEqual(['TOOL:60000 audit the checkout']);
-    expect(b.db.threads.holder(id)).toBe('box-b');
+    expect(b.db.assignments.holder(id)).toBe('box-b');
 
     // The hub shows the run as it syncs back, once its own edits (the title) have gone round.
     for (let n = 0; n < 5 && a.thread(id).status !== 'running'; n++) await both();
@@ -102,9 +102,14 @@ describe('a thread run on another machine', () => {
 
   it('forwards Stop', async () => {
     expect((await a.json(`/threads/${id}/stop`, { body: {} })).status).toBe(200);
-    expect(a.db.kv.get(`runon.stop.${id}.mac-a`)).toBeTruthy();
+    const stop = a.db.remoteCommands.forThread(id).find((c) => c.kind === 'stop')!;
+    expect(stop).toMatchObject({ state: 'sent', target: 'box-b' });
     await both();
     await waitFor(() => !['running', 'queued'].includes(b.thread(id).status), 'B to stop the turn');
+    // The holder answers it, and the hub hears: Stop has a receipt like any command.
+    expect(b.db.remoteCommands.get(stop.id)).toMatchObject({ state: 'accepted', acked_by: 'box-b' });
+    await both();
+    expect(a.db.remoteCommands.get(stop.id)?.state).toBe('accepted');
   }, T.timeout);
 });
 
@@ -151,7 +156,7 @@ describe('a delegated thread run on another machine', () => {
     await b.untilResults(child, 1);
     await both();
     expect(a.db.kv.get(`runon.thread.${child}`)).toBeUndefined();
-    expect(a.db.threads.holder(child)).toBe('box-b');
+    expect(a.db.assignments.holder(child)).toBe('box-b');
 
     // The hub records the switch; sync carries it to B. The next message goes to B, not a worktree here.
     const switched = await a.json(`/threads/${child}/run`, { body: { harness: 'codex', model: 'gpt-5.6-sol' } });
@@ -182,8 +187,8 @@ describe('a thread delegated on the other machine', () => {
     b.db.threads.setLimit(child.id, { state: 'limited', resets_at: '2026-10-30T01:47:00.000Z', id: `stop-${child.id}`, machine: 'box-b' });
     b.db.threads.update(child.id, { status: 'failed' });
     for (let n = 0; n < 5 && !a.db.threads.limit(child.id); n++) await both();
-    expect(a.db.kv.get(`runon.thread.${child.id}`)).toBeUndefined();
-    expect(a.db.threads.holder(child.id)).toBe('box-b');
+    expect(a.db.assignments.get(child.id)?.routed).toBe(false);
+    expect(a.db.assignments.holder(child.id)).toBe('box-b');
     return child.id;
   };
 
@@ -289,8 +294,8 @@ describe('remote preparation and takeover', () => {
     mkdirSync(dirname(session), { recursive: true });
     writeFileSync(session, '{"type":"user","from":"box-b"}\n');
     expect((await a.json(`/threads/${id}/takeover`, { body: {} })).status).toBe(200);
-    for (let n = 0; n < 100 && a.db.threads.holder(id) !== 'mac-a'; n++) { await both(); await new Promise((r) => setTimeout(r, 20)); }
-    await waitFor(() => a.db.threads.holder(id) === 'mac-a', 'A to take over');
+    for (let n = 0; n < 100 && a.db.assignments.holder(id) !== 'mac-a'; n++) { await both(); await new Promise((r) => setTimeout(r, 20)); }
+    await waitFor(() => a.db.assignments.holder(id) === 'mac-a', 'A to take over');
     await both();
     await both();
     expect(userTexts(a, id).filter((t) => t === 'reply exactly once')).toHaveLength(1);
@@ -298,8 +303,8 @@ describe('remote preparation and takeover', () => {
     expect(a.runner.isLive(id)).toBe(false);
     expect(a.db.kv.get(`runon.accepted.${id}.no-replay`)).toBe(true);
     expect((await a.json(`/threads/${id}/handoff`, { body: { to: 'box-b' } })).status).toBe(200);
-    for (let n = 0; n < 100 && b.db.threads.holder(id) !== 'box-b'; n++) { await both(); await new Promise((r) => setTimeout(r, 20)); }
-    await waitFor(() => b.db.threads.holder(id) === 'box-b', 'B to take it back');
+    for (let n = 0; n < 100 && b.db.assignments.holder(id) !== 'box-b'; n++) { await both(); await new Promise((r) => setTimeout(r, 20)); }
+    await waitFor(() => b.db.assignments.holder(id) === 'box-b', 'B to take it back');
     await both();
     expect(userTexts(b, id).filter((t) => t === 'reply exactly once')).toHaveLength(1);
   }, T.timeout);
@@ -346,7 +351,7 @@ describe('picking where a thread runs', () => {
       const res = await a.json('/threads', { body: { channel: 'shop', prompt: 'TOOL:60000 local work', ...(device ? { device } : {}) } });
       expect(res.status).toBe(200);
       await waitFor(() => a.runner.isLive(res.body.id), 'the thread to run on A');
-      expect(a.db.kv.get(`runon.thread.${res.body.id}`)).toBeUndefined();
+      expect(a.db.assignments.get(res.body.id)?.routed).toBeFalsy();
       await a.json(`/threads/${res.body.id}/stop`, { body: {} });
     }
   }, T.timeout);

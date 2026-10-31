@@ -2,17 +2,17 @@
 // (apps/server/scripts/setup.ts) writes the same file from a terminal.
 import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
-import { z } from 'zod';
+import type { SetupState } from '@omni/shared/settings.ts';
 import { getCrew } from './crew.ts';
 import { channels, threads } from './db.ts';
 import { prepareWorkdir } from './sandbox.ts';
 import { addEvent, emitThread } from './runner/state.ts';
 import {
+  checkSettingFields,
   configPath,
   ensureWorkspace,
   fallbacks,
   isOnboarded,
-  isTimezone,
   omniRepo,
   resolved,
   tildify,
@@ -24,7 +24,7 @@ import {
 export const setupApi = new Hono();
 
 /** The saved values (empty strings mean "use the default"), plus what each default resolves to on this machine. */
-export function setupState() {
+export function setupState(): SetupState {
   return {
     onboarded: isOnboarded(),
     path: tildify(configPath()),
@@ -41,18 +41,12 @@ export function setupState() {
   };
 }
 
-// Automation overrides change through POST /api/automations/:id/enabled, not here.
+// Automation overrides change through POST /api/automations/:id/enabled, not here. Each text field is checked by
+// checkSettingFields, as @omni/shared/settings.ts says.
 const patchInput = userConfigPatch.omit({ automations: true, onboardedAt: true }).superRefine((p, ctx) => {
-  const tz = p.user?.timezone;
-  if (tz && !isTimezone(tz)) ctx.addIssue({ code: 'custom', path: ['user', 'timezone'], message: 'Unknown timezone. Use an IANA name like Europe/Amsterdam.' });
-  const email = p.user?.email;
-  if (email && !z.email().safeParse(email).success) ctx.addIssue({ code: 'custom', path: ['user', 'email'], message: 'Enter a valid email, or leave it empty.' });
-  const owner = p.workspace?.githubOwner;
-  if (owner && !/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(owner)) ctx.addIssue({ code: 'custom', path: ['workspace', 'githubOwner'], message: 'A GitHub owner is a user or org name, like octocat.' });
-  const hermes = p.integrations?.hermesUrl;
+  checkSettingFields(p, ctx);
   const device = p.runOn?.device;
   if (device && !/^[A-Za-z0-9-]{1,100}$/.test(device)) ctx.addIssue({ code: 'custom', path: ['runOn', 'device'], message: 'Pick a synced machine, or this one.' });
-  if (hermes && !/^https?:\/\/\S+$/.test(hermes)) ctx.addIssue({ code: 'custom', path: ['integrations', 'hermesUrl'], message: 'Hermes needs a URL like http://100.64.0.1:8642.' });
 });
 
 setupApi.get('/', (c) => c.json(setupState()));

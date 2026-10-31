@@ -1,7 +1,7 @@
 import type { RunName } from '@omni/shared/run-switch.ts';
 import { db, now, tx } from '../connection.ts';
 import { outbox, record } from '../sync.ts';
-import { kv } from './kv.ts';
+import { assignments } from './assignments.ts';
 
 export type ThreadStatus = 'queued' | 'running' | 'done' | 'failed' | 'stopped' | 'imported';
 /** `team`: a member of a team, run under its lead thread and listed only there. */
@@ -61,6 +61,11 @@ export interface Thread {
   /** Why the worktree could not be prepared, while setup is `failed`. */
   setup_error: string | null;
   /**
+   * Why this machine did not resume the thread's session: the session download before the turn failed or timed out,
+   * so the copy here may lack turns another machine ran (runner/spawn.ts). Null once a turn starts. Local only.
+   */
+  resume_blocked: string | null;
+  /**
    * Its last turn stopped at the harness's usage limit (apps/server/runner/limits.ts). Null once anything moves it on.
    * Synced to every Mac, so each lists it in Needs you; only the Mac that ran the turn resumes it.
    */
@@ -99,6 +104,8 @@ export interface PendingHandover {
   since: number;
   /** The fresh native session exists, so the next spawn resumes it while its history still waits. */
   started?: boolean;
+  /** Ben chose to start with fresh context on the same run, not a switch (runner/fresh-context.ts). */
+  fresh?: true;
 }
 /** How a thread's sessions stand across harness switches (apps/server/runner/switch-plan.ts). Synced, kept out of the API. */
 export interface SessionState {
@@ -110,7 +117,7 @@ export interface SessionState {
 // that has not reached this Mac yet reads as the thread's start: the handover then carries too much, never too little.
 export interface StoredSessionState {
   sessions: Partial<Record<string, { id: string; seen: string }>> | null;
-  handover: { from: RunName; since: string | null; started?: boolean } | null;
+  handover: { from: RunName; since: string | null; started?: boolean; fresh?: true } | null;
 }
 const uidOf = (id: number) => (db.prepare('SELECT uid FROM events WHERE id = ?').get(id) as { uid: string } | undefined)?.uid ?? '';
 const idOf = (uid: string) => (db.prepare('SELECT id FROM events WHERE uid = ?').get(uid) as { id: number } | undefined)?.id ?? 1;
@@ -121,26 +128,22 @@ function storedSessions(s: Sessions | null | undefined): StoredSessionState['ses
   return entries.length ? Object.fromEntries(entries.map(([h, p]) => [h, { id: p.id, seen: uidOf(p.seen) }])) : null;
 }
 const storedHandover = (h: PendingHandover | null | undefined): StoredSessionState['handover'] =>
-  h ? { from: h.from, since: h.since ? uidOf(h.since) : null, ...(h.started && { started: true }) } : null;
+  h ? { from: h.from, since: h.since ? uidOf(h.since) : null, ...(h.started && { started: true }), ...(h.fresh && { fresh: true }) } : null;
 const readSessions = (s: StoredSessionState['sessions']): Sessions =>
   Object.fromEntries(Object.entries(s ?? {}).flatMap(([h, p]) => (p ? [[h, { id: p.id, seen: idOf(p.seen) }]] : [])));
-const readHandover = (h: StoredSessionState['handover']): PendingHandover | null => (h ? { from: h.from, since: h.since ? idOf(h.since) : 0, ...(h.started && { started: true }) } : null);
+const readHandover = (h: StoredSessionState['handover']): PendingHandover | null => (h ? { from: h.from, since: h.since ? idOf(h.since) : 0, ...(h.started && { started: true }), ...(h.fresh && { fresh: true }) } : null);
 const json = (v: object | null) => (v ? JSON.stringify(v) : null);
 
 /** The columns clients read, without sync's run_machine, the limit stop's id and owner, or the session state. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, pinned_at, done_at, setup, setup_error, limit_state, limit_resets_at, limit_elsewhere, continued_from, created_at, updated_at';
-
-/** Who runs a thread with this status: this machine while it is running or queued here and sync is set up, else nobody. */
-const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? outbox.machineId() : null);
+  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, continued_from, created_at, updated_at';
 
 /**
- * kv `handoff.holder.<thread>`: the Mac that holds the thread between turns, which Take over asks for it
- * (apps/server/handoff.ts). Synced kv, not a column, since the row is last-writer-wins and a rename on the other Mac
- * would undo it. Only the Mac it moves to writes it.
+ * The machine whose status write this is: this one while it is running or queued here and sync is set up, else nobody.
+ * A tag on the row for the status merge (sync/handlers/thread.ts) and the result trigger (db/migrate.ts), not who owns
+ * the thread: that is the assignment (db/repos/assignments.ts), which the same write claims.
  */
-const HOLDER = 'handoff.holder.';
-const isMachineId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9-]{1,100}$/.test(v);
+const runMachine = (status: ThreadStatus) => (status === 'running' || status === 'queued' ? outbox.machineId() : null);
 
 export const threads = {
   get: (id: string) => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE id = ?`).get(id) as unknown as Thread | undefined,
@@ -196,7 +199,7 @@ export const threads = {
       )
       .all() as unknown as Thread[],
   running: () => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],
-  /** The machine id of the Mac that runs the thread (sync), or null when none does. */
+  /** The machine that wrote the thread's running or queued status (sync), or null. For the status merge; ownership reads the assignment. */
   runMachine: (id: string) =>
     (db.prepare('SELECT run_machine FROM threads WHERE id = ?').get(id) as { run_machine: string | null } | undefined)?.run_machine ?? null,
   list(filter: { channel?: string; status?: string; limit?: number }) {
@@ -212,7 +215,7 @@ export const threads = {
   create(
     t: Omit<
       Thread,
-      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'continued_from'
+      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'resume_blocked' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'continued_from'
     > & {
       has_run?: number; created_at?: string; harness?: string; effort?: string; auto_reason?: string | null; folder_id?: string | null; setup?: ThreadSetup | null;
     },
@@ -227,7 +230,7 @@ export const threads = {
         t.branch, t.parent_id, t.task_id, t.source, t.automation, runMachine(t.status), t.folder_id ?? null, t.setup ?? null, ts, ts,
       );
       record('thread', t.id);
-      if (runMachine(t.status)) threads.hold(t.id);
+      if (runMachine(t.status)) assignments.claim(t.id);
       return threads.get(t.id)!;
     });
   },
@@ -242,7 +245,7 @@ export const threads = {
     return { sessions: parsed(row?.sessions ?? null), handover: parsed(row?.handover ?? null) };
   },
   update(id: string, patch: Partial<Thread> & Partial<SessionState>) {
-    const allowed = ['title', 'status', 'model', 'harness', 'effort', 'auto_reason', 'queued_harness', 'queued_model', 'queued_effort', 'session_id', 'has_run', 'cwd', 'branch', 'last_text', 'archived', 'setup', 'setup_error', 'updated_at'] as const;
+    const allowed = ['title', 'status', 'model', 'harness', 'effort', 'auto_reason', 'queued_harness', 'queued_model', 'queued_effort', 'session_id', 'has_run', 'cwd', 'branch', 'last_text', 'archived', 'setup', 'setup_error', 'resume_blocked', 'updated_at'] as const;
     const keys = allowed.filter((k) => k in patch);
     const sets = keys.map((k) => `${k} = ?`);
     const vals = keys.map((k) => (patch[k] ?? null) as string | number | null);
@@ -256,25 +259,10 @@ export const threads = {
     tx(() => {
       if (!db.prepare(`UPDATE threads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id).changes) return;
       record('thread', id);
-      if (patch.status && runMachine(patch.status)) threads.hold(id);
+      // A turn starting here makes this machine the thread's owner (the same machine again changes nothing).
+      if (patch.status && runMachine(patch.status)) assignments.claim(id);
     });
     return threads.get(id);
-  },
-  /** This Mac holds the thread now: a turn starts here, or it took the thread over. Written once, since the relay keeps every write. */
-  hold(id: string) {
-    const self = outbox.machineId();
-    if (self && kv.get(HOLDER + id) !== self) kv.set(HOLDER + id, self);
-  },
-  /**
-   * The Mac that holds the thread: the one running it, or between turns the one that ran it last or took it since.
-   * Null when no Mac is known to, as for a thread that has not run since this build or with sync never set up.
-   */
-  holder(id: string): string | null {
-    const row = db.prepare('SELECT status, run_machine FROM threads WHERE id = ?').get(id) as { status: ThreadStatus; run_machine: string | null } | undefined;
-    if (!row) return null;
-    if (row.status === 'running' || row.status === 'queued') return row.run_machine;
-    const v = kv.get<unknown>(HOLDER + id);
-    return isMachineId(v) ? v : null;
   },
   /**
    * Pin it to the sidebar, or unpin it. Like a rename it keeps the thread's place in the lists: updated_at stays. The

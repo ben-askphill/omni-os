@@ -60,6 +60,9 @@ describe('runner: proposed follow-up threads', () => {
   it('drops an answer that comes back after another message was sent', T, async () => {
     const t = await h.start('NEXT_THREAD NEXT:800');
     await h.untilResults(t.id, 1);
+    // The second turn's own suggestion reads the thread title. Until the title call lands, the title is the prompt, which
+    // carries NEXT_THREAD, and that second turn would propose a card of its own. A loaded run saw it, so settle it first.
+    await h.until('title', () => h.thread(t.id).title === 'Fake title');
     r.sendMessage(t.id, 'carry on');
     await h.untilResults(t.id, 2);
     await new Promise((res) => setTimeout(res, 1200));

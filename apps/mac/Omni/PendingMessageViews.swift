@@ -343,6 +343,8 @@ struct ParkedMessagesView: View {
   let items: [PendingMsg]
   /// The thread's worktree is not ready: they send once it is, so Retry (SetupCard) stands in for Resume.
   var setup: ThreadSetup? = nil
+  /// The thread's session is not up to date (StaleSessionCard): the heading says that, not a restart.
+  var sessionBlocked = false
   @State private var busy: String?
   @State private var error: String?
 
@@ -352,7 +354,7 @@ struct ParkedMessagesView: View {
     VStack(alignment: .trailing, spacing: z(12)) {
       Rectangle().fill(Tok.line).frame(height: 1)
       HStack(spacing: z(8)) {
-        Text(setup != nil ? PendingMsg.setupLabel : ParkedMessages.heading(items))
+        Text(setup != nil ? PendingMsg.setupLabel : ParkedMessages.heading(items, sessionBlocked: sessionBlocked))
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -369,7 +371,7 @@ struct ParkedMessagesView: View {
         let icon = m.delivery == .uncertain ? "alert" : "clock"
         if m.isOmnis {
           VStack(alignment: .trailing, spacing: z(6)) {
-            PendingBubble(m: m, label: m.label(lead: false, setup: setup), icon: icon, threadID: store.id, client: client)
+            PendingBubble(m: m, label: m.label(lead: false, setup: setup, sessionBlocked: sessionBlocked), icon: icon, threadID: store.id, client: client)
             HStack(spacing: z(4)) {
               sendAgain(m, off: off)
               Button { discard(m) } label: {
@@ -381,7 +383,7 @@ struct ParkedMessagesView: View {
             }
           }
         } else {
-          PendingRow(store: store, client: client, m: m, label: m.label(lead: false, setup: setup), icon: icon) {
+          PendingRow(store: store, client: client, m: m, label: m.label(lead: false, setup: setup, sessionBlocked: sessionBlocked), icon: icon) {
             sendAgain(m, off: off)
           }
         }

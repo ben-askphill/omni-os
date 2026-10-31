@@ -75,33 +75,7 @@ export interface Profile {
 }
 
 /** The user config (data/omni.config.json) behind onboarding and Settings: GET and PUT /api/setup. Empty strings mean the default. */
-export interface UserConfig {
-  onboardedAt?: string;
-  user: { name: string; pronouns: string; email: string; timezone: string };
-  workspace: { root: string; reposDir: string; githubOwner: string };
-  integrations: { hermesUrl: string; centralBrainDir: string; tailscaleLogin?: string };
-  /** Where new threads run unless the composer picks another machine: a synced machine's id, or '' for this one. Older servers leave it out. */
-  runOn?: { device: string };
-  automations: Record<string, { enabled?: boolean; channel?: string }>;
-}
-export type UserConfigPatch = {
-  user?: Partial<UserConfig['user']>;
-  workspace?: Partial<UserConfig['workspace']>;
-  integrations?: Partial<UserConfig['integrations']>;
-  runOn?: { device?: string };
-};
-export interface SetupState {
-  onboarded: boolean;
-  /** Where the file lives, with ~ for the home folder. */
-  path: string;
-  config: UserConfig;
-  /** What each value resolves to on the server's machine, defaults included. */
-  resolved: { timezone: string; workspaceRoot: string; reposDir: string; centralBrainDir: string; hermesUrl: string };
-  fallbacks: { timezone: string; workspaceRoot: string; reposDir: string; home: string };
-  omniRepo: string | null;
-  /** POST /api/setup/complete only: the #conductor thread holding the welcome message, on the first run. */
-  threadId?: string | null;
-}
+export type { SetupState, UserConfig, UserConfigPatch } from '@omni/shared/settings.ts';
 
 export interface Status {
   /** Which server this is. Only the fields the web reads. */
@@ -247,73 +221,23 @@ export interface PRDetail extends PRSummary {
   diff: string;
 }
 
-/** GET /api/threads/:id/changes (apps/server/changes.ts): a thread's branch changes since its base commit, before any PR. */
-/** `turn`: what one turn changed, between its saved before and after snapshots. */
-export type ChangeKind = 'committed' | 'staged' | 'unstaged' | 'untracked' | 'turn';
-export type ChangeStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed' | 'unmerged';
-/** Why a file's diff text was left out. */
-export type DiffOmitted = 'binary' | 'too_large' | 'limit' | 'symlink' | 'unavailable';
-export interface ChangedFile {
-  path: string;
-  old_path: string | null;
-  status: ChangeStatus;
-  /** Null when git cannot count them (binary) or the file was too big to read. */
-  additions: number | null;
-  deletions: number | null;
-  binary: boolean;
-  omitted: DiffOmitted | null;
-  /** This file's part of a unified diff. Empty when omitted. */
-  diff: string;
-}
-export interface ChangeGroup {
-  kind: ChangeKind;
-  files: ChangedFile[];
-  truncated: boolean;
-}
-export interface ChangeBase {
-  sha: string;
-  /** The branch it came from, or `HEAD`. */
-  ref: string;
-  /** `thread-start`: where the worktree was cut. `merge-base`: with the default branch, for a thread without one. */
-  how: 'thread-start' | 'merge-base';
-  recorded_at: string;
-}
-export type BranchChanges =
-  | { available: false; reason: string }
-  | { available: true; cwd: string; branch: string | null; head: string; base: ChangeBase; groups: ChangeGroup[] };
-
-/** GET /api/threads/:id/turns (apps/server/turns.ts): a worktree thread's saved turns, and what one of them changed. */
-export type TurnState = 'running' | 'capturing' | 'ready' | 'failed';
-/** One side of a turn: a snapshot commit under a hidden ref, and HEAD when it was taken. */
-export interface TurnSide {
-  sha: string;
-  ref: string;
-  head: string;
-}
-export interface TurnView {
-  id: string;
-  n: number;
-  /** running: under way. capturing: ended, its after snapshot being saved. failed: `error` says why. */
-  state: TurnState;
-  error: string | null;
-  before: TurnSide | null;
-  after: TurnSide | null;
-  /** The Result the turn ended with, as in Needs you. */
-  completion_uid: string | null;
-  started_at: string;
-  ended_at: string | null;
-}
-export interface TurnChanges {
-  /** False when this thread's turns are not saved here; `reason` says why. */
-  available: boolean;
-  reason: string | null;
-  /** Newest first. */
-  turns: TurnView[];
-  /** The turn shown: the one asked for, else the newest. */
-  turn: TurnView | null;
-  /** Its files once both snapshots are saved: one `turn` group. */
-  groups: ChangeGroup[];
-}
+/**
+ * GET /api/threads/:id/changes (a thread's branch changes since its base commit, before any PR) and
+ * GET /api/threads/:id/turns (a worktree thread's saved turns, and what one of them changed): the server's own types.
+ */
+export type {
+  BranchChanges,
+  ChangeBase,
+  ChangeGroup,
+  ChangeKind,
+  ChangedFile,
+  ChangeStatus,
+  DiffOmitted,
+  TurnChanges,
+  TurnSide,
+  TurnState,
+  TurnView,
+} from '@omni/shared/changes.ts';
 
 export interface AutomationRun {
   thread_id: string | null;

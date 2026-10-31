@@ -39,7 +39,10 @@ struct NotificationSettingsView: View {
         }
       }
 
-      SettingsCard(title: "Channels", note: "A channel turned off still lists its results in Needs you, without a notification.") {
+      // One switch per channel grows with the sidebar, so the list folds shut, as on the web (#405).
+      AdvancedFold(title: "Channels", summary: "\(channels.filter { attention.settings.alerts(channel: $0.id) }.count) of \(channels.count) notify") {
+        Text("A channel turned off still lists its results in Needs you, without a notification.")
+          .font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
         if channels.isEmpty {
           Text("No channels yet.").font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
         }

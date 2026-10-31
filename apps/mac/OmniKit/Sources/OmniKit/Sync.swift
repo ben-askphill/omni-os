@@ -34,7 +34,7 @@ public struct SyncStatus: Decodable, Hashable, Sendable {
     case paused, syncing, failing, starting, waiting, upToDate
   }
 
-  /// Where sync stands, as the Web UI's Sync page words it.
+  /// Where sync stands, as the Web UI's Settings, Machines words it.
   public var phase: Phase {
     if !enabled { return .paused }
     if running { return .syncing }
@@ -104,7 +104,7 @@ public struct SyncPathMapping: Hashable, Sendable, Identifiable {
   }
 }
 
-/// The Sync tab, like the Web UI's Sync page: the status, sync now, pause, sign in and out, and the path map.
+/// The Sync part of the Machines tab, like the Web UI's Settings, Machines: the status, sync now, pause, sign in and out, and the path map.
 /// The password and the code are held only while typed and sent; a sign-in that works clears them.
 @MainActor @Observable
 public final class SyncModel {

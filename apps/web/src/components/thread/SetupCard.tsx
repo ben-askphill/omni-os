@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ActionRun, ThreadActions } from '@omni/shared/channel-actions.ts';
 import { api, errorText, type PendingMsg, type Thread } from '../../api.ts';
 import { runSummary, setupPolls, setupSteps, stripRun, useThreadActions } from '../../channel-actions.ts';
-import { isRemoteHarness } from '../../worktree-base.ts';
+import { isProviderHarness } from '../../worktree-base.ts';
 import { useBranchingFrom } from '../BasePicker.tsx';
 import { Button, ErrorNote, Icon, Loader, StatusDot } from '../ui.tsx';
 import { RunOutput } from './panel/ActionsTab.tsx';
@@ -19,7 +19,7 @@ type Props = { thread: Thread; onRetried: (t: Thread, pending: PendingMsg[]) => 
 export function SetupCard(props: Props) {
   const { thread } = props;
   // A thread off this Mac never gets a worktree, and one without a branch never has one to set up.
-  if (!thread.setup && (isRemoteHarness(thread.harness) || !thread.branch)) return null;
+  if (!thread.setup && (isProviderHarness(thread.harness) || !thread.branch)) return null;
   return <SetupView key={thread.id} {...props} />;
 }
 

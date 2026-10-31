@@ -8,8 +8,12 @@ import { applyPage, earlierCursor, historyQuery, openHistory, revealCursor, type
 import { newContext } from '@omni/shared/message-context.ts';
 import { diffSelection, selectRows } from '@omni/shared/message-context-diff.ts';
 import { EVERY_ACTION_FACTS, threadMenu } from '@omni/shared/thread-actions.ts';
+import { SETTING_FIELDS, SETTING_PAGES, SETTING_SECTIONS, sectionFields } from '@omni/shared/settings.ts';
+import { CHANGE_KINDS, CHANGE_STATUSES, CHANGES_WIRE_KEYS, DIFF_OMITTED, TURN_STATES, changesProblems, turnChangesProblems } from '@omni/shared/changes.ts';
 import { diff, shapeOf, tagOf } from './fixture-shape.ts';
 import { FAKE_CLAUDE, diffFile, fakeAlive } from './support.ts';
+import { macAppSource, omniKitSource, swiftEnumValues, swiftKeys, swiftSwitchCases } from './swift-wire.ts';
+import { userConfigSchema } from '../user-config.ts';
 
 // Golden fixtures for the Mac app's Swift types (apps/mac/OmniKit). Boots the real server with the fake claude CLI,
 // makes a channel and runs a thread through three turns, and keeps what the app reads: the JSON of each GET
@@ -34,7 +38,8 @@ const HINT = `The server JSON the Mac app reads changed shape. If that is on pur
 /**
  * Every fixture this test owns. The Swift tests decode each one. A few come from elsewhere: sync-status.json is checked
  * by sync-setup.test.ts, and those that take two Macs by their own tests: devices.json and thread-handoff.json by
- * handoff-two-macs.test.ts, thread-takeover.json and thread-takeover-requested.json by takeover-two-macs.test.ts.
+ * handoff-two-macs.test.ts, thread-takeover.json and thread-takeover-requested.json by takeover-two-macs.test.ts, and
+ * thread-undelivered.json by delivery-gap-run-on.test.ts.
  */
 const NAMES = [
   'harnesses.json',
@@ -96,6 +101,8 @@ const NAMES = [
   'limit-scheduled.json',
   'limit-cancelled.json',
   'limit-resumed.json',
+  // That thread, once done, started with fresh context: its next turn gets a new session (#400).
+  'session-fresh.json',
   // The retried worktree thread's branch changes, every group, and a thread with no repo to read.
   'changes.json',
   'changes-unavailable.json',
@@ -625,6 +632,12 @@ async function scenario() {
   git('commit', '-q', '--allow-empty', '-m', 'first');
   keep('setup-retried.json', await call('POST', `/threads/${wt.id}/setup/retry`, {}));
   await eventually(async () => (await detail(wt.id)).thread.status === 'done', 'the retried thread to run');
+  // The turn's after snapshot settles behind its status. Edit the checkout while it is still being saved and the save
+  // fails on whatever moved ("pathspec 'README.md' did not match"), which turns.json records as that turn's `error`.
+  await eventually(async () => {
+    const b = (await get(`/threads/${wt.id}/turns`)) as { turns: { state: string }[] };
+    return b.turns.length > 0 && b.turns.every((t) => t.state === 'ready') && b;
+  }, 'the retried turn to be saved');
 
   // Its branch changes before any PR: a commit, a staged rename, an unstaged edit and deletion, an untracked file.
   const tree = (...args: string[]) => execFileSync('git', ['-C', wt.cwd, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', ...args]);
@@ -706,6 +719,8 @@ async function scenario() {
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
+  const fresh = keep('session-fresh.json', await call('POST', `/threads/${capped.id}/session/fresh`, {})) as { thread: { resume_blocked: string | null } };
+  expect(fresh.thread.resume_blocked).toBeNull();
 
   // Bounded history: a first turn whose prompt and answer are too big for a row, then a short one. The client opens on
   // the head, loads the page above it, then reveals the first message and reads it whole, as a search hit would.
@@ -945,4 +960,62 @@ describe('Mac app fixtures', () => {
       expect(out, HINT).toEqual([]);
     });
   }
+});
+
+// The Swift wire types against the @omni/shared contracts the server and the web import. The recorded answers the
+// Swift tests decode must match the shared types exactly, and Changes.swift must read the same keys and know the same
+// values. Reads only files, so it needs no server.
+describe('Swift wire types follow @omni/shared', () => {
+  const fixture = (name: string) => JSON.parse(readFileSync(join(FIXTURES, name), 'utf8')) as unknown;
+
+  it.each([
+    ['changes.json', changesProblems],
+    ['changes-unavailable.json', changesProblems],
+    ['turns.json', turnChangesProblems],
+    ['turns-unavailable.json', turnChangesProblems],
+  ] as const)('%s is what @omni/shared/changes.ts says', (name, problems) => {
+    expect(problems(fixture(name))).toEqual([]);
+  });
+
+  it('Changes.swift reads the keys of each shared type', () => {
+    const src = omniKitSource('Changes.swift');
+    for (const [type, keys] of Object.entries(CHANGES_WIRE_KEYS)) expect([type, swiftKeys(src, type).sort()]).toEqual([type, [...keys].sort()]);
+  });
+
+  it('Changes.swift knows every kind, state, status and omitted reason', () => {
+    const src = omniKitSource('Changes.swift');
+    expect(swiftEnumValues(src, 'ChangeKind').sort()).toEqual([...CHANGE_KINDS].sort());
+    expect(swiftEnumValues(src, 'TurnState').sort()).toEqual([...TURN_STATES].sort());
+    // `modified` is the letter switch's default.
+    expect([...swiftSwitchCases(src, 'ChangedFile', 'letter'), 'modified'].sort()).toEqual([...CHANGE_STATUSES].sort());
+    expect(swiftSwitchCases(src, 'ChangedFile', 'notice').sort()).toEqual([...DIFF_OMITTED].sort());
+  });
+
+  it('Setup.swift holds every field Settings shows, and none the contract lacks', () => {
+    const src = omniKitSource('Setup.swift');
+    const swiftType = { user: 'User', workspace: 'Workspace', integrations: 'Integrations' } as const;
+    for (const section of SETTING_SECTIONS) {
+      const keys = swiftKeys(src, swiftType[section]);
+      const all = sectionFields(section).map((f) => f.key);
+      const shown = sectionFields(section).filter((f) => f.page).map((f) => f.key);
+      expect([section, shown.filter((k) => !keys.includes(k))]).toEqual([section, []]);
+      expect([section, keys.filter((k) => !all.includes(k))]).toEqual([section, []]);
+    }
+    const configKeys = Object.keys(userConfigSchema.parse({}));
+    expect(swiftKeys(src, 'UserConfig').filter((k) => k !== 'onboardedAt' && !configKeys.includes(k))).toEqual([]);
+  });
+
+  it('ProfileSettingsView.swift shows each field with the shared label, hint and placeholder', () => {
+    const src = macAppSource('ProfileSettingsView.swift');
+    const missing: string[] = [];
+    const need = (text: string | undefined) => text && !src.includes(text) && missing.push(text);
+    for (const page of Object.values(SETTING_PAGES)) [page.title, page.advanced?.summary, page.advanced?.note].forEach(need);
+    for (const f of SETTING_FIELDS.filter((x) => x.page)) {
+      need(`"${f.label}"`);
+      // The part before `{fallback}`, which the Swift interpolates.
+      need('hint' in f ? f.hint.split('{fallback}')[0] : undefined);
+      need('placeholder' in f ? `"${f.placeholder}"` : undefined);
+    }
+    expect(missing).toEqual([]);
+  });
 });

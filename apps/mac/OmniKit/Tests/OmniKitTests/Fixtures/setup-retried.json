@@ -30,6 +30,7 @@
     "done_at": null,
     "setup": "preparing",
     "setup_error": null,
+    "resume_blocked": null,
     "limit_state": null,
     "limit_resets_at": null,
     "limit_elsewhere": 0,

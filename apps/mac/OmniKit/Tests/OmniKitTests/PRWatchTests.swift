@@ -96,6 +96,9 @@ private func watch(state: String = "watching", stop: String? = nil, error: Strin
     #expect(queued.label(lead: false) == "Queued, runs after this turn")
     #expect(ParkedMessages.heading([held]) == "1 message is waiting for Resume")
     #expect(ParkedMessages.heading([held, held]) == "2 messages are waiting for Resume")
+    // A thread with a stale session (resume_blocked) says why they wait, not a restart.
+    #expect(ParkedMessages.heading([held], sessionBlocked: true) == "1 message is waiting for a session that is up to date")
+    #expect(ParkedMessages.heading([held, held], sessionBlocked: true) == "2 messages are waiting for a session that is up to date")
   }
 
   @Test func aWakeListsWhatItWasFor() throws {

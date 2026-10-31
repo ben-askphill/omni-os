@@ -2,7 +2,8 @@ import OmniKit
 import SwiftUI
 
 /// The user config that onboarding wrote (data/omni.config.json), like the Web UI's Settings page
-/// (apps/web/src/pages/Settings.tsx): the General tab's part is who you are, plus Run setup again; the Workspace
+/// (apps/web/src/pages/Settings.tsx). Its fields, labels, hints and placeholders are the shared settings contract's
+/// (packages/shared/settings.ts); apps/server/tests/mac-fixtures.test.ts checks this file names each one: the General tab's part is who you are, plus Run setup again; the Workspace
 /// tab's is where your work lives and the optional integrations. Each part saves only its own fields, so the other
 /// tab's unsaved edits stay as they are. The store refreshes after a save so the greeting follows at once.
 struct ProfileSettings: View {
@@ -32,9 +33,11 @@ struct ProfileSettings: View {
     VStack(alignment: .leading, spacing: z(16)) {
       if let state {
         if part == .general {
-          SettingsCard(title: "You", note: "Your name is used in the greeting on Home and told to every agent, so a thread knows who it works for.") {
+          SettingsCard(title: "You") {
             VStack(alignment: .leading, spacing: z(14)) {
-              Row("Name") { TextField("Name", text: $form.user.name, prompt: Text("Your name")).textFieldStyle(.omni).frame(maxWidth: z(320)) }
+              Row("Name", hint: "Used in the greeting on Home and told to every agent, so a thread knows who it works for.") {
+                TextField("Name", text: $form.user.name, prompt: Text("Your name")).textFieldStyle(.omni).frame(maxWidth: z(320))
+              }
               HStack(alignment: .top, spacing: z(12)) {
                 Row("Pronouns") { PronounsField(value: $form.user.pronouns) }
                 Row("Timezone", hint: "Empty uses the server's: \(state.fallbacks.timezone).") {
@@ -58,8 +61,11 @@ struct ProfileSettings: View {
               }
             }
           }
-          SettingsCard(title: "Integrations", note: "Optional. Leave a field empty to turn it off.") {
+          // The developer integrations fold under Advanced, as on the web (#405).
+          AdvancedFold(summary: "Hermes URL and central brain folder") {
             VStack(alignment: .leading, spacing: z(14)) {
+              Text("Optional integrations. Leave a field empty to turn it off.")
+                .font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
               Row("Hermes URL", hint: "A Hermes API server on your tailnet. Its token is the global secret HERMES_API_KEY.") {
                 TextField("Hermes URL", text: $form.integrations.hermesUrl, prompt: Text(verbatim: "http://100.64.0.1:8642")).textFieldStyle(.omniMono)
               }

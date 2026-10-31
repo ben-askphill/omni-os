@@ -19,7 +19,7 @@ final class SetupRuns {
       setups[t.id] = t.setup
       return true
     }
-    guard t.branch != nil, !t.harness.isRemote else { return false }
+    guard t.branch != nil, !t.harness.runsOnProvider else { return false }
     if setups.updateValue(nil, forKey: t.id) != .some(nil) {
       Task { await load(t.id, client: client) }
     }
@@ -90,7 +90,7 @@ private struct PreparationCard: View {
     let failed = thread.setup == .failed
     let stopped = failed && thread.status == .stopped
     // A thread that runs off this Mac gets no setup action, whatever the channel has.
-    let action = thread.harness.isRemote ? nil : actions?.setupAction
+    let action = thread.harness.runsOnProvider ? nil : actions?.setupAction
     let run = actions?.setupRun
     let steps = PreparationStep.steps(setup: thread.setup, action: action, run: run)
     let title = stopped ? "Setup stopped" : failed ? "Setup failed" : "Preparing worktree"

@@ -5,38 +5,9 @@ import { api, errorText, type ChannelWithRunning, type Folder, type FolderWithTh
 import { useToast } from './components/Toaster.tsx';
 import { ConfirmDialog } from './components/ui.tsx';
 import { useApp } from './store.tsx';
+import { cleanName, DEFAULT_FOLDER_NAME, draftKey, duplicateStandIn, FOLDER_NAME_MAX, freeName, newFolderStandIn, patchFolder, reorderedIds, settledFolder, sortFolders, withCollapsed, withFolders, withoutFolder, withThreadMoved } from './folder-edits.ts';
 
-export const FOLDER_NAME_MAX = 60;
-export const DEFAULT_FOLDER_NAME = 'New folder';
-
-/** What `editing` holds while the name field of a folder that does not exist yet shows under a channel. */
-export const draftKey = (channelId: string) => `new:${channelId}`;
-
-/** Manually placed folders first, in their order, then the rest by name. The server's order (db/repos/folders.ts). */
-export function sortFolders<T extends Pick<Folder, 'position' | 'name' | 'created_at'>>(list: T[]) {
-  return [...list].sort(
-    (a, b) =>
-      (a.position === null ? 1 : 0) - (b.position === null ? 1 : 0) ||
-      (a.position ?? 0) - (b.position ?? 0) ||
-      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) ||
-      a.created_at.localeCompare(b.created_at),
-  );
-}
-
-/** `base`, or `base 2`, `base 3`…: the first name no other folder in the list has, ignoring case. */
-export function freeName(list: Pick<Folder, 'id' | 'name'>[], base: string, exceptId?: string) {
-  const taken = new Set(list.filter((f) => f.id !== exceptId).map((f) => f.name.toLocaleLowerCase()));
-  if (!taken.has(base.toLocaleLowerCase())) return base;
-  for (let n = 2; ; n++) {
-    const name = `${[...base].slice(0, FOLDER_NAME_MAX - ` ${n}`.length).join('').trimEnd()} ${n}`;
-    if (!taken.has(name.toLocaleLowerCase())) return name;
-  }
-}
-
-/** One line, trimmed. */
-export const cleanName = (s: string) => s.replace(/\s+/g, ' ').trim();
-
-const busy = (t: Pick<ThreadStub, 'status'>) => t.status === 'running' || t.status === 'queued';
+export { cleanName, DEFAULT_FOLDER_NAME, draftKey, FOLDER_NAME_MAX, freeName, sortFolders };
 
 /** What is being dragged in the sidebar right now. dataTransfer can't be read until the drop, so it lives here. */
 export type Dragged = { kind: 'thread'; thread: ThreadStub } | { kind: 'folder'; id: string; channel_id: string };
@@ -107,27 +78,15 @@ export function FolderProvider({ children }: { children: ReactNode }) {
     [updateChannels, reloadChannels, toast],
   );
 
-  const withFolders = (c: ChannelWithRunning, fn: (list: FolderWithThreads[]) => FolderWithThreads[]) => ({ ...c, folders: sortFolders(fn(c.folders ?? [])) });
-  const patchFolder = (id: string, patch: Partial<FolderWithThreads>) => (c: ChannelWithRunning) =>
-    withFolders(c, (list) => list.map((f) => (f.id === id ? { ...f, ...patch } : f)));
-  /** Swap a stand-in folder for the server's row, keeping what the list knows about its threads. */
   const settle = (channelId: string, tmpId: string, row: Folder) =>
-    updateChannels((list) =>
-      list.map((c) => (c.id === channelId ? withFolders(c, (fs) => fs.map((f) => (f.id === tmpId ? { ...f, ...row } : f))) : c)),
-    );
+    updateChannels((list) => list.map((c) => (c.id === channelId ? settledFolder(tmpId, row)(c) : c)));
 
   const create = useCallback(
     async (channelId: string, raw: string) => {
       const c = latest.current.find((x) => x.id === channelId);
-      const list = c?.folders ?? [];
-      const name = freeName(list, cleanName(raw).slice(0, FOLDER_NAME_MAX) || DEFAULT_FOLDER_NAME);
-      const max = list.reduce<number | null>((m, f) => (f.position === null ? m : Math.max(m ?? -1, f.position)), null);
-      const now = new Date().toISOString();
       const id = `tmp-${++tmp}`;
-      const stand: FolderWithThreads = {
-        id, channel_id: channelId, parent_id: null, name, position: max === null ? null : max + 1, collapsed: 0, created_at: now, updated_at: now,
-        count: 0, running: 0, threads: [],
-      };
+      const stand = newFolderStandIn(id, channelId, c?.folders ?? [], raw);
+      const name = stand.name;
       const row = await optimistic(channelId, (ch) => withFolders(ch, (fs) => [...fs, stand]), () => api.post<Folder>('/folders', { channel: channelId, name }), "Couldn't create the folder");
       if (row) settle(channelId, id, row);
     },
@@ -159,9 +118,7 @@ export function FolderProvider({ children }: { children: ReactNode }) {
       const set = new Set(ids);
       if (!set.size) return;
       const before = latest.current;
-      updateChannels((list) =>
-        list.map((c) => (c.folders?.some((f) => set.has(f.id)) ? { ...c, folders: c.folders.map((f) => (set.has(f.id) ? { ...f, collapsed: 1 } : f)) } : c)),
-      );
+      updateChannels(withCollapsed(set));
       const sent = await Promise.allSettled(ids.map((id) => api.patch<Folder>(`/folders/${encodeURIComponent(id)}`, { collapsed: true })));
       const failed = sent.find((r): r is PromiseRejectedResult => r.status === 'rejected');
       if (!failed) return;
@@ -179,8 +136,7 @@ export function FolderProvider({ children }: { children: ReactNode }) {
       if (!f) return;
       const c = latest.current.find((x) => x.id === f.channel_id);
       const tmpId = `tmp-${++tmp}`;
-      const base = `${[...f.name].slice(0, FOLDER_NAME_MAX - ' copy'.length).join('').trimEnd()} copy`;
-      const stand: FolderWithThreads = { ...f, id: tmpId, name: freeName(c?.folders ?? [], base), position: f.position === null ? null : f.position + 0.5, count: 0, running: 0, threads: [] };
+      const stand = duplicateStandIn(f, tmpId, c?.folders ?? []);
       const row = await optimistic(f.channel_id, (ch) => withFolders(ch, (fs) => [...fs, stand]), () => api.post<Folder>(`/folders/${encodeURIComponent(id)}/duplicate`, {}), "Couldn't duplicate the folder");
       // The copy lands after the original, which moves every folder below it: take the server's order.
       if (row) (settle(f.channel_id, tmpId, row), void reloadChannels());
@@ -193,10 +149,9 @@ export function FolderProvider({ children }: { children: ReactNode }) {
       const f = find(id);
       if (!f) return;
       setDeletingId(null);
-      const unfile = (t: ThreadStub) => (t.folder_id === id ? { ...t, folder_id: null } : t);
       await optimistic(
         f.channel_id,
-        (c) => ({ ...withFolders(c, (fs) => fs.filter((x) => x.id !== id)), active: c.active?.map(unfile), recent: c.recent?.map(unfile) }),
+        withoutFolder(id),
         () => api.del(`/folders/${encodeURIComponent(id)}`),
         "Couldn't delete the folder",
       );
@@ -207,25 +162,9 @@ export function FolderProvider({ children }: { children: ReactNode }) {
   const moveThread = useCallback(
     async (thread: ThreadStub, folderId: string | null) => {
       if ((thread.folder_id ?? null) === folderId || folderId?.startsWith('tmp-')) return;
-      const moved = { ...thread, folder_id: folderId };
-      const swap = (t: ThreadStub) => (t.id === thread.id ? moved : t);
       await optimistic(
         thread.channel_id,
-        (c) => ({
-          ...withFolders(c, (fs) =>
-            fs.map((f) => {
-              const had = f.threads.some((t) => t.id === thread.id) || thread.folder_id === f.id;
-              if (f.id === folderId && !had)
-                return { ...f, count: f.count + 1, running: f.running + (busy(thread) ? 1 : 0), threads: [moved, ...f.threads].sort((a, b) => b.created_at.localeCompare(a.created_at)) };
-              if (f.id !== folderId && had)
-                return { ...f, count: Math.max(0, f.count - 1), running: Math.max(0, f.running - (busy(thread) ? 1 : 0)), threads: f.threads.filter((t) => t.id !== thread.id) };
-              return f;
-            }),
-          ),
-          active: c.active?.map(swap),
-          // An ungrouped thread the list has not got yet shows there right away.
-          recent: folderId === null && !c.recent?.some((t) => t.id === thread.id) ? [moved, ...(c.recent ?? [])] : c.recent?.map(swap),
-        }),
+        withThreadMoved(thread, folderId),
         () => api.patch(`/threads/${encodeURIComponent(thread.id)}`, { folder_id: folderId }),
         "Couldn't move the thread",
       );
@@ -236,11 +175,8 @@ export function FolderProvider({ children }: { children: ReactNode }) {
   const reorder = useCallback(
     async (channelId: string, id: string, beforeId: string | null) => {
       const c = latest.current.find((x) => x.id === channelId);
-      const ids = (c?.folders ?? []).map((f) => f.id).filter((x) => x !== id);
-      if (ids.some((x) => x.startsWith('tmp-')) || id.startsWith('tmp-')) return;
-      const at = beforeId ? ids.indexOf(beforeId) : -1;
-      ids.splice(at < 0 ? ids.length : at, 0, id);
-      if (ids.join() === (c?.folders ?? []).map((f) => f.id).join()) return;
+      const ids = reorderedIds(c?.folders ?? [], id, beforeId);
+      if (!ids) return;
       await optimistic(
         channelId,
         (ch) => withFolders(ch, (fs) => fs.map((f) => ({ ...f, position: ids.indexOf(f.id) }))),

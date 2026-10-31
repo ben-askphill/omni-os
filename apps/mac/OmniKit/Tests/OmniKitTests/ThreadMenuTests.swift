@@ -4,8 +4,7 @@ import OmniKit
 
 /// Cases from packages/shared/tests/thread-actions.test.ts, through the bundled engine. thread-menu.json is the
 /// shared module's menu for a thread every action applies to, recorded by apps/server/tests/mac-fixtures.test.ts.
-private let every = ThreadMenuFacts(
-  row: true, settled: true, harness: "claude-code", handOff: true, takeOverFrom: "Studio", grokBot: true)
+private let every = ThreadMenuFacts(row: true, settled: true, harness: "claude-code", grokBot: true)
 private let engine = SlashEngine.shared
 
 @Suite struct ThreadMenuTests {
@@ -16,7 +15,7 @@ private let engine = SlashEngine.shared
   @Test func groupsTenActionsAtMost() {
     let menu = engine.threadMenu(every)
     #expect(menu.map(\.title) == ["Organize", "Continue", "Send to"])
-    #expect(menu.flatMap(\.items).map(\.id) == [.pin, .done, .rename, .move, .archive, .fork, .reference, .handOff, .takeOver, .grok])
+    #expect(menu.flatMap(\.items).map(\.id) == [.pin, .done, .rename, .move, .archive, .fork, .reference, .grok])
     #expect(menu.flatMap(\.items).map(\.label).last == "Send to Grok Bot")
   }
 

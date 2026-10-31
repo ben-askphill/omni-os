@@ -12,7 +12,7 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 | `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file |
 | Secret store | Secret values: the Keychain on a Mac, `data/secrets.json` on Linux. The database keeps their names only |
 
-`npm run setup` or the first-run screens write `data/omni.config.json` ([Install](install.md#set-up-by-hand)). Change it later in Settings, the same sections on desktop web, phone web and the Mac app: General (you, theme, notifications, run setup again), Workspace (your folders, GitHub owner, integrations), Machines (this machine, where new threads run, Sync, Storage) and Secrets. On the web, Settings is `#/settings` and each section has its own hash (`#/settings/machines`); the old `#/secrets`, `#/sync` and `#/storage` still open the section that holds them. Automations stays a page of its own. Your name goes into the Home greeting and every agent's prompt.
+`npm run setup` or the first-run screens write `data/omni.config.json` ([Install](install.md#set-up-by-hand)). Change it later in Settings, the same sections on desktop web, phone web and the Mac app: General (you, theme, notifications, run setup again), Workspace (your folders, GitHub owner, and the integrations under Advanced), Machines (this machine and its name, where new threads run, Sync, Storage, and under Advanced the address, feed and sync path map; the Mac app adds its server port, repo, Node and log there) and Secrets. On the web, Settings is `#/settings` and each section has its own hash (`#/settings/machines`); the old `#/secrets`, `#/sync` and `#/storage` still open the section that holds them. Automations stays a page of its own. Your name goes into the Home greeting and every agent's prompt.
 
 An install from before the config file existed writes one at its first boot from the old defaults and skips onboarding, so it keeps behaving as before.
 
@@ -60,9 +60,9 @@ Storage, under Settings > Machines, inventories worktrees and explains why each 
 
 Send to Grok Bot posts a thread's title and messages to a webhook. The context is the channel id and the thread id.
 
-The button is in the thread header on the Web UI and on the Mac app. A narrow desktop web header puts it in More. The same action is in the thread's right-click menu on both, and in Thread options on a phone. The Conductor calls `send_to_grok_bot`.
+The action is in the thread's menu on the Web UI and the Mac app: the ⋯ in the thread header, or a right-click on the thread. On a phone it is in Thread options. The Conductor calls `send_to_grok_bot`.
 
-The button and the menu items show only once `GROKBOT_WEBHOOK_URL` is set, as a global secret or in `.env`. `GET /api/status` reports this as `grokBot`. Without it nothing of Grok Bot shows.
+The menu items show only once `GROKBOT_WEBHOOK_URL` is set, as a global secret or in `.env`. `GET /api/status` reports this as `grokBot`. Without it nothing of Grok Bot shows.
 
 The URL and the Authorization value come from the Omni OS requests routine, on Grok Bot's Routines tab. Paste each one in either place.
 

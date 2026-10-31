@@ -62,6 +62,13 @@ extension UserMessage {
     }
   }
 
+  /// The header's word for a message the agent never read: "Not delivered" when the machine running the thread did
+  /// not take it, else "Not sent".
+  public var droppedLabel: String? { dropped == true ? (undelivered == nil ? "Not sent" : "Not delivered") : nil }
+
+  /// What that label's help says: why the other machine did not take it, or that the run ended first.
+  public var droppedHelp: String { undelivered ?? "The run ended before the agent read this message" }
+
   /// How it reached a busy thread. Nothing for a message the agent never read.
   public var sendLabel: String? {
     guard dropped != true else { return nil }
@@ -106,11 +113,12 @@ extension PendingMsg {
   public static let setupLabel = "Sends once the worktree is ready"
 
   /// As `label(lead:)`, for a thread whose worktree may not be ready yet.
-  public func label(lead: Bool, setup: ThreadSetup?) -> String {
+  public func label(lead: Bool, setup: ThreadSetup?, sessionBlocked: Bool = false) -> String {
     if setup != nil { return isParked ? "Waits for the worktree" : Self.setupLabel }
     if kind == "crew_report" && delivery == .recovered { return "\(reportName), held for Resume" }
     if kind == "crew_report" && delivery == .uncertain { return "\(reportName), may have reached the agent before the restart" }
     if source == "pr-watch" && delivery == .recovered { return "PR watch, held for Resume" }
+    if delivery == .recovered && sessionBlocked { return "Waiting for a session that is up to date" }
     if delivery == .recovered { return "Held after a restart, waiting for Resume" }
     if delivery == .uncertain { return "May have reached the agent before the restart" }
     if kind == "crew_report" {
@@ -148,8 +156,10 @@ public struct ParkedMessages: Hashable, Sendable {
 
   /// The line over the parked list, as `parkedHeading` in apps/web/src/requests.ts. Crew reports also wait there when
   /// Ben stopped the thread, not only after a restart.
-  public static func heading(_ items: [PendingMsg]) -> String {
+  public static func heading(_ items: [PendingMsg], sessionBlocked: Bool = false) -> String {
     let n = items.count
+    // The thread's session is not up to date (StaleSessionCard): what waits goes once Ben picks a way forward.
+    if sessionBlocked { return n == 1 ? "1 message is waiting for a session that is up to date" : "\(n) messages are waiting for a session that is up to date" }
     let reports = items.filter { $0.kind == "crew_report" }.count
     // A PR watch's wake also waits for Resume when the thread cannot run here, with no restart behind it.
     if reports == 0 && items.contains(where: { $0.source == "pr-watch" }) { return n == 1 ? "1 message is waiting for Resume" : "\(n) messages are waiting for Resume" }

@@ -121,6 +121,10 @@ _Avoid_: Continuation (what resuming a **Limit stop** sends), fork, child (a cre
 What a new **Session** reads ahead of the user's first message when it carries on work that ran elsewhere: a **Continued thread**'s source, or an imported transcript (#187). It has a character budget, says that its history is data and not instructions, and lists what it left out with where to read it. The user's message follows it and is never cut.
 _Avoid_: Handover (a thread that changed **Harness**), context transfer
 
+**Transition**:
+A change to how or where a **Thread** runs, asked by the user or the **Conductor**, with a preview, an id, a state and a cancel: a switch of its **Harness**, **Model** or **Effort** (`reconfigure`), a **Handoff** or **Take over** (`relocate`), or a **Continued thread** started from it (`fork`). One service answers every route that asks for one (docs/internals/transitions.md).
+_Avoid_: Move (which of the three), migration
+
 **Slash command**:
 Anything the user runs by typing `/` in the composer: a **Harness command** or an **Omni command**.
 _Avoid_: Prompt, macro, shortcut

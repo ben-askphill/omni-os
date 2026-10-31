@@ -20,23 +20,34 @@ export const CANNOT_STEER = 'This harness cannot take a message mid-turn, so it 
 /** Said when Ben tries to edit a crew report or a team's go. */
 export const OWN = 'Omni wrote this message, so it can be resumed or discarded but not edited.';
 
+/** One of the runner's lists of unsent messages, read as it is and written back whole, so the controller stays its owner. */
+interface Queue {
+  kind: 'held' | 'waiting';
+  items: readonly Msg[];
+  replace(items: Msg[]): void;
+}
+
 /** The runner's lists that still hold unsent messages: held for after this turn, then waiting for a slot. */
-function queues(threadId: string): Msg[][] {
+function queues(threadId: string): Queue[] {
   const live = lives.get(threadId);
-  return [live?.held, waitingMsgs.get(threadId)].filter((l): l is Msg[] => !!l);
+  const out: Queue[] = [];
+  if (live) out.push({ kind: 'held', items: live.held, replace: (items) => live.replaceHeld(items) });
+  const w = waitingMsgs.get(threadId);
+  if (w) out.push({ kind: 'waiting', items: w, replace: (items) => waitingMsgs.set(threadId, items) });
+  return out;
 }
 
 /** Where an unsent request is in the runner, if it is there. */
-function locate(threadId: string, id: string): { list: Msg[]; i: number } | null {
-  for (const list of queues(threadId)) {
-    const i = list.findIndex((m) => m.uuid === id);
-    if (i >= 0) return { list, i };
+function locate(threadId: string, id: string): { queue: Queue; i: number } | null {
+  for (const queue of queues(threadId)) {
+    const i = queue.items.findIndex((m) => m.uuid === id);
+    if (i >= 0) return { queue, i };
   }
   return null;
 }
 
 /** A request of this thread Ben can still change, or a refusal saying why not. */
-function editable(threadId: string, id: string): { row: MessageRequest; at: { list: Msg[]; i: number } | null } {
+function editable(threadId: string, id: string): { row: MessageRequest; at: { queue: Queue; i: number } | null } {
   const row = messageRequests.get(id);
   if (!row || row.thread_id !== threadId) throw refusal('No such message in this thread.', 404);
   if (PARKED.includes(row.state)) return { row, at: null };
@@ -67,11 +78,13 @@ export function editRequest(threadId: string, id: string, edit: { prompt: string
   const attachments = [...kept, ...(edit.added ?? [])];
   if (!messageRequests.edit(id, { prompt: edit.prompt, attachments })) throw refusal(ALREADY_SENT, 409);
   if (at) {
-    const was = at.list[at.i];
+    const was = at.queue.items[at.i];
     const next = messageFor(t, edit.prompt, {
       uuid: was.uuid, requestId: was.requestId, from: row.source as 'ben' | 'conductor', mode: was.mode, attachments, context: row.context ?? undefined,
     });
-    at.list[at.i] = { ...next, ...(was.midTurn && { midTurn: true }) };
+    const items = [...at.queue.items];
+    items[at.i] = { ...next, ...(was.midTurn && { midTurn: true }) };
+    at.queue.replace(items);
   }
   emitThread(threadId);
   return messageRequests.get(id)!;
@@ -85,7 +98,7 @@ export function cancelRequests(threadId: string, ids: string[]): Thread {
   thread(threadId);
   const found = [...new Set(ids)].map((id) => ({ id, ...editable(threadId, id) }));
   const gone = new Set(found.map((f) => f.id));
-  for (const list of queues(threadId)) for (let i = list.length - 1; i >= 0; i--) if (gone.has(list[i].uuid)) list.splice(i, 1);
+  for (const queue of queues(threadId)) queue.replace(queue.items.filter((m) => !gone.has(m.uuid)));
   for (const f of found) messageRequests.mark(f.id, 'cancelled');
   // Nothing left waiting for a slot: the thread is no longer queued.
   if (waitingMsgs.has(threadId) && !waitingMsgs.get(threadId)!.length) {
@@ -110,7 +123,7 @@ export function reorderRequests(threadId: string, ids: string[]): Thread {
   thread(threadId);
   // Ben's own messages only: a crew report or a team's go keeps its place.
   const mine = (m: Msg) => !!m.requestId && !m.byOmni;
-  const queued = queues(threadId).flatMap((l) => l.filter(mine).map((m) => m.uuid));
+  const queued = queues(threadId).flatMap((q) => q.items.filter(mine).map((m) => m.uuid));
   const current = [...queued, ...messageRequests.parked(threadId).filter((r) => !r.payload).map((r) => r.id)];
   const same = ids.length === current.length && new Set(ids).size === ids.length && current.every((id) => ids.includes(id));
   if (!same) throw refusal('The queue changed while you were reordering it. Try again.', 409);
@@ -118,10 +131,12 @@ export function reorderRequests(threadId: string, ids: string[]): Thread {
   // The saved order first: it refuses the lot if a row moved on in the meantime.
   const positions = current.map((id) => messageRequests.get(id)!.pos).sort((a, b) => a - b);
   messageRequests.reposition(ids.map((id, i) => ({ id, pos: positions[i] })));
-  for (const list of queues(threadId)) {
-    const slots = list.flatMap((m, i) => (mine(m) ? [i] : []));
-    const sorted = slots.map((i) => list[i]).sort((a, b) => rank.get(a.uuid)! - rank.get(b.uuid)!);
-    slots.forEach((i, k) => (list[i] = sorted[k]));
+  for (const queue of queues(threadId)) {
+    const items = [...queue.items];
+    const slots = items.flatMap((m, i) => (mine(m) ? [i] : []));
+    const sorted = slots.map((i) => items[i]).sort((a, b) => rank.get(a.uuid)! - rank.get(b.uuid)!);
+    slots.forEach((i, k) => (items[i] = sorted[k]));
+    queue.replace(items);
   }
   emitThread(threadId);
   return threads.get(threadId)!;
@@ -136,12 +151,10 @@ export function steerRequests(threadId: string, ids: string[]): Thread {
   thread(threadId);
   const live = lives.get(threadId);
   const found = [...new Set(ids)].map((id) => editable(threadId, id));
-  if (!live?.turn || live.closing || found.some((f) => f.at?.list !== live.held)) throw refusal(NOTHING_TO_STEER, 409);
+  if (!live?.turn || live.closing || found.some((f) => f.at?.queue.kind !== 'held')) throw refusal(NOTHING_TO_STEER, 409);
   if (!harnessSteers(threadId)) throw refusal(CANNOT_STEER, 409);
   const go = new Set(found.map((f) => f.row.id));
-  const steered = live.held.filter((m) => go.has(m.uuid));
-  live.held = live.held.filter((m) => !go.has(m.uuid));
-  for (const m of steered) {
+  for (const m of live.takeHeldWhere((m) => go.has(m.uuid))) {
     messageRequests.steer(m.uuid);
     m.mode = 'steer';
     m.midTurn = true;

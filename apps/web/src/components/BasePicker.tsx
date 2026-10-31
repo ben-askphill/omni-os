@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BaseOptions, BasePick, ThreadBaseView } from '@omni/shared/worktree-base.ts';
 import { useApi, type Thread } from '../api.ts';
-import { baseOptionRows, branchingFrom, HEAD_PICK, isRemoteHarness, pickKey, type BaseOption } from '../worktree-base.ts';
+import { baseOptionRows, branchingFrom, HEAD_PICK, isProviderHarness, pickKey, type BaseOption } from '../worktree-base.ts';
 import { Picker, type PickerOption } from './ui.tsx';
 
 /**
@@ -9,8 +9,8 @@ import { Picker, type PickerOption } from './ui.tsx';
  * pick: a channel without a repo and worktrees, or a harness that runs off this Mac. A failed fetch leaves the default.
  */
 export function useBaseRows(channel: string, harness: string): { rows: BaseOption[] | null; reload: () => void } {
-  const { data, reload } = useApi<BaseOptions>(isRemoteHarness(harness) ? null : `/channels/${encodeURIComponent(channel)}/bases`);
-  const rows = useMemo(() => (isRemoteHarness(harness) ? null : baseOptionRows(data)), [data, harness]);
+  const { data, reload } = useApi<BaseOptions>(isProviderHarness(harness) ? null : `/channels/${encodeURIComponent(channel)}/bases`);
+  const rows = useMemo(() => (isProviderHarness(harness) ? null : baseOptionRows(data)), [data, harness]);
   return { rows, reload };
 }
 

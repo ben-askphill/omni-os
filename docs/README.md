@@ -21,15 +21,18 @@
 Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](../CLAUDE.md).
 
 - [Architecture overview](internals/overview.md): how a thread runs, the Web UI and Mac app split, repo layout
+- [Execution and ownership state](internals/execution-state.md): a thread's process, its messages and its owner machine as state diagrams, who owns each, and how the runner reaches the rest of Omni. Read before touching `apps/server/runner/`
 - [Auto routing](internals/auto-routing.md): how Auto picks a model, and the benchmarks that check it
 - [Thread history](internals/thread-history.md): how a long thread opens on its newest page, the budgets, and what clients hold
 - [Message context](internals/message-context.md): diff lines, terminal excerpts, browser annotations, thread references and how to add a kind
 - [Delivery contract](internals/delivery.md): what an accepted message, wake or Stop is promised on any machine, and the known gaps with their expected-fail tests
+- [Transitions](internals/transitions.md): the one service behind a run switch, a handoff or Take over and a Continue, its four routes, the six older routes that answer through it, and what stays as synced kv for machines on an older build
 - [Glossary](../CONTEXT.md)
 - [Mac app notes](../apps/mac/NOTES.md)
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages
 - [Screenshots on PRs](pr-screenshots.md)
-- Decisions: [0001 Codex app-server](adr/0001-codex-app-server.md) · [0002 Mac app is a client](adr/0002-mac-app-is-a-client.md) · [0003 Hermes remote harness](adr/0003-hermes-remote-harness.md) · [0004 Supabase sync](adr/0004-supabase-sync.md)
+- Reviews: [2026-10-31 consolidation release, the KPIs re-measured](reviews/2026-10-31-consolidation-review.md) · [2026-10-22 bloat and dead code](reviews/2026-10-22-thermo-bloat-review.html) · [2026-10-16 thermo](reviews/2026-10-16-thermo-review.html)
+- Decisions: [0001 Codex app-server](adr/0001-codex-app-server.md) · [0002 Mac app is a client](adr/0002-mac-app-is-a-client.md) · [0003 Hermes remote harness](adr/0003-hermes-remote-harness.md) · [0004 Supabase sync](adr/0004-supabase-sync.md) · [0005 One execution owner](adr/0005-one-execution-owner.md)
 
 ## Where a new doc goes
 

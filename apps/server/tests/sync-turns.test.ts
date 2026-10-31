@@ -71,7 +71,9 @@ describe('with sync on', () => {
 
   it('a thread running on the other Mac takes no turn here', async () => {
     thread('elsewhere', { cwd: r.tmp });
+    // Stands in for mac-b's synced writes: the running row, and the assignment its turn claimed.
     r.db.db.prepare(`UPDATE threads SET status = 'running', run_machine = 'mac-b' WHERE id = 'elsewhere'`).run();
+    r.db.assignments.claim('elsewhere', 'mac-b');
     const d = await detail('elsewhere');
     expect(d.blocked).toMatch(/running on your other Mac/);
     const res = await post('elsewhere');

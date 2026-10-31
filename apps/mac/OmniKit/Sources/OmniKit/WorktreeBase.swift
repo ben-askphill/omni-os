@@ -166,13 +166,13 @@ public enum BaseRules {
   /// Whether the picker shows. A remote harness (Hermes, Cursor Cloud) has no worktree to cut, and a channel can offer
   /// no choice.
   public static func isOffered(_ options: BaseOptions?, harness: HarnessID) -> Bool {
-    options?.available == true && !harness.isRemote
+    options?.available == true && !harness.runsOnProvider
   }
 
   /// The `base` of the create request: nil for the default, which is also what the server does with none, and for a
   /// harness that has no worktree.
   public static func sent(_ pick: BasePick, harness: HarnessID) -> BasePick? {
-    pick == .head || harness.isRemote ? nil : pick
+    pick == .head || harness.runsOnProvider ? nil : pick
   }
 }
 

@@ -4,8 +4,8 @@ import { Button, CopyButton, ErrorNote, Icon, InlineConfirm, Label, Loading, Seg
 import { plural, relTime } from '../format.ts';
 import { useSecretStoreLabel } from '../store.tsx';
 
-// Settings, Machines, Sync: sign in to the Supabase relay, see what is waiting, sync now, pause, sign out, and the
-// path map. The Mac app's Machines tab (apps/mac/Omni/SyncSettingsView.swift) shows the same.
+// Settings, Machines, Sync: sign in to the Supabase relay, see what is waiting, sync now, pause and sign out. The
+// path map sits under Machines' Advanced. The Mac app's Machines tab (apps/mac/Omni/SyncSettingsView.swift) shows the same.
 
 type Status = SyncStatus;
 
@@ -51,7 +51,6 @@ export function SyncSection() {
         <>
           {s.configured && <StatusCard s={s} onChange={reload} />}
           {(!s.configured || s.signedOut) && <SignInForm again={s.configured} onDone={reload} />}
-          <PathMapEditor />
         </>
       )}
     </>
@@ -287,8 +286,8 @@ function SignInForm({ again, onDone }: { again: boolean; onDone: () => void }) {
 
 type MapRow = { from: string; to: string };
 
-/** kv sync.path_map: where another Mac's folders live on this one. */
-function PathMapEditor() {
+/** kv sync.path_map: where another Mac's folders live on this one. Under Machines' Advanced since #405. */
+export function PathMapEditor() {
   const res = useApi<{ map: Record<string, string> }>('/sync/path-map');
   const [rows, setRows] = useState<MapRow[] | null>(null);
   const [saving, setSaving] = useState(false);

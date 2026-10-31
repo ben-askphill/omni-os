@@ -10,8 +10,8 @@ import { recordUsage } from '../usage.ts';
 import { toolTails } from '../tool-tail.ts';
 import { recordContext, recordContextHint } from '../context.ts';
 import { addCursorTurn, afterCursorTurn } from '../cursor-usage.ts';
-import { beforeResume } from '../sync/files.ts';
-import { isRemoteHarness, type HarnessId } from '../harness/types.ts';
+import { beforeResume, type ResumeOutcome } from '../sync/files.ts';
+import { isProviderHarness, type HarnessId } from '../harness/types.ts';
 import type { AdapterContext } from '../harness/adapter.ts';
 import { invalidateCommands } from '../commands.ts';
 import { runnableCommands } from '@omni/shared/slash.ts';
@@ -19,47 +19,20 @@ import { buildSystemPrompt } from './prompts.ts';
 import { onExit, onRecord } from './records.ts';
 import { abortStart } from './session.ts';
 import { adapterFor, addEvent, browserHolder, cliLabel, crash, deliver, emitThread, lives, omniUrl, track, type Live, type Msg } from './state.ts';
+import { ThreadController } from './controller.ts';
+import { controllerDeps } from './ports.ts';
 import { failSetup } from './setup.ts';
-import { sessionStarted, takeHandover } from './switch.ts';
+import { reportToParent } from './queue.ts';
+import { resumesSession, sessionStarted, takeHandover } from './switch.ts';
 import { startTurnSnapshot } from './snapshots.ts';
 
+/** A thread's process starts: its controller is built here, with the deps the composition root bound, and registered. */
 export function launch(threadId: string, first: Msg): Live | undefined {
   const thread = threads.get(threadId);
   if (!thread) return;
-  let done = () => {};
-  const exited = new Promise<void>((r) => (done = r));
-  const live: Live = {
-    threadId,
-    channelId: thread.channel_id,
-    session: null,
-    sessionId: thread.session_id,
-    harness: thread.harness,
-    turn: true,
-    cliTurn: false,
-    replayed: false,
-    limit: null,
-    turnFrom: 0,
-    inflight: [first],
-    held: [],
-    interrupt: null,
-    hardStop: false,
-    closing: false,
-    shutdown: false,
-    browser: false,
-    initSeen: false,
-    tasks: new Map(),
-    taskSaved: new Map(),
-    mods: new Map(),
-    commands: null,
-    resultSeen: false,
-    spawnFailed: false,
-    exitedFlag: false,
-    stderr: '',
-    exited,
-    done,
-  };
+  const live: Live = new ThreadController(thread, first, controllerDeps());
   lives.set(threadId, live);
-  threads.update(threadId, { status: 'running' });
+  live.claimTurn();
   startTurnSnapshot(live);
   spawnLive(live, thread).catch((err) => {
     // Never let one broken thread take the whole server down.
@@ -86,10 +59,31 @@ async function workdirProblem(thread: Thread, repo: string | null): Promise<stri
 /** The worktree is not usable: nothing starts, its messages wait for Retry, and the thread says why. */
 function refuseStart(live: Live, reason: string) {
   const keep = (m: Msg) => !!m.requestId && messageRequests.park(m.uuid);
-  live.inflight = live.inflight.filter((m) => !keep(m));
-  live.held = live.held.filter((m) => !keep(m));
+  live.removeMessages((m) => !keep(m));
   abortStart(live, 'failed');
   failSetup(live.threadId, reason);
+}
+
+/** Why the turn did not resume here, as the thread's card and its transcript say it. */
+export function staleResumeReason(outcome: Extract<ResumeOutcome, 'failed' | 'timed-out'>): string {
+  const why = outcome === 'failed' ? 'the download failed' : 'the download timed out';
+  return `Omni could not bring this thread's latest session to this machine (${why}), so it did not resume the copy here, which may be missing turns that ran on another machine.`;
+}
+
+/**
+ * The session download before a resume failed or timed out: resuming the copy here could answer as if turns another
+ * machine ran never happened. Nothing starts; Ben's messages wait for Resume, and the thread says why and offers to
+ * start with fresh context (runner/fresh-context.ts).
+ */
+function blockResume(live: Live, outcome: Extract<ResumeOutcome, 'failed' | 'timed-out'>) {
+  const reason = staleResumeReason(outcome);
+  const keep = (m: Msg) => !!m.requestId && messageRequests.park(m.uuid);
+  live.removeMessages((m) => !keep(m));
+  threads.update(live.threadId, { resume_blocked: reason });
+  addEvent(live.threadId, 'error', { text: `${reason} Try again, or start with fresh context.` });
+  abortStart(live, 'failed');
+  const t = threads.get(live.threadId);
+  if (t?.parent_id) reportToParent(t.id, 'failed', `This thread did not resume: ${reason}`);
 }
 
 async function spawnLive(live: Live, thread: Thread) {
@@ -97,7 +91,7 @@ async function spawnLive(live: Live, thread: Thread) {
   const role = getCrew(thread.role);
 
   // Hermes and Cursor Cloud are not on this Mac: they must not take the channel's browser profile or see local MCP config.
-  const remote = isRemoteHarness(thread.harness);
+  const remote = isProviderHarness(thread.harness);
   // Every local harness starts here, so this is the one check that a worktree thread never runs anywhere else. It waits
   // out a cleanup of the folder, and checks the branch out again if one removed it (apps/server/workspace.ts).
   const problem = remote ? null : await inWorkspace(thread, (missing) => missing ?? workdirProblem(thread, channel.repo_path));
@@ -108,7 +102,7 @@ async function spawnLive(live: Live, thread: Thread) {
   const browserBusy = !!holder && holder !== thread.id;
   if (config.browser && !browserBusy && !remote) {
     browserHolder.set(channel.id, thread.id);
-    live.browser = true;
+    live.holdsBrowser();
   }
   const cdpEndpoint = live.browser ? await attachThread(channel.id, thread.id, !!channel.browser_headless) : null;
   // Torn down while Chrome started: teardown already ran, so let go of the browser here.
@@ -133,11 +127,15 @@ async function spawnLive(live: Live, thread: Thread) {
     addEvent(thread.id, 'error', { text: `Could not read secrets: ${(err as Error).message}` });
   }
   // With sync on, the other Mac's session file and uploads first, so the harness resumes where it left off.
-  await beforeResume(thread);
+  const synced = await beforeResume(thread);
   // The checkout is saved before the harness can change it (runner/snapshots.ts).
   if (live.gate) await live.gate;
   // Interrupted or shut down while secrets or files were read, or the checkout saved.
   if (lives.get(thread.id) !== live) return;
+  // A resume needs the latest session. A fresh session (a handover that reads the whole thread) does not.
+  if ((synced === 'failed' || synced === 'timed-out') && resumesSession(live, threads.get(thread.id) ?? thread)) return blockResume(live, synced);
+  const now = threads.get(thread.id);
+  if (now?.resume_blocked) threads.update(thread.id, { resume_blocked: null, updated_at: now.updated_at });
 
   const run = takeHandover(live, thread);
   thread = run.thread;
@@ -154,35 +152,37 @@ async function spawnLive(live: Live, thread: Thread) {
     resume: run.resume,
     handoverPending: !!threads.sessionState(thread.id).handover,
   };
-  live.session = adapterFor(thread.harness).spawn(ctx, {
-    record: (rec) => {
-      // Claude chooses its id before spawning. Its user replay confirms that the session accepted input.
-      if (thread.harness === 'claude-code' && rec.kind === 'replay') sessionStarted(live);
-      onRecord(live, rec);
-    },
-    usage: (u) => recordUsage(thread.harness as HarnessId, u),
-    session: (sid) => {
-      live.sessionId = sid;
-      const t = threads.get(thread.id);
-      if (t && t.session_id !== sid) threads.update(thread.id, { session_id: sid, updated_at: t.updated_at });
-      sessionStarted(live);
-    },
-    commandsChanged: () => invalidateCommands(thread.harness as HarnessId),
-    toolOutput: (use, text) => (text === undefined ? toolTails.begin(thread.id, use) : toolTails.append(thread.id, use, text)),
-    commands: (list) => (live.commands = { status: 'ready', commands: runnableCommands(list), fetchedAt: Date.now() }),
-    context: (c) => recordContext(thread.id, c),
-    contextHint: (h) => recordContextHint(thread.id, h),
-    turnTokens: (u) => {
-      addCursorTurn(thread.id, u);
-      afterCursorTurn();
-    },
-    stderr: (d) => (live.stderr = (live.stderr + d).slice(-8000)),
-    spawnError: (err) => {
-      live.spawnFailed = true;
-      addEvent(thread.id, 'error', { text: `Could not start ${cliLabel(thread.harness)}: ${err.message}` });
-    },
-    exit: (code, signal) => onExit(live, code, signal),
-  });
+  live.attach(
+    adapterFor(thread.harness).spawn(ctx, {
+      record: (rec) => {
+        // Claude chooses its id before spawning. Its user replay confirms that the session accepted input.
+        if (thread.harness === 'claude-code' && rec.kind === 'replay') sessionStarted(live);
+        onRecord(live, rec);
+      },
+      usage: (u) => recordUsage(thread.harness as HarnessId, u),
+      session: (sid) => {
+        live.sessionIs(sid);
+        const t = threads.get(thread.id);
+        if (t && t.session_id !== sid) threads.update(thread.id, { session_id: sid, updated_at: t.updated_at });
+        sessionStarted(live);
+      },
+      commandsChanged: () => invalidateCommands(thread.harness as HarnessId),
+      toolOutput: (use, text) => (text === undefined ? toolTails.begin(thread.id, use) : toolTails.append(thread.id, use, text)),
+      commands: (list) => live.sawCommands({ status: 'ready', commands: runnableCommands(list), fetchedAt: Date.now() }),
+      context: (c) => recordContext(thread.id, c),
+      contextHint: (h) => recordContextHint(thread.id, h),
+      turnTokens: (u) => {
+        addCursorTurn(thread.id, u);
+        afterCursorTurn();
+      },
+      stderr: (d) => live.sawStderr(d),
+      spawnError: (err) => {
+        live.failedToSpawn();
+        addEvent(thread.id, 'error', { text: `Could not start ${cliLabel(thread.harness)}: ${err.message}` });
+      },
+      exit: (code, signal) => onExit(live, code, signal),
+    }),
+  );
 
   // Messages go in through the session, never as CLI args, so leading dashes or huge pastes never get parsed as flags.
   for (const m of live.inflight) {

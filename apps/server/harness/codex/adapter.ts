@@ -8,22 +8,21 @@
 //
 // `/review` and `/compact` are Codex's own and run as turns too, started by review/start and
 // thread/compact/start instead of turn/start. Codex steers neither of them.
-import { apiToken } from '../../api-token.ts';
-import { artifactsDir, threadDir } from '../../config.ts';
-import { ASK_SERVER, ASK_TIMEOUT_SEC, buildMcpConfig } from '../../sandbox.ts';
+import { artifactsDir } from '../../config.ts';
 import { describeAttachments, type Attachment } from '../../uploads.ts';
 import { usageFor } from '../../usage.ts';
 import { fromCodexTokenUsage } from '@omni/shared/context-meter.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
-import { harnessEnv } from '../env-guard.ts';
 import { processSession } from '../session.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, CommandUse, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
 import { CodexClient } from './client.ts';
+import { handshake, openThread, sessionEnv, sessionParams, threadConfig } from './session-start.ts';
+export { threadConfig };
 import { codexBin } from './bin.ts';
 import { CODEX_BUILTINS } from './commands.ts';
 import { saveGeneratedImage } from './images.ts';
-import { PLAN_LIMIT_ID, codexLimit, commandUse, normalizeItem, normalizePlan, normalizeRateLimits, normalizeStarted, turnErrorText } from './normalize.ts';
+import { PLAN_LIMIT_ID, commandUse, normalizeItem, normalizePlan, normalizeRateLimits, normalizeStarted, turnEndRecords, turnErrorText } from './normalize.ts';
 import { reviewTarget } from './review.ts';
 import type {
   CodexInput,
@@ -77,20 +76,26 @@ const BUILTINS = new Set(CODEX_BUILTINS.map((c) => c.name));
 /** The Codex built-in a message starts with. A built-in is never a Mention, and has no skill file. */
 const builtinOf = (m: Outgoing) => m.commands.find((c) => !c.path && BUILTINS.has(c.name));
 
-/**
- * Per-thread overrides, as config.toml keys: Omni's MCP servers next to Ben's own (a dotted
- * key merges, a whole `mcp_servers` table would replace his), a shell environment that
- * inherits everything so secrets reach the agent's shell, and ChatGPT-only login. Secret
- * values live in the process env, never in this config.
- */
-export function threadConfig(mcpServers: Record<string, object>) {
-  // Codex gives an MCP call 60 seconds by default; ask_user_question waits for the user.
-  const entry = (name: string, server: object) => (name === ASK_SERVER ? { ...server, tool_timeout_sec: ASK_TIMEOUT_SEC } : server);
-  return {
-    ...Object.fromEntries(Object.entries(mcpServers).map(([name, server]) => [`mcp_servers.${name}`, entry(name, server)])),
-    'shell_environment_policy.inherit': 'all',
-    forced_login_method: 'chatgpt',
-  };
+/** Ask Codex to run the message, as a turn or as the built-in it starts with. Resolves to the turn's id, if the answer has it. */
+async function beginTurn(client: CodexClient, codexThreadId: string | null, thread: AdapterContext['thread'], m: Outgoing, use: CommandUse | undefined): Promise<string | null> {
+  if (use?.name === 'compact') {
+    // Codex compacts without instructions, so the text after the command goes nowhere. The
+    // answer is empty; the compaction's own turn/started has its id.
+    await client.request('thread/compact/start', { threadId: codexThreadId });
+    return null;
+  }
+  if (use?.name === 'review') {
+    const target = await reviewTarget(m.text.slice(use.end), thread.cwd);
+    const r = await client.request<ReviewStartResponse>('review/start', { threadId: codexThreadId, target, delivery: 'inline' });
+    return r.turn.id;
+  }
+  const r = await client.request<{ turn: CodexTurn }>('turn/start', {
+    threadId: codexThreadId,
+    input: buildInput(m.text, m.attachments, m.commands),
+    model: thread.model || undefined,
+    effort: thread.effort || undefined,
+  });
+  return r.turn.id;
 }
 
 export const codexAdapter: HarnessAdapter = {
@@ -136,14 +141,7 @@ export const codexAdapter: HarnessAdapter = {
       emit({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
     };
 
-    const client = new CodexClient({ bin, cwd: thread.cwd, env: harnessEnv('codex', {
-      OMNI_URL: ctx.omniUrl,
-      OMNI_TOKEN: apiToken(),
-      OMNI_THREAD_ID: thread.id,
-      OMNI_THREAD_DIR: threadDir(thread.id),
-      OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),
-      OMNI_CHANNEL: thread.channel_id,
-    }, ctx.secretEnv), onNotification: onNote });
+    const client = new CodexClient({ bin, cwd: thread.cwd, env: sessionEnv(ctx), onNotification: onNote });
 
     /** The runner opens a turn on its init: one per turn, from Codex's answer or turn/started, whichever is first. */
     function turnBegan() {
@@ -226,9 +224,7 @@ export const codexAdapter: HarnessAdapter = {
     }
 
     function completeTurn(turn: CodexTurn | undefined) {
-      const error = turn?.status === 'failed' ? turnErrorText(turn.error?.message ?? '') || lastError || 'Codex turn failed.' : '';
-      // Stopped at the plan's usage limit: said before the result, so the runner keeps it as a limit stop.
-      const limit = turn?.status === 'failed' ? (codexLimit(turn.error, usageFor('codex')) ?? codexLimit(lastFailure, usageFor('codex'))) : null;
+      const recs = turnEndRecords(turn, lastError, lastFailure, usageFor('codex'));
       // Clear the active turn before emitting the result: the runner delivers the next queued
       // message synchronously, and it must start a new turn rather than steer this finished one.
       turnActive = false;
@@ -239,10 +235,7 @@ export const codexAdapter: HarnessAdapter = {
       initSent = false;
       lastError = '';
       lastFailure = null;
-      if (limit) emit({ kind: 'limit', payload: limit });
-      if (error) emit({ kind: 'error', payload: { text: error } });
-      const subtype = turn?.status === 'completed' ? 'success' : turn?.status === 'interrupted' ? 'interrupted' : 'error';
-      emit({ kind: 'result', payload: { ok: subtype === 'success', subtype, turns: 1 } });
+      for (const rec of recs) emit(rec);
       pump();
     }
 
@@ -256,28 +249,6 @@ export const codexAdapter: HarnessAdapter = {
       client.kill('SIGKILL');
     }
 
-    /** Ask Codex to run the message, as a turn or as the built-in it starts with. Resolves to the turn's id, if the answer has it. */
-    async function begin(m: Outgoing, use: CommandUse | undefined): Promise<string | null> {
-      if (use?.name === 'compact') {
-        // Codex compacts without instructions, so the text after the command goes nowhere. The
-        // answer is empty; the compaction's own turn/started has its id.
-        await client.request('thread/compact/start', { threadId: codexThreadId });
-        return null;
-      }
-      if (use?.name === 'review') {
-        const target = await reviewTarget(m.text.slice(use.end), thread.cwd);
-        const r = await client.request<ReviewStartResponse>('review/start', { threadId: codexThreadId, target, delivery: 'inline' });
-        return r.turn.id;
-      }
-      const r = await client.request<{ turn: CodexTurn }>('turn/start', {
-        threadId: codexThreadId,
-        input: buildInput(m.text, m.attachments, m.commands),
-        model: thread.model || undefined,
-        effort: thread.effort || undefined,
-      });
-      return r.turn.id;
-    }
-
     function pump() {
       if (!ready || turnActive || !outbox.length) return;
       const m = outbox.shift()!;
@@ -288,7 +259,7 @@ export const codexAdapter: HarnessAdapter = {
       lastFailure = null;
       startingMessage = m;
       const what = builtin === 'review' ? 'start the review' : builtin === 'compact' ? 'compact the conversation' : 'start the turn';
-      const started = begin(m, use).then((turnId) => {
+      const started = beginTurn(client, codexThreadId, thread, m, use).then((turnId) => {
         // A successful JSON-RPC answer confirms delivery; a rejected request must leave
         // both the message and any handover unread for the runner's retry path.
         accepted(m);
@@ -327,35 +298,11 @@ export const codexAdapter: HarnessAdapter = {
 
     // Handshake, then start or resume the session, then run whatever the runner has queued.
     (async () => {
-      try {
-        await client.request('initialize', { clientInfo: { name: 'omni-os', version: '0.1.0' } });
-        client.notify('initialized', {});
-      } catch {
-        // The process died or never answered; the runner reports the exit and its stderr.
-        return client.kill('SIGKILL');
-      }
-      const mcp = buildMcpConfig({
-        threadId: thread.id,
-        channel: ctx.channel,
-        role: ctx.role,
-        browserBusy: ctx.browserBusy,
-        cdpEndpoint: ctx.cdpEndpoint,
-        omniUrl: ctx.omniUrl,
-      });
-      const params = {
-        model: thread.model || undefined,
-        cwd: thread.cwd,
-        approvalPolicy: 'never',
-        // A delegate-only role (the Conductor) reads but cannot change anything, so it hands the work off.
-        sandbox: ctx.role?.delegateOnly ? 'read-only' : 'danger-full-access',
-        developerInstructions: ctx.systemPrompt,
-        config: threadConfig(mcp.mcpServers),
-      };
+      if (!(await handshake(client))) return client.kill('SIGKILL');
+      const params = sessionParams(ctx);
       let res: ThreadStartResponse;
       try {
-        res = resume && codexThreadId
-          ? await client.request<ThreadStartResponse>('thread/resume', { threadId: codexThreadId, ...params })
-          : await client.request<ThreadStartResponse>('thread/start', params);
+        res = await openThread(client, params, resume ? codexThreadId : null);
       } catch (e) {
         return fatal(resume ? 'resume the session' : 'start the session', e);
       }

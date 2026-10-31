@@ -92,7 +92,7 @@ A Cursor Cloud thread is a [Cursor cloud agent](https://cursor.com/docs/cloud-ag
 It needs two things, and the model picker says which is missing:
 
 - The secret `CURSOR_API_KEY`, globally or on the channel, made at cursor.com/dashboard under Integrations. A key only in the secret store (service `omni-os`, account `global/CURSOR_API_KEY`) works too. Omni sends it only to the Cloud Agents API, on the Authorization header: never to the local `cursor` harness (`apps/server/harness/env-guard.ts` strips it there) and never into a process environment or a log.
-- The channel's GitHub repo, set in its settings. Cursor also needs access to that repo through its GitHub integration.
+- The channel's GitHub repo, which Omni reads from the channel's repo path (when it cannot, type it under Advanced in the channel's settings). Cursor also needs access to that repo through its GitHub integration.
 
 | Piece | What |
 | --- | --- |

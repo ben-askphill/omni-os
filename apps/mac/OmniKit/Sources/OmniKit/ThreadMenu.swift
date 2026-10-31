@@ -15,15 +15,11 @@ public struct ThreadMenuFacts: Encodable, Hashable, Sendable {
   /// It reports to a parent, so it sits under that parent rather than in a folder.
   public var child: Bool
   public var harness: String?
-  /// Another Mac can take it now.
-  public var handOff: Bool
-  /// The Mac that holds it, when this one may take it over now.
-  public var takeOverFrom: String?
   public var grokBot: Bool
 
   public init(
     row: Bool, archived: Bool = false, pinned: Bool = false, done: Bool = false, settled: Bool = false, child: Bool = false,
-    harness: String? = nil, handOff: Bool = false, takeOverFrom: String? = nil, grokBot: Bool = false
+    harness: String? = nil, grokBot: Bool = false
   ) {
     self.row = row
     self.archived = archived
@@ -32,12 +28,10 @@ public struct ThreadMenuFacts: Encodable, Hashable, Sendable {
     self.settled = settled
     self.child = child
     self.harness = harness
-    self.handOff = handOff
-    self.takeOverFrom = takeOverFrom
     self.grokBot = grokBot
   }
 
-  /// The facts a thread's sidebar row gives, before the open thread's store adds where it runs.
+  /// The facts a thread's sidebar row gives.
   public init(stub: ThreadStub?, archived: Bool, pinned: Bool, grokBot: Bool) {
     self.init(
       row: stub != nil, archived: archived, pinned: pinned, done: stub?.doneAt != nil, settled: stub.map { !$0.status.isActive } ?? false,
@@ -46,10 +40,7 @@ public struct ThreadMenuFacts: Encodable, Hashable, Sendable {
 }
 
 public enum ThreadActionID: String, Decodable, Hashable, Sendable {
-  case pin, done, rename, move, archive, fork, reference
-  case handOff = "handoff"
-  case takeOver = "takeover"
-  case grok
+  case pin, done, rename, move, archive, fork, reference, grok
 }
 
 public struct ThreadMenuItem: Decodable, Hashable, Sendable, Identifiable {
