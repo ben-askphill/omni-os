@@ -59,7 +59,7 @@ export function startTurnSnapshot(live: Live) {
   const t = threads.get(live.threadId);
   if (!t?.branch || isProviderHarness(t.harness)) return;
   const id = randomUUID();
-  live.snap = id;
+  live.snapStarted(id);
   turnSnapshots.start(id, t.id, completions.latest(t.id)?.n ?? 0);
   const saved = queue(t.id, () => save(t.id, id, 'before'));
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -70,15 +70,15 @@ export function startTurnSnapshot(live: Live) {
     if (!turnSnapshots.get(id)?.before_sha && turnSnapshots.fail(id, 'Saving the checkout before this turn took too long, so the turn ran without it.')) {
       emitThread(t.id);
     }
-    if (live.gate === gate) live.gate = null;
+    live.gateOff(gate);
     release(live);
   });
-  live.gate = gate;
+  live.gateOn(gate);
 }
 
 /** Write the messages a warm process held back while the checkout was saved. */
 function release(live: Live) {
-  const held = live.gated?.splice(0) ?? [];
+  const held = live.takeGated();
   if (lives.get(live.threadId) !== live || !live.session || live.closing) return;
   for (const m of held) {
     // Dropped while it waited (the process was stopped).
@@ -96,9 +96,8 @@ function release(live: Live) {
  * whatever is still saving for the thread. Safe to call more than once and for a turn with no snapshot.
  */
 export function finishTurnSnapshot(live: Live) {
-  const id = live.snap;
+  const id = live.snapEnded();
   if (!id) return;
-  live.snap = null;
   const row = turnSnapshots.get(id);
   if (!row) return;
   // The status write that ended the turn added its Result: the first one after the turn started is this turn's.

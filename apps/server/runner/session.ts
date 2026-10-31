@@ -37,16 +37,12 @@ import {
 export function requestInterrupt(live: Live) {
   if (live.interrupt || !live.session) return;
   const id = `omni_int_${randomUUID().slice(0, 8)}`;
-  live.interrupt = { id, acked: false };
-  if (!live.session.interrupt(id)) return hardKill(live);
   // The CLI normally winds the turn down within a second. If not, fall back to killing it.
-  live.interruptTimer = setTimeout(() => live.turn && live.interrupt?.id === id && hardKill(live), config.interruptGraceMs);
+  live.armInterrupt(id, config.interruptGraceMs, () => hardKill(live));
+  if (!live.session.interrupt(id)) return hardKill(live);
 }
 
-export function clearInterrupt(live: Live) {
-  clearTimeout(live.interruptTimer);
-  live.interrupt = null;
-}
+export const clearInterrupt = (live: Live) => live.clearInterrupt();
 
 /**
  * The old stop path. The CLI can take seconds to shut down after SIGINT, so from here on new messages wait
@@ -55,15 +51,10 @@ export function clearInterrupt(live: Live) {
 export function hardKill(live: Live) {
   const session = live.session;
   if (!session || live.closing) return;
-  live.closing = true;
-  clearTimeout(live.idleTimer);
+  live.beginClosing();
   const id = live.threadId;
   requeueHeld(live);
-  if (session.alive) {
-    live.hardStop = true;
-    session.end('stop');
-    setTimeout(() => session.alive && session.end('kill'), 5000);
-  }
+  if (session.alive) live.endSession('stop');
   emitThread(id);
 }
 
@@ -71,58 +62,48 @@ export function hardKill(live: Live) {
 export function requeueHeld(live: Live) {
   if (!live.held.length) return;
   const id = live.threadId;
-  for (const m of live.held) track(m, 'waiting');
-  waitingMsgs.set(id, [...live.held.splice(0), ...(waitingMsgs.get(id) ?? [])]);
+  const held = live.takeHeld();
+  for (const m of held) track(m, 'waiting');
+  waitingMsgs.set(id, [...held, ...(waitingMsgs.get(id) ?? [])]);
   if (!waiting.includes(id)) waiting.push(id);
 }
 
 /** Nothing to wind down yet (MCP servers can take 13s to connect): drop what is held and kill it. */
 export function stopStartup(live: Live) {
-  drop(live.threadId, live.held);
-  live.held = [];
+  drop(live.threadId, live.takeHeld());
   if (live.session) hardKill(live);
   else abortStart(live, 'stopped');
 }
 
 /** No more input; the CLI exits on its own. */
 export function closeLive(live: Live) {
-  const session = live.session;
-  if (live.closing || !session) return;
-  live.closing = true;
-  clearTimeout(live.idleTimer);
-  session.end('close');
-  setTimeout(() => session.alive && session.end('terminate'), 10_000).unref();
+  if (live.closing || !live.session) return;
+  live.beginClosing();
+  live.endSession('close');
   emitThread(live.threadId);
 }
 
 export function armIdle(live: Live) {
   if (isShuttingDown()) return;
-  clearTimeout(live.idleTimer);
+  live.clearIdle();
   // Closing stdin now would end the background agents with the process. Wait for them, within a bound.
-  if (hasBackground(live)) {
-    live.idleTimer = setTimeout(() => closeLive(live), config.taskKeepAliveSeconds * 1000);
-    return;
-  }
+  if (hasBackground(live)) return live.armIdle(config.taskKeepAliveSeconds * 1000, () => closeLive(live));
   if (config.keepAliveSeconds <= 0) return closeLive(live);
-  live.idleTimer = setTimeout(() => closeLive(live), config.keepAliveSeconds * 1000);
+  live.armIdle(config.keepAliveSeconds * 1000, () => closeLive(live));
 }
 
 /** Forget the process: timers, browser profile, live state. */
 export function teardown(live: Live) {
-  clearTimeout(live.idleTimer);
+  live.clearIdle();
   endTasks(live);
   toolTails.endThread(live.threadId);
   clearMods(live);
-  clearInterrupt(live);
   if (live.browser && browserHolder.get(live.channelId) === live.threadId) {
     browserHolder.delete(live.channelId);
     detachThread(live.channelId, live.threadId);
   }
   if (lives.get(live.threadId) === live) lives.delete(live.threadId);
-  live.turn = false;
-  live.inflight = [];
-  live.held = [];
-  live.done();
+  live.tornDown();
 }
 
 /** Interrupted or shut down before the process was spawned. */
@@ -142,10 +123,7 @@ export function abortStart(live: Live, status: ThreadStatus) {
  */
 export function endTurn(live: Live, status: ThreadStatus, more = false) {
   const id = live.threadId;
-  live.turn = false;
-  clearInterrupt(live);
-  const runText = events.lastRunText(id, live.turnFrom);
-  live.turnFrom = 0;
+  const runText = events.lastRunText(id, live.closeTurn());
   const t = threads.update(id, {
     status: more ? 'queued' : status,
     has_run: 1,
@@ -226,13 +204,11 @@ export function interruptThread(threadId: string) {
         break;
       case 'kill':
         // No graceful interrupt: end the process. The next message resumes the session.
-        drop(threadId, live.held);
-        live.held = [];
+        drop(threadId, live.takeHeld());
         hardKill(live);
         break;
       case 'interrupt':
-        drop(threadId, live.held);
-        live.held = [];
+        drop(threadId, live.takeHeld());
         requestInterrupt(live);
         break;
       default: {
@@ -259,13 +235,13 @@ export const stopThread = interruptThread;
  */
 export async function releaseForHandoff(threadId: string): Promise<Msg[]> {
   const live = lives.get(threadId);
-  const held = live ? live.held.splice(0) : [];
+  const held = live ? live.takeHeld() : [];
   const w = waiting.indexOf(threadId);
   const queued = w >= 0 ? (waiting.splice(w, 1), waitingMsgs.get(threadId) ?? []) : [];
   waitingMsgs.delete(threadId);
   const read: Msg[] = [];
   if (live) {
-    live.released = read;
+    live.releasing(read);
     if (!live.session) abortStart(live, 'stopped');
     else if (!live.closing) hardKill(live);
     await live.exited;
@@ -290,21 +266,15 @@ export async function shutdownAll() {
     }
     const all = [...lives.values()];
     for (const live of all) {
-      clearTimeout(live.idleTimer);
-      clearInterrupt(live);
-      const session = live.session;
-      if (!session) {
+      live.clearIdle();
+      live.clearInterrupt();
+      if (!live.session) {
         abortStart(live, 'stopped');
         continue;
       }
-      live.shutdown = true;
-      drop(live.threadId, live.held);
-      live.held = [];
-      live.closing = true;
-      session.end('close');
-      const term = setTimeout(() => session.alive && session.end('terminate'), 3000);
-      const kill = setTimeout(() => session.alive && session.end('kill'), 5000);
-      void live.exited.then(() => (clearTimeout(term), clearTimeout(kill)));
+      drop(live.threadId, live.takeHeld());
+      live.beginClosing();
+      live.endSession('shutdown');
     }
     await Promise.all(all.map((l) => l.exited));
     // The turns those processes ended are saved before the database closes.

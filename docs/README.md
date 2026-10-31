@@ -21,6 +21,7 @@
 Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](../CLAUDE.md).
 
 - [Architecture overview](internals/overview.md): how a thread runs, the Web UI and Mac app split, repo layout
+- [Execution and ownership state](internals/execution-state.md): a thread's process, its messages and its owner machine as state diagrams, who owns each, and how the runner reaches the rest of Omni. Read before touching `apps/server/runner/`
 - [Auto routing](internals/auto-routing.md): how Auto picks a model, and the benchmarks that check it
 - [Thread history](internals/thread-history.md): how a long thread opens on its newest page, the budgets, and what clients hold
 - [Message context](internals/message-context.md): diff lines, terminal excerpts, browser annotations, thread references and how to add a kind

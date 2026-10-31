@@ -6,6 +6,8 @@ Tool-failure diagnostics reuse the runner's normalized `tool_result` records and
 
 ## How a thread runs
 
+The states a thread's process, its messages and its owner machine move through, and who owns each, are drawn in [Execution and ownership state](execution-state.md); `apps/server/runner/controller.ts` is the one writer of a process's state, and `apps/server/compose.ts` is where the runner is wired to routing, handoff and publishing.
+
 Each Claude Code thread gets one long-lived `claude -p --input-format stream-json --output-format stream-json` process. Messages go in on stdin, the process runs many turns and stays warm for `OMNI_KEEPALIVE_SECONDS` (default 10 minutes) after the last one, so a follow-up starts instantly. While background agents of that thread are still running, it stays up to `OMNI_TASK_KEEPALIVE_SECONDS` (default 4 hours). It is launched with:
 
 | Piece | What |
