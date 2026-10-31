@@ -145,6 +145,34 @@ describe('a delegated thread run on another machine', () => {
     await both();
     expect(a.byKind(parent.id, 'crew_report')).toHaveLength(1);
   }, T.timeout);
+
+  it("takes Ben's switch and reply on the hub for a thread a routed thread delegated", async () => {
+    const res = await a.json('/threads', { body: { channel: 'shop', prompt: 'lead the sprint', device: 'box-b' } });
+    const lead = res.body.id as string;
+    await both();
+    await b.untilResults(lead, 1);
+    // The lead delegates on B, so the child is never routed itself: it just runs where its lead does.
+    const child = (await b.runner.createThread({ channel: 'shop', prompt: 'check the header', parent_id: lead, source: 'conductor', device: 'here' })).id;
+    await b.untilResults(child, 1);
+    await both();
+    expect(a.db.kv.get(`runon.thread.${child}`)).toBeUndefined();
+    expect(a.db.assignments.holder(child)).toBe('box-b');
+
+    // The hub records the switch; sync carries it to B. The next message goes to B, not a worktree here.
+    const switched = await a.json(`/threads/${child}/run`, { body: { harness: 'codex', model: 'gpt-5.6-sol' } });
+    expect(switched.status, JSON.stringify(switched.body)).toBe(200);
+    expect(switched.body).toMatchObject({ harness: 'codex', model: 'gpt-5.6-sol' });
+    const reply = await a.json(`/threads/${child}/messages`, { body: { prompt: 'and the footer', request_id: 'child-reply' } });
+    expect(reply.status, JSON.stringify(reply.body)).toBe(200);
+    expect(reply.body.forwarded_to).toBe('Box B');
+    expect(a.runner.isLive(child)).toBe(false);
+    expect(existsSync(join(a.paths.worktrees, child))).toBe(false);
+
+    await both();
+    await b.untilResults(child, 2);
+    expect(b.thread(child)).toMatchObject({ harness: 'codex', model: 'gpt-5.6-sol' });
+    expect(b.codexRequests().some((r) => r.method === 'turn/start' && r.thread_id === child)).toBe(true);
+  }, T.timeout);
 });
 
 describe('a thread delegated on the other machine', () => {
