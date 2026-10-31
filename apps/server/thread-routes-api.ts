@@ -42,10 +42,10 @@ import {
   scheduleLimitResume,
   runsHere,
   steerRequests,
-  switchRun,
 } from './runner.ts';
-import { cancelHandoff, handOff, requestTakeover, takeoverOf } from './handoff.ts';
+import { takeoverOf, type HandoffResult } from './handoff.ts';
 import { handoffView } from './handoff/records.ts';
+import { cancelRelocation, createTransition, type ThreadTransition } from './transition.ts';
 import { headPage } from './history.ts';
 import { liveMessage, openingMessages, parseAfter, STREAM_QUEUE_MAX, type DetailOf } from './stream-catch-up.ts';
 import { threadFilesReady, threadOpened } from './sync/files.ts';
@@ -280,26 +280,30 @@ threadActionsApi.post('/:id/limit/schedule', limitAction('schedule', scheduleLim
 threadActionsApi.post('/:id/limit/cancel', limitAction('cancel', cancelLimitResume));
 threadActionsApi.post('/:id/limit/resume', limitAction('resume', resumeLimitNow));
 
+/** What /handoff, /takeover and /handoff/cancel have always answered, from the `relocate` transition. */
+const handoffAnswer = (t: ThreadTransition): HandoffResult => ({ thread: t.thread, handoff: t.handoff ?? null });
+
 /**
- * Hand the running thread to another synced Mac: `{to}`, that Mac's id from GET /api/devices. Answered as soon as the
- * offer is written; the thread's `handoff` then follows it, here and on the other Mac. A 409 says why it cannot go.
+ * Hand the running thread to another synced Mac: `{to}`, that Mac's id from GET /api/devices. The transition
+ * service's `relocate` (transition.ts). Answered as soon as the offer is written; the thread's `handoff` then follows
+ * it, here and on the other Mac. A 409 says why it cannot go.
  */
 threadActionsApi.post('/:id/handoff', async (c) => {
   const { to } = z.object({ to: z.string().min(1).max(200) }).parse(await c.req.json().catch(() => ({})));
-  return c.json(await handOff(c.req.param('id'), to));
+  return c.json(handoffAnswer(await createTransition(c.req.param('id'), { kind: 'relocate', to })));
 });
 
 /**
  * Take over a thread another Mac holds: ask that Mac to hand it here. Answered as soon as the request is written; the
  * thread's `handoff` then follows it, here and on the other Mac. A 409 says why it cannot be taken over.
  */
-threadActionsApi.post('/:id/takeover', async (c) => c.json(await requestTakeover(c.req.param('id'))));
+threadActionsApi.post('/:id/takeover', async (c) => c.json(handoffAnswer(await createTransition(c.req.param('id'), { kind: 'relocate', to: 'here' }))));
 
 /**
  * Cancel this Mac's Take over before it has the thread, or a handoff from this Mac before the other one picks the thread
  * up. A handoff's queued messages wait here for Resume.
  */
-threadActionsApi.post('/:id/handoff/cancel', (c) => c.json(cancelHandoff(c.req.param('id'))));
+threadActionsApi.post('/:id/handoff/cancel', (c) => c.json(cancelRelocation(c.req.param('id'))));
 
 /** Drop messages a restart parked. Each stays in the transcript, marked as never sent. */
 threadActionsApi.post('/:id/requests/discard', async (c) => {
@@ -455,12 +459,13 @@ const runSchema = z.object({
 });
 
 /**
- * Move the thread to another harness, model or effort between turns (runner/switch.ts). A 409 while a turn runs or
- * messages wait, a 400 for a run the catalog does not offer. The same run again changes nothing.
+ * Move the thread to another harness, model or effort: the transition service's `reconfigure` (transition.ts, applied
+ * by runner/switch.ts). Between turns it applies at once; during a turn it waits on the thread. A 409 while another
+ * machine runs the thread, a 400 for a run the catalog does not offer. The same run again changes nothing.
  */
 threadActionsApi.post('/:id/run', async (c) => {
-  const body = runSchema.parse(await c.req.json().catch(() => ({})));
-  return c.json(await switchRun(c.req.param('id'), body));
+  const run = runSchema.parse(await c.req.json().catch(() => ({})));
+  return c.json((await createTransition(c.req.param('id'), { kind: 'reconfigure', run })).thread);
 });
 
 const interrupt = (c: Context) => {

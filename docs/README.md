@@ -26,6 +26,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Thread history](internals/thread-history.md): how a long thread opens on its newest page, the budgets, and what clients hold
 - [Message context](internals/message-context.md): diff lines, terminal excerpts, browser annotations, thread references and how to add a kind
 - [Delivery contract](internals/delivery.md): what an accepted message, wake or Stop is promised on any machine, and the known gaps with their expected-fail tests
+- [Transitions](internals/transitions.md): the one service behind a run switch, a handoff or Take over and a Continue, its four routes, the six older routes that answer through it, and what stays as synced kv for machines on an older build
 - [Glossary](../CONTEXT.md)
 - [Mac app notes](../apps/mac/NOTES.md)
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages

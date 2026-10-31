@@ -498,4 +498,19 @@ export function migrate() {
     routed INTEGER NOT NULL DEFAULT 0,
     at TEXT NOT NULL
   );`);
+  // #413 This machine's ledger of the transitions it created (db/repos/transitions.ts): a run switch, a handoff or
+  // Take over, or a Continue, each with the id a client reads and cancels it by. Local, never synced: a relocate's
+  // cross-machine state is the handoff kv records, which stay for machines on an older build.
+  db.exec(`CREATE TABLE IF NOT EXISTS transitions (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    state TEXT NOT NULL,
+    request TEXT NOT NULL,
+    result TEXT NOT NULL DEFAULT '{}',
+    error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS transitions_thread ON transitions(thread_id, created_at);`);
 }

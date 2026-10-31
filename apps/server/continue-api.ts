@@ -1,9 +1,10 @@
-// /api/threads/:id/continue: continue an idle thread on another local harness (apps/server/continue.ts), with a
-// preview of the Carryover first. And /api/threads/:id/transcript, where a Carryover sends its new session for the
-// history it left out.
+// /api/threads/:id/continue: continue an idle thread on another local harness, with a preview of the Carryover first.
+// Both are the transition service's `fork` (apps/server/transition.ts), answered in the shapes these routes have always
+// had. And /api/threads/:id/transcript, where a Carryover sends its new session for the history it left out.
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { ContinueRefused, historyOf, previewContinue, startContinue } from './continue.ts';
+import { ContinueRefused, historyOf } from './continue.ts';
+import { createTransition, previewTransition } from './transition.ts';
 
 export const continueApi = new Hono();
 
@@ -18,7 +19,8 @@ const runSchema = z.object({
 /** The Carryover the picked run would read, the revision a start must name, and what keeps the thread from it now. */
 continueApi.post('/:id/continue/preview', async (c) => {
   const { attachments, ...run } = runSchema.parse(await c.req.json().catch(() => ({})));
-  return c.json(await previewContinue(c.req.param('id'), run, attachments));
+  const { kind: _kind, ...preview } = await previewTransition(c.req.param('id'), { kind: 'fork', run, attachments });
+  return c.json(preview);
 });
 
 const startSchema = runSchema.extend({
@@ -34,9 +36,10 @@ const startSchema = runSchema.extend({
  * the fresh `preview`, or `request_reused`.
  */
 continueApi.post('/:id/continue', async (c) => {
-  const body = startSchema.parse(await c.req.json().catch(() => ({})));
+  const { harness, model, effort, attachments, text, request_id, revision } = startSchema.parse(await c.req.json().catch(() => ({})));
   try {
-    return c.json(await startContinue(c.req.param('id'), body));
+    const t = await createTransition(c.req.param('id'), { kind: 'fork', run: { harness, model, effort }, attachments, text, request_id, revision });
+    return c.json({ thread: t.fork!.thread, duplicate: !!t.fork!.duplicate });
   } catch (err) {
     if (err instanceof ContinueRefused) return c.json(err.body, 409);
     throw err;
