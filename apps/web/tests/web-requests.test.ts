@@ -46,7 +46,7 @@ describe('messages a restart parked', () => {
     const { recovered, uncertain } = parkedOf(pending);
     expect(recovered.map((m) => m.text)).toEqual(['then write it up']);
     expect(uncertain.map((m) => m.text)).toEqual(['and check the totals']);
-    expect(pending.map(parkedLabel)).toEqual(['Held after a restart, waiting for Resume', 'May have reached the agent before the restart']);
+    expect(pending.map((m) => parkedLabel(m))).toEqual(['Held after a restart, waiting for Resume', 'May have reached the agent before the restart']);
   });
 
   it("treats the runner's own messages as not parked, with or without a request id", () => {

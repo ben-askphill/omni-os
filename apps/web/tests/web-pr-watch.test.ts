@@ -69,6 +69,9 @@ describe('a PR watch wake waiting for Resume', () => {
     expect(parkedHeading([wake])).toBe('1 message is waiting for Resume');
     expect(parkedHeading([wake, ben])).toBe('2 messages are waiting for Resume');
     expect(parkedHeading([ben])).toBe('1 message was waiting when Omni restarted');
+    expect(parkedHeading([ben], true)).toBe('1 message is waiting for a session that is up to date');
+    expect(parkedHeading([ben, ben], true)).toBe('2 messages are waiting for a session that is up to date');
+    expect(parkedLabel({ ...ben, delivery: 'recovered' }, true)).toBe('Waiting for a session that is up to date');
   });
 });
 

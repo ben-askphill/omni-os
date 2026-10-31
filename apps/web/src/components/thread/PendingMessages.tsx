@@ -32,12 +32,15 @@ export function QueuedMessages({
   threadId,
   onPending,
   setup = null,
+  sessionBlocked = false,
   canSteer = true,
 }: {
   items: PendingMsg[];
   starting?: boolean;
   /** The thread's worktree is not ready: what waits sends once it is, so Retry (SetupCard) stands in for Resume. */
   setup?: Thread['setup'];
+  /** The thread's session is not up to date (StaleSessionCard): the headings say that, not a restart. */
+  sessionBlocked?: boolean;
   /** Needed for the actions on Ben's own messages. */
   threadId?: string;
   /** The pending list an action answered with, before the stream brings it. */
@@ -127,7 +130,7 @@ export function QueuedMessages({
           <PendingBubble key={m.uuid ?? i} m={m} label={setup ? SETUP_LABEL : pendingLabel(m, m === lead)} icon={m.state === 'sent' ? 'send' : 'clock'} threadId={threadId} />
         ),
       )}
-      {parked.length > 0 && threadId && <ParkedMessages threadId={threadId} items={parked} onPending={onPending} row={ownRow} busy={busy} setup={setup} />}
+      {parked.length > 0 && threadId && <ParkedMessages threadId={threadId} items={parked} onPending={onPending} row={ownRow} busy={busy} setup={setup} sessionBlocked={sessionBlocked} />}
       {error && <div className="text-right text-[12px] text-needs">{error}</div>}
       {threadId && stale.map((d) => <StaleEdit key={d.uuid} threadId={threadId} draft={d} onClose={() => actions.close(d.uuid)} />)}
     </div>
@@ -372,6 +375,7 @@ function ParkedMessages({
   row,
   busy: rowBusy,
   setup,
+  sessionBlocked,
 }: {
   threadId: string;
   items: PendingMsg[];
@@ -379,6 +383,7 @@ function ParkedMessages({
   row: (m: PendingMsg, label: string, icon: 'send' | 'clock' | 'alert', extra?: ReactNode) => ReactNode;
   busy: string | null;
   setup?: Thread['setup'];
+  sessionBlocked?: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -411,7 +416,7 @@ function ParkedMessages({
   return (
     <div className="flex flex-col gap-3 border-t border-line pt-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[12px] text-fg-3">{setup ? SETUP_LABEL : parkedHeading(items)}</span>
+        <span className="text-[12px] text-fg-3">{setup ? SETUP_LABEL : parkedHeading(items, sessionBlocked)}</span>
         {recovered.length > 0 && !setup && (
           <Button size="sm" variant="primary" icon="play" busy={busy === 'resume'} disabled={off} onClick={() => void resume('resume')}>
             Resume{recovered.length > 1 ? ` ${recovered.length}` : ''}
@@ -425,7 +430,7 @@ function ParkedMessages({
           </Button>
         );
         const icon = m.delivery === 'uncertain' ? 'alert' : 'clock';
-        const label = setup ? 'Waits for the worktree' : parkedLabel(m);
+        const label = setup ? 'Waits for the worktree' : parkedLabel(m, sessionBlocked);
         if (!isOmnis(m)) return row(m, label ?? '', icon, again);
         return (
           <PendingBubble key={m.uuid} m={m} label={label ?? 'Held for Resume'} icon={icon}>

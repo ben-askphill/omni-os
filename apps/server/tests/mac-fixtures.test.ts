@@ -632,6 +632,12 @@ async function scenario() {
   git('commit', '-q', '--allow-empty', '-m', 'first');
   keep('setup-retried.json', await call('POST', `/threads/${wt.id}/setup/retry`, {}));
   await eventually(async () => (await detail(wt.id)).thread.status === 'done', 'the retried thread to run');
+  // The turn's after snapshot settles behind its status. Edit the checkout while it is still being saved and the save
+  // fails on whatever moved ("pathspec 'README.md' did not match"), which turns.json records as that turn's `error`.
+  await eventually(async () => {
+    const b = (await get(`/threads/${wt.id}/turns`)) as { turns: { state: string }[] };
+    return b.turns.length > 0 && b.turns.every((t) => t.state === 'ready') && b;
+  }, 'the retried turn to be saved');
 
   // Its branch changes before any PR: a commit, a staged rename, an unstaged edit and deletion, an untracked file.
   const tree = (...args: string[]) => execFileSync('git', ['-C', wt.cwd, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', ...args]);

@@ -4,7 +4,7 @@
 
 The release ran #386 to #413 in a day and a half. This page re-measures every KPI from the tracker's baseline table with the baseline's method, re-derived where the reviews did not record it, and says for each whether the target is met, missed with a reason, or dropped. Nothing was removed from the product on the way.
 
-**18 of 23 met, 5 missed, 0 dropped.** The misses are the Mac composers (one control over on each), the sidebar (a pinned running thread shows three times, not two), one stale heading (its fix is in a follow-up PR not yet merged), source `any` (68, target 40) and the initial JS bundle (338 kB gzip, target 300). Duplicate-code share could not be compared: the baseline's scan settings were not recorded and no setting reproduces 0.142%, so it is reported at two settings instead of judged.
+**19 of 23 met, 4 missed, 0 dropped.** The misses are the Mac composers (one control over on each), the sidebar (a pinned running thread shows three times, not two), source `any` (68, target 40) and the initial JS bundle (338 kB gzip, target 300). Duplicate-code share could not be compared: the baseline's scan settings were not recorded and no setting reproduces 0.142%, so it is reported at two settings instead of judged.
 
 ## The table
 
@@ -22,7 +22,7 @@ The release ran #386 to #413 in a day and a half. This page re-measures every KP
 | UI | Move-or-continue concepts / entry points | 7 / about 12 | 2 / 4 or fewer | 2 / 4 | met |
 | UI | Sidebar appearances of one thread | 4 | 2 | 3 | missed |
 | UI | Clicks to a new thread in the current channel | 3-4 | 1 | 1 | met |
-| UI | Contradictory or stale copy | 3 | 0 | 1 | missed until the follow-up to #400 merges |
+| UI | Contradictory or stale copy | 3 | 0 | 0 | met (the stale heading was fixed after this was measured) |
 | Architecture | Accepted remote commands silently lost | possible | 0 | 0 | met |
 | Architecture | Ownership representations | 4 | 1 | 1 | met |
 | Architecture | Transition endpoints | 6 | 4 | 4 (the 6 old routes stay as aliases) | met |
@@ -60,7 +60,7 @@ The control counts come from the code, checked on a throwaway QA stack (`scripts
 - **Move or continue.** Two concepts: Continue (fork a thread, through the Continue sheet, `packages/shared/continue.ts`) and Machine (where a thread runs: run on, hand off, take over, all behind the Machine chip, `composer/MachineChip.tsx` and `RunOnPicker.swift`). Four entry points: Fork in the reply box, Fork in the thread menu, the Machine chip on the reply box and the Machine chip on the new-thread composer. The handoff and takeover cards in the transcript show state and cancel; they start nothing.
 - **Sidebar.** Web `Sidebar.tsx` and Mac `SidebarView.swift` both keep Running and Pinned as cross-channel sections above the channels, so a pinned thread that is running shows three times: Running, Pinned, its channel or folder. A thread that is neither pinned nor running shows once. #396 removed Recent threads and the footer theme switch (4 to 3) and kept Pinned on purpose, as the one list of pins from every channel. Missed, by a design choice rather than a slip.
 - **New thread in the current channel.** One click: the sidebar's New thread button opens the current channel's composer (`startNewThread` in `router.ts`, #397), the phone has a New thread chip above the reply box, and the Mac's New thread does the same.
-- **Copy.** The three contradictions from the baseline are gone (#392: the slash menu's "fixed per thread", the "New thread on another model" hint, the agent prompt's renderer workarounds). This review found one stale heading. The parked-messages card said "waiting when Omni restarted" under the stale-session card from #400, where the messages wait for a session download, not a restart. Two Mac QA-harness comments still said Hand off lives in the ⋯ menu; fixed in this PR. The heading's fix is in the follow-up PR to #400, which was not open when this was measured, so it counts as 1 here and the tracker's result table says so.
+- **Copy.** The three contradictions from the baseline are gone (#392: the slash menu's "fixed per thread", the "New thread on another model" hint, the agent prompt's renderer workarounds). This review found one stale heading. The parked-messages card said "waiting when Omni restarted" under the stale-session card from #400, where the messages wait for a session download, not a restart. Two Mac QA-harness comments still said Hand off lives in the ⋯ menu; fixed in this PR. A follow-up PR fixed it after this was measured, so the row now counts 0.
 
 ### Architecture
 
