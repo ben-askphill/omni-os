@@ -37,5 +37,6 @@ export { continuations, type Continuation } from './db/repos/continuations.ts';
 export type { RemoteCommand, RemoteCommandKind, RemoteCommandState } from './db/repos/remote-commands.ts';
 export { isCommandAhead, remoteCommands } from './db/repos/remote-commands.ts';
 export { assignments, type Assignment } from './db/repos/assignments.ts';
+export { transitions, type TransitionRow } from './db/repos/transitions.ts';
 export type { SyncEntity, SyncOp, OutboxRow } from './db/sync.ts';
 export { SEED_TS, outbox, syncMeta } from './db/sync.ts';

@@ -1,8 +1,8 @@
 // Switching a thread's harness, model or effort between turns. switch-plan.ts decides what happens to its sessions,
 // this applies it; the next spawn hands the thread over when the harness changed (handover.ts). A switch picked during
 // a turn waits on the thread until the turn ends.
-import { sameRun, type Run, type RunName, type SwitchP } from '@omni/shared/run-switch.ts';
-import { artifacts, events, threads, type Thread } from '../db.ts';
+import { sameRun, type Run, type RunName, type SwitchMode, type SwitchP } from '@omni/shared/run-switch.ts';
+import { artifacts, events, threads, transitions, type Thread } from '../db.ts';
 import { uploadsDir } from '../config.ts';
 import { forgetContext } from '../context.ts';
 import { userName } from '../profile.ts';
@@ -53,6 +53,32 @@ const plan = (t: Thread, to: Run, cat: Catalog) =>
     events.hasContentAfter(t.id, id),
   );
 
+/** What a switch to `to` would do now, without doing it: the catalog's or the owner's objection, how it reaches the next turn, and whether it waits. */
+export async function previewSwitch(threadId: string, to: Run): Promise<{ run: RunName; blocked: string | null; mode: SwitchMode | 'none'; waits: boolean }> {
+  const t = threads.get(threadId);
+  if (!t) throw refusal('thread not found', 404);
+  const run = runName(to);
+  if (sameRun(runOf(t), to)) return { run, blocked: null, mode: 'none', waits: false };
+  if (!isHarnessId(to.harness)) return { run, blocked: `Unknown harness "${to.harness}".`, mode: 'none', waits: false };
+  const target = { ...to, harness: to.harness };
+  let blocked = invalid(getCatalog(), target) && invalid(await freshCatalog(), target);
+  const now = threads.get(threadId) ?? t;
+  blocked ||= turnBlocked(now, runsHere(threadId));
+  const p = plan(now, to, getCatalog());
+  if (p.kind === 'reject') blocked ||= p.error;
+  return { run, blocked, mode: p.kind === 'reject' ? 'none' : p.kind, waits: now.status === 'running' || holdsTurn(lives.get(threadId)) };
+}
+
+/** Drop the run Ben queued for after the turn, so the thread stays on its run. True when one was dropped. */
+export function cancelQueued(threadId: string): boolean {
+  const t = threads.get(threadId);
+  if (!t || !queuedRun(t)) return false;
+  threads.update(threadId, NO_QUEUED);
+  transitions.settleQueued(threadId, null);
+  emitThread(threadId);
+  return true;
+}
+
 /**
  * Move a thread to another run. The same run again changes nothing, and drops a run queued since. While a turn runs
  * the pick is queued instead (`queued_*` on the thread): a later pick replaces it, and it applies once the thread is
@@ -64,6 +90,7 @@ export async function switchRun(threadId: string, to: Run): Promise<Thread> {
   if (sameRun(runOf(t), to)) {
     if (!queuedRun(t)) return t;
     threads.update(threadId, NO_QUEUED);
+    transitions.settleQueued(threadId, null);
     emitThread(threadId);
     return threads.get(threadId)!;
   }
@@ -85,6 +112,8 @@ export async function switchRun(threadId: string, to: Run): Promise<Thread> {
     const q = queuedRun(now);
     if (q && sameRun(q, to)) return now;
     threads.update(threadId, { queued_harness: to.harness, queued_model: to.model, queued_effort: to.effort });
+    // The pick this one replaces is over; the caller records the new one (transition.ts).
+    if (q) transitions.settleQueued(threadId, null);
     emitThread(threadId);
     return threads.get(threadId)!;
   }
@@ -103,7 +132,10 @@ function apply(t: Thread, to: Run) {
   const p = plan(t, to, cat);
   if (p.kind === 'reject') throw refusal(p.error, 400);
   if (p.kind === 'none') {
-    if (queuedRun(t)) threads.update(t.id, NO_QUEUED);
+    if (queuedRun(t)) {
+      threads.update(t.id, NO_QUEUED);
+      transitions.settleQueued(t.id, null);
+    }
     return;
   }
   threads.update(t.id, {
@@ -116,6 +148,7 @@ function apply(t: Thread, to: Run) {
     sessions: p.sessions,
     handover: p.handover,
   });
+  transitions.settleQueued(t.id, to);
   addEvent(t.id, 'switch', { from: runName(runOf(t), cat), to: runName(to, cat), mode: p.kind } satisfies SwitchP);
   // The meter's reading is the old session's.
   if (to.harness !== t.harness) forgetContext(t.id);
@@ -140,6 +173,7 @@ export function applyQueued(threadId: string): boolean {
     apply(t, to);
   } catch (e) {
     threads.update(threadId, NO_QUEUED);
+    transitions.settleQueued(threadId, null, (e as Error).message);
     addEvent(threadId, 'error', { text: `The switch to ${runName(to).modelLabel} did not apply: ${(e as Error).message}` });
     emitThread(threadId);
   }

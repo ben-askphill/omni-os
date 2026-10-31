@@ -15,6 +15,7 @@ who may run a thread at all is [ADR 0005](../adr/0005-one-execution-owner.md), a
 | A message's delivery state | its request row | `db/repos/requests.ts`, moved by `runner/state.ts track` |
 | Where a thread runs when not here | routing | `run-on.ts` |
 | A thread on its way between Macs | the handoff records | `handoff.ts`, `handoff/records.ts` |
+| A change to a thread's run or machine, or a Continue, as something asked, read and cancelled by id | the transition service | `transition.ts`, `transitions-api.ts`, ledger in `db/repos/transitions.ts` ([transitions](transitions.md)) |
 
 Every other runner module sees a process as `Live`: the controller with every field read-only. It moves the state
 only through the controller's methods, each one arrow below, so `npm run typecheck` fails on a write anywhere else.

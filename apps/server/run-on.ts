@@ -26,7 +26,8 @@ import { cancelLimitResume, fenceStale, interruptThread, resumeLimitNow, saveOwn
 import { fileReport } from './runner/queue.ts';
 import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
 import { safeSegment } from './sync/paths.ts';
-import { activeWorker, onSynced, syncStatus, type SyncWorker } from './sync/worker.ts';
+import { RUN_ON_NEEDS, syncProblem } from './sync/problem.ts';
+import { activeWorker, onSynced, type SyncWorker } from './sync/worker.ts';
 import { receiveUploads, sendSaved, type UploadRef } from './sync/files.ts';
 import { reachabilityOf, tailnet } from './tailscale.ts';
 import type { Attachment } from './uploads.ts';
@@ -72,14 +73,6 @@ const isId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9-
 const fresh = (at: string, now: number, within = FRESH_MS) => now - Date.parse(at) < within;
 const deadline = (kind: RemoteCommand['kind'], now = Date.now()) => new Date(now + COMMAND_WINDOW_MS[kind]).toISOString();
 
-/** Why this machine cannot reach another now, said as Settings would. */
-function syncProblem(): string {
-  const status = syncStatus();
-  if (!status.machineId || !status.configured) return 'Sync is not set up on this machine. Running a thread on another machine needs sync on both.';
-  if (!status.enabled) return 'Sync is paused on this machine. Resume it in Settings, Machines to run threads on another machine.';
-  return 'Sync is set up but not running, so the other machine cannot be told. Check Settings, Machines, then try again.';
-}
-
 /**
  * Where a new thread should run. `asked`: the composer's pick, a synced machine's id, or "here" for this machine;
  * left out, Settings' default. Null means this machine. Refuses a machine that is not synced or that Tailscale sees
@@ -89,7 +82,7 @@ export async function targetFor(asked: string | null | undefined): Promise<{ fro
   const pick = asked === undefined || asked === null ? userConfig().runOn.device : asked;
   const self = outbox.machineId();
   if (!pick || pick === 'here' || pick === self) return null;
-  if (!self || !activeWorker()) throw refused(syncProblem());
+  if (!self || !activeWorker()) throw refused(syncProblem(RUN_ON_NEEDS));
   const target = deviceRecord(pick);
   if (!target) {
     // A stale default (the machine was removed) falls back to this one; a pick Ben just made does not.
