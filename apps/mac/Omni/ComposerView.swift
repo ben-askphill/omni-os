@@ -164,9 +164,8 @@ private struct ReplyComposerView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: z(8)) {
       // The setup card in the transcript says why while the worktree is not ready, and the handoff card while the
-      // thread is on its way to or from another Mac: the server's block is then that card's own line. The Take Over
-      // note says the same as the block of a thread running on another Mac.
-      if let t = store.takeover { TakeoverNote(store: store, takeover: t) }
+      // thread is on its way to or from another Mac: the server's block is then that card's own line. The Machine
+      // chip names the Mac a thread running elsewhere runs on, which is what the block says.
       if let b = store.blocked, thread.setup == nil, store.handoff?.inFlight != true, store.takeover?.running != true {
         ErrorNote(text: b)
       }
@@ -277,9 +276,9 @@ private struct ReplyComposerView: View {
     .padding(.top, z(6))
   }
 
-  /// The model and effort the thread runs on, in one pill. A pick switches its next turn. While a turn runs it waits
-  /// for that turn: the pill shows it, ringed, after a "Next turn" chip whose click keeps the current run. Separate
-  /// views, so the footer wraps between them in a narrow window.
+  /// The model and effort the thread runs on, in one pill, then the Machine chip. A pick switches its next turn. While
+  /// a turn runs it waits for that turn: the pill shows it, ringed, after a "Next turn" chip whose click keeps the
+  /// current run. Separate views, so the footer wraps between them in a narrow window.
   @ViewBuilder private var runPickers: some View {
     let harnesses = fetchedHarnesses ?? model.store.harnesses
     let shown = RunSwitch.shown(thread)
@@ -295,6 +294,7 @@ private struct ReplyComposerView: View {
         options: EffortRules.options(for: EffortRules.model(harness: shown.harness, model: shown.model, in: harnesses)),
         value: shown.effort) { switchRun(RunSwitch.picking(effort: $0, from: shown)) })
       .overlay(ring)
+    ThreadMachineMenu(model: model, store: store)
   }
 
   private func refreshHarnesses() {

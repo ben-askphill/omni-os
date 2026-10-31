@@ -9,7 +9,7 @@ describe('the thread action menu', () => {
     expect(THREAD_ACTIONS.length).toBeLessThanOrEqual(10);
     expect(menu().map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([
       ['Organize', ['Pin thread', 'Mark as done', 'Rename thread', 'Move to folder', 'Archive thread']],
-      ['Continue', ['Fork thread', 'Reference a thread', 'Hand off to…', 'Take over from Studio']],
+      ['Continue', ['Fork thread', 'Reference a thread']],
       ['Send to', ['Send to Grok Bot']],
     ]);
   });
@@ -35,8 +35,9 @@ describe('the thread action menu', () => {
     expect(menu({ grokBot: false }).map((g) => g.id)).toEqual(['organize', 'continue']);
   });
 
-  it('shows Hand off and Take over only when they can run now', () => {
-    expect(ids({ handOff: false, takeOverFrom: null })).toEqual(['pin', 'done', 'rename', 'move', 'archive', 'fork', 'reference', 'grok']);
+  it('leaves where the thread runs to the Machine chip', () => {
+    expect(THREAD_ACTIONS.map((a) => a.id)).not.toContain('handoff');
+    expect(THREAD_ACTIONS.map((a) => a.id)).not.toContain('takeover');
   });
 
   it('turns Fork off, with the reason, for a thread whose files are elsewhere', () => {
@@ -46,6 +47,6 @@ describe('the thread action menu', () => {
   });
 
   it('waits for the row before the actions that need its state', () => {
-    expect(ids({ row: false, handOff: false, takeOverFrom: null })).toEqual(['rename', 'archive', 'grok']);
+    expect(ids({ row: false })).toEqual(['rename', 'archive', 'grok']);
   });
 });

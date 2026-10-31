@@ -3,7 +3,6 @@ import { api, errorText, type Thread } from '../api.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
 import { navigate, href, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
-import { handOff } from './thread/Handoff.tsx';
 import { useToast } from './Toaster.tsx';
 
 /** What the thread menu's items do. Each closes the menu when it works and leaves its message in `error` when it does not. */
@@ -12,7 +11,6 @@ export function useThreadMenuActions({ id, row, archived, current, onClose }: { 
   const route = useRoute();
   const toast = useToast();
   const [error, setError] = useState('');
-  const [sending, setSending] = useState<string | null>(null);
   const sendingGrok = useRef(false);
 
   const toggleArchive = async () => {
@@ -74,18 +72,5 @@ export function useThreadMenuActions({ id, row, archived, current, onClose }: { 
     setError(result.error);
   };
 
-  const sendTo = async (to: string) => {
-    if (!row) return;
-    setSending(to);
-    setError('');
-    try {
-      await handOff(row.id, to);
-      onClose();
-    } catch (e) {
-      setError(errorText(e));
-      setSending(null);
-    }
-  };
-
-  return { error, sending, toggleArchive, rename, togglePin, toggleDone, sendGrok, sendTo };
+  return { error, toggleArchive, rename, togglePin, toggleDone, sendGrok };
 }

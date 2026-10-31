@@ -45,17 +45,6 @@
         "label": "Reference a thread",
         "icon": "message",
         "hint": "Attach another thread, not its messages"
-      },
-      {
-        "id": "handoff",
-        "label": "Hand off to…",
-        "icon": "share",
-        "hint": "Continue it on another Mac"
-      },
-      {
-        "id": "takeover",
-        "label": "Take over from Studio",
-        "icon": "download"
       }
     ]
   },

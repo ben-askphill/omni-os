@@ -270,8 +270,6 @@
       off: (f) => f.harness ? continueSourceRefusal(f.harness) : null
     },
     { id: "reference", group: "continue", icon: "message", when: (f) => f.row && !f.archived, label: () => "Reference a thread", hint: "Attach another thread, not its messages" },
-    { id: "handoff", group: "continue", icon: "share", when: (f) => f.handOff, label: () => "Hand off to\u2026", hint: "Continue it on another Mac" },
-    { id: "takeover", group: "continue", icon: "download", when: (f) => !!f.takeOverFrom, label: (f) => `Take over from ${f.takeOverFrom}` },
     { id: "grok", group: "send", icon: "grok", when: (f) => f.grokBot, label: () => "Send to Grok Bot", hint: "This thread's text" }
   ];
   function threadMenu(f) {

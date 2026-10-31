@@ -196,15 +196,9 @@ struct ThreadActionItems: View {
     stub ?? model.store.pinned.first { $0.id == threadID } ?? model.threads.store(threadID)?.thread.map { ThreadStub($0) }
   }
 
-  /// What the menu knows. Where the turn runs comes only from the thread's open store, so a row whose thread is not
-  /// open leaves Hand Off and Take Over out.
+  /// What the menu knows. Where the thread runs is the reply box's Machine chip (RunOnPicker.swift), not a menu item.
   private var facts: ThreadMenuFacts {
-    var f = ThreadMenuFacts(
-      stub: row, archived: archived, pinned: model.store.pinned.contains { $0.id == threadID }, grokBot: model.store.status?.grokBot == true)
-    let store = model.threads.store(threadID)
-    f.handOff = model.devices.targets(store) != nil
-    if let store, store.canTakeOver { f.takeOverFrom = store.takeover?.from.name }
-    return f
+    ThreadMenuFacts(stub: row, archived: archived, pinned: model.store.pinned.contains { $0.id == threadID }, grokBot: model.store.status?.grokBot == true)
   }
 
   @ViewBuilder
@@ -242,10 +236,6 @@ struct ThreadActionItems: View {
             picker: ThreadReferencePicker(threadID: threadID, channelID: row.channelID, api: model.client, draft: draft))
         }
       }
-    case .handOff:
-      HandOffMenu(model: model, threadID: threadID, title: item.label)
-    case .takeOver:
-      TakeOverItem(model: model, threadID: threadID, title: item.label)
     case .grok:
       Button {
         Task {

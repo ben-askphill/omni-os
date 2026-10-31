@@ -4,10 +4,10 @@
 // JSON as thread-menu.json for the Swift types.
 import { continueSourceRefusal } from './continue.ts';
 
-export type ThreadActionId = 'pin' | 'done' | 'rename' | 'move' | 'archive' | 'fork' | 'reference' | 'handoff' | 'takeover' | 'grok';
+export type ThreadActionId = 'pin' | 'done' | 'rename' | 'move' | 'archive' | 'fork' | 'reference' | 'grok';
 export type ThreadActionGroupId = 'organize' | 'continue' | 'send';
 /** Names every client's icon set has. */
-export type ThreadActionIcon = 'pin' | 'check' | 'pencil' | 'folder' | 'archive' | 'branch' | 'message' | 'share' | 'download' | 'grok';
+export type ThreadActionIcon = 'pin' | 'check' | 'pencil' | 'folder' | 'archive' | 'branch' | 'message' | 'grok';
 
 /** What a surface knows about the thread when it opens the menu. */
 export interface ThreadMenuFacts {
@@ -22,10 +22,6 @@ export interface ThreadMenuFacts {
   child: boolean;
   /** The agent CLI it runs in. Fork is off for one whose files are not on this Mac. */
   harness: string | null;
-  /** Another Mac can take it now. */
-  handOff: boolean;
-  /** The Mac that holds it, when this one may take it over now. */
-  takeOverFrom: string | null;
   /** Grok Bot's webhook URL is set. */
   grokBot: boolean;
 }
@@ -62,7 +58,10 @@ export const THREAD_ACTION_GROUPS: { id: ThreadActionGroupId; title: string }[] 
   { id: 'send', title: 'Send to' },
 ];
 
-/** Every action, in menu order. At most ten, so the menu stays short on a phone. */
+/**
+ * Every action, in menu order. At most ten, so the menu stays short on a phone. Where a thread runs (Run on, Hand off,
+ * Take over) is the composer's Machine chip, not a menu item.
+ */
 export const THREAD_ACTIONS: readonly Spec[] = [
   // Archived threads are out of the lists, so out of Pinned too.
   { id: 'pin', group: 'organize', icon: 'pin', when: (f) => f.row && !f.archived, label: (f) => (f.pinned ? 'Unpin thread' : 'Pin thread') },
@@ -80,8 +79,6 @@ export const THREAD_ACTIONS: readonly Spec[] = [
     off: (f) => (f.harness ? continueSourceRefusal(f.harness) : null),
   },
   { id: 'reference', group: 'continue', icon: 'message', when: (f) => f.row && !f.archived, label: () => 'Reference a thread', hint: 'Attach another thread, not its messages' },
-  { id: 'handoff', group: 'continue', icon: 'share', when: (f) => f.handOff, label: () => 'Hand off to…', hint: 'Continue it on another Mac' },
-  { id: 'takeover', group: 'continue', icon: 'download', when: (f) => !!f.takeOverFrom, label: (f) => `Take over from ${f.takeOverFrom}` },
   { id: 'grok', group: 'send', icon: 'grok', when: (f) => f.grokBot, label: () => 'Send to Grok Bot', hint: "This thread's text" },
 ];
 
@@ -108,7 +105,5 @@ export const EVERY_ACTION_FACTS: ThreadMenuFacts = {
   settled: true,
   child: false,
   harness: 'claude-code',
-  handOff: true,
-  takeOverFrom: 'Studio',
   grokBot: true,
 };

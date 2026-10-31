@@ -8,7 +8,8 @@ import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
 import { HistoryCtx, HistoryEdgeRow } from '../components/thread/HistoryEdgeRow.tsx';
 import { historyEdges } from '@omni/shared/history.ts';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
-import { TakeoverNote } from '../components/thread/Takeover.tsx';
+import { TakeoverConfirm } from '../components/thread/Takeover.tsx';
+import { useThreadMachine } from '../components/composer/MachineChip.tsx';
 import { MoContinueLinks } from '../components/ContinueLinks.tsx';
 import { ErrorNote, StatusPill } from '../components/ui.tsx';
 import { plural } from '../format.ts';
@@ -22,6 +23,7 @@ import { MoEmpty, MoHeader, MoRound } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
 import { Pending, Sending } from './ThreadCards.tsx';
 import { MenuSheet } from './ThreadMenuSheet.tsx';
+import { RunOnSheet } from './RunOnSheet.tsx';
 import { Turn, useBranchChanges, type TurnCtx } from './ThreadTurn.tsx';
 import { useOpenOnNewestTurn } from './useOpenOnNewestTurn.ts';
 import { threadView } from './thread-view.ts';
@@ -34,12 +36,19 @@ export function ThreadScreen() {
   const { needsYou, channel } = useApp();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
+  const [machineSheet, setMachineSheet] = useState(false);
   const spans = history.history.spans;
   const view = useMemo(() => (thread ? threadView({ events, spans, thread, artifacts: files, children }) : null), [events, spans, thread, files, children]);
   const edges = useMemo(() => historyEdges({ spans }, view?.turns.map((t) => t.key) ?? []), [spans, view]);
   const changes = useBranchChanges(thread, slotBusy);
   const pr = useThreadPR(thread, slotBusy, true);
   const { scroll, newest } = useOpenOnNewestTurn({ view, history, ready, revealTarget, clearReveal });
+  const handedOff = (a: HandoffAnswer) => {
+    applyThread(a.thread, true);
+    setHandoff(a.handoff);
+  };
+  // The Machine chip: where the thread runs, as a chip that opens the sheet a new thread picks its machine in.
+  const machine = useThreadMachine({ id: thread?.id ?? '', status: thread?.status }, { blocked: s.blocked, handoff, takeover, onChanged: handedOff }, (e) => e && shell.toast(e));
 
   if (notFound || (!thread && error)) {
     return (
@@ -66,10 +75,6 @@ export function ThreadScreen() {
   const latest = view.turns[view.turns.length - 1];
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
   const theirs = conductor ? 'the Conductor' : thread.role ? `the ${thread.role}` : 'the agent';
-  const handedOff = (a: HandoffAnswer) => {
-    applyThread(a.thread, true);
-    setHandoff(a.handoff);
-  };
 
   const openPR = async () => {
     try {
@@ -81,6 +86,8 @@ export function ThreadScreen() {
   };
   const report = latest?.artifacts.find((a) => a.kind === 'html' || a.kind === 'markdown' || a.kind === 'pdf') ?? latest?.artifacts[0];
   const chips: ComposerChip[] = [];
+  const held = machine.machine;
+  if (held) chips.push({ label: `On ${held.rows.find((r) => r.value === held.value)?.label ?? ''}`, icon: 'monitor', onClick: () => setMachineSheet(true), disabled: machine.sending });
   if (report) chips.push({ label: 'Open report', icon: 'file', onClick: () => viewer(report) });
   if (pr?.pr) chips.push({ label: `Review #${pr.pr.number}`, icon: 'pr', diff: [pr.pr.additions, pr.pr.deletions], onClick: () => shell.open(href.threadView(thread.id, 'pr')) });
   else if (changes?.files.length) {
@@ -157,7 +164,6 @@ export function ThreadScreen() {
           </div>
         </HistoryCtx.Provider>
       </div>
-      <TakeoverNote threadId={thread.id} takeover={takeover} handoff={handoff} mobile onChanged={handedOff} />
       <MoComposer
         thread={thread}
         chips={chips}
@@ -169,6 +175,28 @@ export function ThreadScreen() {
         onFork={() => shell.sheet({ name: 'continue', source: thread })}
       />
       {menu && <MenuSheet thread={thread} prLabel={pr?.pr ? `PR #${pr.pr.number} · ${plural(changes?.files.length ?? 0, 'file')}` : null} onClose={() => setMenu(false)} />}
+      {machineSheet && held && (
+        <RunOnSheet
+          rows={held.rows}
+          value={held.value}
+          onChange={(v) => void machine.pick(v)}
+          onClose={() => setMachineSheet(false)}
+          title="Runs on"
+          note={held.kind === 'held' ? machine.title : 'Pick another machine to hand the thread off. Replies and Stop follow it there.'}
+        />
+      )}
+      {machine.asking && held?.kind === 'held' && (
+        <TakeoverConfirm
+          threadId={thread.id}
+          takeover={held.takeover}
+          mobile
+          onClose={machine.closeAsk}
+          onChanged={(a) => {
+            handedOff(a);
+            shell.toast(`Asked ${held.takeover.from.name} for this thread`);
+          }}
+        />
+      )}
     </>
   );
 }

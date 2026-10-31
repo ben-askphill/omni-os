@@ -1,10 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { api, errorText, type BackgroundTask, type Thread } from '../api.ts';
 import { threadMenu, type ThreadActionId } from '@omni/shared/thread-actions.ts';
-import { handOff, useHandoffTargets } from '../components/thread/Handoff.tsx';
-import { TakeoverConfirm } from '../components/thread/Takeover.tsx';
-import { deviceRows, mayTakeOver } from '../handoff.ts';
-import { Button, ErrorNote, Loader, StatusDot } from '../components/ui.tsx';
+import { Button, ErrorNote, Loader } from '../components/ui.tsx';
 import { duration, toDate } from '../format.ts';
 import { runningSubagents, subagentKind } from '../subagents.ts';
 import { canMarkDone } from '../needs-you.ts';
@@ -34,7 +31,7 @@ function MoSubagentRow({ t, last, onJump }: { t: BackgroundTask; last: boolean; 
 }
 
 /** Actions that open another sheet carry a chevron; the rest act and close. */
-const OPENS = new Set<ThreadActionId>(['rename', 'move', 'fork', 'reference', 'handoff', 'takeover']);
+const OPENS = new Set<ThreadActionId>(['rename', 'move', 'fork', 'reference']);
 
 const SHEET_TITLE = 'px-5 pt-2.5 pb-2 text-[15px] leading-[1.3] font-medium';
 
@@ -177,56 +174,13 @@ function MoveSheet({ thread, onClose }: { thread: Thread; onClose: () => void })
   );
 }
 
-/** The Macs the thread can go to; picking one hands it off and closes the sheet. */
-function HandoffSheet({ thread, devices, onClose }: { thread: Thread; devices: Extract<ReturnType<typeof useHandoffTargets>, { state: 'ready' }>['devices']; onClose: () => void }) {
-  const shell = useShell();
-  const { applyThread, setHandoff } = useThread();
-  const [sending, setSending] = useState<string | null>(null);
-  const sendTo = async (to: { id: string; name: string }) => {
-    setSending(to.id);
-    try {
-      const a = await handOff(thread.id, to.id);
-      applyThread(a.thread, true);
-      setHandoff(a.handoff);
-      onClose();
-      shell.toast(`Handing off to ${to.name}`);
-    } catch (e) {
-      setSending(null);
-      shell.toast(errorText(e));
-    }
-  };
-  return (
-    <MoSheet onClose={onClose} label="Hand off to">
-      <div className="px-5 pt-2.5 pb-0.5 text-[15px] leading-[1.3] font-medium">Hand off to</div>
-      <p className="px-5 pb-2.5 text-[12.5px] leading-[1.4] text-fg-3">The turn stops here and keeps running on the Mac you pick.</p>
-      <div className="flex flex-col gap-2.5 px-3">
-        <MoGroup>
-          {deviceRows(devices).map((d, i, all) => (
-            <MoListRow
-              key={d.id}
-              icon={sending === d.id ? <Loader size={14} /> : <StatusDot status={d.dot} size={9} className="mx-[4.5px]" />}
-              label={d.name}
-              sub={d.label}
-              chevron={false}
-              disabled={!d.pickable || !!sending}
-              onClick={() => void sendTo(d)}
-              last={i === all.length - 1}
-            />
-          ))}
-        </MoGroup>
-      </div>
-    </MoSheet>
-  );
-}
-
-type Mode = 'rename' | 'move' | 'reference' | 'takeover' | 'handoff';
+type Mode = 'rename' | 'move' | 'reference';
 
 export function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabel: string | null; onClose: () => void }) {
   const shell = useShell();
   const { tasks, status } = useApp();
-  const { applyThread, blocked, handoff, setHandoff, takeover, jumpTo } = useThread();
+  const { jumpTo } = useThread();
   const agents = useMemo(() => runningSubagents(tasks, thread.id), [tasks, thread.id]);
-  const targets = useHandoffTargets(thread, { blocked, handoff, takeover });
   // The sheet this one has swapped itself for, if any.
   const [mode, setMode] = useState<Mode | null>(null);
   const { go, pin, done, sendGrok, archive, grokBusy, grokError } = useThreadActions(thread, onClose);
@@ -239,23 +193,6 @@ export function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabe
       </MoSheet>
     );
   }
-  if (mode === 'takeover' && takeover && mayTakeOver(takeover, handoff)) {
-    return (
-      <TakeoverConfirm
-        threadId={thread.id}
-        takeover={takeover}
-        mobile
-        onClose={onClose}
-        onChanged={(a) => {
-          applyThread(a.thread, true);
-          setHandoff(a.handoff);
-          shell.toast(`Asked ${takeover.from.name} for this thread`);
-        }}
-      />
-    );
-  }
-  if (mode === 'handoff' && targets.state === 'ready') return <HandoffSheet thread={thread} devices={targets.devices} onClose={onClose} />;
-  const takeOverNow = takeover && mayTakeOver(takeover, handoff) ? takeover : null;
   // The thread's actions, from the list the desktop menu and the Mac app render too.
   const menu = threadMenu({
     row: true,
@@ -265,8 +202,6 @@ export function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabe
     settled: canMarkDone(thread.status),
     child: !!thread.parent_id,
     harness: thread.harness,
-    handOff: targets.state === 'ready',
-    takeOverFrom: takeOverNow?.from.name ?? null,
     grokBot: !!status?.grokBot,
   });
   const runs: Record<ThreadActionId, () => void> = {
@@ -277,8 +212,6 @@ export function MenuSheet({ thread, prLabel, onClose }: { thread: Thread; prLabe
     archive: () => void archive(),
     fork: () => (onClose(), shell.sheet({ name: 'continue', source: thread })),
     reference: () => setMode('reference'),
-    handoff: () => setMode('handoff'),
-    takeover: () => setMode('takeover'),
     grok: () => void sendGrok(),
   };
   return (
