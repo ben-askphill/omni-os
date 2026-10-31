@@ -492,7 +492,7 @@ private struct PressScale: ButtonStyle {
 }
 
 /// The busy thread's send: Steer (Queue where the harness can't steer) and a menu of the other ways.
-private struct SteerButton: View {
+fileprivate struct SteerButton: View {
   let canSteer: Bool
   let enabled: Bool
   let sending: Bool

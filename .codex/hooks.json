@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node '/home/brosenb/omni-os/.codex/hooks/verify-on-stop.mjs'",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
