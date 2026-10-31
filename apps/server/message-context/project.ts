@@ -9,7 +9,7 @@ import type { MessageContext } from '@omni/shared/message-context.ts';
 import { readContexts, type BodyOf, type ContextReading, type KindName, type KnownContext } from '@omni/shared/message-context-kinds.ts';
 import type { Thread } from '../db.ts';
 import type { Attachment } from '../uploads.ts';
-import { isRemoteHarness, remoteWhere } from '../harness/types.ts';
+import { isProviderHarness, providerWhere } from '../harness/types.ts';
 import { userName, userPossessive } from '../profile.ts';
 import { HISTORY_TOOL, PAGE_ROWS_MAX } from '../thread-history.ts';
 import { defang } from './defang.ts';
@@ -52,7 +52,7 @@ export const CONTEXT_BLOCK_MAX = 40_000;
 const READ_MAX = 1_000_000;
 
 export const placeFor = (t: Pick<Thread, 'harness' | 'cwd'>): Place =>
-  isRemoteHarness(t.harness) ? { remote: true, where: remoteWhere(t.harness) } : { remote: false, read: checkoutReader(t.cwd) };
+  isProviderHarness(t.harness) ? { remote: true, where: providerWhere(t.harness) } : { remote: false, read: checkoutReader(t.cwd) };
 
 /** Reads files that resolve inside `cwd`, symlinks followed, up to READ_MAX bytes, and none with a NUL in its first 8000. */
 export function checkoutReader(cwd: string): Reader {

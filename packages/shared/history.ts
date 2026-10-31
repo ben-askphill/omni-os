@@ -198,16 +198,35 @@ export function unionSpans(spans: readonly Span[]): Span[] {
   return out;
 }
 
-/** Union of rows by id, ascending. Of two copies of one row, an unclipped one wins, else the newer argument's. */
+/** Union of rows by id, ascending: a merge, `a` being ascending. Of two copies of one row, an unclipped one wins, else the newer argument's. */
 function unionRows<R extends HistoryRow>(a: readonly R[], b: readonly R[]): R[] {
   if (!b.length) return a as R[];
-  const byId = new Map<number, R>();
-  for (const r of a) byId.set(r.id, r);
-  for (const r of b) {
-    const prev = byId.get(r.id);
-    if (!prev || !(r.clipped && !prev.clipped)) byId.set(r.id, r);
+  const bs = b.length > 1 ? [...b].sort((x, y) => x.id - y.id) : b;
+  const out: R[] = [];
+  const take = (r: R) => {
+    const last = out[out.length - 1];
+    if (last?.id !== r.id) out.push(r);
+    else if (!(r.clipped && !last.clipped)) out[out.length - 1] = r;
+  };
+  let i = 0;
+  let j = 0;
+  while (i < a.length || j < bs.length) {
+    if (j === bs.length || (i < a.length && a[i].id <= bs[j].id)) take(a[i++]);
+    else take(bs[j++]);
   }
-  return [...byId.values()].sort((x, y) => x.id - y.id);
+  return out;
+}
+
+/** The first index whose row id is `id` or more. */
+function rowIndex(rows: readonly HistoryRow[], id: number): number {
+  let lo = 0;
+  let hi = rows.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (rows[mid].id < id) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
 }
 
 /** The state a thread opens with: the head page from GET /api/threads/:id?history=recent. */
@@ -231,8 +250,12 @@ export function applyHead<R extends HistoryRow>(h: History<R>, events: readonly 
 
 /** Rows from the live stream. They land in the head span (ids only grow). Returns `h` itself when none was new. */
 export function appendLive<R extends HistoryRow>(h: History<R>, rows: readonly R[]): History<R> {
-  const held = new Set(h.rows.map((r) => r.id));
-  const fresh = rows.filter((r) => !held.has(r.id));
+  const tail = tailId(h);
+  const fresh = rows.filter((r) => {
+    if (r.id > tail) return true;
+    const i = rowIndex(h.rows, r.id);
+    return h.rows[i]?.id !== r.id;
+  });
   if (!fresh.length) return h;
   return { ...h, rows: unionRows(h.rows, fresh) };
 }
@@ -254,6 +277,98 @@ export function detachHead<R extends HistoryRow>(h: History<R>): History<R> {
   const last = h.spans[h.spans.length - 1];
   if (!last || last.to !== null) return h;
   return { ...h, spans: [...h.spans.slice(0, -1), { from: last.from, to: tailId(h) + 1 }] };
+}
+
+/**
+ * How much of a thread a client keeps while it holds the thread open (#411). Live rows only add, so a thread left
+ * open while its agent works would hold every row it streamed. Once the held rows pass `rows + slack` while Ben follows
+ * the newest, or `hard` while he reads older ones, `boundHistory` drops the oldest down to `slack` fewer. "Load
+ * earlier" brings them back. The slack makes it a step every few hundred rows, not one per frame.
+ */
+export const RETAIN = { rows: 1500, slack: 500, hard: 6000 } as const;
+
+export type Retain = { -readonly [K in keyof typeof RETAIN]: number };
+
+/** A string field of a row's payload, for the anchors a bound keeps. */
+function field(r: HistoryRow, name: string): string | undefined {
+  try {
+    const v = (JSON.parse(r.payload) as Record<string, unknown>)?.[name];
+    return typeof v === 'string' ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Drops the oldest held rows once there are too many (`RETAIN`). The cut goes at the first turn start among the `slack`
+ * rows past the newest `limit - slack`, else right there (one turn bigger than that). Rows under the cut go, but for
+ * the anchors a head page would bring: the parent calls of the calls kept, and the newest `init` and `result` when the
+ * rows kept have none. Spans start at the cut, and `below` counts the results dropped, so turnCount stays right.
+ * Returns `h` itself when it holds few enough.
+ */
+export function boundHistory<R extends HistoryRow>(h: History<R>, follows: boolean, retain: Retain = RETAIN): History<R> {
+  const { rows, spans } = h;
+  const limit = follows ? retain.rows + retain.slack : retain.hard;
+  if (rows.length <= limit) return h;
+  const start = rows.length - (limit - retain.slack);
+  const inSpan = (i: number) => spanIndex(spans, rows[i].id);
+  let cut = -1;
+  for (let i = Math.max(start, 1); i < Math.min(rows.length, start + retain.slack); i++) {
+    const s = inSpan(i);
+    if (s >= 0 && rows[i - 1].kind === TURN_END && inSpan(i - 1) === s) {
+      cut = i;
+      break;
+    }
+  }
+  if (cut < 0) for (let i = start; i < rows.length && cut < 0; i++) if (inSpan(i) >= 0) cut = i;
+  if (cut <= 0) return h;
+  const floor = rows[cut].id;
+  const kept = rows.slice(cut);
+  const under = rows.slice(0, cut);
+
+  const anchors = new Set<R>();
+  const keptCalls = new Set<string>();
+  const parents: string[] = [];
+  for (const r of kept) {
+    if (r.kind !== 'tool_use') continue;
+    const id = field(r, 'id');
+    if (id) keptCalls.add(id);
+    const parent = field(r, 'parent');
+    if (parent) parents.push(parent);
+  }
+  const wanted = parents.filter((p) => !keptCalls.has(p));
+  if (wanted.length) {
+    const calls = new Map<string, R>();
+    for (const r of under) {
+      if (r.kind !== 'tool_use') continue;
+      const id = field(r, 'id');
+      if (id && !calls.has(id)) calls.set(id, r);
+    }
+    while (wanted.length) {
+      const r = calls.get(wanted.pop()!);
+      if (!r || anchors.has(r)) continue;
+      anchors.add(r);
+      const parent = field(r, 'parent');
+      if (parent) wanted.push(parent);
+    }
+  }
+  for (const kind of ['init', TURN_END]) {
+    if (kept.some((r) => r.kind === kind)) continue;
+    const r = under.findLast((x) => x.kind === kind);
+    if (r) anchors.add(r);
+  }
+
+  let below = h.below;
+  if (floor > below.from) {
+    let results = below.results;
+    for (const r of under) if (r.kind === TURN_END && r.id >= below.from) results++;
+    below = { from: floor, results };
+  }
+  return {
+    rows: [...under.filter((r) => anchors.has(r)), ...kept],
+    spans: spans.filter((s) => s.to === null || s.to > floor).map((s) => (s.from < floor ? { from: floor, to: s.to } : s)),
+    below,
+  };
 }
 
 /** The index of the span holding `id`, -1 for none. */

@@ -1,4 +1,5 @@
-// The entry of the Mac app's slash engine: the same packages/shared/ modules the Web UI runs, behind one global.
+// The entry of the Mac app's slash engine: the same packages/shared/ modules the Web UI runs, behind one global. It also
+// carries the thread action menu (thread-actions.ts), so the right-click lists what the Web UI's menus list.
 // It imports from packages/shared/ only, never from apps/web/, so a Web UI change cannot reach the Mac bundle.
 // Every call takes and returns JSON text, and every offset is a UTF-16 unit, like JavaScript's own.
 // Build with `npm run build:slash`; the bundle is checked in (see docs/adr/0002-mac-app-is-a-client.md).
@@ -7,6 +8,7 @@ import { menuCommands, newThreadHint, replySlash } from '@omni/shared/composer-s
 import { mentionSections, menuSections, pickCommand, slashQuery, type SlashQuery } from '@omni/shared/slash-menu.ts';
 import { fileQuery, pickFile, type FileQuery } from '@omni/shared/mention-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
+import { threadMenu, type ThreadMenuFacts } from '@omni/shared/thread-actions.ts';
 
 const call =
   <A, R>(f: (a: A) => R) =>
@@ -25,4 +27,5 @@ const call =
   fileQuery: call(({ text, caret }: { text: string; caret: number }) => fileQuery(text, caret)),
   pickFile: call(({ text, at, insert }: { text: string; at: FileQuery; insert: string }) => pickFile(text, at, insert)),
   omniCommands: call(() => OMNI_COMMANDS),
+  threadMenu: call((facts: ThreadMenuFacts) => threadMenu(facts)),
 };

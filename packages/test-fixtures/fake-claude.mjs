@@ -59,6 +59,8 @@
 //   FAKE_CLAUDE_MCP_MS=<ms>       how long after startup the user's MCP servers connect (default 30)
 //   FAKE_CLAUDE_TITLE_ORPHAN=1    text mode (Omni's title call): leave a child behind, as ORPHAN does. Not a directive:
 //                                 the title call's prompt is the thread's first message, and the thread's CLI gets it too
+//   FAKE_CLAUDE_SUGGEST_GATE=<file>  text mode (Omni's reply suggestion): answer only once that file exists, so a test
+//                                 decides when the suggestion lands
 //
 // The initialize control request answers with the commands a real CLI lists: a fixed set of personal,
 // plugin and built-in commands, plus one "(project)" command per .claude/commands/*.md in the cwd.
@@ -68,7 +70,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 const VERSION = '2.1.278';
 /** What ASK asks, the shape of Claude Code's AskUserQuestion. */
@@ -820,6 +822,9 @@ async function main() {
       // Omni's reply suggestion. The agent's answer echoes the thread's message, so directives reach here too.
       const wait = Number(/SUGGEST:(\d+)/.exec(prompt)?.[1] ?? 0);
       if (wait) await new Promise((r) => setTimeout(r, wait));
+      const gate = process.env.FAKE_CLAUDE_SUGGEST_GATE;
+      // Gives up once the gate's directory is gone: a test that ended never opens it.
+      while (gate && !existsSync(gate) && existsSync(dirname(gate))) await new Promise((r) => setTimeout(r, 20));
       return process.stdout.write(prompt.includes('SUGGEST_NONE') ? 'NONE\n' : 'Yes, open a PR\n');
     }
     if (outFmt === 'text') {

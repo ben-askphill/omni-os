@@ -11,7 +11,7 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 
 - `npm run typecheck`
 - `npm test` (turbo boundaries, then every package's vitest), or one package: `npx turbo run test --filter=@omni/<server|web|shared|mac>`, or one file while iterating: `cd apps/server && npx vitest run tests/<file>.test.ts` (each package has its own `vitest.config.ts`).
-- A failing test: rerun it on `main` (`git stash; git checkout main; npx vitest run ...`) before treating it as yours. Lock, server-boot, sync-two-macs and mac-fixtures tests can fail on machines without a Mac setup.
+- A failing test: rerun it on `main` (`git stash; git checkout main; npx vitest run ...`) before treating it as yours. The whole suite passes on macOS and Linux, so a failure that main does not show is yours.
 - `npm run build` for web changes. Run it alone, not chained after other commands.
 - Changed a slash module in `packages/shared/`: `npm run build:slash`. Changed `packages/shared/browser-pick-*.ts`: `npm run build:pick`.
 - Mac code (macOS only): `npm run test:mac`.
@@ -47,6 +47,7 @@ If something stopped you (a missing env var, a crash on boot, a step here that i
 Known blockers:
 - The server crashes on boot if `OMNI_AUTOMATIONS_DIR` points at a missing dir. `qa-stack.sh` creates it.
 - macOS has no `setsid`; `qa-stack.sh` falls back to perl's `setpgrp`. The PID file holds the subshell, so `down` stops the group its child leads.
+- A Linux box may have no `lsof`: `qa-stack.sh` reads a process's cwd from `/proc` instead, and `ss -ltnp | grep :<port>` stands in for `lsof -iTCP:<port>` in the checks below.
 - Another worktree's QA stack can already hold :4757 (`up` then logs "port 4757 ... is in use" and your curls hit the wrong code). Check `lsof -nP -iTCP:4757 -sTCP:LISTEN` and move with `QA_SERVER_PORT`/`QA_WEB_PORT`.
 - With several agents running, 4757/4768 and the obvious pairs (4791, 4801, 4811, 4893, 4917, 5131) are often all taken. Find a free pair first: `for p in 6231 6331 6431 6531; do lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null || lsof -nP -iTCP:$((p+1)) -sTCP:LISTEN >/dev/null || { echo $p; break; }; done`, then pass it as `QA_SERVER_PORT`/`QA_WEB_PORT`.
 - A live turn needs the real CLI: `QA_CLAUDE_BIN=$(which claude) QA_CODEX_BIN=$(which codex) QA_CURSOR_BIN=$(which cursor-agent) scripts/qa-stack.sh up --seed 0` swaps any of the fakes, and spends that plan. Cursor's dashboard calls (`harness/cursor/dashboard.ts`) run on a QA stack by default and are off in vitest (`OMNI_CURSOR_DASHBOARD=0`).

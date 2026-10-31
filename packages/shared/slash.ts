@@ -40,10 +40,10 @@ export const OMNI_COMMANDS: SlashCommand[] = [
   { name: 'clear', description: 'Start a new thread with the same settings', source: 'omni', mentionable: false },
   { name: 'new', description: 'Start a new thread with the same settings', source: 'omni', mentionable: false },
   { name: 'rename', argumentHint: '<title>', description: 'Rename this thread', source: 'omni', mentionable: false },
-  // A thread's model and effort are fixed, so these offer a new thread instead.
-  { name: 'model', description: 'Fixed per thread, so it offers a new thread on another model', source: 'omni', mentionable: false },
-  { name: 'effort', description: 'Fixed per thread, so it offers a new thread with another effort', source: 'omni', mentionable: false },
-  { name: 'fast', description: 'Fixed per thread, so it offers a new thread on a faster model', source: 'omni', mentionable: false },
+  // The composer's pills switch a thread's model and effort for its next turn, so these open them.
+  { name: 'model', description: 'Pick the model for the next turn', source: 'omni', mentionable: false },
+  { name: 'effort', description: 'Pick the effort for the next turn', source: 'omni', mentionable: false },
+  { name: 'fast', description: 'Pick a faster model for the next turn', source: 'omni', mentionable: false },
 ];
 
 const OMNI_NAMES = new Set(OMNI_COMMANDS.map((c) => c.name));

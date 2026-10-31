@@ -8,8 +8,8 @@ import { randomUUID } from 'node:crypto';
 import { config } from '../config.ts';
 import { completions, threads, turnSnapshots } from '../db.ts';
 import { snapshot, snapshotCheckout, turnRef } from '../turns.ts';
-import { isRemoteHarness } from '../harness/types.ts';
-import { crash, emitThread, lives, track, userLine, writeLine, type Live } from './state.ts';
+import { isProviderHarness } from '../harness/types.ts';
+import { crash, deliver, emitThread, lives, track, type Live } from './state.ts';
 
 /** Each thread's last queued save. */
 const chains = new Map<string, Promise<void>>();
@@ -57,9 +57,9 @@ async function save(threadId: string, turnId: string, side: 'before' | 'after') 
 export function startTurnSnapshot(live: Live) {
   if (live.snap || !config.turnSnapshots) return;
   const t = threads.get(live.threadId);
-  if (!t?.branch || isRemoteHarness(t.harness)) return;
+  if (!t?.branch || isProviderHarness(t.harness)) return;
   const id = randomUUID();
-  live.snap = id;
+  live.snapStarted(id);
   turnSnapshots.start(id, t.id, completions.latest(t.id)?.n ?? 0);
   const saved = queue(t.id, () => save(t.id, id, 'before'));
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -70,21 +70,21 @@ export function startTurnSnapshot(live: Live) {
     if (!turnSnapshots.get(id)?.before_sha && turnSnapshots.fail(id, 'Saving the checkout before this turn took too long, so the turn ran without it.')) {
       emitThread(t.id);
     }
-    if (live.gate === gate) live.gate = null;
+    live.gateOff(gate);
     release(live);
   });
-  live.gate = gate;
+  live.gateOn(gate);
 }
 
 /** Write the messages a warm process held back while the checkout was saved. */
 function release(live: Live) {
-  const held = live.gated?.splice(0) ?? [];
-  if (lives.get(live.threadId) !== live || !live.child || live.closing) return;
+  const held = live.takeGated();
+  if (lives.get(live.threadId) !== live || !live.session || live.closing) return;
   for (const m of held) {
     // Dropped while it waited (the process was stopped).
     if (!live.inflight.includes(m)) continue;
     track(m, 'sent');
-    if (!writeLine(live, userLine(live, m))) {
+    if (!deliver(live, m)) {
       crash(live);
       break;
     }
@@ -96,9 +96,8 @@ function release(live: Live) {
  * whatever is still saving for the thread. Safe to call more than once and for a turn with no snapshot.
  */
 export function finishTurnSnapshot(live: Live) {
-  const id = live.snap;
+  const id = live.snapEnded();
   if (!id) return;
-  live.snap = null;
   const row = turnSnapshots.get(id);
   if (!row) return;
   // The status write that ended the turn added its Result: the first one after the turn started is this turn's.

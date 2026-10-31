@@ -28,6 +28,8 @@ const SOURCES: [SyncEntity, string][] = [
   ['result_read', 'SELECT thread_id AS k, thread_id AS o1, 0 AS o2 FROM result_reads'],
   ['limit_stop', 'SELECT id AS k, created_at AS o1, rowid AS o2 FROM threads WHERE limit_state IS NOT NULL'],
   ['trigger_delivery', 'SELECT uid AS k, created_at AS o1, uid AS o2 FROM trigger_deliveries'],
+  ['remote_command', 'SELECT id AS k, created_at AS o1, id AS o2 FROM remote_commands'],
+  ['assignment', 'SELECT thread_id AS k, at AS o1, thread_id AS o2 FROM assignments'],
   ['kv', `SELECT key AS k, key AS o1, 0 AS o2 FROM kv WHERE key NOT LIKE 'sync.%'`],
 ];
 
@@ -38,7 +40,7 @@ const SOURCES: [SyncEntity, string][] = [
  */
 export function backfill(opts: { onProgress?: (count: BackfillCount) => void } = {}): BackfillCount[] {
   const self = outbox.machineId();
-  if (!self) throw new Error('sync is not set up on this machine: sign in from Settings, Sync first');
+  if (!self) throw new Error('sync is not set up on this machine: sign in from Settings, Machines first');
   const now = new Date().toISOString();
   const out: BackfillCount[] = [];
   for (const [entity, select] of SOURCES) {

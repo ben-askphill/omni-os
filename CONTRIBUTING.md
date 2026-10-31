@@ -19,7 +19,9 @@ If you already run Omni for real on :4747, do not develop against it. Use the th
 | Command | What |
 | --- | --- |
 | `npm test` | `turbo boundaries`, then every package's vitest suite |
-| `npm run typecheck` | `tsc` in every package |
+| `npm run typecheck` | `tsc` in every package, with `noUnusedLocals` and `noUnusedParameters` on |
+| `npm run unused` | Knip: unused files, dependencies and binaries (`knip.json`). Unused exports are not checked yet |
+| `npm run check` | Typecheck, knip, then `npm test`; the CI workflow runs the same three (`scripts/ci-workflow.yml`, to be moved to `.github/workflows/ci.yml`) |
 | `npm run test:mac` | The Mac app's Swift tests (OmniKit, headless). Needs Xcode |
 | `npm run test:all` | vitest plus the Swift tests |
 | `npx turbo run test --filter=@omni/web` | One package (`server`, `web`, `shared`, `mac`) |
@@ -27,6 +29,12 @@ If you already run Omni for real on :4747, do not develop against it. Use the th
 | `npx turbo run test --affected` | Only what changed against `main` |
 | `npm run build:slash` | Rebuild the Mac app's slash bundle after changing a slash module in `packages/shared/` |
 | `npm run build:pick` | Rebuild the Mac app's page reader after changing `packages/shared/browser-pick-script.ts` or `browser-pick-read.ts` |
+
+`npm test` runs on macOS and Linux and needs Node 24 and git. It runs two packages at a time, each on half the cores. On a small machine, pass a lower cap: `npx turbo run test --concurrency=1 -- --maxWorkers=2`. Some tests need more and skip without it:
+
+- The Swift tests (`npm run test:mac`) and the Mac app's QA harness need macOS with Xcode. On Linux, say in the PR that the Mac app was not built or checked.
+- The real-Chrome tests in `apps/server/tests/browser-pick-cdp.test.ts` skip when no Chrome or Chromium is installed.
+- The real-CLI tests run only on request, with the CLIs signed in: `OMNI_LIVE_COMMANDS=1` for `commands-live`, `OMNI_LIVE_CODEX=1` for `codex-live`.
 
 ## Run it without touching your real data
 

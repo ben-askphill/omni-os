@@ -4,10 +4,35 @@
 // Tool names follow Claude Code's so the transcript renders them unchanged.
 import { cursorTurnUsage, type CursorTurnUsage } from '@omni/shared/context-meter.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
+import { toolResult } from '../tool-result.ts';
 
-const MAX_RESULT = 16_000;
-const clip = (s: string) => (s.length > MAX_RESULT ? s.slice(0, MAX_RESULT) : s);
-const truncated = (s: string) => s.length > MAX_RESULT;
+/** The envelope of a Cursor stream event. Tool inputs and results stay free-form, read through `obj`. */
+interface CursorEvent {
+  type?: unknown;
+  subtype?: unknown;
+  model_call_id?: unknown;
+  session_id?: unknown;
+  model?: unknown;
+  cwd?: unknown;
+  message?: { content?: unknown };
+  /** The live envelope: one `<kind>ToolCall` entry with its args and result. */
+  tool_call?: unknown;
+  /** The legacy flat call's name, args and ids. */
+  tool?: unknown;
+  input?: unknown;
+  toolCallId?: unknown;
+  callId?: unknown;
+  call_id?: unknown;
+  result?: unknown;
+  error?: unknown;
+  is_error?: unknown;
+  usage?: unknown;
+}
+
+type Obj = Record<string, unknown>;
+/** A JSON object's fields, or none when it is not one. */
+const obj = (v: unknown): Obj => (v && typeof v === 'object' ? (v as Obj) : {});
+const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
 
 const TODO_STATUS: Record<string, string> = {
   pending: 'pending',
@@ -54,20 +79,21 @@ export class CursorCallCounter {
 
 const textOf = (content: unknown): string => {
   if (typeof content === 'string') return content;
-  if (Array.isArray(content)) return content.filter((b: any) => b?.type === 'text').map((b: any) => b.text ?? '').join('');
+  if (Array.isArray(content)) return content.filter((b) => obj(b).type === 'text').map((b) => obj(b).text ?? '').join('');
   return '';
 };
 
 /** One Cursor stream event to Omni records (plus session id and terminal result when present). */
-export function normalizeCursor(evt: any): CursorParsed {
+export function normalizeCursor(raw: unknown): CursorParsed {
   const out: CursorParsed = { records: [] };
-  if (!evt || typeof evt !== 'object') return out;
+  if (!raw || typeof raw !== 'object') return out;
+  const evt = raw as CursorEvent;
   if (typeof evt.model_call_id === 'string' && evt.model_call_id) out.modelCallId = evt.model_call_id;
   switch (evt.type) {
     case 'system':
       if (evt.subtype === 'init') {
-        out.sessionId = evt.session_id;
-        out.records.push({ kind: 'init', payload: { model: evt.model ?? '', cwd: evt.cwd ?? '', tools: 0, mcp: [] } });
+        out.sessionId = str(evt.session_id);
+        out.records.push({ kind: 'init', payload: { model: str(evt.model) ?? '', cwd: str(evt.cwd) ?? '', tools: 0, mcp: [] } });
       }
       break;
     case 'user':
@@ -88,9 +114,9 @@ export function normalizeCursor(evt: any): CursorParsed {
       }
       if (evt.subtype === 'completed' || evt.subtype === 'failed') {
         out.records.push(...toolCall(evt));
-        const result = evt.result;
-        const failed = evt.subtype === 'failed' || !!evt.error || result?.isError === true || result?.is_error === true ||
-          !!result?.error || result?.success === false || result?.status === 'failed' || result?.result?.isError === true;
+        const result = obj(evt.result);
+        const failed = evt.subtype === 'failed' || !!evt.error || result.isError === true || result.is_error === true ||
+          !!result.error || result.success === false || result.status === 'failed' || obj(result.result).isError === true;
         if (failed) {
           const existing = out.records.find((r) => r.kind === 'tool_result');
           if (existing?.kind === 'tool_result') existing.payload.is_error = true;
@@ -99,7 +125,7 @@ export function normalizeCursor(evt: any): CursorParsed {
       }
       break;
     case 'result':
-      out.sessionId = evt.session_id ?? out.sessionId;
+      out.sessionId = str(evt.session_id) ?? out.sessionId;
       out.result = { ok: evt.subtype === 'success' && !evt.is_error, text: typeof evt.result === 'string' ? evt.result : '' };
       out.usage = cursorTurnUsage(evt.usage);
       break;
@@ -109,16 +135,13 @@ export function normalizeCursor(evt: any): CursorParsed {
   return out;
 }
 
-function toolResult(id: string, text: string, isError: boolean): StreamRecord {
-  return { kind: 'tool_result', payload: { tool_use_id: id, text: clip(text), is_error: isError, truncated: truncated(text) } };
-}
 const toolUse = (id: string, name: string, input: unknown): StreamRecord => ({ kind: 'tool_use', payload: { id, name, input, parent: null } });
 
-function toolCall(evt: any): StreamRecord[] {
+function toolCall(evt: CursorEvent): StreamRecord[] {
   const id = String(evt.toolCallId ?? evt.callId ?? '');
   const tool = String(evt.tool ?? '');
-  const input = evt.input ?? {};
-  const result = evt.result ?? {};
+  const input = obj(evt.input);
+  const result = obj(evt.result);
   switch (tool) {
     case 'shell': {
       const output = String(result.output ?? result.stdout ?? '');
@@ -133,7 +156,7 @@ function toolCall(evt: any): StreamRecord[] {
       const file_path = String(input.path ?? input.file_path ?? '');
       const edits = Array.isArray(input.edits) ? input.edits : null;
       if (edits && edits.length > 1) return [toolUse(id, 'MultiEdit', { file_path, edits })];
-      const e = edits?.[0] ?? { old_string: input.oldString ?? input.old_string ?? '', new_string: input.newString ?? input.new_string ?? '' };
+      const e = obj(edits?.[0] ?? { old_string: input.oldString ?? input.old_string ?? '', new_string: input.newString ?? input.new_string ?? '' });
       return [toolUse(id, 'Edit', { file_path, old_string: e.old_string, new_string: e.new_string })];
     }
     case 'grep':
@@ -145,7 +168,7 @@ function toolCall(evt: any): StreamRecord[] {
     case 'todo':
     case 'todos':
     case 'todoWrite': {
-      const todos = (Array.isArray(input.todos) ? input.todos : []).map((t: any) => ({
+      const todos = (Array.isArray(input.todos) ? input.todos : []).map(obj).map((t) => ({
         content: String(t.content ?? t.text ?? ''),
         status: TODO_STATUS[String(t.status ?? 'pending')] ?? 'pending',
       }));
@@ -163,24 +186,24 @@ function toolCall(evt: any): StreamRecord[] {
       return recs;
     }
     default:
-      return [toolUse(id, tool || 'tool', input)];
+      return [toolUse(id, tool || 'tool', evt.input ?? {})];
   }
 }
 
 /** Cursor's live protobuf JSON envelope. Legacy flat events above remain completion-only. */
-function nestedEntry(evt: any): { key: string; value: any; id: string } | null {
-  const entry = Object.entries(evt.tool_call).find(([key]) => key.endsWith('ToolCall'));
+function nestedEntry(evt: CursorEvent): { key: string; value: Obj; id: string } | null {
+  const entry = Object.entries(obj(evt.tool_call)).find(([key]) => key.endsWith('ToolCall'));
   if (!entry) return null;
   // Cursor joins its call id and function-call id with a newline. The first is shared by both events.
-  return { key: entry[0], value: entry[1], id: String(evt.call_id ?? evt.toolCallId ?? evt.callId ?? '').split('\n')[0] };
+  return { key: entry[0], value: obj(entry[1]), id: String(evt.call_id ?? evt.toolCallId ?? evt.callId ?? '').split('\n')[0] };
 }
 
 /** The tool_use a nested call opens with. Both its started and its completed event carry the args. */
-function nestedToolUse(evt: any): StreamRecord | null {
+function nestedToolUse(evt: CursorEvent): StreamRecord | null {
   const entry = nestedEntry(evt);
   if (!entry) return null;
   const { key, value, id } = entry;
-  const input = value?.args ?? {};
+  const input = obj(value.args);
   const kind = key.slice(0, -'ToolCall'.length);
   const aliases: Record<string, string> = { updateTodos: 'todos' };
   const tool = aliases[kind] ?? kind;
@@ -208,16 +231,16 @@ function nestedToolUse(evt: any): StreamRecord | null {
  * A taskToolCall runs a sub-agent for as long as the call lasts, so its start and end are a task's.
  * `subagentType` is a message in Cursor's protocol: its one set case names the kind.
  */
-function subagentTask(id: string, value: any, end?: { failed: boolean }): StreamRecord {
+function subagentTask(id: string, value: Obj, end?: { failed: boolean }): StreamRecord {
   if (end) return { kind: 'task', payload: { task_id: id, tool_use_id: id, event: 'ended', status: end.failed ? 'failed' : 'completed' } };
-  const args = value?.args ?? {};
+  const args = obj(value.args);
   const kind = args.subagentType ?? args.subagent_type;
   const type = typeof kind === 'string' ? kind : kind && typeof kind === 'object' ? Object.keys(kind)[0] : undefined;
   const description = String(args.description || 'Subagent');
   return { kind: 'task', payload: { task_id: id, tool_use_id: id, event: 'started', description, task_type: 'local_agent', ...(type ? { subagent_type: type } : {}) } };
 }
 
-function nestedToolCall(evt: any): StreamRecord[] {
+function nestedToolCall(evt: CursorEvent): StreamRecord[] {
   if (evt.subtype === 'started') {
     const use = nestedToolUse(evt);
     if (!use) return [];
@@ -229,26 +252,28 @@ function nestedToolCall(evt: any): StreamRecord[] {
   const { value, id } = entry;
   // Documented at docs.cursor.com/en/cli/reference/output-format. The installed CLI also emits
   // shell result.failure/timeout/rejected/spawnError/permissionDenied alongside result.success.
-  const result = value?.result ?? evt.result;
-  const failure = result?.error || result?.failure || result?.timeout || result?.rejected || result?.spawnError || result?.permissionDenied;
-  const body = failure || result?.success || result;
-  const failed = evt.subtype === 'failed' || !!evt.error || !!failure || body?.isError === true || body?.is_error === true ||
-    !!body?.error || result?.success === false || body?.status === 'failed' || (body?.exitCode != null && body.exitCode !== 0);
-  let text = resultText(evt.error || body);
-  if (body?.exitCode != null && body.exitCode !== 0) text = `Exit code ${body.exitCode}\n${text}`;
+  const result = obj(value.result ?? evt.result);
+  const failure = result.error || result.failure || result.timeout || result.rejected || result.spawnError || result.permissionDenied;
+  const raw = failure || result.success || (value.result ?? evt.result);
+  const body = obj(raw);
+  const failed = evt.subtype === 'failed' || !!evt.error || !!failure || body.isError === true || body.is_error === true ||
+    !!body.error || result.success === false || body.status === 'failed' || (body.exitCode != null && body.exitCode !== 0);
+  let text = resultText(evt.error || raw);
+  if (body.exitCode != null && body.exitCode !== 0) text = `Exit code ${body.exitCode}\n${text}`;
   const done = toolResult(id, text || (failed ? 'Tool reported failure.' : ''), failed);
   return entry.key === 'taskToolCall' ? [done, subagentTask(id, value, { failed })] : [done];
 }
 
-function resultText(result: any): string {
+function resultText(result: unknown): string {
   if (result == null) return '';
   if (typeof result === 'string') return result;
-  if (result.stdout != null || result.stderr != null) return [result.stdout, result.stderr].filter(Boolean).join('\n');
-  if (result.error) return resultText(result.error);
-  if (result.content != null) return typeof result.content === 'string' ? result.content : textOf(result.content) || JSON.stringify(result.content);
-  if (result.output != null) return resultText(result.output);
-  if (result.errorMessage != null) return String(result.errorMessage);
-  if (result.reason != null) return String(result.reason);
-  if (result.result != null) return resultText(result.result);
+  const r = obj(result);
+  if (r.stdout != null || r.stderr != null) return [r.stdout, r.stderr].filter(Boolean).join('\n');
+  if (r.error) return resultText(r.error);
+  if (r.content != null) return typeof r.content === 'string' ? r.content : textOf(r.content) || JSON.stringify(r.content);
+  if (r.output != null) return resultText(r.output);
+  if (r.errorMessage != null) return String(r.errorMessage);
+  if (r.reason != null) return String(r.reason);
+  if (r.result != null) return resultText(r.result);
   return JSON.stringify(result);
 }

@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import type { Device } from '@omni/shared/handoff.ts';
 import { api, errorText, useApi, type SetupState } from '../api.ts';
 import { offersRunOn, runOnPick, runOnRequest, runOnRows, runOnSetting, settingPick, type RunOnRow } from '../run-on.ts';
-import { Picker, type PickerOption } from './ui.tsx';
+import { MachineChip, machineOptions } from './composer/MachineChip.tsx';
 
 /**
- * The new-thread composer's Run on choice: the other synced machines (GET /api/devices) and Settings' default
- * (`runOn.device`). `rows` is null while there is nothing to pick, so the picker hides: sync off, or no other machine.
+ * The new-thread composer's Machine chip: the other synced machines (GET /api/devices) and Settings' default
+ * (`runOn.device`). `rows` is null while there is nothing to pick, so the chip hides: sync off, or no other machine.
  * `request` is what POST /api/threads takes for it.
  */
 export function useRunOn() {
@@ -19,14 +19,11 @@ export function useRunOn() {
   return { rows, pick, setPick: setPicked, request: runOnRequest(pick, list), reload: devices.reload };
 }
 
-export const runOnOptions = (rows: RunOnRow[]): PickerOption<string>[] =>
-  rows.map((r) => ({ value: r.value, label: r.label, sub: r.sub, icon: 'monitor', avatar: false, disabled: r.disabled }));
+export const runOnOptions = machineOptions;
 
-/** "On This Mac" or "On omarchy". Renders nothing when there is no other machine to pick. */
+/** The new thread's Machine chip: "On This Mac" or "On omarchy". Renders nothing when there is no other machine to pick. */
 export function RunOnPicker({ rows, value, onChange }: { rows: RunOnRow[] | null; value: string; onChange: (pick: string) => void }) {
-  const options = useMemo(() => (rows ? runOnOptions(rows) : []), [rows]);
-  if (!rows) return null;
-  return <Picker label="Run on" prefix="On" value={value} options={options} onChange={onChange} />;
+  return <MachineChip rows={rows} value={value} onChange={onChange} />;
 }
 
 /** What Settings says under "Run new threads on", on the desktop and the phone. */

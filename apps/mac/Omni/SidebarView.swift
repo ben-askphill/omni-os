@@ -20,10 +20,9 @@ struct SidebarView: View {
   /// saved as `sidebar.collapsedChannels`, one id per line.
   @State private var collapsed = Set(
     (UserDefaults.standard.string(forKey: collapsedChannelsKey) ?? "").split(separator: "\n").map(String.init))
-  /// Running, Pinned and Recent threads each fold on their own, apart from the channels.
+  /// Running and Pinned each fold on their own, apart from the channels.
   @AppStorage(runningCollapsedKey) private var runningClosed = false
   @AppStorage(pinnedCollapsedKey) private var pinsClosed = false
-  @AppStorage(recentCollapsedKey) private var recentClosed = false
 
   private func setChannel(_ id: String, open: Bool) {
     guard collapsed.contains(id) == open else { return }
@@ -47,7 +46,7 @@ struct SidebarView: View {
 
   private var selected: SidebarItem? { SidebarItem(route: model.route) }
 
-  /// Secrets opens Settings on its tab and leaves the window where it was.
+  /// Settings opens its window on General and leaves the main window where it was.
   private func pick(_ item: SidebarItem) {
     withAnimation(Motion.spring) {
       if model.show(item.route) != nil { openSettings() }
@@ -117,11 +116,6 @@ struct SidebarView: View {
             threadSection("Pinned", closed: $pinsClosed, threads: pins.map { .init(thread: $0, children: []) }, unpin: true)
           }
 
-          let recent = SidebarSections.recentGroups(model.store.channels, open: model.openThread)
-          if !recent.isEmpty {
-            threadSection("Recent threads", closed: $recentClosed, threads: recent)
-          }
-
           if let error = channelsError {
             ErrorNote(text: error)
           }
@@ -155,7 +149,6 @@ struct SidebarView: View {
             VStack(spacing: 1) {
               row(.artifacts) { NavRow(title: "Artifacts", icon: "layers", active: selected == .artifacts) }
               row(.automations) { NavRow(title: "Automations", icon: "zap", active: selected == .automations) }
-              row(.secrets) { NavRow(title: "Secrets", icon: "key", active: false) }
               row(.settings) { NavRow(title: "Settings", icon: "sliders", active: false) }
             }
           }
@@ -199,7 +192,7 @@ struct SidebarView: View {
       .accessibilityAddTraits(on ? .isSelected : [])
   }
 
-  /// Running, Pinned or Recent threads, as ThreadSection in Sidebar.tsx: threads from any channel under a caption
+  /// Running or Pinned, as ThreadSection in Sidebar.tsx: threads from any channel under a caption
   /// that folds them away, with the count beside it while folded. The caller leaves it out when it lists nothing. A
   /// thread here still shows under its own channel too.
   private func threadSection(_ label: String, closed: Binding<Bool>, threads: [SidebarSections.ThreadRowGroup], unpin: Bool = false) -> some View {
@@ -526,7 +519,6 @@ let sidebarWidthKey = "sidebar.width"
 let collapsedChannelsKey = "sidebar.collapsedChannels"
 let pinnedCollapsedKey = "sidebar.pinnedCollapsed"
 let runningCollapsedKey = "sidebar.runningCollapsed"
-let recentCollapsedKey = "sidebar.recentCollapsed"
 let handoffsCollapsedKey = "sidebar.handoffsCollapsed"
 
 /// Tracks the pointer over a row, for a button laid over it that shows on hover.
@@ -539,148 +531,7 @@ private struct HoverChrome<Content: View>: View {
   }
 }
 
-/// A panel edge: drag to resize within its bounds, double-click to restore the initial width.
-struct SidebarResizeHandle: View {
-  @Binding var width: Double
-  let initial: CGFloat
-  var minimum = 200.0
-  var maximum = 420.0
-  var growsLeft = false
-  var label = "Resize sidebar"
-  @State private var start: Double?
-  @State private var hover = false
-
-  static func clamp(_ w: Double) -> CGFloat { CGFloat(min(420, max(200, w))).rounded() }
-
-  private func clamped(_ w: Double) -> Double { min(maximum, max(minimum, w)) }
-
-  var body: some View {
-    Rectangle()
-      .fill(.clear)
-      .frame(width: 8)
-      .overlay {
-        Capsule().fill(Tok.lineStrong)
-          .frame(width: 1)
-          .padding(.vertical, z(12))
-          .opacity(hover || start != nil ? 1 : 0)
-      }
-      .contentShape(Rectangle())
-      .offset(x: growsLeft ? -4 : 4)
-      .pointerStyle(.columnResize)
-      .onHover { hover = $0 }
-      .gesture(
-        DragGesture(minimumDistance: 1, coordinateSpace: .global)
-          .onChanged { g in
-            let from = start ?? clamped(width)
-            start = from
-            width = clamped(from + (growsLeft ? -1 : 1) * g.translation.width / UIZoom.settings.scale)
-          }
-          .onEnded { _ in start = nil })
-      .onTapGesture(count: 2) { width = clamped(Double(initial)) }
-      .help("Drag to resize. Double-click to reset.")
-      .accessibilityElement()
-      .accessibilityLabel(label)
-      .accessibilityValue("\(Int(clamped(width))) points")
-      .accessibilityAdjustableAction { dir in
-        switch dir {
-        case .increment: width = clamped(clamped(width) + 16)
-        case .decrement: width = clamped(clamped(width) - 16)
-        @unknown default: break
-        }
-      }
-  }
-}
-
-/// Hover wash and press for a sidebar row: the wash scales in from the center, like Bencho's.
-struct RailRowStyle: ButtonStyle {
-  @State private var hover = false
-
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .contentShape(Capsule())
-      .background {
-        Capsule().fill(Tok.wash)
-          .opacity(hover || configuration.isPressed ? 1 : 0)
-          .scaleEffect(hover || configuration.isPressed ? 1 : 0.72)
-      }
-      .onHover { hover = $0 }
-      .animation(Motion.spring, value: hover)
-  }
-}
-
-/// NavLink in Sidebar.tsx: 32pt, an icon or lead, the title, a running badge.
-struct NavRow<Lead: View>: View {
-  let title: String
-  var icon: String?
-  let active: Bool
-  var running = 0
-  /// Room kept on the right for a button laid over the row, like a channel's folder-plus.
-  var trailingInset: CGFloat = 0
-  @ViewBuilder var lead: Lead
-
-  var body: some View {
-    HStack(spacing: z(10)) {
-      if let icon {
-        OmniIcon(name: icon, size: 15)
-          .foregroundStyle(active ? Tok.fg : Tok.fg3)
-      }
-      lead
-      Text(title)
-        .lineLimit(1)
-        .frame(maxWidth: .infinity, alignment: .leading)
-      if running > 0 {
-        HStack(spacing: z(6)) {
-          GlyphView(glyph: .running, size: 6)
-          Text("\(running)").monospacedDigit()
-        }
-        .font(.omni(size: 11))
-        .foregroundStyle(Tok.live)
-        .help("\(running) running or queued")
-      }
-    }
-    .font(.omni(size: 13, weight: active ? .medium : .regular))
-    .foregroundStyle(active ? Tok.fg : Tok.fg2)
-    .padding(.leading, z(12))
-    .padding(.trailing, z(12 + trailingInset))
-    .animation(Motion.settle, value: trailingInset)
-    .frame(height: z(32))
-  }
-}
-
-extension NavRow where Lead == EmptyView {
-  init(title: String, icon: String, active: Bool) {
-    self.init(title: title, icon: icon, active: active) { EmptyView() }
-  }
-}
-
-/// ThreadLink in Sidebar.tsx: a thread nested under its channel. A thread whose turn ended still works while its
-/// sub-agents run.
-struct ThreadRow: View {
-  let thread: ThreadStub
-  var active = false
-  var agents = 0
-
-  var body: some View {
-    HStack(spacing: z(8)) {
-      ThreadStatusIcon(status: agents > 0 ? .running : thread.status, done: thread.doneAt != nil)
-        .frame(width: z(12))
-      Text(thread.title.isEmpty ? "Untitled" : thread.title)
-        .lineLimit(1)
-        .frame(maxWidth: .infinity, alignment: .leading)
-      if let harness = thread.harness {
-        HarnessLogo(harness: harness.rawValue, size: 11)
-          .foregroundStyle(active ? Tok.fg3 : Tok.fg4)
-      }
-    }
-    .font(.omni(size: 12.5, weight: active ? .medium : .regular))
-    .foregroundStyle(active ? Tok.fg : thread.doneAt != nil ? Tok.fg4 : Tok.fg3)
-    .padding(.horizontal, z(12))
-    .frame(height: z(28))
-    .help("\(thread.title.isEmpty ? "Untitled" : thread.title) · \(agents > 0 ? "\(Format.plural(agents, "agent")) running" : thread.doneAt != nil ? "Marked done" : thread.status.label)")
-  }
-}
-
-/// SectionLink in Sidebar.tsx: a thread in Running, Pinned or Recent threads, flush with the channels. In Pinned its
+/// SectionLink in Sidebar.tsx: a thread in Running or Pinned, flush with the channels. In Pinned its
 /// channel's name gives way on hover to the button that unpins it.
 private struct SectionRow: View {
   let thread: ThreadStub
@@ -780,106 +631,5 @@ private struct TreeLine: View {
       .stroke(Tok.lineStrong, lineWidth: 1)
     }
     .frame(width: z(8))
-  }
-}
-
-struct ThreadStatusIcon: View {
-  let status: ThreadStatus
-  var done = false
-
-  var body: some View {
-    if status == .running {
-      Loader(size: 11, color: Tok.live)
-        .accessibilityLabel("Running")
-    } else {
-      StatusDot(status: status, size: 7, done: done)
-        .accessibilityLabel(done ? "Marked done" : status.label)
-    }
-  }
-}
-
-/// "Search or jump to" with its shortcut: the 70% white pill over the canvas.
-struct SearchPill: View {
-  let action: () -> Void
-  @State private var hover = false
-
-  var body: some View {
-    Button(action: action) {
-      HStack(spacing: z(10)) {
-        OmniIcon(name: "search", size: 15)
-        Text("Search or jump to")
-          .frame(maxWidth: .infinity, alignment: .leading)
-        Kbd(text: "⌘K")
-      }
-      .font(.omni(size: 13))
-      .foregroundStyle(hover ? Tok.fg3 : Tok.fg4)
-      .padding(.leading, z(14))
-      .padding(.trailing, z(8))
-      .frame(height: z(40))
-      .background(Tok.bg.opacity(0.7), in: Capsule())
-      .cardShadow(20)
-      .clipShape(Capsule())
-      .contentShape(Capsule())
-    }
-    .buttonStyle(.plain)
-    .onHover { hover = $0 }
-  }
-}
-
-/// Which port, whether the server runs and who started it, and whether the feed is reconnecting.
-/// The Server menu hangs off it.
-struct StatusFooter: View {
-  let model: AppModel
-
-  var body: some View {
-    let state = model.supervisor.state
-    Menu {
-      ServerMenuItems(model: model, shortcuts: false)
-    } label: {
-      HStack(spacing: z(8)) {
-        Circle()
-          .fill(color(state))
-          .overlay(Circle().strokeBorder(model.supervisor.isRunning && model.connectionNotice == nil ? Tok.doneEdge : .clear, lineWidth: 1))
-          .frame(width: z(7), height: z(7))
-        VStack(alignment: .leading, spacing: 1) {
-          Text(state.label)
-            .foregroundStyle(Tok.fg2)
-          HStack(spacing: z(6)) {
-            if let name = model.store.status?.device?.name {
-              Text("\(name) · Port \(model.settings.port, format: .number.grouping(.never))")
-                .monospacedDigit()
-                .lineLimit(1)
-                .truncationMode(.middle)
-            } else {
-              Text("Port \(model.settings.port, format: .number.grouping(.never))")
-                .monospacedDigit()
-            }
-            if let notice = model.connectionNotice {
-              Text(notice)
-            }
-          }
-          .foregroundStyle(Tok.fg4)
-        }
-        Spacer(minLength: 0)
-        OmniIcon(name: "chevronDown", size: 12)
-          .foregroundStyle(Tok.fg4)
-      }
-      .font(.omni(size: 11))
-      .padding(.horizontal, z(8))
-      .contentShape(Rectangle())
-    }
-    .menuStyle(.button)
-    .buttonStyle(.plain)
-    .menuIndicator(.hidden)
-    .help("Server")
-    .accessibilityLabel("Server: \(state.label)")
-  }
-
-  private func color(_ state: ServerSupervisor.State) -> Color {
-    switch state {
-    case .running: model.connectionNotice == nil ? Tok.done : Tok.fg4
-    case .notRunning, .failed: Tok.needs
-    default: Tok.fg4
-    }
   }
 }

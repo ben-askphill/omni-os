@@ -36,7 +36,7 @@ private func setupState(device: String?) -> String {
     let box = try machine("omarchy")
     #expect(RunOnRules.label("", devices: [box]) == "This Mac")
     #expect(RunOnRules.label("omarchy", devices: [box]) == "omarchy")
-    #expect(RunOnRules.label("gone", devices: [box]) == "A machine not synced now")
+    #expect(RunOnRules.label("gone", devices: [box]) == "This Mac", "the server runs a machine sync dropped here")
   }
 
   @Test func newThreadCarriesTheDeviceOnlyWhenSet() throws {

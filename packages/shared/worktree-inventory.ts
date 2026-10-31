@@ -1,4 +1,4 @@
-// The worktree storage inventory both clients show (Settings > Storage), as the server's scan reports it
+// The worktree storage inventory both clients show (Settings > Machines), as the server's scan reports it
 // (apps/server/worktree-inventory.ts). Pure: types, the labels the clients share and the totals.
 
 /** managed: a thread's worktree. orphan: a folder in data/worktrees no thread's repo owns. stale-registration: git lists a worktree whose folder is gone. */
@@ -121,8 +121,6 @@ export function summarize(items: WorktreeItem[]): InventorySummary {
   }
   return s;
 }
-
-export const VERDICT_LABEL: Record<WorktreeVerdict, string> = { eligible: 'Eligible', kept: 'Kept', unknown: 'Unknown' };
 
 export const KIND_LABEL: Record<WorktreeKind, string> = {
   managed: 'Thread worktree',

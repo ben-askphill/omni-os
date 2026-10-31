@@ -1,29 +1,18 @@
 // Each turn's saved diff. Before a worktree thread's turn starts and once it ends, Omni saves its checkout as a commit
 // under a hidden ref (refs/omni/turns/<thread>/<turn>/before and /after): HEAD's tree plus every tracked change and
-// every untracked text file git does not ignore. The commits are built in a temporary index, so Ben's branch, HEAD
-// and index are never touched, and the refs keep them from garbage collection, so the turn's diff reads the same
-// after later edits and restarts. It is a before/after snapshot: commits, pulls and other git operations made during
+// every untracked text file git does not ignore, saved as checkpoints (checkpoint.ts), so Ben's branch, HEAD and index
+// are never touched, and the refs keep them from garbage collection, so the turn's diff reads the same after later
+// edits and restarts. It is a before/after snapshot: commits, pulls and other git operations made during
 // the turn are part of it.
-import { copyFileSync, existsSync, lstatSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, sep } from 'node:path';
-import { turnSnapshots, type SkippedFile, type Thread, type TurnSnapshot, type TurnSnapshotState } from './db.ts';
-import { isRemoteHarness, remoteWhere } from './harness/types.ts';
-import { MAX_UNTRACKED_BYTES, changesCheckout, commitsGroup, git, gitOr, head, real, type ChangeGroup, type ChangedFile } from './changes.ts';
+import { turnSnapshots, type SkippedFile, type Thread, type TurnSnapshot } from './db.ts';
+import { isProviderHarness, providerWhere } from './harness/types.ts';
+import type { ChangedFile, TurnChanges, TurnView } from '@omni/shared/changes.ts';
+import { changesCheckout, commitsGroup, gitOr } from './changes.ts';
+import { captureTree, commitCheckpoint } from './checkpoint.ts';
 
 export const TURN_REFS = 'refs/omni/turns';
 /** A turn's hidden ref: one per side, named by the thread and the turn's id. */
 export const turnRef = (threadId: string, turnId: string, side: 'before' | 'after') => `${TURN_REFS}/${threadId}/${turnId}/${side}`;
-
-/** Untracked files saved per snapshot. Past this they are listed as left out. */
-export const MAX_SNAPSHOT_UNTRACKED = 2_000;
-/** Left-out files remembered per snapshot. */
-const MAX_SKIPPED = 200;
-/** Paths per `git add`, to stay under the argument limit. */
-const ADD_CHUNK = 200;
-
-/** Who the snapshot commits are by. They never reach a branch. */
-const IDENT = { GIT_AUTHOR_NAME: 'Omni', GIT_AUTHOR_EMAIL: 'omni@localhost', GIT_COMMITTER_NAME: 'Omni', GIT_COMMITTER_EMAIL: 'omni@localhost' };
 
 export interface Snapshot {
   /** The snapshot commit, whose parent is HEAD. */
@@ -39,111 +28,25 @@ export interface Snapshot {
  */
 export async function snapshotCheckout(t: Thread | undefined): Promise<{ dir: string } | { reason: string }> {
   if (!t) return { reason: 'The thread is gone.' };
-  if (isRemoteHarness(t.harness)) return { reason: `This thread runs ${remoteWhere(t.harness)}, so its files are not on this Mac.` };
+  if (isProviderHarness(t.harness)) return { reason: `This thread runs ${providerWhere(t.harness)}, so its files are not on this Mac.` };
   if (!t.branch) return { reason: 'Turns are saved only for a thread with a worktree of its own.' };
   return changesCheckout(t);
 }
 
-/** Untracked files that are not ignored, split into those a snapshot saves and those it leaves out. */
-async function untracked(dir: string, env: Record<string, string>) {
-  const listed = (await git(dir, ['ls-files', '-z', '--others', '--exclude-standard'], 8 * 1024 * 1024, env)).split('\0').filter(Boolean);
-  const root = real(dir);
-  const save: string[] = [];
-  const skipped: SkippedFile[] = [];
-  const skip = (path: string, reason: SkippedFile['reason']) => skipped.length < MAX_SKIPPED && skipped.push({ path, reason });
-  for (const path of listed) {
-    // A nested repository: git lists its folder, and it is not this checkout's to save.
-    if (path.endsWith('/')) continue;
-    const full = join(dir, path);
-    let st;
-    try {
-      st = lstatSync(full);
-    } catch {
-      continue;
-    }
-    // A symlink is saved as the link itself, never followed.
-    if (!st.isSymbolicLink()) {
-      if (!st.isFile()) continue;
-      let at: string;
-      try {
-        at = realpathSync(full);
-      } catch {
-        continue;
-      }
-      if (!at.startsWith(root + sep)) continue;
-      if (st.size > MAX_UNTRACKED_BYTES) {
-        skip(path, 'too_large');
-        continue;
-      }
-      if (head(full, 8000).includes(0)) {
-        skip(path, 'binary');
-        continue;
-      }
-    }
-    if (save.length >= MAX_SNAPSHOT_UNTRACKED) skip(path, 'limit');
-    else save.push(path);
-  }
-  return { save, skipped };
-}
-
 /**
- * The tree a snapshot of the checkout at dir holds, and HEAD then. Throws with git's reason. Writes only objects and
- * a temporary index outside the repo. A continued thread starts from one too (apps/server/continue.ts).
- */
-export async function checkoutTree(dir: string): Promise<{ tree: string; head: string; skipped: SkippedFile[] }> {
-  const headSha = await gitOr(dir, ['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']);
-  if (!headSha) throw new Error('The checkout has no commit yet.');
-  const tmp = mkdtempSync(join(tmpdir(), 'omni-turn-'));
-  const env = { ...IDENT, GIT_INDEX_FILE: join(tmp, 'index') };
-  try {
-    // A copy of Ben's index: its stat cache spares hashing files that did not change. Only the copy is written.
-    const own = await gitOr(dir, ['rev-parse', '--path-format=absolute', '--git-path', 'index']);
-    if (own && existsSync(own)) copyFileSync(own, env.GIT_INDEX_FILE);
-    else await git(dir, ['read-tree', headSha], undefined, env);
-    await git(dir, ['add', '--update'], undefined, env);
-    const { save, skipped } = await untracked(dir, env);
-    for (let i = 0; i < save.length; i += ADD_CHUNK) await git(dir, ['--literal-pathspecs', 'add', '--', ...save.slice(i, i + ADD_CHUNK)], undefined, env);
-    const tree = (await git(dir, ['write-tree'], undefined, env)).trim();
-    return { tree, head: headSha, skipped };
-  } finally {
-    rmSync(tmp, { recursive: true, force: true });
-  }
-}
-
-/**
- * Save the checkout at dir as a commit under ref, which must not exist yet. Throws with git's reason. Writes only
- * objects, a temporary index outside the repo and the one ref.
+ * Save the checkout at dir as a checkpoint under ref, which must not exist yet: tracked changes and untracked text
+ * files, what the turn's diff shows. Throws with git's reason. Writes only objects, a temporary index outside the repo
+ * and the one ref.
  */
 export async function snapshot(dir: string, ref: string): Promise<Snapshot> {
-  const { tree, head: headSha, skipped } = await checkoutTree(dir);
-  const sha = (await git(dir, ['commit-tree', tree, '-p', headSha, '-m', `Omni turn snapshot ${ref}`], undefined, IDENT)).trim();
-  // An empty old value: the ref must be new, so a snapshot is never replaced.
-  await git(dir, ['update-ref', '--no-deref', ref, sha, ''], undefined, IDENT);
-  return { sha, head: headSha, skipped };
+  const { tree, head, skipped } = await captureTree(dir, 'text');
+  // A new ref only, so a snapshot is never replaced.
+  const sha = await commitCheckpoint(dir, { tree, parent: head, message: `Omni turn snapshot ${ref}`, ref, mode: 'new' });
+  return { sha, head, skipped };
 }
 
-/** One side of a turn, as the clients get it. */
-export interface TurnSide {
-  /** The snapshot commit, kept under `ref`. */
-  sha: string;
-  ref: string;
-  /** HEAD at that moment. A different HEAD after means the turn committed, pulled or switched commits. */
-  head: string;
-}
-
-/** One turn's saved diff, without its files (GET /api/threads/:id/turns). */
-export interface TurnView {
-  id: string;
-  n: number;
-  state: TurnSnapshotState;
-  error: string | null;
-  before: TurnSide | null;
-  after: TurnSide | null;
-  /** The Result the turn ended with, the same id as in Needs you. Null while it runs, or when it left none. */
-  completion_uid: string | null;
-  started_at: string;
-  ended_at: string | null;
-}
+/** One turn's saved diff, as the clients get it (GET /api/threads/:id/turns). */
+export type { TurnChanges, TurnSide, TurnView } from '@omni/shared/changes.ts';
 
 export function turnView(s: TurnSnapshot): TurnView {
   return {
@@ -157,18 +60,6 @@ export function turnView(s: TurnSnapshot): TurnView {
     started_at: s.started_at,
     ended_at: s.ended_at,
   };
-}
-
-/** GET /api/threads/:id/turns: the thread's saved turns, newest first, and the diff of one of them. */
-export interface TurnChanges {
-  /** False when this thread's turns are not saved here; `reason` says why. */
-  available: boolean;
-  reason: string | null;
-  turns: TurnView[];
-  /** The turn shown: the one asked for, else the newest. */
-  turn: TurnView | null;
-  /** Its files, once both snapshots are saved: one `turn` group. */
-  groups: ChangeGroup[];
 }
 
 const parseSkipped = (s: string | null): SkippedFile[] => {

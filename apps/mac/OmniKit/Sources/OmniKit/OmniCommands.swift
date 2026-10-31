@@ -47,11 +47,6 @@ public struct NewThreadPreset: Hashable, Sendable {
     p.prompt = prompt
     return p
   }
-
-  /// "New thread on another model": the channel and role, and nothing that picks a model.
-  public static func otherModel(_ t: OmniThread) -> NewThreadPreset {
-    NewThreadPreset(channel: t.channelID, role: t.role ?? "", pickModel: true)
-  }
 }
 
 /// A folder a new thread is filed in, with its name for the composer's chip.
@@ -88,10 +83,10 @@ public enum OmniCommandResult: Hashable, Sendable {
 public enum OmniCommands {
   /// Run the Omni command a reply starts with, as `runOmni` in apps/web/src/components/Composer.tsx. The
   /// thread itself sees none of it. Nil for a reply that goes to the harness, and for `/model`,
-  /// `/effort` and `/fast`, which the composer answers with `NewThreadPreset.otherModel`.
+  /// `/effort` and `/fast`, which the composer answers by opening its model pill.
   public static func run(_ action: ReplyAction, in thread: OmniThread, client: OmniClient) async throws(OmniAPIError) -> OmniCommandResult? {
     switch action {
-    case .send, .fixed:
+    case .send, .pickModel:
       return nil
     case .newThread(let prompt) where prompt.isEmpty:
       return .openNewThread(.sameSettings(thread))

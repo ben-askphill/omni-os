@@ -43,6 +43,48 @@ describe('cursor model list parser', () => {
     }
   });
 
+  it('uses Cursor\'s label, with the effort suffix removed', () => {
+    expect(byId('composer-2.5')!.label).toBe('Composer 2.5');
+    expect(byId('gpt-5.6-sol')!.label).toBe('GPT-5.6 Sol');
+    expect(byId('cursor-grok-4.6')!.label).toBe('Grok 4.6');
+    expect(byId('gemini-3.8-flash')!.label).toBe('Gemini 3.8 Flash');
+    expect(byId('claude-opus-5-5')!.label).toBe('Claude Opus 5.5');
+    expect(byId('claude-sonnet-5-thinking')!.label).toBe('Claude Sonnet 5 Thinking');
+  });
+
+  it('keeps the CLI label when the effort word sits in the middle or the id hides it', () => {
+    const live = [
+      'cursor-grok-4.5-high - Grok 4.5',
+      'cursor-grok-4.5-high-fast - Grok 4.5 Fast',
+      'cursor-grok-4.5-low - Grok 4.5 Low',
+      'gpt-5.3-codex-high - Codex 5.3 High',
+      'gpt-5.3-codex-xhigh - Codex 5.3 Extra High',
+      'grok-4.7-low - Grok 4.7  Low',
+      'grok-4.7-high - Grok 4.7  High',
+      'claude-opus-5-thinking-low - Claude Opus 5 1M Low Thinking',
+      'claude-opus-5-thinking-high - Claude Opus 5 1M Thinking',
+      'claude-opus-4-8-high - Claude Opus 4.8 1M',
+      'claude-fable-5-thinking-xhigh - Claude Fable 5 1M Extra High Thinking (NO ZDR)',
+      'claude-fable-5-thinking-high - Claude Fable 5 1M Thinking (NO ZDR)',
+      'gpt-5.5-high - GPT-5.5 1M High',
+      'gpt-5.5-extra-high - GPT-5.5 1M Extra High',
+      'composer-2.5',
+    ].join('\n');
+    const parsed = parseCursorModels(live);
+    const label = (id: string) => parsed.find((m) => m.id === id)!.label;
+    expect(label('cursor-grok-4.5')).toBe('Grok 4.5');
+    expect(label('gpt-5.3-codex')).toBe('Codex 5.3');
+    expect(label('grok-4.7')).toBe('Grok 4.7');
+    expect(label('claude-opus-5-thinking')).toBe('Claude Opus 5 1M Thinking');
+    expect(label('claude-opus-4-8')).toBe('Claude Opus 4.8 1M');
+    expect(label('claude-fable-5-thinking')).toBe('Claude Fable 5 1M Thinking (NO ZDR)');
+    expect(label('gpt-5.5')).toBe('GPT-5.5 1M');
+    // `-extra-high` ends in `-high`, so it stays its own family and keeps the words.
+    expect(label('gpt-5.5-extra')).toBe('GPT-5.5 1M Extra High');
+    expect(label('composer-2.5')).toBe('Composer 2.5');
+    expect(parsed.some((m) => m.id.endsWith('-fast'))).toBe(false);
+  });
+
   it('marks auto as the default with no effort levels', () => {
     const auto = byId('auto')!;
     expect(auto.default).toBe(true);

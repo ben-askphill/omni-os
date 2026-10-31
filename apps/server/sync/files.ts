@@ -2,9 +2,10 @@ import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, sep } from 'node:path';
-import { threadDir } from '../config.ts';
+import { threadDir, uploadsDir } from '../config.ts';
 import { db, kv, threads, type Thread } from '../db.ts';
-import { isRemoteHarness } from '../harness/types.ts';
+import { isProviderHarness } from '../harness/types.ts';
+import { safeName, uniqueName, type Attachment } from '../uploads.ts';
 import { safeRel, safeSegment } from './paths.ts';
 import type { SyncTransport } from './transport.ts';
 import { activeWorker, onSynced, type SyncWorker } from './worker.ts';
@@ -244,6 +245,69 @@ export async function pullThreadFiles(threadId: string, opts: FileSyncOptions): 
   }
   if (result.count) kv.set(stateKey(threadId), state);
   return result;
+}
+
+// ---------- files sent with a message to the machine that runs the thread ----------
+
+/** A file Ben attached on the hub, for a thread another machine runs (run-on.ts): its blob is in Storage already. */
+export interface UploadRef {
+  name: string;
+  sha: string;
+  size: number;
+  mime: string;
+  image: boolean;
+}
+
+const isUploadRef = (r: any): r is UploadRef =>
+  typeof r?.name === 'string' && /^[0-9a-f]{64}$/.test(r.sha) && Number.isFinite(r.size) && typeof r.mime === 'string' && typeof r.image === 'boolean';
+
+/**
+ * Put attached files in Storage now, so the machine that runs the thread can fetch them by sha before its turn. Not
+ * through the thread's manifest: both machines rewrite that, and a file listed there can be dropped by the other's write.
+ */
+export async function sendUploads(files: (Pick<Attachment, 'name' | 'mime' | 'image'> & { body: Uint8Array })[]): Promise<UploadRef[]> {
+  if (!files.length) return [];
+  const opts = hookOpts();
+  if (!opts) throw new Error('sync is off');
+  const out: UploadRef[] = [];
+  for (const { name, mime, image, body } of files) {
+    if (body.length > MAX_FILE_BYTES) throw Object.assign(new Error(`"${name}" is over ${MAX_FILE_BYTES / 1024 / 1024} MB, too big to send to another machine.`), { status: 400 });
+    const sha = sha256(body);
+    if (!(await opts.transport.hasObject(blobPath(sha)))) await opts.transport.putObject(blobPath(sha), body);
+    out.push({ name, sha, size: body.length, mime, image });
+  }
+  return out;
+}
+
+/** sendUploads for files saved in a thread's uploads folder. */
+export const sendSaved = (files: Attachment[]) => sendUploads(files.map((f) => ({ ...f, body: readFileSync(f.path) })));
+
+/**
+ * On the machine that runs the thread: fetch files the hub sent with a message into the thread's uploads folder, and
+ * describe them as this machine's attachments. A file already here with the same content is reused. Throws when one
+ * cannot be fetched, so the message waits for the next sync instead of going without it.
+ */
+export async function receiveUploads(threadId: string, refs: unknown): Promise<Attachment[]> {
+  if (!Array.isArray(refs) || !refs.length) return [];
+  const opts = hookOpts();
+  if (!opts) throw new Error('sync is off');
+  if (!safeSegment(threadId)) throw new Error('bad thread id');
+  const dir = uploadsDir(threadId);
+  const out: Attachment[] = [];
+  for (const r of refs) {
+    if (!isUploadRef(r)) throw new Error('a sent file is malformed');
+    const name = safeName(r.name);
+    let path = join(dir, name);
+    if (!existsSync(path) || sha256(readFileSync(path)) !== r.sha) {
+      const body = await opts.transport.getObject(blobPath(r.sha));
+      if (!body || sha256(body) !== r.sha) throw new Error(`"${name}" is not in Storage yet`);
+      // Same name, other content: keep both, as saveUploads would.
+      path = join(dir, uniqueName(dir, name));
+      writeAtomic(path, body);
+    }
+    out.push({ name: basename(path), path, size: r.size, mime: r.mime, image: r.image });
+  }
+  return out;
 }
 
 // ---------- harness session files ----------
@@ -541,8 +605,8 @@ export function sessionOnThisMac(t: Thread): boolean {
 
 /**
  * How the session download before a resume ended. `ready`: it finished, whether or not there was anything to bring.
- * `failed`: it threw, and the harness starts on what is here. `timed-out`: it outlived resumeTimeoutMs, queued or
- * running, and was cancelled. `skipped`: sync is off, the thread never ran, or Hermes or Cursor keeps its session.
+ * `failed`: it threw. `timed-out`: it outlived resumeTimeoutMs, queued or running, and was cancelled. After either, the
+ * runner does not resume the copy here, which may miss turns another machine ran (runner/spawn.ts). `skipped`: sync is off, the thread never ran, or Hermes or Cursor keeps its session.
  */
 export type ResumeOutcome = 'ready' | 'failed' | 'timed-out' | 'skipped';
 
@@ -554,7 +618,7 @@ export type ResumeOutcome = 'ready' | 'failed' | 'timed-out' | 'skipped';
 export async function beforeResume(t: Thread): Promise<ResumeOutcome> {
   const opts = hookOpts();
   // A thread that never ran has no session anywhere; Hermes and Cursor Cloud keep theirs off this Mac.
-  if (!opts || !t.has_run || isRemoteHarness(t.harness)) return 'skipped';
+  if (!opts || !t.has_run || isProviderHarness(t.harness)) return 'skipped';
   const fence = new AbortController();
   const fenced = { ...opts, signal: fence.signal };
   // A job still queued behind another of this thread's jobs when the fence closes never starts.
@@ -569,7 +633,7 @@ export async function beforeResume(t: Thread): Promise<ResumeOutcome> {
   const late = new Promise<ResumeOutcome>((resolve) => (timer = setTimeout(() => resolve('timed-out'), hookDefaults.resumeTimeoutMs)));
   try {
     const outcome = await Promise.race([job, late]);
-    if (outcome === 'timed-out') console.error(`[sync] session download for ${t.id} is slow; starting without it`);
+    if (outcome === 'timed-out') console.error(`[sync] session download for ${t.id} timed out`);
     return outcome;
   } finally {
     clearTimeout(timer);

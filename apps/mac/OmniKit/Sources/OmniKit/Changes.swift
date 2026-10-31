@@ -1,7 +1,8 @@
 import Foundation
 
-/// What GET /api/threads/:id/changes answers (`BranchChanges` in apps/web/src/api.ts): a thread's branch changes since its
-/// base commit, before any PR, or why there are none to read here (`reason`).
+/// What GET /api/threads/:id/changes answers (`BranchChanges` in packages/shared/changes.ts, which the server and the web
+/// import): a thread's branch changes since its base commit, before any PR, or why there are none to read here
+/// (`reason`). apps/server/tests/mac-fixtures.test.ts checks the types here read the shared keys and values.
 public struct BranchChanges: Decodable, Hashable, Sendable {
   public let available: Bool
   public let reason: String?
@@ -172,7 +173,7 @@ public struct ChangesView: Hashable, Sendable {
 
 // MARK: This turn
 
-/// One side of a saved turn (`TurnSide` in apps/web/src/api.ts): a snapshot commit under a hidden ref, and HEAD then.
+/// One side of a saved turn (`TurnSide` in packages/shared/changes.ts): a snapshot commit under a hidden ref, and HEAD then.
 public struct TurnSide: Decodable, Hashable, Sendable {
   public let sha: String
   public let ref: String
@@ -189,7 +190,7 @@ public struct TurnState: OpenEnum {
   public static let failed: Self = "failed"
 }
 
-/// One turn's saved snapshots (`TurnView` in apps/web/src/api.ts).
+/// One turn's saved snapshots (`TurnView` in packages/shared/changes.ts).
 public struct TurnView: Decodable, Hashable, Sendable, Identifiable {
   public let id: String
   public let n: Int
@@ -229,7 +230,7 @@ public struct TurnView: Decodable, Hashable, Sendable, Identifiable {
   }
 }
 
-/// What GET /api/threads/:id/turns answers (`TurnChanges` in apps/web/src/api.ts).
+/// What GET /api/threads/:id/turns answers (`TurnChanges` in packages/shared/changes.ts).
 public struct TurnChanges: Decodable, Hashable, Sendable {
   public let available: Bool
   public let reason: String?

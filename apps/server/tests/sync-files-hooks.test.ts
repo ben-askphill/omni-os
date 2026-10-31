@@ -209,17 +209,23 @@ describe('file sync hooks', () => {
     }
   });
 
-  it('starts the turn anyway when the relay fails', async () => {
+  it('holds a resume when the relay fails, and sends it once the relay works (#400)', async () => {
     const t = await r.start('first', { title: 'Offline' });
     await r.untilResults(t.id, 1);
     await waitFor(() => !r.runner.isLive(t.id), 'the first process to exit');
     relay.failNext(50, 'offline');
     try {
-      await r.runner.postMessage(t.id, 'second');
-      await r.untilResults(t.id, 2);
-      expect(r.thread(t.id).status).toBe('done');
+      await r.runner.postMessage(t.id, 'second', { requestId: 'offline-second' });
+      // The session here may lack turns another machine ran: nothing resumes it, and the message waits.
+      await waitFor(() => !!r.thread(t.id).resume_blocked, 'the resume to be held');
+      expect(r.thread(t.id).status).toBe('failed');
+      expect(r.spawns(t.id)).toHaveLength(1);
     } finally {
       relay.failNext(0);
     }
+    await r.runner.retryResume(t.id);
+    await r.untilResults(t.id, 2);
+    expect(r.thread(t.id).status).toBe('done');
+    expect(r.thread(t.id).resume_blocked).toBeNull();
   });
 });

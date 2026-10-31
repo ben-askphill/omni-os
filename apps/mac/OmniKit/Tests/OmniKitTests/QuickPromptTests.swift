@@ -143,7 +143,7 @@ private func created() throws -> OmniThread {
 @Suite struct QuickPromptQAStepTests {
   @Test func parsesTheQuickPromptStep() throws {
     let script = try QAScript(json: Data(#"[{"quickPrompt": "hi"}, {"quickPrompt": {"send": true}}, {"quickPrompt": false}, {"settings": "quickPrompt"}]"#.utf8))
-    #expect(script.steps == [.quickPrompt(.open("hi")), .quickPrompt(.send), .quickPrompt(.close), .settings(.quickPrompt)])
+    #expect(script.steps == [.quickPrompt(.open("hi")), .quickPrompt(.send), .quickPrompt(.close), .settings(.general)])
     #expect(throws: QAScriptError.self) { try QAScript(json: Data(#"[{"quickPrompt": 3}]"#.utf8)) }
   }
 }

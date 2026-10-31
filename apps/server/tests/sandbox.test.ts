@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -9,7 +9,7 @@ vi.mock('../db.ts', () => {
   throw new Error('db.ts must not be imported by sandbox tests');
 });
 
-import { buildMcpConfig, needsWorktree, playwrightMcpBin, plannedWorktree, prepareWorkdir } from '../sandbox.ts';
+import { buildMcpConfig, needsWorktree, playwrightMcpBin, plannedWorktree, prepareWorkdir, writeCursorDenyConfig } from '../sandbox.ts';
 import { config, paths, browserOutDir, threadDir } from '../config.ts';
 import type { Channel } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
@@ -37,7 +37,7 @@ const channel = (patch: Partial<Channel> = {}): Channel => ({
   ...patch,
 });
 
-const role = (mcp: string[]): CrewRole => ({ id: 'r', name: 'R', description: '', mcp, charter: 'x' });
+const role = (mcp: string[], delegateOnly = false): CrewRole => ({ id: 'r', name: 'R', description: '', mcp, delegateOnly, charter: 'x' });
 
 const THREAD = 'thread-123';
 const OMNI_URL = 'http://127.0.0.1:4747';
@@ -51,6 +51,12 @@ afterAll(() => {
 });
 
 describe('buildMcpConfig: browser', () => {
+  it('gives a delegate-only role the omni tools but no browser', () => {
+    const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: role(['omni'], true), browserBusy: false, omniUrl: OMNI_URL });
+    expect(cfg.mcpServers['omni-browser']).toBeUndefined();
+    expect(cfg.mcpServers['omni']).toBeDefined();
+  });
+
   it('adds a headless playwright server with a persistent per-channel profile', () => {
     const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), browserBusy: false, omniUrl: OMNI_URL });
     const b = cfg.mcpServers['omni-browser'];
@@ -212,5 +218,26 @@ describe('prepareWorkdir', () => {
     expect(needsWorktree(channel({ repo_path: '/r', use_worktree: 0 }))).toBe(false);
     expect(needsWorktree(channel({ repo_path: null, use_worktree: 1 }))).toBe(false);
     expect(needsWorktree(channel({ repo_path: '/r', use_worktree: 1 }), { remote: true })).toBe(false);
+  });
+});
+
+describe('writeCursorDenyConfig', () => {
+  it('writes the deny rules alone when the user has no Cursor config yet, and again each spawn without failing', () => {
+    const user = mkdtempSync(join(tmpdir(), 'omni-cursor-none-'));
+    const dir = join(mkdtempSync(join(tmpdir(), 'omni-cursor-thread-')), 'cursor-config');
+    expect(writeCursorDenyConfig(dir, user)).toBe(dir);
+    expect(JSON.parse(readFileSync(join(dir, 'cli-config.json'), 'utf8'))).toEqual({ version: 1, permissions: { allow: [], deny: ['Shell(*)', 'Write(**)'] } });
+    // A folder Cursor made since the last spawn is linked on the next; the ones already linked stay.
+    mkdirSync(join(user, 'chats'));
+    expect(writeCursorDenyConfig(dir, user)).toBe(dir);
+    expect(lstatSync(join(dir, 'chats')).isSymbolicLink()).toBe(true);
+    expect(writeCursorDenyConfig(dir, user)).toBe(dir);
+  });
+
+  it('never repeats a deny rule the user already has', () => {
+    const user = mkdtempSync(join(tmpdir(), 'omni-cursor-dup-'));
+    writeFileSync(join(user, 'cli-config.json'), JSON.stringify({ permissions: { deny: ['Shell(*)'] } }));
+    const cfg = JSON.parse(readFileSync(join(writeCursorDenyConfig(join(mkdtempSync(join(tmpdir(), 'omni-cursor-thread-')), 'cursor-config'), user), 'cli-config.json'), 'utf8'));
+    expect(cfg.permissions.deny).toEqual(['Shell(*)', 'Write(**)']);
   });
 });

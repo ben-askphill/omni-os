@@ -1,20 +1,18 @@
 import OmniKit
 import SwiftUI
 
-/// The Notifications tab: this Mac's switch, what macOS allows, and a switch per channel. Nothing here syncs; the
-/// other Mac keeps its own choices.
+/// The Notifications cards of the General tab (a tab of its own before #404): this Mac's switch, what macOS allows,
+/// and a switch per channel. Nothing here syncs; the other Mac keeps its own choices.
 struct NotificationSettingsView: View {
   let model: AppModel
   @Bindable var attention: AttentionCenter
 
   var body: some View {
-    SettingsPage {
-      SettingsIntro(
-        icon: "bell",
-        text: Text("This Mac can tell you when a thread finishes or fails while you are somewhere else. Click a notification to open its thread. Nothing alerts for the thread you are looking at, and these choices stay on this Mac.")
-      )
-
-      SettingsCard(title: "Notifications") {
+    VStack(alignment: .leading, spacing: z(16)) {
+      SettingsCard(
+        title: "Notifications",
+        note: "This Mac can tell you when a thread finishes or fails while you are somewhere else. Click a notification to open its thread. Nothing alerts for the thread you are looking at."
+      ) {
         SettingsToggle(
           title: "Notify on this Mac",
           detail: "New finished and failed results, the ones Needs you lists. Turning this on asks macOS the first time.",
@@ -41,7 +39,10 @@ struct NotificationSettingsView: View {
         }
       }
 
-      SettingsCard(title: "Channels", note: "A channel turned off still lists its results in Needs you, without a notification.") {
+      // One switch per channel grows with the sidebar, so the list folds shut, as on the web (#405).
+      AdvancedFold(title: "Channels", summary: "\(channels.filter { attention.settings.alerts(channel: $0.id) }.count) of \(channels.count) notify") {
+        Text("A channel turned off still lists its results in Needs you, without a notification.")
+          .font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
         if channels.isEmpty {
           Text("No channels yet.").font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
         }
@@ -57,6 +58,7 @@ struct NotificationSettingsView: View {
         .opacity(attention.settings.enabled ? 1 : 0.55)
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .task { await attention.refreshPermission() }
   }
 

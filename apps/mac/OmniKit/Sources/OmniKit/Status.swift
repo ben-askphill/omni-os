@@ -12,8 +12,9 @@ public struct HarnessID: OpenEnum, CodingKeyRepresentable {
   /// A Cursor cloud agent, launched through Cursor's API on its own Linux machines.
   public static let cursorCloud: Self = "cursor-cloud"
 
-  /// Runs off this Mac: no worktree, terminal session or local files.
-  public var isRemote: Bool { self == .hermes || self == .cursorCloud }
+  /// Runs on a remote provider (the Hermes server, Cursor's cloud): no worktree, terminal session or local files
+  /// anywhere. A thread another synced Mac runs is a different thing: that one still has an Omni worktree, there.
+  public var runsOnProvider: Bool { self == .hermes || self == .cursorCloud }
 
   public var codingKey: any CodingKey { Key(stringValue: rawValue) }
   public init?<T: CodingKey>(codingKey: T) { self.init(rawValue: codingKey.stringValue) }
@@ -159,9 +160,11 @@ public struct Status: Decodable, Hashable, Sendable {
   public let server: ServerInfo?
   /// Missing from older servers.
   public let device: DeviceInfo?
+  /// A Grok Bot webhook URL is set on the server. Without it the app hides Send to Grok Bot. False from older servers.
+  public let grokBot: Bool
 
   enum CodingKeys: String, CodingKey {
-    case usage, slots, running, queued, maxConcurrent, maxUploadMb, profile, server, device
+    case usage, slots, running, queued, maxConcurrent, maxUploadMb, profile, server, device, grokBot
   }
 
   public init(from decoder: any Decoder) throws {
@@ -176,6 +179,7 @@ public struct Status: Decodable, Hashable, Sendable {
     profile = try c.decodeIfPresent(Profile.self, forKey: .profile)
     server = try c.decodeIfPresent(ServerInfo.self, forKey: .server)
     device = try c.decodeIfPresent(DeviceInfo.self, forKey: .device)
+    grokBot = try c.decodeIfPresent(Bool.self, forKey: .grokBot) ?? false
   }
 }
 

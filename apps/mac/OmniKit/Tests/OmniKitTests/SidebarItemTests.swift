@@ -11,8 +11,8 @@ import OmniKit
     (.newChannel, .newChannel),
     (.artifacts, .artifacts),
     (.automations, .automations),
-    (.secrets, .secrets),
-    (.settings, .settings),
+    (.settings(.general), .settings),
+    (.settings(.machines), .settings),
   ])
   func routesSelectTheirRow(route: Route, item: SidebarItem) {
     #expect(SidebarItem(route: route) == item)
@@ -31,8 +31,7 @@ import OmniKit
     (.newChannel, .newChannel),
     (.artifacts, .artifacts),
     (.automations, .automations),
-    (.secrets, .secrets),
-    (.settings, .settings),
+    (.settings, .settings(.general)),
   ])
   func rowsOpenTheirRoute(item: SidebarItem, route: Route) {
     #expect(item.route == route)
@@ -54,8 +53,8 @@ import OmniKit
     (.thread(id: "t1"), "Thread"),
     (.search(query: "x"), "Search"),
     (.automations, "Automations"),
-    (.secrets, "Secrets"),
-    (.settings, "Settings"),
+    (.settings(.general), "Settings"),
+    (.settings(.secrets), "Settings"),
     (.artifacts, "Artifacts"),
     (.newChannel, "New channel"),
     (.notFound(path: "/x"), "Omni"),
@@ -64,12 +63,13 @@ import OmniKit
     #expect(route.title { names[$0] } == title)
   }
 
-  @Test func newThreadOpensTheChannelsThreadsOrHome() {
-    #expect(Route.home.newThreadRoute == .home)
-    #expect(Route.channel(id: "acme", tab: .prs, pr: 2).newThreadRoute == .channel(id: "acme"))
-    #expect(Route.channel(id: "acme").newThreadRoute == .channel(id: "acme"))
-    #expect(Route.thread(id: "t1").newThreadRoute == .home)
-    #expect(Route.secrets.newThreadRoute == .home)
-    #expect(Route.settings.newThreadRoute == .home)
+  @Test func newThreadOpensTheCurrentChannelsThreadsOrHome() {
+    #expect(Route.home.newThreadRoute(threadChannel: nil) == .home)
+    #expect(Route.channel(id: "acme", tab: .prs, pr: 2).newThreadRoute(threadChannel: nil) == .channel(id: "acme"))
+    #expect(Route.channel(id: "acme").newThreadRoute(threadChannel: "other") == .channel(id: "acme"))
+    #expect(Route.thread(id: "t1").newThreadRoute(threadChannel: "acme") == .channel(id: "acme"))
+    #expect(Route.thread(id: "t1").newThreadRoute(threadChannel: nil) == .home)
+    #expect(Route.settings(.secrets).newThreadRoute(threadChannel: "acme") == .home)
+    #expect(Route.settings(.general).newThreadRoute(threadChannel: nil) == .home)
   }
 }

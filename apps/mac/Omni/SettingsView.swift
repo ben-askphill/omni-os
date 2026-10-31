@@ -2,6 +2,8 @@ import AppKit
 import OmniKit
 import SwiftUI
 
+/// The Settings window: General, Workspace, Machines and Secrets, the same four sections as the Web UI's Settings
+/// page and the phone's Settings list (#404). ⌘, and the sidebar's Settings row both open General.
 struct SettingsView: View {
   @Bindable var model: AppModel
   let appearance: AppearanceSettings
@@ -9,45 +11,52 @@ struct SettingsView: View {
 
   var body: some View {
     TabView(selection: $model.settingsTab) {
-      Tab("Server", systemImage: "server.rack", value: .server) {
-        ServerSettingsPage(settings: model.settings, model: model)
-          .frame(width: z(560), height: 680)
+      Tab("General", systemImage: "person", value: .general) {
+        GeneralSettingsPage(model: model, appearance: appearance, quickPrompt: quickPrompt)
+          .frame(width: z(560), height: 720)
       }
-      Tab("Profile", systemImage: "person", value: .profile) {
-        ProfileSettings(model: model)
-          .frame(width: z(560), height: 420)
+      Tab("Workspace", systemImage: "folder", value: .workspace) {
+        SettingsPage { ProfileSettings(model: model, part: .workspace) }
+          .frame(width: z(560), height: 560)
+      }
+      Tab("Machines", systemImage: "desktopcomputer", value: .machines) {
+        MachinesSettingsPage(settings: model.settings, model: model)
+          .frame(width: z(560), height: 720)
       }
       Tab("Secrets", systemImage: "key", value: .secrets) {
         SecretsSettings(model: model)
           .frame(width: z(560), height: 680)
       }
-      Tab("Sync", systemImage: "arrow.triangle.2.circlepath", value: .sync) {
-        SyncSettings(model: model)
-          .frame(width: z(560), height: 680)
-      }
-      Tab("Storage", systemImage: "internaldrive", value: .storage) {
-        StorageSettings(model: model)
-          .frame(width: z(560), height: 680)
-      }
-      Tab("Notifications", systemImage: "bell", value: .notifications) {
-        NotificationSettingsView(model: model, attention: model.attention)
-          .frame(width: z(560), height: 600)
-      }
-      Tab("Appearance", systemImage: "circle.lefthalf.filled", value: .appearance) {
-        AppearanceSettingsView(appearance: appearance, zoom: UIZoom.settings)
-          .frame(width: 560, height: 360)
-      }
-      Tab("Quick Prompt", systemImage: "command", value: .quickPrompt) {
-        QuickPromptSettingsView(controller: quickPrompt, settings: quickPrompt.settings)
-          .frame(width: z(560), height: 600)
-      }
     }
   }
 }
 
-/// The Server tab: where new threads run, this Mac's server (port, repo, Node) and its status. The model follows the
-/// settings, so a change applies at once: a new port reconnects, and any change checks the server again.
-struct ServerSettingsPage: View {
+/// The General tab: who you are and Run setup again (the Profile tab before #404), then this Mac's appearance,
+/// notifications and Quick Prompt, which were tabs of their own. The last three stay on this Mac and never sync.
+struct GeneralSettingsPage: View {
+  let model: AppModel
+  let appearance: AppearanceSettings
+  let quickPrompt: QuickPromptController
+
+  var body: some View {
+    SettingsPage {
+      ProfileSettings(model: model, part: .general)
+      AppearanceSettingsView(appearance: appearance, zoom: UIZoom.settings)
+      NotificationSettingsView(model: model, attention: model.attention)
+      QuickPromptSettingsView(controller: quickPrompt, settings: quickPrompt.settings)
+      SettingsIntro(
+        icon: "info",
+        text: Text("Your name and email live in \(Text("data/omni.config.json").monospaced()) on this Mac with the Workspace tab's folders, and never go into git. Appearance, notifications and Quick Prompt stay on this Mac.")
+      )
+    }
+  }
+}
+
+/// The Machines tab: this Mac's name (the sidebar footer's before #405) and where new threads run, then Sync and
+/// Storage, which were tabs of their own. Advanced holds the developer items: this Mac's server (port, repo, Node),
+/// its status and log, and the sync path map. The model follows the settings, so a change applies at once: a new
+/// port reconnects, and any change checks the server again.
+struct MachinesSettingsPage: View {
   @Bindable var settings: ServerSettings
   let model: AppModel
 
@@ -55,53 +64,71 @@ struct ServerSettingsPage: View {
     SettingsPage {
       RunOnCard(model: model)
 
-      SettingsCard(
-        title: "This Mac's server",
-        note: "The app looks for the server on this port and starts it from this repo. Leave Node empty to use the newest Node 24 or later it finds."
-      ) {
-        VStack(alignment: .leading, spacing: 0) {
-          FieldLabel(text: "Port")
-          PortField(port: $settings.port)
-            .textFieldStyle(.omniMono)
-            .frame(maxWidth: z(140))
-        }
-        PathField(title: "Repo", path: $settings.repoPath, prompt: ServerSettings.defaultRepoPath) {
-          chooseRepo(from: settings.config.repo)
-        }
-        PathField(title: "Node", path: $settings.nodePath, prompt: "Detect automatically") {
-          chooseNode(from: settings.config.node)
-        }
-        if settings.isVolatile {
-          HStack(spacing: z(8)) {
-            OmniIcon(name: "info", size: 13).foregroundStyle(Tok.fg3)
-            Text("Launch arguments set these values, so changes last until the app quits.")
-              .fixedSize(horizontal: false, vertical: true)
-          }
-          .font(.omni(size: 12.5))
-          .foregroundStyle(Tok.fg2)
-          .padding(.horizontal, z(14))
-          .padding(.vertical, z(10))
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .omniCard(16)
-        }
-      }
+      SettingsPart(title: "Sync", note: "History across your Macs, relayed through your own Supabase project.")
+      SyncSettings(model: model)
 
-      SettingsCard(title: "Status") {
-        InfoRows {
-          InfoRow("Server", value: model.supervisor.state.label)
-          InfoRow("Feed", value: feedLabel)
-          InfoRow(label: "Log") {
-            Button("Open Log") { openLog(model) }
-              .buttonStyle(.pill(.secondary, height: 26))
-              .disabled(!logExists(model))
-          }
-          if let commit = Bundle.main.object(forInfoDictionaryKey: "OmniGitCommit") as? String, !commit.isEmpty {
-            InfoRow(label: "Build") {
-              Text(String(commit.prefix(12)))
-                .font(.omni(size: 12, design: .monospaced))
-                .foregroundStyle(Tok.fg2)
-                .textSelection(.enabled)
-            }
+      SettingsPart(title: "Storage", note: "The worktrees Omni made for threads, what they use, and which are safe to clean up.")
+      StorageSettings(model: model)
+
+      AdvancedFold(summary: "Port, repo, Node, status and the sync path map") {
+        serverCard
+        statusCard
+        SyncPathMap(model: model)
+      }
+    }
+  }
+
+  /// The port, repo and Node the app runs the server with.
+  private var serverCard: some View {
+    SettingsCard(
+      title: "This Mac's server",
+      note: "The app looks for the server on this port and starts it from this repo. Leave Node empty to use the newest Node 24 or later it finds."
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        FieldLabel(text: "Port")
+        PortField(port: $settings.port)
+          .textFieldStyle(.omniMono)
+          .frame(maxWidth: z(140))
+      }
+      PathField(title: "Repo", path: $settings.repoPath, prompt: ServerSettings.defaultRepoPath) {
+        chooseRepo(from: settings.config.repo)
+      }
+      PathField(title: "Node", path: $settings.nodePath, prompt: "Detect automatically") {
+        chooseNode(from: settings.config.node)
+      }
+      if settings.isVolatile {
+        HStack(spacing: z(8)) {
+          OmniIcon(name: "info", size: 13).foregroundStyle(Tok.fg3)
+          Text("Launch arguments set these values, so changes last until the app quits.")
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.omni(size: 12.5))
+        .foregroundStyle(Tok.fg2)
+        .padding(.horizontal, z(14))
+        .padding(.vertical, z(10))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .omniCard(16)
+      }
+    }
+  }
+
+  /// The server's state, the feed, the log and the build.
+  private var statusCard: some View {
+    SettingsCard(title: "Status") {
+      InfoRows {
+        InfoRow("Server", value: model.supervisor.state.label)
+        InfoRow("Feed", value: feedLabel)
+        InfoRow(label: "Log") {
+          Button("Open Log") { openLog(model) }
+            .buttonStyle(.pill(.secondary, height: 26))
+            .disabled(!logExists(model))
+        }
+        if let commit = Bundle.main.object(forInfoDictionaryKey: "OmniGitCommit") as? String, !commit.isEmpty {
+          InfoRow(label: "Build") {
+            Text(String(commit.prefix(12)))
+              .font(.omni(size: 12, design: .monospaced))
+              .foregroundStyle(Tok.fg2)
+              .textSelection(.enabled)
           }
         }
       }
@@ -126,28 +153,35 @@ private struct RunOnCard: View {
   var body: some View {
     let devices = model.devices.devices
     let saved = model.runOn.saved
-    SettingsCard(
-      title: "Run new threads on",
-      note: "New threads run there unless the composer picks another machine. Replies and Stop follow the thread wherever it runs."
-    ) {
-      VStack(alignment: .leading, spacing: z(10)) {
-        HStack(spacing: z(8)) {
-          RunOnMenu(devices: devices, pick: saved) { device in Task { await model.runOn.save(device) } }
-            .disabled((devices.isEmpty && saved.isEmpty) || model.runOn.saving)
-            .opacity(devices.isEmpty && saved.isEmpty ? 0.45 : 1)
-          if model.runOn.saving { Loader(size: 14) }
+    SettingsCard(title: "This Mac", note: "The machine this app runs Omni on, as other machines and the sync list name it.") {
+      // The name, which the sidebar footer showed before #405.
+      if let name = model.store.status?.device?.name {
+        InfoRows {
+          InfoRow("Machine", value: name)
         }
-        if devices.isEmpty {
-          Text(
-            saved.isEmpty
-              ? "No other machine is synced, so threads run on this Mac. Set up Sync on both machines to pick one."
-              : "The saved machine isn't synced now, so new threads can't start there. Pick This Mac, or check Sync."
-          )
-          .font(.omni(size: 12))
-          .foregroundStyle(Tok.fg3)
-          .fixedSize(horizontal: false, vertical: true)
+      }
+      VStack(alignment: .leading, spacing: 0) {
+        FieldLabel(text: "Run new threads on", hint: "New threads run there unless the composer picks another machine. Replies and Stop follow the thread wherever it runs.")
+        VStack(alignment: .leading, spacing: z(10)) {
+          HStack(spacing: z(8)) {
+            // A saved machine sync no longer lists shows as This Mac, where the server runs it.
+            RunOnMenu(devices: devices, pick: RunOnRules.resolved(saved, devices: devices)) { device in Task { await model.runOn.save(device) } }
+              .disabled((devices.isEmpty && saved.isEmpty) || model.runOn.saving)
+              .opacity(devices.isEmpty && saved.isEmpty ? 0.45 : 1)
+            if model.runOn.saving { Loader(size: 14) }
+          }
+          if devices.isEmpty {
+            Text(
+              saved.isEmpty
+                ? "No other machine is synced, so threads run on this Mac. Set up Sync on both machines to pick one."
+                : "The saved machine isn't synced now, so new threads can't start there. Pick This Mac, or check Sync."
+            )
+            .font(.omni(size: 12))
+            .foregroundStyle(Tok.fg3)
+            .fixedSize(horizontal: false, vertical: true)
+          }
+          if let error = model.runOn.error { ErrorNote(text: error) }
         }
-        if let error = model.runOn.error { ErrorNote(text: error) }
       }
     }
     .task(id: model.client.baseURL) {

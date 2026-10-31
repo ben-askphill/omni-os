@@ -1,7 +1,9 @@
 import Foundation
 
-// The user config behind onboarding and the Profile tab, as the Web UI's Onboarding.tsx and Settings.tsx read it:
+// The user config behind onboarding and Settings' General and Workspace tabs, as the Web UI's Onboarding.tsx and Settings.tsx read it:
 // GET and PUT /api/setup, POST /api/setup/complete (apps/server/setup-api.ts). Empty strings mean "use the default".
+// The contract is packages/shared/settings.ts; apps/server/tests/mac-fixtures.test.ts checks these structs hold each
+// field Settings shows.
 
 public struct UserConfig: Codable, Hashable, Sendable {
   public struct User: Codable, Hashable, Sendable {

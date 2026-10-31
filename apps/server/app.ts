@@ -3,6 +3,8 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { existsSync, readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { paths } from './config.ts';
+// The runner's ports are bound before any route can reach it (apps/server/compose.ts).
+import './compose.ts';
 import { artifactsApi } from './artifacts-api.ts';
 import { authApi } from './auth-api.ts';
 import { browserApi } from './browser-api.ts';

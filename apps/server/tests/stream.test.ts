@@ -7,7 +7,7 @@ vi.mock('../db.ts', () => {
   throw new Error('db.ts must not be imported by stream tests');
 });
 
-import { isSubagent, parseEvent, LineSplitter, type Record } from '../stream.ts';
+import { isSubagent, parseEvent, LineSplitter, MAX_RECORD_CHARS, type Record } from '../stream.ts';
 
 const SAMPLE = join(import.meta.dirname, 'fixtures', 'stream-sample.jsonl');
 const sampleLines = () =>
@@ -431,6 +431,46 @@ describe('LineSplitter', () => {
     s.push('tail-without-newline');
     expect(s.flush()).toEqual(['tail-without-newline']);
     expect(s.flush()).toEqual([]);
+  });
+
+  it('drops an unterminated line once it passes the cap, then reads the next line', () => {
+    const over: number[] = [];
+    const s = new LineSplitter({ maxChars: 10, onOverflow: (n) => over.push(n) });
+    expect(s.push('{"a":"0123')).toEqual([]);
+    expect(s.push('456789')).toEqual([]);
+    expect(over).toEqual([16]);
+    // The rest of the oversized record is discarded, not buffered, and reported once.
+    expect(s.push('x'.repeat(1000))).toEqual([]);
+    expect(s.push('tail"}\n{"b":2}\n')).toEqual(['{"b":2}']);
+    expect(over).toEqual([16]);
+    expect(s.flush()).toEqual([]);
+  });
+
+  it('drops an oversized line that arrives whole, and keeps its neighbours', () => {
+    const over: number[] = [];
+    const s = new LineSplitter({ maxChars: 10, onOverflow: (n) => over.push(n) });
+    expect(s.push(`short\n${'y'.repeat(11)}\n0123456789\n`)).toEqual(['short', '0123456789']);
+    expect(over).toEqual([11]);
+  });
+
+  it('drops an oversized tail on flush instead of returning it', () => {
+    const over: number[] = [];
+    const s = new LineSplitter({ maxChars: 4, onOverflow: (n) => over.push(n) });
+    s.push('abcdefgh');
+    expect(s.flush()).toEqual([]);
+    expect(over).toEqual([8]);
+    expect(s.push('ok\n')).toEqual(['ok']);
+  });
+
+  it('caps the buffer by default and says so on stderr', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const s = new LineSplitter();
+    const big = 'z'.repeat(MAX_RECORD_CHARS / 4);
+    for (let i = 0; i < 5; i++) s.push(big);
+    expect(s.push('\n{"after":1}\n')).toEqual(['{"after":1}']);
+    expect(err).toHaveBeenCalledTimes(1);
+    expect(String(err.mock.calls[0][0])).toContain('dropped a line');
+    err.mockRestore();
   });
 
   it('round-trips the captured sample fed one byte-ish chunk at a time', () => {

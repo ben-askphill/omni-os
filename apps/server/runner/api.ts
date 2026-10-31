@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { channels, folders, messageRequests, outbox, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
-import { getCrew } from '../crew.ts';
+import { getCrew, remoteDelegateOnlyRefusal } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
 import { checkBase } from '../worktree-base.ts';
 import type { BasePick } from '@omni/shared/worktree-base.ts';
@@ -10,8 +10,8 @@ import { prepareTurn, turnBlocked } from '../sync/guard.ts';
 import { parseSlash, resolveSlash, slashRecord, type SlashCommand, type SlashRecord } from '@omni/shared/slash.ts';
 import { listCommands, peekCommands } from '../commands.ts';
 import { withMentions } from '../mentions.ts';
-import { saveUploads, type Attachment } from '../uploads.ts';
-import { isRemoteHarness, type HarnessId } from '../harness/types.ts';
+import { fileKind, safeName, saveUploads, type Attachment } from '../uploads.ts';
+import { isProviderHarness, providerWhere, type HarnessId } from '../harness/types.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
 import { usageByHarness } from '../usage.ts';
@@ -23,8 +23,9 @@ import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
 import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
 import { dismissQuestions } from './questions.ts';
-import { forwardMessage, markRouted, remoteHolder, targetFor } from '../run-on.ts';
-import { sendNewThread } from '../handoff.ts';
+import { runnerPorts } from './ports.ts';
+import { assignRouted, remoteHolder } from '../ownership.ts';
+import { sendUploads } from '../sync/files.ts';
 
 // ---------- slash commands ----------
 
@@ -135,11 +136,12 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const images = (input.files ?? []).some((f) => f.type.startsWith('image/'));
   const auto = 'auto' in run ? routeTask(profileTask(input.prompt), { catalog: getCatalog(), usage: usageByHarness(), images }) : null;
   const { harness, model, effort } = auto ?? (run as Resolved);
+  if (role?.delegateOnly && isProviderHarness(harness)) throw new Error(remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
 
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
 
   const id = input.id ?? randomUUID();
-  const remote = isRemoteHarness(harness);
+  const remote = isProviderHarness(harness);
   // Refused before anything is made, so a ref that names nothing leaves the draft where it was typed.
   const base = await checkBase(channel, input.base, { remote });
   const wd = await prepareWorkdir(channel, id, { remote });
@@ -171,14 +173,21 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
 export async function createThread(input: CreateThreadInput): Promise<Thread> {
   // Team members stay with their lead, which runs once with all their replies. A delegated thread may go: its report
   // comes back to the parent (run-on.ts).
-  const route = input.source === 'team' ? null : await targetFor(input.device);
+  const route = input.source === 'team' ? null : await runnerPorts().routing.targetFor(input.device);
   if (route) {
-    if (input.files?.length) throw refusal(`Files cannot go to ${route.to.name} yet. Start the thread without them, or run it on this machine.`, 400);
+    // In Storage before the thread is made, so a failed upload leaves nothing behind and the other machine finds them.
+    const bodies = await Promise.all((input.files ?? []).map(async (f) => new Uint8Array(await f.arrayBuffer())));
+    const sent = await sendUploads((input.files ?? []).map((f, i) => ({ name: safeName(f.name), ...fileKind(safeName(f.name), f.type), body: bodies[i] }))).catch((err) => {
+      throw refusal(`Could not send the files to ${route.to.name}: ${(err as Error).message}`, (err as { status?: number }).status ?? 503);
+    });
     // Stopped, not queued: no turn runs here, and the other machine must not wait for one to end.
     const { thread } = await openThread(input, 'stopped', true);
+    // Kept here too, so the hub's transcript can show them. A name taken already is not, in a new thread.
+    const saved = await saveUploads(thread.id, input.files ?? []);
+    const files = sent.map((f, i) => ({ ...f, name: saved[i]?.name ?? f.name }));
     tx(() => {
-      markRouted(thread.id, route.to.id);
-      sendNewThread(thread.id, input.prompt, route.from, route.to);
+      assignRouted(thread.id, route.to.id);
+      runnerPorts().handoff.sendNewThread(thread.id, input.prompt, route.from, route.to, files);
     });
     if (!input.title) void generateTitle(thread.id, input.prompt);
     emitThread(thread.id);
@@ -426,7 +435,7 @@ export async function postMessage(
   }
   // A thread routed to another machine runs there: the message goes to it (run-on.ts).
   if (remoteHolder(thread)) {
-    return forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, hasFiles: !!opts.attachments?.length, context: opts.context }) as PostedThread;
+    return (await runnerPorts().routing.forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, attachments: opts.attachments, context: opts.context })) as PostedThread;
   }
   // Refused before anything is saved: the other Mac runs it.
   const blocked = turnBlocked(thread, runsHere(threadId));

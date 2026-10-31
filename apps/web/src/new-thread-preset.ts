@@ -33,9 +33,6 @@ export const sameSettings = (t: Thread): NewThreadPreset => ({
   ...(t.auto_reason ? { choice: AUTO_CHOICE, effort: '' } : { choice: { harness: t.harness, model: t.model ?? '' }, effort: t.effort }),
 });
 
-/** "New thread on another model": the channel and role, and nothing that picks a model. */
-export const otherModel = (t: Thread): NewThreadPreset => ({ channel: t.channel_id, role: t.role ?? '', pickModel: true });
-
 /** What a role or a channel picks for a new thread's run. */
 export interface RunDefaults {
   harness?: string | null;

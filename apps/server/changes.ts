@@ -5,50 +5,14 @@ import { execFile } from 'node:child_process';
 import { existsSync, lstatSync, openSync, readSync, closeSync, realpathSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { promisify } from 'node:util';
+import type { BranchChanges, ChangeGroup, ChangeKind, ChangedFile, ChangeStatus, DiffOmitted } from '@omni/shared/changes.ts';
 import { channels, threadBases, type Thread, type ThreadBase } from './db.ts';
 import { plannedWorktree, worktreeProblem } from './sandbox.ts';
-import { isRemoteHarness, remoteWhere } from './harness/types.ts';
+import { isProviderHarness, providerWhere } from './harness/types.ts';
 
 const run = promisify(execFile);
 
-/** `turn`: what one turn changed, between its before and after snapshots (apps/server/turns.ts). */
-export type ChangeKind = 'committed' | 'staged' | 'unstaged' | 'untracked' | 'turn';
-export type ChangeStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'type_changed' | 'unmerged';
-/** Why a file's diff text was left out: binary, too big for one file, past the response's budget, a symlink, or git gave none. */
-export type DiffOmitted = 'binary' | 'too_large' | 'limit' | 'symlink' | 'unavailable';
-
-export interface ChangedFile {
-  path: string;
-  /** The path before a rename or copy, else null. */
-  old_path: string | null;
-  status: ChangeStatus;
-  /** Lines added and removed, null when git cannot count them (binary) or the file was too big to read. */
-  additions: number | null;
-  deletions: number | null;
-  binary: boolean;
-  /** Set when `diff` is empty on purpose. */
-  omitted: DiffOmitted | null;
-  /** This file's part of a unified diff, from its `diff --git` line. Empty when omitted. */
-  diff: string;
-}
-
-export interface ChangeGroup {
-  kind: ChangeKind;
-  files: ChangedFile[];
-  /** More files changed than are listed. */
-  truncated: boolean;
-}
-
-export type BranchChanges =
-  | { available: false; reason: string }
-  | {
-      available: true;
-      cwd: string;
-      branch: string | null;
-      head: string;
-      base: Omit<ThreadBase, 'thread_id'>;
-      groups: ChangeGroup[];
-    };
+export type { BranchChanges, ChangeGroup, ChangeKind, ChangedFile, ChangeStatus, DiffOmitted } from '@omni/shared/changes.ts';
 
 /** Files listed per group. */
 export const MAX_FILES = 400;
@@ -83,7 +47,7 @@ export const gitOr = (dir: string, args: string[]) => git(dir, args).then((s) =>
  * worktree, checked to be on its branch; a thread with worktrees off reads the channel's repo when it runs there.
  */
 export async function changesCheckout(t: Thread): Promise<{ dir: string } | { reason: string }> {
-  if (isRemoteHarness(t.harness)) return { reason: `This thread runs ${remoteWhere(t.harness)}, so its files are not on this Mac.` };
+  if (isProviderHarness(t.harness)) return { reason: `This thread runs ${providerWhere(t.harness)}, so its files are not on this Mac.` };
   if (t.setup === 'preparing') return { reason: "Omni is still preparing this thread's worktree." };
   if (t.setup === 'failed') return { reason: "This thread's worktree could not be prepared, so there are no changes to show." };
   const repo = channels.get(t.channel_id)?.repo_path;

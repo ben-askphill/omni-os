@@ -2,22 +2,29 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { HarnessWithRunning } from '../api.ts';
 import { Icon, Picker, type PickerOption } from './ui.tsx';
 import { HarnessLogo } from './brand.tsx';
-import { AUTO_CHOICE, asksAuto } from '../thread-run.ts';
+import { ModelList } from './model-picker/ModelList.tsx';
+import { asksAuto } from '../thread-run.ts';
 
 export interface ModelChoice {
   harness: string;
   model: string;
 }
 
-const AUTO_NOTE = 'Picks a model for each task';
 /** The open list's height: the search field and the 320px list. */
 const LIST_HEIGHT = 380;
+
+/** Under a thread the pill sits at the bottom of the page, so the list opens upward when it has no room below. */
+function opensUp(btn: HTMLElement | null) {
+  const r = btn?.getBoundingClientRect();
+  return !!r && window.innerHeight - r.bottom < LIST_HEIGHT && r.top > window.innerHeight - r.bottom;
+}
 
 /**
  * One model pill whose list starts with Auto, then groups models under each harness, with a sticky header naming the
  * plan, one search across all groups, and the harness default marked "(default)". A harness that
  * isn't installed or logged in shows disabled with the command that fixes it. `onOpen` fires as
- * the list opens, so the caller can refetch and a fresh login shows up without a reload.
+ * the list opens, so the caller can refetch and a fresh login shows up without a reload. With `effort`, the pill also
+ * reads the effort ("Sonnet 5.5 · high") and the list ends with the picked model's levels, as the phone's model sheet.
  */
 export function ModelPicker({
   harnesses,
@@ -25,18 +32,22 @@ export function ModelPicker({
   onChange,
   onOpen,
   defaultOpen,
+  openRequest = 0,
   placeholder = 'Model',
   offerAuto = true,
   label,
   disabled,
   className = '',
+  effort,
 }: {
   harnesses: HarnessWithRunning[];
   value: ModelChoice;
   onChange: (v: ModelChoice) => void;
   onOpen?: () => void;
-  /** Start with the list open, as "New thread on another model" does. */
+  /** Start with the list open. */
   defaultOpen?: boolean;
+  /** Bumped to open the list, as `/model` in a thread's reply box does. */
+  openRequest?: number;
   /** The pill's label when no model is picked. */
   placeholder?: string;
   /** List Auto first. A thread's own pill leaves it out: Auto picks the run as a thread starts. */
@@ -46,6 +57,8 @@ export function ModelPicker({
   disabled?: boolean;
   /** On the wrapper, around the pill and its list. */
   className?: string;
+  /** The effort picked for `value`, "" for the model's default, and where a pick goes. */
+  effort?: { value: string; onChange: (v: string) => void };
 }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const [up, setUp] = useState(false);
@@ -77,6 +90,15 @@ export function ModelPicker({
   }, []);
 
   useEffect(() => {
+    if (!openRequest) return;
+    onOpen?.();
+    setQ('');
+    setUp(opensUp(btn.current));
+    setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest]);
+
+  useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
       if (!wrap.current?.contains(e.target as Node)) setOpen(false);
@@ -92,6 +114,8 @@ export function ModelPicker({
   };
 
   const buttonLabel = label ?? (auto ? 'Auto' : current.m ? current.m.label : placeholder);
+  const levels = effort && !auto ? modelOf(harnesses, value) : null;
+  const effortShown = levels?.efforts.length ? effort!.value || levels.model?.defaultEffort || 'default' : null;
 
   return (
     <div ref={wrap} className={`relative ${className}`}>
@@ -101,13 +125,15 @@ export function ModelPicker({
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={disabled}
-        aria-label={auto ? 'Model: Auto' : `Model: ${label ?? current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}`}
+        aria-label={
+          auto
+            ? 'Model: Auto'
+            : `Model: ${label ?? current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}${effortShown ? `, effort ${effortShown}` : ''}`
+        }
         onClick={() => {
           if (!open) {
             onOpen?.();
-            // Under a thread the pill sits at the bottom of the page, so the list opens upward when it has no room below.
-            const r = btn.current?.getBoundingClientRect();
-            setUp(!!r && window.innerHeight - r.bottom < LIST_HEIGHT && r.top > window.innerHeight - r.bottom);
+            setUp(opensUp(btn.current));
           }
           setOpen(!open);
         }}
@@ -123,7 +149,11 @@ export function ModelPicker({
           </span>
         )}
         <span className="min-w-0 truncate">{buttonLabel}</span>
-        {current.h && <span className="hidden shrink-0 text-fg-4 sm:inline">· {current.h.name}</span>}
+        {effortShown ? (
+          <span className="shrink-0 text-fg-3">· {effortShown}</span>
+        ) : (
+          current.h && <span className="hidden shrink-0 text-fg-4 sm:inline">· {current.h.name}</span>
+        )}
         <Icon name="chevronDown" size={13} className="text-fg-4" />
       </button>
       {open && (
@@ -139,71 +169,30 @@ export function ModelPicker({
               className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-4"
             />
           </label>
-          <div role="listbox" aria-label="Model" className="scroll-thin max-h-[320px] overflow-y-auto outline-none">
-            {showAuto && (
-              <button type="button" role="option" aria-selected={auto} onClick={() => pick(AUTO_CHOICE)} className="pik-row">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">
-                  <Icon name="zap" size={13} />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[13px] text-fg">Auto</span>
-                  <span className="truncate text-[11.5px] text-fg-4">{AUTO_NOTE}</span>
-                </span>
-                <span className="pik-mark">{auto && <Icon name="check" size={12} strokeWidth={2.6} />}</span>
-              </button>
-            )}
-            {groups.map(({ harness, models }) => (
-              <div key={harness.id}>
-                <div className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-elev px-3 pt-2 pb-1">
-                  <span className="caption flex min-w-0 items-center gap-1.5">
-                    <HarnessLogo harness={harness.id} size={12} />
-                    <span className="truncate">{harness.name}</span>
-                  </span>
-                  <span className="shrink-0 text-[11.5px] text-fg-4">
-                    {harness.available ? (harness.plan.endsWith('plan') ? `Bills your ${harness.plan}` : harness.plan) : 'Unavailable'}
-                  </span>
-                </div>
-                {!harness.available ? (
-                  <div className="px-3 pb-2 text-[11.5px] text-fg-4">
-                    {harness.fix && harness.fix.split(/\s+/).length <= 3 ? (
-                      <>
-                        Not available. Run <code className="font-mono text-fg-2">{harness.fix}</code>.
-                      </>
-                    ) : (
-                      <>Not available. {harness.fix}</>
-                    )}
-                  </div>
-                ) : models.length ? (
-                  models.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      role="option"
-                      aria-selected={harness.id === value.harness && m.id === value.model}
-                      onClick={() => pick({ harness: harness.id, model: m.id })}
-                      className="pik-row"
-                    >
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">
-                        <HarnessLogo harness={harness.id} size={13} />
-                      </span>
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-[13px] text-fg">
-                          {m.label}
-                          {m.default && <span className="text-fg-4"> (default)</span>}
-                        </span>
-                        {m.note && <span className="truncate text-[11.5px] text-fg-4">{m.note}</span>}
-                      </span>
-                      <span className="pik-mark">
-                        {harness.id === value.harness && m.id === value.model && <Icon name="check" size={12} strokeWidth={2.6} />}
-                      </span>
-                    </button>
-                  ))
-                ) : q.trim() ? (
-                  <div className="px-3 pb-2 text-[11.5px] text-fg-4">No match</div>
-                ) : null}
+          <ModelList groups={groups} showAuto={showAuto} auto={auto} value={value} query={q} onPick={pick} />
+          {levels && levels.efforts.length > 0 && (
+            <div className="mt-1 border-t border-line px-2 pt-2 pb-1">
+              <div className="caption mb-1.5 px-1">Effort for {levels.model?.label ?? 'this model'}</div>
+              <div role="radiogroup" aria-label="Effort" className="flex flex-wrap gap-1">
+                {['', ...levels.efforts].map((e) => (
+                  <button
+                    key={e || 'default'}
+                    type="button"
+                    role="radio"
+                    aria-checked={effort!.value === e}
+                    onClick={() => {
+                      effort!.onChange(e);
+                      setOpen(false);
+                      btn.current?.focus();
+                    }}
+                    className="press h-7 rounded-full px-2.5 text-[12px] text-fg-2 transition-colors hover:bg-surface-3 hover:text-fg aria-checked:bg-fg aria-checked:text-on-ink"
+                  >
+                    {e || (levels.model?.defaultEffort ? `Default (${levels.model.defaultEffort})` : 'Default')}
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

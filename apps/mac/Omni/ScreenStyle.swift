@@ -248,7 +248,65 @@ extension SettingsCard where Trailing == EmptyView {
   }
 }
 
-/// The intro card on the web's Sync and Secrets pages: an icon in a bg circle and fg-2 text on the surface.
+/// Advanced: the developer and rarely changed items of a form, folded shut so the everyday ones stand alone, as the
+/// web's `Advanced` in `settings-parts.tsx` (#405). `forced` opens it, for a value Omni could not work out; `title`
+/// names a fold that is not Advanced (a long list).
+struct AdvancedFold<Content: View>: View {
+  var title = "Advanced"
+  var summary: String?
+  var forced = false
+  @ViewBuilder var content: Content
+  @State private var open = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: z(14)) {
+      Button {
+        withAnimation(.easeOut(duration: 0.15)) { open.toggle() }
+      } label: {
+        HStack(spacing: z(8)) {
+          OmniIcon(name: open ? "chevronDown" : "chevronRight", size: 14)
+            .foregroundStyle(Tok.fg3)
+          Text(title).font(.omni(size: 15, weight: .medium)).foregroundStyle(Tok.fg)
+          if let summary, !open {
+            Text(summary).font(.omni(size: 12.5)).foregroundStyle(Tok.fg3).lineLimit(1).truncationMode(.tail)
+          }
+          Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(title)
+      .accessibilityValue(open ? "Expanded" : "Collapsed")
+      if open { content }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, z(20))
+    .padding(.vertical, z(14))
+    .overlay(RoundedRectangle(cornerRadius: z(20), style: .continuous).strokeBorder(Tok.line))
+    .onAppear { if forced { open = true } }
+    .onChange(of: forced) { _, now in if now { open = true } }
+  }
+}
+
+/// A heading between the parts of a tab that gathers what were tabs of their own (Sync and Storage under Machines),
+/// as the web's `PartHeading` in `settings-parts.tsx`.
+struct SettingsPart: View {
+  let title: String
+  let note: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: z(4)) {
+      Text(title).font(.omni(size: 20, weight: .medium)).tracking(-0.2).foregroundStyle(Tok.fg)
+      Text(note).font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(.top, z(8))
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityAddTraits(.isHeader)
+  }
+}
+
+/// The intro card on the web's Settings sections: an icon in a bg circle and fg-2 text on the surface.
 struct SettingsIntro: View {
   let icon: String
   let text: Text

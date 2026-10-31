@@ -29,8 +29,9 @@ private enum Step: Decodable {
   case live([EventRow])
   case replace(EventRow)
   case detach
+  case bound(follows: Bool, retain: History.Retain)
 
-  enum CodingKeys: String, CodingKey { case op, events, head, page, rows, row }
+  enum CodingKeys: String, CodingKey { case op, events, head, page, rows, row, follows, retain }
 
   init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -40,6 +41,7 @@ private enum Step: Decodable {
     case "page": self = .page(try c.decode(HistoryPage.self, forKey: .page))
     case "live": self = .live(try c.decode([EventRow].self, forKey: .rows))
     case "replace": self = .replace(try c.decode(EventRow.self, forKey: .row))
+    case "bound": self = .bound(follows: try c.decode(Bool.self, forKey: .follows), retain: try c.decode(History.Retain.self, forKey: .retain))
     default: self = .detach
     }
   }
@@ -103,6 +105,7 @@ private func run(_ steps: [Step]) -> History {
     case .live(let rows): h.append(live: rows)
     case .replace(let row): h.replace(row)
     case .detach: h.detachHead()
+    case .bound(let follows, let retain): h.bound(follows: follows, retain: retain)
     }
   }
   return h
@@ -134,7 +137,7 @@ private func query(_ c: HistoryCursor?) -> String? {
   @Test func replaysTheSharedCorpus() throws {
     let url = repoRoot.appending(path: "packages/test-fixtures/history/spans.json")
     let corpus = try OmniJSON.decoder().decode(Corpus.self, from: Data(contentsOf: url))
-    #expect(corpus.cases.count >= 7)
+    #expect(corpus.cases.count >= 10)
     for k in corpus.cases {
       let h = run(k.steps)
       let x = k.expect

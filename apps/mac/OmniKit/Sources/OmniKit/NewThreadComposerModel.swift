@@ -75,9 +75,9 @@ public final class NewThreadComposerModel {
   /// Takes the other machines and the saved default as they load. A pick stays while its machine is listed, even when offline.
   public func updateRunOn(devices: [Device], saved: String) {
     if self.devices != devices { self.devices = devices }
-    if runOnPicked, runOn.isEmpty || devices.contains(where: { $0.id == runOn }) { return }
+    if runOnPicked, RunOnRules.holds(runOn, devices: devices) { return }
     runOnPicked = false
-    let next = RunOnRules.resolved(saved, devices: devices)
+    let next = RunOnRules.held(nil, saved: saved, devices: devices)
     if next != runOn { runOn = next }
   }
 

@@ -1,9 +1,8 @@
 import { readFileSync } from 'node:fs';
-import type { ChildProcess } from 'node:child_process';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { fixture } from '@omni/test-fixtures';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
-import type { AdapterContext, HarnessAdapter } from '../harness/adapter.ts';
+import type { AdapterContext, HarnessAdapter, HarnessSession } from '../harness/adapter.ts';
 import { harnessText } from '../message-context/project.ts';
 import type { Record as StreamRecord } from '../stream.ts';
 import { HERMES_FIX } from '../harness/catalog.ts';
@@ -12,7 +11,7 @@ import { waitFor } from './support.ts';
 
 let fake: FakeHermes;
 let hermesAdapter: HarnessAdapter;
-const kids: ChildProcess[] = [];
+const sessions: HarnessSession[] = [];
 
 beforeAll(async () => {
   fake = await startFakeHermes();
@@ -21,8 +20,8 @@ beforeAll(async () => {
 });
 beforeEach(() => fake.reset());
 afterEach(() => {
-  for (const c of kids) if (c.exitCode == null && c.signalCode == null) c.kill('SIGKILL');
-  kids.length = 0;
+  for (const s of sessions) s.end('kill');
+  sessions.length = 0;
   delete process.env.HERMES_API_KEY;
 });
 afterAll(async () => {
@@ -32,8 +31,9 @@ afterAll(async () => {
 
 const posts = () => fake.calls.filter((c) => c.method === 'POST' && c.path === '/v1/runs');
 
-function boot(opts: { key?: string; resume?: boolean; sessionId?: string; prompt?: string } = {}) {
+function boot(opts: { key?: string; resume?: boolean; sessionId?: string; prompt?: string; role?: AdapterContext['role'] } = {}) {
   const records: StreamRecord[] = [];
+  const exits: [number | null, NodeJS.Signals | null][] = [];
   let session: string | null = null;
   const threadId = 'tid';
   const ctx = {
@@ -79,6 +79,7 @@ function boot(opts: { key?: string; resume?: boolean; sessionId?: string; prompt
     browserBusy: false,
     omniUrl: 'http://127.0.0.1:9',
     resume: !!opts.resume,
+    role: opts.role,
   } as AdapterContext;
   const sessionHandle = hermesAdapter.spawn(ctx, {
     record: (r) => records.push(r),
@@ -88,11 +89,12 @@ function boot(opts: { key?: string; resume?: boolean; sessionId?: string; prompt
     session: (id) => {
       session = id;
     },
+    exit: (code, signal) => exits.push([code, signal]),
   });
-  kids.push(sessionHandle.child);
+  sessions.push(sessionHandle);
   const user = (text: string, uuid: string, attachments: { name: string; path: string; size: number; mime: string; image: boolean }[] = []) =>
-    sessionHandle.write({ type: 'user', uuid, _omni: { text, attachments } });
-  return { records, session: () => session, child: sessionHandle.child, write: sessionHandle.write, user };
+    sessionHandle.send({ uuid, text, attachments, commands: [] });
+  return { records, exits, session: () => session, handle: sessionHandle, user };
 }
 
 const resultOf = (records: StreamRecord[]) => records.filter((r) => r.kind === 'result');
@@ -150,7 +152,7 @@ describe('Hermes adapter', () => {
     const parsed = parseContexts([JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')).records[0].raw]);
     if (!parsed.ok) throw new Error(parsed.error);
     const s = boot();
-    // As runner/state.ts userLine writes it for this thread.
+    // As runner/state.ts outgoing projects it for this thread.
     s.user(harnessText('tidy this reduce', parsed.value, { harness: 'hermes', cwd: '/tmp/omni-test' }), 'm-ctx');
     await waitFor(() => posts().length === 1, 'create');
     const input = (posts()[0].body as { input: string }).input;
@@ -203,20 +205,23 @@ describe('Hermes adapter', () => {
     const s = boot();
     s.user('go', 'a');
     await waitFor(() => fake.calls.some((c) => c.path.endsWith('/events')), 'stream open');
-    s.write({ type: 'control_request', request_id: 'int-1', request: { subtype: 'interrupt' } });
+    s.handle.interrupt('int-1');
     await waitFor(() => resultOf(s.records).length === 1, 'cancelled');
     expect(fake.calls.some((c) => c.method === 'POST' && c.path.endsWith('/stop'))).toBe(true);
     expect(s.records.find((r) => r.kind === 'control')?.payload).toMatchObject({ request_id: 'int-1', subtype: 'success' });
     expect(resultOf(s.records)[0].payload).toMatchObject({ ok: false, subtype: 'cancelled', turns: 1 });
   });
 
-  it('stops the active run when the holder dies', async () => {
+  it('stops the active run when the session ends', async () => {
     fake.hold = true;
     const s = boot();
     s.user('go', 'a');
     await waitFor(() => fake.calls.some((c) => c.path.endsWith('/events')), 'stream open');
-    s.child.kill('SIGTERM');
-    await waitFor(() => fake.calls.some((c) => c.method === 'POST' && c.path.endsWith('/stop')), 'stop after kill');
+    s.handle.end('terminate');
+    await waitFor(() => fake.calls.some((c) => c.method === 'POST' && c.path.endsWith('/stop')), 'stop after end');
+    await waitFor(() => s.exits.length === 1, 'session exit');
+    expect(s.exits).toEqual([[null, 'SIGTERM']]);
+    expect(s.handle.send({ uuid: 'b', text: 'too late', attachments: [], commands: [] })).toBe(false);
     expect(resultOf(s.records).length).toBeLessThanOrEqual(1);
   });
 
@@ -272,16 +277,22 @@ describe('Hermes adapter', () => {
     expect(s.records.find((r) => r.kind === 'error')?.payload).toEqual({ text: HERMES_FIX });
     expect(resultOf(s.records)[0].payload).toMatchObject({ ok: false });
     expect(fake.calls.length).toBe(before);
-    await waitFor(() => s.child.exitCode != null || s.child.signalCode != null, 'holder exit');
+    await waitFor(() => s.exits.length === 1, 'session exit');
+    expect(s.handle.alive).toBe(false);
   });
 
-  // Reads the holder's environment from /proc. macOS has no /proc and does not show another process's environment.
-  it.skipIf(process.platform !== 'linux')('never lets the holder see a key', () => {
-    process.env.HERMES_API_KEY = 'from-shell';
-    const live = boot({ key: 'from-keychain' });
-    const env = readFileSync(`/proc/${live.child.pid}/environ`).toString();
-    expect(env).not.toContain('from-shell');
-    expect(env).not.toContain('from-keychain');
-    expect(env).not.toContain('HERMES_API_KEY');
+  it('fails the turn for a delegate-only role without starting a run, for a thread that was on Hermes already', async () => {
+    const before = fake.calls.length;
+    const s = boot({ role: { id: 'conductor', name: 'Conductor', description: '', mcp: ['omni'], delegateOnly: true, charter: 'x' } });
+    s.user('fix the cart', 'm1');
+    await waitFor(() => resultOf(s.records).length === 1, 'refusal');
+    expect(String(s.records.find((r) => r.kind === 'error')?.payload.text)).toMatch(/^Conductor only routes work/);
+    expect(resultOf(s.records)[0].payload).toMatchObject({ ok: false });
+    expect(fake.calls.length).toBe(before);
+  });
+
+  // The key is an HTTP header only: no process runs for the session, so no environment can carry it.
+  it('runs no local process', () => {
+    expect(boot().handle.pid).toBeUndefined();
   });
 });

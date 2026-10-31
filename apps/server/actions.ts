@@ -10,7 +10,7 @@ import { StringDecoder } from 'node:string_decoder';
 import { OUTPUT_LIMIT, type ActionRun, type ChannelAction, type ThreadActions } from '@omni/shared/channel-actions.ts';
 import { actionRuns, channelActions, channels, threadSetupRuns, threads, type Thread } from './db.ts';
 import { artifactsDir } from './config.ts';
-import { isRemoteHarness } from './harness/types.ts';
+import { isProviderHarness } from './harness/types.ts';
 import { worktreeProblem } from './sandbox.ts';
 import { inWorkspace } from './workspace.ts';
 import { namedSecrets } from './secrets.ts';
@@ -50,7 +50,7 @@ const plain = (s: string) => s.replace(ANSI, '').replace(/\r(?!\n)/g, '\n');
 
 /** Why no action can run in this thread right now, or null. A worktree still being prepared is #211's to run in. */
 export function blockedReason(t: Thread): string | null {
-  if (isRemoteHarness(t.harness)) return 'This thread runs off this Mac, so its actions have no checkout here to run in.';
+  if (isProviderHarness(t.harness)) return 'This thread runs off this Mac, so its actions have no checkout here to run in.';
   if (t.setup === 'preparing') return "The thread's worktree is still being prepared.";
   if (t.setup === 'failed') return `The thread's worktree could not be prepared: ${t.setup_error ?? 'unknown error'}`;
   return null;
@@ -58,7 +58,7 @@ export function blockedReason(t: Thread): string | null {
 
 /** The thread's checkout, checked: a worktree thread's must be its own worktree on its own branch, never the repo itself. */
 async function verifiedCwd(t: Thread): Promise<string> {
-  if (isRemoteHarness(t.harness)) throw refusal(blockedReason(t)!, 409);
+  if (isProviderHarness(t.harness)) throw refusal(blockedReason(t)!, 409);
   const repo = channels.get(t.channel_id)?.repo_path;
   if (t.branch && repo) {
     const problem = await worktreeProblem(repo, t.cwd, t.branch);

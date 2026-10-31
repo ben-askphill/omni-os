@@ -49,6 +49,9 @@ public enum SendRules {
   public static func placeholder(busy: Bool, canSteer: Bool = true) -> String {
     !busy ? "Reply" : canSteer ? "Steer the agent. It reads this at its next step." : "Queue a message. It runs after this turn."
   }
+
+  /// A composer's placeholder with the two keys that open a menu, as `withKeys` in Composer.tsx.
+  public static func withKeys(_ text: String) -> String { "\(text) · / commands, @ files" }
 }
 
 /// What Esc needs to know to decide whether it interrupts the turn.

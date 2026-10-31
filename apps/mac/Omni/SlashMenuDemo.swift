@@ -36,7 +36,7 @@ struct SlashMenuDemo: View {
           .focused($focused)
           .frame(height: z(60))
           .scrollContentBackground(.hidden)
-        SlashHintView(model: menu) {}
+        SlashHintView(model: menu)
       }
       .padding(z(10))
       .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(12), style: .continuous))

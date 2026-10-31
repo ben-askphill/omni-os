@@ -12,16 +12,18 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "start": "npm run start --workspace @omni/server",
-    "test": "turbo boundaries && turbo run test",
+    "test": "turbo boundaries && turbo run test --concurrency=2",
     "test:mac": "turbo run test:mac",
-    "test:all": "turbo boundaries && turbo run test test:mac",
+    "test:all": "turbo boundaries && turbo run test test:mac --concurrency=2",
     "typecheck": "turbo run typecheck",
     "import-history": "npm run import-history --workspace @omni/server --",
     "build:slash": "npm run build:slash --workspace @omni/mac",
     "build:pick": "npm run build:pick --workspace @omni/mac",
     "sync:backfill": "npm run sync:backfill --workspace @omni/server --",
     "brain-export": "npm run brain-export --workspace @omni/server --",
-    "setup": "npm run setup --workspace @omni/server --"
+    "setup": "npm run setup --workspace @omni/server --",
+    "unused": "knip",
+    "check": "npm run typecheck && npm run unused && npm test"
   },
   "engines": {
     "node": ">=24"
@@ -33,6 +35,7 @@
     }
   },
   "devDependencies": {
+    "knip": "^6.44.0",
     "turbo": "^2.11.9"
   }
 }

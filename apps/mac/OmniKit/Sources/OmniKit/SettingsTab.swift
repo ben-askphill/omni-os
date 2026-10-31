@@ -1,28 +1,33 @@
 import Foundation
 
-/// A tab of the Settings window.
+/// A tab of the Settings window: the same four sections, in the same order, as the Web UI's Settings nav and the
+/// phone's Settings list (#404). Automations is a page of the main window, as on the web.
 public enum SettingsTab: String, CaseIterable, Hashable, Sendable {
-  /// Where new threads run and this Mac's server. Was Connection.
-  case server, profile, secrets, sync, storage, notifications, appearance, quickPrompt
+  /// You and Run setup again, then this Mac's appearance, notifications and Quick Prompt.
+  case general
+  /// Your folders, GitHub owner and integrations.
+  case workspace
+  /// Where new threads run, this Mac's server, Sync and Storage.
+  case machines
+  case secrets
 
-  /// The tab by name, taking the old "connection" for Server so QA scripts written before the rename still work.
+  /// The tab by name, taking the names of the eight tabs before #404 (and "connection", older still) so a QA
+  /// script written for one of them opens the tab that holds that page now.
   public init?(named name: String) {
-    if name == "connection" {
-      self = .server
-    } else {
-      self.init(rawValue: name)
+    switch name {
+    case "profile", "notifications", "appearance", "quickPrompt": self = .general
+    case "server", "connection", "sync", "storage": self = .machines
+    default: self.init(rawValue: name)
     }
   }
 }
 
 extension Route {
-  /// The Settings tab a route opens instead of a screen of the main window: the sidebar's Secrets and Settings items.
+  /// The Settings tab a route opens instead of a screen of the main window: `#/settings` and its sections, and
+  /// the pages Settings replaced (`#/secrets`, `#/sync`, `#/storage`).
   public var settingsTab: SettingsTab? {
-    switch self {
-    case .secrets: .secrets
-    case .settings: .profile
-    default: nil
-    }
+    if case .settings(let tab) = self { return tab }
+    return nil
   }
 }
 

@@ -7,6 +7,7 @@ import {
   applyHead,
   applyPage,
   atStart,
+  boundHistory,
   cut,
   detachHead,
   earlierCursor,
@@ -27,6 +28,7 @@ import {
   type HistoryHead,
   type HistoryPage,
   type HistoryRow,
+  type Retain,
 } from '../history.ts';
 
 // The client half is ported to Swift (OmniKit/History.swift). Its tests replay packages/test-fixtures/history/spans.json,
@@ -41,6 +43,14 @@ const row = (id: number, kind = 'assistant_text', clipped = false): HistoryRow =
   ...(clipped && { clipped: { bytes: 90_000 } }),
 });
 const rows = (...ids: number[]) => ids.map((id) => row(id));
+/** A tool_use row for call `call`, nested under call `parent`. */
+const use = (id: number, call: string, parent?: string): HistoryRow => ({
+  id,
+  thread_id: 't',
+  kind: 'tool_use',
+  payload: JSON.stringify({ id: call, name: 'Agent', input: {}, ...(parent && { parent }) }),
+  created_at: '2026-10-24T10:00:00.000Z',
+});
 const head = (from: number, results_below = 0): HistoryHead => ({ from, to: null, results_below });
 
 type Step =
@@ -49,7 +59,8 @@ type Step =
   | { op: 'page'; page: HistoryPage }
   | { op: 'live'; rows: HistoryRow[] }
   | { op: 'replace'; row: HistoryRow }
-  | { op: 'detach' };
+  | { op: 'detach' }
+  | { op: 'bound'; follows: boolean; retain: Retain };
 
 function run(steps: Step[]): History {
   let h: History = emptyHistory;
@@ -59,6 +70,7 @@ function run(steps: Step[]): History {
     else if (s.op === 'page') h = applyPage(h, s.page);
     else if (s.op === 'live') h = appendLive(h, s.rows);
     else if (s.op === 'replace') h = replaceRow(h, s.row);
+    else if (s.op === 'bound') h = boundHistory(h, s.follows, s.retain);
     else h = detachHead(h);
   }
   return h;
@@ -153,6 +165,42 @@ const CASES: { name: string; steps: Step[]; reveal: number[]; keys: number[] }[]
     reveal: [700, 520],
     keys: [500, 520, 530, 900, 910],
   },
+  {
+    name: 'bound-cuts-at-a-turn-start-and-keeps-anchors',
+    steps: [
+      {
+        op: 'open',
+        events: [row(10, 'init'), use(20, 'a'), row(30), row(40, 'result'), row(50), use(60, 'b', 'a'), row(70, 'result'), row(80, 'result')],
+        head: head(10, 2),
+      },
+      { op: 'live', rows: [row(90), row(100, 'result'), use(110, 'c', 'b'), row(120)] },
+      { op: 'bound', follows: true, retain: { rows: 4, slack: 2, hard: 8 } },
+      { op: 'bound', follows: false, retain: { rows: 4, slack: 2, hard: 8 } },
+    ],
+    reveal: [50, 110],
+    keys: [90, 100, 110, 120],
+  },
+  {
+    name: 'bound-cuts-one-long-turn-only-while-following',
+    steps: [
+      { op: 'open', events: rows(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), head: head(0) },
+      { op: 'bound', follows: false, retain: { rows: 4, slack: 2, hard: 20 } },
+      { op: 'bound', follows: true, retain: { rows: 4, slack: 2, hard: 20 } },
+    ],
+    reveal: [3, 8],
+    keys: [7, 8, 9, 10],
+  },
+  {
+    name: 'bound-drops-older-islands',
+    steps: [
+      { op: 'open', events: rows(500, 510, 520), head: head(500, 9) },
+      { op: 'page', page: { events: [...rows(100, 110), row(120, 'result')], span: { from: 100, to: 121 } } },
+      { op: 'live', rows: rows(530, 540) },
+      { op: 'bound', follows: true, retain: { rows: 3, slack: 1, hard: 99 } },
+    ],
+    reveal: [110, 510],
+    keys: [520, 530, 540],
+  },
 ];
 
 describe('history cursors', () => {
@@ -245,6 +293,24 @@ describe('history joins', () => {
 
   it('returns the same state when the stream sends nothing new', () => {
     expect(appendLive(start, rows(40, 41))).toBe(start);
+  });
+
+  it('bounds what it holds and leaves a small history as it is', () => {
+    const live = Array.from({ length: 40 }, (_, i) => row(100 + i, i % 5 === 4 ? 'result' : 'assistant_text'));
+    const retain = { rows: 10, slack: 5, hard: 30 };
+    let h = openHistory(rows(1, 2), head(0));
+    expect(boundHistory(h, true, retain)).toBe(h);
+    let total = 0;
+    for (const r of live) {
+      h = boundHistory(appendLive(h, [r]), true, retain);
+      if (r.kind === 'result') total++;
+      expect(h.rows.length).toBeLessThanOrEqual(retain.rows + retain.slack);
+      expect(turnCount(h)).toBe(total);
+    }
+    // Every cut lands right after a result, so the head starts a turn.
+    expect(h.rows[0].id).toBe(h.spans[0].from);
+    expect(live.find((r) => r.id === h.spans[0].from - 1)?.kind).toBe('result');
+    expect(earlierCursor(h)).toEqual({ take: 'newest', before: h.spans[0].from });
   });
 
   it('counts turns held and below the head', () => {

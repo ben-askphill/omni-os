@@ -13,7 +13,8 @@ import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
 import { artifacts, channels, events, fileDigests, messageRequests, publicChannel, requestFingerprint, threads, type Thread } from './db.ts';
-import { forwardStop, remoteHolder } from './run-on.ts';
+import { forwardLimit, forwardStop, type LimitAction } from './run-on.ts';
+import { remoteHolder } from './ownership.ts';
 import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
 import { continueLinks } from './continue.ts';
@@ -36,6 +37,8 @@ import {
   resumeLimitNow,
   resumeRequests,
   retrySetup,
+  retryResume,
+  startFresh,
   scheduleLimitResume,
   runsHere,
   steerRequests,
@@ -169,6 +172,8 @@ threadRoutesApi.get('/:id/summary', (c) => {
     id: t.id, title: t.title, status: t.status, channel: t.channel_id, role: t.role, task_id: t.task_id,
     updated_at: t.updated_at, last_reply: events.lastRunText(t.id) || events.lastAssistantText(t.id),
     artifacts: artifacts.byThread(t.id).map((a) => a.name),
+    // Why this machine did not resume it (runner/spawn.ts), for recover_thread_session. Only while it holds.
+    ...(t.resume_blocked && { resume_blocked: t.resume_blocked }),
     // The agents it spawned that still run, as the thread panel's Running subagents list shows them.
     running_subagents: activeTasks()
       .filter((k) => k.thread_id === t.id && k.subagent)
@@ -244,30 +249,36 @@ threadActionsApi.post('/:id/setup/retry', (c) => {
 });
 
 /**
+ * A thread this machine did not resume because its latest session could not be brought here (runner/spawn.ts):
+ * download it again and send what waits, or start with fresh context, a new session that reads the thread so far.
+ * Each sends the messages waiting for Resume; with none, Ben's next message goes the chosen way. A 409 while it runs.
+ */
+threadActionsApi.post('/:id/session/retry', async (c) => {
+  await retryResume(c.req.param('id'));
+  return c.json(afterRecovery(c.req.param('id')));
+});
+threadActionsApi.post('/:id/session/fresh', async (c) => {
+  await startFresh(c.req.param('id'));
+  return c.json(afterRecovery(c.req.param('id')));
+});
+
+/**
  * A turn the harness stopped at its usage limit (apps/server/runner/limits.ts). Schedule its one continuation for the
  * reset time the harness reported (a 409 when it reported none), cancel that, or send it now. Scheduling or
- * cancelling twice changes nothing; the continuation is sent at most once.
+ * cancelling twice changes nothing; the continuation is sent at most once. A thread that runs on another machine
+ * has its stop there, so the action goes to that machine (run-on.ts).
  */
-threadActionsApi.post('/:id/limit/schedule', (c) => {
-  const id = c.req.param('id');
-  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  scheduleLimitResume(id);
+const limitAction = (action: LimitAction, local: (id: string) => unknown) => (c: Context) => {
+  const id = c.req.param('id')!;
+  const t = threads.get(id);
+  if (!t) return c.json({ error: 'not found' }, 404);
+  if (remoteHolder(t)) forwardLimit(t, action);
+  else local(id);
   return c.json(afterRecovery(id));
-});
-
-threadActionsApi.post('/:id/limit/cancel', (c) => {
-  const id = c.req.param('id');
-  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  cancelLimitResume(id);
-  return c.json(afterRecovery(id));
-});
-
-threadActionsApi.post('/:id/limit/resume', (c) => {
-  const id = c.req.param('id');
-  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  resumeLimitNow(id);
-  return c.json(afterRecovery(id));
-});
+};
+threadActionsApi.post('/:id/limit/schedule', limitAction('schedule', scheduleLimitResume));
+threadActionsApi.post('/:id/limit/cancel', limitAction('cancel', cancelLimitResume));
+threadActionsApi.post('/:id/limit/resume', limitAction('resume', resumeLimitNow));
 
 /**
  * Hand the running thread to another synced Mac: `{to}`, that Mac's id from GET /api/devices. Answered as soon as the

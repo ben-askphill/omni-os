@@ -88,7 +88,6 @@ async function captured(src: Fake, threadId: string) {
   return r.capture;
 }
 const POINT = { x: 400, y: 150 };
-const VIEWPORT = { width: 1280, height: 713 };
 const asElement = (r: ElementPick | 'bad_point') => {
   if (r === 'bad_point' || !('element' in r)) throw new Error(`no element: ${JSON.stringify(r)}`);
   return r.element;

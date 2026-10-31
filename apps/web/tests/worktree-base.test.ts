@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BaseOptions, ThreadBaseView } from '@omni/shared/worktree-base.ts';
 import { baseLabel } from '../src/changes.ts';
-import { baseOptionRows, baseRequest, branchingFrom, HEAD_PICK, isRemoteHarness, pickKey, rowFor } from '../src/worktree-base.ts';
+import { baseOptionRows, baseRequest, branchingFrom, HEAD_PICK, isProviderHarness, pickKey, rowFor } from '../src/worktree-base.ts';
 
 // The new-thread base picker's rows and request (apps/web/src/worktree-base.ts) on the answers of GET /channels/:id/bases.
 
@@ -73,8 +73,8 @@ describe('base in the new-thread request', () => {
   });
 
   it('sends nothing for a harness that runs off this Mac', () => {
-    expect(isRemoteHarness('hermes') && isRemoteHarness('cursor-cloud')).toBe(true);
-    expect(isRemoteHarness('cursor')).toBe(false);
+    expect(isProviderHarness('hermes') && isProviderHarness('cursor-cloud')).toBe(true);
+    expect(isProviderHarness('cursor')).toBe(false);
     expect(baseRequest({ kind: 'ref', ref: 'v3.0' }, 'cursor-cloud')).toEqual({});
   });
 });

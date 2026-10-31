@@ -5,10 +5,10 @@
     { name: "clear", description: "Start a new thread with the same settings", source: "omni", mentionable: false },
     { name: "new", description: "Start a new thread with the same settings", source: "omni", mentionable: false },
     { name: "rename", argumentHint: "<title>", description: "Rename this thread", source: "omni", mentionable: false },
-    // A thread's model and effort are fixed, so these offer a new thread instead.
-    { name: "model", description: "Fixed per thread, so it offers a new thread on another model", source: "omni", mentionable: false },
-    { name: "effort", description: "Fixed per thread, so it offers a new thread with another effort", source: "omni", mentionable: false },
-    { name: "fast", description: "Fixed per thread, so it offers a new thread on a faster model", source: "omni", mentionable: false }
+    // The composer's pills switch a thread's model and effort for its next turn, so these open them.
+    { name: "model", description: "Pick the model for the next turn", source: "omni", mentionable: false },
+    { name: "effort", description: "Pick the effort for the next turn", source: "omni", mentionable: false },
+    { name: "fast", description: "Pick a faster model for the next turn", source: "omni", mentionable: false }
   ];
   var OMNI_NAMES = new Set(OMNI_COMMANDS.map((c) => c.name));
   var TITLE_MAX = 200;
@@ -114,7 +114,7 @@
           return { action: { kind: "rename", title }, armed: !!title && !hint, label: "Rename", hint };
         }
         default:
-          return { action: { kind: "fixed" }, armed: false, label: null, hint: "Switch the model and effort with the pills below. The next turn uses them." };
+          return { action: { kind: "pick-model" }, armed: true, label: "Pick model", hint: "Opens the model pill below. The next turn runs on what you pick." };
       }
     }
     return { action: { kind: "send" }, armed: !!text.trim(), label: null, hint: textHint(text, r, list, harness, "reply") };
@@ -240,6 +240,51 @@
     return pieces;
   }
 
+  // packages/shared/continue.ts
+  function continueSourceRefusal(harness) {
+    if (harness === "hermes") return "This thread runs on the Hermes server, so its files are not on this Mac to continue from.";
+    if (harness === "cursor-cloud") return "This thread runs on Cursor's machines, so its files are not on this Mac to continue from.";
+    return null;
+  }
+
+  // packages/shared/thread-actions.ts
+  var THREAD_ACTION_GROUPS = [
+    { id: "organize", title: "Organize" },
+    { id: "continue", title: "Continue" },
+    { id: "send", title: "Send to" }
+  ];
+  var THREAD_ACTIONS = [
+    // Archived threads are out of the lists, so out of Pinned too.
+    { id: "pin", group: "organize", icon: "pin", when: (f) => f.row && !f.archived, label: (f) => f.pinned ? "Unpin thread" : "Pin thread" },
+    { id: "done", group: "organize", icon: "check", when: (f) => f.row && (f.done || f.settled), label: (f) => f.done ? "Mark as not done" : "Mark as done" },
+    { id: "rename", group: "organize", icon: "pencil", when: () => true, label: () => "Rename thread" },
+    { id: "move", group: "organize", icon: "folder", when: (f) => f.row && !f.child, label: () => "Move to folder" },
+    { id: "archive", group: "organize", icon: "archive", when: () => true, label: (f) => f.archived ? "Unarchive thread" : "Archive thread" },
+    {
+      id: "fork",
+      group: "continue",
+      icon: "branch",
+      when: (f) => f.row,
+      label: () => "Fork thread",
+      hint: "A new thread that picks up from here",
+      off: (f) => f.harness ? continueSourceRefusal(f.harness) : null
+    },
+    { id: "reference", group: "continue", icon: "message", when: (f) => f.row && !f.archived, label: () => "Reference a thread", hint: "Attach another thread, not its messages" },
+    { id: "grok", group: "send", icon: "grok", when: (f) => f.grokBot, label: () => "Send to Grok Bot", hint: "This thread's text" }
+  ];
+  function threadMenu(f) {
+    return THREAD_ACTION_GROUPS.map((g) => ({
+      ...g,
+      items: THREAD_ACTIONS.filter((a) => a.group === g.id && a.when(f)).map((a) => {
+        const item = { id: a.id, label: a.label(f), icon: a.icon };
+        if (a.hint) item.hint = a.hint;
+        const off = a.off?.(f);
+        if (off) item.off = off;
+        return item;
+      })
+    })).filter((g) => g.items.length > 0);
+  }
+
   // apps/mac/slash-engine/entry.ts
   var call = (f) => (json) => JSON.stringify(f(JSON.parse(json)) ?? null);
   globalThis.OmniSlash = {
@@ -253,6 +298,7 @@
     pieces: call(({ text, slash, visible }) => slashPieces(text, slash, visible)),
     fileQuery: call(({ text, caret }) => fileQuery(text, caret)),
     pickFile: call(({ text, at, insert }) => pickFile(text, at, insert)),
-    omniCommands: call(() => OMNI_COMMANDS)
+    omniCommands: call(() => OMNI_COMMANDS),
+    threadMenu: call((facts) => threadMenu(facts))
   };
 })();

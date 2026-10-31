@@ -3,7 +3,7 @@ import OmniKit
 import SwiftUI
 
 /// Onboarding, as Onboarding.tsx: five screens on first run (the status says `onboarded: false`, because the server
-/// has no data/omni.config.json yet), or again from Settings > Profile. It writes the user config through /api/setup;
+/// has no data/omni.config.json yet), or again from Settings > General. It writes the user config through /api/setup;
 /// `npm run setup` asks the same questions in a terminal.
 struct OnboardingSupport: ViewModifier {
   let model: AppModel
@@ -150,7 +150,7 @@ struct OnboardingSheet: View {
              note: "Each thread runs on a CLI you are signed in to, billed to that plan. Omni needs Claude Code; Codex and Cursor Agent are optional.") {
         VStack(alignment: .leading, spacing: z(8)) {
           if let harnesses {
-            ForEach(harnesses.filter { !$0.id.isRemote || $0.available }) { HarnessRow(harness: $0) }
+            ForEach(harnesses.filter { !$0.id.runsOnProvider || $0.available }) { HarnessRow(harness: $0) }
           } else {
             Loader(size: 16).frame(maxWidth: .infinity).padding(.vertical, z(20))
           }
@@ -253,7 +253,7 @@ struct OnboardingSheet: View {
     Task {
       defer { busy = false }
       do {
-        // Skipping still writes the file, so this is not asked again; Settings > Profile has every field.
+        // Skipping still writes the file, so this is not asked again; Settings > General and Workspace have every field.
         try await finish(.empty)
       } catch {
         self.error = error.localizedDescription

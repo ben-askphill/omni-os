@@ -36,7 +36,7 @@ final class QARunner {
   static var openSettings: OpenSettingsAction?
   static var openThreadWindow: ((String) -> Void)?
   static var quickPrompt: QuickPromptController?
-  private static var current: QARunner?
+  static var current: QARunner?
 
   /// Read from the raw arguments: UserDefaults would parse a JSON value as an old-style property list.
   static func launch(from arguments: [String] = ProcessInfo.processInfo.arguments) -> Launch? {
@@ -59,14 +59,14 @@ final class QARunner {
   }
 
   /// Ends the run before the app model exists, so nothing has talked to a server yet.
-  private static func refuse(_ message: String, out: URL) -> Never {
+  static func refuse(_ message: String, out: URL) -> Never {
     try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
     try? encoder.encode(Report(ok: false, error: message)).write(to: out.appending(path: "qa.json"))
     FileHandle.standardError.write(Data("QA: \(message)\n".utf8))
     exit(2)
   }
 
-  private static var encoder: JSONEncoder {
+  static var encoder: JSONEncoder {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
     return encoder
@@ -81,7 +81,7 @@ final class QARunner {
     Task { await runner.run(launch.script) }
   }
 
-  private struct StepResult: Encodable {
+  struct StepResult: Encodable {
     let step: Int
     let action: String
     var ok = true
@@ -92,14 +92,14 @@ final class QARunner {
     var note: String?
   }
 
-  private struct Report: Encodable {
+  struct Report: Encodable {
     var ok = true
     var error: String?
     var steps: [StepResult] = []
     var facts: Facts?
   }
 
-  private struct Facts: Encodable {
+  struct Facts: Encodable {
     let serverState: String
     let connection: String
     let sidebarLoaded: Bool
@@ -108,17 +108,17 @@ final class QARunner {
     let windows: [String]
   }
 
-  private let model: AppModel
-  private let out: URL
-  private var report = Report()
-  private var routedAt: ContinuousClock.Instant?
+  let model: AppModel
+  let out: URL
+  var report = Report()
+  var routedAt: ContinuousClock.Instant?
 
   private init(model: AppModel, out: URL) {
     self.model = model
     self.out = out
   }
 
-  private func run(_ text: String) async {
+  func run(_ text: String) async {
     do {
       try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
     } catch {
@@ -268,9 +268,19 @@ final class QARunner {
           guard let composer = QAComposerProbe.current else { throw QAScriptError("no reply box is showing") }
           try composer.run(run)
           try? await Task.sleep(for: .milliseconds(800))
-        case .send(let mode):
+        case .send(let mode, let wait):
           guard let composer = QAComposerProbe.current else { throw QAScriptError("no reply box is showing") }
-          try await composer.send(mode)
+          if wait {
+            try await composer.send(mode)
+          } else {
+            Task { try? await composer.send(mode) }
+            try? await Task.sleep(for: .milliseconds(300))
+          }
+        case .attach(let path):
+          guard let composer = QAComposerProbe.current else { throw QAScriptError("no reply box is showing") }
+          guard let file = StagedFile.at(URL(fileURLWithPath: path)) else { throw QAScriptError("no file at \(path)") }
+          composer.attach(file)
+          try? await Task.sleep(for: .milliseconds(300))
         case .inspector(let command):
           guard let inspect = InspectorProbe.command else { throw QAScriptError("no thread is open") }
           inspect(command)
@@ -328,7 +338,7 @@ final class QARunner {
   }
 
   /// Quits. A server this run started is stopped first, so a run leaves no server behind.
-  private func end() async -> Never {
+  func end() async -> Never {
     if case .running(startedByApp: true, _) = model.supervisor.state {
       await model.stopServer()
     }
@@ -337,25 +347,25 @@ final class QARunner {
     exit(report.ok ? 0 : 1)
   }
 
-  private func finish(_ result: StepResult, _ started: ContinuousClock.Instant) {
+  func finish(_ result: StepResult, _ started: ContinuousClock.Instant) {
     var result = result
     result.ms = Self.ms(ContinuousClock.now - started)
     if !result.ok { report.ok = false }
     report.steps.append(result)
   }
 
-  private static func ms(_ d: Duration) -> Int {
+  static func ms(_ d: Duration) -> Int {
     Int(d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000)
   }
 
-  private func scriptData(_ text: String) throws -> Data {
+  func scriptData(_ text: String) throws -> Data {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     if trimmed.hasPrefix("[") || trimmed.hasPrefix("{") { return Data(trimmed.utf8) }
     return try Data(contentsOf: URL(filePath: (trimmed as NSString).expandingTildeInPath))
   }
 
   /// The settings form's calls, on the channel `qa-channel`, then the sidebar's reload.
-  private func channelStep(_ action: QAChannelAction) async throws(QAScriptError) {
+  func channelStep(_ action: QAChannelAction) async throws(QAScriptError) {
     let id = "qa-channel"
     do {
       switch action {
@@ -381,7 +391,7 @@ final class QARunner {
   }
 
   /// Shows a folder state in the sidebar, through the same model the rows use.
-  private func folderStep(_ action: QAFolderAction) async throws(QAScriptError) {
+  func folderStep(_ action: QAFolderAction) async throws(QAScriptError) {
     let folders = model.folders
     func folder(_ name: String) throws(QAScriptError) -> FolderWithThreads {
       let all = model.store.channels.flatMap(\.folders)
@@ -425,102 +435,8 @@ final class QARunner {
     }
   }
 
-  /// Right-clicks the folder's row, shoots the screen while its menu is open, then closes the menu.
-  private func menu(on folder: FolderWithThreads, shot: String) async throws(QAScriptError) {
-    guard let frame = QAFolderProbe.frames[folder.id] else { throw QAScriptError("the folder \(folder.name) is not on screen") }
-    try await shootMenu(at: NSPoint(x: frame.minX + 60, y: frame.midY), button: .rightMouseDown, shot: shot, what: folder.name)
-  }
 
-  /// Clicks the thread header's Hand Off button and shoots the screen while its menu is open.
-  private func handoffMenu(shot: String) async throws(QAScriptError) {
-    guard let frame = QAHandoffProbe.button else { throw QAScriptError("no Hand Off button on screen") }
-    try await shootMenu(at: NSPoint(x: frame.midX, y: frame.midY), button: .leftMouseDown, shot: shot, what: "the Hand Off button")
-  }
-
-  /// Clicks `spot` (global, top-left origin) in the main window, shoots the screen once a menu opens, then closes it.
-  private func shootMenu(at spot: NSPoint, button: NSEvent.EventType, shot: String, what: String) async throws(QAScriptError) {
-    guard let window = Self.windows.first(where: Self.isMain), let content = window.contentView else {
-      throw QAScriptError("no main window")
-    }
-    let point = content.convert(content.isFlipped ? spot : NSPoint(x: spot.x, y: content.bounds.height - spot.y), to: nil)
-    guard
-      let event = NSEvent.mouseEvent(
-        with: button, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-        windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
-    else { throw QAScriptError("can't make the click") }
-    final class Outcome: @unchecked Sendable { var failure: QAScriptError? }
-    let outcome = Outcome()
-    let observer = NotificationCenter.default.addObserver(
-      forName: NSMenu.didBeginTrackingNotification, object: nil, queue: nil
-    ) { note in
-      nonisolated(unsafe) let menu = note.object as? NSMenu
-      // This step's job holds the main queue while the menu tracks, so a run loop timer (common modes) shoots it.
-      let timer = Timer(timeInterval: 0.8, repeats: false) { _ in
-        MainActor.assumeIsolated {
-          do throws(QAScriptError) { try self.shoot(window, to: shot) } catch { outcome.failure = error }
-          menu?.cancelTracking()
-        }
-      }
-      RunLoop.main.add(timer, forMode: .common)
-    }
-    defer { NotificationCenter.default.removeObserver(observer) }
-    // Returns once the menu closes.
-    window.sendEvent(event)
-    // A button menu opens on the click's release, not its press.
-    if button == .leftMouseDown, !FileManager.default.fileExists(atPath: out.appending(path: shot + ".png").path),
-      let up = NSEvent.mouseEvent(
-        with: .leftMouseUp, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-        windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)
-    {
-      window.sendEvent(up)
-      try? await Task.sleep(for: .milliseconds(1500))
-    }
-    if let failure = outcome.failure { throw failure }
-    guard FileManager.default.fileExists(atPath: out.appending(path: shot + ".png").path) else {
-      throw QAScriptError("no menu opened on \(what)")
-    }
-  }
-
-  /// The main window with what is over it (sheets, menus).
-  private func screen(_ name: String) async throws(QAScriptError) {
-    guard let window = Self.windows.first(where: Self.isMain) else { throw QAScriptError("no main window") }
-    try? await Task.sleep(for: .milliseconds(700))
-    try shoot(window, to: name)
-  }
-
-  /// The main window drawn as `snapshot` draws it, with the app's windows over it (a sheet, an open menu) drawn
-  /// in place on top. No screen capture, so it works with the screen locked and with no permission.
-  private func shoot(_ window: NSWindow, to name: String) throws(QAScriptError) {
-    guard let base = Self.render(window), let space = CGColorSpace(name: CGColorSpace.sRGB),
-      let context = CGContext(
-        data: nil, width: base.width, height: base.height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
-        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-    else { throw QAScriptError("can't render \(name).png") }
-    let scale = CGFloat(base.width) / max(window.frame.width, 1)
-    context.draw(base, in: CGRect(x: 0, y: 0, width: base.width, height: base.height))
-    let over = NSApp.windows
-      .filter { $0 !== window && $0.isVisible && $0.frame.intersects(window.frame) }
-      .sorted { ($0.level.rawValue, $0.orderedIndex * -1) < ($1.level.rawValue, $1.orderedIndex * -1) }
-    for w in over {
-      guard let root = w.contentView?.superview ?? w.contentView, let image = Self.cache(root) else { continue }
-      let f = w.frame
-      context.draw(
-        image,
-        in: CGRect(
-          x: (f.minX - window.frame.minX) * scale, y: (f.minY - window.frame.minY) * scale,
-          width: f.width * scale, height: f.height * scale))
-    }
-    guard let image = context.makeImage(),
-      let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
-    else { throw QAScriptError("can't encode \(name).png") }
-    do {
-      try png.write(to: out.appending(path: name + ".png"))
-    } catch {
-      throw QAScriptError("can't write \(name).png: \(error.localizedDescription)")
-    }
-  }
-
-  private func describe(_ step: QAStep) -> String {
+  func describe(_ step: QAStep) -> String {
     switch step {
     case .route(let route): "route \(route.hash)"
     case .wait(let condition, let timeout): "wait \(condition) up to \(timeout)"
@@ -546,7 +462,8 @@ final class QARunner {
     case .nativeBrowser(let address): "nativeBrowser \(address.prefix(60))"
     case .type(let text): "type \(text.prefix(40))"
     case .run(let run): "run \(run.harness.rawValue) \(run.model) \(run.effort)"
-    case .send(let mode): "send \(mode?.rawValue ?? "reply")"
+    case .send(let mode, _): "send \(mode?.rawValue ?? "reply")"
+    case .attach(let path): "attach \((path as NSString).lastPathComponent)"
     case .inspector(let command): "inspector \(command.rawValue)"
     case .webTitle(let title): "webTitle \(title)"
     case .channel(let action): "channel \(action.rawValue)"
@@ -570,7 +487,7 @@ final class QARunner {
     }
   }
 
-  private func wait(for condition: QACondition, timeout: Duration) async throws(QAScriptError) {
+  func wait(for condition: QACondition, timeout: Duration) async throws(QAScriptError) {
     let deadline = ContinuousClock.now + timeout
     while !condition.holds(in: facts) {
       guard ContinuousClock.now < deadline else {
@@ -581,87 +498,9 @@ final class QARunner {
     }
   }
 
-  /// Clicks the page, then the address bar, with mouse events through the window's own hit testing, types `text` a key
-  /// at a time and presses Return, then waits for the page to go there. With `escape`, presses Escape instead. Either
-  /// way the keys must end up with the page. Fails when a click or key lands anywhere else. Focus needs the key window,
-  /// so this step brings the app to the front. It drives the Web tab when that shows, else the Browser tab.
-  private func browserAddress(_ text: String, escape: Bool) async throws(QAScriptError) -> String {
-    let shown: (page: NSView, url: () -> String)? =
-      if let native = BrowserAnnotateProbe.native, let web = native.webView, web.window != nil { (web, { native.state.url }) }
-      else if let browser = BrowserAnnotateProbe.browser, let canvas = BrowserAnnotateProbe.canvas { (canvas, { browser.state.url }) }
-      else { nil }
-    guard let shown, let bar = BrowserAnnotateProbe.address, let window = shown.page.window, let content = window.contentView
-    else { throw QAScriptError("neither the Browser tab nor the Web tab is showing") }
-    let canvas = shown.page, url = shown.url
-    /// The page has the keys: the canvas, or the web view or a view inside it.
-    func pageHasKeys() -> Bool {
-      guard let r = window.firstResponder as? NSView else { return false }
-      return r === canvas || r.isDescendant(of: canvas)
-    }
-    func click(_ at: NSPoint) {
-      let p = content.convert(content.isFlipped ? at : NSPoint(x: at.x, y: content.bounds.height - at.y), to: nil)
-      func event(_ type: NSEvent.EventType) -> NSEvent? {
-        NSEvent.mouseEvent(
-          with: type, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-          windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)
-      }
-      guard let down = event(.leftMouseDown), let up = event(.leftMouseUp) else { return }
-      // A control tracks the press until the release, which it reads from the queue, so the release goes there first.
-      NSApp.postEvent(up, atStart: false)
-      window.sendEvent(down)
-    }
-    func key(_ chars: String, code: UInt16) {
-      for type in [NSEvent.EventType.keyDown, .keyUp] {
-        if let e = NSEvent.keyEvent(
-          with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-          windowNumber: window.windowNumber, context: nil, characters: chars, charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)
-        { window.sendEvent(e) }
-      }
-    }
-    func holder() -> String {
-      let r = window.firstResponder
-      if pageHasKeys() { return "the page" }
-      if let editor = r as? NSTextView, editor.isFieldEditor { return "a text field" }
-      return r.map { String(describing: type(of: $0)) } ?? "nothing"
-    }
-    NSApp.activate()
-    window.makeKeyAndOrderFront(nil)
-    try? await Task.sleep(for: .milliseconds(300))
-    let page = canvas.convert(canvas.bounds, to: nil)
-    // A web view takes no first click in a window that is not key, as in Safari, and the harness's window cannot become key
-    // while another app is in front. So the Web tab's page is given the keys directly; the address bar is still clicked.
-    if canvas is WKWebView { window.makeFirstResponder(canvas) } else { click(NSPoint(x: page.midX, y: content.bounds.height - page.midY)) }
-    try? await Task.sleep(for: .milliseconds(300))
-    guard pageHasKeys() else { throw QAScriptError("a click on the page left the keys with \(holder())") }
-    click(NSPoint(x: bar.midX, y: bar.midY))
-    try? await Task.sleep(for: .milliseconds(300))
-    guard let editor = window.firstResponder as? NSTextView, editor.isFieldEditor else {
-      throw QAScriptError("a click on the address bar left the keys with \(holder())")
-    }
-    editor.selectAll(nil)
-    for c in text { key(String(c), code: 0) }
-    try? await Task.sleep(for: .milliseconds(200))
-    guard editor.string == text else { throw QAScriptError("typed \(text), the address bar holds \(editor.string)") }
-    func until(_ seconds: Int, _ done: () -> Bool) async -> Bool {
-      let deadline = ContinuousClock.now + .seconds(seconds)
-      while !done() {
-        guard ContinuousClock.now < deadline else { return false }
-        try? await Task.sleep(for: .milliseconds(100))
-      }
-      return true
-    }
-    key(escape ? "\u{1b}" : "\r", code: escape ? 53 : 36)
-    let pressed = escape ? "Escape" : "Return"
-    guard await until(2, pageHasKeys) else { throw QAScriptError("\(pressed) left the keys with \(holder())") }
-    if escape { return "Escape gave the keys back to the page" }
-    guard await until(10, { url().contains(text) }) else {
-      throw QAScriptError("Return did not go to \(text); the page is at \(url())")
-    }
-    return "went to \(url()), keys with the page"
-  }
 
   /// The model's facts and which transcript the thread screen has laid out.
-  private var facts: QAFacts {
+  var facts: QAFacts {
     var f = model.qaFacts
     f.shownThread = QAProbe.shownThread
     f.browserFrame = BrowserAnnotateProbe.browser?.frame != nil
@@ -669,283 +508,8 @@ final class QARunner {
     return f
   }
 
-  /// The Browser tab's Annotate, through the model its buttons use. `start` waits for the screenshot, and says why when
-  /// the capture failed.
-  private func annotate(_ action: QAAnnotate) async throws(QAScriptError) {
-    guard let a = BrowserAnnotateProbe.annotating else { throw QAScriptError("the Browser tab is not showing") }
-    switch action {
-    case .start:
-      await a.model.start()
-      if case .failed(let e) = a.model.phase { throw QAScriptError(e.message) }
-      // The screenshot is on screen once the image view has loaded it.
-      try? await Task.sleep(for: .milliseconds(1200))
-    case .drag(let x0, let y0, let x1, let y1, let note):
-      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to draw on") }
-      // A 1000 by 1000 stand-in for the shown size, so the fractions are the page's.
-      a.model.drag(.init(x0: x0 * 1000, y0: y0 * 1000, x1: x1 * 1000, y1: y1 * 1000), shown: (1000, 1000))
-      guard a.model.rect != nil else { throw QAScriptError(a.model.error ?? "no rectangle") }
-      a.model.note = note
-      try? await Task.sleep(for: .milliseconds(500))
-    case .tap(let x, let y, let note):
-      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to tap") }
-      // The same stand-in size as a drag, so the fractions are the page's.
-      await a.model.tap(at: (x * 1000, y * 1000), shown: (1000, 1000))
-      guard a.model.element != nil else { throw QAScriptError(a.model.notice ?? "no element") }
-      a.model.note = note
-      try? await Task.sleep(for: .milliseconds(500))
-    case .add:
-      if let refused = await a.model.add(to: a.draft) { throw QAScriptError(refused) }
-      try? await Task.sleep(for: .milliseconds(400))
-    case .shape(let tool, let x0, let y0, let x1, let y1):
-      guard case .picking = a.model.phase, let t = BrowserMarks.Tool(rawValue: tool) else { throw QAScriptError("no screenshot is shown to draw on") }
-      let before = a.model.marks.count
-      a.model.chooseTool(t)
-      a.model.drawShape(.init(x0: x0 * 1000, y0: y0 * 1000, x1: x1 * 1000, y1: y1 * 1000), shown: (1000, 1000))
-      guard a.model.marks.count > before else { throw QAScriptError(a.model.error ?? "no shape") }
-      try? await Task.sleep(for: .milliseconds(300))
-    case .pen(let points):
-      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to draw on") }
-      let before = a.model.marks.count
-      a.model.chooseTool(.pen)
-      a.model.drawStroke(points.map { (x: $0[0] * 1000, y: $0[1] * 1000) }, shown: (1000, 1000))
-      guard a.model.marks.count > before else { throw QAScriptError(a.model.error ?? "no stroke") }
-      try? await Task.sleep(for: .milliseconds(300))
-    case .text(let words, let x, let y):
-      guard case .picking = a.model.phase else { throw QAScriptError("no screenshot is shown to write on") }
-      let before = a.model.marks.count
-      a.model.chooseTool(.text)
-      a.model.drawText(words, at: (x * 1000, y * 1000), shown: (1000, 1000))
-      guard a.model.marks.count > before else { throw QAScriptError(a.model.error ?? "no text") }
-      try? await Task.sleep(for: .milliseconds(300))
-    case .style(let color, let stroke):
-      if let color { a.model.setColor(color) }
-      if let stroke { a.model.setStroke(stroke) }
-    case .move(let x, let y, let dx, let dy):
-      a.model.chooseTool(.select)
-      guard a.model.grab(at: (x * 1000, y * 1000), shown: (1000, 1000)) else { throw QAScriptError("no mark there") }
-      a.model.moveGrabbed(dx: dx * 1000, dy: dy * 1000, shown: (1000, 1000))
-      a.model.releaseGrab()
-      try? await Task.sleep(for: .milliseconds(300))
-    case .undo:
-      a.model.undo()
-    case .note(let words):
-      // The live card's note while it shows, else the screenshot editor's.
-      if let live = a.live, live.isOn, !a.model.isActive, case .marked = live.phase { live.note = words } else { a.model.note = words }
-    case .cancel:
-      a.model.cancel()
-      try? await Task.sleep(for: .milliseconds(400))
-    case .live:
-      guard let live = a.live else { throw QAScriptError("the browser tab has no live Annotate") }
-      let url = BrowserAnnotateProbe.native?.state.url ?? BrowserAnnotateProbe.browser?.state.url ?? ""
-      guard url.lowercased().hasPrefix("http") else { throw QAScriptError("the browser is not on a web page") }
-      live.turnOn()
-      try? await Task.sleep(for: .milliseconds(500))
-    case .hover(let x, let y):
-      let (live, page) = try livePage(a)
-      page.mouseMoved(with: try page.event(.mouseMoved, x, y))
-      guard await Self.until(seconds: 5, { live.hovered != nil }) else { throw QAScriptError("nothing was inspected under the pointer") }
-      try? await Task.sleep(for: .milliseconds(400))
-    case .livePick(let x, let y, let note):
-      let (live, page) = try livePage(a)
-      page.mouseDown(with: try page.event(.leftMouseDown, x, y))
-      page.mouseUp(with: try page.event(.leftMouseUp, x, y))
-      try await liveCard(live, note: note)
-    case .liveDrag(let x0, let y0, let x1, let y1, let note):
-      let (live, page) = try livePage(a)
-      page.mouseDown(with: try page.event(.leftMouseDown, x0, y0))
-      page.mouseDragged(with: try page.event(.leftMouseDragged, (x0 + x1) / 2, (y0 + y1) / 2))
-      page.mouseDragged(with: try page.event(.leftMouseDragged, x1, y1))
-      page.mouseUp(with: try page.event(.leftMouseUp, x1, y1))
-      try await liveCard(live, note: note)
-    case .send:
-      guard let live = a.live, case .marked = live.phase else { throw QAScriptError("no live annotation is marked to send") }
-      if let why = await live.send() { throw QAScriptError(why) }
-      try? await Task.sleep(for: .milliseconds(600))
-    case .escape:
-      let (live, page) = try livePage(a)
-      let before = live.phase
-      page.escape()
-      try? await Task.sleep(for: .milliseconds(300))
-      if before == .idle {
-        guard !live.isOn else { throw QAScriptError("Escape left live Annotate on") }
-      } else {
-        guard live.isOn, live.phase == .idle else { throw QAScriptError("Escape did not clear the card") }
-      }
-    case .optionClick(let x, let y):
-      let (live, page) = try livePage(a)
-      let before = live.phase
-      page.mouseDown(with: try page.event(.leftMouseDown, x, y, option: true))
-      page.mouseUp(with: try page.event(.leftMouseUp, x, y, option: true))
-      try? await Task.sleep(for: .milliseconds(800))
-      guard live.phase == before else { throw QAScriptError("an Option-click marked the page") }
-    case .pageScroll(let dy):
-      guard let web = BrowserAnnotateProbe.native?.webView, web.window != nil else { throw QAScriptError("the Web tab shows no page") }
-      _ = try? await web.evaluateJavaScript("scrollBy(0, \(dy))", in: nil, contentWorld: .defaultClient)
-      // The page fires its scroll event at its next frame, which a window on screen gets at once and the harness's does not.
-      let frame = WKSnapshotConfiguration()
-      frame.afterScreenUpdates = true
-      _ = try? await web.takeSnapshot(configuration: frame)
-      try? await Task.sleep(for: .milliseconds(600))
-    }
-  }
 
-  /// Live Annotate and the page view it takes its input from, in fractions of the shown page: the Web tab's input layer
-  /// when it shows, else the Browser tab's canvas.
-  private func livePage(_ a: Annotating) throws(QAScriptError) -> (BrowserLiveAnnotateModel, QALivePage) {
-    guard let live = a.live, live.isOn else { throw QAScriptError("live Annotate is not on") }
-    if BrowserAnnotateProbe.native != nil {
-      guard let input = BrowserAnnotateProbe.liveInput as? LiveInputView, input.window != nil else { throw QAScriptError("the Web tab shows no live Annotate layer") }
-      return (live, QALivePage(view: input, frame: .init(width: input.bounds.width, height: input.bounds.height)))
-    }
-    guard let canvas = BrowserAnnotateProbe.canvas, canvas.window != nil, let frame = BrowserAnnotateProbe.browser?.frame else {
-      throw QAScriptError("the Browser tab shows no page")
-    }
-    return (live, QALivePage(view: canvas, frame: frame.live))
-  }
-
-  /// Waits for the capture and the element after a click or drag, then writes the note. Fails with why the card says it failed.
-  private func liveCard(_ live: BrowserLiveAnnotateModel, note: String) async throws(QAScriptError) {
-    let settled = await Self.until(seconds: 20) {
-      switch live.phase {
-      case .marked, .failed: true
-      case .idle, .capturing: false
-      }
-    }
-    if case .failed(let why) = live.phase { throw QAScriptError(why) }
-    guard settled, case .marked = live.phase else { throw QAScriptError("the card never got its capture") }
-    live.note = note
-    // The cropped screenshot loads from the thread's uploads.
-    try? await Task.sleep(for: .milliseconds(900))
-  }
-
-  private static func until(seconds: Int, _ done: () -> Bool) async -> Bool {
-    let deadline = ContinuousClock.now + .seconds(seconds)
-    while !done() {
-      guard ContinuousClock.now < deadline else { return false }
-      try? await Task.sleep(for: .milliseconds(100))
-    }
-    return true
-  }
-
-  // MARK: Scrolling
-
-  private func scroll(_ scroll: QAScroll) async throws(QAScriptError) -> String? {
-    guard let scroller = QAProbe.scroller else { throw QAScriptError("no thread on screen") }
-    switch scroll {
-    case .top:
-      scroller.toTop()
-    case .bottom:
-      scroller.toBottom()
-    case .through:
-      guard let view = Self.windows.first(where: Self.isMain)?.contentView else { throw QAScriptError("no main window") }
-      scroller.toBottom()
-      try? await Task.sleep(for: .seconds(1))
-      let gaps = await FrameClock().run(in: view, frames: 5000, scroller.pageUp)
-      return QAFrameStats(gaps: gaps).summary
-    case .nudge:
-      guard let window = Self.windows.first(where: Self.isMain), let content = window.contentView,
-        let transcript = Self.scrollViews(in: content).max(by: { $0.frame.width < $1.frame.width })
-      else { throw QAScriptError("no transcript scroll view") }
-      scroller.toBottom()
-      try? await Task.sleep(for: .seconds(1))
-      // A short trackpad swipe up: began, a few changes, ended, as in Ben's recording.
-      let phases: [CGScrollPhase] = [.began, .changed, .changed, .changed, .ended]
-      for phase in phases {
-        guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: phase == .ended ? 0 : 12, wheel2: 0, wheel3: 0)
-        else { throw QAScriptError("can't make a scroll event") }
-        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: Int64(phase.rawValue))
-        cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
-        guard let event = NSEvent(cgEvent: cg) else { throw QAScriptError("can't make a scroll event") }
-        transcript.scrollWheel(with: event)
-        try? await Task.sleep(for: .milliseconds(16))
-      }
-      try? await Task.sleep(for: .milliseconds(300))
-      let soon = scroller.distanceFromBottom() ?? -1
-      // Then content that grows with no scroll, as a lazy row measured late: the tool groups open.
-      QAProbe.expand?()
-      try? await Task.sleep(for: .milliseconds(1500))
-      let later = scroller.distanceFromBottom() ?? -1
-      return "from the bottom \(Int(soon.rounded())) pt after the swipe, \(Int(later.rounded())) pt once the content grew"
-    case .earlier:
-      return try await earlierPage()
-    case .gap:
-      guard let store = QAProbe.store, store.history.spans.count > 1 else { throw QAScriptError("no gap in the open thread") }
-      let keys = store.transcript.items.compactMap { if case .event(let k) = $0.id { k } else { nil } }
-      guard let key = store.history.edges(keys).first(where: { if case .gap = $0.value { true } else { false } })?.key, key >= 0
-      else { throw QAScriptError("no shown row under the gap") }
-      scroller.toItem(.event(key))
-    }
-    try? await Task.sleep(for: .milliseconds(600))
-    return nil
-  }
-
-  /// Scrolls up with trackpad events, as Ben would, until "Earlier messages" starts a page by itself, takes the row at
-  /// the top of the view right then (the page cannot have landed: it is still on the network), and again once the
-  /// page is laid out. The reading position holds when the same row sits at the same height.
-  private func earlierPage() async throws(QAScriptError) -> String {
-    guard let store = QAProbe.store else { throw QAScriptError("no thread on screen") }
-    guard let window = Self.windows.first(where: Self.isMain), let content = window.contentView,
-      let transcript = Self.scrollViews(in: content).max(by: { $0.frame.width < $1.frame.width })
-    else { throw QAScriptError("no transcript scroll view") }
-    guard let from = store.history.spans.first?.from, from > 0 else { throw QAScriptError("the whole thread is loaded") }
-    func wheel(_ phase: CGScrollPhase, _ dy: Int32) throws(QAScriptError) {
-      guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: dy, wheel2: 0, wheel3: 0)
-      else { throw QAScriptError("can't make a scroll event") }
-      cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: Int64(phase.rawValue))
-      cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
-      guard let event = NSEvent(cgEvent: cg) else { throw QAScriptError("can't make a scroll event") }
-      transcript.scrollWheel(with: event)
-    }
-    func top() -> (id: TranscriptItemID, minY: Double)? { QAProbe.rows?.anchor.map { ($0.id, $0.frame.minY) } }
-    var before: (id: TranscriptItemID, minY: Double)?
-    let deadline = ContinuousClock.now + .seconds(30)
-    try wheel(.began, 0)
-    while !store.loadingEdges.contains(.earlier) {
-      guard ContinuousClock.now < deadline else { throw QAScriptError("no earlier page started") }
-      before = top()
-      try wheel(.changed, 40)
-      try? await Task.sleep(for: .milliseconds(8))
-    }
-    try wheel(.ended, 0)
-    before = top() ?? before
-    while store.loadingEdges.contains(.earlier) {
-      guard ContinuousClock.now < deadline else { throw QAScriptError("the earlier page did not land") }
-      try? await Task.sleep(for: .milliseconds(5))
-    }
-    try? await Task.sleep(for: .milliseconds(800))
-    let held = store.history.spans.first?.from ?? 0
-    guard let before else { return "no row on screen before the page; held from \(from) to \(held)" }
-    let id = if case .event(let k) = before.id { "\(k)" } else { "plan" }
-    guard let now = QAProbe.rows?.frames[before.id]?.minY else {
-      return "row \(id) at \(Int(before.minY.rounded())) pt before, off screen after: moved; held from \(from) to \(held)"
-    }
-    let verdict = abs(now - before.minY) < 1 ? "held" : "moved \(Int((now - before.minY).rounded())) pt"
-    return "row \(id) at \(Int(before.minY.rounded())) pt before, \(Int(now.rounded())) pt after: \(verdict); held from \(from) to \(held)"
-  }
-
-  /// Waits for the thread a search hit opened to show the hit's row in view, and says where.
-  private func revealed(_ hit: SearchHit) async throws(QAScriptError) -> String {
-    guard let at = hit.eventID else { return "a title hit: the thread opens at the bottom" }
-    return try await revealed(thread: hit.threadID, at: at)
-  }
-
-  /// Waits for the open thread to show the row holding an event in view, and says where.
-  private func revealed(thread: String, at: Int) async throws(QAScriptError) -> String {
-    let deadline = ContinuousClock.now + .seconds(15)
-    while ContinuousClock.now < deadline {
-      try? await Task.sleep(for: .milliseconds(100))
-      guard let store = QAProbe.store, store.id == thread, store.revealTarget == nil, store.history.spanIndex(at) != nil,
-        let id = store.transcript.itemID(holding: at), let frame = QAProbe.rows?.frames[id],
-        let height = QAProbe.scroller?.viewportHeight(), frame.minY < height, frame.maxY > 0
-      else { continue }
-      try? await Task.sleep(for: .milliseconds(400))
-      let key = if case .event(let k) = id { "\(k)" } else { "plan" }
-      return "event \(at) in row \(key) at \(Int(frame.minY.rounded())) pt of \(Int(height.rounded())); held from \(store.history.spans.map { "\($0.from)" }.joined(separator: ", "))"
-    }
-    throw QAScriptError("event \(at) never showed")
-  }
-
-  private func abort(_ message: String) {
+  func abort(_ message: String) {
     report.ok = false
     report.error = message
     write()
@@ -953,7 +517,7 @@ final class QARunner {
     exit(2)
   }
 
-  private func write() {
+  func write() {
     let f = model.qaFacts
     report.facts = Facts(
       serverState: f.serverState, connection: f.connection, sidebarLoaded: f.sidebarLoaded, channels: f.channels.sorted(),
@@ -962,290 +526,7 @@ final class QARunner {
     try? Self.encoder.encode(report).write(to: out.appending(path: "qa.json"))
   }
 
-  // MARK: Snapshots
-
-  private static func scrollViews(in view: NSView) -> [NSScrollView] {
-    (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap(scrollViews)
-  }
-
-  private static var windows: [NSWindow] {
-    NSApp.windows
-      .filter { $0.isVisible && (($0.styleMask.contains(.titled) && !($0 is NSPanel)) || $0.identifier == QuickPromptPanel.identifier) }
-      .sorted { $0.windowNumber < $1.windowNumber }
-  }
-
-  private static func isSettings(_ window: NSWindow) -> Bool {
-    window.identifier?.rawValue.localizedCaseInsensitiveContains("settings") == true
-  }
-
-  private static func isMain(_ window: NSWindow) -> Bool {
-    window.identifier?.rawValue.hasPrefix("main") == true
-  }
-
-  private var pending: [String] = []
-
-  /// Writes `<name>.png` for the main window, `<name>-settings.png` for Settings, `<name>-window<n>.png`
-  /// for anything else, and fails when one comes out blank.
-  private func snapshot(_ name: String) async throws(QAScriptError) -> [String] {
-    // A window can take a moment to come up after launch.
-    let deadline = ContinuousClock.now + .seconds(5)
-    while Self.windows.isEmpty, ContinuousClock.now < deadline {
-      try? await Task.sleep(for: .milliseconds(100))
-    }
-    try? await Task.sleep(for: .milliseconds(400))
-    let windows = Self.windows
-    guard !windows.isEmpty else { throw QAScriptError("no window to snapshot") }
-    let pages = await Self.paintWebViews(in: windows)
-    defer { pages.forEach { $0.removeFromSuperview() } }
-    pending = []
-    var blank: [String] = []
-    var others = 0
-    for window in windows {
-      let file: String
-      if Self.isSettings(window) {
-        file = "\(name)-settings.png"
-      } else if Self.isMain(window) {
-        file = "\(name).png"
-      } else {
-        others += 1
-        file = "\(name)-window\(others).png"
-      }
-      guard let image = Self.render(window) else { throw QAScriptError("can't render \(file)") }
-      if QASnapshot.looksBlank(pixels: Self.pixels(image)) { blank.append(file) }
-      guard let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
-        throw QAScriptError("can't encode \(file)")
-      }
-      do {
-        try png.write(to: out.appending(path: file))
-      } catch {
-        throw QAScriptError("can't write \(file): \(error.localizedDescription)")
-      }
-      pending.append(file)
-    }
-    if !blank.isEmpty { throw QAScriptError("blank: \(blank.joined(separator: ", "))") }
-    return pending
-  }
-
-  /// WebKit stops painting a web view a few seconds after its window is last on screen, and the harness's windows are
-  /// not, so `cacheDisplay` draws a page that has sat a while as blank. Each shown web view gets its own snapshot laid just
-  /// over it, under whatever is drawn over the page (live Annotate's outline, tooltip and card). Remove them once drawn.
-  private static func paintWebViews(in windows: [NSWindow]) async -> [NSView] {
-    var laid: [NSView] = []
-    for window in windows {
-      guard let root = window.contentView else { continue }
-      let shown = descendants(of: root).compactMap { $0 as? WKWebView }.filter { web in
-        guard !web.isHiddenOrHasHiddenAncestor, web.bounds.width > 0, web.bounds.height > 0 else { return false }
-        var v: NSView? = web
-        while let view = v {
-          if view.alphaValue == 0 || view.layer?.opacity == 0 { return false }
-          v = view.superview
-        }
-        return true
-      }
-      for web in shown {
-        let config = WKSnapshotConfiguration()
-        config.afterScreenUpdates = true
-        guard let image = try? await web.takeSnapshot(configuration: config), let superview = web.superview else { continue }
-        let view = NSImageView(frame: web.frame)
-        view.image = image
-        view.imageScaling = .scaleAxesIndependently
-        superview.addSubview(view, positioned: .above, relativeTo: web)
-        laid.append(view)
-      }
-    }
-    return laid
-  }
-
-  /// The window's frame view, title bar and toolbar included, drawn the way AppKit caches a view.
-  ///
-  /// `cacheDisplay` leaves out the rows of a sidebar list: its scroll view, inside the sidebar's glass,
-  /// draws nothing. So each table row's cells are drawn on their own and laid over the capture, with a
-  /// plain rounded highlight under a selected row, where the system draws its own.
-  private static func render(_ window: NSWindow) -> CGImage? {
-    guard let root = window.contentView?.superview ?? window.contentView, let base = cache(root) else { return nil }
-    let rows = descendants(of: root).compactMap { $0 as? NSTableRowView }.filter { !$0.isHiddenOrHasHiddenAncestor }
-    guard let space = CGColorSpace(name: CGColorSpace.sRGB),
-      let context = CGContext(
-        data: nil, width: base.width, height: base.height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
-        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-      )
-    else { return base }
-    let scale = CGFloat(base.width) / max(root.bounds.width, 1)
-    let whole = CGRect(x: 0, y: 0, width: base.width, height: base.height)
-    // The glass sidebar and title bar come out see-through. On screen the desktop shows through them.
-    var backdrop = NSColor.windowBackgroundColor.cgColor
-    window.effectiveAppearance.performAsCurrentDrawingAppearance {
-      backdrop = NSColor.windowBackgroundColor.usingColorSpace(.sRGB)?.cgColor ?? backdrop
-    }
-    context.setFillColor(backdrop)
-    context.fill(whole)
-    context.draw(base, in: whole)
-
-    // A rect in root coordinates, in the context's pixels, origin bottom left.
-    func pixels(_ rect: NSRect) -> CGRect {
-      let y = root.isFlipped ? root.bounds.height - rect.maxY : rect.minY
-      return CGRect(x: rect.minX * scale, y: y * scale, width: rect.width * scale, height: rect.height * scale)
-    }
-
-    for row in rows where row.frame.height > 0 {
-      context.saveGState()
-      // Only where rows show: not under the title bar or a bar laid over the list's edge.
-      if let scroll = row.enclosingScrollView {
-        let clip = scroll.contentView
-        let insets = scroll.contentInsets
-        var visible = clip.convert(clip.bounds, to: root)
-        visible.origin.y += root.isFlipped ? insets.top : insets.bottom
-        visible.size.height -= insets.top + insets.bottom
-        context.clip(to: pixels(visible))
-      }
-      if row.isSelected {
-        let rect = pixels(row.convert(row.bounds, to: root).insetBy(dx: 10, dy: 1))
-        let color = window.isKeyWindow ? NSColor.selectedContentBackgroundColor : NSColor.unemphasizedSelectedContentBackgroundColor
-        context.setFillColor(color.usingColorSpace(.sRGB)?.cgColor ?? color.cgColor)
-        context.addPath(CGPath(roundedRect: rect, cornerWidth: 8 * scale, cornerHeight: 8 * scale, transform: nil))
-        context.fillPath()
-      }
-      // Cells and section headers only. The row's own selection and separator views come out black.
-      for cell in row.subviews where !cell.isHidden && cell.frame.height > 0 && Self.isCell(cell) {
-        if let image = cache(cell) {
-          context.draw(image, in: pixels(cell.convert(cell.bounds, to: root)))
-        }
-      }
-      context.restoreGState()
-    }
-    // A terminal (SwiftTerm) comes out shifted and clipped in the window's cache. Drawn on its own it is right.
-    for term in descendants(of: root) where "\(type(of: term))" == "TerminalView" && !term.isHiddenOrHasHiddenAncestor {
-      if let image = cache(term) {
-        context.draw(image, in: pixels(term.convert(term.bounds, to: root)))
-      }
-    }
-    // An open popover is a window of its own, untitled, so it is drawn over the window it hangs from.
-    for pop in NSApp.windows where pop.isVisible && pop.parent === window && "\(type(of: pop))".contains("Popover") {
-      guard let view = pop.contentView, let image = cache(view) else { continue }
-      let rect = view.convert(view.bounds, to: nil)
-      let onScreen = pop.convertToScreen(rect)
-      let inWindow = window.convertFromScreen(onScreen)
-      let frame = CGRect(x: inWindow.minX * scale, y: inWindow.minY * scale, width: inWindow.width * scale, height: inWindow.height * scale)
-      context.saveGState()
-      context.setShadow(offset: CGSize(width: 0, height: -4 * scale), blur: 18 * scale, color: NSColor.black.withAlphaComponent(0.18).cgColor)
-      context.addPath(CGPath(roundedRect: frame, cornerWidth: 10 * scale, cornerHeight: 10 * scale, transform: nil))
-      context.setFillColor(backdrop)
-      context.fillPath()
-      context.restoreGState()
-      context.saveGState()
-      context.addPath(CGPath(roundedRect: frame, cornerWidth: 10 * scale, cornerHeight: 10 * scale, transform: nil))
-      context.clip()
-      context.draw(image, in: frame)
-      context.restoreGState()
-    }
-    return context.makeImage() ?? base
-  }
-
-  private static func isCell(_ view: NSView) -> Bool {
-    let name = "\(type(of: view))"
-    return view is NSTableCellView || name.contains("Cell") || name.contains("Header")
-  }
-
-  private static func cache(_ view: NSView) -> CGImage? {
-    view.layoutSubtreeIfNeeded()
-    guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
-    view.cacheDisplay(in: view.bounds, to: rep)
-    return rep.cgImage
-  }
-
-  private static func descendants(of view: NSView) -> [NSView] {
-    view.subviews + view.subviews.flatMap { descendants(of: $0) }
-  }
-
-  /// The image at half size as RGBA words, for the blank check.
-  private static func pixels(_ image: CGImage) -> [UInt32] {
-    let width = max(1, image.width / 2), height = max(1, image.height / 2)
-    var buffer = [UInt32](repeating: 0, count: width * height)
-    buffer.withUnsafeMutableBytes { raw in
-      guard
-        let space = CGColorSpace(name: CGColorSpace.sRGB),
-        let context = CGContext(
-          data: raw.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4, space: space,
-          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        )
-      else { return }
-      context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-    }
-    return buffer
-  }
-}
-/// Calls `tick` once a frame from the display link until it returns false, and times the frames.
-@MainActor
-private final class FrameClock: NSObject {
-  private var tick: () -> Bool = { false }
-  private var left = 0
-  private var last: CFTimeInterval?
-  private var gaps: [Double] = []
-  private var done: CheckedContinuation<[Double], Never>?
-
-  func run(in view: NSView, frames: Int, _ tick: @escaping () -> Bool) async -> [Double] {
-    self.tick = tick
-    left = frames
-    return await withCheckedContinuation { continuation in
-      done = continuation
-      view.displayLink(target: self, selector: #selector(frame(_:))).add(to: .main, forMode: .common)
-    }
-  }
-
-  @objc private func frame(_ link: CADisplayLink) {
-    if let last { gaps.append((link.timestamp - last) * 1000) }
-    last = link.timestamp
-    left -= 1
-    guard left <= 0 || !tick() else { return }
-    link.invalidate()
-    done?.resume(returning: gaps)
-    done = nil
-  }
-}
-/// The Browser tab's page view, for live Annotate's steps: mouse events at fractions of the page it shows, which is
-/// drawn at the view's full width from its top.
-@MainActor
-struct QALivePage {
-  /// The Browser tab's canvas or the Web tab's input layer.
-  let view: NSView
-  let frame: BrowserAnnotationContext.LiveFrame
-
-  func event(_ type: NSEvent.EventType, _ x: Double, _ y: Double, option: Bool = false) throws(QAScriptError) -> NSEvent {
-    guard let window = view.window, frame.width > 0 else { throw QAScriptError("the page view is not in a window") }
-    let width = view.bounds.width, height = width * frame.height / frame.width
-    // Both views are flipped: y grows down from the page's top.
-    let at = view.convert(NSPoint(x: x * width, y: min(y, 0.999) * height), to: nil)
-    guard
-      let e = NSEvent.mouseEvent(
-        with: type, location: at, modifierFlags: option ? .option : [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
-        context: nil, eventNumber: 0, clickCount: type == .mouseMoved ? 0 : 1, pressure: type == .leftMouseUp || type == .mouseMoved ? 0 : 1)
-    else { throw QAScriptError("can't make a mouse event") }
-    return e
-  }
-
-  func mouseMoved(with e: NSEvent) { view.mouseMoved(with: e) }
-  func mouseDown(with e: NSEvent) { view.mouseDown(with: e) }
-  func mouseDragged(with e: NSEvent) { view.mouseDragged(with: e) }
-  func mouseUp(with e: NSEvent) { view.mouseUp(with: e) }
-
-  /// Escape, with the page holding the keys, through the path a key press takes there.
-  func escape() {
-    guard let window = view.window else { return }
-    for type in [NSEvent.EventType.keyDown, .keyUp] {
-      guard
-        let e = NSEvent.keyEvent(
-          with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
-          characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: LiveAnnotateGesture.escapeKey)
-      else { continue }
-      if let input = view as? LiveInputView {
-        // The web view holds the keys; the input layer sees Escape on its way there.
-        if let page = input.page { window.makeFirstResponder(page) }
-        if !input.takes(type, keyCode: e.keyCode, option: false, window: window.windowNumber) { window.sendEvent(e) }
-      } else {
-        window.makeFirstResponder(view)
-        type == .keyDown ? view.keyDown(with: e) : view.keyUp(with: e)
-      }
-    }
-  }
+  /// The files the last snapshot wrote.
+  var pending: [String] = []
 }
 #endif

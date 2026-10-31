@@ -1,5 +1,5 @@
 // The screens pushed from a thread: its steps, changes and PR, the channel browser, the shell, details and a file.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { turnCount } from '@omni/shared/history.ts';
 import { api, artifactUrl, errorText, useApi, type HarnessWithRunning, type PRDetail } from '../api.ts';
 import { HarnessMark, harnessLabel } from '../components/brand.tsx';
@@ -12,7 +12,6 @@ import { modelOf } from '../components/ModelPicker.tsx';
 import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
 import { usePRWatch, watchCopy } from '../components/thread/PRWatch.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
-import { TerminalView } from '../components/TerminalView.tsx';
 import { ThreadIdCtx, ToolOutput } from '../components/thread/ToolOutput.tsx';
 import { Button, Chip, copyText, ErrorNote, Icon, SlideToConfirm, StatusDot } from '../components/ui.tsx';
 import { cloudAgentUrl } from '../cloud-agent.ts';
@@ -28,6 +27,9 @@ import { useShell, useThread } from './shell.tsx';
 import { threadView } from './thread-view.ts';
 import { holds } from '../thread-history.ts';
 import { hasLiveOutput, outputTarget } from '../tool-output.ts';
+
+// xterm loads only when the terminal opens, as on desktop (pages/Thread.tsx).
+const TerminalView = lazy(() => import('../components/TerminalView.tsx').then((m) => ({ default: m.TerminalView })));
 
 const SOURCE: Record<string, string> = { manual: 'You', conductor: 'The Conductor', team: 'Its team lead', automation: 'Automation', import: 'Imported', capture: 'Captured' };
 
@@ -354,7 +356,13 @@ export function TerminalScreen() {
     <>
       <MoHeader onBack={shell.back} title="Terminal" sub="Read only · tap lines to add them to a message" />
       <div className="flex min-h-0 flex-1 flex-col px-3 pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
-        {thread ? <TerminalView threadId={thread.id} cwd={thread.cwd} readOnly /> : <MoEmpty>Loading</MoEmpty>}
+        {thread ? (
+          <Suspense fallback={<MoEmpty>Loading</MoEmpty>}>
+            <TerminalView threadId={thread.id} cwd={thread.cwd} readOnly />
+          </Suspense>
+        ) : (
+          <MoEmpty>Loading</MoEmpty>
+        )}
       </div>
     </>
   );

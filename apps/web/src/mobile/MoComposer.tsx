@@ -1,8 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
-import { HarnessLogo } from '../components/brand.tsx';
 import { AttachmentStrip, useAttachments, useReplySend } from '../components/Composer.tsx';
-import { sourceRefusal } from '../continue.ts';
 import { ErrorNote, Icon, type IconName } from '../components/ui.tsx';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { removeDraftContext, useDraftContext } from '../message-context/draft.ts';
@@ -10,8 +8,9 @@ import { canSteer } from '../steer.ts';
 import { currentRun, pickedRun, shownRun, threadChoice, threadRunLabels } from '../thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
 import { useDictation, withPhrase } from './dictation.ts';
+import { PICK, PlusSheet, type Pick } from './PlusSheet.tsx';
 import { ModelSheet } from './ModelSheet.tsx';
-import { MoDiff, MoGroup, MoListRow, MoRound, MoSheet } from './parts.tsx';
+import { MoDiff, MoRound } from './parts.tsx';
 
 export interface ComposerChip {
   label: string;
@@ -24,80 +23,6 @@ export interface ComposerChip {
 /** Each thread's unsent text, kept while Ben moves between screens. */
 const drafts = new Map<string, string>();
 
-const PICK = { photo: 'image/*', camera: 'image/*', file: undefined } as const;
-type Pick = keyof typeof PICK;
-
-/**
- * What the + opens: a photo, the camera or a file for the next message, and the thread's model and effort. Tapping
- * those opens the model sheet, which switches the run for the next turn, or once this one ends while it runs. A switch
- * queued that way shows here, with a row that drops it.
- */
-function PlusSheet({
-  thread,
-  harnesses,
-  onPick,
-  onFork,
-  onRun,
-  onKeep,
-  onClose,
-}: {
-  thread: Thread;
-  harnesses?: HarnessWithRunning[];
-  onPick: (p: Pick) => void;
-  onFork: () => void;
-  onRun?: () => void;
-  onKeep: () => void;
-  onClose: () => void;
-}) {
-  const shown = shownRun(thread);
-  const queued = shown !== thread;
-  const labels = threadRunLabels(shown, harnesses);
-  const now = threadRunLabels(thread, harnesses);
-  const busy = thread.status === 'running' || thread.status === 'queued';
-  const tiles: [Pick, IconName, string][] = [
-    ['photo', 'image', 'Photo'],
-    ['camera', 'maximize', 'Camera'],
-    ['file', 'file', 'File'],
-  ];
-  return (
-    <MoSheet onClose={onClose} label="Attach">
-      <div className="grid grid-cols-3 gap-2 px-3 pt-3 pb-2.5">
-        {tiles.map(([p, icon, label]) => (
-          <button key={p} type="button" onClick={() => onPick(p)} className="mo-press flex h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-surface text-[13px]">
-            <Icon name={icon} size={20} />
-            {label}
-          </button>
-        ))}
-      </div>
-      <div className="px-3">
-        <MoGroup>
-          <MoListRow icon="branch" label="Fork thread" sub={sourceRefusal(thread.harness) ?? 'A new thread, on any harness, that picks up from here'} disabled={!!sourceRefusal(thread.harness)} onClick={onFork} />
-        </MoGroup>
-      </div>
-      <div className="px-3 pt-2.5">
-        <MoGroup>
-          <MoListRow
-            icon={<HarnessLogo harness={shown.harness} size={15} />}
-            label={queued ? <span className="text-live-text">Next turn</span> : 'Model'}
-            sub={labels.harnessName || undefined}
-            right={labels.model}
-            onClick={onRun}
-          />
-          <MoListRow icon="gauge" label="Effort" right={labels.effort} onClick={onRun} last={!queued} />
-          {queued && <MoListRow icon="x" label={`Keep ${now.model}`} sub={`${now.harnessName ? `${now.harnessName}, ` : ''}${now.effort}`} onClick={onKeep} chevron={false} last />}
-        </MoGroup>
-        <p className="m-0 px-2 pt-2.5 text-[12.5px] leading-[1.45] text-fg-3">
-          {queued
-            ? `${labels.model} takes over when this turn ends. What you send now waits for it.`
-            : busy
-              ? 'A new model or effort takes over when this turn ends.'
-              : 'A new model or effort takes over from the next message.'}
-        </p>
-      </div>
-    </MoSheet>
-  );
-}
-
 /**
  * The thread's composer on a phone: action chips, one line that grows, + for files and mic or send. It sends the way
  * the desktop reply box does: a busy thread is steered, or queued where the harness cannot steer.
@@ -109,9 +34,12 @@ export function MoComposer({
   onSent,
   onSwitched,
   onFork,
+  stop,
 }: {
   thread: Thread;
   chips: ComposerChip[];
+  /** Set while a turn runs that can be stopped: an empty box shows Stop where Send sits. */
+  stop?: { busy: boolean; run: () => void } | null;
   /** A function gets whether a busy thread steers, so it can say queue where the harness cannot steer. */
   placeholder: string | ((steers: boolean) => string);
   onSent: (t: Thread, mode?: SendMode) => void;
@@ -156,15 +84,20 @@ export function MoComposer({
     const mode: SendMode | undefined = busyThread ? (steers ? 'steer' : 'queue') : undefined;
     setBusy(true);
     setError(null);
+    // The box empties now: the message shows in the thread while it goes, and comes back here if it fails.
+    const raw = text;
+    const files = att.files;
+    setText('');
+    drafts.delete(thread.id);
+    att.clear();
     try {
-      const t = await send(prompt, mode, att.files, context);
-      if ((drafts.get(thread.id) ?? '') === text) {
-        drafts.delete(thread.id);
-        setText('');
-      }
-      att.clear();
+      const t = await send(prompt, mode, files, context);
       onSent(t, mode);
     } catch (e) {
+      // Unless Ben started a new message meanwhile.
+      const now = ref.current?.value ?? '';
+      if (!now || now === raw) update(raw);
+      att.add(files);
       setError(errorText(e));
     } finally {
       setBusy(false);
@@ -251,7 +184,9 @@ export function MoComposer({
             aria-label={hint}
             className="min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-4"
           />
-          {canSend || !mic.supported ? (
+          {stop && !canSend && !att.files.length && !mic.on ? (
+            <MoRound ink icon="stop" label={stop.busy ? 'Stopping' : 'Stop'} onClick={stop.run} disabled={stop.busy} />
+          ) : canSend || !mic.supported ? (
             <MoRound ink icon="send" label={!busyThread ? 'Send' : next ? 'Send after this turn' : 'Send to the running turn'} onClick={() => void submit()} disabled={!canSend || busy} />
           ) : (
             <MoRound quiet={!mic.on} ink={mic.on} icon={mic.on ? 'stop' : 'mic'} label={mic.on ? 'Stop dictating' : 'Dictate'} onClick={mic.toggle} />

@@ -28,6 +28,7 @@ describe('parseCrewFile', () => {
       model: 'opus',
       channel: 'volero',
       mcp: ['omni'],
+      delegateOnly: false,
       charter: 'You write and ship code.\n\n- Keep changes scoped.',
     });
   });
@@ -41,6 +42,7 @@ describe('parseCrewFile', () => {
       model: undefined,
       channel: undefined,
       mcp: [],
+      delegateOnly: false,
       charter: 'Just do quick asks.',
     });
   });
@@ -48,6 +50,11 @@ describe('parseCrewFile', () => {
   it('handles empty frontmatter and a non-array mcp value', () => {
     expect(parseCrewFile('a', '---\n\n---\nbody')).toMatchObject({ name: 'a', mcp: [], charter: 'body' });
     expect(parseCrewFile('b', '---\nmcp: omni\n---\nbody').mcp).toEqual([]);
+  });
+
+  it('reads delegate_only only when it is exactly true', () => {
+    expect(parseCrewFile('e', '---\ndelegate_only: true\n---\nbody').delegateOnly).toBe(true);
+    expect(parseCrewFile('f', '---\ndelegate_only: "yes"\n---\nbody').delegateOnly).toBe(false);
   });
 
   it('accepts frontmatter with no body', () => {
@@ -66,6 +73,9 @@ describe('parseCrewFile', () => {
     expect(crew.length).toBeGreaterThan(0);
     expect(crew[0].id).toBe('conductor');
     expect(crew.find((r) => r.id === 'conductor')!.mcp).toContain('omni');
+    // The Conductor routes work and never does it; the crew it routes to do the work.
+    expect(crew.find((r) => r.id === 'conductor')!.delegateOnly).toBe(true);
+    expect(crew.filter((r) => r.delegateOnly).map((r) => r.id)).toEqual(['conductor']);
     for (const r of crew) expect(r.charter.length).toBeGreaterThan(0);
   });
 });

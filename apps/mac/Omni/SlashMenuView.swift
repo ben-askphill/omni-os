@@ -215,26 +215,16 @@ private struct SlashRow: View {
   }
 }
 
-/// The quiet line under the composer, hidden while the menu is open. `/model`, `/effort` and `/fast` offer
-/// a new thread on another model.
+/// The quiet line under the composer, hidden while the menu is open.
 struct SlashHintView: View {
   let model: SlashMenuModel
-  let onNewThreadOnAnotherModel: () -> Void
 
   var body: some View {
     if let hint = model.hint {
-      HStack(spacing: z(8)) {
-        Text(hint)
-        if model.reply?.action == .fixed {
-          Button("New thread on another model", action: onNewThreadOnAnotherModel)
-            .buttonStyle(.plain)
-            .fontWeight(.medium)
-            .foregroundStyle(Tok.fg2)
-        }
-      }
-      .font(.omni(size: 12))
-      .foregroundStyle(Tok.fg3)
-      .frame(maxWidth: .infinity, alignment: .leading)
+      Text(hint)
+        .font(.omni(size: 12))
+        .foregroundStyle(Tok.fg3)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 }

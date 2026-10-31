@@ -39,12 +39,15 @@ export async function startRunner(env: Record<string, string> = {}) {
   mkdirSync(scratch);
   mkdirSync(brain);
   // The Keychain of the Mac running the tests holds real secrets (the Grok Bot webhook). A `security` that finds nothing keeps them out.
+  // OMNI_SECRET_STORE names the Keychain on every platform, so a Linux run reaches this stub (or the one a file writes)
+  // instead of defaulting to secrets.json. A file that wants the file store passes OMNI_SECRET_STORE: 'file'.
   const bin = join(tmp, 'bin');
   mkdirSync(bin);
   writeFileSync(join(bin, 'security'), '#!/bin/sh\nexit 44\n', { mode: 0o755 });
   Object.assign(process.env, {
     PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
     OMNI_DATA_DIR: join(tmp, 'data'),
+    OMNI_SECRET_STORE: 'keychain',
     OMNI_CLAUDE_BIN: FAKE_CLAUDE,
     // Not installed, unless the file passes the fake.
     OMNI_CODEX_BIN: join(tmp, 'no-codex'),
@@ -72,6 +75,8 @@ export async function startRunner(env: Record<string, string> = {}) {
     throw new Error(`server/config.ts ignores OMNI_DATA_DIR (db is ${paths.db}); refusing to run the runner against the real data/`);
   }
   const db = await import('../db.ts');
+  // The composition root binds the runner's ports and its controllers' deps, as app.ts does for the server.
+  await import('../compose.ts');
   const runner = await import('../runner.ts');
   const { bus } = await import('../bus.ts');
   db.channels.create({ id: 'scratch', name: 'Scratch', kind: 'internal', use_worktree: 0, base_dir: scratch });

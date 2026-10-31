@@ -63,7 +63,9 @@ describe('synced Macs', () => {
       id: 'elsewhere', channel_id: 'scratch', title: 'elsewhere', status: 'done', role: null, model: null, session_id: 'elsewhere',
       cwd: a.tmp, branch: null, parent_id: null, task_id: null, source: 'manual', automation: null,
     });
+    // Stands in for mac-b's synced writes: the running row, and the assignment its turn claimed.
     a.db.db.prepare(`UPDATE threads SET status = 'running', run_machine = 'mac-b' WHERE id = 'elsewhere'`).run();
+    a.db.assignments.claim('elsewhere', 'mac-b');
     expect((await a.json('/threads/elsewhere')).body.blocked).toBe("This thread is running on Ben's Mac Studio.");
   });
 });

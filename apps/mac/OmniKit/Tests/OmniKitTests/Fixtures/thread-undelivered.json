@@ -1,0 +1,122 @@
+{
+  "thread": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "channel_id": "shop",
+    "title": "audit the footer",
+    "status": "running",
+    "role": null,
+    "model": "claude-haiku-4-5",
+    "harness": "claude-code",
+    "effort": "low",
+    "auto_reason": "Light research task: Haiku 4.5, low effort",
+    "queued_harness": null,
+    "queued_model": null,
+    "queued_effort": null,
+    "session_id": "00000000-0000-4000-8000-000000000001",
+    "has_run": 1,
+    "cwd": "/tmp/omni-fixtures",
+    "branch": null,
+    "parent_id": null,
+    "task_id": null,
+    "source": "manual",
+    "automation": null,
+    "last_text": "ack: audit the footer",
+    "suggestion": null,
+    "next_title": null,
+    "next_prompt": null,
+    "archived": 0,
+    "folder_id": null,
+    "pinned_at": null,
+    "done_at": null,
+    "setup": null,
+    "setup_error": null,
+    "resume_blocked": null,
+    "limit_state": null,
+    "limit_resets_at": null,
+    "limit_elsewhere": 0,
+    "continued_from": null,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "updated_at": "2026-01-05T09:00:00.000Z"
+  },
+  "channel": {
+    "id": "shop",
+    "name": "Shop",
+    "kind": "client",
+    "repo_path": null,
+    "github_repo": null,
+    "use_worktree": 0,
+    "base_dir": "/tmp/omni-fixtures",
+    "store_domain": null,
+    "portal_slug": null,
+    "browser_headless": 1,
+    "notes": "",
+    "icon": null,
+    "design_system_name": null,
+    "archived": 0,
+    "created_at": "2026-01-05T09:00:00.000Z",
+    "default_harness": null,
+    "default_model": null,
+    "default_effort": null,
+    "design_system_size": 0
+  },
+  "events": [
+    {
+      "id": 5,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "init",
+      "payload": "{\"model\":\"claude-haiku-4-5\",\"cwd\":\"/tmp/omni-fixtures\",\"tools\":10,\"mcp\":[\"omni-ask:connected\",\"omni-threads:connected\"]}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 6,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "user",
+      "payload": "{\"text\":\"audit the footer\",\"source\":\"manual\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 7,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "assistant_text",
+      "payload": "{\"text\":\"ack: audit the footer\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 8,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "result",
+      "payload": "{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":11,\"turns\":1,\"cost_usd\":0.001}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 9,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "user",
+      "payload": "{\"text\":\"the footer copy\",\"source\":\"ben\",\"mode\":\"queue\",\"dropped\":true,\"undelivered\":\"Box B did not take it within 24 hours.\",\"command\":\"late-1\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    }
+  ],
+  "artifacts": [],
+  "children": [],
+  "team": [],
+  "parent": null,
+  "pending": [],
+  "live": false,
+  "mods": [],
+  "handoff": null,
+  "continued_from": null,
+  "continued_in": [],
+  "blocked": "This thread is running on Box B.",
+  "takeover": {
+    "from": {
+      "id": "box-b",
+      "name": "Box B"
+    },
+    "to": {
+      "id": "mac-a",
+      "name": "Mac A"
+    },
+    "running": true,
+    "refused": null
+  }
+}

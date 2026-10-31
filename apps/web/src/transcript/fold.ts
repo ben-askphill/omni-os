@@ -38,6 +38,8 @@ export interface UserP {
   mode?: 'steer' | 'queue' | 'interrupt';
   /** The run ended before the agent saw this message. */
   dropped?: boolean;
+  /** Why the machine running the thread did not take it, when `dropped` is from there (apps/server/remote-outcomes.ts). */
+  undelivered?: string;
   /** The harness command the message starts with and its Mentions, as they resolved when sent. */
   slash?: SlashRecord;
   /** A PR watch's wake: what it was for (the first few), and how many more there were. */
@@ -84,6 +86,8 @@ export interface ReportP {
   channel?: string;
   status?: string;
   dropped?: boolean;
+  /** Why the machine running the parent did not take it, when `dropped` is from there. */
+  undelivered?: string;
 }
 
 /** Where a Cursor cloud agent's run stands: the server's CloudAgentState (apps/server/stream.ts). */
@@ -178,13 +182,28 @@ export interface FoldPlan {
   after: number;
 }
 
+/**
+ * Each row's parsed payload. A held row never changes (a whole copy of a clipped row is a new object), so it parses
+ * once however often the thread folds again (#411). Nothing writes into a parsed payload.
+ */
+const parsed = new WeakMap<TranscriptEvent, unknown>();
+
+function payload<T>(e: TranscriptEvent): T {
+  let p = parsed.get(e);
+  if (p === undefined) {
+    p = parsePayload<T>(e);
+    parsed.set(e, p);
+  }
+  return p as T;
+}
+
 /** Stored task rows folded per Agent call. One with no end row reads as running; the live list decides. */
 export function buildTasks(events: TranscriptEvent[]) {
   const byTask = new Map<string, string>();
   const out = new Map<string, TaskView>();
   for (const e of events) {
     if (e.kind !== 'task') continue;
-    const p = parsePayload<TaskP>(e);
+    const p = payload<TaskP>(e);
     const tool = p.tool_use_id ?? byTask.get(p.task_id);
     if (!tool) continue;
     byTask.set(p.task_id, tool);
@@ -210,7 +229,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
   const results = new Map<string, ToolResult>();
   for (const e of events) {
     if (e.kind === 'tool_result') {
-      const p = parsePayload<ToolResultP>(e);
+      const p = payload<ToolResultP>(e);
       if (p.tool_use_id) results.set(p.tool_use_id, { ...p, event: e.id, ...(e.clipped && { clipped: e.clipped }) });
     }
   }
@@ -220,7 +239,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
   const planUpdates = new Map<number, string>();
   for (const e of events) {
     if (e.kind === 'plan_step_update') {
-      const p = parsePayload<{ index: number; status: string }>(e);
+      const p = payload<{ index: number; status: string }>(e);
       if (typeof p.index === 'number') planUpdates.set(p.index, p.status);
     }
   }
@@ -248,7 +267,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
     }
     switch (e.kind) {
       case 'tool_use': {
-        const p = parsePayload<ToolUseP>(e);
+        const p = payload<ToolUseP>(e);
         // A call that names itself as its parent is dropped. It is not shown at the top of the group.
         if (p.parent && p.parent === p.id) break;
         if (isQuestionTool(p.name ?? '')) break;
@@ -290,19 +309,19 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         break;
       case 'user':
         group = null;
-        items.push({ type: 'user', key: e.id, at: e.created_at, p: parsePayload<UserP>(e), ...(e.clipped && { clipped: e.clipped }) });
+        items.push({ type: 'user', key: e.id, at: e.created_at, p: payload<UserP>(e), ...(e.clipped && { clipped: e.clipped }) });
         break;
       case 'assistant_text':
         group = null;
         {
-          const p = parsePayload<TextP>(e);
+          const p = payload<TextP>(e);
           const last = items[items.length - 1];
-          if (last?.type === 'text' && !last.clipped && !e.clipped) last.p.text += p.text;
+          if (last?.type === 'text' && !last.clipped && !e.clipped) last.p = { ...last.p, text: last.p.text + p.text };
           else items.push({ type: 'text', key: e.id, at: e.created_at, p, ...(e.clipped && { clipped: e.clipped }) });
         }
         break;
       case 'result': {
-        const p = parsePayload<ResultP>(e);
+        const p = payload<ResultP>(e);
         // Zero-turn success is not a real turn: a local slash command (its output is stored as text
         // just before) or, in older threads, the CLI flushing a background task on resume.
         if (p.ok && !p.turns) break;
@@ -312,14 +331,14 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
       }
       case 'error':
         group = null;
-        items.push({ type: 'error', key: e.id, p: parsePayload<TextP>(e) });
+        items.push({ type: 'error', key: e.id, p: payload<TextP>(e) });
         break;
       case 'crew_report':
         group = null;
-        items.push({ type: 'report', key: e.id, at: e.created_at, p: parsePayload<ReportP>(e) });
+        items.push({ type: 'report', key: e.id, at: e.created_at, p: payload<ReportP>(e) });
         break;
       case 'cloud_agent': {
-        const p = parsePayload<Partial<CloudAgentP>>(e);
+        const p = payload<Partial<CloudAgentP>>(e);
         if (!str(p.agent_id) || !str(p.url) || !str(p.status)) break;
         const id = `${p.agent_id}:${str(p.run_id)}`;
         const known = runs.get(id);
@@ -334,7 +353,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         break;
       }
       case 'switch': {
-        const p = parsePayload<SwitchP>(e);
+        const p = payload<SwitchP>(e);
         const item: SwitchItem = { type: 'switch', key: e.id, p, done: null, superseded: false };
         if (p.mode !== 'settings') {
           if (pending) pending.superseded = true;
@@ -345,7 +364,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         break;
       }
       case 'handover':
-        if (pending) pending.done = parsePayload<HandoverP>(e);
+        if (pending) pending.done = payload<HandoverP>(e);
         pending = null;
         break;
       case QUESTION_EVENT: {
@@ -356,7 +375,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         break;
       }
       case 'mod': {
-        const p = parsePayload<{ plugin?: unknown; text?: unknown }>(e);
+        const p = payload<{ plugin?: unknown; text?: unknown }>(e);
         const text = str(p.text);
         if (!text) break;
         const line = { key: e.id, at: e.created_at, plugin: str(p.plugin) || 'mod', text };
@@ -384,6 +403,36 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
   if (!spans) return { items, plan };
   // A gap after any span but the last may hold a newer TodoWrite.
   return { items: items.filter((it) => segOf(it.key) >= 0), plan: plan && segOf(plan.after) === spans.length - 1 ? plan : null };
+}
+
+/** Structural equality, by identity first. Rows parse once, so the unchanged parts of two folds are mostly one object. */
+export function same(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || !a || !b) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!same(a[i], b[i])) return false;
+    return true;
+  }
+  const x = a as Record<string, unknown>;
+  const y = b as Record<string, unknown>;
+  const keys = Object.keys(x);
+  if (keys.length !== Object.keys(y).length) return false;
+  for (const k of keys) if (!Object.hasOwn(y, k) || !same(x[k], y[k])) return false;
+  return true;
+}
+
+/**
+ * `next` with every item equal to the one `prev` had at its key replaced by that one (#411). Every fold builds new
+ * items; this keeps the unchanged ones the same objects, so the rows that render them skip.
+ */
+export function keepSame(prev: readonly Item[], next: Item[]): Item[] {
+  if (!prev.length) return next;
+  const byKey = new Map(prev.map((it) => [it.key, it]));
+  return next.map((it) => {
+    const old = byKey.get(it.key);
+    return old && same(old, it) ? old : it;
+  });
 }
 
 /** Whether the agent waits on Ben's answer to a question it asked in these events. */

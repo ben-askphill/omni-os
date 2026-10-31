@@ -47,12 +47,13 @@ describe('user config', () => {
   });
 
   it('reads the file, expanding ~, and env vars still win', () => {
+    const c = userConfig();
     writeUserConfig({
-      ...userConfig(),
+      ...c,
       onboardedAt: '2026-10-21T00:00:00.000Z',
-      user: { name: 'Ada', pronouns: 'she/her', email: 'ada@example.com', timezone: 'Europe/London' },
-      workspace: { root: '~/work', reposDir: '~/src', githubOwner: 'ada' },
-      integrations: { hermesUrl: 'http://100.1.2.3:8642/', centralBrainDir: '~/brain', tailscaleLogin: 'Ada@Example.com, ' },
+      user: { ...c.user, name: 'Ada', pronouns: 'she/her', email: 'ada@example.com', timezone: 'Europe/London' },
+      workspace: { ...c.workspace, root: '~/work', reposDir: '~/src', githubOwner: 'ada' },
+      integrations: { ...c.integrations, hermesUrl: 'http://100.1.2.3:8642/', centralBrainDir: '~/brain', tailscaleLogin: 'Ada@Example.com, ' },
     });
     expect(isOnboarded()).toBe(true);
     expect(userName()).toBe('Ada');

@@ -68,7 +68,7 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 ## What you get
 
 - **Channels** per client or project, each with its own icon, default harness, model and effort, a design system file for the agent, and facts like the repo, Shopify store and Portal slug
-- **Threads** per task, dated, full-text searchable and resumable. Running and Recent threads keep work reachable across channels; Mark done clears a thread from Needs you until something new happens. Steer, queue or interrupt while one runs, or pick a model or harness for its next turn
+- **Threads** per task, dated, full-text searchable and resumable. Running and Pinned keep work reachable across channels; Mark done clears a thread from Needs you until something new happens. Steer, queue or interrupt while one runs, or pick a model or harness for its next turn
 - **Composer**: `/` menu for skills, slash commands and MCP prompts per harness, `@` to mention artifacts and repo files, attachments, and chips for diff lines, terminal output, browser annotations and other threads, plus suggested next replies
 - **Sandbox per thread**: its own git worktree in repo channels, a choice of base commit, channel setup and named actions, a persistent browser shown live in the Browser panel, a real terminal, and secrets from the Keychain (or a 0600 file on Linux) as env. Hermes and Cursor Cloud run remotely without these local tools
 - **Artifacts** rendered inline, an Artifacts page across channels, and cards for pages a thread published to claude.ai

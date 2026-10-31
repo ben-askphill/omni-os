@@ -17,7 +17,7 @@ public final class ReplyComposerModel {
   public private(set) var files: [StagedFile] = []
   /// The last problem with a file Ben tried to attach.
   public private(set) var attachError: String?
-  /// The last send that failed. The draft and files stay.
+  /// The last send that failed. The text and files it took come back to the box.
   public private(set) var sendError: String?
   public private(set) var sending = false
   public private(set) var openingPR = false
@@ -25,6 +25,8 @@ public final class ReplyComposerModel {
   public var maxUploadMB = AttachmentRules.defaultMaxMB
   /// The thread's draft records, shared with the Changes tab and the thread's other windows.
   public let context: DraftContextModel
+  /// Where a send shows in the thread while it goes (`ThreadStore.sending`).
+  public let outgoing: SendingModel
 
   /// Text, or records alone.
   public var canSend: Bool {
@@ -39,12 +41,13 @@ public final class ReplyComposerModel {
   private var key: String { "reply:\(threadID)" }
 
   public init(
-    threadID: String, api: any ReplyAPI, context: DraftContextModel, drafts: DraftStore = .standard,
+    threadID: String, api: any ReplyAPI, context: DraftContextModel, outgoing: SendingModel? = nil, drafts: DraftStore = .standard,
     readFile: @escaping @Sendable (StagedFile) throws -> UploadFile = ReplyComposerModel.read
   ) {
     self.threadID = threadID
     self.api = api
     self.context = context
+    self.outgoing = outgoing ?? SendingModel()
     self.drafts = drafts
     self.readFile = readFile
     text = drafts.text(for: "reply:\(threadID)")
@@ -63,8 +66,9 @@ public final class ReplyComposerModel {
     discard(f)
   }
 
-  /// Sends the text, files and records. On success the text is cleared unless Ben typed more meanwhile, the files
-  /// and records it carried go, and the answer is returned. On failure everything stays and `sendError` says why.
+  /// Sends the text, files and records. The text and files leave the box at once and show in the thread
+  /// (`outgoing`) until the server answers. On success the records it carried go and the answer is returned. On
+  /// failure the text comes back (unless Ben started another message), so do the files, and `sendError` says why.
   @discardableResult
   public func send(mode: SendMode?) async -> OmniThread? {
     let raw = text
@@ -78,12 +82,14 @@ public final class ReplyComposerModel {
     let key = PendingRequest.key(prompt: prompt, mode: mode, files: staged.map(\.url.path), context: records.map(\.id))
     let request = PendingRequest.next(after: lastRequest, key: key)
     lastRequest = request
+    text = ""
+    files = []
+    outgoing.begin(.init(requestID: request.id, text: prompt, files: staged))
     do {
       let uploads = try await Self.load(staged, with: readFile)
       let thread = try await api.reply(to: threadID, prompt: prompt, mode: mode, files: uploads, requestID: request.id, context: records)
+      outgoing.end(request.id)
       lastRequest = nil
-      if text == raw { text = "" }
-      files.removeAll { staged.contains($0) }
       staged.forEach(discard)
       context.settle(sent: records.map(\.id))
       attachError = nil
@@ -93,6 +99,9 @@ public final class ReplyComposerModel {
     } catch {
       sendError = error.localizedDescription
     }
+    outgoing.end(request.id)
+    if text.isEmpty { text = raw }
+    files = staged + files.filter { !staged.contains($0) }
     return nil
   }
 

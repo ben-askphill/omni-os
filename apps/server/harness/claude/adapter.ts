@@ -1,17 +1,19 @@
-// Claude Code behind the harness adapter interface. This is the runner's original
-// process handling, moved here unchanged: the same args, the same env (with the API
-// auth vars stripped), the same stream-json parsing.
+// Claude Code behind the harness adapter interface: one warm `claude -p` process per thread,
+// stream-json both ways. The env strips the API auth vars, and output goes through stream.ts.
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { apiToken } from '../../api-token.ts';
 import { config, paths, artifactsDir, threadDir } from '../../config.ts';
 import type { Thread } from '../../db.ts';
+import { DELEGATE_ONLY_DENIED } from '../../crew.ts';
 import { ASK_TIMEOUT_SEC } from '../../sandbox.ts';
 import { parseEvent, LineSplitter } from '../../stream.ts';
+import { describeAttachments, inlinable, messageContent, type Attachment } from '../../uploads.ts';
 import { harnessEnv } from '../env-guard.ts';
+import { processSession } from '../session.ts';
 import { normalizeClaudeCommands } from './commands.ts';
 import { fromClaudeContext, type ContextUsage } from '@omni/shared/context-meter.ts';
 import { CAPABILITIES } from '../types.ts';
@@ -23,9 +25,17 @@ const COMMANDS_REQUEST = 'omni-commands';
 /** Omni's `get_context_usage` requests: the CLI's split of the context window. Costs no tokens. */
 const CONTEXT_REQUEST = 'omni-context';
 
+/** The parts of a stream-json event the adapter reads itself; parseEvent reads the rest. */
+interface ClaudeEvent {
+  type?: unknown;
+  subtype?: unknown;
+  commands?: unknown;
+  response?: { request_id?: unknown; subtype?: unknown; response?: { commands?: unknown } };
+}
+
 /** The answer to one of Omni's context requests, or null for any other event. */
-function contextAnswer(evt: any): ContextUsage | null {
-  if (evt?.type !== 'control_response') return null;
+function contextAnswer(evt: ClaudeEvent): ContextUsage | null {
+  if (evt.type !== 'control_response') return null;
   const r = evt.response;
   if (typeof r?.request_id !== 'string' || !r.request_id.startsWith(CONTEXT_REQUEST) || r.subtype !== 'success') return null;
   return fromClaudeContext(r.response);
@@ -35,14 +45,26 @@ function contextAnswer(evt: any): ContextUsage | null {
  * A command list the process sent: its answer to Omni's `initialize`, or the whole list again once it
  * changed. MCP prompts only arrive the second way, when the servers connect after the answer went out.
  */
-function listedCommands(evt: any): unknown[] | null {
+function listedCommands(evt: ClaudeEvent): unknown[] | null {
   const list =
-    evt?.type === 'control_response' && evt.response?.request_id === COMMANDS_REQUEST && evt.response.subtype === 'success'
+    evt.type === 'control_response' && evt.response?.request_id === COMMANDS_REQUEST && evt.response.subtype === 'success'
       ? evt.response.response?.commands
-      : evt?.type === 'system' && evt.subtype === 'commands_changed'
+      : evt.type === 'system' && evt.subtype === 'commands_changed'
         ? evt.commands
         : null;
   return Array.isArray(list) ? list : null;
+}
+
+/**
+ * Attachments add a note naming every file and where it is on disk, and images small enough for the
+ * API ride along as real image blocks, so the agent sees them without a Read.
+ */
+function messageBody(text: string, attachments: Attachment[]): string | ReturnType<typeof messageContent> {
+  if (!attachments.length) return text;
+  return messageContent(
+    `${text}\n\n${describeAttachments(attachments)}`,
+    attachments.filter(inlinable).map((a) => ({ mime: a.mime, data: readFileSync(a.path).toString('base64') })),
+  );
 }
 
 /** Where the CLI keeps a thread's session: one JSON line per message. */
@@ -106,7 +128,8 @@ export const claudeAdapter: HarnessAdapter = {
     if (thread.cwd !== config.brainDir && existsSync(config.brainDir)) args.push('--add-dir', config.brainDir);
     if (mcpFile) args.push('--mcp-config', mcpFile);
     // Its own AskUserQuestion cannot be answered in -p mode: agents ask with Omni's ask_user_question instead.
-    args.push('--disallowedTools', 'AskUserQuestion');
+    // A delegate-only role (the Conductor) also loses every tool that does work, so it can only hand it off.
+    args.push('--disallowedTools', ['AskUserQuestion', ...(ctx.role?.delegateOnly ? DELEGATE_ONLY_DENIED : [])].join(','));
     for (const dir of modDirs()) args.push('--plugin-dir', dir);
     args.push(resume ? '--resume' : '--session-id', thread.session_id);
 
@@ -136,6 +159,7 @@ export const claudeAdapter: HarnessAdapter = {
       } catch {
         return;
       }
+      if (!evt || typeof evt !== 'object') return;
       const listed = listedCommands(evt);
       if (listed) cb.commands?.(normalizeClaudeCommands(listed));
       const context = contextAnswer(evt);
@@ -149,44 +173,43 @@ export const claudeAdapter: HarnessAdapter = {
         console.error(`[claude] ${thread.id} bad event:`, err);
       }
       // Every turn ends with a fresh split of the window, for the meter.
-      if ((evt as { type?: string }).type === 'result') requestContext();
+      if ((evt as ClaudeEvent).type === 'result') requestContext();
     };
 
-    let contextRequests = 0;
-    const requestContext = () => {
+    /** One stream-json line on stdin. False if the pipe is gone. */
+    const writeLine = (obj: object) => {
       const stdin = child.stdin;
       if (!stdin || stdin.destroyed || stdin.writableEnded) return false;
       try {
-        stdin.write(JSON.stringify({ type: 'control_request', request_id: `${CONTEXT_REQUEST}-${++contextRequests}`, request: { subtype: 'get_context_usage' } }) + '\n');
+        stdin.write(JSON.stringify(obj) + '\n');
         return true;
       } catch {
         return false;
       }
     };
 
+    let contextRequests = 0;
+    const requestContext = () =>
+      writeLine({ type: 'control_request', request_id: `${CONTEXT_REQUEST}-${++contextRequests}`, request: { subtype: 'get_context_usage' } });
+
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (d: string) => splitter.push(d).forEach(handleLine));
     child.stdin.on('error', () => {});
     // Ahead of the first message: the commands this process can run, for the thread's `/` menu.
-    child.stdin.write(JSON.stringify({ type: 'control_request', request_id: COMMANDS_REQUEST, request: { subtype: 'initialize' } }) + '\n');
+    writeLine({ type: 'control_request', request_id: COMMANDS_REQUEST, request: { subtype: 'initialize' } });
 
-    return {
-      child,
-      write(obj: unknown) {
-        const stdin = child.stdin;
-        if (!stdin || stdin.destroyed || stdin.writableEnded) return false;
-        // Drop the Omni side channel; Claude only sees the standard stream-json user line.
-        const { _omni, ...clean } = (obj ?? {}) as Record<string, unknown>;
-        void _omni;
-        try {
-          stdin.write(JSON.stringify(clean) + '\n');
-          return true;
-        } catch {
-          return false;
-        }
-      },
+    return processSession(child, cb, {
+      send: (m) =>
+        writeLine({
+          type: 'user',
+          message: { role: 'user', content: messageBody(m.text, m.attachments) },
+          parent_tool_use_id: null,
+          session_id: thread.session_id,
+          uuid: m.uuid,
+        }),
+      interrupt: (requestId) => writeLine({ type: 'control_request', request_id: requestId, request: { subtype: 'interrupt' } }),
       flush: () => splitter.flush().forEach(handleLine),
       requestContext,
-    };
+    });
   },
 };

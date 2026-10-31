@@ -1,0 +1,201 @@
+{
+ "about": "Run-location defaults: which machine a new thread starts on, which pick holds, what POST /api/threads gets and what the pill says. \"\" is this machine; `listed` names the synced machines GET /api/devices gives, from `devices`. apps/web/src/run-on.ts runs it in apps/web/tests/client-policies.test.ts (\"\" is its HERE); apps/mac/OmniKit/Sources/OmniKit/RunOn.swift runs it in ClientPolicyTests.swift.",
+ "devices": [
+  {
+   "id": "omarchy",
+   "name": "Omarchy",
+   "reachability": "online",
+   "dnsName": null,
+   "lastSeen": null
+  },
+  {
+   "id": "mini",
+   "name": "Mini",
+   "reachability": "offline",
+   "dnsName": null,
+   "lastSeen": null
+  },
+  {
+   "id": "studio",
+   "name": "Studio",
+   "reachability": "unknown",
+   "dnsName": null,
+   "lastSeen": null
+  }
+ ],
+ "defaults": [
+  {
+   "case": "the saved machine",
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "saved": "omarchy",
+   "pick": "omarchy"
+  },
+  {
+   "case": "this machine",
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "saved": "",
+   "pick": ""
+  },
+  {
+   "case": "a saved machine asleep stays, so the server refuses the send",
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "saved": "mini",
+   "pick": "mini"
+  },
+  {
+   "case": "Tailscale can't tell: the server decides",
+   "listed": [
+    "studio"
+   ],
+   "saved": "studio",
+   "pick": "studio"
+  },
+  {
+   "case": "a machine sync no longer lists runs here, as the server does",
+   "listed": [
+    "omarchy"
+   ],
+   "saved": "gone",
+   "pick": ""
+  },
+  {
+   "case": "no other machine",
+   "listed": [],
+   "saved": "omarchy",
+   "pick": ""
+  }
+ ],
+ "holds": [
+  {
+   "case": "no pick yet: the default",
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "picked": null,
+   "saved": "omarchy",
+   "pick": "omarchy"
+  },
+  {
+   "case": "this machine picked over a saved one",
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "picked": "",
+   "saved": "omarchy",
+   "pick": ""
+  },
+  {
+   "case": "a listed machine picked",
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "picked": "omarchy",
+   "saved": "",
+   "pick": "omarchy"
+  },
+  {
+   "case": "a picked machine that went to sleep is still listed",
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "picked": "mini",
+   "saved": "",
+   "pick": "mini"
+  },
+  {
+   "case": "a picked machine sync dropped gives way to the default",
+   "listed": [
+    "mini"
+   ],
+   "picked": "omarchy",
+   "saved": "mini",
+   "pick": "mini"
+  },
+  {
+   "case": "and to this machine when the default is gone too",
+   "listed": [
+    "mini"
+   ],
+   "picked": "omarchy",
+   "saved": "omarchy",
+   "pick": ""
+  }
+ ],
+ "sent": [
+  {
+   "case": "this machine, with a choice",
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "pick": "",
+   "device": "here"
+  },
+  {
+   "case": "another machine",
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "pick": "omarchy",
+   "device": "omarchy"
+  },
+  {
+   "case": "no picker: the server's default applies",
+   "listed": [],
+   "pick": "",
+   "device": null
+  }
+ ],
+ "labels": [
+  {
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "pick": "",
+   "label": "This Mac"
+  },
+  {
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "pick": "omarchy",
+   "label": "Omarchy"
+  },
+  {
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "pick": "mini",
+   "label": "Mini"
+  }
+ ]
+}

@@ -1,4 +1,4 @@
-// Worktree cleanup, as both clients show it under Settings > Storage: what a cleanup Ben starts or this Mac's
+// Worktree cleanup, as both clients show it under Settings > Machines: what a cleanup Ben starts or this Mac's
 // retention policy would remove, and what a run removed, kept or failed to remove (apps/server/worktree-cleanup.ts).
 // Pure: types, the shared labels and the filter that picks what a cleanup may remove from a scan.
 import type { KeepReason, WorktreeItem } from './worktree-inventory.ts';
@@ -69,7 +69,7 @@ export interface CleanupPreview {
   bytes: number;
 }
 
-/** What Settings > Storage shows of cleanup, beside the scan (GET /api/worktrees/scan). */
+/** What Settings > Machines shows of cleanup, beside the scan (GET /api/worktrees/scan). */
 export interface CleanupState {
   policy: RetentionPolicy;
   /** What each kind of cleanup would remove now, from the last scan. Null before the first scan and while one runs. */
@@ -103,8 +103,6 @@ export function cleanupPreview(items: WorktreeItem[], trigger: CleanupTrigger, p
   const candidates = cleanupCandidates(items, trigger, policy, now);
   return { trigger, candidates, bytes: candidates.reduce((n, c) => n + (c.bytes ?? 0), 0) };
 }
-
-export const OUTCOME_LABEL: Record<CleanupOutcome, string> = { removed: 'Removed', kept: 'Kept', failed: 'Failed' };
 
 export const CLEANUP_BECAUSE_LABEL: Record<CleanupBecause, string> = {
   archived: 'Its thread is archived',

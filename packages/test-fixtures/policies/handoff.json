@@ -1,0 +1,872 @@
+{
+ "about": "Handoff display: the banner's line and card per phase from the reading Mac's side, the Take over note and confirm, and the Hand off to picker's rows. packages/shared/handoff.ts and apps/web/src/handoff.ts run it in apps/web/tests/client-policies.test.ts; apps/mac/OmniKit/Sources/OmniKit/Handoff.swift runs it in ClientPolicyTests.swift, read at the view's own `at` so no offer has gone stale on screen. `status` is the thread's; a null banner shows nothing.",
+ "views": [
+  {
+   "case": "asking the holding Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "requested",
+     "stale": false
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": true
+   },
+   "status": "idle",
+   "text": "Asking Studio to hand this thread over.",
+   "banner": {
+    "size": "card",
+    "tone": "waiting",
+    "cancel": true
+   }
+  },
+  {
+   "case": "the holding Mac has not answered",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "requested",
+     "stale": true
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": true
+   },
+   "status": "idle",
+   "text": "Studio has not answered. It may be asleep; it hands the thread over when it wakes.",
+   "banner": {
+    "size": "card",
+    "tone": "alert",
+    "cancel": true
+   }
+  },
+  {
+   "case": "declined, seen by the asking Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "declined",
+     "error": "A turn is starting"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": true
+   },
+   "status": "idle",
+   "text": "Studio kept this thread: A turn is starting.",
+   "banner": {
+    "size": "card",
+    "tone": "alert",
+    "cancel": false
+   }
+  },
+  {
+   "case": "declined, seen by the holding Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "declined",
+     "error": "A turn is starting."
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": true
+   },
+   "status": "idle",
+   "text": "MacBook asked for this thread, and it stays here: A turn is starting.",
+   "banner": {
+    "size": "card",
+    "tone": "alert",
+    "cancel": false
+   }
+  },
+  {
+   "case": "the request expired",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "expired"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": true
+   },
+   "status": "idle",
+   "text": "Studio did not answer within an hour, so the request expired.",
+   "banner": {
+    "size": "card",
+    "tone": "alert",
+    "cancel": false
+   }
+  },
+  {
+   "case": "preparing: stopping",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "preparing",
+     "step": "stopping"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "running",
+   "text": "Handing off to MacBook: stopping the turn here.",
+   "banner": {
+    "size": "card",
+    "tone": "working",
+    "cancel": true
+   }
+  },
+  {
+   "case": "preparing: uploading",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "preparing",
+     "step": "uploading"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "running",
+   "text": "Handing off to MacBook: uploading the session.",
+   "banner": {
+    "size": "card",
+    "tone": "working",
+    "cancel": true
+   }
+  },
+  {
+   "case": "preparing: packing",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "preparing",
+     "step": "packing"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "running",
+   "text": "Handing off to MacBook: packing the worktree.",
+   "banner": {
+    "size": "card",
+    "tone": "working",
+    "cancel": true
+   }
+  },
+  {
+   "case": "preparing, seen by the taking Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "preparing",
+     "step": "packing"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "running",
+   "text": "Studio is handing this thread to this Mac.",
+   "banner": {
+    "size": "card",
+    "tone": "working",
+    "cancel": false
+   }
+  },
+  {
+   "case": "offered, waiting",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "offered",
+     "stale": false
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "idle",
+   "text": "Waiting for MacBook to pick it up.",
+   "banner": {
+    "size": "card",
+    "tone": "waiting",
+    "cancel": true
+   }
+  },
+  {
+   "case": "offered, not picked up",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "offered",
+     "stale": true
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "idle",
+   "text": "MacBook has not picked this thread up yet. It may be asleep or not running Omni.",
+   "banner": {
+    "size": "card",
+    "tone": "alert",
+    "cancel": true
+   }
+  },
+  {
+   "case": "offered, seen by the taking Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "offered",
+     "stale": false
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "idle",
+   "text": "Picking this thread up from Studio.",
+   "banner": {
+    "size": "card",
+    "tone": "working",
+    "cancel": false
+   }
+  },
+  {
+   "case": "handed off mid-turn, giving Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "accepted"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "idle",
+   "text": "Running on MacBook. Handed off from this Mac.",
+   "banner": {
+    "size": "line",
+    "tone": "done"
+   }
+  },
+  {
+   "case": "handed off mid-turn, taking Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "accepted"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "running",
+   "text": "Handed off from Studio. Running on this Mac.",
+   "banner": {
+    "size": "line",
+    "tone": "done"
+   }
+  },
+  {
+   "case": "handed off between turns, giving Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "accepted"
+    },
+    "leftBehind": null,
+    "idle": true,
+    "requested": false
+   },
+   "status": "idle",
+   "text": "Handed off to MacBook. Your next message continues it there.",
+   "banner": {
+    "size": "line",
+    "tone": "done"
+   }
+  },
+  {
+   "case": "handed off between turns, taking Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "accepted"
+    },
+    "leftBehind": null,
+    "idle": true,
+    "requested": false
+   },
+   "status": "idle",
+   "text": "Handed off from Studio. Your next message continues it here.",
+   "banner": {
+    "size": "line",
+    "tone": "done"
+   }
+  },
+  {
+   "case": "taken over mid-turn, holding Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "accepted"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": true
+   },
+   "status": "idle",
+   "text": "MacBook took this thread over. Running there.",
+   "banner": {
+    "size": "line",
+    "tone": "done"
+   }
+  },
+  {
+   "case": "taken over mid-turn, asking Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "accepted"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": true
+   },
+   "status": "running",
+   "text": "Taken over from Studio. Running on this Mac.",
+   "banner": {
+    "size": "line",
+    "tone": "done"
+   }
+  },
+  {
+   "case": "taken over between turns, holding Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "accepted"
+    },
+    "leftBehind": null,
+    "idle": true,
+    "requested": true
+   },
+   "status": "idle",
+   "text": "MacBook took this thread over. The next message runs there.",
+   "banner": {
+    "size": "line",
+    "tone": "done"
+   }
+  },
+  {
+   "case": "taken over between turns, asking Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "accepted"
+    },
+    "leftBehind": null,
+    "idle": true,
+    "requested": true
+   },
+   "status": "idle",
+   "text": "Taken over from Studio. Your next message continues it here.",
+   "banner": {
+    "size": "line",
+    "tone": "done"
+   }
+  },
+  {
+   "case": "failed on the giving Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "failed",
+     "error": "the bundle is too big",
+     "where": "here"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "stopped",
+   "text": "The handoff to MacBook failed: the bundle is too big. The thread is stopped here; reply to continue it.",
+   "banner": {
+    "size": "card",
+    "tone": "alert",
+    "cancel": false
+   }
+  },
+  {
+   "case": "failed there, seen by the taking Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "failed",
+     "error": "no space left",
+     "where": "there"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "idle",
+   "text": "Could not pick this thread up from Studio: no space left. It stays there.",
+   "banner": {
+    "size": "card",
+    "tone": "alert",
+    "cancel": false
+   }
+  },
+  {
+   "case": "failed here, seen by the taking Mac",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": false,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "failed",
+     "error": "git failed",
+     "where": "here"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "idle",
+   "text": "Studio could not hand this thread over: git failed. It stays there.",
+   "banner": {
+    "size": "card",
+    "tone": "alert",
+    "cancel": false
+   }
+  },
+  {
+   "case": "a failure the thread moved past while it runs",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "failed",
+     "error": "git failed",
+     "where": "here"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "running",
+   "text": "The handoff to MacBook failed: git failed. The thread is stopped here; reply to continue it.",
+   "banner": null
+  },
+  {
+   "case": "a failure the thread moved past while it waits",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "failed",
+     "error": "git failed",
+     "where": "here"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "queued",
+   "text": "The handoff to MacBook failed: git failed. The thread is stopped here; reply to continue it.",
+   "banner": null
+  },
+  {
+   "case": "cancelled",
+   "view": {
+    "id": "offer-1",
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "outgoing": true,
+    "at": "2026-10-29T20:00:00.000Z",
+    "state": {
+     "phase": "cancelled"
+    },
+    "leftBehind": null,
+    "idle": false,
+    "requested": false
+   },
+   "status": "idle",
+   "text": "The handoff to MacBook was cancelled.",
+   "banner": {
+    "size": "line",
+    "tone": "cancelled"
+   }
+  }
+ ],
+ "takeovers": [
+  {
+   "takeover": {
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "running": true,
+    "refused": null
+   },
+   "note": "This thread is running on Studio.",
+   "confirm": {
+    "title": "Take over from Studio?",
+    "body": "Studio stops the current turn and hands the thread here. The agent continues on MacBook where it was cut off."
+   }
+  },
+  {
+   "takeover": {
+    "from": {
+     "id": "mac-a",
+     "name": "Studio"
+    },
+    "to": {
+     "id": "mac-b",
+     "name": "MacBook"
+    },
+    "running": false,
+    "refused": "Studio is busy."
+   },
+   "note": "Last ran on Studio.",
+   "confirm": {
+    "title": "Take over from Studio?",
+    "body": "Studio sends its latest session and changes here. Your next message runs on MacBook."
+   }
+  }
+ ],
+ "devices": [
+  {
+   "case": "online first, then unknown, then asleep; by name within each, numbers in order",
+   "devices": [
+    {
+     "id": "d1",
+     "name": "Mac 10",
+     "reachability": "offline",
+     "dnsName": null,
+     "lastSeen": null
+    },
+    {
+     "id": "d2",
+     "name": "Studio",
+     "reachability": "unknown",
+     "dnsName": null,
+     "lastSeen": null
+    },
+    {
+     "id": "d3",
+     "name": "Mac 2",
+     "reachability": "offline",
+     "dnsName": null,
+     "lastSeen": null
+    },
+    {
+     "id": "d4",
+     "name": "Air",
+     "reachability": "online",
+     "dnsName": null,
+     "lastSeen": null
+    },
+    {
+     "id": "d5",
+     "name": "Box",
+     "reachability": "online",
+     "dnsName": null,
+     "lastSeen": null
+    }
+   ],
+   "rows": [
+    {
+     "id": "d4",
+     "pickable": true,
+     "label": "Online on Tailscale"
+    },
+    {
+     "id": "d5",
+     "pickable": true,
+     "label": "Online on Tailscale"
+    },
+    {
+     "id": "d2",
+     "pickable": true,
+     "label": "Can't check Tailscale"
+    },
+    {
+     "id": "d3",
+     "pickable": false,
+     "label": "Asleep or offline"
+    },
+    {
+     "id": "d1",
+     "pickable": false,
+     "label": "Asleep or offline"
+    }
+   ]
+  }
+ ]
+}

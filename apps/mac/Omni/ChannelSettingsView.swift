@@ -22,6 +22,8 @@ struct ChannelSettingsForm: View {
   @State private var fetchedHarnesses: [HarnessInfo]?
   @State private var designBusy = false
   @State private var designError: String?
+  /// The worked-out values whose Change was pressed, so their field shows (#405).
+  @State private var editing: Set<ChannelForm.AutoField> = []
 
   init(model: AppModel, existing: Channel? = nil) {
     self.model = model
@@ -126,8 +128,9 @@ struct ChannelSettingsForm: View {
     VStack(alignment: .leading, spacing: z(16)) {
       basics
       code
+      store
+      advanced
       if let existing { ChannelActionsView(client: model.client, channel: existing.id) }
-      storeAndBrowser
       if let error { ErrorNote(text: error) }
       actions
       if let archiveError { ErrorNote(text: archiveError) }
@@ -137,17 +140,9 @@ struct ChannelSettingsForm: View {
 
   private var basics: some View {
     SettingsSection("Basics") {
-      HStack(alignment: .top, spacing: z(16)) {
-        SettingsField("Name") {
-          TextField("", text: Binding(get: { form.name }, set: { form.setName($0) }), prompt: Text("Acme"))
-            .accessibilityLabel("Name")
-        }
-        SettingsField("Id", hint: isNew ? "Lowercase slug, used in URLs and by the Conductor. Cannot change later." : "Fixed after creation.") {
-          TextField("", text: Binding(get: { form.id }, set: { form.setID($0) }), prompt: Text("acme"))
-            .textFieldStyle(.omniMono)
-            .disabled(!isNew)
-            .accessibilityLabel("Id")
-        }
+      SettingsField("Name") {
+        TextField("", text: Binding(get: { form.name }, set: { form.setName($0) }), prompt: Text("Acme"))
+          .accessibilityLabel("Name")
       }
       SettingsField("Icon", hint: "Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG or pick an icon. Empty uses the first letter.") {
         VStack(alignment: .leading, spacing: z(12)) {
@@ -228,7 +223,7 @@ struct ChannelSettingsForm: View {
 
   private var code: some View {
     SettingsSection("Code") {
-      SettingsField("Repo path", hint: "Absolute path to a local git repo. Enables per-thread worktrees and the PRs tab.") {
+      SettingsField("Repo path", hint: "Absolute path to a local git repo. Omni reads its GitHub repo from it, and it enables per-thread worktrees and the PRs tab.") {
         HStack(spacing: z(8)) {
           TextField("", text: $form.repoPath, prompt: Text("~/code/acme-theme"))
             .textFieldStyle(.omniMono)
@@ -236,30 +231,68 @@ struct ChannelSettingsForm: View {
           FolderButton(title: "Choose repo folder", path: $form.repoPath)
         }
       }
-      SettingsField("GitHub repo", hint: "owner/name. Auto-detected from the repo path when left empty.") {
-        TextField("", text: $form.githubRepo, prompt: Text("acme/acme-theme"))
-          .textFieldStyle(.omniMono)
-          .accessibilityLabel("GitHub repo")
+    }
+  }
+
+  private func shows(_ field: ChannelForm.AutoField) -> Bool {
+    form.shows(field, isNew: isNew, saved: existing, editing: editing)
+  }
+
+  /// Id, GitHub repo and base directory fill themselves in and show as fields only when Omni could not work them
+  /// out or Change was pressed; a failure opens the fold. Then the worktree and browser switches. As the web's (#405).
+  private var advanced: some View {
+    AdvancedFold(summary: "Id, GitHub repo, worktrees and the browser window", forced: form.needsAdvanced(isNew: isNew, saved: existing)) {
+      if shows(.id) {
+        SettingsField("Id", hint: "Lowercase slug, used in URLs and by the Conductor. Cannot change later.") {
+          TextField("", text: Binding(get: { form.id }, set: { form.setID($0) }), prompt: Text("acme"))
+            .textFieldStyle(.omniMono)
+            .accessibilityLabel("Id")
+        }
+      } else {
+        AutoValueRow(label: "Id", value: form.id.isEmpty ? "Type a name first" : form.id, note: isNew ? "From the name" : "Fixed after creation",
+                     change: isNew ? { _ = editing.insert(.id) } : nil)
+      }
+      if form.hasRepo {
+        if shows(.githubRepo) {
+          let failed = form.githubFailed(saved: existing)
+          SettingsField("GitHub repo", hint: failed ? "Omni could not read it from the repo path. Type owner/name, or leave it empty to try again on save." : "owner/name. Empty reads it from the repo path again.") {
+            TextField("", text: $form.githubRepo, prompt: Text("acme/acme-theme"))
+              .textFieldStyle(.omniMono)
+              .accessibilityLabel("GitHub repo")
+          }
+        } else {
+          let known = !form.repoChanged(from: existing) ? existing?.githubRepo.flatMap { $0.isEmpty ? nil : $0 } : nil
+          AutoValueRow(label: "GitHub repo", value: known ?? "Read from the repo path on save", note: known == nil ? nil : "From the repo path",
+                       change: { _ = editing.insert(.githubRepo) })
+        }
+      } else if shows(.baseDir) {
+        SettingsField("Base directory", hint: "Where threads run when there is no repo. Empty uses your workspace folder (Settings), so its CLAUDE.md and skills load.") {
+          HStack(spacing: z(8)) {
+            TextField("", text: $form.baseDir, prompt: Text("~/Omni"))
+              .textFieldStyle(.omniMono)
+              .accessibilityLabel("Base directory")
+            FolderButton(title: "Choose base folder", path: $form.baseDir)
+          }
+        }
+      } else {
+        AutoValueRow(label: "Base directory", value: "Your workspace folder", note: "No repo, so threads run there", change: { _ = editing.insert(.baseDir) })
       }
       SettingsToggle(
         title: "Worktree per thread",
         detail: "Each thread gets its own branch (omni/...) so parallel work never collides. Off runs in the repo itself.",
         isOn: $form.useWorktree
       )
-      .disabled(form.repoPath.trimmingCharacters(in: .whitespaces).isEmpty)
-      SettingsField("Base directory", hint: "Where threads run when there is no repo. Defaults to your workspace folder (Settings), so its CLAUDE.md and skills load.") {
-        HStack(spacing: z(8)) {
-          TextField("", text: $form.baseDir, prompt: Text("~/Omni"))
-            .textFieldStyle(.omniMono)
-            .accessibilityLabel("Base directory")
-          FolderButton(title: "Choose base folder", path: $form.baseDir)
-        }
-      }
+      .disabled(!form.hasRepo)
+      SettingsToggle(
+        title: "Show the browser window",
+        detail: "Off runs the channel browser headless. Turn on to watch it or to log in by hand. Logins persist per channel.",
+        isOn: $form.showBrowser
+      )
     }
   }
 
-  private var storeAndBrowser: some View {
-    SettingsSection("Store and browser") {
+  private var store: some View {
+    SettingsSection("Store") {
       HStack(alignment: .top, spacing: z(16)) {
         SettingsField("Store domain", hint: "The myshopify domain, e.g. acme.myshopify.com") {
           TextField("", text: $form.storeDomain, prompt: Text("acme.myshopify.com"))
@@ -272,11 +305,6 @@ struct ChannelSettingsForm: View {
             .accessibilityLabel("Portal slug")
         }
       }
-      SettingsToggle(
-        title: "Show the browser window",
-        detail: "Off runs the channel browser headless. Turn on to watch it or to log in by hand. Logins persist per channel.",
-        isOn: $form.showBrowser
-      )
     }
   }
 
@@ -345,15 +373,19 @@ struct ChannelSettingsForm: View {
     busy = true
     error = nil
     defer { busy = false }
+    // The GitHub repo goes only when its field shows; otherwise the server reads it from the repo path.
+    var sent = form
+    sent.sendsGithubRepo = shows(.githubRepo)
     do {
       if let existing {
-        let ch = try await model.client.updateChannel(existing.id, form, system: isSystem)
+        let ch = try await model.client.updateChannel(existing.id, sent, system: isSystem)
         await model.store.reloadChannels()
         form = ChannelForm(channel: ch)
         savedForm = form
+        editing = []
         saved = true
       } else {
-        let ch = try await model.client.createChannel(form)
+        let ch = try await model.client.createChannel(sent)
         await model.store.reloadChannels()
         model.route = .channel(id: ch.id)
       }
@@ -525,6 +557,31 @@ struct SettingsToggle: View {
     .padding(.horizontal, z(16))
     .padding(.vertical, z(12))
     .background(Tok.surface, in: RoundedRectangle(cornerRadius: z(18), style: .continuous))
+  }
+}
+
+/// A value Omni worked out, shown as text with Change, which swaps in the field. As `AutoValue` in ChannelSettings.tsx.
+private struct AutoValueRow: View {
+  let label: String
+  let value: String
+  var note: String?
+  var change: (() -> Void)?
+
+  var body: some View {
+    HStack(spacing: z(12)) {
+      Text(label).font(.omni(size: 13)).foregroundStyle(Tok.fg3)
+        .frame(width: z(112), alignment: .leading)
+      (Text(value).font(.omni(size: 12.5, design: .monospaced)).foregroundStyle(Tok.fg)
+        + Text(note.map { " · \($0)" } ?? "").font(.omni(size: 13)).foregroundStyle(Tok.fg3))
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      if let change {
+        Button("Change", action: change)
+          .buttonStyle(.pill(.ghost, height: 28))
+      }
+    }
+    .accessibilityElement(children: .combine)
   }
 }
 

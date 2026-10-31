@@ -302,6 +302,9 @@ export function migrate() {
   // A worktree thread's preparation (apps/server/runner/setup.ts): preparing or failed, with why; null once it is ready. Local, not synced.
   ensureColumn('threads', 'setup', 'TEXT');
   ensureColumn('threads', 'setup_error', 'TEXT');
+  // Why this machine did not resume the thread's session (apps/server/runner/spawn.ts): the other machine's newer
+  // session could not be brought here. Null once a turn starts. Local, not synced: it is about this machine's copy.
+  ensureColumn('threads', 'resume_blocked', 'TEXT');
   // A turn the harness stopped at its usage limit (apps/server/runner/limits.ts): limited, or scheduled to resume at the
   // reset time it reported. limit_id keys the one continuation; limit_machine is the Mac that ran the turn and the
   // only one that resumes it. Synced on its own (apps/server/sync/handlers/limit-stop.ts), never with the thread row;
@@ -324,6 +327,9 @@ export function migrate() {
   // The claude.ai page an artifact was published as (packages/shared/published.ts), and what the publish said it was.
   ensureColumn('artifacts', 'url', 'TEXT');
   ensureColumn('artifacts', 'description', 'TEXT');
+  // The newest file per page and a thread's files in order (db/repos/artifacts.ts ARTIFACT_SQL), without a table scan.
+  db.exec(`CREATE INDEX IF NOT EXISTS artifacts_url ON artifacts(url, updated_at, id) WHERE url IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS artifacts_thread ON artifacts(thread_id, created_at);`);
   // Sync matches these rows on uid, never on the local integer id. Old rows get one once; the index then makes the check free.
   // Queue order for durable requests (db/repos/requests.ts); a row saved before reordering existed keeps its arrival order.
   ensureColumn('message_requests', 'pos', 'INTEGER');
@@ -456,4 +462,40 @@ export function migrate() {
   CREATE INDEX IF NOT EXISTS trigger_deliveries_thread ON trigger_deliveries(thread_id) WHERE thread_id IS NOT NULL;`);
   // #228 A retry is the next attempt of the same delivery row: 1 for the first go. Each attempt has its own thread id.
   ensureColumn('trigger_deliveries', 'attempt', 'INTEGER NOT NULL DEFAULT 1');
+  // #398 Commands for a thread that runs on another machine (db/repos/remote-commands.ts): one row per forwarded
+  // message, crew report, limit action and Stop, with the outcome the holder gave it. Synced (sync/handlers/remote-command.ts);
+  // a row's state only moves forward, so the sender's "sent" never undoes the holder's answer.
+  db.exec(`CREATE TABLE IF NOT EXISTS remote_commands (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    sender TEXT NOT NULL,
+    target TEXT NOT NULL,
+    target_name TEXT NOT NULL,
+    prompt TEXT NOT NULL DEFAULT '',
+    mode TEXT,
+    source TEXT,
+    context TEXT,
+    files TEXT,
+    report_key TEXT,
+    report TEXT,
+    limit_action TEXT,
+    state TEXT NOT NULL,
+    reason TEXT,
+    acked_by TEXT,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS remote_commands_thread ON remote_commands(thread_id, created_at);
+  CREATE INDEX IF NOT EXISTS remote_commands_open ON remote_commands(expires_at) WHERE state = 'sent';`);
+  // #399 Who runs a thread (db/repos/assignments.ts): the one record every delivery decision reads. The machine
+  // that holds it and a generation that counts the moves; synced by generation (sync/handlers/assignment.ts).
+  db.exec(`CREATE TABLE IF NOT EXISTS assignments (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+    machine TEXT NOT NULL,
+    generation INTEGER NOT NULL,
+    routed INTEGER NOT NULL DEFAULT 0,
+    at TEXT NOT NULL
+  );`);
 }

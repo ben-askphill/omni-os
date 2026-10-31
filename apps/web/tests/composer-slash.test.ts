@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { SlashCommand } from '@omni/shared/slash.ts';
 import type { CommandList, Thread } from '../src/api.ts';
 import { menuCommands, newThreadHint, replySlash } from '@omni/shared/composer-slash.ts';
-import { newThreadBody, otherModel, sameSettings } from '../src/new-thread-preset.ts';
+import { newThreadBody, sameSettings } from '../src/new-thread-preset.ts';
 import { menuSections } from '@omni/shared/slash-menu.ts';
 
 // What the reply composer does with a `/`: the Omni commands it adds to every thread's menu, what
@@ -112,16 +112,16 @@ describe('replySlash: what Send does', () => {
     const claude: CommandList = { status: 'ready', commands: CLAUDE, fetchedAt: 3 };
     expect(replySlash('/reset', claude, 'claude-code')).toMatchObject({ action: { kind: 'new-thread', prompt: '' }, armed: true, label: 'New thread' });
     expect(replySlash('/Name Launch prep', claude, 'claude-code')).toMatchObject({ action: { kind: 'rename', title: 'Launch prep' }, armed: true, label: 'Rename' });
-    expect(replySlash('/model', claude, 'claude-code')).toMatchObject({ action: { kind: 'fixed' }, armed: false });
+    expect(replySlash('/model', claude, 'claude-code')).toMatchObject({ action: { kind: 'pick-model' }, armed: true });
   });
 
-  it('points at the model and effort pills, and sends nothing', () => {
+  it('opens the model pill, and sends nothing to the thread', () => {
     for (const text of ['/model', '/effort high', '/Fast']) {
       expect(replySlash(text, READY, 'claude-code')).toEqual({
-        action: { kind: 'fixed' },
-        armed: false,
-        label: null,
-        hint: 'Switch the model and effort with the pills below. The next turn uses them.',
+        action: { kind: 'pick-model' },
+        armed: true,
+        label: 'Pick model',
+        hint: 'Opens the model pill below. The next turn runs on what you pick.',
       });
     }
   });
@@ -220,9 +220,5 @@ describe('a new thread from this one', () => {
   it('opens the composer with the same settings for /clear on its own', () => {
     expect(sameSettings(thread)).toEqual({ channel: 'acme', role: 'builder', choice: { harness: 'codex', model: 'gpt-5.6-sol' }, effort: 'high' });
     expect(sameSettings({ ...thread, role: null, model: null, effort: '' })).toEqual({ channel: 'acme', role: '', choice: { harness: 'codex', model: '' }, effort: '' });
-  });
-
-  it('keeps only the channel and role for another model, with the model picker open', () => {
-    expect(otherModel(thread)).toEqual({ channel: 'acme', role: 'builder', pickModel: true });
   });
 });

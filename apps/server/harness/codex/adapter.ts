@@ -8,24 +8,25 @@
 //
 // `/review` and `/compact` are Codex's own and run as turns too, started by review/start and
 // thread/compact/start instead of turn/start. Codex steers neither of them.
-import { apiToken } from '../../api-token.ts';
-import { artifactsDir, threadDir } from '../../config.ts';
-import { ASK_SERVER, ASK_TIMEOUT_SEC, buildMcpConfig } from '../../sandbox.ts';
+import { artifactsDir } from '../../config.ts';
 import { describeAttachments, type Attachment } from '../../uploads.ts';
 import { usageFor } from '../../usage.ts';
 import { fromCodexTokenUsage } from '@omni/shared/context-meter.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
-import { harnessEnv } from '../env-guard.ts';
+import { processSession } from '../session.ts';
 import { CAPABILITIES } from '../types.ts';
-import type { AdapterCallbacks, AdapterContext, CommandUse, HarnessAdapter, HarnessSession } from '../adapter.ts';
+import type { AdapterCallbacks, AdapterContext, CommandUse, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
 import { CodexClient } from './client.ts';
+import { handshake, openThread, sessionEnv, sessionParams, threadConfig } from './session-start.ts';
+export { threadConfig };
 import { codexBin } from './bin.ts';
 import { CODEX_BUILTINS } from './commands.ts';
 import { saveGeneratedImage } from './images.ts';
-import { PLAN_LIMIT_ID, codexLimit, commandUse, normalizeItem, normalizePlan, normalizeRateLimits, normalizeStarted, turnErrorText } from './normalize.ts';
+import { PLAN_LIMIT_ID, commandUse, normalizeItem, normalizePlan, normalizeRateLimits, normalizeStarted, turnEndRecords, turnErrorText } from './normalize.ts';
 import { reviewTarget } from './review.ts';
 import type {
   CodexInput,
+  CodexItem,
   CodexTurn,
   ErrorNotification,
   PlanUpdate,
@@ -36,12 +37,18 @@ import type {
   TurnError,
 } from './protocol.ts';
 
-interface Outgoing {
-  text: string;
-  uuid: string;
-  attachments: Attachment[];
-  commands: CommandUse[];
+interface Outgoing extends OutgoingMessage {
   accepted?: boolean;
+}
+
+/** The notification params Omni reads. Each method sends its own subset. */
+interface NoteParams {
+  turn?: CodexTurn;
+  turnId?: string;
+  item?: CodexItem;
+  itemId?: unknown;
+  delta?: unknown;
+  rateLimits?: RateLimits;
 }
 
 /**
@@ -69,27 +76,26 @@ const BUILTINS = new Set(CODEX_BUILTINS.map((c) => c.name));
 /** The Codex built-in a message starts with. A built-in is never a Mention, and has no skill file. */
 const builtinOf = (m: Outgoing) => m.commands.find((c) => !c.path && BUILTINS.has(c.name));
 
-const omniOf = (obj: any): Outgoing => ({
-  text: String(obj?._omni?.text ?? ''),
-  uuid: String(obj?.uuid ?? ''),
-  attachments: (obj?._omni?.attachments ?? []) as Attachment[],
-  commands: (obj?._omni?.commands ?? []) as CommandUse[],
-});
-
-/**
- * Per-thread overrides, as config.toml keys: Omni's MCP servers next to Ben's own (a dotted
- * key merges, a whole `mcp_servers` table would replace his), a shell environment that
- * inherits everything so secrets reach the agent's shell, and ChatGPT-only login. Secret
- * values live in the process env, never in this config.
- */
-export function threadConfig(mcpServers: Record<string, object>) {
-  // Codex gives an MCP call 60 seconds by default; ask_user_question waits for the user.
-  const entry = (name: string, server: object) => (name === ASK_SERVER ? { ...server, tool_timeout_sec: ASK_TIMEOUT_SEC } : server);
-  return {
-    ...Object.fromEntries(Object.entries(mcpServers).map(([name, server]) => [`mcp_servers.${name}`, entry(name, server)])),
-    'shell_environment_policy.inherit': 'all',
-    forced_login_method: 'chatgpt',
-  };
+/** Ask Codex to run the message, as a turn or as the built-in it starts with. Resolves to the turn's id, if the answer has it. */
+async function beginTurn(client: CodexClient, codexThreadId: string | null, thread: AdapterContext['thread'], m: Outgoing, use: CommandUse | undefined): Promise<string | null> {
+  if (use?.name === 'compact') {
+    // Codex compacts without instructions, so the text after the command goes nowhere. The
+    // answer is empty; the compaction's own turn/started has its id.
+    await client.request('thread/compact/start', { threadId: codexThreadId });
+    return null;
+  }
+  if (use?.name === 'review') {
+    const target = await reviewTarget(m.text.slice(use.end), thread.cwd);
+    const r = await client.request<ReviewStartResponse>('review/start', { threadId: codexThreadId, target, delivery: 'inline' });
+    return r.turn.id;
+  }
+  const r = await client.request<{ turn: CodexTurn }>('turn/start', {
+    threadId: codexThreadId,
+    input: buildInput(m.text, m.attachments, m.commands),
+    model: thread.model || undefined,
+    effort: thread.effort || undefined,
+  });
+  return r.turn.id;
 }
 
 export const codexAdapter: HarnessAdapter = {
@@ -135,14 +141,7 @@ export const codexAdapter: HarnessAdapter = {
       emit({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
     };
 
-    const client = new CodexClient({ bin, cwd: thread.cwd, env: harnessEnv('codex', {
-      OMNI_URL: ctx.omniUrl,
-      OMNI_TOKEN: apiToken(),
-      OMNI_THREAD_ID: thread.id,
-      OMNI_THREAD_DIR: threadDir(thread.id),
-      OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),
-      OMNI_CHANNEL: thread.channel_id,
-    }, ctx.secretEnv), onNotification: onNote });
+    const client = new CodexClient({ bin, cwd: thread.cwd, env: sessionEnv(ctx), onNotification: onNote });
 
     /** The runner opens a turn on its init: one per turn, from Codex's answer or turn/started, whichever is first. */
     function turnBegan() {
@@ -152,7 +151,7 @@ export const codexAdapter: HarnessAdapter = {
     }
 
     function onNote(n: RpcNotification) {
-      const p = (n.params ?? {}) as Record<string, any>;
+      const p = (n.params ?? {}) as NoteParams;
       switch (n.method) {
         case 'turn/started':
           // Also covers a turn Codex starts by itself. A review announces itself under an id its
@@ -161,13 +160,14 @@ export const codexAdapter: HarnessAdapter = {
           // Notifications can arrive in the same stdout chunk as the request's answer,
           // before its promise runs. A started turn also confirms that Codex took its input.
           if (startingMessage) accepted(startingMessage);
-          if (builtin !== 'review') currentTurnId ??= (p.turn as CodexTurn | undefined)?.id ?? null;
+          if (builtin !== 'review') currentTurnId ??= p.turn?.id ?? null;
           turnBegan();
           break;
         case 'item/started':
+          if (!p.item) break;
           for (const rec of normalizeStarted(p.item)) emit(rec);
           // A command's row opens when it starts, so Ben can follow its output while it runs (apps/server/tool-tail.ts).
-          if (p.item?.type === 'commandExecution') {
+          if (p.item.type === 'commandExecution') {
             announced.add(p.item.id);
             cb.toolOutput?.(p.item.id);
             emit(commandUse(p.item));
@@ -177,17 +177,18 @@ export const codexAdapter: HarnessAdapter = {
           if (typeof p.itemId === 'string' && typeof p.delta === 'string') cb.toolOutput?.(p.itemId, p.delta);
           break;
         case 'item/completed': {
-          const saved = p.item?.type === 'imageGeneration' ? saveGeneratedImage(p.item, artifactsDir(thread.id)) : null;
+          if (!p.item) break;
+          const saved = p.item.type === 'imageGeneration' ? saveGeneratedImage(p.item, artifactsDir(thread.id)) : null;
           // A command that announced itself has its call row already; only its result is left.
           const recs = normalizeItem(p.item, saved);
-          for (const rec of announced.delete(p.item?.id) ? recs.filter((r) => r.kind !== 'tool_use') : recs) emit(rec);
+          for (const rec of announced.delete(p.item.id) ? recs.filter((r) => r.kind !== 'tool_use') : recs) emit(rec);
           break;
         }
         case 'turn/plan/updated':
-          for (const rec of normalizePlan(p as PlanUpdate, `plan-${p.turnId ?? currentTurnId}-${++plans}`)) emit(rec);
+          for (const rec of normalizePlan(n.params as PlanUpdate, `plan-${p.turnId ?? currentTurnId}-${++plans}`)) emit(rec);
           break;
         case 'error': {
-          const e = p as ErrorNotification;
+          const e = n.params as ErrorNotification;
           const text = turnErrorText(String(e.error?.message ?? ''));
           // A retry shows as progress; a final error ends the turn, below.
           if (e.willRetry) emit({ kind: 'status', payload: { text } });
@@ -195,7 +196,7 @@ export const codexAdapter: HarnessAdapter = {
           break;
         }
         case 'turn/completed': {
-          const turn = p.turn as CodexTurn | undefined;
+          const turn = p.turn;
           // A steer answer can share this stdout chunk. Let its delivery receipt run
           // before the result, or the runner would keep its unread message inflight.
           if (steering.size) void Promise.allSettled([...steering]).then(() => completeTurn(turn));
@@ -203,13 +204,13 @@ export const codexAdapter: HarnessAdapter = {
           break;
         }
         case 'account/rateLimits/updated': {
-          const rl = p.rateLimits as RateLimits | undefined;
+          const rl = p.rateLimits;
           // Only the plan's bucket; a reserve model's has its own.
           if (rl && (rl.limitId ?? PLAN_LIMIT_ID) === PLAN_LIMIT_ID) cb.usage(normalizeRateLimits(rl, usageFor('codex')));
           break;
         }
         case 'thread/tokenUsage/updated': {
-          const c = fromCodexTokenUsage(p, model || null);
+          const c = fromCodexTokenUsage(n.params, model || null);
           if (c) cb.context?.(c);
           break;
         }
@@ -223,9 +224,7 @@ export const codexAdapter: HarnessAdapter = {
     }
 
     function completeTurn(turn: CodexTurn | undefined) {
-      const error = turn?.status === 'failed' ? turnErrorText(turn.error?.message ?? '') || lastError || 'Codex turn failed.' : '';
-      // Stopped at the plan's usage limit: said before the result, so the runner keeps it as a limit stop.
-      const limit = turn?.status === 'failed' ? (codexLimit(turn.error, usageFor('codex')) ?? codexLimit(lastFailure, usageFor('codex'))) : null;
+      const recs = turnEndRecords(turn, lastError, lastFailure, usageFor('codex'));
       // Clear the active turn before emitting the result: the runner delivers the next queued
       // message synchronously, and it must start a new turn rather than steer this finished one.
       turnActive = false;
@@ -236,10 +235,7 @@ export const codexAdapter: HarnessAdapter = {
       initSent = false;
       lastError = '';
       lastFailure = null;
-      if (limit) emit({ kind: 'limit', payload: limit });
-      if (error) emit({ kind: 'error', payload: { text: error } });
-      const subtype = turn?.status === 'completed' ? 'success' : turn?.status === 'interrupted' ? 'interrupted' : 'error';
-      emit({ kind: 'result', payload: { ok: subtype === 'success', subtype, turns: 1 } });
+      for (const rec of recs) emit(rec);
       pump();
     }
 
@@ -253,28 +249,6 @@ export const codexAdapter: HarnessAdapter = {
       client.kill('SIGKILL');
     }
 
-    /** Ask Codex to run the message, as a turn or as the built-in it starts with. Resolves to the turn's id, if the answer has it. */
-    async function begin(m: Outgoing, use: CommandUse | undefined): Promise<string | null> {
-      if (use?.name === 'compact') {
-        // Codex compacts without instructions, so the text after the command goes nowhere. The
-        // answer is empty; the compaction's own turn/started has its id.
-        await client.request('thread/compact/start', { threadId: codexThreadId });
-        return null;
-      }
-      if (use?.name === 'review') {
-        const target = await reviewTarget(m.text.slice(use.end), thread.cwd);
-        const r = await client.request<ReviewStartResponse>('review/start', { threadId: codexThreadId, target, delivery: 'inline' });
-        return r.turn.id;
-      }
-      const r = await client.request<{ turn: CodexTurn }>('turn/start', {
-        threadId: codexThreadId,
-        input: buildInput(m.text, m.attachments, m.commands),
-        model: thread.model || undefined,
-        effort: thread.effort || undefined,
-      });
-      return r.turn.id;
-    }
-
     function pump() {
       if (!ready || turnActive || !outbox.length) return;
       const m = outbox.shift()!;
@@ -285,7 +259,7 @@ export const codexAdapter: HarnessAdapter = {
       lastFailure = null;
       startingMessage = m;
       const what = builtin === 'review' ? 'start the review' : builtin === 'compact' ? 'compact the conversation' : 'start the turn';
-      const started = begin(m, use).then((turnId) => {
+      const started = beginTurn(client, codexThreadId, thread, m, use).then((turnId) => {
         // A successful JSON-RPC answer confirms delivery; a rejected request must leave
         // both the message and any handover unread for the runner's retry path.
         accepted(m);
@@ -324,34 +298,11 @@ export const codexAdapter: HarnessAdapter = {
 
     // Handshake, then start or resume the session, then run whatever the runner has queued.
     (async () => {
-      try {
-        await client.request('initialize', { clientInfo: { name: 'omni-os', version: '0.1.0' } });
-        client.notify('initialized', {});
-      } catch {
-        // The process died or never answered; the runner reports the exit and its stderr.
-        return client.kill('SIGKILL');
-      }
-      const mcp = buildMcpConfig({
-        threadId: thread.id,
-        channel: ctx.channel,
-        role: ctx.role,
-        browserBusy: ctx.browserBusy,
-        cdpEndpoint: ctx.cdpEndpoint,
-        omniUrl: ctx.omniUrl,
-      });
-      const params = {
-        model: thread.model || undefined,
-        cwd: thread.cwd,
-        approvalPolicy: 'never',
-        sandbox: 'danger-full-access',
-        developerInstructions: ctx.systemPrompt,
-        config: threadConfig(mcp.mcpServers),
-      };
+      if (!(await handshake(client))) return client.kill('SIGKILL');
+      const params = sessionParams(ctx);
       let res: ThreadStartResponse;
       try {
-        res = resume && codexThreadId
-          ? await client.request<ThreadStartResponse>('thread/resume', { threadId: codexThreadId, ...params })
-          : await client.request<ThreadStartResponse>('thread/start', params);
+        res = await openThread(client, params, resume ? codexThreadId : null);
       } catch (e) {
         return fatal(resume ? 'resume the session' : 'start the session', e);
       }
@@ -362,31 +313,25 @@ export const codexAdapter: HarnessAdapter = {
       pump();
     })();
 
-    return {
-      child: client.child,
-      write(obj: unknown) {
-        const o = obj as { type?: string; request?: { subtype?: string }; request_id?: string };
-        if (o?.type === 'user') {
-          const m = omniOf(o);
-          // Mid-turn goes in as a steer; otherwise it starts (or is queued for) the next turn. A
-          // built-in runs as a turn of its own, and nothing steers into one.
-          if (turnActive && !builtin && !builtinOf(m)) {
-            const sent = steer(m);
-            steering.add(sent);
-            void sent.finally(() => steering.delete(sent));
-          }
-          else {
-            outbox.push(m);
-            pump();
-          }
-          return true;
-        }
-        if (o?.type === 'control_request' && o.request?.subtype === 'interrupt') {
-          void interrupt(String(o.request_id ?? ''));
-          return true;
+    return processSession(client.child, cb, {
+      send(m) {
+        const o: Outgoing = { ...m };
+        // Mid-turn goes in as a steer; otherwise it starts (or is queued for) the next turn. A
+        // built-in runs as a turn of its own, and nothing steers into one.
+        if (turnActive && !builtin && !builtinOf(o)) {
+          const sent = steer(o);
+          steering.add(sent);
+          void sent.finally(() => steering.delete(sent));
+        } else {
+          outbox.push(o);
+          pump();
         }
         return true;
       },
-    };
+      interrupt(requestId) {
+        void interrupt(requestId);
+        return true;
+      },
+    });
   },
 };

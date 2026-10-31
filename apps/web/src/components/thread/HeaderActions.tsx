@@ -2,26 +2,19 @@ import type { ReactNode } from 'react';
 import type { Thread } from '../../api.ts';
 import { canMarkDone } from '../../needs-you.ts';
 import { openMenu } from '../ContextMenu.tsx';
-import { Button, Icon, IconButton, StatusPill } from '../ui.tsx';
-import { ThreadReferenceButton } from '../ThreadReference.tsx';
+import { Button, IconButton, StatusPill } from '../ui.tsx';
 import { ASKING_LABEL } from './QuestionCard.tsx';
 
-// Below this header width (the side panel open, a small window) pin, done, hand off and Send to Grok Bot fold into one More button and
-// Interrupt drops its label, so the title keeps its room. The header is the @container; 3xl is 48rem.
-export const FOLD = '@max-3xl:hidden';
-export const UNFOLD = '@3xl:hidden';
-
+// The header keeps the context meter, Done (Restore on an archived thread), the status, the thread menu and the panel
+// toggle. Pin, rename, move, archive, fork, reference, hand off and Send to Grok Bot are in the thread menu (⋯), the
+// list in packages/shared/thread-actions.ts that the right-click renders too.
 export function HeaderActions({
   thread,
   meter,
   reconnecting,
-  handoffReady,
-  onPin,
   onDone,
   onRestore,
   restoring,
-  grok,
-  interrupt,
   panelOpen,
   onPanel,
   artifactCount,
@@ -30,14 +23,9 @@ export function HeaderActions({
   thread: Thread;
   meter: ReactNode;
   reconnecting: boolean;
-  handoffReady: boolean;
-  onPin: () => void;
   onDone: () => void;
   onRestore: () => void;
   restoring: boolean;
-  grok: { busy: boolean; run: () => void };
-  /** Set while a turn runs that can be interrupted. */
-  interrupt: { busy: boolean; run: () => void } | null;
   panelOpen: boolean;
   onPanel: () => void;
   artifactCount: number;
@@ -46,10 +34,6 @@ export function HeaderActions({
 }) {
   const archived = !!thread.archived;
   const doneable = !archived && (!!thread.done_at || canMarkDone(thread.status));
-  const menuAt = (el: HTMLElement, handoff?: boolean) => {
-    const r = el.getBoundingClientRect();
-    openMenu({ kind: 'thread', id: thread.id }, r.left, r.bottom + 6, handoff);
-  };
   return (
     <div className="flex shrink-0 items-center gap-1">
       {reconnecting && (
@@ -58,18 +42,6 @@ export function HeaderActions({
         </span>
       )}
       {meter}
-      {!archived && <ThreadReferenceButton thread={thread} />}
-      {!archived && (
-        <IconButton
-          icon="pin"
-          label={thread.pinned_at ? 'Unpin thread' : 'Pin thread'}
-          title={thread.pinned_at ? 'Unpin from the sidebar' : 'Pin to the sidebar'}
-          active={!!thread.pinned_at}
-          aria-pressed={!!thread.pinned_at}
-          className={FOLD}
-          onClick={onPin}
-        />
-      )}
       {doneable && (
         <IconButton
           icon="check"
@@ -77,7 +49,6 @@ export function HeaderActions({
           title={thread.done_at ? 'Marked done. Click to bring it back to Needs you.' : 'Mark as done: out of Needs you until something new happens here'}
           active={!!thread.done_at}
           aria-pressed={!!thread.done_at}
-          className={FOLD}
           onClick={onDone}
         />
       )}
@@ -86,37 +57,16 @@ export function HeaderActions({
           Restore
         </Button>
       )}
-      <Button size="sm" variant="ghost" busy={grok.busy} aria-label="Send to Grok Bot" aria-busy={grok.busy} title="Send this thread's text to Grok Bot" className={`${FOLD} w-8 px-0`} onClick={grok.run}>
-        {!grok.busy && <Icon name="grok" size={16} />}
-      </Button>
       <StatusPill status={asking ? 'needs' : thread.status} label={asking ? ASKING_LABEL : undefined} />
-      {handoffReady && (
-        <IconButton
-          icon="share"
-          label="Hand off to another Mac"
-          title="Hand off to another Mac: a running turn carries on there, an idle thread continues there with your next message"
-          aria-haspopup="menu"
-          className={FOLD}
-          onClick={(e) => menuAt(e.currentTarget, true)}
-        />
-      )}
-      {/* The thread menu holds pin, done, hand off and Send to Grok Bot, and more. */}
-      {!archived && <IconButton icon="more" label="Thread actions" aria-haspopup="menu" className={UNFOLD} onClick={(e) => menuAt(e.currentTarget)} />}
-      {interrupt && (
-        <Button
-          size="sm"
-          variant="secondary"
-          icon="stop"
-          onClick={interrupt.run}
-          busy={interrupt.busy}
-          title="Interrupt the agent (Esc). Messages already sent still run."
-          aria-label={interrupt.busy ? 'Interrupting' : 'Interrupt'}
-          aria-keyshortcuts="Escape"
-          className="@max-3xl:px-2"
-        >
-          <span className="@max-3xl:sr-only">{interrupt.busy ? 'Interrupting' : 'Interrupt'}</span>
-        </Button>
-      )}
+      <IconButton
+        icon="more"
+        label="Thread actions"
+        aria-haspopup="menu"
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          openMenu({ kind: 'thread', id: thread.id }, r.left, r.bottom + 6);
+        }}
+      />
       <span className="relative">
         <IconButton icon="panel" label="Artifacts, changes, browser, terminal, actions, details" active={panelOpen} onClick={onPanel} />
         {artifactCount > 0 && (

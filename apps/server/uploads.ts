@@ -38,6 +38,12 @@ export const imageMime = (name: string, type?: string) => {
   return type && Object.values(IMAGE_MIME).includes(type) ? type : null;
 };
 
+/** What a file is, as an attachment records it. */
+export function fileKind(name: string, type?: string) {
+  const mime = imageMime(name, type);
+  return { mime: mime ?? (type || 'application/octet-stream'), image: !!mime };
+}
+
 /** No directories, no dotfiles, nothing that can escape the uploads folder. */
 export function safeName(raw: string) {
   const name = basename(raw.replace(/\\/g, '/'))
@@ -80,8 +86,7 @@ export async function saveUploads(threadId: string, files: File[]): Promise<Atta
     const path = join(dir, name);
     const buf = Buffer.from(await f.arrayBuffer());
     writeFileSync(path, buf);
-    const mime = imageMime(name, f.type);
-    out.push({ name, path, size: buf.byteLength, mime: mime ?? f.type ?? 'application/octet-stream', image: !!mime });
+    out.push({ name, path, size: buf.byteLength, ...fileKind(name, f.type) });
   }
   return out;
 }

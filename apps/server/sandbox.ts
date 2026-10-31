@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -224,7 +224,8 @@ export function buildMcpConfig(input: McpInput) {
 
   servers[ASK_SERVER] = { command: paths.tsx, args: [paths.mcpAsk], env: api };
 
-  if (config.browser) {
+  // A delegate-only role hands browser work to a crewmate, so it gets no browser to be tempted by.
+  if (config.browser && !input.role?.delegateOnly) {
     const args = [playwrightMcpBin(), '--output-dir', browserOutDir(input.threadId)];
     // Chrome locks a profile dir, so only one live thread per channel gets the persistent logins.
     if (input.cdpEndpoint && !input.browserBusy) args.push('--cdp-endpoint', input.cdpEndpoint);
@@ -263,6 +264,37 @@ export function writeCursorPlugin(input: McpInput): string {
   mkdirSync(join(dir, '.cursor-plugin'), { recursive: true });
   writeFileSync(join(dir, '.cursor-plugin', 'plugin.json'), JSON.stringify({ name: 'omni-os', version: '0.1.0' }, null, 2));
   writeFileSync(join(dir, '.mcp.json'), JSON.stringify(cfg, null, 2));
+  return dir;
+}
+
+/** The Cursor Agent permission rules a delegate-only role runs under. Deny beats `--force`, and MCP tools stay allowed. */
+export const CURSOR_DELEGATE_ONLY_DENY = ['Shell(*)', 'Write(**)'];
+
+/**
+ * Make dir a delegate-only role's Cursor config folder, for CURSOR_CONFIG_DIR: the user's own folder with `cli-config.json`
+ * copied and its deny list extended, and everything else linked, so the login, chats and sessions stay where they
+ * are. Cursor reads its permissions only from there or from the repo's `.cursor/cli.json`, and Omni writes neither
+ * the repo nor ~/.cursor. Rewritten every spawn, so a change to the user's config reaches the next turn.
+ */
+export function writeCursorDenyConfig(dir: string, userDir: string): string {
+  mkdirSync(dir, { recursive: true });
+  for (const name of existsSync(userDir) ? readdirSync(userDir) : []) {
+    if (name === 'cli-config.json') continue;
+    const link = join(dir, name);
+    try {
+      lstatSync(link);
+    } catch {
+      symlinkSync(join(userDir, name), link);
+    }
+  }
+  let cfg: { permissions?: { allow?: string[]; deny?: string[] }; [k: string]: unknown } = { version: 1 };
+  try {
+    cfg = JSON.parse(readFileSync(join(userDir, 'cli-config.json'), 'utf8'));
+  } catch {
+    // No config of the user's yet: the deny list alone.
+  }
+  const deny = [...new Set([...(cfg.permissions?.deny ?? []), ...CURSOR_DELEGATE_ONLY_DENY])];
+  writeFileSync(join(dir, 'cli-config.json'), JSON.stringify({ ...cfg, permissions: { allow: cfg.permissions?.allow ?? [], deny } }, null, 2));
   return dir;
 }
 

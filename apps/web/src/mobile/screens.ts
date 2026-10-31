@@ -15,7 +15,7 @@ export type ScreenKey =
   | 'viewer'
   | 'settings'
   | 'search'
-  /** A desktop page the phone has no screen of its own for (automations, secrets, sync, channel setup), under a back bar. */
+  /** A desktop page the phone has no screen of its own for (a Settings section, automations, channel setup), under a back bar. */
   | 'page'
   | 'notfound';
 
@@ -71,13 +71,10 @@ export function screenOf(r: Route): ScreenKey {
     case 'thread':
       return r.artifact ? 'viewer' : (r.view ?? 'thread');
     case 'settings':
-      return r.page ? 'page' : 'settings';
+      return r.section ? 'page' : 'settings';
     case 'search':
       return 'search';
     case 'automations':
-    case 'secrets':
-    case 'sync':
-    case 'storage':
     case 'new-channel':
       return 'page';
     case 'notfound':
@@ -87,8 +84,6 @@ export function screenOf(r: Route): ScreenKey {
 
 export const specOf = (r: Route) => SCREENS[screenOf(r)];
 
-/** A route's path, its key as a layer. */
-export const pathOf = (hash: string) => hash.replace(/^#/, '').split('?')[0] || '/';
 
 /**
  * The pushed screens a route shows, bottom first, ending with the route itself; empty for a tab root. Each one under

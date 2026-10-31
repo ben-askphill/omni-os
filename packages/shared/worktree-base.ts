@@ -48,11 +48,3 @@ export interface ThreadBaseView {
   ref: string | null;
 }
 
-/** A pick as the API sends it, or null when it is not one. */
-export function parsePick(v: unknown): BasePick | null {
-  if (!v || typeof v !== 'object') return null;
-  const o = v as { kind?: unknown; ref?: unknown };
-  if (o.kind === 'head' || o.kind === 'remote-default') return { kind: o.kind };
-  if (o.kind === 'ref' && typeof o.ref === 'string' && o.ref.trim()) return { kind: 'ref', ref: o.ref.trim() };
-  return null;
-}

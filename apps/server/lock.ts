@@ -1,11 +1,43 @@
+import { spawnSync } from 'node:child_process';
 import { closeSync, constants, fstatSync, ftruncateSync, openSync, readFileSync, rmSync, statSync, writeSync } from 'node:fs';
 
 // One server per data dir. The server keeps the lock file open with an exclusive flock(2), which the
 // kernel drops when the process ends, however it ends. So a lock is never stale and no pid is guessed at:
 // the pid in the file only names the holder for the message a second server prints.
 
-/** macOS open(2) flag: take an exclusive flock as the file opens. Node has no constant for it. */
+/** macOS and BSD open(2) flag: take an exclusive flock as the file opens. Node has no constant for it. */
 const O_EXLOCK = 0x20;
+
+/** Linux has no O_EXLOCK, and Node has no flock(2). */
+const viaOpen = process.platform === 'darwin' || process.platform === 'freebsd';
+
+/** flock(1)'s exit code when the lock is held, so it differs from its own errors. */
+const HELD = 75;
+
+/**
+ * Opens file holding an exclusive flock, or returns null while another process holds it. On Linux, util-linux
+ * flock(1) takes the lock on the descriptor it shares: a flock belongs to the open file, not to the process that
+ * took it, so it stays with this process when flock(1) exits.
+ */
+function openLocked(file: string): number | null {
+  if (viaOpen) {
+    try {
+      return openSync(file, constants.O_RDWR | constants.O_CREAT | constants.O_NONBLOCK | O_EXLOCK, 0o644);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'EAGAIN') return null;
+      throw err;
+    }
+  }
+  const fd = openSync(file, constants.O_RDWR | constants.O_CREAT, 0o644);
+  const run = spawnSync('flock', ['--nonblock', '--exclusive', '--conflict-exit-code', String(HELD), '3'], {
+    stdio: ['ignore', 'ignore', 'pipe', fd],
+  });
+  if (run.status === 0) return fd;
+  closeSync(fd);
+  if (run.status === HELD) return null;
+  const why = run.error ? run.error.message : run.stderr.toString().trim() || `exit ${run.status ?? run.signal}`;
+  throw new Error(`could not lock ${file} with flock(1), from util-linux: ${why}`);
+}
 
 /** The locks this process holds, by file: the descriptor holding each. */
 const held = new Map<string, number>();
@@ -36,11 +68,8 @@ const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(
 export function takeLock(file: string): number | null {
   if (held.has(file)) return null;
   for (let attempt = 0; attempt < 50; attempt++) {
-    let fd: number;
-    try {
-      fd = openSync(file, constants.O_RDWR | constants.O_CREAT | constants.O_NONBLOCK | O_EXLOCK, 0o644);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EAGAIN') throw err;
+    const fd = openLocked(file);
+    if (fd === null) {
       // Held. Its server writes its pid right after it takes the lock: until then the file names the one before.
       const holder = readPid(file);
       if (holder && alive(holder)) return holder;

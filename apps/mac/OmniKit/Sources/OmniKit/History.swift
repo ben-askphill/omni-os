@@ -162,6 +162,72 @@ public struct History: Equatable, Sendable {
     return true
   }
 
+  /// How much of a thread the app keeps while it holds the thread open (#411), as RETAIN in
+  /// packages/shared/history.ts. Once the held rows pass `rows + slack` while Ben follows the newest, or `hard` while
+  /// he reads older ones, `bound` drops the oldest down to `slack` fewer. "Load earlier" brings them back.
+  public struct Retain: Decodable, Hashable, Sendable {
+    public var rows: Int
+    public var slack: Int
+    public var hard: Int
+
+    public init(rows: Int, slack: Int, hard: Int) {
+      (self.rows, self.slack, self.hard) = (rows, slack, hard)
+    }
+
+    public static let standard = Retain(rows: 1500, slack: 500, hard: 6000)
+  }
+
+  /// Drops the oldest held rows once there are too many, as boundHistory does. The cut goes at the first turn start
+  /// among the `slack` rows past the newest `limit - slack`, else right there. Rows under the cut go, but for the
+  /// anchors a head page would bring: the parent calls of the calls kept, and the newest `init` and `result` when the
+  /// rows kept have none. Spans start at the cut, and `below` counts the results dropped. Returns whether it dropped any.
+  @discardableResult
+  public mutating func bound(follows: Bool, retain: Retain = .standard) -> Bool {
+    let limit = follows ? retain.rows + retain.slack : retain.hard
+    guard rows.count > limit else { return false }
+    let start = rows.count - (limit - retain.slack)
+    func inSpan(_ i: Int) -> Int? { spanIndex(rows[i].id) }
+    var cut: Int?
+    for i in max(start, 1)..<min(rows.count, start + retain.slack) {
+      if let s = inSpan(i), rows[i - 1].kind == "result", inSpan(i - 1) == s {
+        cut = i
+        break
+      }
+    }
+    if cut == nil { cut = (start..<rows.count).first { inSpan($0) != nil } }
+    guard let cut, cut > 0 else { return false }
+    let floor = rows[cut].id
+    let kept = rows[cut...]
+    let under = rows[..<cut]
+    func use(_ r: EventRow) -> ToolUse? { if case .toolUse(let u) = r.content { u } else { nil } }
+
+    var anchors = Set<Int>()
+    let keptCalls = Set(kept.compactMap { use($0)?.id })
+    var wanted = kept.compactMap { use($0)?.parent }.filter { !keptCalls.contains($0) }
+    if !wanted.isEmpty {
+      var calls: [String: EventRow] = [:]
+      for r in under {
+        if let u = use(r), calls[u.id] == nil { calls[u.id] = r }
+      }
+      while let id = wanted.popLast() {
+        guard let r = calls[id], !anchors.contains(r.id) else { continue }
+        anchors.insert(r.id)
+        if let parent = use(r)?.parent { wanted.append(parent) }
+      }
+    }
+    for kind in ["init", "result"] where !kept.contains(where: { $0.kind == kind }) {
+      if let r = under.last(where: { $0.kind == kind }) { anchors.insert(r.id) }
+    }
+
+    if floor > below.from {
+      let dropped = under.count(where: { $0.kind == "result" && $0.id >= below.from })
+      below = Below(from: floor, results: below.results + dropped)
+    }
+    rows = under.filter { anchors.contains($0.id) } + kept
+    spans = spans.filter { s in s.to.map { $0 > floor } ?? true }.map { s in s.from < floor ? HistorySpan(from: floor, to: s.to) : s }
+    return true
+  }
+
   /// For #224: the stream says the gap since `tailID` is too big to replay. The head span closes after the newest
   /// held row and becomes an island; the fresh head then comes in through `apply(head:)`.
   public mutating func detachHead() {

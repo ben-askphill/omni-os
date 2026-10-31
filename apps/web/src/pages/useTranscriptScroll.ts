@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useScrollAnchor } from './useScrollAnchor.ts';
 
 /** How close to the bottom counts as at it, for fractional scroll positions and zoom. */
@@ -55,6 +55,8 @@ export function useTranscriptScroll(tailId: number, content: unknown, active: bo
   const pin = () => {
     nearBottom.current = true;
   };
+  /** Whether the view follows the bottom now, for the history bound (useThreadHistory's `follows`). */
+  const following = useCallback(() => nearBottom.current, []);
   /** Stop following the bottom: the view moved to something older on purpose (a search hit). */
   const release = () => {
     nearBottom.current = false;
@@ -87,5 +89,5 @@ export function useTranscriptScroll(tailId: number, content: unknown, active: bo
     } else if (next === 'pill') setShowJump(true);
   }, [tailId, content]);
 
-  return { scrollRef, contentRef, onScroll, showJump, jump, pin, release };
+  return { scrollRef, contentRef, onScroll, showJump, jump, pin, release, following };
 }

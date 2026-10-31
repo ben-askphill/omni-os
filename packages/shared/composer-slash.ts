@@ -22,8 +22,8 @@ export type ReplyAction =
   /** `/clear` or `/new`: a new thread with this one's settings. No prompt opens its composer. */
   | { kind: 'new-thread'; prompt: string }
   | { kind: 'rename'; title: string }
-  /** `/model`, `/effort` or `/fast`: Omni switches these with the composer pills, so Send does nothing. */
-  | { kind: 'fixed' };
+  /** `/model`, `/effort` or `/fast`: Send opens the composer's model pill. Its pick switches the next turn. */
+  | { kind: 'pick-model' };
 
 export interface ReplySlash {
   action: ReplyAction;
@@ -59,7 +59,7 @@ export function replySlash(text: string, list: CommandList | null, harness: stri
         return { action: { kind: 'rename', title }, armed: !!title && !hint, label: 'Rename', hint };
       }
       default:
-        return { action: { kind: 'fixed' }, armed: false, label: null, hint: 'Switch the model and effort with the pills below. The next turn uses them.' };
+        return { action: { kind: 'pick-model' }, armed: true, label: 'Pick model', hint: 'Opens the model pill below. The next turn runs on what you pick.' };
     }
   }
   return { action: { kind: 'send' }, armed: !!text.trim(), label: null, hint: textHint(text, r, list, harness, 'reply') };

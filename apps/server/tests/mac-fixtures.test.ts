@@ -7,8 +7,13 @@ import { join, resolve } from 'node:path';
 import { applyPage, earlierCursor, historyQuery, openHistory, revealCursor, type HistoryHead, type HistoryPage, type HistoryRow } from '@omni/shared/history.ts';
 import { newContext } from '@omni/shared/message-context.ts';
 import { diffSelection, selectRows } from '@omni/shared/message-context-diff.ts';
+import { EVERY_ACTION_FACTS, threadMenu } from '@omni/shared/thread-actions.ts';
+import { SETTING_FIELDS, SETTING_PAGES, SETTING_SECTIONS, sectionFields } from '@omni/shared/settings.ts';
+import { CHANGE_KINDS, CHANGE_STATUSES, CHANGES_WIRE_KEYS, DIFF_OMITTED, TURN_STATES, changesProblems, turnChangesProblems } from '@omni/shared/changes.ts';
 import { diff, shapeOf, tagOf } from './fixture-shape.ts';
 import { FAKE_CLAUDE, diffFile, fakeAlive } from './support.ts';
+import { macAppSource, omniKitSource, swiftEnumValues, swiftKeys, swiftSwitchCases } from './swift-wire.ts';
+import { userConfigSchema } from '../user-config.ts';
 
 // Golden fixtures for the Mac app's Swift types (apps/mac/OmniKit). Boots the real server with the fake claude CLI,
 // makes a channel and runs a thread through three turns, and keeps what the app reads: the JSON of each GET
@@ -33,7 +38,8 @@ const HINT = `The server JSON the Mac app reads changed shape. If that is on pur
 /**
  * Every fixture this test owns. The Swift tests decode each one. A few come from elsewhere: sync-status.json is checked
  * by sync-setup.test.ts, and those that take two Macs by their own tests: devices.json and thread-handoff.json by
- * handoff-two-macs.test.ts, thread-takeover.json and thread-takeover-requested.json by takeover-two-macs.test.ts.
+ * handoff-two-macs.test.ts, thread-takeover.json and thread-takeover-requested.json by takeover-two-macs.test.ts, and
+ * thread-undelivered.json by delivery-gap-run-on.test.ts.
  */
 const NAMES = [
   'harnesses.json',
@@ -95,6 +101,8 @@ const NAMES = [
   'limit-scheduled.json',
   'limit-cancelled.json',
   'limit-resumed.json',
+  // That thread, once done, started with fresh context: its next turn gets a new session (#400).
+  'session-fresh.json',
   // The retried worktree thread's branch changes, every group, and a thread with no repo to read.
   'changes.json',
   'changes-unavailable.json',
@@ -132,6 +140,9 @@ const NAMES = [
   'action-run.json',
   'action-run-stopped.json',
   'thread-actions.json',
+  // Not the server's: the shared thread action menu (packages/shared/thread-actions.ts) for a thread every action applies
+  // to, which the Mac app runs through its slash engine bundle.
+  'thread-menu.json',
   // The storage scan over the worktrees above, once it has finished.
   'worktree-scan.json',
   // A cleanup of two of them that removes one and keeps the other, then this Mac's retention policy turned on.
@@ -148,6 +159,9 @@ type Name = (typeof NAMES)[number];
 const tmp = mkdtempSync(join(tmpdir(), 'omni-mac-fixtures-'));
 const data = join(tmp, 'data');
 const fakeLog = join(tmp, 'fake-claude.jsonl');
+// Reply suggestions land only while this file exists (FAKE_CLAUDE_SUGGEST_GATE): the lists and streams record a done
+// thread with none, and needs-you.json with one. Left to timing, a loaded machine got them the other way round.
+const suggestGate = join(tmp, 'suggest-gate');
 const got = new Map<Name, string>();
 let child: ChildProcess | undefined;
 
@@ -247,8 +261,12 @@ async function boot(): Promise<number> {
     env: {
       PATH: `${bin}:${process.env.PATH}`,
       HOME: process.env.HOME,
+      // Channel actions run in $SHELL, else /bin/zsh, which a Linux box may not have.
+      SHELL: '/bin/sh',
       TMPDIR: tmpdir(),
       OMNI_DATA_DIR: data,
+      // The fake `security` above, on Linux too, where the default store is secrets.json.
+      OMNI_SECRET_STORE: 'keychain',
       OMNI_TOKEN: process.env.OMNI_TOKEN,
       OMNI_PORT: '0',
       OMNI_HOST: '127.0.0.1',
@@ -265,6 +283,7 @@ async function boot(): Promise<number> {
       OMNI_WEB_DIST: join(tmp, 'no-web'),
       OMNI_AUTOMATIONS_DIR: automationsDir,
       FAKE_CLAUDE_LOG: fakeLog,
+      FAKE_CLAUDE_SUGGEST_GATE: suggestGate,
       FAKE_CLAUDE_LATENCY_MS: '10',
       FAKE_CLAUDE_CRASH_ON: 'CRASH_NOW',
       // Pages of 6 rows, 8 KB, 1 KB a row: a short thread still shows every history shape.
@@ -595,7 +614,14 @@ async function scenario() {
 
   // Needs you now holds every kind: done, failed and stopped results, a question, failed Setup, parked requests and a limit stop.
   type Item = { thread: Thread; result: { uid: string; status: string } | null; blockers: { kind: string }[] };
+  writeFileSync(suggestGate, '');
+  await eventually(async () => {
+    const { items } = (await get('/needs-you')) as { items: (Item & { thread: { suggestion: string | null } })[] };
+    // Automation runs and threads whose answer asks for no reply get none, so one done thread with a suggestion is enough.
+    return items.some((i) => i.result?.status === 'done' && i.thread.suggestion);
+  }, 'a done thread\'s reply suggestion');
   const inbox = keep('needs-you.json', await get('/needs-you')) as { items: Item[] };
+  rmSync(suggestGate);
   expect(new Set(inbox.items.flatMap((i) => (i.result ? [i.result.status] : [])))).toEqual(new Set(['done', 'failed', 'stopped']));
   expect(new Set(inbox.items.flatMap((i) => i.blockers.map((b) => b.kind)))).toEqual(new Set(['question', 'setup', 'recovered', 'limited']));
   // Ben reads the stopped parent's result: its held crew report still needs him. The uid is this run's.
@@ -687,6 +713,8 @@ async function scenario() {
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
+  const fresh = keep('session-fresh.json', await call('POST', `/threads/${capped.id}/session/fresh`, {})) as { thread: { resume_blocked: string | null } };
+  expect(fresh.thread.resume_blocked).toBeNull();
 
   // Bounded history: a first turn whose prompt and answer are too big for a row, then a short one. The client opens on
   // the head, loads the page above it, then reveals the first message and reads it whole, as a search hit would.
@@ -754,6 +782,7 @@ async function scenario() {
   const again = (await call('POST', `/threads/${id}/action-runs/${previewing.id}/retry`, {})) as Run;
   keep('thread-actions.json', await get(`/threads/${id}/actions`));
   await call('POST', `/threads/${id}/action-runs/${again.id}/stop`, {});
+  keep('thread-menu.json', threadMenu(EVERY_ACTION_FACTS));
 
   // Two archived worktree threads in a repo with an origin, so that both can be cleaned up.
   const gadgetsOrigin = join(tmp, 'gadgets.git');
@@ -925,4 +954,62 @@ describe('Mac app fixtures', () => {
       expect(out, HINT).toEqual([]);
     });
   }
+});
+
+// The Swift wire types against the @omni/shared contracts the server and the web import. The recorded answers the
+// Swift tests decode must match the shared types exactly, and Changes.swift must read the same keys and know the same
+// values. Reads only files, so it needs no server.
+describe('Swift wire types follow @omni/shared', () => {
+  const fixture = (name: string) => JSON.parse(readFileSync(join(FIXTURES, name), 'utf8')) as unknown;
+
+  it.each([
+    ['changes.json', changesProblems],
+    ['changes-unavailable.json', changesProblems],
+    ['turns.json', turnChangesProblems],
+    ['turns-unavailable.json', turnChangesProblems],
+  ] as const)('%s is what @omni/shared/changes.ts says', (name, problems) => {
+    expect(problems(fixture(name))).toEqual([]);
+  });
+
+  it('Changes.swift reads the keys of each shared type', () => {
+    const src = omniKitSource('Changes.swift');
+    for (const [type, keys] of Object.entries(CHANGES_WIRE_KEYS)) expect([type, swiftKeys(src, type).sort()]).toEqual([type, [...keys].sort()]);
+  });
+
+  it('Changes.swift knows every kind, state, status and omitted reason', () => {
+    const src = omniKitSource('Changes.swift');
+    expect(swiftEnumValues(src, 'ChangeKind').sort()).toEqual([...CHANGE_KINDS].sort());
+    expect(swiftEnumValues(src, 'TurnState').sort()).toEqual([...TURN_STATES].sort());
+    // `modified` is the letter switch's default.
+    expect([...swiftSwitchCases(src, 'ChangedFile', 'letter'), 'modified'].sort()).toEqual([...CHANGE_STATUSES].sort());
+    expect(swiftSwitchCases(src, 'ChangedFile', 'notice').sort()).toEqual([...DIFF_OMITTED].sort());
+  });
+
+  it('Setup.swift holds every field Settings shows, and none the contract lacks', () => {
+    const src = omniKitSource('Setup.swift');
+    const swiftType = { user: 'User', workspace: 'Workspace', integrations: 'Integrations' } as const;
+    for (const section of SETTING_SECTIONS) {
+      const keys = swiftKeys(src, swiftType[section]);
+      const all = sectionFields(section).map((f) => f.key);
+      const shown = sectionFields(section).filter((f) => f.page).map((f) => f.key);
+      expect([section, shown.filter((k) => !keys.includes(k))]).toEqual([section, []]);
+      expect([section, keys.filter((k) => !all.includes(k))]).toEqual([section, []]);
+    }
+    const configKeys = Object.keys(userConfigSchema.parse({}));
+    expect(swiftKeys(src, 'UserConfig').filter((k) => k !== 'onboardedAt' && !configKeys.includes(k))).toEqual([]);
+  });
+
+  it('ProfileSettingsView.swift shows each field with the shared label, hint and placeholder', () => {
+    const src = macAppSource('ProfileSettingsView.swift');
+    const missing: string[] = [];
+    const need = (text: string | undefined) => text && !src.includes(text) && missing.push(text);
+    for (const page of Object.values(SETTING_PAGES)) [page.title, page.advanced?.summary, page.advanced?.note].forEach(need);
+    for (const f of SETTING_FIELDS.filter((x) => x.page)) {
+      need(`"${f.label}"`);
+      // The part before `{fallback}`, which the Swift interpolates.
+      need('hint' in f ? f.hint.split('{fallback}')[0] : undefined);
+      need('placeholder' in f ? `"${f.placeholder}"` : undefined);
+    }
+    expect(missing).toEqual([]);
+  });
 });

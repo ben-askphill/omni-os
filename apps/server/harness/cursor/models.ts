@@ -14,6 +14,52 @@ const prettyLabel = (id: string) =>
     .map((p) => (/^\d/.test(p) ? p : p.charAt(0).toUpperCase() + p.slice(1)))
     .join(' ');
 
+/** The word Cursor appends to a label for each effort. xhigh is "Extra High", not "Xhigh". */
+const EFFORT_WORD: Record<string, string> = {
+  none: 'None',
+  minimal: 'Minimal',
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  xhigh: 'Extra High',
+  max: 'Max',
+};
+
+/**
+ * The family's name from one `--list-models` label. Cursor puts the effort in the label ("Grok 4.6 Low",
+ * "Claude Opus 5 1M Low Thinking", "GPT-5.6 Sol (high)") and the picker shows that effort on its own,
+ * so it comes off. A fast suffix comes off too. "(NO ZDR)" stays: it is not an effort.
+ * An id ending in `-extra-high` parses as effort `high` on the base `…-extra` (the suffix is `-high`).
+ * Leave "Extra High" in place there, or that family reads "… Extra".
+ */
+function familyLabel(raw: string, effort: string): string {
+  let label = raw.trim().replace(
+    /\s*\((?:default|fast|none|minimal|low|medium|high|xhigh|extra high|max)(?:\s*,\s*fast)?\)\s*$/i,
+    '',
+  );
+  label = label.replace(/\s+Fast$/i, '');
+  const word = EFFORT_WORD[effort];
+  if (word) {
+    const body = word.replace(/\s+/g, '\\s+');
+    if (effort === 'high') {
+      label = label.replace(/\s+High(?=\s|$)/i, (match, offset: number, str: string) =>
+        str.slice(Math.max(0, offset - 'Extra'.length), offset) === 'Extra' ? match : '',
+      );
+    } else {
+      label = label.replace(new RegExp(`\\s+${body}(?=\\s|$)`, 'i'), '');
+    }
+  }
+  return label.replace(/[ \t]{2,}/g, ' ').trim();
+}
+
+/** The name most of a family's rows agree on. A tie takes the shorter one, which is the one with the effort gone. */
+function pickLabel(names: string[]): string | undefined {
+  if (!names.length) return undefined;
+  const counts = new Map<string, number>();
+  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)[0][0];
+}
+
 /** Split a CLI model id into its base family and effort, ignoring the `-fast` suffix. */
 export function splitCursorId(id: string): { base: string; effort: string; fast: boolean } {
   let rest = id;
@@ -39,18 +85,19 @@ export function cursorModelId(family: string, effort: string): string {
 /**
  * Parse the `--list-models` output ("id - Label" or "id" per line) into catalog families. The
  * "Available models" header and the closing "Tip: ..." line have spaces, which no id has.
+ * The label is Cursor's own text, not the id with its dashes turned into spaces: `cursor-grok-4.5`
+ * is "Grok 4.5", and `claude-opus-4-8` is "Claude Opus 4.8 1M", not "Claude Opus 4 8".
+ * A line with no label falls back to that dash spacing.
  */
 export function parseCursorModels(listOutput: string): ModelEntry[] {
-  const ids = listOutput
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((l) => l.split(/\s+-\s+/)[0].trim())
-    .filter((id) => /^\S+$/.test(id));
-
   const efforts = new Map<string, Set<string>>();
+  const labels = new Map<string, string[]>();
   let hasAuto = false;
-  for (const id of ids) {
+  for (const line of listOutput.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const [id, ...rest] = trimmed.split(/\s+-\s+/);
+    if (!id || !/^\S+$/.test(id)) continue;
     if (id === 'auto') {
       hasAuto = true;
       continue;
@@ -59,13 +106,19 @@ export function parseCursorModels(listOutput: string): ModelEntry[] {
     if (fast) continue; // fast variants stay out of the picker
     if (!efforts.has(base)) efforts.set(base, new Set());
     if (effort) efforts.get(base)!.add(effort);
+    const name = familyLabel(rest.join(' - '), effort);
+    if (name) {
+      const got = labels.get(base);
+      if (got) got.push(name);
+      else labels.set(base, [name]);
+    }
   }
 
   const entry = (base: string): ModelEntry => {
     const levels = CURSOR_EFFORTS.filter((e) => efforts.get(base)!.has(e));
     return {
       id: base,
-      label: prettyLabel(base),
+      label: pickLabel(labels.get(base) ?? []) ?? prettyLabel(base),
       efforts: levels,
       defaultEffort: levels.includes('high') ? 'high' : levels[0] ?? '',
       ...(isClaude(base) ? { note: CLAUDE_NOTE } : {}),

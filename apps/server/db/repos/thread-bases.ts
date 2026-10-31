@@ -1,10 +1,12 @@
 import { db, now } from '../connection.ts';
 
+import type { BaseHow } from '@omni/shared/changes.ts';
+
 /**
  * How a thread's base commit was picked: `thread-start` is the commit its worktree was cut from, `merge-base` the
  * merge base of its checkout with the repo's default branch, for a thread that had none recorded.
  */
-export type BaseHow = 'thread-start' | 'merge-base';
+export type { BaseHow };
 
 /** The commit a thread's changes are compared to (apps/server/changes.ts). Local to this Mac, not synced. */
 export interface ThreadBase {

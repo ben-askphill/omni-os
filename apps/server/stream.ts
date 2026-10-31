@@ -351,23 +351,75 @@ export function parseEvent(evt: any): Parsed {
   return out;
 }
 
-/** Splits a stdout chunk stream into complete JSON lines. */
+/**
+ * The longest record a CLI may write on one line, in characters. Well above any real one (a
+ * stream-json line carrying a large image), so only a runaway or wedged process reaches it.
+ */
+export const MAX_RECORD_CHARS = 64 * 1024 * 1024;
+
+export interface LineSplitterOptions {
+  /** Longest line kept, in characters. Default MAX_RECORD_CHARS. */
+  maxChars?: number;
+  /** Called once for each line dropped for being too long, with the characters it had reached. Logs by default. */
+  onOverflow?: (chars: number) => void;
+}
+
+/**
+ * Splits a stdout chunk stream into complete JSON lines. A line longer than the cap is dropped up
+ * to its newline, so an unterminated record cannot grow memory without bound.
+ */
 export class LineSplitter {
   private buf = '';
+  /** Inside a dropped line: discard everything up to the next newline. */
+  private skipping = false;
+  private readonly maxChars: number;
+  private readonly onOverflow: (chars: number) => void;
+
+  constructor(opts: LineSplitterOptions = {}) {
+    this.maxChars = opts.maxChars ?? MAX_RECORD_CHARS;
+    this.onOverflow = opts.onOverflow
+      ?? ((chars) => console.error(`[stream] dropped a line of at least ${chars} characters (limit ${this.maxChars})`));
+  }
+
   push(chunk: string): string[] {
-    this.buf += chunk;
     const lines: string[] = [];
+    // Only the new chunk is scanned, and each line is sliced out once.
+    let from = 0;
     let idx: number;
-    while ((idx = this.buf.indexOf('\n')) >= 0) {
-      const line = this.buf.slice(0, idx).trim();
-      this.buf = this.buf.slice(idx + 1);
-      if (line) lines.push(line);
+    while ((idx = chunk.indexOf('\n', from)) >= 0) {
+      if (this.skipping) this.skipping = false;
+      else this.take(this.buf + chunk.slice(from, idx), lines);
+      this.buf = '';
+      from = idx + 1;
+    }
+    if (from < chunk.length && !this.skipping) {
+      this.buf += from ? chunk.slice(from) : chunk;
+      if (this.buf.length > this.maxChars) this.drop();
     }
     return lines;
   }
+
   flush(): string[] {
-    const rest = this.buf.trim();
+    const lines: string[] = [];
+    if (!this.skipping) this.take(this.buf, lines);
     this.buf = '';
-    return rest ? [rest] : [];
+    this.skipping = false;
+    return lines;
+  }
+
+  private take(raw: string, lines: string[]) {
+    if (raw.length > this.maxChars) {
+      this.onOverflow(raw.length);
+      return;
+    }
+    const line = raw.trim();
+    if (line) lines.push(line);
+  }
+
+  private drop() {
+    const chars = this.buf.length;
+    this.buf = '';
+    this.skipping = true;
+    this.onOverflow(chars);
   }
 }

@@ -11,7 +11,7 @@ public enum SidebarItem: Hashable, Sendable {
   case newChannel
   case artifacts
   case automations
-  case secrets
+  /// Opens the Settings window on General and never shows as selected: Settings is a window, not a screen.
   case settings
 
   /// The row a route selects, nil for a route with none, like search.
@@ -23,7 +23,6 @@ public enum SidebarItem: Hashable, Sendable {
     case .newChannel: self = .newChannel
     case .artifacts: self = .artifacts
     case .automations: self = .automations
-    case .secrets: self = .secrets
     case .settings: self = .settings
     case .search, .notFound: return nil
     }
@@ -37,8 +36,7 @@ public enum SidebarItem: Hashable, Sendable {
     case .newChannel: .newChannel
     case .artifacts: .artifacts
     case .automations: .automations
-    case .secrets: .secrets
-    case .settings: .settings
+    case .settings: .settings(.general)
     }
   }
 }
@@ -52,7 +50,6 @@ extension Route {
     case .thread: "Thread"
     case .search: "Search"
     case .automations: "Automations"
-    case .secrets: "Secrets"
     case .settings: "Settings"
     case .artifacts: "Artifacts"
     case .newChannel: "New channel"
@@ -60,9 +57,14 @@ extension Route {
     }
   }
 
-  /// Where New thread goes from here, like the Web UI's startThread: a channel's threads, else Home.
-  public var newThreadRoute: Route {
-    if case .channel(let id, _, _) = self { .channel(id: id) } else { .home }
+  /// Where New thread goes from here, like `startNewThread` in apps/web/src/router.ts: a channel's threads, the open
+  /// thread's channel on a thread (`threadChannel`, nil until its store has it), else Home.
+  public func newThreadRoute(threadChannel: String?) -> Route {
+    switch self {
+    case .channel(let id, _, _): .channel(id: id)
+    case .thread: threadChannel.map { Route.channel(id: $0) } ?? .home
+    default: .home
+    }
   }
 }
 

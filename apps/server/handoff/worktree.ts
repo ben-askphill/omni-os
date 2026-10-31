@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync 
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+import { applyCheckpoint, captureTree, commitCheckpoint } from '../checkpoint.ts';
 import { worktreeProblem } from '../sandbox.ts';
 import { MAX_FILE_BYTES } from '../sync/files.ts';
 import type { SyncTransport } from '../sync/transport.ts';
@@ -23,8 +24,6 @@ export interface WorktreeBundle {
 }
 
 const run = promisify(execFile);
-/** The handoff commit is Omni's, never on a branch: no identity of Ben's is needed or used. */
-const IDENTITY = { GIT_AUTHOR_NAME: 'Omni', GIT_AUTHOR_EMAIL: 'omni@localhost', GIT_COMMITTER_NAME: 'Omni', GIT_COMMITTER_EMAIL: 'omni@localhost' };
 
 async function git(dir: string, args: string[], env: Record<string, string> = {}): Promise<string> {
   try {
@@ -55,14 +54,8 @@ function scratch<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   return fn(dir).finally(() => rmSync(dir, { recursive: true, force: true }));
 }
 
-/** The tree a commit of everything git does not ignore in the checkout would have, read through an index of its own. */
-const snapshotTree = (dir: string) =>
-  scratch(async (tmp) => {
-    const env = { GIT_INDEX_FILE: join(tmp, 'index') };
-    await git(dir, ['read-tree', 'HEAD'], env);
-    await git(dir, ['add', '-A'], env);
-    return git(dir, ['write-tree'], env);
-  });
+/** The tree a commit of everything git does not ignore in the checkout would have: the checkout moves whole. */
+const snapshotTree = async (dir: string) => (await captureTree(dir, 'all', git)).tree;
 
 const descends = async (dir: string, from: string, to: string) => from === to || succeeds(git(dir, ['merge-base', '--is-ancestor', from, to]));
 
@@ -70,10 +63,10 @@ const ownCommits = (branch: string) => new Error(`this Mac's copy of branch ${br
 
 /** Pack the worktree at dir and upload the bundle. Changes nothing in the checkout. */
 export async function packWorktree(dir: string, threadId: string, offerId: string, transport: SyncTransport): Promise<WorktreeBundle> {
-  const base = await git(dir, ['rev-parse', 'HEAD']);
-  const wip = await git(dir, ['commit-tree', await snapshotTree(dir), '-p', base, '-m', `Omni handoff ${offerId}: uncommitted changes`], IDENTITY);
+  const { tree, head: base } = await captureTree(dir, 'all', git);
   const ref = handoffRef(threadId, offerId);
-  await git(dir, ['update-ref', ref, wip]);
+  // Packing the same offer again moves its ref to the new commit.
+  const wip = await commitCheckpoint(dir, { tree, parent: base, message: `Omni handoff ${offerId}: uncommitted changes`, ref, mode: 'replace' }, git);
   return scratch(async (tmp) => {
     const file = join(tmp, 'worktree.bundle');
     await git(dir, ['bundle', 'create', file, ref, '--not', '--remotes']);
@@ -148,7 +141,6 @@ export async function unpackWorktree(u: Unpack): Promise<void> {
     // What is left untracked is what this Mac handed away before, and that handoff's ref still holds it.
     if (!clean) await git(dir, ['clean', '--quiet', '-fd']);
   }
-  await git(dir, ['read-tree', '-u', '--reset', bundle.wip]);
-  // The index back at HEAD: the changes are uncommitted again, and new files untracked, as they were.
-  await git(dir, ['reset', '--quiet']);
+  // The changes uncommitted again, and new files untracked, as they were.
+  await applyCheckpoint(dir, bundle.wip, git);
 }

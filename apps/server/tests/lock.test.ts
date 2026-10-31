@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -102,6 +102,26 @@ describe('takeLock', () => {
       process.kill(helper, 'SIGKILL');
     }
   });
+
+  it('stops a second server on the same data dir before it opens the database', () => {
+    const data = mkdtempSync(join(tmp, 'second-'));
+    const file = join(data, 'server.pid');
+    expect(takeLock(file)).toBeNull();
+    try {
+      // OMNI_PORT 0: should the lock fail to stop it, the server listens nowhere that matters.
+      const second = spawnSync(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', 'tsx', join(ROOT, 'apps', 'server', 'index.ts')], {
+        cwd: ROOT,
+        env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: tmpdir(), OMNI_DATA_DIR: data, OMNI_PORT: '0' },
+        encoding: 'utf8',
+        timeout: 30_000,
+      });
+      expect(second.status).toBe(1);
+      expect(second.stderr).toContain(`another Omni server (pid ${process.pid}) is running on ${data}. Stop it first.`);
+      expect(readdirSync(data)).not.toContain('omni.db');
+    } finally {
+      releaseLock(file);
+    }
+  }, 40_000);
 
   it('takes over a lock whose pid now belongs to another node program', async () => {
     const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60_000)'], { stdio: 'ignore' });

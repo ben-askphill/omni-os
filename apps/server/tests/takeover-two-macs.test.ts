@@ -79,7 +79,7 @@ function heldByA(threadId: string, patch: Record<string, unknown> = {}) {
     id: threadId, channel_id: 'shop', title: threadId, status: 'done', role: null, model: null, session_id: threadId, cwd: shared,
     branch: null, parent_id: null, task_id: null, source: 'manual', automation: null, ...(patch as object),
   });
-  a.db.threads.hold(threadId);
+  a.db.assignments.claim(threadId);
   return threadId;
 }
 

@@ -1,52 +1,10 @@
 import OmniKit
 import SwiftUI
 
-/// The thread header's thread reference button and the picker it opens, as `ThreadReferenceButton` in ThreadReference.tsx: a
-/// search over thread titles and channels, this channel unless Ben switches to All channels. A pick adds a chip to the
-/// draft. Nothing is sent to, started in or changed on the picked thread. The `@` menu for files is untouched.
-struct ThreadReferenceButton: View {
-  let disabled: Bool
-  @State private var picker: ThreadReferencePicker
-  @State private var open = false
-  /// How far the button's right edge is from the window's left edge. A popover centres on its anchor, so the strip
-  /// shrinks until the list's left edge stays inside the window.
-  @State private var room: CGFloat = .infinity
-
-  init(client: OmniClient, thread: OmniThread, draft: DraftContextModel, disabled: Bool) {
-    self.disabled = disabled
-    _picker = State(initialValue: ThreadReferencePicker(threadID: thread.id, channelID: thread.channelID, api: client, draft: draft))
-  }
-
-  var body: some View {
-    Button {
-      if !open { picker.reset() }
-      open.toggle()
-    } label: {
-      OmniIcon(name: "message", size: 15)
-    }
-    .buttonStyle(.icon(size: 28))
-    .disabled(disabled)
-    .help("Reference another thread")
-    .accessibilityLabel("Reference another thread")
-    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { room = max($0, 1) }
-    // Anchored to a strip as wide as the list that ends at the button, so the list opens under the header rather than
-    // hanging out of the window to the button's right.
-    .background(alignment: .trailing) {
-      Color.clear
-        .frame(width: min(ThreadReferencePanel.width, max(1, 2 * (room - ThreadReferencePanel.width / 2 - z(12)))), height: 1)
-        .popover(isPresented: $open, arrowEdge: .bottom) { ThreadReferencePanel(picker: picker) { open = false } }
-    }
-    #if DEBUG
-    .onAppear {
-      let picker = picker
-      let open = $open
-      ThreadReferenceProbe.current = ThreadReferenceProbe(picker: picker, setOpen: { open.wrappedValue = $0 })
-    }
-    .onDisappear { ThreadReferenceProbe.current = nil }
-    #endif
-  }
-}
-
+/// The thread reference picker the thread menu's Reference a thread opens, as `ThreadReferencePanel` in
+/// ThreadReference.tsx: a search over thread titles and channels, this channel unless Ben switches to All channels. A
+/// pick adds a chip to the draft. Nothing is sent to, started in or changed on the picked thread. The `@` menu for files
+/// is untouched.
 struct ThreadReferencePanel: View {
   static var width: CGFloat { z(360) }
   @Bindable var picker: ThreadReferencePicker
@@ -168,7 +126,7 @@ struct ThreadReferencePanel: View {
 }
 
 #if DEBUG
-/// The QA harness's way to the reply box's thread reference picker (`{"referenceThread": "open"}`).
+/// The QA harness's way to the open thread's reference picker, which its header's ⋯ menu opens (`{"referenceThread": "open"}`).
 @MainActor struct ThreadReferenceProbe {
   static var current: ThreadReferenceProbe?
   let picker: ThreadReferencePicker

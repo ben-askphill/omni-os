@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { startRunner } from './runner-boot.ts';
 
-// A handoff, or a Take over, needs a running sync: the refusal says which part is missing, as the Sync page would.
+// A handoff, or a Take over, needs a running sync: the refusal says which part is missing, as Settings, Machines would.
 
 const h = await startRunner();
 const { db } = await import('../db.ts');
@@ -24,11 +24,11 @@ describe('handing off or taking over with sync not running', () => {
     h.db.outbox.arm('mac-a');
     for (const name of Object.values(SYNC_SECRETS)) db.prepare('INSERT INTO secrets (scope, name) VALUES (?, ?)').run('global', name);
     h.db.kv.set('sync.enabled', false);
-    expect(await refusal(t.id)).toBe('409 Sync is paused on this Mac. Resume it on the Sync page to move threads between Macs.');
+    expect(await refusal(t.id)).toBe('409 Sync is paused on this Mac. Resume it in Settings, Machines to move threads between Macs.');
 
     h.db.kv.set('sync.enabled', true);
     expect(await refusal(t.id)).toBe(
-      '409 Sync is set up on this Mac but not running, so the other Mac cannot be told. Check the Sync page, then try again.',
+      '409 Sync is set up on this Mac but not running, so the other Mac cannot be told. Check Settings, Machines, then try again.',
     );
   });
 });

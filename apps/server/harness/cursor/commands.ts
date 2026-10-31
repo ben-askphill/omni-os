@@ -57,7 +57,7 @@ export function probeCursorCommands(cwd: string): Promise<SlashCommand[] | null>
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (d: string) => {
       for (const line of splitter.push(d)) {
-        let msg: { id?: number; method?: string; result?: { sessionId?: unknown }; error?: unknown; params?: any };
+        let msg: { id?: number; method?: string; result?: { sessionId?: unknown }; error?: unknown; params?: { sessionId?: unknown; update?: { sessionUpdate?: unknown; availableCommands?: unknown } } };
         try {
           msg = JSON.parse(line);
         } catch {
@@ -66,7 +66,7 @@ export function probeCursorCommands(cwd: string): Promise<SlashCommand[] | null>
         if (msg.method) {
           const update = msg.params?.update;
           if (msg.method === 'session/update' && update?.sessionUpdate === 'available_commands_update') {
-            if (typeof msg.params.sessionId === 'string') sessionId ??= msg.params.sessionId;
+            if (typeof msg.params?.sessionId === 'string') sessionId ??= msg.params.sessionId;
             finish(Array.isArray(update.availableCommands) ? normalizeCursorCommands(update.availableCommands) : null);
           } else if (msg.id !== undefined) {
             // Cursor Agent asking the client for something: listing needs none of it.
@@ -94,7 +94,7 @@ export function probeCursorCommands(cwd: string): Promise<SlashCommand[] | null>
 }
 
 /** Where Cursor Agent keeps its state, found the way it finds it. */
-function cursorConfigDir(env: NodeJS.ProcessEnv): string {
+export function cursorConfigDir(env: NodeJS.ProcessEnv): string {
   if (env.CURSOR_CONFIG_DIR?.trim()) return env.CURSOR_CONFIG_DIR;
   if (env.XDG_CONFIG_HOME?.trim()) return join(env.XDG_CONFIG_HOME, 'cursor');
   return join(homedir(), '.cursor');

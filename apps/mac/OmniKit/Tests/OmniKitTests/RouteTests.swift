@@ -15,8 +15,10 @@ import OmniKit
     .search(query: ""),
     .search(query: "fix the cart & checkout? 100%+"),
     .automations,
-    .secrets,
-    .settings,
+    .settings(.general),
+    .settings(.workspace),
+    .settings(.machines),
+    .settings(.secrets),
     .artifacts,
     .newChannel,
     .notFound(path: "/nope"),
@@ -38,10 +40,19 @@ import OmniKit
     #expect(Route.thread(id: "abc", artifact: 3).hash == "#/t/abc?artifact=3")
     #expect(Route.search(query: "a b&c").hash == "#/search?q=a%20b%26c")
     #expect(Route.automations.hash == "#/automations")
-    #expect(Route.secrets.hash == "#/secrets")
-    #expect(Route.settings.hash == "#/settings")
+    #expect(Route.settings(.general).hash == "#/settings")
+    #expect(Route.settings(.secrets).hash == "#/settings/secrets")
+    #expect(Route.settings(.machines).hash == "#/settings/machines")
     #expect(Route.artifacts.hash == "#/artifacts")
     #expect(Route.newChannel.hash == "#/new-channel")
+  }
+
+  /// The pages Settings replaced (#404) keep their hashes, on the web and here.
+  @Test func takesThePagesSettingsReplaced() {
+    #expect(Route(hash: "#/secrets") == .settings(.secrets))
+    #expect(Route(hash: "#/sync") == .settings(.machines))
+    #expect(Route(hash: "#/storage") == .settings(.machines))
+    #expect(Route(hash: "#/sync/x") == .notFound(path: "/sync/x"))
   }
 
   @Test func encodesLikeEncodeURIComponent() {
@@ -71,6 +82,9 @@ import OmniKit
     #expect(Route(hash: "#/search?q=100%") == .search(query: "100%"))
     #expect(Route(hash: "#/search/extra?q=x") == .search(query: "x"))
     #expect(Route(hash: "#/secrets/x") == .notFound(path: "/secrets/x"))
+    #expect(Route(hash: "#/settings/nope") == .notFound(path: "/settings/nope"))
+    #expect(Route(hash: "#/settings/general") == .settings(.general))
+    #expect(Route(hash: "#/settings/workspace/x") == .notFound(path: "/settings/workspace/x"))
     #expect(Route(hash: "#/t/%E0%A4%A") == .thread(id: "%E0%A4%A"))
     #expect(Route(hash: "#/nope?x=1") == .notFound(path: "/nope"))
   }

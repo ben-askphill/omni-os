@@ -119,8 +119,8 @@ public enum ReplyAction: Decodable, Hashable, Sendable {
   /// `/clear` or `/new`. No prompt opens the new-thread composer.
   case newThread(prompt: String)
   case rename(title: String)
-  /// `/model`, `/effort` or `/fast`, which a thread can't change.
-  case fixed
+  /// `/model`, `/effort` or `/fast`: the composer opens its model pill. Its pick switches the next turn.
+  case pickModel
 
   private enum Keys: String, CodingKey { case kind, prompt, title }
 
@@ -129,7 +129,7 @@ public enum ReplyAction: Decodable, Hashable, Sendable {
     switch try c.decode(String.self, forKey: .kind) {
     case "new-thread": self = .newThread(prompt: try c.decode(String.self, forKey: .prompt))
     case "rename": self = .rename(title: try c.decode(String.self, forKey: .title))
-    case "fixed": self = .fixed
+    case "pick-model": self = .pickModel
     default: self = .send
     }
   }
