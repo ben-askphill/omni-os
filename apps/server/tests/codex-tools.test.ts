@@ -22,6 +22,8 @@ describe('codex tools, secrets and crew reports', () => {
     // The conductor is delegate-only: browser work goes to a crewmate, so it gets no browser.
     expect(cfg['mcp_servers.omni-browser']).toBeUndefined();
     expect(cfg.mcp_servers).toBeUndefined();
+    // approvalPolicy is 'never', so a tool Codex would ask about is rejected unless its server is approved up front.
+    for (const name of ['omni', 'omni-ask']) expect(cfg[`mcp_servers.${name}`].default_tools_approval_mode).toBe('approve');
     // ask_user_question waits for Ben, far past Codex's 60 second default for an MCP call.
     expect(cfg['mcp_servers.omni-ask']).toMatchObject({ command: expect.any(String), args: [expect.stringMatching(/apps\/mcp\/ask\.ts$/)], tool_timeout_sec: 86_400 });
     expect(cfg['shell_environment_policy.inherit']).toBe('all');
