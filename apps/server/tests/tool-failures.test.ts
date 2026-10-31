@@ -109,6 +109,24 @@ describe('tool failure capture and triage', () => {
       }
     }
   });
+
+  it('heads off the recurring zsh, file: URL and member-thread slips', async () => {
+    const t = await h.start('hello');
+    await h.untilResults(t.id, 1);
+    const channel = h.db.channels.get('scratch')!;
+    const prompt = (harness: string, lead = false) => buildSystemPrompt({ ...h.thread(t.id), harness } as any, channel, undefined, lead);
+    vi.stubEnv('SHELL', '/bin/zsh');
+    try {
+      for (const harness of ['claude-code', 'codex', 'cursor']) expect(prompt(harness)).toContain("quote glob arguments (--include='*.ts')");
+      expect(prompt('hermes')).not.toContain('quote glob arguments');
+      vi.stubEnv('SHELL', '/bin/bash');
+      expect(prompt('claude-code')).not.toContain('quote glob arguments');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(prompt('claude-code', true)).toContain('read_referenced_thread cannot open member threads');
+    expect(prompt('claude-code')).not.toContain('read_referenced_thread cannot open member threads');
+  });
 });
 
 describe('adapter failure signals', () => {
