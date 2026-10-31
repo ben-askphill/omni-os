@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { events, messageRequests, outbox, threads, type ThreadStatus } from '../db.ts';
 import { publishFeed, publishThread } from '../bus.ts';
-import { onToolResult } from '../published.ts';
+import { runnerPorts } from './ports.ts';
 import { turnFinished } from '../sync/files.ts';
 import { observeToolResult } from '../tool-failures.ts';
 import { toolTails } from '../tool-tail.ts';
@@ -20,7 +20,6 @@ import {
   eventPayload,
   hasBackground,
   isShuttingDown,
-  ownTurn,
   publishMods,
   send,
   track,
@@ -54,7 +53,7 @@ export function onTask(live: Live, u: TaskUpdate) {
     if (known) return;
     const t = threads.get(id);
     const row = addEvent(id, 'task', u);
-    live.tasks.set(u.task_id, {
+    live.taskStarted({
       thread_id: id,
       channel_id: live.channelId,
       lead_id: t?.source === 'team' ? (t.parent_id ?? undefined) : undefined,
@@ -69,12 +68,11 @@ export function onTask(live: Live, u: TaskUpdate) {
       background: !!u.background,
       started_at: new Date().toISOString(),
     });
-    live.taskSaved.set(u.task_id, Date.now());
     return publishTasks(true);
   }
   if (u.event === 'progress') {
     if (!known) return;
-    Object.assign(known, {
+    live.taskProgress(u.task_id, {
       description: u.description ?? known.description,
       background: u.background ?? known.background,
       last_tool: u.last_tool ?? known.last_tool,
@@ -83,17 +81,11 @@ export function onTask(live: Live, u: TaskUpdate) {
       summary: u.summary ?? known.summary,
     });
     // A task backgrounded mid-turn now keeps the process alive; a stored row keeps the transcript honest.
-    const last = live.taskSaved.get(u.task_id) ?? 0;
-    if (u.background !== undefined || Date.now() - last >= TASK_PROGRESS_MS) {
-      live.taskSaved.set(u.task_id, Date.now());
-      addEvent(id, 'task', u);
-    }
+    if (live.taskSaveDue(u.task_id, TASK_PROGRESS_MS, u.background !== undefined)) addEvent(id, 'task', u);
     return publishTasks();
   }
   // Ended. The CLI can report the end twice (a status patch, then the notification); keep the first.
-  if (!known) return;
-  live.tasks.delete(u.task_id);
-  live.taskSaved.delete(u.task_id);
+  if (!live.taskEnded(u.task_id)) return;
   addEvent(id, 'task', u);
   publishTasks(true);
   if (live.turn || hasBackground(live)) return;
@@ -104,11 +96,7 @@ export function onTask(live: Live, u: TaskUpdate) {
 
 /** The process is gone: whatever it still ran ended with it. */
 export function endTasks(live: Live) {
-  if (!live.tasks.size) return;
-  for (const t of live.tasks.values()) addEvent(live.threadId, 'task', { task_id: t.task_id, tool_use_id: t.tool_use_id, event: 'ended', status: 'stopped' });
-  live.tasks.clear();
-  live.taskSaved.clear();
-  publishTasks(true);
+  if (live.endTasks()) publishTasks(true);
 }
 
 /**
@@ -125,25 +113,12 @@ export function onMod(live: Live, m: ModUi) {
     publishThread(id, { kind: 'mod_toast', thread_id: id, plugin: m.plugin, text: m.text, timeout_ms: m.timeout_ms });
     return;
   }
-  const prev = live.mods.get(m.plugin);
-  if (m.text === null) {
-    if (!prev) return;
-    live.mods.delete(m.plugin);
-  } else {
-    if (prev?.text === m.text) return;
-    live.mods.set(m.plugin, { thread_id: id, channel_id: live.channelId, plugin: m.plugin, text: m.text, updated_at: new Date().toISOString() });
-  }
-  publishMods();
+  if (live.setMod(m.plugin, m.text)) publishMods();
 }
 
 export function onResult(live: Live, p: ResultPayload) {
   const id = live.threadId;
-  live.resultSeen = true;
-  live.cliTurn = false;
-  const limit = live.limit;
-  live.limit = null;
-  const answered = live.replayed;
-  live.replayed = false;
+  const { limit, answered } = live.sawResult();
   // On resume the CLI can flush a leftover background task as an empty zero-turn result, before it has
   // taken any message of ours. Not a turn.
   if (p.ok && !p.turns && !answered) return;
@@ -167,7 +142,7 @@ export function onResult(live: Live, p: ResultPayload) {
     requeueHeld(live);
     return endTurn(live, status, true);
   }
-  const next = live.held.shift();
+  const next = live.nextHeld();
   if (next) {
     send(live, next);
     return emitThread(id);
@@ -182,7 +157,7 @@ export function onResult(live: Live, p: ResultPayload) {
  */
 function limitStop(live: Live, resetsAt: number | null) {
   const id = live.threadId;
-  for (const m of live.held.splice(0)) if (!(m.requestId && messageRequests.park(m.uuid))) drop(id, [m]);
+  for (const m of live.takeHeld()) if (!(m.requestId && messageRequests.park(m.uuid))) drop(id, [m]);
   threads.setLimit(id, {
     state: 'limited',
     resets_at: resetsAt ? new Date(resetsAt * 1000).toISOString() : null,
@@ -196,10 +171,8 @@ export function onRecord(live: Live, rec: StreamRecord) {
   const id = live.threadId;
   switch (rec.kind) {
     case 'replay': {
-      const i = live.inflight.findIndex((m) => m.uuid === rec.payload.uuid);
-      if (i < 0) return;
-      const [m] = live.inflight.splice(i, 1);
-      live.replayed = true;
+      const m = live.takeInflight(rec.payload.uuid);
+      if (!m) return;
       if (live.handover?.uuid === m.uuid) handedOver(live);
       // The harness read it: the transcript records it here, where it did.
       const row = addEvent(id, m.event.kind, eventPayload(m));
@@ -210,14 +183,12 @@ export function onRecord(live: Live, rec: StreamRecord) {
       if (live.interrupt?.id !== rec.payload.request_id) return;
       // Answered between two CLI turns there was nothing to stop: the queued messages run as the next turn
       // like after any interrupt, and that turn must not be killed by the grace timer or marked stopped.
-      if (rec.payload.subtype === 'success' && live.cliTurn) live.interrupt.acked = true;
+      if (rec.payload.subtype === 'success' && live.cliTurn) live.ackInterrupt();
       else clearInterrupt(live); // nothing to interrupt; the turn ends on its own
       return;
     case 'init':
-      live.cliTurn = true;
       // The CLI emits one per turn. Only the first per process is worth showing.
-      if (live.initSeen) return;
-      live.initSeen = true;
+      if (!live.sawInit()) return;
       addEvent(id, 'init', rec.payload);
       return;
     case 'result':
@@ -228,7 +199,7 @@ export function onRecord(live: Live, rec: StreamRecord) {
       return onMod(live, rec.payload);
     case 'limit':
       // Kept until the result says whether the turn failed. A later one with a reset time wins over one without.
-      live.limit = { resets_at: rec.payload.resets_at ?? live.limit?.resets_at ?? null };
+      live.sawLimit(rec.payload.resets_at);
       return;
     default: {
       // The model is working with no turn of ours open: a background task finished and the CLI runs a turn
@@ -236,7 +207,7 @@ export function onRecord(live: Live, rec: StreamRecord) {
       const opens = !live.turn && !live.closing && (rec.kind === 'assistant_text' || (rec.kind === 'tool_use' && !rec.payload.parent));
       if (opens) openTurn(live);
       const row = addEvent(id, rec.kind, rec.payload);
-      if (opens) live.turnFrom = row.id - 1;
+      if (opens) live.turnOpenedAt(row.id);
       if (rec.kind === 'tool_result') {
         toolTails.end(id, rec.payload.tool_use_id);
         // Separate from transcript publishing: capture failure must not prevent result delivery.
@@ -249,7 +220,7 @@ export function onRecord(live: Live, rec: StreamRecord) {
             console.error('[tool-failures] capture failed; tool result delivery continues');
           }
         }
-        onToolResult(id, rec.payload);
+        runnerPorts().reporting.toolResult(id, rec.payload);
       }
     }
   }
@@ -257,17 +228,14 @@ export function onRecord(live: Live, rec: StreamRecord) {
 
 /** A turn the CLI started on its own. It takes a slot even past the cap: the work is already running. */
 export function openTurn(live: Live) {
-  live.turn = true;
-  clearTimeout(live.idleTimer);
-  ownTurn(live.threadId);
+  live.beginTurn();
   // Already under way, so nothing waits for this one: its before snapshot may hold the turn's first edits.
   startTurnSnapshot(live);
   emitThread(live.threadId);
 }
 
 export function onExit(live: Live, code: number | null, signal: NodeJS.Signals | null) {
-  if (live.exitedFlag) return;
-  live.exitedFlag = true;
+  if (!live.sawExit()) return;
   const id = live.threadId;
   const wasTurn = live.turn;
   const undelivered = [...live.inflight, ...live.held];

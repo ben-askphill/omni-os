@@ -159,11 +159,11 @@ export function takeHandover(live: Live, thread: Thread): { thread: Thread; resu
   if (fresh) {
     thread = { ...thread, session_id: adapterFor(thread.harness).freshSessionId(thread) };
     threads.update(thread.id, { session_id: thread.session_id });
-    live.sessionId = thread.session_id;
+    live.sessionIs(thread.session_id);
   }
   const target = live.inflight.find((m) => !leadsWithCommand(m));
   if (target) handOverWith(live, target, thread, handover);
-  else live.handoverDue = true;
+  else live.handoverWaits(true);
   return { thread, resume: !fresh };
 }
 
@@ -187,7 +187,7 @@ const leadsWithCommand = (m: Msg) => !!m.commands?.some((c) => c.start === m.tex
 /** Puts the pending handover ahead of `m`, unless `m` starts with a command, which then runs first. */
 export function handOverWith(live: Live, m: Msg, thread = threads.get(live.threadId)!, handover = threads.sessionState(live.threadId).handover) {
   if (leadsWithCommand(m)) return;
-  live.handoverDue = false;
+  live.handoverWaits(false);
   if (!handover) return;
   const session = handover.since ? 'resumed' : 'fresh';
   const to = runName(runOf(thread));
@@ -205,14 +205,13 @@ export function handOverWith(live: Live, m: Msg, thread = threads.get(live.threa
   });
   m.text = h.text + m.text;
   m.commands = m.commands?.map((c) => ({ ...c, start: c.start + h.text.length, end: c.end + h.text.length }));
-  live.handover = { uuid: m.uuid, done: { to, session, entries: h.entries, omitted: h.omitted, chars: h.chars } };
+  live.carryHandover(m.uuid, { to, session, entries: h.entries, omitted: h.omitted, chars: h.chars });
 }
 
 /** The harness read the handover: the transcript says so and the thread no longer has one pending. */
 export function handedOver(live: Live) {
-  const done = live.handover?.done;
+  const done = live.handoverRead();
   if (!done) return;
-  live.handover = undefined;
   threads.update(live.threadId, { handover: null });
   addEvent(live.threadId, 'handover', done);
   emitThread(live.threadId);

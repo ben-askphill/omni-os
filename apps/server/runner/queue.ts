@@ -7,7 +7,7 @@ import { closeLive, hardKill, requestInterrupt, stopStartup } from './session.ts
 import { launch } from './spawn.ts';
 import { applyQueued, queuedRun } from './switch.ts';
 import { userName } from '../profile.ts';
-import { forwardReport } from '../run-on.ts';
+import { runnerPorts } from './ports.ts';
 import { heldElsewhere, lostTo } from '../ownership.ts';
 import { machineName, wakeBlocked } from '../sync/guard.ts';
 import { startTurnSnapshot } from './snapshots.ts';
@@ -18,7 +18,6 @@ import {
   deliveryCaps,
   isShuttingDown,
   lives,
-  ownTurn,
   refusal,
   requestMsg,
   runsHere,
@@ -59,18 +58,18 @@ export function deliver(threadId: string, m: Msg) {
     const action = resolveDelivery(m.mode, caps, 'running');
     // A switch waits for this turn to end, and a message sent now goes on the new run: it waits for the turn too.
     if (queuedRun(threads.get(threadId)) && (action === 'steer' || action === 'interrupt')) {
-      live.held.push(m);
+      live.hold(m);
       track(m, 'held');
       if (action === 'interrupt') requestInterrupt(live);
       return emitThread(threadId);
     }
     switch (action) {
       case 'queue':
-        live.held.push(m);
+        live.hold(m);
         track(m, 'held');
         break;
       case 'kill':
-        live.held.push(m);
+        live.hold(m);
         track(m, 'held');
         hardKill(live);
         break;
@@ -137,9 +136,7 @@ export function pump() {
 function begin(threadId: string, [first, ...rest]: Msg[]) {
   const warm = lives.get(threadId);
   if (warm) {
-    clearTimeout(warm.idleTimer);
-    warm.turn = true;
-    ownTurn(threadId);
+    warm.beginTurn();
     startTurnSnapshot(warm);
     send(warm, first);
   } else if (!launch(threadId, first)) return;
@@ -220,7 +217,7 @@ export function reportToParent(childId: string, status: string, text: string, co
   if (waitingLead) return teamReported(parent.id, key, prompt, report);
   // The parent is on another machine (a delegation sent elsewhere, run-on.ts), or on its way to one: the report goes
   // to it there, and whichever machine holds the parent at its next sync files it.
-  if (heldElsewhere(parent.id)) return forwardReport(parent.id, key, prompt, report);
+  if (heldElsewhere(parent.id)) return runnerPorts().routing.forwardReport(parent.id, key, prompt, report);
   fileReport(parent.id, key, prompt, report);
 }
 

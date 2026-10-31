@@ -1,17 +1,17 @@
 // Live processes, the queue's waiting maps, and the helpers the lifecycle modules share.
 import type { MessageContext } from '@omni/shared/message-context.ts';
-import type { HandoverP } from '@omni/shared/run-switch.ts';
 import type { DeliveryPhase } from '../delivery.ts';
 import { about } from '../about.ts';
 import { config } from '../config.ts';
-import { assignments, events, messageRequests, threads, type DeliveryState, type MessageRequest } from '../db.ts';
+import { events, messageRequests, threads, type DeliveryState, type MessageRequest } from '../db.ts';
 import { publishFeed, publishThread } from '../bus.ts';
 import type { Attachment } from '../uploads.ts';
 import { contextAttachments, harnessText } from '../message-context/project.ts';
 import type { CommandList } from '../commands.ts';
+import type { Live } from './controller.ts';
 import { handOverWith } from './switch.ts';
 import { CAPABILITIES, type HarnessId } from '../harness/types.ts';
-import type { CommandUse, HarnessAdapter, HarnessSession, OutgoingMessage } from '../harness/adapter.ts';
+import type { CommandUse, HarnessAdapter, OutgoingMessage } from '../harness/adapter.ts';
 import { claudeAdapter } from '../harness/claude/adapter.ts';
 import { codexAdapter } from '../harness/codex/adapter.ts';
 import { cursorAdapter } from '../harness/cursor/adapter.ts';
@@ -96,66 +96,11 @@ export interface PendingMsg {
   context?: MessageContext[];
 }
 
-/** One long-lived claude process per thread. It runs many turns and stays warm in between. */
-export interface Live {
-  threadId: string;
-  channelId: string;
-  /** The harness session. null while secrets and the MCP config are prepared; inflight is sent right after spawn. */
-  session: HarnessSession | null;
-  sessionId: string;
-  /** The harness it was spawned for. A switch synced from another machine changes the thread's, not this process's. */
-  harness?: string;
-  /** A turn is in progress. Holds a concurrency slot. */
-  turn: boolean;
-  /** The CLI itself is inside a turn: between its init and its result. False in the gap between two queued turns. */
-  cliTurn: boolean;
-  /** One of our messages was replayed since the last result, so a zero-turn result answers it. */
-  replayed: boolean;
-  /** The harness refused this turn at its usage limit (and when it resets, if it said). A failed result makes it a limit stop. */
-  limit: { resets_at: number | null } | null;
-  /** A turn the CLI opened by itself reports only the text written after this event id. */
-  turnFrom: number;
-  inflight: Msg[];
-  held: Msg[];
-  idleTimer?: ReturnType<typeof setTimeout>;
-  interruptTimer?: ReturnType<typeof setTimeout>;
-  /** Interrupt sent for the current turn; acked once the CLI answers the control request. */
-  interrupt: { id: string; acked: boolean } | null;
-  hardStop: boolean;
-  /** stdin ended or the process is being killed. New messages wait for a fresh process. */
-  closing: boolean;
-  shutdown: boolean;
-  /** Holds the channel's persistent browser profile. */
-  browser: boolean;
-  initSeen: boolean;
-  /** Tasks the CLI runs beside the turn, by task id, until they end. Background ones keep the process alive. */
-  tasks: Map<string, ActiveTask>;
-  /** Progress persisted per task, at most every TASK_PROGRESS_MS. */
-  taskSaved: Map<string, number>;
-  /** The status line each mod set with $.ui.status, by plugin, until it clears it or the process ends. */
-  mods: Map<string, ModStatus>;
-  /** The commands the process listed itself, once it has. */
-  commands: CommandList | null;
-  resultSeen: boolean;
-  spawnFailed: boolean;
-  exitedFlag: boolean;
-  stderr: string;
-  exited: Promise<void>;
-  done: () => void;
-  /** The turn whose snapshots are being saved (runner/snapshots.ts), until it ends. */
-  snap?: string | null;
-  /** Set while the checkout is saved before a turn: messages wait in `gated` until it is, so the harness edits nothing first. */
-  gate?: Promise<void> | null;
-  gated?: Msg[];
-  /** The message carrying the handover, and the event recorded once the harness reads it (runner/switch.ts). */
-  handover?: { uuid: string; done: HandoverP };
-  /** A handover still waits for a message that is not a command: the next one sent carries it. */
-  handoverDue?: boolean;
-  /** Set while the thread is handed to another Mac (session.ts releaseForHandoff): what the process never read goes here, not dropped. */
-  released?: Msg[];
-  /** The thread's assignment generation when this process last started a turn (ownership.ts lostTo): a later one means it moved. */
-  generation?: number;
-}
+/**
+ * One long-lived claude process per thread. It runs many turns and stays warm in between. Its state is the thread's
+ * controller (controller.ts), read here and moved only through the controller's methods.
+ */
+export type { Live } from './controller.ts';
 
 /** A sub-agent, background shell or workflow still running in some thread's process. */
 export interface ActiveTask {
@@ -227,9 +172,7 @@ export const publishMods = () => publishFeed({ type: 'mods', mods: activeMods() 
 
 /** The process is gone: its mods went with it. */
 export function clearMods(live: Live) {
-  if (!live.mods.size) return;
-  live.mods.clear();
-  publishMods();
+  if (live.clearMods()) publishMods();
 }
 
 export const runningCount = () => [...lives.values()].filter((l) => l.turn).length;
@@ -256,16 +199,6 @@ export function slotsByHarness(): Record<string, { running: number; cap: number 
 
 /** This Mac runs the thread: a process is attached, or it waits for a slot. */
 export const runsHere = (threadId: string) => lives.has(threadId) || waiting.includes(threadId);
-
-/**
- * A turn starts here: the status write claims the thread for this machine (db/repos/threads.ts), and the process
- * remembers the generation it runs on, so a move since then shows it as stale (ownership.ts lostTo).
- */
-export function ownTurn(threadId: string) {
-  threads.update(threadId, { status: 'running' });
-  const live = lives.get(threadId);
-  if (live) live.generation = assignments.get(threadId)?.generation;
-}
 
 /** A warm claude process exists for this thread. */
 export const isLive = (threadId: string) => {
@@ -370,8 +303,7 @@ export function drop(threadId: string, msgs: Msg[]) {
 
 /** Messages this process will never read: kept for the Mac the thread is handed to, else dropped. */
 export function unread(live: Live, msgs: Msg[]) {
-  if (live.released) live.released.push(...msgs);
-  else drop(live.threadId, msgs);
+  if (!live.keepUnread(msgs)) drop(live.threadId, msgs);
 }
 
 /** startup: no child yet, or init has not arrived. running: the CLI has begun a turn. */
@@ -400,11 +332,11 @@ export const crash = (live: Live) => live.session?.alive && live.session.end('ki
 /** Write a message to the harness. Before the process exists it waits in inflight, and spawn writes it. */
 export function send(live: Live, m: Msg) {
   if (live.handoverDue) handOverWith(live, m);
-  live.inflight.push(m);
+  live.enqueue(m);
   if (!live.session) return;
   // The checkout before this turn is still being saved: written once it is (runner/snapshots.ts).
   if (live.gate) {
-    (live.gated ??= []).push(m);
+    live.gateMessage(m);
     return;
   }
   // Marked first: a write that fails can still have reached the harness.

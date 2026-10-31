@@ -75,6 +75,8 @@ export async function startRunner(env: Record<string, string> = {}) {
     throw new Error(`server/config.ts ignores OMNI_DATA_DIR (db is ${paths.db}); refusing to run the runner against the real data/`);
   }
   const db = await import('../db.ts');
+  // The composition root binds the runner's ports and its controllers' deps, as app.ts does for the server.
+  await import('../compose.ts');
   const runner = await import('../runner.ts');
   const { bus } = await import('../bus.ts');
   db.channels.create({ id: 'scratch', name: 'Scratch', kind: 'internal', use_worktree: 0, base_dir: scratch });

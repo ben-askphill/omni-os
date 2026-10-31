@@ -23,9 +23,8 @@ import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
 import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
 import { dismissQuestions } from './questions.ts';
-import { forwardMessage, targetFor } from '../run-on.ts';
+import { runnerPorts } from './ports.ts';
 import { assignRouted, remoteHolder } from '../ownership.ts';
-import { sendNewThread } from '../handoff.ts';
 import { sendUploads } from '../sync/files.ts';
 
 // ---------- slash commands ----------
@@ -174,7 +173,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
 export async function createThread(input: CreateThreadInput): Promise<Thread> {
   // Team members stay with their lead, which runs once with all their replies. A delegated thread may go: its report
   // comes back to the parent (run-on.ts).
-  const route = input.source === 'team' ? null : await targetFor(input.device);
+  const route = input.source === 'team' ? null : await runnerPorts().routing.targetFor(input.device);
   if (route) {
     // In Storage before the thread is made, so a failed upload leaves nothing behind and the other machine finds them.
     const bodies = await Promise.all((input.files ?? []).map(async (f) => new Uint8Array(await f.arrayBuffer())));
@@ -188,7 +187,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     const files = sent.map((f, i) => ({ ...f, name: saved[i]?.name ?? f.name }));
     tx(() => {
       assignRouted(thread.id, route.to.id);
-      sendNewThread(thread.id, input.prompt, route.from, route.to, files);
+      runnerPorts().handoff.sendNewThread(thread.id, input.prompt, route.from, route.to, files);
     });
     if (!input.title) void generateTitle(thread.id, input.prompt);
     emitThread(thread.id);
@@ -436,7 +435,7 @@ export async function postMessage(
   }
   // A thread routed to another machine runs there: the message goes to it (run-on.ts).
   if (remoteHolder(thread)) {
-    return (await forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, attachments: opts.attachments, context: opts.context })) as PostedThread;
+    return (await runnerPorts().routing.forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, attachments: opts.attachments, context: opts.context })) as PostedThread;
   }
   // Refused before anything is saved: the other Mac runs it.
   const blocked = turnBlocked(thread, runsHere(threadId));
