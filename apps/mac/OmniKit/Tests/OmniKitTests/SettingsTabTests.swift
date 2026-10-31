@@ -58,8 +58,8 @@ import OmniKit
   @Test func takesTheOldTabNames() {
     #expect(SettingsTab(named: "general") == .general)
     #expect(SettingsTab(named: "machines") == .machines)
-    for old in ["profile", "notifications", "appearance", "quickPrompt"] { #expect(SettingsTab(named: old) == .general, old) }
-    for old in ["server", "connection", "sync", "storage"] { #expect(SettingsTab(named: old) == .machines, old) }
+    for old in ["profile", "notifications", "appearance", "quickPrompt"] { #expect(SettingsTab(named: old) == .general, "\(old)") }
+    for old in ["server", "connection", "sync", "storage"] { #expect(SettingsTab(named: old) == .machines, "\(old)") }
     #expect(SettingsTab(named: "garage") == nil)
   }
 
