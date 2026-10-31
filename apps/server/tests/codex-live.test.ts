@@ -10,8 +10,9 @@ import type { ThreadStartResponse } from '../harness/codex/protocol.ts';
 //   OMNI_LIVE_CODEX=1 npx vitest run --config apps/server/vitest.config.ts apps/server/tests/codex-live.test.ts
 const LIVE = process.env.OMNI_LIVE_CODEX === '1';
 
-// keepalive 0 closes the app-server after each turn, so the follow-up is a thread/resume.
-const H = LIVE ? await startRunner({ OMNI_KEEPALIVE_SECONDS: '0', OMNI_BROWSER: '1' }) : null!;
+// keepalive 0 closes the app-server after each turn, so the follow-up is a thread/resume. startRunner
+// points OMNI_CODEX_BIN at a missing file; empty falls back to the `codex` on PATH.
+const H = LIVE ? await startRunner({ OMNI_KEEPALIVE_SECONDS: '0', OMNI_BROWSER: '1', OMNI_CODEX_BIN: '' }) : null!;
 const svc = LIVE ? await import('../harness/catalog-service.ts') : null!;
 const usage = LIVE ? await import('../usage.ts') : null!;
 
@@ -38,7 +39,7 @@ describe.skipIf(!LIVE)('the real codex-cli', () => {
       omniUrl: 'http://127.0.0.1:9',
     });
     const names = Object.keys(mcpServers);
-    expect([...names].sort()).toEqual(['omni', 'omni-browser']);
+    expect([...names].sort()).toEqual(['omni', 'omni-ask', 'omni-browser']);
 
     const client = new CodexClient({ bin: codexBin()!, env: harnessEnv('codex', {}), cwd: H.tmp });
     try {
@@ -66,7 +67,7 @@ describe.skipIf(!LIVE)('the real codex-cli', () => {
         if (names.every((n) => seen[n] === 'connected') || Date.now() > end) break;
         await sleep(500);
       }
-      expect(seen).toEqual({ omni: 'connected', 'omni-browser': 'connected' });
+      expect(seen).toEqual({ omni: 'connected', 'omni-ask': 'connected', 'omni-browser': 'connected' });
     } finally {
       client.kill();
     }

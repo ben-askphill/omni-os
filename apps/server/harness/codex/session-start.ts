@@ -10,13 +10,20 @@ import type { ThreadStartResponse } from './protocol.ts';
 
 /**
  * Per-thread overrides, as config.toml keys: Omni's MCP servers next to Ben's own (a dotted
- * key merges, a whole `mcp_servers` table would replace his), a shell environment that
+ * key merges, a whole `mcp_servers` table would replace his), each with its tools approved up
+ * front, a shell environment that
  * inherits everything so secrets reach the agent's shell, and ChatGPT-only login. Secret
  * values live in the process env, never in this config.
  */
 export function threadConfig(mcpServers: Record<string, object>) {
+  // The session runs with approvalPolicy 'never', so Codex rejects any MCP call that would ask
+  // first: every tool without a readOnlyHint. These servers are Omni's own, so approve them all.
   // Codex gives an MCP call 60 seconds by default; ask_user_question waits for the user.
-  const entry = (name: string, server: object) => (name === ASK_SERVER ? { ...server, tool_timeout_sec: ASK_TIMEOUT_SEC } : server);
+  const entry = (name: string, server: object) => ({
+    ...server,
+    default_tools_approval_mode: 'approve',
+    ...(name === ASK_SERVER ? { tool_timeout_sec: ASK_TIMEOUT_SEC } : {}),
+  });
   return {
     ...Object.fromEntries(Object.entries(mcpServers).map(([name, server]) => [`mcp_servers.${name}`, entry(name, server)])),
     'shell_environment_policy.inherit': 'all',
