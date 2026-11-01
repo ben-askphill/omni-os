@@ -11,8 +11,9 @@ import { runningCount } from './runner.ts';
 //
 // The check fetches origin's main every 15 minutes and compares it with the commit this server booted from. Update
 // waits until no turn runs, runs scripts/sync-main.sh (the main checkout fast-forwards; a worktree stays), rebuilds
-// the Web UI and exits with RESTART_EXIT_CODE. Only an app that started the server (the Mac app or the Linux app sets
-// OMNI_SUPERVISOR) starts it again, so without one Update is not offered.
+// the Web UI and exits with RESTART_EXIT_CODE. Only a supervisor starts it again: the Mac app or the Linux app, or a
+// service manager such as systemd with OMNI_SUPERVISOR set by hand (docs/user/install.md). Without one, Update is not
+// offered.
 
 const run = promisify(execFile);
 
