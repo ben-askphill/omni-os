@@ -146,8 +146,12 @@ The native macOS client for the desk.
 _Avoid_: Desktop app, native UI, "the app"
 
 **Web UI**:
-The browser client, used from the phone over tailscale and as a fallback on the Mac.
+The browser client, used from the phone over Tailscale or [Omni Connect](docs/user/omni-connect.md), and as a fallback on the Mac.
 _Avoid_: Frontend, dashboard
+
+**Omni Connect**:
+Remote access to a machine through the sync relay's Cloudflare tunnel, without Tailscale. Each machine that turns it on gets a public hostname; the relay's Connect page lists them after Google sign-in.
+_Avoid_: Funnel, public tunnel (alone), Tailscale Serve
 
 ## Relationships
 

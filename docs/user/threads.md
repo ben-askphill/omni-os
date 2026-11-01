@@ -6,7 +6,7 @@ A thread's menu is the same list on every surface: the ⋯ in the thread header 
 
 ## Finding threads and clearing Needs you
 
-Running and Pinned in the desktop web and Mac sidebars list work across channels. Running includes queued threads and threads whose sub-agents still run; it hides when empty. For the latest threads by activity, use Home or Cmd-K. Conductor handoffs nest under their parent in Running and in the Conductor's channel view (expand/collapse). Each section folds independently and remembers its state on that device. On a phone, Activity lists Running, Pinned and Recent threads (the five latest by activity), and a channel splits its folder and ungrouped threads between Active and Recent, with the same nesting.
+Running and Pinned in the desktop web and Mac sidebars list work across channels. Running includes queued threads and threads whose sub-agents still run; it hides when empty. For the latest threads by activity, use Home or Cmd-K. Conductor handoffs nest under their parent in Running and in the Conductor's channel view (expand/collapse). Each section folds independently and remembers its state on that device. On a phone, Activity lists Running, Pinned and Recent threads (the five latest by activity), and a channel splits its folder and ungrouped threads between Active and Recent, with the same nesting. **New thread** in the sidebar (File > New Thread or Cmd-N in the Mac app) opens a composer in the channel you are in; from inside a thread it uses that thread's channel. On a phone, a New thread chip above the reply box does the same.
 
 Needs you holds unread results and threads waiting for you to act. Opening a thread reads the result it shows, so a newer result stays unread. **Mark as done** clears any of those reasons without archiving the thread or changing how its last turn ended. It stays in its channel and folder with a grey check, muted title and Done chip. **Mark as not done** brings back its unread result and blockers. A new message, a run starting or Retry setup clears done; the flag syncs between Macs. Running and queued threads cannot be marked done.
 
@@ -127,7 +127,7 @@ A thread with an open PR can watch its checks and its reviews: **Watch PR** in t
 - Comment text is quoted to the agent as input to weigh, not as instructions from you.
 - The wake is saved before it is sent, like any queued message. One saved before a restart waits in the thread for Resume. A thread this Mac cannot run (it runs on your other Mac, its worktree is not ready) gets it held for Resume too.
 - Polls come every minute while checks run and slow to every 15 minutes while nothing changes. GitHub errors back off, and five in a row stop the watch. A rate limit pauses every watch for 15 minutes without counting as an error.
-- A watch ends when you stop it, the PR merges or closes, the thread is archived, it has woken the thread five times, or three times for review comments alone with no failing check in the wake. The PR menu says which; Watch PR starts it again with fresh budgets. Starting a watch that is already running changes nothing.
+- A watch ends when you stop it, the PR merges or closes, the thread is archived, it has woken the thread five times, or three times for review comments alone with no failing check in the wake. The PRs tab says which; Watch PR starts it again with fresh budgets. Starting a watch that is already running changes nothing.
 - Watches live on the Mac that started them and are not synced.
 
 ## Send to Grok Bot

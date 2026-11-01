@@ -34,7 +34,7 @@ Below 768px, the Web UI uses its phone layout, whether opened in a browser or sa
 - Library lists artifacts with thumbnails. Open one full screen to read or share it.
 - The + button starts a thread with the Conductor or a channel, with model and effort choices, attachments and dictation.
 
-A thread shows each prompt and answer before its folded steps; tap the step count to open them. The thread menu opens Changes, PR, Browser, Terminal, Actions or Details full screen. The PR screen has checks and a slide to squash and merge. Browser is watch-only and supports annotations. Terminal is read-only with tap-to-select output for a message. Automations, Secrets, Sync, Storage and settings pages without a phone-specific screen use the desktop page under a back bar.
+A thread shows each prompt and answer before its folded steps; tap the step count to open them. Thread options opens Details, PRs, Changes, Browser, Terminal or Actions full screen. Details has the branch card and agents; the PRs screen lists the branch's pull requests, Watch PR, checks and a slide to squash and merge. Browser is watch-only and supports annotations. Terminal is read-only with tap-to-select output for a message. Automations, Secrets, Sync, Storage and settings pages without a phone-specific screen use the desktop page under a back bar.
 
 Links and reloads return to the same screen. Back uses the parent screen when there is no in-app history. Home-screen setup does not add iOS Live Activities or a lock-screen view.
 

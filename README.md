@@ -74,10 +74,12 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 - **Composer**: `/` menu for skills, slash commands and MCP prompts per harness, `@` to mention artifacts and repo files, attachments, and chips for diff lines, terminal output, browser annotations and other threads, plus suggested next replies
 - **Sandbox per thread**: its own git worktree in repo channels, a choice of base commit, channel setup and named actions, a persistent browser shown live in the Browser panel, a real terminal, and secrets from the Keychain (or a 0600 file on Linux) as env. Hermes and Cursor Cloud run remotely without these local tools
 - **Artifacts** rendered inline, an Artifacts page across channels, and cards for pages a thread published to claude.ai
-- **GitHub panel** per repo channel: PRs, checks, diff and merge. Watch PR wakes the thread for failing checks or new review feedback
+- **PRs** per repo channel and in each thread's panel: checks, diff and merge. Watch PR in the thread's PRs tab wakes the thread for failing checks or new review feedback
 - **Conductor and crew**: one front agent that delegates to roles (builder, researcher, store-ops, inbox), alone or as a team
 - **Automations**: YAML on a cron schedule, GitHub PR event, published page or signed GitHub webhook; every run is its own thread
 - **Sync** between two Macs through a relay on your own Cloudflare account (optional), with handoff of a running thread to the other Mac
+- **Omni Connect**: open any synced machine from a phone through that relay, without Tailscale
+- **Update**: one button in the Mac app, the desktop sidebar and phone Activity when origin's `main` is ahead; syncs, rebuilds and restarts
 - **Phone layout** with Activity, Channels and Library tabs, a new-thread sheet and full-screen thread panels. Save it to the iPhone home screen over Tailscale
 
 ## Documentation
