@@ -8,7 +8,7 @@ Omni runs on the Mac where your agents work. Set that machine up first; the Web 
 | --- | --- | --- |
 | macOS, for the Mac app | `uname` prints `Darwin` | On Linux, skip the Mac app and run `scripts/install-linux.sh`. Secrets go in `data/secrets.json` ([Configuration](configuration.md#secrets)) |
 | Node 24+ and npm | `node -v` | `nvm install 24`, `mise use node@24`, or `brew install node` |
-| Chromium, for the Linux app | `command -v chromium` | Your distro's Chromium, Chrome or Brave. Omarchy already has one |
+| Chromium, for the Linux app and the agents' browser | `command -v chromium` | Your distro's Chromium, Chrome or Brave. Omarchy already has one |
 | Claude Code, signed in | `claude --version` | `npm install -g @anthropic-ai/claude-code`, then `claude` and `/login` |
 | `gh`, signed in (GitHub panel, PR automations) | `gh auth status` | `brew install gh && gh auth login` |
 | Xcode (Mac app only) | `xcodebuild -version` | Install Xcode from the App Store, then `sudo xcode-select -s /Applications/Xcode.app` |

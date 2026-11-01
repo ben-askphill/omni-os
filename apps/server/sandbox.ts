@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { tokenPath } from './api-token.ts';
+import { chromeBinary } from './browser-page.ts';
 import { userName } from './user-config.ts';
 import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile } from './config.ts';
 import type { Channel } from './db.ts';
@@ -233,6 +234,10 @@ export function buildMcpConfig(input: McpInput) {
       if (input.channel.browser_headless) args.push('--headless');
       if (input.browserBusy) args.push('--isolated');
       else args.push('--user-data-dir', join(paths.browsers, input.channel.id));
+      // Launching its own browser, @playwright/mcp wants Google Chrome at its stock path. Point it at the one Omni
+      // found instead, so a machine with only Chromium (most Linux installs) or Playwright's build still gets a browser.
+      const bin = chromeBinary();
+      if (bin) args.push('--executable-path', bin);
     }
     servers['omni-browser'] = { command: process.execPath, args };
   }

@@ -82,6 +82,22 @@ describe('buildMcpConfig: browser', () => {
     expect(installed.version).toBe(dependencies['@playwright/mcp']);
   });
 
+  it('points a browser it launches at the one Omni found, not Playwright\'s stock Chrome path', () => {
+    const before = process.env.OMNI_CHROME_BIN;
+    process.env.OMNI_CHROME_BIN = '/usr/bin/chromium';
+    try {
+      for (const browserBusy of [false, true]) {
+        const args = buildMcpConfig({ threadId: THREAD, channel: channel(), browserBusy, omniUrl: OMNI_URL }).mcpServers['omni-browser'].args;
+        expect(args[args.indexOf('--executable-path') + 1]).toBe('/usr/bin/chromium');
+      }
+      const attached = buildMcpConfig({ threadId: THREAD, channel: channel(), browserBusy: false, cdpEndpoint: 'http://127.0.0.1:9333', omniUrl: OMNI_URL });
+      expect(attached.mcpServers['omni-browser'].args).not.toContain('--executable-path');
+    } finally {
+      if (before === undefined) delete process.env.OMNI_CHROME_BIN;
+      else process.env.OMNI_CHROME_BIN = before;
+    }
+  });
+
   it('omits --headless when the channel wants a visible browser', () => {
     const cfg = buildMcpConfig({ threadId: THREAD, channel: channel({ browser_headless: 0 }), browserBusy: false, omniUrl: OMNI_URL });
     expect(cfg.mcpServers['omni-browser'].args).not.toContain('--headless');

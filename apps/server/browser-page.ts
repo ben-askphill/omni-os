@@ -124,22 +124,54 @@ export function keyCommands(key: string, modifiers: number): string[] | undefine
 /** With nobody watching and no thread attached, the browser closes after this long. */
 export const IDLE_MS = 5 * 60_000;
 
-/** Google Chrome if it is installed (the profiles were made with it), else the newest Playwright Chromium. */
-export function chromeBinary(): string | null {
-  if (process.env.OMNI_CHROME_BIN) return process.env.OMNI_CHROME_BIN;
-  const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-  if (existsSync(chrome)) return chrome;
-  const cache = join(homedir(), 'Library', 'Caches', 'ms-playwright');
-  if (!existsSync(cache)) return null;
-  const dirs = readdirSync(cache).filter((d) => /^chromium-\d+$/.test(d)).sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
+/** What {@link findChrome} looks at, so a test can stand in for the machine. */
+export interface ChromeLookup {
+  platform: NodeJS.Platform;
+  home: string;
+  /** The PATH to search on Linux. */
+  path: string;
+  exists(path: string): boolean;
+  list(dir: string): string[];
+}
+
+/** Chromium-family browsers a Linux machine may have on PATH, Google Chrome first. Same family as the Linux app's list. */
+const LINUX_BROWSERS = ['google-chrome-stable', 'google-chrome', 'chromium', 'chromium-browser', 'brave-browser', 'brave'];
+
+/**
+ * Google Chrome if it is installed (the profiles were made with it), else another Chromium-family browser on Linux,
+ * else the newest Playwright Chromium.
+ */
+export function findChrome(at: ChromeLookup): string | null {
+  const candidates: string[] = [];
+  let cache: string;
+  let builds: string[];
+  if (at.platform === 'darwin') {
+    candidates.push('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
+    cache = join(at.home, 'Library', 'Caches', 'ms-playwright');
+    builds = ['chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', 'chrome-mac/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', 'chrome-mac/Chromium.app/Contents/MacOS/Chromium'];
+  } else if (at.platform === 'linux') {
+    candidates.push('/opt/google/chrome/chrome');
+    const dirs = at.path.split(':').filter(Boolean);
+    for (const name of LINUX_BROWSERS) for (const dir of dirs) candidates.push(join(dir, name));
+    cache = join(at.home, '.cache', 'ms-playwright');
+    builds = ['chrome-linux64/chrome', 'chrome-linux/chrome'];
+  } else return null;
+  for (const bin of candidates) if (at.exists(bin)) return bin;
+  if (!at.exists(cache)) return null;
+  const dirs = at.list(cache).filter((d) => /^chromium-\d+$/.test(d)).sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
   for (const d of dirs) {
-    for (const app of ['chrome-mac-arm64/Google Chrome for Testing.app', 'chrome-mac/Google Chrome for Testing.app', 'chrome-mac/Chromium.app']) {
-      const name = app.endsWith('Chromium.app') ? 'Chromium' : 'Google Chrome for Testing';
-      const bin = join(cache, d, app, 'Contents', 'MacOS', name);
-      if (existsSync(bin)) return bin;
+    for (const build of builds) {
+      const bin = join(cache, d, build);
+      if (at.exists(bin)) return bin;
     }
   }
   return null;
+}
+
+/** The browser Omni runs: OMNI_CHROME_BIN, else {@link findChrome} on this machine. */
+export function chromeBinary(): string | null {
+  if (process.env.OMNI_CHROME_BIN) return process.env.OMNI_CHROME_BIN;
+  return findChrome({ platform: process.platform, home: homedir(), path: process.env.PATH ?? '', exists: existsSync, list: readdirSync });
 }
 
 /** Only web pages and blank tabs: nothing internal, no navigating the browser to file:// or chrome://. */

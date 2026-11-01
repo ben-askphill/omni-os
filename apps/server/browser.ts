@@ -62,7 +62,7 @@ class ChannelBrowser {
 
   private async launch(): Promise<string> {
     const bin = chromeBinary();
-    if (!bin) throw new Error('No Chrome found. Install Google Chrome, or set OMNI_CHROME_BIN.');
+    if (!bin) throw new Error('No Chrome found. Install Google Chrome (or Chromium on Linux), or set OMNI_CHROME_BIN.');
     const profile = join(paths.browsers, this.channelId);
     mkdirSync(profile, { recursive: true });
     const portFile = join(profile, 'DevToolsActivePort');

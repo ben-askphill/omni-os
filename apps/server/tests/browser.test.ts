@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { clampViewport, defaultFavicon, keyCommands, normalizeUrl, safeIcon } from '../browser.ts';
+import { findChrome, type ChromeLookup } from '../browser-page.ts';
 
 describe('normalizeUrl: the address bar', () => {
   it('adds https to a bare host', () => {
@@ -56,5 +57,44 @@ describe('keyCommands: Cmd shortcuts in the page', () => {
     expect(keyCommands('ArrowLeft', 12)).toEqual(['moveToBeginningOfLineAndModifySelection']);
     expect(keyCommands('a', 0)).toBeUndefined();
     expect(keyCommands('q', 4)).toBeUndefined();
+  });
+});
+
+describe('findChrome: the browser Omni and the browser MCP run', () => {
+  const machine = (platform: NodeJS.Platform, files: string[], path = '/usr/local/bin:/usr/bin'): ChromeLookup => {
+    const set = new Set(files);
+    return {
+      platform,
+      home: '/home/u',
+      path,
+      exists: (p) => set.has(p) || files.some((f) => f.startsWith(`${p}/`)),
+      list: (dir) => [...new Set(files.filter((f) => f.startsWith(`${dir}/`)).map((f) => f.slice(dir.length + 1).split('/')[0]))],
+    };
+  };
+
+  it('prefers Google Chrome on a Mac, then the newest Playwright build', () => {
+    const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    const pw = (n: number) => `/home/u/Library/Caches/ms-playwright/chromium-${n}/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`;
+    expect(findChrome(machine('darwin', [chrome, pw(1200)]))).toBe(chrome);
+    expect(findChrome(machine('darwin', [pw(1100), pw(1200)]))).toBe(pw(1200));
+    expect(findChrome(machine('darwin', []))).toBeNull();
+  });
+
+  it('finds Chromium on PATH on Linux, where Google Chrome is usually absent', () => {
+    expect(findChrome(machine('linux', ['/usr/bin/chromium']))).toBe('/usr/bin/chromium');
+    expect(findChrome(machine('linux', ['/usr/bin/chromium', '/usr/bin/brave']))).toBe('/usr/bin/chromium');
+    expect(findChrome(machine('linux', ['/usr/bin/chromium', '/opt/google/chrome/chrome']))).toBe('/opt/google/chrome/chrome');
+    expect(findChrome(machine('linux', ['/usr/bin/chromium', '/usr/bin/google-chrome-stable']))).toBe('/usr/bin/google-chrome-stable');
+    expect(findChrome(machine('linux', ['/usr/bin/chromium'], '/usr/local/bin'))).toBeNull();
+  });
+
+  it("falls back to Playwright's Linux Chromium", () => {
+    const pw = '/home/u/.cache/ms-playwright/chromium-1200/chrome-linux64/chrome';
+    expect(findChrome(machine('linux', [pw]))).toBe(pw);
+    expect(findChrome(machine('linux', []))).toBeNull();
+  });
+
+  it('finds nothing on other platforms', () => {
+    expect(findChrome(machine('win32', ['/usr/bin/chromium']))).toBeNull();
   });
 });
