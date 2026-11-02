@@ -19,6 +19,15 @@ export function defaultDataDir(dirs: PlatformDirs, input: { dev: boolean; repo: 
   return join(base, 'omni-os', 'data');
 }
 
+/**
+ * Electron's logs folder, or one inside a `--user-data-dir` given on the command line. Electron keeps
+ * ~/Library/Logs/<name> whatever the user-data folder is, and that is the installed app's log, and the SwiftUI
+ * app's server log too, so a dev or QA run would write its server's output into theirs.
+ */
+export function logsDir(input: { userData: string; electronLogs: string; customUserData: boolean }): string {
+  return input.customUserData ? join(input.userData, 'logs') : input.electronLogs;
+}
+
 export function serverLogFile(dirs: PlatformDirs): string {
   if (dirs.platform === 'darwin') return join(dirs.logs, 'server.log');
   const base = dirs.env.XDG_STATE_HOME || join(dirs.home, '.local', 'state');

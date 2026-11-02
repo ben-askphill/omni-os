@@ -16,7 +16,7 @@ import { installMenu, showServerLog } from './menu.ts';
 import { desktopPlatform } from './menu-template.ts';
 import { installNativeBrowser } from './native-browser.ts';
 import { parseOptions, safeRoute } from './options.ts';
-import { defaultDataDir, serverLogFile, type PlatformDirs } from './paths.ts';
+import { defaultDataDir, logsDir, serverLogFile, type PlatformDirs } from './paths.ts';
 import { installQuickPrompt } from './quick-prompt.ts';
 import { installQuitHold } from './quit.ts';
 import { focusServerScreen, showServerFailure } from './server-screen.ts';
@@ -62,7 +62,11 @@ async function boot(): Promise<void> {
     home: homedir(),
     env: process.env,
     userData: app.getPath('userData'),
-    logs: app.getPath('logs'),
+    logs: logsDir({
+      userData: app.getPath('userData'),
+      electronLogs: app.getPath('logs'),
+      customUserData: app.commandLine.hasSwitch('user-data-dir'),
+    }),
   };
   const settings = openSettings(join(dirs.userData, 'settings.json'));
   const dataDir =
