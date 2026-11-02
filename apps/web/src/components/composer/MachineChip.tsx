@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import { takeoverNote } from '@omni/shared/handoff.ts';
+import { HERE, threadMachine, type RunOnRow } from '@omni/shared/thread-machine.ts';
 import { errorText, type Thread } from '../../api.ts';
 import { useHereName } from '../../store.tsx';
-import { HERE, threadMachine, type RunOnRow } from '../../run-on.ts';
 import { handOff, useHandoffTargets, type HandoffAnswer } from '../thread/Handoff.tsx';
 import { TakeoverConfirm } from '../thread/Takeover.tsx';
 import { Picker, type PickerOption } from '../ui.tsx';

@@ -7,10 +7,18 @@
 // page, the person approves there, and the client polls the server until Clerk says yes. The device code never
 // leaves the server, and the client proves each poll with a secret only it got.
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { db } from './db.ts';
+import { db, tx } from './db.ts';
+import { closeSessionStreams, sessionsWithStreams } from './session-streams.ts';
 import { clerk as defaultClerk, type ClerkClient, type DeviceCode, type Identity } from './clerk.ts';
 
 export type SessionKind = 'browser' | 'app';
+
+/**
+ * How a session was granted. `google`: the owner signed in with Google, and it ends when the owner changes or is
+ * unlinked. `pairing`: an app redeemed a one-time code (apps/server/app-pairing.ts) from an already authenticated
+ * device, and it needs no Google owner.
+ */
+export type SessionMethod = 'google' | 'pairing';
 
 export interface Owner {
   issuer: string;
@@ -24,6 +32,7 @@ export interface DeviceSession {
   id: string;
   name: string;
   kind: SessionKind;
+  method: SessionMethod;
   createdAt: string;
   lastSeenAt: string;
 }
@@ -48,36 +57,56 @@ export function owner(): Owner | null {
   return r ? { issuer: r.issuer, sub: r.sub, email: r.email, name: r.name, linkedAt: r.linked_at } : null;
 }
 
-/** Make `who` the owner. Sessions another user's sign-ins made stop working with the change. */
+/**
+ * End the live sessions `where` selects: mark them revoked, drop their push tokens and alert choices, and close the SSE
+ * streams they hold. Returns their ids. The streams close after the rows commit, so a client that reconnects at once is refused.
+ */
+function endSessions(where: string, ...params: string[]): string[] {
+  const ids = tx(() => {
+    const rows = db.prepare(`SELECT id FROM device_sessions WHERE revoked_at IS NULL AND (${where})`).all(...params) as { id: string }[];
+    const ids = rows.map((r) => r.id);
+    const at = now();
+    for (const id of ids) db.prepare('UPDATE device_sessions SET revoked_at = ? WHERE id = ?').run(at, id);
+    // Their push tokens and alert choices go with them (push-tokens.ts, push-preferences.ts), in the same commit as the revoke.
+    for (const id of ids) db.prepare('DELETE FROM push_tokens WHERE session_id = ?').run(id);
+    for (const id of ids) db.prepare('DELETE FROM push_preferences WHERE session_id = ?').run(id);
+    return ids;
+  });
+  closeSessionStreams(ids);
+  return ids;
+}
+
+/** Make `who` the owner. Google sessions another user's sign-ins made stop working with the change. Paired apps do not depend on the owner. */
 export function linkOwner(who: Identity): Owner {
   db.prepare(
     `INSERT INTO auth_owner (id, issuer, sub, email, name, linked_at) VALUES (1, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET issuer = excluded.issuer, sub = excluded.sub, email = excluded.email, name = excluded.name, linked_at = excluded.linked_at`,
   ).run(who.issuer, who.sub, who.email, who.name, now());
-  db.prepare('UPDATE device_sessions SET revoked_at = ? WHERE sub != ? AND revoked_at IS NULL').run(now(), who.sub);
+  endSessions(`method = 'google' AND sub != ?`, who.sub);
   return owner()!;
 }
 
-/** Forget the owner and end every session: Google sign-in is off until someone links again. */
+/** Forget the owner and end every Google session: Google sign-in is off until someone links again. Paired apps keep working. */
 export function unlinkOwner() {
   db.prepare('DELETE FROM auth_owner WHERE id = 1').run();
-  db.prepare('UPDATE device_sessions SET revoked_at = ? WHERE revoked_at IS NULL').run(now());
+  endSessions(`method = 'google'`);
 }
 
 const isOwner = (who: Identity, o = owner()) => !!o && o.issuer === who.issuer && o.sub === who.sub;
 
 // ---------- sessions ----------
 
-/** A new session for the owner. Returns the token, which is never stored or shown again. */
-export function createSession(name: string, kind: SessionKind, sub: string): { id: string; token: string } {
+/** A new session. Returns the token, which is never stored or shown again. `sub` is the owner's for a Google session and '' for a pairing. */
+export function createSession(name: string, kind: SessionKind, sub: string, method: SessionMethod = 'google'): { id: string; token: string } {
   const id = randomUUID();
   const token = `omni_s_${randomBytes(32).toString('hex')}`;
   const at = now();
-  db.prepare('INSERT INTO device_sessions (id, token_hash, name, kind, sub, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO device_sessions (id, token_hash, name, kind, method, sub, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
     id,
     sha256(token),
     name.slice(0, 100) || 'Device',
     kind,
+    method,
     sub,
     at,
     at,
@@ -85,34 +114,71 @@ export function createSession(name: string, kind: SessionKind, sub: string): { i
   return { id, token };
 }
 
-/** The session a token names, while it is live: not revoked, used within IDLE_DAYS, and the owner's. */
-export function sessionFor(token: string | undefined | null, at = Date.now()): { id: string } | null {
-  if (!token?.startsWith('omni_s_')) return null;
-  const r = db.prepare('SELECT id, sub, last_seen_at, revoked_at FROM device_sessions WHERE token_hash = ?').get(sha256(token)) as
-    | { id: string; sub: string; last_seen_at: string; revoked_at: string | null }
-    | undefined;
-  if (!r || r.revoked_at) return null;
-  const seen = Date.parse(r.last_seen_at);
-  if (at - seen > IDLE_DAYS * 86_400_000) return null;
-  if (owner()?.sub !== r.sub) return null;
-  if (at - seen > TOUCH_MS) db.prepare('UPDATE device_sessions SET last_seen_at = ? WHERE id = ?').run(new Date(at).toISOString(), r.id);
-  return { id: r.id };
+interface SessionRow {
+  id: string;
+  sub: string;
+  kind: SessionKind;
+  method: SessionMethod;
+  last_seen_at: string;
+  revoked_at: string | null;
 }
 
-/** The live sessions, most recently used first. */
+/** Whether a row still opens the door: not revoked, used within IDLE_DAYS, and, for Google, the owner's. */
+function liveRow(r: SessionRow | undefined, at: number): r is SessionRow {
+  if (!r || r.revoked_at) return false;
+  if (at - Date.parse(r.last_seen_at) > IDLE_DAYS * 86_400_000) return false;
+  return r.method === 'pairing' || owner()?.sub === r.sub;
+}
+
+/** The session a token names, while it is live. */
+export function sessionFor(token: string | undefined | null, at = Date.now()): { id: string; kind: SessionKind; method: SessionMethod } | null {
+  if (!token?.startsWith('omni_s_')) return null;
+  const r = db.prepare('SELECT id, sub, kind, method, last_seen_at, revoked_at FROM device_sessions WHERE token_hash = ?').get(sha256(token)) as SessionRow | undefined;
+  if (!liveRow(r, at)) return null;
+  touch(r, at);
+  return { id: r.id, kind: r.kind, method: r.method };
+}
+
+function touch(r: SessionRow, at: number) {
+  if (at - Date.parse(r.last_seen_at) > TOUCH_MS) db.prepare('UPDATE device_sessions SET last_seen_at = ? WHERE id = ?').run(new Date(at).toISOString(), r.id);
+}
+
+/** The live sessions, most recently used first: the owner's Google sessions, and every paired app. */
 export function listSessions(): DeviceSession[] {
   const o = owner();
-  if (!o) return [];
   const cutoff = new Date(Date.now() - IDLE_DAYS * 86_400_000).toISOString();
   const rows = db
-    .prepare('SELECT id, name, kind, created_at, last_seen_at FROM device_sessions WHERE revoked_at IS NULL AND sub = ? AND last_seen_at > ? ORDER BY last_seen_at DESC')
-    .all(o.sub, cutoff) as { id: string; name: string; kind: SessionKind; created_at: string; last_seen_at: string }[];
-  return rows.map((r) => ({ id: r.id, name: r.name, kind: r.kind, createdAt: r.created_at, lastSeenAt: r.last_seen_at }));
+    .prepare(
+      `SELECT id, name, kind, method, created_at, last_seen_at FROM device_sessions
+       WHERE revoked_at IS NULL AND last_seen_at > ? AND (method = 'pairing' OR sub = ?) ORDER BY last_seen_at DESC`,
+    )
+    .all(cutoff, o?.sub ?? null) as { id: string; name: string; kind: SessionKind; method: SessionMethod; created_at: string; last_seen_at: string }[];
+  return rows.map((r) => ({ id: r.id, name: r.name, kind: r.kind, method: r.method, createdAt: r.created_at, lastSeenAt: r.last_seen_at }));
 }
 
-/** End one session. False when there was no live one by that id. */
+/** How many paired apps are live. */
+export function pairedSessionCount(): number {
+  const cutoff = new Date(Date.now() - IDLE_DAYS * 86_400_000).toISOString();
+  return (db.prepare(`SELECT COUNT(*) AS n FROM device_sessions WHERE revoked_at IS NULL AND method = 'pairing' AND last_seen_at > ?`).get(cutoff) as { n: number }).n;
+}
+
+/** End one session and its streams and push token. False when there was no live one by that id. */
 export function revokeSession(id: string): boolean {
-  return db.prepare('UPDATE device_sessions SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL').run(now(), id).changes > 0;
+  return endSessions('id = ?', id).length > 0;
+}
+
+/** Whether the session is live now, without counting as use. */
+export function sessionIsLive(id: string, at = Date.now()): boolean {
+  return liveRow(db.prepare('SELECT id, sub, kind, method, last_seen_at, revoked_at FROM device_sessions WHERE id = ?').get(id) as SessionRow | undefined, at);
+}
+
+/**
+ * Close the streams of sessions that stopped being live without a revoke: idle past IDLE_DAYS, or the owner changed
+ * underneath them. An open stream is not use, so a connection held open past its session's expiry ends here, without
+ * waiting for another request. sse.ts runs this every few seconds while a stream is open.
+ */
+export function reconcileStreams(at = Date.now()) {
+  closeSessionStreams(sessionsWithStreams().filter((id) => !sessionIsLive(id, at)));
 }
 
 // ---------- sign-in flows ----------

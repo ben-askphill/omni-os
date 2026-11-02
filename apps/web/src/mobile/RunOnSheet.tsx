@@ -1,5 +1,5 @@
+import { type RunOnRow } from '@omni/shared/thread-machine.ts';
 import { Icon } from '../components/ui.tsx';
-import type { RunOnRow } from '../run-on.ts';
 import { MoGroup, MoListRow, MoRadio, MoSection, MoSheet } from './parts.tsx';
 
 /** The new-thread sheet's machine chip: "On This Mac", or "On omarchy". */

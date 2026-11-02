@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
+import { relTime } from '@omni/shared/format.ts';
+import { type ThreadLinks } from '@omni/shared/continue-flow.ts';
 import type { BackgroundTask, Thread } from '../../../api.ts';
-import type { ThreadLinks } from '../../../continue.ts';
-import { relTime } from '../../../format.ts';
 import { href } from '../../../router.ts';
 import { harnessLabel, HarnessLogo } from '../../brand.tsx';
 import { Icon, STATUS_LABEL, StatusDot, type IconName } from '../../ui.tsx';

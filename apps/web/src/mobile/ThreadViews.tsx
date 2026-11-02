@@ -10,23 +10,26 @@ import { BrowserWatch, displayUrl, useChannelBrowser } from '../components/LiveB
 import { Markdown } from '../components/Markdown.tsx';
 import { modelOf } from '../components/ModelPicker.tsx';
 import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
-import { usePRWatch, watchCopy } from '../components/thread/PRWatch.tsx';
+import { usePRWatch } from '../components/thread/PRWatch.tsx';
+import { watchCopy } from '@omni/shared/pr-watch.ts';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ThreadIdCtx, ToolOutput } from '../components/thread/ToolOutput.tsx';
 import { Button, Chip, copyText, ErrorNote, Icon, SlideToConfirm, STATUS_LABEL, StatusDot } from '../components/ui.tsx';
-import { cloudAgentUrl } from '../cloud-agent.ts';
+import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import { carriedText } from '@omni/shared/continue.ts';
+import { relTime } from '@omni/shared/format.ts';
 import { linkName } from '../components/ContinueLinks.tsx';
-import { fullDate, plural, relTime } from '../format.ts';
+import { fullDate, plural } from '../format.ts';
 import { runningSubagents, subagentKind } from '../subagents.ts';
 import { href, type Route } from '../router.ts';
-import { checkTone } from '../pages/PRs.tsx';
+import { mergeNote } from '@omni/shared/pr-merge.ts';
+import { checkTone } from '@omni/shared/thread-glance.ts';
 import { useApp } from '../store.tsx';
-import { toolLabel, toolSummary, type Item, type ToolCall } from '../transcript/fold.ts';
+import { toolLabel, toolSummary, type Item, type ToolCall } from '@omni/shared/transcript-fold.ts';
 import { CrewPRList } from './CrewPRs.tsx';
 import { MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSection } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
-import { threadView } from './thread-view.ts';
+import { threadView } from '@omni/shared/thread-view.ts';
 import { holds } from '../thread-history.ts';
 import { hasLiveOutput, outputTarget } from '../tool-output.ts';
 
@@ -216,11 +219,7 @@ export function PRScreen() {
   }
 
   const open = !p.state || p.state === 'OPEN';
-  const pending = p.checkRuns.filter((c) => checkTone(c.state) === 'running').length;
-  const failing = p.checkRuns.filter((c) => checkTone(c.state) === 'needs').length;
-  const note = [failing && `${plural(failing, 'check')} failing.`, pending && `${plural(pending, 'check')} still running. Merging now skips them.`, p.mergeable === 'CONFLICTING' && 'It conflicts with the base branch.']
-    .filter(Boolean)
-    .join(' ');
+  const note = mergeNote(p);
   const canWatch = open || watch.watching;
   const { action, line } = watchCopy(watch.watch);
   return (

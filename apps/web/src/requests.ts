@@ -1,25 +1,10 @@
-// Durable sends (apps/server/db/repos/requests.ts) from the Web UI's side: one request id per message, kept across
-// its retries, and what a restart left waiting on Ben. RequestIds.swift is the Mac app's copy.
+// Durable sends (apps/server/db/repos/requests.ts) from the Web UI's side: what makes two sends the same message, and what a
+// restart left waiting on Ben. The request id itself is packages/shared/request-id.ts.
 import type { PendingMsg } from './api.ts';
 
 /** What makes two sends the same message: its text, mode, files and context records. A send without context keys as it always did. */
 export function sendKey(prompt: string, mode: string | undefined, files: readonly { name: string; size: number; lastModified?: number }[], contextIds: readonly string[] = []) {
   return JSON.stringify([prompt, mode ?? '', files.map((f) => [f.name, f.size, f.lastModified ?? 0]), ...(contextIds.length ? [contextIds] : [])]);
-}
-
-export interface PendingRequest {
-  key: string;
-  id: string;
-}
-
-const newId = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
-
-/**
- * The request id for a send: the last failed one's when Ben retries the same message, so the server answers a
- * retry of something it already accepted with that acceptance; a new one for anything else.
- */
-export function requestIdFor(last: PendingRequest | null, key: string, make: () => string = newId): PendingRequest {
-  return last?.key === key ? last : { key, id: make() };
 }
 
 /** Accepted before a restart and waiting on Ben: `recovered` never reached a harness, `uncertain` may have. */

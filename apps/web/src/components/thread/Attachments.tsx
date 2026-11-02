@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import { bytes } from '@omni/shared/format.ts';
 import { uploadUrl, type Attachment } from '../../api.ts';
-import { bytes } from '../../format.ts';
 import { Icon, Modal } from '../ui.tsx';
 
 /**

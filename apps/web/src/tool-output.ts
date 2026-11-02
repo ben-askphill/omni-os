@@ -4,7 +4,7 @@
 // @omni/shared/tool-output.ts; this adds the requests, one chunk in flight, and what the row shows meanwhile.
 import { applyChunk, applyTail, noOutput, outputMeta, type LoadedOutput, type OutputChunk, type TailMessage } from '@omni/shared/tool-output.ts';
 import { errorText } from './api.ts';
-import type { ToolCall } from './transcript/fold.ts';
+import type { ToolCall } from '@omni/shared/transcript-fold.ts';
 
 /** Where an open row reads its output from. */
 export type OutputTarget = { kind: 'saved'; event: number } | { kind: 'live'; tool: string };

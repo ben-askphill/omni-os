@@ -1,7 +1,7 @@
 import Foundation
 
 /// The top of the inspector's Details tab: a branch PR's state and the one step it calls for, as
-/// apps/web/src/thread-glance.ts. Ben's threads mostly end as a merged PR: open it, fix conflicts, fix checks, merge.
+/// packages/shared/thread-glance.ts. Ben's threads mostly end as a merged PR: open it, fix conflicts, fix checks, merge.
 public enum ThreadGlance {
   public static let openPRPrompt = "Commit your work, push the branch and open a PR with gh. Reply with the PR URL."
   public static let fixConflictsPrompt = "Rebase this branch on its base branch, resolve the merge conflicts, run the tests and force-push with lease."

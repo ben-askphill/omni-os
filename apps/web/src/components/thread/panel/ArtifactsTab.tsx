@@ -1,7 +1,7 @@
+import { relTime } from '@omni/shared/format.ts';
 import type { Artifact } from '../../../api.ts';
 import { ArtifactViewer, kindIcon } from '../../ArtifactViewer.tsx';
 import { Empty, Icon } from '../../ui.tsx';
-import { relTime } from '../../../format.ts';
 
 export function ArtifactsTab({ artifacts, selected, onSelect }: { artifacts: Artifact[]; selected: Artifact | undefined; onSelect: (id: number) => void }) {
   if (!artifacts.length) {

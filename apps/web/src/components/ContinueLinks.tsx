@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { carriedText, type ContinueLink } from '@omni/shared/continue.ts';
-import { newestLink, type ThreadLinks } from '../continue.ts';
+import { newestLink, type ThreadLinks } from '@omni/shared/continue-flow.ts';
 import { href } from '../router.ts';
 import { harnessLabel } from './brand.tsx';
 import { Icon, StatusDot } from './ui.tsx';

@@ -7,7 +7,7 @@ import { DetailsTab } from '../src/components/thread/panel/DetailsTab.tsx';
 import { PRsTab } from '../src/components/thread/panel/PRsTab.tsx';
 import { useThreadPR } from '../src/components/thread/ThreadPR.tsx';
 import { CrewPRList } from '../src/mobile/CrewPRs.tsx';
-import { crewLine } from '../src/thread-glance.ts';
+import { crewLine } from '@omni/shared/thread-glance.ts';
 
 // The PRs a thread's delegated threads opened (GET /threads/:id/pr `crew`), on the thread that delegated them: the PRs
 // tab on the desktop (components/thread/panel/PRsTab.tsx) and the phone's list (mobile/CrewPRs.tsx).

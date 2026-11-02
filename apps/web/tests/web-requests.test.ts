@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { requestIdFor } from '@omni/shared/request-id.ts';
 import type { PendingMsg, ThreadDetail } from '../src/api.ts';
-import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf, reportNotes, requestIdFor, sendKey } from '../src/requests.ts';
+import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf, reportNotes, sendKey } from '../src/requests.ts';
 import { isEditable, movedOrder } from '../src/pending-edits.ts';
 
 // The Web UI's side of durable sends (apps/web/src/requests.ts), against the same recorded server answers the Mac app's

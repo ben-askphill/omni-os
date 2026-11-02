@@ -115,7 +115,7 @@ private func parsed(_ json: String) throws -> DiffSelectionContext.Body {
     let f = try #require(c["file"])
     let path = try #require(f["path"]?.stringValue)
     let diff = FileDiff(path: path, header: strings(f["header"]), lines: lines(f), add: 0, del: 0, binary: false)
-    // The corpus numbers its lines as apps/web/src/diff.ts does; FileDiff must agree.
+    // The corpus numbers its lines as packages/shared/diff.ts does; FileDiff must agree.
     if case .array(let want)? = f["lines"] {
       #expect(diff.rows.map { [$0.old, $0.new] } == want.map { [int($0["old"]), int($0["new"])] }, "\(name)")
     }

@@ -112,7 +112,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const role = getCrew(input.role);
   const channelId = input.channel || role?.channel || 'inbox';
   const channel = channels.get(channelId);
-  if (!channel) throw new Error(`unknown channel "${channelId}"`);
+  if (!channel) throw refusal(`unknown channel "${channelId}"`, 404);
 
   // Resolve harness/model/effort: the thread's own choice, then the role's default, then the channel's, then Auto.
   // On a miss, probe the harnesses that are down and try again: Ben may have just logged in.

@@ -47,7 +47,7 @@ struct GoogleAccountCard: View {
       Button("Unlink and Sign Out All", role: .destructive) { Task { await google.unlink() } }
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("Every device that signed in with Google loses access. Devices paired with the token keep it.")
+      Text("Every device that signed in with Google loses access. Devices paired with the token or a code keep it.")
     }
   }
 
@@ -63,11 +63,6 @@ struct GoogleAccountCard: View {
           InfoRow("Linked", value: RelTime.label(owner.linkedAt, now: context.date))
         }
       }
-      devicesList
-      if account.via == "token" {
-        Button("Unlink Account") { confirmingUnlink = true }
-          .buttonStyle(.pill(.ghost, height: 28))
-      }
     } else if let flow = google.linking {
       DeviceCodePanel(flow: flow) { google.cancelLink() }
     } else if account.via == "token" {
@@ -82,6 +77,13 @@ struct GoogleAccountCard: View {
         if google.isStarting { Loader(size: 14) }
       }
     }
+    if account.owner != nil || !google.devices.isEmpty {
+      devicesList
+    }
+    if account.owner != nil, account.via == "token" {
+      Button("Unlink Account") { confirmingUnlink = true }
+        .buttonStyle(.pill(.ghost, height: 28))
+    }
     if let error = google.actionError {
       ErrorNote(text: error)
     }
@@ -92,7 +94,7 @@ struct GoogleAccountCard: View {
     VStack(alignment: .leading, spacing: z(6)) {
       FieldLabel(text: "Signed-in devices")
       if google.devices.isEmpty {
-        Text("None yet. Open Omni on another device and choose Sign in with Google.")
+        Text("None yet. Open Omni on another device and choose Sign in with Google, or pair the iOS app below.")
           .font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
       } else {
         InfoRows {
@@ -100,7 +102,7 @@ struct GoogleAccountCard: View {
             TimelineView(.periodic(from: .now, by: 30)) { context in
               InfoRow(label: device.name) {
                 HStack(spacing: z(8)) {
-                  Text("\(device.kind == "app" ? "App" : "Browser"), used \(RelTime.label(device.lastSeenAt, now: context.date))")
+                  Text("\(device.kind == "app" ? "App" : "Browser")\(device.method == "pairing" ? ", paired with a code" : ""), used \(RelTime.label(device.lastSeenAt, now: context.date))")
                     .foregroundStyle(Tok.fg2)
                   Spacer(minLength: 0)
                   Button("Revoke") { Task { await google.revoke(device) } }

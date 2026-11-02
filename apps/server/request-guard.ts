@@ -97,6 +97,10 @@ export const SIGN_IN_ROUTES: readonly (readonly [string, string])[] = [
 ];
 const isSignInRoute = (c: Context) => SIGN_IN_ROUTES.some(([m, p]) => c.req.method === m && c.req.path === p);
 
+/** Redeeming a pairing code needs no token: the one-time code, which only an authenticated device could mint, is the proof. */
+export const APP_PAIRING_OPEN_ROUTES: readonly (readonly [string, string])[] = [['POST', '/api/auth/app-pairings/redeem']];
+const isAppPairingRoute = (c: Context) => APP_PAIRING_OPEN_ROUTES.some(([m, p]) => c.req.method === m && c.req.path === p);
+
 /** Omni Connect's routes that prove themselves: the relay's signed mint and health requests, and a browser's code and key proof. */
 export const CONNECT_OPEN_ROUTES: readonly (readonly [string, string])[] = [
   ['POST', '/api/connect/mint'],
@@ -105,8 +109,11 @@ export const CONNECT_OPEN_ROUTES: readonly (readonly [string, string])[] = [
 ];
 const isConnectRoute = (c: Context) => CONNECT_OPEN_ROUTES.some(([m, p]) => c.req.method === m && c.req.path === p);
 
-/** How a request proved itself: the install's token, a signed-in device's session, or neither (the open routes). */
-export type OmniAuth = { via: 'token' } | { via: 'session'; session: string } | { via: 'none' };
+/**
+ * How a request proved itself: the install's token, a device's session (`method`: signed in with Google, or an app
+ * that redeemed a pairing code), or neither (the open routes).
+ */
+export type OmniAuth = { via: 'token' } | { via: 'session'; session: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' } | { via: 'none' };
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -115,7 +122,7 @@ declare module 'hono' {
 }
 
 /** Looks a session token up (google-auth.ts sessionFor). app.ts sets it, so this module and its tests never open the db. */
-let sessionCheck: (token: string) => { id: string } | null = () => null;
+let sessionCheck: (token: string) => { id: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' } | null = () => null;
 export const useSessionCheck = (fn: typeof sessionCheck) => {
   sessionCheck = fn;
 };
@@ -178,6 +185,21 @@ export function fromThisMac(c: Context): boolean {
   return ownAddresses().includes(client.trim().toLowerCase().replace(/^::ffff:(?=\d+\.)/, ''));
 }
 
+/**
+ * Who is asking, for rate limits on the open routes. Behind a proxy every request's socket is the proxy's, so the
+ * address comes from what the proxy adds: Cloudflare's Cf-Connecting-IP (it sets that itself) or the last
+ * X-Forwarded-For entry, which the proxy appends and the client cannot overwrite; Tailscale's login when it names
+ * one. A request with no proxy in front is its socket's address, and a client's own forwarding headers count for
+ * nothing. In-process requests (tests) have no socket and share the key `direct:local`.
+ */
+export function clientKey(c: Context): string {
+  const host = requestHost(c);
+  const last = (c.req.header('x-forwarded-for') ?? '').split(',').at(-1)?.trim();
+  if (fromConnectTunnel(c, host)) return `connect:${c.req.header('cf-connecting-ip')?.trim() || last || 'unknown'}`;
+  if (cameThroughProxy(c, host)) return `proxy:${c.req.header('tailscale-user-login')?.trim().toLowerCase() || last || 'unknown'}`;
+  return `direct:${(c.env as { incoming?: IncomingMessage } | undefined)?.incoming?.socket.remoteAddress ?? 'local'}`;
+}
+
 /** Body types a cross-site page can send without a CORS preflight. JSON routes never take them. */
 const SIMPLE_TYPES = ['text/plain', 'application/x-www-form-urlencoded'];
 
@@ -189,7 +211,7 @@ const SIMPLE_TYPES = ['text/plain', 'application/x-www-form-urlencoded'];
  * - a text/plain or form-urlencoded body, the content types that skip the preflight;
  * - no token, or the wrong one (401), in the Authorization header or the paired browser's cookie, and no live
  *   device session in either, except on the proof route, a GitHub webhook post (its own signature), GET desktop-pair
- *   from this machine, the Google sign-in routes, and Omni Connect's signed routes (CONNECT_OPEN_ROUTES);
+ *   from this machine, the Google sign-in routes, redeeming an app pairing code, and Omni Connect's signed routes (CONNECT_OPEN_ROUTES);
  * - through tailscale serve (a tailnet Host, or any proxy header), a Tailscale-User-Login that is not in
  *   `integrations.tailscaleLogin`, when that is set.
  * The Mac app, apps/mcp/omni.ts, scripts and curl send no Origin or Sec-Fetch-Site, so the Host and token checks apply to them.
@@ -214,13 +236,13 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
   if (SIMPLE_TYPES.includes(type)) return refuse('send JSON', 415);
   const desktop = c.req.method === 'GET' && c.req.path === DESKTOP_PAIR_PATH;
   if (desktop && !desktopPairAllowed(c)) return refuse('desktop pairing is only from this machine');
-  const open = desktop || (c.req.method === 'GET' && c.req.path === PROOF_PATH) || isWebhookPost(c) || isSignInRoute(c) || isConnectRoute(c);
+  const open = desktop || (c.req.method === 'GET' && c.req.path === PROOF_PATH) || isWebhookPost(c) || isSignInRoute(c) || isAppPairingRoute(c) || isConnectRoute(c);
   const given = bearer(c);
   let auth: OmniAuth = { via: 'none' };
   if (tokenMatches(given ?? getCookie(c, cookieName()))) auth = { via: 'token' };
   else {
     const session = sessionCheck(given ?? getCookie(c, sessionCookieName()) ?? '');
-    if (session) auth = { via: 'session', session: session.id };
+    if (session) auth = { via: 'session', session: session.id, kind: session.kind, method: session.method };
   }
   if (auth.via === 'none' && !open) return refuse("Unauthorized: send this install's token (data/api-token), pair this browser, or sign in with Google", 401);
   c.set('omniAuth', auth);

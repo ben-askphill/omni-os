@@ -5,9 +5,9 @@ import type { Question, ThreadQuestion } from '@omni/shared/question.ts';
 import type { NeedsYouItem, Thread } from '../src/api.ts';
 import { QuestionCard } from '../src/components/thread/QuestionCard.tsx';
 import { needsCard } from '../src/mobile/activity.ts';
-import { threadView } from '../src/mobile/thread-view.ts';
+import { threadView } from '@omni/shared/thread-view.ts';
 import { reasonOf } from '../src/needs-you.ts';
-import { buildItems, isAsking, type TranscriptEvent } from '../src/transcript/fold.ts';
+import { buildItems, isAsking, type TranscriptEvent } from '@omni/shared/transcript-fold.ts';
 
 // The question card (ask_user_question) in the Web UI: the card itself, where the fold puts it, and Needs you.
 

@@ -41,7 +41,7 @@ public struct ChangeBase: Decodable, Hashable, Sendable {
 
   public var short: String { String(sha.prefix(7)) }
 
-  /// Where it came from, in words, as `baseLabel` in apps/web/src/changes.ts.
+  /// Where it came from, in words, as `baseLabel` in packages/shared/changes-view.ts.
   public var label: String {
     if how == "thread-start" { return ref == "HEAD" ? "where the thread started" : "\(ref) when the thread started" }
     return ref == "HEAD" ? "the current commit" : "merge base with \(ref)"
@@ -111,7 +111,7 @@ public struct ChangedFile: Decodable, Hashable, Sendable {
   /// `old → new` for a rename or copy, else the path.
   public var label: String { oldPath.map { "\($0) → \(path)" } ?? path }
 
-  /// Why there are no lines, in words, as apps/web/src/changes.ts.
+  /// Why there are no lines, in words, as packages/shared/changes-view.ts.
   public var notice: String? {
     switch omitted {
     case "binary": "Binary file, not shown."
@@ -125,7 +125,7 @@ public struct ChangedFile: Decodable, Hashable, Sendable {
 }
 
 /// The Changes panel's model: the groups that have files, each file's lines numbered, and totals. `changesView` in
-/// apps/web/src/changes.ts.
+/// packages/shared/changes-view.ts.
 public struct ChangesView: Hashable, Sendable {
   public struct File: Hashable, Sendable, Identifiable {
     public let id: String
@@ -210,7 +210,7 @@ public struct TurnView: Decodable, Hashable, Sendable, Identifiable {
     case endedAt = "ended_at"
   }
 
-  /// "Turn 3", as `turnTitle` in apps/web/src/changes.ts.
+  /// "Turn 3", as `turnTitle` in packages/shared/changes-view.ts.
   public var title: String { "Turn \(n)" }
 
   /// Why the turn has no files to show yet, or ever. nil once both snapshots are saved. `turnStateNote` on the web.
@@ -241,7 +241,7 @@ public struct TurnChanges: Decodable, Hashable, Sendable {
   public let groups: [ChangeGroup]
 }
 
-/// The This turn view's model, as `turnChangesView` in apps/web/src/changes.ts.
+/// The This turn view's model, as `turnChangesView` in packages/shared/changes-view.ts.
 public struct TurnChangesView: Hashable, Sendable {
   /// What the diff is, said where it is shown: a snapshot, not authorship.
   public static let note =

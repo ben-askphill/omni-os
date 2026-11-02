@@ -30,6 +30,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Delivery contract](internals/delivery.md): what an accepted message, wake or Stop is promised on any machine, and the known gaps with their expected-fail tests
 - [Transitions](internals/transitions.md): the one service behind a run switch, a handoff or Take over and a Continue, its four routes, the six older routes that answer through it, and what stays as synced kv for machines on an older build
 - [Glossary](../CONTEXT.md)
+- [Native app pairing contract](internals/app-pairing.md): session pairing, capabilities, and push token registration
 - [Mac app notes](../apps/mac/NOTES.md)
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages
 - [Screenshots on PRs](pr-screenshots.md)

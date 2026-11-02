@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { agentStatus, splitGroup } from '../src/transcript/delegation.ts';
-import type { ToolCall } from '../src/transcript/fold.ts';
+import type { ToolCall } from '@omni/shared/transcript-fold.ts';
 
 const call = (id: string, name: string, result?: { text: string; is_error?: boolean }): ToolCall => ({
   id,

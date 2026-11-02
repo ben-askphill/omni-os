@@ -102,3 +102,13 @@ export function portLabel(port: number | null): string {
   if (port === null) return 'No port';
   return port === 0 ? 'A free port per run' : `Port ${port}`;
 }
+
+export const anyRunning = (data: ThreadActions | undefined) => !!data?.runs.some((r) => r.state === 'running');
+
+/** The run of this action still going in the thread, if any. Runs come newest first. */
+export const liveRun = (data: ThreadActions, action: ChannelAction) => data.runs.find((r) => r.action_id === action.id && r.state === 'running');
+
+export function withRun(data: ThreadActions, run: ActionRun): ThreadActions {
+  const runs = data.runs.some((r) => r.id === run.id) ? data.runs.map((r) => (r.id === run.id ? run : r)) : [run, ...data.runs];
+  return { ...data, runs, setup_run: data.setup_run?.id === run.id ? run : data.setup_run };
+}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, errorText, type HistoryEvent, type PendingMsg } from '../api.ts';
 import type { InitP, ResultP } from '../components/thread/panel/DetailsTab.tsx';
-import { parsePayload } from '../format.ts';
+import { parsePayload } from '@omni/shared/transcript-fold.ts';
 
 /** The id of the newest result row, 0 when there is none. */
 export function lastResultIdOf(events: readonly HistoryEvent[]) {

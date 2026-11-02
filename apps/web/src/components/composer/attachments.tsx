@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent as ReactClipboardEvent, type DragEvent as ReactDragEvent } from 'react';
-import { bytes } from '../../format.ts';
+import { bytes } from '@omni/shared/format.ts';
 import { useApp } from '../../store.tsx';
 import { Icon, IconButton } from '../ui.tsx';
 

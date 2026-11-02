@@ -1,5 +1,5 @@
-import type { CloudAgentP } from '../../transcript/fold.ts';
-import { cloudStatus, prNumber } from '../../cloud-agent.ts';
+import type { CloudAgentP } from '@omni/shared/transcript-fold.ts';
+import { cloudStatus, prNumber } from '@omni/shared/cloud-agent.ts';
 import { HarnessLogo } from '../brand.tsx';
 import { Icon, LinkButton, StatusPill } from '../ui.tsx';
 

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { PRSummary, Thread } from '../src/api.ts';
 import { AgentsSection } from '../src/components/thread/panel/AgentsSection.tsx';
 import { DetailsTab } from '../src/components/thread/panel/DetailsTab.tsx';
-import { FIX_CHECKS_PROMPT, FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT, prLine, prNext } from '../src/thread-glance.ts';
+import { FIX_CHECKS_PROMPT, FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT, prLine, prNext } from '@omni/shared/thread-glance.ts';
 
 // The thread panel's Details tab: the branch card on top (thread-glance.ts, GlanceCard.tsx), the agents card and the
 // session rows with MCP folded to one line. The Mac app mirrors prNext in OmniKit's ThreadGlance.swift.

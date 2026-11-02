@@ -175,7 +175,7 @@ public struct Plan: Hashable, Sendable {
 /// since the last call, so a busy thread costs the same per event however long it runs.
 ///
 /// With `spans` (`History.spans`), every event is folded, so rows outside them (anchors) still nest calls and settle
-/// questions, but only items keyed inside a span show, as buildItems in apps/web/src/transcript/fold.ts does it:
+/// questions, but only items keyed inside a span show, as buildItems in packages/shared/transcript-fold.ts does it:
 /// a span edge closes the open group of calls and the run of mod lines, and the plan shows only when its group is
 /// in the last span. No spans: the whole thread.
 public struct Transcript: Sendable {

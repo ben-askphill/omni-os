@@ -2,7 +2,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { watchLine, type PRWatchView } from '@omni/shared/pr-watch.ts';
 import type { PendingMsg } from '../src/api.ts';
-import { PRWakeList, watchCopy } from '../src/components/thread/PRWatch.tsx';
+import { watchCopy } from '@omni/shared/pr-watch.ts';
+import { PRWakeList } from '../src/components/thread/PRWatch.tsx';
 import { isOmnis, parkedHeading, parkedLabel } from '../src/requests.ts';
 
 const at = '2026-10-24T10:00:00.000Z';

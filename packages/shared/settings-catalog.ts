@@ -108,6 +108,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'sync-status', section: 'sync', title: 'Sync sign-in and status', keywords: ['relay', 'cloudflare', 'worker', 'pause', 'sync now', 'pending'] },
   { id: 'path-map', section: 'sync', title: 'Path map', keywords: ['folders', 'paths', 'other machine', 'map'] },
   { id: 'google', section: 'access', title: 'Google account and signed-in devices', keywords: ['sign in', 'owner', 'devices', 'revoke', 'sessions', 'phone', 'permissions'] },
+  { id: 'ios', section: 'access', title: 'Omni for iOS', keywords: ['iphone', 'ipad', 'qr', 'pair', 'app'] },
   { id: 'connect', section: 'access', title: 'Omni Connect', keywords: ['tunnel', 'cloudflared', 'remote', 'phone', 'other machines'] },
   { id: 'network', section: 'access', title: 'Tailscale logins and public MCP URL', keywords: ['tailscale', 'tailnet', 'serve', 'mcp', 'claude.ai', 'chatgpt', 'clerk', 'remote access'] },
   { id: 'hermes', section: 'integrations', title: 'Hermes URL', keywords: ['hermes', 'tailnet', 'HERMES_API_KEY'] },

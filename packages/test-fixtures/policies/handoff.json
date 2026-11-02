@@ -1,5 +1,5 @@
 {
- "about": "Handoff display: the banner's line and card per phase from the reading Mac's side, the Take over note and confirm, and the Hand off to picker's rows. packages/shared/handoff.ts and apps/web/src/handoff.ts run it in apps/web/tests/client-policies.test.ts; apps/mac/OmniKit/Sources/OmniKit/Handoff.swift runs it in ClientPolicyTests.swift, read at the view's own `at` so no offer has gone stale on screen. `status` is the thread's; a null banner shows nothing.",
+ "about": "Handoff display: the banner's line and card per phase from the reading Mac's side, the Take over note and confirm, and the Hand off to picker's rows. packages/shared/handoff.ts and packages/shared/thread-machine.ts run it in apps/web/tests/client-policies.test.ts; apps/mac/OmniKit/Sources/OmniKit/Handoff.swift runs it in ClientPolicyTests.swift, read at the view's own `at` so no offer has gone stale on screen. `status` is the thread's; a null banner shows nothing.",
  "views": [
   {
    "case": "asking the holding Mac",

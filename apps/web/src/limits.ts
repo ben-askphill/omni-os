@@ -1,7 +1,7 @@
 // A turn stopped at the harness's usage limit (apps/server/runner/limits.ts), from the Web UI's side: when it resets and
 // what the card offers. Limits.swift is the Mac app's copy.
+import { clock } from '@omni/shared/format.ts';
 import type { Thread } from './api.ts';
-import { clock } from './format.ts';
 
 const DAY = 86_400_000;
 

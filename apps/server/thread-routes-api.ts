@@ -2,7 +2,7 @@
 // Split into two apps so app.ts can keep mounting threadsApi and terminalApi between them.
 // Hono keeps the first registered match, so that order is the one the handlers already won with.
 import { Hono, type Context } from 'hono';
-import { streamSSE } from 'hono/streaming';
+import { sessionSSE } from './sse.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -60,6 +60,8 @@ export const threadRoutesApi = new Hono();
 export const threadActionsApi = new Hono();
 
 const createSchema = z.object({
+  /** The client's id for this thread, kept across its retries. It names the thread's folder on disk, so only a uuid. */
+  id: z.string().uuid().optional(),
   channel: z.string().default('inbox'),
   prompt: z.string().min(1),
   role: z.string().nullish(),
@@ -87,12 +89,26 @@ threadRoutesApi.get('/', (c) =>
   ),
 );
 
+/** Creations in flight by the id the client chose, so a retry that arrives before the first answer shares it. */
+const creating = new Map<string, Promise<Thread>>();
+
 threadRoutesApi.post('/', async (c) => {
   const { data, files } = await readBody(c);
   // run-on.ts: a synced machine's id, "here", or left out for Settings' default.
   const body = createSchema.parse(data);
   checkUploads(files);
-  return c.json(await createThread({ ...body, files }));
+  const { id } = body;
+  if (!id) return c.json(await createThread({ ...body, files }));
+  // A retry of a create whose answer was lost: the thread it made, not a second one with the same first message.
+  const made = threads.get(id);
+  if (made) return made.channel_id === body.channel ? c.json(made) : c.json({ error: `Thread id ${id} was already used in another channel.` }, 409);
+  const first = creating.get(id) ?? createThread({ ...body, files });
+  creating.set(id, first);
+  try {
+    return c.json(await first);
+  } finally {
+    creating.delete(id);
+  }
 });
 
 const teamSchema = z.object({
@@ -482,7 +498,7 @@ threadActionsApi.post('/:id/interrupt', interrupt);
 threadActionsApi.get('/:id/stream', (c) => {
   const id = c.req.param('id');
   const after = parseAfter(c.req.query('after') ?? c.req.header('Last-Event-ID') ?? '0');
-  return streamSSE(c, async (stream) => {
+  return sessionSSE(c, async (stream) => {
     const queue: unknown[] = [];
     // Rows the opening messages carried, so the bus's copies are not sent twice (apps/server/stream-catch-up.ts).
     const sent = new Set<number>();

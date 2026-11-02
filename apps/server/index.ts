@@ -39,6 +39,7 @@ const { startSync } = await import('./sync/worker.ts');
 const { startConnect, stopConnect } = await import('./connect/service.ts');
 const { recoverHandoffs } = await import('./handoff.ts');
 const { startWorktreeRetention } = await import('./worktree-cleanup.ts');
+const { startPush } = await import('./push-sender.ts');
 const { migrateLegacyConfig } = await import('./config-migrate.ts');
 const { computerName } = await import('./sync/devices.ts');
 const { onRestart, RESTART_EXIT_CODE, startUpdateCheck } = await import('./update.ts');
@@ -83,6 +84,8 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startCatalogRefresh();
   // With this Mac's retention policy on (Settings > Worktrees), removes idle worktrees that hold nothing unsaved, now and daily.
   startWorktreeRetention();
+  // Alerts go out only when the APNs key is set (push-sender.ts); otherwise this logs why and nothing is sent.
+  void startPush();
   // The Mac stays awake while the server runs, as the old LaunchAgent's caffeinate kept it: phones reach it over the
   // tailnet. -w ends caffeinate with this process. OMNI_CAFFEINATE=0 turns it off.
   if (process.platform === 'darwin' && process.env.OMNI_CAFFEINATE !== '0') {

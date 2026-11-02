@@ -18,9 +18,11 @@ export function configureDevices(o: { name?: string }) {
   Object.assign(options, o);
 }
 
-/** This Mac's ComputerName ("Ben's MacBook Pro"), else its host name. */
+/** This Mac's ComputerName ("Ben's MacBook Pro"), else its host name. OMNI_DEVICE_NAME names a QA server on a shared Mac (scripts/qa-handoff-stack.sh). */
 export function computerName(): Promise<string> {
   if (options.name) return Promise.resolve(options.name);
+  const named = process.env.OMNI_DEVICE_NAME?.trim();
+  if (named) return Promise.resolve(named);
   return new Promise((resolve) =>
     execFile('scutil', ['--get', 'ComputerName'], { timeout: 3_000 }, (err, out) => resolve((!err && out.trim()) || hostname())),
   );

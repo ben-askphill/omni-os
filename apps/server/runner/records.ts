@@ -4,6 +4,7 @@ import { events, messageRequests, outbox, threads, type ThreadStatus } from '../
 import { publishFeed, publishThread } from '../bus.ts';
 import { runnerPorts } from './ports.ts';
 import { turnFinished } from '../sync/files.ts';
+import { notifyEnded } from '../push-sender.ts';
 import { observeToolResult } from '../tool-failures.ts';
 import { toolTails } from '../tool-tail.ts';
 import { isSubagent, type ModUi, type Record as StreamRecord, type TaskUpdate } from '../stream.ts';
@@ -256,6 +257,8 @@ export function onExit(live: Live, code: number | null, signal: NodeJS.Signals |
       has_run: live.resultSeen || thread.has_run ? 1 : 0,
       last_text: runText ? runText.slice(0, 600) : thread.last_text,
     });
+    // A turn cut short by Omni's own shutdown is not news to Ben; the thread simply resumes on the next start.
+    if (!live.shutdown) notifyEnded(id, status);
     if (thread.parent_id && !isShuttingDown()) reportToParent(id, status, runText);
   } else if (thread && live.resultSeen && !thread.has_run) {
     threads.update(id, { has_run: 1, updated_at: thread.updated_at });

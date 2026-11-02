@@ -1,6 +1,7 @@
+import { parseCsv } from '@omni/shared/artifacts.ts';
 import { useEffect, useMemo, useState } from 'react';
+import { bytes, relTime } from '@omni/shared/format.ts';
 import { artifactUrl, type Artifact } from '../api.ts';
-import { bytes, relTime } from '../format.ts';
 import { useImageZoom, ZoomableImage, ZoomControls, type ImageZoom } from './ImageZoom.tsx';
 import { Markdown } from './Markdown.tsx';
 import { PublishedActions } from './Published.tsx';
@@ -28,41 +29,6 @@ function useText(a: Artifact, enabled: boolean) {
     };
   }, [a.id, a.updated_at, a.name, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
   return { text, error };
-}
-
-/** Minimal CSV parser: quotes, escaped quotes, commas and newlines inside quotes. */
-function parseCsv(src: string, maxRows = 500) {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = '';
-  let q = false;
-  for (let i = 0; i < src.length; i++) {
-    const ch = src[i];
-    if (q) {
-      if (ch === '"') {
-        if (src[i + 1] === '"') {
-          cell += '"';
-          i++;
-        } else q = false;
-      } else cell += ch;
-    } else if (ch === '"') q = true;
-    else if (ch === ',') {
-      row.push(cell);
-      cell = '';
-    } else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && src[i + 1] === '\n') i++;
-      row.push(cell);
-      rows.push(row);
-      row = [];
-      cell = '';
-      if (rows.length >= maxRows) return { rows, truncated: true };
-    } else cell += ch;
-  }
-  if (cell || row.length) {
-    row.push(cell);
-    rows.push(row);
-  }
-  return { rows, truncated: false };
 }
 
 function CsvTable({ text }: { text: string }) {

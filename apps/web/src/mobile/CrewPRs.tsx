@@ -1,6 +1,6 @@
 import type { CrewPR } from '../api.ts';
 import { Chip } from '../components/ui.tsx';
-import { crewLine, prBadge } from '../thread-glance.ts';
+import { crewLine, prBadge } from '@omni/shared/thread-glance.ts';
 import { MoGroup, MoListRow, MoSection } from './parts.tsx';
 
 /** The PRs the threads this one delegated to opened. A row opens the thread that opened it, where its PR can be reviewed. */

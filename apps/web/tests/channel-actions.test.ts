@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OUTPUT_LIMIT, type ActionRun, type ChannelAction, type ThreadActions } from '@omni/shared/channel-actions.ts';
-import { actionInput, anyRunning, draftOf, liveRun, outputCut, parseSecrets, runSummary, setupPolls, setupSteps, stripRun, withRun } from '../src/channel-actions.ts';
+import { actionInput, draftOf, outputCut, parseSecrets, runSummary, setupPolls, setupSteps, stripRun } from '../src/channel-actions.ts';
 
 // The thread Actions tab and the channel settings editor (apps/web/src/channel-actions.ts) on GET /threads/:id/actions.
 
@@ -39,12 +39,6 @@ const run = (over: Partial<ActionRun> = {}): ActionRun => ({
 const thread = (runs: ActionRun[], over: Partial<ThreadActions> = {}): ThreadActions => ({ actions: [action()], runs, blocked: null, setup_run: null, ...over });
 
 describe('polling', () => {
-  it('the Actions tab polls only while a run is running', () => {
-    expect(anyRunning(undefined)).toBe(false);
-    expect(anyRunning(thread([run()]))).toBe(false);
-    expect(anyRunning(thread([run({ state: 'running', ended_at: null })]))).toBe(true);
-  });
-
   it('the setup card polls while the worktree is prepared, and a ready thread only while its setup run runs', () => {
     const live = run({ id: 's1', state: 'running', exit_code: null, ended_at: null });
     const preview = run({ id: 'p1', action_id: 'a2', state: 'running', exit_code: null, ended_at: null });
@@ -105,13 +99,6 @@ describe('run rows', () => {
     const now = Date.parse('2026-01-05T09:00:05.000Z');
     expect(runSummary(run({ state: 'running', exit_code: null, ended_at: null, port: 4799 }), now)).toBe('Port 4799 · 5s');
   });
-
-  it('finds the run of an action still going, newest first', () => {
-    const data = thread([run({ id: 'r3', state: 'running', ended_at: null }), run({ id: 'r2', state: 'running', ended_at: null }), run()]);
-    expect(liveRun(data, action())?.id).toBe('r3');
-    expect(liveRun(thread([run()]), action())).toBeUndefined();
-    expect(liveRun(data, action({ id: 'other' }))).toBeUndefined();
-  });
 });
 
 describe('output', () => {
@@ -121,24 +108,6 @@ describe('output', () => {
     expect(outputCut(run({ output: full, output_bytes: OUTPUT_LIMIT }))).toBeNull();
     // Colour codes count in the bytes but are gone from the text: nothing was cut.
     expect(outputCut(run({ output: 'ok\n', output_bytes: 40 }))).toBeNull();
-  });
-});
-
-describe('answers to Run, Stop and Retry', () => {
-  it('puts a new run on top and replaces a known one in place', () => {
-    const data = thread([run({ id: 'r1' }), run({ id: 'r0' })]);
-    expect(withRun(data, run({ id: 'r2', state: 'running' })).runs.map((r) => r.id)).toEqual(['r2', 'r1', 'r0']);
-    const stopped = withRun(data, run({ id: 'r0', state: 'stopped' }));
-    expect(stopped.runs.map((r) => [r.id, r.state])).toEqual([
-      ['r1', 'succeeded'],
-      ['r0', 'stopped'],
-    ]);
-  });
-
-  it('updates the setup run when the answer is about it', () => {
-    const data = thread([run({ id: 's1', state: 'running', ended_at: null })], { setup_run: run({ id: 's1', state: 'running', ended_at: null }) });
-    expect(withRun(data, run({ id: 's1', state: 'stopped' })).setup_run?.state).toBe('stopped');
-    expect(withRun(data, run({ id: 'r9' })).setup_run?.id).toBe('s1');
   });
 });
 

@@ -1,5 +1,5 @@
+import { relTime } from '@omni/shared/format.ts';
 import type { NeedsYou as Inbox, NeedsYouItem } from '../api.ts';
-import { relTime } from '../format.ts';
 import { canMarkDone, reasonOf } from '../needs-you.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Device, HandoffView } from '@omni/shared/handoff.ts';
+import { handoffBanner, handoffTargets, mayHandOff, syncCarries, type Holding } from '@omni/shared/thread-machine.ts';
 import { api, errorText, useApi, type SyncStatus, type Thread } from '../../api.ts';
-import { handoffBanner, handoffTargets, mayHandOff, syncCarries, type Holding } from '../../handoff.ts';
 import { Button, ErrorNote, Icon, Loader } from '../ui.tsx';
 
 /** POST /api/threads/:id/handoff and /handoff/cancel answer with both. */

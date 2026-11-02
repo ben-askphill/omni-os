@@ -1,8 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useApi, type HarnessWithRunning, type Thread } from '../api.ts';
-import { HarnessLogo, harnessLabel } from '../components/brand.tsx';
-import { BlockNote, ExactText, rowTone, useContinue } from '../components/ContinueSheet.tsx';
-import { Button, Chip, ErrorNote, Toggle } from '../components/ui.tsx';
 import {
   attachmentRows,
   attachmentsSummary,
@@ -18,7 +14,11 @@ import {
   type ContinueSource,
   type ContinueTargets,
   type PreviewSection,
-} from '../continue.ts';
+} from '@omni/shared/continue-flow.ts';
+import { useApi, type HarnessWithRunning, type Thread } from '../api.ts';
+import { HarnessLogo, harnessLabel } from '../components/brand.tsx';
+import { BlockNote, ExactText, rowTone, useContinue } from '../components/ContinueSheet.tsx';
+import { Button, Chip, ErrorNote, Toggle } from '../components/ui.tsx';
 import { href } from '../router.ts';
 import { ModelSheet, runLabel } from './ModelSheet.tsx';
 import { MoEmpty, MoGroup, MoListRow, MoSection, MoSheet } from './parts.tsx';
@@ -80,7 +80,7 @@ function Sheet({
   onStarted,
 }: {
   source: ContinueSource;
-  targets: ContinueTargets;
+  targets: ContinueTargets<HarnessWithRunning>;
   onPickerOpen: () => void;
   onClose: () => void;
   onStarted: (t: Thread) => void;

@@ -10,9 +10,10 @@ import {
   type CleanupState,
   type RetentionPolicy,
 } from '@omni/shared/worktree-cleanup.ts';
+import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi } from '../api.ts';
 import { Button, Chip, ConfirmDialog, ErrorNote, Icon, Loading, Picker, StatusDot, Toggle } from '../components/ui.tsx';
-import { plural, relTime } from '../format.ts';
+import { plural } from '../format.ts';
 import { href } from '../router.ts';
 
 // Settings, Worktrees: the worktrees Omni made in data/worktrees, what each uses on disk, why each must stay

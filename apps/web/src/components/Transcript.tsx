@@ -1,6 +1,6 @@
 import { Fragment, memo, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, type Artifact, type EventRow, type Thread } from '../api.ts';
-import { clock, duration, plural, toDate } from '../format.ts';
+import { duration, plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { DelegationCard } from './Delegation.tsx';
@@ -20,9 +20,10 @@ import { publishedFrom, type Published } from '@omni/shared/published.ts';
 import { renderedFrom } from '@omni/shared/html-render.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
-import { buildItems, buildTasks, keepSame, same, type FoldPlan, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type Todo, type ModLine, type SwitchItem, type ToolCall, type UserP } from '../transcript/fold.ts';
+import { buildItems, buildTasks, keepSame, same, type FoldPlan, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type Todo, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
 import { delegations, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
+import { clock, toDate } from '@omni/shared/format.ts';
 import type { ThreadHistory } from '../pages/useThreadHistory.ts';
 
 import { AgentRow, countCalls, flatten, TaskCtx, ToolGroup } from './thread/ToolRows.tsx';

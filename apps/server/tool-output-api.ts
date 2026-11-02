@@ -2,7 +2,7 @@
 // that history sends compact (#225), read in chunks once saved and followed through a bounded tail while it runs.
 // See apps/server/tool-output.ts and tool-tail.ts.
 import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
+import { sessionSSE } from './sse.ts';
 import { TOOL_OUTPUT } from '@omni/shared/tool-output.ts';
 import { threads } from './db.ts';
 import { readOutput } from './tool-output.ts';
@@ -34,7 +34,7 @@ toolOutputApi.get('/:id/tools/:toolUseId/tail', (c) => {
   const id = c.req.param('id');
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
   const tail = toolTails.subscribe(id, c.req.param('toolUseId'));
-  return streamSSE(c, async (stream) => {
+  return sessionSSE(c, async (stream) => {
     stream.onAbort(() => tail.close());
     try {
       await stream.writeSSE({ event: 'ping', data: '' });

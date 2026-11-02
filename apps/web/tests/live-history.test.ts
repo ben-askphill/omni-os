@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { appendLive, applyPage, boundHistory, earlierCursor, openHistory, RETAIN, spanIndex, TURN_END, turnCount, type History, type HistoryRow } from '@omni/shared/history.ts';
-import { buildItems, keepSame, type TranscriptEvent } from '../src/transcript/fold.ts';
+import { buildItems, keepSame, type TranscriptEvent } from '@omni/shared/transcript-fold.ts';
 import { historyServer, longRows } from './history-sim.ts';
 
 // A thread held open while its agent streams for hours (#411): the client opens on the head of an 80-turn thread, and

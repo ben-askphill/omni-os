@@ -1,6 +1,6 @@
 import Foundation
 
-/// One line of a diff's hunks, numbered in the old and the new file. `apps/web/src/diff.ts` is the same model.
+/// One line of a diff's hunks, numbered in the old and the new file. `packages/shared/diff.ts` is the same model.
 public struct DiffLine: Hashable, Sendable {
   public enum Kind: Hashable, Sendable { case hunk, add, del, context, note }
 
@@ -79,7 +79,7 @@ public struct FileDiff: Hashable, Sendable {
   public var numbered: Bool { rows.contains { $0.old != nil || $0.new != nil } }
 }
 
-/// `parseDiff` and the open rule of apps/web/src/diff.ts.
+/// `parseDiff` and the open rule of packages/shared/diff.ts.
 public enum DiffParser {
   /// Lines shown per file before "Show N more lines".
   public static let lineCap = 1500

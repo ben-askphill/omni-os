@@ -1,0 +1,205 @@
+{
+ "name": "rich-kinds",
+ "events": [
+  {
+   "kind": "user",
+   "payload": "{\"text\":\"Find the checkout drop-off and fix it. Check the rates first.\"}",
+   "created_at": "2026-11-02T09:00:01.000Z"
+  },
+  {
+   "kind": "init",
+   "payload": "{\"model\":\"claude-opus-4-7\",\"cwd\":\"/work/volero\",\"tools\":12,\"mcp\":[]}",
+   "created_at": "2026-11-02T09:00:02.000Z"
+  },
+  {
+   "kind": "assistant_text",
+   "payload": "{\"text\":\"I'll look at the rate table first, then run the tests.\"}",
+   "created_at": "2026-11-02T09:00:03.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"todo1\",\"name\":\"TodoWrite\",\"input\":{\"todos\":[{\"content\":\"Read the rate table\",\"activeForm\":\"Reading the rate table\",\"status\":\"completed\"},{\"content\":\"Fix the lookup\",\"activeForm\":\"Fixing the lookup\",\"status\":\"in_progress\"},{\"content\":\"Run tests\",\"activeForm\":\"Running tests\",\"status\":\"pending\"}]},\"parent\":null}",
+   "created_at": "2026-11-02T09:00:04.000Z"
+  },
+  {
+   "kind": "tool_result",
+   "payload": "{\"tool_use_id\":\"todo1\",\"text\":\"Todos updated\",\"is_error\":false,\"truncated\":false}",
+   "created_at": "2026-11-02T09:00:05.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"read1\",\"name\":\"Read\",\"input\":{\"file_path\":\"/work/volero/snippets/shipping-rates.liquid\"},\"parent\":null}",
+   "created_at": "2026-11-02T09:00:06.000Z"
+  },
+  {
+   "kind": "tool_result",
+   "payload": "{\"tool_use_id\":\"read1\",\"text\":\"1\\t{% assign rate = 4.5 %}\\n2\\t{{ rate }}\",\"is_error\":false,\"truncated\":false}",
+   "created_at": "2026-11-02T09:00:07.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"task1\",\"name\":\"Task\",\"input\":{\"description\":\"Find callers of the rate lookup\",\"subagent_type\":\"Explore\"},\"parent\":null}",
+   "created_at": "2026-11-02T09:00:08.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"grep1\",\"name\":\"Grep\",\"input\":{\"pattern\":\"shipping-rates\"},\"parent\":\"task1\"}",
+   "created_at": "2026-11-02T09:00:09.000Z"
+  },
+  {
+   "kind": "tool_result",
+   "payload": "{\"tool_use_id\":\"grep1\",\"text\":\"snippets/cart.liquid:12\\nsnippets/checkout.liquid:40\",\"is_error\":false,\"truncated\":false}",
+   "created_at": "2026-11-02T09:00:10.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"read2\",\"name\":\"Read\",\"input\":{\"file_path\":\"/work/volero/snippets/cart.liquid\"},\"parent\":\"task1\"}",
+   "created_at": "2026-11-02T09:00:11.000Z"
+  },
+  {
+   "kind": "tool_result",
+   "payload": "{\"tool_use_id\":\"read2\",\"text\":\"1\\t<div class=\\\"cart\\\">\",\"is_error\":false,\"truncated\":false}",
+   "created_at": "2026-11-02T09:00:12.000Z"
+  },
+  {
+   "kind": "tool_result",
+   "payload": "{\"tool_use_id\":\"task1\",\"text\":\"Found two callers: cart.liquid and checkout.liquid.\",\"is_error\":false,\"truncated\":false}",
+   "created_at": "2026-11-02T09:00:13.000Z"
+  },
+  {
+   "kind": "mod",
+   "payload": "{\"plugin\":\"omni-progress\",\"level\":\"log\",\"text\":\"step 2 of 3\"}",
+   "created_at": "2026-11-02T09:00:14.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"edit1\",\"name\":\"Edit\",\"input\":{\"file_path\":\"/work/volero/snippets/shipping-rates.liquid\",\"old_string\":\"{% assign rate = 4.5 %}\",\"new_string\":\"{% assign rate = 4.5 | plus: weight %}\"},\"parent\":null}",
+   "created_at": "2026-11-02T09:00:15.000Z"
+  },
+  {
+   "kind": "tool_result",
+   "payload": "{\"tool_use_id\":\"edit1\",\"text\":\"The file has been updated.\",\"is_error\":false,\"truncated\":false}",
+   "created_at": "2026-11-02T09:00:16.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"bash1\",\"name\":\"Bash\",\"input\":{\"command\":\"npm test -- checkout\",\"description\":\"Run the checkout tests\"},\"parent\":null}",
+   "created_at": "2026-11-02T09:00:17.000Z"
+  },
+  {
+   "kind": "tool_result",
+   "payload": "{\"tool_use_id\":\"bash1\",\"text\":\"Exit code 1\\nFAIL  tests/checkout-1.test.ts\\nFAIL  tests/checkout-2.test.ts\\nFAIL  tests/checkout-3.test.ts\\nFAIL  tests/checkout-4.test.ts\\nFAIL  tests/checkout-5.test.ts\",\"is_error\":true,\"truncated\":false,\"output\":{\"chars\":1703,\"lines\":31,\"exit_code\":1}}",
+   "created_at": "2026-11-02T09:00:18.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"bash2\",\"name\":\"Bash\",\"input\":{\"command\":\"cat logs/build.log\"},\"parent\":null}",
+   "created_at": "2026-11-02T09:00:19.000Z"
+  },
+  {
+   "kind": "tool_result",
+   "payload": "{\"tool_use_id\":\"bash2\",\"text\":\"line 1: the quick brown fox jumps over the lazy dog\\nline 2: the quick brown fox jumps over the lazy dog\\nline 3: the quick brown fox jumps over the lazy dog\\nline 4: the quick brown fox jumps over the lazy dog\\nline 5: the quick brown fox jumps over the lazy dog\",\"is_error\":false,\"truncated\":false,\"output\":{\"chars\":10691,\"lines\":200}}",
+   "created_at": "2026-11-02T09:00:20.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"web1\",\"name\":\"WebFetch\",\"input\":{\"url\":\"https://example.com/docs/rates\"},\"parent\":null}",
+   "created_at": "2026-11-02T09:00:21.000Z"
+  },
+  {
+   "kind": "tool_result",
+   "payload": "{\"tool_use_id\":\"web1\",\"text\":\"Rates are flat below one kilo.\",\"is_error\":false,\"truncated\":false}",
+   "created_at": "2026-11-02T09:00:22.000Z"
+  },
+  {
+   "kind": "assistant_text",
+   "payload": "{\"text\":\"Tests fail on the old rate. Fixing the lookup now.\"}",
+   "created_at": "2026-11-02T09:00:23.000Z"
+  },
+  {
+   "kind": "assistant_text",
+   "payload": "{\"text\":\"\\n\\n## Checkout funnel\\n\\nThe drop-off is at **shipping to payment**: it fell `26` points after the new rate table shipped.\\n\\n1. Revert the rate lookup in `snippets/shipping-rates.liquid`\\n2. Add a regression test\\n3. Re-measure for a week\\n\\n- Unordered item with a [link](https://example.com/report)\\n- Another item with *emphasis* and ~~strike~~\\n\\n```ts\\nexport function rate(weight: number): number {\\n  return weight < 1 ? 4.5 : 4.5 + (weight - 1) * 1.2;\\n}\\n```\\n\\n> Rates below one kilo are flat.\\n\\n| Region | Before | After |\\n| --- | --- | --- |\\n| US | 41% | 15% |\\n| EU | 38% | 22% |\\n\\nDelegated work lives in 3f9a1c2e-7b64-4d0f-9a31-2c5d8e4b7a10 if you want to follow it.\"}",
+   "created_at": "2026-11-02T09:00:24.000Z"
+  },
+  {
+   "kind": "result",
+   "payload": "{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":132000,\"turns\":6,\"cost_usd\":0.41}",
+   "created_at": "2026-11-02T09:00:25.000Z"
+  },
+  {
+   "kind": "user",
+   "payload": "{\"text\":\"Looks right. Ship it, and note the weight edge case.\"}",
+   "created_at": "2026-11-02T09:00:26.000Z"
+  },
+  {
+   "kind": "assistant_text",
+   "payload": "{\"text\":\"Shipping now.\"}",
+   "created_at": "2026-11-02T09:00:27.000Z"
+  },
+  {
+   "kind": "user",
+   "payload": "{\"text\":\"Also add a changelog line.\",\"mode\":\"steer\"}",
+   "created_at": "2026-11-02T09:00:28.000Z"
+  },
+  {
+   "kind": "crew_report",
+   "payload": "{\"text\":\"The changelog line is in. **Task T-12** closed.\",\"thread_id\":\"3f9a1c2e-7b64-4d0f-9a31-2c5d8e4b7a10\",\"task_id\":\"T-12\",\"role\":\"Builder\",\"title\":\"Changelog\"}",
+   "created_at": "2026-11-02T09:00:29.000Z"
+  },
+  {
+   "kind": "assistant_text",
+   "payload": "{\"text\":\"Done. Changelog updated.\"}",
+   "created_at": "2026-11-02T09:00:30.000Z"
+  },
+  {
+   "kind": "result",
+   "payload": "{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":48000,\"turns\":2}",
+   "created_at": "2026-11-02T09:00:31.000Z"
+  },
+  {
+   "kind": "user",
+   "payload": "{\"text\":\"Now run the migration.\"}",
+   "created_at": "2026-11-02T09:00:32.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"bash3\",\"name\":\"Bash\",\"input\":{\"command\":\"npm run migrate\"},\"parent\":null}",
+   "created_at": "2026-11-02T09:00:33.000Z"
+  },
+  {
+   "kind": "tool_result",
+   "payload": "{\"tool_use_id\":\"bash3\",\"text\":\"Exit code 2\\nmigration 0042 failed\",\"is_error\":true,\"truncated\":false}",
+   "created_at": "2026-11-02T09:00:34.000Z"
+  },
+  {
+   "kind": "error",
+   "payload": "{\"text\":\"The run failed: the migration command exited with code 2 and the database was left untouched. Check the migration log for details before retrying. This message is long on purpose so the clamp can show a fold after four lines of text and tell the reader there is more to open.\"}",
+   "created_at": "2026-11-02T09:00:35.000Z"
+  },
+  {
+   "kind": "result",
+   "payload": "{\"ok\":false,\"subtype\":\"error\",\"duration_ms\":9000,\"turns\":1}",
+   "created_at": "2026-11-02T09:00:36.000Z"
+  },
+  {
+   "kind": "user",
+   "payload": "{\"text\":\"Try again, but stop if it fails.\"}",
+   "created_at": "2026-11-02T09:00:37.000Z"
+  },
+  {
+   "kind": "assistant_text",
+   "payload": "{\"text\":\"Stopping before I touch anything.\"}",
+   "created_at": "2026-11-02T09:00:38.000Z"
+  },
+  {
+   "kind": "result",
+   "payload": "{\"ok\":false,\"subtype\":\"cancelled\",\"stopped\":true,\"turns\":1,\"duration_ms\":2000}",
+   "created_at": "2026-11-02T09:00:39.000Z"
+  },
+  {
+   "kind": "user",
+   "payload": "{\"text\":\"A message that never reached the agent.\",\"dropped\":true,\"undelivered\":\"The machine was offline\"}",
+   "created_at": "2026-11-02T09:00:40.000Z"
+  }
+ ]
+}

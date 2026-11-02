@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { draftRun, draftRunRequest, newThreadBody, runPreselect, sameSettings } from '../src/new-thread-preset.ts';
+import { newThreadBody, sameSettings } from '../src/new-thread-preset.ts';
+import { draftRun, draftRunRequest, runPreselect } from '@omni/shared/draft-run.ts';
 import type { Channel, CrewRole, Thread } from '../src/api.ts';
 
 // What the web new-thread composer preselects: the role's run defaults, else the channel's, else Auto.

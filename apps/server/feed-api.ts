@@ -1,6 +1,6 @@
 // /api/feed, /status, /tasks, /recent, /needs-you, /search: the global views across threads.
 import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
+import { sessionSSE } from './sse.ts';
 import { about } from './about.ts';
 import { bus, publishFeed, type FeedEvent } from './bus.ts';
 import { config } from './config.ts';
@@ -15,7 +15,7 @@ import { usageByHarness } from './usage.ts';
 export const feedApi = new Hono();
 
 feedApi.get('/feed', (c) =>
-  streamSSE(c, async (stream) => {
+  sessionSSE(c, async (stream) => {
     // A thread carries its handoff on every update, as its own stream and GET do.
     const onFeed = (e: FeedEvent) =>
       void stream.writeSSE({ data: JSON.stringify(e.type === 'thread' ? { ...e, handoff: handoffView(e.thread as Thread) } : e) });

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { SETTINGS_SECTION_DEFS } from '@omni/shared/settings-catalog.ts';
+import { relTime } from '@omni/shared/format.ts';
 import type { ChannelWithRunning, Thread, ThreadStub } from '../../api.ts';
-import { relTime } from '../../format.ts';
 import { href, navigate, startNewThread, type Route } from '../../router.ts';
 import { setTheme } from '../theme.tsx';
 import { Avatar, Icon, StatusDot, type IconName } from '../ui.tsx';

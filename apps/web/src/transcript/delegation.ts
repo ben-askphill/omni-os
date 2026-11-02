@@ -1,7 +1,7 @@
 // Delegation cards: the threads the Conductor's delegate and delegate_team calls started, and the sub-agents
 // any thread's own run launched with the harness's Agent tool.
 import type { Thread } from '../api.ts';
-import { str, type TaskView, type ToolCall } from './fold.ts';
+import { str, type TaskView, type ToolCall } from '@omni/shared/transcript-fold.ts';
 
 /** One delegated thread as a card row. Live fields come from the thread itself once it is known. */
 export interface Branch {

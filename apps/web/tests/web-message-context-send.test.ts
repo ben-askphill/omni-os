@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { diffSelection, selectRows } from '@omni/shared/message-context-diff.ts';
 import { newContext } from '@omni/shared/message-context.ts';
 import type { Thread } from '../src/api.ts';
-import { parseDiff } from '../src/diff.ts';
+import { parseDiff } from '@omni/shared/diff.ts';
 
 vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: [], crew: [], status: null }) }));
 

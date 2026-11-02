@@ -47,7 +47,7 @@ export function fakeAlive(pid: number, needle = 'fake-claude.mjs') {
   }
 }
 
-/** A file of a /changes response, its diff numbered as the clients number it (apps/web/src/diff.ts), for selectRows. */
+/** A file of a /changes response, its diff numbered as the clients number it (packages/shared/diff.ts), for selectRows. */
 export function diffFile(f: { path: string; old_path: string | null; diff: string }): DiffFileLike {
   const header: string[] = [];
   const lines: DiffLineLike[] = [];

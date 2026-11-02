@@ -1,7 +1,7 @@
 import OmniKit
 import SwiftUI
 
-/// A PR's diff, file by file. Which files start open and the line cap follow apps/web/src/diff.ts.
+/// A PR's diff, file by file. Which files start open and the line cap follow packages/shared/diff.ts.
 struct DiffView: View {
   let diff: String
 

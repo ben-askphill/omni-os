@@ -13,18 +13,17 @@ import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.ts
 import { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { usePRWatch } from '../components/thread/PRWatch.tsx';
 import { useBranchChanges } from '../mobile/ThreadTurn.tsx';
-import { prNext } from '../thread-glance.ts';
+import { prNext } from '@omni/shared/thread-glance.ts';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
 import { Empty, ErrorNote, Icon, LinkButton, Loading } from '../components/ui.tsx';
 import { href } from '../router.ts';
-import { blockedNote } from '../handoff.ts';
 import { reportNotes } from '../requests.ts';
 import { canSteer } from '../steer.ts';
 import { teamOf } from '../transcript/delegation.ts';
 import { runningSubagents } from '../subagents.ts';
-import { isAsking } from '../transcript/fold.ts';
+import { isAsking } from '@omni/shared/transcript-fold.ts';
 import { useApp } from '../store.tsx';
 import { useThreadActions } from './useThreadActions.ts';
 import { useThreadInterruptKey } from './useThreadInterruptKey.ts';
@@ -34,6 +33,7 @@ import { useThreadSession } from './useThreadSession.ts';
 import { useTranscriptScroll } from './useTranscriptScroll.ts';
 import { useReveal } from './useReveal.ts';
 import { tailId } from '@omni/shared/history.ts';
+import { blockedNote } from '@omni/shared/thread-machine.ts';
 
 export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; artifact?: number; at?: number }) {
   const { mods, tasks } = useApp();

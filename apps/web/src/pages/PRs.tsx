@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react';
+import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type Channel, type Checks, type PRDetail as PRDetailT, type PRSummary, type Thread } from '../api.ts';
 import { Button, Chip, StatusDot, Empty, ErrorNote, Icon, IconLink, LinkButton, Loading, Tabs } from '../components/ui.tsx';
-import { relTime } from '../format.ts';
 import { href, navigate } from '../router.ts';
 import { PRDetailTabBody, type DetailTab } from './PRDetailTabs.tsx';
 import { PRMergePanel } from './PRMergePanel.tsx';
@@ -14,8 +14,6 @@ function NoRepo({ channel }: { channel: Channel }) {
     </Empty>
   );
 }
-
-export { checkTone } from './PRDetailTabs.tsx';
 
 export function ChecksSummary({ c }: { c: Checks }) {
   if (!c.passed && !c.failed && !c.pending) return <span className="text-[12px] text-fg-4">no checks</span>;

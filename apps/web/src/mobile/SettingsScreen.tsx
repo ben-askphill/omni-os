@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { searchSettings, sectionDef, sectionsIn, SETTINGS_GROUPS, type SettingsSectionId } from '@omni/shared/settings-catalog.ts';
+import { relTime } from '@omni/shared/format.ts';
 import { useApi, type Automation, type SyncStatus } from '../api.ts';
 import { DeviceLabel } from '../components/DeviceLabel.tsx';
 import { Icon, type IconName } from '../components/ui.tsx';
-import { relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useNow, useSecretStoreLabel } from '../store.tsx';
 import { MoGroup, MoHeader, MoListRow, MoScroll, MoSection } from './parts.tsx';

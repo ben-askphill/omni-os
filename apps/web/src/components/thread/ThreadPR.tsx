@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, type CrewPR, type PRSummary, type Thread } from '../../api.ts';
 
-export { OPEN_PR_PROMPT } from '../../thread-glance.ts';
+export { OPEN_PR_PROMPT } from '@omni/shared/thread-glance.ts';
 
 /** A thread's own PRs (none without a branch) and the PRs the threads it delegated to opened. */
 export type ThreadPRData = { pr: PRSummary | null; prs: PRSummary[]; crew: CrewPR[] };

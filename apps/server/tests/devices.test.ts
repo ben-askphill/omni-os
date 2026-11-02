@@ -69,3 +69,16 @@ describe('synced Macs', () => {
     expect((await a.json('/threads/elsewhere')).body.blocked).toBe("This thread is running on Ben's Mac Studio.");
   });
 });
+
+describe('naming a QA server', () => {
+  it('OMNI_DEVICE_NAME is the name a Mac gives itself when no test set one', async () => {
+    a.devices.configureDevices({ name: undefined });
+    process.env.OMNI_DEVICE_NAME = ' QA Mac A ';
+    try {
+      expect(await a.devices.computerName()).toBe('QA Mac A');
+    } finally {
+      delete process.env.OMNI_DEVICE_NAME;
+      a.devices.configureDevices({ name: "Ben's MacBook Air" });
+    }
+  });
+});

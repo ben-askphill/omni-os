@@ -178,6 +178,18 @@ final class QARunner {
           result.files = [name + ".png"]
           await takeOver.confirm()
           try? await Task.sleep(for: .milliseconds(600))
+        case .pairingAddress(let address):
+          guard let use = QAIosPairingProbe.useAddress else { throw QAScriptError("no Omni for iOS card on screen") }
+          if let problem = use(address) { throw QAScriptError(problem) }
+          try? await Task.sleep(for: .milliseconds(600))
+          Self.scrollSettings(toShow: QAIosPairingProbe.frame)
+          try? await Task.sleep(for: .milliseconds(300))
+        case .pairingCode:
+          guard let issue = QAIosPairingProbe.issue else { throw QAScriptError("no Omni for iOS card on screen") }
+          await issue()
+          try? await Task.sleep(for: .milliseconds(600))
+          Self.scrollSettings(toShow: QAIosPairingProbe.frame)
+          try? await Task.sleep(for: .milliseconds(300))
         case .scroll(let scroll):
           result.note = try await self.scroll(scroll)
         case .expand:
@@ -468,6 +480,8 @@ final class QARunner {
     case .handoffMenu(let name): "handoffMenu \(name)"
     case .handOff(let device): "handOff \(device)"
     case .takeOver(let name): "takeOver \(name)"
+    case .pairingCode: "iosPairing showCode"
+    case .pairingAddress(let address): "iosPairing address \(address)"
     case .palette(let query): "palette \(query ?? "close")"
     case .quickPrompt(let action): "quickPrompt \(action)"
     case .selectLines(let file, let from, let to): "selectLines \(file) \(from)-\(to)"

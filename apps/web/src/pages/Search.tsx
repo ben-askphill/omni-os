@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { relTime } from '@omni/shared/format.ts';
 import { useApi, type SearchHit } from '../api.ts';
 import { Empty, ErrorNote, Icon, Loading, PageHeader, StatusDot } from '../components/ui.tsx';
-import { plural, relTime, safeSnippet } from '../format.ts';
+import { plural, safeSnippet } from '../format.ts';
 import { href, navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
 

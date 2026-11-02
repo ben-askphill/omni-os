@@ -1,7 +1,7 @@
 // How the Web UI shows a diff_selection (packages/shared/message-context-diff.ts): which lines of which file, where
 // they came from, and the rows as Ben saw them.
 import type { DiffSelection } from '@omni/shared/message-context-diff.ts';
-import { GROUP_TITLE, shortSha } from '../changes.ts';
+import { GROUP_TITLE, shortSha } from '@omni/shared/changes-view.ts';
 import { LINE_CLASS } from '../components/DiffViewer.tsx';
 import type { ContextView } from './views.ts';
 

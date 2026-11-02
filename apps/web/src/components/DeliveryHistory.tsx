@@ -1,7 +1,8 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { DELIVERY_STATE_LABELS, deliveryStages, type TriggerDeliveryState } from '@omni/shared/automation-triggers.ts';
+import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, refusedDelivery, type DeliveryPage, type DeliveryView } from '../api.ts';
-import { describeDeliverySource, expiryFact, fullDate, httpUrl, mergeDeliveries, receivedAgo, relTime } from '../format.ts';
+import { describeDeliverySource, expiryFact, fullDate, httpUrl, mergeDeliveries, receivedAgo } from '../format.ts';
 import { href } from '../router.ts';
 import { DeliveryStages } from './DeliveryStages.tsx';
 import { Button, Chip, ErrorNote, Icon, InlineConfirm, LinkButton, StatusDot, type ChipTone } from './ui.tsx';

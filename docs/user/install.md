@@ -126,4 +126,13 @@ scripts/build-mac.sh      # Mac: rebuilds and reinstalls the app (syncs main fir
 scripts/install-linux.sh  # Linux: rebuilds the Web UI and the launcher
 ```
 
+A server that a service manager keeps running, such as a systemd user service, can offer the button too. Set `OMNI_SUPERVISOR` in its environment and make sure the manager starts it again after it exits with code 75. With systemd, add a drop-in at `~/.config/systemd/user/<service>.service.d/update.conf`, then run `systemctl --user daemon-reload` and restart the service:
+
+```ini
+[Service]
+Environment=OMNI_SUPERVISOR=systemd
+# Already there when the unit has Restart=always.
+Restart=always
+```
+
 The Conductor reaches the same button through its `omni_update` tool. `OMNI_UPDATE_CHECK=0` turns the check off. A fork merges cleanly as long as your settings stay in `data/`; see [FORKING.md](../../FORKING.md).

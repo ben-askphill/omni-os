@@ -15,7 +15,10 @@ import { needsCard } from './activity.ts';
 import { NeedsActions } from './NeedsCard.tsx';
 import { MoAvatar, MoDiff, MoStripes } from './parts.tsx';
 import { useShell } from './shell.tsx';
-import type { NowDoing, PlanView, TurnView } from './thread-view.ts';
+import type { NowDoing, PlanView, TurnView as TurnOf } from '@omni/shared/thread-view.ts';
+
+/** The phone's turn, carrying the web's own artifact and thread rows. */
+export type TurnView = TurnOf<Artifact, Thread>;
 
 const DRAWN = new Set(['html', 'image', 'svg']);
 const ext = (name: string) => (name.includes('.') ? name.split('.').pop()! : 'file');

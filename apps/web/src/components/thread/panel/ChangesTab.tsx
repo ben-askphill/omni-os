@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { clock } from '@omni/shared/format.ts';
 import { useApi, type BranchChanges, type Thread, type TurnChanges } from '../../../api.ts';
 import {
   baseLabel,
@@ -12,9 +13,9 @@ import {
   turnTitle,
   type ChangeFileView,
   type ChangeGroupView,
-} from '../../../changes.ts';
-import { startsOpen } from '../../../diff.ts';
-import { clock, plural } from '../../../format.ts';
+} from '@omni/shared/changes-view.ts';
+import { startsOpen } from '@omni/shared/diff.ts';
+import { plural } from '../../../format.ts';
 import { DiffFile, type LineSelect } from '../../DiffViewer.tsx';
 import { Empty, ErrorNote, IconButton, Loading, Picker, Segmented } from '../../ui.tsx';
 import { SelectionDock, useLineSelection } from './LineSelection.tsx';

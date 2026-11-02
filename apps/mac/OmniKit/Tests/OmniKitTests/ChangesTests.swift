@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import OmniKit
 
-// The Changes panel's model on the recorded answers (apps/web/tests/web-changes.test.ts checks the Web UI's against the same).
+// The Changes panel's model on the recorded answers (packages/shared/tests/changes-view.test.ts checks the Web UI's against the same).
 
 @Suite struct ChangesTests {
   @Test func groupsTheRecordedChanges() throws {

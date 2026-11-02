@@ -6,6 +6,7 @@ import { withWorkspace } from '../workspace.ts';
 import { recordStartBase } from '../changes.ts';
 import { baseFor } from '../worktree-base.ts';
 import { carryInto } from '../continue-carry.ts';
+import { notifyEnded } from '../push-sender.ts';
 import type { Attachment } from '../uploads.ts';
 import { reportToParent, settleTeam } from './queue.ts';
 import { beginAttempt, endAttempt, runSetupAction } from './setup-action.ts';
@@ -124,6 +125,7 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
 /** The thread could not be prepared, or Ben stopped it first: why, on the thread, with its first prompt kept for Retry. */
 export function failSetup(threadId: string, reason: string, stopped = false) {
   threads.update(threadId, { setup: 'failed', setup_error: reason, status: stopped ? 'stopped' : 'failed' });
+  if (!stopped) notifyEnded(threadId, 'failed');
   for (const r of messageRequests.unstarted(threadId)) messageRequests.park(r.id);
   emitThread(threadId);
   const t = threads.get(threadId);

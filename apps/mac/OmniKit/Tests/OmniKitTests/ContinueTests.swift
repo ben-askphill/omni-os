@@ -193,7 +193,7 @@ private let startBody = ContinueBody(
     #expect(ContinueRules.carriedText(one) == "Carried 3 entries, 1 attachment.")
   }
 
-  // Expected strings printed by typeLabel and attachmentRows in apps/web/src/continue.ts.
+  // Expected strings printed by typeLabel and attachmentRows in packages/shared/continue-flow.ts.
   @Test(arguments: [
     ("image/png", "PNG image"), ("image/jpeg", "JPEG image"), ("image/svg+xml", "SVG image"), ("application/pdf", "PDF"),
     ("text/plain", "Text"), ("application/zip", "File"), ("", "File"),

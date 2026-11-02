@@ -1,7 +1,8 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
+import { toDate } from '@omni/shared/format.ts';
 import { type BackgroundTask, type ChannelWithRunning, type ThreadStub } from '../../api.ts';
 import { drag } from '../../folders.tsx';
-import { duration, plural, toDate } from '../../format.ts';
+import { duration, plural } from '../../format.ts';
 import { href } from '../../router.ts';
 import { readPref, useApp, useNow, writePref } from '../../store.tsx';
 import { HarnessLogo, Loader } from '../brand.tsx';

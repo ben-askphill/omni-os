@@ -1,5 +1,5 @@
 import { memo, useMemo, useState, type ReactNode } from 'react';
-import { MAX_LINES, parseDiff, startsOpen, type DiffLine, type FileDiff } from '../diff.ts';
+import { MAX_LINES, parseDiff, startsOpen, type DiffLine, type FileDiff } from '@omni/shared/diff.ts';
 import { Icon } from './ui.tsx';
 
 export const LINE_CLASS: Record<DiffLine['kind'], string> = {

@@ -18,6 +18,7 @@ import {
 } from '@omni/shared/question.ts';
 import { bus, publishFeed } from '../bus.ts';
 import { events, threads } from '../db.ts';
+import { notifyNeedsInput } from '../push-sender.ts';
 import { turnBlocked } from '../sync/guard.ts';
 import { saveOwn, wake } from './queue.ts';
 import { addEvent, lives, refusal, runsHere } from './state.ts';
@@ -50,6 +51,7 @@ export function askQuestion(threadId: string, raw: unknown): { id: string } {
   const id = randomUUID();
   addEvent(threadId, QUESTION_EVENT, { id, questions: parsed.value } satisfies QuestionPayload);
   settled(threadId);
+  notifyNeedsInput(threadId);
   return { id };
 }
 

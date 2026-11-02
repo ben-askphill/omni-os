@@ -493,6 +493,18 @@
       ]
     },
     {
+      "id": "ios",
+      "section": "access",
+      "title": "Omni for iOS",
+      "keywords": [
+        "iphone",
+        "ipad",
+        "qr",
+        "pair",
+        "app"
+      ]
+    },
+    {
       "id": "connect",
       "section": "access",
       "title": "Omni Connect",

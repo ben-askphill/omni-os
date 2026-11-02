@@ -2,5 +2,6 @@
   "available": true,
   "issuer": "https://fake-walrus.clerk.accounts.dev",
   "owner": { "email": "ada@example.com", "name": "Ada", "linkedAt": "2026-11-01T09:00:00.000Z" },
-  "via": "token"
+  "via": "token",
+  "sessionMethod": null
 }

@@ -2,17 +2,12 @@ import { Markdown } from '../components/Markdown.tsx';
 import { DiffViewer } from '../components/DiffViewer.tsx';
 import { Avatar, Chip, Icon, IconLink } from '../components/ui.tsx';
 import { fullDate } from '../format.ts';
+import { checkTone } from '@omni/shared/thread-glance.ts';
 import type { PRDetail as PRDetailT } from '../api.ts';
 
 /** GitHub hides HTML comments (PR templates, bots); react-markdown would print them. */
 const ghBody = (s: string | null | undefined) => (s ?? '').replace(/<!--[\s\S]*?-->/g, '').trim();
 
-/** A check run's state as a glyph: done, needs (failed) or running. */
-export function checkTone(state: string) {
-  if (['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(state)) return 'done';
-  if (['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(state)) return 'needs';
-  return 'running';
-}
 function checkGlyph(state: string) {
   const t = checkTone(state);
   return t === 'done' ? '✓' : t === 'needs' ? '✗' : '•';

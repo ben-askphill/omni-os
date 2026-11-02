@@ -1,7 +1,7 @@
 import type { HarnessWithRunning } from '../api.ts';
 import { HarnessLogo, OmniMark } from '../components/brand.tsx';
 import { modelOf, type ModelChoice } from '../components/ModelPicker.tsx';
-import { AUTO_CHOICE, asksAuto } from '../thread-run.ts';
+import { AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
 import { MoGroup, MoListRow, MoRadio, MoSection, MoSheet } from './parts.tsx';
 
 /** What a run's chip reads: "Sonnet 5.5 · high", the model's default effort when none is picked. */

@@ -1,9 +1,10 @@
+import { relTime } from '@omni/shared/format.ts';
 import { Loader } from './brand.tsx';
 import { useCallback, useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { api, errorText, useApi, type BranchPRMark, type ChannelWithRunning, type FolderWithThreads, type Thread } from '../api.ts';
 import { folderOf, groupByFolder } from '../folder-groups.ts';
 import { drag, useFolders } from '../folders.tsx';
-import { groupByDay, plural, relTime } from '../format.ts';
+import { groupByDay, plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useFeed, useNow } from '../store.tsx';
 import { Avatar, Button, Chip, DoneMark, Empty, ErrorNote, Icon, Loading, StatusDot } from './ui.tsx';

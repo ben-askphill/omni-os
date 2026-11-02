@@ -1,7 +1,8 @@
 // How the Web UI shows a terminal_excerpt (packages/shared/message-context-terminal.ts): which shell the text came
 // from, when Ben selected it, and the text as it was then.
 import type { TerminalExcerpt } from '@omni/shared/message-context-terminal.ts';
-import { fullDate, plural, shortPath } from '../format.ts';
+import { shortPath } from '@omni/shared/short-path.ts';
+import { fullDate, plural } from '../format.ts';
 import type { ContextView } from './views.ts';
 
 function TerminalExcerptDetail({ body: b }: { body: TerminalExcerpt }) {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CLOUD_STATUS, cloudAgentUrl, cloudStatus, prNumber } from '../src/cloud-agent.ts';
+import { CLOUD_STATUS, cloudAgentUrl, cloudStatus, prNumber } from '@omni/shared/cloud-agent.ts';
 import { harnessesPath } from '../src/api.ts';
-import { threadView } from '../src/mobile/thread-view.ts';
+import { threadView } from '@omni/shared/thread-view.ts';
 import type { Thread } from '../src/api.ts';
-import type { TranscriptEvent } from '../src/transcript/fold.ts';
+import type { TranscriptEvent } from '@omni/shared/transcript-fold.ts';
 
 describe('cloud agent card', () => {
   it('says each run status in words, with the thread status its pill draws', () => {

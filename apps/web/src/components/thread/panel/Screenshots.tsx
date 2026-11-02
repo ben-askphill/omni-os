@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { relTime } from '@omni/shared/format.ts';
 import { artifactUrl, type Artifact } from '../../../api.ts';
 import { Empty, IconButton, Modal } from '../../ui.tsx';
-import { fullDate, relTime } from '../../../format.ts';
+import { fullDate } from '../../../format.ts';
 
 export function Screenshots({ shots }: { shots: Artifact[] }) {
   const [open, setOpen] = useState<Artifact | null>(null);

@@ -1,10 +1,10 @@
 import { machineLabel } from '@omni/shared/handoff.ts';
+import { relTime } from '@omni/shared/format.ts';
+import { HERE } from '@omni/shared/thread-machine.ts';
 import { useApi, type SetupState, type SyncStatus } from '../api.ts';
 import { DeviceLabel } from '../components/DeviceLabel.tsx';
 import { RUN_ON_HINT, runOnOptions, useRunOnSetting } from '../components/RunOnPicker.tsx';
-import { HERE } from '../run-on.ts';
 import { ErrorNote, Picker, StatusDot } from '../components/ui.tsx';
-import { relTime } from '../format.ts';
 import { useApp, useHereName } from '../store.tsx';
 import { Card, InfoRow, Origin, ServerOptions } from './settings-parts.tsx';
 

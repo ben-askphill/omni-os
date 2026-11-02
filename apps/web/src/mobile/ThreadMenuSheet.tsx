@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { api, errorText, type BackgroundTask, type Thread } from '../api.ts';
 import { threadMenu, type ThreadActionId } from '@omni/shared/thread-actions.ts';
+import { toDate } from '@omni/shared/format.ts';
 import { Button, ErrorNote, Loader } from '../components/ui.tsx';
-import { duration, toDate } from '../format.ts';
+import { duration } from '../format.ts';
 import { runningSubagents, subagentKind } from '../subagents.ts';
 import { canMarkDone } from '../needs-you.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';

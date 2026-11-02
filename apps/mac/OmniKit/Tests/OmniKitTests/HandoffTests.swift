@@ -218,7 +218,7 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
   }
 }
 
-/// handoffBanner in apps/web/src/handoff.ts.
+/// handoffBanner in packages/shared/thread-machine.ts.
 @Suite struct HandoffBannerTests {
   private func banner(_ state: String, outgoing: Bool = true, status: ThreadStatus = .running) throws -> HandoffBanner? {
     let v = try view(state, outgoing: outgoing)

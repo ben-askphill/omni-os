@@ -105,6 +105,21 @@ extension QARunner {
     (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap(scrollViews)
   }
 
+  /// Scrolls the Settings window's scroll views so `frame` (global, top-left origin, as SwiftUI reports it) shows.
+  static func scrollSettings(toShow frame: CGRect?) {
+    guard let frame, let window = windows.first(where: isSettings), let content = window.contentView else { return }
+    let local = content.isFlipped
+      ? frame
+      : NSRect(x: frame.minX, y: content.bounds.height - frame.maxY, width: frame.width, height: frame.height)
+    let inWindow = content.convert(local, to: nil)
+    for scroll in scrollViews(in: content) {
+      guard let document = scroll.documentView else { continue }
+      let rect = document.convert(inWindow, from: nil)
+      guard document.bounds.intersects(rect) else { continue }
+      document.scrollToVisible(rect)
+    }
+  }
+
   static var windows: [NSWindow] {
     NSApp.windows
       .filter { $0.isVisible && (($0.styleMask.contains(.titled) && !($0 is NSPanel)) || $0.identifier == QuickPromptPanel.identifier) }

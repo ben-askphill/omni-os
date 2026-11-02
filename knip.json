@@ -42,6 +42,18 @@
         "external/stdio.ts"
       ]
     },
+    "apps/ios": {
+      "ignoreDependencies": [
+        "@effect/atom-react",
+        "effect",
+        "expo-status-bar",
+        "react-native-reanimated",
+        "react-native-worklets",
+        "babel-plugin-react-compiler",
+        "expo-updates",
+        "expo-system-ui"
+      ]
+    },
     "apps/web": {
       "entry": [
         "tests/**/*.test.ts"

@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { machineLabel } from '@omni/shared/handoff.ts';
+import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SyncSignedIn, type SyncStatus } from '../api.ts';
 import { DeviceCodeSignIn, type FlowStart } from '../components/GoogleSignIn.tsx';
 import { Button, CopyButton, ErrorNote, Icon, InlineConfirm, Label, Loading, StatusDot } from '../components/ui.tsx';
-import { plural, relTime } from '../format.ts';
+import { plural } from '../format.ts';
 import { useHereName, useSecretStoreLabel } from '../store.tsx';
 
 // Settings, Sync: sign in to the Cloudflare relay with Google (through Clerk), see what is waiting, sync now, pause and sign out. The

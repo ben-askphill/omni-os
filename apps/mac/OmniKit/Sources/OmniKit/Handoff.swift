@@ -4,7 +4,7 @@ import Observation
 // Handing a thread, running or idle, to another synced Mac, and taking one over from another Mac. The shapes and the
 // banner text are packages/shared/handoff.ts;
 // apps/server/tests/mac-fixtures.test.ts holds both clients to the same JSON. When to offer it, the picker's rows and
-// the banner per phase follow apps/web/src/handoff.ts.
+// the banner per phase follow packages/shared/thread-machine.ts.
 
 /// Whether a Mac can take a thread now, as this Mac's Tailscale sees it. `unknown`: no Tailscale here or there to ask.
 public struct Reachability: OpenEnum {
@@ -30,7 +30,7 @@ public struct Device: Decodable, Hashable, Sendable, Identifiable {
   /// `canTake` in handoff.ts: only a Mac Tailscale knows is away is refused.
   public var canTake: Bool { reachability != .offline }
 
-  /// The second line of its row in Hand Off to, as `deviceRow` in apps/web/src/handoff.ts.
+  /// The second line of its row in Hand Off to, as `deviceRow` in packages/shared/thread-machine.ts.
   public func reachabilityLabel(now: Date = .now, calendar: Calendar = Format.localCalendar) -> String {
     switch reachability {
     case .online: return "Online on Tailscale"
@@ -222,7 +222,7 @@ public struct HandoffView: Decodable, Hashable, Sendable {
   private static func sentence(_ s: String) -> String { s.hasSuffix(".") ? s : s + "." }
 }
 
-/// The thread's handoff banner, as `handoffBanner` in apps/web/src/handoff.ts. A card while it is under way or went
+/// The thread's handoff banner, as `handoffBanner` in packages/shared/thread-machine.ts. A card while it is under way or went
 /// wrong, with Cancel on the Mac that started it while the other has not taken it; one quiet line once it settled.
 public enum HandoffBanner: Hashable, Sendable {
   public enum Tone: Hashable, Sendable {

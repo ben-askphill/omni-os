@@ -2,7 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 import { useReveal } from '../pages/useReveal.ts';
 import { useScrollAnchor } from '../pages/useScrollAnchor.ts';
 import type { useThread } from './shell.tsx';
-import type { ThreadView } from './thread-view.ts';
+import type { ThreadView } from '@omni/shared/thread-view.ts';
 
 /** The reading position of the thread screen: the scroller, and the element of the newest turn. */
 export function useOpenOnNewestTurn({

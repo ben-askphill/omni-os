@@ -534,4 +534,28 @@ export function migrate() {
     last_seen_at TEXT NOT NULL,
     revoked_at TEXT
   );`);
+  // How a session was granted: 'google' (the owner signed in; ends when the owner changes) or 'pairing' (an app
+  // redeemed a one-time code from an authenticated device; needs no Google owner). Older rows are all Google's.
+  ensureColumn('device_sessions', 'method', `TEXT NOT NULL DEFAULT 'google'`);
+  // The push token an app registered for its session (apps/server/push-tokens.ts). Deleted when the session ends.
+  // Local, never synced: a token belongs to the app's session on this machine.
+  db.exec(`CREATE TABLE IF NOT EXISTS push_tokens (
+    session_id TEXT PRIMARY KEY REFERENCES device_sessions(id) ON DELETE CASCADE,
+    token TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    environment TEXT NOT NULL,
+    bundle_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );`);
+  // Which alerts a device gets (apps/server/push-preferences.ts). A row exists only once the device changes something:
+  // no row means every kind is on. Deleted when the session ends, like its token.
+  db.exec(`CREATE TABLE IF NOT EXISTS push_preferences (
+    session_id TEXT PRIMARY KEY REFERENCES device_sessions(id) ON DELETE CASCADE,
+    needs_input INTEGER NOT NULL DEFAULT 1,
+    finished INTEGER NOT NULL DEFAULT 1,
+    failed INTEGER NOT NULL DEFAULT 1,
+    crew_report INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL
+  );`);
 }

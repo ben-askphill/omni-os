@@ -29,8 +29,8 @@ describe.runIf(process.env.OMNI_MEASURE === '1')('a thread held open for a long 
     const { flushSync } = await import('react-dom');
     const { createRoot } = await import('react-dom/client');
     const { Transcript } = await import('../src/components/Transcript.tsx');
-    const { buildItems } = await import('../src/transcript/fold.ts');
-    const { threadView } = await import('../src/mobile/thread-view.ts');
+    const { buildItems } = await import('@omni/shared/transcript-fold.ts');
+    const { threadView } = await import('@omni/shared/thread-view.ts');
 
     const turns = Number(process.env.OMNI_MEASURE_TURNS ?? 400);
     const bound = process.env.OMNI_MEASURE_BOUND !== '0';

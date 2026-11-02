@@ -2,6 +2,7 @@
 // polls while one runs, or while the worktree is prepared, and the page is visible, and loads once otherwise.
 import { useCallback, useEffect, useState } from 'react';
 import {
+  anyRunning,
   OUTPUT_LIMIT,
   SETUP_MODE_LABEL,
   type ActionRun,
@@ -10,19 +11,16 @@ import {
   type ChannelActionInput,
   type SetupMode,
   type ThreadActions,
+  withRun,
 } from '@omni/shared/channel-actions.ts';
+import { bytes } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type Thread } from './api.ts';
-import { bytes, duration } from './format.ts';
+import { duration } from './format.ts';
 
 export const POLL_MS = 1000;
 
 /** A run's state as the status glyph draws it. */
 export const RUN_GLYPH: Record<ActionRunState, string> = { running: 'running', succeeded: 'done', failed: 'failed', stopped: 'stopped' };
-
-export const anyRunning = (data: ThreadActions | undefined) => !!data?.runs.some((r) => r.state === 'running');
-
-/** The run of this action still going in the thread, if any. Runs come newest first. */
-export const liveRun = (data: ThreadActions, action: ChannelAction) => data.runs.find((r) => r.action_id === action.id && r.state === 'running');
 
 /** "Port 9301 · 12s · exit 1": what a run's row says under its name. A running run counts up to `now`. */
 export function runSummary(run: ActionRun, now = Date.now()) {
@@ -43,12 +41,6 @@ export function runSummary(run: ActionRun, now = Date.now()) {
  */
 export function outputCut(run: ActionRun) {
   return run.output.length >= OUTPUT_LIMIT && run.output_bytes > run.output.length ? `Showing the last ${bytes(OUTPUT_LIMIT)} of ${bytes(run.output_bytes)}` : null;
-}
-
-/** The answer to Run, Stop or Retry, in place of its old copy or on top as the newest. */
-export function withRun(data: ThreadActions, run: ActionRun): ThreadActions {
-  const runs = data.runs.some((r) => r.id === run.id) ? data.runs.map((r) => (r.id === run.id ? run : r)) : [run, ...data.runs];
-  return { ...data, runs, setup_run: data.setup_run?.id === run.id ? run : data.setup_run };
 }
 
 // ---------- the setup action in a new worktree ----------

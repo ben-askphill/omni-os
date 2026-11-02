@@ -7,7 +7,7 @@
 // POST   /:id/terminal/resize   { cols, rows }
 // DELETE /:id/terminal          hang up
 import { Hono, type Context } from 'hono';
-import { streamSSE } from 'hono/streaming';
+import { sessionSSE } from './sse.ts';
 import { z } from 'zod';
 import { threads, type Thread } from './db.ts';
 import { closeTerminal, getTerminal, openTerminal, resizeTerminal, snapshot, writeTerminal, type Terminal, type TerminalMessage } from './terminal.ts';
@@ -78,7 +78,7 @@ terminalApi.get('/:id/terminal/stream', async (c) => {
   // Reflow to this client's size before the snapshot, so it fits.
   else if (size.success) resizeTerminal(thread.id, size.data.cols, size.data.rows);
   const t = term;
-  return streamSSE(c, async (stream) => {
+  return sessionSSE(c, async (stream) => {
     // Subscribe before the snapshot is taken, in the same tick, so no output falls between them.
     const queue: TerminalMessage[] = [{ kind: 'snapshot', data: snapshot(t), running: t.running, code: t.code }];
     let wake: (() => void) | null = null;

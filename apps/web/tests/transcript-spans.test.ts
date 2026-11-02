@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { fixture } from '@omni/test-fixtures';
 import { LONG_THREAD } from '@omni/test-fixtures/long-thread.ts';
 import { ALL, applyPage, earlierCursor, HISTORY_BUDGET, laterCursor, openHistory, revealCursor, spanIndex, TURN_END, type History, type HistoryBudget, type HistoryRow, type Span } from '@omni/shared/history.ts';
-import { buildItems, type Item, type TranscriptEvent } from '../src/transcript/fold.ts';
+import { buildItems, type Item, type TranscriptEvent } from '@omni/shared/transcript-fold.ts';
 import { historyServer, longRows } from './history-sim.ts';
-import { projectFold } from './transcript-snapshot.ts';
+import { projectFold } from '@omni/shared/tests/transcript-snapshot.ts';
 
 // The fold over held spans (#223): the same rules as Transcript.swift, checked on the shared corpus and on real pages
 // of the long fixture against the fold of the whole thread.

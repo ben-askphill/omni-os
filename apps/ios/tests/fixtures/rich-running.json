@@ -1,0 +1,31 @@
+{
+ "name": "rich-running",
+ "events": [
+  {
+   "kind": "user",
+   "payload": "{\"text\":\"Keep going on the refactor.\"}",
+   "created_at": "2026-11-02T09:11:41.000Z"
+  },
+  {
+   "kind": "assistant_text",
+   "payload": "{\"text\":\"Reading the module list.\"}",
+   "created_at": "2026-11-02T09:11:42.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"r1\",\"name\":\"Read\",\"input\":{\"file_path\":\"/work/volero/src/index.ts\"},\"parent\":null}",
+   "created_at": "2026-11-02T09:11:43.000Z"
+  },
+  {
+   "kind": "tool_result",
+   "payload": "{\"tool_use_id\":\"r1\",\"text\":\"export * from \\\"./cart\\\";\",\"is_error\":false,\"truncated\":false}",
+   "created_at": "2026-11-02T09:11:44.000Z"
+  },
+  {
+   "kind": "tool_use",
+   "payload": "{\"id\":\"r2\",\"name\":\"Grep\",\"input\":{\"pattern\":\"TODO\"},\"parent\":null}",
+   "created_at": "2026-11-02T09:11:45.000Z"
+  }
+ ],
+ "status": "running"
+}

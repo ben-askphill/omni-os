@@ -1,6 +1,6 @@
 // /api/channels/:id/browser: the channel's live browser, its stream, and input.
 import { Hono, type Context } from 'hono';
-import { streamSSE } from 'hono/streaming';
+import { sessionSSE } from './sse.ts';
 import { z } from 'zod';
 import { captureApi } from './browser-capture.ts';
 import { forget, inspectApi, pickApi, remember } from './browser-pick.ts';
@@ -33,7 +33,7 @@ browserApi.get('/:id/browser', (c) => {
 /** Live view: `state` messages, and `frame` messages with a JPEG. A slow client skips frames rather than queueing them. */
 browserApi.get('/:id/browser/stream', (c) => {
   const b = browserFor(c);
-  return streamSSE(c, async (stream) => {
+  return sessionSSE(c, async (stream) => {
     const states: BrowserEvent[] = [];
     let frame: BrowserEvent | null = null;
     let wake: (() => void) | null = null;

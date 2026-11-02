@@ -1,7 +1,7 @@
 import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { outputMeta } from '@omni/shared/tool-output.ts';
 import { useToolOutput } from '../../pages/useToolOutput.ts';
-import type { ToolCall } from '../../transcript/fold.ts';
+import type { ToolCall } from '@omni/shared/transcript-fold.ts';
 import { outputLeft, outputTarget, outputText } from '../../tool-output.ts';
 import { Button, Loader } from '../ui.tsx';
 import { ClippedNote } from './HistoryEdgeRow.tsx';

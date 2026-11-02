@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { HarnessWithRunning } from '../src/api.ts';
 import { ModelSheet, runLabel } from '../src/mobile/ModelSheet.tsx';
-import { AUTO_CHOICE } from '../src/thread-run.ts';
+import { AUTO_CHOICE } from '@omni/shared/thread-run.ts';
 
 const harnesses = [{
   id: 'cursor', name: 'Cursor Agent', available: true, models: [

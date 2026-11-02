@@ -3,7 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { api, errorText } from '../api.ts';
-import { shortPath } from '../format.ts';
+import { shortPath } from '@omni/shared/short-path.ts';
 import { THEME, attachInteractive, attachReadOnly } from './terminal-session.ts';
 import { TerminalSelectionDock, useSelectedText, useTapToPick } from './TerminalSelection.tsx';
 import { Button, ErrorNote, Icon, IconButton } from './ui.tsx';

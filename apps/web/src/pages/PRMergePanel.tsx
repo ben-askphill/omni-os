@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, errorText, type Channel, type PRDetail as PRDetailT } from '../api.ts';
 import { Chip, ErrorNote, Picker, SlideToConfirm, StatusDot, Toggle, type PickerOption } from '../components/ui.tsx';
-import { checkTone } from './PRDetailTabs.tsx';
+import { checkTone } from '@omni/shared/thread-glance.ts';
 
 type MergeMethod = 'squash' | 'merge' | 'rebase';
 

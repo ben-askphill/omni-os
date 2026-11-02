@@ -1,26 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { ARTIFACT_FILTERS, matchesArtifactFilter, type ArtifactFilter } from '@omni/shared/artifacts.ts';
+import { relTime, toDate } from '@omni/shared/format.ts';
 import { artifactUrl, useApi, type ArtifactWithThread } from '../api.ts';
 import { kindIcon } from '../components/ArtifactViewer.tsx';
 import { Empty, ErrorNote, Icon, Loading, PageHeader, Segmented } from '../components/ui.tsx';
-import { relTime, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { readPref, useApp, useFeed, writePref } from '../store.tsx';
-
-export const ARTIFACT_FILTERS = [
-  { id: 'all', label: 'All' },
-  { id: 'html', label: 'Pages' },
-  { id: 'image', label: 'Images' },
-  { id: 'doc', label: 'Docs' },
-  { id: 'data', label: 'Data' },
-] as const;
-export type ArtifactFilter = (typeof ARTIFACT_FILTERS)[number]['id'];
-
-export const matchesArtifactFilter = (f: ArtifactFilter, kind: string) =>
-  f === 'all' ||
-  (f === 'html' && (kind === 'html' || kind === 'svg')) ||
-  (f === 'image' && kind === 'image') ||
-  (f === 'doc' && (kind === 'markdown' || kind === 'pdf' || kind === 'text')) ||
-  (f === 'data' && (kind === 'csv' || kind === 'json'));
 
 /**
  * A file's preview: images as they are, pages live and scaled down (to a quarter, or `scale`), anything else its

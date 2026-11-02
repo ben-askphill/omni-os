@@ -4,7 +4,7 @@ import { HarnessLogo } from '../components/brand.tsx';
 import { ErrorNote, Loading, StatusDot } from '../components/ui.tsx';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp } from '../store.tsx';
-import { asksAuto } from '../thread-run.ts';
+import { asksAuto } from '@omni/shared/thread-run.ts';
 import { RunDefaultsField } from './ChannelSettings.tsx';
 import { Card, Origin, ServerOptions, useScopedChannel } from './settings-parts.tsx';
 

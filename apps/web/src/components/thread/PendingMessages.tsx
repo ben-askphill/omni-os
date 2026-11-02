@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { bytes } from '@omni/shared/format.ts';
+import { requestIdFor } from '@omni/shared/request-id.ts';
 import { Attachments } from './Attachments.tsx';
 import { api, ApiError, errorText, type Attachment, type PendingMsg, type Thread } from '../../api.ts';
-import { bytes, plural } from '../../format.ts';
+import { plural } from '../../format.ts';
 import { Button, copyText, Icon, IconButton } from '../ui.tsx';
-import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf, requestIdFor } from '../../requests.ts';
+import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf } from '../../requests.ts';
 import { useSending } from '../../sending.ts';
 import { canMove, canSteerNow, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE, type EditDraft } from '../../pending-edits.ts';
 import { ContextChips, hasContext } from '../../message-context/ContextChips.tsx';

@@ -10,7 +10,8 @@
 #   scripts/qa-stack.sh logs            tail the server and vite logs
 #
 # QA_SERVER_PORT (default 4757) and QA_WEB_PORT (default 4768) move the ports, QA_DIR the state dir
-# (default $TMPDIR/omni-qa-<server port>). QA_CLAUDE_BIN, QA_CODEX_BIN and QA_CURSOR_BIN swap a fake CLI for a real one
+# (default $TMPDIR/omni-qa-<server port>). QA_NO_WEB=1 starts no vite, for a client that only needs the API
+# (scripts/qa-handoff-stack.sh runs two servers that way). QA_CLAUDE_BIN, QA_CODEX_BIN and QA_CURSOR_BIN swap a fake CLI for a real one
 # (a live turn spends that plan). QA_BROWSER=1 turns the channel browser on, so a thread's Browser tab launches a real
 # headless Chrome on the stack's own profile dir. Otherwise threads run on fake-claude, so a prompt with directives such as
 # RICH, TOOL:<ms> or LIMIT drives a turn without spending a plan (see packages/test-fixtures/fake-claude.mjs).
@@ -77,16 +78,18 @@ SH
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
     detach npx tsx apps/server/index.ts >"$DIR/server.log" 2>&1 &
   echo $! >"$DIR/server.pid"
-  OMNI_PORT="$SERVER_PORT" detach npx vite --config apps/web/vite.config.ts --port "$WEB_PORT" --strictPort >"$DIR/web.log" 2>&1 &
-  echo $! >"$DIR/web.pid"
+  if [ "${QA_NO_WEB:-0}" != 1 ]; then
+    OMNI_PORT="$SERVER_PORT" detach npx vite --config apps/web/vite.config.ts --port "$WEB_PORT" --strictPort >"$DIR/web.log" 2>&1 &
+    echo $! >"$DIR/web.pid"
+  fi
 
   for _ in $(seq 1 60); do
-    api /channels >/dev/null 2>&1 && curl -fsS "$WEB" >/dev/null 2>&1 && break
+    api /channels >/dev/null 2>&1 && { [ "${QA_NO_WEB:-0}" = 1 ] || curl -fsS "$WEB" >/dev/null 2>&1; } && break
     alive server || { tail -20 "$DIR/server.log" >&2; die "server exited, log above"; }
     sleep 0.5
   done
   api /channels >/dev/null 2>&1 || { tail -20 "$DIR/server.log" >&2; die "server not healthy after 30s"; }
-  curl -fsS "$WEB" >/dev/null 2>&1 || { tail -20 "$DIR/web.log" >&2; die "vite not up after 30s"; }
+  [ "${QA_NO_WEB:-0}" = 1 ] || curl -fsS "$WEB" >/dev/null 2>&1 || { tail -20 "$DIR/web.log" >&2; die "vite not up after 30s"; }
 
   for ((i = 1; i <= seed; i++)); do
     local prompt="Sample thread $i"
@@ -128,12 +131,12 @@ down() {
 
 status() {
   echo "server  $API  $(alive server && echo up || echo down)"
-  echo "web     $WEB  $(alive web && echo up || echo down)"
+  [ "${QA_NO_WEB:-0}" = 1 ] || echo "web     $WEB  $(alive web && echo up || echo down)"
   echo "data    $DIR"
   if alive server; then
     echo "token   $(tok)"
-    echo "pair    $WEB/#/?pair=$(tok)"
-    api /threads 2>/dev/null | node -e '
+    [ "${QA_NO_WEB:-0}" = 1 ] || echo "pair    $WEB/#/?pair=$(tok)"
+    [ "${QA_NO_WEB:-0}" = 1 ] || api /threads 2>/dev/null | node -e '
       let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
         for (const t of JSON.parse(s)) console.log(`thread  ${process.argv[1]}/#/t/${t.id}?pair=${process.argv[2]}  ${t.status}  ${t.title ?? ""}`);
       });' "$WEB" "$(tok)" || true

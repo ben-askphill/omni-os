@@ -2,7 +2,7 @@
 // GET /channels/:id/bases, the pick in the POST /threads body, and the line a preparing thread shows. Pure, so tests run it
 // on the server's answers. The shapes are packages/shared/worktree-base.ts, which the Mac app mirrors.
 import { HEAD_PICK, pickLabel, type BaseOptions, type BasePick, type ThreadBaseView } from '@omni/shared/worktree-base.ts';
-import { shortSha } from './changes.ts';
+import { shortSha } from '@omni/shared/changes-view.ts';
 
 export { HEAD_PICK };
 

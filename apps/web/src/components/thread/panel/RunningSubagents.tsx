@@ -1,5 +1,6 @@
+import { toDate } from '@omni/shared/format.ts';
 import type { BackgroundTask } from '../../../api.ts';
-import { duration, toDate } from '../../../format.ts';
+import { duration } from '../../../format.ts';
 import { useNow } from '../../../store.tsx';
 import { subagentKind, subagentTip } from '../../../subagents.ts';
 import { Loader } from '../../brand.tsx';

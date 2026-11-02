@@ -55,6 +55,7 @@
         "updated_at": "2026-01-05T09:00:00.000Z",
         "folder_id": null,
         "harness": "claude-code",
+        "pinned_at": null,
         "done_at": null,
         "parent_id": null,
         "source": "manual"
@@ -70,6 +71,7 @@
         "updated_at": "2026-01-05T09:00:00.000Z",
         "folder_id": null,
         "harness": "claude-code",
+        "pinned_at": null,
         "done_at": null,
         "parent_id": null,
         "source": "manual"

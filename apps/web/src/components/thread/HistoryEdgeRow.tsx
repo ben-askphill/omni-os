@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { earlierCursor, historyQuery, laterCursor, type Clipped, type HistoryCursor, type HistoryEdge } from '@omni/shared/history.ts';
-import { bytes } from '../../format.ts';
+import { bytes } from '@omni/shared/format.ts';
 import type { ThreadHistory } from '../../pages/useThreadHistory.ts';
 import { Button, Loader } from '../ui.tsx';
 

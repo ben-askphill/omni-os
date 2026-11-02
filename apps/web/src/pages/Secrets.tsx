@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SecretRow } from '../api.ts';
 import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, Picker, StatusDot, type PickerOption } from '../components/ui.tsx';
-import { relTime } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useSecretStoreLabel } from '../store.tsx';
 import { Origin } from './settings-parts.tsx';

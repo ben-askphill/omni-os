@@ -7,6 +7,7 @@ import { paths } from './config.ts';
 import './compose.ts';
 import { artifactsApi } from './artifacts-api.ts';
 import { authApi } from './auth-api.ts';
+import { capabilitiesApi } from './capabilities-api.ts';
 import { browserApi } from './browser-api.ts';
 import { changesApi } from './changes-api.ts';
 import { continueApi } from './continue-api.ts';
@@ -63,6 +64,7 @@ api.use('*', requestGuard);
 // Mounted in the same order the handlers used to be registered. Hono runs the first match, so
 // threadsApi and terminalApi stay between the thread reads and the message, upload, stop, and stream routes.
 api.route('/auth', authApi);
+api.route('/capabilities', capabilitiesApi);
 api.route('/channels', channelsApi);
 api.route('/channels', browserApi);
 api.route('/', actionsApi);

@@ -1,8 +1,8 @@
 // What every phone screen reaches for: Back, opening a route, the shell's sheets and its toast, and the thread a
 // thread's screens share.
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { type ContinueSource } from '@omni/shared/continue-flow.ts';
 import { useThreadSession } from '../pages/useThreadSession.ts';
-import type { ContinueSource } from '../continue.ts';
 import { shownResult } from '../needs-you.ts';
 import { useApp, usePageVisible } from '../store.tsx';
 

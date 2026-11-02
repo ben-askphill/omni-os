@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { PRSummary, Thread } from '../../../api.ts';
 import type { PanelTab } from '../../../pages/useThreadSession.ts';
 import { plural } from '../../../format.ts';
-import { prBadge, prLine, type PRNext } from '../../../thread-glance.ts';
+import { prBadge, prLine, type PRNext } from '@omni/shared/thread-glance.ts';
 import { Chip, copyText, Icon, IconButton, type IconName } from '../../ui.tsx';
 import { PRNextButton, type ThreadPRs } from './PRsTab.tsx';
 

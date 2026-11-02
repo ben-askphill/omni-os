@@ -5,7 +5,7 @@ import { ErrorNote, Icon, type IconName } from '../components/ui.tsx';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { removeDraftContext, useDraftContext } from '../message-context/draft.ts';
 import { canSteer } from '../steer.ts';
-import { currentRun, pickedRun, shownRun, threadChoice, threadRunLabels } from '../thread-run.ts';
+import { currentRun, pickedModelRun, shownRun, threadChoice, threadRunLabels } from '@omni/shared/thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
 import { useDictation, withPhrase } from './dictation.ts';
 import { PICK, PlusSheet, type Pick } from './PlusSheet.tsx';
@@ -107,8 +107,7 @@ export function MoComposer({
   const shown = shownRun(thread);
   const next = shown !== thread ? threadRunLabels(shown, harnesses).model : null;
   const switchRun = async (choice: { harness: string; model: string }, effort: string) => {
-    const now = threadChoice(shown, harnesses);
-    await post(pickedRun(shown, harnesses, choice.harness === now.harness && choice.model === now.model ? { effort } : choice));
+    await post(pickedModelRun(shown, harnesses, choice, effort));
   };
   const post = async (run: Run | null) => {
     if (!run || switching) return;

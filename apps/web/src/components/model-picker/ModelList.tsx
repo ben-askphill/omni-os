@@ -1,5 +1,5 @@
 import type { HarnessWithRunning } from '../../api.ts';
-import { AUTO_CHOICE } from '../../thread-run.ts';
+import { AUTO_CHOICE } from '@omni/shared/thread-run.ts';
 import { HarnessLogo } from '../brand.tsx';
 import { Icon } from '../ui.tsx';
 import type { ModelChoice } from '../ModelPicker.tsx';

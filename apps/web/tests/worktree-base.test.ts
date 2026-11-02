@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BaseOptions, ThreadBaseView } from '@omni/shared/worktree-base.ts';
-import { baseLabel } from '../src/changes.ts';
+import { baseLabel } from '@omni/shared/changes-view.ts';
 import { baseOptionRows, baseRequest, branchingFrom, HEAD_PICK, isProviderHarness, pickKey, rowFor } from '../src/worktree-base.ts';
 
 // The new-thread base picker's rows and request (apps/web/src/worktree-base.ts) on the answers of GET /channels/:id/bases.

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { sectionDef, type Provenance } from '@omni/shared/settings-catalog.ts';
 import { pageFields, SETTING_PAGES, settingHint, settingId, settingPlaceholder, settingProblem, type SettingField, type SettingPage } from '@omni/shared/settings.ts';
+import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SetupState, type Status, type UserConfig, type UserConfigPatch } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setChannelAlerts, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
@@ -8,13 +9,13 @@ import { PronounsInput, TimezoneInput } from '../components/Onboarding.tsx';
 import { SettingsNav } from '../components/SettingsNav.tsx';
 import { useTheme } from '../components/theme.tsx';
 import { Avatar, Button, Chip, ErrorNote, Icon, LinkButton, Loading, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
-import { relTime } from '../format.ts';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp, useSecretStoreLabel } from '../store.tsx';
 import { ChannelSettingsForm, Section } from './ChannelSettings.tsx';
 import { GoogleAccountSection } from './GoogleAccount.tsx';
 import { ConnectSection } from './Connect.tsx';
+import { IosPairingSection } from './IosPairing.tsx';
 import { MachinesSection, RunOnCard } from './Machines.tsx';
 import { SecretsSection } from './Secrets.tsx';
 import { ModelsSection } from './SettingsAgents.tsx';
@@ -316,6 +317,7 @@ function AccessSection() {
       <div id={settingAnchor('connect')} className="scroll-mt-6 space-y-5">
         <ConnectSection />
       </div>
+      <IosPairingSection />
       <ConfigSection part="access" />
     </>
   );

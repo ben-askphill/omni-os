@@ -1,8 +1,8 @@
 import { type HarnessWithRunning, type Thread } from '../api.ts';
 import { HarnessLogo } from '../components/brand.tsx';
-import { sourceRefusal } from '../continue.ts';
 import { Icon, type IconName } from '../components/ui.tsx';
-import { shownRun, threadRunLabels } from '../thread-run.ts';
+import { shownRun, threadRunLabels } from '@omni/shared/thread-run.ts';
+import { sourceRefusal } from '@omni/shared/continue-flow.ts';
 import { MoGroup, MoListRow, MoSheet } from './parts.tsx';
 
 export const PICK = { photo: 'image/*', camera: 'image/*', file: undefined } as const;

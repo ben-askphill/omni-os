@@ -3,7 +3,7 @@ import type { HarnessWithRunning } from '../api.ts';
 import { Icon, Picker, type PickerOption } from './ui.tsx';
 import { HarnessLogo } from './brand.tsx';
 import { ModelList } from './model-picker/ModelList.tsx';
-import { asksAuto } from '../thread-run.ts';
+import { asksAuto } from '@omni/shared/thread-run.ts';
 
 export interface ModelChoice {
   harness: string;

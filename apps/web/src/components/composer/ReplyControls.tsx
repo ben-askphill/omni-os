@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../../api.ts';
 import { Icon, Kbd, Loader, type IconName } from '../ui.tsx';
 import { ModelPicker } from '../ModelPicker.tsx';
-import { currentRun, pickedRun, shownRun, threadChoice, threadRunLabels, type RunPick } from '../../thread-run.ts';
+import { currentRun, pickedRun, shownRun, threadChoice, threadRunLabels, type RunPick } from '@omni/shared/thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
 
 

@@ -7,6 +7,7 @@ import { lostTo } from '../ownership.ts';
 import { machineName } from '../sync/guard.ts';
 import { detachThread } from '../browser.ts';
 import { turnFinished } from '../sync/files.ts';
+import { notifyEnded } from '../push-sender.ts';
 import { suggestNextThread, suggestReply } from './aux.ts';
 import { finishTurnSnapshot, settleSnapshots } from './snapshots.ts';
 import { pump, reportToParent } from './queue.ts';
@@ -129,6 +130,7 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
     has_run: 1,
     last_text: runText ? runText.slice(0, 600) : threads.get(id)?.last_text ?? null,
   });
+  if (!more) notifyEnded(id, status);
   applyQueued(id);
   // Shown done at once; the checkout after the turn is saved behind it.
   finishTurnSnapshot(live);

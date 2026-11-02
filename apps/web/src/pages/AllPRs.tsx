@@ -1,8 +1,8 @@
 import type { CSSProperties } from 'react';
 import { useApi, type AllPRs, type Async } from '../api.ts';
 import { Button, Chip, Empty, ErrorNote, Icon, Loading, PageHeader } from '../components/ui.tsx';
-import { relTime } from '../format.ts';
-import { prBadge } from '../thread-glance.ts';
+import { relTime } from '@omni/shared/format.ts';
+import { prBadge } from '@omni/shared/thread-glance.ts';
 import { ChecksSummary } from './PRs.tsx';
 
 export const useAllPRs = () => useApi<AllPRs>('/prs');

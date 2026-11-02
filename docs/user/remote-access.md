@@ -21,6 +21,14 @@ Every client names the Mac its Omni runs on: the desktop sidebar's footer, the p
 
 On an iPhone, open the `.ts.net` address in Safari and use Share, then Add to Home Screen. Omni then opens full screen with the phone layout: Activity, Channels, Library and PRs tabs, and a + button for a new delegation. A home-screen app can keep its own cookies apart from Safari's, so if it opens on the pairing screen, paste the token there once.
 
+## Pair the native iOS app
+
+In Settings, open Sharing & access and choose Omni for iOS. Pairing takes the install token, so use the Omni Mac app or a browser paired with the install token. A browser that signed in with Google shows where to go instead of a code.
+
+Pick the address the phone will use. The card offers this page's address when it is HTTPS, then the Omni Connect address while the tunnel is connected. For Tailscale, run `tailscale serve --bg 4747`, open "Use another address" and enter your `.ts.net` name. The card cannot check that the phone reaches an address you typed.
+
+Scan the QR code or type the manual code in the app. The code expires after five minutes and works once. The phone gets its own revocable app session, not the install token. Revoke a session under signed-in devices. A paired phone has the same access as a Google session, including the terminal and agents, so revoking does not undo commands it already ran.
+
 ## Without Tailscale
 
 [Omni Connect](omni-connect.md) gives each machine a Cloudflare tunnel and a public `https://<name>-xxxxxx.omni-os.app` address, through your sync relay. Sign in with Google once on the relay's Connect page, then open any machine from there. Every request still needs the token or a session.
@@ -48,7 +56,7 @@ Link the Google account that owns this Omni once, and new devices sign in with i
 3. On a new device, open Omni and choose Sign in with Google on the pairing screen. Approve the code the same way, with the same account.
 
 - Signed-in devices are listed under the account, with when each was last used. Revoke ends one; Sign out on the device you are using ends its own. A session unused for 90 days stops working.
-- Only a device holding the token can link, change or unlink the account. Linking another account, or unlinking, signs every device out. Paired devices keep the token and are not affected.
+- Only a device holding the token can link, change or unlink the account. Linking another account or unlinking signs out Google sessions. Native app pairing sessions and browsers holding the install token are not affected.
 - Signing in needs Clerk and the network. A device that already signed in keeps working offline.
 - Omni uses a shared Clerk instance by default. `integrations.clerkPublishableKey` and `integrations.clerkClientId` in `data/omni.config.json` (or `OMNI_CLERK_PUBLISHABLE_KEY` and `OMNI_CLERK_CLIENT_ID`) point it at your own. Its OAuth application must be public, with the device authorization grant turned on. Both values are public; Omni holds no Clerk secret key.
 - The Conductor lists signed-in devices with `signed_in_devices` and revokes one with `revoke_signed_in_device`.

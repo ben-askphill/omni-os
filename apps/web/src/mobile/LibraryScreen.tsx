@@ -1,7 +1,8 @@
+import { ARTIFACT_FILTERS, matchesArtifactFilter, type ArtifactFilter } from '@omni/shared/artifacts.ts';
 import { useMemo, useState } from 'react';
 import type { ArtifactWithThread } from '../api.ts';
 import { Segmented } from '../components/ui.tsx';
-import { ARTIFACT_FILTERS, ArtifactThumb, matchesArtifactFilter, useArtifacts, type ArtifactFilter } from '../pages/Artifacts.tsx';
+import { ArtifactThumb, useArtifacts } from '../pages/Artifacts.tsx';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { HeaderActions } from './HeaderActions.tsx';

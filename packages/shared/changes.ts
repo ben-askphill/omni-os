@@ -1,5 +1,5 @@
-// The wire types of a thread's Changes panel, the one copy the server (apps/server/changes.ts, turns.ts) and the web
-// (apps/web/src/changes.ts) import: GET /api/threads/:id/changes (`BranchChanges`) and GET /api/threads/:id/turns
+// The wire types of a thread's Changes panel, the one copy the server (apps/server/changes.ts, turns.ts) and the clients
+// (changes-view.ts, which both phone UIs draw) import: GET /api/threads/:id/changes (`BranchChanges`) and GET /api/threads/:id/turns
 // (`TurnChanges`). The Mac app's Changes.swift mirrors them; apps/server/tests/mac-fixtures.test.ts checks its recorded
 // answers with `changesProblems` and `turnChangesProblems`, and Changes.swift's value lists against the ones here.
 

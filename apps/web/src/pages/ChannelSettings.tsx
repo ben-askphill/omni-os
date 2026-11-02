@@ -1,11 +1,12 @@
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
-import { AUTO, AUTO_CHOICE, asksAuto } from '../thread-run.ts';
+import { AUTO, AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
 import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { CHANNEL_GLYPHS, glyphIcon, parseChannelIcon, readSvgIcon } from '@omni/shared/channel-icon.ts';
 import { readDesignSystem } from '@omni/shared/design-system.ts';
-import { bytes, lastGrapheme, slugify } from '../format.ts';
+import { bytes } from '@omni/shared/format.ts';
+import { lastGrapheme, slugify } from '../format.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { Advanced } from './settings-parts.tsx';

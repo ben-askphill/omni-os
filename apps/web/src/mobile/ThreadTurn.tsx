@@ -8,17 +8,16 @@ import { ClippedNote } from '../components/thread/HistoryEdgeRow.tsx';
 import type { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { OmniMark } from '../components/brand.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
-import { changesView } from '../changes.ts';
+import { changesView } from '@omni/shared/changes-view.ts';
 import { atStart } from '@omni/shared/history.ts';
 import { href } from '../router.ts';
 import { isRenderPath } from '@omni/shared/html-render.ts';
 import { HtmlRender } from '../components/HtmlRender.tsx';
-import { ArtifactCard, ChangesCard, Clamped, Delegation, MoProse, NowLine, Outcome, Plan, Report, StepsRow } from './ThreadCards.tsx';
+import { ArtifactCard, ChangesCard, Clamped, Delegation, MoProse, NowLine, Outcome, Plan, Report, StepsRow, type TurnView } from './ThreadCards.tsx';
 import { MoBubble } from './parts.tsx';
 import { shortTime } from './rows.ts';
 import type { useShell, useThread } from './shell.tsx';
-import type { ThreadView } from './thread-view.ts';
-import type { TurnView } from './thread-view.ts';
+import type { ThreadView as ThreadOf } from '@omni/shared/thread-view.ts';
 
 /** A worktree thread's changes since its base, again whenever a turn starts or ends. */
 export function useBranchChanges(thread: Thread | null, busy: boolean) {
@@ -39,7 +38,7 @@ export function useBranchChanges(thread: Thread | null, busy: boolean) {
 /** What a turn reads from its thread screen besides the turn itself. */
 export type TurnCtx = {
   thread: Thread;
-  view: ThreadView;
+  view: ThreadOf<Artifact, Thread>;
   history: ReturnType<typeof useThread>['history'];
   conductor: boolean;
   crew: Thread[];

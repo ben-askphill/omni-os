@@ -45,7 +45,7 @@ export const ROWS_MAX = 200;
 export const ROW_CHARS_MAX = 500;
 export const PATH_MAX = 1_024;
 
-/** A diff line as apps/web/src/diff.ts numbers it. Structural, so the web model and the test corpus both fit. */
+/** A diff line as packages/shared/diff.ts numbers it. Structural, so the web model and the test corpus both fit. */
 export interface DiffLineLike {
   kind: 'hunk' | 'add' | 'del' | 'context' | 'note';
   text: string;

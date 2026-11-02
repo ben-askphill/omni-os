@@ -493,6 +493,7 @@ struct AccessSection: View {
     SettingsPage {
       GoogleAccountSettings(model: model)
       ConnectSettings(model: model)
+      IosPairingSettings(model: model)
       ProfileSettings(model: model, part: .access)
     }
   }

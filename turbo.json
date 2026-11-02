@@ -41,6 +41,9 @@
       },
       "relay": {
         "dependencies": { "deny": ["@omni/web", "@omni/mac", "@omni/server", "@omni/shared", "@omni/mcp"] }
+      },
+      "ios": {
+        "dependencies": { "deny": ["@omni/web", "@omni/mac", "@omni/server"] }
       }
     }
   }

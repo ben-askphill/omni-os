@@ -1,12 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
-import { carriedText, carryoverSize, continueRefusal, continueSourceRefusal, entryText, type CarriedStats, type CarryoverEntry } from '@omni/shared/continue.ts';
+import {
+  carriedText,
+  carryoverSize,
+  continueRefusal,
+  continueSourceRefusal,
+  entryText,
+  type CarriedStats,
+  type CarryoverEntry,
+} from '@omni/shared/continue.ts';
 import { handoffText, takeoverConfirm, takeoverNote, type Device, type HandoffView, type Takeover } from '@omni/shared/handoff.ts';
+import { deviceRows, handoffBanner, HERE, runOnDefault, runOnPick, runOnRequest, runOnRows, settingPick } from '@omni/shared/thread-machine.ts';
+import { continueTargets, defaultRun, slashHint } from '@omni/shared/continue-flow.ts';
 import type { HarnessWithRunning } from '../src/api.ts';
-import { continueTargets, defaultRun, slashHint } from '../src/continue.ts';
-import { deviceRows, handoffBanner } from '../src/handoff.ts';
-import { HERE, runOnDefault, runOnPick, runOnRequest, runOnRows, settingPick } from '../src/run-on.ts';
 
 // The client policies the Web UI and the Mac app both implement, held to one corpus each in
 // packages/test-fixtures/policies/. apps/mac/OmniKit/Tests/OmniKitTests/ClientPolicyTests.swift reads the same files,

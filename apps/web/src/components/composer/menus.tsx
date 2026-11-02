@@ -4,8 +4,8 @@ import { useFileMenu } from '../FileMenu.tsx';
 import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '@omni/shared/slash-menu.ts';
 import { menuCommands, newThreadHint } from '@omni/shared/composer-slash.ts';
 import { parseSlash } from '@omni/shared/slash.ts';
-import { asksAuto } from '../../thread-run.ts';
-import type { DraftRun } from '../../new-thread-preset.ts';
+import { asksAuto } from '@omni/shared/thread-run.ts';
+import type { DraftRun } from '@omni/shared/draft-run.ts';
 import { type SlashCommand } from '@omni/shared/slash.ts';
 
 

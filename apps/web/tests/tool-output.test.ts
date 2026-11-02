@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TOOL_OUTPUT, type OutputChunk } from '@omni/shared/tool-output.ts';
-import { buildItems, type TranscriptEvent } from '../src/transcript/fold.ts';
+import { buildItems, type TranscriptEvent } from '@omni/shared/transcript-fold.ts';
 import { IDLE, hasLiveOutput, outputLeft, outputTarget, outputText, tailMessage, toolOutput, type OutputIO, type OutputState, type OutputTarget } from '../src/tool-output.ts';
 
 // An open tool row's output: the saved text in chunks, a running call's bounded tail, and the release on close.

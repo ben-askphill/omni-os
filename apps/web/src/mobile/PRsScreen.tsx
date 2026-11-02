@@ -1,6 +1,6 @@
 import { Chip, ErrorNote } from '../components/ui.tsx';
 import { allPRsEmpty, failedText, useAllPRs } from '../pages/AllPRs.tsx';
-import { prBadge } from '../thread-glance.ts';
+import { prBadge } from '@omni/shared/thread-glance.ts';
 import { useNow } from '../store.tsx';
 import { HeaderActions } from './HeaderActions.tsx';
 import { MoEmpty, MoHeader, MoScroll, MoTitle } from './parts.tsx';

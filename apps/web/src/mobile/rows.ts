@@ -1,6 +1,6 @@
 // A thread as the phone lists it: in Activity, in a channel and in search. Pure.
+import { relTime } from '@omni/shared/format.ts';
 import type { Thread, ThreadStub } from '../api.ts';
-import { relTime } from '../format.ts';
 
 export interface RowItem {
   id: string;

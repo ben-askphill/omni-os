@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { Device } from '@omni/shared/handoff.ts';
+import { offersRunOn, runOnPick, runOnRequest, runOnRows, runOnSetting, settingPick, type RunOnRow } from '@omni/shared/thread-machine.ts';
 import { api, errorText, useApi, type SetupState } from '../api.ts';
 import { useHereName } from '../store.tsx';
-import { offersRunOn, runOnPick, runOnRequest, runOnRows, runOnSetting, settingPick, type RunOnRow } from '../run-on.ts';
 import { MachineChip, machineOptions } from './composer/MachineChip.tsx';
 
 /**

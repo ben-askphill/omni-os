@@ -1,6 +1,6 @@
 // Delegation card: the threads a Conductor (or a team lead) fanned out to, or a thread's own sub-agents, each with its live state.
 import type { ReactNode } from 'react';
-import { relTime } from '../format.ts';
+import { relTime } from '@omni/shared/format.ts';
 import { href } from '../router.ts';
 import { useNow } from '../store.tsx';
 import type { Branch } from '../transcript/delegation.ts';

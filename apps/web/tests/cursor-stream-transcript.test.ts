@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { normalizeCursor } from '@omni/server/harness/cursor/normalize.ts';
-import { buildItems, toolSummary } from '../src/transcript/fold.ts';
+import { buildItems, toolSummary } from '@omni/shared/transcript-fold.ts';
 
 const stream = readFileSync(new URL('../../server/tests/fixtures/cursor-stream-tools.jsonl', import.meta.url), 'utf8')
   .trim().split('\n').map((line) => JSON.parse(line));

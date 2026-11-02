@@ -81,8 +81,8 @@ const RECENT_PER_CHANNEL = 5;
 /** A folder lists at most this many of its threads in the sidebar; its count still says how many there are. */
 const THREADS_PER_FOLDER = 50;
 
-const stub = ({ id, channel_id, title, status, created_at, updated_at, folder_id, harness, done_at, parent_id, source }: Thread) => ({
-  id, channel_id, title, status, created_at, updated_at, folder_id, harness, done_at, parent_id, source,
+const stub = ({ id, channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source }: Thread) => ({
+  id, channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source,
 });
 
 /** Conductor jobs with their delegated child threads, including children in other channels. */

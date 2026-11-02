@@ -10,8 +10,8 @@ import {
   type ContextUsage,
   type ThreadSpend,
 } from '@omni/shared/context-meter.ts';
+import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, type ContextView, type Thread } from '../../api.ts';
-import { relTime } from '../../format.ts';
 import { Button, ErrorNote, Icon } from '../ui.tsx';
 import { useDismissable } from '../ui/use-dismissable.ts';
 

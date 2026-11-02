@@ -2,7 +2,7 @@ import { lazy, Suspense, type ComponentProps } from 'react';
 import type { Artifact, Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { plural } from '../../format.ts';
-import { crewLine, prLine } from '../../thread-glance.ts';
+import { crewLine, prLine } from '@omni/shared/thread-glance.ts';
 import { IconButton, Loading, Segmented, StatusDot } from '../ui.tsx';
 import { ActionsTab } from './panel/ActionsTab.tsx';
 import { ArtifactsTab } from './panel/ArtifactsTab.tsx';

@@ -1,7 +1,7 @@
 // A thread's PR watch (apps/server/pr-watch/): the server polls the branch's open PR and wakes the thread when a
 // check fails or a review comes in. The composer's PR menu and the phone's PR screen both read it through usePRWatch.
 import { useEffect, useState } from 'react';
-import { WATCH_ACTION, WATCH_HINT, watchLine, type PRWakeItem, type PRWatchView } from '@omni/shared/pr-watch.ts';
+import { watchCopy, watchLine, type PRWakeItem, type PRWatchView } from '@omni/shared/pr-watch.ts';
 import { api, errorText, type PRSummary } from '../../api.ts';
 import { Icon } from '../ui.tsx';
 
@@ -43,11 +43,6 @@ export function usePRWatch(threadId: string | null | undefined, prs: { pr: PRSum
 }
 
 export type PRWatchState = ReturnType<typeof usePRWatch>;
-
-/** The toggle's two lines: what pressing it does, and the watch's status line, or what a watch would do. */
-export function watchCopy(w: PRWatchView | null | undefined) {
-  return { action: w?.state === 'watching' ? 'Stop watching' : WATCH_ACTION, line: w ? watchLine(w) : WATCH_HINT };
-}
 
 /**
  * The PR menu's watch row: start or stop over the status line, for an open PR or a running watch. A watch that ended

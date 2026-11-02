@@ -16,12 +16,14 @@ public struct AuthAccount: Decodable, Hashable, Sendable {
   public let via: String
 }
 
-/// A device that signed in with Google as the owner: GET /api/auth/devices.
+/// A device that signed in, with Google as the owner or as an app paired with a code: GET /api/auth/devices.
 public struct SignedInDevice: Decodable, Hashable, Sendable, Identifiable {
   public let id: String
   public let name: String
   /// "browser" or "app".
   public let kind: String
+  /// "google" or "pairing": how it got in. Nil from an older server, which only had Google.
+  public let method: String?
   public let createdAt: Date
   public let lastSeenAt: Date
   public let current: Bool
@@ -111,7 +113,13 @@ public final class GoogleAccountModel {
     do throws(OmniAPIError) {
       let a = try await client.authAccount()
       account = a
-      devices = a.owner == nil ? [] : try await client.signedInDevices()
+      // Asked whether or not a Google account is linked: an app paired with a code is a signed-in device with no owner
+      // behind it. With no owner, a server that cannot list them leaves the list empty rather than failing the card.
+      if a.owner == nil {
+        devices = (try? await client.signedInDevices()) ?? []
+      } else {
+        devices = try await client.signedInDevices()
+      }
       loadError = nil
     } catch {
       guard error != .cancelled else { return }

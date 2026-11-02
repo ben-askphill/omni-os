@@ -2,8 +2,8 @@
 // titles and channels, scoped to this channel unless Ben switches it to All channels. A pick adds a chip to the draft;
 // nothing is sent to, started in or changed on the picked thread. The `@` menu for files is untouched.
 import { useEffect, useId, useRef, useState } from 'react';
+import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, type Thread } from '../api.ts';
-import { relTime } from '../format.ts';
 import { attachReference, isAttached, searchPath, type ReferenceCandidate, type ReferenceScope } from '../message-context/thread-picker.ts';
 import { useDraftContext } from '../message-context/draft.ts';
 import { Icon, StatusDot } from './ui.tsx';

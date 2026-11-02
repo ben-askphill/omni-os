@@ -1,0 +1,20 @@
+{
+ "name": "rich-question",
+ "events": [
+  {
+   "kind": "user",
+   "payload": "{\"text\":\"Which database should I migrate?\"}",
+   "created_at": "2026-11-02T09:10:01.000Z"
+  },
+  {
+   "kind": "assistant_text",
+   "payload": "{\"text\":\"I need one choice from you before I start.\"}",
+   "created_at": "2026-11-02T09:10:02.000Z"
+  },
+  {
+   "kind": "question",
+   "payload": "{\"id\":\"q-ios-1\",\"questions\":[{\"question\":\"Which database should I migrate first?\",\"header\":\"Database\",\"multiSelect\":false,\"options\":[{\"label\":\"Staging\",\"description\":\"Safe to retry\"},{\"label\":\"Production\",\"description\":\"Needs a backup first\"}]}]}",
+   "created_at": "2026-11-02T09:10:03.000Z"
+  }
+ ]
+}
