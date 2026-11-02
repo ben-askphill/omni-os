@@ -73,7 +73,7 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 - **Threads** per task, dated, full-text searchable and resumable. Running and Pinned keep work reachable across channels; Mark done clears a thread from Needs you until something new happens. Steer, queue or interrupt while one runs, or pick a model or harness for its next turn
 - **Composer**: `/` menu for skills, slash commands and MCP prompts per harness, `@` to mention artifacts and repo files, attachments, and chips for diff lines, terminal output, browser annotations and other threads, plus suggested next replies
 - **Sandbox per thread**: its own git worktree in repo channels, a choice of base commit, channel setup and named actions, a persistent browser shown live in the Browser panel, a real terminal, and secrets from the Keychain (or a 0600 file on Linux) as env. Hermes and Cursor Cloud run remotely without these local tools
-- **Artifacts** rendered inline, an Artifacts page across channels, and cards for pages a thread published to claude.ai
+- **Artifacts**: an HTML page a thread writes runs inline in its transcript, sandboxed and sized to fit, under the call that wrote it. An Artifacts page across channels, and cards for pages a thread published to claude.ai
 - **PRs** per repo channel and in each thread's panel: checks, diff and merge. Watch PR in the thread's PRs tab wakes the thread for failing checks or new review feedback
 - **Conductor and crew**: one front agent that delegates to roles (builder, researcher, store-ops, inbox), alone or as a team
 - **Automations**: YAML on a cron schedule, GitHub PR event, published page or signed GitHub webhook; every run is its own thread

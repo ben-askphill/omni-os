@@ -11,6 +11,8 @@ import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { changesView } from '../changes.ts';
 import { atStart } from '@omni/shared/history.ts';
 import { href } from '../router.ts';
+import { rendersInline } from '@omni/shared/inline-artifacts.ts';
+import { InlineArtifact } from '../components/InlineArtifact.tsx';
 import { ArtifactCard, ChangesCard, Clamped, Delegation, MoProse, NowLine, Outcome, Plan, Report, StepsRow } from './ThreadCards.tsx';
 import { MoBubble } from './parts.tsx';
 import { shortTime } from './rows.ts';
@@ -86,9 +88,13 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
         {t.prose && <MoProse text={t.prose} />}
         {t.prose && t.proseClipped && <ClippedNote event={t.proseClipped.key} clipped={t.proseClipped.clipped} />}
         {delegated}
-        {t.artifacts.map((a) => (
-          <ArtifactCard key={a.id} a={a} sub={`#${ch?.name ?? thread.channel_id} · ${shortTime(a.updated_at, now)}`} onOpen={() => viewer(a)} />
-        ))}
+        {t.artifacts.map((a) =>
+          rendersInline(a) ? (
+            <InlineArtifact key={a.id} a={a} onOpen={() => viewer(a)} />
+          ) : (
+            <ArtifactCard key={a.id} a={a} sub={`#${ch?.name ?? thread.channel_id} · ${shortTime(a.updated_at, now)}`} onOpen={() => viewer(a)} />
+          ),
+        )}
         {last && changes && changes.files.length > 0 && <ChangesCard files={changes.files} onOpen={() => shell.open(href.threadView(thread.id, pr?.pr ? 'pr' : 'changes'))} />}
         {t.steps > 0 && <StepsRow t={t} onClick={() => steps(t)} />}
       </>

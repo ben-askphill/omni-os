@@ -40,3 +40,16 @@ export function useTheme() {
   }, []);
   return [t, setTheme] as const;
 }
+
+/** The scheme the app draws in: the forced one, or the system's. */
+export function useScheme(): 'light' | 'dark' {
+  const [pref] = useTheme();
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const on = () => setSystemDark(media.matches);
+    media.addEventListener('change', on);
+    return () => media.removeEventListener('change', on);
+  }, []);
+  return pref === 'system' ? (systemDark ? 'dark' : 'light') : pref;
+}

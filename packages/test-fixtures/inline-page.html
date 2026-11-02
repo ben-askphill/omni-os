@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signups by week</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fbfaf7; --fg: #1c1b19; --muted: #6f6b63; --bar: #3a6ea5; --line: #e4e0d8; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1b1a18; --fg: #f1efe9; --muted: #a29e95; --bar: #7fa8d6; --line: #34322e; } }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 -apple-system, system-ui, sans-serif; }
+  main { padding: 16px 20px 20px; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  p { margin: 0 0 12px; color: var(--muted); }
+  .bars { display: flex; align-items: flex-end; gap: 8px; height: 140px; border-bottom: 1px solid var(--line); }
+  .bars div { flex: 1; background: var(--bar); border-radius: 6px 6px 0 0; transition: height .2s; }
+  button { margin-top: 12px; font: inherit; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
+  #more { display: none; margin-top: 12px; }
+  #more.on { display: block; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Signups by week</h1>
+  <p>Clicked <b id="count">0</b> times. The page reports its height, so the details below grow the frame.</p>
+  <div class="bars" id="bars"></div>
+  <button id="shuffle">Shuffle</button>
+  <button id="toggle">Details</button>
+  <div id="more"><p>Week 1 to 8. The numbers are random on each shuffle.</p><p>Opened inline, in a sandboxed frame.</p></div>
+</main>
+<script>
+  var n = 0, bars = document.getElementById('bars');
+  function draw() { bars.innerHTML = ''; for (var i = 0; i < 8; i++) { var d = document.createElement('div'); d.style.height = (20 + Math.random() * 80) + '%'; bars.appendChild(d); } }
+  document.getElementById('shuffle').onclick = function () { n++; document.getElementById('count').textContent = n; draw(); };
+  document.getElementById('toggle').onclick = function () { document.getElementById('more').classList.toggle('on'); };
+  draw();
+</script>
+</body>
+</html>

@@ -30,6 +30,7 @@
 //   MOD_CLEAR         before the answer, a ui_status with null text, which clears that mod's status
 //   RUN:<path>        before the answer, run that shell script in the cwd, like a Bash call that edits files or runs git
 //   PUBLISH:<path>    an Artifact tool call that publishes that file, answered "Published <path> at <url>" like the real CLI
+//   WRITE:<name>      a Write tool call that writes inline-page.html (an interactive page) to that name in OMNI_ARTIFACTS_DIR
 //   ORPHAN            leave a child behind that holds our stdout until it is killed (two minutes at most), like a
 //                     daemon started without redirecting its output: once we exit, the runner never sees our pipes close
 //   LIMIT[:<epoch>]   the plan's usage limit refuses the turn: a rejected rate_limit_event (with resetsAt when an
@@ -69,7 +70,7 @@
 // list again, their prompts included, as system/commands_changed.
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const VERSION = '2.1.278';
@@ -411,6 +412,7 @@ async function runTurn() {
   let fullMeter = false;
   let ask = null;
   const publishes = [];
+  const writes = [];
   const scripts = [];
   let steps = 0;
 
@@ -449,6 +451,7 @@ async function runTurn() {
       const asks = m.text.match(/\bASK(_ONE)?\b/);
       if (asks) ask = asks[1] ? QUESTIONS.slice(0, 1) : QUESTIONS;
       for (const x of m.text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
+      for (const x of m.text.matchAll(/WRITE:(\S+)/g)) writes.push(x[1]);
       for (const x of m.text.matchAll(/RUN:(\S+)/g)) scripts.push(x[1]);
     }
     return true;
@@ -514,6 +517,16 @@ async function runTurn() {
   }
   if (modClear) emit({ type: 'system', subtype: 'ui_status', plugin: 'omni-tool', text: null });
   for (const file of scripts.splice(0)) execFileSync('sh', [file], { cwd: process.cwd(), stdio: 'ignore' });
+  for (const name of writes.splice(0)) {
+    const toolId = `toolu_fake_${++seq}`;
+    const file = join(process.env.OMNI_ARTIFACTS_DIR ?? process.cwd(), name);
+    const content = readFileSync(new URL('./inline-page.html', import.meta.url), 'utf8');
+    steps++;
+    assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id: toolId, name: 'Write', input: { file_path: file, content } }]);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, content);
+    toolResult(toolId, `File created successfully at: ${file}`, false);
+  }
   for (const file of publishes.splice(0)) {
     const toolId = `toolu_fake_${++seq}`;
     steps++;
