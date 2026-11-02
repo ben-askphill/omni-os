@@ -156,6 +156,14 @@ export const threads = {
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
   children: (parentId: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? ORDER BY created_at`).all(parentId) as unknown as Thread[],
+  /** Every thread delegated from this one at any depth, team members under their lead included, oldest first. */
+  descendants: (id: string) =>
+    db
+      .prepare(
+        `WITH RECURSIVE under(id) AS (SELECT id FROM threads WHERE parent_id = ? UNION SELECT t.id FROM threads t JOIN under ON t.parent_id = under.id)
+         SELECT ${THREAD_COLUMNS} FROM threads WHERE id IN (SELECT id FROM under) AND id != ? ORDER BY created_at, rowid`,
+      )
+      .all(id, id) as unknown as Thread[],
   /** Threads delegated from Conductor jobs, kept visible beside their parent in the originating channel. */
   conductorHandoffChildren: () =>
     db

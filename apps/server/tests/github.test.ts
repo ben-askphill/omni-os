@@ -63,7 +63,7 @@ describe('pickBranchPR', () => {
 });
 
 describe('markBranches', () => {
-  const pr = (number: number, state: string, headRefName: string) => ({ number, state, isDraft: false, url: `u/${number}`, headRefName });
+  const pr = (number: number, state: string, headRefName: string) => ({ number, title: `PR ${number}`, state, isDraft: false, url: `u/${number}`, headRefName });
   it('marks a branch with its open PR, else its newest merged one', () => {
     const marks = markBranches([pr(3, 'MERGED', 'a'), pr(2, 'OPEN', 'a'), pr(1, 'MERGED', 'b'), pr(0, 'MERGED', 'b')]);
     expect(marks.a.number).toBe(2);

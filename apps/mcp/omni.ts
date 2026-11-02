@@ -328,6 +328,23 @@ server.registerTool(
 );
 
 server.registerTool(
+  'crew_prs',
+  {
+    description:
+      'The PRs opened from the branches of the threads you delegated to, and of the threads they delegated to in turn (a ' +
+      "team's members included): number, title, state (OPEN or MERGED; one closed without merging is left out), url, repo, " +
+      'and the thread and task id it came from. Read from GitHub on each call, so it is current. A crew report does not ' +
+      'say when a PR merges later; call this to check. thread_id defaults to your own thread.',
+    inputSchema: { thread_id: z.string().optional() },
+  },
+  async ({ thread_id }) => {
+    const id = thread_id ?? SELF;
+    if (!id) throw new Error('Pass a thread_id: this session is not a thread.');
+    return text((await call(`/threads/${encodeURIComponent(id)}/pr`)).crew ?? []);
+  },
+);
+
+server.registerTool(
   'continue_thread',
   {
     description:

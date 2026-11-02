@@ -110,6 +110,7 @@ export async function mergePR(repo: string, n: number, method: 'squash' | 'merge
 
 export interface BranchPRMark {
   number: number;
+  title: string;
   state: string;
   isDraft: boolean;
   url: string;
@@ -122,7 +123,7 @@ export function markBranches(prs: (BranchPRMark & { headRefName: string })[]): R
   const out: Record<string, BranchPRMark> = {};
   for (const [branch, list] of byBranch) {
     const pr = pickBranchPR(list.filter((p) => p.state === 'OPEN' || p.state === 'MERGED'));
-    if (pr) out[branch] = { number: pr.number, state: pr.state, isDraft: pr.isDraft, url: pr.url };
+    if (pr) out[branch] = { number: pr.number, title: pr.title, state: pr.state, isDraft: pr.isDraft, url: pr.url };
   }
   return out;
 }
@@ -133,7 +134,7 @@ const markCache = new Map<string, { at: number; marks: Record<string, BranchPRMa
 export async function threadPRMarks(repo: string) {
   const hit = markCache.get(repo);
   if (hit && Date.now() - hit.at < 30_000) return hit.marks;
-  const raw = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--state', 'all', '--limit', '200', '--json', 'number,state,isDraft,headRefName,url']));
+  const raw = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--state', 'all', '--limit', '200', '--json', 'number,title,state,isDraft,headRefName,url']));
   const marks = markBranches(raw);
   markCache.set(repo, { at: Date.now(), marks });
   return marks;
