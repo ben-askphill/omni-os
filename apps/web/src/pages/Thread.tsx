@@ -7,6 +7,7 @@ import { ThreadIdCtx } from '../components/thread/ToolOutput.tsx';
 import { PanelResizeHandle } from '../components/thread/panel/PanelResizeHandle.tsx';
 import { NextThreadCard } from '../components/thread/NextThreadCard.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
+import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
 import { LimitCard } from '../components/thread/LimitCard.tsx';
 import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
@@ -205,6 +206,9 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                   <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} />
                 </ThreadIdCtx.Provider>
               </LinkChannel.Provider>
+              <div className="mt-4 empty:hidden">
+                <CrewQuestions threadId={id} />
+              </div>
               <SetupCard
                 thread={thread}
                 onRetried={(t, pending) => {

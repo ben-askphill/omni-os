@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { api, errorText, type Artifact, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
 import { ASKING_LABEL } from '../components/thread/QuestionCard.tsx';
+import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
@@ -134,6 +135,7 @@ export function ThreadScreen() {
               );
             })}
             {edges.get(-1) && <HistoryEdgeRow edge={edges.get(-1)!} history={history} touch />}
+            <CrewQuestions threadId={thread.id} touch onOpen={(id) => shell.open(href.thread(id))} />
             <HandoffCard thread={thread} handoff={handoff} mobile onChanged={handedOff} />
             {!view.turns.length && !thread.setup && <MoEmpty>Nothing here yet.</MoEmpty>}
             <SetupCard
