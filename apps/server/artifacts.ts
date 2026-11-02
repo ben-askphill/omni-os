@@ -36,7 +36,8 @@ export function classify(rel: string): { threadId: string; kind: string } | null
 
 const timers = new Map<string, NodeJS.Timeout>();
 
-function register(rel: string) {
+/** Record the file at `rel` (under the threads dir) as an artifact and tell the clients. Returns its row. */
+export function register(rel: string) {
   const c = classify(rel);
   if (!c || !threads.get(c.threadId)) return;
   const full = join(paths.threads, rel);
@@ -49,6 +50,7 @@ function register(rel: string) {
   const row = artifacts.upsert({ thread_id: c.threadId, path: full, name: basename(full), kind: c.kind, size: st.size });
   publishThread(c.threadId, { kind: 'artifact', artifact: row });
   publishFeed({ type: 'artifact', artifact: row });
+  return row;
 }
 
 export function startArtifactWatcher() {

@@ -4,7 +4,7 @@ import { clock, duration, plural, toDate } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { DelegationCard } from './Delegation.tsx';
-import { InlineArtifact } from './InlineArtifact.tsx';
+import { HtmlRender } from './HtmlRender.tsx';
 import { PublishedCard } from './Published.tsx';
 import { CloudAgentCard } from './thread/CloudAgentCard.tsx';
 import { PRWakeList } from './thread/PRWatch.tsx';
@@ -17,7 +17,7 @@ import { slashPieces } from '@omni/shared/slash-pills.ts';
 import { statusLabel } from '../status-line.ts';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
-import { inlineArtifactsByGroup } from '@omni/shared/inline-artifacts.ts';
+import { renderedFrom } from '@omni/shared/html-render.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { buildItems, buildTasks, keepSame, same, type FoldPlan, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type Todo, type ModLine, type SwitchItem, type ToolCall, type UserP } from '../transcript/fold.ts';
@@ -329,19 +329,17 @@ interface ItemRowProps {
   artifacts: Artifact[];
   /** The published pages whose card goes under this group. */
   pages?: Published[];
-  /** The HTML artifacts that run inline under this group (`inlineArtifactsByGroup`). */
-  inline?: Artifact[];
   /** The plan, on the group of the latest TodoWrite. */
   plan?: FoldPlan;
 }
 
 /**
  * One item and the cards that go with it. Unchanged items keep their object across folds (`keepSame`), so a row
- * whose props are the same skips rendering when the stream brings new rows (#411). `pages`, `inline` and `plan` are rebuilt
+ * whose props are the same skips rendering when the stream brings new rows (#411). `pages` and `plan` are rebuilt
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, isLast, team, reports, byId, artifacts, pages, inline, plan }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, isLast, team, reports, byId, artifacts, pages, plan }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
@@ -359,10 +357,15 @@ const ItemRow = memo(
         case 'tools': {
           const { agents, rest, agentsFirst } = splitGroup(it.calls);
           const cards = [
+            // Pages html_render showed, right under the call, before the reply.
+            ...flatten(it.calls).flatMap((c) => {
+              const r = renderedFrom(c.name, c.input, c.result);
+              const a = r && artifacts.find((x) => x.id === r.artifact);
+              return a ? [<HtmlRender key={`r${c.id}`} a={a} title={r.title} />] : [];
+            }),
             ...delegations(it.calls).map((d) => (
               <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} reports={reports} />
             )),
-            ...(inline ?? []).map((a) => <InlineArtifact key={`i${a.id}`} a={a} />),
             ...(pages ?? []).map((p) => <PublishedCard key={`p${p.url}`} p={p} threadId={threadId} artifact={artifacts.findLast((a) => a.url === p.url)} />),
           ];
           const group = rest.length ? (
@@ -403,7 +406,7 @@ const ItemRow = memo(
   },
   (a, b) => {
     for (const k of Object.keys(b) as (keyof ItemRowProps)[]) {
-      if (k === 'pages' || k === 'plan' || k === 'inline' ? !same(a[k], b[k]) : a[k] !== b[k]) return false;
+      if (k === 'pages' || k === 'plan' ? !same(a[k], b[k]) : a[k] !== b[k]) return false;
     }
     return Object.keys(a).length === Object.keys(b).length;
   },
@@ -450,10 +453,6 @@ export const Transcript = memo(function Transcript({
   // The first item is the thread's first message only when the start is held.
   const fromStart = !spans || atStart({ spans });
   const pages = useMemo(() => publishedByGroup(items), [items]);
-  const inline = useMemo(
-    () => inlineArtifactsByGroup(items.flatMap((it) => (it.type === 'tools' ? [{ key: it.key, calls: flatten(it.calls) }] : [])), artifacts),
-    [items, artifacts],
-  );
   const { tasks: live, feedLive } = useApp();
   const stored = useMemo(() => buildTasks(events), [events]);
   // The server's live list wins: a task it no longer runs has ended, even if no end row was stored.
@@ -502,7 +501,6 @@ export const Transcript = memo(function Transcript({
               byId={byId}
               artifacts={artifacts}
               pages={pages.get(it.key)}
-              inline={inline.get(it.key)}
               plan={plan?.after === it.key ? plan : undefined}
             />,
           ])}

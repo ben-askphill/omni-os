@@ -1,0 +1,51 @@
+[
+  {
+    "case": "a page shown from Claude Code",
+    "name": "mcp__omni-render__html_render",
+    "input": { "title": "Commits by package", "html": "<p>x</p>" },
+    "result": { "text": "Shown inline in the thread as \"Commits by package\" (artifact 42). Do not restate or describe the page: say what it means, or nothing.", "is_error": false },
+    "expected": { "artifact": 42, "title": "Commits by package" }
+  },
+  {
+    "case": "Codex names the server with an underscore",
+    "name": "mcp__omni_render__html_render",
+    "input": { "title": "  Q3  ", "html": "<p>x</p>" },
+    "result": { "text": "Shown inline in the thread as \"Q3\" (artifact 7).", "is_error": false },
+    "expected": { "artifact": 7, "title": "Q3" }
+  },
+  {
+    "case": "no title falls back to Page",
+    "name": "mcp__omni-render__html_render",
+    "input": { "html": "<p>x</p>" },
+    "result": { "text": "Shown inline in the thread as \"Page\" (artifact 3).", "is_error": false },
+    "expected": { "artifact": 3, "title": "Page" }
+  },
+  {
+    "case": "a refused call shows nothing",
+    "name": "mcp__omni-render__html_render",
+    "input": { "title": "Big", "html": "<p>x</p>" },
+    "result": { "text": "The page is larger than 512000 bytes.", "is_error": true },
+    "expected": null
+  },
+  {
+    "case": "a result without an artifact shows nothing",
+    "name": "mcp__omni-render__html_render",
+    "input": { "title": "T", "html": "<p>x</p>" },
+    "result": { "text": "MCP error: connection closed", "is_error": false },
+    "expected": null
+  },
+  {
+    "case": "another server's tool of the same name is not Omni's",
+    "name": "mcp__t3-code__html_render",
+    "input": { "title": "T", "html": "<p>x</p>" },
+    "result": { "text": "Shown inline in the thread as \"T\" (artifact 9).", "is_error": false },
+    "expected": null
+  },
+  {
+    "case": "a file write is not a render",
+    "name": "Write",
+    "input": { "file_path": "/d/threads/t1/artifacts/report.html", "content": "<p>x</p>" },
+    "result": { "text": "File created (artifact 5)", "is_error": false },
+    "expected": null
+  }
+]

@@ -33,6 +33,11 @@ enum Tok {
   static let done = Color(hex: 0xc6f52b)
   /// `--warn` in index.css: amber text and strokes, for a meter that is filling up.
   static let warn = dyn(0xb45309, 0xf5b544)
+  /// `--chart-1` to `--chart-6`: categorical series for charts, in fixed order.
+  static let chart = [
+    dyn(0x2a78d6, 0x3987e5), dyn(0xeb6834, 0xd95926), dyn(0x1baf7a, 0x199e70),
+    dyn(0xeda100, 0xc98500), dyn(0xe87ba4, 0xd55181), dyn(0x008300, 0x008300),
+  ]
   /// The done disc's edge: ink on white, none in dark.
   static let doneEdge = dyn(0x17181a, 0x17181a, alpha: 1, darkAlpha: 0)
 

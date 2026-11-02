@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { tokenPath } from './api-token.ts';
 import { chromeBinary } from './browser-page.ts';
 import { userName } from './user-config.ts';
+import { RENDER_SERVER } from '@omni/shared/html-render.ts';
 import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile } from './config.ts';
 import type { Channel } from './db.ts';
 import type { CrewRole } from './crew.ts';
@@ -224,6 +225,7 @@ export function buildMcpConfig(input: McpInput) {
   const api = { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: tokenPath(), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName() };
 
   servers[ASK_SERVER] = { command: paths.tsx, args: [paths.mcpAsk], env: api };
+  servers[RENDER_SERVER] = { command: paths.tsx, args: [paths.mcpRender], env: api };
 
   // A delegate-only role hands browser work to a crewmate, so it gets no browser to be tempted by.
   if (config.browser && !input.role?.delegateOnly) {

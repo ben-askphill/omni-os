@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { RENDER_COLORS, RENDER_OTHER, type FrameTheme } from '@omni/shared/html-render.ts';
 import { readPref, writePref } from '../store.tsx';
 
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -52,4 +53,26 @@ export function useScheme(): 'light' | 'dark' {
     return () => media.removeEventListener('change', on);
   }, []);
   return pref === 'system' ? (systemDark ? 'dark' : 'light') : pref;
+}
+
+/**
+ * Omni's theme as an html_render page gets it: each variable the page reads with its token's resolved value. A probe
+ * resolves colours, since a custom property's own value is still the unresolved `light-dark(...)`.
+ */
+export function useFrameTheme(): FrameTheme {
+  const scheme = useScheme();
+  return useMemo(() => {
+    const probe = document.createElement('i');
+    probe.style.display = 'none';
+    document.body.append(probe);
+    const vars: Record<string, string> = {};
+    for (const [name, token] of Object.entries(RENDER_COLORS)) {
+      probe.style.color = `var(${token})`;
+      vars[name] = getComputedStyle(probe).color;
+    }
+    probe.remove();
+    const root = getComputedStyle(document.documentElement);
+    for (const [name, token] of Object.entries(RENDER_OTHER)) vars[name] = root.getPropertyValue(token).trim();
+    return { scheme, vars };
+  }, [scheme]);
 }

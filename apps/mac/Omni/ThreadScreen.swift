@@ -418,7 +418,6 @@ private struct TranscriptRows: View {
     let known = Dictionary((store.children + store.team).map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
     let members = Delegation.team(of: store.children)
     let pages = PublishedPage.byGroup(transcript.items)
-    let inline = InlineArtifacts.byGroup(transcript.items, artifacts: store.artifacts)
     let reports = PendingMsg.reportNotes(store.pending)
     let first = transcript.items.first?.id
     let live: TranscriptItemID? =
@@ -441,7 +440,7 @@ private struct TranscriptRows: View {
           }
           TranscriptRow(
             item: item, live: item.id == live, running: running, cwd: cwd, threadID: store.id, model: model, ui: ui,
-            markdown: markdown, agents: agents, known: known, pages: pages, inline: inline, artifacts: store.artifacts, reports: reports
+            markdown: markdown, agents: agents, known: known, pages: pages, artifacts: store.artifacts, reports: reports
           )
           .copyMenu { TranscriptMarkdown.copyText(item, cwd: cwd) }
           .clippedNote(item)
@@ -504,8 +503,6 @@ private struct TranscriptRow: View {
   var known: [String: OmniThread] = [:]
   /// Pages the thread published, by the tool group that shows each one's card.
   var pages: [Int: [PublishedPage]] = [:]
-  /// HTML artifacts that run inline, by the tool group they show under (`InlineArtifacts.byGroup`).
-  var inline: [Int: [Artifact]] = [:]
   var artifacts: [Artifact] = []
   /// Crew reports the thread has not read yet, by the thread that reported, for the delegation cards.
   var reports: [String: String] = [:]
@@ -533,8 +530,13 @@ private struct TranscriptRow: View {
           ToolGroupView(group: kept, live: live && kept.hasPending, running: running, cwd: cwd, ui: ui, agents: agents)
         }
         if !agentsFirst { subagentCard(subagents) }
+        // Pages html_render showed, right under the call, before the reply.
+        ForEach(RenderedPage.shown(in: group), id: \.artifact) { page in
+          if let a = artifacts.first(where: { $0.id == page.artifact }) {
+            HtmlRenderView(artifact: a, page: page, model: model)
+          }
+        }
         ForEach(cards) { DelegationCard(delegation: $0, model: model, reports: reports) }
-        ForEach(inline[group.eventID] ?? []) { InlineArtifactView(artifact: $0, model: model) }
         ForEach(pages[group.eventID] ?? []) { page in
           PublishedCard(page: page, threadID: threadID, artifact: artifacts.last { $0.url == page.url }, model: model)
         }

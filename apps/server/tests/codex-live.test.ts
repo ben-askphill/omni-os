@@ -39,7 +39,7 @@ describe.skipIf(!LIVE)('the real codex-cli', () => {
       omniUrl: 'http://127.0.0.1:9',
     });
     const names = Object.keys(mcpServers);
-    expect([...names].sort()).toEqual(['omni', 'omni-ask', 'omni-browser']);
+    expect([...names].sort()).toEqual(['omni', 'omni-ask', 'omni-browser', 'omni-render']);
 
     const client = new CodexClient({ bin: codexBin()!, env: harnessEnv('codex', {}), cwd: H.tmp });
     try {
@@ -67,7 +67,7 @@ describe.skipIf(!LIVE)('the real codex-cli', () => {
         if (names.every((n) => seen[n] === 'connected') || Date.now() > end) break;
         await sleep(500);
       }
-      expect(seen).toEqual({ omni: 'connected', 'omni-ask': 'connected', 'omni-browser': 'connected' });
+      expect(seen).toEqual({ omni: 'connected', 'omni-ask': 'connected', 'omni-browser': 'connected', 'omni-render': 'connected' });
     } finally {
       client.kill();
     }
