@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Device } from '@omni/shared/handoff.ts';
 import { api, errorText, useApi, type SetupState } from '../api.ts';
+import { useHereName } from '../store.tsx';
 import { offersRunOn, runOnPick, runOnRequest, runOnRows, runOnSetting, settingPick, type RunOnRow } from '../run-on.ts';
 import { MachineChip, machineOptions } from './composer/MachineChip.tsx';
 
@@ -12,16 +13,17 @@ import { MachineChip, machineOptions } from './composer/MachineChip.tsx';
 export function useRunOn() {
   const devices = useApi<Device[]>('/devices');
   const setup = useApi<SetupState>('/setup');
+  const hereName = useHereName();
   const [picked, setPicked] = useState<string | null>(null);
   const list = offersRunOn(devices.data) ? devices.data : null;
   const pick = runOnPick(picked, setup.data?.config.runOn?.device, list ?? []);
-  const rows = useMemo(() => (list ? runOnRows(list) : null), [list]);
+  const rows = useMemo(() => (list ? runOnRows(list, { hereName }) : null), [list, hereName]);
   return { rows, pick, setPick: setPicked, request: runOnRequest(pick, list), reload: devices.reload };
 }
 
 export const runOnOptions = machineOptions;
 
-/** The new thread's Machine chip: "On This Mac" or "On omarchy". Renders nothing when there is no other machine to pick. */
+/** The new thread's Machine chip: "On Ben's MacBook Pro" or "On omarchy". Renders nothing when there is no other machine to pick. */
 export function RunOnPicker({ rows, value, onChange }: { rows: RunOnRow[] | null; value: string; onChange: (pick: string) => void }) {
   return <MachineChip rows={rows} value={value} onChange={onChange} />;
 }
@@ -37,12 +39,13 @@ export const RUN_ON_HINT = 'New threads run there unless the composer picks anot
 export function useRunOnSetting(setup?: SetupState | null) {
   const devices = useApi<Device[]>('/devices');
   const own = useApi<SetupState>(setup === undefined ? '/setup' : null);
+  const hereName = useHereName();
   const state = setup === undefined ? own.data : setup;
   const [saved, setSaved] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const list = devices.data ?? [];
-  const rows = useMemo(() => runOnRows(devices.data ?? [], { asDefault: true }), [devices.data]);
+  const rows = useMemo(() => runOnRows(devices.data ?? [], { asDefault: true, hereName }), [devices.data, hereName]);
   const save = async (pick: string) => {
     setSaving(true);
     setError(null);
@@ -57,7 +60,7 @@ export function useRunOnSetting(setup?: SetupState | null) {
   };
   return {
     rows,
-    /** Another synced machine to pick. Without one, the choice is This Mac only. */
+    /** Another synced machine to pick. Without one, the choice is this machine only. */
     offered: offersRunOn(devices.data),
     loading: !state || !devices.data,
     pick: settingPick(saved ?? state?.config.runOn?.device, list),

@@ -90,12 +90,12 @@ describe('the delivery boundary', () => {
     H.db.assignments.claim('bound', 'mac-b');
     const idle = H.db.threads.get('bound')!;
     expect(G.turnBlocked(idle)).toBeNull();
-    expect(G.wakeBlocked(idle)).toBe('This thread is on your other Mac. Resume it to run it here.');
+    expect(G.wakeBlocked(idle)).toBe('This thread is on your other machine. Resume it to run it here.');
     H.db.db.prepare(`UPDATE threads SET status = 'running' WHERE id = 'bound'`).run();
     const busy = H.db.threads.get('bound')!;
     expect(G.runningElsewhere(busy)).toBe(true);
-    expect(G.turnBlocked(busy)).toBe('This thread is running on your other Mac.');
-    expect(G.wakeBlocked(busy)).toBe('This thread is running on your other Mac.');
+    expect(G.turnBlocked(busy)).toBe('This thread is running on your other machine.');
+    expect(G.wakeBlocked(busy)).toBe('This thread is running on your other machine.');
     // Without sync there is no owner, so nothing is ever elsewhere.
     expect(O.ownedElsewhere(busy)).toMatchObject({ machine: 'mac-b' });
   });
@@ -111,10 +111,10 @@ describe('generation fencing', () => {
     const at = new Date().toISOString();
     expect(H.db.assignments.applyRemote({ thread_id: t.id, machine: 'mac-b', generation: 1, routed: false, at })).toBe(true);
     expect(O.lostTo(t.id, 0)).toMatchObject({ machine: 'mac-b', generation: 1 });
-    expect(() => H.runner.sendMessage(t.id, 'one more')).toThrow('This thread moved to your other Mac while it ran here.');
+    expect(() => H.runner.sendMessage(t.id, 'one more')).toThrow('This thread moved to your other machine while it ran here.');
     H.runner.fenceStale();
     await H.untilStatus(t.id, 'stopped');
-    expect(H.byKind(t.id, 'error').map((e) => e.p.text)).toContain('This thread moved to your other Mac while it ran here, so the turn was stopped.');
+    expect(H.byKind(t.id, 'error').map((e) => e.p.text)).toContain('This thread moved to your other machine while it ran here, so the turn was stopped.');
     expect(H.db.threads.get(t.id)!.status).toBe('stopped');
     // Taken back here (Ben replied here): the next generation. The warm process left from the stale turn is not the
     // one to run it, so the reply starts a fresh one.

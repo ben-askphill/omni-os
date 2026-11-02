@@ -4,8 +4,8 @@
     { "harness": "claude-code", "target": null, "source": null },
     { "harness": "codex", "target": null, "source": null },
     { "harness": "cursor", "target": null, "source": null },
-    { "harness": "hermes", "target": "Hermes runs on its own server, so this thread's files cannot move there.", "source": "This thread runs on the Hermes server, so its files are not on this Mac to continue from." },
-    { "harness": "cursor-cloud", "target": "Cursor Cloud works on its own clone of the repo, so it cannot start from this thread's checkout.", "source": "This thread runs on Cursor's machines, so its files are not on this Mac to continue from." }
+    { "harness": "hermes", "target": "Hermes runs on its own server, so this thread's files cannot move there.", "source": "This thread runs on the Hermes server, so its files are not on this machine to continue from." },
+    { "harness": "cursor-cloud", "target": "Cursor Cloud works on its own clone of the repo, so it cannot start from this thread's checkout.", "source": "This thread runs on Cursor's machines, so its files are not on this machine to continue from." }
   ],
   "catalog": [
     { "id": "claude-code", "name": "Claude Code", "plan": "Claude plan", "capabilities": { "warmProcess": true, "steer": true, "inlineImages": true, "usage": "five-hour-week" }, "available": true, "cap": 4, "running": 0,

@@ -77,14 +77,14 @@ function judge(dir: string, c: Candidate): Judged {
   try {
     st = lstatSync(path);
   } catch {
-    return no('missing', 'Its bytes are not on this Mac: it was attached on the other Mac, or deleted.', c.recorded);
+    return no('missing', 'Its bytes are not on this machine: it was attached on the other machine, or deleted.', c.recorded);
   }
   if (st.isSymbolicLink()) return no('unsupported', 'It is a link, not a file, so Omni will not follow it.', c.recorded);
   if (!st.isFile()) return no('unsupported', 'It is not a regular file.', c.recorded);
   try {
     if (realpathSync(path) !== join(realpathSync(dir), base)) return no('unsupported', 'It resolves outside the thread\'s uploads folder.', c.recorded);
   } catch {
-    return no('missing', 'Its bytes are not on this Mac.', c.recorded);
+    return no('missing', 'Its bytes are not on this machine.', c.recorded);
   }
   if (c.recorded !== null && c.recorded !== st.size) return no('missing', 'The file on disk is not the one that was attached: its size differs.', st.size);
   if (!st.size) return no('unsupported', 'It is empty.', 0);

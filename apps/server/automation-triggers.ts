@@ -126,9 +126,9 @@ async function admit(listed: TriggerDelivery, automations: Automation[]): Promis
       if (a) adopt(a, made);
       return settle('started', { thread_id: made, reason: made === id ? null : 'An earlier attempt had already made this thread' });
     }
-    if (!a) return skip('No automation with this id on the Mac that runs automations');
+    if (!a) return skip('No automation with this id on the machine that runs automations');
     if (a.error) return skip(`The automation is invalid: ${a.error}`);
-    if (!a.enabled) return skip('Paused on the Mac that runs automations');
+    if (!a.enabled) return skip('Paused on the machine that runs automations');
     const limits = a.on && !isPrTrigger(a.on) ? a.on : undefined;
     // Late, whether Omni was off, the other Mac slept on it or the automation was at its limit: it never starts now.
     if (isExpired(d.created_at, limits)) return skip(`Expired: it arrived ${span(Date.now() - new Date(d.created_at).getTime())} ago, over the ${span(maxAgeMs(limits))} limit`);

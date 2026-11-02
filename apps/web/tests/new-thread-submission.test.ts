@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { Channel, CrewRole } from '../src/api.ts';
 
 const state = vi.hoisted(() => ({ channels: [] as Channel[], crew: [] as CrewRole[] }));
-vi.mock('../src/store.tsx', () => ({ useApp: () => ({ ...state, status: null }) }));
+vi.mock('../src/store.tsx', () => ({ useApp: () => ({ ...state, status: null }), useHereName: () => undefined }));
 vi.mock('../src/mobile/shell.tsx', () => ({ useShell: () => ({ open: vi.fn(), sheet: vi.fn() }) }));
 
 import { NewThreadComposer } from '../src/components/Composer.tsx';

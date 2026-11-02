@@ -43,6 +43,9 @@ export const deviceRecord = (id: string): DeviceRecord | null => parse(PREFIX + 
 /** The name a synced Mac gave itself, or null before it has synced since this build. */
 export const deviceName = (id: string): string | null => deviceRecord(id)?.name ?? null;
 
+/** This machine's name for a handoff or a refusal: as it announced itself, else its host name. Never "this Mac". */
+export const ownName = (id: string): string => deviceName(id) ?? hostname();
+
 let announcedAt = 0;
 
 /** Write this Mac's record when its name or node changed. A no-op while sync is off. */
@@ -83,4 +86,4 @@ export async function listDevices(): Promise<Device[]> {
     .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
 
-onSynced(() => void announceDevice().catch((err) => console.error('[sync] could not describe this Mac:', (err as Error).message)));
+onSynced(() => void announceDevice().catch((err) => console.error('[sync] could not describe this machine:', (err as Error).message)));

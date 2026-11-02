@@ -42,7 +42,7 @@ describe('the thread action menu', () => {
 
   it('turns Fork off, with the reason, for a thread whose files are elsewhere', () => {
     const fork = menu({ harness: 'hermes' })[1]!.items.find((i) => i.id === 'fork');
-    expect(fork?.off).toMatch(/not on this Mac/);
+    expect(fork?.off).toMatch(/not on this machine/);
     expect(menu()[1]!.items.find((i) => i.id === 'fork')?.off).toBeUndefined();
   });
 

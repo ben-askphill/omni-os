@@ -22,7 +22,7 @@ const limitsOf = (a: Automation | undefined) => (a?.on && !isPrTrigger(a.on) ? a
 function retryBlock(d: TriggerDelivery, a: Automation | undefined, made: boolean, now: number): string | null {
   if (d.thread_id || made) return 'Its thread exists, so what it did is unknown. Open the thread and send a follow-up there.';
   if (triggerDeliveries.isStarting(d.id)) return 'It is being started right now.';
-  if (!a) return 'No automation with this id on this Mac.';
+  if (!a) return 'No automation with this id on this machine.';
   if (a.error) return `The automation is invalid: ${a.error}`;
   if (!a.enabled && automationsOwner().isThisMac) return 'The automation is paused.';
   if (isExpired(d.created_at, limitsOf(a), now)) return `The event is older than the automation's ${span(maxAgeMs(limitsOf(a)))} limit.`;
@@ -30,7 +30,7 @@ function retryBlock(d: TriggerDelivery, a: Automation | undefined, made: boolean
 }
 
 /** What a Mac that does not run automations says of a pending delivery: another Mac decides, so nothing here may skip it. */
-const HELD_FOR_OWNER = 'Held for the Mac that runs automations. Skip it there: it may already be starting.';
+const HELD_FOR_OWNER = 'Held for the machine that runs automations. Skip it there: it may already be starting.';
 
 /** A delivery as the routes send it: the row and what is true of it right now. `live` counts runs going, by automation, for one request. */
 export function viewOf(d: TriggerDelivery, a: Automation | undefined, live: Map<string, number> = new Map(), now = Date.now()): DeliveryView {

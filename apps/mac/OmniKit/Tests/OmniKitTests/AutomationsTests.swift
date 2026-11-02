@@ -546,10 +546,10 @@ private final class AutomationsServer: HTTPTransport {
     #expect(anyone.scheduleDetail() == "acme/shop · pull_request_review · anyone")
 
     let unset = try #require(a.webhook)
-    #expect(unset.secretStatus == "No signing secret on this Mac")
+    #expect(unset.secretStatus == "No signing secret on this machine")
     #expect(unset.secretAction == "Set secret…")
     let set = try #require(try decode(Automation.self, webhookAutomationJSON(webhook: #"{"path":"/api/hooks/github/ci-fixer","secret":"OMNI_WEBHOOK_CI_FIXER","secret_set":true}"#)).webhook)
-    #expect(set.secretStatus == "Signing secret set on this Mac")
+    #expect(set.secretStatus == "Signing secret set on this machine")
     #expect(set.secretAction == "Replace secret…")
   }
 

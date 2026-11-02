@@ -86,7 +86,7 @@ describe('retry and skip on two Macs', () => {
     b.triggers.observePublication(source, 'toolu_race', page('race'));
     expect(delivery(b, 'toolu_race')).toMatchObject({ state: 'queued' });
     const held = (await b.json(`/deliveries/${uidOf('toolu_race')}`)).body;
-    expect(held).toMatchObject({ can_skip: false, waiting: expect.stringMatching(/^Held for the Mac that runs automations/) });
+    expect(held).toMatchObject({ can_skip: false, waiting: expect.stringMatching(/^Held for the machine that runs automations/) });
     const refused = await b.json(`/deliveries/${uidOf('toolu_race')}/skip`, { body: {} });
     expect(refused.status).toBe(409);
     expect(refused.body.error).toMatch(/Skip it there/);

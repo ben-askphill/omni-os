@@ -47,15 +47,15 @@ export const gitOr = (dir: string, args: string[]) => git(dir, args).then((s) =>
  * worktree, checked to be on its branch; a thread with worktrees off reads the channel's repo when it runs there.
  */
 export async function changesCheckout(t: Thread): Promise<{ dir: string } | { reason: string }> {
-  if (isProviderHarness(t.harness)) return { reason: `This thread runs ${providerWhere(t.harness)}, so its files are not on this Mac.` };
+  if (isProviderHarness(t.harness)) return { reason: `This thread runs ${providerWhere(t.harness)}, so its files are not on this machine.` };
   if (t.setup === 'preparing') return { reason: "Omni is still preparing this thread's worktree." };
   if (t.setup === 'failed') return { reason: "This thread's worktree could not be prepared, so there are no changes to show." };
   const repo = channels.get(t.channel_id)?.repo_path;
   if (!repo) return { reason: "This thread's channel has no repository, so there are no branch changes to show." };
-  if (!existsSync(repo)) return { reason: `The channel's repository is not on this Mac: ${repo}` };
+  if (!existsSync(repo)) return { reason: `The channel's repository is not on this machine: ${repo}` };
   if (t.branch) {
     const dir = plannedWorktree(t.id).cwd;
-    if (!existsSync(dir)) return { reason: "This thread's worktree is not on this Mac." };
+    if (!existsSync(dir)) return { reason: "This thread's worktree is not on this machine." };
     const problem = await worktreeProblem(repo, dir, t.branch);
     return problem ? { reason: problem } : { dir };
   }

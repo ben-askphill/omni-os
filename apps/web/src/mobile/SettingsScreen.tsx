@@ -33,7 +33,7 @@ export function SettingsScreen() {
   const [q, setQ] = useState('');
   const hits = searchSettings(q, 'web');
   const open = (section: SettingsSectionId, focus?: string) => shell.open(href.settingsSection(section, focus));
-  const automationsSub = automations.error ?? (automations.data ? (automations.data.length ? `${automations.data.length} on this Mac` : 'None yet') : 'Loading');
+  const automationsSub = automations.error ?? (automations.data ? (automations.data.length ? `${automations.data.length} on ${host || 'this machine'}` : 'None yet') : 'Loading');
 
   // A live line for the sections that have one; the rest show their blurb.
   const live: Partial<Record<SettingsSectionId, string>> = {

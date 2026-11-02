@@ -57,10 +57,10 @@ describe('with sync on', () => {
     expect(r.db.outbox.machineId()).toBe('mac-a');
   });
 
-  it('a thread whose folder is not on this Mac is read-only, with the reason', async () => {
+  it('a thread whose folder is not on this machine is read-only, with the reason', async () => {
     thread('missing');
     const d = await detail('missing');
-    expect(d.blocked).toMatch(/not on this Mac/);
+    expect(d.blocked).toMatch(/not on this machine/);
     expect(d.blocked).toContain('/nowhere/omni-test');
     const res = await post('missing');
     expect(res.status).toBe(409);
@@ -75,12 +75,12 @@ describe('with sync on', () => {
     r.db.db.prepare(`UPDATE threads SET status = 'running', run_machine = 'mac-b' WHERE id = 'elsewhere'`).run();
     r.db.assignments.claim('elsewhere', 'mac-b');
     const d = await detail('elsewhere');
-    expect(d.blocked).toMatch(/running on your other Mac/);
+    expect(d.blocked).toMatch(/running on your other machine/);
     const res = await post('elsewhere');
     expect(res.status).toBe(409);
     expect(res.body.error).toBe(d.blocked);
     expect(r.events('elsewhere')).toEqual([]);
-    expect(() => r.runner.sendMessage('elsewhere', 'direct')).toThrow(/running on your other Mac/);
+    expect(() => r.runner.sendMessage('elsewhere', 'direct')).toThrow(/running on your other machine/);
     // An open thread hears it on its stream when the thread changes.
     const ctl = new AbortController();
     const res2 = await app.request('/api/threads/elsewhere/stream', { signal: ctl.signal });

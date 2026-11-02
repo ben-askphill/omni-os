@@ -137,7 +137,7 @@ async function switchBack(dir: string, branch: string, on: string | null): Promi
  */
 export async function prepareWorktree(repo: string | null, dir: string, branch: string, base?: () => Promise<string>): Promise<void> {
   if (!repo) throw new Error('The channel has no repository set.');
-  if (!existsSync(repo)) throw new Error(`The channel's repository is not on this Mac: ${repo}`);
+  if (!existsSync(repo)) throw new Error(`The channel's repository is not on this machine: ${repo}`);
   if (!(await isGitRepo(repo))) throw new Error(`${repo} is not a git repository. Turn off "Worktree per thread" in the channel's settings to run threads in it directly.`);
   const found = await checkWorktree(repo, dir, branch);
   if (!found) return;

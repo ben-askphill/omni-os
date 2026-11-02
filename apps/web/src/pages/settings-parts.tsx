@@ -123,7 +123,7 @@ export function ScopeBar() {
         onChange={setSettingsScope}
         searchable={listed.length > 7}
         options={[
-          { value: '', label: 'Every channel', sub: "This machine's values", icon: 'monitor', avatar: false },
+          { value: '', label: 'Every channel', sub: 'Machine-wide values', icon: 'monitor', avatar: false },
           ...listed.map((c) => ({ value: c.id, label: c.id === 'conductor' ? 'Conductor' : `#${c.name}`, channelIcon: c.icon })),
         ]}
       />

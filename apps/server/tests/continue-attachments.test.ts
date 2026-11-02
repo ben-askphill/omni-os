@@ -179,8 +179,8 @@ describe('what cannot be carried', () => {
     rmSync(join(uploadsDir(src.id), 'gone.txt'));
     const ids = idsOf((await preview(src.id, claude)).body);
     const p = (await preview(src.id, claude, ids)).body;
-    expect(byName(p, 'gone.txt')).toMatchObject({ availability: 'missing', carried: false, selected: true, as: null, reason: expect.stringContaining('not on this Mac') });
-    expect(p.carryover.omitted).toContainEqual(expect.objectContaining({ what: 'attachments', count: 1, note: expect.stringContaining('gone.txt (Its bytes are not on this Mac') }));
+    expect(byName(p, 'gone.txt')).toMatchObject({ availability: 'missing', carried: false, selected: true, as: null, reason: expect.stringContaining('not on this machine') });
+    expect(p.carryover.omitted).toContainEqual(expect.objectContaining({ what: 'attachments', count: 1, note: expect.stringContaining('gone.txt (Its bytes are not on this machine') }));
     const id = (await start(src.id, claude, 'go', ids)).body.thread.id as string;
     await H.untilResults(id, 1);
     expect(files(uploadsDir(id))).toEqual(['here.txt']);

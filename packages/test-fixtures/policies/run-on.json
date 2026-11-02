@@ -1,5 +1,5 @@
 {
- "about": "Run-location defaults: which machine a new thread starts on, which pick holds, what POST /api/threads gets and what the pill says. \"\" is this machine; `listed` names the synced machines GET /api/devices gives, from `devices`. apps/web/src/run-on.ts runs it in apps/web/tests/client-policies.test.ts (\"\" is its HERE); apps/mac/OmniKit/Sources/OmniKit/RunOn.swift runs it in ClientPolicyTests.swift.",
+ "about": "Run-location defaults: which machine a new thread starts on, which pick holds, what POST /api/threads gets and what the pill says: this machine by its name, `here` (GET /api/status `device.name`), or \"Unnamed machine\" without one, never \"This Mac\". \"\" is this machine; `listed` names the synced machines GET /api/devices gives, from `devices`. apps/web/src/run-on.ts runs it in apps/web/tests/client-policies.test.ts (\"\" is its HERE); apps/mac/OmniKit/Sources/OmniKit/RunOn.swift runs it in ClientPolicyTests.swift.",
  "devices": [
   {
    "id": "omarchy",
@@ -177,7 +177,8 @@
     "studio"
    ],
    "pick": "",
-   "label": "This Mac"
+   "label": "Ben's MacBook Pro",
+   "here": "Ben's MacBook Pro"
   },
   {
    "listed": [
@@ -186,7 +187,8 @@
     "studio"
    ],
    "pick": "omarchy",
-   "label": "Omarchy"
+   "label": "Omarchy",
+   "here": "Ben's MacBook Pro"
   },
   {
    "listed": [
@@ -195,7 +197,34 @@
     "studio"
    ],
    "pick": "mini",
-   "label": "Mini"
+   "label": "Mini",
+   "here": "Ben's MacBook Pro"
+  },
+  {
+   "listed": [
+    "omarchy",
+    "mini",
+    "studio"
+   ],
+   "here": "omarchy-box",
+   "pick": "",
+   "label": "omarchy-box"
+  },
+  {
+   "listed": [
+    "omarchy"
+   ],
+   "here": null,
+   "pick": "",
+   "label": "Unnamed machine"
+  },
+  {
+   "listed": [
+    "omarchy"
+   ],
+   "here": "  ",
+   "pick": "",
+   "label": "Unnamed machine"
   }
  ]
 }

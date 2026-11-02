@@ -81,7 +81,7 @@ describe('a data folder copied to another Mac', () => {
     expect(b.db.kv.get('sync.hardware_id')).toBe('hw-b');
     expect(b.db.kv.get('sync.cursor')).toBe(0);
     expect(warned).toHaveLength(1);
-    expect(warned[0]).toMatch(/^\[sync\] this data folder was copied from another Mac/);
+    expect(warned[0]).toMatch(/^\[sync\] this data folder was copied from another machine/);
     // A second start on this Mac keeps the new id.
     expect(b.sync.createSyncWorker({ transport: relay }).machineId).toBe(b.worker.machineId);
   });

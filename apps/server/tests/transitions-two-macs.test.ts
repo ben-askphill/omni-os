@@ -73,7 +73,7 @@ describe('a Take over asked on B', () => {
   it('previews from both sides', async () => {
     expect((await preview(b, { kind: 'relocate', to: 'here' })).body).toEqual({ kind: 'relocate', from: MAC_A, to: MAC_B, blocked: null, running: true, takeover: true });
     expect((await preview(a, { kind: 'relocate', to: 'mac-b' })).body).toEqual({ kind: 'relocate', from: MAC_A, to: MAC_B, blocked: null, running: true, takeover: false });
-    expect((await preview(a, { kind: 'relocate', to: 'here' })).body).toMatchObject({ takeover: true, blocked: 'This thread is on this Mac already.' });
+    expect((await preview(a, { kind: 'relocate', to: 'here' })).body).toMatchObject({ takeover: true, blocked: 'This thread is on this machine already.' });
     expect((await preview(b, { kind: 'relocate', to: 'mac-a' })).body).toMatchObject({ takeover: false, blocked: 'This thread is on Mac A. Take it over instead.' });
   });
 
@@ -87,7 +87,7 @@ describe('a Take over asked on B', () => {
     // Asked once, however often Ben clicks.
     const again = await create(b, { kind: 'relocate', to: 'here' });
     expect(again.status).toBe(409);
-    expect(again.body.error).toBe('This thread is already on its way between Macs.');
+    expect(again.body.error).toBe('This thread is already on its way between machines.');
   });
 
   it('is cancelled before A answers, so A keeps its turn', T, async () => {

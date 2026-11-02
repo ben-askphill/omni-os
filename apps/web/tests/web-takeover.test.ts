@@ -84,14 +84,14 @@ const option = (label: string) => options().find((o) => o.textContent?.startsWit
 const dialog = () => host.querySelector<HTMLElement>('[role="dialog"]');
 
 describe('the Machine chip on a thread another Mac holds', () => {
-  it('names that Mac, selected, with This Mac as Take over', async () => {
+  it('names that Mac, selected, with this one by its name as Take over', async () => {
     await mount(held());
     expect(chip()!.getAttribute('aria-label')).toBe("Run on: Ben's MacBook Pro");
     expect(chip()!.closest('span[title]')!.getAttribute('title')).toBe("This thread is running on Ben's MacBook Pro.");
     await open();
     expect(options().map((o) => [o.textContent, o.getAttribute('aria-selected'), o.disabled])).toEqual([
       ["Ben's MacBook ProRunning there now", 'true', false],
-      ['This MacTake over: stops there, continues here', 'false', false],
+      ["Ben's MacBook AirTake over: stops there, continues here", 'false', false],
     ]);
   });
 
@@ -99,14 +99,14 @@ describe('the Machine chip on a thread another Mac holds', () => {
     await mount(held({ running: false }), null, 'done');
     expect(chip()!.closest('span[title]')!.getAttribute('title')).toBe("Last ran on Ben's MacBook Pro.");
     await open();
-    expect(option('This Mac')!.textContent).toContain('Take over: next message runs here');
+    expect(option("Ben's MacBook Air")!.textContent).toContain('Take over: next message runs here');
   });
 
-  it('disables This Mac with why when it cannot be taken over now', async () => {
+  it('disables this machine with why when it cannot be taken over now', async () => {
     await mount(held({ refused: 'It has crew threads running.' }));
     await open();
-    expect(option('This Mac')!.disabled).toBe(true);
-    expect(option('This Mac')!.textContent).toContain('It has crew threads running.');
+    expect(option("Ben's MacBook Air")!.disabled).toBe(true);
+    expect(option("Ben's MacBook Air")!.textContent).toContain('It has crew threads running.');
   });
 
   it('is not there while the request is under way: the handoff card says so', async () => {
@@ -117,7 +117,7 @@ describe('the Machine chip on a thread another Mac holds', () => {
   it('asks in takeoverConfirm words, posts /takeover and hands the answer on', async () => {
     await mount(held());
     await open();
-    await act(async () => option('This Mac')!.click());
+    await act(async () => option("Ben's MacBook Air")!.click());
     expect(dialog()!.textContent).toContain("Take over from Ben's MacBook Pro?");
     expect(dialog()!.textContent).toContain("Ben's MacBook Pro stops the current turn and hands the thread here.");
     expect(posts).toEqual([]);
@@ -131,7 +131,7 @@ describe('the Machine chip on a thread another Mac holds', () => {
     refuse = 'This thread has crew threads running.';
     await mount(held({ running: false }), null, 'done');
     await open();
-    await act(async () => option('This Mac')!.click());
+    await act(async () => option("Ben's MacBook Air")!.click());
     expect(dialog()!.textContent).toContain("Your next message runs on Ben's MacBook Air.");
     await act(async () => [...dialog()!.querySelectorAll('button')].find((b) => b.textContent === 'Take over')!.click());
     expect(dialog()!.querySelector('[role="alert"]')!.textContent).toContain('This thread has crew threads running.');
@@ -143,13 +143,13 @@ describe('the Machine chip on a thread another Mac holds', () => {
 });
 
 describe('the Machine chip on a thread this Mac holds', () => {
-  it('reads This Mac and hands the thread to the Mac picked', async () => {
+  it('reads Unnamed machine without a status name, never This Mac, and hands the thread to the Mac picked', async () => {
     devices = [pro];
     await mount(null);
     await settle();
-    expect(chip()!.getAttribute('aria-label')).toBe('Run on: This Mac');
+    expect(chip()!.getAttribute('aria-label')).toBe('Run on: Unnamed machine');
     await open();
-    expect(options().map((o) => o.textContent)).toEqual(['This MacRunning here now', "Ben's MacBook ProHand off: Online on Tailscale"]);
+    expect(options().map((o) => o.textContent)).toEqual(['Unnamed machineRunning here now', "Ben's MacBook ProHand off: Online on Tailscale"]);
     await act(async () => option("Ben's MacBook Pro")!.click());
     expect(posts).toEqual(['/api/threads/t1/handoff']);
     expect(changed).toEqual([answer]);

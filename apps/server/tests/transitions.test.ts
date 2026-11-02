@@ -138,7 +138,7 @@ describe('relocate with sync off', () => {
   it('previews as blocked and refuses to start, for a handoff and for a Take over', async () => {
     const t = await H.start('first', claude);
     await H.untilResults(t.id, 1);
-    const why = 'Sync is not set up on this Mac. Moving a thread between Macs needs sync on both.';
+    const why = 'Sync is not set up on this machine. Moving a thread between machines needs sync on both.';
     expect((await preview(t.id, { kind: 'relocate', to: 'mac-b' })).body).toEqual({ kind: 'relocate', from: null, to: null, blocked: why, running: false, takeover: false });
     expect((await preview(t.id, { kind: 'relocate', to: 'here' })).body).toEqual({ kind: 'relocate', from: null, to: null, blocked: why, running: false, takeover: true });
     for (const to of ['mac-b', 'here']) {
@@ -149,7 +149,7 @@ describe('relocate with sync off', () => {
     // The older routes refuse the same way.
     expect((await call('POST', `/threads/${t.id}/handoff`, { to: 'mac-b' })).body.error).toBe(why);
     expect((await call('POST', `/threads/${t.id}/takeover`, {})).body.error).toBe(why);
-    expect((await call('POST', `/threads/${t.id}/handoff/cancel`, {})).body.error).toBe('This thread is not being handed off from this Mac.');
+    expect((await call('POST', `/threads/${t.id}/handoff/cancel`, {})).body.error).toBe('This thread is not being handed off from this machine.');
   });
 
   it('rejects a body with no kind', async () => {

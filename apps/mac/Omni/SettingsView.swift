@@ -140,7 +140,7 @@ struct MachinesSettingsPage: View {
 
   var body: some View {
     SettingsPage {
-      SettingsCard(title: "This Mac", note: "The machine this app runs Omni on, as other machines and the sync list name it.") {
+      SettingsCard(title: RunOnRules.hereLabel(model.store.status?.device?.name), note: "The machine this app runs Omni on, as other machines and the sync list name it.") {
         InfoRows {
           if let name = model.store.status?.device?.name { InfoRow("Machine", value: name) }
           InfoRow("Server", value: model.supervisor.state.label)

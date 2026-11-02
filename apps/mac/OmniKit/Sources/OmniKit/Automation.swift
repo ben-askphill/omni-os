@@ -210,7 +210,7 @@ public struct AutomationWebhook: Decodable, Hashable, Sendable {
     case secretSet = "secret_set"
   }
 
-  public var secretStatus: String { secretSet ? "Signing secret set on this Mac" : "No signing secret on this Mac" }
+  public var secretStatus: String { secretSet ? "Signing secret set on this machine" : "No signing secret on this machine" }
   public var secretAction: String { secretSet ? "Replace secret…" : "Set secret…" }
 }
 

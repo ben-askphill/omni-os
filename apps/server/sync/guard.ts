@@ -11,7 +11,7 @@ import { deviceName } from './devices.ts';
 // The one place that decides it, for Ben's replies and for Omni's own wakes alike (docs/adr/0005-one-execution-owner.md).
 
 /** A machine as the refusals name it. */
-export const machineName = (id: string) => deviceName(id) ?? 'your other Mac';
+export const machineName = (id: string) => deviceName(id) ?? 'your other machine';
 
 /** The owner, when the thread is running or queued on another machine. Null between turns: a reply here then brings the thread here. */
 const busyElsewhere = (t: Pick<Thread, 'id' | 'status'>) => (t.status === 'running' || t.status === 'queued' ? heldElsewhere(t.id) : null);
@@ -52,7 +52,7 @@ export function turnBlocked(t: Thread, here = false, taking = false): string | n
   const handoff = handoffBlock(t, taking);
   if (handoff) return handoff;
   if (!outbox.machineId() || existsSync(t.cwd) || rebuildable(t)) return null;
-  return `This thread's folder is not on this Mac: ${t.cwd}. Continue it on the Mac that has it, or map the folder to one here in sync.path_map.`;
+  return `This thread's folder is not on this machine: ${t.cwd}. Continue it on the machine that has it, or map the folder to one here in sync.path_map.`;
 }
 
 /**
@@ -86,7 +86,7 @@ export async function prepareTurn(t: Thread, here = false, taking = false): Prom
       try {
         await restoreCheckout(target.worktree.repo, target.cwd, target.worktree.branch);
       } catch (err) {
-        throw refused(`This thread's worktree is not on this Mac and Omni could not make it again: ${(err as Error).message}`);
+        throw refused(`This thread's worktree is not on this machine and Omni could not make it again: ${(err as Error).message}`);
       }
     }
   }

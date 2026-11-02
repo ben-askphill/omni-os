@@ -183,6 +183,7 @@ public struct HandoffView: Decodable, Hashable, Sendable {
   /// `handoffText` in handoff.ts: one line for the banner, from the reading Mac's side.
   public static func text(from: Mac, to: Mac, outgoing: Bool, state: HandoffPhase, idle: Bool = false, requested: Bool = false) -> String {
     let other = outgoing ? to.name : from.name
+    let here = outgoing ? from.name : to.name
     switch state {
     case .requested(let stale):
       return stale
@@ -193,7 +194,7 @@ public struct HandoffView: Decodable, Hashable, Sendable {
     case .expired:
       return "\(from.name) did not answer within an hour, so the request expired."
     case .preparing(let step):
-      if !outgoing { return "\(other) is handing this thread to this Mac." }
+      if !outgoing { return "\(other) is handing this thread to \(here)." }
       return "Handing off to \(to.name): \(step.doing)."
     case .offered(let stale):
       if !outgoing { return "Picking this thread up from \(other)." }
@@ -201,12 +202,12 @@ public struct HandoffView: Decodable, Hashable, Sendable {
     case .accepted:
       if requested {
         if idle { return outgoing ? "\(other) took this thread over. The next message runs there." : "Taken over from \(other). Your next message continues it here." }
-        return outgoing ? "\(other) took this thread over. Running there." : "Taken over from \(other). Running on this Mac."
+        return outgoing ? "\(other) took this thread over. Running there." : "Taken over from \(other). Running on \(here)."
       }
       if idle {
         return outgoing ? "Handed off to \(other). Your next message continues it there." : "Handed off from \(other). Your next message continues it here."
       }
-      return outgoing ? "Running on \(other). Handed off from this Mac." : "Handed off from \(other). Running on this Mac."
+      return outgoing ? "Running on \(other). Handed off from \(here)." : "Handed off from \(other). Running on \(here)."
     case .failed(let error, let side):
       if outgoing { return "The handoff to \(to.name) failed: \(sentence(error)) The thread is stopped here; reply to continue it." }
       return side == .here

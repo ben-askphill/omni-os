@@ -19,16 +19,16 @@ const refusal = async (id: string) => {
 describe('handing off or taking over with sync not running', () => {
   it('says sync is not set up, then paused, then set up but not running', async () => {
     const t = await h.runner.createThread({ channel: 'scratch', prompt: 'TOOL:60000 a long one' });
-    expect(await refusal(t.id)).toBe('409 Sync is not set up on this Mac. Moving a thread between Macs needs sync on both.');
+    expect(await refusal(t.id)).toBe('409 Sync is not set up on this machine. Moving a thread between machines needs sync on both.');
 
     h.db.outbox.arm('mac-a');
     for (const name of Object.values(SYNC_SECRETS)) db.prepare('INSERT INTO secrets (scope, name) VALUES (?, ?)').run('global', name);
     h.db.kv.set('sync.enabled', false);
-    expect(await refusal(t.id)).toBe('409 Sync is paused on this Mac. Resume it in Settings, Sync to move threads between Macs.');
+    expect(await refusal(t.id)).toBe('409 Sync is paused on this machine. Resume it in Settings, Sync to move threads between machines.');
 
     h.db.kv.set('sync.enabled', true);
     expect(await refusal(t.id)).toBe(
-      '409 Sync is set up on this Mac but not running, so the other Mac cannot be told. Check Settings, Sync, then try again.',
+      '409 Sync is set up on this machine but not running, so the other machine cannot be told. Check Settings, Sync, then try again.',
     );
   });
 });

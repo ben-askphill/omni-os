@@ -73,7 +73,7 @@ private func withNewer(_ n: NeedsYou, _ title: String, uid: String) -> NeedsYou 
     // The other Mac's stop, as sync leaves it here: the same reset, and where it is.
     let otherMac = NeedsYouItem(
       thread: base.thread, result: nil, blockers: [NeedsYouBlocker(kind: .limited, resetsAt: base.at, elsewhere: true)], at: base.at)
-    #expect(otherMac.reason.label == "Usage limit reached on your other Mac")
+    #expect(otherMac.reason.label == "Usage limit reached on your other machine")
     #expect(otherMac.reason.detail?.hasPrefix("Resets at ") == true)
   }
 

@@ -5,7 +5,7 @@ describe('continue texts', () => {
   it('refuses the remote harnesses as target and as source, and nothing else', () => {
     for (const h of ['hermes', 'cursor-cloud']) {
       expect(continueRefusal(h)).toMatch(/cannot/);
-      expect(continueSourceRefusal(h)).toMatch(/not on this Mac/);
+      expect(continueSourceRefusal(h)).toMatch(/not on this machine/);
     }
     for (const h of ['claude-code', 'codex', 'cursor']) {
       expect(continueRefusal(h)).toBeNull();

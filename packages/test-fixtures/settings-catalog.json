@@ -88,7 +88,7 @@
       "group": "connections",
       "title": "Machines",
       "icon": "monitor",
-      "blurb": "This machine and the server Omni runs on."
+      "blurb": "The machine Omni runs on and its server."
     },
     {
       "id": "sync",
@@ -432,7 +432,7 @@
     {
       "id": "this-machine",
       "section": "machines",
-      "title": "This machine",
+      "title": "Current machine",
       "keywords": [
         "name",
         "device",

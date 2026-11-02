@@ -33,7 +33,7 @@ try {
   const report = backfill({
     onProgress: (c) => {
       const parts = [`${c.queued} queued`, `${c.alreadyQueued} already queued`];
-      if (c.elsewhere) parts.push(`${c.elsewhere} last written on another Mac`);
+      if (c.elsewhere) parts.push(`${c.elsewhere} last written on another machine`);
       console.log(`${LABEL[c.entity].padEnd(16)} ${parts.join(', ')} (of ${c.total})`);
     },
   });

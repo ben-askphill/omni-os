@@ -1,10 +1,11 @@
+import { machineLabel } from '@omni/shared/handoff.ts';
 import { useApi, type SetupState, type SyncStatus } from '../api.ts';
 import { DeviceLabel } from '../components/DeviceLabel.tsx';
 import { RUN_ON_HINT, runOnOptions, useRunOnSetting } from '../components/RunOnPicker.tsx';
 import { HERE } from '../run-on.ts';
 import { ErrorNote, Picker, StatusDot } from '../components/ui.tsx';
 import { relTime } from '../format.ts';
-import { useApp } from '../store.tsx';
+import { useApp, useHereName } from '../store.tsx';
 import { Card, InfoRow, Origin, ServerOptions } from './settings-parts.tsx';
 
 // Settings, Machines: this machine (its name, sync state, the address this browser uses, the feed and the thread
@@ -27,7 +28,7 @@ export function MachinesSection() {
   const synced = syncLine(sync.data, Date.now());
   return (
     <>
-      <Card entry="this-machine" title="This machine" subtitle="The machine Omni runs on, as your other machines and the sync list name it.">
+      <Card entry="this-machine" title={machineLabel(status?.device?.name)} subtitle="The machine Omni runs on, as your other machines and the sync list name it.">
         <div className="space-y-2 text-[13px]">
           {status?.device && (
             <InfoRow label="Machine">
@@ -63,12 +64,13 @@ export function MachinesSection() {
 export function RunOnCard({ state }: { state: SetupState | null }) {
   const runOn = useRunOnSetting(state);
   const saved = runOn.device;
+  const hereName = useHereName();
   return (
     <Card
       entry="run-on"
       title="Run new threads on"
       subtitle={runOn.offered ? RUN_ON_HINT : 'Only this machine for now. Sync another machine with this one to run threads there.'}
-      origin={state && <Origin of={saved ? 'machine' : 'default'} label={saved ? undefined : 'Built-in default: this machine'} onReset={() => void runOn.save(HERE)} busy={runOn.saving} />}
+      origin={state && <Origin of={saved ? 'machine' : 'default'} label={saved ? undefined : `Built-in default: ${machineLabel(hereName)}`} onReset={() => void runOn.save(HERE)} busy={runOn.saving} />}
     >
       <div className="flex flex-wrap items-center gap-3">
         <Picker label="Run new threads on" value={runOn.pick} options={runOnOptions(runOn.rows)} onChange={(v) => void runOn.save(v)} disabled={runOn.loading || runOn.saving || !runOn.offered} />

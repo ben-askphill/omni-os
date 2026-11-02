@@ -87,7 +87,7 @@ server.registerTool(
         .string()
         .optional()
         .describe(
-          'Override the role default harness: claude-code, codex, cursor, hermes or cursor-cloud. cursor runs the cursor-agent CLI on this Mac; ' +
+          'Override the role default harness: claude-code, codex, cursor, hermes or cursor-cloud. cursor runs the cursor-agent CLI on this machine; ' +
             'cursor-cloud launches a Cursor cloud agent on Cursor\'s Linux machines that pushes a branch and opens a PR (no Mac build, Swift tests or screenshots). Use list_harnesses.',
         ),
       model: z
@@ -308,7 +308,7 @@ server.registerTool(
       "conversation comments, never the signed-in account's own), with author, link and an excerpt; unchanged polls cost " +
       'no turn. A watch ends on its own when the PR merges or closes, the thread is archived, or after its wake limit ' +
       '(three wakes for review comments alone). action: start (the branch\'s open PR, or `number`), stop, ' +
-      'or status. Without thread_id, status lists every watch on this Mac.',
+      'or status. Without thread_id, status lists every watch on this machine.',
     inputSchema: {
       thread_id: z.string().optional(),
       action: z.enum(['start', 'stop', 'status']),
@@ -436,13 +436,13 @@ server.registerTool(
   'hand_off_thread',
   {
     description:
-      `Move a thread to another of ${USER}'s Macs, only when ${USER} asks. A running turn stops here and the other Mac resumes the same ` +
-      'session, then runs the messages that were queued for it. An idle thread moves between turns: the next message runs on the other Mac. A worktree thread takes its commits and uncommitted changes along. ' +
-      'With to "here", take over a thread another Mac holds: that Mac hands it to this one on its next sync, the same way. ' +
+      `Move a thread to another of ${USER}'s machines, only when ${USER} asks. A running turn stops here and the other machine resumes the same ` +
+      'session, then runs the messages that were queued for it. An idle thread moves between turns: the next message runs on the other machine. A worktree thread takes its commits and uncommitted changes along. ' +
+      'With to "here", take over a thread another machine holds: that machine hands it to this one on its next sync, the same way. ' +
       'It runs in the background after this answers; the thread shows where it is.',
     inputSchema: {
       thread_id: z.string(),
-      to: z.string().describe('The Mac, by id or name (ignoring case), from list_devices, or "here" to take the thread over from the Mac that holds it.'),
+      to: z.string().describe('The machine, by id or name (ignoring case), from list_devices, or "here" to take the thread over from the machine that holds it.'),
     },
   },
   async ({ thread_id, to }) => {
@@ -454,8 +454,8 @@ server.registerTool(
     const want = to.trim().toLowerCase();
     const named = devices.filter((d) => d.name.toLowerCase() === want);
     const hit = devices.find((d) => d.id === to) ?? (named.length === 1 ? named[0] : null);
-    if (named.length > 1 && !hit) throw new Error(`${named.length} Macs are called "${to}". Pass the id instead: ${named.map((d) => d.id).join(', ')}.`);
-    if (!hit) throw new Error(`No synced Mac is called "${to}". Macs: ${devices.map((d) => `${d.name} (${d.id})`).join(', ') || 'none, sync is off or no other Mac has synced'}.`);
+    if (named.length > 1 && !hit) throw new Error(`${named.length} machines are called "${to}". Pass the id instead: ${named.map((d) => d.id).join(', ')}.`);
+    if (!hit) throw new Error(`No synced machine is called "${to}". Machines: ${devices.map((d) => `${d.name} (${d.id})`).join(', ') || 'none, sync is off or no other machine has synced'}.`);
     const res = await call(`/threads/${thread_id}/handoff`, { method: 'POST', body: JSON.stringify({ to: hit.id }) });
     return text({ thread_id, to: { id: hit.id, name: hit.name }, handoff: res.handoff?.state ?? null });
   },
@@ -533,7 +533,7 @@ server.registerTool(
   {
     description:
       "An event automation's deliveries, newest first: each event that reached it (a published page, a GitHub webhook) and what became of it. " +
-      'state is received, accepted, queued (held for the Mac that runs automations), started (its thread exists: see thread_id and thread_status), ' +
+      'state is received, accepted, queued (held for the machine that runs automations), started (its thread exists: see thread_id and thread_status), ' +
       'failed or skipped (with reason). can_retry means it failed before any thread was made, so retrying cannot duplicate a run. ' +
       "A failed one that has a thread (retry_blocked says so) has an unknown outcome: open that thread and follow up there. Pass the last id as before to page.",
     inputSchema: { automation: z.string().min(1).max(200), limit: z.number().int().min(1).max(100).optional(), before: z.string().optional() },
@@ -567,7 +567,7 @@ server.registerTool(
 );
 
 server.registerTool('worktree_storage', {
-  description: 'Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup, plus what a cleanup or this Mac\'s retention policy would remove and the last cleanup runs. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing: only Ben removes worktrees, in Settings > Worktrees.',
+  description: 'Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup, plus what a cleanup or this machine\'s retention policy would remove and the last cleanup runs. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing: only Ben removes worktrees, in Settings > Worktrees.',
   inputSchema: { scan: z.boolean().optional() },
 }, async ({ scan }) => text(await call('/worktrees/scan', scan ? { method: 'POST' } : undefined)));
 

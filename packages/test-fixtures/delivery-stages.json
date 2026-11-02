@@ -1,6 +1,6 @@
 [
   {
-    "case": "held for the Mac that runs automations",
+    "case": "held for the machine that runs automations",
     "input": {"state": "queued", "reason": null, "thread_id": null, "thread_status": null, "waiting": null},
     "expected": [
       {"name": "Trigger", "label": "Held for owner", "tone": "plain", "note": null},

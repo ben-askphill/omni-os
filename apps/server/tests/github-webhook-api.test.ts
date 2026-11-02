@@ -101,7 +101,7 @@ describe('refused before anything is saved', () => {
     ['an unknown automation', () => hook(workflowRun(), { automation: 'nope' }), 404],
     ['an automation with another trigger', () => hook(workflowRun(), { automation: 'page' }), 404],
     ['no secret set on this Mac', () => hook(workflowRun(), { automation: 'unset' }), 503],
-    ['a paused automation on the Mac that runs automations', () => hook(workflowRun(), { automation: 'paused' }), 409],
+    ['a paused automation on the machine that runs automations', () => hook(workflowRun(), { automation: 'paused' }), 409],
   ];
   for (const [name, send, status] of refusals) {
     it(name, async () => {

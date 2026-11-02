@@ -204,7 +204,7 @@ private struct NewThreadBox: View {
         pick: { composer.selectModel(harness: $0, model: $1) }, refresh: refreshHarnesses, openRequest: pickerRequest, openQuery: pickerQuery,
         effort: EffortPick(options: composer.effortOptions, value: composer.choice.effort, pick: composer.selectEffort))
       if !composer.devices.isEmpty {
-        RunOnMenu(devices: composer.devices, pick: composer.runOn, select: composer.selectRunOn)
+        RunOnMenu(devices: composer.devices, pick: composer.runOn, hereName: model.store.status?.device?.name, select: composer.selectRunOn)
       }
       if BaseRules.isOffered(bases.options, harness: composer.choice.harness), let options = bases.options {
         BasePicker(options: options, pick: composer.basePick, select: composer.selectBase)

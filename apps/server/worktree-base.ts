@@ -48,7 +48,7 @@ const commitOf = (repo: string, ref: string) => gitOr(repo, ['rev-parse', '--ver
 export async function baseOptions(channel: Channel): Promise<BaseOptions> {
   const repo = channel.repo_path;
   if (!channel.repo_path || !channel.use_worktree) return { available: false, reason: 'This channel does not start threads in worktrees of a repository.' };
-  if (!repo || !existsSync(repo)) return { available: false, reason: `The channel's repository is not on this Mac: ${channel.repo_path}` };
+  if (!repo || !existsSync(repo)) return { available: false, reason: `The channel's repository is not on this machine: ${channel.repo_path}` };
   const sha = await commitOf(repo, 'HEAD');
   if (!sha) return { available: false, reason: `${repo} has no commits yet, or is not a git repository.` };
   const current = await gitOr(repo, ['branch', '--show-current']);

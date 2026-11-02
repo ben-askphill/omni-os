@@ -93,7 +93,7 @@ struct HandoffCard: View {
         }
         .buttonStyle(.pill(.secondary, height: 28))
         .disabled(store.handingOff)
-        .help(handoff.outgoing ? "Keep the thread on this Mac" : "Leave the thread on \(handoff.from.name)")
+        .help(handoff.outgoing ? "Keep the thread on \(handoff.from.name)" : "Leave the thread on \(handoff.from.name)")
       }
     }
     .padding(.horizontal, z(16))

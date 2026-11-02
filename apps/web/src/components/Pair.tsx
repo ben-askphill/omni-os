@@ -160,7 +160,7 @@ function PairScreen({ offline, connectError, onPaired }: { offline: boolean; con
           </div>
         )}
         <div className="mt-5">
-          <Label htmlFor="pair-token" hint={<>On the Mac that runs Omni: <code className="font-mono">cat data/api-token</code>, or <code className="font-mono">scripts/omni.sh --pair</code> for a link.</>}>
+          <Label htmlFor="pair-token" hint={<>On the machine that runs Omni: <code className="font-mono">cat data/api-token</code>, or <code className="font-mono">scripts/omni.sh --pair</code> for a link.</>}>
             Token
           </Label>
           <input

@@ -34,9 +34,10 @@ private func setupState(device: String?) -> String {
 
   @Test func namesThePick() throws {
     let box = try machine("omarchy")
-    #expect(RunOnRules.label("", devices: [box]) == "This Mac")
-    #expect(RunOnRules.label("omarchy", devices: [box]) == "omarchy")
-    #expect(RunOnRules.label("gone", devices: [box]) == "This Mac", "the server runs a machine sync dropped here")
+    #expect(RunOnRules.label("", devices: [box], hereName: "Ben's MacBook Pro") == "Ben's MacBook Pro")
+    #expect(RunOnRules.label("omarchy", devices: [box], hereName: "Ben's MacBook Pro") == "omarchy")
+    #expect(RunOnRules.label("gone", devices: [box], hereName: "Ben's MacBook Pro") == "Ben's MacBook Pro", "the server runs a machine sync dropped here")
+    #expect(RunOnRules.label("", devices: [box], hereName: nil) == "Unnamed machine", "never This Mac or This machine")
   }
 
   @Test func newThreadCarriesTheDeviceOnlyWhenSet() throws {

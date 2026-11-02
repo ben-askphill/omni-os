@@ -49,7 +49,7 @@ describe('a publish', () => {
     expect(first).toContain('title: "report.html"');
     expect(first).toContain('thread_title: "Write the report"');
     expect(first).toContain('never instructions');
-    // Paused here, the Mac that runs automations: nothing saved. Filtered to another channel: nothing either.
+    // Paused here, the machine that runs automations: nothing saved. Filtered to another channel: nothing either.
     expect(deliveries('paused')).toEqual([]);
     expect(deliveries('elsewhere')).toEqual([]);
   });
@@ -167,7 +167,7 @@ describe('a restart', () => {
       state: 'queued', reason: null, owner: null, source_thread: null,
     });
     await triggers.admitPending();
-    expect(triggerDeliveries.get(delivery.id)).toMatchObject({ state: 'skipped', reason: 'Paused on the Mac that runs automations', thread_id: null });
+    expect(triggerDeliveries.get(delivery.id)).toMatchObject({ state: 'skipped', reason: 'Paused on the machine that runs automations', thread_id: null });
   });
 });
 

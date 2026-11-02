@@ -475,7 +475,7 @@ export async function resumeRequests(threadId: string, ids?: string[]): Promise<
   const chosen = ids ? parked.filter((r) => ids.includes(r.id)) : parked.filter((r) => r.state === 'recovered');
   if (ids && chosen.length !== new Set(ids).size) throw refusal('Some of these messages are no longer waiting to be resumed.', 409);
   const self = outbox.machineId();
-  if (chosen.some((r) => r.machine_id && r.machine_id !== self)) throw refusal('This message was queued on your other Mac. Resume it there.', 409);
+  if (chosen.some((r) => r.machine_id && r.machine_id !== self)) throw refusal('This message was queued on your other machine. Resume it there.', 409);
   const blocked = turnBlocked(thread, runsHere(threadId));
   if (blocked) throw refusal(blocked, 409);
   for (const r of chosen) messageRequests.mark(r.id, 'accepted');

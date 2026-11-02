@@ -131,11 +131,11 @@ function WebhookPanel({ id, webhook, onChanged }: { id: string; webhook: NonNull
           <span className="min-w-0 flex-1 basis-56">
             {webhook.secret_set ? (
               <span className="flex items-center gap-2 text-[12.5px] text-fg-2">
-                <StatusDot status="done" size={7} /> Signing secret set on this Mac
+                <StatusDot status="done" size={7} /> Signing secret set on this machine
               </span>
             ) : (
               <span className="flex items-center gap-2 text-[12.5px] text-warn">
-                <Icon name="alert" size={13} /> No signing secret on this Mac
+                <Icon name="alert" size={13} /> No signing secret on this machine
               </span>
             )}
             {webhook.secret_set ? (
@@ -390,7 +390,7 @@ function AutomationMachine({ refreshing }: { refreshing: boolean }) {
     <div className="relative z-10 rounded-[24px] bg-surface p-4 md:p-5">
       <div className="mb-2 text-[13px] font-medium">Run automations on</div>
       <Picker label="Run automations on" value={pick} options={options} onChange={(v) => void save(v)} disabled={saving || !status.data?.machineId || !devices.data} />
-      <p className="mt-2 text-[12.5px] text-fg-3">Scheduled and event-triggered runs use this machine after sync. It must be awake with Omni running. Run now uses the connected machine.</p>
+      <p className="mt-2 text-[12.5px] text-fg-3">Scheduled and event-triggered runs use the machine picked here after sync. It must be awake with Omni running. Run now uses the connected machine.</p>
       {status.data && !status.data.machineId && <p className="mt-2 text-[12.5px] text-fg-3">Sync another machine to choose where automations run.</p>}
       {(error || status.error || devices.error) && <ErrorNote className="mt-2">{error || status.error || devices.error}</ErrorNote>}
     </div>

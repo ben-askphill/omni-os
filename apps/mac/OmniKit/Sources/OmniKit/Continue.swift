@@ -435,8 +435,8 @@ public enum ContinueRules {
   /// Why a thread on this harness cannot be continued, for the header button's help (`continueSourceRefusal`). Nil
   /// when it can.
   public static func sourceRefusal(_ harness: HarnessID) -> String? {
-    if harness == .hermes { return "This thread runs on the Hermes server, so its files are not on this Mac to continue from." }
-    if harness == .cursorCloud { return "This thread runs on Cursor's machines, so its files are not on this Mac to continue from." }
+    if harness == .hermes { return "This thread runs on the Hermes server, so its files are not on this machine to continue from." }
+    if harness == .cursorCloud { return "This thread runs on Cursor's machines, so its files are not on this machine to continue from." }
     return nil
   }
 

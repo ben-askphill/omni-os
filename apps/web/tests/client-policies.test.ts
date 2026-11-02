@@ -88,8 +88,8 @@ describe('run-location defaults (policies/run-on.json)', () => {
   });
 
   it('names the pick', () => {
-    for (const c of r.labels as { listed: string[]; pick: string; label: string }[]) {
-      expect(runOnRows(devices(c.listed)).find((row) => row.value === here(c.pick))?.label).toBe(c.label);
+    for (const c of r.labels as { listed: string[]; here: string | null; pick: string; label: string }[]) {
+      expect(runOnRows(devices(c.listed), { hereName: c.here }).find((row) => row.value === here(c.pick))?.label).toBe(c.label);
     }
   });
 });

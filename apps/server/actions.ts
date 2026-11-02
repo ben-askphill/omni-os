@@ -50,7 +50,7 @@ const plain = (s: string) => s.replace(ANSI, '').replace(/\r(?!\n)/g, '\n');
 
 /** Why no action can run in this thread right now, or null. A worktree still being prepared is #211's to run in. */
 export function blockedReason(t: Thread): string | null {
-  if (isProviderHarness(t.harness)) return 'This thread runs off this Mac, so its actions have no checkout here to run in.';
+  if (isProviderHarness(t.harness)) return 'This thread runs off this machine, so its actions have no checkout here to run in.';
   if (t.setup === 'preparing') return "The thread's worktree is still being prepared.";
   if (t.setup === 'failed') return `The thread's worktree could not be prepared: ${t.setup_error ?? 'unknown error'}`;
   return null;
@@ -64,7 +64,7 @@ async function verifiedCwd(t: Thread): Promise<string> {
     const problem = await worktreeProblem(repo, t.cwd, t.branch);
     if (problem) throw refusal(`The thread's checkout is not ready: ${problem}`, 409);
   } else if (!existsSync(t.cwd)) {
-    throw refusal(`The thread's working directory is not on this Mac: ${t.cwd}`, 409);
+    throw refusal(`The thread's working directory is not on this machine: ${t.cwd}`, 409);
   }
   return t.cwd;
 }
@@ -94,7 +94,7 @@ async function claimPort(want: number | null): Promise<number | null> {
     claimed.add(want);
     if (await portFree(want)) return want;
     claimed.delete(want);
-    throw refusal(`Port ${want} is already in use on this Mac by a program outside Omni. Stop it, or set this action's port to 0.`, 409);
+    throw refusal(`Port ${want} is already in use on this machine by a program outside Omni. Stop it, or set this action's port to 0.`, 409);
   }
   for (let p = PREVIEW_PORTS.from; p <= PREVIEW_PORTS.to; p++) {
     if (claimed.has(p)) continue;

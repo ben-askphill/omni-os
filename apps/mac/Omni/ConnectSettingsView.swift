@@ -13,7 +13,7 @@ struct ConnectSettings: View {
   var body: some View {
     Group {
       if let connect {
-        ConnectCard(connect: connect)
+        ConnectCard(connect: connect, hereName: model.store.status?.device?.name)
       } else {
         LoadingNote()
       }
@@ -39,9 +39,11 @@ struct ConnectSettings: View {
 
 struct ConnectCard: View {
   @Bindable var connect: ConnectModel
+  /// This machine's name (GET /api/status `device.name`), for the switch's title.
+  let hereName: String?
 
   var body: some View {
-    SettingsCard(title: "Omni Connect", note: "Open this Mac from a phone or another computer through a Cloudflare tunnel. Sign in once on the Connect page, then open any machine.") {
+    SettingsCard(title: "Omni Connect", note: "Open this machine from a phone or another computer through a Cloudflare tunnel. Sign in once on the Connect page, then open any machine.") {
       if let error = connect.loadError, connect.status == nil {
         ErrorNote(text: error) { Task { await connect.load() } }
       } else if let status = connect.status {
@@ -61,8 +63,8 @@ struct ConnectCard: View {
     }
     HStack(spacing: z(8)) {
       SettingsToggle(
-        title: "Omni Connect on this Mac",
-        detail: "The relay gives this Mac a public address, and cloudflared keeps the tunnel to it open.",
+        title: "Reach \(RunOnRules.hereLabel(hereName)) with Omni Connect",
+        detail: "The relay gives this machine a public address, and cloudflared keeps the tunnel to it open.",
         isOn: Binding(get: { s.enabled }, set: { on in Task { await connect.setEnabled(on) } })
       )
       .disabled(connect.isBusy || (!s.signedIn && !s.enabled))
@@ -136,13 +138,13 @@ struct ConnectCard: View {
   }
 }
 
-/// A machine on Connect: online or offline, This Mac, and Open while it is online.
+/// A machine on Connect: online or offline, Current for this one, and Open while it is online.
 struct ConnectMachineRow: View {
   let machine: ConnectMachine
 
   private var statusText: String {
     let state = machine.online ? "Online" : "Offline"
-    return machine.current ? "This Mac, \(state.lowercased())" : state
+    return machine.current ? "Current, \(state.lowercased())" : state
   }
 
   var body: some View {

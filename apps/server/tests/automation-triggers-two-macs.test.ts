@@ -7,7 +7,7 @@ import { bootMac, type Mac } from './two-macs.ts';
 
 // An event automation on two synced Macs, two real servers with fake claude and one in-memory relay. Mac A runs
 // automations. A publish both Macs see starts one run, on A; one only B sees is held on B and started on A. The
-// automation is paused on B and on on A: the Mac that runs automations decides.
+// automation is paused on B and on on A: the machine that runs automations decides.
 
 const relay = new MemoryTransport();
 const T = { timeout: 30_000 };

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import { takeoverNote } from '@omni/shared/handoff.ts';
 import { errorText, type Thread } from '../../api.ts';
+import { useHereName } from '../../store.tsx';
 import { HERE, threadMachine, type RunOnRow } from '../../run-on.ts';
 import { handOff, useHandoffTargets, type HandoffAnswer } from '../thread/Handoff.tsx';
 import { TakeoverConfirm } from '../thread/Takeover.tsx';
@@ -15,7 +16,7 @@ import { Picker, type PickerOption } from '../ui.tsx';
 export const machineOptions = (rows: RunOnRow[]): PickerOption<string>[] =>
   rows.map((r) => ({ value: r.value, label: r.label, sub: r.sub, icon: 'monitor', avatar: false, disabled: r.disabled }));
 
-/** "On This Mac" or "On omarchy", with the rows to pick from. Renders nothing without rows: one machine. */
+/** "On Ben's MacBook Pro" or "On omarchy", with the rows to pick from. Renders nothing without rows: one machine. */
 export function MachineChip({ rows, value, onChange, disabled, title }: { rows: RunOnRow[] | null; value: string; onChange: (pick: string) => void; disabled?: boolean; title?: string }) {
   const options = useMemo(() => (rows ? machineOptions(rows) : []), [rows]);
   if (!rows) return null;
@@ -42,7 +43,11 @@ export interface MachineHeld {
 export function useThreadMachine(thread: { id: string; status?: Thread['status'] }, held: MachineHeld, onError?: (text: string | null) => void) {
   const targets = useHandoffTargets(thread.status ? { status: thread.status } : null, held);
   const running = thread.status === 'running' || thread.status === 'queued';
-  const machine = useMemo(() => threadMachine({ targets, takeover: held.takeover, handoff: held.handoff, running }), [targets, held.takeover, held.handoff, running]);
+  const hereName = useHereName();
+  const machine = useMemo(
+    () => threadMachine({ targets, takeover: held.takeover, handoff: held.handoff, running, hereName }),
+    [targets, held.takeover, held.handoff, running, hereName],
+  );
   const [sending, setSending] = useState(false);
   const [asking, setAsking] = useState(false);
   const pick = async (value: string) => {

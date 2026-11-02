@@ -146,12 +146,12 @@ describe('branch changes of a worktree thread', () => {
     expect(group(body, 'untracked').truncated).toBe(true);
   });
 
-  it('is unavailable while the worktree is not on this Mac or not on its branch', async () => {
+  it('is unavailable while the worktree is not on this machine or not on its branch', async () => {
     const { t } = await worktreeThread();
     git(t.cwd, 'checkout', '-q', '-b', 'elsewhere');
     expect((await changes(t.id)).body).toEqual({ available: false, reason: expect.stringContaining('not omni/') });
     rmSync(t.cwd, { recursive: true, force: true });
-    expect((await changes(t.id)).body).toEqual({ available: false, reason: "This thread's worktree is not on this Mac." });
+    expect((await changes(t.id)).body).toEqual({ available: false, reason: "This thread's worktree is not on this machine." });
   });
 });
 

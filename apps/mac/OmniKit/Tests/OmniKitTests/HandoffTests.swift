@@ -43,7 +43,7 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
     #expect(try text(#"{"phase":"preparing","step":"stopping"}"#) == "Handing off to Ben's MacBook Pro: stopping the turn here.")
     #expect(try text(#"{"phase":"preparing","step":"uploading"}"#) == "Handing off to Ben's MacBook Pro: uploading the session.")
     #expect(try text(#"{"phase":"preparing","step":"packing"}"#) == "Handing off to Ben's MacBook Pro: packing the worktree.")
-    #expect(try text(#"{"phase":"preparing","step":"packing"}"#, outgoing: false) == "Ben's MacBook Air is handing this thread to this Mac.")
+    #expect(try text(#"{"phase":"preparing","step":"packing"}"#, outgoing: false) == "Ben's MacBook Air is handing this thread to Ben's MacBook Pro.")
   }
 
   @Test func saysWhoIsWaitingOnWhom() throws {
@@ -55,8 +55,8 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
   }
 
   @Test func saysWhereItRunsOnceTaken() throws {
-    #expect(try text(#"{"phase":"accepted"}"#) == "Running on Ben's MacBook Pro. Handed off from this Mac.")
-    #expect(try text(#"{"phase":"accepted"}"#, outgoing: false) == "Handed off from Ben's MacBook Air. Running on this Mac.")
+    #expect(try text(#"{"phase":"accepted"}"#) == "Running on Ben's MacBook Pro. Handed off from Ben's MacBook Air.")
+    #expect(try text(#"{"phase":"accepted"}"#, outgoing: false) == "Handed off from Ben's MacBook Air. Running on Ben's MacBook Pro.")
   }
 
   @Test func saysTheNextMessageContinuesAThreadHandedOffBetweenTurns() throws {
@@ -67,7 +67,7 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
   @Test func saysWhoAskedWhenTakenOver() throws {
     let accepted = #"{"phase":"accepted"}"#
     #expect(try text(accepted, requested: true) == "Ben's MacBook Pro took this thread over. Running there.")
-    #expect(try text(accepted, outgoing: false, requested: true) == "Taken over from Ben's MacBook Air. Running on this Mac.")
+    #expect(try text(accepted, outgoing: false, requested: true) == "Taken over from Ben's MacBook Air. Running on Ben's MacBook Pro.")
     #expect(try text(accepted, idle: true, requested: true) == "Ben's MacBook Pro took this thread over. The next message runs there.")
     #expect(
       try text(accepted, outgoing: false, idle: true, requested: true) == "Taken over from Ben's MacBook Air. Your next message continues it here.")
@@ -227,7 +227,7 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
 
   @Test func aCardWithCancelOnlyOnTheGivingMacWhileTheOtherHasNotTakenIt() throws {
     #expect(try banner(#"{"phase":"preparing","step":"stopping"}"#) == .card(tone: .working, text: "Handing off to Ben's MacBook Pro: stopping the turn here.", cancel: true))
-    #expect(try banner(#"{"phase":"preparing","step":"stopping"}"#, outgoing: false) == .card(tone: .working, text: "Ben's MacBook Air is handing this thread to this Mac.", cancel: false))
+    #expect(try banner(#"{"phase":"preparing","step":"stopping"}"#, outgoing: false) == .card(tone: .working, text: "Ben's MacBook Air is handing this thread to Ben's MacBook Pro.", cancel: false))
     #expect(try banner(#"{"phase":"offered","stale":false}"#) == .card(tone: .waiting, text: "Waiting for Ben's MacBook Pro to pick it up.", cancel: true))
     guard case .card(.alert, _, true)? = try banner(#"{"phase":"offered","stale":true}"#) else { Issue.record("a stale offer alerts"); return }
     #expect(try banner(#"{"phase":"offered","stale":false}"#, outgoing: false, status: .stopped) == .card(tone: .working, text: "Picking this thread up from Ben's MacBook Air.", cancel: false))
@@ -263,7 +263,7 @@ private func device(_ reachability: String, lastSeen: String? = nil, name: Strin
   }
 
   @Test func oneQuietLineOnceSettled() throws {
-    #expect(try banner(#"{"phase":"accepted"}"#, status: .stopped) == .line(tone: .done, text: "Running on Ben's MacBook Pro. Handed off from this Mac."))
+    #expect(try banner(#"{"phase":"accepted"}"#, status: .stopped) == .line(tone: .done, text: "Running on Ben's MacBook Pro. Handed off from Ben's MacBook Air."))
     #expect(try banner(#"{"phase":"cancelled"}"#, status: .running) == .line(tone: .cancelled, text: "The handoff to Ben's MacBook Pro was cancelled."))
     #expect(HandoffBanner(nil, status: .running) == nil)
   }

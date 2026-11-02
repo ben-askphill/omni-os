@@ -59,7 +59,7 @@ const snapshotTree = async (dir: string) => (await captureTree(dir, 'all', git))
 
 const descends = async (dir: string, from: string, to: string) => from === to || succeeds(git(dir, ['merge-base', '--is-ancestor', from, to]));
 
-const ownCommits = (branch: string) => new Error(`this Mac's copy of branch ${branch} has commits the other Mac's does not, so Omni left it alone`);
+const ownCommits = (branch: string) => new Error(`this machine's copy of branch ${branch} has commits the other machine's does not, so Omni left it alone`);
 
 /** Pack the worktree at dir and upload the bundle. Changes nothing in the checkout. */
 export async function packWorktree(dir: string, threadId: string, offerId: string, transport: SyncTransport): Promise<WorktreeBundle> {
@@ -134,7 +134,7 @@ export async function unpackWorktree(u: Unpack): Promise<void> {
     const unstaged = await names([]);
     const stagedOnly = [...(await names(['--cached']))].some((f) => unstaged.has(f));
     if (stagedOnly || (!clean && !handed.includes(tree))) {
-      throw new Error("this Mac's worktree for the thread has uncommitted changes of its own, so Omni left it alone. Commit or stash them there, then hand the thread over again");
+      throw new Error("this machine's worktree for the thread has uncommitted changes of its own, so Omni left it alone. Commit or stash them there, then hand the thread over again");
     }
     if (!(await descends(dir, await git(dir, ['rev-parse', 'HEAD']), bundle.base))) throw ownCommits(branch);
     await git(dir, ['reset', '--quiet', '--hard', bundle.base]);

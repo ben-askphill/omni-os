@@ -114,7 +114,7 @@ public struct NeedsYouItem: Decodable, Hashable, Sendable, Identifiable {
       case .recovered: return (.needs, many(b.count, "A message waits for Resume", "# messages wait for Resume"), preview)
       case .limited:
         let at = b.resetsAt.map { LimitStop.resetLabel($0) }
-        return (.needs, b.elsewhere ? "Usage limit reached on your other Mac" : "Usage limit reached", at.map { "\(b.scheduled ? "Resumes" : "Resets") at \($0)" } ?? "No reset time given")
+        return (.needs, b.elsewhere ? "Usage limit reached on your other machine" : "Usage limit reached", at.map { "\(b.scheduled ? "Resumes" : "Resets") at \($0)" } ?? "No reset time given")
       default: break
       }
     }

@@ -33,9 +33,16 @@ public enum RunOnRules {
     return pick.isEmpty ? here : pick
   }
 
-  /// The pick's name: the machine's, else "This Mac", where a machine sync does not list runs.
-  public static func label(_ pick: String, devices: [Device]) -> String {
-    devices.first { $0.id == pick }?.name ?? "This Mac"
+  /// The pick's name: the machine's, else this machine's own (`hereName`, GET /api/status `device.name`), where a
+  /// machine sync does not list runs. Never "This Mac": Omni runs on Linux machines too.
+  public static func label(_ pick: String, devices: [Device], hereName: String?) -> String {
+    devices.first { $0.id == pick }?.name ?? hereLabel(hereName)
+  }
+
+  /// `machineLabel` in handoff.ts: this machine's name, else "Unnamed machine".
+  public static func hereLabel(_ name: String?) -> String {
+    let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return trimmed.isEmpty ? "Unnamed machine" : trimmed
   }
 }
 

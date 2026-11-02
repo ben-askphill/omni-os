@@ -197,6 +197,14 @@ export function useApp() {
   return v;
 }
 
+/**
+ * The name of the machine Omni runs on (GET /api/status `device`), for the labels that name it. Undefined until the
+ * status loads, or outside the provider; `machineLabel` then says "Unnamed machine".
+ */
+export function useHereName(): string | undefined {
+  return useContext(Ctx)?.status?.device?.name;
+}
+
 /** Subscribe to /feed events for the lifetime of the component. */
 export function useFeed(fn: (e: FeedEvent) => void) {
   const { subscribe } = useApp();

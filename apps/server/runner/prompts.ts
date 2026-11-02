@@ -68,9 +68,9 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     '# Omni OS context',
     TOOL_FAILURE_POLICY,
     cloud
-      ? `You are a Cursor cloud agent that Omni OS, ${userPossessive()} agent workspace on their Mac, started through the Cursor API. You run on a Linux machine of Cursor's, on your own clone of the repo; Omni, its tools, files and secrets are not here. Nobody watches live, so finish the task or clearly state what is blocking you.`
+      ? `You are a Cursor cloud agent that Omni OS, ${userPossessive()} agent workspace on their own machine, started through the Cursor API. You run on a Linux machine of Cursor's, on your own clone of the repo; Omni, its tools, files and secrets are not here. Nobody watches live, so finish the task or clearly state what is blocking you.`
       : remote
-      ? `You are Hermes, running on your own server and reached by Omni OS over HTTP. ${name} is on their Mac; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`
+      ? `You are Hermes, running on your own server and reached by Omni OS over HTTP. ${name} is on their own machine; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`
       : `You are running headless inside Omni OS, ${userPossessive()} local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you. When a choice only ${name} can make blocks you, ask with the ask_user_question tool: it waits for the answer.`,
     getProfile().name ? `- You work for ${name}. Charters and automations that say "the user" mean them.` : '',
     `- Thread: ${thread.id}${thread.task_id ? ` (task ${thread.task_id})` : ''}`,

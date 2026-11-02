@@ -31,7 +31,7 @@ private func previewJSON(
         {"id":"u2:0","name":"cart.png","event_id":2,"mime":"image/png","size":3400,"image":true,"availability":"available",
          "reason":null,"selected":true,"carried":true,"as":"inline"},
         {"id":"u2:1","name":"trace.zip","event_id":2,"mime":"application/zip","size":null,"image":false,"availability":"missing",
-         "reason":"Its bytes are not on this Mac.","selected":true,"carried":false,"as":null}],
+         "reason":"Its bytes are not on this machine.","selected":true,"carried":false,"as":null}],
       "omitted":[{"what":"history","count":20,"note":"20 older entries left out.","ref":"/api/threads/t1/transcript?through=2"},
         {"what":"attachments","count":1,"note":"1 attachment is not carried.","ref":null},
         {"what":"uncommitted","count":2,"note":"2 binary files are not carried.","ref":"git -C /tmp/x status"},
@@ -126,7 +126,7 @@ private let startBody = ContinueBody(
     #expect(c.attachments.map(\.availability) == [.available, .missing])
     #expect(c.attachments.map(\.arrival) == ["inline", nil])
     #expect(c.attachments.map(\.size) == [3400, nil])
-    #expect(c.attachments[1].reason == "Its bytes are not on this Mac.")
+    #expect(c.attachments[1].reason == "Its bytes are not on this machine.")
     #expect(c.omitted.map(\.what) == [.history, .attachments, .uncommitted, .messages])
     #expect(c.omitted.map(\.ref) == ["/api/threads/t1/transcript?through=2", nil, "git -C /tmp/x status", nil])
     #expect(c.budget == 24000)
@@ -205,13 +205,13 @@ private let startBody = ContinueBody(
   @Test func describesEachAttachment() throws {
     let files = try decode(ContinuePreview.self, previewJSON()).carryover.attachments
     #expect(files.map(ContinueRules.attachmentMeta) == ["PNG image · 3.3 KB", "File · size unknown"])
-    #expect(files.map(ContinueRules.attachmentNote) == ["Goes inline as an image.", "Its bytes are not on this Mac."])
+    #expect(files.map(ContinueRules.attachmentNote) == ["Goes inline as an image.", "Its bytes are not on this machine."])
     let notTicked = try decode(
       ContinuePreview.self,
       previewJSON().replacingOccurrences(of: #""selected":true,"carried":true"#, with: #""selected":false,"carried":false"#)
     ).carryover.attachments
     #expect(ContinueRules.attachmentNote(notTicked[0]) == nil)
-    #expect(ContinueRules.attachmentNote(notTicked[1]) == "Its bytes are not on this Mac.")
+    #expect(ContinueRules.attachmentNote(notTicked[1]) == "Its bytes are not on this machine.")
     #expect(files.map(ContinueRules.attachmentTag) == [nil, "Missing"])
     #expect(ContinueRules.attachmentsSummary(files) == "1 of 2 will be copied into the new thread.")
     #expect(ContinueRules.attachmentsSummary([]) == "None will be carried. Tick the ones the new thread needs.")

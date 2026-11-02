@@ -151,7 +151,7 @@ private struct AutomationMachinePanel: View {
   var body: some View {
     VStack(alignment: .leading, spacing: z(10)) {
       Text("Run automations on").font(.omni(size: 13, weight: .medium))
-      RunOnMenu(devices: model.devices.devices, pick: pick, select: { device in
+      RunOnMenu(devices: model.devices.devices, pick: pick, hereName: model.store.status?.device?.name, select: { device in
         saving = true
         error = nil
         Task {
@@ -162,7 +162,7 @@ private struct AutomationMachinePanel: View {
       }, allowOffline: true)
       .disabled(saving || status?.machineId == nil)
       .help("The machine that runs scheduled and event-triggered automations.")
-      Text("Scheduled and event-triggered runs use this machine after sync. It must be awake with Omni running. Run now uses the connected machine.")
+      Text("Scheduled and event-triggered runs use the machine picked here after sync. It must be awake with Omni running. Run now uses the connected machine.")
         .font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)
       if let status, status.machineId == nil {
         Text("Sync another machine to choose where automations run.").font(.omni(size: 12.5)).foregroundStyle(Tok.fg3)

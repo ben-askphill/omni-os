@@ -124,16 +124,16 @@ describe('buildCarryover', () => {
   it('lists the files it carries, and each file it could not with its reason', () => {
     const c = withFiles([
       file({ id: 'uid-1:0', name: 'cart.png', selected: true, carried: true }),
-      file({ id: 'uid-1:1', name: 'trace.zip', mime: 'application/zip', image: false, availability: 'missing', reason: 'Its bytes are not on this Mac.', selected: true, as: null }),
+      file({ id: 'uid-1:1', name: 'trace.zip', mime: 'application/zip', image: false, availability: 'missing', reason: 'Its bytes are not on this machine.', selected: true, as: null }),
       file({ id: 'uid-1:2', name: 'huge.mov', mime: 'video/quicktime', image: false, availability: 'oversize', reason: '90 MB is over the limit.', selected: true, as: null }),
     ]);
     expect(c.text).toContain('Attachments carried, copied into your own uploads folder and listed with the first message you read: cart.png.');
     expect(c.text).toContain('  - Attachment: cart.png (carried, listed with the first message)');
-    expect(c.text).toContain('  - Attachment: trace.zip (not carried: Its bytes are not on this Mac.)');
+    expect(c.text).toContain('  - Attachment: trace.zip (not carried: Its bytes are not on this machine.)');
     expect(c.omitted).toContainEqual({
       what: 'attachments',
       count: 2,
-      note: '2 attachments were not carried: trace.zip (Its bytes are not on this Mac.); huge.mov (90 MB is over the limit.).',
+      note: '2 attachments were not carried: trace.zip (Its bytes are not on this machine.); huge.mov (90 MB is over the limit.).',
       ref: null,
     });
     expect(carriedStats(c).attachments).toBe(1);

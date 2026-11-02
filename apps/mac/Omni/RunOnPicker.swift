@@ -5,20 +5,22 @@ import SwiftUI
 // `RunOnMenu` is a new thread's (Run on) and Settings' default; `ThreadMachineMenu` an open thread's (Hand Off and
 // Take Over). Each hides while there is one machine.
 
-/// The Run on pill: This Mac, then each other synced machine in picker order, an offline one marked.
+/// The Run on pill: this machine under its own name, then each other synced machine in picker order, an offline one marked.
 /// One Tailscale sees offline can't be picked. The new-thread box and Settings > Threads both use it (RunOn.swift).
 struct RunOnMenu: View {
   let devices: [Device]
-  /// A device id, or "" for this Mac.
+  /// A device id, or "" for this machine.
   let pick: String
+  /// This machine's name (GET /api/status `device.name`), which its row and the pill show.
+  let hereName: String?
   let select: (String) -> Void
   var allowOffline = false
 
   var body: some View {
-    let label = RunOnRules.label(pick, devices: devices)
+    let label = RunOnRules.label(pick, devices: devices, hereName: hereName)
     Menu {
       Picker("Run on", selection: Binding(get: { pick }, set: select)) {
-        Text("This Mac").tag("")
+        Text(RunOnRules.hereLabel(hereName)).tag("")
         Section("Synced machines") {
           ForEach(devices) { d in
             Text(d.canTake ? d.name : "\(d.name) · Offline")
@@ -38,8 +40,8 @@ struct RunOnMenu: View {
   }
 }
 
-/// An open thread's Machine chip: the Mac that holds it, and where it can go. While this Mac holds it, the other Macs
-/// hand it off (the items the menu bar's Thread menu lists too); while another Mac holds it, This Mac takes it over,
+/// An open thread's Machine chip: the machine that holds it, and where it can go. While this machine holds it, the
+/// other machines hand it off (the items the menu bar's Thread menu lists too); while another holds it, this one takes it over,
 /// through the confirm `store.askTakeOver` raises, as the Thread menu's Take Over does. Nothing with one machine.
 struct ThreadMachineMenu: View {
   let model: AppModel
@@ -54,21 +56,24 @@ struct ThreadMachineMenu: View {
     }
   }
 
+  /// This machine's name, or "Unnamed machine": never "This Mac", since Omni runs on Linux machines too.
+  private var here: String { RunOnRules.hereLabel(model.store.status?.device?.name) }
+
   private func heldHere(_ devices: [Device]) -> some View {
     Menu {
-      Section("This Mac") {
+      Section(here) {
         Text(store.running ? "Running here now" : "Runs here")
       }
       Section("Hand off to") {
         HandOffItems(store: store, devices: devices)
       }
     } label: {
-      PickerPill(text: "This Mac") { PillIcon(name: "monitor") }
+      PickerPill(text: here) { PillIcon(name: "monitor") }
     }
     .pillMenu()
     .disabled(store.handingOff)
-    .help("Where this thread runs. Pick another Mac to hand it off.")
-    .accessibilityLabel("Run on: This Mac")
+    .help("Where this thread runs. Pick another machine to hand it off.")
+    .accessibilityLabel("Run on: \(here)")
   }
 
   private func heldElsewhere(_ takeover: Takeover) -> some View {
@@ -77,7 +82,7 @@ struct ThreadMachineMenu: View {
       Section(takeover.from.name) {
         Text(takeover.running ? "Running there now" : "Last ran there")
       }
-      Section("This Mac") {
+      Section(RunOnRules.hereLabel(takeover.to.name)) {
         Button(takeover.running ? "Take Over: it stops there and continues here" : "Take Over: your next message runs here") { store.askTakeOver() }
           .disabled(!store.canTakeOver)
         if let refused = takeover.refused { Text(refused) }

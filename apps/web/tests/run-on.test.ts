@@ -8,16 +8,22 @@ const mini: Device = { id: 'mini-id', name: "Ben's Mac mini", reachability: 'off
 const unsure: Device = { id: 'air-id', name: 'Air', reachability: 'unknown', dnsName: null, lastSeen: null };
 
 describe('where a new thread runs', () => {
-  it('lists This Mac first, then each synced machine, with an offline one disabled in the composer', () => {
-    const rows = runOnRows([omarchy, mini, unsure], { now });
+  it('lists this machine first by its name, then each synced machine, with an offline one disabled in the composer', () => {
+    const rows = runOnRows([omarchy, mini, unsure], { now, hereName: "Ben's MacBook Pro" });
     expect(rows.map((r) => [r.value, r.label, r.disabled])).toEqual([
-      [HERE, 'This Mac', false],
+      [HERE, "Ben's MacBook Pro", false],
       ['omarchy-id', 'omarchy', false],
       ['mini-id', "Ben's Mac mini", true],
       ['air-id', 'Air', false],
     ]);
     expect(rows[1].sub).toBe('Online on Tailscale');
     expect(rows[2].sub).toMatch(/^Asleep or offline, last seen /);
+  });
+
+  it('labels this machine Unnamed machine without a name, never This Mac or This machine', () => {
+    expect(runOnRows([omarchy], { now })[0]!.label).toBe('Unnamed machine');
+    expect(runOnRows([omarchy], { now, hereName: ' ' })[0]!.label).toBe('Unnamed machine');
+    expect(runOnRows([omarchy], { now, hereName: 'omarchy-box' })[0]!.label).toBe('omarchy-box');
   });
 
   it('lets Settings name a sleeping machine as the default', () => {

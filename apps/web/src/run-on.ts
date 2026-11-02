@@ -1,4 +1,4 @@
-import type { Device, HandoffView, Takeover } from '@omni/shared/handoff.ts';
+import { machineLabel, type Device, type HandoffView, type Takeover } from '@omni/shared/handoff.ts';
 import { deviceRow, mayTakeOver, takeoverShown, type HandoffTargets } from './handoff.ts';
 
 // Where a thread runs: this machine, or another synced one (apps/server/run-on.ts). The Machine chip on both composers
@@ -8,7 +8,8 @@ import { deviceRow, mayTakeOver, takeoverShown, type HandoffTargets } from './ha
 /** This machine, as POST /api/threads takes it. */
 export const HERE = 'here';
 
-export const HERE_LABEL = 'This Mac';
+/** This machine's row label: its name from GET /api/status `device`, never "This Mac" or "This machine". */
+export const hereLabel = (name: string | null | undefined) => machineLabel(name);
 
 /** One machine in the Run on list. `disabled` for a machine Tailscale sees offline. */
 export interface RunOnRow {
@@ -19,12 +20,15 @@ export interface RunOnRow {
 }
 
 /**
- * This Mac first, then the other synced machines as GET /api/devices lists them. The composer disables an offline one,
+ * This machine first, under its own name (`hereName`), then the other synced machines as GET /api/devices lists them. The composer disables an offline one,
  * since the server refuses it; Settings (`asDefault`) does not, as a default may name a machine that sleeps for now.
  */
-export function runOnRows(devices: Device[], { now = Date.now(), asDefault = false }: { now?: number; asDefault?: boolean } = {}): RunOnRow[] {
+export function runOnRows(
+  devices: Device[],
+  { now = Date.now(), asDefault = false, hereName }: { now?: number; asDefault?: boolean; hereName?: string | null } = {},
+): RunOnRow[] {
   return [
-    { value: HERE, label: HERE_LABEL, sub: 'The machine you talk to', disabled: false },
+    { value: HERE, label: hereLabel(hereName), sub: 'The machine you talk to', disabled: false },
     ...devices.map((d) => {
       const row = deviceRow(d, now);
       return { value: d.id, label: d.name, sub: row.label, disabled: !asDefault && !row.pickable };
@@ -36,7 +40,7 @@ export function runOnRows(devices: Device[], { now = Date.now(), asDefault = fal
 const listed = (id: string | null | undefined, devices: Device[]) => (id && devices.some((d) => d.id === id) ? id : HERE);
 
 /**
- * What a new thread starts on: Settings' default (`runOn.device`, '' for this machine), or This Mac when that machine
+ * What a new thread starts on: Settings' default (`runOn.device`, '' for this machine), or this machine when that one
  * is gone. An offline default stays selected and the server refuses the send.
  */
 export const runOnDefault = (setting: string | null | undefined, devices: Device[]) => listed(setting, devices);
@@ -60,13 +64,13 @@ export const settingPick = (setting: string | null | undefined, devices: Device[
 /**
  * The Machine chip on an existing thread, in the same rows as a new thread's. `holds`: this machine has the thread,
  * and picking another hands it off. `held`: another machine has it (`takeover`), listed first and selected, and picking
- * This Mac takes it over, or is disabled with why. Null when there is nothing to pick: one machine, the targets still
+ * this machine takes it over, or is disabled with why. Null when there is nothing to pick: one machine, the targets still
  * loading, or a handoff under way (the handoff card says so).
  */
 export type ThreadMachine = { kind: 'holds'; rows: RunOnRow[]; value: string } | { kind: 'held'; rows: RunOnRow[]; value: string; takeover: Takeover };
 
 export function threadMachine(
-  v: { targets: HandoffTargets; takeover: Takeover | null | undefined; handoff: HandoffView | null | undefined; running: boolean },
+  v: { targets: HandoffTargets; takeover: Takeover | null | undefined; handoff: HandoffView | null | undefined; running: boolean; hereName?: string | null },
   now = Date.now(),
 ): ThreadMachine | null {
   const t = takeoverShown(v.takeover, v.handoff);
@@ -78,12 +82,12 @@ export function threadMachine(
       takeover: t,
       rows: [
         { value: t.from.id, label: t.from.name, sub: t.running ? 'Running there now' : 'Last ran there', disabled: false },
-        { value: HERE, label: HERE_LABEL, sub: t.refused ?? (t.running ? 'Take over: stops there, continues here' : 'Take over: next message runs here'), disabled: !can },
+        { value: HERE, label: hereLabel(t.to.name || v.hereName), sub: t.refused ?? (t.running ? 'Take over: stops there, continues here' : 'Take over: next message runs here'), disabled: !can },
       ],
     };
   }
   if (v.targets.state !== 'ready') return null;
-  const rows = runOnRows(v.targets.devices, { now });
+  const rows = runOnRows(v.targets.devices, { now, hereName: v.hereName });
   rows[0] = { ...rows[0]!, sub: v.running ? 'Running here now' : 'Runs here' };
   for (const r of rows.slice(1)) if (!r.disabled) r.sub = `Hand off: ${r.sub}`;
   return { kind: 'holds', value: HERE, rows };

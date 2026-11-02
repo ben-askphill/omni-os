@@ -50,7 +50,7 @@ function BrowserAnnotationDetail({ body: b }: { body: BrowserAnnotation }) {
       </a>
       {b.title && <div className="mt-0.5 truncate text-[11.5px] text-fg-2">{b.title}</div>}
       {missing ? (
-        <p className="mt-2 rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] text-fg-3">The screenshot is not on this Mac.</p>
+        <p className="mt-2 rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] text-fg-3">The screenshot is not on this machine.</p>
       ) : (
         <div
           className="relative mt-2 overflow-hidden rounded-xl shadow-[inset_0_0_0_1px_var(--line)]"

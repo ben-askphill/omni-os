@@ -23,10 +23,10 @@ import { inOwnWorktree, packWorktree, unpackWorktree, type WorktreeBundle } from
 import { releaseForHandoff, runsHere, saveOwn, wake, wakePrepared, type Msg } from './runner.ts';
 import { failSetup, setUpThread, START_REQUEST } from './runner/setup.ts';
 import { drop } from './runner/state.ts';
-import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
+import { computerName, deviceName, deviceRecord, ownName } from './sync/devices.ts';
 import { receiveUploads, sessionOnThisMac, uploadNow, type UploadRef } from './sync/files.ts';
 import type { Attachment } from './uploads.ts';
-import { prepareTurn } from './sync/guard.ts';
+import { machineName, prepareTurn } from './sync/guard.ts';
 import { toPortable } from './sync/paths.ts';
 import { HANDOFF_NEEDS, syncProblem } from './sync/problem.ts';
 import { activeWorker, onSynced, type SyncWorker } from './sync/worker.ts';
@@ -63,7 +63,7 @@ class Cancelled extends Error {}
 function notResumable(t: Thread): string | null {
   if ((t.harness !== 'codex' && t.harness !== 'cursor') || t.session_id !== t.id) return null;
   const name = isHarnessId(t.harness) ? HARNESS_META[t.harness].name : t.harness;
-  return `${name} has not reported this thread's session yet, so another Mac could not resume it. Try again once it has replied.`;
+  return `${name} has not reported this thread's session yet, so another machine could not resume it. Try again once it has replied.`;
 }
 
 /**
@@ -112,9 +112,9 @@ export async function handOffCheck(threadId: string, to: string): Promise<HandOf
   const self = outbox.machineId();
   const worker = activeWorker();
   if (!self || !worker) throw refused(syncProblem(HANDOFF_NEEDS));
-  if (to === self) throw refused('That is this Mac. Pick the Mac to hand the thread to.');
+  if (to === self) throw refused('That is this machine. Pick the machine to hand the thread to.');
   const target = deviceRecord(to);
-  if (!target) throw refused('No synced Mac has that id. A Mac shows up once it has synced with this one.');
+  if (!target) throw refused('No synced machine has that id. A machine shows up once it has synced with this one.');
   const [net, name] = await Promise.all([tailnet(), deviceName(self) ?? computerName()]);
   const reach = reachabilityOf(net, target);
   if (reach.reachability === 'offline') {
@@ -123,10 +123,10 @@ export async function handOffCheck(threadId: string, to: string): Promise<HandOf
   const t = threads.get(threadId)!;
   // Another Mac holds what this one has of it, which may be behind: handing that off would undo its turns.
   const holder = holderOf(threadId);
-  if (holder && holder !== self) throw refused(`This thread is on ${deviceName(holder) ?? 'your other Mac'}. Take it over instead.`);
+  if (holder && holder !== self) throw refused(`This thread is on ${machineName(holder)}. Take it over instead.`);
   // A running turn must be this Mac's to stop; an idle thread has none, so only the Mac that runs it elsewhere is refused.
-  if (busy(t) && !runsHere(threadId)) throw refused('This thread is running on another Mac, so only that Mac can hand it off.');
-  const why = refusal(t, 'this Mac');
+  if (busy(t) && !runsHere(threadId)) throw refused('This thread is running on another machine, so only that machine can hand it off.');
+  const why = refusal(t, name);
   if (why) throw refused(why);
   if (moving(phaseOf(threadId)?.phase)) throw refused('This thread is already being handed off.');
   return { thread: t, from: { id: self, name }, to: { id: target.id, name: target.name }, worker };
@@ -178,8 +178,8 @@ export function takeoverOf(t: Thread): Takeover | null {
   const self = outbox.machineId();
   const holder = self && holderOf(t.id);
   if (!self || !holder || holder === self || inFlight(t.id)) return null;
-  const from = { id: holder, name: deviceName(holder) ?? 'your other Mac' };
-  const to = { id: self, name: deviceName(self) ?? 'this Mac' };
+  const from = { id: holder, name: machineName(holder) };
+  const to = { id: self, name: ownName(self) };
   return { from, to, running: busy(t), refused: activeWorker() ? refusal(t, from.name) : syncProblem(HANDOFF_NEEDS) };
 }
 
@@ -207,8 +207,8 @@ export async function takeoverCheck(threadId: string): Promise<{ self: string; n
   const take = takeoverOf(t);
   if (!take) {
     const holder = holderOf(threadId);
-    if (holder === self) throw refused('This thread is on this Mac already.');
-    throw refused(holder ? 'This thread is already on its way between Macs.' : 'No Mac is known to hold this thread yet. Once it runs again, it can be taken over.');
+    if (holder === self) throw refused('This thread is on this machine already.');
+    throw refused(holder ? 'This thread is already on its way between machines.' : 'No machine is known to hold this thread yet. Once it runs again, it can be taken over.');
   }
   if (take.refused) throw refused(take.refused);
   return { self, name, take, worker };
@@ -356,7 +356,7 @@ export function cancelHandoff(threadId: string): HandoffResult {
   const giving = offer?.from.id === self ? offer : null;
   // A request of this Mac's that has already ended, and no handoff from here to cancel instead.
   if (mine && !(giving && moving(phase))) return result(threadId);
-  if (!giving) throw refused('This thread is not being handed off from this Mac.');
+  if (!giving) throw refused('This thread is not being handed off from this machine.');
   if (phase === 'accepted') throw refused(`${giving.to.name} has already picked this thread up.`);
   if (moving(phase)) {
     tx(() => {
@@ -383,7 +383,7 @@ const taking = new Set<string>();
 
 const continuation = (offer: Offered) => ({
   prompt:
-    `This thread was moved from ${offer.from.name} to this Mac (${offer.to.name}) while you were working, and your last turn ` +
+    `This thread was moved from ${offer.from.name} to this machine (${offer.to.name}) while you were working, and your last turn ` +
     `was cut off at the handoff. Continue where you left off.${offer.leftBehind ? ` Note: ${offer.leftBehind}` : ''}`,
   kind: 'user' as const,
   payload: { text: `${offer.request ? 'Taken over' : 'Handed off'} from ${offer.from.name}. Continue where you left off.`, source: 'handoff' },
@@ -427,7 +427,7 @@ async function take(offer: Offered, worker: SyncWorker) {
     const { bundle } = offer;
     if (bundle) {
       const repo = channels.get(t.channel_id)?.repo_path;
-      if (!t.branch || !repo || !existsSync(repo)) throw new Error(`the channel's repository is not on this Mac${repo ? `: ${repo}` : ''}`);
+      if (!t.branch || !repo || !existsSync(repo)) throw new Error(`the channel's repository is not on this machine${repo ? `: ${repo}` : ''}`);
       const dir = join(paths.worktrees, id);
       const { branch } = t;
       // Held like a start, so a cleanup never removes the folder while the handoff lays it out (workspace.ts).

@@ -242,8 +242,8 @@
 
   // packages/shared/continue.ts
   function continueSourceRefusal(harness) {
-    if (harness === "hermes") return "This thread runs on the Hermes server, so its files are not on this Mac to continue from.";
-    if (harness === "cursor-cloud") return "This thread runs on Cursor's machines, so its files are not on this Mac to continue from.";
+    if (harness === "hermes") return "This thread runs on the Hermes server, so its files are not on this machine to continue from.";
+    if (harness === "cursor-cloud") return "This thread runs on Cursor's machines, so its files are not on this machine to continue from.";
     return null;
   }
 

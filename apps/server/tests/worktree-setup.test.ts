@@ -144,7 +144,7 @@ describe('a worktree thread', () => {
     const t = await r.runner.createThread({ channel: channel(gone, { base_dir: base }), prompt: 'look around' });
     expect(t.cwd).toBe(join(r.paths.worktrees, t.id));
     const f = await failed(t.id);
-    expect(f.setup_error).toMatch(/not on this Mac/);
+    expect(f.setup_error).toMatch(/not on this machine/);
     expect(r.spawns(t.id)).toEqual([]);
     expect(ranIn(base)).toEqual([]);
     expect(ranIn(r.config.brainDir)).toEqual([]);

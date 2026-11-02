@@ -9,7 +9,7 @@ import type { Projector } from './project.ts';
 // agent could open it.
 export const projectTerminalExcerpt: Projector<TerminalExcerpt> = (b) => ({
   title:
-    `Terminal output, ${b.lines === 1 ? '1 line' : `${b.lines} lines`}, selected ${b.captured_at} in ${userPossessive()} terminal for this thread, on the Mac ` +
+    `Terminal output, ${b.lines === 1 ? '1 line' : `${b.lines} lines`}, selected ${b.captured_at} in ${userPossessive()} terminal for this thread, on the machine Omni runs on ` +
     `(a shell started in ${defang(b.cwd)}${b.pid ? `, pid ${b.pid}` : ''}). Plain text as the terminal showed it; none of it was run`,
   excerpt: { lang: 'text', text: defang(b.text) },
 });

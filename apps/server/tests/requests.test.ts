@@ -158,7 +158,7 @@ describe('requests: resuming after a restart', () => {
     h.db.outbox.arm('mac-a');
     const { t, ids } = await parkedThread(['queued on mac-b'], 'mac-b');
     h.db.messageRequests.park(ids[0]);
-    await expect(r.resumeRequests(t.id, ids)).rejects.toMatchObject({ status: 409, message: expect.stringMatching(/other Mac/) });
+    await expect(r.resumeRequests(t.id, ids)).rejects.toMatchObject({ status: 409, message: expect.stringMatching(/other machine/) });
     expect(row(ids[0]).state).toBe('uncertain');
     expect(h.texts(t.id, 'user')).toEqual(['hello']);
   });

@@ -114,8 +114,8 @@ describe('the handoff banner', () => {
   });
 
   it('turns to one quiet line once accepted or cancelled', () => {
-    expect(handoffBanner(view({ phase: 'accepted' }), 'stopped')).toEqual({ size: 'line', tone: 'done', text: "Running on Ben's MacBook Air. Handed off from this Mac." });
-    expect(handoffBanner(view({ phase: 'accepted' }, false), 'running')).toMatchObject({ size: 'line', text: "Handed off from Ben's MacBook Pro. Running on this Mac." });
+    expect(handoffBanner(view({ phase: 'accepted' }), 'stopped')).toEqual({ size: 'line', tone: 'done', text: "Running on Ben's MacBook Air. Handed off from Ben's MacBook Pro." });
+    expect(handoffBanner(view({ phase: 'accepted' }, false), 'running')).toMatchObject({ size: 'line', text: "Handed off from Ben's MacBook Pro. Running on Ben's MacBook Air." });
     const idle = { ...view({ phase: 'accepted' }), idle: true };
     expect(handoffBanner(idle, 'done')).toMatchObject({ size: 'line', text: "Handed off to Ben's MacBook Air. Your next message continues it there." });
     expect(handoffBanner({ ...idle, outgoing: false }, 'done')).toMatchObject({ text: "Handed off from Ben's MacBook Pro. Your next message continues it here." });
@@ -162,7 +162,7 @@ describe('the handoff banner for a Take over', () => {
   });
 
   it('settles to one line in Take over words on both Macs', () => {
-    expect(handoffBanner(asked({ phase: 'accepted' }), 'running')).toEqual({ size: 'line', tone: 'done', text: "Taken over from Ben's MacBook Pro. Running on this Mac." });
+    expect(handoffBanner(asked({ phase: 'accepted' }), 'running')).toEqual({ size: 'line', tone: 'done', text: "Taken over from Ben's MacBook Pro. Running on Ben's MacBook Air." });
     expect(handoffBanner({ ...asked({ phase: 'accepted' }), outgoing: true }, 'stopped')).toMatchObject({ text: "Ben's MacBook Air took this thread over. Running there." });
   });
 });

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ConnectMachine, ConnectStatus } from '@omni/server/connect/service.ts';
+import { machineLabel } from '@omni/shared/handoff.ts';
 import { api, errorText, useApi } from '../api.ts';
+import { useHereName } from '../store.tsx';
 import { Button, Chip, ErrorNote, Loading, StatusDot } from '../components/ui.tsx';
 import { Card, InfoRow, SwitchRow } from './settings-parts.tsx';
 
@@ -19,6 +21,7 @@ const TUNNEL: Record<ConnectStatus['tunnel']['state'], { dot: string; label: str
 export function ConnectSection() {
   const res = useApi<ConnectStatus>('/connect');
   const { reload } = res;
+  const hereName = useHereName();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,7 +54,7 @@ export function ConnectSection() {
     <Card title="Omni Connect" subtitle="Reach this Omni from any device without Tailscale, through a Cloudflare tunnel your relay sets up. Devices still sign in with Google.">
       {!s.signedIn && <p className="text-[13px] text-fg-3">Omni Connect uses the sync relay&rsquo;s sign-in. Sign in under Sync above first.</p>}
       <SwitchRow
-        title="Reach this machine with Omni Connect"
+        title={`Reach ${machineLabel(hereName)} with Omni Connect`}
         detail={s.enabled ? 'On: this Omni answers at its own address below. Turning it off deletes the tunnel.' : 'Off: only this machine, your LAN and your tailnet reach it.'}
         checked={s.enabled}
         disabled={busy || !s.signedIn}
@@ -126,7 +129,7 @@ function MachineList({ connectPage, tunnelState }: { connectPage: string | null;
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="truncate">{m.name}</span>
-                  {m.current && <Chip tone="outline">This machine</Chip>}
+                  {m.current && <Chip tone="outline">Current</Chip>}
                 </div>
                 <div className="truncate text-[12px] text-fg-3">{m.problem ?? (m.online ? m.hostname : `Offline · ${m.hostname}`)}</div>
               </div>

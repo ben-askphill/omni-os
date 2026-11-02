@@ -53,7 +53,7 @@ const runOf = (t: Thread): Run => ({ harness: t.harness, model: t.model ?? '', e
  */
 export function sourceBlock(t: Thread): ContinueBlock | null {
   const block = (code: ContinueBlock['code'], message: string): ContinueBlock => ({ code, message });
-  if (isProviderHarness(t.harness)) return block('remote', continueSourceRefusal(t.harness) ?? `This thread runs ${providerWhere(t.harness)}, so its files are not on this Mac.`);
+  if (isProviderHarness(t.harness)) return block('remote', continueSourceRefusal(t.harness) ?? `This thread runs ${providerWhere(t.harness)}, so its files are not on this machine.`);
   if (t.setup === 'preparing') return block('setup', "Omni is still preparing this thread's worktree.");
   if (t.setup === 'failed') return block('setup', "This thread's worktree could not be prepared. Retry it first.");
   const elsewhere = turnBlocked(t, runsHere(t.id));

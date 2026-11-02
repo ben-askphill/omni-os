@@ -76,7 +76,7 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
       kv.set(OWNER_KEY, target);
       return c.json({ ok: true, status: syncStatus() });
     }
-    if (!claimAutomations()) return c.json({ error: 'Sync is not set up on this Mac' }, 409);
+    if (!claimAutomations()) return c.json({ error: 'Sync is not set up on this machine' }, 409);
     return c.json({ ok: true, status: syncStatus() });
   });
 

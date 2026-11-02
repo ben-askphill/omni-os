@@ -194,7 +194,7 @@ export function PRScreen() {
           ) : (
             <MoEmpty>
               {n
-                ? `PR #${n} is open. Set this channel's GitHub repo on the Mac to read it here.`
+                ? `PR #${n} is open. Set this channel's GitHub repo on the desktop to read it here.`
                 : thread.branch
                   ? 'No pull request from this branch yet.'
                   : 'This thread works without a branch, so it has no pull request.'}
@@ -344,7 +344,7 @@ function BrowserBody({ channelId, threadId, onBack }: { channelId: string; threa
           )}
           {drawing && <AnnotateLayer channelId={channelId} threadId={threadId} from={drawing} onClose={() => setDrawing(null)} onAdded={drawn} />}
         </div>
-        <p className="m-0 px-1 text-[13px] leading-[1.5] text-fg-3">The agent drives this browser. Logins and captchas are handled on the Mac.</p>
+        <p className="m-0 px-1 text-[13px] leading-[1.5] text-fg-3">The agent drives this browser. Logins and captchas are handled on the desktop.</p>
       </div>
     </>
   );
@@ -471,7 +471,7 @@ export function DetailsScreen() {
         <p className="m-0 px-1 text-[13px] leading-[1.5] text-fg-3">
           {thread.harness === 'cursor-cloud'
             ? "This thread runs as a Cursor cloud agent on Cursor's Linux cloud, on its own clone of the channel repo. Another message goes to it as a follow-up."
-            : 'The session id, working directory and resume command are on the Mac, under Details in the thread panel.'}
+            : 'The session id, working directory and resume command are on the desktop, under Details in the thread panel.'}
         </p>
       </Body>
     </>

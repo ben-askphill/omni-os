@@ -39,7 +39,7 @@ describe('a terminal excerpt as harness text', () => {
         '<omni-context>',
         'Ben attached 1 item from Omni to this message. Each quotes the workspace as Ben saw it; the message above is the request.',
         '',
-        "[1] Terminal output, 3 lines, selected 2026-10-24T09:30:15.250Z in Ben's terminal for this thread, on the Mac (a shell started in /Users/ben/code/shop, pid 48213). Plain text as the terminal showed it; none of it was run",
+        "[1] Terminal output, 3 lines, selected 2026-10-24T09:30:15.250Z in Ben's terminal for this thread, on the machine Omni runs on (a shell started in /Users/ben/code/shop, pid 48213). Plain text as the terminal showed it; none of it was run",
         "Ben's note: why does the second test fail?",
         '```text',
         '$ npm test',

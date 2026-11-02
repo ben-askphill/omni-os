@@ -72,7 +72,7 @@ describe('sync backfill', () => {
       encoding: 'utf8',
     });
     expect(out).toMatch(/channels\s+0 queued, 3 already queued/);
-    expect(out).toMatch(/threads\s+0 queued, 1 already queued, 1 last written on another Mac/);
+    expect(out).toMatch(/threads\s+0 queued, 1 already queued, 1 last written on another machine/);
     expect(out).toMatch(/Nothing new to queue/);
   });
 });

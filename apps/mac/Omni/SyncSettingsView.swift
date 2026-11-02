@@ -44,7 +44,7 @@ struct SyncForm: View {
     VStack(alignment: .leading, spacing: z(16)) {
       SettingsIntro(
         icon: "refresh",
-        text: Text("Sync keeps this Mac's history in step with your other machines. Each machine keeps its own database; your own Cloudflare relay only carries the changes. The relay URL and this Mac's sign-in token live in \(storeLabel). Sign in with the Google account linked under Google account.")
+        text: Text("Sync keeps this machine's history in step with your other machines. Each machine keeps its own database; your own Cloudflare relay only carries the changes. The relay URL and this machine's sign-in token live in \(storeLabel). Sign in with the Google account linked under Google account.")
       )
 
       switch sync.loadState {
@@ -60,11 +60,11 @@ struct SyncForm: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .confirmationDialog("Sign out of sync on this Mac?", isPresented: $confirmingSignOut) {
+    .confirmationDialog("Sign out of sync on this machine?", isPresented: $confirmingSignOut) {
       Button("Sign Out", role: .destructive) { Task { await sync.signOut() } }
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("Omni stops syncing, ends this Mac's sign-in on the relay and removes the relay URL and its token from \(storeLabel). The history on this Mac stays.")
+      Text("Omni stops syncing, ends this machine's sign-in on the relay and removes the relay URL and its token from \(storeLabel). The history on this machine stays.")
     }
   }
 
@@ -107,10 +107,10 @@ struct SyncForm: View {
           InfoRow(label: "Waiting") {
             Text("\(s.deferred)").monospacedDigit()
           }
-          .help("Changes from the other Mac that wait for a row they depend on. Omni tries them again after each pull.")
+          .help("Changes from the other machine that wait for a row they depend on. Omni tries them again after each pull.")
         }
         if let id = s.machineId {
-          InfoRow(label: "This Mac") {
+          InfoRow(label: "Sync id") {
             HStack(spacing: z(6)) {
               Text(id).font(.omni(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.middle)
                 .textSelection(.enabled)
@@ -136,10 +136,10 @@ struct SyncForm: View {
         ErrorNote(text: error)
       }
       if sync.relayChanged {
-        DoneNote(text: "Signed in to a new relay. This Mac's history is queued for it.")
+        DoneNote(text: "Signed in to a new relay. This machine's history is queued for it.")
       }
       HStack(alignment: .firstTextBaseline, spacing: z(12)) {
-        Text("Signing out removes the relay URL and this Mac's token from \(storeLabel). History stays on this Mac.")
+        Text("Signing out removes the relay URL and this machine's token from \(storeLabel). History stays on this machine.")
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
           .fixedSize(horizontal: false, vertical: true)
@@ -170,9 +170,9 @@ struct SyncForm: View {
       note: "Use the same relay on every machine, and the Google account linked to this Omni. Setting up the relay is in docs/user/sync.md."
     ) {
       if s.signedOut {
-        NeedsNote(text: "The relay signed this Mac out. Sign in again to keep syncing.")
+        NeedsNote(text: "The relay signed this machine out. Sign in again to keep syncing.")
       } else if s.legacyRelay == true {
-        NeedsNote(text: "Sync moved from Supabase to a Cloudflare relay. Sign in once on each machine: this Mac's history is queued again, and nothing is lost.")
+        NeedsNote(text: "Sync moved from Supabase to a Cloudflare relay. Sign in once on each machine: this machine's history is queued again, and nothing is lost.")
       }
       if let flow = sync.signingIn {
         DeviceCodePanel(flow: flow) { sync.cancelSignIn() }
@@ -231,7 +231,7 @@ private struct SyncPathMapCard: View {
   var body: some View {
     SettingsCard(
       title: "Path map",
-      note: "Paths travel with your home folder as ~. When the other Mac keeps a folder somewhere else, map it here: ~/work to ~/code turns its ~/work/volero into ~/code/volero on this Mac."
+      note: "Paths travel with your home folder as ~. When the other machine keeps a folder somewhere else, map it here: ~/work to ~/code turns its ~/work/volero into ~/code/volero on this machine."
     ) {
       if !sync.mappings.isEmpty {
         VStack(spacing: z(8)) {

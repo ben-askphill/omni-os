@@ -39,7 +39,7 @@ function composePrompt(m: OutgoingMessage): { text: string; images?: CursorImage
   }
   const lines = [m.text];
   if (left.length) {
-    lines.push('', '## Attachments', `${userName()} attached files on their Mac. They were not sent to this machine, so you cannot read them.`);
+    lines.push('', '## Attachments', `${userName()} attached files on their own machine. They were not sent to this one, so you cannot read them.`);
     for (const a of left) lines.push(`- ${a.name} (${a.mime}, ${Math.max(1, Math.round(a.size / 1024))} KB), not sent`);
   }
   return { text: lines.join('\n'), ...(images.length && { images }) };

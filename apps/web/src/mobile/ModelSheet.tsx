@@ -101,7 +101,7 @@ export function ModelSheet({
                   />
                 ))
               ) : (
-                <MoListRow label="Not available" sub={h.fix || 'Install and log in on the Mac'} chevron={false} last />
+                <MoListRow label="Not available" sub={h.fix || 'Install and log in on the machine Omni runs on'} chevron={false} last />
               )}
             </MoGroup>
           </MoSection>

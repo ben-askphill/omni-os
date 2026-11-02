@@ -41,13 +41,13 @@ export function handoffTargets(
     devices: Device[] | null | undefined;
   },
 ): HandoffTargets {
-  if (!mayHandOff(v)) return { state: 'none', reason: 'Another Mac holds this thread, or it is being handed off already.' };
+  if (!mayHandOff(v)) return { state: 'none', reason: 'Another machine holds this thread, or it is being handed off already.' };
   if (!v.sync) return { state: 'loading' };
   if (!syncCarries(v.sync)) {
-    return { state: 'none', reason: v.sync.configured && !v.sync.signedOut ? 'Sync is paused. Turn it back on to hand threads off.' : 'Sign in to sync on both Macs to hand threads between them.' };
+    return { state: 'none', reason: v.sync.configured && !v.sync.signedOut ? 'Sync is paused. Turn it back on to hand threads off.' : 'Sign in to sync on both machines to hand threads between them.' };
   }
   if (!v.devices) return { state: 'loading' };
-  if (!v.devices.length) return { state: 'none', reason: 'No other synced Mac yet.' };
+  if (!v.devices.length) return { state: 'none', reason: 'No other synced machine yet.' };
   return { state: 'ready', devices: v.devices };
 }
 

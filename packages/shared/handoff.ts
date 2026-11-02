@@ -40,6 +40,12 @@ export interface Device {
 
 export const canTake = (d: Pick<Device, 'reachability'>) => d.reachability !== 'offline';
 
+/**
+ * How the clients label a machine, the one Omni runs on included: its own name, else a neutral label. Omni runs on
+ * Linux machines as well as Macs, so a label never says "This Mac", and never "This machine" either.
+ */
+export const machineLabel = (name: string | null | undefined): string => name?.trim() || 'Unnamed machine';
+
 /** What the giving Mac does before the offer goes out, in order. Shown while it works. */
 export type PrepareStep = 'stopping' | 'uploading' | 'packing';
 
@@ -201,6 +207,7 @@ export function requestPhase(request: HandoffRequest, now: number): HandoffPhase
 export function handoffText(h: Pick<HandoffView, 'from' | 'to' | 'outgoing' | 'state'> & { idle?: boolean; requested?: boolean }): string {
   const s = h.state;
   const other = h.outgoing ? h.to.name : h.from.name;
+  const here = h.outgoing ? h.from.name : h.to.name;
   const error = (e: string) => e.replace(/\.?$/, '.');
   switch (s.phase) {
     case 'requested':
@@ -212,7 +219,7 @@ export function handoffText(h: Pick<HandoffView, 'from' | 'to' | 'outgoing' | 's
     case 'expired':
       return `${h.from.name} did not answer within an hour, so the request expired.`;
     case 'preparing':
-      if (!h.outgoing) return `${other} is handing this thread to this Mac.`;
+      if (!h.outgoing) return `${other} is handing this thread to ${here}.`;
       return `Handing off to ${h.to.name}: ${{ stopping: 'stopping the turn here', uploading: 'uploading the session', packing: 'packing the worktree' }[s.step]}.`;
     case 'offered':
       if (!h.outgoing) return `Picking this thread up from ${other}.`;
@@ -220,10 +227,10 @@ export function handoffText(h: Pick<HandoffView, 'from' | 'to' | 'outgoing' | 's
     case 'accepted':
       if (h.requested) {
         if (h.idle) return h.outgoing ? `${other} took this thread over. The next message runs there.` : `Taken over from ${other}. Your next message continues it here.`;
-        return h.outgoing ? `${other} took this thread over. Running there.` : `Taken over from ${other}. Running on this Mac.`;
+        return h.outgoing ? `${other} took this thread over. Running there.` : `Taken over from ${other}. Running on ${here}.`;
       }
       if (h.idle) return h.outgoing ? `Handed off to ${other}. Your next message continues it there.` : `Handed off from ${other}. Your next message continues it here.`;
-      return h.outgoing ? `Running on ${other}. Handed off from this Mac.` : `Handed off from ${other}. Running on this Mac.`;
+      return h.outgoing ? `Running on ${other}. Handed off from ${here}.` : `Handed off from ${other}. Running on ${here}.`;
     case 'failed':
       if (h.outgoing) return `The handoff to ${h.to.name} failed: ${error(s.error)} The thread is stopped here; reply to continue it.`;
       return s.where === 'here'

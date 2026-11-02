@@ -35,7 +35,7 @@ const harnessName = (t: Thread) => (isHarnessId(t.harness) ? HARNESS_META[t.harn
 function ownStop(t: Thread) {
   const l = threads.limit(t.id);
   if (!l) throw refusal('This thread is not waiting on a usage limit.', 409);
-  if (l.limit_machine && l.limit_machine !== outbox.machineId()) throw refusal('This thread stopped on your other Mac. Resume it there.', 409);
+  if (l.limit_machine && l.limit_machine !== outbox.machineId()) throw refusal('This thread stopped on your other machine. Resume it there.', 409);
   return l;
 }
 

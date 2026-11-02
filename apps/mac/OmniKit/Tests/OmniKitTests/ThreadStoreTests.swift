@@ -666,9 +666,9 @@ private func handoffAnswer(_ thread: String, _ state: String, outgoing: Bool = t
     let (store, _, _, _) = try await openStore(api)
     defer { store.stop() }
 
-    api.handoff = .failure(.http(status: 409, message: "Sync is paused on this Mac."))
+    api.handoff = .failure(.http(status: 409, message: "Sync is paused on this machine."))
     await store.takeOver()
-    #expect(store.actionError?.message == "Sync is paused on this Mac.")
+    #expect(store.actionError?.message == "Sync is paused on this machine.")
     #expect(store.handoff == nil)
     #expect(store.canTakeOver, "a refused Take over leaves the note as it was")
 

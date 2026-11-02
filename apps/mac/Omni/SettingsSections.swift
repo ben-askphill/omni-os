@@ -298,15 +298,15 @@ struct RunOnCard: View {
       title: "Run new threads on",
       note: "New threads run there unless the composer picks another machine. Replies and Stop follow the thread wherever it runs.",
       trailing: {
-        OriginChip(of: saved.isEmpty ? .default : .machine, label: saved.isEmpty ? "Built-in default: this Mac" : nil) {
+        OriginChip(of: saved.isEmpty ? .default : .machine, label: saved.isEmpty ? "Built-in default: \(RunOnRules.hereLabel(model.store.status?.device?.name))" : nil) {
           Task { await model.runOn.save("") }
         }
       }
     ) {
       VStack(alignment: .leading, spacing: z(10)) {
         HStack(spacing: z(8)) {
-          // A saved machine sync no longer lists shows as This Mac, where the server runs it.
-          RunOnMenu(devices: devices, pick: RunOnRules.resolved(saved, devices: devices)) { device in Task { await model.runOn.save(device) } }
+          // A saved machine sync no longer lists shows as this one, where the server runs it.
+          RunOnMenu(devices: devices, pick: RunOnRules.resolved(saved, devices: devices), hereName: model.store.status?.device?.name) { device in Task { await model.runOn.save(device) } }
             .disabled((devices.isEmpty && saved.isEmpty) || model.runOn.saving)
             .opacity(devices.isEmpty && saved.isEmpty ? 0.45 : 1)
           if model.runOn.saving { Loader(size: 14) }
@@ -314,8 +314,8 @@ struct RunOnCard: View {
         if devices.isEmpty {
           Text(
             saved.isEmpty
-              ? "No other machine is synced, so threads run on this Mac. Set up Sync on both machines to pick one."
-              : "The saved machine isn't synced now, so new threads can't start there. Pick This Mac, or check Sync."
+              ? "No other machine is synced, so threads run on this one. Set up Sync on both machines to pick one."
+              : "The saved machine isn't synced now, so new threads can't start there. Pick \(RunOnRules.hereLabel(model.store.status?.device?.name)), or check Sync."
           )
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)

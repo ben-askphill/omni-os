@@ -135,10 +135,10 @@ struct StorageForm: View {
 
   private func retentionCard(_ cleanup: CleanupState) -> some View {
     let policy = cleanup.policy
-    return SettingsCard(title: "Retention on This Mac") {
+    return SettingsCard(title: "Worktree retention") {
       SettingsToggle(
         title: "Remove idle worktrees on a schedule",
-        detail: "Only this Mac: the setting is not synced. It covers worktrees of archived, merged or deleted threads with nothing unsaved, idle at least \(Format.plural(policy.idleDays, "day")). It runs a minute after Omni starts, then daily.",
+        detail: "Only this machine: the setting is not synced. It covers worktrees of archived, merged or deleted threads with nothing unsaved, idle at least \(Format.plural(policy.idleDays, "day")). It runs a minute after Omni starts, then daily.",
         isOn: Binding(get: { policy.enabled }, set: { on in Task { await inventory.setRetention(enabled: on) } })
       )
       .disabled(inventory.isBusy)

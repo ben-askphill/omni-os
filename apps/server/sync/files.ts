@@ -444,7 +444,7 @@ export async function pullSession(t: Thread, opts: FileSyncOptions): Promise<num
         if (sha256(readFileSync(path)) === remote.sha) {
           remember(state, skey, path, remote.sha);
           learned = true;
-        } else console.error(`[sync] kept this Mac's ${t.harness} session for ${t.id}: it changed here since the last sync`);
+        } else console.error(`[sync] kept this machine's ${t.harness} session for ${t.id}: it changed here since the last sync`);
         continue;
       }
       // Unchanged here since the last sync, and the relay has a newer one: take it.
@@ -460,7 +460,7 @@ export async function pullSession(t: Thread, opts: FileSyncOptions): Promise<num
   // store.db and its -wal must not end up from different Macs, and a fenced-off job writes nothing.
   if (fetched.length && !opts.signal?.aborted) {
     if (fetched.some((f) => fingerprint(f.path) !== f.before)) {
-      console.error(`[sync] kept this Mac's ${t.harness} session for ${t.id}: it changed here during the download`);
+      console.error(`[sync] kept this machine's ${t.harness} session for ${t.id}: it changed here during the download`);
     } else {
       for (const f of fetched) {
         const landed = writeAtomic(f.path, f.body, f.mtime);

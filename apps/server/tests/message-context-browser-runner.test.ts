@@ -175,16 +175,16 @@ describe('a browser annotation on a message', () => {
     const thread = { harness: 'claude-code', cwd: '/nowhere' };
     expect(project.contextAttachments([rec])).toEqual([]);
     const text = project.harnessText('look', [rec], thread);
-    expect(text).toContain(`Screenshot: ${c.image.name}, 2560×1426 px, is unavailable: its file is no longer saved on Ben's Mac. Work from the description above.`);
+    expect(text).toContain(`Screenshot: ${c.image.name}, 2560×1426 px, is unavailable: its file is no longer saved on Ben's machine. Work from the description above.`);
     expect(text).not.toContain('is attached to this message');
   });
 
-  it('tells a remote agent the file is on the Mac, never a path to open', T, async () => {
+  it('tells a remote agent the file is on the user machine, never a path to open', T, async () => {
     const t = await H.runner.createThread({ channel: 'web', prompt: 'CMD hi' });
     await H.untilResults(t.id, 1);
     const c = capture(t.id);
     const text = project.harnessText('look', [record(c)], { harness: 'hermes', cwd: '/nowhere' });
-    expect(text).toMatch(/Screenshot: annotation-[0-9a-f]{16}\.png, 2560×1426 px, is a file on Ben's Mac\. You run .* and cannot open it\. It comes with this message as an image only where your harness takes images/);
+    expect(text).toMatch(/Screenshot: annotation-[0-9a-f]{16}\.png, 2560×1426 px, is a file on Ben's machine\. You run .* and cannot open it\. It comes with this message as an image only where your harness takes images/);
     expect(text).not.toContain(uploadsDir(t.id));
     expect(text).not.toContain('is attached to this message');
   });

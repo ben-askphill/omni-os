@@ -210,6 +210,7 @@ private struct RunOnCorpus: Decodable {
   }
   struct Label: Decodable {
     let listed: [String]
+    let here: String?
     let pick: String
     let label: String
   }
@@ -240,6 +241,6 @@ private struct RunOnCorpus: Decodable {
 
   @Test func namesThePick() throws {
     let r = try corpus(RunOnCorpus.self, "run-on")
-    for c in r.labels { #expect(RunOnRules.label(c.pick, devices: r.listed(c.listed)) == c.label) }
+    for c in r.labels { #expect(RunOnRules.label(c.pick, devices: r.listed(c.listed), hereName: c.here) == c.label) }
   }
 }

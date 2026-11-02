@@ -161,7 +161,7 @@ describe('the context block', () => {
     const cwd = '/Users/ben/code/widgets';
     for (const harness of ['hermes', 'cursor-cloud']) {
       const block = harnessText('Fix this', [cart], { harness, cwd });
-      expect(block).toContain("File: src/cart.ts, in Ben's checkout on the Mac.");
+      expect(block).toContain("File: src/cart.ts, in Ben's checkout on the machine Omni runs on.");
       expect(block).toContain(harness === 'hermes' ? 'You run on the Hermes server and cannot open it; work from the excerpt.' : 'You run as a Cursor cloud agent and cannot open it');
       expect(block).not.toContain('relative to your working directory');
       expect(block).not.toContain('Check:');

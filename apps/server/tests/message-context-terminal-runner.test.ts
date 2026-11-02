@@ -64,7 +64,7 @@ describe('terminal output on a message', () => {
 
     const blocks = Object.entries(threads).map(([harness, t]) => block(received[harness as keyof typeof received](t.id)));
     expect(blocks[0]).toContain('```text\n$ npm test\n FAIL  src/cart.test.ts\n  ✕ totals an empty cart (4 ms)\n```');
-    expect(blocks[0]).toMatch(/selected 2026-10-24T09:30:15\.250Z in .* terminal for this thread, on the Mac \(a shell started in .*, pid \d+\)\. Plain text/);
+    expect(blocks[0]).toMatch(/selected 2026-10-24T09:30:15\.250Z in .* terminal for this thread, on the machine Omni runs on \(a shell started in .*, pid \d+\)\. Plain text/);
     // Each block names its own thread's shell, so only those lines differ.
     const same = (b: string) => b.replace(/started in [^,]*, pid \d+/, 'started in CWD, pid N');
     expect(same(blocks[1])).toBe(same(blocks[0]));

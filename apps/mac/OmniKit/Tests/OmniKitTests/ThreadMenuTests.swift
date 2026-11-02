@@ -34,6 +34,6 @@ private let engine = SlashEngine.shared
     var f = every
     f.harness = "hermes"
     let fork = try #require(engine.threadMenu(f).flatMap(\.items).first { $0.id == .fork })
-    #expect(fork.off?.contains("not on this Mac") == true)
+    #expect(fork.off?.contains("not on this machine") == true)
   }
 }

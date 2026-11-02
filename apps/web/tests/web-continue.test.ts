@@ -85,8 +85,8 @@ describe('which harnesses the sheet offers', () => {
   });
 
   it('offers no continuing for a remote thread, and says why', () => {
-    expect(sourceRefusal('hermes')).toMatch(/not on this Mac/);
-    expect(sourceRefusal('cursor-cloud')).toMatch(/not on this Mac/);
+    expect(sourceRefusal('hermes')).toMatch(/not on this machine/);
+    expect(sourceRefusal('cursor-cloud')).toMatch(/not on this machine/);
     for (const h of ['claude-code', 'codex', 'cursor']) expect(sourceRefusal(h)).toBeNull();
   });
 });
@@ -139,7 +139,7 @@ describe('attachments', () => {
           file({ selected: true, carried: true }),
           file({ id: 'u1:1', name: 'notes.txt', mime: 'text/plain', size: 10, image: false, as: 'path' }),
           file({ id: 'u1:2', name: 'photo.jpg', mime: 'image/jpeg', as: 'path' }),
-          file({ id: 'u1:3', name: 'trace.zip', mime: 'application/zip', size: null, image: false, availability: 'missing', reason: 'Its bytes are not on this Mac.', selected: true, as: null }),
+          file({ id: 'u1:3', name: 'trace.zip', mime: 'application/zip', size: null, image: false, availability: 'missing', reason: 'Its bytes are not on this machine.', selected: true, as: null }),
           file({ id: 'u1:4', name: 'big.mov', mime: 'video/quicktime', size: 90_000_000, image: false, availability: 'oversize', reason: '85.8 MB is over the 25 MB limit for one file.', as: null }),
           file({ id: 'u1:5', name: 'link', mime: 'application/octet-stream', availability: 'unsupported', reason: 'It is a link, not a file.', as: null }),
         ],
@@ -149,7 +149,7 @@ describe('attachments', () => {
       ['shot.png', 'PNG image · 3.3 KB', 'Goes inline as an image.', null, true, true],
       ['notes.txt', 'Text · 10 B', null, null, false, true],
       ['photo.jpg', 'JPEG image · 3.3 KB', null, null, false, true],
-      ['trace.zip', 'File · size unknown', 'Its bytes are not on this Mac.', 'Missing', false, false],
+      ['trace.zip', 'File · size unknown', 'Its bytes are not on this machine.', 'Missing', false, false],
       ['big.mov', 'File · 85.8 MB', '85.8 MB is over the 25 MB limit for one file.', 'Too big', false, false],
       ['link', 'File · 3.3 KB', 'It is a link, not a file.', 'Not a file', false, false],
     ]);

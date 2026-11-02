@@ -161,7 +161,7 @@ function Wizard() {
                   <Row label="Name" htmlFor="ob-ch-name">
                     <input id="ob-ch-name" className="field w-full" value={channelName} placeholder="Acme" onChange={(e) => setChannelName(e.target.value)} />
                   </Row>
-                  <Row label="Repo folder" htmlFor="ob-ch-repo" hint="Optional. A git checkout on this Mac.">
+                  <Row label="Repo folder" htmlFor="ob-ch-repo" hint="Optional. A git checkout on this machine.">
                     <input
                       id="ob-ch-repo"
                       className="field w-full font-mono !text-[13px]"

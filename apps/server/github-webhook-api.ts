@@ -45,7 +45,7 @@ githubWebhookApi.post(
     const guid = c.req.header('x-github-delivery') ?? '';
     if (!DELIVERY_ID.test(guid)) return c.json({ error: 'missing or malformed X-GitHub-Delivery' }, 400);
     const secret = await globalSecret(webhookSecretName(a.id));
-    if (!secret) return c.json({ error: 'no signing secret is set for this automation on this Mac' }, 503);
+    if (!secret) return c.json({ error: 'no signing secret is set for this automation on this machine' }, 503);
     const body = new Uint8Array(await c.req.arrayBuffer());
     if (!signatureValid(secret, body, c.req.header('x-hub-signature-256'))) return c.json({ error: 'bad signature' }, 401);
     // GitHub pings a new hook once. Answered so the hook shows as working, and nothing is saved.

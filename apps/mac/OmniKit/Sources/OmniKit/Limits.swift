@@ -71,8 +71,8 @@ public enum LimitStop {
       let scheduledAt = limit == .scheduled ? at : nil
       let when = scheduledAt.map { "It resumes there at \($0)." } ?? at.map { "It resets at \($0)." } ?? "It did not say when it resets."
       return View(
-        title: scheduledAt.map { "Resumes at \($0) on your other Mac" } ?? "Usage limit reached on your other Mac",
-        body: "\(harness) stopped this turn at your plan's limit on your other Mac. \(when) Resume it there.",
+        title: scheduledAt.map { "Resumes at \($0) on your other machine" } ?? "Usage limit reached on your other machine",
+        body: "\(harness) stopped this turn at your plan's limit on your other machine. \(when) Resume it there.",
         actions: [])
     }
     if limit == .scheduled, let at {

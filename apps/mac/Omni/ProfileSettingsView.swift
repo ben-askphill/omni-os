@@ -74,7 +74,7 @@ struct ProfileSettings: View {
       if part != .access {
         SettingsIntro(
           icon: "info",
-          text: Text("These settings live in \(Text(state?.path ?? "data/omni.config.json").monospaced()) on this Mac and never go into git, so a fork stays clean. An environment variable in \(Text(".env").monospaced()) wins over a value here; the chip beside a field says so.")
+          text: Text("These settings live in \(Text(state?.path ?? "data/omni.config.json").monospaced()) on this machine and never go into git, so a fork stays clean. An environment variable in \(Text(".env").monospaced()) wins over a value here; the chip beside a field says so.")
         )
       }
     }

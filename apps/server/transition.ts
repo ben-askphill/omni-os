@@ -19,7 +19,7 @@ import { cancelHandoff, handOff, handOffCheck, requestTakeover, takeoverCheck, t
 import { handoffView, offerOf, replyOf, requestOf } from './handoff/records.ts';
 import { refusal } from './runner/state.ts';
 import { cancelQueued, previewSwitch, queuedRun, runName, switchRun } from './runner/switch.ts';
-import { deviceName, deviceRecord } from './sync/devices.ts';
+import { deviceRecord, ownName } from './sync/devices.ts';
 
 export type ThreadTransition = Transition<Thread>;
 
@@ -70,7 +70,7 @@ async function previewRelocate(threadId: string, to: string): Promise<Transition
   );
   const self = outbox.machineId();
   const target = deviceRecord(to);
-  const from: Party | null = checked.ready?.from ?? (self ? { id: self, name: deviceName(self) ?? 'this Mac' } : null);
+  const from: Party | null = checked.ready?.from ?? (self ? { id: self, name: ownName(self) } : null);
   const dest: Party | null = checked.ready?.to ?? (target && { id: target.id, name: target.name });
   return { kind: 'relocate', from, to: dest, blocked: checked.blocked, running, takeover: false };
 }

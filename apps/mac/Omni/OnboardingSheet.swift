@@ -170,7 +170,7 @@ struct OnboardingSheet: View {
             .padding(z(16)).frame(maxWidth: .infinity, alignment: .leading).omniCard(16)
         } else {
           Field("Name") { TextField("Name", text: $channelName, prompt: Text("Acme")).textFieldStyle(.omni) }
-          Field("Repo folder", hint: "Optional. A git checkout on this Mac.") {
+          Field("Repo folder", hint: "Optional. A git checkout on this machine.") {
             TextField("Repo folder", text: $channelRepo, prompt: Text("\(state.resolved.reposDir)/acme-theme")).textFieldStyle(.omniMono)
           }
           Field("Shopify store", hint: "Optional. The myshopify domain.") {

@@ -263,7 +263,7 @@
     "requested": false
    },
    "status": "running",
-   "text": "Studio is handing this thread to this Mac.",
+   "text": "Studio is handing this thread to MacBook.",
    "banner": {
     "size": "card",
     "tone": "working",
@@ -382,7 +382,7 @@
     "requested": false
    },
    "status": "idle",
-   "text": "Running on MacBook. Handed off from this Mac.",
+   "text": "Running on MacBook. Handed off from Studio.",
    "banner": {
     "size": "line",
     "tone": "done"
@@ -410,7 +410,7 @@
     "requested": false
    },
    "status": "running",
-   "text": "Handed off from Studio. Running on this Mac.",
+   "text": "Handed off from Studio. Running on MacBook.",
    "banner": {
     "size": "line",
     "tone": "done"
@@ -522,7 +522,7 @@
     "requested": true
    },
    "status": "running",
-   "text": "Taken over from Studio. Running on this Mac.",
+   "text": "Taken over from Studio. Running on MacBook.",
    "banner": {
     "size": "line",
     "tone": "done"

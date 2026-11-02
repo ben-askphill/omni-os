@@ -56,7 +56,7 @@ struct StaleSessionCard: View {
             }
           }
           .buttonStyle(.pill(.secondary, height: 28))
-          .help("Start a new session that reads this thread so far, instead of resuming the copy on this Mac")
+          .help("Start a new session that reads this thread so far, instead of resuming the copy on this machine")
           .disabled(busy != nil)
         }
       }

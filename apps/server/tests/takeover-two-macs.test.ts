@@ -133,7 +133,7 @@ describe('taking over a running thread', () => {
     requestId = res.body.handoff.id;
     const again = await takeOver(b, id);
     expect(again.status).toBe(409);
-    expect(again.body.error).toBe('This thread is already on its way between Macs.');
+    expect(again.body.error).toBe('This thread is already on its way between machines.');
     expect(request(b, id)).toMatchObject({ id: requestId, by: MAC_B, from: MAC_A, state: 'pending' });
 
     const d = await detail(b);
@@ -199,7 +199,7 @@ describe('taking over a running thread', () => {
     expect(res.body.error).toBe('This thread is on Mac B. Take it over instead.');
     const own = await takeOver(b, id);
     expect(own.status).toBe(409);
-    expect(own.body.error).toBe('This thread is on this Mac already.');
+    expect(own.body.error).toBe('This thread is on this machine already.');
   });
 
   it('sends the Mac app the shapes its fixtures hold', () => {
@@ -308,14 +308,14 @@ describe('a Take over that is refused', () => {
     expect((await detail(b, 'unheld')).takeover).toBeUndefined();
     const res = await takeOver(b, 'unheld');
     expect(res.status).toBe(409);
-    expect(res.body.error).toBe('No Mac is known to hold this thread yet. Once it runs again, it can be taken over.');
+    expect(res.body.error).toBe('No machine is known to hold this thread yet. Once it runs again, it can be taken over.');
   });
 
   it('for a crew thread, a session not reported yet, or a usage limit stop, said before Ben asks', async () => {
     heldByA('crew-lead');
     const cases = [
       [heldByA('crew-member', { parent_id: 'crew-lead' }), 'This thread reports to the thread that delegated it, so it stays on Mac A.'],
-      [heldByA('codex-new', { harness: 'codex' }), "Codex has not reported this thread's session yet, so another Mac could not resume it. Try again once it has replied."],
+      [heldByA('codex-new', { harness: 'codex' }), "Codex has not reported this thread's session yet, so another machine could not resume it. Try again once it has replied."],
       [heldByA('limited'), 'This thread is waiting on a usage limit on Mac A. Resume it first.'],
     ] as const;
     a.db.threads.setLimit('limited', { state: 'limited', resets_at: null, id: 'limit-1', machine: 'mac-a' });

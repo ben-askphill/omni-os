@@ -21,7 +21,7 @@ export function reasonOf(item: NeedsYouItem): Reason {
   if (b?.kind === 'setup') return { glyph: 'needs', label: 'Worktree could not be prepared', detail: b.detail };
   if (b?.kind === 'limited') {
     const at = b.resets_at ? resetLabel(b.resets_at) : null;
-    const where = b.elsewhere ? ' on your other Mac' : '';
+    const where = b.elsewhere ? ' on your other machine' : '';
     return { glyph: 'needs', label: `Usage limit reached${where}`, detail: at ? `${b.scheduled ? 'Resumes' : 'Resets'} at ${at}` : 'No reset time given' };
   }
   if (b?.kind === 'uncertain') return { glyph: 'needs', label: plural(b.count, 'A message may not have been sent', '# messages may not have been sent'), detail: preview };

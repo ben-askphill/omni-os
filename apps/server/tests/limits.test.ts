@@ -162,7 +162,7 @@ describe('the continuation', () => {
     const t = await limited(`LIMIT:${RESET} other mac`);
     // As sync leaves the other Mac's stop here (apps/server/sync/handlers/limit-stop.ts).
     H.db.db.prepare('UPDATE threads SET limit_machine = ?, limit_elsewhere = 1 WHERE id = ?').run('other-mac', t.id);
-    expect(refused(() => H.runner.scheduleLimitResume(t.id))).toMatchObject({ status: 409, message: expect.stringMatching(/other Mac/) });
+    expect(refused(() => H.runner.scheduleLimitResume(t.id))).toMatchObject({ status: 409, message: expect.stringMatching(/other machine/) });
     expect(refused(() => H.runner.resumeLimitNow(t.id)).status).toBe(409);
     H.db.db.prepare(`UPDATE threads SET limit_state = 'scheduled' WHERE id = ?`).run(t.id);
     expect(refused(() => H.runner.cancelLimitResume(t.id)).status).toBe(409);

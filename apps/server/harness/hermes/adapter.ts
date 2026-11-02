@@ -24,7 +24,7 @@ function composeInput(m: OutgoingMessage): string {
     m.text,
     '',
     '## Attachments',
-    `${userName()} attached files on their Mac. They were not transferred to this server, so you cannot read them.`,
+    `${userName()} attached files on their machine. They were not transferred to this server, so you cannot read them.`,
   ];
   for (const a of m.attachments) {
     lines.push(`- ${a.name} (${a.mime}, ${Math.max(1, Math.round(a.size / 1024))} KB) — not transferred`);

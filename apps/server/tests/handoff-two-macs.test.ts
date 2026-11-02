@@ -98,9 +98,9 @@ describe('handing a running thread to the other Mac', () => {
     thread('codex-new', { harness: 'codex' });
     thread('delegated', { parent_id: 'archived' });
     const refusals = [
-      [await handOff(a, id, 'mac-a'), /this Mac/],
-      [await handOff(a, 'delegated', 'mac-b'), /reports to the thread that delegated it, so it stays on this Mac/],
-      [await handOff(a, id, 'mac-z'), /No synced Mac/],
+      [await handOff(a, id, 'mac-a'), /That is this machine/],
+      [await handOff(a, 'delegated', 'mac-b'), /reports to the thread that delegated it, so it stays on Mac A/],
+      [await handOff(a, id, 'mac-z'), /No synced machine/],
       [await handOff(a, 'archived', 'mac-b'), /archived/],
       [await handOff(a, 'codex-new', 'mac-b'), /Codex has not reported this thread's session/],
     ] as const;
@@ -153,7 +153,7 @@ describe('handing a running thread to the other Mac', () => {
     expect(spawn.args[spawn.args.indexOf('--resume') + 1]).toBe(t.session_id);
     expect(readFileSync(sessionFile(b, t), 'utf8')).toBe('{"type":"user","from":"mac-a"}\n');
     expect(b.db.messageRequests.byRequestId(id, `handoff:${offerId}`)?.prompt).toMatch(
-      /^This thread was moved from Mac A to this Mac \(Mac B\) while you were working, and your last turn was cut off at the handoff\./,
+      /^This thread was moved from Mac A to this machine \(Mac B\) while you were working, and your last turn was cut off at the handoff\./,
     );
     expect(t.status).toBe('running');
     const d = await detail(b);
@@ -248,7 +248,7 @@ describe('a handoff that does not go through', () => {
       at: new Date(Date.now() - minutesAgo * 60_000).toISOString(), state: 'preparing', step: 'uploading',
     });
     b.db.kv.set(`handoff.offer.${quiet}`, offer(1));
-    expect((await detail(b, quiet)).blocked).toBe('Mac A is handing this thread to this Mac.');
+    expect((await detail(b, quiet)).blocked).toBe('Mac A is handing this thread to Mac B.');
     b.db.kv.set(`handoff.offer.${quiet}`, offer(16));
     expect((await detail(b, quiet)).blocked).toBeUndefined();
   });
@@ -267,7 +267,7 @@ describe('a handoff that does not go through', () => {
       const v = await detail(a, other);
       return v.handoff?.state.phase === 'failed' && v;
     }, 'B to refuse it');
-    expect(d.handoff.state).toEqual({ phase: 'failed', where: 'there', error: expect.stringContaining("This thread's folder is not on this Mac") });
+    expect(d.handoff.state).toEqual({ phase: 'failed', where: 'there', error: expect.stringContaining("This thread's folder is not on this machine") });
     expect(d.blocked).toBeUndefined();
     expect(d.pending.map((p: { text: string; delivery: string }) => [p.text, p.delivery])).toEqual([['and the footer', 'recovered']]);
     expect(b.runner.isLive(other)).toBe(false);

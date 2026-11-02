@@ -307,7 +307,7 @@ function RetentionCard({ cleanup, scanning, onChange }: { cleanup: CleanupState;
     <section className={CARD}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-display text-[16px]">Retention on this Mac</h2>
+          <h2 className="font-display text-[16px]">Worktree retention</h2>
           <p className="mt-0.5 text-[12.5px] text-fg-3">Remove idle worktrees on a schedule.</p>
         </div>
         <Toggle checked={policy.enabled} onChange={(on) => save({ enabled: on })} disabled={busy} label="Remove idle worktrees on a schedule" />
@@ -327,7 +327,7 @@ function RetentionCard({ cleanup, scanning, onChange }: { cleanup: CleanupState;
         </div>
       )}
       <p className="text-[12.5px] leading-relaxed text-fg-3">
-        Only this Mac: the setting is not synced. It covers worktrees of archived, merged or deleted threads with nothing unsaved, idle at least {plural(policy.idleDays, 'day')}. It runs a
+        Only this machine: the setting is not synced. It covers worktrees of archived, merged or deleted threads with nothing unsaved, idle at least {plural(policy.idleDays, 'day')}. It runs a
         minute after Omni starts, then daily.
       </p>
       <p className="text-[12.5px] text-fg-2" role="status">

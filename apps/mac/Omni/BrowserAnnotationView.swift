@@ -100,7 +100,7 @@ struct MarkedScreenshot: View {
     var body: some View {
       VStack(spacing: z(6)) {
         OmniIcon(name: "image", size: 18).foregroundStyle(Tok.fg4)
-        Text("The screenshot is not on this Mac.")
+        Text("The screenshot is not on this machine.")
           .font(.omni(size: 12))
           .foregroundStyle(Tok.fg3)
       }
