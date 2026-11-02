@@ -15,11 +15,18 @@
       "state": "OPEN",
       "isDraft": false,
       "updatedAt": "2026-01-05T09:00:00Z",
+      "createdAt": "2026-01-05T09:00:00Z",
       "reviewDecision": "REVIEW_REQUIRED",
       "url": "https://github.com/acme/shop/pull/7",
       "additions": 71,
       "deletions": 4,
       "mergeable": "MERGEABLE",
+      "labels": [
+        "feature"
+      ],
+      "reviewRequests": [
+        "ben"
+      ],
       "checks": {
         "passed": 1,
         "failed": 0,
@@ -33,5 +40,6 @@
       "repo": "acme/gone",
       "error": "GraphQL: Could not resolve to a Repository with the name 'acme/gone'."
     }
-  ]
+  ],
+  "viewer": "ben"
 }

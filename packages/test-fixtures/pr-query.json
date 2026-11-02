@@ -1,0 +1,62 @@
+{
+  "prs": [
+    { "number": 12, "title": "Add the size guide drawer", "author": { "login": "maya" }, "headRefName": "feat/size-guide", "repo": "acme/shop", "baseRefName": "main", "url": "https://github.com/acme/shop/pull/12", "additions": 0, "deletions": 0, "mergeable": "MERGEABLE", "state": "OPEN", "isDraft": false, "updatedAt": "2026-11-02T10:00:00Z", "createdAt": "2026-10-29T09:00:00Z", "reviewDecision": "REVIEW_REQUIRED", "checks": { "passed": 2, "failed": 1, "pending": 1 }, "labels": ["feature"], "reviewRequests": ["ben"] },
+    { "number": 9, "title": "Draft: cart upsell", "author": { "login": "ben" }, "headRefName": "exp/cart-upsell", "repo": "acme/shop", "baseRefName": "main", "url": "https://github.com/acme/shop/pull/9", "additions": 0, "deletions": 0, "mergeable": "MERGEABLE", "state": "OPEN", "isDraft": true, "updatedAt": "2026-11-01T08:00:00Z", "createdAt": "2026-10-24T09:00:00Z", "reviewDecision": null, "checks": { "passed": 0, "failed": 0, "pending": 0 }, "labels": ["experiment"], "reviewRequests": [] },
+    { "number": 7, "title": "Fix the predictive search flicker", "author": { "login": "sam" }, "headRefName": "fix/search-flicker", "repo": "acme/shop", "baseRefName": "main", "url": "https://github.com/acme/shop/pull/7", "additions": 0, "deletions": 0, "mergeable": "MERGEABLE", "state": "OPEN", "isDraft": false, "updatedAt": "2026-10-28T08:00:00Z", "createdAt": "2026-10-27T09:00:00Z", "reviewDecision": "APPROVED", "checks": { "passed": 2, "failed": 0, "pending": 0 }, "labels": ["bug"], "reviewRequests": [] },
+    { "number": 31, "title": "Bug: broken RSS feed", "author": { "login": "ben" }, "headRefName": "fix/rss", "repo": "acme/blog", "baseRefName": "main", "url": "https://github.com/acme/blog/pull/31", "additions": 0, "deletions": 0, "mergeable": "MERGEABLE", "state": "MERGED", "isDraft": false, "updatedAt": "2026-11-02T12:00:00Z", "createdAt": "2026-10-30T09:00:00Z", "reviewDecision": "APPROVED", "checks": { "passed": 3, "failed": 0, "pending": 0 }, "labels": ["bug", "Good First Issue"], "reviewRequests": [] },
+    { "number": 30, "title": "Update the about page", "author": { "login": "maya" }, "headRefName": "docs/about", "repo": "acme/blog", "baseRefName": "main", "url": "https://github.com/acme/blog/pull/30", "additions": 0, "deletions": 0, "mergeable": "MERGEABLE", "state": "CLOSED", "isDraft": false, "updatedAt": "2026-10-20T08:00:00Z", "createdAt": "2026-10-01T09:00:00Z", "reviewDecision": "CHANGES_REQUESTED", "checks": { "passed": 0, "failed": 0, "pending": 1 }, "labels": [], "reviewRequests": [] },
+    { "number": 5, "title": "Add search to the archive", "author": null, "headRefName": "feat/archive-search", "repo": "acme/blog", "baseRefName": "main", "url": "https://github.com/acme/blog/pull/5", "additions": 0, "deletions": 0, "mergeable": "MERGEABLE", "state": "OPEN", "isDraft": false, "updatedAt": "2026-10-31T08:00:00Z", "reviewDecision": "REVIEW_REQUIRED", "checks": { "passed": 1, "failed": 0, "pending": 2 }, "reviewRequests": ["BEN"] }
+  ],
+  "queries": [
+    { "case": "default: open first, grouped by the viewer", "viewer": "ben", "query": { "search": "", "sort": "open", "filters": {}, "repo": null },
+      "expected": [{ "group": "authored", "numbers": [9, 31] }, { "group": "review", "numbers": [12, 5] }, { "group": "other", "numbers": [7, 30] }] },
+    { "case": "no viewer puts everything in others", "viewer": null, "query": { "search": "", "sort": "open", "filters": {}, "repo": null },
+      "expected": [{ "group": "other", "numbers": [12, 9, 5, 7, 31, 30] }] },
+    { "case": "a word matches title or branch", "viewer": "ben", "query": { "search": "SEARCH", "sort": "open", "filters": {}, "repo": null },
+      "expected": [{ "group": "review", "numbers": [5] }, { "group": "other", "numbers": [7] }] },
+    { "case": "label token", "viewer": "ben", "query": { "search": "label:bug", "sort": "open", "filters": {}, "repo": null },
+      "expected": [{ "group": "authored", "numbers": [31] }, { "group": "other", "numbers": [7] }] },
+    { "case": "quoted label, any case, with a word", "viewer": "ben", "query": { "search": "label:\"good first issue\" rss", "sort": "open", "filters": {}, "repo": null },
+      "expected": [{ "group": "authored", "numbers": [31] }] },
+    { "case": "number with a hash", "viewer": "ben", "query": { "search": "#9", "sort": "open", "filters": {}, "repo": null },
+      "expected": [{ "group": "authored", "numbers": [9] }] },
+    { "case": "repo word, sorted by title", "viewer": "ben", "query": { "search": "blog", "sort": "title", "filters": {}, "repo": null },
+      "expected": [{ "group": "authored", "numbers": [31] }, { "group": "review", "numbers": [5] }, { "group": "other", "numbers": [30] }] },
+    { "case": "state filter is any of", "viewer": "ben", "query": { "search": "", "sort": "updated", "filters": { "state": ["draft", "merged"] }, "repo": null },
+      "expected": [{ "group": "authored", "numbers": [31, 9] }] },
+    { "case": "checks filter, newest falls back to updated", "viewer": "ben", "query": { "search": "", "sort": "newest", "filters": { "checks": ["failing", "pending"] }, "repo": null },
+      "expected": [{ "group": "review", "numbers": [5, 12] }, { "group": "other", "numbers": [30] }] },
+    { "case": "facets combine with and", "viewer": "ben", "query": { "search": "", "sort": "open", "filters": { "author": ["unknown"], "review": ["required"] }, "repo": null },
+      "expected": [{ "group": "review", "numbers": [5] }] },
+    { "case": "one repo, oldest first", "viewer": "ben", "query": { "search": "", "sort": "oldest", "filters": {}, "repo": "acme/shop" },
+      "expected": [{ "group": "authored", "numbers": [9] }, { "group": "review", "numbers": [12] }, { "group": "other", "numbers": [7] }] },
+    { "case": "repo scope and label filter", "viewer": "ben", "query": { "search": "", "sort": "repo", "filters": { "label": ["bug"] }, "repo": "acme/blog" },
+      "expected": [{ "group": "authored", "numbers": [31] }] },
+    { "case": "by repo, then recently updated", "viewer": "ben", "query": { "search": "", "sort": "repo", "filters": {}, "repo": null },
+      "expected": [{ "group": "authored", "numbers": [31, 9] }, { "group": "review", "numbers": [5, 12] }, { "group": "other", "numbers": [30, 7] }] },
+    { "case": "nothing matches", "viewer": "ben", "query": { "search": "nothing-here", "sort": "open", "filters": {}, "repo": null },
+      "expected": [] }
+  ],
+  "facets": [
+    { "case": "state offers the fixed values", "facet": "state", "repo": null, "picked": [],
+      "expected": [{ "value": "open", "label": "Open", "count": 3 }, { "value": "draft", "label": "Draft", "count": 1 }, { "value": "merged", "label": "Merged", "count": 1 }, { "value": "closed", "label": "Closed", "count": 1 }] },
+    { "case": "checks", "facet": "checks", "repo": null, "picked": [],
+      "expected": [{ "value": "passing", "label": "Passing", "count": 2 }, { "value": "failing", "label": "Failing", "count": 1 }, { "value": "pending", "label": "Running", "count": 2 }, { "value": "none", "label": "No checks", "count": 1 }] },
+    { "case": "labels, most used first", "facet": "label", "repo": null, "picked": [],
+      "expected": [{ "value": "bug", "label": "bug", "count": 2 }, { "value": "experiment", "label": "experiment", "count": 1 }, { "value": "feature", "label": "feature", "count": 1 }, { "value": "Good First Issue", "label": "Good First Issue", "count": 1 }] },
+    { "case": "authors, a missing one as unknown", "facet": "author", "repo": null, "picked": [],
+      "expected": [{ "value": "ben", "label": "ben", "count": 2 }, { "value": "maya", "label": "maya", "count": 2 }, { "value": "sam", "label": "sam", "count": 1 }, { "value": "unknown", "label": "unknown", "count": 1 }] },
+    { "case": "a value no PR in scope has is left out", "facet": "review", "repo": "acme/shop", "picked": [],
+      "expected": [{ "value": "approved", "label": "Approved", "count": 1 }, { "value": "required", "label": "Review required", "count": 1 }, { "value": "none", "label": "No review decision", "count": 1 }] },
+    { "case": "unless it is picked", "facet": "review", "repo": "acme/shop", "picked": ["changes"],
+      "expected": [{ "value": "approved", "label": "Approved", "count": 1 }, { "value": "changes", "label": "Changes requested", "count": 0 }, { "value": "required", "label": "Review required", "count": 1 }, { "value": "none", "label": "No review decision", "count": 1 }] },
+    { "case": "a picked label outside the scope", "facet": "label", "repo": "acme/shop", "picked": ["Good First Issue"],
+      "expected": [{ "value": "bug", "label": "bug", "count": 1 }, { "value": "experiment", "label": "experiment", "count": 1 }, { "value": "feature", "label": "feature", "count": 1 }, { "value": "Good First Issue", "label": "Good First Issue", "count": 0 }] }
+  ],
+  "searches": [
+    { "input": "fix Label:Bug label:\"good first issue\" \"size guide\"", "expected": { "words": ["fix", "size guide"], "labels": ["bug", "good first issue"] } },
+    { "input": "label: bug", "expected": { "words": ["bug"], "labels": [] } },
+    { "input": "label:\"half typed", "expected": { "words": [], "labels": ["half typed"] } },
+    { "input": "   ", "expected": { "words": [], "labels": [] } }
+  ]
+}

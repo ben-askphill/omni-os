@@ -32,9 +32,18 @@ export function summarizeChecks(rollup: any[] | null | undefined) {
   return s;
 }
 
+/** A list row also carries what the PRs page searches and groups by: labels by name, and who is asked to review by login (teams left out). */
+const LIST_FIELDS = `${PR_FIELDS},createdAt,labels,reviewRequests`;
+
 export async function listPRs(repo: string, state = 'open') {
-  const prs = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--state', state, '--limit', '40', '--json', PR_FIELDS], undefined, CHECK_TIMEOUT));
-  return prs.map((p: any) => ({ ...p, checks: summarizeChecks(p.statusCheckRollup), statusCheckRollup: undefined }));
+  const prs = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--state', state, '--limit', '40', '--json', LIST_FIELDS], undefined, CHECK_TIMEOUT));
+  return prs.map((p: any) => ({
+    ...p,
+    checks: summarizeChecks(p.statusCheckRollup),
+    statusCheckRollup: undefined,
+    labels: (p.labels ?? []).map((l: { name: string }) => l.name),
+    reviewRequests: (p.reviewRequests ?? []).flatMap((r: { login?: string }) => (r.login ? [r.login] : [])),
+  }));
 }
 
 type Listed = Awaited<ReturnType<typeof listPRs>>[number];

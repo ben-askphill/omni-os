@@ -227,8 +227,9 @@ function fakeGh(bin: string) {
   };
   const listed = {
     number: 7, title: 'Add the size guide drawer', author: { login: 'maya' }, headRefName: 'feat/size-guide', baseRefName: 'main', state: 'OPEN', isDraft: false,
-    updatedAt: '2026-11-01T09:00:00Z', reviewDecision: 'REVIEW_REQUIRED', statusCheckRollup: pr.statusCheckRollup, url: 'https://github.com/acme/shop/pull/7',
-    additions: 71, deletions: 4, mergeable: 'MERGEABLE',
+    updatedAt: '2026-11-01T09:00:00Z', createdAt: '2026-10-30T09:00:00Z', reviewDecision: 'REVIEW_REQUIRED', statusCheckRollup: pr.statusCheckRollup,
+    url: 'https://github.com/acme/shop/pull/7', additions: 71, deletions: 4, mergeable: 'MERGEABLE',
+    labels: [{ id: 'L1', name: 'feature', description: '', color: '0e8a16' }], reviewRequests: [{ __typename: 'User', login: 'ben' }, { __typename: 'Team', name: 'Theme', slug: 'theme' }],
   };
   const list = `if [ "$1 $2 $8" = "pr list 40" ]; then [ "$4" = "acme/shop" ] && echo '${JSON.stringify([listed])}' && exit 0; echo "GraphQL: Could not resolve to a Repository with the name '$4'." >&2; exit 1; fi\n`;
   writeFileSync(join(bin, 'gh'), `#!/bin/sh\nif [ "$1 $2" = "pr view" ]; then echo '${JSON.stringify(pr)}'; exit 0; fi\n${list}if [ "$1 $2" = "api user" ]; then echo ben; exit 0; fi\nif [ "$1" = "api" ]; then exit 0; fi\necho "fake gh: $*" >&2\nexit 1\n`);
@@ -864,8 +865,10 @@ async function scenario() {
 
   // Every channel's PRs: acme's repo answers, gadgets' repo is one gh cannot read.
   await call('PATCH', '/channels/gadgets', { github_repo: 'acme/gone' });
-  const all = keep('all-prs.json', await get('/prs')) as { prs: { number: number }[]; failed: { repo: string }[] };
+  const all = keep('all-prs.json', await get('/prs')) as { prs: { number: number; labels: string[]; reviewRequests: string[] }[]; failed: { repo: string }[]; viewer: string };
   expect(all.prs.map((p) => p.number)).toEqual([7]);
+  expect(all.prs[0]).toMatchObject({ labels: ['feature'], reviewRequests: ['ben'] });
+  expect(all.viewer).toBe('ben');
   expect(all.failed.map((f) => f.repo)).toEqual(['acme/gone']);
 }
 

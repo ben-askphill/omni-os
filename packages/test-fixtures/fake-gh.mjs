@@ -10,18 +10,21 @@ const check = (name, conclusion, status = 'COMPLETED') => ({ __typename: 'CheckR
 const PRS = [
   {
     number: 12, title: 'Add the size guide drawer to product pages', author: { login: 'maya' }, headRefName: 'feat/size-guide', baseRefName: 'main',
-    state: 'OPEN', isDraft: false, updatedAt: new Date(Date.now() - 3 * 3600_000).toISOString(), reviewDecision: 'REVIEW_REQUIRED',
+    state: 'OPEN', isDraft: false, updatedAt: new Date(Date.now() - 3 * 3600_000).toISOString(), createdAt: new Date(Date.now() - 4 * 86400_000).toISOString(), reviewDecision: 'REVIEW_REQUIRED',
+    labels: [{ id: 'L1', name: 'feature', color: '0e8a16' }], reviewRequests: [{ __typename: 'User', login: 'ben-askphill' }, { __typename: 'Team', name: 'Theme', slug: 'theme' }],
     url: 'https://github.com/acme/shop/pull/12', additions: 71, deletions: 4, mergeable: 'MERGEABLE', headRefOid: '4f9c2d17e8a3b6c05d1e2f3a4b5c6d7e8f9a0b1c',
     statusCheckRollup: [check('lint', 'SUCCESS'), check('theme-check', 'SUCCESS'), check('e2e', 'FAILURE'), check('deploy-preview', '', 'IN_PROGRESS')],
   },
   {
-    number: 9, title: 'Draft: cart upsell experiments', author: { login: 'ben' }, headRefName: 'exp/cart-upsell', baseRefName: 'main',
-    state: 'OPEN', isDraft: true, updatedAt: new Date(Date.now() - 30 * 3600_000).toISOString(), reviewDecision: null,
+    number: 9, title: 'Draft: cart upsell experiments', author: { login: 'ben-askphill' }, headRefName: 'exp/cart-upsell', baseRefName: 'main',
+    state: 'OPEN', isDraft: true, updatedAt: new Date(Date.now() - 30 * 3600_000).toISOString(), createdAt: new Date(Date.now() - 9 * 86400_000).toISOString(), reviewDecision: null,
+    labels: [{ id: 'L2', name: 'experiment', color: 'fbca04' }], reviewRequests: [],
     url: 'https://github.com/acme/shop/pull/9', additions: 240, deletions: 12, mergeable: 'CONFLICTING', headRefOid: '9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b', statusCheckRollup: [],
   },
   {
     number: 7, title: 'Fix the predictive search flicker', author: { login: 'sam' }, headRefName: 'fix/search-flicker', baseRefName: 'main',
-    state: 'OPEN', isDraft: false, updatedAt: new Date(Date.now() - 5 * 86400_000).toISOString(), reviewDecision: 'APPROVED',
+    state: 'OPEN', isDraft: false, updatedAt: new Date(Date.now() - 5 * 86400_000).toISOString(), createdAt: new Date(Date.now() - 6 * 86400_000).toISOString(), reviewDecision: 'APPROVED',
+    labels: [{ id: 'L3', name: 'bug', color: 'd73a4a' }], reviewRequests: [],
     url: 'https://github.com/acme/shop/pull/7', additions: 6, deletions: 6, mergeable: 'MERGEABLE', headRefOid: '0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c',
     statusCheckRollup: [check('lint', 'SUCCESS'), check('theme-check', 'SUCCESS')],
   },
