@@ -77,6 +77,13 @@ extension SidebarSections {
     Set((channels.first { $0.id == conductorID }?.handoffs ?? []).flatMap { $0.children.map(\.id) })
   }
 
+  /// As rowsElsewhere in apps/web/src/sidebar-lists.ts: the threads whose row is somewhere other than under their
+  /// channel or folder, so every thread has one row. A delegated thread's row is its job's count. A thread in Running
+  /// lives there while Running is open; folded, Running hands its threads back to their channels.
+  public static func rowsElsewhere(_ channels: [ChannelWithRunning], running: [ThreadStub], runningOpen: Bool) -> Set<String> {
+    delegatedIDs(channels).union(runningOpen ? running.map(\.id) : [])
+  }
+
   /// The threads each Conductor job delegated, keyed by the job's id.
   public static func delegates(_ channels: [ChannelWithRunning]) -> [String: [ThreadStub]] {
     Dictionary(

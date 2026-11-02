@@ -83,6 +83,16 @@ export function runningThreadGroups(channels: Listing[], open: ThreadStub | null
   return nestedRows(runningThreads(channels, open), allHandoffs(channels), 'running', Number.MAX_SAFE_INTEGER);
 }
 
+/**
+ * The threads whose sidebar row is somewhere other than under their channel or folder, so the channel skips them and
+ * every thread has one row. A delegated thread's row is its Conductor job's count. A thread in Running lives there
+ * while Running is open; folded, Running hands its threads back to their channels.
+ */
+export function rowsElsewhere(channels: Listing[], running: ThreadStub[], runningOpen: boolean): Set<string> {
+  const delegated = allHandoffs(channels).flatMap((g) => g.children.map((c) => c.id));
+  return new Set([...delegated, ...(runningOpen ? running.map((t) => t.id) : [])]);
+}
+
 /** The five latest jobs and regular threads, with delegated children nested under each visible Conductor job. */
 export function recentThreadGroups(channels: Listing[], open: ThreadStub | null = null, limit = RECENT_THREADS): ThreadRowGroup[] {
   const all = recentThreads(channels, open, Number.MAX_SAFE_INTEGER);

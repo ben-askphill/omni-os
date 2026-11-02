@@ -2,11 +2,11 @@ import { Fragment, useRef, type ReactNode } from 'react';
 import { taskHost, type ChannelWithRunning, type FolderWithThreads, type ThreadStub } from '../api.ts';
 import { DEFAULT_FOLDER_NAME, draftKey, freeName, useFolders } from '../folders.tsx';
 import { pinnedRows } from '../pins.ts';
-import { runningThreadGroups } from '../sidebar-lists.ts';
+import { rowsElsewhere, runningThreadGroups } from '../sidebar-lists.ts';
 import { href, useHash, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
-import { delegatedIds, delegatesByParent } from '@omni/shared/delegate-count.ts';
+import { delegatesByParent } from '@omni/shared/delegate-count.ts';
 import { OmniMark } from './brand.tsx';
 import { ChannelMark, ErrorNote, Thumb, useSlidingThumb } from './ui.tsx';
 import { useUngroupDrop } from './sidebar/channel-lists.ts';
@@ -58,16 +58,17 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   // Threads in a folder are listed under the folder instead.
   // Threads the Conductor delegated get no row of their own, anywhere: the count on their Conductor thread's row
   // stands for them, and the channel's running badge still counts the ones at work.
-  const delegated = delegatedIds(conductor?.handoffs);
+  // A thread listed in Running lives there alone while Running is open, so one row holds the highlight.
   const delegates = delegatesByParent(conductor?.handoffs);
-  const undelegated = (f: FolderWithThreads) => ({ ...f, threads: f.threads.filter((t) => !delegated.has(t.id)) });
-  const threadsOf = (c: ChannelWithRunning) => channelThreads(c, openIn(c), focused).filter((t) => !delegated.has(t.id));
-  /** The channel's folders, with the open thread under its own even past the listed ones. */
-  const foldersOf = (c: ChannelWithRunning) => channelFolders(c, openIn(c)).map(undelegated);
-  // Rows appearing or leaving above the highlighted one move it, so they re-measure the thumb too.
   const openCopy = openThread && openThread.id === openId ? openThread : null;
-  const runningGroups = runningThreadGroups(channels, openCopy);
-  const running = runningGroups.map((g) => g.thread);
+  const running = runningThreadGroups(channels, openCopy).map((g) => g.thread);
+  const away = rowsElsewhere(channels, running, !runningClosed);
+  const elsewhere = (t: ThreadStub) => away.has(t.id);
+  const listed = (f: FolderWithThreads) => ({ ...f, threads: f.threads.filter((t) => !elsewhere(t)) });
+  const threadsOf = (c: ChannelWithRunning) => channelThreads(c, openIn(c), focused).filter((t) => !elsewhere(t));
+  /** The channel's folders, with the open thread under its own even past the listed ones. */
+  const foldersOf = (c: ChannelWithRunning) => channelFolders(c, openIn(c)).map(listed);
+  // Rows appearing or leaving above the highlighted one move it, so they re-measure the thumb too.
   const pins = pinnedRows(pinned, openCopy);
   const sectionKey = (closed: boolean, list: ThreadStub[]) => (closed ? 'closed' : list.map((t) => t.id).join());
   const sectionsKey = [sectionKey(runningClosed, running), sectionKey(pinsClosed, pins)].join('|');
@@ -99,7 +100,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
         >
           <div className="min-h-0 space-y-px overflow-hidden">{channelContents(c, closed)}</div>
         </div>
-        {closed && open && !delegated.has(open.id) && (
+        {closed && open && !elsewhere(open) && (
           <ChannelThreadEntry t={open} active tasks={agents(open.id)} handoffs={c.handoffs} flush={c.id === 'conductor'} onNavigate={onNavigate} />
         )}
       </>
@@ -114,7 +115,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
     const shown = list.filter((t, i) => i < MAX_THREADS || t.id === oid || agents(t.id).length > 0);
     return (
       <>
-        {(closed ? (c.folders ?? []).map(undelegated) : foldersOf(c)).map((f) => (
+        {(closed ? (c.folders ?? []).map(listed) : foldersOf(c)).map((f) => (
           <FolderRow key={f.id} f={f} openId={oid} tasks={tasks} handoffs={c.handoffs} onNavigate={onNavigate} />
         ))}
         {folders.editing === draftKey(c.id) && (
@@ -178,13 +179,16 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
     </div>
   );
 
+  // A Running row is the thread's only row, so it wears the thumb and nests its sub-agents. A Pinned row is a second
+  // copy: open, it reads bold and the thumb stays on the thread's own row.
   const sectionLink = (t: ThreadStub, unpin = false) => (
     <SectionEntry
       key={t.id}
       t={t}
       channel={t.channel_id === 'conductor' ? 'Conductor' : (channels.find((c) => c.id === t.channel_id)?.name ?? t.channel_id)}
       active={t.id === openId}
-      agents={tasks.filter((k) => taskHost(k) === t.id).length}
+      home={!unpin}
+      tasks={tasks.filter((k) => taskHost(k) === t.id)}
       unpin={unpin}
       delegated={unpin ? undefined : delegates.get(t.id)}
       onNavigate={onNavigate}

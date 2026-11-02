@@ -148,9 +148,10 @@ export function ChannelThreadEntry({ t, active, tasks, handoffs, flush = false, 
 
 /**
  * A sub-agent running in a thread, nested under it on a tree line from the thread's status dot, like a Claude Desktop
- * task under its session. It links to the thread that started it.
+ * task under its session. It links to the thread that started it. `flush`: under a Running row, whose dot sits nearer
+ * the edge than a channel's thread's.
  */
-function AgentLink({ t, last, onNavigate }: { t: BackgroundTask; last: boolean; onNavigate?: () => void }) {
+function AgentLink({ t, last, flush = false, onNavigate }: { t: BackgroundTask; last: boolean; flush?: boolean; onNavigate?: () => void }) {
   const now = useNow(1000);
   const tip = [t.description, t.tool_uses ? plural(t.tool_uses, 'tool') : null, t.last_tool && `last ${t.last_tool}`].filter(Boolean).join(' · ');
   return (
@@ -158,7 +159,7 @@ function AgentLink({ t, last, onNavigate }: { t: BackgroundTask; last: boolean; 
       href={href.thread(t.thread_id)}
       onClick={onNavigate}
       title={tip}
-      className={`hov relative z-[1] flex h-8 items-center gap-2 rounded-full pr-3 pl-4 text-[12.5px] text-fg-3 transition-colors hover:text-fg md:h-7 md:text-[12px] ml-[43px]`}
+      className={`hov relative z-[1] flex h-8 items-center gap-2 rounded-full pr-3 pl-4 text-[12.5px] text-fg-3 transition-colors hover:text-fg md:h-7 md:text-[12px] ${flush ? 'ml-[19px]' : 'ml-[43px]'}`}
     >
       <span
         aria-hidden
@@ -174,20 +175,25 @@ function AgentLink({ t, last, onNavigate }: { t: BackgroundTask; last: boolean; 
 /**
  * A thread in the Running or Pinned section, flush with the channels: its status, its title and its
  * channel's name. In Pinned the name gives way on hover to the button that unpins it. It opens the thread as its row
- * under its channel does, and a right-click gives the same menu. Open, it reads bold; the thumb stays on its row under
- * its channel.
+ * under its channel does, and a right-click gives the same menu. `home`: the thread's only row (Running), which wears
+ * the thumb while open and nests its running sub-agents. Otherwise (Pinned), open, it reads bold and the thumb stays
+ * on the thread's own row.
  */
-export function SectionLink({ t, channel, active, agents, unpin, delegates, onNavigate }: { t: ThreadStub; channel: string; active: boolean; agents: number; unpin?: boolean; delegates?: RowDelegates; onNavigate?: () => void }) {
+export function SectionLink({ t, channel, active, home = false, tasks, unpin, delegates, onNavigate }: { t: ThreadStub; channel: string; active: boolean; home?: boolean; tasks: BackgroundTask[]; unpin?: boolean; delegates?: RowDelegates; onNavigate?: () => void }) {
   const { setPinned } = useApp();
   const title = t.title || 'Untitled';
+  const agents = tasks.length;
   const busy = t.status === 'running' || agents > 0;
   return (
+    <>
     <WithDelegates delegates={delegates}>
     <div className="group/pin flex items-center rounded-full">
       <a
         href={href.thread(t.id)}
         onClick={onNavigate}
         title={`${title} · ${channel} · ${agents ? plural(agents, 'agent') + ' running' : (STATUS_LABEL[t.status] ?? t.status)}`}
+        aria-current={active && home ? 'page' : undefined}
+        data-active={(active && home) || undefined}
         className={`hov z-[1] flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 text-[13.5px] transition-colors md:h-8 md:text-[13px] ${
           active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-2 hover:text-fg'
         }`}
@@ -224,6 +230,8 @@ export function SectionLink({ t, channel, active, agents, unpin, delegates, onNa
       )}
     </div>
     </WithDelegates>
+    {home && tasks.map((k, i) => <AgentLink key={k.task_id} t={k} last={i === agents - 1} flush onNavigate={onNavigate} />)}
+    </>
   );
 }
 

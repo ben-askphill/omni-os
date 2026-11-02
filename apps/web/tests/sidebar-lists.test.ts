@@ -6,7 +6,7 @@ vi.mock('@omni/server/db.ts', () => {
 });
 
 import type { ThreadStub } from '../src/api.ts';
-import { RECENT_THREADS, recentThreadGroups, recentThreads, runningThreadGroups, runningThreads } from '../src/sidebar-lists.ts';
+import { RECENT_THREADS, recentThreadGroups, recentThreads, rowsElsewhere, runningThreadGroups, runningThreads } from '../src/sidebar-lists.ts';
 
 const t = (id: string, over: Partial<ThreadStub> = {}): ThreadStub => ({
   id,
@@ -115,5 +115,24 @@ describe('Conductor handoff rows', () => {
     const ordinary = t('ordinary-child', { parent_id: 'job', source: 'manual', status: 'running' });
     const rows = runningThreadGroups([{ id: 'conductor', active: [], handoffs: [group] }, { id: 'other', active: [ordinary] }]);
     expect(rows.map((r) => r.thread.id)).toEqual(['ordinary-child']);
+  });
+});
+
+describe('rowsElsewhere', () => {
+  const job = t('job', { channel_id: 'conductor', status: 'running' });
+  const child = t('child', { status: 'running' });
+  const run = t('run', { status: 'running' });
+  const channels = [
+    { id: 'conductor', active: [job], handoffs: [{ parent: job, children: [child] }] },
+    { id: 'c', active: [run, child], recent: [t('old')] },
+  ];
+  const running = runningThreadGroups(channels).map((g) => g.thread);
+
+  it('takes every thread in Running out of its channel while Running is open, so one row holds the highlight', () => {
+    expect([...rowsElsewhere(channels, running, true)].sort()).toEqual(['child', 'job', 'run']);
+  });
+
+  it('hands Running threads back to their channels while Running is folded, but never a delegated thread', () => {
+    expect([...rowsElsewhere(channels, running, false)]).toEqual(['child']);
   });
 });

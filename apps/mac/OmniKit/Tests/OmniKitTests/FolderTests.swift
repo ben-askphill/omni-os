@@ -186,6 +186,23 @@ private func threadStub(_ id: String, status: String = "done", minute: Int = 0, 
     #expect(workflow.kind == "workflow")
   }
 
+  @Test func aThreadInOpenRunningLeavesItsChannelAndFolder() throws {
+    let filed = stub("filed", status: "running", minute: 4, folder: "f1")
+    let c = try acme(
+      active: [stub("run", status: "running", minute: 3), filed],
+      recent: [stub("done", minute: 1)],
+      folders: [folderRow("f1", name: "A", threads: [filed, stub("idle", minute: 2, folder: "f1")])])
+    let running = SidebarSections.runningGroups([c]).map(\.thread)
+    let open = SidebarSections.rowsElsewhere([c], running: running, runningOpen: true)
+    #expect(open == ["run", "filed"])
+    #expect(SidebarSections.threads(of: c, focused: true, elsewhere: open).shown.map(\.id) == ["done"])
+    #expect(SidebarSections.threads(in: c.folders[0], openID: nil, elsewhere: open).shown.map(\.id) == ["idle"])
+    // Folded, Running hands them back.
+    let folded = SidebarSections.rowsElsewhere([c], running: running, runningOpen: false)
+    #expect(folded.isEmpty)
+    #expect(SidebarSections.threads(of: c, focused: true, elsewhere: folded).shown.map(\.id) == ["run", "done"])
+  }
+
   @Test func anEmptyOpenFolderSaysSo() throws {
     let c = try acme(folders: [folderRow("f1", name: "A"), folderRow("f2", name: "B", collapsed: 1)])
     #expect(SidebarSections.threads(in: c.folders[0], openID: nil).empty)

@@ -4,8 +4,9 @@ import SwiftUI
 /// The sidebar, as Sidebar.tsx (the design system's Rail): the wordmark, search and New thread, then Home and
 /// Conductor (one row per job, with the count of the threads it delegated), the channels by kind with their running
 /// threads (and those threads' sub-agents nested under them), Add channel, and the workspace pages. Threads the
-/// Conductor delegated get no row of their own: their job's count stands for them. The
-/// selected row wears a white thumb that springs from row to row. Usage and the server's state sit at the bottom.
+/// Conductor delegated get no row of their own: their job's count stands for them. A thread in Running lives there
+/// alone while Running is open. The selected row wears a white thumb that springs from row to row. Usage and the
+/// server's state sit at the bottom.
 struct SidebarView: View {
   let model: AppModel
   @Environment(\.openSettings) private var openSettings
@@ -45,6 +46,16 @@ struct SidebarView: View {
   }
 
   private var selected: SidebarItem? { SidebarItem(route: model.route) }
+
+  /// Running's threads, the open one with its fresher copy.
+  private var runningThreads: [ThreadStub] {
+    SidebarSections.runningGroups(model.store.channels, open: model.openThread).map(\.thread)
+  }
+
+  /// Threads whose row is not under their channel or folder: delegated ones, and Running's while it is open.
+  private var elsewhere: Set<String> {
+    SidebarSections.rowsElsewhere(model.store.channels, running: runningThreads, runningOpen: !runningClosed)
+  }
 
   /// Settings opens its window on General and leaves the main window where it was.
   private func pick(_ item: SidebarItem) {
@@ -106,7 +117,7 @@ struct SidebarView: View {
             }
           }
 
-          let running = SidebarSections.runningGroups(model.store.channels, open: model.openThread).map(\.thread)
+          let running = runningThreads
           if !running.isEmpty {
             threadSection("Running", closed: $runningClosed, threads: running)
           }
@@ -195,7 +206,7 @@ struct SidebarView: View {
 
   /// Running or Pinned, as ThreadSection in Sidebar.tsx: threads from any channel under a caption
   /// that folds them away, with the count beside it while folded. The caller leaves it out when it lists nothing. A
-  /// thread here still shows under its own channel too.
+  /// thread in open Running shows nowhere else; a pinned thread still shows under its own channel too.
   private func threadSection(_ label: String, closed: Binding<Bool>, threads: [ThreadStub], unpin: Bool = false) -> some View {
     let what = label.lowercased().replacingOccurrences(of: " threads", with: "")
     return VStack(alignment: .leading, spacing: 0) {
@@ -232,15 +243,18 @@ struct SidebarView: View {
   }
 
   /// A thread in a section, flush with the channels: its status, title and channel. In Pinned, the pin that unpins it
-  /// shows on hover. In Running, a Conductor job carries its delegate count in place of the threads it delegated. Open,
-  /// it reads bold; the thumb stays on its row under its channel.
+  /// shows on hover; open, it reads bold and the thumb stays on the thread's own row. In Running, which is the
+  /// thread's only row, it wears the thumb, nests its running sub-agents, and a Conductor job carries its delegate
+  /// count in place of the threads it delegated.
+  @ViewBuilder
   private func sectionRow(_ thread: ThreadStub, unpin: Bool) -> some View {
     let item = SidebarItem.thread(thread.id)
     let channel = thread.channelID == SidebarSections.conductorID ? "Conductor" : (model.store.channel(thread.channelID)?.name ?? thread.channelID)
     let count = unpin ? nil : delegates(of: thread.id)
-    return HoverChrome { hover in
-      row(item, thumb: false) {
-        SectionRow(thread: thread, channel: channel, active: selected == item, agents: agents[thread.id]?.count ?? 0, hover: unpin && hover, delegates: count)
+    let tasks = agents[thread.id] ?? []
+    HoverChrome { hover in
+      row(item, thumb: !unpin) {
+        SectionRow(thread: thread, channel: channel, active: selected == item, agents: tasks.count, hover: unpin && hover, delegates: count)
       }
       .overlay(alignment: .trailing) {
         if let count {
@@ -265,6 +279,13 @@ struct SidebarView: View {
       }
     }
     .openInNewWindow(thread.id, model: model, title: thread.title, stub: thread)
+    if !unpin {
+      ForEach(Array(tasks.enumerated()), id: \.element.id) { i, task in
+        AgentRow(task: task, last: i == tasks.count - 1) { pick(.thread(task.threadID)) }
+          .padding(.leading, z(19))
+          .openInNewWindow(task.threadID, model: model)
+      }
+    }
   }
 
   /// A Conductor job's delegate count, read against Needs you; nil when it delegated nothing.
@@ -327,7 +348,7 @@ struct SidebarView: View {
     }
     if closed {
       // Closed, it still shows the open thread, so the highlight never vanishes into it.
-      if let open = model.openThread, open.channelID == channel.id, !SidebarSections.delegatedIDs(model.store.channels).contains(open.id) {
+      if let open = model.openThread, open.channelID == channel.id, !elsewhere.contains(open.id) {
         threadRow(open)
       }
     } else {
@@ -350,11 +371,10 @@ struct SidebarView: View {
         },
         onCancel: { model.folders.editing = nil })
     }
+    // Delegated threads get no row here (their Conductor job's count stands for them), nor do open Running's.
     let links = SidebarSections.threads(
-      of: channel, open: model.openThread, focused: model.focusedChannel == channel.id, busy: Set(agents.keys))
-    // Delegated threads get no row here: their Conductor job's count stands for them.
-    let delegated = SidebarSections.delegatedIDs(model.store.channels)
-    ForEach(links.shown.filter { !delegated.contains($0.id) }) { thread in
+      of: channel, open: model.openThread, focused: model.focusedChannel == channel.id, busy: Set(agents.keys), elsewhere: elsewhere)
+    ForEach(links.shown) { thread in
       threadRow(thread)
     }
     if links.seeAll || links.more > 0 {
@@ -417,9 +437,8 @@ struct SidebarView: View {
       FolderRowView(model: model, folder: folder, busy: busy)
     }
     let all = expanded.contains(folder.id)
-    let links = SidebarSections.threads(in: folder, openID: model.openThread?.id, all: all, busy: hosts)
-    let delegated = SidebarSections.delegatedIDs(model.store.channels)
-    ForEach(links.shown.filter { !delegated.contains($0.id) }) { thread in
+    let links = SidebarSections.threads(in: folder, openID: model.openThread?.id, all: all, busy: hosts, elsewhere: elsewhere)
+    ForEach(links.shown) { thread in
       threadRow(thread)
     }
     if links.more > 0 {

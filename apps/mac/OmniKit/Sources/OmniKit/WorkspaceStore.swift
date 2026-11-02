@@ -583,9 +583,10 @@ public struct SidebarSections: Hashable, Sendable {
 
   /// A folder's rows: its threads while open, at most `maxFolderThreads` unless `all`, past which it still shows
   /// the open thread and any in `busy` (running sub-agents). Closed, it still shows the open thread, so the
-  /// highlight never vanishes into it.
-  public static func threads(in folder: FolderWithThreads, openID: String?, all: Bool = false, busy: Set<String> = []) -> FolderLinks {
-    let list = folder.collapsed ? folder.threads.filter { $0.id == openID } : folder.threads
+  /// highlight never vanishes into it. Threads in `elsewhere` (see `rowsElsewhere`) have their row somewhere else.
+  public static func threads(in folder: FolderWithThreads, openID: String?, all: Bool = false, busy: Set<String> = [], elsewhere: Set<String> = []) -> FolderLinks {
+    let own = folder.threads.filter { !elsewhere.contains($0.id) }
+    let list = folder.collapsed ? own.filter { $0.id == openID } : own
     let shown = all ? list : list.enumerated().filter { $0.offset < maxFolderThreads || $0.element.id == openID || busy.contains($0.element.id) }.map(\.element)
     return FolderLinks(shown: shown, more: folder.collapsed ? 0 : list.count - shown.count, empty: !folder.collapsed && folder.count == 0)
   }
@@ -594,12 +595,13 @@ public struct SidebarSections: Hashable, Sendable {
   /// is in this channel, joins them and stays after it stops, so the highlight never jumps away. The
   /// highlighted channel also lists its latest threads of any status, so finished ones stay findable. Threads in a
   /// folder are listed under the folder instead. Past `maxThreads` it still shows any in `busy` (running sub-agents).
-  public static func threads(of channel: ChannelWithRunning, open: ThreadStub? = nil, focused: Bool = false, busy: Set<String> = []) -> ThreadLinks {
+  /// Threads in `elsewhere` (see `rowsElsewhere`) have their row somewhere else.
+  public static func threads(of channel: ChannelWithRunning, open: ThreadStub? = nil, focused: Bool = false, busy: Set<String> = [], elsewhere: Set<String> = []) -> ThreadLinks {
     let open = open?.channelID == channel.id ? open : nil
     var seen: Set<String> = open.map { [$0.id] } ?? []
     var list = (channel.active + (focused ? channel.recent : [])).filter { seen.insert($0.id).inserted }
     if let open { list.insert(open, at: 0) }
-    list.removeAll { folder(of: $0, in: channel) != nil }
+    list.removeAll { folder(of: $0, in: channel) != nil || elsewhere.contains($0.id) }
     list.sort { $0.createdAt > $1.createdAt }
     let shown = list.enumerated().filter { $0.offset < maxThreads || $0.element.id == open?.id || busy.contains($0.element.id) }.map(\.element)
     return ThreadLinks(shown: shown, more: focused ? 0 : list.count - shown.count, seeAll: focused)
