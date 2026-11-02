@@ -11,3 +11,4 @@ xcuserdata/
 .playwright-mcp/
 .wrangler/
 .dev.vars
+.claude/worktrees/
