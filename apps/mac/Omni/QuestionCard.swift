@@ -8,11 +8,14 @@ struct QuestionCard: View {
   let threadID: String
   let client: OmniClient
   let ui: TranscriptUI
+  /// Once the server has the answer, or already had one (409). A card shown outside the asking thread has no stream to
+  /// fold it.
+  var answered: (@MainActor () -> Void)? = nil
 
   var body: some View {
     if question.state == .pending {
       VStack(alignment: .leading, spacing: z(10)) {
-        PendingQuestionCard(question: question, threadID: threadID, client: client, ui: ui)
+        PendingQuestionCard(question: question, threadID: threadID, client: client, ui: ui, answered: answered)
         StatusPill(glyph: .needs, label: QuestionState.pending.label)
       }
     } else {
@@ -32,6 +35,7 @@ private struct PendingQuestionCard: View {
   let threadID: String
   let client: OmniClient
   let ui: TranscriptUI
+  let answered: (@MainActor () -> Void)?
 
   private enum Focus: Hashable { case card, other }
   @FocusState private var focus: Focus?
@@ -280,12 +284,77 @@ private struct PendingQuestionCard: View {
     Task {
       do throws(OmniAPIError) {
         _ = try await client.answerQuestion(threadID: threadID, questionID: id, answers: answers)
+        answered?()
       } catch .http(status: 409, _) {
-        return
+        answered?()
       } catch {
         self.error = error.message
         sending = false
       }
+    }
+  }
+}
+
+/// The pending questions of the threads delegated from this one, at any depth, so Ben answers them in the thread he
+/// delegated from. Read when the thread opens, on each `needs_you` feed event (a question asked or answered anywhere,
+/// the other Mac's included), when the feed opens again after missing events, and once a card's answer lands.
+@MainActor @Observable final class CrewQuestionsModel {
+  private(set) var items: [CrewQuestion] = []
+  /// A sync sends `needs_you` in bursts: one load at a time, and one more after it when more came meanwhile.
+  @ObservationIgnored private var loading = false
+  @ObservationIgnored private var again = false
+
+  func load(client: OmniClient, thread: String) {
+    guard !loading else {
+      again = true
+      return
+    }
+    loading = true
+    Task {
+      repeat {
+        again = false
+        // A failed read keeps the last list.
+        if let list = try? await client.crewQuestions(threadID: thread), list != items { items = list }
+      } while again
+      loading = false
+    }
+  }
+}
+
+/// Under the transcript, as CrewQuestions.tsx: each question a delegated thread asks, under "<task> · <title> asks",
+/// which opens that thread. The card answers to that thread.
+struct CrewQuestionCards: View {
+  let model: AppModel
+  let crew: CrewQuestionsModel
+  let threadID: String
+  let ui: TranscriptUI
+
+  var body: some View {
+    if !crew.items.isEmpty {
+      VStack(alignment: .leading, spacing: z(16)) {
+        ForEach(crew.items) { c in
+          VStack(alignment: .leading, spacing: z(6)) {
+            Button {
+              model.route = .thread(id: c.threadID)
+            } label: {
+              HStack(spacing: z(6)) {
+                OmniIcon(name: "message", size: 13)
+                Text("\(c.byline) asks").lineLimit(1).truncationMode(.middle)
+              }
+              .font(.omni(size: 12))
+              .foregroundStyle(Tok.fg3)
+              .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Open thread: \(c.threadTitle)")
+            QuestionCard(question: c.question, threadID: c.threadID, client: model.client, ui: ui) {
+              crew.load(client: model.client, thread: threadID)
+            }
+          }
+        }
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityLabel("Questions from delegated threads")
     }
   }
 }

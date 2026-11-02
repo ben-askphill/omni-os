@@ -41,6 +41,7 @@ private struct ThreadView: View {
   let store: ThreadStore
   @State private var ui = TranscriptUI()
   @State private var markdown = MarkdownCache<Int>()
+  @State private var crew = CrewQuestionsModel()
 
   var body: some View {
     switch store.loadState {
@@ -68,11 +69,23 @@ private struct ThreadView: View {
       if let thread = store.thread {
         VStack(spacing: 0) {
           ThreadHeader(model: model, store: store, thread: thread)
-          TranscriptView(model: model, store: store, ui: ui, markdown: markdown)
+          TranscriptView(model: model, store: store, ui: ui, markdown: markdown, crew: crew)
             .overlay(alignment: .topTrailing) { ModToastStack(store: store) }
           ReplyComposerHost(model: model, store: store, thread: thread)
         }
         .readsShownResult(model: model, threadID: thread.id, status: thread.status)
+        .task(id: model.client.baseURL) {
+          let (client, id, questions) = (model.client, store.id, crew)
+          let ticket = model.subscribeFeed { event in
+            switch event {
+            case .message(.needsYou(_)), .state(.open): questions.load(client: client, thread: id)
+            default: break
+            }
+          }
+          questions.load(client: client, thread: id)
+          while !Task.isCancelled { try? await Task.sleep(for: .seconds(86_400)) }
+          model.unsubscribeFeed(ticket)
+        }
         #if DEBUG
         .onAppear {
           QAProbe.expand = {
@@ -298,12 +311,13 @@ private struct TranscriptView: View {
   let store: ThreadStore
   let ui: TranscriptUI
   let markdown: MarkdownCache<Int>
+  let crew: CrewQuestionsModel
   @State private var pin = PinState()
   @State private var position = ScrollPosition(edge: .bottom)
 
   var body: some View {
     ScrollView {
-      TranscriptRows(model: model, store: store, ui: ui, markdown: markdown)
+      TranscriptRows(model: model, store: store, ui: ui, markdown: markdown, crew: crew)
         .frame(maxWidth: ThreadStyle.thread)
         .padding(.horizontal, z(24))
         .padding(.top, z(16))
@@ -408,6 +422,7 @@ private struct TranscriptRows: View {
   let store: ThreadStore
   let ui: TranscriptUI
   let markdown: MarkdownCache<Int>
+  let crew: CrewQuestionsModel
 
   var body: some View {
     // Queued means waiting for a slot: nothing is working yet.
@@ -457,6 +472,7 @@ private struct TranscriptRows: View {
       if let line = store.workingLine {
         WorkingLine(text: line)
       }
+      CrewQuestionCards(model: model, crew: crew, threadID: store.id, ui: ui)
       if let t = store.thread, SetupCard.shows(t, model: model) {
         SetupCard(model: model, store: store, thread: t)
       }

@@ -67,7 +67,8 @@ public enum FeedEvent: Decodable, Hashable, Sendable {
   case mods([ModStatus])
   /// A channel changed on another Mac (sync): refetch the channel list.
   case channel(id: String)
-  /// Ben read a thread's result, here or in the Web UI: refetch Needs you. Nothing else about the thread changed.
+  /// Ben read a thread's result, here or in the Web UI, or a question in the thread was asked or answered: refetch Needs
+  /// you, and the crew questions of the thread on screen. Nothing else about the thread changed.
   case needsYou(threadID: String)
   /// An event-triggered automation's delivery was saved or changed state: refetch the automations.
   case automationDelivery(automation: String)

@@ -1,0 +1,33 @@
+{
+  "items": [
+    {
+      "thread_id": "00000000-0000-4000-8000-000000000074",
+      "thread_title": "Size the digest",
+      "task_id": "T-7C8B",
+      "channel_id": "acme",
+      "question": {
+        "id": "00000000-0000-4000-8000-000000000075",
+        "event_id": 230,
+        "questions": [
+          {
+            "question": "Which store should the digest cover first?",
+            "header": "Digest",
+            "options": [
+              {
+                "label": "Acme EU",
+                "description": "The store with the cart changes."
+              },
+              {
+                "label": "Acme US",
+                "description": "The store launching next month."
+              }
+            ],
+            "multiSelect": false
+          }
+        ],
+        "state": "pending",
+        "answers": null
+      }
+    }
+  ]
+}

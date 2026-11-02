@@ -122,6 +122,29 @@ private func questions(_ items: [TranscriptItem]) -> [ThreadQuestion] {
     #expect(try bodyJSON(req) == .object(["answers": .array([.object(["selected": .array([.string("Acne")]), "other": .null]), .null])]))
   }
 
+  @Test func listsTheQuestionsTheCrewWaitsOnWithTheThreadThatAsked() async throws {
+    let t = StubTransport(body: try fixture("crew-questions.json"))
+    let list = try await OmniClient(port: 4799, transport: t).crewQuestions(threadID: "conductor")
+    #expect(t.requests[0].url?.path == "/api/threads/conductor/crew-questions")
+    #expect(list.count == 1)
+    let q = try #require(list.first)
+    #expect(q.threadID == "00000000-0000-4000-8000-000000000074")
+    #expect(q.channelID == "acme")
+    #expect(q.byline == "T-7C8B · Size the digest")
+    #expect(q.id == q.question.id)
+    #expect(q.question.eventID == 230)
+    #expect(q.question.state == .pending && q.question.answers == nil)
+    #expect(q.question.questions.map(\.header) == ["Digest"])
+    #expect(q.question.questions[0].options.map(\.label) == ["Acme EU", "Acme US"])
+
+    let untitled = try OmniJSON.decoder().decode(
+      CrewQuestion.self,
+      from: Data(
+        #"{"thread_id":"t2","thread_title":"","task_id":null,"channel_id":"acme","question":{"id":"q2","event_id":3,"questions":[],"state":"pending","answers":null}}"#
+          .utf8))
+    #expect(untitled.byline == "Untitled")
+  }
+
   @Test func saysEachAnswerInWords() {
     #expect(QuestionAnswer.words(QuestionAnswer(selected: ["NL", "FR"], other: "BE")) == "NL, FR, BE")
     #expect(QuestionAnswer.words(nil) == "Skipped")

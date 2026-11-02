@@ -169,6 +169,46 @@ public struct ThreadQuestion: Hashable, Sendable {
   }
 }
 
+/// GET /api/threads/:id/crew-questions sends it with `event_id` in the asking thread.
+extension ThreadQuestion: Decodable {
+  enum CodingKeys: String, CodingKey {
+    case id, questions, state, answers
+    case eventID = "event_id"
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      id: try c.decode(String.self, forKey: .id), eventID: try c.decode(Int.self, forKey: .eventID),
+      questions: try c.decode([Question].self, forKey: .questions), state: try c.decode(QuestionState.self, forKey: .state),
+      answers: try c.decodeIfPresent([QuestionAnswer?].self, forKey: .answers))
+  }
+}
+
+/// A question a thread delegated from the open one waits on, at any depth: `CrewQuestion` in
+/// packages/shared/question.ts. Pending only. Its card answers to `threadID`, the thread that asked.
+public struct CrewQuestion: Decodable, Hashable, Sendable, Identifiable {
+  public let threadID: String
+  public let threadTitle: String
+  public let taskID: String?
+  public let channelID: String
+  public let question: ThreadQuestion
+
+  public var id: String { question.id }
+  /// The task it was for, if any, and the thread that asked: "T-AB12 · Build the export", as `CrewPullRequest.byline`.
+  public var byline: String {
+    [taskID, threadTitle.isEmpty ? "Untitled" : threadTitle].compactMap { $0 }.joined(separator: " · ")
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case question
+    case threadID = "thread_id"
+    case threadTitle = "thread_title"
+    case taskID = "task_id"
+    case channelID = "channel_id"
+  }
+}
+
 /// What Ben has picked on one question so far. `other` is the typed text; `otherOn` whether the Other row is chosen.
 public struct QuestionChoice: Hashable, Sendable {
   public var selected: [String]
@@ -218,6 +258,10 @@ private struct AnswersBody: Encodable, Sendable {
   let answers: [QuestionAnswer?]
 }
 
+private struct CrewQuestionsReply: Decodable {
+  let items: [CrewQuestion]
+}
+
 extension OmniClient {
   /// Ben's answers to a question, one per question in order, nil for each he skipped. 409 when it already has one.
   public func answerQuestion(threadID: String, questionID: String, answers: [QuestionAnswer?]) async throws(OmniAPIError)
@@ -225,5 +269,11 @@ extension OmniClient {
   {
     try await send(
       "POST", "/api/threads/\(uriComponent(threadID))/questions/\(uriComponent(questionID))/answer", body: AnswersBody(answers: answers))
+  }
+
+  /// The questions the threads delegated from this one wait on, oldest asked first. Answer each on its own `threadID`.
+  public func crewQuestions(threadID: String) async throws(OmniAPIError) -> [CrewQuestion] {
+    let reply: CrewQuestionsReply = try await send("GET", "/api/threads/\(uriComponent(threadID))/crew-questions")
+    return reply.items
   }
 }

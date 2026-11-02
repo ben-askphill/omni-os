@@ -48,6 +48,7 @@ private struct DeliveryRefusal: Decodable {
     "all-prs.json": { _ = try decodeFixture(AllPullRequests.self, "all-prs.json") },
     // Written by hand to the shape apps/server/tests/crew-prs.test.ts checks: a branchless Conductor thread's crew.
     "crew-prs.json": { _ = try decodeFixture(ThreadPullRequests.self, "crew-prs.json") },
+    "crew-questions.json": { _ = try decodeFixture([String: [CrewQuestion]].self, "crew-questions.json") },
     "channel-threads.json": { _ = try decodeFixture([OmniThread].self, "channel-threads.json") },
     "threads.json": { _ = try decodeFixture([OmniThread].self, "threads.json") },
     "recent.json": { _ = try decodeFixture([OmniThread].self, "recent.json") },

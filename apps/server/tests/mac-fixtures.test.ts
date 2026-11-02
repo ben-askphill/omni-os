@@ -155,6 +155,8 @@ const NAMES = [
   'pr-watch-stopped.json',
   // Every channel's PRs, with one repo gh cannot read.
   'all-prs.json',
+  // A question a delegated thread asked, as the thread that delegated it lists it.
+  'crew-questions.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -867,6 +869,15 @@ async function scenario() {
   const all = keep('all-prs.json', await get('/prs')) as { prs: { number: number }[]; failed: { repo: string }[] };
   expect(all.prs.map((p) => p.number)).toEqual([7]);
   expect(all.failed.map((f) => f.repo)).toEqual(['acme/gone']);
+
+  // A delegated thread asks: the thread above it lists the question, with the asking thread's id for the answer.
+  const conductor = (await call('POST', '/threads', { channel: 'acme', prompt: 'plan the launch week', title: 'Plan the launch week' })) as Thread;
+  await eventually(async () => (await detail(conductor.id)).thread.status === 'done', 'the delegating thread to run');
+  const asker = (await call('POST', '/threads', { channel: 'acme', prompt: 'size the digest', title: 'Size the digest', parent_id: conductor.id })) as Thread;
+  await eventually(async () => (await detail(asker.id)).thread.status === 'done', 'the delegated thread to run');
+  await call('POST', `/threads/${asker.id}/questions`, { questions: [digestQuestion] });
+  const asked = keep('crew-questions.json', await get(`/threads/${conductor.id}/crew-questions`)) as { items: { thread_id: string }[] };
+  expect(asked.items.map((q) => q.thread_id)).toEqual([asker.id]);
 }
 
 /** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */
