@@ -1,9 +1,9 @@
 import OmniKit
 import SwiftUI
 
-/// A thread branch's PRs, PR watch and changes, read for the inspector: the Details tab's branch card, the PRs tab and
-/// the PRs tab's dot all show it. Read again when a turn ends (it may have opened the PR) and every minute to catch a
-/// merge, as `useThreadPR` in apps/web/src/components/thread/ThreadPR.tsx.
+/// A thread branch's PRs, PR watch and changes, and its crew's PRs, read for the inspector: the Details tab's branch
+/// card, the PRs tab and the PRs tab's dot all show it. Read again when a turn ends (it may have opened the PR) and
+/// every minute to catch a merge, as `useThreadPR` in apps/web/src/components/thread/ThreadPR.tsx.
 @MainActor @Observable final class ThreadBranchModel {
   struct Changes: Equatable {
     let files: Int
@@ -22,13 +22,15 @@ import SwiftUI
   var pr: PullRequestSummary? { prs?.pr }
   var next: ThreadGlance.Next? { ThreadGlance.next(pr, hasChanges: (changes?.files ?? 0) > 0) }
 
-  func load(client: OmniClient, thread: String) async {
+  /// A thread without a branch reads only its crew's PRs.
+  func load(client: OmniClient, thread: String, hasBranch: Bool) async {
     do {
       prs = try await client.pullRequests(forThread: thread)
     } catch {
       // A failed read keeps the last answer, and says "No PR yet" before any.
       if prs == nil { prs = try? JSONDecoder().decode(ThreadPullRequests.self, from: Data(#"{"pr":null,"prs":[]}"#.utf8)) }
     }
+    guard hasBranch else { return }
     if let view = try? await ChangesView(client.changes(forThread: thread)) {
       changes = Changes(files: view.fileCount, add: view.additions, del: view.deletions)
     }
@@ -198,56 +200,112 @@ struct GlanceCard: View {
 }
 
 /// The PRs tab, as PRsTab.tsx: every PR from the branch with what decides whether it can merge, the step it calls for,
-/// and the watch that wakes the thread on a failed check or a review.
+/// and the watch that wakes the thread on a failed check or a review. Then the PRs of the threads it delegated to, also
+/// on a thread without a branch, such as the Conductor's.
 struct PRsTab: View {
   let model: AppModel
   let store: ThreadStore
   let branch: ThreadBranchModel
 
   var body: some View {
-    if store.thread?.branch?.isEmpty ?? true {
-      EmptyNote(symbol: "pr", title: "No branch", message: "This thread works in the channel folder, not on a branch of its own, so it has no PRs.")
-        .panelEmptyNote()
-    } else if let prs = branch.prs {
+    let hasBranch = !(store.thread?.branch?.isEmpty ?? true)
+    if let prs = branch.prs, hasBranch || !prs.crew.isEmpty {
       ScrollView {
         VStack(alignment: .leading, spacing: z(10)) {
-          if prs.prs.isEmpty {
-            VStack(spacing: z(6)) {
-              Text("No PR yet").font(.omni(size: 13, weight: .medium))
-              Text("Nothing from \(store.thread?.branch ?? "this branch") has been sent for review.")
-                .font(.omni(size: 12.5)).foregroundStyle(Tok.fg3).multilineTextAlignment(.center)
-              PRNextButton(model: model, store: store, branch: branch, next: .open).fixedSize().padding(.top, z(6))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, z(20))
-            .padding(.horizontal, z(16))
-            .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
-          } else {
-            HStack {
-              Text("Pull requests").omniCaption()
-              Spacer()
-              Text("\(Format.plural(prs.prs.count, "PR")) from \(store.thread?.branch ?? "")").font(.omni(size: 11)).foregroundStyle(Tok.fg3).lineLimit(1).truncationMode(.middle)
-            }
-            .padding(.horizontal, z(8))
-            VStack(spacing: 0) {
-              ForEach(prs.prs) { p in prRow(p) }
-            }
-            .padding(z(4))
-            .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
-            HStack(spacing: z(6)) {
-              if let next = branch.next, next != .open { PRNextButton(model: model, store: store, branch: branch, next: next).fixedSize() }
-              if prs.canOpenAnother { PRNextButton(model: model, store: store, branch: branch, next: .open).fixedSize() }
-            }
-            .padding(.horizontal, z(4))
-          }
-          if let pr = prs.pr { watchCard(open: pr.isOpen) }
+          if hasBranch { branchSection(prs) }
+          if !prs.crew.isEmpty { crewSection(prs.crew) }
         }
         .padding(.horizontal, z(10))
         .padding(.bottom, z(12))
       }
+    } else if branch.prs != nil {
+      EmptyNote(symbol: "pr", title: "No branch", message: "This thread works in the channel folder, not on a branch of its own, so it has no PRs.")
+        .panelEmptyNote()
     } else {
       ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+  }
+
+  @ViewBuilder private func branchSection(_ prs: ThreadPullRequests) -> some View {
+    if prs.prs.isEmpty {
+      VStack(spacing: z(6)) {
+        Text("No PR yet").font(.omni(size: 13, weight: .medium))
+        Text("Nothing from \(store.thread?.branch ?? "this branch") has been sent for review.")
+          .font(.omni(size: 12.5)).foregroundStyle(Tok.fg3).multilineTextAlignment(.center)
+        PRNextButton(model: model, store: store, branch: branch, next: .open).fixedSize().padding(.top, z(6))
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, z(20))
+      .padding(.horizontal, z(16))
+      .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
+    } else {
+      HStack {
+        Text("Pull requests").omniCaption()
+        Spacer()
+        Text("\(Format.plural(prs.prs.count, "PR")) from \(store.thread?.branch ?? "")").font(.omni(size: 11)).foregroundStyle(Tok.fg3).lineLimit(1).truncationMode(.middle)
+      }
+      .padding(.horizontal, z(8))
+      VStack(spacing: 0) {
+        ForEach(prs.prs) { p in prRow(p) }
+      }
+      .padding(z(4))
+      .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
+      HStack(spacing: z(6)) {
+        if let next = branch.next, next != .open { PRNextButton(model: model, store: store, branch: branch, next: next).fixedSize() }
+        if prs.canOpenAnother { PRNextButton(model: model, store: store, branch: branch, next: .open).fixedSize() }
+      }
+      .padding(.horizontal, z(4))
+    }
+    if let pr = prs.pr { watchCard(open: pr.isOpen) }
+  }
+
+  private func crewSection(_ crew: [CrewPullRequest]) -> some View {
+    VStack(alignment: .leading, spacing: z(10)) {
+      HStack {
+        Text("From delegated threads").omniCaption()
+        Spacer()
+        Text(Format.plural(crew.count, "PR")).font(.omni(size: 11)).foregroundStyle(Tok.fg3)
+      }
+      .padding(.horizontal, z(8))
+      VStack(spacing: 0) {
+        ForEach(crew) { p in crewRow(p) }
+      }
+      .padding(z(4))
+      .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(20), style: .continuous))
+    }
+  }
+
+  /// Opens the PR in its channel's PRs, and beside it the thread that opened it.
+  private func crewRow(_ p: CrewPullRequest) -> some View {
+    HStack(spacing: z(4)) {
+      Button {
+        model.route = .channel(id: p.channelID, tab: .prs, pr: p.number)
+      } label: {
+        HStack(alignment: .top, spacing: z(10)) {
+          Text("#\(p.number)").font(.omni(size: 12.5).monospacedDigit()).foregroundStyle(Tok.fg3).frame(width: z(36), alignment: .leading)
+          VStack(alignment: .leading, spacing: z(3)) {
+            Text(p.title).font(.omni(size: 13, weight: .medium)).lineLimit(1)
+            Text(p.byline).font(.omni(size: 11.5)).foregroundStyle(Tok.fg3).lineLimit(1)
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          PRChip(text: p.badge, tone: p.badge == "open" ? .ok : p.badge == "merged" ? .info : .outline)
+        }
+        .padding(.leading, z(12))
+        .padding(.vertical, z(10))
+        .contentShape(RoundedRectangle(cornerRadius: z(16), style: .continuous))
+      }
+      .buttonStyle(.plain)
+      .help("\(p.repo)#\(p.number): \(p.title)")
+      Button {
+        model.route = .thread(id: p.threadID)
+      } label: {
+        OmniIcon(name: "delegate", size: 13)
+      }
+      .buttonStyle(.icon(size: 24))
+      .help("Open the delegated thread")
+    }
+    .padding(.trailing, z(8))
+    .rowHover(radius: 16)
   }
 
   private func prRow(_ p: PullRequestSummary) -> some View {

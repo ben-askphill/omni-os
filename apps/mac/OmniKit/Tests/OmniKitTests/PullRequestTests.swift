@@ -143,6 +143,8 @@ import OmniKit
     let r = try await OmniClient(port: 4799, transport: t).pullRequests(forThread: "t1")
     #expect(r.pr == nil)
     #expect(r.prs.isEmpty)
+    // A server from before crew PRs sends no `crew`.
+    #expect(r.crew.isEmpty)
     #expect(r.canOpenAnother)
     #expect(t.requests[0].url?.path == "/api/threads/t1/pr")
   }
@@ -158,6 +160,18 @@ import OmniKit
     #expect(old.prs.map(\.number) == [5])
     #expect(old.prs[0].badge == "merged")
     #expect(old.canOpenAnother)
+  }
+
+  @Test func threadPRsListTheCrewsPRsEvenWithoutABranch() async throws {
+    let t = StubTransport(body: try fixture("crew-prs.json"))
+    let r = try await OmniClient(port: 4799, transport: t).pullRequests(forThread: "conductor")
+    #expect(r.pr == nil && r.prs.isEmpty)
+    #expect(r.crew.map(\.number) == [4, 9])
+    #expect(r.crew.map(\.badge) == ["open", "merged"])
+    #expect(r.crew.map(\.isOpen) == [true, false])
+    #expect(r.crew[0].channelID == "shop")
+    #expect(r.crew[0].threadID == "c5d1e2f3-0000-4000-8000-000000000004")
+    #expect(r.crew.map(\.byline) == ["T-AB12 · Add the size guide", "Wire the drawer into the app"])
   }
 
   @Test func badgeSaysWhetherItMerged() throws {

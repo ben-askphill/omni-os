@@ -188,11 +188,14 @@ private struct InspectorPanel: View {
     }
     .frame(maxHeight: .infinity, alignment: .top)
     // Again when a turn ends (it may have opened the PR or pushed), and every minute to catch a merge.
-    // Keyed on the branch too: the thread arrives after the panel, and a thread can gain a branch.
-    .task(id: "\(store.running) \(store.thread?.branch ?? "")") {
-      guard !store.running, store.thread?.branch?.isEmpty == false else { return }
+    // Keyed on the thread and its branch too: the thread arrives after the panel, and a thread can gain a branch.
+    // A thread without a branch shows only its crew's PRs, which its own turn does not change, so it reads them mid-turn.
+    .task(id: "\(store.running) \(store.thread == nil) \(store.thread?.branch ?? "")") {
+      guard let thread = store.thread else { return }
+      let hasBranch = thread.branch?.isEmpty == false
+      guard !store.running || !hasBranch else { return }
       while !Task.isCancelled {
-        await branch.load(client: model.client, thread: store.id)
+        await branch.load(client: model.client, thread: store.id, hasBranch: hasBranch)
         try? await Task.sleep(for: .seconds(60))
       }
     }
@@ -207,8 +210,8 @@ private struct InspectorPanel: View {
       case .browser: store.screenshots.count
       // The Details tab lists them: a count on it says some run while another tab is open.
       case .details: OmniKit.BackgroundTask.runningSubagents(model.store.tasks, in: store.id).count
-      // The open PRs: one, nearly always, so the tab says the branch has a PR waiting.
-      case .prs: branch.prs?.prs.filter(\.isOpen).count ?? 0
+      // The open PRs, the crew's too, so the tab says a PR is waiting.
+      case .prs: branch.prs.map { $0.prs.filter(\.isOpen).count + $0.crew.filter(\.isOpen).count } ?? 0
       default: 0
       }
     return n > 0 ? n : nil

@@ -1,0 +1,30 @@
+{
+  "pr": null,
+  "prs": [],
+  "crew": [
+    {
+      "number": 4,
+      "title": "Child work",
+      "state": "OPEN",
+      "isDraft": false,
+      "url": "https://github.com/acme/shop/pull/4",
+      "repo": "acme/shop",
+      "thread_id": "c5d1e2f3-0000-4000-8000-000000000004",
+      "thread_title": "Add the size guide",
+      "channel_id": "shop",
+      "task_id": "T-AB12"
+    },
+    {
+      "number": 9,
+      "title": "Grandchild work",
+      "state": "MERGED",
+      "isDraft": false,
+      "url": "https://github.com/acme/app/pull/9",
+      "repo": "acme/app",
+      "thread_id": "c5d1e2f3-0000-4000-8000-000000000009",
+      "thread_title": "Wire the drawer into the app",
+      "channel_id": "app",
+      "task_id": null
+    }
+  ]
+}
