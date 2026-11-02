@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -11,7 +11,8 @@ import { FAKE_CLAUDE, waitFor } from './support.ts';
 // This builds that bundle, lays it out the way apps/desktop/scripts/stage.ts does, boots it and asks it questions.
 
 const REPO = resolve(import.meta.dirname, '../../..');
-const tmp = mkdtempSync(join(tmpdir(), 'omni-bundle-'));
+// Real path: on a Mac $TMPDIR is under /var, a link to /private/var, and the server reports its root resolved.
+const tmp = mkdtempSync(join(realpathSync(tmpdir()), 'omni-bundle-'));
 const app = join(tmp, 'app');
 const data = join(tmp, 'data');
 const children: ChildProcess[] = [];
