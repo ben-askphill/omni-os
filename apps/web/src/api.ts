@@ -211,9 +211,13 @@ export interface PRSummary {
  */
 export interface AllPRs {
   repos: string[];
-  prs: (PRSummary & { repo: string })[];
+  prs: ListedPR[];
   failed: { repo: string; error: string }[];
+  /** The gh login, which the page groups by. null when gh cannot say; absent from an older server. */
+  viewer?: string | null;
 }
+/** A GET /prs row: a summary, its repo, and what the page searches and groups by. */
+export type ListedPR = PRSummary & { repo: string; createdAt?: string; labels?: string[]; reviewRequests?: string[] };
 /** What GET /channels/:id/thread-prs marks a branch with: its open or merged PR. */
 export interface BranchPRMark {
   number: number;

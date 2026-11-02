@@ -249,12 +249,20 @@ public struct AllPullRequests: Decodable, Hashable, Sendable {
   public let repos: [String]
   public let prs: [Listed]
   public let failed: [Failure]
+  /// The gh login, which the page groups by. nil when gh cannot say, or from an older server.
+  public let viewer: String?
 
-  /// A summary and the repo it is in. Reads the summary's fields directly, as in `pr.title`.
+  /// A summary, the repo it is in, and what the page searches and groups by. Reads the summary's fields directly, as
+  /// in `pr.title`.
   @dynamicMemberLookup
   public struct Listed: Decodable, Hashable, Sendable, Identifiable {
     public let summary: PullRequestSummary
     public let repo: String
+    /// nil from an older server.
+    public let createdAt: Date?
+    public let labels: [String]
+    /// Logins asked to review.
+    public let reviewRequests: [String]
 
     public var id: String { "\(repo)#\(summary.number)" }
 
@@ -262,11 +270,15 @@ public struct AllPullRequests: Decodable, Hashable, Sendable {
       summary[keyPath: path]
     }
 
-    enum CodingKeys: String, CodingKey { case repo }
+    enum CodingKeys: String, CodingKey { case repo, createdAt, labels, reviewRequests }
 
     public init(from decoder: any Decoder) throws {
       summary = try PullRequestSummary(from: decoder)
-      repo = try decoder.container(keyedBy: CodingKeys.self).decode(String.self, forKey: .repo)
+      let c = try decoder.container(keyedBy: CodingKeys.self)
+      repo = try c.decode(String.self, forKey: .repo)
+      createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
+      labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
+      reviewRequests = try c.decodeIfPresent([String].self, forKey: .reviewRequests) ?? []
     }
   }
 

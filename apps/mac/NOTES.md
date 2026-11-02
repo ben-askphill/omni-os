@@ -686,7 +686,7 @@ Wired (both composers):
 - Merge is a sheet with method and delete-branch. Neither button is the default one, so Return does not confirm. The body always carries `confirm: true`.
 - QA without GitHub: `packages/test-fixtures/fake-gh.mjs` answers the `gh` calls of `apps/server/github.ts`. Link it as `gh` in a folder first on the test server's PATH. `Fixtures/prs.json` and `pr.json` were recorded from that server.
 - Debug launch args `-OmniPRTab Diff` and `-OmniPRMergeSheet YES` open a tab or the sheet, since QA scripts only pick routes.
-- `#/prs` renders `AllPullRequestsScreen`: every channel's PRs from `GET /api/prs` (`AllPullRequests`, `OmniClient.allPullRequests`), a Workspace row in the sidebar. A row opens the PR on GitHub. `Fixtures/all-prs.json` is recorded by mac-fixtures.test.ts.
+- `#/prs` renders `AllPullRequestsScreen`: every channel's PRs from `GET /api/prs` (`AllPullRequests`, `OmniClient.allPullRequests`), a Workspace row in the sidebar. A row opens the PR on GitHub. `Fixtures/all-prs.json` is recorded by mac-fixtures.test.ts. Its toolbar's search, sort, filters, repo and groups are `PRQuery` in `PullRequestQuery.swift`, the port of `packages/shared/pr-query.ts`; `PullRequestQueryTests` runs the shared cases in `packages/test-fixtures/pr-query.json`.
 - `QARunner` ignores the `expand` step for now (it was missing, so the Debug build did not compile).
 
 ## Thread in its own window (#75)
