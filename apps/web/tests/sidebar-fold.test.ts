@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FolderWithThreads } from '../src/api.ts';
-import { foldAllAction, openFolderIds } from '../src/sidebar-fold.ts';
+import { closedChannels, foldAllAction, openFolderIds, opensOnVisit, savedFold } from '../src/sidebar-fold.ts';
 
 const at = '2026-10-10T00:00:00.000Z';
 const folder = (id: string, collapsed = 0): FolderWithThreads => ({
@@ -30,5 +30,30 @@ describe('openFolderIds', () => {
       { id: 'bare' },
     ];
     expect(openFolderIds(channels)).toEqual(['a', 'c']);
+  });
+});
+
+describe('closedChannels', () => {
+  it('starts with the Conductor closed and every other channel open', () => {
+    expect([...closedChannels([], false)]).toEqual(['conductor']);
+  });
+
+  it('keeps channels closed before this rule, and reads the Conductor only from its own pref', () => {
+    expect([...closedChannels(['acme'], false)].sort()).toEqual(['acme', 'conductor']);
+    expect([...closedChannels(['acme', 'conductor'], true)]).toEqual(['acme']);
+  });
+
+  it('round-trips through what it saves', () => {
+    for (const closed of [new Set<string>(), new Set(['conductor']), new Set(['acme', 'conductor']), new Set(['acme'])]) {
+      const { channels, conductorOpen } = savedFold(closed);
+      expect(closedChannels(channels, conductorOpen)).toEqual(closed);
+    }
+  });
+});
+
+describe('opensOnVisit', () => {
+  it('opens a channel on a visit, but not the Conductor', () => {
+    expect(opensOnVisit('acme')).toBe(true);
+    expect(opensOnVisit('conductor')).toBe(false);
   });
 });

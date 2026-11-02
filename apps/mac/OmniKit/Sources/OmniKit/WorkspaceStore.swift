@@ -464,6 +464,18 @@ public struct SidebarSections: Hashable, Sendable {
   /// Past this many threads an open folder shows "N more".
   public static let maxFolderThreads = 8
 
+  /// The closed channels, as closedChannels in apps/web/src/sidebar-fold.ts. A channel is open until closed, saved in
+  /// `sidebar.collapsedChannels`. The Conductor is closed until opened, saved in `sidebar.conductorOpen`, because its
+  /// folders hold every job and would fill the sidebar. Its own page lists them all.
+  public static func closedChannels(saved: [String], conductorOpen: Bool) -> Set<String> {
+    var closed = Set(saved.filter { $0 != conductorID })
+    if !conductorOpen { closed.insert(conductorID) }
+    return closed
+  }
+
+  /// Whether going to a channel from its sidebar row opens it. Not the Conductor, so a visit never unfolds every job.
+  public static func opensOnVisit(_ id: String) -> Bool { id != conductorID }
+
   /// What the sidebar's fold-all button does, as foldAllAction in apps/web/src/sidebar-fold.ts: true while any channel
   /// is open (it closes them all), false once every one is closed (it opens them).
   public static func collapsesAll(_ channels: [ChannelWithRunning], collapsed: Set<String>) -> Bool {

@@ -383,6 +383,15 @@ private final class FakeFolderAPI: FolderAPI {
     #expect(!SidebarSections.collapsesAll(list, collapsed: ["conductor", "acme", "gone"]))
   }
 
+  @Test func conductorStartsClosedAndOtherChannelsOpen() {
+    #expect(SidebarSections.closedChannels(saved: [], conductorOpen: false) == ["conductor"])
+    #expect(SidebarSections.closedChannels(saved: ["acme"], conductorOpen: false) == ["acme", "conductor"])
+    // The Conductor reads only its own pref, so an old entry in the channel list does not keep it closed.
+    #expect(SidebarSections.closedChannels(saved: ["acme", "conductor"], conductorOpen: true) == ["acme"])
+    #expect(SidebarSections.opensOnVisit("acme"))
+    #expect(!SidebarSections.opensOnVisit("conductor"))
+  }
+
   @Test func deleteMovesTheThreadsBack() async throws {
     let (m, store, api, _) = try await setup()
     m.deletingID = "f1"

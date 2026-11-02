@@ -2,6 +2,7 @@ import { Fragment, useRef, type ReactNode } from 'react';
 import { taskHost, type ChannelWithRunning, type FolderWithThreads, type ThreadStub } from '../api.ts';
 import { DEFAULT_FOLDER_NAME, draftKey, freeName, useFolders } from '../folders.tsx';
 import { pinnedRows } from '../pins.ts';
+import { opensOnVisit } from '../sidebar-fold.ts';
 import { rowsElsewhere, runningThreadGroups } from '../sidebar-lists.ts';
 import { href, useHash, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -156,13 +157,14 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
           active={activeChannel === c.id}
           expanded={!collapsed.has(c.id)}
           onNavigate={(e) => {
-            // Clicking the channel already open on its threads closes or opens what is under it; any other click goes there, opened.
+            // Clicking the channel already open on its threads closes or opens what is under it; any other click goes there,
+            // opened, except the Conductor.
             if (route.name === 'channel' && route.id === c.id && route.tab === 'threads') {
               e.preventDefault();
               setChannelOpen(c.id, collapsed.has(c.id));
               return;
             }
-            setChannelOpen(c.id, true);
+            if (opensOnVisit(c.id)) setChannelOpen(c.id, true);
             onNavigate?.();
           }}
           right={

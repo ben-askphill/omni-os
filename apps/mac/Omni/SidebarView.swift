@@ -18,9 +18,10 @@ struct SidebarView: View {
   /// As wide as Ben last dragged its right edge, in unzoomed points.
   @AppStorage(sidebarWidthKey) private var width = Double(Self.width)
   /// Channels whose folders and threads are hidden under their name. State, not AppStorage, so the change animates;
-  /// saved as `sidebar.collapsedChannels`, one id per line.
-  @State private var collapsed = Set(
-    (UserDefaults.standard.string(forKey: collapsedChannelsKey) ?? "").split(separator: "\n").map(String.init))
+  /// saved as `sidebar.collapsedChannels`, one id per line, and `sidebar.conductorOpen` (SidebarSections.closedChannels).
+  @State private var collapsed = SidebarSections.closedChannels(
+    saved: (UserDefaults.standard.string(forKey: collapsedChannelsKey) ?? "").split(separator: "\n").map(String.init),
+    conductorOpen: UserDefaults.standard.bool(forKey: conductorOpenKey))
   /// Running and Pinned each fold on their own, apart from the channels.
   @AppStorage(runningCollapsedKey) private var runningClosed = false
   @AppStorage(pinnedCollapsedKey) private var pinsClosed = false
@@ -30,7 +31,13 @@ struct SidebarView: View {
     withAnimation(Motion.spring) {
       if open { collapsed.remove(id) } else { collapsed.insert(id) }
     }
-    UserDefaults.standard.set(collapsed.sorted().joined(separator: "\n"), forKey: collapsedChannelsKey)
+    saveCollapsed()
+  }
+
+  private func saveCollapsed() {
+    let conductor = SidebarSections.conductorID
+    UserDefaults.standard.set(collapsed.subtracting([conductor]).sorted().joined(separator: "\n"), forKey: collapsedChannelsKey)
+    UserDefaults.standard.set(!collapsed.contains(conductor), forKey: conductorOpenKey)
   }
 
   /// One click closes every channel and its open folders; with all closed, it opens the channels again. The open
@@ -41,7 +48,7 @@ struct SidebarView: View {
     withAnimation(Motion.spring) {
       collapsed = closing ? Set(channels.map(\.id)) : []
     }
-    UserDefaults.standard.set(collapsed.sorted().joined(separator: "\n"), forKey: collapsedChannelsKey)
+    saveCollapsed()
     if closing { Task { await model.folders.collapseAll(SidebarSections.openFolderIDs(channels)) } }
   }
 
@@ -310,12 +317,13 @@ struct SidebarView: View {
     let item = SidebarItem.channel(channel.id)
     let closed = collapsed.contains(channel.id)
     ChannelRowChrome(model: model, channel: channel, onNewFolder: { setChannel(channel.id, open: true) }) { hover in
-      // Clicking the channel already open on its threads closes or opens what is under it; any other click goes there, opened.
+      // Clicking the channel already open on its threads closes or opens what is under it; any other click goes there,
+      // opened, except the Conductor.
       row(item, action: {
         if model.route == .channel(id: channel.id) {
           setChannel(channel.id, open: closed)
         } else {
-          setChannel(channel.id, open: true)
+          if SidebarSections.opensOnVisit(channel.id) { setChannel(channel.id, open: true) }
           pick(item)
         }
       }) {
@@ -474,6 +482,7 @@ struct SidebarView: View {
 
 let sidebarWidthKey = "sidebar.width"
 let collapsedChannelsKey = "sidebar.collapsedChannels"
+let conductorOpenKey = "sidebar.conductorOpen"
 let pinnedCollapsedKey = "sidebar.pinnedCollapsed"
 let runningCollapsedKey = "sidebar.runningCollapsed"
 
