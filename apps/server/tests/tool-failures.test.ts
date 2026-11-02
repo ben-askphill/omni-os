@@ -8,6 +8,7 @@ const h = await startRunner();
 const { toolFailures, observeToolResult, classifyFailure, safeGuidance } = await import('../tool-failures.ts');
 const { onRecord } = await import('../runner/records.ts');
 const { buildSystemPrompt } = await import('../runner/prompts.ts');
+const { config } = await import('../config.ts');
 const { app } = await import('../app.ts');
 const send = (method: string, path: string, body?: unknown) => app.request(`/api/tool-failures${path}`, {
   method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
@@ -110,7 +111,7 @@ describe('tool failure capture and triage', () => {
     }
   });
 
-  it('heads off the recurring zsh, file: URL and member-thread slips', async () => {
+  it('heads off the recurring zsh, file: URL, browser_find and member-thread slips', async () => {
     const t = await h.start('hello');
     await h.untilResults(t.id, 1);
     const channel = h.db.channels.get('scratch')!;
@@ -123,6 +124,13 @@ describe('tool failure capture and triage', () => {
       expect(prompt('claude-code')).not.toContain('quote glob arguments');
     } finally {
       vi.unstubAllEnvs();
+    }
+    const browser = config.browser;
+    config.browser = true;
+    try {
+      expect(prompt('claude-code')).toContain('browser_find searches for a `text` substring or a `regex`');
+    } finally {
+      config.browser = browser;
     }
     expect(prompt('claude-code', true)).toContain('read_referenced_thread cannot open member threads');
     expect(prompt('claude-code')).not.toContain('read_referenced_thread cannot open member threads');
