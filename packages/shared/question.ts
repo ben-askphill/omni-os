@@ -143,6 +143,18 @@ export interface ThreadQuestion {
   answers: Answer[] | null;
 }
 
+/**
+ * A question a thread delegated from this one waits on (GET /threads/:id/crew-questions), so Ben answers it where he
+ * works: the card posts to `thread_id`, the thread that asked. Only pending ones: once answered anywhere it is gone.
+ */
+export interface CrewQuestion {
+  thread_id: string;
+  thread_title: string;
+  task_id: string | null;
+  channel_id: string;
+  question: ThreadQuestion;
+}
+
 type EventLike = { id: number; kind: string; payload: string | object };
 const payloadOf = <T>(e: EventLike) => (typeof e.payload === 'string' ? JSON.parse(e.payload) : e.payload) as T;
 

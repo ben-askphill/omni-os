@@ -12,6 +12,7 @@ import {
   resultText,
   stateOf,
   type AnswerPayload,
+  type CrewQuestion,
   type QuestionPayload,
   type QuestionState,
   type ThreadQuestion,
@@ -43,16 +44,36 @@ const reply = (q: ThreadQuestion) => ({ state: q.state, text: resultText(q.quest
 
 const settled = (threadId: string) => publishFeed({ type: 'needs_you', thread_id: threadId });
 
-/** The agent asks: a card in the thread, and a blocker in Needs you until Ben acts. Refused with what to fix. */
+/**
+ * The agent asks: a card in the thread, and a blocker in Needs you until Ben acts. A delegated thread's card also shows
+ * on every thread above it (crewQuestions) and its blocker sits on the top one, the thread Ben delegated from, which
+ * comes back out of done for it. Refused with what to fix.
+ */
 export function askQuestion(threadId: string, raw: unknown): { id: string } {
   if (!threads.get(threadId)) throw refusal('thread not found', 404);
   const parsed = parseQuestions(raw);
   if (!parsed.ok) throw refusal(parsed.error, 400);
   const id = randomUUID();
   addEvent(threadId, QUESTION_EVENT, { id, questions: parsed.value } satisfies QuestionPayload);
+  const home = threads.root(threadId);
+  if (home !== threadId) threads.setDone(home, false);
   settled(threadId);
   notifyNeedsInput(threadId);
   return { id };
+}
+
+/** The questions waiting on Ben in the threads delegated from this one, at any depth, in the order they were asked. */
+export function crewQuestions(threadId: string): CrewQuestion[] {
+  if (!threads.get(threadId)) throw refusal('thread not found', 404);
+  return threads
+    .descendants(threadId)
+    .filter((t) => !t.archived)
+    .flatMap((t) =>
+      questionsIn(events.questions(t.id))
+        .filter((q) => q.state === 'pending')
+        .map((question) => ({ thread_id: t.id, thread_title: t.title, task_id: t.task_id, channel_id: t.channel_id, question })),
+    )
+    .sort((a, b) => a.question.event_id - b.question.event_id);
 }
 
 /**

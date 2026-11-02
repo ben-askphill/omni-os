@@ -1,7 +1,7 @@
 // /api/threads/:id/questions: what ask_user_question (apps/mcp/ask.ts) asks and polls, and what the question card
 // sends. apps/server/runner/questions.ts decides; the shared parsers' messages come back as 400s.
 import { Hono, type Context } from 'hono';
-import { answerQuestion, askQuestion, awaitAnswer, WAIT_MAX_SEC } from './runner.ts';
+import { answerQuestion, askQuestion, awaitAnswer, crewQuestions, WAIT_MAX_SEC } from './runner.ts';
 
 export const questionsApi = new Hono();
 
@@ -13,6 +13,9 @@ async function field(c: Context, name: string): Promise<unknown> {
 
 /** Ask: `{ questions }` in, `{ id }` out. */
 questionsApi.post('/:id/questions', async (c) => c.json(askQuestion(c.req.param('id'), await field(c, 'questions'))));
+
+/** What the threads delegated from this one, at any depth, wait on Ben to answer: `{ items: CrewQuestion[] }`. */
+questionsApi.get('/:id/crew-questions', (c) => c.json({ items: crewQuestions(c.req.param('id')) }));
 
 /** Long poll, `?wait=<seconds>` up to 30: `{ state, text }`, with `text` what the agent reads. */
 questionsApi.get('/:id/questions/:qid', async (c) => {

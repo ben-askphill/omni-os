@@ -171,6 +171,20 @@ export const threads = {
          SELECT ${THREAD_COLUMNS} FROM threads WHERE id IN (SELECT id FROM under) AND id != ? ORDER BY created_at, rowid`,
       )
       .all(id, id) as unknown as Thread[],
+  /**
+   * The top of this thread's delegation chain: the thread Ben delegated from, where its crew's questions wait on him.
+   * Itself when nothing delegated it, and the highest one here when an ancestor has not synced to this Mac.
+   */
+  root: (id: string) =>
+    (
+      db
+        .prepare(
+          `WITH RECURSIVE up(id, parent_id, depth) AS (SELECT id, parent_id, 0 FROM threads WHERE id = ?
+             UNION ALL SELECT t.id, t.parent_id, up.depth + 1 FROM threads t JOIN up ON t.id = up.parent_id WHERE up.depth < 32)
+           SELECT id FROM up ORDER BY depth DESC LIMIT 1`,
+        )
+        .get(id) as { id: string } | undefined
+    )?.id ?? id,
   /** Threads delegated from Conductor jobs, kept visible beside their parent in the originating channel. */
   conductorHandoffChildren: () =>
     db

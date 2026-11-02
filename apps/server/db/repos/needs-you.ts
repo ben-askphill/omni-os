@@ -2,7 +2,7 @@ import { ANSWER_EVENT, QUESTION_EVENT, type QuestionPayload } from '@omni/shared
 import { db, now, tx } from '../connection.ts';
 import { outbox, record } from '../sync.ts';
 import { PARKED } from './requests.ts';
-import { THREAD_COLUMNS, type Thread } from './threads.ts';
+import { THREAD_COLUMNS, threads, type Thread } from './threads.ts';
 
 // Needs you: the unread results and the blockers across every thread that is not archived, not only the recent
 // list. Three states stay apart here: execution (the thread's status, and the `completions` its turns left),
@@ -173,17 +173,25 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
     .prepare(`SELECT ${prefixed} FROM threads t WHERE ${LISTED} ${scope} AND t.limit_state IS NOT NULL`)
     .all(...args) as unknown as Thread[];
 
-  // Questions with no answer yet, whatever the thread's status: newest first, so the first row per thread is its newest.
-  const asked = db
-    .prepare(
-      `SELECT ${prefixed}, q.payload AS q_payload, q.created_at AS q_at
-       FROM events q JOIN threads t ON t.id = q.thread_id
-       WHERE ${LISTED} ${scope} AND q.kind = '${QUESTION_EVENT}'
-         AND NOT EXISTS (SELECT 1 FROM events a WHERE a.thread_id = q.thread_id AND a.kind = '${ANSWER_EVENT}'
-           AND json_extract(a.payload, '$.id') = json_extract(q.payload, '$.id'))
-       ORDER BY q.id DESC`,
-    )
-    .all(...args) as unknown as (Thread & { q_payload: string; q_at: string })[];
+  // Questions with no answer yet, whatever the asking thread's status, newest first so the first row per thread is its
+  // newest. Each waits on the top of its delegation chain (threads.root), the thread Ben delegated from, where its card
+  // shows too: a delegated thread's or a team member's question brings that thread here, not the one that asked.
+  const home = db.prepare(`SELECT ${prefixed} FROM threads t WHERE t.id = ? AND ${LISTED} ${scope}`);
+  const asked = (
+    db
+      .prepare(
+        `SELECT q.thread_id AS q_thread, q.payload AS q_payload, q.created_at AS q_at
+         FROM events q JOIN threads t ON t.id = q.thread_id
+         WHERE t.archived = 0 AND q.kind = '${QUESTION_EVENT}'
+           AND NOT EXISTS (SELECT 1 FROM events a WHERE a.thread_id = q.thread_id AND a.kind = '${ANSWER_EVENT}'
+             AND json_extract(a.payload, '$.id') = json_extract(q.payload, '$.id'))
+         ORDER BY q.id DESC`,
+      )
+      .all() as { q_thread: string; q_payload: string; q_at: string }[]
+  ).flatMap((q) => {
+    const t = home.get(threads.root(q.q_thread), ...args) as unknown as Thread | undefined;
+    return t ? [{ ...t, ...q }] : [];
+  });
 
   const items = new Map<string, NeedsYouItem>();
   const item = (t: Thread, at: string) => {
