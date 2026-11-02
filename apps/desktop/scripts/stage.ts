@@ -20,7 +20,7 @@ export const STAGE_DIR = join(DESKTOP, 'build', 'omni');
 const CACHE_DIR = join(DESKTOP, 'build', 'cache');
 
 /** The packages apps/server/scripts/bundle.ts leaves out of the bundle (its EXTERNAL). tests/stage.test.ts keeps the two equal. */
-export const EXTERNALS = ['node-pty', '@playwright/mcp', 'tsx'] as const;
+export const EXTERNALS = ['node-pty', '@playwright/mcp', 'tsx', '@xterm/headless', '@xterm/addon-serialize'] as const;
 
 /** Copied as they are, beside the bundles. */
 const SHIPPED_DIRS = ['crew', 'automations', 'mods', 'prototypes/activity-monitor'] as const;

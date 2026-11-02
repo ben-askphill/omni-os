@@ -9,8 +9,9 @@ const REPO = resolve(import.meta.dirname, '../../..');
 /**
  * Left out of the bundle. node-pty loads a native addon and finds its spawn helper beside its package.json.
  * @playwright/mcp is started as a CLI from its package path (sandbox.ts). tsx registers a loader by path.
+ * terminal.ts loads the two @xterm packages through createRequire at the first terminal, which esbuild cannot follow.
  */
-export const EXTERNAL = ['node-pty', '@playwright/mcp', 'tsx'] as const;
+export const EXTERNAL = ['node-pty', '@playwright/mcp', 'tsx', '@xterm/headless', '@xterm/addon-serialize'] as const;
 
 export const MCP_SCRIPTS = ['omni', 'ask', 'render', 'threads'] as const;
 
