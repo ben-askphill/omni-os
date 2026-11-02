@@ -145,16 +145,22 @@ export function ChangesScreen() {
   );
 }
 
-/** The thread branch's PR: what it changes, its checks, and a squash merge behind a slide. */
+/**
+ * The thread branch's PR: what it changes, its checks, and a squash merge behind a slide. A thread without a PR of its own
+ * shows its first open delegated PR the same way, and a tap on a delegated PR below shows that one, so a Conductor thread
+ * merges its delegates' work from here.
+ */
 export function PRScreen() {
   const shell = useShell();
   const { thread, slotBusy, applyThread } = useThread();
   const { channel } = useApp();
   const mark = useThreadPR(thread, slotBusy, true);
   const watch = usePRWatch(thread?.id, mark);
-  const ch = thread ? channel(thread.channel_id) : undefined;
-  const n = mark?.pr?.number;
   const crew = mark?.crew ?? [];
+  const [picked, setPicked] = useState<string | null>(null);
+  const crewPR = crew.find((p) => p.url === picked) ?? (mark?.pr ? undefined : crew.find((p) => p.state === 'OPEN' && !p.isDraft));
+  const ch = thread ? channel(crewPR?.channel_id ?? thread.channel_id) : undefined;
+  const n = crewPR?.number ?? mark?.pr?.number;
   const q = useApi<PRDetail>(n && ch?.github_repo ? `/channels/${encodeURIComponent(ch.id)}/prs/${n}` : null);
   const [error, setError] = useState<string | null>(null);
   const [reviewBusy, setReviewBusy] = useState(false);
@@ -225,7 +231,7 @@ export function PRScreen() {
               </Button>
             </div>
           )}
-          {crew.length > 0 && <CrewPRList crew={crew} onOpen={(id) => shell.open(href.thread(id))} />}
+          {crew.length > 0 && <CrewPRList crew={crew} onOpen={(p) => setPicked(p.url)} />}
         </Body>
       </>
     );
@@ -233,7 +239,7 @@ export function PRScreen() {
 
   const open = !p.state || p.state === 'OPEN';
   const note = mergeNote(p);
-  const canWatch = open || watch.watching;
+  const canWatch = !crewPR && (open || watch.watching);
   const { action, line } = watchCopy(watch.watch);
   return (
     <>
@@ -255,7 +261,12 @@ export function PRScreen() {
           </span>
         </div>
         <Button icon="layers" busy={reviewBusy} onClick={() => void review()}>Ask builder to review</Button>
-        {(canWatch || watch.watch) && (
+        {crewPR && (
+          <MoGroup className="shrink-0">
+            <MoListRow icon={<Icon name="message" size={18} />} label={crewPR.thread_title || 'Untitled'} sub="The delegated thread that opened it" onClick={() => shell.open(href.thread(crewPR.thread_id))} last />
+          </MoGroup>
+        )}
+        {!crewPR && (canWatch || watch.watch) && (
           <div className="flex flex-col gap-2">
             <MoGroup>
               <MoListRow
@@ -292,7 +303,7 @@ export function PRScreen() {
             ))}
           </MoGroup>
         </MoSection>
-        {crew.length > 0 && <CrewPRList crew={crew} onOpen={(id) => shell.open(href.thread(id))} />}
+        {crew.length > 0 && <CrewPRList crew={crew} onOpen={(p) => setPicked(p.url)} />}
       </Body>
       {open && (
         <div className="flex shrink-0 flex-col gap-2 px-4 pt-2" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>

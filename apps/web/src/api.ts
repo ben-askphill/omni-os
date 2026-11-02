@@ -244,6 +244,14 @@ export interface PRDetail extends PRSummary {
   comments: { author: { login: string } | null; body: string; createdAt?: string }[];
   checkRuns: { name: string; state: string; url?: string }[];
   diff: string;
+  /** The Omni thread on its head branch and the thread that delegated it. null for a PR opened outside Omni. */
+  thread?: PRThread | null;
+}
+export interface PRThread {
+  id: string;
+  title: string;
+  channel_id: string;
+  parent: { id: string; title: string } | null;
 }
 
 /**

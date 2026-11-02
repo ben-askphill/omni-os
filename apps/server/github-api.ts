@@ -2,7 +2,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { ghLogin } from './automation-watch.ts';
-import { crewPRs } from './crew-prs.ts';
+import { crewPRs, prThread } from './crew-prs.ts';
 import { channels, threads } from './db.ts';
 import { allPRs, branchPRs, getPR, listPRs, mergePR, threadPRMarks } from './github.ts';
 import { requestPRReview } from './pr-review.ts';
@@ -30,17 +30,20 @@ githubApi.get('/channels/:id/thread-prs', async (c) => {
   if (!repo) return c.json({});
   return c.json(await threadPRMarks(repo).catch(() => ({})));
 });
-// Bodies come back with GitHub-hosted images pointed at the image route below, so private ones load too.
+// Bodies come back with GitHub-hosted images pointed at the image route below, so private ones load too. `thread`: the
+// Omni thread on its head branch and the thread that delegated it, or null (crew-prs.ts prThread).
 githubApi.get('/channels/:id/prs/:n', async (c) => {
   const id = c.req.param('id');
   const n = Number(c.req.param('n'));
-  const pr = await getPR(repoOf(id), n);
+  const repo = repoOf(id);
+  const pr = await getPR(repo, n);
   const fix = (body: string | null | undefined) => (body ? proxyPRImages(body, `/api/channels/${encodeURIComponent(id)}/prs/${n}/image?src=`) : body);
   return c.json({
     ...pr,
     body: fix(pr.body),
     reviews: pr.reviews?.map((r: { body?: string }) => ({ ...r, body: fix(r.body) })),
     comments: pr.comments?.map((m: { body?: string }) => ({ ...m, body: fix(m.body) })),
+    thread: pr.headRefName ? prThread(repo, pr.headRefName) : null,
   });
 });
 // One image from a PR's conversation, fetched with gh's GitHub login. Only GitHub image URLs are served.

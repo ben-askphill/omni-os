@@ -189,6 +189,9 @@ import OmniKit
     #expect(detail.number == 12)
     #expect(!detail.diff.isEmpty)
     #expect(detail.checkRuns.count == detail.checks.passed + detail.checks.failed + detail.checks.pending)
+    #expect(detail.thread?.id == "c5d1e2f3-0000-4000-8000-000000000012")
+    #expect(detail.thread?.channelID == "acme")
+    #expect(detail.thread?.parent?.title == "Plan the product page work")
   }
 
   @Test func reviewOpensTheParentReturnedByTheServer() async throws {

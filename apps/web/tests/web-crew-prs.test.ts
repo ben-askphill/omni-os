@@ -148,15 +148,58 @@ describe('the Details tab of a thread with no branch', () => {
   });
 });
 
+describe('the Details tab of a thread that delegated work', () => {
+  const render = (crew: CrewPR[], over: Partial<Thread> = {}) =>
+    act(() =>
+      root.render(
+        createElement(DetailsTab, {
+          thread: thread(over),
+          channel: undefined,
+          parent: null,
+          children: [],
+          lastResult: null,
+          warm: undefined,
+          links: { from: null, into: [] },
+          agents: [],
+          onJump: () => {},
+          init: null,
+          prs: { pr: null, prs: [], crew },
+        }),
+      ),
+    );
+  const merges = () => [...host.querySelectorAll('a')].filter((a) => a.textContent?.startsWith('Merge')).map((a) => [a.textContent, a.getAttribute('href')]);
+
+  it("offers Merge for each open crew PR, on the PR's own channel page, with or without a branch", () => {
+    render([crewPR(), crewPR({ number: 13, url: 'https://github.com/o/r/pull/13', channel_id: 'shop' }), merged]);
+    expect(merges()).toEqual([
+      ['Merge #12', '#/c/omni/prs/12'],
+      ['Merge #13', '#/c/shop/prs/13'],
+    ]);
+    expect(host.textContent).not.toContain('Show PRs in Thread options');
+
+    render([crewPR()], { branch: 'omni/own' });
+    expect(merges()).toEqual([['Merge #12', '#/c/omni/prs/12']]);
+  });
+
+  it('lists a draft without Merge, and shows nothing once every crew PR merged', () => {
+    render([crewPR({ isDraft: true })]);
+    expect(host.textContent).toContain('#12');
+    expect(merges()).toEqual([]);
+
+    render([merged]);
+    expect(host.querySelector('[aria-label="Delegated PRs at a glance"]')).toBeNull();
+  });
+});
+
 describe('the phone list', () => {
-  it('shows each PR with its title, origin and state, and opens the delegated thread', async () => {
+  it('shows each PR with its title, origin and state, and picks the PR a row is for', async () => {
     const opened: string[] = [];
-    await act(async () => root.render(createElement(CrewPRList, { crew: [crewPR(), merged], onOpen: (id) => opened.push(id) })));
+    await act(async () => root.render(createElement(CrewPRList, { crew: [crewPR(), merged], onOpen: (p) => opened.push(p.url) })));
     const rows = [...host.querySelectorAll('button')];
     expect(rows.map((r) => r.textContent)).toEqual(['Add the crew PR list#12 · web-ui · Web UI crew listopen', 'Show PRs in Thread options#9 · Mac crew listmerged']);
     expect(host.textContent).toContain('From delegated threads');
     await act(async () => rows[1].click());
-    expect(opened).toEqual(['t-mac']);
+    expect(opened).toEqual([merged.url]);
   });
 });
 

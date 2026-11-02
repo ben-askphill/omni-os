@@ -36,3 +36,19 @@ export async function crewPRs(threadId: string): Promise<CrewPR[]> {
   }
   return out;
 }
+
+/** The thread a PR came from, and the thread that delegated it, for a link back from the PR page. */
+export interface PRThread {
+  id: string;
+  title: string;
+  channel_id: string;
+  parent: { id: string; title: string } | null;
+}
+
+/** The newest thread on the PR's head branch in a channel on the same repo. null for a PR opened outside Omni. */
+export function prThread(repo: string, branch: string): PRThread | null {
+  const t = threads.withBranch(branch).find((t) => channels.get(t.channel_id)?.github_repo === repo);
+  if (!t) return null;
+  const parent = t.parent_id ? threads.get(t.parent_id) : null;
+  return { id: t.id, title: t.title, channel_id: t.channel_id, parent: parent ? { id: parent.id, title: parent.title } : null };
+}

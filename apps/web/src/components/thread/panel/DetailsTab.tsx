@@ -9,7 +9,7 @@ import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import type { PanelTab } from '../../../pages/useThreadSession.ts';
 import type { PRNext } from '@omni/shared/thread-glance.ts';
 import { AgentsSection } from './AgentsSection.tsx';
-import { GlanceCard, type BranchChanges } from './GlanceCard.tsx';
+import { CrewGlance, GlanceCard, type BranchChanges } from './GlanceCard.tsx';
 import type { ThreadPRs } from './PRsTab.tsx';
 
 export interface InitP {
@@ -126,6 +126,7 @@ export function DetailsTab({
   return (
     <div className="scroll-thin flex h-full flex-col gap-3 overflow-y-auto px-2.5 pb-3 [&>*]:shrink-0">
       <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} busy={busy} onAsk={onAsk} onTab={onTab} />
+      {prs && <CrewGlance crew={prs.crew} onTab={onTab} />}
       <AgentsSection parent={parent} links={links} children={children} agents={agents} onJump={onJump} />
       <dl className="divide-y divide-line rounded-[20px] bg-bg py-1">
         <Row k="Channel">

@@ -151,6 +151,26 @@ describe('crew PRs', () => {
     expect(keys(sent.crew[0])).toEqual(keys(fixture.crew[0]));
   });
 
+  it("links a PR page to the thread on its head branch and the thread that delegated it, on the PR's repo only", T, async () => {
+    const { prThread } = await import('../crew-prs.ts');
+    const conductor = await H.start('be the conductor');
+    await H.untilResults(conductor.id, 1);
+    const child = await delegate(conductor.id, 'shop', 'omni/linked');
+    expect(prThread('acme/shop', 'omni/linked')).toEqual({ id: child.id, title: child.title, channel_id: 'shop', parent: { id: conductor.id, title: H.thread(conductor.id).title } });
+    // The Mac app decodes this as pr.json's `thread`.
+    const fixture = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../mac/OmniKit/Tests/OmniKitTests/Fixtures/pr.json'), 'utf8')).thread;
+    const keys = (o: object) => Object.keys(o).sort();
+    expect(keys(prThread('acme/shop', 'omni/linked')!)).toEqual(keys(fixture));
+    expect(keys(prThread('acme/shop', 'omni/linked')!.parent!)).toEqual(keys(fixture.parent));
+    expect(prThread('acme/app', 'omni/linked')).toBeNull();
+    expect(prThread('acme/shop', 'someone/else')).toBeNull();
+
+    const solo = await H.start('own branch', { channel: 'shop' });
+    await H.untilResults(solo.id, 1);
+    H.db.threads.update(solo.id, { branch: 'omni/solo' });
+    expect(prThread('acme/shop', 'omni/solo')?.parent).toBeNull();
+  });
+
   it('still answers for a thread with no crew and no branch', async () => {
     const solo = await H.start('alone');
     await H.untilResults(solo.id, 1);

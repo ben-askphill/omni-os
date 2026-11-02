@@ -163,7 +163,21 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {p.thread?.parent && (
+            <LinkButton href={href.thread(p.thread.parent.id)} icon="arrowUpRight">
+              <span className="max-w-[220px] truncate" title={`The thread that delegated this work: ${p.thread.parent.title}`}>
+                {p.thread.parent.title || 'Parent thread'}
+              </span>
+            </LinkButton>
+          )}
+          {p.thread && (
+            <LinkButton href={href.thread(p.thread.id)} icon="message">
+              <span className="max-w-[220px] truncate" title={`The thread that opened this PR: ${p.thread.title}`}>
+                {p.thread.parent ? 'Delegated thread' : p.thread.title || 'Open thread'}
+              </span>
+            </LinkButton>
+          )}
           <IconLink href={p.url} icon="external" label="Open on GitHub" newTab />
           <Button icon="layers" onClick={askReview} busy={reviewBusy}>
             Ask builder to review

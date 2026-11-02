@@ -163,6 +163,9 @@ export const threads = {
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
   children: (parentId: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? ORDER BY created_at`).all(parentId) as unknown as Thread[],
+  /** The threads working on a branch, newest first. Omni names branches per thread, so it is one in practice. */
+  withBranch: (branch: string) =>
+    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE branch = ? ORDER BY created_at DESC, rowid DESC`).all(branch) as unknown as Thread[],
   /** Every thread delegated from this one at any depth, team members under their lead included, oldest first. */
   descendants: (id: string) =>
     db

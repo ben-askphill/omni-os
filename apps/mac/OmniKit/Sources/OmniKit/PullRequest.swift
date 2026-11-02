@@ -112,13 +112,16 @@ public struct PullRequestDetail: Decodable, Hashable, Sendable {
   public let checkRuns: [CheckRun]
   /// The whole unified diff, as `gh pr diff` prints it (the server cuts it at 400 000 characters).
   public let diff: String
+  /// The Omni thread on its head branch and the thread that delegated it. nil for a PR opened outside Omni, or from an
+  /// older server.
+  public let thread: PRThread?
 
   public subscript<T>(dynamicMember path: KeyPath<PullRequestSummary, T>) -> T {
     summary[keyPath: path]
   }
 
   enum CodingKeys: String, CodingKey {
-    case body, files, reviews, comments, checkRuns, diff
+    case body, files, reviews, comments, checkRuns, diff, thread
   }
 
   public init(from decoder: any Decoder) throws {
@@ -130,6 +133,7 @@ public struct PullRequestDetail: Decodable, Hashable, Sendable {
     comments = try c.decodeIfPresent([PRComment].self, forKey: .comments) ?? []
     checkRuns = try c.decodeIfPresent([CheckRun].self, forKey: .checkRuns) ?? []
     diff = try c.decodeIfPresent(String.self, forKey: .diff) ?? ""
+    thread = try c.decodeIfPresent(PRThread.self, forKey: .thread)
   }
 
   /// GitHub hides HTML comments (PR templates, bots); markdown would print them.
@@ -204,6 +208,24 @@ public struct ThreadPullRequests: Decodable, Hashable, Sendable {
 }
 
 /// A PR a delegated thread's branch was opened as: `CrewPR` in apps/server/crew-prs.ts. Open or merged only.
+/// The thread a PR came from, and the thread that delegated it, as GET /api/channels/:id/prs/:n `thread` sends them.
+public struct PRThread: Decodable, Hashable, Sendable {
+  public struct Parent: Decodable, Hashable, Sendable {
+    public let id: String
+    public let title: String
+  }
+
+  public let id: String
+  public let title: String
+  public let channelID: String
+  public let parent: Parent?
+
+  enum CodingKeys: String, CodingKey {
+    case id, title, parent
+    case channelID = "channel_id"
+  }
+}
+
 public struct CrewPullRequest: Decodable, Hashable, Sendable, Identifiable {
   public let number: Int
   public let title: String

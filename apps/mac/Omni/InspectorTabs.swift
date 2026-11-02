@@ -229,6 +229,7 @@ struct DetailsTab: View {
       ScrollView {
         VStack(alignment: .leading, spacing: z(12)) {
           GlanceCard(model: model, store: store, branch: branch, tab: $tab)
+          CrewGlanceCard(model: model, branch: branch, tab: $tab)
           AgentsCard(model: model, store: store)
             .id(agentsCardID)
           VStack(spacing: 0) {

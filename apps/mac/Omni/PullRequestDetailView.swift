@@ -118,6 +118,12 @@ struct PullRequestDetailView: View {
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
         HStack(spacing: z(8)) {
+          if let thread = pr.thread {
+            if let parent = thread.parent {
+              threadButton(parent.id, icon: "arrowUpRight", title: parent.title.isEmpty ? "Parent thread" : parent.title, help: "The thread that delegated this work: \(parent.title)")
+            }
+            threadButton(thread.id, icon: "message", title: thread.parent != nil ? "Delegated thread" : thread.title.isEmpty ? "Open thread" : thread.title, help: "The thread that opened this PR: \(thread.title)")
+          }
           if let url = URL(string: pr.url) {
             Link(destination: url) {
               Label { Text("Open on GitHub") } icon: { OmniIcon(name: "external", size: 15) }
@@ -165,6 +171,21 @@ struct PullRequestDetailView: View {
       .font(.omni(size: 12.5))
       .foregroundStyle(Tok.fg3)
     }
+  }
+
+  /// Back to a thread behind the PR, as the PR page's thread buttons in apps/web/src/pages/PRs.tsx.
+  private func threadButton(_ id: String, icon: String, title: String, help: String) -> some View {
+    Button {
+      model.route = .thread(id: id)
+    } label: {
+      HStack(spacing: z(8)) {
+        OmniIcon(name: icon, size: 15)
+        // Capped and fixed, so a long title truncates and a short one keeps its own width.
+        Text(title).lineLimit(1).truncationMode(.tail).frame(maxWidth: z(200)).fixedSize()
+      }
+    }
+    .buttonStyle(.pill(.secondary, height: 34))
+    .help(help)
   }
 
   private func load() async {

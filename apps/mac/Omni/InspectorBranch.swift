@@ -199,6 +199,71 @@ struct GlanceCard: View {
   }
 }
 
+/// The open PRs from the threads this one delegated to, under the branch card, each with Merge on its PR page, as
+/// CrewGlance in GlanceCard.tsx. A Conductor thread has no branch, so this is where its delegates' work gets merged from.
+struct CrewGlanceCard: View {
+  let model: AppModel
+  let branch: ThreadBranchModel
+  @Binding var tab: InspectorSelection.Tab
+
+  var body: some View {
+    let open = (branch.prs?.crew ?? []).filter(\.isOpen)
+    let ready = open.filter { !$0.isDraft }
+    if !open.isEmpty {
+      VStack(spacing: 0) {
+        ForEach(open) { p in
+          Button { tab = .prs } label: {
+            HStack(spacing: z(10)) {
+              OmniIcon(name: "pr", size: 15).foregroundStyle(Tok.fg3)
+              HStack(spacing: z(8)) {
+                Text("#\(p.number)").monospacedDigit()
+                Chip(text: p.badge, tone: p.isDraft ? .outline : .live)
+                Text(p.title).foregroundStyle(Tok.fg3).lineLimit(1)
+                Spacer(minLength: 0)
+              }
+              OmniIcon(name: "chevronRight", size: 13).foregroundStyle(Tok.fg4)
+            }
+            .font(.omni(size: 12.5))
+            .padding(.horizontal, z(10))
+            .frame(height: z(40))
+            .contentShape(RoundedRectangle(cornerRadius: z(12), style: .continuous))
+            .rowHover(radius: 12)
+          }
+          .buttonStyle(.plain)
+          .help("\(p.title), from \(p.byline)")
+        }
+        if !ready.isEmpty {
+          VStack(spacing: z(6)) {
+            ForEach(ready) { p in
+              Button {
+                model.route = .channel(id: p.channelID, tab: .prs, pr: p.number)
+              } label: {
+                HStack(spacing: z(6)) {
+                  OmniIcon(name: "pr", size: 14)
+                  Text("Merge #\(p.number)")
+                }
+                .frame(maxWidth: .infinity)
+              }
+              .buttonStyle(.pill(.primary, height: 28))
+              .help("Open the PR to merge it")
+            }
+          }
+          .padding(.horizontal, z(4))
+          .padding(.top, z(8))
+          .padding(.bottom, z(4))
+          .overlay(alignment: .top) { Hairline() }
+          .padding(.top, z(4))
+        }
+      }
+      .padding(z(6))
+      .background(Tok.bg, in: RoundedRectangle(cornerRadius: z(18), style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: z(18), style: .continuous).strokeBorder(Tok.line))
+      .accessibilityElement(children: .contain)
+      .accessibilityLabel("Delegated PRs at a glance")
+    }
+  }
+}
+
 /// The PRs tab, as PRsTab.tsx: every PR from the branch with what decides whether it can merge, the step it calls for,
 /// and the watch that wakes the thread on a failed check or a review. Then the PRs of the threads it delegated to, also
 /// on a thread without a branch, such as the Conductor's.
