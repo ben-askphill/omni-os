@@ -139,7 +139,7 @@ describe('buildMcpConfig: omni-ask', () => {
     for (const r of [undefined, role([]), role(['github']), role(['omni'])]) {
       const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: r, browserBusy: false, omniUrl: OMNI_URL });
       expect(cfg.mcpServers['omni-ask']).toEqual({
-        command: paths.tsx,
+        command: paths.mcpRunner,
         args: [paths.mcpAsk],
         env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
       });
@@ -153,7 +153,7 @@ describe('buildMcpConfig: omni-render', () => {
     for (const r of [undefined, role([]), role(['github']), role(['omni'])]) {
       const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: r, browserBusy: false, omniUrl: OMNI_URL });
       expect(cfg.mcpServers['omni-render']).toEqual({
-        command: paths.tsx,
+        command: paths.mcpRunner,
         args: [paths.mcpRender],
         env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
       });
@@ -167,7 +167,7 @@ describe('buildMcpConfig: omni-threads', () => {
     for (const r of [undefined, role([]), role(['github'])]) {
       const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: r, browserBusy: false, omniUrl: OMNI_URL });
       expect(cfg.mcpServers['omni-threads']).toEqual({
-        command: paths.tsx,
+        command: paths.mcpRunner,
         args: [paths.mcpThreads],
         env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
       });
@@ -181,7 +181,7 @@ describe('buildMcpConfig: omni conductor server', () => {
   it('is added only when the role asks for omni', () => {
     const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: role(['omni']), browserBusy: false, omniUrl: OMNI_URL });
     expect(cfg.mcpServers['omni']).toEqual({
-      command: paths.tsx,
+      command: paths.mcpRunner,
       args: [paths.mcpOmni],
       // The token file's path, never the token: mcp.json and Cursor's plugin folder hold no secret value.
       env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },

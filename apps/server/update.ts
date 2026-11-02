@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { about } from './about.ts';
 import { publishFeed } from './bus.ts';
-import { ROOT } from './config.ts';
+import { BUNDLED, ROOT } from './config.ts';
 import { runningCount } from './runner.ts';
 
 // Update: is this server behind main, and the one Update button that brings it level.
@@ -148,7 +148,8 @@ export function defaultDeps(): UpdateDeps {
     root: ROOT,
     current: () => about.gitHead,
     supervised: () => Boolean(process.env.OMNI_SUPERVISOR),
-    enabled: () => process.env.OMNI_UPDATE_CHECK !== '0',
+    // The desktop app's bundle has no checkout to bring level: it updates itself (apps/desktop/src/updates.ts).
+    enabled: () => !BUNDLED && process.env.OMNI_UPDATE_CHECK !== '0',
     runningTurns: runningCount,
     install: installFromMain,
     restart: () => restartHandler(),

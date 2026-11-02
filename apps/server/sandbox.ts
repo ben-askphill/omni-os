@@ -7,7 +7,7 @@ import { tokenPath } from './api-token.ts';
 import { chromeBinary } from './browser-page.ts';
 import { userName } from './user-config.ts';
 import { RENDER_SERVER } from '@omni/shared/html-render.ts';
-import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile } from './config.ts';
+import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
 import type { Channel } from './db.ts';
 import type { CrewRole } from './crew.ts';
 
@@ -222,10 +222,10 @@ export const ASK_TIMEOUT_SEC = 86_400;
 /** Per-thread MCP servers, layered on top of the user's normal Claude Code MCP config. Hermes gets none: it runs elsewhere. */
 export function buildMcpConfig(input: McpInput) {
   const servers: Record<string, { command: string; args: string[]; env?: Record<string, string> }> = {};
-  const api = { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: tokenPath(), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName() };
+  const api = { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: tokenPath(), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName(), ...nodeChildEnv };
 
-  servers[ASK_SERVER] = { command: paths.tsx, args: [paths.mcpAsk], env: api };
-  servers[RENDER_SERVER] = { command: paths.tsx, args: [paths.mcpRender], env: api };
+  servers[ASK_SERVER] = { command: paths.mcpRunner, args: [paths.mcpAsk], env: api };
+  servers[RENDER_SERVER] = { command: paths.mcpRunner, args: [paths.mcpRender], env: api };
 
   // A delegate-only role hands browser work to a crewmate, so it gets no browser to be tempted by.
   if (config.browser && !input.role?.delegateOnly) {
@@ -241,13 +241,13 @@ export function buildMcpConfig(input: McpInput) {
       const bin = chromeBinary();
       if (bin) args.push('--executable-path', bin);
     }
-    servers['omni-browser'] = { command: process.execPath, args };
+    servers['omni-browser'] = { command: process.execPath, args, env: { ...nodeChildEnv } };
   }
 
   if (input.role?.mcp.includes('omni')) {
-    servers['omni'] = { command: paths.tsx, args: [paths.mcpOmni], env: api };
+    servers['omni'] = { command: paths.mcpRunner, args: [paths.mcpOmni], env: api };
   } else {
-    servers[THREADS_SERVER] = { command: paths.tsx, args: [paths.mcpThreads], env: api };
+    servers[THREADS_SERVER] = { command: paths.mcpRunner, args: [paths.mcpThreads], env: api };
   }
   return { mcpServers: servers };
 }

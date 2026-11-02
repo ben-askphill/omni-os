@@ -2,8 +2,20 @@ import { join, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { configPath, resolved } from './user-config.ts';
 
-/** The repo root: data/, crew/, automations/ and mods/ live here, beside apps/ and packages/. */
+/**
+ * The repo root: data/, crew/, automations/ and mods/ live here, beside apps/ and packages/. The desktop app ships the
+ * server as apps/server/index.mjs in a copy of that layout (apps/desktop/scripts/stage.ts), so the same path holds there.
+ */
 export const ROOT = resolve(import.meta.dirname, '../..');
+
+/** The server runs as the desktop app's bundle, not from a checkout's TypeScript. Every module of a bundle shares its URL. */
+export const BUNDLED = import.meta.url.endsWith('.mjs');
+
+/**
+ * What a Node child of the server needs from this runtime. The desktop app runs the server on Electron's own Node,
+ * which acts as Node only when told, and a child started with process.execPath is that same binary.
+ */
+export const nodeChildEnv: Record<string, string> = process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {};
 
 // Minimal .env loader so a server the Mac or Linux app starts and `npm run dev` read the same config.
 const envFile = join(ROOT, '.env');
@@ -78,6 +90,10 @@ export const config = {
   retentionFirstPassMs: Number(env.OMNI_RETENTION_FIRST_PASS_MS ?? 60_000),
 };
 
+function mcpScript(name: 'omni' | 'ask' | 'render' | 'threads'): string {
+  return join(ROOT, 'apps', 'mcp', BUNDLED ? `${name}.mjs` : `${name}.ts`);
+}
+
 // OMNI_DATA_DIR moves all runtime state, so tests can run against a temp dir.
 const DATA = env.OMNI_DATA_DIR ? resolve(ROOT, env.OMNI_DATA_DIR) : join(ROOT, 'data');
 
@@ -101,17 +117,18 @@ export const paths = {
     return configPath();
   },
   webDist: env.OMNI_WEB_DIST ? resolve(ROOT, env.OMNI_WEB_DIST) : join(ROOT, 'apps', 'web', 'dist'),
-  mcpOmni: join(ROOT, 'apps', 'mcp', 'omni.ts'),
+  mcpOmni: mcpScript('omni'),
   /** ask_user_question, which every local thread gets. */
-  mcpAsk: join(ROOT, 'apps', 'mcp', 'ask.ts'),
+  mcpAsk: mcpScript('ask'),
   /** html_render, which every local thread gets. */
-  mcpRender: join(ROOT, 'apps', 'mcp', 'render.ts'),
+  mcpRender: mcpScript('render'),
   /** read_referenced_thread alone, which every local thread without `omni` gets. */
-  mcpThreads: join(ROOT, 'apps', 'mcp', 'threads.ts'),
+  mcpThreads: mcpScript('threads'),
   /** Claude Code mods (plugins of function hooks) Omni loads when config.mods is on. */
   mods: join(ROOT, 'mods'),
   modProgress: join(ROOT, 'mods', 'omni-progress'),
-  tsx: join(ROOT, 'node_modules', '.bin', 'tsx'),
+  /** Runs the mcp scripts: tsx on the TypeScript in a checkout, this runtime on the built files in the desktop app. */
+  mcpRunner: BUNDLED ? process.execPath : join(ROOT, 'node_modules', '.bin', 'tsx'),
 };
 
 for (const p of [paths.data, paths.threads, paths.worktrees, paths.browsers]) mkdirSync(p, { recursive: true });

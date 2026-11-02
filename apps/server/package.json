@@ -37,6 +37,7 @@
   "devDependencies": {
     "@omni/test-fixtures": "*",
     "@omni/typescript-config": "*",
+    "esbuild": "^0.28.2",
     "@types/node": "^26.6.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"

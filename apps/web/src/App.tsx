@@ -5,6 +5,7 @@ import { Onboarding } from './components/Onboarding.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { BrowserNotifier } from './components/BrowserNotifier.tsx';
+import { DesktopHooks } from './components/DesktopHooks.tsx';
 import { ThreadNotifier, ToastProvider } from './components/Toaster.tsx';
 import { useRoute } from './router.ts';
 import { Page } from './pages/Page.tsx';
@@ -115,6 +116,7 @@ function Shell() {
       <Onboarding />
       <ThreadNotifier />
       <BrowserNotifier />
+      <DesktopHooks />
       <ContextMenuHost />
       <ContinueSheetHost />
       <FolderDeleteDialog />

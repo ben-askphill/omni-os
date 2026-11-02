@@ -1,0 +1,36 @@
+{
+  "name": "@omni/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Omni's desktop app: an Electron window on the Web UI that runs the server itself.",
+  "main": "dist/main.cjs",
+  "exports": {
+    "./*": "./*"
+  },
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "dev": "tsx scripts/build.ts && node scripts/ensure-electron.mjs && electron . --dev",
+    "start": "tsx scripts/build.ts && node scripts/ensure-electron.mjs && electron .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "stage": "tsx scripts/stage.ts",
+    "dist": "tsx scripts/dist.ts",
+    "qa": "tsx scripts/qa.ts"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  },
+  "devDependencies": {
+    "@omni/shared": "*",
+    "@omni/typescript-config": "*",
+    "@types/node": "^26.6.2",
+    "electron": "44.10.1",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
+    "playwright": "1.64.0-alpha-1790635538000",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
