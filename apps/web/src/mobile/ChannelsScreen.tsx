@@ -8,6 +8,7 @@ import { href } from '../router.ts';
 import { readPref, useApp, useNow, writePref } from '../store.tsx';
 import { useFolders } from '../folders.tsx';
 import { bottomInset, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoRow, MoScroll, MoSection, MoTitle } from './parts.tsx';
+import { HeaderActions } from './HeaderActions.tsx';
 import { rowOf, type RowItem } from './rows.ts';
 import { useShell } from './shell.tsx';
 
@@ -40,25 +41,17 @@ function Counts({ needs, running }: { needs: number; running: number }) {
 /** The Channels tab: the Conductor, then every channel by kind with what needs Ben and what runs in it. */
 export function ChannelsScreen() {
   const shell = useShell();
-  const { channels, needsYou, profile, channel } = useApp();
+  const { channels, needsYou, channel } = useApp();
   const listed = channels.filter((c) => !c.archived && c.id !== 'conductor');
   const conductor = channel('conductor');
   const running = channels.reduce((n, c) => n + (c.running || 0), 0);
   const needsIn = (id: string) => inChannel(needsYou, id)?.items.length ?? 0;
-  const initial = (profile?.name || 'You').trim().slice(0, 1).toUpperCase();
 
   return (
     <>
       <MoHeader
         left={<span className="w-10" />}
-        right={
-          <>
-            <MoRound icon="search" label="Search channels" onClick={() => shell.sheet({ name: 'search' })} />
-            <MoRound label="Settings" onClick={() => shell.open(href.settingsPage())}>
-              <span className="font-rounded text-[14px] leading-none font-semibold">{initial}</span>
-            </MoRound>
-          </>
-        }
+        right={<HeaderActions searchLabel="Search channels" />}
       />
       <MoScroll tabBar>
         {/* The machine's name lives in Settings, Machines (#405), as on the desktop and the Mac. */}

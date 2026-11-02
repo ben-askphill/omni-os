@@ -11,7 +11,8 @@ import { activityOf } from './activity.ts';
 import { rowOf, type RowItem } from './rows.ts';
 import { MobileHandoffGroup } from './ChannelsScreen.tsx';
 import { NeedsCardView } from './NeedsCard.tsx';
-import { MoEmpty, MoHeader, MoRound, MoRows, MoScroll, MoSection, MoTitle } from './parts.tsx';
+import { HeaderActions } from './HeaderActions.tsx';
+import { MoEmpty, MoHeader, MoRows, MoScroll, MoSection, MoTitle } from './parts.tsx';
 import { useShell } from './shell.tsx';
 
 type Filter = 'all' | 'needs' | 'running' | 'done';
@@ -47,7 +48,7 @@ export function ActivityScreen() {
             <span className="text-[14px] leading-none font-medium">Conductor</span>
           </button>
         }
-        right={<MoRound icon="search" label="Search threads" onClick={() => shell.sheet({ name: 'search' })} />}
+        right={<HeaderActions />}
       />
       <MoScroll tabBar>
         <div>

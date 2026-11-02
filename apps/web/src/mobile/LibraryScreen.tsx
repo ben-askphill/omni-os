@@ -4,7 +4,8 @@ import { Segmented } from '../components/ui.tsx';
 import { ARTIFACT_FILTERS, ArtifactThumb, matchesArtifactFilter, useArtifacts, type ArtifactFilter } from '../pages/Artifacts.tsx';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
-import { MoEmpty, MoHeader, MoRound, MoScroll, MoStripes, MoTitle } from './parts.tsx';
+import { HeaderActions } from './HeaderActions.tsx';
+import { MoEmpty, MoHeader, MoScroll, MoStripes, MoTitle } from './parts.tsx';
 import { shortTime } from './rows.ts';
 import { useShell } from './shell.tsx';
 
@@ -44,7 +45,7 @@ export function LibraryScreen() {
 
   return (
     <>
-      <MoHeader left={<span className="w-10" />} right={<MoRound icon="search" label="Search threads" onClick={() => shell.sheet({ name: 'search' })} />} />
+      <MoHeader left={<span className="w-10" />} right={<HeaderActions />} />
       <MoScroll tabBar>
         <div>
           <MoTitle title="Library" sub="Reports, pages and files from every channel" />
