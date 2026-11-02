@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { crewPRs } from './crew-prs.ts';
 import { channels, threads } from './db.ts';
 import { allPRs, branchPRs, getPR, listPRs, mergePR, threadPRMarks } from './github.ts';
+import { requestPRReview } from './pr-review.ts';
 import { fetchPRImage, githubImage, proxyPRImages } from './github-images.ts';
 
 export const githubApi = new Hono();
@@ -68,4 +69,11 @@ githubApi.post('/channels/:id/prs/:n/merge', async (c) => {
   void confirm;
   const out = await mergePR(repoOf(c.req.param('id')), Number(c.req.param('n')), method, delete_branch);
   return c.json({ ok: true, output: out });
+});
+
+// Resolve the PR's origin on the server so every client delegates to the same parent.
+githubApi.post('/channels/:id/prs/:n/review', async (c) => {
+  const channel = c.req.param('id');
+  const number = z.coerce.number().int().positive().parse(c.req.param('n'));
+  return c.json(await requestPRReview(channel, repoOf(channel), number));
 });

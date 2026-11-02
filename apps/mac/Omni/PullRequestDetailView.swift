@@ -191,9 +191,9 @@ struct PullRequestDetailView: View {
     reviewBusy = true
     reviewError = nil
     defer { reviewBusy = false }
-    let r = await attempt { () async throws(OmniAPIError) in try await model.client.createThread(PullRequestDetail.reviewThread(number: pr.number, repo: repo, channel: channelID)) }
+    let r = await attempt { () async throws(OmniAPIError) in try await model.client.review(pullRequest: pr.number, in: channelID) }
     switch r {
-    case .success(let thread): model.route = .thread(id: thread.id)
+    case .success(let destination): model.route = .thread(id: destination)
     case .failure(let error): reviewError = error.message
     }
   }

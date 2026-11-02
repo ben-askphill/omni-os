@@ -85,7 +85,7 @@ export async function mergedBranchPRs(repo: string, branch: string): Promise<{ n
 
 export async function getPR(repo: string, n: number) {
   const [view, diff] = await Promise.all([
-    gh(['pr', 'view', String(n), '--repo', repo, '--json', `${PR_FIELDS},body,files,reviews,comments`]),
+    gh(['pr', 'view', String(n), '--repo', repo, '--json', `${PR_FIELDS},isCrossRepository,body,files,reviews,comments`]),
     gh(['pr', 'diff', String(n), '--repo', repo]).catch((e) => `Could not load diff: ${e.message}`),
   ]);
   const pr = JSON.parse(view);

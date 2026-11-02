@@ -157,6 +157,7 @@ export function PRScreen() {
   const crew = mark?.crew ?? [];
   const q = useApi<PRDetail>(n && ch?.github_repo ? `/channels/${encodeURIComponent(ch.id)}/prs/${n}` : null);
   const [error, setError] = useState<string | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
   const p = q.data;
 
   const merge = async () => {
@@ -168,6 +169,18 @@ export function PRScreen() {
     } catch (e) {
       setError(errorText(e));
       throw e;
+    }
+  };
+  const review = async () => {
+    setReviewBusy(true);
+    setError(null);
+    try {
+      const result = await api.post<{ destination_thread_id: string }>(`/channels/${encodeURIComponent(ch!.id)}/prs/${n}/review`, {});
+      shell.open(href.thread(result.destination_thread_id));
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setReviewBusy(false);
     }
   };
   const openPR = async () => {
@@ -241,6 +254,7 @@ export function PRScreen() {
             {p.headRefName} → {p.baseRefName}
           </span>
         </div>
+        <Button icon="layers" busy={reviewBusy} onClick={() => void review()}>Ask builder to review</Button>
         {(canWatch || watch.watch) && (
           <div className="flex flex-col gap-2">
             <MoGroup>

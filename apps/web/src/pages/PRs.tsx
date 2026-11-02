@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import { relTime } from '@omni/shared/format.ts';
-import { api, errorText, useApi, type Channel, type Checks, type PRDetail as PRDetailT, type PRSummary, type Thread } from '../api.ts';
+import { api, errorText, useApi, type Channel, type Checks, type PRDetail as PRDetailT, type PRSummary } from '../api.ts';
 import { Button, Chip, StatusDot, Empty, ErrorNote, Icon, IconLink, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { href, navigate } from '../router.ts';
 import { PRDetailTabBody, type DetailTab } from './PRDetailTabs.tsx';
@@ -133,12 +133,8 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
     setReviewBusy(true);
     setReviewError(null);
     try {
-      const t = await api.post<Thread>('/threads', {
-        channel: channel.id,
-        role: 'builder',
-        prompt: `Review PR #${p.number} in ${channel.github_repo}: summarize the change, risks, and anything that should block merge.`,
-      });
-      navigate(`/t/${t.id}`);
+      const result = await api.post<{ destination_thread_id: string }>(`/channels/${encodeURIComponent(channel.id)}/prs/${n}/review`, {});
+      navigate(`/t/${result.destination_thread_id}`);
     } catch (e) {
       setReviewError(errorText(e));
       setReviewBusy(false);

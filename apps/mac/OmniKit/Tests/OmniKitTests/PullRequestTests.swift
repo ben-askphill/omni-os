@@ -191,10 +191,13 @@ import OmniKit
     #expect(detail.checkRuns.count == detail.checks.passed + detail.checks.failed + detail.checks.pending)
   }
 
-  @Test func reviewThreadIsABuilderThreadOnThePR() {
-    let new = PullRequestDetail.reviewThread(number: 12, repo: "acme/shop", channel: "acme")
-    #expect(new.channel == "acme" && new.role == "builder")
-    #expect(new.prompt == "Review PR #12 in acme/shop: summarize the change, risks, and anything that should block merge.")
+  @Test func reviewOpensTheParentReturnedByTheServer() async throws {
+    let t = StubTransport(body: #"{"thread_id":"review-child","destination_thread_id":"conductor-parent"}"#)
+    let destination = try await OmniClient(port: 4799, transport: t).review(pullRequest: 12, in: "acme")
+    #expect(destination == "conductor-parent")
+    let req = try #require(t.requests.first)
+    #expect(req.httpMethod == "POST")
+    #expect(req.url?.path == "/api/channels/acme/prs/12/review")
   }
 
   @Test func hidesHTMLCommentsFromDescriptions() {

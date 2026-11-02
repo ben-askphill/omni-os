@@ -154,14 +154,6 @@ public struct PullRequestDetail: Decodable, Hashable, Sendable {
       PRConversationItem(id: i, who: entry.element.who, at: entry.element.at, body: entry.element.body, reviewState: entry.element.state)
     }
   }
-
-  /// Ask for review: a builder thread on the PR, worded as the Web UI's button.
-  public static func reviewThread(number: Int, repo: String, channel: String) -> NewThread {
-    NewThread(
-      channel: channel,
-      prompt: "Review PR #\(number) in \(repo): summarize the change, risks, and anything that should block merge.",
-      role: "builder")
-  }
 }
 
 public enum PullRequestListState: String, CaseIterable, Sendable {
@@ -325,6 +317,13 @@ extension OmniClient {
 
   public func pullRequest(_ number: Int, in channel: String) async throws(OmniAPIError) -> PullRequestDetail {
     try await send("GET", "/api/channels/\(uriComponent(channel))/prs/\(number)")
+  }
+
+  /// Delegates under the PR's originating thread and returns the thread to open.
+  public func review(pullRequest number: Int, in channel: String) async throws(OmniAPIError) -> String {
+    struct ReviewReply: Decodable { let destination_thread_id: String }
+    let reply: ReviewReply = try await send("POST", "/api/channels/\(uriComponent(channel))/prs/\(number)/review")
+    return reply.destination_thread_id
   }
 
   /// Merges with `gh pr merge` on the server. Returns what gh printed.

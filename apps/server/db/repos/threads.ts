@@ -147,6 +147,13 @@ const runMachine = (status: ThreadStatus) => (status === 'running' || status ===
 
 export const threads = {
   get: (id: string) => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE id = ?`).get(id) as unknown as Thread | undefined,
+  /** Exact branch owners in a GitHub repo, including archived threads and channels sharing that repo. */
+  byRepoBranch: (repo: string, branch: string) =>
+    db
+      .prepare(`SELECT ${THREAD_COLUMNS.split(', ').map((c) => `t.${c}`).join(', ')}
+      FROM threads t JOIN channels c ON c.id = t.channel_id
+      WHERE c.github_repo = ? COLLATE NOCASE AND t.branch = ? ORDER BY t.created_at, t.rowid`)
+      .all(repo, branch) as unknown as Thread[],
   /** A channel's threads, without team members: those are listed under their lead. */
   byChannel: (channelId: string, limit = 200, archived = false) =>
     db
