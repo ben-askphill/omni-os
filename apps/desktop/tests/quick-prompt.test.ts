@@ -47,4 +47,9 @@ describe('the Quick Prompt panel', () => {
     expect(qp.wisprUrl('start')).toBe('wispr-flow://start-hands-free');
     expect(qp.wisprUrl('stop')).toBe('wispr-flow://stop-hands-free');
   });
+
+  it('stops Wispr Flow as Omni quits only while the panel had it listening', () => {
+    expect(qp.wisprOnQuit(true)).toBe('wispr-flow://stop-hands-free');
+    expect(qp.wisprOnQuit(false)).toBeNull();
+  });
 });
