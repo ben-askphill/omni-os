@@ -205,6 +205,15 @@ export interface PRSummary {
   mergeable: string;
   checks: Checks;
 }
+/**
+ * GET /prs: the PRs of every channel with a repo set, open ones first, then newest first. `repos` is every repo asked,
+ * `failed` the ones gh could not read, with gh's reason.
+ */
+export interface AllPRs {
+  repos: string[];
+  prs: (PRSummary & { repo: string })[];
+  failed: { repo: string; error: string }[];
+}
 /** What GET /channels/:id/thread-prs marks a branch with: its open or merged PR. */
 export interface BranchPRMark {
   number: number;

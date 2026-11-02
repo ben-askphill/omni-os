@@ -17,6 +17,8 @@ public enum Route: Hashable, Sendable {
   /// parse to the tab that holds them now. A channel's own tab is `.channel(_, .settings)`.
   case settings(SettingsTab)
   case artifacts
+  /// Every channel's PRs (`#/prs`). One channel's is `.channel(_, .prs)`.
+  case pullRequests
   case newChannel
   case notFound(path: String)
 
@@ -76,6 +78,7 @@ public enum Route: Hashable, Sendable {
         self = .notFound(path: pathPart)
       }
     case ("artifacts", nil): self = .artifacts
+    case ("prs", nil): self = .pullRequests
     case ("new-channel", nil): self = .newChannel
     default: self = .notFound(path: pathPart)
     }
@@ -96,6 +99,7 @@ public enum Route: Hashable, Sendable {
     case .settings(.general): "#/settings"
     case .settings(let tab): "#/settings/\(tab.rawValue)"
     case .artifacts: "#/artifacts"
+    case .pullRequests: "#/prs"
     case .newChannel: "#/new-channel"
     case .notFound(let path): "#\(path)"
     }

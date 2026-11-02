@@ -20,6 +20,7 @@ import OmniKit
     .settings(.machines),
     .settings(.secrets),
     .artifacts,
+    .pullRequests,
     .newChannel,
     .notFound(path: "/nope"),
     .notFound(path: "/automations/extra"),
@@ -44,6 +45,7 @@ import OmniKit
     #expect(Route.settings(.secrets).hash == "#/settings/secrets")
     #expect(Route.settings(.machines).hash == "#/settings/machines")
     #expect(Route.artifacts.hash == "#/artifacts")
+    #expect(Route.pullRequests.hash == "#/prs")
     #expect(Route.newChannel.hash == "#/new-channel")
   }
 

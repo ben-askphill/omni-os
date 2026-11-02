@@ -10,6 +10,7 @@ describe('the phone layout\'s screens', () => {
     expect(screenOf(route('#/'))).toBe('activity');
     expect(screenOf(route(href.channels()))).toBe('channels');
     expect(screenOf(route(href.artifacts()))).toBe('library');
+    expect(screenOf(route(href.pullRequests()))).toBe('prs');
     expect(screenOf(route(href.channel('volero')))).toBe('channel');
     expect(screenOf(route(href.pr('volero', 812)))).toBe('channel-pr');
     expect(screenOf(route(href.prs('volero')))).toBe('page');
@@ -31,6 +32,7 @@ describe('the phone layout\'s screens', () => {
     expect(keys('#/')).toEqual([]);
     expect(keys('#/channels')).toEqual([]);
     expect(keys('#/artifacts')).toEqual([]);
+    expect(keys('#/prs')).toEqual([]);
   });
 
   it('stacks a screen over its parents, the same however it was reached', () => {

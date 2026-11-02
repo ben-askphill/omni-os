@@ -1,8 +1,8 @@
-// /api/channels/:id/prs and /api/threads/:id/pr: pull requests for a channel or a thread's branch.
+// /api/prs, /api/channels/:id/prs and /api/threads/:id/pr: pull requests across channels, for a channel or a thread's branch.
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { channels, threads } from './db.ts';
-import { branchPRs, getPR, listPRs, mergePR, threadPRMarks } from './github.ts';
+import { allPRs, branchPRs, getPR, listPRs, mergePR, threadPRMarks } from './github.ts';
 import { fetchPRImage, githubImage, proxyPRImages } from './github-images.ts';
 
 export const githubApi = new Hono();
@@ -13,6 +13,8 @@ const repoOf = (channelId: string) => {
   return ch.github_repo;
 };
 
+// Every PR across the channels with a repo set. Channels sharing a repo ask GitHub once.
+githubApi.get('/prs', async (c) => c.json(await allPRs([...new Set(channels.list().flatMap((ch) => (ch.github_repo ? [ch.github_repo] : [])))])));
 githubApi.get('/channels/:id/prs', async (c) => c.json(await listPRs(repoOf(c.req.param('id')), c.req.query('state') ?? 'open')));
 // Branch name to the open or merged PR from it, for marking threads in a list. {} with no repo or when gh fails.
 githubApi.get('/channels/:id/thread-prs', async (c) => {

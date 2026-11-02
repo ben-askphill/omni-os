@@ -10,6 +10,7 @@ import OmniKit
     (.thread(id: "t1", artifact: 2), .thread("t1")),
     (.newChannel, .newChannel),
     (.artifacts, .artifacts),
+    (.pullRequests, .pullRequests),
     (.automations, .automations),
     (.settings(.general), .settings),
     (.settings(.machines), .settings),
@@ -30,6 +31,7 @@ import OmniKit
     (.more("acme"), .channel(id: "acme")),
     (.newChannel, .newChannel),
     (.artifacts, .artifacts),
+    (.pullRequests, .pullRequests),
     (.automations, .automations),
     (.settings, .settings(.general)),
   ])
@@ -56,6 +58,7 @@ import OmniKit
     (.settings(.general), "Settings"),
     (.settings(.secrets), "Settings"),
     (.artifacts, "Artifacts"),
+    (.pullRequests, "Pull requests"),
     (.newChannel, "New channel"),
     (.notFound(path: "/x"), "Omni"),
   ])

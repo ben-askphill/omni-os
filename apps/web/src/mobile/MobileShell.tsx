@@ -1,4 +1,4 @@
-// The phone layout: three tab roots under a floating tab bar, screens pushed over them, sheets and a toast.
+// The phone layout: four tab roots under a floating tab bar, screens pushed over them, sheets and a toast.
 // Which screens show is derived from the hash (screens.ts); only the open sheet and the toast are local state.
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { BrowserNotifier } from '../components/BrowserNotifier.tsx';
@@ -14,7 +14,7 @@ import { RENDER, SheetView } from './registry.tsx';
 import { placeEntry, rootTabOf, screenOf, specOf, stackOf, type NavDirection, type Tab } from './screens.ts';
 import { ShellCtx, ThreadScope, type MobileShellApi, type ShellSheet } from './shell.tsx';
 
-const TAB_PATH: Record<Tab, string> = { activity: '/', channels: '/channels', library: '/artifacts' };
+const TAB_PATH: Record<Tab, string> = { activity: '/', channels: '/channels', library: '/artifacts', prs: '/prs' };
 const PUSH_MS = 420;
 
 /** This entry's place in history, numbered the first time the app sees it, and which way the last move went. */

@@ -30,6 +30,8 @@ export type Route =
    */
   | { name: 'settings'; section?: SettingsSection; focus?: string }
   | { name: 'artifacts' }
+  /** Every channel's pull requests in one list: the phone's PRs tab, a Workspace page on the desktop. */
+  | { name: 'prs' }
   | { name: 'new-channel' }
   | { name: 'notfound'; path: string };
 
@@ -79,6 +81,7 @@ export function parseHash(hash: string): Route {
     if (section) return { name: 'settings', section, focus: q.get('focus') || undefined };
   }
   if (a === 'artifacts' && !b) return { name: 'artifacts' };
+  if (a === 'prs' && !b) return { name: 'prs' };
   if (a === 'new-channel' && !b) return { name: 'new-channel' };
   return { name: 'notfound', path: pathPart };
 }
@@ -102,6 +105,8 @@ export function pageTitle(route: Route, channelName: (id: string) => string | un
       return route.section ? SETTINGS_LABEL[route.section] : 'Settings';
     case 'artifacts':
       return 'Artifacts';
+    case 'prs':
+      return 'Pull requests';
     case 'new-channel':
       return 'New channel';
     default:
@@ -160,6 +165,8 @@ export const href = {
   /** One Settings section: General, Workspace, Machines or Secrets. */
   settingsSection: (section: SettingsSection, focus?: string) => settingsHash(section, focus),
   artifacts: () => '#/artifacts',
+  /** Every channel's PRs. One channel's is `prs(id)`. */
+  pullRequests: () => '#/prs',
   newChannel: () => '#/new-channel',
 };
 

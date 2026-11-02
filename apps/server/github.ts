@@ -8,7 +8,7 @@ async function gh(args: string[], cwd?: string, timeout?: number) {
   return stdout;
 }
 
-/** For the worktree checks, which hold a thread's folder while they run (workspace.ts): a stalled `gh` gives up. */
+/** For the worktree checks, which hold a thread's folder while they run (workspace.ts), and the PR lists: a stalled `gh` gives up. */
 const CHECK_TIMEOUT = 30_000;
 
 export async function detectRepo(repoPath: string): Promise<string | null> {
@@ -33,8 +33,37 @@ export function summarizeChecks(rollup: any[] | null | undefined) {
 }
 
 export async function listPRs(repo: string, state = 'open') {
-  const prs = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--state', state, '--limit', '40', '--json', PR_FIELDS]));
+  const prs = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--state', state, '--limit', '40', '--json', PR_FIELDS], undefined, CHECK_TIMEOUT));
   return prs.map((p: any) => ({ ...p, checks: summarizeChecks(p.statusCheckRollup), statusCheckRollup: undefined }));
+}
+
+type Listed = Awaited<ReturnType<typeof listPRs>>[number];
+
+/**
+ * Every repo's open PRs and its 40 newest in any state, each marked with its repo: open ones first, then by last
+ * update, newest first. A repo gh cannot read (no access, gone, gh signed out) goes in `failed` and the rest still list.
+ */
+export async function allPRs(repos: string[]) {
+  const results = await Promise.allSettled(
+    repos.map(async (repo) => {
+      const [open, recent] = await Promise.all([listPRs(repo, 'open'), listPRs(repo, 'all')]);
+      const byNumber = new Map<number, Listed>([...recent, ...open].map((p) => [p.number, p]));
+      return [...byNumber.values()].map((p) => ({ ...p, repo }));
+    }),
+  );
+  const isOpen = (p: Listed) => (p.state ?? 'OPEN') === 'OPEN';
+  const prs = results
+    .flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+    .sort((a, b) => Number(isOpen(b)) - Number(isOpen(a)) || Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  const failed = results.flatMap((r, i) => (r.status === 'rejected' ? [{ repo: repos[i], error: ghError(r.reason) }] : []));
+  return { repos, prs, failed };
+}
+
+/** The last line gh printed to stderr, which says why ("Could not resolve to a Repository", "HTTP 401"). */
+function ghError(e: unknown) {
+  const err = e as { stderr?: string; message?: string; killed?: boolean };
+  if (err.killed) return `gh gave no answer in ${CHECK_TIMEOUT / 1000}s`;
+  return (err.stderr || err.message || String(e)).trim().split('\n').pop() || 'gh failed';
 }
 
 /** The PR a branch was opened as: its open one, else the newest (gh lists newest first). */

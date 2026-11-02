@@ -9,6 +9,7 @@ import { ChannelScreen, ChannelsScreen } from './ChannelsScreen.tsx';
 import { ContinueSheet } from './ContinueSheet.tsx';
 import { LibraryScreen } from './LibraryScreen.tsx';
 import { NewSheet } from './NewSheet.tsx';
+import { PRsScreen } from './PRsScreen.tsx';
 import { MoEmpty, MoHeader } from './parts.tsx';
 import type { ScreenKey } from './screens.ts';
 import { SearchSheet } from './SearchSheet.tsx';
@@ -45,6 +46,7 @@ export const RENDER: Record<ScreenKey, (r: Route) => ReactNode> = {
   activity: () => <ActivityScreen />,
   channels: () => <ChannelsScreen />,
   library: () => <LibraryScreen />,
+  prs: () => <PRsScreen />,
   channel: (r) => r.name === 'channel' && <ChannelScreen key={r.id} id={r.id} />,
   'channel-pr': (r) => <PageScreen route={r} />,
   thread: () => <ThreadScreen />,

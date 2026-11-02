@@ -6,10 +6,11 @@ const TABS: { id: Tab; icon: IconName; label: string }[] = [
   { id: 'activity', icon: 'inbox', label: 'Activity' },
   { id: 'channels', icon: 'hash', label: 'Channels' },
   { id: 'library', icon: 'layers', label: 'Library' },
+  { id: 'prs', icon: 'pr', label: 'PRs' },
 ];
 
 /**
- * Three labelled tabs in a floating pill, the new-delegation disc beside it. The thumb springs between tabs, and a
+ * Four labelled tabs in a floating pill, the new-delegation disc beside it. The thumb springs between tabs, and a
  * needs glyph rides Activity while anything waits on Ben. Hidden on pushed screens.
  */
 export function MoTabBar({ tab, onTab, onNew }: { tab: Tab; onTab: (t: Tab) => void; onNew: () => void }) {
@@ -18,11 +19,11 @@ export function MoTabBar({ tab, onTab, onNew }: { tab: Tab; onTab: (t: Tab) => v
   const i = Math.max(0, TABS.findIndex((t) => t.id === tab));
   return (
     <div className="absolute right-3.5 left-3.5 z-20 flex gap-2.5" style={{ bottom: 'calc(max(env(safe-area-inset-bottom), 20px) - 6px)' }}>
-      <nav aria-label="Tabs" className="relative grid h-[60px] flex-1 grid-cols-3 rounded-full bg-elev p-1 shadow-[var(--shadow-menu)]">
+      <nav aria-label="Tabs" className="relative grid h-[60px] flex-1 grid-cols-4 rounded-full bg-elev p-1 shadow-[var(--shadow-menu)]">
         <span
           aria-hidden="true"
           className="absolute top-1 bottom-1 left-1 rounded-full bg-surface-2"
-          style={{ width: 'calc((100% - 8px) / 3)', transform: `translateX(${i * 100}%)`, transition: 'transform 420ms var(--ease-spring)' }}
+          style={{ width: 'calc((100% - 8px) / 4)', transform: `translateX(${i * 100}%)`, transition: 'transform 420ms var(--ease-spring)' }}
         />
         {TABS.map((t) => (
           <button

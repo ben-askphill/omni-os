@@ -45,6 +45,7 @@ private struct DeliveryRefusal: Decodable {
     "thread-continued.json": { _ = try decodeFixture(ThreadDetail.self, "thread-continued.json") },
     "prs.json": { _ = try decodeFixture([PullRequestSummary].self, "prs.json") },
     "pr.json": { _ = try decodeFixture(PullRequestDetail.self, "pr.json") },
+    "all-prs.json": { _ = try decodeFixture(AllPullRequests.self, "all-prs.json") },
     "channel-threads.json": { _ = try decodeFixture([OmniThread].self, "channel-threads.json") },
     "threads.json": { _ = try decodeFixture([OmniThread].self, "threads.json") },
     "recent.json": { _ = try decodeFixture([OmniThread].self, "recent.json") },

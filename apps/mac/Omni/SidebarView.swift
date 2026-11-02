@@ -148,6 +148,7 @@ struct SidebarView: View {
               .padding(.bottom, z(8))
             VStack(spacing: 1) {
               row(.artifacts) { NavRow(title: "Artifacts", icon: "layers", active: selected == .artifacts) }
+              row(.pullRequests) { NavRow(title: "Pull requests", icon: "pr", active: selected == .pullRequests) }
               row(.automations) { NavRow(title: "Automations", icon: "zap", active: selected == .automations) }
               row(.settings) { NavRow(title: "Settings", icon: "sliders", active: false) }
             }

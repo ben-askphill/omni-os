@@ -10,6 +10,7 @@ public enum SidebarItem: Hashable, Sendable {
   case more(String)
   case newChannel
   case artifacts
+  case pullRequests
   case automations
   /// Opens the Settings window on General and never shows as selected: Settings is a window, not a screen.
   case settings
@@ -22,6 +23,7 @@ public enum SidebarItem: Hashable, Sendable {
     case .thread(let id, _): self = .thread(id)
     case .newChannel: self = .newChannel
     case .artifacts: self = .artifacts
+    case .pullRequests: self = .pullRequests
     case .automations: self = .automations
     case .settings: self = .settings
     case .search, .notFound: return nil
@@ -35,6 +37,7 @@ public enum SidebarItem: Hashable, Sendable {
     case .thread(let id): .thread(id: id)
     case .newChannel: .newChannel
     case .artifacts: .artifacts
+    case .pullRequests: .pullRequests
     case .automations: .automations
     case .settings: .settings(.general)
     }
@@ -52,6 +55,7 @@ extension Route {
     case .automations: "Automations"
     case .settings: "Settings"
     case .artifacts: "Artifacts"
+    case .pullRequests: "Pull requests"
     case .newChannel: "New channel"
     case .notFound: "Omni"
     }

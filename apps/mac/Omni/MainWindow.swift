@@ -192,6 +192,8 @@ struct DetailView: View {
       AutomationsView(model: model)
     } else if case .artifacts = model.route {
       ArtifactsScreen(model: model)
+    } else if case .pullRequests = model.route {
+      AllPullRequestsScreen(model: model)
     } else {
       RoutePlaceholder(route: model.route, title: model.route.title { model.store.channel($0)?.name }) {
         model.route = .home
@@ -237,6 +239,7 @@ extension Route {
     case .automations: "bolt"
     case .settings: "slider.horizontal.3"
     case .artifacts: "square.stack.3d.up"
+    case .pullRequests: "arrow.triangle.pull"
     case .newChannel: "plus"
     case .notFound: "questionmark.folder"
     }

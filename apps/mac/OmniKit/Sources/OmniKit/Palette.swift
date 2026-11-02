@@ -50,6 +50,7 @@ public enum Palette {
       page("a:new", .actions, "New thread", "Start a task", "plus", .newThread),
       page("p:home", .goTo, "Home", nil, "house", .go(.home)),
       page("p:artifacts", .goTo, "Artifacts", nil, "square.stack.3d.up", .go(.artifacts)),
+      page("p:prs", .goTo, "Pull requests", nil, "arrow.triangle.pull", .go(.pullRequests)),
       page("p:automations", .goTo, "Automations", nil, "bolt", .go(.automations)),
       page("p:settings", .goTo, "Settings", "General: you, theme, notifications", "slider.horizontal.3", .go(.settings(.general))),
       page("p:workspace", .goTo, "Workspace", "Settings: folders and GitHub owner", "folder", .go(.settings(.workspace))),

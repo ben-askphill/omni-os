@@ -207,6 +207,53 @@ public struct ThreadPullRequests: Decodable, Hashable, Sendable {
   }
 }
 
+/// GET /api/prs: the PRs of every channel with a repo set, open ones first, then newest first. `AllPRs` in
+/// apps/web/src/api.ts. `repos` is every repo asked, `failed` the ones gh could not read.
+public struct AllPullRequests: Decodable, Hashable, Sendable {
+  public let repos: [String]
+  public let prs: [Listed]
+  public let failed: [Failure]
+
+  /// A summary and the repo it is in. Reads the summary's fields directly, as in `pr.title`.
+  @dynamicMemberLookup
+  public struct Listed: Decodable, Hashable, Sendable, Identifiable {
+    public let summary: PullRequestSummary
+    public let repo: String
+
+    public var id: String { "\(repo)#\(summary.number)" }
+
+    public subscript<T>(dynamicMember path: KeyPath<PullRequestSummary, T>) -> T {
+      summary[keyPath: path]
+    }
+
+    enum CodingKeys: String, CodingKey { case repo }
+
+    public init(from decoder: any Decoder) throws {
+      summary = try PullRequestSummary(from: decoder)
+      repo = try decoder.container(keyedBy: CodingKeys.self).decode(String.self, forKey: .repo)
+    }
+  }
+
+  public struct Failure: Decodable, Hashable, Sendable {
+    public let repo: String
+    public let error: String
+  }
+
+  /// Why the list has no rows, as `allPRsEmpty` in apps/web/src/pages/AllPRs.tsx. nil when it has some.
+  public enum Empty: Sendable { case noRepos, allFailed, nothingYet }
+
+  public var empty: Empty? {
+    if !prs.isEmpty { return nil }
+    if repos.isEmpty { return .noRepos }
+    return failed.count == repos.count ? .allFailed : .nothingYet
+  }
+
+  /// The repos gh could not read, one line each.
+  public var failedText: String {
+    failed.map { "Could not read \($0.repo): \($0.error)" }.joined(separator: "\n")
+  }
+}
+
 /// What GET /api/channels/:id/thread-prs marks a branch with: its open or merged PR.
 public struct BranchPRMark: Decodable, Hashable, Sendable {
   public let number: Int
@@ -229,6 +276,11 @@ extension OmniClient {
   /// The PRs opened from a thread's branch, open or not.
   public func pullRequests(forThread id: String) async throws(OmniAPIError) -> ThreadPullRequests {
     try await send("GET", "/api/threads/\(uriComponent(id))/pr")
+  }
+
+  /// Every channel's PRs, open first, newest first.
+  public func allPullRequests() async throws(OmniAPIError) -> AllPullRequests {
+    try await send("GET", "/api/prs")
   }
 
   public func pullRequests(in channel: String, state: PullRequestListState = .open) async throws(OmniAPIError) -> [PullRequestSummary] {

@@ -132,6 +132,21 @@ export function registerExternalTools(server: McpServer, call: Call) {
   );
 
   server.registerTool(
+    'list_pull_requests',
+    {
+      description:
+        "Pull requests across every channel's GitHub repo, open ones first, then newest first: title, repo, author, state and URL. " +
+        '`failed` names repos gh could not read.',
+      annotations: { readOnlyHint: true },
+    },
+    async () => {
+      const all = await call('/prs');
+      const state = (p: any) => (p.state === 'OPEN' && p.isDraft ? 'DRAFT' : p.state);
+      return text({ prs: all.prs.map((p: any) => ({ repo: p.repo, number: p.number, title: p.title, author: p.author?.login ?? null, state: state(p), url: p.url, updated_at: p.updatedAt })), failed: all.failed });
+    },
+  );
+
+  server.registerTool(
     'search_threads',
     { description: 'Full-text search across every Omni thread: titles and what was said.', inputSchema: { query: z.string().min(1) }, annotations: { readOnlyHint: true } },
     async ({ query }) => text(await call(`/search?q=${encodeURIComponent(query)}`)),

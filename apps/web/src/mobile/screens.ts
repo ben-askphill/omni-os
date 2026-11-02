@@ -2,12 +2,13 @@
 // the only navigation state, so a reload, a notification or a link lands on the same stack.
 import { parseHash, type Route, type ThreadView } from '../router.ts';
 
-export type Tab = 'activity' | 'channels' | 'library';
+export type Tab = 'activity' | 'channels' | 'library' | 'prs';
 
 export type ScreenKey =
   | 'activity'
   | 'channels'
   | 'library'
+  | 'prs'
   | 'channel'
   | 'channel-pr'
   | 'thread'
@@ -20,7 +21,7 @@ export type ScreenKey =
   | 'notfound';
 
 interface ScreenSpec {
-  /** Set on the three tab roots: the tab bar floats over them and they have no back button. */
+  /** Set on the tab roots: the tab bar floats over them and they have no back button. */
   root?: Tab;
   /** The tab the screen belongs to. Unset, it stays on the tab it was opened from. */
   tab?: Tab;
@@ -38,6 +39,7 @@ export const SCREENS: Record<ScreenKey, ScreenSpec> = {
   activity: { root: 'activity', tab: 'activity', parent: () => null },
   channels: { root: 'channels', tab: 'channels', parent: () => null },
   library: { root: 'library', tab: 'library', parent: () => null },
+  prs: { root: 'prs', tab: 'prs', parent: () => null },
   channel: { tab: 'channels', parent: () => '/channels' },
   'channel-pr': { tab: 'channels', parent: (r) => (r.name === 'channel' ? `/c/${encodeURIComponent(r.id)}` : '/channels') },
   thread: { parent: () => '/', thread: true },
@@ -65,6 +67,8 @@ export function screenOf(r: Route): ScreenKey {
       return 'channels';
     case 'artifacts':
       return 'library';
+    case 'prs':
+      return 'prs';
     case 'channel':
       if (r.tab === 'threads') return 'channel';
       return r.tab === 'prs' && r.pr ? 'channel-pr' : 'page';

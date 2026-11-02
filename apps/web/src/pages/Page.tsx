@@ -1,5 +1,6 @@
 import { Empty, LinkButton } from '../components/ui.tsx';
 import { href, type Route } from '../router.ts';
+import { AllPRsPage } from './AllPRs.tsx';
 import { ArtifactsPage } from './Artifacts.tsx';
 import { AutomationsPage } from './Automations.tsx';
 import { ChannelPage } from './Channel.tsx';
@@ -27,6 +28,8 @@ export function Page({ route }: { route: Route }) {
       return <SettingsPage section={route.section} focus={route.focus} />;
     case 'artifacts':
       return <ArtifactsPage />;
+    case 'prs':
+      return <AllPRsPage />;
     case 'new-channel':
       return <NewChannelPage />;
     default:

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { href, useRoute } from '../../router.ts';
 import { NavLink } from './SidebarRows.tsx';
 
-/** The rail's Workspace group: Artifacts, Automations and Settings. */
+/** The rail's Workspace group: Artifacts, Pull requests, Automations and Settings. */
 export function WorkspaceLinks({ onNavigate }: { onNavigate?: () => void }) {
   const route = useRoute();
   return (
@@ -11,6 +11,9 @@ export function WorkspaceLinks({ onNavigate }: { onNavigate?: () => void }) {
       <div className="space-y-px">
         <NavLink to={href.artifacts()} icon="layers" active={route.name === 'artifacts'} onNavigate={onNavigate}>
           Artifacts
+        </NavLink>
+        <NavLink to={href.pullRequests()} icon="pr" active={route.name === 'prs'} onNavigate={onNavigate}>
+          Pull requests
         </NavLink>
         <NavLink to={href.automations()} icon="zap" active={route.name === 'automations'} onNavigate={onNavigate}>
           Automations

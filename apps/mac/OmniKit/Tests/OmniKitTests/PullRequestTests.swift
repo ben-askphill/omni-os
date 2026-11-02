@@ -111,6 +111,24 @@ import OmniKit
     #expect(t.requests[0].url?.absoluteString == "http://127.0.0.1:4799/api/channels/acme/prs?state=merged")
   }
 
+  @Test func everyChannelsPRsCarryTheirRepoAndTheReposThatFailed() async throws {
+    let t = StubTransport(body: try fixture("all-prs.json"))
+    let all = try await OmniClient(port: 4799, transport: t).allPullRequests()
+    #expect(t.requests[0].url?.path == "/api/prs")
+    #expect(all.prs.map(\.id) == ["acme/shop#7"])
+    #expect(all.prs[0].badge == "open")
+    #expect(all.failedText == "Could not read acme/gone: GraphQL: Could not resolve to a Repository with the name 'acme/gone'.")
+    #expect(all.empty == nil)
+  }
+
+  @Test func everyChannelsPRsSayWhyTheyAreEmpty() throws {
+    func empty(_ json: String) throws -> AllPullRequests.Empty? { try decode(AllPullRequests.self, json).empty }
+    #expect(try empty(#"{"repos":[],"prs":[],"failed":[]}"#) == .noRepos)
+    #expect(try empty(#"{"repos":["a/b"],"prs":[],"failed":[]}"#) == .nothingYet)
+    #expect(try empty(#"{"repos":["a/b"],"prs":[],"failed":[{"repo":"a/b","error":"HTTP 404"}]}"#) == .allFailed)
+    #expect(try empty(#"{"repos":["a/b","c/d"],"prs":[],"failed":[{"repo":"a/b","error":"HTTP 404"}]}"#) == .nothingYet)
+  }
+
   @Test func threadMarksMapABranchToItsPR() async throws {
     let t = StubTransport(body: #"{"omni/a":{"number":7,"state":"MERGED","isDraft":false,"url":"u"},"omni/b":{"number":8,"state":"OPEN","isDraft":true,"url":"v"}}"#)
     let marks = try await OmniClient(port: 4799, transport: t).threadPullRequests(in: "acme")

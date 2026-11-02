@@ -400,6 +400,20 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'list_pull_requests',
+  {
+    description:
+      "Pull requests across every channel's GitHub repo, open ones first, then newest first: title, repo, author, state and URL. " +
+      '`failed` names repos gh could not read.',
+  },
+  async () => {
+    const all = await call('/prs');
+    const state = (p: any) => (p.state === 'OPEN' && p.isDraft ? 'DRAFT' : p.state);
+    return text({ prs: all.prs.map((p: any) => ({ repo: p.repo, number: p.number, title: p.title, author: p.author?.login ?? null, state: state(p), url: p.url, updated_at: p.updatedAt })), failed: all.failed });
+  },
+);
+
 /** A machine named by id or name (from list_devices), "here", or nothing for the default, as POST /threads takes it. */
 async function deviceId(device: string | undefined): Promise<string | undefined> {
   const want = device?.trim();

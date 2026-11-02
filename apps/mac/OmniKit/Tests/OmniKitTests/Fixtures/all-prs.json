@@ -1,0 +1,37 @@
+{
+  "repos": [
+    "acme/shop",
+    "acme/gone"
+  ],
+  "prs": [
+    {
+      "number": 7,
+      "title": "Add the size guide drawer",
+      "author": {
+        "login": "maya"
+      },
+      "headRefName": "feat/size-guide",
+      "baseRefName": "main",
+      "state": "OPEN",
+      "isDraft": false,
+      "updatedAt": "2026-01-05T09:00:00Z",
+      "reviewDecision": "REVIEW_REQUIRED",
+      "url": "https://github.com/acme/shop/pull/7",
+      "additions": 71,
+      "deletions": 4,
+      "mergeable": "MERGEABLE",
+      "checks": {
+        "passed": 1,
+        "failed": 0,
+        "pending": 1
+      },
+      "repo": "acme/shop"
+    }
+  ],
+  "failed": [
+    {
+      "repo": "acme/gone",
+      "error": "GraphQL: Could not resolve to a Repository with the name 'acme/gone'."
+    }
+  ]
+}

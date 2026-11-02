@@ -153,6 +153,8 @@ const NAMES = [
   'pr-watch-none.json',
   'pr-watch.json',
   'pr-watch-stopped.json',
+  // Every channel's PRs, with one repo gh cannot read.
+  'all-prs.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -209,8 +211,9 @@ function fakeSecurity() {
 
 /**
  * A `gh` that answers only the PR watch's poll, with an open PR whose checks are one passed and one running, no
- * review feedback and a signed-in login, so the watch records counts and wakes no one. Every other call fails, as gh
- * does in a repo without a remote, and nothing reaches GitHub.
+ * review feedback and a signed-in login, so the watch records counts and wakes no one, and a channel's PR list for
+ * acme/shop with that PR, which GET /prs reads. Every other call fails, as gh does in a repo without a remote, and
+ * nothing reaches GitHub.
  */
 function fakeGh(bin: string) {
   const pr = {
@@ -222,7 +225,13 @@ function fakeGh(bin: string) {
       { __typename: 'CheckRun', name: 'e2e', conclusion: '', status: 'IN_PROGRESS' },
     ],
   };
-  writeFileSync(join(bin, 'gh'), `#!/bin/sh\nif [ "$1 $2" = "pr view" ]; then echo '${JSON.stringify(pr)}'; exit 0; fi\nif [ "$1 $2" = "api user" ]; then echo ben; exit 0; fi\nif [ "$1" = "api" ]; then exit 0; fi\necho "fake gh: $*" >&2\nexit 1\n`);
+  const listed = {
+    number: 7, title: 'Add the size guide drawer', author: { login: 'maya' }, headRefName: 'feat/size-guide', baseRefName: 'main', state: 'OPEN', isDraft: false,
+    updatedAt: '2026-11-01T09:00:00Z', reviewDecision: 'REVIEW_REQUIRED', statusCheckRollup: pr.statusCheckRollup, url: 'https://github.com/acme/shop/pull/7',
+    additions: 71, deletions: 4, mergeable: 'MERGEABLE',
+  };
+  const list = `if [ "$1 $2 $8" = "pr list 40" ]; then [ "$4" = "acme/shop" ] && echo '${JSON.stringify([listed])}' && exit 0; echo "GraphQL: Could not resolve to a Repository with the name '$4'." >&2; exit 1; fi\n`;
+  writeFileSync(join(bin, 'gh'), `#!/bin/sh\nif [ "$1 $2" = "pr view" ]; then echo '${JSON.stringify(pr)}'; exit 0; fi\n${list}if [ "$1 $2" = "api user" ]; then echo ben; exit 0; fi\nif [ "$1" = "api" ]; then exit 0; fi\necho "fake gh: $*" >&2\nexit 1\n`);
   chmodSync(join(bin, 'gh'), 0o755);
 }
 
@@ -852,6 +861,12 @@ async function scenario() {
   keep('pr-watch.json', polled);
   const ended = keep('pr-watch-stopped.json', await call('DELETE', `/threads/${id}/pr-watch`));
   expect(ended).toMatchObject({ state: 'stopped', stop_reason: 'stopped' });
+
+  // Every channel's PRs: acme's repo answers, gadgets' repo is one gh cannot read.
+  await call('PATCH', '/channels/gadgets', { github_repo: 'acme/gone' });
+  const all = keep('all-prs.json', await get('/prs')) as { prs: { number: number }[]; failed: { repo: string }[] };
+  expect(all.prs.map((p) => p.number)).toEqual([7]);
+  expect(all.failed.map((f) => f.repo)).toEqual(['acme/gone']);
 }
 
 /** A request body the app sends: the recorded one, so the server is checked against what the Swift tests expect. */

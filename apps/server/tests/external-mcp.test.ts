@@ -97,7 +97,7 @@ describe('/mcp: the tools', () => {
     const { result } = (await res.json()) as { result: { tools: { name: string }[] } };
     expect(result.tools.map((t) => t.name).sort()).toEqual(
       [
-        'create_folder', 'delete_folder', 'get_thread', 'list_automations', 'list_channels', 'list_crew', 'list_folders', 'list_harnesses', 'list_threads', 'message_thread',
+        'create_folder', 'delete_folder', 'get_thread', 'list_automations', 'list_channels', 'list_crew', 'list_folders', 'list_harnesses', 'list_pull_requests', 'list_threads', 'message_thread',
         'read_thread', 'rename_folder', 'run_automation', 'search_threads', 'set_automation_enabled', 'start_thread', 'stop_thread', 'switch_thread_run', 'update_thread',
       ].sort(),
     );
@@ -107,6 +107,7 @@ describe('/mcp: the tools', () => {
     const t = make('An external one');
     expect((await tool('list_channels')).body.map((c: any) => c.id)).toContain('scratch');
     expect((await tool('list_threads', { channel: 'scratch' })).body.map((x: any) => x.id)).toContain(t.id);
+    expect((await tool('list_pull_requests')).body).toEqual({ prs: [], failed: [] });
   });
 
   it('reads a thread conversation a page at a time, and says not found for an unknown thread', T, async () => {
@@ -307,7 +308,7 @@ describe('/mcp: Google sign-in through Clerk', () => {
     const before = userinfoCalls();
     const res = await listTools(token);
     expect(res.status).toBe(200);
-    expect(((await res.json()) as { result: { tools: unknown[] } }).result.tools.length).toBe(19);
+    expect(((await res.json()) as { result: { tools: unknown[] } }).result.tools.length).toBe(20);
     expect((await listTools(token)).status).toBe(200);
     expect(userinfoCalls()).toBe(before + 1);
   });

@@ -38,6 +38,7 @@ export function paletteItems(q: string, channels: ChannelWithRunning[], recent: 
     { id: 'a:new', group: 'Actions', label: 'New thread', sub: 'Start a task', lead: lead('plus'), run: newThread },
     { id: 'p:home', group: 'Go to', label: 'Home', lead: lead('home'), run: () => go(href.home()) },
     { id: 'p:artifacts', group: 'Go to', label: 'Artifacts', lead: lead('layers'), run: () => go(href.artifacts()) },
+    { id: 'p:prs', group: 'Go to', label: 'Pull requests', lead: lead('pr'), run: () => go(href.pullRequests()) },
     { id: 'p:automations', group: 'Go to', label: 'Automations', lead: lead('zap'), run: () => go(href.automations()) },
     { id: 'p:settings', group: 'Go to', label: 'Settings', sub: 'General: you and setup', lead: lead('sliders'), run: () => go(href.settingsPage()) },
     // Every other Settings section by name, as the Settings nav lists them.
