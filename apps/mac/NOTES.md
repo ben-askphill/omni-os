@@ -592,7 +592,7 @@ env -i PATH="$PATH" HOME="$HOME" TMPDIR="$S/tmp" OMNI_DATA_DIR="$S/tmp/qa-data" 
 
 For the Automations page, add `OMNI_AUTOMATIONS_DIR="$S/tmp/qa-automations"` with a YAML file or two in it (name, cron, channel, prompt, `enabled: true`). Without it the server reads and writes the repo's `automations/`, and the enabled ones run on their schedule.
 
-A thread whose prompt is `TOOL:300000` keeps running for five minutes with the fake CLI, for spinners and running counts. The server runs four per harness at once; the rest queue.
+A thread whose prompt is `TOOL:300000` keeps running for five minutes with the fake CLI, for spinners and running counts. The server runs twelve per harness at once by default; the rest queue.
 
 What the tracer's QA run covered (each checked by eye in the PNGs): the sidebar with channels, badges, running and queued threads and "N more"; a count and a thread row showing up while the app ran; channel, thread and unknown routes; Settings; not running (4759); a foreign server (a plain HTTP server on 4758: "not an Omni server"); a start that failed, with short and long log tails; a start and stop by the app on 4758 with the QA environment; the server killed under a connected app (Reconnecting, then Not running).
 

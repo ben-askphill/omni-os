@@ -9,7 +9,7 @@
 - [Crew and Conductor](user/crew.md)
 - [Automations](user/automations.md): cron, GitHub PR events, published pages and signed GitHub webhooks
 - [Sync between two Macs](user/sync.md)
-- [Remote access and security](user/remote-access.md), including the phone layout and home-screen setup
+- [Remote access and security](user/remote-access.md), including the phone layout, home-screen setup and pairing the native iOS app
 - [Omni Connect](user/omni-connect.md): open any machine from a phone through your relay, without Tailscale
 - [Link previews](user/link-previews.md)
 - [Mods](user/mods.md)
@@ -31,6 +31,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Transitions](internals/transitions.md): the one service behind a run switch, a handoff or Take over and a Continue, its four routes, the six older routes that answer through it, and what stays as synced kv for machines on an older build
 - [Glossary](../CONTEXT.md)
 - [Native app pairing contract](internals/app-pairing.md): session pairing, capabilities, and push token registration
+- [iOS app](../apps/ios/README.md) · [iOS release](../apps/ios/RELEASE.md)
 - [Mac app notes](../apps/mac/NOTES.md)
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages
 - [Screenshots on PRs](pr-screenshots.md)

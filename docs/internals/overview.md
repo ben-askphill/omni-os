@@ -46,7 +46,8 @@ The two clients are kept apart so a change to one cannot break the other:
 - `apps/web/` imports only `apps/web/`, `packages/shared/` and server types. It never imports `apps/mac/`.
 - Below 768px, `apps/web/src/mobile/MobileShell.tsx` replaces the desktop shell. Phone screens and their parents come from the hash route (`mobile/screens.ts`), and the thread screens share their loaded thread and stream. Check this layout separately from desktop.
 - `apps/mac/` imports only `apps/mac/` and `packages/shared/`. Its Swift code talks to the server over HTTP and SSE, never to `apps/web/`.
-- `packages/shared/` holds the pure TypeScript both need (slash grammar, `/` menu ranking, command pills) and imports only itself. It also holds wire contracts the server and the web both import, such as the Changes panel's types (`changes.ts`) and the user config's fields (`settings.ts`). The Mac's Swift copies of those are checked against them by `apps/server/tests/mac-fixtures.test.ts`. The Mac app runs it through JavaScriptCore from checked-in bundles: run `npm run build:slash` after changing a slash module, `npm run build:pick` after changing `browser-pick-script.ts` or `browser-pick-read.ts`.
+- `packages/shared/` holds the pure TypeScript the web, Mac and iOS clients need (slash grammar, `/` menu ranking, command pills, and shared view models) and imports only itself. It also holds wire contracts the server and the web both import, such as the Changes panel's types (`changes.ts`) and the user config's fields (`settings.ts`). The Mac's Swift copies of those are checked against them by `apps/server/tests/mac-fixtures.test.ts`. The Mac app runs it through JavaScriptCore from checked-in bundles: run `npm run build:slash` after changing a slash module, `npm run build:pick` after changing `browser-pick-script.ts` or `browser-pick-read.ts`.
+- `apps/ios/` is a separate Expo client. It talks to the server through `packages/client-core` and `packages/shared`, and imports nothing from `apps/web`, `apps/mac` or `apps/server`. Pairing, push and the app's screens are in [apps/ios/README.md](../../apps/ios/README.md) and [Native app pairing](app-pairing.md).
 - `turbo boundaries` (part of `npm test`) fails on any import that crosses these lines: a file outside its package, a package that is not a declared dependency, or a dependency the tags in `turbo.json` deny.
 - `apps/server/tests/mac-fixtures.test.ts` pins the JSON the Mac app reads from the server, so a server change that would break the app fails `npm test`.
 - Some screens copy a Web UI rule (transcript grouping, status line, format helpers). Those are ported to Swift with their own tests, not imported. A Web UI change to one of them should say whether the Mac app needs it too ([ADR 0002](../adr/0002-mac-app-is-a-client.md)).
@@ -65,8 +66,10 @@ apps/server/                @omni/server: Hono API (*-api.ts), runner/, harness/
 apps/mcp/                   @omni/mcp: omni.ts, the conductor tools; ask.ts, ask_user_question for every thread; threads.ts, read_referenced_thread for every thread but the conductor's
 apps/web/                   @omni/web: Web UI (React, Vite)
 apps/mac/                   @omni/mac: SwiftUI app (Omni/), OmniKit package, slash engine entry and bundler
+apps/ios/                   @omni/ios: Expo React Native app (pairing, live threads, Activity, Library)
 apps/linux/                 @omni/linux: desktop launcher for Linux. Starts the server and opens the Web UI in an app window
-packages/shared/            @omni/shared: pure TypeScript both clients use (slash grammar, menu, pills)
+packages/shared/            @omni/shared: pure TypeScript the web, Mac and iOS clients use (slash grammar, menu, pills)
+packages/client-core/       @omni/client-core: typed HTTP and thread stream for the iOS app
 packages/test-fixtures/     @omni/test-fixtures: fake CLIs and corpora the TS and Swift tests share
 packages/typescript-config/ @omni/typescript-config: the tsconfig bases every package extends
 crew/                       shared role charters (yours override them from data/crew/)

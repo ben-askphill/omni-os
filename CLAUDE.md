@@ -28,9 +28,10 @@ Local agent workspace. See README.md for what it does.
 - Web UI: `apps/web/` (React 19, Tailwind v4, hash router). Talks only to `/api`.
 - Mac app: `apps/mac/` (SwiftUI app plus the `OmniKit` package). Another client of `/api`, see `apps/mac/NOTES.md` and ADR 0002.
 - Sync relay: `apps/relay/`. A Cloudflare Worker each user deploys; see ADR 0008. It imports nothing from the other packages.
-- iOS app: `apps/ios/` (Expo, React Native). Reads channels and threads from a server, live, read only. Pairing and sending are not built yet. It imports nothing from `apps/web`, `apps/mac` or `apps/server`. See `apps/ios/README.md`.
+- iOS app: `apps/ios/` (Expo, React Native). Pairs with a server over HTTPS, reads channels and threads live, sends and steers, Activity, Library, handoff, attachments, Changes and PR review. It imports `@omni/client-core` and `@omni/shared`, nothing from `apps/web`, `apps/mac` or `apps/server`. See `apps/ios/README.md` and `apps/ios/RELEASE.md`.
 - Linux app: `apps/linux/`. A desktop launcher. It starts the server and opens the Web UI in an app window. It is not a fourth screen to port. A Web UI change is what it shows. See ADR 0006.
-- `packages/shared/`: pure TypeScript both clients use (slash grammar, menu, pills). It imports only itself. `apps/web/` and `apps/mac/` never import each other. `apps/linux` imports neither. `turbo boundaries` (run by `npm test`) enforces it with the tags in `turbo.json`.
+- `packages/shared/`: pure TypeScript the web, Mac and iOS clients use (slash grammar, menu, pills, and shared view models). It imports only itself. `apps/web/` and `apps/mac/` never import each other. `apps/linux` imports neither. `turbo boundaries` (run by `npm test`) enforces it with the tags in `turbo.json`.
+- `packages/client-core/`: typed HTTP and thread stream for the iOS app. It imports `@omni/shared` only.
 - Monorepo: npm workspaces (`apps/*`, `packages/*`) run with Turborepo. Import another package by name (`@omni/shared/slash.ts`), never by a relative path out of the package, and declare it in that package's `package.json`. `packages/test-fixtures` holds the fake CLIs and corpora the TS and Swift tests share. `data/`, `crew/`, `automations/` and `mods/` stay at the repo root.
 - `npm run test:mac` (Swift), `npm run build:slash` after changing a slash module in `packages/shared/`, `npm run build:pick` after changing `packages/shared/browser-pick-*.ts`.
 - Conductor tools: `apps/mcp/omni.ts`, calls the local API.
