@@ -30,16 +30,16 @@ export const config = {
   claudeBin: env.OMNI_CLAUDE_BIN ?? 'claude',
   defaultModel: env.OMNI_DEFAULT_MODEL ?? 'claude-sonnet-5-5',
   permissionMode: env.OMNI_PERMISSION_MODE ?? 'bypassPermissions',
-  maxConcurrent: Number(env.OMNI_MAX_CONCURRENT ?? 4),
+  maxConcurrent: Number(env.OMNI_MAX_CONCURRENT ?? 12),
   /** Per-harness concurrency caps. Claude Code uses OMNI_MAX_CONCURRENT. */
-  maxConcurrentCodex: Number(env.OMNI_MAX_CONCURRENT_CODEX ?? 4),
-  maxConcurrentCursor: Number(env.OMNI_MAX_CONCURRENT_CURSOR ?? 4),
-  maxConcurrentHermes: Number(env.OMNI_MAX_CONCURRENT_HERMES ?? 4),
+  maxConcurrentCodex: Number(env.OMNI_MAX_CONCURRENT_CODEX ?? 12),
+  maxConcurrentCursor: Number(env.OMNI_MAX_CONCURRENT_CURSOR ?? 12),
+  maxConcurrentHermes: Number(env.OMNI_MAX_CONCURRENT_HERMES ?? 12),
   /** Hermes API server on the server's Tailscale address, like http://100.x.y.z:8642. Unset means Hermes is off. The bearer token is the secret store secret HERMES_API_KEY, not an env var. */
   get hermesUrl() {
     return resolved.hermesUrl();
   },
-  maxConcurrentCursorCloud: Number(env.OMNI_MAX_CONCURRENT_CURSOR_CLOUD ?? 4),
+  maxConcurrentCursorCloud: Number(env.OMNI_MAX_CONCURRENT_CURSOR_CLOUD ?? 12),
   /** The Cursor Cloud Agents API. Set only to point Omni at a fake for tests or QA. The key is the secret CURSOR_API_KEY. */
   cursorApiUrl: env.OMNI_CURSOR_API_URL ?? 'https://api.cursor.com',
   /** How often a running Cursor cloud agent's run is read for its status, branch and PR. */

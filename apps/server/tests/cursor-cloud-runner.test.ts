@@ -51,7 +51,7 @@ describe('Cursor Cloud through the runner', () => {
     expect(h.available).toBe(true);
     expect(h.models.map((m) => m.id)).toEqual(['default', 'composer-2', 'claude-4.5-sonnet']);
     expect(channelCatalog(getCatalog(), 'notes').harnesses.find((x) => x.id === 'cursor-cloud')).toMatchObject({ available: false });
-    expect(H.runner.slotsByHarness()['cursor-cloud'].cap).toBe(4);
+    expect(H.runner.slotsByHarness()['cursor-cloud'].cap).toBe(12);
   });
 
   it('runs a Conductor delegate as a cloud agent with no worktree, and reports back with the PR', async () => {

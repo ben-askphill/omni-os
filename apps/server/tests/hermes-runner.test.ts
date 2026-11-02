@@ -61,7 +61,7 @@ describe('Hermes through the runner', () => {
     expect(h?.available).toBe(true);
     expect(h?.models.map((m) => m.id)).toEqual(['hermes']);
     expect(h?.models[0].efforts).toEqual([]);
-    expect(H.runner.slotsByHarness().hermes.cap).toBe(4);
+    expect(H.runner.slotsByHarness().hermes.cap).toBe(12);
   });
 
   it('accepts a conductor delegate, skips the worktree, and continues the remote session', async () => {
