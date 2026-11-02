@@ -1,19 +1,19 @@
 import { Fragment, useRef, type ReactNode } from 'react';
-import { taskHost, type ChannelWithRunning, type ThreadStub } from '../api.ts';
+import { taskHost, type ChannelWithRunning, type FolderWithThreads, type ThreadStub } from '../api.ts';
 import { DEFAULT_FOLDER_NAME, draftKey, freeName, useFolders } from '../folders.tsx';
 import { pinnedRows } from '../pins.ts';
 import { runningThreadGroups } from '../sidebar-lists.ts';
 import { href, useHash, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
+import { delegatedIds, delegatesByParent } from '@omni/shared/delegate-count.ts';
 import { OmniMark } from './brand.tsx';
 import { ChannelMark, ErrorNote, Thumb, useSlidingThumb } from './ui.tsx';
 import { useUngroupDrop } from './sidebar/channel-lists.ts';
 import { SidebarTop } from './sidebar/SidebarTop.tsx';
 import { channelFolders, channelThreads, useChannelFold } from './sidebar/channel-lists.ts';
-import { ThreadHandoffs } from './ThreadHandoffs.tsx';
 import { FolderNameField, FolderRow, AddFolderButton } from './sidebar/FolderRows.tsx';
-import { ChannelThreadEntry, NavLink, RunningBadge, SectionLink, ThreadLink, ThreadSection, useSectionFold } from './sidebar/SidebarRows.tsx';
+import { ChannelThreadEntry, NavLink, RunningBadge, SectionLink, ThreadSection, useRowDelegates, useSectionFold } from './sidebar/SidebarRows.tsx';
 import { ChannelListLink, WorkspaceLinks } from './sidebar/SidebarLinks.tsx';
 import { UsageCard } from './sidebar/UsageCard.tsx';
 import { UpdateNotice } from './UpdateNotice.tsx';
@@ -56,9 +56,14 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   // copy and stays after it stops, so the highlight never jumps out from under you. The highlighted
   // channel also lists its latest threads of any status, so finished ones stay a click away.
   // Threads in a folder are listed under the folder instead.
-  const threadsOf = (c: ChannelWithRunning) => channelThreads(c, openIn(c), focused);
+  // Threads the Conductor delegated get no row of their own, anywhere: the count on their Conductor thread's row
+  // stands for them, and the channel's running badge still counts the ones at work.
+  const delegated = delegatedIds(conductor?.handoffs);
+  const delegates = delegatesByParent(conductor?.handoffs);
+  const undelegated = (f: FolderWithThreads) => ({ ...f, threads: f.threads.filter((t) => !delegated.has(t.id)) });
+  const threadsOf = (c: ChannelWithRunning) => channelThreads(c, openIn(c), focused).filter((t) => !delegated.has(t.id));
   /** The channel's folders, with the open thread under its own even past the listed ones. */
-  const foldersOf = (c: ChannelWithRunning) => channelFolders(c, openIn(c));
+  const foldersOf = (c: ChannelWithRunning) => channelFolders(c, openIn(c)).map(undelegated);
   // Rows appearing or leaving above the highlighted one move it, so they re-measure the thumb too.
   const openCopy = openThread && openThread.id === openId ? openThread : null;
   const runningGroups = runningThreadGroups(channels, openCopy);
@@ -94,7 +99,9 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
         >
           <div className="min-h-0 space-y-px overflow-hidden">{channelContents(c, closed)}</div>
         </div>
-        {closed && open && <ThreadLink t={open} active tasks={agents(open.id)} onNavigate={onNavigate} />}
+        {closed && open && !delegated.has(open.id) && (
+          <ChannelThreadEntry t={open} active tasks={agents(open.id)} handoffs={c.handoffs} flush={c.id === 'conductor'} onNavigate={onNavigate} />
+        )}
       </>
     );
   };
@@ -107,7 +114,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
     const shown = list.filter((t, i) => i < MAX_THREADS || t.id === oid || agents(t.id).length > 0);
     return (
       <>
-        {(closed ? (c.folders ?? []) : foldersOf(c)).map((f) => (
+        {(closed ? (c.folders ?? []).map(undelegated) : foldersOf(c)).map((f) => (
           <FolderRow key={f.id} f={f} openId={oid} tasks={tasks} handoffs={c.handoffs} onNavigate={onNavigate} />
         ))}
         {folders.editing === draftKey(c.id) && (
@@ -118,7 +125,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
           />
         )}
         {shown.map((t) => (
-          <ChannelThreadEntry key={t.id} t={t} active={t.id === oid} tasks={agents(t.id)} handoffs={c.handoffs} onNavigate={onNavigate} />
+          <ChannelThreadEntry key={t.id} t={t} active={t.id === oid} tasks={agents(t.id)} handoffs={c.handoffs} flush={c.id === 'conductor'} onNavigate={onNavigate} />
         ))}
         {c.id === focused ? (
           <ChannelListLink channelId={c.id} onNavigate={onNavigate}>
@@ -172,21 +179,17 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   );
 
   const sectionLink = (t: ThreadStub, unpin = false) => (
-    <SectionLink
+    <SectionEntry
       key={t.id}
       t={t}
       channel={t.channel_id === 'conductor' ? 'Conductor' : (channels.find((c) => c.id === t.channel_id)?.name ?? t.channel_id)}
       active={t.id === openId}
       agents={tasks.filter((k) => taskHost(k) === t.id).length}
       unpin={unpin}
+      delegated={unpin ? undefined : delegates.get(t.id)}
       onNavigate={onNavigate}
     />
   );
-
-  const sectionGroup = (group: { thread: ThreadStub; children: ThreadStub[] }, idPrefix: string) =>
-    group.children.length ? (
-      <ThreadHandoffs key={group.thread.id} idPrefix={idPrefix} parent={group.thread} children={group.children} renderParent={sectionLink(group.thread)} onNavigate={onNavigate} />
-    ) : sectionLink(group.thread);
 
   const channelLink = (c: ChannelWithRunning) => (
     <Fragment key={c.id}>
@@ -226,8 +229,8 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
           </div>
 
           {running.length > 0 && (
-            <ThreadSection label="Running" closed={runningClosed} onToggle={toggleRunning} count={runningGroups.reduce((n, g) => n + 1 + g.children.length, 0)}>
-              {runningGroups.map((group) => sectionGroup(group, 'running'))}
+            <ThreadSection label="Running" closed={runningClosed} onToggle={toggleRunning} count={running.length}>
+              {running.map((t) => sectionLink(t))}
             </ThreadSection>
           )}
 
@@ -266,4 +269,10 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
       </div>
     </nav>
   );
+}
+
+/** A Running or Pinned row. A Conductor thread in Running carries its delegate count, in place of the threads it delegated. */
+function SectionEntry({ delegated, ...props }: Omit<Parameters<typeof SectionLink>[0], 'delegates'> & { delegated?: readonly ThreadStub[] }) {
+  const delegates = useRowDelegates(props.t.id, delegated, props.onNavigate);
+  return <SectionLink {...props} delegates={delegates} />;
 }

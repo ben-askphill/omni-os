@@ -225,10 +225,12 @@ struct DetailsTab: View {
       let session = store.events.last { $0.kind == "init" }.flatMap { if case .sessionInit(let s) = $0.content { s } else { nil } }
       let last = store.events.last { $0.kind == "result" }.flatMap { if case .result(let r) = $0.content { r } else { nil } }
       let cwd = store.cwd ?? ""
+      ScrollViewReader { proxy in
       ScrollView {
         VStack(alignment: .leading, spacing: z(12)) {
           GlanceCard(model: model, store: store, branch: branch, tab: $tab)
           AgentsCard(model: model, store: store)
+            .id(agentsCardID)
           VStack(spacing: 0) {
             let channel = store.channel?.name ?? thread.channelID
             row("Channel") {
@@ -297,8 +299,17 @@ struct DetailsTab: View {
         .padding(.horizontal, z(10))
         .padding(.bottom, z(12))
       }
+      // A sidebar delegate count opened this thread: scroll to the threads it delegated.
+      .onChange(of: model.agentsFocus, initial: true) { _, focus in
+        guard focus == store.id else { return }
+        withAnimation(Motion.spring) { proxy.scrollTo(agentsCardID, anchor: .top) }
+        model.agentsFocus = nil
+      }
+      }
     }
   }
+
+  private let agentsCardID = "agents"
 
   private func resumeCard(_ command: String) -> some View {
     VStack(alignment: .leading, spacing: z(8)) {

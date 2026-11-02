@@ -204,6 +204,10 @@ final class QARunner {
           guard let open = QAProbe.openModelPicker else { throw QAScriptError("no new thread box on screen") }
           open(query)
           try? await Task.sleep(for: .milliseconds(1200))
+        case .delegates(let id):
+          model.showDelegates(of: id)
+          routedAt = .now
+          try? await Task.sleep(for: .milliseconds(1200))
         case .foldAll:
           guard let fold = QAProbe.foldAll else { throw QAScriptError("no sidebar fold-all button on screen") }
           fold()
@@ -460,6 +464,7 @@ final class QARunner {
     case .expand: "expand"
     case .meter: "meter"
     case .modelPicker(let query): "modelPicker \(query)"
+    case .delegates(let id): "delegates \(id)"
     case .foldAll: "foldAll"
     case .editPending(let text): "editPending \(text.prefix(40))"
     case .webhookSecret(let id): "webhookSecret \(id)"

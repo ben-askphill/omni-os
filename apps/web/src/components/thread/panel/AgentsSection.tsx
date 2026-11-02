@@ -32,6 +32,9 @@ function AgentLink({ to, title, mark, side, sub }: { to: string; title: string; 
 }
 
 const ACTIVE = new Set(['running', 'queued']);
+
+/** The card's element id: a delegate count in the sidebar opens Details scrolled to it. */
+export const AGENTS_CARD_ID = 'thread-agents';
 const statusText = (s: string) => STATUS_LABEL[s] ?? s;
 
 /**
@@ -46,7 +49,7 @@ export function AgentsSection({ parent, links, children, agents, onJump, now = D
   const lineage = !!parent || !!links.from || links.into.length > 0;
   if (!lineage && !agents.length && !children.length) return null;
   return (
-    <section aria-label="Agents" className="rounded-[20px] bg-bg p-1">
+    <section id={AGENTS_CARD_ID} aria-label="Agents" className="scroll-mt-3 rounded-[20px] bg-bg p-1">
       {lineage && (
         <>
           <div className="caption px-3 pt-2 pb-1">Lineage</div>

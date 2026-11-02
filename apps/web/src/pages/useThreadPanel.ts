@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Artifact } from '../api.ts';
 import { PANEL_MIN, THREAD_MIN, defaultPanelWidth } from '../components/thread/panel/PanelResizeHandle.tsx';
 import { readPref, writePref } from '../store.tsx';
@@ -57,6 +57,11 @@ export function useThreadPanel({
     return () => ro.disconnect();
   }, [loaded]);
 
+  /** Open it, as a delegate count's click does, and remember it open. */
+  const show = useCallback(() => {
+    setOpen(true);
+    writePref('threadPanel', true);
+  }, []);
   const toggle = () =>
     setOpen((v) => {
       writePref('threadPanel', !v);
@@ -72,5 +77,5 @@ export function useThreadPanel({
     setWidth(null);
     writePref('threadPanelWidth', null);
   };
-  return { open, toggle, rootRef, max, width: shown, resize, reset };
+  return { open, show, toggle, rootRef, max, width: shown, resize, reset };
 }

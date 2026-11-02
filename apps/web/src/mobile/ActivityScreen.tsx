@@ -9,7 +9,8 @@ import { recentThreadGroups, recentThreads, runningThreadGroups, type ThreadRowG
 import { useApp, useNow } from '../store.tsx';
 import { activityOf } from './activity.ts';
 import { rowOf, type RowItem } from './rows.ts';
-import { MobileHandoffGroup } from './ChannelsScreen.tsx';
+import { MoDelegatedRow } from './DelegatedRow.tsx';
+import { delegatedIds, delegatesByParent } from '@omni/shared/delegate-count.ts';
 import { NeedsCardView } from './NeedsCard.tsx';
 import { HeaderActions } from './HeaderActions.tsx';
 import { MoEmpty, MoHeader, MoRows, MoScroll, MoSection, MoTitle } from './parts.tsx';
@@ -26,14 +27,17 @@ export function ActivityScreen() {
   const recent = useLiveThreads('/recent?limit=60', acceptAll, 60);
   const now = useNow(60_000);
   const [filter, setFilter] = useState<Filter>('all');
+  const delegated = useMemo(() => delegatedIds(channels.find((c) => c.id === 'conductor')?.handoffs), [channels]);
+  // Recent threads leaves delegated threads out before taking the latest five, so it still lists five rows.
+  const undelegated = useMemo(() => channels.map((c) => ({ ...c, recent: c.recent?.filter((t) => !delegated.has(t.id)) })), [channels, delegated]);
   const a = useMemo(
-    () => activityOf({ recent: recent.data, needsYou, pinned, latest: recentThreads(channels), channel: (id) => channel(id), harness: harnessLabel, now }),
-    [recent.data, needsYou, pinned, channels, channel, now],
+    () => activityOf({ recent: recent.data, needsYou, pinned, latest: recentThreads(undelegated), channel: (id) => channel(id), harness: harnessLabel, now }),
+    [recent.data, needsYou, pinned, undelegated, channel, now],
   );
   const runningGroups = useMemo(() => runningThreadGroups(channels), [channels]);
   const latestGroups = useMemo(() => recentThreadGroups(channels), [channels]);
-  const runningCount = countGroupedRows(a.running, runningGroups);
-  const latestCount = countGroupedRows(a.latest, latestGroups, true);
+  const runningCount = countThreadRows(a.running, runningGroups, delegated);
+  const latestCount = countThreadRows(a.latest, latestGroups, delegated);
   const open = (id: string) => shell.open(href.thread(id));
   const waiting = a.needs.some((n) => n.glyph === 'needs');
   const show = (f: Filter) => filter === 'all' || filter === f;
@@ -85,7 +89,7 @@ export function ActivityScreen() {
         {/* As the sidebar: Running (hidden under All while nothing runs), Pinned, then Recent threads. */}
         {(filter === 'running' || (filter === 'all' && a.running.length > 0)) && (
           <MoSection title="Running" count={runningCount}>
-            {a.running.length ? <ActivityThreadRows idPrefix="activity-running" items={a.running} groups={runningGroups} channel={channel} now={now} onOpen={(r) => open(r.id)} /> : <MoEmpty>Nothing is running. Tap + to start something.</MoEmpty>}
+            {a.running.length ? <ActivityThreadRows items={a.running} groups={runningGroups} channel={channel} now={now} onOpen={(r) => open(r.id)} /> : <MoEmpty>Nothing is running. Tap + to start something.</MoEmpty>}
           </MoSection>
         )}
         {filter === 'all' && a.pinned.length > 0 && (
@@ -95,7 +99,7 @@ export function ActivityScreen() {
         )}
         {filter === 'all' && a.latest.length > 0 && (
           <MoSection title="Recent threads" count={latestCount}>
-            <ActivityThreadRows idPrefix="activity-recent" items={a.latest} groups={latestGroups} channel={channel} now={now} includeInactiveChildren onOpen={(r) => open(r.id)} />
+            <ActivityThreadRows items={a.latest} groups={latestGroups} channel={channel} now={now} onOpen={(r) => open(r.id)} />
           </MoSection>
         )}
         {show('done') && (
@@ -137,45 +141,40 @@ function UsageMeters({ usage }: { usage: ReturnType<typeof useApp>['usage'] }) {
   );
 }
 
-function countGroupedRows(items: RowItem[], groups: ThreadRowGroup[], includeInactiveChildren = false) {
+/**
+ * The rows a list shows: each Conductor thread once, with its delegate count in place of the threads it delegated, which
+ * get no row of their own. A Conductor thread whose delegated threads run joins Running even after its own turn ended.
+ */
+function threadRows(items: RowItem[], groups: ThreadRowGroup[], delegated: Set<string>) {
   const ids = new Set(items.map((item) => item.id));
-  const visible = groups.filter((group) => ids.has(group.thread.id) || group.children.some((child) => ids.has(child.id)));
-  const parentIds = new Set(visible.map((group) => group.thread.id));
-  const childIds = new Set(visible.flatMap((group) => group.children.map((child) => child.id)));
-  return visible.reduce((count, group) => count + 1 + (includeInactiveChildren ? group.children.length : group.children.filter((child) => ids.has(child.id)).length), 0)
-    + items.filter((item) => !parentIds.has(item.id) && !childIds.has(item.id)).length;
+  const parents = groups.filter((group) => ids.has(group.thread.id) || group.children.some((child) => ids.has(child.id))).map((g) => g.thread);
+  const parentIds = new Set(parents.map((t) => t.id));
+  return { parents, ordinary: items.filter((item) => !parentIds.has(item.id) && !delegated.has(item.id)) };
 }
 
-function ActivityThreadRows({ items, groups, channel, now, includeInactiveChildren = false, idPrefix, onOpen }: {
+function countThreadRows(items: RowItem[], groups: ThreadRowGroup[], delegated: Set<string>) {
+  const { parents, ordinary } = threadRows(items, groups, delegated);
+  return parents.length + ordinary.length;
+}
+
+function ActivityThreadRows({ items, groups, channel, now, onOpen }: {
   items: RowItem[];
   groups: ThreadRowGroup[];
   channel: (id: string) => { name: string; icon: string | null } | undefined;
   now: number;
-  includeInactiveChildren?: boolean;
-  idPrefix: string;
   onOpen: (item: RowItem) => void;
 }) {
+  const { channels } = useApp();
+  const handoffs = channels.find((c) => c.id === 'conductor')?.handoffs;
+  const delegates = delegatesByParent(handoffs);
+  const { parents, ordinary } = threadRows(items, groups, delegatedIds(handoffs));
   const byID = new Map(items.map((item) => [item.id, item]));
-  const visibleGroups = groups.filter((group) => byID.has(group.thread.id) || group.children.some((child) => byID.has(child.id)));
-  const parentIDs = new Set(visibleGroups.map((group) => group.thread.id));
-  const childIDs = new Set(visibleGroups.flatMap((group) => group.children.map((child) => child.id)));
-  const ordinary = items.filter((item) => !parentIDs.has(item.id) && !childIDs.has(item.id));
+  const rows = [...parents.map((t) => byID.get(t.id) ?? rowOf(t, channel(t.channel_id), now)), ...ordinary];
   return (
     <div className="flex flex-col">
-      {visibleGroups.map((group, i) => {
-        const item = byID.get(group.thread.id) ?? rowOf(group.thread, channel(group.thread.channel_id), now);
-        const children = includeInactiveChildren ? group.children : group.children.filter((child) => byID.has(child.id));
-        if (!children.length) return <MoRows key={group.thread.id} items={[item]} onOpen={onOpen} />;
-        return <MobileHandoffGroup
-          key={group.thread.id}
-          item={item}
-          group={{ parent: group.thread, children }}
-          onOpen={onOpen}
-          last={i === visibleGroups.length - 1 && ordinary.length === 0}
-          idPrefix={idPrefix}
-        />;
-      })}
-      {ordinary.length > 0 && <MoRows items={ordinary} onOpen={onOpen} />}
+      {rows.map((item, i) => (
+        <MoDelegatedRow key={item.id} it={item} delegated={delegates.get(item.id)} last={i === rows.length - 1} onOpen={() => onOpen(item)} />
+      ))}
     </div>
   );
 }

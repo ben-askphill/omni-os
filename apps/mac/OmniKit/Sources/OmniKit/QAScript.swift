@@ -179,6 +179,8 @@ public enum QAStep: Hashable, Sendable {
   case modelPicker(String)
   /// Presses the sidebar's collapse-all (or expand-all) button.
   case foldAll
+  /// What a sidebar delegate count's click does for this Conductor thread: opens it on Details at its agents card.
+  case delegates(String)
   /// Opens the edit of the open thread's first editable unsent message, with this text in it.
   case editPending(String)
   /// Opens the Set secret form of the webhook automation with this id, on the Automations page.
@@ -338,7 +340,7 @@ public struct QAScript: Hashable, Sendable {
     self.steps = steps
   }
 
-  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "editPending", "webhookSecret", "deliveries", "searchHit", "subagent", "imageZoom", "nativeBrowser", "type", "attach", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "takeOver", "iosPairing", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "browserAddress", "openContext", "referenceThread", "quit"]
+  private static let kinds = ["route", "wait", "sleep", "snapshot", "port", "open", "openThread", "settings", "server", "appearance", "scroll", "expand", "meter", "modelPicker", "foldAll", "delegates", "editPending", "webhookSecret", "deliveries", "searchHit", "subagent", "imageZoom", "nativeBrowser", "type", "attach", "run", "send", "inspector", "webTitle", "palette", "channel", "folder", "screen", "handoffMenu", "handOff", "takeOver", "iosPairing", "quickPrompt", "selectLines", "addContext", "selectTerminal", "addTerminal", "annotate", "browserAddress", "openContext", "referenceThread", "quit"]
 
   private static func step(_ raw: Any) throws(QAScriptError) -> QAStep {
     guard let dict = raw as? [String: Any] else { throw QAScriptError("a step must be an object") }
@@ -402,6 +404,9 @@ public struct QAScript: Hashable, Sendable {
       return .modelPicker("")
     case "foldAll":
       return .foldAll
+    case "delegates":
+      guard let id = value as? String, !id.isEmpty else { throw QAScriptError("delegates takes a Conductor thread id") }
+      return .delegates(id)
     case "editPending":
       guard let text = value as? String else { throw QAScriptError("editPending takes the text to put in the edit") }
       return .editPending(text)

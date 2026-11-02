@@ -78,6 +78,12 @@ private struct ThreadInspector: ViewModifier {
       selection.arrived(page)
       open = true
     }
+    // A sidebar delegate count: open on Details, where the Details tab scrolls to the agents card and clears it.
+    .onChange(of: model.agentsFocus, initial: true) { _, focus in
+      guard focus == store.id else { return }
+      selection.tab = .details
+      open = true
+    }
     .onChange(of: Self.param(model.route)) { _, artifact in
       guard let artifact else { return }
       selection.open(artifact: artifact)

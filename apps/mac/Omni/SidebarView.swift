@@ -2,8 +2,9 @@ import OmniKit
 import SwiftUI
 
 /// The sidebar, as Sidebar.tsx (the design system's Rail): the wordmark, search and New thread, then Home and
-/// Conductor, the channels by kind with their running threads (and those threads' sub-agents nested under them),
-/// Add channel, and the workspace pages. The
+/// Conductor (one row per job, with the count of the threads it delegated), the channels by kind with their running
+/// threads (and those threads' sub-agents nested under them), Add channel, and the workspace pages. Threads the
+/// Conductor delegated get no row of their own: their job's count stands for them. The
 /// selected row wears a white thumb that springs from row to row. Usage and the server's state sit at the bottom.
 struct SidebarView: View {
   let model: AppModel
@@ -11,7 +12,6 @@ struct SidebarView: View {
   @Namespace private var thumb
   /// Folders showing all their listed threads, past "N more".
   @State private var expanded: Set<String> = []
-  @State private var collapsedHandoffs = Set(UserDefaults.standard.stringArray(forKey: handoffsCollapsedKey) ?? [])
 
   static let width: CGFloat = 252
   /// As wide as Ben last dragged its right edge, in unzoomed points.
@@ -106,14 +106,14 @@ struct SidebarView: View {
             }
           }
 
-          let running = SidebarSections.runningGroups(model.store.channels, open: model.openThread)
+          let running = SidebarSections.runningGroups(model.store.channels, open: model.openThread).map(\.thread)
           if !running.isEmpty {
             threadSection("Running", closed: $runningClosed, threads: running)
           }
 
           let pins = SidebarSections.pinned(model.store.pinned, open: model.openThread)
           if !pins.isEmpty {
-            threadSection("Pinned", closed: $pinsClosed, threads: pins.map { .init(thread: $0, children: []) }, unpin: true)
+            threadSection("Pinned", closed: $pinsClosed, threads: pins, unpin: true)
           }
 
           if let error = channelsError {
@@ -196,7 +196,7 @@ struct SidebarView: View {
   /// Running or Pinned, as ThreadSection in Sidebar.tsx: threads from any channel under a caption
   /// that folds them away, with the count beside it while folded. The caller leaves it out when it lists nothing. A
   /// thread here still shows under its own channel too.
-  private func threadSection(_ label: String, closed: Binding<Bool>, threads: [SidebarSections.ThreadRowGroup], unpin: Bool = false) -> some View {
+  private func threadSection(_ label: String, closed: Binding<Bool>, threads: [ThreadStub], unpin: Bool = false) -> some View {
     let what = label.lowercased().replacingOccurrences(of: " threads", with: "")
     return VStack(alignment: .leading, spacing: 0) {
       Button {
@@ -209,7 +209,7 @@ struct SidebarView: View {
             .foregroundStyle(Tok.fg4)
           Spacer(minLength: 0)
           if closed.wrappedValue {
-            Text("\(threads.reduce(0) { $0 + 1 + $1.children.count })")
+            Text("\(threads.count)")
               .omniCaption()
               .monospacedDigit()
           }
@@ -221,101 +221,32 @@ struct SidebarView: View {
       }
       .buttonStyle(.plain)
       .help(closed.wrappedValue ? "Show \(what) threads" : "Hide \(what) threads")
-      .accessibilityLabel("\(label), \(Format.plural(threads.reduce(0) { $0 + 1 + $1.children.count }, "thread"))")
+      .accessibilityLabel("\(label), \(Format.plural(threads.count, "thread"))")
       .accessibilityValue(closed.wrappedValue ? "Collapsed" : "Expanded")
       if !closed.wrappedValue {
         VStack(spacing: 1) {
-          ForEach(threads) { sectionGroupRow($0, unpin: unpin) }
+          ForEach(threads) { sectionRow($0, unpin: unpin) }
         }
       }
     }
-  }
-
-  @ViewBuilder
-  private func sectionGroupRow(_ group: SidebarSections.ThreadRowGroup, unpin: Bool) -> some View {
-    if group.children.isEmpty {
-      sectionRow(group.thread, unpin: unpin)
-    } else {
-      handoffRows(parent: group.thread, children: group.children) {
-        sectionRow(group.thread, unpin: unpin)
-      }
-    }
-  }
-
-  private func handoffRows<Content: View>(parent: ThreadStub, children: [ThreadStub], channelIndent: Bool = false, @ViewBuilder content: () -> Content) -> some View {
-    VStack(spacing: 1) {
-      HStack(spacing: z(2)) {
-        let collapsed = collapsedHandoffs.contains(parent.id)
-        Button { toggleHandoffs(parent.id) } label: {
-          OmniIcon(name: collapsed ? "chevronRight" : "chevronDown", size: 11)
-            .foregroundStyle(Tok.fg4)
-            .frame(width: z(18), height: z(28))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(RailRowStyle())
-        .help("\(collapsed ? "Show" : "Hide") delegated threads for \(parent.title)")
-        .accessibilityLabel("\(collapsed ? "Expand" : "Collapse") delegated threads for \(parent.title)")
-        .accessibilityValue(collapsed ? "Collapsed" : "Expanded")
-        content()
-      }
-      if !collapsedHandoffs.contains(parent.id) {
-        VStack(spacing: 1) {
-          ForEach(Array(children.enumerated()), id: \.element.id) { index, child in
-            handoffRow(child, last: index == children.count - 1)
-          }
-        }
-        .padding(.leading, z(23))
-      }
-    }
-    .padding(.leading, channelIndent ? z(25) : 0)
-  }
-
-  private func toggleHandoffs(_ id: String) {
-    if collapsedHandoffs.contains(id) { collapsedHandoffs.remove(id) } else { collapsedHandoffs.insert(id) }
-    UserDefaults.standard.set(collapsedHandoffs.sorted(), forKey: handoffsCollapsedKey)
-  }
-
-  private func handoffRow(_ thread: ThreadStub, last: Bool) -> some View {
-    let channel = model.store.channel(thread.channelID)?.name ?? thread.channelID
-    let item = SidebarItem.thread(thread.id)
-    return Button { model.route = .thread(id: thread.id) } label: {
-      HStack(spacing: z(8)) {
-        ThreadStatusIcon(status: thread.status, done: thread.doneAt != nil)
-          .frame(width: z(10))
-        Text(thread.title.isEmpty ? "Untitled" : thread.title)
-          .lineLimit(1)
-          .frame(maxWidth: .infinity, alignment: .leading)
-        Text("#\(channel)")
-          .font(.omni(size: 9.5))
-          .foregroundStyle(Tok.fg4)
-          .lineLimit(1)
-          .padding(.horizontal, z(6))
-          .padding(.vertical, z(2))
-          .background(Tok.surface2, in: Capsule())
-      }
-      .font(.omni(size: 11.5))
-      .foregroundStyle(selected == item ? Tok.fg : Tok.fg3)
-      .padding(.horizontal, z(7))
-      .frame(height: z(27))
-      .contentShape(Capsule())
-    }
-    .buttonStyle(RailRowStyle())
-    .background(alignment: .leading) { TreeLine(last: last).allowsHitTesting(false) }
-    .help("\(thread.title.isEmpty ? "Untitled" : thread.title) · #\(channel) · \(thread.status.label)")
-    .accessibilityLabel("\(thread.title.isEmpty ? "Untitled" : thread.title), #\(channel), \(thread.status.label)")
-    .openInNewWindow(thread.id, model: model, title: thread.title, stub: thread)
   }
 
   /// A thread in a section, flush with the channels: its status, title and channel. In Pinned, the pin that unpins it
-  /// shows on hover. Open, it reads bold; the thumb stays on its row under its channel.
+  /// shows on hover. In Running, a Conductor job carries its delegate count in place of the threads it delegated. Open,
+  /// it reads bold; the thumb stays on its row under its channel.
   private func sectionRow(_ thread: ThreadStub, unpin: Bool) -> some View {
     let item = SidebarItem.thread(thread.id)
     let channel = thread.channelID == SidebarSections.conductorID ? "Conductor" : (model.store.channel(thread.channelID)?.name ?? thread.channelID)
+    let count = unpin ? nil : delegates(of: thread.id)
     return HoverChrome { hover in
       row(item, thumb: false) {
-        SectionRow(thread: thread, channel: channel, active: selected == item, agents: agents[thread.id]?.count ?? 0, hover: unpin && hover)
+        SectionRow(thread: thread, channel: channel, active: selected == item, agents: agents[thread.id]?.count ?? 0, hover: unpin && hover, delegates: count)
       }
       .overlay(alignment: .trailing) {
+        if let count {
+          DelegateCount(summary: count) { model.showDelegates(of: thread.id) }
+            .padding(.trailing, z(6))
+        }
         if unpin {
           Button {
             Task { await model.setThreadPinned(thread, false) }
@@ -334,6 +265,12 @@ struct SidebarView: View {
       }
     }
     .openInNewWindow(thread.id, model: model, title: thread.title, stub: thread)
+  }
+
+  /// A Conductor job's delegate count, read against Needs you; nil when it delegated nothing.
+  private func delegates(of threadID: String) -> DelegateSummary? {
+    guard let children = SidebarSections.delegates(model.store.channels)[threadID] else { return nil }
+    return DelegateSummary.of(children, inbox: model.store.needsYou)
   }
 
   /// The threads with sub-agents running, keyed by the thread they nest under.
@@ -390,7 +327,9 @@ struct SidebarView: View {
     }
     if closed {
       // Closed, it still shows the open thread, so the highlight never vanishes into it.
-      if let open = model.openThread, open.channelID == channel.id { threadRow(open) }
+      if let open = model.openThread, open.channelID == channel.id, !SidebarSections.delegatedIDs(model.store.channels).contains(open.id) {
+        threadRow(open)
+      }
     } else {
       channelContents(channel)
     }
@@ -413,8 +352,9 @@ struct SidebarView: View {
     }
     let links = SidebarSections.threads(
       of: channel, open: model.openThread, focused: model.focusedChannel == channel.id, busy: Set(agents.keys))
-    let nestedChildren = Set(channel.handoffs.flatMap { $0.children.map(\.id) })
-    ForEach(links.shown.filter { !nestedChildren.contains($0.id) }) { thread in
+    // Delegated threads get no row here: their Conductor job's count stands for them.
+    let delegated = SidebarSections.delegatedIDs(model.store.channels)
+    ForEach(links.shown.filter { !delegated.contains($0.id) }) { thread in
       threadRow(thread)
     }
     if links.seeAll || links.more > 0 {
@@ -432,29 +372,26 @@ struct SidebarView: View {
   }
 
   /// A thread under its channel, or under a folder (which sits flush with its channel), with its running sub-agents
-  /// nested under it. Dragged onto a folder it files there; onto its channel's name, back to the ungrouped list.
+  /// nested under it. A Conductor job is one row with its delegate count on the right, almost flush with the
+  /// Conductor's name. Dragged onto a folder it files there; onto its channel's name, back to the ungrouped list.
   @ViewBuilder
   private func threadRow(_ thread: ThreadStub, indent: Bool = true) -> some View {
-    let handoff = model.store.channel(SidebarSections.conductorID)?.handoffs.first { $0.parent.id == thread.id }
-    if let handoff, !handoff.children.isEmpty {
-      handoffRows(parent: thread, children: handoff.children, channelIndent: indent) {
-        threadRowContent(thread, indent: false)
-      }
-    } else {
-      threadRowContent(thread, indent: indent)
-    }
-  }
-
-  @ViewBuilder
-  private func threadRowContent(_ thread: ThreadStub, indent: Bool) -> some View {
     let item = SidebarItem.thread(thread.id)
     let tasks = agents[thread.id] ?? []
-    row(item) { ThreadRow(thread: thread, active: selected == item, agents: tasks.count) }
+    let count = delegates(of: thread.id)
+    let flush = indent && thread.channelID == SidebarSections.conductorID && thread.folderID == nil
+    row(item) { ThreadRow(thread: thread, active: selected == item, agents: tasks.count, delegates: count) }
+      .overlay(alignment: .trailing) {
+        if let count {
+          DelegateCount(summary: count) { model.showDelegates(of: thread.id) }
+            .padding(.trailing, z(6))
+        }
+      }
       .onDrag {
         model.folders.dragging = .thread(thread)
         return NSItemProvider(object: (thread.title.isEmpty ? "Untitled" : thread.title) as NSString)
       }
-      .padding(.leading, indent ? z(25) : 0)
+      .padding(.leading, flush ? z(4) : indent ? z(25) : 0)
       .openInNewWindow(thread.id, model: model, title: thread.title, stub: thread)
     ForEach(Array(tasks.enumerated()), id: \.element.id) { i, task in
       AgentRow(task: task, last: i == tasks.count - 1) { pick(.thread(task.threadID)) }
@@ -481,8 +418,8 @@ struct SidebarView: View {
     }
     let all = expanded.contains(folder.id)
     let links = SidebarSections.threads(in: folder, openID: model.openThread?.id, all: all, busy: hosts)
-    let nestedChildren = Set((model.store.channel(SidebarSections.conductorID)?.handoffs ?? []).flatMap { $0.children.map(\.id) })
-    ForEach(links.shown.filter { !nestedChildren.contains($0.id) }) { thread in
+    let delegated = SidebarSections.delegatedIDs(model.store.channels)
+    ForEach(links.shown.filter { !delegated.contains($0.id) }) { thread in
       threadRow(thread)
     }
     if links.more > 0 {
@@ -520,7 +457,6 @@ let sidebarWidthKey = "sidebar.width"
 let collapsedChannelsKey = "sidebar.collapsedChannels"
 let pinnedCollapsedKey = "sidebar.pinnedCollapsed"
 let runningCollapsedKey = "sidebar.runningCollapsed"
-let handoffsCollapsedKey = "sidebar.handoffsCollapsed"
 
 /// Tracks the pointer over a row, for a button laid over it that shows on hover.
 private struct HoverChrome<Content: View>: View {
@@ -540,6 +476,8 @@ private struct SectionRow: View {
   let active: Bool
   let agents: Int
   let hover: Bool
+  /// A Conductor job's delegate count in Running: room for the button the sidebar lays over the row.
+  var delegates: DelegateSummary?
 
   var body: some View {
     let title = thread.title.isEmpty ? "Untitled" : thread.title
@@ -549,13 +487,18 @@ private struct SectionRow: View {
       Text(title)
         .lineLimit(1)
         .frame(maxWidth: .infinity, alignment: .leading)
-      Text(channel)
-        .font(.omni(size: 11))
-        .foregroundStyle(Tok.fg4)
-        .lineLimit(1)
-        .frame(maxWidth: z(90), alignment: .trailing)
-        .fixedSize(horizontal: true, vertical: false)
-        .opacity(hover ? 0 : 1)
+      // A delegate count says it is a Conductor job, so the channel's name gives way to it.
+      if let delegates {
+        DelegateCountFace(summary: delegates).hidden().padding(.trailing, z(-6))
+      } else {
+        Text(channel)
+          .font(.omni(size: 11))
+          .foregroundStyle(Tok.fg4)
+          .lineLimit(1)
+          .frame(maxWidth: z(90), alignment: .trailing)
+          .fixedSize(horizontal: true, vertical: false)
+          .opacity(hover ? 0 : 1)
+      }
     }
     .font(.omni(size: 13, weight: active ? .medium : .regular))
     .foregroundStyle(active ? Tok.fg : Tok.fg2)

@@ -101,6 +101,15 @@ public final class AppModel {
   }
   /// History, the Go to palette and composer focus.
   public let shell = ShellState()
+  /// A Conductor thread whose inspector should open on Details at its agents card: a sidebar delegate count's click.
+  /// The thread's inspector opens the tab and the Details tab scrolls there, then clears it.
+  public var agentsFocus: String?
+
+  /// Opens a Conductor thread on its Details tab at the threads it delegated, as a delegate count's click does.
+  public func showDelegates(of threadID: String) {
+    route = .thread(id: threadID)
+    agentsFocus = threadID
+  }
   /// The section the Settings window shows.
   public var settingsTab = SettingsTab.general
   /// Settings' channel scope: "" is Every channel (this machine's values), else a channel id. It stays picked from

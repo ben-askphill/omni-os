@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApi, type HarnessWithRunning } from '../api.ts';
 import { ReplyComposer } from '../components/Composer.tsx';
 import { QueuedMessages, SendingMessages, Transcript } from '../components/Transcript.tsx';
@@ -17,8 +17,9 @@ import { prNext } from '@omni/shared/thread-glance.ts';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
+import { AGENTS_CARD_ID } from '../components/thread/panel/AgentsSection.tsx';
 import { Empty, ErrorNote, Icon, LinkButton, Loading } from '../components/ui.tsx';
-import { href } from '../router.ts';
+import { href, navigate, type ThreadView } from '../router.ts';
 import { reportNotes } from '../requests.ts';
 import { canSteer } from '../steer.ts';
 import { teamOf } from '../transcript/delegation.ts';
@@ -35,7 +36,7 @@ import { useReveal } from './useReveal.ts';
 import { tailId } from '@omni/shared/history.ts';
 import { blockedNote } from '@omni/shared/thread-machine.ts';
 
-export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; artifact?: number; at?: number }) {
+export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: string; artifact?: number; at?: number; view?: ThreadView }) {
   const { mods, tasks } = useApp();
   const modLines = useMemo(() => mods.filter((m) => m.thread_id === id), [mods, id]);
   // GET /api/harnesses, the same list the reply pills load. Until it arrives, canSteer uses the Cursor fallback.
@@ -109,6 +110,24 @@ export function ThreadPage({ id, artifact: artifactParam, at }: { id: string; ar
     [setSelected, setPanelTab],
   );
   const panel = useThreadPanel({ artifactParam, files, ready, loaded: thread !== null, select: selectArtifact });
+  // A delegate count links here as /details: the panel opens on Details at the agents card, and the address goes back
+  // to the thread's own, so the next click on the count lands here again.
+  const [toAgents, setToAgents] = useState(false);
+  const { show: showPanel } = panel;
+  useEffect(() => {
+    if (view !== 'details') return;
+    setPanelTab('details');
+    showPanel();
+    setToAgents(true);
+    navigate(href.thread(id), { replace: true });
+  }, [view, id, setPanelTab, showPanel]);
+  useEffect(() => {
+    if (!toAgents || panelTab !== 'details') return;
+    const card = document.getElementById(AGENTS_CARD_ID);
+    if (!card) return;
+    card.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    setToAgents(false);
+  }, [toAgents, panelTab, children, panel.open]);
   const { prBusy, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, applyThread, setActionError, pin });
   // The branch's PRs and changes: the PRs tab and the Details tab's branch card read them, and the PRs tab's badge.
   const prs = useThreadPR(thread, slotBusy);

@@ -132,7 +132,8 @@ export function MoDiff({ add, del }: { add: number; del: number }) {
 }
 
 /** One thread in a list: Activity, a channel, search. */
-export function MoRow({ it, onOpen, last }: { it: RowItem; onOpen: () => void; last?: boolean }) {
+/** `trailing`: room at the end of the second line, for a control laid over the row (MoDelegatedRow's count). */
+export function MoRow({ it, onOpen, last, trailing }: { it: RowItem; onOpen: () => void; last?: boolean; trailing?: ReactNode }) {
   return (
     <button type="button" onClick={onOpen} className="mo-row flex min-w-0 w-full items-center gap-3 px-1 py-2.5 text-left">
       <MoAvatar role={it.role} channel={it.channelId} channelIcon={it.channelIcon} state={it.status} />
@@ -143,6 +144,7 @@ export function MoRow({ it, onOpen, last }: { it: RowItem; onOpen: () => void; l
         </span>
         <span className="flex items-center gap-2 text-[12.5px] leading-[1.35] text-fg-3">
           <span className="min-w-0 flex-1 truncate">{[`#${it.channel}`, it.meta].filter(Boolean).join(' · ')}</span>
+          {trailing}
         </span>
       </span>
     </button>

@@ -520,6 +520,7 @@ Steps (a list, or an object with the list under `steps`):
 | `{"meter": true}` | Opens the open thread's context meter panel |
 | `{"modelPicker": true}`, `{"modelPicker": "cursor"}` | Opens the new thread box's model list, with that in its search. Draw it with `screen`: it is a popover |
 | `{"foldAll": true}` | Presses the sidebar's collapse-all (or expand-all) button |
+| `{"delegates": "<thread id>"}` | Does what a Conductor row's delegate count does on click: opens that thread on Details, scrolled to its agents card |
 | `{"editPending": "text"}` | Opens the edit of the open thread's first editable unsent message, with this text in it |
 | `{"scroll": "earlier"}` | Scrolls the open thread up with trackpad events until "Earlier messages" starts a page, and notes the row at the top then and once the page is laid out ("held" when it kept its height) |
 | `{"scroll": "gap"}` | Centres the first gap a reveal left |
