@@ -23,6 +23,7 @@ import { href, type Route } from '../router.ts';
 import { checkTone } from '../pages/PRs.tsx';
 import { useApp } from '../store.tsx';
 import { toolLabel, toolSummary, type Item, type ToolCall } from '../transcript/fold.ts';
+import { CrewPRList } from './CrewPRs.tsx';
 import { MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSection } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
 import { threadView } from './thread-view.ts';
@@ -150,6 +151,7 @@ export function PRScreen() {
   const watch = usePRWatch(thread?.id, mark);
   const ch = thread ? channel(thread.channel_id) : undefined;
   const n = mark?.pr?.number;
+  const crew = mark?.crew ?? [];
   const q = useApi<PRDetail>(n && ch?.github_repo ? `/channels/${encodeURIComponent(ch.id)}/prs/${n}` : null);
   const [error, setError] = useState<string | null>(null);
   const p = q.data;
@@ -176,7 +178,7 @@ export function PRScreen() {
     }
   };
 
-  if (!thread || (thread.branch && !mark) || (n && ch?.github_repo && !p && !q.error)) {
+  if (!thread || !mark || (n && ch?.github_repo && !p && !q.error)) {
     return (
       <>
         <MoHeader onBack={shell.back} title="Pull request" />
@@ -187,11 +189,11 @@ export function PRScreen() {
   if (!n || !p) {
     return (
       <>
-        <MoHeader onBack={shell.back} title="Pull request" sub={thread?.branch ?? undefined} />
+        <MoHeader onBack={shell.back} title={thread.branch || !crew.length ? 'Pull request' : 'Delegated PRs'} sub={thread.branch ?? undefined} />
         <Body className="gap-3">
           {q.error ? (
             <ErrorNote onRetry={q.reload}>{q.error}</ErrorNote>
-          ) : (
+          ) : !n && !thread.branch && crew.length ? null : (
             <MoEmpty>
               {n
                 ? `PR #${n} is open. Set this channel's GitHub repo on the desktop to read it here.`
@@ -207,6 +209,7 @@ export function PRScreen() {
               </Button>
             </div>
           )}
+          {crew.length > 0 && <CrewPRList crew={crew} onOpen={(id) => shell.open(href.thread(id))} />}
         </Body>
       </>
     );
@@ -276,6 +279,7 @@ export function PRScreen() {
             ))}
           </MoGroup>
         </MoSection>
+        {crew.length > 0 && <CrewPRList crew={crew} onOpen={(id) => shell.open(href.thread(id))} />}
       </Body>
       {open && (
         <div className="flex shrink-0 flex-col gap-2 px-4 pt-2" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>

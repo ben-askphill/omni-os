@@ -97,7 +97,7 @@ describe('the Details tab', () => {
         ...details,
         thread: thread({ branch: 't3/x' }),
         init: null,
-        prs: { pr: pr({ mergeable: 'CONFLICTING' }), prs: [pr({ mergeable: 'CONFLICTING' })] },
+        prs: { pr: pr({ mergeable: 'CONFLICTING' }), prs: [pr({ mergeable: 'CONFLICTING' })], crew: [] },
         changes: { files: [{}, {}], add: 4, del: 1 },
         next: prNext(pr({ mergeable: 'CONFLICTING' }), true),
       }),

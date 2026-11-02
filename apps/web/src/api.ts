@@ -217,9 +217,21 @@ export interface AllPRs {
 /** What GET /channels/:id/thread-prs marks a branch with: its open or merged PR. */
 export interface BranchPRMark {
   number: number;
+  title: string;
   state: 'OPEN' | 'MERGED';
   isDraft: boolean;
   url: string;
+}
+/**
+ * A PR a delegated thread opened, from GET /threads/:id/pr `crew`: one per thread under this one in the delegation
+ * tree, at any depth, oldest delegation first. Open or merged only.
+ */
+export interface CrewPR extends BranchPRMark {
+  repo: string;
+  thread_id: string;
+  thread_title: string;
+  channel_id: string;
+  task_id: string | null;
 }
 export interface PRDetail extends PRSummary {
   body: string;

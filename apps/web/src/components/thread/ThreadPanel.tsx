@@ -2,7 +2,7 @@ import { lazy, Suspense, type ComponentProps } from 'react';
 import type { Artifact, Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { plural } from '../../format.ts';
-import { prLine } from '../../thread-glance.ts';
+import { crewLine, prLine } from '../../thread-glance.ts';
 import { IconButton, Loading, Segmented, StatusDot } from '../ui.tsx';
 import { ActionsTab } from './panel/ActionsTab.tsx';
 import { ArtifactsTab } from './panel/ArtifactsTab.tsx';
@@ -49,6 +49,10 @@ export function ThreadPanel({
   const { agents } = details;
   const pr = prs.data?.pr;
   const line = pr ? prLine(pr) : null;
+  const crew = prs.data?.crew ?? [];
+  // The thread's own PR leads. A thread without one shows what its delegated threads opened.
+  const crewSum = crew.length ? crewLine(crew) : null;
+  const prTab = pr && line ? { title: `PRs: #${pr.number}, ${line.text}`, tone: line.tone } : crewSum ? { title: `PRs: ${plural(crew.length, 'PR')} from delegated threads, ${crewSum.text}`, tone: crewSum.tone } : null;
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-1 px-2.5 py-2.5">
@@ -72,8 +76,8 @@ export function ThreadPanel({
               {
                 id: 'prs',
                 icon: 'pr',
-                title: pr && line ? `PRs: #${pr.number}, ${line.text}` : 'PRs',
-                badge: pr && line ? <StatusDot status={PR_DOT[line.tone]} size={6} /> : undefined,
+                title: prTab?.title ?? 'PRs',
+                badge: prTab ? <StatusDot status={PR_DOT[prTab.tone]} size={6} /> : undefined,
               },
               { id: 'artifacts', icon: 'layers', title: 'Artifacts', badge: files.length ? <span className="font-num text-[10.5px] text-fg-4">{files.length}</span> : undefined },
               { id: 'changes', icon: 'diff', title: 'Changes' },

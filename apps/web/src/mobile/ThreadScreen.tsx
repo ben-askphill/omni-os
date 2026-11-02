@@ -27,7 +27,7 @@ import { RunOnSheet } from './RunOnSheet.tsx';
 import { Turn, useBranchChanges, type TurnCtx } from './ThreadTurn.tsx';
 import { useOpenOnNewestTurn } from './useOpenOnNewestTurn.ts';
 import { threadView } from './thread-view.ts';
-import { prLine } from '../thread-glance.ts';
+import { crewLine, prLine } from '../thread-glance.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */
 export function ThreadScreen() {
@@ -178,7 +178,7 @@ export function ThreadScreen() {
       {menu && (
         <MenuSheet
           thread={thread}
-          pr={pr?.pr ? { label: `PR #${pr.pr.number}`, line: prLine(pr.pr).text } : null}
+          pr={pr?.pr ? { label: `PR #${pr.pr.number}`, line: prLine(pr.pr).text } : pr?.crew.length ? { label: 'PRs from delegated threads', line: crewLine(pr.crew).text } : null}
           changes={changes?.files.length ? `${plural(changes.files.length, 'file')} · +${changes.add} −${changes.del}` : null}
           onClose={() => setMenu(false)}
         />

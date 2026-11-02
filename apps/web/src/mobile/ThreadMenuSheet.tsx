@@ -224,7 +224,7 @@ export function MenuSheet({ thread, pr, changes, onClose }: { thread: Thread; pr
       <div className="flex flex-col gap-2.5 px-3">
         <MoGroup>
           <MoListRow icon="info" label="Details" sub="Agents, harness, model, session" onClick={() => go(href.threadView(thread.id, 'details'))} />
-          {thread.branch && <MoListRow icon="pr" label={pr?.label ?? 'PR'} sub={pr?.line ?? 'No PR yet'} onClick={() => go(href.threadView(thread.id, 'pr'))} />}
+          {(thread.branch || pr) && <MoListRow icon="pr" label={pr?.label ?? 'PR'} sub={pr?.line ?? 'No PR yet'} onClick={() => go(href.threadView(thread.id, 'pr'))} />}
           {thread.branch && <MoListRow icon="diff" label="Changes" sub={changes ?? `On ${thread.branch}`} onClick={() => go(href.threadView(thread.id, 'changes'))} />}
           <MoListRow icon="browser" label="Browser" sub="Watch only" onClick={() => go(href.threadView(thread.id, 'browser'))} />
           <MoListRow icon="terminal" label="Terminal" sub="Read only" onClick={() => go(href.threadView(thread.id, 'terminal'))} />

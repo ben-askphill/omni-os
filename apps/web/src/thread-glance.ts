@@ -1,7 +1,7 @@
 // What the top of the thread panel's Details tab reads: the branch's PR state and the one next step it calls for.
 // Ben's history says the panel is mostly used to steer a branch to a merged PR: open the PR, fix conflicts, fix
 // checks, then merge. The Mac app mirrors these rules in OmniKit's ThreadGlance.swift.
-import type { PRSummary } from './api.ts';
+import type { CrewPR, PRSummary } from './api.ts';
 
 export const OPEN_PR_PROMPT = 'Commit your work, push the branch and open a PR with gh. Reply with the PR URL.';
 export const FIX_CONFLICTS_PROMPT = 'Rebase this branch on its base branch, resolve the merge conflicts, run the tests and force-push with lease.';
@@ -49,4 +49,11 @@ export function prLine(pr: PRSummary): { text: string; tone: PRTone } {
   if (pr.reviewDecision === 'CHANGES_REQUESTED') return { text: 'Changes requested', tone: 'needs' };
   const checks = total ? `${total} checks passed` : 'No checks';
   return { text: pr.reviewDecision === 'APPROVED' ? `${checks} · approved` : checks, tone: pr.isDraft ? 'outline' : 'live' };
+}
+
+/** What the PRs from a thread's delegated threads add up to, for a tab title or a row: "2 open, 1 merged". */
+export function crewLine(crew: Pick<CrewPR, 'state'>[]): { text: string; tone: PRTone } {
+  const open = crew.filter((p) => p.state === 'OPEN').length;
+  const merged = crew.length - open;
+  return { text: [open && `${open} open`, merged && `${merged} merged`].filter(Boolean).join(', '), tone: open ? 'live' : 'done' };
 }
