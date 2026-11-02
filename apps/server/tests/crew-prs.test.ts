@@ -1,5 +1,5 @@
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { CrewPR } from '../crew-prs.ts';
 import { startRunner } from './runner-boot.ts';
@@ -136,6 +136,19 @@ describe('crew PRs', () => {
     ];
     expect((await prsOf(lead.id)).crew.map((p) => [p.number, p.thread_id, p.task_id])).toEqual(want);
     expect((await prsOf(conductor.id)).crew.map((p) => [p.number, p.thread_id, p.task_id])).toEqual(want);
+  });
+
+  it("sends the keys the Mac app's crew-prs.json fixture decodes", T, async () => {
+    const conductor = await H.start('be the conductor');
+    await H.untilResults(conductor.id, 1);
+    await delegate(conductor.id, 'shop', 'omni/mac-shape');
+    github({ 'acme/shop': [{ number: 51, branch: 'omni/mac-shape' }] });
+    later();
+    const sent = await prsOf(conductor.id);
+    const fixture = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../mac/OmniKit/Tests/OmniKitTests/Fixtures/crew-prs.json'), 'utf8'));
+    const keys = (o: object) => Object.keys(o).sort();
+    expect(keys(sent)).toEqual(keys(fixture));
+    expect(keys(sent.crew[0])).toEqual(keys(fixture.crew[0]));
   });
 
   it('still answers for a thread with no crew and no branch', async () => {
