@@ -52,6 +52,11 @@ export function wisprUrl(action: 'start' | 'stop'): string {
   return `wispr-flow://${action}-hands-free`;
 }
 
+/** The link to send as Omni quits: Wispr Flow outlives Omni, so dictation the panel started would keep the mic on. */
+export function wisprOnQuit(listening: boolean): string | null {
+  return listening ? wisprUrl('stop') : null;
+}
+
 interface State {
   ctx: AppContext | null;
   panel: BrowserWindow | null;
@@ -64,9 +69,20 @@ interface State {
   active: boolean;
   /** When the panel last showed itself or changed its own size. */
   movedAt: number;
+  /** The last link sent to Wispr Flow was start: it is listening for the panel. */
+  wisprListening: boolean;
 }
 
-const state: State = { ctx: null, panel: null, accelerator: null, registered: true, wasActive: false, active: false, movedAt: 0 };
+const state: State = {
+  ctx: null,
+  panel: null,
+  accelerator: null,
+  registered: true,
+  wasActive: false,
+  active: false,
+  movedAt: 0,
+  wisprListening: false,
+};
 
 export function installQuickPrompt(ctx: AppContext): void {
   if (state.ctx) return;
@@ -88,7 +104,19 @@ export function installQuickPrompt(ctx: AppContext): void {
     panel.setBounds({ x: bounds.x, y: bounds.y, width: PANEL_WIDTH, height: next });
   });
   on('omni:wispr', (_event, action) => {
-    if ((action === 'start' || action === 'stop') && wisprInstalled()) void shell.openExternal(wisprUrl(action), { activate: false });
+    if ((action !== 'start' && action !== 'stop') || !wisprInstalled()) return;
+    state.wisprListening = action === 'start';
+    void shell.openExternal(wisprUrl(action), { activate: false });
+  });
+  // Quitting with the panel open (Cmd-Q while it listens) closes it without the page's own stop. A quit the dialog
+  // in quit.ts still holds (event.defaultPrevented) may yet be cancelled, so wait for the one that goes through.
+  app.on('before-quit', (event) => {
+    if (event.defaultPrevented) return;
+    const stop = wisprOnQuit(state.wisprListening);
+    if (!stop) return;
+    state.wisprListening = false;
+    hide(ctx, { handBack: false });
+    void shell.openExternal(stop, { activate: false });
   });
 
   if (MAC) {
