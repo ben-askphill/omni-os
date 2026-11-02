@@ -32,6 +32,9 @@ export function Page({ route }: { route: Route }) {
       return <AllPRsPage />;
     case 'new-channel':
       return <NewChannelPage />;
+    case 'quick-prompt':
+      // The desktop app's panel only (App.tsx). Anywhere else it is no page.
+      return <Page route={{ name: 'notfound', path: '/quick-prompt' }} />;
     default:
       return (
         <div className="h-full overflow-y-auto">

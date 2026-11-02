@@ -33,6 +33,8 @@ export type Route =
   /** Every channel's pull requests in one list: the phone's PRs tab, a Workspace page on the desktop. */
   | { name: 'prs' }
   | { name: 'new-channel' }
+  /** The desktop app's Quick Prompt panel (apps/desktop/src/quick-prompt.ts). A page of its own, with no sidebar. */
+  | { name: 'quick-prompt' }
   | { name: 'notfound'; path: string };
 
 export function parseHash(hash: string): Route {
@@ -83,6 +85,7 @@ export function parseHash(hash: string): Route {
   if (a === 'artifacts' && !b) return { name: 'artifacts' };
   if (a === 'prs' && !b) return { name: 'prs' };
   if (a === 'new-channel' && !b) return { name: 'new-channel' };
+  if (a === 'quick-prompt' && !b) return { name: 'quick-prompt' };
   return { name: 'notfound', path: pathPart };
 }
 
@@ -109,6 +112,8 @@ export function pageTitle(route: Route, channelName: (id: string) => string | un
       return 'Pull requests';
     case 'new-channel':
       return 'New channel';
+    case 'quick-prompt':
+      return 'Quick Prompt';
     default:
       return 'Omni';
   }
@@ -168,6 +173,7 @@ export const href = {
   /** Every channel's PRs. One channel's is `prs(id)`. */
   pullRequests: () => '#/prs',
   newChannel: () => '#/new-channel',
+  quickPrompt: () => '#/quick-prompt',
 };
 
 // ---------- composer focus requests (from the sidebar "New thread" button) ----------

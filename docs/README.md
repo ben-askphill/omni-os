@@ -2,7 +2,7 @@
 
 ## Using Omni
 
-- [Install and first run](user/install.md), including the step-by-step agent instructions
+- [Install and first run](user/install.md): the desktop app, and the step-by-step agent instructions for a checkout
 - [Configuration](user/configuration.md): your config, `.env`, placeholders and secrets
 - [Threads](user/threads.md): Needs you and Mark done, the composer, context chips, history, channel actions, Watch PR and Send to Grok Bot
 - [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent, Hermes and Cursor Cloud
@@ -32,11 +32,12 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Glossary](../CONTEXT.md)
 - [Native app pairing contract](internals/app-pairing.md): session pairing, capabilities, and push token registration
 - [iOS app](../apps/ios/README.md) · [iOS release](../apps/ios/RELEASE.md)
-- [Mac app notes](../apps/mac/NOTES.md)
+- [Desktop app](../apps/desktop/README.md): develop against a QA stack, the QA harness (`scripts/qa.ts`), packaging, where data and logs live, and the bridge contract
+- [Mac app notes](../apps/mac/NOTES.md), until the desktop app replaces it
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages
 - [Screenshots on PRs](pr-screenshots.md)
 - Reviews: [2026-10-31 consolidation release, the KPIs re-measured](reviews/2026-10-31-consolidation-review.md) · [2026-10-22 bloat and dead code](reviews/2026-10-22-thermo-bloat-review.html) · [2026-10-16 thermo](reviews/2026-10-16-thermo-review.html)
-- Decisions: [0001 Codex app-server](adr/0001-codex-app-server.md) · [0002 Mac app is a client](adr/0002-mac-app-is-a-client.md) · [0003 Hermes remote harness](adr/0003-hermes-remote-harness.md) · [0004 Supabase sync](adr/0004-supabase-sync.md) · [0005 One execution owner](adr/0005-one-execution-owner.md) · [0006 Linux app is a window](adr/0006-linux-app-is-a-window.md) · [0007 Google sign-in through Clerk](adr/0007-google-sign-in-through-clerk.md) · [0008 Cloudflare relay](adr/0008-cloudflare-relay.md) · [0009 Omni Connect](adr/0009-omni-connect.md)
+- Decisions: [0001 Codex app-server](adr/0001-codex-app-server.md) · [0002 Mac app is a client](adr/0002-mac-app-is-a-client.md) (superseded) · [0003 Hermes remote harness](adr/0003-hermes-remote-harness.md) · [0004 Supabase sync](adr/0004-supabase-sync.md) · [0005 One execution owner](adr/0005-one-execution-owner.md) · [0006 Linux app is a window](adr/0006-linux-app-is-a-window.md) (superseded) · [0007 Google sign-in through Clerk](adr/0007-google-sign-in-through-clerk.md) · [0008 Cloudflare relay](adr/0008-cloudflare-relay.md) · [0009 Omni Connect](adr/0009-omni-connect.md) · [0010 Desktop app is Electron](adr/0010-desktop-app-is-electron.md)
 
 ## Where a new doc goes
 

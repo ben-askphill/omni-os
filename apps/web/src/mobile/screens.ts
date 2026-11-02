@@ -81,6 +81,7 @@ export function screenOf(r: Route): ScreenKey {
     case 'automations':
     case 'new-channel':
       return 'page';
+    case 'quick-prompt':
     case 'notfound':
       return 'notfound';
   }

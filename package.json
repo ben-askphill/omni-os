@@ -19,6 +19,8 @@
     "import-history": "npm run import-history --workspace @omni/server --",
     "build:slash": "npm run build:slash --workspace @omni/mac",
     "build:pick": "npm run build:pick --workspace @omni/mac",
+    "desktop:dist": "npm run dist --workspace @omni/desktop --",
+    "build:desktop": "scripts/build-desktop.sh",
     "sync:backfill": "npm run sync:backfill --workspace @omni/server --",
     "brain-export": "npm run brain-export --workspace @omni/server --",
     "setup": "npm run setup --workspace @omni/server --",

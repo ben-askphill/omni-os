@@ -8,7 +8,8 @@ import { holds } from '../thread-history.ts';
 import { useInterrupt, useTurnState } from './threadTurn.ts';
 import { useThreadHistory } from './useThreadHistory.ts';
 
-export type PanelTab = 'details' | 'prs' | 'artifacts' | 'changes' | 'browser' | 'terminal' | 'actions';
+/** `web` is the desktop app's own browser (NativeBrowser.tsx), offered only when its bridge is there. */
+export type PanelTab = 'details' | 'prs' | 'artifacts' | 'changes' | 'browser' | 'web' | 'terminal' | 'actions';
 
 /**
  * The later of two snapshots of the thread. A send's reply can land after the stream has already
@@ -63,8 +64,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     artifactIds.current.add(a.id);
     if (isNew && a.kind === 'html') {
       setSelected(a.id);
-      // Never pull Ben out of the shell mid-command, the changes he is reading, a run's output or his PRs.
-      setPanelTab((t) => (t === 'terminal' || t === 'changes' || t === 'actions' || t === 'prs' ? t : 'artifacts'));
+      // Never pull Ben out of the shell mid-command, the changes he is reading, a run's output, his PRs or his own browser.
+      setPanelTab((t) => (t === 'terminal' || t === 'changes' || t === 'actions' || t === 'prs' || t === 'web' ? t : 'artifacts'));
     }
     setArtifacts((prev) => (prev.some((x) => x.id === a.id) ? prev.map((x) => (x.id === a.id ? a : x)) : [...prev, a]));
   }, []);

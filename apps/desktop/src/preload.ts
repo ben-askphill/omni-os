@@ -25,8 +25,6 @@ const bridge: DesktopBridge = {
   },
   openWindow: (route) => send('omni:open-window', route),
   focus: () => send('omni:focus'),
-  openPath: (path) => invoke('omni:open-path', path),
-  showInFolder: (path) => send('omni:show-in-folder', path),
   setAppearance: (mode) => send('omni:appearance', mode),
   settings: {
     get: () => invoke('omni:settings:get'),
@@ -34,6 +32,9 @@ const bridge: DesktopBridge = {
   },
   quickPrompt: {
     done: (route) => send('omni:quick-prompt:done', route),
+    status: () => invoke('omni:quick-prompt:status'),
+    open: () => send('omni:quick-prompt:open'),
+    resize: (height) => send('omni:quick-prompt:resize', height),
   },
   wispr: (action) => send('omni:wispr', action),
   updates: {
@@ -45,7 +46,10 @@ const bridge: DesktopBridge = {
     info: () => invoke('omni:server:info'),
     showLog: () => send('omni:server:show-log'),
   },
-  nativeBrowser: boot.nativeBrowser,
+  nativeBrowser: {
+    ...boot.nativeBrowser,
+    capture: (webContentsId) => invoke('omni:native-browser:capture', webContentsId),
+  },
 };
 
 contextBridge.exposeInMainWorld('omniDesktop', bridge);

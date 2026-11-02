@@ -1,7 +1,107 @@
-// The application menu.
-import { Menu } from 'electron';
+// The application menu (menu-template.ts), rebuilt when the server or the zoom changes so each item's enabled
+// state is right. Commands go to the focused Omni window's page, which carries them out (DesktopHooks.tsx).
+import { app, Menu, shell } from 'electron';
+import { existsSync } from 'node:fs';
+import { clampZoom, ZOOM_STEP, type DesktopCommand } from '@omni/shared/desktop-bridge.ts';
+import { openActivityMonitor } from './activity-monitor.ts';
+import type { BackendState } from './backend/index.ts';
 import type { AppContext } from './context.ts';
+import { EVENT } from './ipc.ts';
+import { commandRoute, menuTemplate, type MenuActions, type ServerMenuState } from './menu-template.ts';
+import { openQuickPrompt } from './quick-prompt.ts';
+import { retryFromMenu } from './server-screen.ts';
+import { applyZoom, focusedOmniWindow } from './windows.ts';
 
-export function installMenu(_ctx: AppContext): void {
-  Menu.setApplicationMenu(Menu.getApplicationMenu());
+function serverState(state: BackendState): ServerMenuState {
+  switch (state.kind) {
+    case 'idle':
+    case 'starting':
+      return 'starting';
+    case 'ready':
+      return 'ready';
+    case 'restarting':
+      return 'restarting';
+    case 'failed':
+      return 'failed';
+    case 'stopped':
+      return 'stopped';
+  }
+}
+
+/** Has the focused Omni window carry out a command. With none open, the main window opens where the command leads. */
+export function sendCommand(ctx: AppContext, command: DesktopCommand): void {
+  const win = focusedOmniWindow(ctx);
+  if (win) {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    win.webContents.send(EVENT, { type: 'command', command });
+    return;
+  }
+  if (ctx.backend.current.kind === 'ready') ctx.showMain(commandRoute(command) ?? undefined);
+}
+
+export function installMenu(ctx: AppContext): void {
+  app.setAboutPanelOptions({
+    applicationName: 'Omni',
+    applicationVersion: app.getVersion(),
+    ...(ctx.paths.icon && process.platform !== 'darwin' ? { iconPath: ctx.paths.icon } : {}),
+  });
+
+  const zoom = (to: 'in' | 'out' | 'reset') => {
+    const current = ctx.settings.get().zoom;
+    const next = to === 'reset' ? 1 : clampZoom(current + (to === 'in' ? ZOOM_STEP : -ZOOM_STEP));
+    if (next !== current) ctx.settings.update({ zoom: next });
+  };
+
+  const history = (step: 'back' | 'forward') => {
+    const nav = focusedOmniWindow(ctx)?.webContents.navigationHistory;
+    if (!nav) return;
+    if (step === 'back' && nav.canGoBack()) nav.goBack();
+    if (step === 'forward' && nav.canGoForward()) nav.goForward();
+  };
+
+  const actions: MenuActions = {
+    command: (command) => sendCommand(ctx, command),
+    quickPrompt: () => openQuickPrompt(ctx),
+    newWindow: () => {
+      if (ctx.backend.current.kind === 'ready') ctx.openWindow('#/');
+    },
+    zoom,
+    back: () => history('back'),
+    forward: () => history('forward'),
+    restartServer: () => {
+      if (ctx.backend.current.kind === 'failed') retryFromMenu(ctx);
+      else void ctx.backend.restart();
+    },
+    showServerLog: () => {
+      void shell.openPath(ctx.backend.config.logFile);
+    },
+    activityMonitor: () => openActivityMonitor(ctx),
+  };
+
+  const build = () => {
+    const template = menuTemplate(
+      {
+        platform: process.platform === 'darwin' || process.platform === 'win32' ? process.platform : 'linux',
+        packaged: app.isPackaged,
+        port: ctx.backend.config.port,
+        server: serverState(ctx.backend.current),
+        startedHere: ctx.backend.info().startedHere,
+        zoom: ctx.settings.get().zoom,
+        logExists: existsSync(ctx.backend.config.logFile),
+      },
+      actions,
+    );
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  };
+
+  build();
+  ctx.backend.onState(build);
+  ctx.settings.onChange((next, previous) => {
+    if (next.zoom !== previous.zoom) {
+      applyZoom(next.zoom);
+      build();
+    }
+  });
 }

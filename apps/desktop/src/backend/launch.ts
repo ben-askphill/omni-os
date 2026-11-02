@@ -118,8 +118,9 @@ export type Decision = { action: 'start' } | { action: 'attach' } | { action: 'f
 function sentence(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return trimmed;
+  const capital = trimmed[0].toUpperCase() + trimmed.slice(1);
   const last = trimmed[trimmed.length - 1];
-  return last === '.' || last === '!' || last === '?' ? trimmed : `${trimmed}.`;
+  return last === '.' || last === '!' || last === '?' ? capital : `${capital}.`;
 }
 
 export function decide(probe: Probe, port: number): Decision {
@@ -194,29 +195,33 @@ export interface WaitInput {
   cancelled: () => boolean;
 }
 
-export async function waitForReady(input: WaitInput): Promise<{ ok: true } | { ok: false; message: string }> {
+export type WaitResult = { ok: true } | { ok: false; message: string; logTail: string };
+
+export async function waitForReady(input: WaitInput): Promise<WaitResult> {
+  const fail = (message: string): WaitResult => ({ ok: false, message, logTail: input.logTail().trim() });
   let last: Probe = { kind: 'free' };
   for (let i = 0; i < input.attempts; i++) {
-    if (input.cancelled()) return { ok: false, message: 'Start cancelled.' };
+    if (input.cancelled()) return { ok: false, message: 'Start cancelled.', logTail: '' };
     const code = input.exited();
-    if (code !== null) {
-      const why = code === 0 ? 'The server stopped while starting.' : `The server stopped while starting, with exit code ${code}.`;
-      const tail = input.logTail().trim();
-      return { ok: false, message: tail ? `${why}\n${tail}` : why };
-    }
+    if (code !== null) return fail(code === 0 ? 'The server stopped while starting.' : `The server stopped while starting, with exit code ${code}.`);
     last = await input.probe();
     if (last.kind === 'omni') return { ok: true };
     if (last.kind === 'not-omni' || last.kind === 'not-this-install') {
       const decision = decide(last, input.port);
-      return { ok: false, message: decision.action === 'fail' ? decision.message : 'The server on that port is not this install.' };
+      return fail(decision.action === 'fail' ? decision.message : 'The server on that port is not this install.');
     }
     await input.sleep(250);
   }
   if (last.kind === 'no-token') {
     const decision = decide(last, input.port);
-    return { ok: false, message: decision.action === 'fail' ? decision.message : 'This data dir has no token yet.' };
+    return fail(decision.action === 'fail' ? decision.message : 'This data dir has no token yet.');
   }
-  return { ok: false, message: 'The server did not answer within 30 seconds.' };
+  return fail('The server did not answer within 30 seconds.');
+}
+
+/** Why the server stopped on its own after it was ready. */
+export function exitMessage(code: number): string {
+  return code === 0 ? 'The server stopped.' : `The server stopped with exit code ${code}.`;
 }
 
 function assertNever(value: never): never {

@@ -25,6 +25,11 @@ export interface SettingsSectionDef {
   blurb: string;
   /** Shows the channel scope picker. */
   scoped?: boolean;
+  /**
+   * Only in the desktop app (apps/desktop), where the Web UI has its bridge. A browser, the phone layout and the Mac
+   * app never list it, and the Mac app's fixture leaves it out.
+   */
+  desktopApp?: boolean;
 }
 
 /** In nav order. */
@@ -42,6 +47,7 @@ export const SETTINGS_SECTION_DEFS = [
   { id: 'access', group: 'connections', title: 'Sharing & access', icon: 'lock', blurb: 'Who and what can reach this Omni: Google sign-in, Omni Connect, Tailscale and MCP.' },
   { id: 'integrations', group: 'connections', title: 'Integrations', icon: 'switchboard', blurb: 'Hermes and the central brain.' },
   { id: 'secrets', group: 'connections', title: 'Secrets', icon: 'key', blurb: 'API keys and tokens for the crew, stored outside the database.', scoped: true },
+  { id: 'desktop', group: 'app', title: 'Desktop app', icon: 'monitor', blurb: 'Quick Prompt, opening at login, zoom and updates for this app.', desktopApp: true },
   { id: 'about', group: 'app', title: 'About', icon: 'info', blurb: 'Version, build and where Omni keeps its files.' },
 ] as const satisfies readonly SettingsSectionDef[];
 
@@ -49,7 +55,11 @@ export type SettingsSectionId = (typeof SETTINGS_SECTION_DEFS)[number]['id'];
 export const SETTINGS_SECTION_IDS: readonly SettingsSectionId[] = SETTINGS_SECTION_DEFS.map((s) => s.id);
 export const isSettingsSectionId = (s: string | undefined | null): s is SettingsSectionId => (SETTINGS_SECTION_IDS as readonly string[]).includes(s ?? '');
 export const sectionDef = (id: SettingsSectionId): SettingsSectionDef => SETTINGS_SECTION_DEFS.find((s) => s.id === id)!;
-export const sectionsIn = (group: SettingsGroupId): readonly SettingsSectionDef[] => SETTINGS_SECTION_DEFS.filter((s) => s.group === group);
+/** A group's sections in nav order. A desktop-app section only with `desktopApp`; every list says which it is. */
+export const sectionsIn = (group: SettingsGroupId, opts: { desktopApp: boolean }): readonly SettingsSectionDef[] =>
+  SETTINGS_SECTION_DEFS.filter((s: SettingsSectionDef) => s.group === group && (!s.desktopApp || opts.desktopApp));
+/** Whether a section shows here: a desktop-app one only in the desktop app. */
+export const sectionShows = (id: SettingsSectionId, desktopApp: boolean): boolean => desktopApp || !sectionDef(id).desktopApp;
 
 /**
  * Old names that still open a section: the pages Settings replaced (#/sync, #/storage, #/secrets) and the Mac's tab
@@ -67,7 +77,8 @@ export const LEGACY_SETTINGS_SECTIONS: Record<string, SettingsSectionId> = {
 export const settingsSectionNamed = (name: string | undefined | null): SettingsSectionId | null =>
   isSettingsSectionId(name) ? name : name && Object.hasOwn(LEGACY_SETTINGS_SECTIONS, name) ? LEGACY_SETTINGS_SECTIONS[name] : null;
 
-export type SettingsSurface = 'web' | 'mac';
+/** `desktop`: the Web UI in the desktop app (apps/desktop). It finds everything `web` does, and its own section. */
+export type SettingsSurface = 'web' | 'mac' | 'desktop';
 
 /** One thing a search finds. `id` is also the anchor a client scrolls to: `setting-<id>` on the web. */
 export interface SettingsEntry {
@@ -114,6 +125,10 @@ export const SETTINGS_ENTRIES = [
   { id: 'hermes', section: 'integrations', title: 'Hermes URL', keywords: ['hermes', 'tailnet', 'HERMES_API_KEY'] },
   { id: 'brain', section: 'integrations', title: 'Central brain folder', keywords: ['notes', 'brain-nightly', 'export', 'digests'] },
   { id: 'secrets', section: 'secrets', title: 'Secrets', keywords: ['api key', 'token', 'env', 'keychain', 'password', 'credentials', 'grok bot'] },
+  { id: 'desktop-quick-prompt', section: 'desktop', title: 'Quick Prompt', keywords: ['hotkey', 'shortcut', 'keyboard', 'global', 'launcher', 'wispr flow', 'dictate'], surfaces: ['desktop'] },
+  { id: 'desktop-login', section: 'desktop', title: 'Open Omni at login', keywords: ['startup', 'launch', 'login items', 'autostart'], surfaces: ['desktop'] },
+  { id: 'desktop-zoom', section: 'desktop', title: 'Zoom', keywords: ['text size', 'scale', 'bigger', 'smaller', 'font size'], surfaces: ['desktop'] },
+  { id: 'desktop-app', section: 'desktop', title: 'App version, server and updates', keywords: ['version', 'update', 'log', 'data folder', 'server', 'relaunch'], surfaces: ['desktop'] },
   { id: 'version', section: 'about', title: 'Version and build', keywords: ['version', 'commit', 'build', 'update', 'release'] },
   { id: 'files', section: 'about', title: 'Where Omni keeps its files', keywords: ['data folder', 'config file', 'omni.config.json', 'secret store', 'logs'] },
 ] as const satisfies readonly SettingsEntry[];
@@ -133,7 +148,7 @@ export function searchSettings(query: string, surface: SettingsSurface): Setting
   const scored: { e: SettingsEntry; score: number; i: number }[] = [];
   const order = (e: SettingsEntry) => SETTINGS_SECTION_IDS.indexOf(e.section) * 100;
   SETTINGS_ENTRIES.forEach((e: SettingsEntry, i) => {
-    if (e.surfaces && !e.surfaces.includes(surface)) return;
+    if (e.surfaces && !e.surfaces.includes(surface) && !(surface === 'desktop' && e.surfaces.includes('web'))) return;
     const title = fold(e.title);
     const section = fold(sectionDef(e.section).title);
     const keys = e.keywords.map(fold);

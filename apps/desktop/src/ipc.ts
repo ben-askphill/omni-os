@@ -7,6 +7,8 @@ import type {
   DesktopSettings,
   DesktopSettingsPatch,
   DesktopUpdateView,
+  NativeBrowserShot,
+  QuickPromptStatus,
 } from '@omni/shared/desktop-bridge.ts';
 
 /** Answered once, synchronously, as the preload runs: the facts the bridge exposes as plain properties. */
@@ -25,19 +27,21 @@ export const EVENT = 'omni:event';
 export interface InvokeChannels {
   'omni:settings:get': { args: []; result: DesktopSettings };
   'omni:settings:set': { args: [DesktopSettingsPatch]; result: DesktopSettings };
-  'omni:open-path': { args: [string]; result: string };
   'omni:updates:get': { args: []; result: DesktopUpdateView };
   'omni:updates:check': { args: []; result: DesktopUpdateView };
   'omni:server:info': { args: []; result: DesktopServerInfo };
+  'omni:quick-prompt:status': { args: []; result: QuickPromptStatus };
+  'omni:native-browser:capture': { args: [webContentsId: number]; result: NativeBrowserShot };
 }
 
 /** One way, page to main, through ipcRenderer.send and ipcMain.on. */
 export interface SendChannels {
   'omni:open-window': [route: string];
   'omni:focus': [];
-  'omni:show-in-folder': [path: string];
   'omni:appearance': [mode: 'system' | 'light' | 'dark'];
   'omni:quick-prompt:done': [route?: string];
+  'omni:quick-prompt:open': [];
+  'omni:quick-prompt:resize': [height: number];
   'omni:wispr': [action: 'start' | 'stop'];
   'omni:updates:install': [];
   'omni:server:show-log': [];

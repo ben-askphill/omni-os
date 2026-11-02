@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RENDER_COLORS, RENDER_OTHER, type FrameTheme } from '@omni/shared/html-render.ts';
+import { desktop } from '../desktop.ts';
 import { readPref, writePref } from '../store.tsx';
 
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -22,12 +23,15 @@ let current: ThemePref = (() => {
   const v = readPref<unknown>('theme', 'system');
   return valid(v) ? v : 'system';
 })();
+// The desktop app draws its own window chrome and menus in the theme the page picked.
+desktop?.setAppearance(current);
 const listeners = new Set<(t: ThemePref) => void>();
 
 export function setTheme(t: ThemePref) {
   current = t;
   writePref('theme', t);
   apply(t);
+  desktop?.setAppearance(t);
   listeners.forEach((fn) => fn(t));
 }
 

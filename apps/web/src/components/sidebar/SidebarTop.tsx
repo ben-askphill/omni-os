@@ -24,7 +24,8 @@ export function SidebarTop({
   const { openThread } = useApp();
   return (
     <>
-      <div className="flex h-14 items-center justify-between pr-3 pl-5">
+      {/* desktop-titlebar: the desktop app's macOS window drags by this row, with its traffic lights at the left (index.css). */}
+      <div className="desktop-titlebar flex h-14 items-center justify-between pr-3 pl-5">
         <a href={href.home()} onClick={onNavigate} aria-label="Omni home" className="wordmark-write">
           <Wordmark size={18} />
         </a>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { searchSettings, sectionDef, sectionsIn, SETTINGS_GROUPS, type SettingsSectionId } from '@omni/shared/settings-catalog.ts';
+import { desktop } from '../desktop.ts';
 import { href, navigate } from '../router.ts';
 import { Icon, type IconName } from './ui.tsx';
 
@@ -9,7 +10,7 @@ import { Icon, type IconName } from './ui.tsx';
 
 export function SettingsNav({ section }: { section: SettingsSectionId }) {
   const [q, setQ] = useState('');
-  const hits = searchSettings(q, 'web');
+  const hits = searchSettings(q, desktop ? 'desktop' : 'web');
   const open = (s: SettingsSectionId, focus?: string) => {
     setQ('');
     navigate(href.settingsSection(s, focus));
@@ -48,7 +49,7 @@ export function SettingsNav({ section }: { section: SettingsSectionId }) {
           <div key={g.id}>
             {g.title && <div className="caption mb-1 px-3">{g.title}</div>}
             <ul className="space-y-0.5">
-              {sectionsIn(g.id).map((d) => {
+              {sectionsIn(g.id, { desktopApp: desktop !== null }).map((d) => {
                 const current = d.id === section;
                 return (
                   <li key={d.id}>

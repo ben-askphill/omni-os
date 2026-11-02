@@ -16,6 +16,9 @@ export const BUNDLED = import.meta.url.endsWith('.mjs');
  * which acts as Node only when told, and a child started with process.execPath is that same binary.
  */
 export const nodeChildEnv: Record<string, string> = process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {};
+// The variable was for this process. Left in process.env, every harness, terminal and action would inherit it, and an
+// Electron app run from a thread would start as plain Node.
+delete process.env.ELECTRON_RUN_AS_NODE;
 
 // Minimal .env loader so a server the Mac or Linux app starts and `npm run dev` read the same config.
 const envFile = join(ROOT, '.env');

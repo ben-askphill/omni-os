@@ -56,7 +56,6 @@ export function writeNodeShim(dir: string, binary: string): string {
 
 export interface Spawned {
   pid: number;
-  startedAt: number;
   /** The exit code once it exited, else null. */
   exited: () => number | null;
   onExit: (listener: (code: number) => void) => void;
@@ -81,7 +80,6 @@ export function spawnServer(input: { command: string; args: string[]; cwd: strin
     if (!child.pid) throw new Error('Could not start the server.');
     return {
       pid: child.pid,
-      startedAt: Date.now(),
       exited: () => code,
       onExit: (listener) => {
         if (code !== null) listener(code);

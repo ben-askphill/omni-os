@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { SETTINGS_SECTION_DEFS } from '@omni/shared/settings-catalog.ts';
+import { sectionShows, SETTINGS_SECTION_DEFS } from '@omni/shared/settings-catalog.ts';
 import { relTime } from '@omni/shared/format.ts';
 import type { ChannelWithRunning, Thread, ThreadStub } from '../../api.ts';
+import { desktop } from '../../desktop.ts';
 import { href, navigate, startNewThread, type Route } from '../../router.ts';
 import { setTheme } from '../theme.tsx';
 import { Avatar, Icon, StatusDot, type IconName } from '../ui.tsx';
@@ -42,7 +43,7 @@ export function paletteItems(q: string, channels: ChannelWithRunning[], recent: 
     { id: 'p:automations', group: 'Go to', label: 'Automations', lead: lead('zap'), run: () => go(href.automations()) },
     { id: 'p:settings', group: 'Go to', label: 'Settings', sub: 'General: you and setup', lead: lead('sliders'), run: () => go(href.settingsPage()) },
     // Every other Settings section by name, as the Settings nav lists them.
-    ...SETTINGS_SECTION_DEFS.filter((d) => d.id !== 'general').map<Item>((d) => ({
+    ...SETTINGS_SECTION_DEFS.filter((d) => d.id !== 'general' && sectionShows(d.id, desktop !== null)).map<Item>((d) => ({
       id: `p:${d.id}`,
       group: 'Go to',
       label: d.title,

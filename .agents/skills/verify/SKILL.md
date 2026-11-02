@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Use to check your own work in Omni OS whenever you change apps/server/, apps/web/, packages/shared/, apps/mac/ or apps/mcp/ code, before you say it is done or open a PR. Runs the checks, starts a throwaway stack, drives it and proves the change. Use it aggressively.
+description: Use to check your own work in Omni OS whenever you change apps/server/, apps/web/, apps/desktop/, packages/shared/, apps/mac/ or apps/mcp/ code, before you say it is done or open a PR. Runs the checks, starts a throwaway stack, drives it and proves the change. Use it aggressively.
 ---
 
 # Verify your change in Omni OS
@@ -10,11 +10,12 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 ## 1. Static checks (every change)
 
 - `npm run typecheck`
-- `npm test` (turbo boundaries, then every package's vitest), or one package: `npx turbo run test --filter=@omni/<server|web|shared|mac>`, or one file while iterating: `cd apps/server && npx vitest run tests/<file>.test.ts` (each package has its own `vitest.config.ts`).
+- `npm test` (turbo boundaries, then every package's vitest), or one package: `npx turbo run test --filter=@omni/<server|web|desktop|shared|mac>`, or one file while iterating: `cd apps/server && npx vitest run tests/<file>.test.ts` (each package has its own `vitest.config.ts`).
 - A failing test: rerun it on `main` (`git stash; git checkout main; npx vitest run ...`) before treating it as yours. The whole suite passes on macOS and Linux, so a failure that main does not show is yours.
 - `npm run build` for web changes. Run it alone, not chained after other commands.
 - Changed a slash module in `packages/shared/`: `npm run build:slash`. Changed `packages/shared/browser-pick-*.ts`: `npm run build:pick`.
-- Mac code (macOS only): `npm run test:mac`.
+- Desktop app: `cd apps/desktop && npx vitest run && npx tsc --noEmit`.
+- Mac code, until the cutover deletes `apps/mac` (macOS only): `npm run test:mac`.
 
 ## 2. Run it
 
@@ -32,7 +33,8 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 - With `omni-browser`, take a `browser_snapshot` before clicking. Pass the exact snapshot reference as `target` to `browser_click`; `element` is only a description, and `ref` is not a supported argument. For a selector, pass a valid unique CSS selector as `target`.
 - Omit the `omni-browser` screenshot filename to save in the thread's browser folder. An explicit relative filename saves in the working directory instead. Do not pass an absolute path in `/tmp` or another directory outside the thread's browser folder and worktree. Read or copy the exact returned path, then put a copy in `shots/` for `scripts/pr-screenshots.sh`.
 - Server: curl the route and read the response. Then check the side effect: the row in the QA db, the feed event (`curl -N localhost:4757/api/feed`), the line in `scripts/qa-stack.sh logs`.
-- Mac: the Debug app's QA harness (`-OmniQAScript`, see "QA harness" in `apps/mac/NOTES.md`) points the app at :4757 and snapshots windows.
+- Desktop app: `cd apps/desktop && npx tsx scripts/qa.ts --script run.json --out <scratch>/qa` launches the Electron app with Playwright, attaches it to the stack (`"port"` and `"dataDir"` in the script, the stack's `$QA_DIR/data`), runs the steps and writes PNGs and `qa.json`. It exits non-zero on a failed step and refuses :4747 and a checkout's `data/`. The steps and flags are under "QA harness" in `apps/desktop/README.md`. Add `--app-url http://127.0.0.1:<vite port>` with a Vite on `127.0.0.1` in front of the stack to see a Web UI change; the server alone serves the last build of `apps/web/dist`. `--app <path>` runs a packaged build instead of the dev one.
+- Mac app, until the cutover: the Debug app's QA harness (`-OmniQAScript`, see "QA harness" in `apps/mac/NOTES.md`) points the app at :4757 and snapshots windows.
 
 ## 4. Prove it
 
@@ -58,6 +60,9 @@ Known blockers:
 - A fresh worktree has no `node_modules`, so `@omni/server` types resolve to the main checkout's copy and typecheck misses (or invents) errors in your change. Tests do the same: `@omni/test-fixtures` resolves to main's fake CLIs, so a new fixture directive silently does nothing. Run `npm ci --include=dev` in the worktree first (agent shells set `NODE_ENV=production`).
 - The Mac QA harness pointed at a `qa-stack.sh` server shows "Port answers, but not as this install's Omni": in QA mode the app reads the token from `<-OmniQAOut>/data/api-token`, not the stack's. Copy it there first (`mkdir -p "$OUT/data"; install -m 600 "$QA_DIR/data/api-token" "$OUT/data/api-token"`) and launch with `env -u OMNI_TOKEN`.
 - `qa-stack.sh`'s `security` wrapper passes every call but the Cursor key to the real login Keychain, so saving a secret on a QA stack (Secrets, or a webhook's Set secret) writes it to Ben's Keychain. After `up`, overwrite `$QA_DIR/bin/security` with a stub (`-i` reads stdin and exits 0; `find-generic-password` prints a fixed value for the names you test) before saving any.
+- The desktop QA harness only attaches. "no QA server on port N that owns <dir>" means the stack is not up or `dataDir` is not its `$QA_DIR/data`. It never starts a server itself, since one started from the checkout would run the real harness CLIs.
+- Desktop QA on a tiling window manager (Hyprland, Omarchy): the manager sizes the app's windows, so a `size` step or the script's `size` may not hold once a second window opens. `qa.json`'s `facts.windows[].bounds` shows what the window got.
+- In the desktop QA harness, a `{"click": "text=Skip setup"}` on a fresh stack's onboarding leaves the window on the Conductor's welcome thread. Route back with `{"route": "#/"}`.
 - Mac QA runs read and write the real app's drafts (`~/Library/Application Support/Omni/Drafts`), so text or context left unsent in one run is in the reply box on the next. Delete that thread's `reply%3A<id>.txt` and `context%3A<id>.txt` (the id percent-encoded) between runs and after the last one.
 - The thread's Browser panel says "The live browser is off" on a default QA stack. Start it with `QA_BROWSER=1 scripts/qa-stack.sh up` (it launches a real Chrome for the channel).
 - A web view in a Mac QA window stops painting a few seconds after it loads (the window is never on screen), so `cacheDisplay` drew the Web tab's page blank. `snapshot` now lays each shown web view's own `takeSnapshot` over it while it draws. For the same reason the page's `requestAnimationFrame` and scroll events wait for a frame that never comes; `{"annotate": {"pageScroll": n}}` forces one.

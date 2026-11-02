@@ -1289,3 +1289,36 @@ html:has(.mo-app) body {
 .md .mermaid-diagram > div { padding: 12px 14px; }
 .md .mermaid-diagram svg { display: block; height: auto; max-width: 100%; margin: auto; }
 .md .mermaid-diagram pre { margin: 0; border: 0; }
+
+/* ---- the desktop app's own title bar on macOS (apps/desktop/src/windows.ts: hiddenInset) ----
+   The window has no title bar: it drags by the chrome around the panes and by the sidebar's top row, where the
+   traffic lights sit. Every control inside a drag area opts out, or it would take no clicks. */
+[data-desktop="darwin"] .desktop-shell {
+  -webkit-app-region: drag;
+}
+[data-desktop="darwin"] .desktop-shell > * {
+  -webkit-app-region: no-drag;
+}
+[data-desktop="darwin"] .desktop-titlebar {
+  -webkit-app-region: drag;
+  padding-left: 84px;
+}
+[data-desktop="darwin"] .desktop-titlebar :is(a, button, input, select, textarea, [role="button"]) {
+  -webkit-app-region: no-drag;
+}
+/* The phone layout, in a narrow window: a strip above it for the traffic lights, to drag the window by
+   (apps/web/src/desktop.ts adds it). */
+.desktop-drag-strip {
+  display: none;
+}
+[data-desktop="darwin"] body:has(.mo-app) .desktop-drag-strip {
+  display: block;
+  position: fixed;
+  inset: 0 0 auto;
+  height: 28px;
+  -webkit-app-region: drag;
+}
+[data-desktop="darwin"] .mo-app {
+  top: 28px;
+  max-height: calc(100% - 28px);
+}

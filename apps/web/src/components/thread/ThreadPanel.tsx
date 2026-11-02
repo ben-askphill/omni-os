@@ -1,8 +1,9 @@
-import { lazy, Suspense, type ComponentProps } from 'react';
+import { lazy, Suspense, useState, type ComponentProps } from 'react';
 import type { Artifact, Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { plural } from '../../format.ts';
 import { crewLine, prLine } from '@omni/shared/thread-glance.ts';
+import { desktop } from '../../desktop.ts';
 import { IconButton, Loading, Segmented, StatusDot } from '../ui.tsx';
 import { ActionsTab } from './panel/ActionsTab.tsx';
 import { ArtifactsTab } from './panel/ArtifactsTab.tsx';
@@ -13,6 +14,8 @@ import { PRsTab } from './panel/PRsTab.tsx';
 
 // xterm.js is large; load it the first time the tab opens.
 const TerminalView = lazy(() => import('../TerminalView.tsx').then((m) => ({ default: m.TerminalView })));
+// The desktop app's Web tab, which a browser or a phone never loads.
+const NativeBrowser = lazy(() => import('../NativeBrowser.tsx').then((m) => ({ default: m.NativeBrowser })));
 
 type Details = ComponentProps<typeof DetailsTab>;
 type PRs = ComponentProps<typeof PRsTab>;
@@ -47,6 +50,10 @@ export function ThreadPanel({
   prs: Omit<PRs, 'thread'>;
 }) {
   const { agents } = details;
+  // The channel whose Web tab was opened. It stays mounted while another tab shows, as the Mac app kept its page: the
+  // page, a form half filled in and a sign-in midway live only in it.
+  const [webFor, setWebFor] = useState<string | null>(null);
+  if (tab === 'web' && webFor !== thread.channel_id) setWebFor(thread.channel_id);
   const pr = prs.data?.pr;
   const line = pr ? prLine(pr) : null;
   const crew = prs.data?.crew ?? [];
@@ -82,6 +89,7 @@ export function ThreadPanel({
               { id: 'artifacts', icon: 'layers', title: 'Artifacts', badge: files.length ? <span className="font-num text-[10.5px] text-fg-4">{files.length}</span> : undefined },
               { id: 'changes', icon: 'diff', title: 'Changes' },
               { id: 'browser', icon: 'browser', title: 'Browser', badge: shots.length ? <span className="font-num text-[10.5px] text-fg-4">{shots.length}</span> : undefined },
+              ...(desktop ? [{ id: 'web' as const, icon: 'globe' as const, title: 'Web' }] : []),
               { id: 'terminal', icon: 'terminal', title: 'Terminal' },
               { id: 'actions', icon: 'play', title: 'Actions' },
             ]}
@@ -95,6 +103,13 @@ export function ThreadPanel({
         {tab === 'artifacts' && <ArtifactsTab artifacts={files} selected={selectedArtifact} onSelect={onSelect} />}
         {tab === 'changes' && <ChangesTab thread={thread} />}
         {tab === 'browser' && <BrowserTab channelId={thread.channel_id} threadId={thread.id} shots={shots} />}
+        {desktop && webFor === thread.channel_id && (
+          <div className={tab === 'web' ? 'h-full' : 'hidden'}>
+            <Suspense fallback={<Loading />}>
+              <NativeBrowser channelId={thread.channel_id} threadId={thread.id} />
+            </Suspense>
+          </div>
+        )}
         {tab === 'terminal' && (
           <Suspense fallback={<Loading />}>
             <TerminalView threadId={thread.id} cwd={thread.cwd} />

@@ -2,6 +2,7 @@
 // Which screens show is derived from the hash (screens.ts); only the open sheet and the toast are local state.
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { BrowserNotifier } from '../components/BrowserNotifier.tsx';
+import { useDesktopLayoutActions } from '../components/DesktopHooks.tsx';
 import { ContextMenuHost } from '../components/ContextMenu.tsx';
 import { Onboarding } from '../components/Onboarding.tsx';
 import { ThreadNotifier } from '../components/Toaster.tsx';
@@ -114,6 +115,10 @@ export function MobileShell() {
 
   useEffect(() => setSheet(null), [hash]);
   useSyncOnReturn();
+  useDesktopLayoutActions({
+    newThread: () => setSheet({ name: 'new', channel: route.name === 'channel' ? route.id : undefined }),
+    goTo: () => setSheet((s) => (s?.name === 'search' ? null : { name: 'search' })),
+  });
   usePageTitle(route);
 
   const back = useCallback(() => {

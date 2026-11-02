@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { searchSettings, sectionDef, sectionsIn, SETTINGS_GROUPS, type SettingsSectionId } from '@omni/shared/settings-catalog.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { useApi, type Automation, type SyncStatus } from '../api.ts';
+import { desktop } from '../desktop.ts';
 import { DeviceLabel } from '../components/DeviceLabel.tsx';
 import { Icon, type IconName } from '../components/ui.tsx';
 import { href } from '../router.ts';
@@ -31,7 +32,7 @@ export function SettingsScreen() {
   const host = status?.device?.name || location.hostname;
   const secretStore = useSecretStoreLabel();
   const [q, setQ] = useState('');
-  const hits = searchSettings(q, 'web');
+  const hits = searchSettings(q, desktop ? 'desktop' : 'web');
   const open = (section: SettingsSectionId, focus?: string) => shell.open(href.settingsSection(section, focus));
   const automationsSub = automations.error ?? (automations.data ? (automations.data.length ? `${automations.data.length} on ${host || 'this machine'}` : 'None yet') : 'Loading');
 
@@ -86,7 +87,7 @@ export function SettingsScreen() {
         ) : (
           <>
             {SETTINGS_GROUPS.map((g) => {
-              const list = sectionsIn(g.id);
+              const list = sectionsIn(g.id, { desktopApp: desktop !== null });
               return (
                 <MoSection key={g.id} title={g.title || (g.id === 'omni' ? 'Omni' : 'App')}>
                   <MoGroup>

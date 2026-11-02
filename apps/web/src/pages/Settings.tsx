@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { sectionDef, type Provenance } from '@omni/shared/settings-catalog.ts';
+import { sectionDef, sectionShows, type Provenance } from '@omni/shared/settings-catalog.ts';
 import { pageFields, SETTING_PAGES, settingHint, settingId, settingPlaceholder, settingProblem, type SettingField, type SettingPage } from '@omni/shared/settings.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SetupState, type Status, type UserConfig, type UserConfigPatch } from '../api.ts';
@@ -8,6 +8,7 @@ import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
 import { PronounsInput, TimezoneInput } from '../components/Onboarding.tsx';
 import { SettingsNav } from '../components/SettingsNav.tsx';
 import { useTheme } from '../components/theme.tsx';
+import { desktop } from '../desktop.ts';
 import { Avatar, Button, Chip, ErrorNote, Icon, LinkButton, Loading, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
@@ -18,6 +19,7 @@ import { ConnectSection } from './Connect.tsx';
 import { IosPairingSection } from './IosPairing.tsx';
 import { MachinesSection, RunOnCard } from './Machines.tsx';
 import { SecretsSection } from './Secrets.tsx';
+import { DesktopSection } from './SettingsDesktop.tsx';
 import { ModelsSection } from './SettingsAgents.tsx';
 import { StorageSection } from './Storage.tsx';
 import { PathMapEditor, SyncSection } from './Sync.tsx';
@@ -31,13 +33,14 @@ import { Advanced, Card, InfoRow, Origin, Row, ScopeBar, ServerOptions, settingA
 // to data/omni.config.json through PUT /api/setup, as the Mac app's ProfileSettingsView.swift does.
 
 export function SettingsPage({ section, focus }: { section?: SettingsSection; focus?: string }) {
-  const current = section ?? 'general';
+  // The desktop app's own section is no page in a browser or on a phone.
+  const current = section && sectionShows(section, desktop !== null) ? section : 'general';
   const def = sectionDef(current);
   // The pages Settings replaced (#/sync, #/storage, #/secrets) and old section names land here; the address becomes the section's own.
   const hash = useHash();
   useEffect(() => {
-    if (section && hash.split('?')[0] !== settingsHash(section)) navigate(settingsHash(section, focus), { replace: true });
-  }, [hash, section, focus]);
+    if (section && hash.split('?')[0] !== settingsHash(current)) navigate(settingsHash(current, current === section ? focus : undefined), { replace: true });
+  }, [hash, section, current, focus]);
   useFocus(current, focus);
 
   return (
@@ -105,6 +108,8 @@ function SectionBody({ section }: { section: SettingsSection }) {
           <SecretsSection scoped={channel?.id} />
         </div>
       );
+    case 'desktop':
+      return desktop ? <DesktopSection bridge={desktop} /> : null;
     case 'about':
       return <AboutSection />;
   }
@@ -590,9 +595,20 @@ function AppearanceCard() {
           ]}
         />
       </Card>
-      <Card entry="zoom" title="Text size" subtitle="For bigger or smaller text, use the browser's zoom (Cmd + and Cmd -). The Mac app has its own." origin={<Origin of="device" label="This browser only" />}>
-        {null}
-      </Card>
+      {desktop ? (
+        <Card
+          entry="zoom"
+          title="Text size"
+          subtitle="This app has its own zoom, in Desktop app and in the View menu."
+          origin={<LinkButton size="sm" href={href.settingsSection('desktop', 'desktop-zoom')}>Open Desktop app</LinkButton>}
+        >
+          {null}
+        </Card>
+      ) : (
+        <Card entry="zoom" title="Text size" subtitle="For bigger or smaller text, use the browser's zoom (Cmd + and Cmd -). The Mac app has its own." origin={<Origin of="device" label="This browser only" />}>
+          {null}
+        </Card>
+      )}
     </>
   );
 }

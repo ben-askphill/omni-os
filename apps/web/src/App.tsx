@@ -5,13 +5,15 @@ import { Onboarding } from './components/Onboarding.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { BrowserNotifier } from './components/BrowserNotifier.tsx';
-import { DesktopHooks } from './components/DesktopHooks.tsx';
+import { DesktopHooks, useDesktopLayoutActions } from './components/DesktopHooks.tsx';
 import { ThreadNotifier, ToastProvider } from './components/Toaster.tsx';
-import { useRoute } from './router.ts';
+import { startNewThread, useRoute } from './router.ts';
 import { Page } from './pages/Page.tsx';
-import { AppProvider, readPref, useIsMobile, usePageTitle, useSyncOnReturn, writePref } from './store.tsx';
+import { AppProvider, readPref, useApp, useIsMobile, usePageTitle, useSyncOnReturn, writePref } from './store.tsx';
 import { FolderDeleteDialog, FolderProvider } from './folders.tsx';
 import { MobileShell } from './mobile/MobileShell.tsx';
+import { desktop } from './desktop.ts';
+import { QuickPromptPage } from './pages/QuickPrompt.tsx';
 
 const SIDEBAR_WIDTH = 252;
 const SIDEBAR_MIN = 200;
@@ -98,11 +100,13 @@ function Shell() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const { openThread } = useApp();
+  useDesktopLayoutActions({ newThread: () => startNewThread(route, openThread), goTo: openPalette });
   useSyncOnReturn();
   usePageTitle(route);
 
   return (
-    <div className="flex h-full min-h-0 flex-col md:flex-row md:bg-[var(--chrome)] md:py-2 md:pr-2">
+    <div className="desktop-shell flex h-full min-h-0 flex-col md:flex-row md:bg-[var(--chrome)] md:py-2 md:pr-2">
       {/* Desktop sidebar */}
       <SidebarPane>
         <Sidebar onSearch={openPalette} />
@@ -116,7 +120,6 @@ function Shell() {
       <Onboarding />
       <ThreadNotifier />
       <BrowserNotifier />
-      <DesktopHooks />
       <ContextMenuHost />
       <ContinueSheetHost />
       <FolderDeleteDialog />
@@ -126,10 +129,19 @@ function Shell() {
 
 /** Below the md breakpoint the phone layout (apps/web/src/mobile) replaces the sidebar shell. */
 function Shells() {
-  return useIsMobile() ? <MobileShell /> : <Shell />;
+  const mobile = useIsMobile();
+  return (
+    <>
+      <DesktopHooks />
+      {mobile ? <MobileShell /> : <Shell />}
+    </>
+  );
 }
 
 export function App() {
+  // The desktop app's Quick Prompt panel is a page of its own: no sidebar, no shell, none of the shell's live data.
+  const quickPrompt = useRoute().name === 'quick-prompt' && desktop;
+  if (quickPrompt) return <QuickPromptPage bridge={quickPrompt} />;
   return (
     <AppProvider>
       <ToastProvider>

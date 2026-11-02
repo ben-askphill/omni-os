@@ -12,7 +12,9 @@ export type DesktopEvent =
   /** The machine woke from sleep or came back online: worth asking the server to sync. */
   | { type: 'resume' }
   | { type: 'update'; update: DesktopUpdateView }
-  | { type: 'settings'; settings: DesktopSettings };
+  | { type: 'settings'; settings: DesktopSettings }
+  /** To the Quick Prompt panel only. `open`: it was just shown. `shortcut`: its shortcut, pressed while it shows. `hidden`: it was put away. */
+  | { type: 'quick-prompt'; action: 'open' | 'shortcut' | 'hidden' };
 
 /** The Quick Prompt's shortcut choices. Fixed, so none is a key the OS keeps for itself (Cmd-Space is Spotlight). */
 export const QUICK_PROMPT_SHORTCUTS = ['controlOptionSpace', 'optionSpace', 'shiftOptionSpace', 'controlShiftSpace'] as const;
@@ -98,7 +100,7 @@ export function applySettingsPatch(current: DesktopSettings, patch: DesktopSetti
   });
 }
 
-/** The app's own updater (electron-updater). `unsupported` covers dev builds, a Linux install that is not a writable AppImage, and no feed. */
+/** The app's own updater (electron-updater). `unsupported` covers dev builds, an app in a folder it cannot replace itself in, and no feed. */
 export type DesktopUpdateView =
   | { state: 'unsupported'; reason: string }
   | { state: 'idle'; checkedAt: string | null }
@@ -106,7 +108,8 @@ export type DesktopUpdateView =
   | { state: 'downloading'; version: string; percent: number }
   /** Downloaded. Relaunch installs it. */
   | { state: 'ready'; version: string }
-  | { state: 'error'; message: string };
+  /** `downloadUrl`: the page with the latest build, to get it by hand while the app cannot update itself. */
+  | { state: 'error'; message: string; downloadUrl?: string };
 
 export interface DesktopServerInfo {
   port: number;
@@ -128,9 +131,6 @@ export interface DesktopBridge {
   openWindow(route: string): void;
   /** Brings this window forward, as a notification click should. */
   focus(): void;
-  /** Opens a local file or folder with its default app. Resolves to an error message, or '' when it opened. */
-  openPath(path: string): Promise<string>;
-  showInFolder(path: string): void;
   /** Keeps the native window chrome and menus on the theme the Web UI picked. */
   setAppearance(mode: 'system' | 'light' | 'dark'): void;
   settings: {
@@ -140,6 +140,11 @@ export interface DesktopBridge {
   quickPrompt: {
     /** Closes the Quick Prompt panel. With a route, the main window opens there. */
     done(route?: string): void;
+    status(): Promise<QuickPromptStatus>;
+    /** Shows the panel, as its shortcut does. */
+    open(): void;
+    /** The panel's page asks for its height in CSS pixels, so the panel fits the prompt as it grows. */
+    resize(height: number): void;
   };
   /** Starts or stops Wispr Flow hands-free dictation (macOS). */
   wispr(action: 'start' | 'stop'): void;
@@ -157,5 +162,52 @@ export interface DesktopBridge {
   nativeBrowser: {
     partition: string;
     preload: string;
+    /** A screenshot of the visible page of this window's `<webview>`, by its `getWebContentsId()`. */
+    capture(webContentsId: number): Promise<NativeBrowserShot>;
   };
+}
+
+/** A Web tab screenshot: a PNG while it fits the server's inline limit, else a JPEG. */
+export interface NativeBrowserShot {
+  mime: 'image/png' | 'image/jpeg';
+  data: Uint8Array;
+}
+
+// The Web tab's page and the Omni page that shows it talk directly, never through the main process: the host asks with
+// `webview.send(NATIVE_PICK_ASK, request)`, and the guest's pick preload answers with `ipcRenderer.sendToHost`.
+export const NATIVE_PICK_ASK = 'omni-pick:ask';
+export const NATIVE_PICK_ANSWER = 'omni-pick:answer';
+/** Unasked, guest to host: the page scrolled, or a key the Web tab handles was pressed in the page. */
+export const NATIVE_PICK_EVENT = 'omni-pick:event';
+
+export type NativePickRequest = { id: number; op: 'look' } | { id: number; op: 'inspect' | 'pick'; x: number; y: number };
+
+/** `value`: a NativePageLook for `look`, else what the shared pick script returned (RawInspect or RawPick), unchecked. */
+export interface NativePickAnswer {
+  id: number;
+  value: unknown;
+}
+
+/** The page as its own window sees it, in CSS pixels. */
+export interface NativePageLook {
+  url: string;
+  title: string;
+  width: number;
+  height: number;
+  scrollX: number;
+  scrollY: number;
+}
+
+export type NativeGuestEvent =
+  | { type: 'scroll'; x: number; y: number }
+  /** Escape and Alt for live Annotate, and the browser's own shortcuts (`l` address bar, `r` reload, `[` back, `]` forward). */
+  | { type: 'key'; key: 'Escape' | 'Alt' | 'l' | 'r' | '[' | ']'; down: boolean };
+
+export interface QuickPromptStatus {
+  /** False while another app holds the shortcut. True while the Quick Prompt is off. */
+  registered: boolean;
+  /** Wispr Flow is installed and takes its links (macOS). */
+  wispr: boolean;
+  /** The panel shows now. */
+  visible: boolean;
 }

@@ -1,5 +1,7 @@
 # The Linux app is a desktop window on the Web UI
 
+> Superseded by [ADR 0010](0010-desktop-app-is-electron.md): one Electron app on the Web UI, with the server bundled inside it, replaces this launcher on Linux and the SwiftUI app on a Mac. This record stays as the history of the launcher.
+
 Omni on a Mac is a SwiftUI client ([ADR 0002](0002-mac-app-is-a-client.md)). That app does not run on Linux. Omarchy is a Hyprland desktop. The machine this was built for has GTK 4, libadwaita and Chromium, and not WebKitGTK 6.
 
 A port of every Mac screen to GTK would be a second client to keep in step with the Web UI. ADR 0002 accepted that cost on the Mac because the native controls were the point. On Linux the Web UI is already the full client. What was missing is the part the Mac app does around it: start the server, stop it on quit when this launch started it, and a launcher entry that is not a browser tab.

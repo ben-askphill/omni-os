@@ -2,6 +2,8 @@
 
 Project context and conventions live in `CLAUDE.md`. Read it first.
 
+- Desktop app: `apps/desktop/` (Electron). It loads the Web UI and runs the bundled server on Electron's own Node, and will replace `apps/mac` and `apps/linux` (ADR 0010). Desktop-only UI goes through `window.omniDesktop` (`packages/shared/desktop-bridge.ts`, read via `apps/web/src/desktop.ts`), always gated on it being there. It imports `@omni/shared` only. QA harness: `apps/desktop/scripts/qa.ts`. See `apps/desktop/README.md`.
+
 ## Standing rules
 
 ### Every surface, every time

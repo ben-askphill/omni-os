@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { about } from './about.ts';
 import { publishFeed } from './bus.ts';
-import { BUNDLED, ROOT } from './config.ts';
+import { BUNDLED, nodeChildEnv, ROOT } from './config.ts';
 import { runningCount } from './runner.ts';
 
 // Update: is this server behind main, and the one Update button that brings it level.
@@ -113,9 +113,9 @@ export interface UpdateDeps {
   changed: () => void;
 }
 
-async function runStep(cmd: string, args: string[], cwd: string, timeoutMs: number): Promise<string | null> {
+async function runStep(cmd: string, args: string[], cwd: string, timeoutMs: number, env?: Record<string, string>): Promise<string | null> {
   try {
-    await run(cmd, args, { cwd, timeout: timeoutMs, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    await run(cmd, args, { cwd, timeout: timeoutMs, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, env: env && { ...process.env, ...env } });
     return null;
   } catch (err) {
     const e = err as { stderr?: string; stdout?: string; message: string };
@@ -132,7 +132,7 @@ async function installFromMain(root: string): Promise<string | null> {
   }
   const vite = join(root, 'node_modules/vite/bin/vite.js');
   if (!existsSync(vite)) return 'The Web UI could not be built. Run npm install in the repo first.';
-  const error = await runStep(process.execPath, [vite, 'build'], join(root, 'apps/web'), 5 * 60_000);
+  const error = await runStep(process.execPath, [vite, 'build'], join(root, 'apps/web'), 5 * 60_000, nodeChildEnv);
   return error ? `The Web UI build failed. ${error}` : null;
 }
 

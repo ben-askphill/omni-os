@@ -12,7 +12,7 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 | `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file |
 | Secret store | Secret values: the Keychain on a Mac, `data/secrets.json` on Linux. The database keeps their names only |
 
-`npm run setup` or the first-run screens write `data/omni.config.json` ([Install](install.md#set-up-by-hand)). Change it later in Settings, which has the same sections on desktop web, phone web and the Mac app (`packages/shared/settings-catalog.ts`):
+`npm run setup` or the first-run screens write `data/omni.config.json` ([Install](install.md#set-up-by-hand)). Change it later in Settings, which has the same sections on desktop web, phone web and the Mac app (`packages/shared/settings-catalog.ts`). The desktop app (`apps/desktop`) adds one more, Desktop app:
 
 | Group | Sections |
 | --- | --- |
@@ -20,7 +20,7 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 | Agents | Harnesses & models (each harness, the default model per channel, the model options from `.env`), Threads (run new threads on, sessions and usage limits from `.env`, a link to Automations) |
 | Code | Channels (each channel's settings and actions), Workspace (your folders, GitHub owner), Worktrees (storage and cleanup) |
 | Connections | Machines (this machine; the Mac app adds its server port, repo, Node and log), Sync, Sharing & access (Google account, signed-in devices, Omni Connect, Tailscale logins, public MCP URL), Integrations (Hermes, central brain), Secrets |
-| | About (version, build, where the files live) |
+| | Desktop app, only in the desktop app (Quick Prompt and its shortcut, Wispr Flow on a Mac, open at login, zoom, the app's version, server, log and updates), About (version, build, where the files live) |
 
 - Search at the top of the nav finds a single setting and scrolls to it.
 - Notifications, Harnesses & models, Channels, Workspace, Worktrees and Secrets have a scope picker: Every channel shows this machine's values, a channel shows what it sets and what it inherits. The pick stays as you move between sections.

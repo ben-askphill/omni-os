@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { threadMenu, type ThreadActionId } from '@omni/shared/thread-actions.ts';
 import { useFolders } from '../folders.tsx';
+import { desktop } from '../desktop.ts';
 import { canMarkDone } from '../needs-you.ts';
+import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { openContinue } from './ContinueSheet.tsx';
 import { useThreadMenuActions } from './useThreadMenuActions.ts';
@@ -110,9 +112,14 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     reference: () => setReferencing(true),
     grok: () => void sendGrok(),
   };
+  // The desktop app opens a thread in a window of its own, as the Mac app's menu did.
+  const ownWindow: { items: MenuItem[] }[] =
+    desktop && target.kind === 'thread'
+      ? [{ items: [{ label: 'Open in New Window', icon: 'external', run: () => (desktop?.openWindow(href.thread(target.id)), onClose()) }] }]
+      : [];
   const groups: { title?: string; items: MenuItem[] }[] =
     target.kind === 'thread'
-      ? threadMenu({
+      ? [...ownWindow, ...threadMenu({
           row: !!row,
           archived: !!archived,
           pinned: !!row?.pinned_at,
@@ -121,7 +128,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
           child: !!row?.parent_id,
           harness: row?.harness ?? null,
           grokBot: !!status?.grokBot,
-        }).map((g) => ({ title: g.title, items: g.items.map((it) => ({ ...it, run: runs[it.id] })) }))
+        }).map((g) => ({ title: g.title, items: g.items.map((it) => ({ ...it, run: runs[it.id] })) }))]
       : [{ items: containerItems(target, folders, onClose) }];
   const title = target.kind === 'channel' ? `#${channel(target.id)?.name ?? ''}` : folder ? folder.name : undefined;
 

@@ -82,8 +82,9 @@ async function boot(): Promise<void> {
 
   let main: BrowserWindow | null = null;
   let quitting = false;
-  app.on('before-quit', () => {
-    quitting = true;
+  app.on('before-quit', (event) => {
+    // quit.ts holds a quit while it asks about running turns; Cancel leaves the app open.
+    quitting = !event.defaultPrevented;
   });
 
   const ctx: AppContext = {
@@ -136,10 +137,6 @@ async function boot(): Promise<void> {
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
-  });
-  handle('omni:open-path', (_event, path) => (typeof path === 'string' && path.startsWith('/') ? shell.openPath(path) : 'Not a local path.'));
-  on('omni:show-in-folder', (_event, path) => {
-    if (typeof path === 'string' && path.startsWith('/')) shell.showItemInFolder(path);
   });
   handle('omni:server:info', () => backend.info());
   on('omni:server:show-log', () => void shell.openPath(backend.config.logFile));

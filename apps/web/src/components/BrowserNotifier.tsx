@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { createTracker, notificationPrefs, permissionNow } from '../attention.ts';
+import { desktop } from '../desktop.ts';
 import { href, navigate, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
 
@@ -37,6 +38,8 @@ export function BrowserNotifier() {
         const n = new Notification(a.title, { body: a.body, tag: a.id, icon: '/app-icon.svg' });
         n.onclick = () => {
           window.focus();
+          // A page cannot raise its own window in the desktop app; the app does.
+          desktop?.focus();
           navigate(href.thread(a.threadId));
           n.close();
         };

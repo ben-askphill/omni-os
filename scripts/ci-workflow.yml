@@ -25,3 +25,31 @@ jobs:
         run: npm run unused
       - name: Tests
         run: npm test
+
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --include=dev
+      # The AppImage ships node-pty's addon compiled for Linux, and stage.ts checks it on Electron's own binary.
+      - name: Build node-pty and fetch Electron
+        run: |
+          npm rebuild node-pty
+          node apps/desktop/scripts/ensure-electron.mjs
+      - name: Typecheck
+        run: npx turbo run typecheck --filter=@omni/desktop
+      - name: Tests
+        run: npx turbo run test --filter=@omni/desktop
+      # This runner's glibc is newer than the AppImage's floor, so stage.ts compiles node-pty again in an older
+      # distro's container (docker is on the runner) and fails if the addon still needs more.
+      - name: Stage and package the AppImage
+        run: npm run dist:linux --workspace @omni/desktop
+      - name: Check the packaged node-pty against the glibc floor
+        run: |
+          need="$(objdump -T apps/desktop/release/linux-unpacked/resources/omni/node_modules/node-pty/build/Release/pty.node | grep -oE 'GLIBC_[0-9.]+' | sort -uV | tail -1)"
+          echo "pty.node needs $need"
+          [ "$(printf '%s\n' "$need" GLIBC_2.28 | sort -V | tail -1)" = GLIBC_2.28 ]
