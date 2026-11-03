@@ -29,6 +29,7 @@ import { Turn, useBranchChanges, type TurnCtx } from './ThreadTurn.tsx';
 import { useOpenOnNewestTurn } from './useOpenOnNewestTurn.ts';
 import { threadView } from '@omni/shared/thread-view.ts';
 import { crewLine, prLine } from '@omni/shared/thread-glance.ts';
+import { statusLabel } from '../status-line.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */
 export function ThreadScreen() {
@@ -42,6 +43,7 @@ export function ThreadScreen() {
   const spans = history.history.spans;
   const view = useMemo(() => (thread ? threadView({ events, spans, thread, artifacts: files, children }) : null), [events, spans, thread, files, children]);
   const edges = useMemo(() => historyEdges({ spans }, view?.turns.map((t) => t.key) ?? []), [spans, view]);
+  const status = useMemo(() => (thread?.status === 'running' ? statusLabel(events) : null), [events, thread?.status]);
   const changes = useBranchChanges(thread, slotBusy);
   const pr = useThreadPR(thread, slotBusy, true);
   const { scroll, newest } = useOpenOnNewestTurn({ view, history, ready, revealTarget, clearReveal });
@@ -103,7 +105,7 @@ export function ThreadScreen() {
   // A Conductor thread needs Ben while any thread it delegated does.
   const kidIds = new Set(crew.map((c) => c.id));
   const needs = card?.glyph === 'needs' || (conductor && !!needsYou?.items.some((i) => kidIds.has(i.thread.id) && reasonOf(i).glyph === 'needs'));
-  const ctx: TurnCtx = { thread, view, history, conductor, crew, ch, changes, pr, now, shell };
+  const ctx: TurnCtx = { thread, view, history, conductor, crew, ch, changes, pr, now, shell, status };
 
   return (
     <>

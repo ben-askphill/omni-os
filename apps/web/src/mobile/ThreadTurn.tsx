@@ -7,6 +7,7 @@ import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
 import { ClippedNote } from '../components/thread/HistoryEdgeRow.tsx';
 import type { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { OmniMark } from '../components/brand.tsx';
+import { ThinkingLine } from '../components/thread/ThinkingLine.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { changesView } from '@omni/shared/changes-view.ts';
 import { atStart } from '@omni/shared/history.ts';
@@ -47,13 +48,14 @@ export type TurnCtx = {
   pr: ReturnType<typeof useThreadPR>;
   now: number;
   shell: ReturnType<typeof useShell>;
+  /** The running turn's latest status (`statusLabel`), null for the default. */
+  status: string | null;
 };
 
 function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
   const { view, conductor, crew, ch, thread, changes, pr, now, shell } = c;
   const steps = (t: TurnView) => shell.open(href.threadView(thread.id, 'steps', t.key));
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
-  const sinceStart = (t: TurnView) => shortTime(t.at || thread.created_at, now);
     const delegated = t.children.length > 0 && <Delegation kids={t.children} />;
     if (last && (t.status === 'running' || t.status === 'queued')) {
       return (
@@ -61,7 +63,7 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
           {t.status === 'queued' ? (
             <NowLine now={{ verb: 'Waiting for a free slot', target: '' }} />
           ) : (
-            view.now && <NowLine now={view.now} meta={view.plan ? `step ${Math.min(view.plan.done + 1, view.plan.todos.length)}/${view.plan.todos.length}` : sinceStart(t)} />
+            <ThinkingLine label={c.status ?? 'Thinking'} since={t.at || thread.created_at} className="rounded-2xl bg-surface px-3.5 py-3 text-[14px]" />
           )}
           {view.plan && <Plan plan={view.plan} />}
           {t.cloud && <CloudAgentCard p={t.cloud} />}

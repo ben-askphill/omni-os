@@ -117,11 +117,15 @@ public final class ThreadStore {
     guard loadState == .loaded, case .reconnecting = connection else { return false }
     return true
   }
-  /// The line under the transcript while the agent works: the latest status, else "Working" when nothing
-  /// has come back since the last message. A queued thread is not working yet.
+  /// The line under the transcript for the whole running turn: the latest status, else "Thinking". A queued thread
+  /// is not working yet, and a turn waiting on a question says so in its card.
   public var workingLine: String? {
-    guard thread?.status == .running, !transcript.waitsOnQuestion, transcript.showsWorking(running: true) || statusLabel != nil else { return nil }
-    return statusLabel ?? "Working"
+    guard thread?.status == .running, !transcript.waitsOnQuestion else { return nil }
+    return statusLabel ?? "Thinking"
+  }
+  /// When the running turn started, for the working line's timer: Ben's last message, else the first row held.
+  public var turnStart: Date? {
+    (events.last { $0.kind == "user" } ?? events.first)?.createdAt
   }
   public var files: [Artifact] { artifacts.filter { $0.kind != "screenshot" } }
   public var screenshots: [Artifact] { artifacts.filter { $0.kind == "screenshot" } }

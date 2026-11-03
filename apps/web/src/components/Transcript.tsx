@@ -14,7 +14,8 @@ import { Markdown } from './Markdown.tsx';
 import { CheckItem, copyText, Icon, Loader, StatusDot, StatusPill, Ticks } from './ui.tsx';
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
-import { statusLabel } from '../status-line.ts';
+import { statusLabel, turnStart } from '../status-line.ts';
+import { ThinkingLine } from './thread/ThinkingLine.tsx';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
 import { renderedFrom } from '@omni/shared/html-render.ts';
@@ -470,11 +471,11 @@ export const Transcript = memo(function Transcript({
     return out;
   }, [stored, live, feedLive, threadId]);
   const latestStatus = useMemo(() => (running ? statusLabel(events) : null), [events, running]);
+  const since = useMemo(() => (running ? turnStart(events) : null), [events, running]);
 
   // Mod log lines are asides: the row before them is still the live one.
   const lastIdx = items.findLastIndex((it) => it.type !== 'mod');
   const last = items[lastIdx];
-  const showWorking = running && (!last || last.type === 'user' || last.type === 'report' || last.type === 'text');
   // The turn is waiting on Ben's answer, not working: the card under it says so.
   const asking = last?.type === 'question' && last.q.state === 'pending';
 
@@ -506,12 +507,7 @@ export const Transcript = memo(function Transcript({
             />,
           ])}
           {edgeRow(-1)}
-          {(showWorking || latestStatus) && !asking && (
-            <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
-              {running && <Loader size={13} />}
-              <span className="truncate">{latestStatus ?? 'Working'}</span>
-            </div>
-          )}
+          {running && !asking && <ThinkingLine label={latestStatus ?? 'Thinking'} since={since} />}
         </div>
       </TaskCtx.Provider>
     </HistoryCtx.Provider>

@@ -564,17 +564,46 @@ struct TicksView: View {
   }
 }
 
-/// The agent's latest status while it works.
+/// ThinkingLine in the Web UI: the mark thinking, the label shimmering and how long the turn has run.
 struct WorkingLine: View {
   let text: String
+  /// When the turn started; without one the timer counts from when the line appeared.
+  var since: Date?
+  @State private var shown = Date()
 
   var body: some View {
     HStack(spacing: z(8)) {
       Loader(size: 13, color: Tok.fg3)
-      Text(text).lineLimit(1).truncationMode(.tail)
+      Text(text).lineLimit(1).truncationMode(.tail).modifier(Shimmer())
+      TimelineView(.periodic(from: .now, by: 1)) { context in
+        Text(Format.duration(ms: max(0, context.date.timeIntervalSince(since ?? shown)).rounded(.down) * 1000))
+          .monospacedDigit()
+      }
     }
     .font(.omni(size: ThreadStyle.small))
     .foregroundStyle(Tok.fg3)
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+/// `.shimmer-text` in index.css: a highlight sweeps across the text every 2s. Still under Reduce Motion.
+private struct Shimmer: ViewModifier {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  func body(content: Content) -> some View {
+    if reduceMotion {
+      content
+    } else {
+      TimelineView(.animation) { context in
+        let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2) / 2
+        content.overlay {
+          LinearGradient(
+            stops: [.init(color: .clear, location: 0), .init(color: Tok.fg, location: 0.5), .init(color: .clear, location: 1)],
+            startPoint: UnitPoint(x: -1 + 3 * phase - 0.5, y: 0.5), endPoint: UnitPoint(x: -1 + 3 * phase + 0.5, y: 0.5)
+          )
+          .mask(content)
+        }
+      }
+    }
   }
 }

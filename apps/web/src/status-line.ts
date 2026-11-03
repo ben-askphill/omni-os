@@ -18,3 +18,9 @@ export function statusLabel(events: Pick<EventRow, 'kind' | 'payload'>[]): strin
   }
   return null;
 }
+
+/** When the running turn started: Ben's last message, else the first row held. null with no rows. */
+export function turnStart(events: Pick<EventRow, 'kind' | 'created_at'>[]): string | null {
+  for (let k = events.length - 1; k >= 0; k--) if (events[k].kind === 'user') return events[k].created_at;
+  return events[0]?.created_at ?? null;
+}

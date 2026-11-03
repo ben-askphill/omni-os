@@ -1187,6 +1187,23 @@
   animation: omni-write 0.9s cubic-bezier(0.45, 0, 0.2, 1) both;
 }
 
+/* A running turn's label: a highlight sweeps across the text, as T3 does on its thinking line. */
+@keyframes omni-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+.shimmer-text {
+  background: linear-gradient(90deg, var(--fg-3) 35%, var(--fg) 50%, var(--fg-3) 65%) 0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: omni-shimmer 2s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -1197,7 +1214,8 @@
   }
   .pulse,
   .ping,
-  .spin {
+  .spin,
+  .shimmer-text {
     animation: none !important;
   }
 }

@@ -470,7 +470,7 @@ private struct TranscriptRows: View {
         HistoryEdgeRow(store: store, edge: edge)
       }
       if let line = store.workingLine {
-        WorkingLine(text: line)
+        WorkingLine(text: line, since: store.turnStart)
       }
       CrewQuestionCards(model: model, crew: crew, threadID: store.id, ui: ui)
       if let t = store.thread, SetupCard.shows(t, model: model) {

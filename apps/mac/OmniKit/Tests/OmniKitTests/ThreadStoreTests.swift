@@ -492,7 +492,8 @@ private let turn = [
     defer { store.stop() }
     #expect(!store.betweenTurns)
     #expect(store.statusLabel == nil)
-    #expect(store.workingLine == "Working")
+    #expect(store.workingLine == "Thinking")
+    #expect(store.turnStart != nil)
 
     conn.send(sse(event: ev(2, "status", #"{"text":"Compacting the conversation"}"#), id: 2))
     try await waitFor("the status") { store.statusLabel == "Compacting the conversation" }
