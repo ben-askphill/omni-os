@@ -42,9 +42,11 @@ import {
   scheduleLimitResume,
   runsHere,
   steerRequests,
+  type PendingMsg,
 } from './runner.ts';
 import { takeoverOf, type HandoffResult } from './handoff.ts';
-import { handoffView } from './handoff/records.ts';
+import { freshPrompt, handoffView } from './handoff/records.ts';
+import type { Opening } from '@omni/shared/opening.ts';
 import { cancelRelocation, createTransition, type ThreadTransition } from './transition.ts';
 import { headPage } from './history.ts';
 import { liveMessage, openingMessages, parseAfter, STREAM_QUEUE_MAX, type DetailOf } from './stream-catch-up.ts';
@@ -152,8 +154,21 @@ threadRoutesApi.get('/:id', (c) => {
   return c.json(threadDetail(t, c.req.query('history') === 'recent' ? headPage(t.id) : { events: events.since(t.id) }));
 });
 
+/**
+ * Ben's first message while the transcript has none of his yet (packages/shared/opening.ts): the one on its way to
+ * the harness here, or the prompt a thread sent to another machine left with.
+ */
+function openingOf(id: string, pending: PendingMsg[]): Opening | null {
+  if (events.firstUserText(id) !== null) return null;
+  const lead = pending.find((m) => m.kind === 'user' && m.state === 'sent');
+  if (lead) return { text: lead.text, uuid: lead.uuid, ...(lead.attachments?.length && { attachments: lead.attachments }), ...(lead.context && { context: lead.context }) };
+  const prompt = freshPrompt(id);
+  return prompt ? { text: prompt } : null;
+}
+
 /** The detail with `page`'s events: every event, the head and its `history`, or none (the stream's sync). */
 function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
+  const pending = pendingFor(t.id);
   const detail = {
     thread: t,
     channel: (ch => ch && publicChannel(ch))(channels.get(t.channel_id)),
@@ -164,7 +179,8 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
     // Members of the teams this thread started, so its delegation cards can show their state.
     team: threads.children(t.id).flatMap((ch) => threads.team(ch.id)),
     parent: t.parent_id ? threads.get(t.parent_id) : null,
-    pending: pendingFor(t.id),
+    pending,
+    opening: openingOf(t.id, pending),
     live: isLive(t.id),
     // The status lines its mods pinned, while its process runs. The feed's mods event keeps them current.
     mods: activeMods().filter((m) => m.thread_id === t.id),
@@ -515,10 +531,12 @@ threadActionsApi.get('/:id/stream', (c) => {
       if (e.type !== 'thread' || (e.thread as Thread).id !== id) return;
       const blocked = turnBlocked(e.thread as Thread, runsHere(id));
       const takeover = takeoverOf(e.thread as Thread);
+      const pending = pendingFor(id);
       onEvent({
         kind: 'thread',
         thread: e.thread,
-        pending: pendingFor(id),
+        pending,
+        opening: openingOf(id, pending),
         live: isLive(id),
         handoff: handoffView(e.thread as Thread),
         ...(blocked && { blocked }),

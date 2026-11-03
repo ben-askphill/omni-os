@@ -248,6 +248,7 @@
   "team": [],
   "parent": null,
   "pending": [],
+  "opening": null,
   "live": true,
   "mods": [],
   "handoff": null,

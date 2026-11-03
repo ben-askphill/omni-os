@@ -3,6 +3,7 @@ import { api, errorText, useThreadStream, type Artifact, type Channel, type Cont
 import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
+import { withOpening, type Opening } from '@omni/shared/opening.ts';
 import { linksOf, linksWith, NO_LINKS, type ThreadLinks } from '@omni/shared/continue-flow.ts';
 import { holds } from '../thread-history.ts';
 import { useInterrupt, useTurnState } from './threadTurn.ts';
@@ -47,6 +48,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   const [blocked, setBlocked] = useState<string | null>(null);
   const [handoff, setHandoff] = useState<HandoffView | null>(null);
   const [takeover, setTakeover] = useState<Takeover | null>(null);
+  // Ben's first message until the transcript has it (packages/shared/opening.ts).
+  const [opening, setOpening] = useState<Opening | null>(null);
   const [links, setLinks] = useState<ThreadLinks>(NO_LINKS);
   // The newest context reading the stream pushed. The meter loads its first one itself.
   const [context, setContext] = useState<ContextUsage | null>(null);
@@ -75,6 +78,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   const applyDetail = useCallback((d: ThreadOpen) => {
     setThread((prev) => newer(prev, d.thread));
     setQueued(d.pending ?? []);
+    setOpening(d.opening ?? null);
     if (d.live !== undefined) setWarm(d.live);
     setBlocked(d.blocked ?? null);
     setHandoff(d.handoff ?? null);
@@ -155,6 +159,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
         case 'thread':
           setThread((prev) => newer(prev, m.thread));
           if (m.pending) setQueued(m.pending);
+          if (m.opening !== undefined) setOpening(m.opening);
           if (m.live !== undefined) setWarm(m.live);
           setBlocked(m.blocked ?? null);
           setHandoff(m.handoff ?? null);
@@ -197,6 +202,9 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     setThread((prev) => newer(prev, next, reply));
   }, []);
 
+  // What the views draw: the opening as the transcript's first row, and not again among the pending messages.
+  const shown = useMemo(() => (thread ? withOpening(events, queued, opening, thread) : { events, pending: queued }), [events, queued, opening, thread]);
+
   const files = useMemo(() => artifacts.filter((a) => a.kind !== 'screenshot'), [artifacts]);
   const shots = useMemo(() => artifacts.filter((a) => a.kind === 'screenshot'), [artifacts]);
   const selectedArtifact = files.find((a) => a.id === selected) ?? files[files.length - 1];
@@ -207,7 +215,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     parent,
     children,
     team,
-    events,
+    events: shown.events,
     history,
     revealTarget,
     clearReveal,
@@ -223,7 +231,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     setActionError,
     notFound,
     ready,
-    queued,
+    queued: shown.pending,
     setQueued,
     warm,
     blocked,

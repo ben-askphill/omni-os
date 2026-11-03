@@ -6,6 +6,7 @@ import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
 import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
+import type { Opening } from '@omni/shared/opening.ts';
 import type { DeliveryPage, DeliveryView } from '@omni/shared/automation-triggers.ts';
 import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/automation-events.ts';
 import type { ContinueLink } from '@omni/shared/continue.ts';
@@ -111,6 +112,8 @@ export interface ThreadDetail {
   team?: Thread[];
   parent: Thread | null;
   pending?: PendingMsg[];
+  /** Ben's first message while the transcript has none of his yet (packages/shared/opening.ts). Older servers leave it out. */
+  opening?: Opening | null;
   /** A warm CLI process is attached (idle or mid-turn), so the next message starts instantly. */
   live?: boolean;
   /** Why this Mac cannot start a turn in the thread (sync: it runs on the other Mac, or its folder is not here). */
@@ -657,7 +660,7 @@ export function openSSE(
 export type StreamMessage =
   | { type: 'event'; event: EventRow }
   | { type: 'artifact'; artifact: Artifact }
-  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; live?: boolean; blocked?: string; handoff?: HandoffView | null; takeover?: Takeover }
+  | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; opening?: Opening | null; live?: boolean; blocked?: string; handoff?: HandoffView | null; takeover?: Takeover }
   /**
    * Sent once per connect, after any replayed rows (#224): the detail as GET /threads/:id has it now. `snapshot`: the
    * gap was too big to replay, so `detail` carries the newest page and its head instead.
@@ -675,7 +678,9 @@ export function classifyStream(d: unknown): StreamMessage | null {
   if (o.kind === 'artifact' && o.artifact) return { type: 'artifact', artifact: o.artifact as Artifact };
   if (o.kind === 'thread' && o.thread)
     return {
-      type: 'thread', thread: o.thread as Thread, pending: o.pending as PendingMsg[] | undefined, live: typeof o.live === 'boolean' ? o.live : undefined,
+      type: 'thread', thread: o.thread as Thread, pending: o.pending as PendingMsg[] | undefined,
+      opening: o.opening === undefined ? undefined : o.opening && typeof o.opening === 'object' ? (o.opening as Opening) : null,
+      live: typeof o.live === 'boolean' ? o.live : undefined,
       blocked: typeof o.blocked === 'string' ? o.blocked : undefined,
       handoff: o.handoff && typeof o.handoff === 'object' ? (o.handoff as HandoffView) : null,
       takeover: o.takeover && typeof o.takeover === 'object' ? (o.takeover as Takeover) : undefined,

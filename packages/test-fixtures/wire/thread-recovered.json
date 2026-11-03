@@ -115,6 +115,7 @@
       "delivery": "uncertain"
     }
   ],
+  "opening": null,
   "live": false,
   "mods": [],
   "handoff": null,

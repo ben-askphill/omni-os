@@ -101,6 +101,7 @@
   "team": [],
   "parent": null,
   "pending": [],
+  "opening": null,
   "live": false,
   "mods": [],
   "handoff": {

@@ -154,6 +154,7 @@
       "delivery": "held"
     }
   ],
+  "opening": null,
   "live": true,
   "mods": [],
   "handoff": null,

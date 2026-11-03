@@ -161,6 +161,7 @@
       "delivery": "recovered"
     }
   ],
+  "opening": null,
   "live": true,
   "mods": [],
   "handoff": null,

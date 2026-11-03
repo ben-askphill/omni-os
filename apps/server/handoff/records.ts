@@ -187,3 +187,9 @@ export function handoffBlock(t: Pick<Thread, 'id' | 'status' | 'updated_at'>, ta
   const waits = phase === 'requested' || preparing || (phase === 'offered' && !(taking && !v.outgoing));
   return waits ? handoffText(v) : null;
 }
+
+/** A new thread sent to another machine to run there: its first prompt, which the offer carries. Null for any other thread. */
+export function freshPrompt(threadId: string): string | null {
+  const offer = offerOf(threadId);
+  return offer?.fresh && offer.state === 'offered' ? (offer.queued[0] ?? null) : null;
+}

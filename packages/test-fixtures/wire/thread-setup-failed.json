@@ -76,6 +76,7 @@
       "delivery": "recovered"
     }
   ],
+  "opening": null,
   "live": false,
   "mods": [],
   "handoff": null,
