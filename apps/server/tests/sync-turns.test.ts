@@ -97,6 +97,28 @@ describe('with sync on', () => {
     expect(await detail('elsewhere')).not.toHaveProperty('blocked');
   });
 
+  it('forks a folder thread whose folder is not on this machine, but not one running on the other Mac', async () => {
+    const run = { harness: 'claude-code', model: 'sonnet', effort: 'high' };
+    const fork = (id: string, body: object) =>
+      app.request(`/api/threads/${id}/continue${'text' in body ? '' : '/preview'}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...run, ...body }) });
+    thread('fork-missing');
+    r.db.events.add('fork-missing', 'user', { text: 'reconstruct my day' });
+    expect((await detail('fork-missing')).blocked, 'no turn here').toMatch(/not on this machine/);
+    const p = (await (await fork('fork-missing', {})).json()) as any;
+    expect(p).toMatchObject({ workspace: 'folder', blocked: null });
+    const res = await fork('fork-missing', { text: 'carry on', request_id: 'fork-missing-1', revision: p.revision });
+    expect(res.status).toBe(200);
+    const made = ((await res.json()) as any).thread;
+    expect(existsSync(made.cwd), 'the fork has a folder of its own here').toBe(true);
+    await r.untilResults(made.id, 1);
+
+    thread('fork-elsewhere', { cwd: r.tmp });
+    r.db.events.add('fork-elsewhere', 'user', { text: 'work' });
+    r.db.db.prepare(`UPDATE threads SET status = 'running', run_machine = 'mac-b' WHERE id = 'fork-elsewhere'`).run();
+    r.db.assignments.claim('fork-elsewhere', 'mac-b');
+    expect(((await (await fork('fork-elsewhere', {})).json()) as any).blocked).toMatchObject({ code: 'elsewhere', message: expect.stringMatching(/running on your other machine/) });
+  });
+
   it('a thread running here is not running elsewhere, even when the other Mac wrote to it last', async () => {
     const t = await r.start('THINK:1500 a long answer');
     await r.untilStatus(t.id, 'running');

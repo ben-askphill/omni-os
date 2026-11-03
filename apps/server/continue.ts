@@ -25,7 +25,7 @@ import { saveStart, setUpThread } from './runner/setup.ts';
 import { emitThread, hasBackground, lives, refusal, runsHere, waiting } from './runner/state.ts';
 import { invalid, runName } from './runner/switch.ts';
 import { plannedWorktree, prepareWorkdir } from './sandbox.ts';
-import { turnBlocked } from './sync/guard.ts';
+import { elsewhereBlocked } from './sync/guard.ts';
 import { getTerminal } from './terminal.ts';
 import { captureTree } from './checkpoint.ts';
 
@@ -56,7 +56,9 @@ export function sourceBlock(t: Thread): ContinueBlock | null {
   if (isProviderHarness(t.harness)) return block('remote', continueSourceRefusal(t.harness) ?? `This thread runs ${providerWhere(t.harness)}, so its files are not on this machine.`);
   if (t.setup === 'preparing') return block('setup', "Omni is still preparing this thread's worktree.");
   if (t.setup === 'failed') return block('setup', "This thread's worktree could not be prepared. Retry it first.");
-  const elsewhere = turnBlocked(t, runsHere(t.id));
+  // Folder work forks into a folder of its own, and repo work reads the source's checkout, which readCheckout refuses
+  // when it is not here. So only a run on, or a handoff to, another machine blocks a fork here.
+  const elsewhere = elsewhereBlocked(t, runsHere(t.id));
   if (elsewhere) return block('elsewhere', elsewhere);
   const live = lives.get(t.id);
   if (running(t) || waiting.includes(t.id) || t.queued_harness || (live && (live.turn || live.inflight.length || live.held.length || hasBackground(live)))) {

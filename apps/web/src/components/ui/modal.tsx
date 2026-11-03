@@ -8,14 +8,20 @@ import { useDismissable } from './use-dismissable.ts';
 export function Modal({ open, onClose, children, title, wide }: { open: boolean; onClose: () => void; children: ReactNode; title?: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useDismissable(open, onClose, { outside: false });
+  // On open only. Callers pass a new onClose on each render, and the app re-renders whenever any thread moves: a
+  // focus move on each of those took the caret out of the field Ben was typing in.
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
-    ref.current?.querySelector<HTMLElement>('[data-autofocus], button, input, select, textarea')?.focus();
+    const dialog = ref.current;
+    // A field that took the focus itself (autoFocus) keeps it; otherwise the marked control, then the first one.
+    if (dialog && !dialog.contains(document.activeElement)) {
+      (dialog.querySelector<HTMLElement>('[data-autofocus]') ?? dialog.querySelector<HTMLElement>('button, input, select, textarea'))?.focus();
+    }
     return () => {
       prev?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <div className="scrim fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>

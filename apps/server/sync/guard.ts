@@ -37,6 +37,16 @@ function rebuildable(t: Thread): { cwd: string; worktree?: { repo: string; branc
 }
 
 /**
+ * Why another machine has the thread now, or null: it runs there, or a handoff is moving it. Unlike turnBlocked, a
+ * folder that is not on this machine does not count, so a fork, which starts in a folder of its own, is not refused for it.
+ */
+export function elsewhereBlocked(t: Thread, here = false, taking = false): string | null {
+  const elsewhere = here ? null : busyElsewhere(t);
+  if (elsewhere) return `This thread is running on ${machineName(elsewhere.machine)}.`;
+  return handoffBlock(t, taking);
+}
+
+/**
  * Why this Mac cannot start a turn in the thread, or null when it can. GET /api/threads/:id shows it, and a
  * message to the thread is refused with it. A worktree thread is blocked while its worktree is prepared or after
  * that failed; otherwise, with sync never set up here, this is always null.
@@ -47,10 +57,8 @@ export function turnBlocked(t: Thread, here = false, taking = false): string | n
   // A worktree thread runs only in its own worktree, once Omni has made and checked it (apps/server/runner/setup.ts).
   if (t.setup === 'preparing') return "Omni is still preparing this thread's worktree.";
   if (t.setup === 'failed') return `This thread's worktree could not be prepared: ${(t.setup_error ?? 'unknown error').replace(/\.?$/, '.')} Retry to try again.`;
-  const elsewhere = here ? null : busyElsewhere(t);
-  if (elsewhere) return `This thread is running on ${machineName(elsewhere.machine)}.`;
-  const handoff = handoffBlock(t, taking);
-  if (handoff) return handoff;
+  const held = elsewhereBlocked(t, here, taking);
+  if (held) return held;
   if (!outbox.machineId() || existsSync(t.cwd) || rebuildable(t)) return null;
   return `This thread's folder is not on this machine: ${t.cwd}. Continue it on the machine that has it, or map the folder to one here in sync.path_map.`;
 }
