@@ -9,7 +9,7 @@ describe('appUpdateNotice', () => {
     expect(appUpdateNotice({ state: 'unsupported', reason: 'A development build does not update itself.' }, false)).toBeNull();
   });
 
-  it('shows a download under way, then Relaunch to update', () => {
+  it('shows a download under way, then Relaunch to Update', () => {
     expect(appUpdateNotice({ state: 'downloading', version: '0.2.0', percent: 41 }, true)).toEqual({
       text: 'Downloading Omni 0.2.0 (41%)',
       busy: true,
@@ -18,7 +18,7 @@ describe('appUpdateNotice', () => {
     });
     expect(appUpdateNotice({ state: 'ready', version: '0.2.0' }, true)).toMatchObject({
       text: 'Omni 0.2.0 is ready',
-      action: { kind: 'install', label: 'Relaunch to update' },
+      action: { kind: 'install', label: 'Relaunch to Update' },
     });
   });
 

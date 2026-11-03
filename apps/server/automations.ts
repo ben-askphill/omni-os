@@ -7,7 +7,7 @@ import { automationRuns, db } from './db.ts';
 import { createThread } from './runner.ts';
 import { runsAutomationsHere } from './sync/owner.ts';
 import { parseTrigger, type EventTrigger } from './automation-events.ts';
-import { fillPlaceholders, updateUserConfig, userConfig } from './user-config.ts';
+import { fillPlaceholders, NEEDS_CHECKOUT, omniCheckout, updateUserConfig, userConfig } from './user-config.ts';
 
 export interface Automation {
   id: string;
@@ -39,6 +39,7 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
   } catch (err) {
     yamlError = `bad yaml: ${(err as Error).message}`;
   }
+  const rawPrompt = String(y.prompt ?? '').trim();
   const a: Automation = {
     id,
     name: y.name ?? id,
@@ -49,7 +50,7 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
     harness: y.harness,
     model: y.model,
     effort: y.effort,
-    prompt: fillPlaceholders(String(y.prompt ?? '').trim()),
+    prompt: fillPlaceholders(rawPrompt),
     enabled: y.enabled === true,
     file,
     catchup: y.catchup === true,
@@ -64,6 +65,7 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
   else if (a.on && a.cron) a.error = 'set either cron or on, not both';
   else if (!a.on && !a.cron) a.error = 'missing cron';
   else if (!a.prompt) a.error = 'missing prompt';
+  else if (NEEDS_CHECKOUT.test(rawPrompt) && !omniCheckout()) a.error = 'needs an Omni checkout: set OMNI_CHECKOUT in the data dir\'s .env';
   else if (a.on) a.next = null;
   else {
     try {

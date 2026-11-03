@@ -21,7 +21,7 @@ export const LIVE_PORT = 4747;
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 /** The commands a `command` step may send. The page ignores one it does not know, so a typo would pass silently. */
-export const QA_COMMANDS = ['new-thread', 'go-to', 'search', 'home', 'settings', 'quick-prompt-settings'] as const satisfies readonly DesktopCommand[];
+export const QA_COMMANDS = ['new-thread', 'go-to', 'search', 'home', 'settings'] as const satisfies readonly DesktopCommand[];
 
 export type Appearance = 'light' | 'dark';
 export type WindowTarget = 'main' | 'quick-prompt' | 'newest';

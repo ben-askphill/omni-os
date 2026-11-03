@@ -14,6 +14,12 @@ describe('normalizeUrl: the address bar', () => {
     expect(normalizeUrl('127.0.0.1:3000')).toBe('http://127.0.0.1:3000/');
   });
 
+  it('reads a machine on this network as the desktop Web tab does', () => {
+    expect(normalizeUrl('192.168.1.5:3000')).toBe('http://192.168.1.5:3000/');
+    expect(normalizeUrl('myhost.local')).toBe('http://myhost.local/');
+    expect(normalizeUrl('[::1]:3000')).toBe('http://[::1]:3000/');
+  });
+
   it('searches for words', () => {
     expect(normalizeUrl('volero bikes')).toBe('https://www.google.com/search?q=volero%20bikes');
     expect(normalizeUrl('amsterdam')).toBe('https://www.google.com/search?q=amsterdam');

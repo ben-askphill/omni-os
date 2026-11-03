@@ -1,7 +1,7 @@
 import type { MenuItemConstructorOptions } from 'electron';
 import { describe, expect, it, vi } from 'vitest';
 import type { DesktopCommand } from '@omni/shared/desktop-bridge.ts';
-import { commandRoute, editMenuTemplate, menuTemplate, serverStatusLabel, type MenuActions, type MenuState } from '../src/menu-template.ts';
+import { commandRoute, desktopPlatform, editMenuTemplate, menuTemplate, serverStatusLabel, type MenuActions, type MenuState } from '../src/menu-template.ts';
 
 const state = (over: Partial<MenuState> = {}): MenuState => ({
   platform: 'darwin',
@@ -124,6 +124,13 @@ describe('application menu', () => {
     expect(item(menuTemplate(state({ logExists: false }), actions()), 'server-log').enabled).toBe(false);
   });
 
+  it("offers the log of the app's own server only, and after a failure", () => {
+    expect(item(menuTemplate(state(), actions()), 'server-log').enabled).toBe(true);
+    // A server running when the app opened writes elsewhere: the app's log file holds some other server's output.
+    expect(item(menuTemplate(state({ startedHere: false }), actions()), 'server-log').enabled).toBe(false);
+    expect(item(menuTemplate(state({ startedHere: false, server: 'failed' }), actions()), 'server-log').enabled).toBe(true);
+  });
+
   it('labels the server state', () => {
     expect(serverStatusLabel({ port: 4747, server: 'ready', startedHere: true })).toBe('Port 4747: running');
     expect(serverStatusLabel({ port: 4762, server: 'ready', startedHere: false })).toBe('Port 4762: running, started outside this app');
@@ -136,7 +143,6 @@ describe('commandRoute', () => {
     expect(commandRoute('home')).toBe('#/');
     expect(commandRoute('new-thread')).toBe('#/');
     expect(commandRoute('settings')).toBe('#/settings');
-    expect(commandRoute('quick-prompt-settings')).toBe('#/settings/desktop');
     expect(commandRoute('search')).toBe('#/search?q=');
     expect(commandRoute('go-to')).toBeNull();
   });
@@ -170,5 +176,21 @@ describe('editMenuTemplate', () => {
     expect(edit.learnWord).toHaveBeenCalledWith('teh');
     const none = editMenuTemplate({ ...base, isEditable: true, misspelledWord: 'qzx' }, edit);
     expect(none[0]).toMatchObject({ label: 'No Guesses Found', enabled: false });
+  });
+});
+
+describe('the Server menu off the Mac', () => {
+  it('offers the activity monitor on the Mac only, where its sampler runs', () => {
+    const ids = (platform: MenuState['platform']) => (menu(menuTemplate(state({ platform }), actions()), 'Server').map((m) => m.id).filter(Boolean));
+    expect(ids('darwin')).toContain('activity-monitor');
+    expect(ids('linux')).not.toContain('activity-monitor');
+    expect(ids('win32')).not.toContain('activity-monitor');
+  });
+
+  it('names any platform but the Mac and Windows Linux', () => {
+    expect(desktopPlatform('darwin')).toBe('darwin');
+    expect(desktopPlatform('win32')).toBe('win32');
+    expect(desktopPlatform('linux')).toBe('linux');
+    expect(desktopPlatform('freebsd')).toBe('linux');
   });
 });

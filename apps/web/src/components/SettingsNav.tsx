@@ -10,7 +10,7 @@ import { Icon, type IconName } from './ui.tsx';
 
 export function SettingsNav({ section }: { section: SettingsSectionId }) {
   const [q, setQ] = useState('');
-  const hits = searchSettings(q, desktop ? 'desktop' : 'web');
+  const hits = searchSettings(q, desktop ? 'desktop' : 'web', { loginItem: desktop?.loginItemSupported });
   const open = (s: SettingsSectionId, focus?: string) => {
     setQ('');
     navigate(href.settingsSection(s, focus));

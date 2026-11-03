@@ -112,8 +112,6 @@ export function pageTitle(route: Route, channelName: (id: string) => string | un
       return 'Pull requests';
     case 'new-channel':
       return 'New channel';
-    case 'quick-prompt':
-      return 'Quick Prompt';
     default:
       return 'Omni';
   }
@@ -173,7 +171,6 @@ export const href = {
   /** Every channel's PRs. One channel's is `prs(id)`. */
   pullRequests: () => '#/prs',
   newChannel: () => '#/new-channel',
-  quickPrompt: () => '#/quick-prompt',
 };
 
 // ---------- composer focus requests (from the sidebar "New thread" button) ----------

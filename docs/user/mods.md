@@ -1,6 +1,6 @@
 # Mods
 
-Claude Code mods are plugins of function hooks (Claude Code 2.1.287 and later, early access). The repo ships them in `mods/`. With `OMNI_MODS=1` in `.env`, every Claude Code thread's process starts with `--plugin-dir` for each one; the flag is off by default for now. Nothing is installed in `~/.claude`.
+Claude Code mods are plugins of function hooks (Claude Code 2.1.287 and later, early access). The repo ships them in `mods/`. With `OMNI_MODS=1` in `.env` ([where it goes](configuration.md#server-options)), every Claude Code thread's process starts with `--plugin-dir` for each one; the flag is off by default for now. Nothing is installed in `~/.claude`.
 
 | Mod | What |
 | --- | --- |

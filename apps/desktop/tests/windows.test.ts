@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { linkTarget, nextWindowState, parseWindowState, restoreBounds, staysInWindow, trafficLights } from '../src/window-rules.ts';
+import {
+  appPermissionAllowed,
+  GESTURE_MS,
+  isGesture,
+  isWebUiDocument,
+  linkTarget,
+  nextWindowState,
+  parseWindowState,
+  recentGesture,
+  restoreBounds,
+  staysInWindow,
+  subframeNavigationAllowed,
+  trafficLights,
+} from '../src/window-rules.ts';
 
 const origins = { app: 'http://127.0.0.1:4747', server: 'http://127.0.0.1:4747' };
 
@@ -77,5 +90,60 @@ describe('trafficLights', () => {
     expect(trafficLights(700, 1)).toEqual({ x: 12, y: 7 });
     // 1000 window pixels at 160% are 625 CSS pixels: the phone layout.
     expect(trafficLights(1000, 1.6)).toEqual({ x: 12, y: 7 });
+  });
+});
+
+describe('the app session', () => {
+  const app = 'http://127.0.0.1:4747';
+
+  it('tells the Web UI document from a file the server serves', () => {
+    expect(isWebUiDocument('http://127.0.0.1:4747/#/t/abc', app)).toBe(true);
+    expect(isWebUiDocument('http://127.0.0.1:4747/', app)).toBe(true);
+    expect(isWebUiDocument('http://127.0.0.1:4747/api/artifacts/3/raw?v=2', app)).toBe(false);
+    expect(isWebUiDocument('http://127.0.0.1:47471/', app)).toBe(false);
+    expect(isWebUiDocument('http://127.0.0.1:4747@evil.example/', app)).toBe(false);
+    expect(isWebUiDocument(undefined, app)).toBe(false);
+    expect(isWebUiDocument('null', app)).toBe(false);
+  });
+
+  it("grants the Web UI's top frame what it uses, and an artifact nothing", () => {
+    const top = { isMainFrame: true, requestingUrl: 'http://127.0.0.1:4747/#/' };
+    for (const permission of ['clipboard-sanitized-write', 'fullscreen', 'notifications', 'media']) {
+      expect(appPermissionAllowed(permission, top, app)).toBe(true);
+    }
+    // An artifact in the transcript's sandboxed frame, and the same artifact opened as a page of its own.
+    expect(appPermissionAllowed('notifications', { isMainFrame: false, requestingUrl: 'http://127.0.0.1:4747/api/artifacts/3/raw?v=2' }, app)).toBe(false);
+    expect(appPermissionAllowed('notifications', { isMainFrame: true, requestingUrl: 'http://127.0.0.1:4747/api/artifacts/3/raw' }, app)).toBe(false);
+    expect(appPermissionAllowed('notifications', { isMainFrame: false, requestingUrl: 'http://127.0.0.1:4747/' }, app)).toBe(false);
+    expect(appPermissionAllowed('notifications', { isMainFrame: true }, app)).toBe(false);
+  });
+
+  it('never lets a page hand a link to another app', () => {
+    expect(appPermissionAllowed('openExternal', { isMainFrame: true, requestingUrl: 'http://127.0.0.1:4747/' }, app)).toBe(false);
+    for (const permission of ['geolocation', 'clipboard-read', 'midi', 'hid', 'display-capture']) {
+      expect(appPermissionAllowed(permission, { isMainFrame: true, requestingUrl: 'http://127.0.0.1:4747/' }, app)).toBe(false);
+    }
+  });
+
+  it('keeps frames on web pages and documents of their own', () => {
+    for (const url of ['https://example.com/', 'http://127.0.0.1:4747/api/artifacts/3/raw', 'about:blank', 'about:srcdoc', 'data:text/html,hi', 'blob:http://127.0.0.1:4747/x']) {
+      expect(subframeNavigationAllowed(url)).toBe(true);
+    }
+    for (const url of ['smb://attacker/share', 'vscode://file/x', 'ssh://host', 'mailto:a@b.c', 'file:///etc/passwd', 'omniprobe://x', 'not a url']) {
+      expect(subframeNavigationAllowed(url)).toBe(false);
+    }
+  });
+});
+
+describe('gestures', () => {
+  it('counts a click or key press as a gesture for a second, and the pointer passing over never', () => {
+    expect(isGesture('mouseDown')).toBe(true);
+    expect(isGesture('rawKeyDown')).toBe(true);
+    expect(isGesture('mouseMove')).toBe(false);
+    expect(isGesture('mouseWheel')).toBe(false);
+    expect(recentGesture(null, 5000)).toBe(false);
+    expect(recentGesture(5000, 5000 + GESTURE_MS)).toBe(true);
+    expect(recentGesture(5000, 5000 + GESTURE_MS + 1)).toBe(false);
+    expect(recentGesture(5000, 4000)).toBe(false);
   });
 });

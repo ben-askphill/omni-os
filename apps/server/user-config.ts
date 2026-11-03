@@ -250,12 +250,32 @@ export function objectPronoun(pronouns = resolved.pronouns()) {
 
 // ---------- the Omni checkout itself ----------
 
+const isCheckout = (dir: string) => existsSync(join(dir, 'apps', 'server', 'index.ts'));
+
+/**
+ * The Omni git checkout that automations about Omni itself work in ({{omniRoot}}, {{omniRepo}}). A server run from a
+ * checkout is in one. The desktop app's bundle is not: it uses OMNI_CHECKOUT, else the checkout whose data/ it adopted
+ * from the SwiftUI app or the Linux launcher (apps/desktop/src/backend/data-dir.ts), else none.
+ */
+export function omniCheckout(): string | null {
+  if (!import.meta.url.endsWith('.mjs')) return ROOT;
+  const named = process.env.OMNI_CHECKOUT;
+  if (named) return isCheckout(resolve(named)) ? resolve(named) : null;
+  const ofData = dirname(dataDir());
+  return isCheckout(ofData) ? ofData : null;
+}
+
+/** Automations that work in the Omni checkout cannot run without one. */
+export const NEEDS_CHECKOUT = /\{\{\s*omni(Root|Repo)\s*\}\}/;
+
 let originCache: string | null | undefined;
-/** owner/repo of this checkout's `origin`, for the forker's own PRs. Null when there is no GitHub remote. */
+/** owner/repo of the Omni checkout's `origin`, for the forker's own PRs. Null when there is no GitHub remote. */
 export function omniRepo(): string | null {
   if (originCache !== undefined) return originCache;
+  const checkout = omniCheckout();
+  if (!checkout) return (originCache = null);
   try {
-    const url = execFileSync('git', ['-C', ROOT, 'remote', 'get-url', 'origin'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const url = execFileSync('git', ['-C', checkout, 'remote', 'get-url', 'origin'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     originCache = url.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/)?.[1] ?? null;
   } catch {
     originCache = null;
@@ -274,7 +294,10 @@ export function fillPlaceholders(text: string) {
     workspace: () => tildify(resolved.workspaceRoot()),
     reposDir: () => tildify(resolved.reposDir()),
     githubOwner: () => resolved.githubOwner() || '<your GitHub owner>',
-    omniRoot: () => tildify(ROOT),
+    omniRoot: () => {
+      const checkout = omniCheckout();
+      return checkout ? tildify(checkout) : '<your Omni checkout>';
+    },
     omniRepo: () => omniRepo() ?? '<your Omni repo>',
     centralBrain: () => tildify(resolved.centralBrainDir()) || '<your central brain folder>',
     timezone: resolved.timezone,

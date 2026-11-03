@@ -1,5 +1,5 @@
-// How the desktop app decides to start or attach, and the environment of the server it starts. Moved from the
-// Linux launcher (ADR 0010): a proof that the process on the port holds this install's token, or a free port.
+// How the desktop app decides to start or attach, and the environment of the server it starts. The same rules as
+// the Linux launcher's (ADR 0010): a proof that the process on the port holds this install's token, or a free port.
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { join } from 'node:path';
 
@@ -219,8 +219,9 @@ export async function waitForReady(input: WaitInput): Promise<WaitResult> {
   return fail('The server did not answer within 30 seconds.');
 }
 
-/** Why the server stopped on its own after it was ready. */
-export function exitMessage(code: number): string {
+/** Why the server stopped on its own after it was ready. A signal is a crash or a kill, not a stop of its own. */
+export function exitMessage(code: number, signal: NodeJS.Signals | null = null): string {
+  if (signal) return signal === 'SIGSEGV' || signal === 'SIGBUS' || signal === 'SIGABRT' || signal === 'SIGILL' ? `The server crashed (${signal}).` : `The server was killed by ${signal}.`;
   return code === 0 ? 'The server stopped.' : `The server stopped with exit code ${code}.`;
 }
 

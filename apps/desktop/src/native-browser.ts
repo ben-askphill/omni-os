@@ -6,6 +6,7 @@ import { app, session, shell, webContents, type BrowserWindowConstructorOptions,
 import type { NativeBrowserShot } from '@omni/shared/desktop-bridge.ts';
 import type { AppContext } from './context.ts';
 import { handle } from './handle.ts';
+import { isGesture, recentGesture } from './window-rules.ts';
 import { omniWindows } from './windows.ts';
 
 export const NATIVE_BROWSER_PARTITION = 'persist:omni-web';
@@ -75,24 +76,6 @@ export function guestNavigation(url: string): GuestNavigation {
   if (url === 'about:blank' || url.startsWith('about:blank#')) return 'allow';
   if (protocol === 'mailto:' || protocol === 'tel:' || protocol === 'sms:') return 'external';
   return 'block';
-}
-
-/**
- * How long after a click or key press in the page it may open a window or another app. A script on a timer, or a page
- * nobody touched, cannot: the Mac app let only a click open another app, and WebKit blocked popups without one.
- */
-export const GESTURE_MS = 1000;
-
-const GESTURES = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'gestureTap', 'touchEnd']);
-
-/** True for an input event that is Ben acting on the page, not the pointer passing over it. */
-export function isGesture(type: string): boolean {
-  return GESTURES.has(type);
-}
-
-/** True when the page's last click or key press was recent enough to open something. */
-export function recentGesture(lastGesture: number | null, now: number): boolean {
-  return lastGesture !== null && now - lastGesture >= 0 && now - lastGesture <= GESTURE_MS;
 }
 
 /**

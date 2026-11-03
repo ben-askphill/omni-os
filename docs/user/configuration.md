@@ -9,7 +9,7 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 | `data/omni.config.json` | You, your folders, integrations (Hermes URL, central brain, the Tailscale login allowed through `tailscale serve`, the public MCP URL of a [Cloudflare Tunnel](external-mcp.md#from-anywhere-else-http), the Clerk instance for [Google sign-in](remote-access.md#sign-in-with-google)), automation on/off and this Mac's worktree retention policy. Every field: `omni.config.example.json` |
 | `data/crew/*.md` | Your own version of a crew charter; replaces the one in `crew/` with the same name |
 | `data/automations/*.yaml` | Your own automations; one with the same id as a shared one replaces it |
-| `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file |
+| `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file. In a checkout it sits at the repo root; the packaged desktop app reads it from its data dir instead ([Server options](#server-options)) |
 | Secret store | Secret values: the Keychain on a Mac, `data/secrets.json` on Linux. The database keeps their names only |
 
 `npm run setup` or the first-run screens write `data/omni.config.json` ([Install](install.md#set-up-by-hand)). Change it later in Settings, which has the same sections on desktop web, phone web and the Mac app (`packages/shared/settings-catalog.ts`). The desktop app (`apps/desktop`) adds one more, Desktop app:
@@ -24,7 +24,7 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 
 - Search at the top of the nav finds a single setting and scrolls to it.
 - Notifications, Harnesses & models, Channels, Workspace, Worktrees and Secrets have a scope picker: Every channel shows this machine's values, a channel shows what it sets and what it inherits. The pick stays as you move between sections.
-- A chip beside each value says where it comes from: built-in default, set in `.env`, set on this machine, set on a channel, inherited, or this device only. Reset beside a saved value puts the default back. Values from `.env` are read-only there: change `.env` and restart the server.
+- A chip beside each value says where it comes from: built-in default, set in `.env`, set on this machine, set on a channel, inherited, or this device only. Reset beside a saved value puts the default back. Values from `.env` are read-only there: change `.env` and restart the server (in the desktop app, **Server > Restart Server**).
 - On the web, Settings is `#/settings` and each section has its own hash (`#/settings/threads`). The old `#/secrets`, `#/sync` and `#/storage` still open the section that holds them. The Conductor reads the same values with its `settings` tool. Your name goes into the Home greeting and every agent's prompt.
 
 An install from before the config file existed writes one at its first boot from the old defaults and skips onboarding, so it keeps behaving as before.
@@ -35,9 +35,18 @@ Crew charters and automation prompts can use these, filled from your config, so 
 
 `{{user}}`, `{{workspace}}`, `{{reposDir}}`, `{{githubOwner}}`, `{{omniRoot}}`, `{{omniRepo}}`, `{{centralBrain}}`, `{{timezone}}`
 
+`{{omniRoot}}` and `{{omniRepo}}` name an Omni git checkout, for the automations that work on Omni itself (docs-daily, brain-nightly, pr-babysitter, tool-failure-triage). A server run from a checkout uses that one. The packaged desktop app is not a checkout: it uses `OMNI_CHECKOUT` from its data dir's `.env`, or else the checkout whose `data/` it kept using. With neither, those automations show the error "needs an Omni checkout" and do not run.
+
 ## Server options
 
 Optional. Copy `.env.example` to `.env` (gitignored) and uncomment what you need. It covers the port and host, the default model, permission mode, concurrency per harness, keepalive, browser flags, data and automations dirs, upload cap and reply suggestions (`OMNI_SUGGESTIONS=0` turns them off). Each line in `.env.example` says what it does.
+
+Where `.env` goes depends on what runs the server:
+
+- From a checkout (`npm run dev`, the SwiftUI app, the Linux launcher, or the desktop app with `--dev`): the repo root.
+- The packaged desktop app: its data dir, like `~/Library/Application Support/Omni/data/.env` ([where the data dir is](install.md#the-desktop-app)). If you moved over from a checkout and kept using its `data/`, the server also reads the checkout's `.env`; a line in `data/.env` wins over the same one there.
+
+The desktop app, packaged or `--dev`, starts the server with a fixed environment, so a variable exported in your shell never reaches it: put it in `.env`. It also sets the port and data dir itself (`--port`, `--data-dir`), so `OMNI_PORT` and `OMNI_DATA_DIR` in `.env` have no effect there.
 
 ## Secrets
 

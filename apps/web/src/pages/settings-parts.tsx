@@ -134,7 +134,7 @@ export function ScopeBar() {
 
 /**
  * The .env options for one section, read-only with where each value came from. The server reads them at start, so a
- * change goes in .env followed by a restart.
+ * change goes in .env (the data dir's in the desktop app, apps/server/config.ts) followed by a restart.
  */
 export function ServerOptions({ section, entry, title = 'Server options' }: { section: ServerOption['section']; entry?: string; title?: string }) {
   const res = useApi<ServerOptionsState>('/setup/server');
@@ -146,7 +146,8 @@ export function ServerOptions({ section, entry, title = 'Server options' }: { se
     <Advanced title={title} summary={set ? `${set} set in .env` : 'All built-in defaults'}>
       <div id={entry && settingAnchor(entry)} className="scroll-mt-6 space-y-3">
         <p className="text-[12.5px] text-fg-3">
-          Read from <code>.env</code> or the environment when the server starts. Change one there and restart the server.
+          Read from <code>.env</code> or the environment when the server starts. The desktop app reads the <code>.env</code> in
+          its data folder, a checkout the one at the repo root. Change one there and restart the server.
         </p>
         <ul className="divide-y divide-line">
           {rows.map((o) => (

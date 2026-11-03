@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('electron', () => ({ app: {}, session: {}, shell: {}, webContents: {}, BrowserWindow: {}, Menu: {}, nativeTheme: {}, screen: {}, ipcMain: { handle: vi.fn(), on: vi.fn() } }));
 
 const {
-  GESTURE_MS,
   INLINE_IMAGE_MAX,
   NATIVE_BROWSER_PARTITION,
   allowedGuestSrc,
@@ -12,12 +11,10 @@ const {
   guestPreferences,
   guestUserAgent,
   hostsGuest,
-  isGesture,
   navigationAction,
   permissionAllowed,
   popupAction,
   popupWindowOptions,
-  recentGesture,
 } = await import('../src/native-browser.ts');
 const { guestKey, pickRequest } = await import('../src/pick-protocol.ts');
 
@@ -137,17 +134,6 @@ describe('popups', () => {
       sandbox: true,
       webviewTag: false,
     });
-  });
-
-  it('counts a click or key press as a gesture for a second, and the pointer passing over never', () => {
-    expect(isGesture('mouseDown')).toBe(true);
-    expect(isGesture('rawKeyDown')).toBe(true);
-    expect(isGesture('mouseMove')).toBe(false);
-    expect(isGesture('mouseWheel')).toBe(false);
-    expect(recentGesture(null, 5000)).toBe(false);
-    expect(recentGesture(5000, 5000 + GESTURE_MS)).toBe(true);
-    expect(recentGesture(5000, 5000 + GESTURE_MS + 1)).toBe(false);
-    expect(recentGesture(5000, 4000)).toBe(false);
   });
 });
 

@@ -8,7 +8,7 @@ An Electron window on the Web UI that runs the Omni server itself ([ADR 0010](..
 | --- | --- |
 | `src/main.ts` | The main process: one instance, the backend, the windows, and each feature's `install*(ctx)` |
 | `src/context.ts` | `AppContext`, what every feature gets |
-| `src/backend/` | Attach to this install's server or start one, restart it after exit 75, stop it on quit if this launch started it. `data-dir.ts` picks the data dir |
+| `src/backend/` | Attach to this install's server or start one, restart it after exit 75, stop it on quit if this app started it (on this launch, or on an earlier one that kept it running: a note in userData's `server-<port>.json` says so). An attached server that stops answering shows the failure screen. `data-dir.ts` picks the data dir |
 | `src/ipc.ts`, `src/handle.ts`, `src/preload.ts` | The bridge: channel table, typed `ipcMain` handlers with an origin check, and `window.omniDesktop` |
 | `src/options.ts`, `src/paths.ts`, `src/settings.ts` | Command line, per-OS default paths, the app's own settings file |
 | `scripts/build.ts` | Builds `dist/main.cjs`, `dist/preload.cjs` and `dist/pick-preload.cjs` |
@@ -98,7 +98,7 @@ A script is a list of steps, or an object with the run's settings and `steps`:
 | `{"wait": 500}`, `{"wait": "<selector>"}`, `{"wait": {"for": "<selector>", "timeout": 30}}` | Waits for milliseconds, or until the selector is visible (10 seconds by default, `timeout` in seconds). The Mac harness's conditions are refused when the script is read, with the selector to use instead: `sidebarLoaded` is `[data-channel-id]`, `channel:<id>` is `[data-channel-id="<id>"]`, `thread:<id>` is `openThread` or a `route` and then a transcript selector, and `serverState:` and `connection:` always hold, since the harness only attaches to a running server |
 | `{"sleep": 1.5}` | Seconds, as in the Mac harness |
 | `{"expect": "<selector>"}`, `{"expect": {"selector": "h1", "text": "General", "timeout": 5}}` | Fails unless the selector is visible and, when given, its text contains `text` |
-| `{"command": "settings"}` | Sends a `DesktopCommand` to the current window on the event channel, as a menu item does: `new-thread`, `go-to`, `search`, `home`, `settings`, `quick-prompt-settings` |
+| `{"command": "settings"}` | Sends a `DesktopCommand` to the current window on the event channel, as a menu item does: `new-thread`, `go-to`, `search`, `home`, `settings` |
 | `{"menu": "View > Zoom In"}` | Clicks that item of the application menu for the current window. Labels match without `&`, a trailing ellipsis, or case |
 | `{"window": "main"}`, `"quick-prompt"`, `"newest"` | Makes that window current, waiting for it to show. Quick Prompt's panel stays loaded while hidden, so this waits until it is on screen |
 | `{"openThread": "<id>"}`, `{"openWindow": "#/settings"}` | Opens the route in a window of its own through the bridge, as Open in New Window does, and makes it current |
@@ -121,7 +121,11 @@ npx tsx scripts/dist.ts --platform mac --arch arm64      # or x64, universal; --
 npx tsx scripts/dist.ts --platform linux --arch x64      # the AppImage
 ```
 
-`dist.ts` builds `dist/`, stages `build/omni` with `stage.ts` (the server and MCP bundles, `apps/web/dist`, `crew/`, `automations/`, `mods/`, a `package.json` and a `node_modules` with only the bundle's external packages for that target), then runs electron-builder with `electron-builder.config.cjs`. Artifacts land in `release/` as `Omni-<version>-<os>-<arch>.<ext>`. It never publishes. A Mac build signs with the keychain's Developer ID identity when there is one, and notarizes only when Apple's credentials are in the environment.
+`dist.ts` builds `dist/`, stages `build/omni` with `stage.ts` (the server and MCP bundles, `apps/web/dist`, `crew/`, `automations/`, `mods/`, `prototypes/activity-monitor/`, a `package.json` and a `node_modules` with only the bundle's external packages for that target), then runs electron-builder with `electron-builder.config.cjs`. Artifacts land in `release/` as `Omni-<version>-<os>-<arch>.<ext>`. It never publishes. A Mac build signs with the keychain's Developer ID identity when there is one, and notarizes only when Apple's credentials are in the environment.
+
+A Linux build ships `node-pty`'s compiled addon, which must load on glibc 2.28. When the checkout's own build needs a newer glibc (most current distros), `stage.ts` compiles it again in docker's `node:24-bullseye` image, so it needs a working docker, and stops with an error without one. `--host-glibc` skips that and ships this machine's build, which only runs on a glibc as new as this one: fine for a local test, not for a release.
+
+On a Mac, `npm run build:desktop` (`scripts/build-desktop.sh`) builds the unpacked app for this Mac's arch, installs it to `~/Applications/Omni.app` and opens it. In the main checkout it first syncs to `main`. It signs with a Developer ID or Apple Development identity from the keychain, else ad hoc, and never notarizes. `scripts/build-mac.sh` installs the SwiftUI app to the same path, and each script refuses to replace an app with the other's bundle id, so until the cutover only one of the two can live there: move the other away first. `build-desktop.sh` never replaces the app while it, or a server it started, still runs from the bundle.
 
 ## Where things live
 

@@ -1,6 +1,7 @@
 // Process work the backend does: read the login shell's PATH, start the server into its log, stop its process group.
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { constants } from 'node:os';
 import { chmodSync, closeSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { extractPath } from './launch.ts';
@@ -56,9 +57,16 @@ export function writeNodeShim(dir: string, binary: string): string {
 
 export interface Spawned {
   pid: number;
-  /** The exit code once it exited, else null. */
+  /** The exit code once it exited, else null. A process killed by a signal has the shell's 128 + its number. */
   exited: () => number | null;
-  onExit: (listener: (code: number) => void) => void;
+  /** `signal` names the signal that killed it (SIGKILL from the OOM killer, SIGSEGV), null for an exit of its own. */
+  onExit: (listener: (code: number, signal: NodeJS.Signals | null) => void) => void;
+}
+
+/** The exit code a shell reports: the process's own, or 128 plus the number of the signal that killed it. */
+export function exitCode(status: number | null, signal: NodeJS.Signals | null): number {
+  if (status !== null) return status;
+  return signal ? 128 + (constants.signals[signal] ?? 0) : 0;
 }
 
 export function spawnServer(input: { command: string; args: string[]; cwd: string; env: NodeJS.ProcessEnv; logFile: string }): Spawned {
@@ -68,21 +76,23 @@ export function spawnServer(input: { command: string; args: string[]; cwd: strin
     // Its own process group, so stopping it also stops what it started, and a crash of this app does not.
     const child = spawn(input.command, input.args, { cwd: input.cwd, env: input.env, detached: true, stdio: ['ignore', fd, fd] });
     let code: number | null = null;
-    const listeners: ((code: number) => void)[] = [];
-    const finish = (status: number) => {
+    let killedBy: NodeJS.Signals | null = null;
+    const listeners: ((code: number, signal: NodeJS.Signals | null) => void)[] = [];
+    const finish = (status: number, signal: NodeJS.Signals | null) => {
       if (code !== null) return;
       code = status;
-      for (const listener of listeners) listener(status);
+      killedBy = signal;
+      for (const listener of listeners) listener(status, signal);
     };
-    child.once('exit', (status) => finish(status ?? 0));
-    child.once('error', () => finish(1));
+    child.once('exit', (status, signal) => finish(exitCode(status, signal), status === null ? signal : null));
+    child.once('error', () => finish(1, null));
     child.unref();
     if (!child.pid) throw new Error('Could not start the server.');
     return {
       pid: child.pid,
       exited: () => code,
       onExit: (listener) => {
-        if (code !== null) listener(code);
+        if (code !== null) listener(code, killedBy);
         else listeners.push(listener);
       },
     };

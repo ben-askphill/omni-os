@@ -1,7 +1,6 @@
 // The IPC between the preload (the page's `window.omniDesktop`) and the main process. One table of channels, so
 // the preload and each feature that answers one agree on names and shapes.
 import type {
-  DesktopEvent,
   DesktopPlatform,
   DesktopServerInfo,
   DesktopSettings,
@@ -17,7 +16,6 @@ export interface Bootstrap {
   version: string;
   packaged: boolean;
   loginItemSupported: boolean;
-  nativeBrowser: { partition: string; preload: string };
 }
 
 export const BOOTSTRAP = 'omni:bootstrap';
@@ -49,4 +47,3 @@ export interface SendChannels {
 
 export type InvokeChannel = keyof InvokeChannels;
 export type SendChannel = keyof SendChannels;
-export type { DesktopEvent };

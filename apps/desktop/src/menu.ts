@@ -2,15 +2,16 @@
 // state is right. Commands go to the focused Omni window's page, which carries them out (DesktopHooks.tsx).
 import { app, Menu, shell } from 'electron';
 import { existsSync } from 'node:fs';
-import { clampZoom, ZOOM_STEP, type DesktopCommand } from '@omni/shared/desktop-bridge.ts';
+import type { DesktopCommand } from '@omni/shared/desktop-bridge.ts';
 import { openActivityMonitor } from './activity-monitor.ts';
 import type { BackendState } from './backend/index.ts';
 import type { AppContext } from './context.ts';
 import { EVENT } from './ipc.ts';
-import { commandRoute, menuTemplate, type MenuActions, type ServerMenuState } from './menu-template.ts';
+import { commandRoute, desktopPlatform, menuTemplate, type MenuActions, type ServerMenuState } from './menu-template.ts';
 import { openQuickPrompt } from './quick-prompt.ts';
+import { restartServer } from './quit.ts';
 import { retryFromMenu } from './server-screen.ts';
-import { applyZoom, focusedOmniWindow } from './windows.ts';
+import { applyZoom, bringForward, focusedOmniWindow, stepZoom } from './windows.ts';
 
 function serverState(state: BackendState): ServerMenuState {
   switch (state.kind) {
@@ -32,13 +33,16 @@ function serverState(state: BackendState): ServerMenuState {
 export function sendCommand(ctx: AppContext, command: DesktopCommand): void {
   const win = focusedOmniWindow(ctx);
   if (win) {
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.focus();
+    bringForward(win);
     win.webContents.send(EVENT, { type: 'command', command });
     return;
   }
   if (ctx.backend.current.kind === 'ready') ctx.showMain(commandRoute(command) ?? undefined);
+}
+
+/** Server > Show Server Log, and the Web UI's Show Server Log. */
+export function showServerLog(ctx: AppContext): void {
+  void shell.openPath(ctx.backend.config.logFile);
 }
 
 export function installMenu(ctx: AppContext): void {
@@ -47,12 +51,6 @@ export function installMenu(ctx: AppContext): void {
     applicationVersion: app.getVersion(),
     ...(ctx.paths.icon && process.platform !== 'darwin' ? { iconPath: ctx.paths.icon } : {}),
   });
-
-  const zoom = (to: 'in' | 'out' | 'reset') => {
-    const current = ctx.settings.get().zoom;
-    const next = to === 'reset' ? 1 : clampZoom(current + (to === 'in' ? ZOOM_STEP : -ZOOM_STEP));
-    if (next !== current) ctx.settings.update({ zoom: next });
-  };
 
   const history = (step: 'back' | 'forward') => {
     const nav = focusedOmniWindow(ctx)?.webContents.navigationHistory;
@@ -67,23 +65,21 @@ export function installMenu(ctx: AppContext): void {
     newWindow: () => {
       if (ctx.backend.current.kind === 'ready') ctx.openWindow('#/');
     },
-    zoom,
+    zoom: (to) => stepZoom(ctx, to),
     back: () => history('back'),
     forward: () => history('forward'),
     restartServer: () => {
       if (ctx.backend.current.kind === 'failed') retryFromMenu(ctx);
-      else void ctx.backend.restart();
+      else void restartServer(ctx);
     },
-    showServerLog: () => {
-      void shell.openPath(ctx.backend.config.logFile);
-    },
+    showServerLog: () => showServerLog(ctx),
     activityMonitor: () => openActivityMonitor(ctx),
   };
 
   const build = () => {
     const template = menuTemplate(
       {
-        platform: process.platform === 'darwin' || process.platform === 'win32' ? process.platform : 'linux',
+        platform: desktopPlatform(),
         packaged: app.isPackaged,
         port: ctx.backend.config.port,
         server: serverState(ctx.backend.current),

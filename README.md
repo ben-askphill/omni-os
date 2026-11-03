@@ -13,6 +13,7 @@ One Node server runs everything (threads, harnesses, database, secrets, automati
 
 | Client | What | Where |
 | --- | --- | --- |
+| Desktop app | Electron app for macOS and Linux: the Web UI in its own window, with the server inside. No checkout or Node needed. Replacing the Mac and Linux apps ([ADR 0010](docs/adr/0010-desktop-app-is-electron.md)) | `apps/desktop/` |
 | Mac app | Native SwiftUI app for the desk. Starts and stops the server itself | `apps/mac/` |
 | Linux app | Desktop launcher for Omarchy and other Linux desktops. Starts the server and opens the Web UI as an app window | `apps/linux/` |
 | Web UI | React app, in any browser and on your phone over Tailscale | `apps/web/` |
@@ -54,10 +55,13 @@ git clone https://github.com/<you>/omni-os.git ~/omni-os
 cd ~/omni-os
 npm install --include=dev
 npm run setup          # who you are and where your work lives; Enter takes each default
+npm run build:desktop     # Desktop app on a Mac: builds, installs to ~/Applications/Omni.app and opens it
 scripts/build-mac.sh      # Mac app: builds, installs to ~/Applications/Omni.app and opens it
 scripts/install-linux.sh  # Linux: builds the Web UI and installs the Omni launcher
 npm run dev               # or the Web UI: server on :4747, UI on http://localhost:4748
 ```
+
+`build:desktop` and `build-mac.sh` install to the same path, so only one of the two apps lives there at a time. The desktop app's Linux AppImage and other builds: [apps/desktop/README.md](apps/desktop/README.md).
 
 Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal lives in `data/`, so upstream updates merge cleanly.
 

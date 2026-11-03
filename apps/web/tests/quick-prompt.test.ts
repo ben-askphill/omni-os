@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { canSend, CONDUCTOR, dictationSettled, editingHint, quickPromptKey, quickPromptThread, reopened, sentLabel } from '../src/pages/quick-prompt-model.ts';
-import { href, pageTitle, parseHash } from '../src/router.ts';
+import { pageTitle, parseHash } from '../src/router.ts';
 import { screenOf } from '../src/mobile/screens.ts';
 
 const key = (k: Partial<Parameters<typeof quickPromptKey>[0]>) => quickPromptKey({ key: 'Enter', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...k });
 
+// The desktop app's panel opens this route (apps/desktop/src/quick-prompt.ts QUICK_PROMPT_ROUTE).
+const QUICK_PROMPT = '#/quick-prompt';
+
 describe('the Quick Prompt route', () => {
   it('is a page of its own that the phone layout has no screen for', () => {
-    expect(parseHash(href.quickPrompt())).toEqual({ name: 'quick-prompt' });
+    expect(parseHash(QUICK_PROMPT)).toEqual({ name: 'quick-prompt' });
     expect(parseHash('#/quick-prompt/x')).toEqual({ name: 'notfound', path: '/quick-prompt/x' });
-    expect(screenOf(parseHash(href.quickPrompt()))).toBe('notfound');
-    expect(pageTitle(parseHash(href.quickPrompt()), () => undefined)).toBe('Quick Prompt');
+    expect(screenOf(parseHash(QUICK_PROMPT))).toBe('notfound');
+    // Only the shell titles a page, and the shell shows this route as not found.
+    expect(pageTitle(parseHash(QUICK_PROMPT), () => undefined)).toBe('Omni');
   });
 });
 

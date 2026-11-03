@@ -1,6 +1,6 @@
 import { join, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { configPath, resolved } from './user-config.ts';
+import { configPath, omniCheckout, resolved } from './user-config.ts';
 
 /**
  * The repo root: data/, crew/, automations/ and mods/ live here, beside apps/ and packages/. The desktop app ships the
@@ -20,9 +20,16 @@ export const nodeChildEnv: Record<string, string> = process.versions.electron ? 
 // Electron app run from a thread would start as plain Node.
 delete process.env.ELECTRON_RUN_AS_NODE;
 
-// Minimal .env loader so a server the Mac or Linux app starts and `npm run dev` read the same config.
-const envFile = join(ROOT, '.env');
-if (existsSync(envFile)) {
+// Minimal .env loader so a server an app starts from a checkout and `npm run dev` read the same config. The desktop
+// app's bundle sits in the app's read-only resources and gets only a fixed environment (apps/desktop/src/backend/launch.ts),
+// so it reads the .env in its data dir instead. When that data dir is a checkout's data/, which the desktop app adopts
+// from the SwiftUI app or the Linux launcher (apps/desktop/src/backend/data-dir.ts), the checkout's .env still counts,
+// below the data dir's: it may hold OMNI_SECRET_STORE, without which the secrets the old server kept are not found.
+const checkout = omniCheckout();
+const envFiles = BUNDLED
+  ? [join(resolve(ROOT, process.env.OMNI_DATA_DIR || 'data'), '.env'), ...(checkout ? [join(checkout, '.env')] : [])]
+  : [join(ROOT, '.env')];
+for (const envFile of envFiles.filter((file) => existsSync(file))) {
   for (const line of readFileSync(envFile, 'utf8').split('\n')) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
     if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');

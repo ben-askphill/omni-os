@@ -27,7 +27,7 @@ describe('legacy checkouts', () => {
 });
 
 describe('planDataDir', () => {
-  const base = { dev: false, fallback: '/fresh/data', stored: null, repos: ['/repo'] };
+  const base = { fallback: '/fresh/data', stored: null, repos: ['/repo'] };
   const has = (...dirs: string[]) => (dir: string) => dirs.includes(dir);
 
   it('asks when the old data has a database and the default has none', () => {
@@ -40,9 +40,8 @@ describe('planDataDir', () => {
     expect(planDataDir({ ...base, repos: [], hasDatabase: has('/repo/data') })).toEqual({ kind: 'use', dir: '/fresh/data' });
   });
 
-  it('keeps an earlier answer, and development always uses its own', () => {
+  it('keeps an earlier answer', () => {
     expect(planDataDir({ ...base, stored: '/repo/data', hasDatabase: has() })).toEqual({ kind: 'use', dir: '/repo/data' });
-    expect(planDataDir({ ...base, dev: true, stored: '/x', hasDatabase: has('/repo/data') })).toEqual({ kind: 'use', dir: '/fresh/data' });
   });
 
   it('does not ask about the default dir itself', () => {

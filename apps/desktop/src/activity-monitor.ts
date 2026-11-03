@@ -1,19 +1,23 @@
 // The activity monitor (prototypes/activity-monitor): a sampler on :4791 and its dashboard in a window. The app
 // starts the sampler on its own binary as Node unless a monitor already answers there, and stops only the one it
-// started (OmniKit/ActivityMonitor.swift).
+// started (OmniKit/ActivityMonitor.swift). Its window has a session of its own: whatever answers on the port gets
+// none of the app's cookies, which sign in to the Omni API.
 import { BrowserWindow, dialog } from 'electron';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { AppContext } from './context.ts';
 import { readTail, spawnServer, stopGroup, type Spawned } from './backend/process.ts';
+import { bringForward } from './windows.ts';
 
 export const MONITOR_PORT = 4791;
 export const MONITOR_SCRIPT = 'prototypes/activity-monitor/sampler.mjs';
 /** The page's <title>: how a probe tells the monitor from another program on the port. */
 const MONITOR_TITLE = 'Omni Activity';
 const START_TIMEOUT_MS = 10_000;
+/** In memory, and no other window's: the monitor's page is whatever holds the port, which this app cannot vouch for. */
+export const MONITOR_PARTITION = 'omni-monitor';
 
-export type MonitorStart = { ok: true; startedHere: boolean } | { ok: false; message: string };
+export type MonitorStart = { ok: true } | { ok: false; message: string };
 
 let spawned: Spawned | null = null;
 let starting: Promise<MonitorStart> | null = null;
@@ -51,10 +55,19 @@ export function monitorEnv(app: NodeJS.ProcessEnv, port: number): Record<string,
   return env;
 }
 
+/** True for a URL on the monitor's own origin. */
+export function onMonitor(url: string, port = MONITOR_PORT): boolean {
+  try {
+    return new URL(url).origin === new URL(monitorUrl(port)).origin;
+  } catch {
+    return false;
+  }
+}
+
 async function start(ctx: AppContext, port: number): Promise<MonitorStart> {
-  if (await answers(port)) return { ok: true, startedHere: spawned !== null };
-  // The sampler reads macOS tools (vm_stat, sysctl) and exits elsewhere.
+  // The sampler reads macOS tools (vm_stat, sysctl) and exits elsewhere, so elsewhere nothing on the port is it.
   if (process.platform !== 'darwin') return { ok: false, message: 'The activity monitor runs on macOS only.' };
+  if (await answers(port)) return { ok: true };
   const script = join(ctx.paths.appRoot, MONITOR_SCRIPT);
   if (!existsSync(script)) return { ok: false, message: `${MONITOR_SCRIPT} is not in ${ctx.paths.appRoot}.` };
   const logFile = join(dirname(ctx.backend.config.logFile), 'monitor.log');
@@ -68,7 +81,7 @@ async function start(ctx: AppContext, port: number): Promise<MonitorStart> {
   const end = Date.now() + START_TIMEOUT_MS;
   while (Date.now() < end) {
     if (spawned !== child) return { ok: false, message: 'The activity monitor was stopped while starting.' };
-    if (await answers(port)) return { ok: true, startedHere: true };
+    if (await answers(port)) return { ok: true };
     if (child.exited() !== null) {
       spawned = null;
       const last = readTail(logFile, 1);
@@ -96,9 +109,7 @@ export async function stopActivityMonitor(): Promise<void> {
 
 export function openActivityMonitor(ctx: AppContext): void {
   if (monitorWindow && !monitorWindow.isDestroyed()) {
-    if (monitorWindow.isMinimized()) monitorWindow.restore();
-    monitorWindow.show();
-    monitorWindow.focus();
+    bringForward(monitorWindow);
     return;
   }
   void startActivityMonitor(ctx).then((result) => {
@@ -116,12 +127,12 @@ export function openActivityMonitor(ctx: AppContext): void {
       title: 'Omni Activity',
       icon: ctx.paths.icon ?? undefined,
       autoHideMenuBar: true,
-      // Not an Omni page: no bridge preload.
-      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+      // Not an Omni page: no bridge preload, and not the app's session with its API cookies.
+      webPreferences: { partition: MONITOR_PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true },
     });
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', (event, url) => {
-      if (!url.startsWith(monitorUrl())) event.preventDefault();
+      if (!onMonitor(url)) event.preventDefault();
     });
     win.on('closed', () => {
       if (monitorWindow === win) monitorWindow = null;

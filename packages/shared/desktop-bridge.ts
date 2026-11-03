@@ -5,7 +5,7 @@
 export type DesktopPlatform = 'darwin' | 'linux' | 'win32';
 
 /** A menu item or global shortcut that the page carries out, because only the page knows how. */
-export type DesktopCommand = 'new-thread' | 'go-to' | 'search' | 'home' | 'settings' | 'quick-prompt-settings';
+export type DesktopCommand = 'new-thread' | 'go-to' | 'search' | 'home' | 'settings';
 
 export type DesktopEvent =
   | { type: 'command'; command: DesktopCommand }
@@ -119,6 +119,12 @@ export interface DesktopServerInfo {
   startedHere: boolean;
 }
 
+/**
+ * Who started the server, as the Server menu and Settings > Desktop app both say it. An attached server's log is not
+ * `logFile`, which only the app's own server writes to, so neither offers it.
+ */
+export const serverOriginLabel = (startedHere: boolean): string => (startedHere ? 'started by this app' : 'started outside this app');
+
 export interface DesktopBridge {
   readonly platform: DesktopPlatform;
   /** The app's version, as its About panel shows it. */
@@ -158,10 +164,8 @@ export interface DesktopBridge {
     info(): Promise<DesktopServerInfo>;
     showLog(): void;
   };
-  /** The Web tab's real browser (`<webview>`): its session partition and the file URL of the preload that picks elements. */
+  /** The Web tab's real browser (`<webview>`). The main process gives each one its session and pick preload. */
   nativeBrowser: {
-    partition: string;
-    preload: string;
     /** A screenshot of the visible page of this window's `<webview>`, by its `getWebContentsId()`. */
     capture(webContentsId: number): Promise<NativeBrowserShot>;
   };

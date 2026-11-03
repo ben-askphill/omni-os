@@ -27,7 +27,7 @@ describe('updateNotice', () => {
   it('has no button when no app restarts the server', () => {
     const n = updateNotice(view({ behind: 2, canApply: false }));
     expect(n?.action).toBeNull();
-    expect(n?.text).toBe('2 new commits on main. Restart Omni from the Mac or Linux app to update.');
+    expect(n?.text).toBe('2 new commits on main. Nothing restarts this server, so update it by hand.');
   });
 
   it('shows progress and its button', () => {

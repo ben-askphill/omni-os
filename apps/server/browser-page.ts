@@ -1,6 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { readAddress } from '@omni/shared/address-bar.ts';
 
 /** The channel browser's types and pure helpers: viewport clamping, tab icons, key commands, Chrome lookup and URL normalizing. */
 
@@ -176,20 +177,6 @@ export function chromeBinary(): string | null {
 
 /** Only web pages and blank tabs: nothing internal, no navigating the browser to file:// or chrome://. */
 export function normalizeUrl(input: string): string | null {
-  const s = input.trim();
-  if (!s) return null;
-  if (s === 'about:blank') return s;
-  const withScheme = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?([/?#]|$)/.test(s)
-    ? `http://${s}`
-    : /^[a-z][a-z0-9+.-]*:(?!\d)/i.test(s)
-      ? s
-      : /\s/.test(s) || !/\./.test(s)
-        ? `https://www.google.com/search?q=${encodeURIComponent(s)}`
-        : `https://${s}`;
-  try {
-    const u = new URL(withScheme);
-    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
-  } catch {
-    return null;
-  }
+  const address = readAddress(input);
+  return address && address.kind !== 'refused' ? address.url : null;
 }

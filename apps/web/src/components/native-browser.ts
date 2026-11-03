@@ -9,55 +9,18 @@ import {
   type NativePageLook,
   type NativePickRequest,
 } from '@omni/shared/desktop-bridge.ts';
-
-const SEARCH = 'https://www.google.com/search?q=';
-
-/** The host part of what was typed: before any path, without a port, lower case. */
-function hostOf(text: string) {
-  return text.split(/[/?#]/)[0].replace(/:\d*$/, '').toLowerCase();
-}
-
-function isLocal(text: string) {
-  const h = hostOf(text);
-  const parts = h.split('.');
-  return h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || (parts.length === 4 && parts.every((p) => /^\d+$/.test(p)));
-}
-
-function looksLikeHost(text: string) {
-  const h = hostOf(text);
-  if (h === 'localhost') return true;
-  return h.includes('.') && !h.startsWith('.') && !h.endsWith('.') && /^[\p{L}\p{N}.-]+$/u.test(h);
-}
+import { readAddress, SEARCH_URL } from '@omni/shared/address-bar.ts';
 
 /**
- * What the address bar loads: a web address as it stands, a bare host or `localhost:3000` with a scheme added, anything
- * else as a search. Null for blank input. Only http, https and about:blank load: `file:` or `javascript:` becomes a
- * search for its words. The Mac app's Web tab read addresses the same way.
+ * What the address bar loads (@omni/shared/address-bar.ts, as the agent's Browser tab reads it). Null for blank input.
+ * Only http, https and about:blank load: `file:` or `javascript:` becomes a search for its words.
  */
 export function resolveAddress(input: string): string | null {
-  const text = input.trim();
-  if (!text) return null;
-  if (text === 'about:blank') return text;
-  const scheme = /^([a-z][a-z0-9+.-]*):\/\/[^/?#\s]/i.exec(text);
-  if (scheme) {
-    if (!/^https?$/i.test(scheme[1])) return SEARCH + encodeURIComponent(text);
-    try {
-      return new URL(text).href;
-    } catch {
-      return SEARCH + encodeURIComponent(text);
-    }
-  }
-  if (!/\s/.test(text) && looksLikeHost(text)) {
-    try {
-      return new URL(`${isLocal(text) ? 'http' : 'https'}://${text}`).href;
-    } catch {
-      // Not an address after all.
-    }
-  }
-  return SEARCH + encodeURIComponent(text);
+  const address = readAddress(input);
+  if (!address) return null;
+  return address.kind === 'refused' ? SEARCH_URL + encodeURIComponent(input.trim()) : address.url;
 }
 
-/** A page that Annotate can capture: a web page, not a blank or an error. */
 /** How much webview.sendInputEvent's pixels exceed the page's: it takes them before the page's zoom, which follows the app's View > Zoom. */
 export function inputScale(zoom: number): number {
   return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
@@ -69,6 +32,7 @@ export function inputPoint(p: { x: number; y: number }, zoom: number): { x: numb
   return { x: Math.round(p.x * z), y: Math.round(p.y * z) };
 }
 
+/** A page that Annotate can capture: a web page, not a blank or an error. */
 export const isWebPage = (url: string) => /^https?:\/\//i.test(url);
 
 /**

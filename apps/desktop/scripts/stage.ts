@@ -6,10 +6,8 @@
 //
 //   --host-glibc  ship this machine's node-pty build on Linux even when it needs a newer glibc than the floor
 //
-// Packages come from the repo's node_modules along package-lock.json's graph. One the repo has not installed,
-// such as another platform's esbuild binary, comes from its locked tarball, checked against the lock's integrity.
+// Packages come from the repo's node_modules along package-lock.json's graph, at their locked versions.
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, relative, resolve, sep } from 'node:path';
@@ -20,7 +18,7 @@ export const STAGE_DIR = join(DESKTOP, 'build', 'omni');
 const CACHE_DIR = join(DESKTOP, 'build', 'cache');
 
 /** The packages apps/server/scripts/bundle.ts leaves out of the bundle (its EXTERNAL). tests/stage.test.ts keeps the two equal. */
-export const EXTERNALS = ['node-pty', '@playwright/mcp', 'tsx'] as const;
+export const EXTERNALS = ['node-pty', '@playwright/mcp'] as const;
 
 /** Copied as they are, beside the bundles. */
 const SHIPPED_DIRS = ['crew', 'automations', 'mods', 'prototypes/activity-monitor'] as const;
@@ -227,15 +225,15 @@ export function stagedPtyProblems(ptyDir: string, target: Target, hostGlibc = fa
   return problems;
 }
 
-/** Checks bytes against an SRI string such as the lock's `sha512-...`. */
-export function integrityMatches(bytes: Buffer, integrity: string): boolean {
-  return integrity.split(/\s+/).some((item) => {
-    const dash = item.indexOf('-');
-    if (dash < 0) return false;
-    const algorithm = item.slice(0, dash);
-    if (!['sha1', 'sha256', 'sha384', 'sha512'].includes(algorithm)) return false;
-    return createHash(algorithm).update(bytes).digest('base64') === item.slice(dash + 1);
-  });
+/**
+ * Why the repo's copy of a closure package cannot ship, or null when it can. It must be installed at the locked
+ * version. One with an install script may hold files built for this machine (a native binary), so it ships only to
+ * this machine's platform and arch. node-pty has an install script and its own branch in installClosure.
+ */
+export function copyProblem(path: string, entry: LockEntry, installed: string | null, hostTarget: boolean): string | null {
+  if (installed !== entry.version) return `${path} is ${installed ?? 'not installed'}, not the locked ${entry.version}. Run npm install --include=dev.`;
+  if (entry.hasInstallScript && !hostTarget) return `${path} has an install script, so the repo's copy is built for this machine only`;
+  return null;
 }
 
 function run(command: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): void {
@@ -306,37 +304,14 @@ function localVersion(dir: string): string | null {
   }
 }
 
-async function fetchTarball(path: string, entry: LockEntry, dest: string): Promise<void> {
-  if (!entry.resolved || !entry.integrity) throw new Error(`${path}: the lock has no tarball to fetch`);
-  mkdirSync(CACHE_DIR, { recursive: true });
-  const file = join(CACHE_DIR, `${createHash('sha256').update(entry.integrity).digest('hex').slice(0, 24)}.tgz`);
-  let bytes = existsSync(file) ? readFileSync(file) : null;
-  if (!bytes || !integrityMatches(bytes, entry.integrity)) {
-    const res = await fetch(entry.resolved, { signal: AbortSignal.timeout(120_000) });
-    if (!res.ok) throw new Error(`${entry.resolved}: ${res.status}`);
-    bytes = Buffer.from(await res.arrayBuffer());
-    if (!integrityMatches(bytes, entry.integrity)) throw new Error(`${entry.resolved}: does not match the lock's integrity`);
-    writeFileSync(file, bytes);
-  }
-  mkdirSync(dest, { recursive: true });
-  run('tar', ['-xzf', file, '-C', dest, '--strip-components=1'], dest);
-}
-
-/**
- * Copies or fetches each package of the closure to the same lock path under `out`, so Node resolves them as it
- * does in the repo. A package whose install script may have left host-only files (esbuild swaps in its native
- * binary) comes from its tarball when the target is not this machine.
- */
-async function installClosure(
-  lock: Lockfile,
-  paths: string[],
-  target: Target,
-  out: string,
-  hostGlibc: boolean,
-): Promise<{ copied: number; fetched: string[] }> {
+/** Copies each package of the closure from the repo to the same lock path under `out`, so Node resolves them as it does in the repo. */
+function installClosure(lock: Lockfile, paths: string[], target: Target, out: string, hostGlibc: boolean): void {
   const hostTarget = target.platform === process.platform && target.arches.length === 1 && target.arches[0] === process.arch;
-  const fetched: string[] = [];
-  let copied = 0;
+  const problems = paths
+    .filter((path) => !path.endsWith('node_modules/node-pty') && !lock.packages[path].inBundle)
+    .map((path) => copyProblem(path, lock.packages[path], localVersion(join(REPO, path)), hostTarget))
+    .filter((problem) => problem !== null);
+  if (problems.length) throw new Error(`cannot ship the externals' packages: ${problems.join('; ')}`);
   for (const path of paths) {
     const entry = lock.packages[path];
     const src = join(REPO, path);
@@ -355,20 +330,11 @@ async function installClosure(
       }
       const problems = stagedPtyProblems(dest, target, hostGlibc);
       if (problems.length) throw new Error(`staged node-pty: ${problems.join('; ')}`);
-      copied++;
       continue;
     }
-    const usable = localVersion(src) === entry.version && !(entry.hasInstallScript && !hostTarget);
-    if (usable) {
-      const nested = join(src, 'node_modules');
-      cpSync(src, dest, { recursive: true, filter: (file) => file !== nested });
-      copied++;
-    } else {
-      await fetchTarball(path, entry, dest);
-      fetched.push(path);
-    }
+    const nested = join(src, 'node_modules');
+    cpSync(src, dest, { recursive: true, filter: (file) => file !== nested });
   }
-  return { copied, fetched };
 }
 
 function stampPackageJson(out: string): string {
@@ -438,8 +404,8 @@ export async function stage(args: StageArgs, out = STAGE_DIR): Promise<void> {
   say('Copying node_modules for the externals');
   const lock = JSON.parse(readFileSync(join(REPO, 'package-lock.json'), 'utf8')) as Lockfile;
   const paths = dependencyClosure(lock, EXTERNALS, target, 'apps/server');
-  const { copied, fetched } = await installClosure(lock, paths, target, out, args.hostGlibc);
-  say(`${paths.length} packages: ${copied} copied${fetched.length ? `, ${fetched.length} fetched (${fetched.map((p) => p.replace(/^.*node_modules\//, '')).join(', ')})` : ''}`);
+  installClosure(lock, paths, target, out, args.hostGlibc);
+  say(`${paths.length} packages copied`);
 
   if (target.platform === process.platform && target.arches.includes(process.arch as Arch)) {
     say('Checking the staged tree on Electron');

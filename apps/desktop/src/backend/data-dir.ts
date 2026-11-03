@@ -3,9 +3,10 @@
 // Looking for the old data only reads: it never copies, moves or writes into the old folder.
 import { dialog } from 'electron';
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
 import type { PlatformDirs } from '../paths.ts';
+import { writeJsonAtomic } from '../settings.ts';
 
 /** The SwiftUI app's UserDefaults domain and key for its checkout (OmniKit/ServerSettings.swift). */
 export const MAC_DEFAULTS_DOMAIN = 'com.omni-os.mac';
@@ -63,14 +64,13 @@ export type DataDirPlan =
   /** Old data exists and the default has none: ask once, then remember the answer. */
   | { kind: 'ask'; existing: string; fresh: string };
 
+/** Development never gets here: chooseDataDir gives it the fallback before it reads anything. */
 export function planDataDir(input: {
-  dev: boolean;
   fallback: string;
   stored: string | null;
   repos: string[];
   hasDatabase: (dir: string) => boolean;
 }): DataDirPlan {
-  if (input.dev) return { kind: 'use', dir: input.fallback };
   if (input.stored) return { kind: 'use', dir: input.stored };
   if (input.hasDatabase(input.fallback)) return { kind: 'use', dir: input.fallback };
   const existing = input.repos.map((repo) => join(repo, 'data')).find((dir) => dir !== input.fallback && input.hasDatabase(dir));
@@ -91,10 +91,7 @@ export function readChoice(file: string): string | null {
 }
 
 export function writeChoice(file: string, dataDir: string): void {
-  mkdirSync(dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify({ dataDir }, null, 2)}\n`, { mode: 0o600 });
-  renameSync(tmp, file);
+  writeJsonAtomic(file, { dataDir });
 }
 
 function readMacRepoPath(): Promise<string | null> {
@@ -157,7 +154,6 @@ export async function chooseDataDir(
     repos = legacyRepos({ platform: input.dirs.platform, home: input.dirs.home, macRepoPath, linuxDesktopEntry });
   }
   const plan = planDataDir({
-    dev: input.dev,
     fallback: input.fallback,
     stored,
     repos,

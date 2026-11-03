@@ -81,6 +81,7 @@ function deps(over: Partial<UpdateDeps> = {}): UpdateDeps & { restart: ReturnTyp
     root: '/nowhere',
     current: () => 'abc',
     supervised: () => true,
+    bundled: false,
     enabled: () => true,
     runningTurns: () => 0,
     install: vi.fn(async () => null),
@@ -101,6 +102,14 @@ describe('Updater', () => {
     const u = new Updater(d);
     expect(u.apply()).toMatchObject({ ok: false });
     expect(u.view().canApply).toBe(false);
+    expect(d.install).not.toHaveBeenCalled();
+  });
+
+  it('refuses in the desktop app, which updates itself, even though the app supervises the server', () => {
+    const d = deps({ bundled: true });
+    const u = new Updater(d);
+    expect(u.view().canApply).toBe(false);
+    expect(u.apply()).toEqual({ ok: false, error: expect.stringContaining('updates itself') });
     expect(d.install).not.toHaveBeenCalled();
   });
 

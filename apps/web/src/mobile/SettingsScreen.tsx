@@ -32,7 +32,7 @@ export function SettingsScreen() {
   const host = status?.device?.name || location.hostname;
   const secretStore = useSecretStoreLabel();
   const [q, setQ] = useState('');
-  const hits = searchSettings(q, desktop ? 'desktop' : 'web');
+  const hits = searchSettings(q, desktop ? 'desktop' : 'web', { loginItem: desktop?.loginItemSupported });
   const open = (section: SettingsSectionId, focus?: string) => shell.open(href.settingsSection(section, focus));
   const automationsSub = automations.error ?? (automations.data ? (automations.data.length ? `${automations.data.length} on ${host || 'this machine'}` : 'None yet') : 'Loading');
 

@@ -45,7 +45,6 @@ describe('DesktopHooks', () => {
     const cases = [
       ['settings', '#/settings'],
       ['search', '#/search'],
-      ['quick-prompt-settings', '#/settings/desktop'],
       ['home', '#/'],
     ] as const;
     for (const [c, to] of cases) {

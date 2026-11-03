@@ -5,6 +5,7 @@ import { app, BrowserWindow, nativeTheme, shell } from 'electron';
 import { existsSync } from 'node:fs';
 import type { AppContext } from './context.ts';
 import { installQuickPrompt } from './quick-prompt.ts';
+import { bringForward } from './windows.ts';
 
 /** The page's buttons are links to this host. The window catches the navigation and never loads it. */
 const ACTION_HOST = 'omni-server-screen.invalid';
@@ -168,6 +169,13 @@ export function retryFromMenu(ctx: AppContext): void {
   if (screen && !screen.isDestroyed()) void tryAgain(ctx, screen);
 }
 
+/** Brings the open screen forward, failed or retrying. False when none is open. */
+export function focusServerScreen(): boolean {
+  if (!screen || screen.isDestroyed()) return false;
+  bringForward(screen);
+  return true;
+}
+
 /** Shows the failure, in the open screen or a new one. Called for each failed state, at the first start or later. */
 export function showServerFailure(ctx: AppContext, message: string): void {
   if (ctx.quitting()) return;
@@ -178,13 +186,7 @@ export function showServerFailure(ctx: AppContext, message: string): void {
     app.on('activate', () => {
       const state = ctx.backend.current;
       if (state.kind !== 'failed') return;
-      if (screen && !screen.isDestroyed()) {
-        if (screen.isMinimized()) screen.restore();
-        screen.show();
-        screen.focus();
-        return;
-      }
-      showServerFailure(ctx, state.message);
+      if (!focusServerScreen()) showServerFailure(ctx, state.message);
     });
   }
   const win = screen && !screen.isDestroyed() ? screen : createScreen(ctx);

@@ -11,9 +11,10 @@ import { runningCount } from './runner.ts';
 //
 // The check fetches origin's main every 15 minutes and compares it with the commit this server booted from. Update
 // waits until no turn runs, runs scripts/sync-main.sh (the main checkout fast-forwards; a worktree stays), rebuilds
-// the Web UI and exits with RESTART_EXIT_CODE. Only a supervisor starts it again: the Mac app or the Linux app, or a
-// service manager such as systemd with OMNI_SUPERVISOR set by hand (docs/user/install.md). Without one, Update is not
-// offered.
+// the Web UI and exits with RESTART_EXIT_CODE. Only a supervisor starts it again: the desktop app run with --dev, the
+// SwiftUI Mac app, the Linux launcher, or a service manager such as systemd with OMNI_SUPERVISOR set by hand
+// (docs/user/install.md). Without one, Update is not offered. The packaged desktop app runs the server as a bundle
+// with no checkout and updates itself (apps/desktop/src/updates.ts), so there Update is neither checked nor offered.
 
 const run = promisify(execFile);
 
@@ -104,6 +105,8 @@ export interface UpdateDeps {
   root: string;
   current: () => string | null;
   supervised: () => boolean;
+  /** The desktop app's bundle: no checkout to update, and the app replaces the server with itself. */
+  bundled: boolean;
   enabled: () => boolean;
   runningTurns: () => number;
   /** Fast-forwards main and rebuilds the Web UI. Returns an error message, null on success. */
@@ -149,6 +152,7 @@ export function defaultDeps(): UpdateDeps {
     current: () => about.gitHead,
     supervised: () => Boolean(process.env.OMNI_SUPERVISOR),
     // The desktop app's bundle has no checkout to bring level: it updates itself (apps/desktop/src/updates.ts).
+    bundled: BUNDLED,
     enabled: () => !BUNDLED && process.env.OMNI_UPDATE_CHECK !== '0',
     runningTurns: runningCount,
     install: installFromMain,
@@ -181,7 +185,7 @@ export class Updater {
       phase: this.phase,
       waitingFor: this.waitingFor,
       error: this.error,
-      canApply: this.deps.supervised(),
+      canApply: !this.deps.bundled && this.deps.supervised(),
     };
   }
 
@@ -195,8 +199,11 @@ export class Updater {
     return this.view();
   }
 
-  /** Starts Update. Refused without an app to start the server again. A second call joins the first. */
+  /** Starts Update. Refused in the desktop app's bundle, and without an app to start the server again. A second call joins the first. */
   apply(): { ok: true } | { ok: false; error: string } {
+    if (this.deps.bundled) {
+      return { ok: false, error: 'This server is part of the Omni desktop app, which updates itself: relaunch when it says an update is ready.' };
+    }
     if (!this.deps.supervised()) {
       return { ok: false, error: 'This server was not started by the Omni app, so it can not restart itself. Restart it by hand.' };
     }

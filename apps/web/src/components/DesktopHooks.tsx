@@ -39,8 +39,6 @@ function run(command: DesktopCommand) {
       return navigate(href.home());
     case 'settings':
       return navigate(href.settingsPage());
-    case 'quick-prompt-settings':
-      return navigate('#/settings/desktop');
   }
 }
 

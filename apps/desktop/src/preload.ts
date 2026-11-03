@@ -47,7 +47,6 @@ const bridge: DesktopBridge = {
     showLog: () => send('omni:server:show-log'),
   },
   nativeBrowser: {
-    ...boot.nativeBrowser,
     capture: (webContentsId) => invoke('omni:native-browser:capture', webContentsId),
   },
 };

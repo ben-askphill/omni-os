@@ -1,6 +1,6 @@
 // The desktop app's main process: one instance, the server behind it, the windows, and the OS hooks the Web UI
 // cannot reach from a browser (ADR 0010).
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -8,22 +8,22 @@ import type { DesktopEvent } from '@omni/shared/desktop-bridge.ts';
 import { Backend } from './backend/index.ts';
 import { chooseDataDir } from './backend/data-dir.ts';
 import { checkoutMessage, checkoutProblem } from './backend/launch.ts';
-import { writeNodeShim } from './backend/process.ts';
 import type { AppContext, AppPaths } from './context.ts';
 import { handle, on, trusted, trustOrigins } from './handle.ts';
 import { BOOTSTRAP, EVENT, type Bootstrap } from './ipc.ts';
-import { installLoginItem } from './login-item.ts';
-import { installMenu } from './menu.ts';
-import { installNativeBrowser, NATIVE_BROWSER_PARTITION } from './native-browser.ts';
+import { installLoginItem, LOGIN_ITEM_SUPPORTED } from './login-item.ts';
+import { installMenu, showServerLog } from './menu.ts';
+import { desktopPlatform } from './menu-template.ts';
+import { installNativeBrowser } from './native-browser.ts';
 import { parseOptions, safeRoute } from './options.ts';
 import { defaultDataDir, serverLogFile, type PlatformDirs } from './paths.ts';
 import { installQuickPrompt } from './quick-prompt.ts';
 import { installQuitHold } from './quit.ts';
-import { showServerFailure } from './server-screen.ts';
+import { focusServerScreen, showServerFailure } from './server-screen.ts';
 import { openSettings } from './settings.ts';
 import { installSystemEvents } from './system.ts';
 import { installUpdates } from './updates.ts';
-import { createOmniWindow } from './windows.ts';
+import { bringForward, createOmniWindow, reloadIfFailed, routeUrl, secureAppSession } from './windows.ts';
 
 app.setName('Omni');
 
@@ -76,7 +76,9 @@ async function boot(): Promise<void> {
     bundled: paths.bundled,
     appRoot: paths.appRoot,
     binary: process.execPath,
-    shimDir: dev ? null : writeNodeShim(join(dirs.userData, 'bin'), process.execPath),
+    // Written when this app starts a server, not when it attaches to one that runs on another launch's binary.
+    shimDir: dev ? null : join(dirs.userData, 'bin'),
+    recordFile: join(dirs.userData, `server-${options.port}.json`),
     home: dirs.home,
   });
 
@@ -97,10 +99,9 @@ async function boot(): Promise<void> {
     showMain(route) {
       const open = ctx.mainWindow();
       if (open) {
-        if (route) void open.loadURL(`${ctx.appUrl()}/${safeRoute(route) ?? ''}`);
-        if (open.isMinimized()) open.restore();
-        open.show();
-        open.focus();
+        // A window opened before the server was up shows an error page: it loads again, now that it is.
+        if (!reloadIfFailed(ctx, open, route) && route) void open.loadURL(routeUrl(ctx.appUrl(), route));
+        bringForward(open);
         return open;
       }
       main = createOmniWindow(ctx, { kind: 'main', route: route ?? options.route });
@@ -113,14 +114,14 @@ async function boot(): Promise<void> {
     quitting: () => quitting,
   };
 
+  secureAppSession(ctx);
   trustOrigins(() => [new URL(ctx.appUrl()).origin, backend.origin()]);
   ipcMain.on(BOOTSTRAP, (event) => {
     const boot: Bootstrap = {
-      platform: process.platform === 'darwin' || process.platform === 'win32' ? process.platform : 'linux',
+      platform: desktopPlatform(),
       version: app.getVersion(),
       packaged: app.isPackaged,
-      loginItemSupported: process.platform === 'darwin' || process.platform === 'win32',
-      nativeBrowser: { partition: NATIVE_BROWSER_PARTITION, preload: `file://${paths.pickPreload}` },
+      loginItemSupported: LOGIN_ITEM_SUPPORTED,
     };
     event.returnValue = trusted(event) ? boot : null;
   });
@@ -133,13 +134,10 @@ async function boot(): Promise<void> {
   });
   on('omni:focus', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return;
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.focus();
+    if (win) bringForward(win);
   });
   handle('omni:server:info', () => backend.info());
-  on('omni:server:show-log', () => void shell.openPath(backend.config.logFile));
+  on('omni:server:show-log', () => showServerLog(ctx));
 
   installMenu(ctx);
   installSystemEvents(ctx);
@@ -148,7 +146,13 @@ async function boot(): Promise<void> {
   installQuitHold(ctx);
   installLoginItem(ctx);
 
-  app.on('second-instance', () => ctx.showMain());
+  // Opening the app again while it runs: the main window once the server is up, else the failure screen. A start
+  // still under way opens the main window itself when it is ready (below, and the screen's Try Again).
+  app.on('second-instance', () => {
+    const state = backend.current;
+    if (state.kind === 'ready') ctx.showMain();
+    else if (!focusServerScreen() && state.kind === 'failed') showServerFailure(ctx, state.message);
+  });
   app.on('activate', () => {
     if (backend.current.kind === 'ready') ctx.showMain();
   });

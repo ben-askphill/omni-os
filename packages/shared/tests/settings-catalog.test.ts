@@ -56,7 +56,10 @@ describe('settings catalog', () => {
     expect(searchSettings('hotkey', 'desktop').map((e) => e.id)).toEqual(['desktop-quick-prompt']);
     expect(searchSettings('hotkey', 'web')).toEqual([]);
     expect(searchSettings('login', 'web').map((e) => e.id)).not.toContain('desktop-login');
-    expect(searchSettings('login', 'desktop').map((e) => e.id)).toContain('desktop-login');
+    expect(searchSettings('login', 'desktop', { loginItem: true }).map((e) => e.id)).toContain('desktop-login');
+    // Linux opens no app at login, and its Desktop app section draws no such card: no hit that lands on nothing.
+    expect(searchSettings('login', 'desktop', { loginItem: false }).map((e) => e.id)).not.toContain('desktop-login');
+    expect(searchSettings('autostart', 'desktop')).toEqual([]);
     expect(searchSettings('theme', 'desktop').map((e) => e.id)).toEqual(searchSettings('theme', 'web').map((e) => e.id));
   });
 

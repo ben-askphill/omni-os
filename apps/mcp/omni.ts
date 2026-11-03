@@ -680,7 +680,7 @@ server.registerTool('note_tool_failure_recovery', {
 }, async ({ id, ...body }) => text(await call(`/tool-failures/occurrences/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) })));
 
 server.registerTool('omni_update', {
-  description: `Omni's own update. check: fetch origin's main and say how many commits this server is behind, with their subjects. apply: the Update button. It waits until no turn runs (this one included, so it starts after your turn ends), updates the main checkout to main, rebuilds the Web UI and restarts the server. Only works when the Mac or Linux app started the server. Apply only when ${USER} asks.`,
+  description: `Omni's own update. check: fetch origin's main and say how many commits this server is behind, with their subjects. apply: the Update button. It waits until no turn runs (this one included, so it starts after your turn ends), updates the main checkout to main, rebuilds the Web UI and restarts the server. Only works when an app started the server from a checkout: the SwiftUI Mac app, the Linux launcher, or the desktop app run with --dev. The packaged desktop app updates itself and offers to relaunch, so there check finds nothing and apply is refused. Apply only when ${USER} asks.`,
   inputSchema: { action: z.enum(['check', 'apply']) },
 }, async ({ action }) => text(await call(action === 'check' ? '/update/check' : '/update', { method: 'POST' })));
 

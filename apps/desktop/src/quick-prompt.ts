@@ -12,6 +12,7 @@ import type { AppContext } from './context.ts';
 import { handle, on } from './handle.ts';
 import { EVENT } from './ipc.ts';
 import { safeRoute } from './options.ts';
+import { isWebUiDocument, linkTarget } from './window-rules.ts';
 import { routeUrl } from './windows.ts';
 
 const MAC = process.platform === 'darwin';
@@ -214,12 +215,14 @@ function createPanel(ctx: AppContext): BrowserWindow {
   panel.on('closed', () => {
     if (state.panel === panel) state.panel = null;
   });
+  // Origins, not prefixes: http://127.0.0.1:4747@evil.example/ starts with the app's URL too.
   panel.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//.test(url) && !url.startsWith(ctx.appUrl())) void shell.openExternal(url);
+    const target = linkTarget(url, { app: ctx.appUrl(), server: ctx.backend.origin() });
+    if (target.kind === 'external' && /^https?:/.test(target.url)) void shell.openExternal(target.url);
     return { action: 'deny' };
   });
   panel.webContents.on('will-navigate', (event, url) => {
-    if (!url.startsWith(ctx.appUrl())) event.preventDefault();
+    if (!isWebUiDocument(url, ctx.appUrl())) event.preventDefault();
   });
   void panel.loadURL(routeUrl(ctx.appUrl(), QUICK_PROMPT_ROUTE)).catch((err: unknown) => {
     if (!panel.isDestroyed()) console.error('[omni] Quick Prompt failed to load:', err);

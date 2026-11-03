@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decideQuit, QUIT_CHOICES, quitAction, quitDialog } from '../src/quit.ts';
+import { decideQuit, QUIT_CHOICES, quitAction, quitDialog, RESTART_CHOICES, restartDialog } from '../src/quit.ts';
 
 describe('quit', () => {
   it('quits at once from an attached server, which keeps running', () => {
@@ -31,5 +31,15 @@ describe('quit', () => {
     expect(quitDialog(1).detail).toBe('Keep the server running in the background to let them finish, or stop them and quit.');
     expect(quitDialog(1).buttons).toEqual(['Keep Server Running', 'Stop Them and Quit', 'Cancel']);
     expect(QUIT_CHOICES).toEqual(['keep-server-running', 'stop-and-quit', 'cancel']);
+  });
+});
+
+describe('Restart Server with turns running', () => {
+  it('asks to wait for them, stop them, or cancel', () => {
+    expect(RESTART_CHOICES).toEqual(['when-finished', 'stop-and-restart', 'cancel']);
+    expect(restartDialog(1)).toMatchObject({ message: '1 turn is still running', buttons: ['Restart When They Finish', 'Stop Them and Restart', 'Cancel'] });
+    expect(restartDialog(3).message).toBe('3 turns are still running');
+    expect(restartDialog(null).message).toBe('Turns may still be running');
+    expect(restartDialog(null).buttons).toEqual(restartDialog(2).buttons);
   });
 });

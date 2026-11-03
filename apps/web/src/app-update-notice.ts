@@ -1,5 +1,12 @@
 import type { DesktopUpdateView } from '@omni/shared/desktop-bridge.ts';
 
+/** The words the sidebar notice and Settings > Desktop app both use, so one update state reads the same in both. */
+export const appUpdateWords = {
+  downloading: (view: { version: string; percent: number }) => `Downloading Omni ${view.version} (${Math.round(view.percent)}%)`,
+  ready: (view: { version: string }) => `Omni ${view.version} is ready`,
+  relaunch: 'Relaunch to Update',
+} as const;
+
 export interface AppUpdateNotice {
   text: string;
   /** The updater's own words, as the text's tooltip. */
@@ -18,9 +25,9 @@ export function appUpdateNotice(view: DesktopUpdateView | null, afterDownload: b
   if (!view) return null;
   switch (view.state) {
     case 'downloading':
-      return { text: `Downloading Omni ${view.version} (${view.percent}%)`, busy: true, failed: false, action: null };
+      return { text: appUpdateWords.downloading(view), busy: true, failed: false, action: null };
     case 'ready':
-      return { text: `Omni ${view.version} is ready`, busy: false, failed: false, action: { kind: 'install', label: 'Relaunch to update' } };
+      return { text: appUpdateWords.ready(view), busy: false, failed: false, action: { kind: 'install', label: appUpdateWords.relaunch } };
     case 'error':
       if (afterDownload) return { text: 'The update did not download.', detail: view.message, busy: false, failed: true, action: { kind: 'retry', label: 'Retry' } };
       if (view.downloadUrl) {

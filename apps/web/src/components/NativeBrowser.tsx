@@ -50,7 +50,8 @@ const SAD = 'The page scrolled or changed after the screenshot. The screenshot a
 
 /**
  * One channel's <webview>: what it shows, the page's own size and scroll for live Annotate, and the calls Annotate
- * makes of it. The element is made here and not by React, so its partition and preload are set before it loads.
+ * makes of it. The element is made here and not by React. The main process gives it the Web tab's session and the
+ * pick preload as it attaches, whatever its attributes say (apps/desktop/src/native-browser.ts).
  */
 function useNativePage(channelId: string, host: React.RefObject<HTMLDivElement | null>, onKey: (key: string, down: boolean) => void) {
   const bridge = desktop!.nativeBrowser;
@@ -69,8 +70,6 @@ function useNativePage(channelId: string, host: React.RefObject<HTMLDivElement |
     const box = host.current;
     if (!box) return;
     const el = document.createElement('webview') as WebviewTag;
-    el.setAttribute('partition', bridge.partition);
-    el.setAttribute('preload', bridge.preload);
     el.setAttribute('src', savedAddress(channelId) ?? 'about:blank');
     el.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;');
     box.appendChild(el);
@@ -83,7 +82,7 @@ function useNativePage(channelId: string, host: React.RefObject<HTMLDivElement |
       el.remove();
       setView(null);
     };
-  }, [channelId, host, bridge.partition, bridge.preload]);
+  }, [channelId, host]);
 
   useEffect(() => {
     if (!view || !link) return;

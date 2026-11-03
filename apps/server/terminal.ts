@@ -11,8 +11,10 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import type { IPty } from 'node-pty';
-import type { Terminal as Headless } from '@xterm/headless';
-import type { SerializeAddon } from '@xterm/addon-serialize';
+// Imported, not required at run time, so the desktop app's bundle carries them: it ships no node_modules for them.
+// Both are CommonJS, and Node finds no named exports in @xterm/headless's, so the classes come off the default export.
+import xtermHeadless, { type Terminal as Headless } from '@xterm/headless';
+import xtermSerialize, { type SerializeAddon } from '@xterm/addon-serialize';
 import { artifactsDir } from './config.ts';
 import { terminalEnv } from './terminal-env.ts';
 
@@ -63,8 +65,8 @@ function loadPty() {
 }
 
 function headless(cols: number, rows: number) {
-  const { Terminal } = require('@xterm/headless') as typeof import('@xterm/headless');
-  const { SerializeAddon } = require('@xterm/addon-serialize') as typeof import('@xterm/addon-serialize');
+  const { Terminal } = xtermHeadless;
+  const { SerializeAddon } = xtermSerialize;
   const screen = new Terminal({ cols, rows, scrollback: SCROLLBACK_LINES, allowProposedApi: true });
   const serializer = new SerializeAddon();
   screen.loadAddon(serializer);
@@ -102,8 +104,16 @@ export function openTerminal(threadId: string, cwd: string, size: { cols?: numbe
     OMNI_ARTIFACTS_DIR: artifactsDir(threadId),
   });
 
-  const pty = loadPty().spawn(shell, ['-l'], { name: 'xterm-256color', cols, rows, cwd, env });
-  const term: Terminal = { threadId, cwd, pid: pty.pid, cols, rows, running: true, code: null, ...headless(cols, rows), pty, events: new EventEmitter() };
+  // The screen first: anything that throws after the spawn would leave a shell nobody can reach or close.
+  const { screen, serializer } = headless(cols, rows);
+  let pty: IPty;
+  try {
+    pty = loadPty().spawn(shell, ['-l'], { name: 'xterm-256color', cols, rows, cwd, env });
+  } catch (err) {
+    screen.dispose();
+    throw err;
+  }
+  const term: Terminal = { threadId, cwd, pid: pty.pid, cols, rows, running: true, code: null, screen, serializer, pty, events: new EventEmitter() };
   term.events.setMaxListeners(0);
   // Clients get output once the headless screen has parsed it, so a snapshot and the output after it
   // never overlap or leave a gap. The exit waits behind the output the same way.

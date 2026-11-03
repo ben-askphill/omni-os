@@ -28,7 +28,7 @@ export function updateNotice(v: UpdateView | null | undefined): UpdateNotice | n
   if (v.behind <= 0) return null;
   const detail = v.commits.length ? v.commits.map((c) => c.subject).join('\n') + (v.behind > v.commits.length ? `\nand ${v.behind - v.commits.length} more` : '') : null;
   const count = v.behind === 1 ? '1 new commit on main' : `${v.behind} new commits on main`;
-  if (!v.canApply) return { text: `${count}. Restart Omni from the Mac or Linux app to update.`, detail, action: null, busy: false, failed: false };
+  if (!v.canApply) return { text: `${count}. Nothing restarts this server, so update it by hand.`, detail, action: null, busy: false, failed: false };
   return { text: count, detail, action: 'update', busy: false, failed: false };
 }
 

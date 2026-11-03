@@ -44,6 +44,9 @@
       },
       "ios": {
         "dependencies": { "deny": ["@omni/web", "@omni/mac", "@omni/server"] }
+      },
+      "desktop": {
+        "dependencies": { "deny": ["@omni/web", "@omni/mac", "@omni/server", "@omni/linux", "@omni/mcp", "@omni/client-core"] }
       }
     }
   }

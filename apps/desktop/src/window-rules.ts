@@ -38,6 +38,59 @@ export function staysInWindow(url: string, origins: { app: string; server: strin
   }
 }
 
+/** True for the Web UI's own document, not a file the server serves at another path (an artifact, an upload). */
+export function isWebUiDocument(url: string | undefined, appUrl: string): boolean {
+  if (!url) return false;
+  try {
+    const target = new URL(url);
+    return target.origin === new URL(appUrl).origin && (target.pathname === '/' || target.pathname === '');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What the Web UI asks the browser for: writing the clipboard, full screen, notifications and dictation's
+ * microphone. Electron grants every permission unless told otherwise.
+ */
+const WEB_UI_PERMISSIONS = new Set(['clipboard-sanitized-write', 'fullscreen', 'notifications', 'media']);
+
+/**
+ * A permission for a page in the app's own session: only the Web UI's top frame gets one. An agent's HTML (an
+ * artifact in a sandboxed frame, or opened as a page of its own under /api) gets none, and nothing gets
+ * `openExternal`, which would hand a link in any scheme to the app registered for it, without a click.
+ */
+export function appPermissionAllowed(permission: string, details: { isMainFrame: boolean; requestingUrl?: string }, appUrl: string): boolean {
+  return WEB_UI_PERMISSIONS.has(permission) && details.isMainFrame && isWebUiDocument(details.requestingUrl, appUrl);
+}
+
+/** What a frame inside an Omni window may load: a web page, or a document of its own. No other app's scheme. */
+export function subframeNavigationAllowed(url: string): boolean {
+  try {
+    return ['http:', 'https:', 'about:', 'blob:', 'data:'].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * How long after a click or key press a page may open a window, a browser tab or another app. A script on a timer,
+ * or a page nobody touched, cannot: Electron has no popup blocker of its own, and WebKit blocked popups without one.
+ */
+export const GESTURE_MS = 1000;
+
+const GESTURES = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'gestureTap', 'touchEnd']);
+
+/** True for an input event that is Ben acting on the page, not the pointer passing over it. */
+export function isGesture(type: string): boolean {
+  return GESTURES.has(type);
+}
+
+/** True when the page's last click or key press was recent enough to open something. */
+export function recentGesture(lastGesture: number | null, now: number): boolean {
+  return lastGesture !== null && now - lastGesture >= 0 && now - lastGesture <= GESTURE_MS;
+}
+
 export interface Rect {
   x: number;
   y: number;

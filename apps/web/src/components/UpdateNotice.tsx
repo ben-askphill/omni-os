@@ -77,7 +77,7 @@ function AppUpdateNotice({ bridge, className }: { bridge: DesktopBridge; classNa
           {notice.text}
         </span>
       </div>
-      {/* Its own row: the sidebar is too narrow for the text and "Relaunch to update" side by side. */}
+      {/* Its own row: the sidebar is too narrow for the text and "Relaunch to Update" side by side. */}
       {action && (
         <Button size="sm" variant={action.kind === 'install' ? 'primary' : 'ghost'} busy={action.kind === 'retry' && retrying} onClick={run} className="mt-2 w-full">
           {action.label}

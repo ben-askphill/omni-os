@@ -43,10 +43,14 @@ function read(file: string): DesktopSettings {
   }
 }
 
-/** Write then rename, so a crash mid-write leaves the old file whole. */
 function write(file: string, settings: DesktopSettings): void {
+  writeJsonAtomic(file, settings);
+}
+
+/** Writes JSON for this user only, then renames it into place, so a crash mid-write leaves the old file whole. */
+export function writeJsonAtomic(file: string, value: unknown): void {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(settings, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
   renameSync(tmp, file);
 }

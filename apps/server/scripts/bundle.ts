@@ -8,9 +8,10 @@ const REPO = resolve(import.meta.dirname, '../../..');
 
 /**
  * Left out of the bundle. node-pty loads a native addon and finds its spawn helper beside its package.json.
- * @playwright/mcp is started as a CLI from its package path (sandbox.ts). tsx registers a loader by path.
+ * @playwright/mcp is started as a CLI from its package path (sandbox.ts). Nothing bundled loads tsx: when BUNDLED,
+ * the MCP scripts run as .mjs on process.execPath (config.ts).
  */
-export const EXTERNAL = ['node-pty', '@playwright/mcp', 'tsx'] as const;
+export const EXTERNAL = ['node-pty', '@playwright/mcp'] as const;
 
 export const MCP_SCRIPTS = ['omni', 'ask', 'render', 'threads'] as const;
 

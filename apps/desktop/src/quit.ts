@@ -1,6 +1,7 @@
 // Quitting, as the SwiftUI app did it (OmniKit/Quit.swift): a server this app started stops with it, unless turns
-// still run on it. Then the app asks whether to keep the server running for them. A server it attached to keeps
-// running, and the app quits at once. The activity monitor this app started stops either way.
+// still run on it. Then the app asks whether to keep the server running for them. A server someone else started keeps
+// running, and the app quits at once. The activity monitor this app started stops either way. Restart Server asks
+// the same question before it stops a server with turns on it.
 import { app, BrowserWindow, dialog } from 'electron';
 import { stopActivityMonitor } from './activity-monitor.ts';
 import type { AppContext } from './context.ts';
@@ -45,61 +46,81 @@ export function quitDialog(runningTurns: number | null): { message: string; deta
   };
 }
 
-const STATUS_TIMEOUT_MS = 3000;
+export type RestartChoice = 'when-finished' | 'stop-and-restart' | 'cancel';
+export const RESTART_CHOICES: readonly RestartChoice[] = ['when-finished', 'stop-and-restart', 'cancel'];
 
-/** Turns running on the server, or null when a ready server does not say within 3 seconds. */
-async function runningTurns(ctx: AppContext): Promise<number | null> {
-  if (ctx.backend.current.kind !== 'ready') return 0;
-  try {
-    const status = await ctx.backend.api<{ running?: unknown }>('/api/status', { signal: AbortSignal.timeout(STATUS_TIMEOUT_MS) });
-    return typeof status.running === 'number' ? status.running : null;
-  } catch {
-    // Busy, as a server with several turns running can be. Stopping it now could end turns nobody was asked about.
-    return null;
-  }
+/** Restart Server's question when turns run, as the quit dialog words it. Buttons follow RESTART_CHOICES. */
+export function restartDialog(runningTurns: number | null): { message: string; detail: string; buttons: string[] } {
+  const buttons = ['Restart When They Finish', 'Stop Them and Restart', 'Cancel'];
+  const message =
+    runningTurns === null ? 'Turns may still be running' : runningTurns === 1 ? '1 turn is still running' : `${runningTurns} turns are still running`;
+  const detail =
+    runningTurns === null
+      ? 'The server did not answer in time. Restart it once no turn runs, or stop any turns and restart now.'
+      : 'Restarting the server now stops them. Restart it once they finish, or stop them and restart now.';
+  return { message, detail, buttons };
 }
 
-/** Interrupts queued turns first, so none starts in between, then the running ones. */
-async function interruptTurns(ctx: AppContext): Promise<void> {
-  const ids: string[] = [];
-  for (const status of ['queued', 'running']) {
-    try {
-      const threads = await ctx.backend.api<{ id: string }[]>(`/api/threads?status=${status}&limit=200`);
-      ids.push(...threads.map((thread) => thread.id));
-    } catch {
-      // The server is going away anyway; a list it cannot give is nothing to stop.
-    }
-  }
-  await Promise.allSettled(
-    ids.map((id) => ctx.backend.api(`/api/threads/${encodeURIComponent(id)}/stop`, { method: 'POST' })),
-  );
-}
-
-async function ask(ctx: AppContext, running: number | null): Promise<QuitChoice> {
-  const text = quitDialog(running);
+async function ask<T>(ctx: AppContext, text: { message: string; detail: string; buttons: string[] }, choices: readonly T[], cancel: T): Promise<T> {
   const options: Electron.MessageBoxOptions = {
     type: 'warning',
     message: text.message,
     detail: text.detail,
     buttons: text.buttons,
     defaultId: 0,
-    cancelId: QUIT_CHOICES.indexOf('cancel'),
+    cancelId: choices.indexOf(cancel),
     noLink: true,
   };
   const parent = ctx.mainWindow();
   const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
-  return QUIT_CHOICES[response] ?? 'cancel';
+  return choices[response] ?? cancel;
+}
+
+/** How often Restart When They Finish asks the server whether turns still run. */
+const IDLE_POLL_MS = 2000;
+let restartPending = false;
+
+/**
+ * Server > Restart Server on a ready server this app started. With turns running it asks first: wait for them (as the
+ * SwiftUI app's ServerRestart did), stop them, or leave the server alone.
+ */
+export async function restartServer(ctx: AppContext): Promise<void> {
+  if (restartPending) return;
+  restartPending = true;
+  try {
+    const running = await ctx.backend.runningTurns();
+    if (running !== 0) {
+      const choice = await ask(ctx, restartDialog(running), RESTART_CHOICES, 'cancel');
+      if (choice === 'cancel') return;
+      if (choice === 'stop-and-restart') await ctx.backend.interruptTurns();
+      else if (!(await untilIdle(ctx))) return;
+    }
+    if (ctx.backend.current.kind === 'ready' && !ctx.quitting()) await ctx.backend.restart();
+  } finally {
+    restartPending = false;
+  }
+}
+
+/** Waits until no turn runs. False when the server stopped being ready meanwhile, or the app is quitting. */
+async function untilIdle(ctx: AppContext): Promise<boolean> {
+  while (ctx.backend.current.kind === 'ready' && !ctx.quitting()) {
+    if ((await ctx.backend.runningTurns()) === 0) return true;
+    await new Promise((resolve) => setTimeout(resolve, IDLE_POLL_MS));
+  }
+  return false;
 }
 
 /** True to go on quitting. */
 async function prepareToQuit(ctx: AppContext): Promise<boolean> {
   const startedHere = ctx.backend.info().startedHere;
-  const decision = decideQuit({ startedHere, runningTurns: startedHere ? await runningTurns(ctx) : 0 });
+  const decision = decideQuit({ startedHere, runningTurns: startedHere ? await ctx.backend.runningTurns() : 0 });
   const action: QuitAction =
-    decision.kind === 'ask' ? quitAction(await ask(ctx, decision.runningTurns)) : { kind: 'quit', interruptTurns: false, stopServer: decision.stopServer };
+    decision.kind === 'ask'
+      ? quitAction(await ask(ctx, quitDialog(decision.runningTurns), QUIT_CHOICES, 'cancel'))
+      : { kind: 'quit', interruptTurns: false, stopServer: decision.stopServer };
   if (action.kind === 'stay-open') return false;
-  if (action.interruptTurns) await interruptTurns(ctx);
-  // Backend.stop only stops a server this app started. One it attached to keeps running, and a start still reading
+  if (action.interruptTurns) await ctx.backend.interruptTurns();
+  // Backend.stop only stops a server this app started. One someone else started keeps running, and a start still reading
   // the login shell's PATH gives up instead of spawning a server after the app has gone.
   if (action.stopServer || !startedHere) await ctx.backend.stop();
   await stopActivityMonitor();

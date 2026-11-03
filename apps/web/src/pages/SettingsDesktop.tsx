@@ -5,6 +5,7 @@ import {
   ZOOM_MAX,
   ZOOM_MIN,
   ZOOM_STEP,
+  serverOriginLabel,
   type DesktopBridge,
   type DesktopServerInfo,
   type DesktopSettings,
@@ -15,6 +16,7 @@ import {
 } from '@omni/shared/desktop-bridge.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { errorText } from '../api.ts';
+import { appUpdateWords } from '../app-update-notice.ts';
 import { Button, ErrorNote, Loader, Picker } from '../components/ui.tsx';
 import { Card, InfoRow, Origin, Row, SwitchRow } from './settings-parts.tsx';
 
@@ -195,16 +197,23 @@ function AppCard({ bridge }: { bridge: DesktopBridge }) {
           </span>
         </InfoRow>
         <InfoRow label="Server">
-          <span className="truncate">{info ? `Port ${info.port}, ${info.startedHere ? 'started by this app' : 'already running when the app opened'}` : '…'}</span>
+          <span className="truncate">{info ? `Port ${info.port}, ${serverOriginLabel(info.startedHere)}` : '…'}</span>
         </InfoRow>
         <InfoRow label="Data">
           <span className="truncate font-mono text-[12.5px]">{info?.dataDir ?? '…'}</span>
         </InfoRow>
         <InfoRow label="Log">
-          <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]">{info?.logFile ?? '…'}</span>
-          <Button size="sm" onClick={() => bridge.server.showLog()} disabled={!info}>
-            Show Log
-          </Button>
+          {info && !info.startedHere ? (
+            // The app's log file holds only the servers it started; this one writes wherever it was started from.
+            <span className="min-w-0 flex-1 truncate text-fg-3">Kept by whatever started the server</span>
+          ) : (
+            <>
+              <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]">{info?.logFile ?? '…'}</span>
+              <Button size="sm" onClick={() => bridge.server.showLog()} disabled={!info}>
+                Show Log
+              </Button>
+            </>
+          )}
         </InfoRow>
         <InfoRow label="Updates">
           <UpdateLine update={update} busy={busy} onCheck={() => void check()} onInstall={() => bridge.updates.install()} />
@@ -240,15 +249,15 @@ function UpdateLine({ update, busy, onCheck, onInstall }: { update: DesktopUpdat
     case 'downloading':
       return (
         <span className="flex items-center gap-2 text-fg-3">
-          <Loader size={12} /> Downloading {update.version}, {Math.round(update.percent)}%
+          <Loader size={12} /> {appUpdateWords.downloading(update)}
         </span>
       );
     case 'ready':
       return (
         <>
-          <span className="min-w-0 flex-1 truncate">{update.version} is ready</span>
+          <span className="min-w-0 flex-1 truncate">{appUpdateWords.ready(update)}</span>
           <Button size="sm" variant="primary" onClick={onInstall}>
-            Relaunch to Update
+            {appUpdateWords.relaunch}
           </Button>
         </>
       );

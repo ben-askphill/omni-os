@@ -2,9 +2,14 @@
 // label, shortcut and platform difference; menu.ts and windows.ts turn them into native menus.
 // The menu is OmniCommands in apps/mac/Omni/OmniApp.swift, with Ctrl in place of Cmd off the Mac.
 import type { MenuItemConstructorOptions } from 'electron';
-import { ZOOM_MAX, ZOOM_MIN, type DesktopCommand, type DesktopPlatform } from '@omni/shared/desktop-bridge.ts';
+import { serverOriginLabel, ZOOM_MAX, ZOOM_MIN, type DesktopCommand, type DesktopPlatform } from '@omni/shared/desktop-bridge.ts';
 
 export type ServerMenuState = 'starting' | 'ready' | 'restarting' | 'failed' | 'stopped';
+
+/** The platform as the Web UI and the menu know it: anything not a Mac or Windows is Linux. */
+export function desktopPlatform(platform: NodeJS.Platform = process.platform): DesktopPlatform {
+  return platform === 'darwin' || platform === 'win32' ? platform : 'linux';
+}
 
 export interface MenuState {
   platform: DesktopPlatform;
@@ -40,9 +45,12 @@ const SERVER_LABEL: Record<ServerMenuState, string> = {
 
 export function serverStatusLabel(state: Pick<MenuState, 'port' | 'server' | 'startedHere'>): string {
   const label = SERVER_LABEL[state.server];
-  const elsewhere = state.server === 'ready' && !state.startedHere ? ', started outside this app' : '';
+  const elsewhere = attached(state) ? `, ${serverOriginLabel(false)}` : '';
   return `Port ${state.port}: ${label}${elsewhere}`;
 }
+
+/** Running, but not started by this app: its output goes to whoever started it, not to this app's log file. */
+const attached = (state: Pick<MenuState, 'server' | 'startedHere'>) => state.server === 'ready' && !state.startedHere;
 
 const separator: MenuItemConstructorOptions = { type: 'separator' };
 
@@ -154,9 +162,9 @@ export function menuTemplate(state: MenuState, actions: MenuActions): MenuItemCo
         enabled: (state.startedHere && state.server === 'ready') || state.server === 'failed',
         click: () => actions.restartServer(),
       },
-      { id: 'server-log', label: 'Show Server Log', enabled: state.logExists, click: () => actions.showServerLog() },
-      separator,
-      { id: 'activity-monitor', label: 'Activity Monitor', click: () => actions.activityMonitor() },
+      { id: 'server-log', label: 'Show Server Log', enabled: state.logExists && !attached(state), click: () => actions.showServerLog() },
+      // The sampler reads macOS tools, so the monitor is the Mac's only.
+      ...(mac ? [separator, { id: 'activity-monitor', label: 'Activity Monitor', click: () => actions.activityMonitor() }] : []),
     ],
   };
 
@@ -174,8 +182,6 @@ export function commandRoute(command: DesktopCommand): string | null {
       return '#/';
     case 'settings':
       return '#/settings';
-    case 'quick-prompt-settings':
-      return '#/settings/desktop';
     case 'search':
       return '#/search?q=';
     case 'go-to':

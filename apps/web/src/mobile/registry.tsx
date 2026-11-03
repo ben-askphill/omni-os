@@ -61,7 +61,8 @@ export const RENDER: Record<ScreenKey, (r: Route) => ReactNode> = {
   settings: () => <SettingsScreen />,
   search: (r) => <PageScreen route={r} />,
   page: (r) => <PageScreen route={r} />,
-  notfound: (r) => <NotFound path={r.name === 'notfound' ? r.path : ''} />,
+  // The desktop app's Quick Prompt panel never reaches the shell (App.tsx), so here it is no page.
+  notfound: (r) => <NotFound path={r.name === 'notfound' ? r.path : r.name === 'quick-prompt' ? '/quick-prompt' : ''} />,
 };
 
 export function SheetView({ sheet }: { sheet: ShellSheet }) {

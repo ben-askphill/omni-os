@@ -59,6 +59,16 @@
         "tests/**/*.test.ts"
       ]
     },
+    "apps/desktop": {
+      "entry": [
+        "src/main.ts",
+        "src/preload.ts",
+        "src/pick-preload.ts",
+        "scripts/*.{ts,mjs}",
+        "electron-builder.config.cjs",
+        "tests/**/*.test.ts"
+      ]
+    },
     "apps/linux": {
       "entry": [
         "src/main.ts",

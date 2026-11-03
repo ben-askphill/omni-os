@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { createHash } from 'node:crypto';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { builderArgs } from '../scripts/dist.ts';
 import {
   compareVersions,
+  copyProblem,
   dependencyClosure,
   elfVersionNeeds,
   EXTERNALS,
   fieldAllows,
   glibcProblems,
-  integrityMatches,
   keepPtyFile,
   parseStageArgs,
   resolveFrom,
@@ -23,6 +22,7 @@ import {
 const linux: Target = { platform: 'linux', arches: ['x64'] };
 const macArm: Target = { platform: 'darwin', arches: ['arm64'] };
 const universal: Target = { platform: 'darwin', arches: ['arm64', 'x64'] };
+const realLock = () => JSON.parse(readFileSync(join(import.meta.dirname, '../../../package-lock.json'), 'utf8')) as Lockfile;
 
 // A small lock in npm's v3 shape: a workspace, hoisted and nested copies, a platform binary per OS, a peer.
 const lock: Lockfile = {
@@ -97,10 +97,18 @@ describe('the closure walk over package-lock.json', () => {
   });
 
   it('walks the real lock for the bundle externals', () => {
-    const real = JSON.parse(readFileSync(join(import.meta.dirname, '../../../package-lock.json'), 'utf8')) as Lockfile;
-    const paths = dependencyClosure(real, EXTERNALS, universal, 'apps/server');
-    expect(paths).toEqual(expect.arrayContaining(['node_modules/node-pty', 'node_modules/@playwright/mcp', 'node_modules/tsx', 'node_modules/@esbuild/darwin-arm64', 'node_modules/@esbuild/darwin-x64']));
+    const paths = dependencyClosure(realLock(), EXTERNALS, universal, 'apps/server');
+    expect(paths).toEqual(expect.arrayContaining(['node_modules/node-pty', 'node_modules/@playwright/mcp']));
     expect(paths.some((p) => p.includes('linux'))).toBe(false);
+  });
+
+  it('can ship every package of the real closure to any target from any machine', () => {
+    const real = realLock();
+    for (const target of [linux, { platform: 'linux', arches: ['arm64'] } as Target, macArm, universal]) {
+      const paths = dependencyClosure(real, EXTERNALS, target, 'apps/server').filter((p) => !p.endsWith('node_modules/node-pty'));
+      const problems = paths.map((p) => copyProblem(p, real.packages[p], real.packages[p].version ?? null, false)).filter(Boolean);
+      expect(problems, `${target.platform}-${target.arches.join('+')}`).toEqual([]);
+    }
   });
 });
 
@@ -191,13 +199,22 @@ describe('the staged node-pty', () => {
   });
 });
 
-describe('integrityMatches', () => {
-  it('checks bytes against an SRI hash', () => {
-    const bytes = Buffer.from('package');
-    const sri = `sha512-${createHash('sha512').update(bytes).digest('base64')}`;
-    expect(integrityMatches(bytes, sri)).toBe(true);
-    expect(integrityMatches(Buffer.from('tampered'), sri)).toBe(false);
-    expect(integrityMatches(bytes, 'md5-abc')).toBe(false);
+describe("copying a package from the repo's node_modules", () => {
+  const plain = { version: '1.0.0' };
+  const native = { version: '1.0.0', hasInstallScript: true };
+
+  it('ships an installed package at its locked version', () => {
+    expect(copyProblem('node_modules/lib', plain, '1.0.0', false)).toBeNull();
+    expect(copyProblem('node_modules/engine', native, '1.0.0', true)).toBeNull();
+  });
+
+  it('refuses a missing or drifted install', () => {
+    expect(copyProblem('node_modules/lib', plain, null, true)).toMatch(/not installed, not the locked 1.0.0/);
+    expect(copyProblem('node_modules/lib', plain, '1.1.0', true)).toMatch(/is 1.1.0, not the locked 1.0.0/);
+  });
+
+  it("refuses a package with an install script for a target that is not this machine", () => {
+    expect(copyProblem('node_modules/engine', native, '1.0.0', false)).toMatch(/install script/);
   });
 });
 

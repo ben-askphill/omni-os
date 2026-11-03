@@ -8,9 +8,10 @@ Project context and conventions live in `CLAUDE.md`. Read it first.
 
 ### Every surface, every time
 
-- A feature or fix takes effect on all three surfaces unless the task says otherwise: the Web UI on desktop, the Web UI's phone layout (`apps/web/src/mobile/`) and the Mac app (`apps/mac/`).
-- Ship all three in the same PR. None of them is a follow-up. If one surface does not need the change, say why in the PR.
-- Check each surface before calling the work done: desktop browser, 390px phone width and the Mac app's QA harness. A UI change carries screenshots of all three.
+- A feature or fix takes effect on all three surfaces unless the task says otherwise: the Web UI on desktop, the Web UI's phone layout (`apps/web/src/mobile/`) and the desktop app (`apps/desktop/`, ADR 0010). The desktop app shows the Web UI, so a Web UI change reaches it as is. Desktop-only behavior goes through `window.omniDesktop`.
+- Until the cutover deletes `apps/mac` (ADR 0010), the SwiftUI Mac app still gets every change that shows there, in the same PR.
+- Ship all of them in the same PR. None of them is a follow-up. If one surface does not need the change, say why in the PR.
+- Check each surface before calling the work done: desktop browser, 390px phone width and the desktop app's QA harness (`apps/desktop/scripts/qa.ts`), plus the Mac app's QA harness when the change touches `apps/mac`. A UI change carries screenshots of each ([docs/pr-screenshots.md](docs/pr-screenshots.md)).
 - Why: folders once shipped web-only (#177) and never reached the Mac app, and later the phone Channels screen ignored folder data.
 
 ### New UI components go into the design system
