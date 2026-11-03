@@ -23,6 +23,9 @@ export function useSlidingThumb(
 ): ThumbBox | null {
   const [box, setBox] = useState<ThumbBox | null>(null);
   const last = useRef<Omit<ThumbBox, 'phase'> | null>(null);
+  // Owned by the stretch, not by one run of the effect: a key change that doesn't move the item must not cancel it.
+  const settle = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(settle.current), []);
 
   const measure = useCallback(() => {
     const el = track.current?.querySelector<HTMLElement>(selector);
@@ -34,17 +37,17 @@ export function useSlidingThumb(
     const next = measure();
     const prev = last.current;
     last.current = next;
+    if (prev && next && prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h) return;
+    clearTimeout(settle.current);
     if (!next) return setBox(null);
     if (!prev || reducedMotion()) return setBox({ ...next, phase: 'idle' });
-    if (prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h) return;
     // Stretch to cover old and new along the travel axis, then spring into place.
     const x = vertical ? next.x : Math.min(prev.x, next.x);
     const y = vertical ? Math.min(prev.y, next.y) : next.y;
     const w = vertical ? next.w : Math.max(prev.x + prev.w, next.x + next.w) - x;
     const h = vertical ? Math.max(prev.y + prev.h, next.y + next.h) - y : next.h;
     setBox({ x, y, w, h, phase: 'stretch' });
-    const t = setTimeout(() => setBox({ ...next, phase: 'settle' }), 150);
-    return () => clearTimeout(t);
+    settle.current = setTimeout(() => setBox({ ...next, phase: 'settle' }), 150);
   }, [activeKey, measure, vertical]);
 
   // Fonts loading, lists growing and window resizes move items: follow without animating.
@@ -54,6 +57,7 @@ export function useSlidingThumb(
     const ro = new ResizeObserver(() => {
       const n = measure();
       last.current = n;
+      clearTimeout(settle.current);
       setBox(n ? { ...n, phase: 'idle' } : null);
     });
     ro.observe(el);
