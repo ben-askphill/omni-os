@@ -14,7 +14,7 @@ import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.ts
 import { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { usePRWatch } from '../components/thread/PRWatch.tsx';
 import { useBranchChanges } from '../mobile/ThreadTurn.tsx';
-import { prNext } from '@omni/shared/thread-glance.ts';
+import { prNext, stepOf, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
@@ -129,12 +129,13 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     card.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     setToAgents(false);
   }, [toAgents, panelTab, children, panel.open]);
-  const { prBusy, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, applyThread, setActionError, pin });
+  const { sending, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, applyThread, setActionError, pin });
   // The branch's PRs and changes: the PRs tab and the Details tab's branch card read them, and the PRs tab's badge.
   const prs = useThreadPR(thread, slotBusy);
   const watch = usePRWatch(thread?.id, prs);
   const changes = useBranchChanges(thread, slotBusy);
   const next = prNext(prs?.pr ?? null, !!changes?.files.length);
+  const step = useMemo(() => stepOf(sending) ?? stepUnderway(events, queued, slotBusy), [sending, events, queued, slotBusy]);
 
   useThreadPresence(id, thread);
   useThreadInterruptKey({ slotBusy, interrupting, interrupt });
@@ -295,8 +296,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               tab={panelTab}
               onTab={setPanelTab}
               onClose={panel.toggle}
-              details={{ channel, parent, children, init, lastResult, warm, links, agents, onJump: jumpTo, prs, changes, next, busy: prBusy, onAsk: (p) => void ask(p), onTab: setPanelTab }}
-              prs={{ data: prs, watch, next, busy: prBusy, onAsk: (p) => void ask(p) }}
+              details={{ channel, parent, children, init, lastResult, warm, links, agents, onJump: jumpTo, prs, changes, next, step, onAsk: (p) => void ask(p), onTab: setPanelTab }}
+              prs={{ data: prs, watch, next, step, onAsk: (p) => void ask(p) }}
             />
           </div>
         </aside>

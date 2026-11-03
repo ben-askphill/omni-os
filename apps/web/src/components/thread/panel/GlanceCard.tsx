@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { CrewPR, PRSummary, Thread } from '../../../api.ts';
 import type { PanelTab } from '../../../pages/useThreadSession.ts';
 import { plural } from '../../../format.ts';
-import { prBadge, prLine, type PRNext } from '@omni/shared/thread-glance.ts';
+import { prBadge, prLine, STEP_WORKING, type PRNext, type PRStep } from '@omni/shared/thread-glance.ts';
 import { href } from '../../../router.ts';
 import { Chip, copyText, Icon, IconButton, LinkButton, type IconName } from '../../ui.tsx';
 import { PRNextButton, type ThreadPRs } from './PRsTab.tsx';
@@ -50,7 +50,7 @@ function CopyBranch({ name }: { name: string }) {
  * for (open it, fix conflicts or checks, merge). Ben's threads mostly end as a merged PR, so this is what he checks first.
  * Nothing for a thread without a branch.
  */
-export function GlanceCard({ thread, prs, changes, next, busy, onAsk, onTab }: { thread: Thread; prs: ThreadPRs; changes: BranchChanges; next: PRNext; busy: boolean; onAsk: (prompt: string) => void; onTab: (tab: PanelTab) => void }) {
+export function GlanceCard({ thread, prs, changes, next, step, onAsk, onTab }: { thread: Thread; prs: ThreadPRs; changes: BranchChanges; next: PRNext; step: PRStep | null; onAsk: (prompt: string) => void; onTab: (tab: PanelTab) => void }) {
   if (!thread.branch) return null;
   const pr: PRSummary | null = prs?.pr ?? null;
   const badge = pr ? prBadge(pr) : null;
@@ -73,6 +73,8 @@ export function GlanceCard({ thread, prs, changes, next, busy, onAsk, onTab }: {
             <Chip tone={line.tone === 'needs' ? 'needs' : badge.tone}>{line.tone === 'needs' && badge.label === 'open' ? 'blocked' : badge.label}</Chip>
             <span className="min-w-0 truncate text-fg-3">{line.text}</span>
           </>
+        ) : step === 'open' ? (
+          <span className="text-fg-3">{STEP_WORKING.open}…</span>
         ) : (
           <span className="text-fg-3">No PR yet</span>
         )}
@@ -96,7 +98,7 @@ export function GlanceCard({ thread, prs, changes, next, busy, onAsk, onTab }: {
       </GlanceRow>
       {next && (
         <div className="mt-1 flex border-t border-line px-1 pt-2 pb-1 [&>*]:flex-1">
-          <PRNextButton next={next} thread={thread} pr={pr} busy={busy} onAsk={onAsk} />
+          <PRNextButton next={next} thread={thread} pr={pr} step={step} onAsk={onAsk} />
         </div>
       )}
     </section>

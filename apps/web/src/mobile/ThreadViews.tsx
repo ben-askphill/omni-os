@@ -23,7 +23,7 @@ import { fullDate, plural } from '../format.ts';
 import { runningSubagents, subagentKind } from '../subagents.ts';
 import { href, type Route } from '../router.ts';
 import { mergeNote } from '@omni/shared/pr-merge.ts';
-import { checkTone } from '@omni/shared/thread-glance.ts';
+import { checkTone, STEP_WORKING, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { useApp } from '../store.tsx';
 import { toolLabel, toolSummary, type Item, type ToolCall } from '@omni/shared/transcript-fold.ts';
 import { CrewPRList } from './CrewPRs.tsx';
@@ -152,9 +152,11 @@ export function ChangesScreen() {
  */
 export function PRScreen() {
   const shell = useShell();
-  const { thread, slotBusy, applyThread } = useThread();
+  const { thread, slotBusy, applyThread, events, queued } = useThread();
   const { channel } = useApp();
   const mark = useThreadPR(thread, slotBusy, true);
+  const [asking, setAsking] = useState(false);
+  const opening = asking || stepUnderway(events, queued, slotBusy) === 'open';
   const watch = usePRWatch(thread?.id, mark);
   const crew = mark?.crew ?? [];
   const [picked, setPicked] = useState<string | null>(null);
@@ -191,12 +193,15 @@ export function PRScreen() {
   };
   const openPR = async () => {
     if (!thread) return;
+    setAsking(true);
     try {
       applyThread(await api.post(`/threads/${encodeURIComponent(thread.id)}/messages`, { prompt: OPEN_PR_PROMPT, mode: slotBusy ? 'queue' : undefined }), true);
       shell.toast('Asked for a PR');
       shell.back();
     } catch (e) {
       shell.toast(errorText(e));
+    } finally {
+      setAsking(false);
     }
   };
 
@@ -220,14 +225,16 @@ export function PRScreen() {
               {n
                 ? `PR #${n} is open. Set this channel's GitHub repo on the desktop to read it here.`
                 : thread.branch
-                  ? 'No pull request from this branch yet.'
+                  ? opening
+                    ? 'The agent is committing and pushing this branch. The PR shows here once it opens.'
+                    : 'No pull request from this branch yet.'
                   : 'This thread works without a branch, so it has no pull request.'}
             </MoEmpty>
           )}
           {!n && thread.branch && (
             <div className="px-1">
-              <Button size="lg" icon="pr" onClick={() => void openPR()}>
-                Open PR
+              <Button size="lg" icon="pr" busy={opening} onClick={() => void openPR()}>
+                {opening ? `${STEP_WORKING.open}…` : 'Open PR'}
               </Button>
             </div>
           )}

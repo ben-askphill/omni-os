@@ -61,7 +61,7 @@ afterEach(async () => {
 function Tab({ t }: { t: Thread }) {
   const data = useThreadPR(t, false);
   const watch = { watch: null, watching: false, busy: false, error: null, start: async () => {}, stop: async () => {} };
-  return createElement(PRsTab, { thread: t, data, watch, next: null, busy: false, onAsk: () => {} });
+  return createElement(PRsTab, { thread: t, data, watch, next: null, step: null, onAsk: () => {} });
 }
 const mount = async (t: Thread) => {
   await act(async () => root.render(createElement(Tab, { t })));

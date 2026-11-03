@@ -2,7 +2,7 @@ import { relTime } from '@omni/shared/format.ts';
 import type { CrewPR, PRSummary, Thread } from '../../../api.ts';
 import { plural } from '../../../format.ts';
 import { href } from '../../../router.ts';
-import { crewLine, OPEN_PR_PROMPT, prBadge, prLine, type PRNext, type PRTone } from '@omni/shared/thread-glance.ts';
+import { crewLine, OPEN_PR_PROMPT, prBadge, prLine, STEP_WORKING, type PRNext, type PRStep, type PRTone } from '@omni/shared/thread-glance.ts';
 import { Button, Chip, Empty, Icon, IconLink, LinkButton, Loading, StatusDot } from '../../ui.tsx';
 import { watchCopy } from '@omni/shared/pr-watch.ts';
 import type { PRWatchState } from '../PRWatch.tsx';
@@ -12,8 +12,11 @@ export type ThreadPRs = ThreadPRData | undefined;
 
 const TONE_DOT: Record<PRTone, string> = { live: 'running', done: 'done', needs: 'needs', outline: 'idle' };
 
-/** The step the branch's PR calls for, as one button: a prompt to the agent, or Merge on the PR page. */
-export function PRNextButton({ next, thread, pr, busy, onAsk, size = 'sm' }: { next: PRNext; thread: Thread; pr: PRSummary | null; busy: boolean; onAsk: (prompt: string) => void; size?: 'sm' | 'md' }) {
+/**
+ * The step the branch's PR calls for, as one button: a prompt to the agent, or Merge on the PR page. While the agent
+ * works on a step the button spins and says so, and every step button waits for it.
+ */
+export function PRNextButton({ next, thread, pr, step, onAsk, size = 'sm' }: { next: PRNext; thread: Thread; pr: PRSummary | null; step: PRStep | null; onAsk: (prompt: string) => void; size?: 'sm' | 'md' }) {
   if (!next) return null;
   if (next.kind === 'merge')
     return pr ? (
@@ -22,8 +25,8 @@ export function PRNextButton({ next, thread, pr, busy, onAsk, size = 'sm' }: { n
       </LinkButton>
     ) : null;
   return (
-    <Button size={size} variant={next.kind === 'open' ? 'primary' : 'secondary'} icon={next.kind === 'open' ? 'pr' : 'zap'} busy={busy} title={next.prompt} onClick={() => onAsk(next.prompt)}>
-      {next.label}
+    <Button size={size} variant={next.kind === 'open' ? 'primary' : 'secondary'} icon={next.kind === 'open' ? 'pr' : 'zap'} busy={step !== null} title={next.prompt} onClick={() => onAsk(next.prompt)}>
+      {step === next.kind ? `${STEP_WORKING[step]}…` : next.label}
     </Button>
   );
 }
@@ -33,7 +36,7 @@ export function PRNextButton({ next, thread, pr, busy, onAsk, size = 'sm' }: { n
  * the watch that wakes the thread on a failed check or a review. Opening a PR asks the agent, like it always has. A
  * thread that delegated work lists the PRs its delegated threads opened below, with or without a branch of its own.
  */
-export function PRsTab({ thread, data, watch, next, busy, onAsk }: { thread: Thread; data: ThreadPRs; watch: PRWatchState; next: PRNext; busy: boolean; onAsk: (prompt: string) => void }) {
+export function PRsTab({ thread, data, watch, next, step, onAsk }: { thread: Thread; data: ThreadPRs; watch: PRWatchState; next: PRNext; step: PRStep | null; onAsk: (prompt: string) => void }) {
   if (!data) return <Loading label="Loading PRs" />;
   const { pr, crew } = data;
   if (!thread.branch && !crew.length)
@@ -45,25 +48,34 @@ export function PRsTab({ thread, data, watch, next, busy, onAsk }: { thread: Thr
   const open = (pr?.state ?? 'OPEN') === 'OPEN';
   return (
     <div className="scroll-thin h-full overflow-y-auto px-2.5 pb-3">
-      {thread.branch && <BranchPRs thread={thread} data={data} next={next} busy={busy} onAsk={onAsk} />}
+      {thread.branch && <BranchPRs thread={thread} data={data} next={next} step={step} onAsk={onAsk} />}
       {crew.length > 0 && <CrewPRs crew={crew} first={!thread.branch} />}
       {pr && <WatchCard w={watch} open={open} />}
     </div>
   );
 }
 
-function BranchPRs({ thread, data: { pr, prs }, next, busy, onAsk }: { thread: Thread; data: NonNullable<ThreadPRs>; next: PRNext; busy: boolean; onAsk: (prompt: string) => void }) {
+function BranchPRs({ thread, data: { pr, prs }, next, step, onAsk }: { thread: Thread; data: NonNullable<ThreadPRs>; next: PRNext; step: PRStep | null; onAsk: (prompt: string) => void }) {
   const canOpen = !prs.some((p) => (p.state ?? 'OPEN') === 'OPEN');
+  const opening = step === 'open';
   if (prs.length === 0)
     return (
-      <div className="rounded-[20px] bg-bg px-4 py-5 text-center">
-        <div className="text-[13px] font-medium text-fg">No PR yet</div>
+      <div className="rounded-[20px] bg-bg px-4 py-5 text-center" aria-live="polite">
+        <div className="text-[13px] font-medium text-fg">{opening ? `${STEP_WORKING.open}…` : 'No PR yet'}</div>
         <p className="mx-auto mt-1 max-w-[260px] text-[12.5px] leading-relaxed text-fg-3">
-          Nothing from <span className="font-mono text-[12px]">{thread.branch}</span> has been sent for review.
+          {opening ? (
+            <>
+              The agent is committing and pushing <span className="font-mono text-[12px]">{thread.branch}</span>. The PR shows here once it opens.
+            </>
+          ) : (
+            <>
+              Nothing from <span className="font-mono text-[12px]">{thread.branch}</span> has been sent for review.
+            </>
+          )}
         </p>
         <div className="mt-3 flex justify-center">
-          <Button size="sm" variant="primary" icon="pr" busy={busy} title={OPEN_PR_PROMPT} onClick={() => onAsk(OPEN_PR_PROMPT)}>
-            Open PR
+          <Button size="sm" variant="primary" icon="pr" busy={step !== null} title={OPEN_PR_PROMPT} onClick={() => onAsk(OPEN_PR_PROMPT)}>
+            {opening ? STEP_WORKING.open : 'Open PR'}
           </Button>
         </div>
       </div>
@@ -102,10 +114,10 @@ function BranchPRs({ thread, data: { pr, prs }, next, busy, onAsk }: { thread: T
       </div>
       {(next || canOpen) && (
         <div className="mt-2.5 flex flex-wrap gap-1.5 px-1">
-          <PRNextButton next={next} thread={thread} pr={pr} busy={busy} onAsk={onAsk} />
+          <PRNextButton next={next} thread={thread} pr={pr} step={step} onAsk={onAsk} />
           {canOpen && next?.kind !== 'open' && (
-            <Button size="sm" variant="ghost" icon="pr" busy={busy} title={OPEN_PR_PROMPT} onClick={() => onAsk(OPEN_PR_PROMPT)}>
-              Open a new PR
+            <Button size="sm" variant="ghost" icon="pr" busy={step !== null} title={OPEN_PR_PROMPT} onClick={() => onAsk(OPEN_PR_PROMPT)}>
+              {opening ? `${STEP_WORKING.open}…` : 'Open a new PR'}
             </Button>
           )}
         </div>

@@ -23,11 +23,12 @@ export function useThreadActions({
   pin: () => void;
 }) {
   const { reloadChannels, setDone } = useApp();
-  const [prBusy, setPrBusy] = useState(false);
+  // The step prompt being sent, so its button turns to working at the click, before the thread shows the message.
+  const [sending, setSending] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
 
   const ask = async (prompt: string) => {
-    setPrBusy(true);
+    setSending(prompt);
     setActionError(null);
     try {
       // Mid-turn, wait for the work to finish instead of steering it to commit halfway.
@@ -38,7 +39,7 @@ export function useThreadActions({
     } catch (e) {
       setActionError(errorText(e));
     } finally {
-      setPrBusy(false);
+      setSending(null);
     }
   };
 
@@ -68,5 +69,5 @@ export function useThreadActions({
     }
   };
 
-  return { prBusy, restoring, ask, openPR, restore, toggleDone };
+  return { sending, restoring, ask, openPR, restore, toggleDone };
 }

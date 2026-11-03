@@ -7,7 +7,7 @@ import { duration, fullDate, plural } from '../../../format.ts';
 import { href } from '../../../router.ts';
 import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import type { PanelTab } from '../../../pages/useThreadSession.ts';
-import type { PRNext } from '@omni/shared/thread-glance.ts';
+import type { PRNext, PRStep } from '@omni/shared/thread-glance.ts';
 import { AgentsSection } from './AgentsSection.tsx';
 import { CrewGlance, GlanceCard, type BranchChanges } from './GlanceCard.tsx';
 import type { ThreadPRs } from './PRsTab.tsx';
@@ -90,7 +90,7 @@ export function DetailsTab({
   prs,
   changes,
   next,
-  busy = false,
+  step = null,
   onAsk = () => {},
   onTab = () => {},
 }: {
@@ -109,7 +109,8 @@ export function DetailsTab({
   prs?: ThreadPRs;
   changes?: BranchChanges;
   next?: PRNext;
-  busy?: boolean;
+  /** The step the agent is working on, so its button shows it. */
+  step?: PRStep | null;
   onAsk?: (prompt: string) => void;
   onTab?: (tab: PanelTab) => void;
 }) {
@@ -125,7 +126,7 @@ export function DetailsTab({
   const resume = remote ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin flex h-full flex-col gap-3 overflow-y-auto px-2.5 pb-3 [&>*]:shrink-0">
-      <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} busy={busy} onAsk={onAsk} onTab={onTab} />
+      <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} step={step} onAsk={onAsk} onTab={onTab} />
       {prs && <CrewGlance crew={prs.crew} onTab={onTab} />}
       <AgentsSection parent={parent} links={links} children={children} agents={agents} onJump={onJump} />
       <dl className="divide-y divide-line rounded-[20px] bg-bg py-1">

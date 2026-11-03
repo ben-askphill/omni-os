@@ -44,6 +44,41 @@ export function prNext(pr: PRSummary | null, hasChanges: boolean): PRNext {
   return { kind: 'merge', label: 'Merge' };
 }
 
+export type PRStep = 'open' | 'conflicts' | 'checks';
+
+const STEP_OF: Record<string, PRStep> = { [OPEN_PR_PROMPT]: 'open', [FIX_CONFLICTS_PROMPT]: 'conflicts', [FIX_CHECKS_PROMPT]: 'checks' };
+
+/** The step a message asks for, when it is one of the step prompts. */
+export function stepOf(text: string | null | undefined): PRStep | null {
+  return STEP_OF[(text ?? '').trim()] ?? null;
+}
+
+/** What a step's button says while the agent works on it. */
+export const STEP_WORKING: Record<PRStep, string> = { open: 'Opening PR', conflicts: 'Fixing conflicts', checks: 'Fixing checks' };
+
+/**
+ * The branch step the agent is on: Ben's newest message is one of the step prompts, and it is still queued or its turn
+ * has not ended. It reads the thread, so a reload or another client shows the same thing.
+ */
+export function stepUnderway(
+  events: readonly { kind: string; payload: string | null }[],
+  queued: readonly { kind: string; text: string }[],
+  busy: boolean,
+): PRStep | null {
+  const waiting = queued.filter((q) => q.kind === 'user');
+  if (waiting.length) return stepOf(waiting[waiting.length - 1].text);
+  if (!busy) return null;
+  for (let k = events.length - 1; k >= 0; k--) {
+    if (events[k].kind !== 'user') continue;
+    try {
+      return stepOf(String(JSON.parse(events[k].payload ?? 'null')?.text ?? ''));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 /** The PR's line under its number: checks, conflicts and review, the parts that decide whether it can merge. */
 export function prLine(pr: PRSummary): { text: string; tone: PRTone } {
   const state = pr.state ?? 'OPEN';
