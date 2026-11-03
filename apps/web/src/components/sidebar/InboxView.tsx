@@ -1,32 +1,17 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { relTime } from '@omni/shared/format.ts';
-import { delegatedIds, delegatesByParent } from '@omni/shared/delegate-count.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
-import { taskHost, type NeedsYouItem, type Thread, type ThreadStub } from '../../api.ts';
-import { DONE_INITIAL, DONE_PAGE, inboxLayout, rowStatus, type InboxThread } from '../../inbox.ts';
-import { href, useHash, useRoute } from '../../router.ts';
-import { readPref, useApp, useNow, writePref } from '../../store.tsx';
+import type { Thread, ThreadStub } from '../../api.ts';
+import { useInbox } from '../../app/useInbox.ts';
+import type { InboxThread, RowStatus } from '../../inbox.ts';
+import { canMarkDone } from '../../needs-you.ts';
+import { href, useHash } from '../../router.ts';
+import { useApp, useNow } from '../../store.tsx';
 import { HarnessLogo, Loader, OmniMark } from '../brand.tsx';
-import { useLiveThreads } from '../ThreadList.tsx';
 import { ChannelMark, DoneMark, Icon, StatusDot, Thumb, useSlidingThumb } from '../ui.tsx';
 import { DelegateCount, DelegateCountSpace } from '../DelegateCount.tsx';
 import { useRowDelegates } from './SidebarRows.tsx';
 import { WorkspaceLinks } from './SidebarLinks.tsx';
-
-/** Enough recent threads to fill the inbox; Needs you, Running and Pinned add any older thread they hold. */
-const RECENT_LIMIT = 200;
-const acceptAll = () => true;
-
-/** A shelf's open state on this device. Every shelf starts folded, as T3's do. */
-function useShelf(pref: string): [open: boolean, toggle: () => void] {
-  const [open, setOpen] = useState(() => readPref<boolean>(pref, false));
-  const toggle = () =>
-    setOpen((prev) => {
-      writePref(pref, !prev);
-      return !prev;
-    });
-  return [open, toggle];
-}
 
 /**
  * The sidebar's Inbox view, T3 Code's default thread list: every channel's threads in one list. Pinned cards, then the
@@ -34,40 +19,13 @@ function useShelf(pref: string): [open: boolean, toggle: () => void] {
  * (the check on hover) moves it to Done, as Settle does in T3.
  */
 export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
-  const route = useRoute();
   const hash = useHash();
-  const { channels, pinned, needsYou, openThread, tasks } = useApp();
-  const recent = useLiveThreads(`/recent?limit=${RECENT_LIMIT}`, acceptAll, RECENT_LIMIT);
-  const [workingOpen, toggleWorking] = useShelf('sidebar.inbox.workingOpen');
-  const [doneOpen, toggleDone] = useShelf('sidebar.inbox.doneOpen');
-  const [doneLimit, setDoneLimit] = useState(DONE_INITIAL);
+  const { channels } = useApp();
+  const { pinned, inbox, working, done, loaded, openId, status, delegates } = useInbox();
   const listRef = useRef<HTMLDivElement>(null);
-
-  const openId = route.name === 'thread' ? route.id : null;
-  const openCopy = openThread && openThread.id === openId ? openThread : null;
-  const handoffs = channels.find((c) => c.id === 'conductor')?.handoffs;
-  const needs = needsYou?.items ?? [];
-  const layout = useMemo(
-    () =>
-      inboxLayout({
-        threads: [...(recent.data ?? []), ...pinned, ...channels.flatMap((c) => c.active ?? []), ...needs.map((n) => n.thread)],
-        needs,
-        delegated: delegatedIds(handoffs),
-        open: openCopy,
-      }),
-    [recent.data, pinned, channels, needs, handoffs, openCopy],
-  );
-  const needOf = useMemo(() => new Map(needs.map((n) => [n.thread.id, n])), [needs]);
-  const delegates = delegatesByParent(handoffs);
   const channelOf = (id: string) => channels.find((c) => c.id === id);
 
-  // A folded shelf still lists the open thread, so the highlight never vanishes into it.
-  const shown = (open: boolean, list: InboxThread[]) => (open ? list : list.filter((t) => t.id === openId));
-  const working = shown(workingOpen, layout.working);
-  const done = shown(doneOpen, layout.done.slice(0, doneLimit).concat(layout.done.slice(doneLimit).filter((t) => t.id === openId)));
-  const hiddenDone = Math.max(0, layout.done.length - doneLimit);
-
-  const rowsKey = [layout.pinned, layout.inbox, working, done].map((l) => l.map((t) => t.id).join()).join('|');
+  const rowsKey = [pinned, inbox, working.rows, done.rows].map((l) => l.map((t) => t.id).join()).join('|');
   const box = useSlidingThumb(listRef, `${hash}:${rowsKey}`, true, '[data-active="true"]');
 
   const card = (t: InboxThread, pinnedRow = false) => (
@@ -75,8 +33,7 @@ export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
       key={t.id}
       t={t}
       channel={channelOf(t.channel_id)}
-      need={needOf.get(t.id)}
-      agents={tasks.filter((k) => taskHost(k) === t.id).length}
+      status={status(t)}
       delegated={delegates.get(t.id)}
       active={t.id === openId}
       pinned={pinnedRow}
@@ -88,32 +45,30 @@ export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
     <div ref={listRef} className="relative flex min-h-full flex-col">
       <Thumb box={box} />
       <div className="space-y-px">
-        {layout.pinned.map((t) => card(t, true))}
-        {layout.inbox.map((t) => card(t))}
-        {recent.data && !layout.pinned.length && !layout.inbox.length && (
-          <p className="px-3 py-6 text-center text-[12.5px] text-fg-4">Nothing is waiting on you.</p>
-        )}
+        {pinned.map((t) => card(t, true))}
+        {inbox.map((t) => card(t))}
+        {loaded && !pinned.length && !inbox.length && <p className="px-3 py-6 text-center text-[12.5px] text-fg-4">Nothing is waiting on you.</p>}
       </div>
 
       <div className="mt-auto space-y-px pt-4">
-        {layout.working.length > 0 && (
+        {working.count > 0 && (
           <>
-            <Shelf label="Working" count={layout.working.length} open={workingOpen} onToggle={toggleWorking} />
-            {working.map((t) => card(t))}
+            <Shelf label="Working" count={working.count} open={working.open} onToggle={working.toggle} />
+            {working.rows.map((t) => card(t))}
           </>
         )}
-        <Shelf label="Done" count={layout.done.length} open={doneOpen} onToggle={toggleDone} />
-        {done.map((t) => (
+        <Shelf label="Done" count={done.count} open={done.open} onToggle={done.toggle} />
+        {done.rows.map((t) => (
           <DoneRow key={t.id} t={t} active={t.id === openId} onNavigate={onNavigate} />
         ))}
-        {doneOpen && hiddenDone > 0 && (
+        {done.more > 0 && (
           <button
             type="button"
-            onClick={() => setDoneLimit((n) => n + DONE_PAGE)}
+            onClick={done.showMore}
             className="hov z-[1] flex h-8 w-full items-center gap-2 rounded-full px-3 text-[12.5px] text-fg-4 transition-colors hover:text-fg-2"
           >
             <Icon name="chevronDown" size={12} />
-            Show {Math.min(hiddenDone, DONE_PAGE)} more
+            Show {done.more} more
           </button>
         )}
       </div>
@@ -151,8 +106,7 @@ function ChannelLead({ channel }: { channel: ReturnType<typeof useApp>['channels
 function InboxCard({
   t,
   channel,
-  need,
-  agents,
+  status,
   delegated,
   active,
   pinned,
@@ -160,8 +114,7 @@ function InboxCard({
 }: {
   t: InboxThread & Partial<Pick<Thread, 'branch'>>;
   channel: ReturnType<typeof useApp>['channels'][number] | undefined;
-  need: NeedsYouItem | undefined;
-  agents: number;
+  status: RowStatus | null;
   delegated: readonly ThreadStub[] | undefined;
   active: boolean;
   pinned: boolean;
@@ -170,7 +123,6 @@ function InboxCard({
   const { setDone, setPinned } = useApp();
   const now = useNow(60_000);
   const delegates = useRowDelegates(t.id, delegated, onNavigate);
-  const status = rowStatus(t, need, agents);
   const title = t.title || 'Untitled';
   const channelName = channel?.id === 'conductor' ? 'Conductor' : (channel?.name ?? t.channel_id);
   // Work in progress recedes, as in T3: what waits on Ben stands out.
@@ -224,7 +176,7 @@ function InboxCard({
       {delegates && <DelegateCount summary={delegates.summary} onOpen={delegates.open} className="z-[2] mr-2 mb-2 self-end justify-self-end [grid-area:1/1]" />}
       <span className="z-[2] mt-1.5 mr-1.5 flex items-center gap-0.5 self-start justify-self-end [grid-area:1/1] opacity-100 transition-opacity md:opacity-0 md:group-focus-within/row:opacity-100 md:group-hover/row:opacity-100">
         {pinned && <RowAction icon="pin" label={`Unpin ${title}`} onClick={() => void setPinned(t, false).catch(() => {})} />}
-        <RowAction icon="check" label={`Mark ${title} done`} text="Done" onClick={() => void setDone(t.id, true).catch(() => {})} />
+        {canMarkDone(t.status) && <RowAction icon="check" label={`Mark ${title} done`} text="Done" onClick={() => void setDone(t.id, true).catch(() => {})} />}
       </span>
     </div>
   );

@@ -20,6 +20,26 @@ export interface InboxLayout {
 export const DONE_INITIAL = 10;
 export const DONE_PAGE = 25;
 
+/** A shelf as a list shows it under its header. */
+export interface ShelfView {
+  /** Every thread on the shelf, listed or not: the header's count. */
+  count: number;
+  /** Open: its first `limit` threads. Folded: none. Either way the open thread, so the highlight never vanishes into it. */
+  rows: InboxThread[];
+  /** How many threads Show more adds under the open shelf, at most DONE_PAGE. 0 once every thread is listed. */
+  more: number;
+}
+
+/** Working lists every thread it holds; Done pages, `limit` growing from DONE_INITIAL by DONE_PAGE. */
+export function shelfView(list: InboxThread[], { open, openId, limit = Infinity }: { open: boolean; openId: string | null; limit?: number }): ShelfView {
+  const isOpenThread = (t: InboxThread) => t.id === openId;
+  return {
+    count: list.length,
+    rows: open ? [...list.slice(0, limit), ...list.slice(limit).filter(isOpenThread)] : list.filter(isOpenThread),
+    more: open ? Math.min(DONE_PAGE, Math.max(0, list.length - limit)) : 0,
+  };
+}
+
 /** What a card says on its right in place of the time, T3's status label. Null: nothing to say, so it shows the time. */
 export interface RowStatus {
   glyph: Glyph;
