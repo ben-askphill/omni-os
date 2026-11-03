@@ -244,6 +244,16 @@ describe('Backend', () => {
     expect(existsSync(r.recordFile)).toBe(false);
   });
 
+  it('knows its noted server still runs before a later launch has adopted it', async () => {
+    const r = await rig();
+    await r.backend.start();
+    const later = r.relaunch();
+    expect(later.info().startedHere).toBe(false);
+    expect(later.recordedServerUp()).toBe(true);
+    await r.backend.stop();
+    expect(later.recordedServerUp()).toBe(false);
+  });
+
   it('treats a server whose pid is not the noted one as started elsewhere', async () => {
     const r = await rig();
     await r.backend.start();

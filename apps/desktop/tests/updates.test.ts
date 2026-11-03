@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DesktopUpdateView } from '@omni/shared/desktop-bridge.ts';
-import { initialView, reduceUpdate, releasesPage, shouldCheck, unsupportedReason, updateErrorText, type UpdateHost, type UpdaterEvent } from '../src/update-state.ts';
+import { initialView, installOnQuit, reduceUpdate, releasesPage, shouldCheck, unsupportedReason, updateErrorText, type UpdateHost, type UpdaterEvent } from '../src/update-state.ts';
 
 const mac: UpdateHost = { packaged: true, platform: 'darwin', hasFeed: true, appImage: undefined, installDirWritable: true };
 const appImage: UpdateHost = { packaged: true, platform: 'linux', hasFeed: true, appImage: '/home/me/Apps/Omni.AppImage', installDirWritable: true };
@@ -114,5 +114,24 @@ describe('updateErrorText', () => {
     expect(updateErrorText(new Error('HttpError: 404\n"method: GET url: https://github.com/..."\nheaders...'))).toBe('HttpError: 404');
     expect(updateErrorText(new Error(''))).toBe('The update check failed.');
     expect(updateErrorText('x'.repeat(300))).toHaveLength(200);
+  });
+});
+
+describe('installing at quit', () => {
+  const ready: DesktopUpdateView = { state: 'ready', version: '0.2.0' };
+
+  it('installs once the server stopped, opening the app again only after Relaunch to Update', () => {
+    expect(installOnQuit(ready, { forUpdate: true, serverKeepsRunning: false })).toEqual({ relaunch: true });
+    expect(installOnQuit(ready, { forUpdate: false, serverKeepsRunning: false })).toEqual({ relaunch: false });
+  });
+
+  it('leaves the update for a later quit while a server this app started keeps running', () => {
+    expect(installOnQuit(ready, { forUpdate: false, serverKeepsRunning: true })).toBeNull();
+    expect(installOnQuit(ready, { forUpdate: true, serverKeepsRunning: true })).toBeNull();
+  });
+
+  it('installs nothing before an update is ready or before the quit flow let the app go', () => {
+    expect(installOnQuit({ state: 'downloading', version: '0.2.0', percent: 50 }, { forUpdate: false, serverKeepsRunning: false })).toBeNull();
+    expect(installOnQuit(ready, null)).toBeNull();
   });
 });

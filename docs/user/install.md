@@ -137,7 +137,7 @@ Click **Update**. The server checks origin's `main` every 15 minutes. When `main
 3. rebuilds the Web UI and restarts the server,
 4. in the Mac app, when the app itself is behind, rebuilds and relaunches it.
 
-The desktop app updates itself instead: it checks the GitHub Releases of the repo it was built from, downloads a new version in the background and offers to relaunch into it. A build without a release feed (a development build, or an AppImage in a folder it cannot write) updates by installing the new DMG or AppImage over the old one.
+The desktop app updates itself instead: it checks the GitHub Releases of the repo it was built from, downloads a new version in the background and offers to relaunch into it. It installs a downloaded version when you quit, unless you keep the server running for turns: then it waits for a later quit. Relaunch to Update with turns running offers to update once they finish or stop them now. A build without a release feed (a development build, or an AppImage in a folder it cannot write) updates by installing the new DMG or AppImage over the old one.
 
 Update needs an app that started the server from a checkout: the Mac app, the Linux app, or the desktop app run with `--dev`. A server you run with `npm run dev` or `npm start` shows the notice without the button; update it by hand:
 

@@ -1,6 +1,7 @@
 // The app updater's state, as the Web UI shows it (DesktopUpdateView): when this copy can update itself, and how
 // electron-updater's events move it. Pure, so tests pin each step; updates.ts wires it to the updater.
 import type { DesktopUpdateView } from '@omni/shared/desktop-bridge.ts';
+import type { QuitPlan } from './quit.ts';
 
 export type UpdaterEvent =
   | { type: 'checking' }
@@ -107,4 +108,13 @@ export function sameView(a: DesktopUpdateView, b: DesktopUpdateView): boolean {
 /** Whether a scheduled check should run: not while one runs or a download is under way, and not once one is ready. */
 export function shouldCheck(view: DesktopUpdateView): boolean {
   return view.state === 'idle' || view.state === 'error';
+}
+
+/**
+ * What a quit does with a downloaded update: install it, opening the app again after Relaunch to Update, or leave it
+ * for a later quit. Never while a server this app started keeps running, which still runs from the files it replaces.
+ */
+export function installOnQuit(view: DesktopUpdateView, plan: QuitPlan | null): { relaunch: boolean } | null {
+  if (view.state !== 'ready' || !plan || plan.serverKeepsRunning) return null;
+  return { relaunch: plan.forUpdate };
 }

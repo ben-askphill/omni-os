@@ -209,6 +209,15 @@ export class Backend {
     return this.state;
   }
 
+  /**
+   * A server this app noted starting, on this launch or an earlier one, still runs. True as well when this launch
+   * has not adopted it (still starting, or the server was too busy to say who it is).
+   */
+  recordedServerUp(): boolean {
+    const record = this.readRecord();
+    return !!record && record.port === this.config.port && record.dataDir === this.config.dataDir && alive(record.pid);
+  }
+
   /** Stops the server this app started, on this launch or an earlier one. One someone else started keeps running. */
   async stop(): Promise<void> {
     this.generation++;

@@ -14,6 +14,7 @@ An Electron window on the Web UI that runs the Omni server itself ([ADR 0010](..
 | `scripts/build.ts` | Builds `dist/main.cjs`, `dist/preload.cjs` and `dist/pick-preload.cjs` |
 | `scripts/stage.ts`, `scripts/dist.ts`, `electron-builder.config.cjs` | Stage the server bundle and package the app |
 | `scripts/qa.ts` | The QA harness |
+| `scripts/update-check.ts` | The self-update, end to end on Linux: every way of quitting with an update downloaded |
 
 ## The bridge
 
@@ -126,6 +127,16 @@ npx tsx scripts/dist.ts --platform linux --arch x64      # the AppImage
 A Linux build ships `node-pty`'s compiled addon, which must load on glibc 2.28. When the checkout's own build needs a newer glibc (most current distros), `stage.ts` compiles it again in docker's `node:24-bullseye` image, so it needs a working docker, and stops with an error without one. `--host-glibc` skips that and ships this machine's build, which only runs on a glibc as new as this one: fine for a local test, not for a release.
 
 On a Mac, `npm run build:desktop` (`scripts/build-desktop.sh`) builds the unpacked app for this Mac's arch, installs it to `~/Applications/Omni.app` and opens it. In the main checkout it first syncs to `main`. It signs with a Developer ID or Apple Development identity from the keychain, else ad hoc, and never notarizes. `scripts/build-mac.sh` installs the SwiftUI app to the same path, and each script refuses to replace an app with the other's bundle id, so until the cutover only one of the two can live there: move the other away first. `build-desktop.sh` never replaces the app while it, or a server it started, still runs from the bundle.
+
+## Updates
+
+A downloaded update installs as the app quits, once the server it started has stopped. Keep Server Running in the quit question leaves the update for a later quit, because that server still runs from the files the update replaces. Relaunch to Update asks the same question without that choice: Update When They Finish, Stop Them and Update, or Cancel.
+
+`scripts/update-check.ts` builds this checkout as two AppImages, 0.1.0 and 0.1.1, serves 0.1.1 from a local feed on port 47901 and runs each case on port 47911 against a copy of 0.1.0 with a fake-claude turn where the case needs one. It needs a display, takes a few minutes and keeps its folder in `$TMPDIR` when a case fails. `--old` and `--feed` reuse earlier builds, and `--only <text>` runs the cases whose names contain it. A Mac has no counterpart, as Squirrel.Mac installs only a signed app.
+
+```sh
+npx tsx scripts/update-check.ts
+```
 
 ## Where things live
 
