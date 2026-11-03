@@ -9,7 +9,7 @@ import { readPref, useApp, useNow, writePref } from '../../store.tsx';
 import { HarnessLogo, Loader, OmniMark } from '../brand.tsx';
 import { useLiveThreads } from '../ThreadList.tsx';
 import { ChannelMark, DoneMark, Icon, StatusDot, Thumb, useSlidingThumb } from '../ui.tsx';
-import { DelegateCount } from '../DelegateCount.tsx';
+import { DelegateCount, DelegateCountSpace } from '../DelegateCount.tsx';
 import { useRowDelegates } from './SidebarRows.tsx';
 import { WorkspaceLinks } from './SidebarLinks.tsx';
 
@@ -181,7 +181,7 @@ function InboxCard({
     </span>
   );
   return (
-    <div className="group/row grid">
+    <div className="group/row grid grid-cols-1">
       <a
         href={href.thread(t.id)}
         onClick={onNavigate}
@@ -210,12 +210,14 @@ function InboxCard({
         <span className={`mt-1 flex items-center gap-1.5 text-[13px] leading-5 ${active ? 'font-medium text-fg' : receded ? 'text-fg-3' : 'font-medium text-fg-2'}`}>
           <span className="min-w-0 flex-1 truncate">{title}</span>
           {!t.branch && harness}
+          {!t.branch && delegates && <DelegateCountSpace summary={delegates.summary} />}
         </span>
         {t.branch && (
           <span className="mt-0.5 flex h-4 items-center gap-1.5 text-[11.5px] text-fg-4">
             <Icon name="branch" size={11} className="shrink-0" />
             <span className="min-w-0 flex-1 truncate">{t.branch}</span>
             {harness}
+            {delegates && <DelegateCountSpace summary={delegates.summary} />}
           </span>
         )}
       </a>
@@ -234,7 +236,7 @@ function DoneRow({ t, active, onNavigate }: { t: InboxThread; active: boolean; o
   const now = useNow(60_000);
   const title = t.title || 'Untitled';
   return (
-    <div className="group/row grid">
+    <div className="group/row grid grid-cols-1">
       <a
         href={href.thread(t.id)}
         onClick={onNavigate}

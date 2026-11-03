@@ -9,6 +9,8 @@ export interface ThumbBox {
   y: number;
   w: number;
   h: number;
+  /** The active item's corner radius, so the thumb takes the shape of a pill or a card. */
+  r: string;
   phase: Phase;
 }
 
@@ -30,14 +32,14 @@ export function useSlidingThumb(
   const measure = useCallback(() => {
     const el = track.current?.querySelector<HTMLElement>(selector);
     if (!el) return null;
-    return { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
+    return { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight, r: getComputedStyle(el).borderRadius };
   }, [track, selector]);
 
   useLayoutEffect(() => {
     const next = measure();
     const prev = last.current;
     last.current = next;
-    if (prev && next && prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h) return;
+    if (prev && next && prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h && prev.r === next.r) return;
     clearTimeout(settle.current);
     if (!next) return setBox(null);
     if (!prev || reducedMotion()) return setBox({ ...next, phase: 'idle' });
@@ -46,7 +48,7 @@ export function useSlidingThumb(
     const y = vertical ? Math.min(prev.y, next.y) : next.y;
     const w = vertical ? next.w : Math.max(prev.x + prev.w, next.x + next.w) - x;
     const h = vertical ? Math.max(prev.y + prev.h, next.y + next.h) - y : next.h;
-    setBox({ x, y, w, h, phase: 'stretch' });
+    setBox({ x, y, w, h, r: next.r, phase: 'stretch' });
     settle.current = setTimeout(() => setBox({ ...next, phase: 'settle' }), 150);
   }, [activeKey, measure, vertical]);
 
@@ -75,7 +77,7 @@ export function Thumb({ box, tone, className = '' }: { box: ThumbBox | null; ton
       className={`seg-thumb ${className}`}
       data-phase={box.phase}
       data-tone={tone}
-      style={{ width: box.w, height: box.h, transform: `translate3d(${box.x}px, ${box.y}px, 0)` }}
+      style={{ width: box.w, height: box.h, borderRadius: box.r, transform: `translate3d(${box.x}px, ${box.y}px, 0)` }}
     />
   );
 }

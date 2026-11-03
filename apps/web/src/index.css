@@ -414,19 +414,22 @@
     transition:
       transform 0.19s var(--ease-stretch),
       width 0.19s var(--ease-stretch),
-      height 0.19s var(--ease-stretch);
+      height 0.19s var(--ease-stretch),
+      border-radius 0.19s var(--ease-stretch);
   }
   .seg-thumb[data-phase="settle"] {
     transition:
       transform 0.42s var(--ease-settle),
       width 0.42s var(--ease-spring),
-      height 0.42s var(--ease-spring);
+      height 0.42s var(--ease-spring),
+      border-radius 0.42s var(--ease-spring);
   }
   .seg-item {
     position: relative;
     z-index: 1;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     border-radius: 999px;
     padding: 0 14px;
