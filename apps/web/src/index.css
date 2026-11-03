@@ -1200,21 +1200,33 @@
   animation: omni-write 0.9s cubic-bezier(0.45, 0, 0.2, 1) both;
 }
 
-/* A running turn's label: a highlight sweeps across the text, as T3 does on its thinking line. */
+/* A running turn's label: a vermilion highlight sweeps across muted text. */
 @keyframes omni-shimmer {
   from {
-    background-position: 100% 0;
+    background-position: 115% 0;
   }
   to {
-    background-position: 0 0;
+    background-position: -15% 0;
   }
 }
 .shimmer-text {
-  background: linear-gradient(90deg, var(--fg-3) 35%, var(--fg) 50%, var(--fg-3) 65%) 0 0 / 300% 100%;
+  background: linear-gradient(
+      90deg,
+      var(--fg-4) 0%,
+      var(--fg-4) 14%,
+      color-mix(in srgb, var(--fg-4) 30%, var(--vermilion)) 26%,
+      color-mix(in srgb, var(--fg-3) 10%, var(--vermilion)) 38%,
+      var(--vermilion) 50%,
+      color-mix(in srgb, var(--fg-3) 10%, var(--vermilion)) 62%,
+      color-mix(in srgb, var(--fg-4) 30%, var(--vermilion)) 74%,
+      var(--fg-4) 86%,
+      var(--fg-4) 100%
+    )
+    115% 0 / 480% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: omni-shimmer 2s linear infinite;
+  animation: omni-shimmer 1.75s var(--ease-fluid) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1230,6 +1242,12 @@
   .spin,
   .shimmer-text {
     animation: none !important;
+  }
+  .shimmer-text {
+    color: var(--fg-3);
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
   }
 }
 
