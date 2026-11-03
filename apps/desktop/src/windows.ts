@@ -54,7 +54,7 @@ export function stepZoom(ctx: AppContext, to: 'in' | 'out' | 'reset'): void {
   if (next !== current) ctx.settings.update({ zoom: next });
 }
 
-/** Sets every Omni window's zoom. <webview> guests are web contents of their own and keep theirs. */
+/** Sets every Omni window's zoom. The Web tab's <webview> pages follow their host window's zoom, as part of its page. */
 export function applyZoom(factor: number): void {
   for (const win of omniWindows()) {
     win.webContents.setZoomFactor(factor);

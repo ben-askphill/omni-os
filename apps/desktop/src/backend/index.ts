@@ -171,8 +171,12 @@ export class Backend {
     }
   }
 
-  /** Stops queued turns first, so none starts in between, then the running ones. */
-  async interruptTurns(): Promise<void> {
+  /**
+   * Stops queued turns first, so none starts in between, then the running ones, and waits up to `settleMs` for the
+   * server to record them. A server stopped before then marks them failed ("Omni shut down while this turn was
+   * running") instead of stopped.
+   */
+  async interruptTurns(settleMs = 5000): Promise<void> {
     const ids: string[] = [];
     for (const status of ['queued', 'running']) {
       try {
@@ -183,6 +187,9 @@ export class Backend {
       }
     }
     await Promise.allSettled(ids.map((id) => this.api(`/api/threads/${encodeURIComponent(id)}/stop`, { method: 'POST' })));
+    if (!ids.length) return;
+    const until = this.deps.now() + settleMs;
+    while (this.deps.now() < until && (await this.runningTurns(1000)) !== 0) await sleep(150);
   }
 
   /** Attaches or starts. Resolves once the server answers as this install, or with why it could not. */

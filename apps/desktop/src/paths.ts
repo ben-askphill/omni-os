@@ -7,7 +7,7 @@ export interface PlatformDirs {
   env: NodeJS.ProcessEnv;
   /** Electron's userData folder (macOS: ~/Library/Application Support/Omni). */
   userData: string;
-  /** Electron's logs folder (macOS: ~/Library/Logs/Omni). */
+  /** Where the server's log goes: logsDir's answer. */
   logs: string;
 }
 
@@ -20,16 +20,23 @@ export function defaultDataDir(dirs: PlatformDirs, input: { dev: boolean; repo: 
 }
 
 /**
- * Electron's logs folder, or one inside a `--user-data-dir` given on the command line. Electron keeps
- * ~/Library/Logs/<name> whatever the user-data folder is, and that is the installed app's log, and the SwiftUI
- * app's server log too, so a dev or QA run would write its server's output into theirs.
+ * The logs folder: macOS's ~/Library/Logs/Omni, the XDG state folder elsewhere, or one inside a `--user-data-dir`
+ * given on the command line. The default one is the installed app's, and the SwiftUI app and the Linux launcher wrote
+ * their server logs there too, so a dev or QA run keeps its own.
  */
-export function logsDir(input: { userData: string; electronLogs: string; customUserData: boolean }): string {
-  return input.customUserData ? join(input.userData, 'logs') : input.electronLogs;
+export function logsDir(input: {
+  platform: NodeJS.Platform;
+  home: string;
+  env: NodeJS.ProcessEnv;
+  userData: string;
+  electronLogs: string;
+  customUserData: boolean;
+}): string {
+  if (input.customUserData) return join(input.userData, 'logs');
+  if (input.platform === 'darwin') return input.electronLogs;
+  return join(input.env.XDG_STATE_HOME || join(input.home, '.local', 'state'), 'omni-os');
 }
 
 export function serverLogFile(dirs: PlatformDirs): string {
-  if (dirs.platform === 'darwin') return join(dirs.logs, 'server.log');
-  const base = dirs.env.XDG_STATE_HOME || join(dirs.home, '.local', 'state');
-  return join(base, 'omni-os', 'server.log');
+  return join(dirs.logs, 'server.log');
 }

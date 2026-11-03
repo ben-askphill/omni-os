@@ -110,33 +110,35 @@ function readText(file: string): string | null {
   }
 }
 
-/** Asks whether to keep using the old data. True: use it in place. */
-async function askUseExisting(existing: string, fresh: string): Promise<boolean> {
+export type DataDirAnswer = 'existing' | 'fresh' | 'quit';
+
+/** Asks whether to keep using the old data in place. Escape quits without deciding: a choice is remembered for good. */
+async function askUseExisting(existing: string, fresh: string): Promise<DataDirAnswer> {
   const { response } = await dialog.showMessageBox({
     type: 'question',
     message: 'Use your existing Omni data?',
     detail:
       `Omni found the data an earlier Omni app used, in ${existing}. Keep using it there, or start fresh in ${fresh}.\n\n` +
       'Nothing is copied or moved. Omni asks once.',
-    buttons: ['Use Existing Data', 'Start Fresh'],
+    buttons: ['Use Existing Data', 'Start Fresh', 'Quit'],
     defaultId: 0,
-    cancelId: 0,
+    cancelId: 2,
     noLink: true,
   });
-  return response === 0;
+  return response === 0 ? 'existing' : response === 1 ? 'fresh' : 'quit';
 }
 
 export interface ChooseDeps {
   readMacRepoPath: () => Promise<string | null>;
   readFile: (file: string) => string | null;
   exists: (path: string) => boolean;
-  ask: (existing: string, fresh: string) => Promise<boolean>;
+  ask: (existing: string, fresh: string) => Promise<DataDirAnswer>;
 }
 
 export async function chooseDataDir(
   input: { dirs: PlatformDirs; fallback: string; dev: boolean },
   deps: Partial<ChooseDeps> = {},
-): Promise<string> {
+): Promise<string | null> {
   if (input.dev) return input.fallback;
   const d: ChooseDeps = {
     readMacRepoPath: deps.readMacRepoPath ?? readMacRepoPath,
@@ -160,7 +162,9 @@ export async function chooseDataDir(
     hasDatabase: (dir) => d.exists(join(dir, 'omni.db')),
   });
   if (plan.kind === 'use') return plan.dir;
-  const dir = (await d.ask(plan.existing, plan.fresh)) ? plan.existing : plan.fresh;
+  const answer = await d.ask(plan.existing, plan.fresh);
+  if (answer === 'quit') return null;
+  const dir = answer === 'existing' ? plan.existing : plan.fresh;
   writeChoice(file, dir);
   return dir;
 }

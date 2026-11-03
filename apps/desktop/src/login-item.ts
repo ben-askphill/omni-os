@@ -3,7 +3,8 @@
 import { app } from 'electron';
 import type { AppContext } from './context.ts';
 
-export const LOGIN_ITEM_SUPPORTED = process.platform === 'darwin' || process.platform === 'win32';
+/** A development build would register the Electron binary itself, which shares no identity with Omni. */
+export const LOGIN_ITEM_SUPPORTED = app.isPackaged && (process.platform === 'darwin' || process.platform === 'win32');
 
 /** Whether the OS should change: only when the setting moved and the OS does not already agree. */
 export function loginItemChange(next: boolean, previous: boolean, os: boolean): boolean | null {

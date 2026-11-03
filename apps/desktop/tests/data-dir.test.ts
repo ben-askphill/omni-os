@@ -76,7 +76,7 @@ describe('chooseDataDir', () => {
       readMacRepoPath: async () => repo,
       ask: async (existing: string, fresh: string) => {
         asked.push([existing, fresh]);
-        return true;
+        return 'existing' as const;
       },
     };
     expect(await chooseDataDir({ dirs, fallback, dev: false }, deps)).toBe(join(repo, 'data'));
@@ -87,9 +87,15 @@ describe('chooseDataDir', () => {
     expect(snapshot(join(repo, 'data'))).toEqual(before);
   });
 
+  it('quits without remembering anything when the dialog is dismissed', async () => {
+    const { repo, dirs, fallback } = setup();
+    expect(await chooseDataDir({ dirs, fallback, dev: false }, { readMacRepoPath: async () => repo, ask: async () => 'quit' as const })).toBeNull();
+    expect(readChoice(choiceFile(dirs.userData))).toBeNull();
+  });
+
   it('remembers Start Fresh too', async () => {
     const { dirs, fallback } = setup();
-    const deps = { readMacRepoPath: async () => null, ask: async () => false };
+    const deps = { readMacRepoPath: async () => null, ask: async () => 'fresh' as const };
     expect(await chooseDataDir({ dirs, fallback, dev: false }, deps)).toBe(fallback);
     expect(readChoice(choiceFile(dirs.userData))).toBe(fallback);
   });
@@ -100,7 +106,7 @@ describe('chooseDataDir', () => {
     mkdirSync(join(root, '.local/share/applications'), { recursive: true });
     writeFileSync(join(root, '.local/share/applications/omni-os.desktop'), `Exec=/usr/bin/uwsm-app -- ${repo}/scripts/omni-linux.sh\n`);
     let asked = false;
-    const dir = await chooseDataDir({ dirs, fallback, dev: false }, { ask: async () => (asked = true) });
+    const dir = await chooseDataDir({ dirs, fallback, dev: false }, { ask: async () => ((asked = true), 'existing' as const) });
     expect(asked).toBe(true);
     expect(dir).toBe(join(repo, 'data'));
   });

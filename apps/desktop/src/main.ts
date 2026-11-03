@@ -57,12 +57,16 @@ async function boot(): Promise<void> {
     }
   }
 
+  const home = homedir();
   const dirs: PlatformDirs = {
     platform: process.platform,
-    home: homedir(),
+    home,
     env: process.env,
     userData: app.getPath('userData'),
     logs: logsDir({
+      platform: process.platform,
+      home,
+      env: process.env,
       userData: app.getPath('userData'),
       electronLogs: app.getPath('logs'),
       customUserData: app.commandLine.hasSwitch('user-data-dir'),
@@ -73,6 +77,10 @@ async function boot(): Promise<void> {
     options.dataDir !== null
       ? resolve(options.dataDir)
       : await chooseDataDir({ dirs, fallback: defaultDataDir(dirs, { dev, repo }), dev });
+  if (dataDir === null) {
+    app.quit();
+    return;
+  }
   const backend = new Backend({
     port: options.port,
     dataDir,

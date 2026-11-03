@@ -506,7 +506,8 @@ async function main(argv: readonly string[]): Promise<number> {
   const { _electron } = await import('playwright');
   let app: ElectronApplication;
   try {
-    app = await _electron.launch({ executablePath, args: launchArgs, cwd: DESKTOP, env, timeout: 60_000 });
+    // Playwright emulates a light scheme unless told otherwise; without --appearance the run shows the OS's.
+    app = await _electron.launch({ executablePath, args: launchArgs, cwd: DESKTOP, env, timeout: 60_000, colorScheme: null });
   } catch (err) {
     bail(out, report, `the app did not start: ${(err as Error).message}`, 1);
   }
