@@ -1,6 +1,6 @@
 // The Omni mobile design system's parts (ui_kits/omni-mobile/MobileParts.jsx), on the Web UI's own components.
 // Metrics are the design's, in CSS pixels on a 390-wide phone.
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { CrewMark, isCrewRole } from '../components/brand.tsx';
 import { Avatar, Icon, StatusDot, type Glyph, type IconName } from '../components/ui.tsx';
 import type { RowItem } from './rows.ts';
@@ -219,16 +219,66 @@ export function MoListRow({
   );
 }
 
-/** Ben's message. `above` sits over the bubble (the context he attached); without `children` there is no bubble. */
-export function MoBubble({ children, caption, above }: { children: ReactNode; caption?: ReactNode; above?: ReactNode }) {
+/**
+ * Ben's message. `above` sits over the bubble (the context he attached); without `children` there is no bubble.
+ * `fold` keeps a long message to its first lines, faded, with Show more under it.
+ */
+export function MoBubble({ children, caption, above, fold }: { children: ReactNode; caption?: ReactNode; above?: ReactNode; fold?: boolean }) {
   return (
     <div className="flex flex-col items-end gap-1">
       {caption && <span className="text-[12px] leading-[1.3] text-fg-3">{caption}</span>}
       {above}
       {children != null && (
-        <div className="max-w-[86%] rounded-[20px] bg-bubble px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap text-pretty">{children}</div>
+        <div className="max-w-[86%] rounded-[20px] bg-bubble px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap text-pretty">
+          {fold ? <Folded>{children}</Folded> : children}
+        </div>
       )}
     </div>
+  );
+}
+
+/** Lines a folded message shows. */
+const FOLD_LINES = 7;
+/** It folds only when there are this many more, so the button never hides a line or two. */
+const FOLD_SLACK = 2;
+
+function Folded({ children }: { children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [tall, setTall] = useState(false);
+  const [open, setOpen] = useState(false);
+  // Measured, not counted in characters: the lines depend on the width and the font.
+  const measure = () => {
+    const el = box.current;
+    if (el) setTall(el.scrollHeight > parseFloat(getComputedStyle(el).lineHeight) * (FOLD_LINES + FOLD_SLACK));
+  };
+  useLayoutEffect(measure);
+  useEffect(() => {
+    const seen = new ResizeObserver(() => measure());
+    if (box.current) seen.observe(box.current);
+    return () => seen.disconnect();
+  }, []);
+  const folded = tall && !open;
+  return (
+    <>
+      <div
+        ref={box}
+        className={folded ? 'overflow-hidden [mask-image:linear-gradient(to_bottom,black_55%,transparent)]' : undefined}
+        style={folded ? { maxHeight: `${FOLD_LINES}lh` } : undefined}
+      >
+        {children}
+      </div>
+      {tall && (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="mo-press -mb-1 flex h-8 items-center gap-1 text-[13px] leading-none font-medium whitespace-normal text-fg-2"
+        >
+          {open ? 'Show less' : 'Show more'}
+          <Icon name="chevronDown" size={13} className={open ? 'rotate-180' : undefined} />
+        </button>
+      )}
+    </>
   );
 }
 

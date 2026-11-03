@@ -107,9 +107,12 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
   const { thread } = c;
   return (
     <>
-    {t.prompts.map((p, k) => (
+    {t.prompts.map((p, k) => {
+      const brief = first && k === 0 && !!thread.parent_id && atStart(c.history.history);
+      return (
       <Fragment key={k}>
         <MoBubble
+          fold={brief}
           caption={
             p.dropped
               ? p.undelivered
@@ -117,7 +120,7 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
                 : 'Not sent'
               : p.source === 'pr-watch'
                 ? 'PR watch'
-              : first && k === 0 && thread.parent_id && atStart(c.history.history)
+              : brief
                 ? `Delegated by the Conductor${thread.task_id ? ` · ${thread.task_id}` : ''}`
                 : k > 0
                   ? 'Sent while it ran'
@@ -135,7 +138,8 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
         </MoBubble>
         <ClippedNote event={p.key} clipped={p.clipped} className="-mt-2.5 justify-end" />
       </Fragment>
-    ))}
+      );
+    })}
     {t.reports.map((r, k) => (
       <Report key={k} role={r.role} taskId={r.task_id} text={r.text} dropped={r.dropped} undelivered={r.undelivered} />
     ))}
