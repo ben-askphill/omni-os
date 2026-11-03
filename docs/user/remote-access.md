@@ -37,7 +37,7 @@ Scan the QR code or type the manual code in the app. The code expires after five
 
 Below 768px, the Web UI uses its phone layout, whether opened in a browser or saved to the home screen.
 
-- Activity puts Needs you cards first, then Running, Pinned, Recent threads and Done today. Answer a blocker from its card or tap it to open the thread.
+- Activity shows the desktop Inbox view's list: pinned threads, the threads waiting on you, and the Working and Done shelves (see [Threads](threads.md#finding-threads-and-clearing-needs-you)). Tap a row to open its thread. Its check marks it done, and the undo on a Done row puts it back.
 - Channels groups clients, internal and personal channels. A channel shows collapsible folders and ungrouped threads in Active and Recent tabs. Active means Needs you or running; both tab counts include folded folders. Folder order and context menus are managed on desktop.
 - Library lists artifacts with thumbnails. Open one full screen to read or share it.
 - PRs lists the pull requests of every channel with a GitHub repo. Search matches title, number, author, branch and repo (and `label:` tokens); sort and filters narrow the list; rows group into Authored, Review requested and Others for your `gh` login. Tap one to open it on GitHub. Desktop web and the desktop app show the same list at `#/prs`. A repo gh cannot read is named under the list and the rest still show.
