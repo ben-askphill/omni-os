@@ -110,8 +110,8 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
   const linkCls = 'hov inline-flex h-7 max-w-full items-center gap-1.5 rounded-full bg-surface px-2.5 text-[12px] text-fg-2 [--hov:var(--surface-2)]';
 
   return (
-    <div className="scroll-thin h-full overflow-y-auto">
-      <div className={`mx-auto px-4 pt-6 md:px-8 md:pt-10 ${tab === 'settings' ? 'max-w-2xl' : tab === 'prs' ? (pr ? 'max-w-5xl' : 'max-w-4xl') : 'max-w-3xl'}`}>
+    <div className="scroll-thin h-full overflow-y-auto [scrollbar-gutter:stable]">
+      <div className={`mx-auto px-4 pt-6 md:px-8 md:pt-10 ${tab === 'prs' ? (pr ? 'max-w-5xl' : 'max-w-4xl') : 'max-w-3xl'}`}>
         <div className="flex items-center gap-3.5">
           <Avatar name={ch.name} channelIcon={ch.icon} icon={isConductor ? 'target' : undefined} size={44} />
           <div className="min-w-0 flex-1">
@@ -156,11 +156,13 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
       {tab === 'threads' && <ThreadsTab id={id} isConductor={isConductor} />}
       {tab === 'prs' && (pr ? <PRDetail channel={ch} n={pr} /> : <PRList channel={ch} />)}
       {tab === 'settings' && (
-        <div className="mx-auto max-w-2xl space-y-4 px-4 pt-6 pb-16 md:px-8">
-          <ChannelSettingsForm existing={ch} />
-          <Section title="Actions">
-            <ChannelActionsEditor channelId={ch.id} />
-          </Section>
+        <div className="mx-auto max-w-3xl px-4 pt-6 pb-16 md:px-8">
+          <div className="max-w-2xl space-y-4">
+            <ChannelSettingsForm existing={ch} />
+            <Section title="Actions">
+              <ChannelActionsEditor channelId={ch.id} />
+            </Section>
+          </div>
         </div>
       )}
     </div>
