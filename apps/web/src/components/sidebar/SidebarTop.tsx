@@ -1,11 +1,16 @@
 import { href, startNewThread, useRoute } from '../../router.ts';
 import { useApp } from '../../store.tsx';
-import { Icon, IconButton, Kbd, Wordmark } from '../ui.tsx';
+import { Icon, IconButton, Kbd, Segmented, Wordmark } from '../ui.tsx';
+
+/** The rail's two views: channels with their threads (Projects), or every thread in one list (Inbox). */
+export type SidebarView = 'projects' | 'inbox';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
-/** The rail's top: the wordmark with collapse-all (and the mobile drawer's close), then Search and New thread. */
+/** The rail's top: the wordmark with collapse-all (and the mobile drawer's close), then Search, New thread and the view toggle. */
 export function SidebarTop({
+  view,
+  onView,
   channelCount,
   foldAll,
   onToggleAll,
@@ -13,6 +18,8 @@ export function SidebarTop({
   onSearch,
   onClose,
 }: {
+  view: SidebarView;
+  onView: (view: SidebarView) => void;
   channelCount: number;
   foldAll: 'collapse' | 'expand';
   onToggleAll: () => void;
@@ -30,7 +37,7 @@ export function SidebarTop({
           <Wordmark size={18} />
         </a>
         <div className={`flex items-center ${onClose ? '-mr-1' : ''}`}>
-          {channelCount > 0 && (
+          {view === 'projects' && channelCount > 0 && (
             <button
               type="button"
               onClick={onToggleAll}
@@ -68,6 +75,17 @@ export function SidebarTop({
         >
           <Icon name="plus" size={15} strokeWidth={2} /> New thread
         </button>
+        <Segmented
+          label="Sidebar view"
+          size="sm"
+          className="w-full [&>.seg-item]:flex-1"
+          value={view}
+          onChange={onView}
+          options={[
+            { id: 'projects', label: 'Projects' },
+            { id: 'inbox', label: 'Inbox' },
+          ]}
+        />
       </div>
     </>
   );

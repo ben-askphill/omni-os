@@ -1,17 +1,18 @@
-import { Fragment, useRef, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { taskHost, type ChannelWithRunning, type FolderWithThreads, type ThreadStub } from '../api.ts';
 import { DEFAULT_FOLDER_NAME, draftKey, freeName, useFolders } from '../folders.tsx';
 import { pinnedRows } from '../pins.ts';
 import { opensOnVisit } from '../sidebar-fold.ts';
 import { rowsElsewhere, runningThreadGroups } from '../sidebar-lists.ts';
 import { href, useHash, useRoute } from '../router.ts';
-import { useApp } from '../store.tsx';
+import { readPref, useApp, writePref } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { delegatesByParent } from '@omni/shared/delegate-count.ts';
 import { OmniMark } from './brand.tsx';
 import { ChannelMark, ErrorNote, Thumb, useSlidingThumb } from './ui.tsx';
 import { useUngroupDrop } from './sidebar/channel-lists.ts';
-import { SidebarTop } from './sidebar/SidebarTop.tsx';
+import { SidebarTop, type SidebarView } from './sidebar/SidebarTop.tsx';
+import { InboxView } from './sidebar/InboxView.tsx';
 import { channelFolders, channelThreads, useChannelFold } from './sidebar/channel-lists.ts';
 import { FolderNameField, FolderRow, AddFolderButton } from './sidebar/FolderRows.tsx';
 import { ChannelThreadEntry, NavLink, RunningBadge, SectionLink, ThreadSection, useRowDelegates, useSectionFold } from './sidebar/SidebarRows.tsx';
@@ -37,6 +38,11 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   const listRef = useRef<HTMLDivElement>(null);
   const { dropOn, ungroupDrop } = useUngroupDrop(folders);
   const { collapsed, setChannelOpen, foldAll, toggleAll } = useChannelFold(channels, folders);
+  const [view, setView] = useState<SidebarView>(() => (readPref<SidebarView>('sidebar.view', 'projects') === 'inbox' ? 'inbox' : 'projects'));
+  const switchView = (next: SidebarView) => {
+    writePref('sidebar.view', next);
+    setView(next);
+  };
 
   // Running and Pinned each fold on their own.
   const [runningClosed, toggleRunning] = useSectionFold('sidebar.runningCollapsed');
@@ -217,55 +223,59 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
 
   return (
     <nav className="flex h-full flex-col bg-sidebar" aria-label="Main">
-      <SidebarTop channelCount={channels.length} foldAll={foldAll} onToggleAll={toggleAll} onNavigate={onNavigate} onSearch={onSearch} onClose={onClose} />
+      <SidebarTop view={view} onView={switchView} channelCount={channels.length} foldAll={foldAll} onToggleAll={toggleAll} onNavigate={onNavigate} onSearch={onSearch} onClose={onClose} />
 
       <div className="scroll-thin mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        <div ref={listRef} className="relative space-y-4">
-          <Thumb box={box} />
-          <div className="space-y-px">
-            <NavLink to={href.home()} icon="home" active={route.name === 'home'} onNavigate={onNavigate}>
-              Home
-            </NavLink>
-            {conductor && (
-              <>
-                {channelRow(conductor, 'Conductor', <span className="grid w-[15px] place-items-center"><OmniMark size={17} /></span>)}
-                {threadLinks(conductor)}
-              </>
+        {view === 'inbox' ? (
+          <InboxView onNavigate={onNavigate} />
+        ) : (
+          <div ref={listRef} className="relative space-y-4">
+            <Thumb box={box} />
+            <div className="space-y-px">
+              <NavLink to={href.home()} icon="home" active={route.name === 'home'} onNavigate={onNavigate}>
+                Home
+              </NavLink>
+              {conductor && (
+                <>
+                  {channelRow(conductor, 'Conductor', <span className="grid w-[15px] place-items-center"><OmniMark size={17} /></span>)}
+                  {threadLinks(conductor)}
+                </>
+              )}
+            </div>
+
+            {running.length > 0 && (
+              <ThreadSection label="Running" closed={runningClosed} onToggle={toggleRunning} count={running.length}>
+                {running.map((t) => sectionLink(t))}
+              </ThreadSection>
             )}
+
+            {pins.length > 0 && (
+              <ThreadSection label="Pinned" closed={pinsClosed} onToggle={togglePins} count={pins.length}>
+                {pins.map((t) => sectionLink(t, true))}
+              </ThreadSection>
+            )}
+
+            {channelsError && <ErrorNote>{channelsError}</ErrorNote>}
+
+            {GROUPS.map((g) => {
+              const list = rest.filter((c) => c.kind === g.kind);
+              if (!list.length) return null;
+              return (
+                <div key={g.kind}>
+                  <div className="caption px-3 pt-1 pb-2">{g.label}</div>
+                  <div className="space-y-px">{list.map(channelLink)}</div>
+                </div>
+              );
+            })}
+            {other.length > 0 && <div className="space-y-px">{other.map(channelLink)}</div>}
+
+            <NavLink to={href.newChannel()} icon="plus" active={route.name === 'new-channel'} onNavigate={onNavigate}>
+              Add channel
+            </NavLink>
+
+            <WorkspaceLinks onNavigate={onNavigate} />
           </div>
-
-          {running.length > 0 && (
-            <ThreadSection label="Running" closed={runningClosed} onToggle={toggleRunning} count={running.length}>
-              {running.map((t) => sectionLink(t))}
-            </ThreadSection>
-          )}
-
-          {pins.length > 0 && (
-            <ThreadSection label="Pinned" closed={pinsClosed} onToggle={togglePins} count={pins.length}>
-              {pins.map((t) => sectionLink(t, true))}
-            </ThreadSection>
-          )}
-
-          {channelsError && <ErrorNote>{channelsError}</ErrorNote>}
-
-          {GROUPS.map((g) => {
-            const list = rest.filter((c) => c.kind === g.kind);
-            if (!list.length) return null;
-            return (
-              <div key={g.kind}>
-                <div className="caption px-3 pt-1 pb-2">{g.label}</div>
-                <div className="space-y-px">{list.map(channelLink)}</div>
-              </div>
-            );
-          })}
-          {other.length > 0 && <div className="space-y-px">{other.map(channelLink)}</div>}
-
-          <NavLink to={href.newChannel()} icon="plus" active={route.name === 'new-channel'} onNavigate={onNavigate}>
-            Add channel
-          </NavLink>
-
-          <WorkspaceLinks onNavigate={onNavigate} />
-        </div>
+        )}
       </div>
 
       {/* The machine's name moved to Settings, Machines (#405). */}
